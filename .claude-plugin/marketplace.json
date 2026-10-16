@@ -1,0 +1,11 @@
+{
+  "name": "hf-tools",
+  "owner": { "name": "Horizon Found" },
+  "plugins": [
+    {
+      "name": "the-engine",
+      "source": "./plugins/the-engine",
+      "description": "The Engine by Horizon Found. Your brand. Your voice. Just faster."
+    }
+  ]
+}
