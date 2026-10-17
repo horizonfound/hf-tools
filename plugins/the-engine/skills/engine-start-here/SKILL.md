@@ -58,7 +58,7 @@ When all four parts are done, read `references/brand-file-template.md` and write
 1. Show it to them as a document they can read and save.
 2. Run the **voice check**: write three short test pieces in their voice (an Instagram caption for a recent session, a short reel hook with its on-screen text, and a story caption announcing something they're booking). Ask which sounds most like them, and ask them to change any word or line that doesn't. Every change they make goes into the Brand File's "Voice fixes" list.
 3. Update the Brand File with those fixes and show the final version.
-4. Tell them to save it where the Engine can always find it. For this test version: upload the Brand File into the Claude Project they use for the Engine, so every chat in that project reads it automatically.
+4. Tell them exactly how to save it, in these words: "Download this file. Then open your Project's page (click the Project name in the left sidebar, not a chat inside it). On the right there's a Files panel. Click the + on it and upload the file. From now on every chat in this Project reads it." If they're on the website instead of the desktop app, the panel is called Project knowledge; same + button. Confirm they've done it before ending.
 
 ## Updating later
 
