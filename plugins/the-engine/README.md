@@ -1,6 +1,6 @@
 # The Assistant · by Horizon Found
 
-Version 0.3.0 (working title; the plugin's internal name is still `the-engine` so updates keep flowing).
+Version 0.3.1 (working title; the plugin's internal name is still `the-engine` so updates keep flowing).
 
 You decide what to post. The Assistant makes it, in your voice and your look, from your own photos and clips. It never posts anything and never touches your originals. It runs inside the Claude desktop app, and we say so.
 
@@ -9,7 +9,7 @@ You decide what to post. The Assistant makes it, in your voice and your look, fr
 | Say | What happens |
 |---|---|
 | **start here** | A forty-minute conversation that learns your business, your voice (you talk, it listens) and your look, then writes your Brand File. Once. |
-| **make a reel** | A session folder (photos, behind-the-scenes clips, a talking clip, a song) becomes a reel cut to the beat, with ten to twenty hook options in your voice. Extra versions for trial reels in seconds. |
+| **make a reel** | A session folder (photos, behind-the-scenes clips, a talking clip, a song) becomes a reel cut to the beat: the song starts where it picks up, the photos move slow and smooth, the text is set like a designer would, the voice sits over the ducked song. Ten to twenty hook options in your voice, extra versions for trial reels in seconds, and it grades its own result before handing over. |
 | **make a carousel** | Every photo from a session on one numbered sheet; the Assistant picks and orders them so people keep swiping, with a cover line or none. Exports slides ready to post. |
 | **make stories** | Three to five story frames spun off today's reel or carousel. |
 | **check my setup** | What this computer can do and how fast. Nothing to install. |

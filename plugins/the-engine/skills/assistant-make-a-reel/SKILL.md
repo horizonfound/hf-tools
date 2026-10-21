@@ -39,6 +39,8 @@ The reel is cut to the beat, so the song comes first. Three ways, in this order:
 2. **A song they picked in CapCut.** CapCut keeps a copy of any song added to a project. Ask them to connect their CapCut folder, then run `python3 scripts/find_music.py "$HOME/mnt/<capcut folder>"` and show the newest few. Untested on a real CapCut install; say so the first time and tell Dustin what you found.
 3. **No song yet.** Say: "No song in mind? Drop one in the folder, or say no song and I'll cut at an even pace so you can add audio in Instagram." With no song the cuts land every 1.2 seconds (100 bpm, every second beat), which lines up with most pop tempos but not with a specific track.
 
+The script starts the song where it picks up (the chorus, the drop), not at 0:00, and says so ("starting the song at 41.3 s"). If they want a different moment, `--song-start 58` is seconds into the song; `--song-start 0` is the top.
+
 Never promise a trending Instagram audio can be used here; it can't be read from Instagram. Trial reels get their audio in the Instagram app anyway.
 
 ## Step 3: the recipe, as a pick-one
@@ -68,20 +70,22 @@ Caption: only if they ask. If they do, a short story with a beginning, in their 
 
 ## Step 5: build it
 
-Fill the command from the Brand File's Look section (hook font, color, position). Nicole's reel rule is the default: one short line, cream, centered in the upper third, in their headline font.
+Fill the command from the Brand File's Look section. The text style follows their headline font: a serif brand (Cormorant, Fraunces, anything with serifs) gets `--hook-style editorial`; a sans brand (Montserrat, DM Sans, Inter) gets `--hook-style clean`; `label` is the native Instagram pill, for anyone whose look is plain and bold. Leave color and position on auto unless the Brand File names a text color: the script looks at the frame behind the text, keeps it off faces and hands, picks cream or ink, and adds a soft gradient only when the background is bright. A kicker is optional: the couple's names or the place, small, above the line.
 
 ```
 python3 scripts/make_reel.py --session "$HOME/mnt/<folder>" \
   --recipe hook-photos --photos 7,3,9,1,5,8,2,6 \
-  --hook "the line they picked" --hook-font Cormorant --hook-color "#F5F4ED" --hook-position upper \
-  --name "kira-beach"
+  --hook "the line they picked" --hook-style editorial --hook-kicker "Kira + James · Laguna" \
+  --end-text "@their.handle" --name "kira-beach"
 ```
 
-Useful switches: `--clip <file>` to choose which clip opens · `--song <file>` or `--song none` · `--beats-per-photo 1` for a faster cut, `4` for a slow one · `--max-seconds 15` · `--hook-persist` to keep the text on for the whole reel · `--zoom off` to hold photos still · `--dry-run` to print the plan without rendering.
+Useful switches: `--clip <file>` to choose which clip opens · `--clip-sound mute` when the clip has no talking in it · `--song <file>` or `--song none` · `--song-start 58` · `--beats-per-photo 1` for a faster cut, `4` for a slow one · `--rhythm build` so the photos come faster toward the end · `--max-seconds 15` · `--hook-font "cormorant semibold italic"` or a .ttf path to override the style's font · `--hook-color "#2B2420"` · `--hook-position lower` · `--hook-persist` to keep the text on for the whole reel · `--end-text "@handle"` for a small line on the last photo · `--motion off` to hold photos still · `--dry-run` to print the plan without rendering.
 
-Run `--dry-run` first and show the plan in one short table (what opens, how many photos, how long). Then render. It takes 15 to 60 seconds on most computers; the script says what it is doing. Everything goes into `<folder>/_assistant/reel-<name>/`. The originals are never touched.
+What the script does on its own, so you can say it plainly: every cut lands on a beat; the opening clip ends on one; the dead air before they start talking is trimmed; the song is ducked under the voice with a smooth curve and the voice is cleaned up; photos move with a slow push, pull or sideways drift drawn to a fraction of a pixel; the text fades in with a small rise and fades out before the cut; the sound is encoded once.
 
-The script grades its own result (`grade_reel.py`): every cut within two frames of a beat, the hook held, the text band. If it says FAIL, read the reason, fix the cause (usually the song had no steady beat), and build again. Never hand over a FAIL without saying what's off.
+Run `--dry-run` first and show the plan in one short table (what opens, how many photos, how long). Then render. A twenty-second reel takes about 20 seconds on a recent Mac, longer on older machines; the script says what it is doing. Everything goes into `<folder>/_assistant/reel-<name>/`. The originals are never touched.
+
+The script grades its own result (`grade_reel.py`) the way a picky editor would: every cut within two frames of a beat, the opening held, no clicks or clipping in the sound, the photo motion smooth (under 0.25 px a frame), the text readable against what is behind it (3:1 or better). If it says FAIL, read the reason, fix the cause, and build again. Never hand over a FAIL without saying what's off. Taste is not graded; that is theirs.
 
 ## Step 6: hand it back, then the trial reels
 
@@ -95,11 +99,11 @@ End with a line starting **Next:** (post it tonight, or make the carousel from t
 
 - Never move, rename or overwrite their files. Write only into `_assistant/`.
 - No song, no beat promise. Say it plainly instead of pretending.
-- A talking clip longer than three seconds: only the first three seconds open the reel in this version. Say so. Cutting a long talking clip for dead air comes later.
+- A talking clip longer than three seconds: the dead air at the start is trimmed, then only the first three seconds open the reel in this version. Say so. `--hook-hold 5` holds it longer; cutting the middle of a long talking clip comes later.
 - Never add music they didn't give you. Never generate a voice.
 - Keep your messages short. The reel is the deliverable, not the explanation.
 - Honest about what's untested: CapCut's music folder, iPhone HEIC photos on a PC, Intel Macs. Say "first time on this, tell me if it misbehaves" and keep going.
 
 ## What's coming (don't promise, do mention if asked)
 
-An editable CapCut draft of the same reel (every layer still theirs), cutting a long talking clip for dead air, and the matching-moment finder that pairs a behind-the-scenes clip with its finished photo. Not in this version.
+An editable CapCut draft of the same reel (every layer still theirs), word-by-word captions for the talking clip, cutting the middle of a long talking clip, and the matching-moment finder that pairs a behind-the-scenes clip with its finished photo. Not in this version.

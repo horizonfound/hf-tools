@@ -60,26 +60,33 @@ def main():
         line("free space", free > 1.0, f"{free:.1f} GB in the workspace; a reel needs well under 1 GB")
     except Exception:
         pass
-    # speed probe: one second of 1080x1920 with the push-in, same filter the reel uses
+    # speed probe: one second of 1080x1920 the way the reel draws it (frame by frame in Pillow, encoded by ffmpeg)
     if shutil.which("ffmpeg"):
         try:
             from PIL import Image
-            tmp = tempfile.mkdtemp()
-            jpg = os.path.join(tmp, "p.jpg"); out = os.path.join(tmp, "p.mp4")
-            Image.new("RGB", (1440, 2560), (200, 180, 150)).save(jpg, quality=80)
-            vf = ("scale=1296:2304,zoompan=z='min(1+0.10*on/30,1.10)':x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*0.40':d=1:s=1080x1920:fps=30,setsar=1")
+            W, H = 1080, 1920
+            im = Image.new("RGB", (int(W * 1.14), int(H * 1.14)), (200, 180, 150))
+            bw, bh = im.size
             t0 = time.time()
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", "30", "-t", "1", "-i", jpg, "-vf", vf, "-t", "1",
-                            "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", out], capture_output=True, timeout=180)
+            p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", "30",
+                                  "-i", "-", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "15", "-pix_fmt", "yuv420p",
+                                  "-f", "null", "-"], stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            for i in range(30):
+                z = 1 + 0.07 * i / 29
+                vw, vh = bw / z, bh / z
+                fr = im.transform((W, H), Image.AFFINE, (vw / W, 0, (bw - vw) / 2, 0, vh / H, (bh - vh) * 0.4), resample=Image.BILINEAR)
+                p.stdin.write(fr.tobytes())
+            p.stdin.close(); p.wait()
             dt = time.time() - t0
-            shutil.rmtree(tmp, ignore_errors=True)
+            cores = os.cpu_count() or 2
+            per_reel = int(dt * 15 / max(1, cores - 1) * 1.2) + 12
             if dt < 4:
-                speed = f"fast: a 15-second reel takes about {int(dt * 15 * 1.3) + 10} seconds"
-            elif dt < 10:
-                speed = f"okay: a 15-second reel takes about {int(dt * 15 * 1.3) + 10} seconds; the push-in effect stays on"
+                speed = f"fast: a 15-second reel takes about {per_reel} seconds"
+            elif dt < 7:
+                speed = f"okay: a 15-second reel takes about {per_reel} seconds; the slow push on photos stays on"
             else:
-                speed = f"slow: a 15-second reel would take several minutes, so photos will hold still instead of pushing in (same cuts)"
-            print(f"Speed    {dt:.1f} s to render one second of video · {speed}")
+                speed = "slow: a 15-second reel would take a few minutes, so photos will hold still instead of moving (same cuts)"
+            print(f"Speed    {dt:.1f} s to draw one second of video on {cores} cores · {speed}")
         except Exception as e:
             print(f"Speed    couldn't measure ({e.__class__.__name__})")
     print("Everything the reel tool needs is here. Nothing to install." if all_ok else

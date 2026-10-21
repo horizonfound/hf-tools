@@ -104,6 +104,47 @@ def beat_grid(times, period, duration):
     return beats
 
 
+def energy_per_beat(a, grid):
+    """Loudness (RMS) of the song between each beat and the next, so we can find the chorus."""
+    out = []
+    for i, b in enumerate(grid):
+        e = grid[i + 1] if i + 1 < len(grid) else b + 0.5
+        seg = a[int(b * SR):int(e * SR)]
+        out.append(float(np.sqrt(np.mean(seg ** 2))) if len(seg) else 0.0)
+    return out
+
+
+def best_start(info, need):
+    """Where to start the song for a reel `need` seconds long: the start of the loudest stretch that fits, on a
+    beat, with a nudge toward moments where the energy jumps (a drop, a chorus coming in). Returns seconds.
+    Falls back to 0 when the whole song is needed or nothing is clearly better than the top."""
+    grid, energy = info.get("beats") or [], info.get("energy") or []
+    dur = info.get("duration", 0)
+    if not grid or not energy or need <= 0 or dur - need < 2.0:
+        return 0.0
+    n = len(grid)
+    best_i, best_score, first_score = 0, -1.0, None
+    for i in range(n):
+        if grid[i] + need > dur:
+            break
+        j = i
+        while j < n and grid[j] < grid[i] + need:
+            j += 1
+        win = energy[i:j]
+        if not win:
+            continue
+        before = float(np.mean(energy[max(0, i - 4):i])) if i > 0 else 0.0
+        after = float(np.mean(energy[i:i + 4]))
+        score = float(np.mean(win)) + 0.6 * max(0.0, after - before)
+        if first_score is None:
+            first_score = score
+        if score > best_score:
+            best_i, best_score = i, score
+    if first_score is not None and best_score <= first_score * 1.08:
+        return 0.0
+    return float(grid[best_i])
+
+
 def analyze(path):
     dur = duration_of(path)
     a = load_mono(path)
@@ -113,7 +154,26 @@ def analyze(path):
     bpm, period = tempo_from(ons)
     grid = beat_grid(ons, period, dur) if period else []
     return {"ok": bool(grid), "duration": round(dur, 3), "tempo": bpm, "period": round(period, 4) if period else 0,
-            "beats": grid, "onsets": ons}
+            "beats": grid, "onsets": ons, "energy": energy_per_beat(a, grid) if grid else []}
+
+
+def first_sound(path, floor_db=-38.0, look=4.0):
+    """Seconds of dead air at the start of a clip before someone speaks or something happens (0 if none)."""
+    a = load_mono(path)
+    if a is None:
+        return 0.0
+    a = a[: int(look * SR)]
+    n = len(a) // HOP
+    if n < 5:
+        return 0.0
+    env = np.sqrt(np.mean(a[: n * HOP].reshape(n, HOP) ** 2, axis=1))
+    db = 20 * np.log10(env + 1e-9)
+    noise = float(np.percentile(db, 20))
+    thr = max(floor_db, noise + 12)
+    for i in range(n - 2):
+        if db[i] > thr and db[i + 1] > thr and db[i + 2] > thr:
+            return max(0.0, i * HOP / SR - 0.25)
+    return 0.0
 
 
 if __name__ == "__main__":
