@@ -1,31 +1,37 @@
-# The Engine by Horizon Found (prototype 0.2)
+# The Assistant · by Horizon Found
 
-Your brand. Your voice. Just faster.
+Version 0.3.0 (working title; the plugin's internal name is still `the-engine` so updates keep flowing).
 
-## Install (about 2 minutes)
+You decide what to post. The Assistant makes it, in your voice and your look, from your own photos and clips. It never posts anything and never touches your originals. It runs inside the Claude desktop app, and we say so.
 
-You don't need to unzip anything. Claude takes the zip file as it is.
+## What's in it
 
-1. Open Claude (the desktop app or claude.ai). You need a paid plan; the free one runs out mid-conversation.
-2. Click your name in the bottom corner → Settings → Customize.
-3. Find Plugins and click Upload. Pick `the-engine-plugin.zip`.
-4. You'll see "The Engine" with four tools inside. That's it.
+| Say | What happens |
+|---|---|
+| **start here** | A forty-minute conversation that learns your business, your voice (you talk, it listens) and your look, then writes your Brand File. Once. |
+| **make a reel** | A session folder (photos, behind-the-scenes clips, a talking clip, a song) becomes a reel cut to the beat, with ten to twenty hook options in your voice. Extra versions for trial reels in seconds. |
+| **make a carousel** | Every photo from a session on one numbered sheet; the Assistant picks and orders them so people keep swiping, with a cover line or none. Exports slides ready to post. |
+| **make stories** | Three to five story frames spun off today's reel or carousel. |
+| **check my setup** | What this computer can do and how fast. Nothing to install. |
+| **what are we doing today?** | The menu. |
 
-Then make a new Project (the Projects tab, "New project") named after your business. Start a chat inside it and type **start here**. Your Brand File and Post Bank get saved in that Project, so every tool can find them.
+Everything it makes lands in an `_assistant` folder inside your session folder. Your photos and clips are never moved or changed.
 
-## Four tools, in the order you use them
+## Install (once, in the Claude desktop app)
 
-1. **start here**: a 40-minute conversation that learns your business, voice and look, and writes your Brand File. Do this first, in one sitting.
-2. **fix my grid**: a one-time read of your Instagram grid with specific moves to make it flow.
-3. **plan my week**: your posts for the week (reels, carousels, photos, stories) in your voice, planned so your grid stays cohesive.
-4. **make a reel**: turns a session folder into an editable CapCut draft in your look. Needs the Claude desktop app, CapCut desktop, and a one-time tool install. Type **set up the reel tool** when you're ready, and **check my setup** to see what's installed.
+Settings → Plugins → Add marketplace → Add from a repository → paste `horizonfound/hf-tools` → Sync → Discover → The Assistant → Add. Updates arrive on their own.
 
-You don't need CapCut or any installs for the first three.
+Connect the folder your sessions live in (the Add folder button in the desktop app). That is how the Assistant sees your photos without you uploading anything.
 
-## The rule
+## How it's built
 
-Everything the Engine writes is a suggestion. You decide. It never posts anything.
+- `skills/` : one folder per tool. `SKILL.md` is what Claude follows; `references/` are the rules it reads; `scripts/` are the small Python programs that do the measured work (beats, cuts, crops, text).
+- `shared/playbook.md` : Nicole's thinking about posting, written down. Every tool reads it first. `shared/guardrails.md` : the hard-yes, hard-no list every piece is checked against. `shared/voice-of-the-assistant.md` : how it talks to you.
+- `shared/fonts/` : free fonts for on-screen text (Cormorant Garamond, Montserrat, DM Sans, Inter, Fraunces).
+- Scripts need only ffmpeg, Python 3, numpy and Pillow, all already inside the Claude workspace on Mac and PC.
 
-## Updates
+## Requirements
 
-When there's a new version, upload the new zip the same way. Your Brand File and Post Bank live in your Project, not in the plugin, so nothing you've built is lost.
+A Mac or a Windows computer with the Claude desktop app on a paid Claude plan. Tested on Apple silicon. Intel Mac and Windows: the setup check reports what it finds; tell us.
+
+Horizon Found LLC · The Assistant runs inside Claude. Separate companies, their own pricing.

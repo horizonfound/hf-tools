@@ -1,8 +1,8 @@
 {
   "name": "the-engine",
-  "displayName": "The Engine",
-  "version": "0.2.5",
-  "description": "The Engine by Horizon Found. An assistant that helps photographers post on Instagram in their own voice and look. Your brand. Your voice. Just faster.",
+  "displayName": "The Assistant",
+  "version": "0.3.0",
+  "description": "The Assistant by Horizon Found. You decide what to post; it makes it: a reel cut to the beat, a carousel in the right order, story frames, all in your voice and your look. Never posts. Your brand. Your voice. Just faster.",
   "author": {
     "name": "Horizon Found"
   },
@@ -10,7 +10,8 @@
     "photography",
     "instagram",
     "reels",
-    "content",
+    "carousels",
+    "stories",
     "brand voice"
   ]
 }
