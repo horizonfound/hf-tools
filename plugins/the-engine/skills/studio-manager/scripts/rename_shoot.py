@@ -70,22 +70,37 @@ def plan_rename(session, studio, shoot_id, new_name):
             new = new_folder / f"{prefix}_{m['n']}_{m['orig']}"
             sidecar_name = lambda ext, m=m: f"{prefix}_{m['n']}_{Path(m['orig']).stem}{ext}"  # noqa: E731
         moves.append({"from": p["file"], "to": new.as_posix(), "original": p["original"], "sha256": rec["sha256"]})
-        # the sidecar, if the sorter brought one along
+        # the sidecar, if the sorter brought one along: once, by the record the backup verified
+        # (her drive ignores upper and lower case, so .xmp and .XMP on disk are one file)
         for ext in (".xmp", ".XMP"):
             sc = cur.with_suffix(ext)
-            if (session / sc).exists():
-                so = Path(p["original"]).with_suffix(ext).as_posix()
+            so = Path(p["original"]).with_suffix(ext).as_posix()
+            if so in files and (session / sc).exists():
+                if not files[so].get("sha256"):
+                    sys.exit(f"STOP: no verified record for {so}. Nothing renamed.")
                 moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(ext)).as_posix(),
-                              "original": so, "sha256": files.get(so, {}).get("sha256")})
+                              "original": so, "sha256": files[so]["sha256"]})
+                break
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
-    dests = [x["to"] for x in moves]
+    dests = [x["to"].lower() for x in moves]
     if len(set(dests)) != len(dests):
         sys.exit("STOP: two files would get the same new name. Nothing renamed.")
+    # nothing may be in the way before the first move happens, so a rename never stops halfway
+    old_names = {x.name.lower() for x in (session / old_folder).iterdir()}
+    for x in moves:
+        to_name, from_name = Path(x["to"]).name, Path(x["from"]).name
+        if to_name.lower() != from_name.lower() and to_name.lower() in old_names:
+            sys.exit(f"STOP: {to_name} is already in {old_folder}. Nothing renamed.")
+    if new_folder == old_folder and all(Path(x["to"]).name == Path(x["from"]).name for x in moves):
+        return shoot, old_folder, new_folder, []
     return shoot, old_folder, new_folder, moves
 
 
 def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
+    if not moves:
+        say(f"{shoot['id']} is already named \"{new_name}\". Nothing to do.")
+        return
     say(f"{shoot['id']}: \"{shoot.get('name') or shoot.get('suggested')}\"  ->  \"{new_name}\"")
     say(f"  {old_folder}/  ->  {new_folder}/   {len(moves)} files")
     say(f"  e.g. {Path(moves[0]['from']).name}  ->  {Path(moves[0]['to']).name}")
@@ -126,7 +141,7 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             entry["verified"] += 1
     say(f"  {entry['verified']} of {len(moves)} verified in {time.time() - t1:.0f} s")
 
-    new_path = {m["from"]: m["to"] for m in moves}
+    new_path = where_they_are(session, new_folder, moves)
     index = load(studio, "index.json")
     for p in index["photos"]:
         p["file"] = new_path.get(p["file"], p["file"])
@@ -153,32 +168,66 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     say("  All done.")
 
 
+def where_they_are(session, new_folder, moves):
+    """Every file's true path after a rename: its new name if that move happened, else its old name
+    inside the renamed folder. Records must say where files are, never where they were meant to be."""
+    out = {}
+    for m in moves:
+        if m.get("moved") or (session / m["to"]).exists():
+            out[m["from"]] = m["to"]
+        else:
+            out[m["from"]] = (new_folder / Path(m["from"]).name).as_posix()
+    return out
+
+
 def finish_unfinished(session, studio):
-    """A rename that was cut off after moving but before the records were updated (power, a closed
-    pipe) leaves its log entry without 'finished'. Every move is in that entry, so finish it: see which
-    files landed, verify them, update the records. Runs before anything new."""
+    """A rename that was cut off (power, a closed pipe, a file in the way) leaves its log entry without
+    'finished', or with moves not marked moved. Every move is in that entry, so finish it: move what is
+    still waiting under its old name (never over anything), verify every file, update the records.
+    Runs before anything new."""
     log_path = studio / "rename-log.json"
     if not log_path.exists():
         return
     log = json.loads(log_path.read_text())
     for entry in log.get("renames", []):
-        if entry.get("finished"):
+        moves = entry["moves"]
+        # a move planned twice for one file (an older version saw .xmp and .XMP as two files) is a phantom
+        lower_to = [m["to"].lower() for m in moves]
+        for m in moves:
+            if not m.get("sha256") and lower_to.count(m["to"].lower()) > 1:
+                m["phantom"] = True
+        real = [m for m in moves if not m.get("phantom")]
+        pending = [m for m in real if not m.get("moved")]
+        if entry.get("finished") and not pending:
             continue
         say(f"Finishing a rename that was cut off: {entry.get('from_name')} -> {entry.get('to_name')}")
-        new_path = {}
-        for m in entry["moves"]:
+        new_folder = Path(real[0]["to"]).parent if real else None
+        # the old run's own notes about what it had not got to yet, and about phantoms, are not problems
+        phantom_names = [m["to"] for m in moves if m.get("phantom")]
+        entry["problems"] = [p for p in entry.get("problems", [])
+                             if not p.startswith("after the rename, ") and not any(ph in p for ph in phantom_names)]
+        entry["verified"] = 0
+        for m in real:
             dst = session / m["to"]
-            if dst.exists():
-                new_path[m["from"]] = m["to"]
+            src = session / new_folder / Path(m["from"]).name
+            if not m.get("moved") and src.exists() and not dst.exists():
+                os.rename(src, dst)
+                m["moved"] = True
+            if dst.exists() and not (src.exists() and src != dst):
+                m["moved"] = True
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
-                    entry["verified"] = entry.get("verified", 0) + (0 if m.get("checked") else 1)
+                    entry["verified"] += 1
                     m["checked"] = True
                 else:
-                    entry.setdefault("problems", []).append(f"could not verify {m['to']}")
-            elif (session / m["from"]).exists():
-                entry.setdefault("problems", []).append(f"never moved: {m['from']}")
+                    entry["problems"].append(f"could not verify {m['to']}")
+            elif src.exists() and dst.exists():
+                entry["problems"].append(f"{m['to']} is in the way of {src.name}; both left as they are")
+            elif src.exists():
+                entry["problems"].append(f"never moved: {m['from']}")
             else:
-                entry.setdefault("problems", []).append(f"missing: {m['from']}")
+                entry["problems"].append(f"missing: {m['from']}")
+        log_path.write_text(json.dumps(log, indent=1))
+        new_path = where_they_are(session, new_folder, real) if new_folder else {}
         index = load(studio, "index.json")
         for p in index["photos"]:
             p["file"] = new_path.get(p["file"], p["file"])
@@ -188,17 +237,18 @@ def finish_unfinished(session, studio):
             grp["files"] = [new_path.get(f, f) for f in grp["files"]]
         (studio / "groups.json").write_text(json.dumps(g, indent=1))
         sh = load(studio, "shoots.json")
-        folder = Path(next(iter(new_path.values()))).parent.as_posix() if new_path else None
         for s in sh["shoots"]:
-            if s["id"] == entry["shoot"] and folder:
-                s["name"], s["folder"] = entry["to_name"], folder
+            if s["id"] == entry["shoot"] and new_folder:
+                s["name"], s["folder"] = entry["to_name"], new_folder.as_posix()
         (studio / "shoots.json").write_text(json.dumps(sh, indent=1))
         names = load(studio, "names.json", required=False) or {}
         names[entry["shoot"]] = entry["to_name"]
         (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False))
         entry["finished"] = datetime.now().isoformat(timespec="seconds") + " (finished on a later run)"
         log_path.write_text(json.dumps(log, indent=1))
-        say(f"  {entry.get('verified', 0)} of {len(entry['moves'])} verified" + (f"; problems: {entry['problems']}" if entry.get("problems") else ""))
+        say(f"  {entry['verified']} of {len(real)} verified" + (f"; problems: {entry['problems'][:5]}" if entry["problems"] else ""))
+        if entry["problems"]:
+            sys.exit(1)
 
 
 def main():

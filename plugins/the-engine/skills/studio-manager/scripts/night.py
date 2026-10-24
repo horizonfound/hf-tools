@@ -143,10 +143,18 @@ def main():
     if a.source and not a.session and not a.again:
         fp, held = cards.check(a.source)
         if held:
-            say(f"This card is already safe: {fp['count']:,} files backed up to {held['folder']} on {held['when'][:10]}. Nothing to do.")
-            say("(To copy it again anyway, run with --again.)")
-            say(f"Report: {Path(held['folder']) / '_studio' / 'report.html'}")
-            sys.exit(0)
+            folder = Path(held["folder"])
+            if (folder / "_studio" / "first-look.html").exists():
+                # the whole night ran on this card already: copied, verified, sorted, report written
+                say(f"This card is already safe: {fp['count']:,} files backed up to {folder} on {held['when'][:10]}. Nothing to do.")
+                say("(To copy it again anyway, run with --again.)")
+                say(f"Report: {folder / '_studio' / 'report.html'}")
+                sys.exit(0)
+            # copied and verified, but the night did not finish (Claude's look, the sort, the report): pick it up there
+            say(f"This card is already copied and verified, in {folder}. Picking up where the night left off.")
+            if a.check:
+                return
+            a.session = str(folder)
 
     if a.session:
         session = Path(a.session).expanduser().resolve()
@@ -221,8 +229,9 @@ def main():
         for i, g in enumerate(groups, 1):
             gap = f"after a {g['gap_before_min']} min gap" if g.get("gap_before_min") is not None else "first of the day"
             say(f"   {i:02d} {g['id']}  {g['start'][:16].replace('T', ' ')} to {g['end'][11:16]}  {g['count']:>5} photos  {gap}")
-        say("   Decide which rows are one shoot (same people, same place, same day) and write " + str(studio / "shoots.json") + ":")
-        say('   {"decided_by": "Claude, from the contact sheet", "shoots": [{"id": "s1", "suggested": "<place or subject>, <Mon D, YYYY>",'
+        say("   Decide which rows are one shoot (same people, same place, same day) and write " + str(studio / "shoots.json") + ".")
+        say("   The suggested name is the place or subject only (\"Black-sand beach\"); the date goes on by her folder naming, so never put it in the name:")
+        say('   {"decided_by": "Claude, from the contact sheet", "shoots": [{"id": "s1", "suggested": "<place or subject, no date: her folder naming adds the date>",'
             ' "groups": ["g01", "g02"], "photos": 1234, "recap": "<two or three warm sentences about what is in it>", "why": "<one line>"}, ...]}')
         say("   Then run this command again.")
         sys.exit(4)

@@ -30,9 +30,10 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JSON = HOME / "studio.json"
 MD = HOME / "studio-file.md"
 
+# the same order as the skill offers them: 1 is the recommended one (date first, so folders line up)
 OFFERED = [
-    {"label": "Smith Family, Oct 18 2026", "folder_pattern": "{shoot}, {date}", "date_format": "%b %-d %Y"},
     {"label": "2026-10-18 Smith Family", "folder_pattern": "{date} {shoot}", "date_format": "%Y-%m-%d"},
+    {"label": "Smith Family, Oct 18 2026", "folder_pattern": "{shoot}, {date}", "date_format": "%b %-d %Y"},
 ]
 
 # date spellings a photographer might use in a folder name, most specific first
