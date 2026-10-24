@@ -143,7 +143,9 @@ def shoots_section(studio):
 
 def write_page(session_dir):
     """Kept so older links still work: first-look.html now just opens the report."""
-    studio = Path(session_dir) / "_studio"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from where import locate
+    _, studio = locate(session_dir)
     page = studio / "first-look.html"
     page.write_text("<!doctype html><meta http-equiv='refresh' content='0; url=report.html'><a href='report.html'>The report</a>")
     return page

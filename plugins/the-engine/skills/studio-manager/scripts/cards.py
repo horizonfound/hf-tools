@@ -105,7 +105,14 @@ def check(root):
     entry = load()["cards"].get(key(fp))
     if not entry:
         return fp, None
-    live = [s for s in entry.get("sessions", []) if Path(s["folder"]).is_dir() and (Path(s["folder"]) / "_studio" / "manifest.json").exists()]
+    from where import locate
+    live = []
+    for s in entry.get("sessions", []):
+        try:
+            root, studio = locate(s["folder"])  # still on disk, before or after the night settled
+        except SystemExit:
+            continue
+        live.append(dict(s, root=str(root), studio=str(studio)))
     return fp, (live[-1] if live else None)
 
 

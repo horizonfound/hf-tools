@@ -277,8 +277,8 @@ def main():
     ap.add_argument("--from-names", action="store_true", help="apply _studio/names.json to every shoot whose name differs")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    session = Path(a.session).expanduser().resolve()
-    studio = session / "_studio"
+    from where import locate
+    session, studio = locate(a.session)  # the folder the shoots sit in, and the records (before or after the night settles)
     finish_unfinished(session, studio)
 
     jobs = []

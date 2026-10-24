@@ -348,7 +348,9 @@ def build(manifest, studio):
 
 
 def write_page(session_dir):
-    studio = Path(session_dir) / "_studio"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from where import locate
+    _, studio = locate(session_dir)
     manifest = json.loads((studio / "manifest.json").read_text())
     page = studio / "report.html"
     page.write_text(build(manifest, studio))

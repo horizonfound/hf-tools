@@ -73,7 +73,9 @@ def main():
     ap.add_argument("session")
     ap.add_argument("--port", type=int, default=8765)
     a = ap.parse_args()
-    studio = Path(a.session) / "_studio"
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from where import locate
+    _, studio = locate(a.session)
     manifest = json.loads((studio / "manifest.json").read_text())
     Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
     # the asked-for port, or the next free one: another session's server may be holding it

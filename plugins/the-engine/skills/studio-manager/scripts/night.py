@@ -35,6 +35,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import cards  # noqa: E402
 import studio_file  # noqa: E402
+from where import locate  # noqa: E402
 
 
 def say(msg):
@@ -144,21 +145,33 @@ def main():
     if a.source and not a.session and not a.again:
         fp, held = cards.check(a.source)
         if held:
-            folder = Path(held["folder"])
-            if (folder / "_studio" / "first-look.html").exists():
+            root, held_studio = Path(held["root"]), Path(held["studio"])
+            if (held_studio / "settled.json").exists() or (held_studio / "first-look.html").exists():
                 # the whole night ran on this card already: copied, verified, sorted, report written
-                say(f"This card is already safe: {fp['count']:,} files backed up to {folder} on {held['when'][:10]}. Nothing to do.")
+                say(f"This card is already safe: {fp['count']:,} files backed up to {root} on {held['when'][:10]}. Nothing to do.")
                 say("(To copy it again anyway, run with --again.)")
-                say(f"Report: {folder / '_studio' / 'report.html'}")
+                say(f"Report: {held_studio / 'report.html'}")
+                if not a.check and not a.no_open:
+                    open_report(held_studio, held_studio)
                 sys.exit(0)
             # copied and verified, but the night did not finish (Claude's look, the sort, the report): pick it up there
-            say(f"This card is already copied and verified, in {folder}. Picking up where the night left off.")
+            say(f"This card is already copied and verified, in {root}. Picking up where the night left off.")
             if a.check:
                 return
-            a.session = str(folder)
+            a.session = str(root)
 
     if a.session:
         session = Path(a.session).expanduser().resolve()
+        if not (session / "_studio").exists():
+            try:
+                root, st = locate(session)
+            except SystemExit:
+                root, st = None, None
+            if st is not None and (st / "settled.json").exists():
+                say(f"This night is finished and settled: the shoots are in {root}.")
+                if not a.no_open:
+                    open_report(st, st)
+                return
     elif a.source and a.dest and a.name:
         session = Path(a.dest).expanduser() / f"{a.date} {a.name}"
     else:
@@ -255,6 +268,18 @@ def main():
     say("6. Writing the report")
     if run("first_look.py", session) != 0 or run("report_page.py", session) != 0:
         sys.exit(1)
+
+    # 7. settle: the shoot folders go up into the place they chose, the day folder goes away,
+    # the records move to a hidden .studio folder there. Left together (exit 6) only for a good reason.
+    say("7. Putting the shoots where they belong")
+    code = run("settle.py", session)
+    if code not in (0, 6):
+        sys.exit(1)
+    if code == 0:
+        root, studio = locate(session)
+        session = studio  # every script finds the photos from the records now
+        run("first_look.py", studio)
+        run("report_page.py", studio)  # the report's "where your photos are" now points at the new place
     say(f"\nDone. Report: {studio / 'report.html'}")
     # so there is something nice on the screen when they come back: the night opens the report itself,
     # served by serve_report.py so its "Take me to the photos" button works, and it does not depend on
