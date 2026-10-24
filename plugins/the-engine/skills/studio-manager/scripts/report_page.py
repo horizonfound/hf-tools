@@ -126,6 +126,17 @@ def duration(start, end):
         return ""
 
 
+def sort_aside(studio):
+    """Files the sorter set aside in _studio/from-the-card (camera housekeeping, undated files)."""
+    p = studio / "sort-log.json"
+    if not p.exists():
+        return []
+    try:
+        return [a["from"] for a in json.loads(p.read_text()).get("set_aside", [])]
+    except (ValueError, OSError):
+        return []
+
+
 def index_facts(studio):
     """When it was taken and on what, from index.json, in plain words."""
     p = studio / "index.json"
@@ -271,6 +282,10 @@ def build(manifest, studio):
         out.append("<p>Taken: dates will show here once the index is built.</p>")
     if skipped:
         out.append(f"<p>{skipped} hidden Mac system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
+    aside = sort_aside(studio)
+    if aside:
+        out.append(f"<p>{len(aside)} file{'s' if len(aside) != 1 else ''} that aren't photos "
+                   f"({', '.join(sorted({Path(a).suffix.lower().lstrip('.') for a in aside}))}) set aside, not deleted.</p>")
     out.append("</div>")
 
     def photos_folder(root):

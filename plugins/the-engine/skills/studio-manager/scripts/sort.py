@@ -81,12 +81,15 @@ def make_plan(session, studio):
                  f"{len(manifest.get('problems') or [])} problems). Nothing sorted.")
 
     by_file = {p["file"]: p for p in index["photos"]}
+    # a photo the sorter already placed carries its original path; it is never planned again
+    already = sum(1 for p in index["photos"] if p.get("original"))
     moves, used_dest = [], set()
     for s in shoots:
         name = (names.get(s["id"]) or s.get("suggested") or s["id"]).strip()
         folder = safe_folder(name)
         prefix = slug(name)
-        photos = sorted((by_file[f] for g in s["groups"] for f in groups[g]["files"] if f in by_file),
+        photos = sorted((by_file[f] for g in s["groups"] for f in groups[g]["files"]
+                         if f in by_file and not by_file[f].get("original")),
                         key=lambda p: (p.get("taken") or "", p["file"]))
         for n, p in enumerate(photos, 1):
             src = Path(p["file"])
@@ -100,14 +103,18 @@ def make_plan(session, studio):
             for a, b in cands:
                 if b.as_posix() in used_dest:
                     sys.exit(f"STOP: two files would land on {b}. Nothing sorted.")
+                rec = files.get(a.as_posix())
+                if not rec or not rec.get("sha256"):
+                    # no verified record means we could not prove the move safe afterwards: refuse
+                    sys.exit(f"STOP: {a} has no verified record in the backup manifest. Nothing sorted.")
                 used_dest.add(b.as_posix())
                 moves.append({"from": a.as_posix(), "to": b.as_posix(), "shoot": s["id"], "name": name,
-                              "sha256": files.get(a.as_posix(), {}).get("sha256"),
-                              "size": files.get(a.as_posix(), {}).get("size")})
+                              "sha256": rec["sha256"], "size": rec.get("size")})
     planned = {m["from"] for m in moves}
-    untouched = [k for k in files if k not in planned]
+    # untouched: files still sitting at their card path (housekeeping, undated), not the ones already sorted
+    untouched = [k for k in files if k not in planned and (session / k).exists()]
     return {"session": manifest.get("session"), "planned": datetime.now().isoformat(timespec="seconds"),
-            "moves": moves, "untouched": untouched}
+            "moves": moves, "already_sorted": already, "untouched": untouched}
 
 
 def check_plan(session, plan):
@@ -144,6 +151,8 @@ def main():
         by_shoot.setdefault(m["name"], 0)
         by_shoot[m["name"]] += 1
     say(f"Plan for {plan['session']}:")
+    if plan["already_sorted"]:
+        say(f"  already sorted on an earlier run, left alone: {plan['already_sorted']} photos")
     for name, n in by_shoot.items():
         say(f"  {safe_folder(name)}/   {n} files")
     say(f"  left where they are: {len(plan['untouched'])} (no capture time, or not a photo)")
@@ -188,6 +197,37 @@ def main():
     log_path.write_text(json.dumps(log, indent=1))
     say(f"{log['done']} files moved in {time.time() - t0:.0f} s")
 
+    # whatever was not sorted (camera housekeeping, anything with no capture time) is set aside
+    # inside _studio, original path kept, so her folder shows only the shoots. Nothing is deleted.
+    aside = []
+    if not log["problems"]:
+        for rel in plan["untouched"]:
+            src, dst = session / rel, studio / "from-the-card" / rel
+            if not src.exists() or dst.exists():
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(src, dst)
+            aside.append({"from": rel, "to": dst.relative_to(session).as_posix()})
+        # folders the card layout left behind come down once only Finder's hidden notes (.DS_Store and the
+        # like) remain; those are set aside too, never deleted. rmdir refuses a folder with anything in it.
+        for d in sorted((p for p in session.rglob("*") if p.is_dir() and "_studio" not in p.parts), key=lambda p: -len(p.parts)):
+            entries = list(d.iterdir())
+            if entries and all(x.is_file() and x.name.startswith(".") for x in entries):
+                for x in entries:
+                    rel = x.relative_to(session)
+                    dst = studio / "from-the-card" / rel
+                    if not dst.exists():
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        os.rename(x, dst)
+                        aside.append({"from": rel.as_posix(), "to": dst.relative_to(session).as_posix()})
+            try:
+                d.rmdir()
+            except OSError:
+                pass
+        log["set_aside"] = aside
+        if aside:
+            say(f"{len(aside)} file{'s that are not photos' if len(aside) != 1 else ' that is not a photo'} set aside in _studio/from-the-card")
+
     if not a.no_verify and not log["problems"]:
         say("Reading every moved file again against the backup's hashes...")
         t1 = time.time()
@@ -196,7 +236,10 @@ def main():
             if not dst.exists():
                 log["problems"].append(f"after the move, {m['to']} is not there")
                 continue
-            if m["sha256"] and sha256_of(dst) != m["sha256"]:
+            if not m["sha256"]:
+                log["problems"].append(f"no hash to check against: {m['to']}")  # must never pass silently
+                continue
+            if sha256_of(dst) != m["sha256"]:
                 log["problems"].append(f"hash mismatch after the move: {m['to']}")
                 continue
             log["verified"] += 1

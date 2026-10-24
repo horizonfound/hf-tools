@@ -19,6 +19,18 @@ MEDIA = {".jpg", ".jpeg", ".heic", ".heif", ".png", ".tif", ".tiff", ".cr2", ".c
 SKIP_DIRS = {".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", "System Volume Information", "_studio"}
 
 
+def hide(folder):
+    """Hide the Studio's own folder in Finder (Mac) or Explorer (Windows). The name stays
+    `_studio`, so every script and the report's links keep working; it is just not in her way."""
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["chflags", "hidden", str(folder)], check=False, capture_output=True)
+        elif sys.platform == "win32":
+            subprocess.run(["attrib", "+h", str(folder)], check=False, capture_output=True)
+    except OSError:
+        pass
+
+
 def say(msg):
     print(msg, flush=True)
 
@@ -225,6 +237,7 @@ def main():
 
     studio = dest / "_studio"
     studio.mkdir(parents=True, exist_ok=True)
+    hide(studio)  # out of sight in Finder; she asks Claude for the report
     mpath = studio / "manifest.json"
     manifest = json.loads(mpath.read_text()) if mpath.exists() else {"session": folder, "source": str(src), "files": {}}
     manifest["source"] = str(src)
@@ -241,6 +254,7 @@ def main():
     if second and not problems:
         say(f"Second copy to {second}")
         (second / "_studio").mkdir(parents=True, exist_ok=True)
+        hide(second / "_studio")
         left = (a.budget - (time.time() - t0)) if a.budget else None
         problems += run_copy("second", files, src, second, manifest, False, save, left if (left is None or left > 5) else 5)
         save()
