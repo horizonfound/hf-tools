@@ -43,6 +43,26 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"opened" if ok else b"not a folder this report names")
 
+    def do_POST(self):
+        """The first-look page sends the names she typed: {shoot id: name}. Kept in _studio/names.json."""
+        if urlsplit(self.path).path != "/names":
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+            names = json.loads(self.rfile.read(n) or b"{}")
+            assert isinstance(names, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in names.items())
+        except (ValueError, AssertionError):
+            self.send_error(HTTPStatus.BAD_REQUEST, "expected {shoot id: name}")
+            return
+        clean = {k[:40]: " ".join(v.split())[:120] for k, v in names.items() if v.strip()}
+        (Path(self.directory) / "names.json").write_text(json.dumps(clean, indent=1, ensure_ascii=False))
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"saved")
+        sys.stderr.write(f"names saved: {clean}\n")
+
     def log_message(self, fmt, *args):  # quieter: only the opens
         if "/open" in str(args[0] if args else ""):
             sys.stderr.write("%s\n" % (fmt % args))
