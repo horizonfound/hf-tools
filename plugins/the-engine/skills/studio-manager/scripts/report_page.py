@@ -41,6 +41,10 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .brand b{font:600 16px/1 var(--sans);letter-spacing:-.01em}
 .brand small{font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2);white-space:nowrap}
+.bar .nav{display:inline-flex;align-items:center;gap:.8rem;font:600 16px/1 var(--sans);color:#fff;text-decoration:none;padding:.5rem .5rem .5rem 1.3rem;border-radius:999px;background:var(--coral);border:1.5px solid var(--coral);white-space:nowrap;box-shadow:0 14px 28px -18px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+.bar .nav .arr{width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:15px;transition:transform .35s var(--ease)}
+.bar .nav:hover{transform:translateY(-2px);box-shadow:var(--shadow)}.bar .nav:hover .arr{transform:translate(2px,-2px)}
+@media(max-width:600px){.bar .nav{font-size:14px;padding-left:1rem}}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .h1{font:600 clamp(36px,5.4vw,64px)/1.02 var(--sans);letter-spacing:-.035em;text-wrap:balance;max-width:14em}
 .h1.bad{max-width:16em}
@@ -216,7 +220,9 @@ def build(manifest, studio):
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
            f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>",
            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
-           f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span></div></div>"]
+           f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
+           + ("<a class='nav' href='first-look.html'>Show me my photos<span class='arr'>&#8599;</span></a>" if (studio / "first-look.html").exists() else "")
+           + "</div></div>"]
 
     # hero: the one line she needs
     out.append("<section class='wrap hero'>")

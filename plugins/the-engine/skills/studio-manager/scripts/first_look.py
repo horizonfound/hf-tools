@@ -55,10 +55,9 @@ CSS = BASE_CSS + """
 .name input::placeholder{color:#9AA0AB;font-weight:400;font-style:italic;font-family:var(--sans);font-size:.72em;letter-spacing:0}
 .name small{color:var(--ink-2);font-size:13px}.name small b{color:var(--ink);font-weight:600}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.6rem 0 2.6rem}
-.btn{display:inline-flex;align-items:center;gap:.9rem;padding:.5rem .5rem .5rem 1.4rem;border-radius:999px;background:var(--ink);color:var(--cream);font:500 17px/1 var(--sans);border:1.5px solid var(--ink);cursor:pointer;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+.btn{display:inline-flex;align-items:center;gap:1.1rem;padding:.7rem .7rem .7rem 1.9rem;border-radius:999px;background:var(--coral);color:#fff;font:600 22px/1 var(--sans);letter-spacing:-.01em;border:1.5px solid var(--coral);cursor:pointer;box-shadow:0 18px 36px -20px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .btn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
-.btn .arr{width:38px;height:38px;border-radius:50%;background:var(--coral);color:#fff;display:grid;place-items:center;font-size:17px}
-.btn.quiet{background:transparent;color:var(--ink)}.btn.quiet .arr{background:var(--sand-l);color:var(--ink)}
+.btn .arr{width:48px;height:48px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:22px}
 .toast{font-size:14px;color:var(--ink-2);min-height:1.2em}
 .undo{font-size:13px;color:var(--ink-2);max-width:40em}
 @media(max-width:900px){.shoot,.shoot:nth-child(even){grid-template-columns:1fr}.shoot:nth-child(even) .pics{order:0}.talk{grid-template-columns:1fr}}
@@ -90,7 +89,9 @@ def build(studio):
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
            f"<title>First look · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>",
            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
-           f"<span class='when'>{'All backed up, verified and filed.' if all(s.get('folder') for s in shoots) else 'The copy is running.'} This is what's on the card.</span></div></div>"]
+           f"<span class='when'>{'All backed up, verified and filed.' if all(s.get('folder') for s in shoots) else 'The copy is running.'} This is what's on the card.</span>"
+           + ("<a class='nav' href='report.html'>Show me my report<span class='arr'>&#8599;</span></a>" if (studio / "report.html").exists() else "")
+           + "</div></div>"]
 
     out.append("<section class='wrap hero'><span class='eyebrow'>First look</span>")
     n = len(shoots)
@@ -138,7 +139,6 @@ def build(studio):
 
     out.append("<div class='save'>"
                "<button class='btn' id='save'>Lock the names in<span class='arr'>&#10003;</span></button>"
-               "<button class='btn quiet' id='later'>I'll do it in the morning<span class='arr'>&#8599;</span></button>"
                f"<span class='toast' id='toast'>{'All named.' if named == len(shoots) and shoots else (f'{named} of {len(shoots)} named so far.' if named else '')}</span></div>")
     out.append("<p class='undo'>Nothing on the card is ever changed. Names go on the copy on your drive, and you can rename any shoot later by just asking.</p></div>")
     out.append("<footer class='foot'><div class='wrap'>Nothing deleted, nothing moved, nothing posted.</div><div class='wordmark'>The Studio</div></footer>")
@@ -150,7 +150,6 @@ async function save(){const names={};for(const i of document.querySelectorAll('.
   toast.textContent=r.ok?(Object.keys(names).length+' name'+(Object.keys(names).length==1?'':'s')+' locked in. Sleep well.'):'Could not save. Tell Claude the names instead.';}
  catch(e){toast.textContent='Could not save. Tell Claude the names instead.';}}
 document.getElementById('save').addEventListener('click',save);
-document.getElementById('later').addEventListener('click',()=>{toast.textContent='No problem. They\\'ll be named by date, and the morning report will ask again.';});
 // Enter in a box moves to the next box; only the button at the bottom saves, so nothing locks in by accident.
 const boxes=[...document.querySelectorAll('.name input')];
 boxes.forEach((i,k)=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();const nx=boxes[k+1];if(nx)nx.focus();else i.blur();}}));
