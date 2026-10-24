@@ -277,7 +277,15 @@ def build(manifest, studio):
         """The folder the photos actually sit in (e.g. .../DCIM/100EOSR5), not the top of the drive."""
         if not root:
             return root
-        parents = {Path(k).parent for k in files if Path(k).suffix.lower() in MEDIA}
+        # after the sorter has run, index.json carries the new paths; before it, the manifest's card layout
+        paths = list(files)
+        ixp = studio / "index.json"
+        if ixp.exists():
+            try:
+                paths = [p["file"] for p in json.loads(ixp.read_text()).get("photos", [])] or paths
+            except (ValueError, OSError):
+                pass
+        parents = {Path(k).parent for k in paths if Path(k).suffix.lower() in MEDIA}
         if not parents:
             return root
         common = Path(*os.path.commonprefix([list(p.parts) for p in parents])) if len(parents) > 1 else parents.pop()

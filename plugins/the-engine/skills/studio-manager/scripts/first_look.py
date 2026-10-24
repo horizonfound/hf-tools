@@ -149,7 +149,9 @@ async function save(){const names={};for(const i of document.querySelectorAll('.
  catch(e){toast.textContent='Could not save. Tell Claude the names instead.';}}
 document.getElementById('save').addEventListener('click',save);
 document.getElementById('later').addEventListener('click',()=>{toast.textContent='No problem. They\\'ll be named by date, and the morning report will ask again.';});
-for(const i of document.querySelectorAll('.name input'))i.addEventListener('keydown',ev=>{if(ev.key==='Enter')save();});
+// Enter in a box moves to the next box; only the button at the bottom saves, so nothing locks in by accident.
+const boxes=[...document.querySelectorAll('.name input')];
+boxes.forEach((i,k)=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();const nx=boxes[k+1];if(nx)nx.focus();else i.blur();}}));
 </script></body></html>""")
     return "\n".join(out)
 
