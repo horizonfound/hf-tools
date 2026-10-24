@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Rename a shoot that the sorter has already placed: the folder and every
-photo in it take her name, keeping the running number and the original
-filename. This is her one decision on the first look, made real.
+photo in it take their name, keeping the running number and the original
+filename. This is their one decision on the first look, made real.
 
     python3 rename_shoot.py "<session>" --shoot s2 --name "Brittan sunset palms"
     python3 rename_shoot.py "<session>" --from-names        apply _studio/names.json to every shoot whose name differs
     ...  --dry-run                                           show the plan, touch nothing
 
-Same promises as the sorter: only the copy on her drive, never the card;
+Same promises as the sorter: only the copy on their drive, never the card;
 a destination that exists stops it; renames on the same drive only; every
 move written to _studio/rename-log.json before it happens; every renamed
 photo re-read against the backup's hash for its original frame. The
@@ -40,7 +40,7 @@ def plan_rename(session, studio, shoot_id, new_name):
     if not shoot.get("folder"):
         sys.exit(f"STOP: {shoot_id} has not been sorted yet; run sort.py first.")
     old_folder = Path(shoot["folder"])
-    # her naming, from the Studio File: folder pattern, and whether photos keep their frame names
+    # their naming, from the Studio File: folder pattern, and whether photos keep their frame names
     naming = studio_file.load().get("naming", {})
     keep_names = naming.get("file_names", "shoot") == "original"
     in_folder = [p for p in index["photos"] if Path(p["file"]).parent == old_folder and p.get("original")]
@@ -71,7 +71,7 @@ def plan_rename(session, studio, shoot_id, new_name):
             sidecar_name = lambda ext, m=m: f"{prefix}_{m['n']}_{Path(m['orig']).stem}{ext}"  # noqa: E731
         moves.append({"from": p["file"], "to": new.as_posix(), "original": p["original"], "sha256": rec["sha256"]})
         # the sidecar, if the sorter brought one along: once, by the record the backup verified
-        # (her drive ignores upper and lower case, so .xmp and .XMP on disk are one file)
+        # (the drive ignores upper and lower case, so .xmp and .XMP on disk are one file)
         for ext in (".xmp", ".XMP"):
             sc = cur.with_suffix(ext)
             so = Path(p["original"]).with_suffix(ext).as_posix()
@@ -115,6 +115,14 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     log_path.write_text(json.dumps(log, indent=1))
 
     t0 = time.time()
+    # each file's identity on the drive before anything moves: a rename never rewrites bytes, so the
+    # same inode, size and modified time at the new name proves it is the same file
+    for m in moves:
+        try:
+            st = os.stat(session / m["from"])
+            m["ident"] = [st.st_ino, st.st_size, st.st_mtime_ns]
+        except OSError:
+            m["ident"] = None
     if new_folder != old_folder:
         os.rename(session / old_folder, session / new_folder)  # one atomic move of the whole folder
     for m in moves:
@@ -127,19 +135,29 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             os.rename(src, dst)
         m["moved"] = True
     log_path.write_text(json.dumps(log, indent=1))
-    say(f"  renamed in {time.time() - t0:.0f} s; reading every file again against the backup's hashes...")
+    say(f"  renamed in {time.time() - t0:.0f} s; checking every file is the same file it was...")
     t1 = time.time()
+    hashed = 0
     for m in moves:
         dst = session / m["to"]
         if not dst.exists():
             entry["problems"].append(f"after the rename, {m['to']} is not there")
-        elif not m["sha256"]:
-            entry["problems"].append(f"no hash to check against: {m['to']}")
-        elif sha256_of(dst) != m["sha256"]:
-            entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
-        else:
-            entry["verified"] += 1
-    say(f"  {entry['verified']} of {len(moves)} verified in {time.time() - t1:.0f} s")
+            continue
+        same = False
+        if m.get("ident"):
+            st = os.stat(dst)
+            same = [st.st_ino, st.st_size, st.st_mtime_ns] == m["ident"]
+        if not same:  # could not prove it by identity: read it in full. Never a pass without one or the other.
+            if not m["sha256"]:
+                entry["problems"].append(f"no hash to check against: {m['to']}")
+                continue
+            if sha256_of(dst) != m["sha256"]:
+                entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
+                continue
+            hashed += 1
+        entry["verified"] += 1
+    entry["hashed_in_full"] = hashed
+    say(f"  {entry['verified']} of {len(moves)} checked in {time.time() - t1:.0f} s" + (f" ({hashed} read in full)" if hashed else ""))
 
     new_path = where_they_are(session, new_folder, moves)
     index = load(studio, "index.json")
@@ -272,7 +290,7 @@ def main():
             if want and want != (s.get("name") or ""):
                 jobs.append((s["id"], want))
         if not jobs:
-            say("Every shoot already has the name she gave it. Nothing to do.")
+            say("Every shoot already has the name the photographer gave it. Nothing to do.")
             return
     elif a.shoot and a.name:
         jobs.append((a.shoot, " ".join(a.name.split())))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The Studio File: what the Studio knows about her, asked once, on the first
+"""The Studio File: what the Studio knows about the photographer, asked once, on the first
 run, and never again. Lives in ~/.studio/ as studio.json (what the scripts
-read) with a plain-words mirror in studio-file.md (what she can read).
+read) with a plain-words mirror in studio-file.md (what they can read).
 
     python3 studio_file.py show
     python3 studio_file.py drives                         the drives it can see, to pick from
@@ -9,10 +9,10 @@ read) with a plain-words mirror in studio-file.md (what she can read).
         [--example "2026-10-18 Smith Family" | --folder-pattern "{shoot}, {date}" --date-format "%b %-d %Y"] \
         [--file-names original|shoot]
     python3 studio_file.py pattern "Smith Family - 10.18.26"    show what a pasted example teaches it
-    python3 studio_file.py render "Smith Family" 2026-10-18     the folder name her pattern gives
+    python3 studio_file.py render "Smith Family" 2026-10-18     the folder name their pattern gives
 
 Naming: a folder pattern made of {shoot} and {date}, with a strftime format
-for the date, worked out from an example folder name she pastes (so her
+for the date, worked out from an example folder name they paste (so their
 drive looks the same before and after the Studio) or picked from two
 offered patterns. Photos either keep their original frame names or take the
 shoot's name with a running number ("shoot").
@@ -119,7 +119,7 @@ def _looks_like_shoot(folder, limit=40):
 
 
 def shoot_folders(drive, limit=2):
-    """Top-level folders on a drive that look like where her shoots live, best first, at most `limit`."""
+    """Top-level folders on a drive that look like where their shoots live, best first, at most `limit`."""
     found = []
     try:
         tops = [p for p in Path(drive).iterdir() if p.is_dir() and not p.name.startswith(".")]
@@ -138,7 +138,7 @@ def shoot_folders(drive, limit=2):
 
 
 def drives():
-    """Volumes she might mean; the Mac itself, camera cards, Time Machine and tiny helper volumes left out.
+    """Volumes they might mean; the Mac itself, camera cards, Time Machine and tiny helper volumes left out.
     Each carries its likely shoot folders; the one that already has shoots on it is `recommended`."""
     out = []
     if not Path("/Volumes").is_dir():
@@ -166,7 +166,7 @@ def drives():
 
 
 def learn_pattern(example):
-    """From a folder name she pasted: where the date is, how it is written, what sits between."""
+    """From a folder name they pasted: where the date is, how it is written, what sits between."""
     ex = example.strip()
     for rx, fmt in DATE_FORMS:
         m = re.search(rx, ex, re.IGNORECASE)
@@ -191,13 +191,13 @@ def learn_pattern(example):
             return None
         got = {"folder_pattern": pat, "date_format": fmt, "example": ex, "example_shoot": shoot.strip()}
         if " " not in shoot.strip() and "_" in shoot:
-            got["space"] = "_"  # she writes Smith_Family, so the Studio does too
+            got["space"] = "_"  # they write Smith_Family, so the Studio does too
         return got
     return None
 
 
 def render(naming, shoot, when):
-    """The folder name her pattern gives this shoot on this date."""
+    """The folder name their pattern gives this shoot on this date."""
     pat = naming.get("folder_pattern") or "{shoot}, {date}"
     fmt = naming.get("date_format") or "%b %-d %Y"
     if isinstance(when, str):
@@ -244,7 +244,7 @@ def main():
     if a.cmd == "pattern":
         got = learn_pattern(a.example)
         if not got:
-            sys.exit("Could not find a date in that name. Ask her where the date goes, or offer the two patterns.")
+            sys.exit("Could not find a date in that name. Ask where the date goes, or offer the two patterns.")
         print(json.dumps(got, indent=1))
         print("Smith Family on Oct 18, 2026 would be:", render(got, "Smith Family", date(2026, 10, 18)))
         return

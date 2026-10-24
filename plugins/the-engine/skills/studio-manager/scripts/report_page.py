@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn a session's _studio/manifest.json into a page she can look at:
+"""Turn a session's _studio/manifest.json into a page the photographer can look at:
 _studio/report.html. One file, no account; opens in the Claude desktop app or
 any browser. Problems first, then the good news, then a few teasers from the
 shoot itself (from _studio/previews/, picked in _studio/teasers.json).
@@ -226,12 +226,12 @@ def build(manifest, studio):
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]
 
-    # hero: the one line she needs
+    # hero: the one line they need
     out.append("<section class='wrap hero'>")
     out.append(f"<span class='eyebrow'>Morning report · {e(name)}</span>")
     if problems:
         out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
-        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. The card has not been touched; "
+        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. Nothing on the memory card has been changed; "
                    "fix what's below, run it again, and it picks up where it left off.</p>")
         out.append("<span class='pill bad'><span class='dot'>!</span>Not finished</span>")
         out.append("<div class='problems'><span class='eyebrow'>Needs you first</span><h2>What stopped it</h2><ul>"
@@ -331,7 +331,7 @@ def build(manifest, studio):
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
         out.append(f"<p class='also'>Second copy{e(tail)}: {e(photos_folder(second))}</p>")
     if not all_good:
-        out.append("<p class='also'>The card is untouched. Keep it until this report says every file is checked.</p>")
+        out.append("<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
     out.append("</div>")
     out.append("</div></div>")
 

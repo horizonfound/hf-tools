@@ -21,7 +21,7 @@ SKIP_DIRS = {".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", "Sy
 
 def hide(folder):
     """Hide the Studio's own folder in Finder (Mac) or Explorer (Windows). The name stays
-    `_studio`, so every script and the report's links keep working; it is just not in her way."""
+    `_studio`, so every script and the report's links keep working; it is just not in their way."""
     try:
         if sys.platform == "darwin":
             subprocess.run(["chflags", "hidden", str(folder)], check=False, capture_output=True)
@@ -62,7 +62,7 @@ def copy_with_hash(src, dst):
 def inventory(root):
     """Every file worth copying, plus a count of the hidden Mac system files
     (._ sidecars, .DS_Store) left behind on purpose, so the report's numbers
-    match what she sees in Finder."""
+    match what they see in Finder."""
     files = []
     skipped = 0
     for dirpath, dirnames, filenames in os.walk(root):
@@ -237,7 +237,7 @@ def main():
 
     studio = dest / "_studio"
     studio.mkdir(parents=True, exist_ok=True)
-    hide(studio)  # out of sight in Finder; she asks Claude for the report
+    hide(studio)  # out of sight in Finder; they ask Claude for the report
     mpath = studio / "manifest.json"
     manifest = json.loads(mpath.read_text()) if mpath.exists() else {"session": folder, "source": str(src), "files": {}}
     manifest["source"] = str(src)
@@ -284,7 +284,7 @@ def main():
     lines = [f"# Morning report · {folder}", ""]
     if problems:
         lines += ["## Needs you first", ""] + [f"- {p}" for p in problems] + [""]
-        lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. The card has not been touched; run it again when the problem is fixed and it picks up where it left off.", ""]
+        lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. Nothing on the memory card has been changed; run it again when the problem is fixed and it picks up where it left off.", ""]
     else:
         lines += [f"**All {len(files)} files ({human(total_bytes)}) have been safely backed up and verified.** Every one was checked against the card, byte for byte."
                   + (" They are on your drive and in your second copy." if second else ""), ""]
@@ -301,12 +301,12 @@ def main():
     lines += ["", "## Where", "", f"- Session drive: `{dest}`"]
     if second:
         lines.append(f"- Second copy: `{second}`" + ("" if ok_second == len(files) else f" ({ok_second} of {len(files)} checked)"))
-    lines += ["", "## The card", "", "Untouched. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
+    lines += ["", "## The card", "", "Nothing on it was changed. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
               "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · nothing deleted, nothing moved, nothing posted._"]
     report = "\n".join(lines) + "\n"
     (studio / "morning-report.md").write_text(report)
     # the index (when each photo was taken, which camera) and the same report as a
-    # page she can look at; neither may ever break the backup
+    # page they can look at; neither may ever break the backup
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         if not problems and not a.dry_run:

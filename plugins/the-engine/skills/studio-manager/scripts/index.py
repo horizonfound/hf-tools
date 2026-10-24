@@ -4,7 +4,7 @@ when it was taken, which camera and lens, its size, and the hash backup.py
 already verified. Everything after the backup reads from this file, so no
 later step has to open a RAW to learn when it was taken.
 
-Reads the verified copy on her drive, never the card. Metadata only: a few MB
+Reads the verified copy on their drive, never the card. Metadata only: a few MB
 from the front of each file, so a 4,000-photo session takes about a minute.
 
     python3 index.py "<session folder>"

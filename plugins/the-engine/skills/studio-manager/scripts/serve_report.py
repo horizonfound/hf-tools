@@ -4,7 +4,7 @@ http://127.0.0.1:<port>/report.html, and let its folder links open Finder.
 
 A page served from localhost is not allowed to open file:// links itself, so
 the page asks this server to do it: GET /open?path=<folder>. Only folders the
-report names (the source, her drive, the second copy) or folders inside them
+report names (the source, their drive, the second copy) or folders inside them
 may be opened; anything else is refused. Listens on 127.0.0.1 only, so nothing outside this Mac can
 reach it. Opened by double-click in Safari, the same links work on their own.
 
@@ -44,7 +44,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(b"opened" if ok else b"not a folder this report names")
 
     def do_POST(self):
-        """The first-look page sends the names she typed: {shoot id: name}. Kept in _studio/names.json."""
+        """The first-look page sends the names they typed: {shoot id: name}. Kept in _studio/names.json."""
         if urlsplit(self.path).path != "/names":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
