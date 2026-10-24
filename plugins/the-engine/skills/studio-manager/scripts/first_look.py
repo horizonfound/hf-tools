@@ -90,7 +90,7 @@ def build(studio):
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
            f"<title>First look · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>",
            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
-           "<span class='when'>The copy is running. This is what's on the card.</span></div></div>"]
+           f"<span class='when'>{'All backed up, verified and filed.' if all(s.get('folder') for s in shoots) else 'The copy is running.'} This is what's on the card.</span></div></div>"]
 
     out.append("<section class='wrap hero'><span class='eyebrow'>First look</span>")
     n = len(shoots)
@@ -130,7 +130,9 @@ def build(studio):
         out.append(f"<div class='name'><label for='{s['id']}'>What should I call this one?</label>"
                    f"<div class='field'><span class='pen'>&#9998;</span>"
                    f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'></div>"
-                   f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>")
+                   + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
+                      if s.get("folder") else
+                      f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
         out.append("</div></article>")
     out.append("</div>")
 
