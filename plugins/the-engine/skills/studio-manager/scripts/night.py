@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import subprocess
+import time
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -255,11 +256,48 @@ def main():
     if run("first_look.py", session) != 0 or run("report_page.py", session) != 0:
         sys.exit(1)
     say(f"\nDone. Report: {studio / 'report.html'}")
-    # so there is something nice on the screen when they come back
+    # so there is something nice on the screen when they come back: the night opens the report itself,
+    # served by serve_report.py so its "Take me to the photos" button works, and it does not depend on
+    # anyone remembering to open it afterwards
     if not a.no_open:
-        opener = {"darwin": ["open"], "win32": ["cmd", "/c", "start", ""], "linux": ["xdg-open"]}.get(sys.platform)
-        if opener:
-            subprocess.run([*opener, str(studio / "report.html")], check=False)
+        open_report(session, studio)
+
+
+def open_report(session, studio):
+    """Start the little report server (unless one is already up for this session) and open the report
+    in the default browser. Falls back to opening the file itself if the server will not start."""
+    url_file = studio / "report-url.txt"
+    url = None
+    if url_file.exists():
+        old = url_file.read_text().strip()
+        try:  # is that server still alive?
+            import urllib.request
+            urllib.request.urlopen(old, timeout=1).read(1)
+            url = old
+        except Exception:
+            url = None
+    if not url:
+        log = open(studio / "serve.log", "a")
+        try:
+            subprocess.Popen([sys.executable, str(HERE / "serve_report.py"), str(session)],
+                             stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            for _ in range(30):  # the server prints its address on the first line
+                time.sleep(0.1)
+                text = (studio / "serve.log").read_text()
+                hit = [ln for ln in text.splitlines() if "http://" in ln]
+                if hit:
+                    url = hit[-1].split("http://", 1)[1].split()[0]
+                    url = "http://" + url
+                    break
+        except Exception:
+            url = None
+    if url:
+        url_file.write_text(url)
+    target = url or str(studio / "report.html")
+    opener = {"darwin": ["open"], "win32": ["cmd", "/c", "start", ""], "linux": ["xdg-open"]}.get(sys.platform)
+    if opener:
+        subprocess.run([*opener, target], check=False)
+    say(f"Report on screen: {target}")
 
 
 if __name__ == "__main__":
