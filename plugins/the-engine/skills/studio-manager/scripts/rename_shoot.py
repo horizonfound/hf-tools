@@ -100,6 +100,14 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     log_path.write_text(json.dumps(log, indent=1))
 
     t0 = time.time()
+    # each file's identity on the drive before anything moves: a rename never rewrites bytes, so the
+    # same inode, size and modified time at the new name proves it is the same file
+    for m in moves:
+        try:
+            st = os.stat(session / m["from"])
+            m["ident"] = [st.st_ino, st.st_size, st.st_mtime_ns]
+        except OSError:
+            m["ident"] = None
     if new_folder != old_folder:
         os.rename(session / old_folder, session / new_folder)  # one atomic move of the whole folder
     for m in moves:
@@ -112,19 +120,29 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             os.rename(src, dst)
         m["moved"] = True
     log_path.write_text(json.dumps(log, indent=1))
-    say(f"  renamed in {time.time() - t0:.0f} s; reading every file again against the backup's hashes...")
+    say(f"  renamed in {time.time() - t0:.0f} s; checking every file is the same file it was...")
     t1 = time.time()
+    hashed = 0
     for m in moves:
         dst = session / m["to"]
         if not dst.exists():
             entry["problems"].append(f"after the rename, {m['to']} is not there")
-        elif not m["sha256"]:
-            entry["problems"].append(f"no hash to check against: {m['to']}")
-        elif sha256_of(dst) != m["sha256"]:
-            entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
-        else:
-            entry["verified"] += 1
-    say(f"  {entry['verified']} of {len(moves)} verified in {time.time() - t1:.0f} s")
+            continue
+        same = False
+        if m.get("ident"):
+            st = os.stat(dst)
+            same = [st.st_ino, st.st_size, st.st_mtime_ns] == m["ident"]
+        if not same:  # could not prove it by identity: read it in full. Never a pass without one or the other.
+            if not m["sha256"]:
+                entry["problems"].append(f"no hash to check against: {m['to']}")
+                continue
+            if sha256_of(dst) != m["sha256"]:
+                entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
+                continue
+            hashed += 1
+        entry["verified"] += 1
+    entry["hashed_in_full"] = hashed
+    say(f"  {entry['verified']} of {len(moves)} checked in {time.time() - t1:.0f} s" + (f" ({hashed} read in full)" if hashed else ""))
 
     new_path = {m["from"]: m["to"] for m in moves}
     index = load(studio, "index.json")

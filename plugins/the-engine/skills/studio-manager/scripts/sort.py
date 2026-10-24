@@ -153,7 +153,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("session")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--no-verify", action="store_true", help="skip the re-read after moving (not recommended)")
+    ap.add_argument("--no-verify", action="store_true", help="skip the check after moving (not recommended)")
+    ap.add_argument("--deep", action="store_true", help="re-read and hash every moved file instead of the identity check")
     a = ap.parse_args()
     session = Path(a.session).expanduser().resolve()
     studio = session / "_studio"
@@ -202,6 +203,8 @@ def main():
         if dst.exists():
             log["problems"].append(f"{m['to']} appeared since the plan was checked; not overwritten")
             break
+        st = os.stat(src)
+        m["ident"] = [st.st_ino, st.st_size, st.st_mtime_ns]  # the file's identity on this drive, before the move
         os.rename(src, dst)
         m["moved"] = True
         log["done"] += 1
@@ -243,23 +246,36 @@ def main():
             say(f"{len(aside)} file{'s that are not photos' if len(aside) != 1 else ' that is not a photo'} set aside in _studio/from-the-card")
 
     if not a.no_verify and not log["problems"]:
-        say("Reading every moved file again against the backup's hashes...")
+        # A rename on the same drive never rewrites a byte: the file keeps its identity (inode), size and
+        # modified time. Checking those proves the file at the new name is the very same file, instantly.
+        # Any file that cannot be proved that way (moved by an earlier run, or an odd drive) is read and
+        # hashed in full instead. Nothing passes without one of the two. --deep hashes everything.
+        say("Checking every moved file is the same file it was..." if not a.deep else "Reading every moved file again against the backup's hashes...")
         t1 = time.time()
+        hashed = 0
         for m in plan["moves"]:
             dst = session / m["to"]
             if not dst.exists():
                 log["problems"].append(f"after the move, {m['to']} is not there")
                 continue
-            if not m["sha256"]:
-                log["problems"].append(f"no hash to check against: {m['to']}")  # must never pass silently
-                continue
-            if sha256_of(dst) != m["sha256"]:
-                log["problems"].append(f"hash mismatch after the move: {m['to']}")
-                continue
+            same = False
+            if not a.deep and m.get("ident"):
+                st = os.stat(dst)
+                same = [st.st_ino, st.st_size, st.st_mtime_ns] == m["ident"] and (m["size"] is None or st.st_size == m["size"])
+            if not same:
+                if not m["sha256"]:
+                    log["problems"].append(f"no hash to check against: {m['to']}")  # must never pass silently
+                    continue
+                if sha256_of(dst) != m["sha256"]:
+                    log["problems"].append(f"hash mismatch after the move: {m['to']}")
+                    continue
+                hashed += 1
             log["verified"] += 1
             if log["verified"] % 500 == 0:
-                say(f"  {log['verified']} of {len(plan['moves'])} verified")
-        say(f"{log['verified']} of {len(plan['moves'])} verified in {time.time() - t1:.0f} s")
+                say(f"  {log['verified']} of {len(plan['moves'])} checked")
+        log["hashed_in_full"] = hashed
+        say(f"{log['verified']} of {len(plan['moves'])} checked in {time.time() - t1:.0f} s"
+            + (f" ({hashed} read in full)" if hashed else ""))
 
     # the index and groups now point at the new names; the original path stays beside it
     new_path = {m["from"]: m["to"] for m in plan["moves"]}

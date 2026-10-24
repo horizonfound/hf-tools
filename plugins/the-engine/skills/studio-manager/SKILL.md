@@ -78,7 +78,7 @@ A full first night, so the tone is clear:
 1. **Find the card.** Look in `/Volumes` for a volume with a `DCIM` folder. One card: that is the source; say what you found in one line ("Found your card: 3,934 files, 127 GB"). Two cards: ask which, or do both as two sessions. No card: say so and ask where the photos are. A drive with many folders and no single shoot: list the folders with photo counts and ask which one they mean; never copy a whole mixed drive on a guess.
 2. **The drive, second copy and naming come from the Studio File.** Do not ask for them again. (No Studio File: do the first-time setup above first.) Instead, **one screen, every night, two button questions on it** (one `AskUserQuestion` call carrying both), after a line that says what you found: "Found your card: 3,934 photos, 127 GB."
    - "Onto Big Kahuna like usual?" Choices: "Yes, like usual (recommended)", "Somewhere else this time". Somewhere else: ask where in the next message, use it for this run, and ask whether that is the new usual; only then change the Studio File.
-   - "How many memory cards for this shoot?" Choices: "Just this one (recommended)", "2", "3", "4 or more". (Other is there for a number.)
+   - "How many memory cards for this shoot?" Choices: "Just this one", "2", "3", "4 or more". (Other is there for a number.) No recommended on this one; only they know.
 
    Run the preflight (step 4) while you wait. Then: "Starting now. You can walk away." That screen is the whole conversation on a normal night; nothing else is asked.
 
