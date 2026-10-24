@@ -3,7 +3,7 @@
 shoot, with every photo named for the shoot and its original filename kept
 inside the new one, in shooting order. Rule 1 in code:
 
-  - the card is never touched; this only ever works on the copy
+  - the card is never changed; this only ever works on the copy
   - it refuses to run unless backup.py verified every file and saw no problems
   - nothing is deleted or overwritten: a destination that already exists stops it
   - files are renamed on the same drive (no data is copied), then every moved
