@@ -14,6 +14,7 @@ backup.py calls write_page() at the end of every run.
 """
 import html
 import json
+import os
 import sys
 from collections import Counter
 from datetime import datetime
@@ -65,7 +66,14 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .chip{position:absolute;padding:.55rem 1rem;border-radius:999px;font:500 13px/1 var(--sans);color:var(--ink);border:3px solid var(--paper);box-shadow:0 12px 26px -12px rgba(31,36,48,.4);transform:rotate(var(--rot,0deg));z-index:2}
 .f-sun{background:var(--sun-l)}.f-ocean{background:var(--ocean-l)}.f-lime{background:var(--lime)}.f-sand{background:var(--sand-l)}.f-paper{background:var(--paper)}
 .teaser-note{font-size:13px;color:var(--ink-2);margin-top:-.6rem}
-.cards{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
+.where-card{justify-content:center}
+.where-card .path{font:400 14px/1.45 var(--sans);color:var(--ink-2);word-break:break-all;background:var(--paper);border-radius:14px;padding:.75rem .9rem}
+a.go{display:inline-flex;align-items:center;gap:.9rem;align-self:flex-start;padding:.5rem .5rem .5rem 1.4rem;border-radius:999px;background:var(--coral);color:#fff;font:500 17px/1 var(--sans);text-decoration:none;border:1.5px solid var(--coral);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+a.go:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+a.go .arr{width:38px;height:38px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:17px;transition:transform .35s var(--ease)}
+a.go:hover .arr{transform:translate(2px,-2px)}
+.where-card .also{font-size:13px;color:var(--ink-2);word-break:break-all}
 .card{border-radius:var(--r);padding:1.6rem;background:var(--paper);display:flex;flex-direction:column;gap:.8rem;min-height:220px}
 .card h3{font:600 20px/1.25 var(--sans);letter-spacing:-.015em}
 .card p{color:var(--ink-2);font-size:15px}.card p b{color:var(--ink);font-weight:600}
@@ -116,6 +124,39 @@ def duration(start, end):
         return seconds_text((datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds())
     except (TypeError, ValueError):
         return ""
+
+
+def index_facts(studio):
+    """When it was taken and on what, from index.json, in plain words."""
+    p = studio / "index.json"
+    if not p.exists():
+        return None
+    try:
+        ix = json.loads(p.read_text())
+    except (ValueError, OSError):
+        return None
+    if not ix.get("first"):
+        return None
+
+    def day(iso):
+        return datetime.fromisoformat(iso).strftime("%b %-d, %Y")
+
+    def clock(iso):
+        return datetime.fromisoformat(iso).strftime("%-I:%M %p").replace("AM", "am").replace("PM", "pm")
+
+    first, last = ix["first"], ix["last"]
+    if first[:10] == last[:10]:
+        span = f"{day(first)}, {clock(first)} to {clock(last)}"
+    else:
+        span = f"{day(first)} to {day(last)}"
+    ndays = len(ix.get("days", {}))
+    days = f" · {ndays} days of shooting" if ndays > 1 else ""
+    cams = ix.get("cameras", {})
+    bodies = ix.get("bodies", 0)
+    cam_text = ", ".join(f"{c} ({n:,})" for c, n in cams.items()) if len(cams) > 1 else next(iter(cams), "")
+    if bodies > 1:
+        cam_text += f" · {bodies} camera bodies"
+    return {"span": span, "days": days, "cameras": cam_text}
 
 
 def teasers(studio):
@@ -222,31 +263,51 @@ def build(manifest, studio):
             for i, (k, n) in enumerate(parts)) + "</div>")
         out.append("<div class='legend'>" + "".join(
             f"<span><i style='background:{PALETTE[i % len(PALETTE)]}'></i>{n:,} .{e(k)}</span>" for i, (k, n) in enumerate(parts)) + "</div>")
-    taken = manifest.get("taken")
-    out.append(f"<p>Taken: <b>{e(taken)}</b></p>" if taken else "<p>Taken: dates will show here once the index is built.</p>")
+    ix = index_facts(studio)
+    if ix:
+        out.append(f"<p>Taken: <b>{e(ix['span'])}</b>{e(ix['days'])}</p>")
+        out.append(f"<p>{e(ix['cameras'])}</p>")
+    else:
+        out.append("<p>Taken: dates will show here once the index is built.</p>")
     if skipped:
         out.append(f"<p>{skipped} hidden Mac system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
     out.append("</div>")
 
-    out.append("<div class='card f-sand'><span class='eyebrow'>Where</span>")
-    out.append(f"<div class='row'><b>From</b><span>{e(manifest.get('source', ''))}</span></div>")
-    out.append(f"<div class='row'><b>Your drive</b><span>{e(manifest.get('dest', ''))}</span></div>")
-    if second:
-        tail = "" if ok_second == total else f" · {ok_second:,} of {total:,} checked"
-        out.append(f"<div class='row'><b>Second copy</b><span>{e(second)}{e(tail)}</span></div>")
-    out.append("</div>")
+    def photos_folder(root):
+        """The folder the photos actually sit in (e.g. .../DCIM/100EOSR5), not the top of the drive."""
+        if not root:
+            return root
+        parents = {Path(k).parent for k in files if Path(k).suffix.lower() in MEDIA}
+        if not parents:
+            return root
+        common = Path(*os.path.commonprefix([list(p.parts) for p in parents])) if len(parents) > 1 else parents.pop()
+        return str(Path(root) / common) if str(common) not in (".", "") else root
 
-    if all_good:
-        out.append("<div class='card f-lime'><span class='eyebrow' style='color:var(--ink-deep)'>The card</span>"
-                   "<p class='big-ok'>Untouched. Safe to format when you're ready.</p>"
-                   "<p>Both copies are identical. Formatting is always your move, never ours.</p></div>")
-    else:
-        out.append("<div class='card f-sun'><span class='eyebrow'>The card</span>"
-                   "<p class='big-ok'>Untouched. Keep it.</p><p>Until this report says every file is checked, the card is the original.</p></div>")
+    # one card, one button: where the photos ended up, and a way to go there.
+    # Opens the folder in Finder: from Safari on its own, or via serve_report.py inside the app.
+    where = photos_folder(manifest.get("dest", ""))
+    url = Path(where).as_uri() + "/" if where else ""
+    out.append("<div class='card f-sand where-card'><span class='eyebrow'>Where your photos are</span>")
+    out.append(f"<p class='path'>{e(where)}</p>")
+    if url:
+        out.append(f"<a class='go where' href='{e(url)}' title='Open this folder in Finder'>Take me to the photos"
+                   "<span class='arr'>&#8599;</span></a>")
+    if second:
+        tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
+        out.append(f"<p class='also'>Second copy{e(tail)}: {e(photos_folder(second))}</p>")
+    if not all_good:
+        out.append("<p class='also'>The card is untouched. Keep it until this report says every file is checked.</p>")
+    out.append("</div>")
     out.append("</div></div>")
 
     out.append("<footer class='foot'><div class='wrap'>Nothing deleted, nothing moved, nothing posted.</div>"
-               "<div class='wordmark'>The Studio</div></footer></body></html>")
+               "<div class='wordmark'>The Studio</div></footer>")
+    # Served from localhost (inside the Claude app), a page may not open file:// links itself,
+    # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.
+    out.append("<script>if(location.protocol.startsWith('http')){let last=0;for(const a of document.querySelectorAll('a.where')){"
+               "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
+               "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
+               "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script></body></html>")
     return "\n".join(out)
 
 

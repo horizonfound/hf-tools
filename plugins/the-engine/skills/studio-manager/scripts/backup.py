@@ -291,9 +291,13 @@ def main():
               "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · nothing deleted, nothing moved, nothing posted._"]
     report = "\n".join(lines) + "\n"
     (studio / "morning-report.md").write_text(report)
-    # the same report as a page she can look at; never let it break the backup
+    # the index (when each photo was taken, which camera) and the same report as a
+    # page she can look at; neither may ever break the backup
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
+        if not problems and not a.dry_run:
+            from index import build as build_index
+            build_index(dest)
         from report_page import write_page
         page = write_page(dest)
     except Exception as e:  # noqa: BLE001
