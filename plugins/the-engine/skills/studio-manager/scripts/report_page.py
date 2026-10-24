@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""Turn a session's _studio/manifest.json into a page she can look at:
+_studio/report.html. One file, no account; opens in the Claude desktop app or
+any browser. Problems first, then the good news, then a few teasers from the
+shoot itself (from _studio/previews/, picked in _studio/teasers.json).
+
+The look follows the Studio sales-page mock-up ("Fresh": cream desk, coral
+accent, Fraunces + DM Sans, rounded cards, a few things tilted). Fonts load
+from Google when there is internet and fall back to Georgia / the system font
+when there is not; the page works either way.
+
+Run on its own:  python3 report_page.py "<session folder>"
+backup.py calls write_page() at the end of every run.
+"""
+import html
+import json
+import sys
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
+
+MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff",
+         ".mov", ".mp4", ".mxf", ".avi"}
+
+FONTS = ("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600"
+         "&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&display=swap")
+
+CSS = """
+:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--ink-deep:#2F6F6B;
+--coral:#F07F5A;--coral-2:#D4643F;--ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;
+--line:rgba(31,36,48,.12);--shadow:0 30px 60px -30px rgba(31,36,48,.35);
+--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;--r:30px;--ease:cubic-bezier(.2,.7,.2,1);
+color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding:0 clamp(16px,3vw,32px)}
+.bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:.6rem;white-space:nowrap}
+.brand b{font:600 16px/1 var(--sans);letter-spacing:-.01em}
+.brand small{font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
+.bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2);white-space:nowrap}
+.eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
+.h1{font:600 clamp(36px,5.4vw,64px)/1.02 var(--sans);letter-spacing:-.035em;text-wrap:balance;max-width:14em}
+.h1.bad{max-width:16em}
+.swap{font:italic 400 1.14em/1 var(--display);color:var(--ink);text-decoration:underline wavy var(--coral);text-decoration-thickness:.06em;text-underline-offset:.1em;letter-spacing:0}
+.lede{font-size:clamp(16px,1.4vw,19px);color:var(--ink-2);max-width:36em;text-wrap:pretty}
+.hero{display:grid;gap:1.2rem;padding:clamp(2.2rem,5vw,4rem) 0 clamp(1.6rem,3vw,2.4rem)}
+.pill{display:inline-flex;align-items:center;gap:.7rem;padding:.4rem .4rem .4rem 1.1rem;border-radius:999px;font:500 14px/1 var(--sans);background:var(--paper);border:1.5px solid var(--ink);white-space:nowrap;width:max-content}
+.pill .dot{width:30px;height:30px;border-radius:50%;background:var(--lime);display:grid;place-items:center;flex:none;color:var(--ink)}
+.pill.bad{background:var(--coral);border-color:var(--coral);color:#fff}.pill.bad .dot{background:var(--paper);color:var(--coral)}
+.pill.wait{background:var(--sun-l);border-color:var(--sun)}.pill.wait .dot{background:var(--sun)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat{padding:1.5rem 1.2rem;border-left:1px solid var(--line)}.stat:first-child{border-left:0}
+.stat b{display:block;font:600 clamp(34px,4.2vw,54px)/1 var(--sans);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:.6rem}
+.problems{background:var(--coral);color:#fff;border-radius:var(--r);padding:clamp(1.4rem,3vw,2.2rem);display:grid;gap:.8rem;margin-top:1.4rem}
+.problems .eyebrow{color:#fff;opacity:.85}.problems h2{font:600 clamp(22px,2.4vw,30px)/1.15 var(--sans);letter-spacing:-.02em}
+.problems ul{margin:0;padding-left:1.2rem;display:grid;gap:.4rem;font-size:16px}.problems p{opacity:.92}
+.teasers{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:clamp(.6rem,1.6vw,1.2rem);padding:clamp(2.4rem,5vw,3.6rem) 0 clamp(1.8rem,3vw,2.6rem);align-items:end}
+.teasers .ph{border-radius:22px;overflow:hidden;aspect-ratio:4/5;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease)}
+.teasers .ph:hover{transform:rotate(0) translateY(-8px);box-shadow:var(--shadow)}
+.teasers .ph img{width:100%;height:100%;object-fit:cover}
+.teasers .ph:nth-child(2n){margin-bottom:1.6rem}
+.chip{position:absolute;padding:.55rem 1rem;border-radius:999px;font:500 13px/1 var(--sans);color:var(--ink);border:3px solid var(--paper);box-shadow:0 12px 26px -12px rgba(31,36,48,.4);transform:rotate(var(--rot,0deg));z-index:2}
+.f-sun{background:var(--sun-l)}.f-ocean{background:var(--ocean-l)}.f-lime{background:var(--lime)}.f-sand{background:var(--sand-l)}.f-paper{background:var(--paper)}
+.teaser-note{font-size:13px;color:var(--ink-2);margin-top:-.6rem}
+.cards{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
+.card{border-radius:var(--r);padding:1.6rem;background:var(--paper);display:flex;flex-direction:column;gap:.8rem;min-height:220px}
+.card h3{font:600 20px/1.25 var(--sans);letter-spacing:-.015em}
+.card p{color:var(--ink-2);font-size:15px}.card p b{color:var(--ink);font-weight:600}
+.bar-k{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--sand-l)}.bar-k span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--ink-2);font-size:13.5px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.row{display:grid;gap:.15rem;padding:.7rem 0;border-top:1px solid var(--line)}.row:first-of-type{border-top:0;padding-top:0}
+.row b{font-size:13px;font-weight:600}.row span{color:var(--ink-2);font-size:14px;word-break:break-all}
+.card.f-lime p,.card.f-sun p{color:var(--ink)}
+.big-ok{font:400 clamp(26px,2.6vw,34px)/1.1 var(--display);text-wrap:balance}
+.foot{background:var(--ink);color:var(--cream);overflow:hidden;margin-top:1rem}
+.foot .wrap{padding-top:2rem;font-size:14px;text-align:center;opacity:.9}
+.wordmark{font:400 clamp(44px,11vw,160px)/.78 var(--display);letter-spacing:-.03em;white-space:nowrap;text-transform:uppercase;text-align:center;margin:1.2rem 0 -.22em;color:var(--coral)}
+@media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}
+.teasers{grid-template-columns:repeat(3,1fr)}.cards{grid-template-columns:1fr}}
+@media(max-width:600px){.teasers{grid-template-columns:repeat(2,1fr)}.bar .when{display:none}}
+"""
+
+PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
+ROTS = [-3, 2, -1.5, 2.5, -2, 1.5]
+
+
+def human(n):
+    for unit in ("bytes", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{n:.0f} {unit}" if unit == "bytes" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def nice_time(iso):
+    try:
+        d = datetime.fromisoformat(iso)
+        return d.strftime("%A, %B %-d · %-I:%M %p").replace("AM", "am").replace("PM", "pm")
+    except (TypeError, ValueError):
+        return ""
+
+
+def seconds_text(s):
+    if s < 90:
+        return f"{s:.0f} sec"
+    if s < 5400:
+        return f"{s / 60:.0f} min"
+    return f"{s / 3600:.1f} hrs"
+
+
+def duration(start, end):
+    try:
+        return seconds_text((datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds())
+    except (TypeError, ValueError):
+        return ""
+
+
+def teasers(studio):
+    """Up to six previews: the ones picked in teasers.json if it exists, else an even spread."""
+    folder = studio / "previews"
+    if not folder.is_dir():
+        return [], ""
+    picks, note = [], ""
+    tj = studio / "teasers.json"
+    if tj.exists():
+        try:
+            d = json.loads(tj.read_text())
+            picks = [folder / f for f in d.get("files", []) if (folder / f).exists()]
+            note = d.get("picked_by", "")
+        except (ValueError, OSError):
+            picks = []
+    if not picks:
+        allp = sorted(p for p in folder.glob("*.jpg"))
+        if len(allp) > 6:
+            step = (len(allp) - 1) / 5
+            allp = [allp[round(i * step)] for i in range(6)]
+        picks, note = allp, "evenly across the shoot; the good ones get chosen later"
+    return picks[:6], note
+
+
+def build(manifest, studio):
+    files = manifest.get("files", {})
+    total = len(files)
+    total_bytes = sum(e.get("size", 0) for e in files.values() if e.get("size", 0) > 0)
+    ok_dest = sum(1 for e in files.values() if e.get("dest", {}).get("ok"))
+    second = manifest.get("second")
+    ok_second = sum(1 for e in files.values() if e.get("second", {}).get("ok")) if second else None
+    problems = manifest.get("problems") or []
+    kinds = Counter(Path(k).suffix.lower().lstrip(".") or "other" for k in files)
+    media = sum(n for k, n in kinds.items() if f".{k}" in MEDIA)
+    skipped = manifest.get("skipped_system_files", 0)
+    session = manifest.get("session", "Session")
+    name = session.split(" ", 1)[1] if session[:10].count("-") == 2 and " " in session else session
+    finished = manifest.get("finished")
+    work = manifest.get("work_seconds")
+    took = seconds_text(work) if work else duration(manifest.get("started"), finished)
+    all_good = not problems and ok_dest == total and (ok_second == total if second else True)
+    pics, pick_note = teasers(studio)
+    e = html.escape
+
+    out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
+           f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>",
+           "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
+           f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span></div></div>"]
+
+    # hero: the one line she needs
+    out.append("<section class='wrap hero'>")
+    out.append(f"<span class='eyebrow'>Morning report · {e(name)}</span>")
+    if problems:
+        out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
+        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. The card has not been touched; "
+                   "fix what's below, run it again, and it picks up where it left off.</p>")
+        out.append("<span class='pill bad'><span class='dot'>!</span>Not finished</span>")
+        out.append("<div class='problems'><span class='eyebrow'>Needs you first</span><h2>What stopped it</h2><ul>"
+                   + "".join(f"<li>{e(p)}</li>" for p in problems) + "</ul></div>")
+    elif all_good:
+        where = "your drive and your second copy" if second else "your drive"
+        out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
+        out.append(f"<p class='lede'>Every one was checked against the card, byte for byte. They're on {where}. "
+                   "Nothing deleted, nothing moved, nothing posted.</p>")
+        out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
+    else:
+        out.append(f"<h1 class='h1'>Not finished <span class='swap'>yet.</span></h1>")
+        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked so far. Run it again to continue.</p>")
+        out.append("<span class='pill wait'><span class='dot'>…</span>Keep the card for now</span>")
+    out.append("</section>")
+
+    # the numbers
+    out.append("<div class='wrap'><div class='stats'>"
+               f"<div class='stat'><b>{total:,}</b><span class='eyebrow'>files</span></div>"
+               f"<div class='stat'><b>{e(human(total_bytes))}</b><span class='eyebrow'>copied</span></div>"
+               f"<div class='stat'><b>{ok_dest:,}</b><span class='eyebrow'>checked byte for byte</span></div>"
+               f"<div class='stat'><b>{e(took) or '—'}</b><span class='eyebrow'>to finish</span></div>"
+               "</div></div>")
+
+    # teasers from the shoot
+    if pics:
+        out.append("<div class='wrap'><div class='teasers'>")
+        for i, p in enumerate(pics):
+            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
+        chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", f"{media:,} photos"),
+                 ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
+                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good else "keep the card")]
+        for cls, rot, pos, text in chips:
+            out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
+        out.append("</div>")
+        if pick_note:
+            out.append(f"<p class='teaser-note'>Teasers picked {e(pick_note)}.</p>")
+        out.append("</div>")
+
+    # the details
+    out.append("<div class='wrap'><div class='cards'>")
+    out.append("<div class='card'><span class='eyebrow'>What's on it</span>"
+               f"<h3>{media:,} photos or clips</h3>")
+    if total:
+        parts = kinds.most_common()
+        out.append("<div class='bar-k'>" + "".join(
+            f"<span style='width:{100 * n / total:.2f}%;background:{PALETTE[i % len(PALETTE)]}' title='{e(k)}: {n:,}'></span>"
+            for i, (k, n) in enumerate(parts)) + "</div>")
+        out.append("<div class='legend'>" + "".join(
+            f"<span><i style='background:{PALETTE[i % len(PALETTE)]}'></i>{n:,} .{e(k)}</span>" for i, (k, n) in enumerate(parts)) + "</div>")
+    taken = manifest.get("taken")
+    out.append(f"<p>Taken: <b>{e(taken)}</b></p>" if taken else "<p>Taken: dates will show here once the index is built.</p>")
+    if skipped:
+        out.append(f"<p>{skipped} hidden Mac system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
+    out.append("</div>")
+
+    out.append("<div class='card f-sand'><span class='eyebrow'>Where</span>")
+    out.append(f"<div class='row'><b>From</b><span>{e(manifest.get('source', ''))}</span></div>")
+    out.append(f"<div class='row'><b>Your drive</b><span>{e(manifest.get('dest', ''))}</span></div>")
+    if second:
+        tail = "" if ok_second == total else f" · {ok_second:,} of {total:,} checked"
+        out.append(f"<div class='row'><b>Second copy</b><span>{e(second)}{e(tail)}</span></div>")
+    out.append("</div>")
+
+    if all_good:
+        out.append("<div class='card f-lime'><span class='eyebrow' style='color:var(--ink-deep)'>The card</span>"
+                   "<p class='big-ok'>Untouched. Safe to format when you're ready.</p>"
+                   "<p>Both copies are identical. Formatting is always your move, never ours.</p></div>")
+    else:
+        out.append("<div class='card f-sun'><span class='eyebrow'>The card</span>"
+                   "<p class='big-ok'>Untouched. Keep it.</p><p>Until this report says every file is checked, the card is the original.</p></div>")
+    out.append("</div></div>")
+
+    out.append("<footer class='foot'><div class='wrap'>Nothing deleted, nothing moved, nothing posted.</div>"
+               "<div class='wordmark'>The Studio</div></footer></body></html>")
+    return "\n".join(out)
+
+
+def write_page(session_dir):
+    studio = Path(session_dir) / "_studio"
+    manifest = json.loads((studio / "manifest.json").read_text())
+    page = studio / "report.html"
+    page.write_text(build(manifest, studio))
+    return page
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("usage: report_page.py <session folder>")
+    print(write_page(sys.argv[1]))

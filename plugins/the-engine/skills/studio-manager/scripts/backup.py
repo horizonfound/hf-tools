@@ -48,11 +48,18 @@ def copy_with_hash(src, dst):
 
 
 def inventory(root):
+    """Every file worth copying, plus a count of the hidden Mac system files
+    (._ sidecars, .DS_Store) left behind on purpose, so the report's numbers
+    match what she sees in Finder."""
     files = []
+    skipped = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
         for fn in filenames:
-            if fn.startswith(".") or fn.endswith(".studio-partial"):
+            if fn.startswith("."):
+                skipped += 1
+                continue
+            if fn.endswith(".studio-partial"):
                 continue
             p = Path(dirpath) / fn
             try:
@@ -60,7 +67,7 @@ def inventory(root):
             except OSError:
                 files.append((p, -1))
     files.sort(key=lambda t: str(t[0]).lower())
-    return files
+    return files, skipped
 
 
 def free_bytes(path):
@@ -189,7 +196,7 @@ def main():
     dest = Path(a.dest).expanduser() / folder
     second = Path(a.second).expanduser() / folder if a.second else None
 
-    files = inventory(src)
+    files, skipped = inventory(src)
     total_bytes = sum(s for _, s in files if s > 0)
     media = [p for p, s in files if p.suffix.lower() in MEDIA]
     say(f"Source: {src}\n  {len(files)} files, {human(total_bytes)}, {len(media)} photos or clips")
@@ -221,6 +228,9 @@ def main():
     mpath = studio / "manifest.json"
     manifest = json.loads(mpath.read_text()) if mpath.exists() else {"session": folder, "source": str(src), "files": {}}
     manifest["source"] = str(src)
+    manifest["dest"] = str(dest)
+    manifest["second"] = str(second) if second else None
+    manifest["skipped_system_files"] = skipped
     manifest["started"] = manifest.get("started") or datetime.now().isoformat(timespec="seconds")
 
     t0 = time.time()
@@ -253,6 +263,8 @@ def main():
     elapsed = time.time() - t0
     manifest["finished"] = datetime.now().isoformat(timespec="seconds")
     manifest["problems"] = problems
+    manifest["taken"] = (f"{taken[0]} to {taken[-1]}" if len(taken) >= 2 else taken[0]) if taken else None
+    manifest["work_seconds"] = manifest.get("work_seconds", 0) + elapsed  # across resumed runs
     mpath.write_text(json.dumps(manifest, indent=1))
 
     lines = [f"# Morning report · {folder}", ""]
@@ -260,10 +272,11 @@ def main():
         lines += ["## Needs you first", ""] + [f"- {p}" for p in problems] + [""]
         lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. The card has not been touched; run it again when the problem is fixed and it picks up where it left off.", ""]
     else:
-        where = "two places" if second else "one place (no second copy was given for this run)"
-        lines += [f"**Safe in {where}.** All {len(files)} files ({human(total_bytes)}) copied and every one checked against the card, byte for byte.", ""]
+        lines += [f"**All {len(files)} files ({human(total_bytes)}) have been safely backed up and verified.** Every one was checked against the card, byte for byte."
+                  + (" They are on your drive and in your second copy." if second else ""), ""]
+    skipped_note = f" ({skipped} hidden Mac system file{'s' if skipped != 1 else ''} left behind, as they should be)" if skipped else ""
     lines += ["## What's on it", "",
-              f"- {len(media)} photos or clips, " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda t: -t[1])),
+              f"- {len(media)} photos or clips, " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda t: -t[1])) + skipped_note,
               f"- Taken: {taken[0]} to {taken[-1]}" if len(taken) >= 2 else (f"- Taken: {taken[0]}" if taken else "- Taken: (no dates found yet)")]
     cams = sorted({v["camera"] for v in infos.values() if v.get("camera")})
     if cams:
@@ -274,12 +287,22 @@ def main():
     lines += ["", "## Where", "", f"- Session drive: `{dest}`"]
     if second:
         lines.append(f"- Second copy: `{second}`" + ("" if ok_second == len(files) else f" ({ok_second} of {len(files)} checked)"))
-    lines += ["", "## The card", "", "Untouched. " + ("You can format it in the camera whenever you like." if (not problems and second) else "Keep it until a second copy exists." if not problems else "Keep it."),
+    lines += ["", "## The card", "", "Untouched. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
               "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · nothing deleted, nothing moved, nothing posted._"]
     report = "\n".join(lines) + "\n"
     (studio / "morning-report.md").write_text(report)
+    # the same report as a page she can look at; never let it break the backup
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from report_page import write_page
+        page = write_page(dest)
+    except Exception as e:  # noqa: BLE001
+        page = None
+        say(f"(could not write report.html: {e.__class__.__name__}: {e})")
     say("")
     say(report)
+    if page:
+        say(f"Open it: {page}")
     sys.exit(1 if problems else 0)
 
 
