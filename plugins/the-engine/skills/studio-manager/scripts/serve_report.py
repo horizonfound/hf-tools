@@ -76,8 +76,17 @@ def main():
     studio = Path(a.session) / "_studio"
     manifest = json.loads((studio / "manifest.json").read_text())
     Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), partial(Handler, directory=str(studio)))
-    print(f"Morning report: http://127.0.0.1:{a.port}/report.html", flush=True)
+    # the asked-for port, or the next free one: another session's server may be holding it
+    srv = None
+    for port in range(a.port, a.port + 20):
+        try:
+            srv = ThreadingHTTPServer(("127.0.0.1", port), partial(Handler, directory=str(studio)))
+            break
+        except OSError:
+            continue
+    if not srv:
+        sys.exit(f"STOP: no free port between {a.port} and {a.port + 19}.")
+    print(f"Morning report: http://127.0.0.1:{port}/report.html", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

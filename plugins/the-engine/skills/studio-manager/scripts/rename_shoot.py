@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sort import safe_folder, slug, sha256_of, load, say  # noqa: E402
+import studio_file  # noqa: E402
 
 NUMBERED = re.compile(r"^(?P<prefix>.+?)_(?P<n>\d{4})_(?P<orig>.+)$")
 
@@ -39,7 +40,12 @@ def plan_rename(session, studio, shoot_id, new_name):
     if not shoot.get("folder"):
         sys.exit(f"STOP: {shoot_id} has not been sorted yet; run sort.py first.")
     old_folder = Path(shoot["folder"])
-    new_folder = Path(safe_folder(new_name))
+    # her naming, from the Studio File: folder pattern, and whether photos keep their frame names
+    naming = studio_file.load().get("naming", {})
+    keep_names = naming.get("file_names", "shoot") == "original"
+    in_folder = [p for p in index["photos"] if Path(p["file"]).parent == old_folder and p.get("original")]
+    shoot_date = min((p["taken"] for p in in_folder if p.get("taken")), default=None)
+    new_folder = Path(safe_folder(studio_file.render(naming, new_name, shoot_date)) if naming.get("folder_pattern") and shoot_date else safe_folder(new_name))
     prefix = slug(new_name)
     if not (session / old_folder).is_dir():
         sys.exit(f"STOP: the folder {old_folder} is not there. Nothing renamed.")
@@ -48,24 +54,28 @@ def plan_rename(session, studio, shoot_id, new_name):
 
     files = manifest["files"]
     moves = []
-    for p in index["photos"]:
+    for p in in_folder:
         cur = Path(p["file"])
-        if cur.parent != old_folder or not p.get("original"):
-            continue
-        m = NUMBERED.match(cur.name)
-        if not m:
-            sys.exit(f"STOP: {cur.name} is not in the sorter's naming; will not guess. Nothing renamed.")
         rec = files.get(p["original"])
         if not rec or not rec.get("sha256"):
             sys.exit(f"STOP: no verified record for {p['original']}. Nothing renamed.")
-        new = new_folder / f"{prefix}_{m['n']}_{m['orig']}"
+        if keep_names:
+            # photos keep their frame names; only the folder changes
+            new = new_folder / cur.name
+            sidecar_name = lambda ext: cur.with_suffix(ext).name  # noqa: E731
+        else:
+            m = NUMBERED.match(cur.name)
+            if not m:
+                sys.exit(f"STOP: {cur.name} is not in the sorter's naming; will not guess. Nothing renamed.")
+            new = new_folder / f"{prefix}_{m['n']}_{m['orig']}"
+            sidecar_name = lambda ext, m=m: f"{prefix}_{m['n']}_{Path(m['orig']).stem}{ext}"  # noqa: E731
         moves.append({"from": p["file"], "to": new.as_posix(), "original": p["original"], "sha256": rec["sha256"]})
         # the sidecar, if the sorter brought one along
         for ext in (".xmp", ".XMP"):
             sc = cur.with_suffix(ext)
             if (session / sc).exists():
                 so = Path(p["original"]).with_suffix(ext).as_posix()
-                moves.append({"from": sc.as_posix(), "to": (new_folder / f"{prefix}_{m['n']}_{Path(m['orig']).stem}{ext}").as_posix(),
+                moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(ext)).as_posix(),
                               "original": so, "sha256": files.get(so, {}).get("sha256")})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
@@ -143,6 +153,54 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     say("  All done.")
 
 
+def finish_unfinished(session, studio):
+    """A rename that was cut off after moving but before the records were updated (power, a closed
+    pipe) leaves its log entry without 'finished'. Every move is in that entry, so finish it: see which
+    files landed, verify them, update the records. Runs before anything new."""
+    log_path = studio / "rename-log.json"
+    if not log_path.exists():
+        return
+    log = json.loads(log_path.read_text())
+    for entry in log.get("renames", []):
+        if entry.get("finished"):
+            continue
+        say(f"Finishing a rename that was cut off: {entry.get('from_name')} -> {entry.get('to_name')}")
+        new_path = {}
+        for m in entry["moves"]:
+            dst = session / m["to"]
+            if dst.exists():
+                new_path[m["from"]] = m["to"]
+                if m.get("sha256") and sha256_of(dst) == m["sha256"]:
+                    entry["verified"] = entry.get("verified", 0) + (0 if m.get("checked") else 1)
+                    m["checked"] = True
+                else:
+                    entry.setdefault("problems", []).append(f"could not verify {m['to']}")
+            elif (session / m["from"]).exists():
+                entry.setdefault("problems", []).append(f"never moved: {m['from']}")
+            else:
+                entry.setdefault("problems", []).append(f"missing: {m['from']}")
+        index = load(studio, "index.json")
+        for p in index["photos"]:
+            p["file"] = new_path.get(p["file"], p["file"])
+        (studio / "index.json").write_text(json.dumps(index, indent=1))
+        g = load(studio, "groups.json")
+        for grp in g["groups"]:
+            grp["files"] = [new_path.get(f, f) for f in grp["files"]]
+        (studio / "groups.json").write_text(json.dumps(g, indent=1))
+        sh = load(studio, "shoots.json")
+        folder = Path(next(iter(new_path.values()))).parent.as_posix() if new_path else None
+        for s in sh["shoots"]:
+            if s["id"] == entry["shoot"] and folder:
+                s["name"], s["folder"] = entry["to_name"], folder
+        (studio / "shoots.json").write_text(json.dumps(sh, indent=1))
+        names = load(studio, "names.json", required=False) or {}
+        names[entry["shoot"]] = entry["to_name"]
+        (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False))
+        entry["finished"] = datetime.now().isoformat(timespec="seconds") + " (finished on a later run)"
+        log_path.write_text(json.dumps(log, indent=1))
+        say(f"  {entry.get('verified', 0)} of {len(entry['moves'])} verified" + (f"; problems: {entry['problems']}" if entry.get("problems") else ""))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("session")
@@ -153,6 +211,7 @@ def main():
     a = ap.parse_args()
     session = Path(a.session).expanduser().resolve()
     studio = session / "_studio"
+    finish_unfinished(session, studio)
 
     jobs = []
     if a.from_names:

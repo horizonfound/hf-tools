@@ -28,9 +28,16 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import studio_file  # noqa: E402
+
 
 def say(msg):
-    print(msg, flush=True)
+    """Print, but never let a closed pipe (someone ran us through `head`) stop the work on her files."""
+    try:
+        print(msg, flush=True)
+    except BrokenPipeError:
+        sys.stdout = open(os.devnull, "w")
 
 
 def safe_folder(name):
@@ -81,28 +88,35 @@ def make_plan(session, studio):
                  f"{len(manifest.get('problems') or [])} problems). Nothing sorted.")
 
     by_file = {p["file"]: p for p in index["photos"]}
+    # her naming, from the Studio File: how folders are named, and whether photos keep their frame names
+    naming = studio_file.load().get("naming", {})
+    keep_names = naming.get("file_names", "shoot") == "original"
     # a photo the sorter already placed carries its original path; it is never planned again
     already = sum(1 for p in index["photos"] if p.get("original"))
     moves, used_dest = [], set()
     for s in shoots:
         name = (names.get(s["id"]) or s.get("suggested") or s["id"]).strip()
-        folder = safe_folder(name)
-        prefix = slug(name)
         photos = sorted((by_file[f] for g in s["groups"] for f in groups[g]["files"]
                          if f in by_file and not by_file[f].get("original")),
                         key=lambda p: (p.get("taken") or "", p["file"]))
+        if not photos:
+            continue
+        shoot_date = photos[0].get("taken") or groups[s["groups"][0]]["start"]
+        folder = safe_folder(studio_file.render(naming, name, shoot_date)) if naming.get("folder_pattern") else safe_folder(name)
+        prefix = slug(name)
         for n, p in enumerate(photos, 1):
             src = Path(p["file"])
-            new_name = f"{prefix}_{n:04d}_{src.name}"
+            new_name = src.name if keep_names else f"{prefix}_{n:04d}_{src.name}"
             dest = Path(folder) / new_name
             cands = [(src, dest)]
             # the sidecar travels with its photo, same new stem
             for sc in (src.with_suffix(".xmp"), src.with_suffix(".XMP")):
                 if sc.as_posix() in files:
-                    cands.append((sc, Path(folder) / f"{prefix}_{n:04d}_{sc.name}"))
+                    cands.append((sc, Path(folder) / (sc.name if keep_names else f"{prefix}_{n:04d}_{sc.name}")))
             for a, b in cands:
                 if b.as_posix() in used_dest:
-                    sys.exit(f"STOP: two files would land on {b}. Nothing sorted.")
+                    sys.exit(f"STOP: two files would land on {b}. Nothing sorted."
+                             + (" (Two frames share a name; naming photos for the shoot would keep them apart.)" if keep_names else ""))
                 rec = files.get(a.as_posix())
                 if not rec or not rec.get("sha256"):
                     # no verified record means we could not prove the move safe afterwards: refuse

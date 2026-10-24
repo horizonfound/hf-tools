@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""The Studio File: what the Studio knows about her, asked once, on the first
+run, and never again. Lives in ~/.studio/ as studio.json (what the scripts
+read) with a plain-words mirror in studio-file.md (what she can read).
+
+    python3 studio_file.py show
+    python3 studio_file.py drives                         the drives it can see, to pick from
+    python3 studio_file.py set --drive "/Volumes/Big Kahuna" [--second "/path"] \
+        [--example "2026-10-18 Smith Family" | --folder-pattern "{shoot}, {date}" --date-format "%b %-d %Y"] \
+        [--file-names original|shoot]
+    python3 studio_file.py pattern "Smith Family - 10.18.26"    show what a pasted example teaches it
+    python3 studio_file.py render "Smith Family" 2026-10-18     the folder name her pattern gives
+
+Naming: a folder pattern made of {shoot} and {date}, with a strftime format
+for the date, worked out from an example folder name she pastes (so her
+drive looks the same before and after the Studio) or picked from two
+offered patterns. Photos either keep their original frame names or take the
+shoot's name with a running number ("shoot").
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
+JSON = HOME / "studio.json"
+MD = HOME / "studio-file.md"
+
+OFFERED = [
+    {"label": "Smith Family, Oct 18 2026", "folder_pattern": "{shoot}, {date}", "date_format": "%b %-d %Y"},
+    {"label": "2026-10-18 Smith Family", "folder_pattern": "{date} {shoot}", "date_format": "%Y-%m-%d"},
+]
+
+# date spellings a photographer might use in a folder name, most specific first
+DATE_FORMS = [
+    (r"(?<![A-Za-z0-9])(\d{4})-(\d{2})-(\d{2})(?![A-Za-z0-9])", "%Y-%m-%d"),
+    (r"(?<![A-Za-z0-9])(\d{4})_(\d{2})_(\d{2})(?![A-Za-z0-9])", "%Y_%m_%d"),
+    (r"(?<![A-Za-z0-9])(\d{4})\.(\d{2})\.(\d{2})(?![A-Za-z0-9])", "%Y.%m.%d"),
+    (r"(?<![A-Za-z0-9])(\d{4})(\d{2})(\d{2})(?![A-Za-z0-9])", "%Y%m%d"),
+    (r"(?<![A-Za-z0-9])(\d{1,2})-(\d{1,2})-(\d{4})(?![A-Za-z0-9])", "%m-%d-%Y"),
+    (r"(?<![A-Za-z0-9])(\d{1,2})\.(\d{1,2})\.(\d{4})(?![A-Za-z0-9])", "%m.%d.%Y"),
+    (r"(?<![A-Za-z0-9])(\d{1,2})_(\d{1,2})_(\d{4})(?![A-Za-z0-9])", "%m_%d_%Y"),
+    (r"(?<![A-Za-z0-9])(\d{1,2})-(\d{1,2})-(\d{2})(?![A-Za-z0-9])", "%m-%d-%y"),
+    (r"(?<![A-Za-z0-9])(\d{1,2})\.(\d{1,2})\.(\d{2})(?![A-Za-z0-9])", "%m.%d.%y"),
+    (r"(?<![A-Za-z0-9])(\d{2})(\d{2})(\d{2})(?![A-Za-z0-9])", "%m%d%y"),
+    (r"(?<![A-Za-z0-9])(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})(?![A-Za-z0-9])", "%B %-d, %Y"),
+    (r"(?<![A-Za-z0-9])(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})(?![A-Za-z0-9])", "%B %-d %Y"),
+    (r"(?<![A-Za-z0-9])(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.? (\d{1,2}), (\d{4})(?![A-Za-z0-9])", "%b %-d, %Y"),
+    (r"(?<![A-Za-z0-9])(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.? (\d{1,2}) (\d{4})(?![A-Za-z0-9])", "%b %-d %Y"),
+    (r"(?<![A-Za-z0-9])(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (\d{4})(?![A-Za-z0-9])", "%-d %b %Y"),
+    (r"(?<![A-Za-z0-9])(January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})(?![A-Za-z0-9])", "%B %Y"),
+    (r"(?<![A-Za-z0-9])(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})(?![A-Za-z0-9])", "%b %Y"),
+    (r"(?<![A-Za-z0-9])(\d{4})(?![A-Za-z0-9])", "%Y"),
+]
+
+
+def load():
+    if JSON.exists():
+        try:
+            return json.loads(JSON.read_text())
+        except ValueError:
+            pass
+    return {}
+
+
+def save(sf):
+    HOME.mkdir(parents=True, exist_ok=True)
+    sf["updated"] = datetime.now().isoformat(timespec="seconds")
+    JSON.write_text(json.dumps(sf, indent=1, ensure_ascii=False))
+    MD.write_text(as_markdown(sf))
+
+
+def as_markdown(sf):
+    d, n = sf.get("drives", {}), sf.get("naming", {})
+    lines = ["# Studio File", "", "What the Studio knows about you. Asked once; change any line by telling the Studio.", "",
+             "## Drives", "",
+             f"- Sessions go on: `{d.get('session', '(not set)')}`",
+             f"- Second copy: `{d.get('second')}`" if d.get("second") else "- Second copy: none (that's fine)", "",
+             "## Naming", ""]
+    if n.get("folder_pattern"):
+        lines += [f"- Shoot folders look like: **{render(n, 'Smith Family', date(2026, 10, 18))}**",
+                  f"- Pattern: `{n['folder_pattern']}` with the date as `{n['date_format']}`"
+                  + (f", learned from your example `{n['example']}`" if n.get("example") else "")]
+    else:
+        lines += ["- Shoot folders: (not set)"]
+    lines += [f"- Photos: {'keep their original frame names' if n.get('file_names', 'shoot') == 'original' else 'take the shoot name and a running number, with the original frame name kept at the end'}",
+              "", f"_Updated {sf.get('updated', '')}_", ""]
+    return "\n".join(lines)
+
+
+def drives():
+    """Volumes she might mean, biggest first; the system drive and tiny helper volumes left out."""
+    out = []
+    for v in Path("/Volumes").iterdir():
+        try:
+            st = os.statvfs(v)
+        except OSError:
+            continue
+        total = st.f_frsize * st.f_blocks
+        free = st.f_frsize * st.f_bavail
+        if total < 8 * 1024 ** 3 or v.name in ("Macintosh HD", "Recovery") or (v / "DCIM").is_dir():
+            continue  # too small to be a session drive, the Mac itself, or a camera card
+        out.append({"path": str(v), "name": v.name, "total_gb": round(total / 1024 ** 3), "free_gb": round(free / 1024 ** 3)})
+    return sorted(out, key=lambda d: -d["total_gb"])
+
+
+def learn_pattern(example):
+    """From a folder name she pasted: where the date is, how it is written, what sits between."""
+    ex = example.strip()
+    for rx, fmt in DATE_FORMS:
+        m = re.search(rx, ex, re.IGNORECASE)
+        if not m:
+            continue
+        try:  # make sure the spelling really parses as that format
+            datetime.strptime(m.group(0).replace("Sept", "Sep"), fmt.replace("%-d", "%d"))
+        except ValueError:
+            continue
+        before, after = ex[:m.start()], ex[m.end():]
+        words = lambda s: re.search(r"[A-Za-z0-9]", s) is not None  # noqa: E731
+        if words(before):
+            # the shoot comes first; whatever punctuation sits between it and the date is the separator
+            sep = re.search(r"[^A-Za-z0-9]*$", before).group(0)
+            shoot = before[:len(before) - len(sep)]
+            pat = "{shoot}" + sep + "{date}" + after
+        elif words(after):
+            sep = re.match(r"^[^A-Za-z0-9]*", after).group(0)
+            shoot = after[len(sep):]
+            pat = before + "{date}" + sep + "{shoot}"
+        else:
+            return None
+        got = {"folder_pattern": pat, "date_format": fmt, "example": ex, "example_shoot": shoot.strip()}
+        if " " not in shoot.strip() and "_" in shoot:
+            got["space"] = "_"  # she writes Smith_Family, so the Studio does too
+        return got
+    return None
+
+
+def render(naming, shoot, when):
+    """The folder name her pattern gives this shoot on this date."""
+    pat = naming.get("folder_pattern") or "{shoot}, {date}"
+    fmt = naming.get("date_format") or "%b %-d %Y"
+    if isinstance(when, str):
+        when = datetime.fromisoformat(when[:19] if len(when) > 10 else when)
+    out = pat.replace("{date}", when.strftime(fmt)).replace("{shoot}", shoot.replace(" ", naming.get("space", " ")))
+    return re.sub(r'[\\/:*?"<>|]+', " ", out).strip(" .")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("show")
+    sub.add_parser("drives")
+    s = sub.add_parser("set")
+    s.add_argument("--drive")
+    s.add_argument("--second")
+    s.add_argument("--no-second", action="store_true")
+    s.add_argument("--example", help="a folder name from a past shoot to match")
+    s.add_argument("--folder-pattern")
+    s.add_argument("--date-format")
+    s.add_argument("--offered", type=int, help="1 or 2: one of the two offered patterns")
+    s.add_argument("--file-names", choices=["original", "shoot"])
+    p = sub.add_parser("pattern")
+    p.add_argument("example")
+    r = sub.add_parser("render")
+    r.add_argument("shoot")
+    r.add_argument("date")
+    a = ap.parse_args()
+
+    if a.cmd == "show":
+        sf = load()
+        print(as_markdown(sf) if sf else "No Studio File yet. The first 'backup now' sets it up.")
+        return
+    if a.cmd == "drives":
+        for d in drives():
+            print(f"{d['path']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free")
+        return
+    if a.cmd == "pattern":
+        got = learn_pattern(a.example)
+        if not got:
+            sys.exit("Could not find a date in that name. Ask her where the date goes, or offer the two patterns.")
+        print(json.dumps(got, indent=1))
+        print("Smith Family on Oct 18, 2026 would be:", render(got, "Smith Family", date(2026, 10, 18)))
+        return
+    if a.cmd == "render":
+        print(render(load().get("naming", {}), a.shoot, a.date))
+        return
+
+    sf = load()
+    d = sf.setdefault("drives", {})
+    n = sf.setdefault("naming", {})
+    if a.drive:
+        if not Path(a.drive).is_dir():
+            sys.exit(f"STOP: {a.drive} is not a folder I can see.")
+        d["session"] = str(Path(a.drive).expanduser().resolve())
+    if a.second:
+        if not Path(a.second).is_dir():
+            sys.exit(f"STOP: {a.second} is not a folder I can see.")
+        d["second"] = str(Path(a.second).expanduser().resolve())
+    if a.no_second:
+        d["second"] = None
+    if a.example:
+        got = learn_pattern(a.example)
+        if not got:
+            sys.exit("Could not find a date in that example.")
+        n.update(got)
+    if a.offered:
+        n.update(OFFERED[a.offered - 1])
+        n.pop("example", None)
+    if a.folder_pattern:
+        n["folder_pattern"] = a.folder_pattern
+        n.pop("example", None)
+    if a.date_format:
+        n["date_format"] = a.date_format
+    if a.file_names:
+        n["file_names"] = a.file_names
+    save(sf)
+    print(as_markdown(sf))
+
+
+if __name__ == "__main__":
+    main()

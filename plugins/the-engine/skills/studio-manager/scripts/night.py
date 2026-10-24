@@ -14,16 +14,26 @@ Safe to run again at any point; each step is skipped once its result exists.
 
 Exit codes: 0 done · 1 problems (read the report) · 2 stop (missing source
 or drive) · 3 paused (run again) · 4 needs Claude's look (read
-_studio/groups-sheet.png, write _studio/shoots.json, run again).
+_studio/groups-sheet.png, write _studio/shoots.json, run again) · 5 needs
+setup (no Studio File yet: ask her drive and naming, save with
+studio_file.py, run again).
+
+Her drive, second copy and naming come from ~/.studio (studio_file.py), so
+after the first run the command is just:  night.py --source /Volumes/CARD
+A card the ledger (cards.py) already knows is not copied again.
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import cards  # noqa: E402
+import studio_file  # noqa: E402
 
 
 def say(msg):
@@ -31,13 +41,54 @@ def say(msg):
 
 
 def run(script, *args):
-    """Run one of the scripts beside this one, streaming its output; return its exit code."""
-    return subprocess.run([sys.executable, str(HERE / script), *map(str, args)]).returncode
+    """Run one of the scripts beside this one, streaming its output; return its exit code.
+    On a Mac, under caffeinate, so the Mac does not doze off in the middle of a long copy."""
+    cmd = [sys.executable, str(HERE / script), *map(str, args)]
+    if sys.platform == "darwin" and Path("/usr/bin/caffeinate").exists():
+        cmd = ["/usr/bin/caffeinate", "-i", *cmd]
+    return subprocess.run(cmd).returncode
 
 
 def fresh(a, b):
     """True when file a exists and is newer than file b (or b is missing)."""
     return a.exists() and (not b.exists() or a.stat().st_mtime >= b.stat().st_mtime)
+
+
+def preflight(source, dest, second):
+    """Plain-words problems that would stop the night, found now rather than at 2am."""
+    problems = []
+    if not source.is_dir():
+        problems.append(f"The card is not there: {source}")
+        return problems
+    try:
+        files = cards.files_on(source)
+    except OSError as e:
+        return [f"Cannot read the card ({e.__class__.__name__})."]
+    if not files:
+        problems.append(f"Nothing on the card to copy: {source}")
+        return problems
+    need = sum(s for _, s in files)
+    if not dest.is_dir():
+        problems.append(f"The drive is not plugged in or the folder is not there: {dest}")
+    else:
+        try:
+            probe = dest / ".studio-write-test"
+            probe.write_text("ok")
+            probe.unlink()
+        except OSError:
+            problems.append(f"Cannot write to the drive: {dest}")
+        st = os.statvfs(dest)
+        free = st.f_frsize * st.f_bavail
+        if free < need * 1.05 + 2 * 1024 ** 3:
+            problems.append(f"Not enough room on the drive: the card holds {need / 1e9:.1f} GB, the drive has {free / 1e9:.1f} GB free.")
+    if second:
+        if not second.is_dir():
+            problems.append(f"The second-copy folder is not there: {second}")
+        else:
+            st = os.statvfs(second)
+            if st.f_frsize * st.f_bavail < need * 1.05 + 2 * 1024 ** 3:
+                problems.append(f"Not enough room in the second-copy folder: {second}")
+    return problems
 
 
 def check_shoots(studio):
@@ -69,16 +120,53 @@ def main():
     ap.add_argument("--session", help="an existing session folder, to continue")
     ap.add_argument("--gap", default="15", help="quiet minutes that start a new group")
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
-    ap.add_argument("--no-open", action="store_true", help="don't open the first look when done (the Claude app shows it in its own pane)")
+    ap.add_argument("--no-open", action="store_true", help="don't open the report when done (the Claude app shows it in its own pane)")
+    ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
+    ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
     a = ap.parse_args()
+
+    # her drive and second copy come from the Studio File unless given here
+    sf = studio_file.load()
+    drives = sf.get("drives", {})
+    if a.source and not a.dest:
+        a.dest = drives.get("session")
+    if a.source and a.second is None and drives.get("second"):
+        a.second = drives["second"]
+    if a.source and not a.dest:
+        say("5. NEEDS SETUP. No Studio File yet: ask which drive her sessions go on (studio_file.py drives lists them), "
+            "whether she keeps a second copy, and how she names shoot folders, then save it with studio_file.py set.")
+        sys.exit(5)
+    if a.source and not a.name:
+        a.name = datetime.now().strftime("%A").lower() + " card"  # "saturday card"
+
+    # the ledger: a card already backed up is not copied again
+    if a.source and not a.session and not a.again:
+        fp, held = cards.check(a.source)
+        if held:
+            say(f"This card is already safe: {fp['count']:,} files backed up to {held['folder']} on {held['when'][:10]}. Nothing to do.")
+            say("(To copy it again anyway, run with --again.)")
+            say(f"Report: {Path(held['folder']) / '_studio' / 'report.html'}")
+            sys.exit(0)
 
     if a.session:
         session = Path(a.session).expanduser().resolve()
     elif a.source and a.dest and a.name:
         session = Path(a.dest).expanduser() / f"{a.date} {a.name}"
     else:
-        sys.exit("usage: --source --dest --name, or --session <folder>")
+        sys.exit("usage: --source [--dest --name], or --session <folder>")
     studio = session / "_studio"
+
+    # preflight: everything the night needs, checked before she walks away, so nothing stops it later
+    if a.source and not a.session:
+        problems = preflight(Path(a.source), Path(a.dest), Path(a.second) if a.second else None)
+        if problems:
+            say("STOP, before anything is copied:")
+            for p in problems:
+                say(f"  - {p}")
+            sys.exit(2)
+        if a.check:
+            say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. Safe to walk away once it starts.")
+            return
 
     # 1. copy and verify (backup.py also builds the index and the report page)
     manifest = studio / "manifest.json"
@@ -98,6 +186,7 @@ def main():
         code = run("backup.py", *args)
         if code != 0:
             sys.exit(code)  # 1 problems, 2 stop, 3 paused: backup.py already said why
+        cards.register(a.source, session)  # now the ledger knows this card
     else:
         say("1. Already copied and verified")
 
