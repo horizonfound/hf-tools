@@ -92,9 +92,56 @@ def as_markdown(sf):
     return "\n".join(lines)
 
 
+PHOTO_EXT = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".jpg", ".jpeg", ".heic", ".tif", ".tiff"}
+SHOOT_WORDS = ("shoot", "session", "client", "wedding", "photo", "raw", "job", "work")
+DATED = re.compile(r"(19|20)\d\d[-._ ]?\d\d[-._ ]?\d\d|\b(19|20)\d\d\b")
+
+
+def _looks_like_shoot(folder, limit=40):
+    """A folder of dated subfolders, or of photos, is a shoot folder. Returns (score, shoots)."""
+    dated = photos = subs = 0
+    try:
+        for i, p in enumerate(folder.iterdir()):
+            if i >= limit:
+                break
+            if p.name.startswith("."):
+                continue
+            if p.is_dir():
+                subs += 1
+                if DATED.search(p.name):
+                    dated += 1
+            elif p.suffix.lower() in PHOTO_EXT:
+                photos += 1
+    except OSError:
+        return 0, 0
+    return dated * 3 + (2 if photos >= 5 else 0) + (1 if subs >= 3 else 0), subs
+
+
+def shoot_folders(drive, limit=2):
+    """Top-level folders on a drive that look like where her shoots live, best first, at most `limit`."""
+    found = []
+    try:
+        tops = [p for p in Path(drive).iterdir() if p.is_dir() and not p.name.startswith(".")]
+    except OSError:
+        return []
+    for p in tops[:60]:
+        if p.name in ("Backups.backupdb", "System Volume Information", "$RECYCLE.BIN"):
+            continue
+        score, subs = _looks_like_shoot(p)
+        if any(w in p.name.lower() for w in SHOOT_WORDS):
+            score += 2
+        if score >= 3:
+            found.append({"path": str(p), "name": p.name, "shoots": subs, "score": score})
+    found.sort(key=lambda f: -f["score"])
+    return found[:limit]
+
+
 def drives():
-    """Volumes she might mean, biggest first; the system drive and tiny helper volumes left out."""
+    """Volumes she might mean; the Mac itself, camera cards, Time Machine and tiny helper volumes left out.
+    Each carries its likely shoot folders; the one that already has shoots on it is `recommended`."""
     out = []
+    if not Path("/Volumes").is_dir():
+        return out
     for v in Path("/Volumes").iterdir():
         try:
             st = os.statvfs(v)
@@ -104,8 +151,17 @@ def drives():
         free = st.f_frsize * st.f_bavail
         if total < 8 * 1024 ** 3 or v.name in ("Macintosh HD", "Recovery") or (v / "DCIM").is_dir():
             continue  # too small to be a session drive, the Mac itself, or a camera card
-        out.append({"path": str(v), "name": v.name, "total_gb": round(total / 1024 ** 3), "free_gb": round(free / 1024 ** 3)})
-    return sorted(out, key=lambda d: -d["total_gb"])
+        if (v / "Backups.backupdb").is_dir() or (v / ".com.apple.timemachine.supported").exists():
+            continue  # Time Machine
+        folders = shoot_folders(v)
+        root_score, _ = _looks_like_shoot(v)
+        out.append({"path": str(v), "name": v.name, "total_gb": round(total / 1024 ** 3),
+                    "free_gb": round(free / 1024 ** 3), "shoot_folders": folders,
+                    "has_shoots": bool(folders) or root_score >= 3, "recommended": False})
+    out.sort(key=lambda d: (-int(d["has_shoots"]), -d["total_gb"]))
+    if out:
+        out[0]["recommended"] = True
+    return out
 
 
 def learn_pattern(example):
@@ -175,8 +231,14 @@ def main():
         print(as_markdown(sf) if sf else "No Studio File yet. The first 'backup now' sets it up.")
         return
     if a.cmd == "drives":
-        for d in drives():
-            print(f"{d['path']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free")
+        found = drives()
+        if not found:
+            print("No drives plugged in besides the Mac itself.")
+        for d in found:
+            tag = "   (recommended: already has shoots on it)" if d["recommended"] and d["has_shoots"] else ("   (recommended)" if d["recommended"] else "")
+            print(f"{d['path']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free{tag}")
+            for f in d["shoot_folders"]:
+                print(f"    shoot folder: {f['name']}   {f['shoots']} folders in there")
         return
     if a.cmd == "pattern":
         got = learn_pattern(a.example)

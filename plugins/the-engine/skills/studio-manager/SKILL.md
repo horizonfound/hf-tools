@@ -33,13 +33,15 @@ How it reads:
 
 The conversation, in this order (first find the card and run `studio_file.py drives` so the names are real):
 
-**Opening, with the card found.** One short message before any question: what you found, that nothing is copied and nothing on the card gets touched, and that since it's the first time you have three quick questions and then she can walk away.
+**Opening, with the card found.** One short message before any question: what you found, that nothing is copied and nothing on the card gets touched, and that since it's the first time you have a few quick questions and then she can walk away.
 
-**Question 1, the drive.** "Where do your sessions live?" Choices: each drive you can see, by name with its free space ("Big Kahuna, 18 TB free"), the biggest first with "(recommended)"; plus "A folder on this Mac". Other is for a path or a drive that isn't plugged in yet; if she names one that isn't there, say she can plug it in now and you'll wait. Never assume the desktop.
+**Question 1, the drive.** "Here are the drives I can see. Which one do your shoots go on?" Choices: every connected drive by name with its free space ("Big Kahuna, 18 TB free"), plus "A folder on this Mac". Leave out the Mac's own startup disk and any Time Machine or backup-software drive. The one marked "(recommended)" is the drive that already has her shoots on it (a folder of dated subfolders full of photos is the tell); only when no drive shows that is the biggest free space the pick. Other is for a path or a drive that isn't plugged in yet; if she names one that isn't there, say she can plug it in now and you'll wait. Never assume the desktop.
 
-**Question 2, the second copy.** "Do you keep a second copy anywhere?" Choices: "No second copy (recommended if you don't have one)", then any Dropbox, Google Drive or iCloud folder you can actually see on the Mac, by name. Other is for any folder she wants.
+**Question 2, where on the drive.** "Right on Big Kahuna, or inside a folder?" Choices: "Right on Big Kahuna (recommended)" first, unless the drive has an obvious shoot folder (a top-level folder named like Photo Shoots, Sessions, Clients, Weddings, or one whose contents are dated shoot folders), in which case that folder is first and recommended ("Photo Shoots, 212 shoots in there (recommended)"). Offer at most two such folders; never list the whole drive. Other is for a folder she names: look for it, and if it is there, confirm in one line what you found ("Found it: Photo Shoots, 212 folders in there. That's the spot?") with a yes/no pair before locking it in; if it is not there, say so and offer to make it. The chosen place is what goes in `--drive`.
 
-**Question 3, how she names a shoot folder.** "How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If she picks her own way, or types in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
+**Question 3, the second copy.** "Do you keep a second copy anywhere?" Choices: "No second copy (recommended if you don't have one)", then any Dropbox, Google Drive or iCloud folder you can actually see on the Mac, by name. Other is for any folder she wants.
+
+**Question 4, how she names a shoot folder.** "Last one. How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If she picks her own way, or types in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
 
 **The photo names are not a question.** Tell her what you'll do in one sentence and move on: "I'll name each photo after the shoot and keep your camera's number on the end, so nothing ever loses its place. If you'd rather keep the camera's names exactly as they are, just say so." Only if she says so do you set `--file-names original`.
 
@@ -47,14 +49,19 @@ Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --n
 
 A full first night, so the tone is clear:
 
-> Found your card: 3,931 photos, 127 GB. Nothing's copied yet, and nothing on the card gets touched. Since this is our first time, I've got three quick questions, then you can walk away.
+> Found your card: 3,931 photos, 127 GB. Nothing's copied yet, and nothing on the card gets touched. Since this is our first time, I've got a few quick questions, then you can walk away.
 >
-> Where do your sessions live?
-> [ Big Kahuna, 18 TB free (recommended) ] [ A folder on this Mac ] [ Other ]
+> Here are the drives I can see. Which one do your shoots go on?
+> [ Big Kahuna, 18 TB free (recommended) ] [ LaCie Rugged, 1.2 TB free ] [ A folder on this Mac ] [ Other ]
 >
 > *click: Big Kahuna*
 >
-> Got it, Big Kahuna. Do you keep a second copy anywhere?
+> Got it, Big Kahuna. Right on the drive, or inside a folder?
+> [ Photo Shoots, 212 shoots in there (recommended) ] [ Right on Big Kahuna ] [ Other ]
+>
+> *click: Photo Shoots*
+>
+> Photo Shoots it is. Do you keep a second copy anywhere?
 > [ No second copy (recommended if you don't have one) ] [ Dropbox ] [ Other ]
 >
 > *click: No second copy*
