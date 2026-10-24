@@ -1,0 +1,67 @@
+# The Studio, by Horizon Found
+
+Read this first, every session. It is the one place that says what we are building, the rules nothing may break, and where things stand. The long briefs are in `docs/`.
+
+## Who you are working with
+
+Dustin Damron (growth, tech, ads) and Nicole (creative lead, on camera, writes the lessons) run Horizon Found, a photography education company. Dustin is not a Claude Code regular: talk plainly, no jargon, no "tech bro" phrasing, short answers with the result first. Show him the file to watch or open, not the grade. When something is a judgment call for the two of them, say so and stop; never decide product questions for them.
+
+## What the product is, in one paragraph
+
+**The Studio** is a staff that lives on a photographer's own computer and runs on her own Claude plan. The **Studio Manager** handles everything around the art from the moment a card goes in: backup to the drive she chose, second copy to her cloud folder, every file verified byte for byte, blinks and near-duplicates marked for review only, a mini-session day sorted into families by timestamps against her booking screenshot, sneak peeks, the client note, the delivery date on her calendar, the empty gallery, the export check, the upload, and then the handoff of her favorites to the **Assistant** (the old "Engine"), which cuts a reel on the beat of the song she picked, builds a carousel, writes hooks, captions on request, and stories. The **Concierge** (inbox, milestones, testimonials, gifts) is the first add-on, 2027. One product, one install, one-time purchase. Launch target: January 1 (or January 6), 2027. Black Friday is off.
+
+The full story: `docs/STUDIO-PLAN.md` (the plan and feasibility read), `docs/the-studio-brief-v3.md` (Nicole's brief, the one that counts), `docs/THE-ASSISTANT-BRIEF.md` (the Assistant, traced to who said what).
+
+## Rules that nothing may break
+
+1. **The Studio Manager never deletes, never moves, never overwrites.** Copy, verify, report. The worst outcome is a job that did not finish, never a lost photo. A file that already exists at the destination is compared, not replaced. She formats her own card, after the report says "safe in two places."
+2. **Stop loudly on any problem.** A copy error, a hash mismatch, a missing drive, a full cloud folder: stop, put it at the top of the report. Never guess.
+3. **Culling is a marker, not an action.** Blinks, soft focus, duplicates are labeled for her review and stay where they are.
+4. **Every frame is theirs.** No AI-generated pixels or motion. The Assistant is not a video editor: song first, hard cuts on the beat, no transitions, no effects, no Ken Burns. Photo motion exists in the code and is to be off by default.
+5. **Nothing posts, nothing sends.** Drafts wait for her approval. Nothing the Assistant makes is ever published by us.
+6. **Heavy lifting in scripts, not in Claude.** A 2,000-image session must not be looked at photo by photo by the model. Scripts score and shortlist; Claude looks at the shortlist. This keeps her plan cost near zero.
+7. **Honest claims only.** Nothing on a sales page that has not run on a real Mac. Placeholders are marked ([PRICE], [DATE], [QUOTE], "confirm after beta"). Only real quotes.
+8. **It is Claude, and we say so.** No hidden app.
+9. **Study Meg's engine (The Startup Mom), never bootleg it.**
+10. **Nothing goes to Nicole or Slack without Dustin's say-so.**
+
+## Repo layout
+
+```
+.claude-plugin/marketplace.json     marketplace "hf-tools", one plugin: the-engine
+plugins/the-engine/                 the plugin (displayName "The Assistant", version in .claude-plugin/plugin.json)
+  skills/assistant-start-here/      the 40-minute interview that writes the Brand File
+  skills/assistant-make-a-reel/     scripts/: make_reel.py, hooktext.py, grade_reel.py, beats.py, check_setup.py
+  skills/assistant-make-a-carousel/
+  skills/assistant-make-stories/
+  skills/assistant-menu/
+  skills/studio-manager/scripts/backup.py   the safety core (no SKILL.md yet)
+  shared/                           playbook, guardrails, the Assistant's voice, fonts
+docs/                               briefs, plan, test notes (copied from the claude.ai Project "The Engine")
+```
+
+Students install from GitHub: `/plugin marketplace add horizonfound/hf-tools` then `/plugin install the-engine@hf-tools`. Installed copies auto-update from main, so **main must always be shippable**. Work on a branch when a change could break a student.
+
+## Where things stand (Oct 23, 2026)
+
+- **Studio Manager safety core: built and proven once.** `backup.py` copies a card (or any folder) to the session drive and optionally a second folder, sha256 while copying, write to `.studio-partial` then rename, re-read verify, never overwrite, resumable from `_studio/manifest.json`, `--budget` seconds to pause cleanly (exit 3), morning report with problems first. Ran on Dustin's R5 card to his RAID "Big Kahuna" (`/Volumes/Big Kahuna/The Engine Test/`): 6.9 GB, 5 files, all verified; independent `sha256sum` matched. Exit codes: 0 safe, 1 problems, 2 stop (missing source or space), 3 paused.
+- **Not built yet, in order:** second-copy test to a cloud folder; RAW preview reading (ImageMagick reads CR2/CR3/ARW/NEF/DNG/RAF/ORF on the Mac workspace); blink/soft-focus/duplicate markers (OpenCV 5 FaceDetectorYN available, no cascades; bundle the small model); mini-session sorting (timestamps + booking screenshot); sneak peeks; client note from the Studio File; calendar; gallery setup (ShootProof and Pic-Time have APIs, Pixieset needs browser automation, do it last); export check; upload; handoff to the Assistant; the Studio File interview; a `SKILL.md` for the studio-manager skill.
+- **Assistant 0.3.1: built, tested on one Mac with test files.** Reel pipeline renders an MP4 in ~15 s; grader checks beat alignment, clicks, clipping, motion smoothness, text contrast. Also proven: writing an editable CapCut 9.6 draft on Mac (`draft_info.json` + `root_meta_info.json`; CapCut must be closed while writing; Windows uses `draft_content.json`). Untested: a real session, a real talking clip, HEIC, Windows, Intel Mac, Canva folder route.
+- **Decisions open for Dustin and Nicole:** hard cuts only vs motion as an off switch; Jan 1 vs Jan 6; galleries on day one (all three, or two then Pixieset); Engine-alone price; trademark/handle for "The Studio"; the five beta testers.
+
+## Why we moved to Claude Code
+
+The Claude desktop app's workspace stops any process the moment a step finishes (180 s per step), so a long backup had to run as resumable chunks. Claude Code runs commands directly on the Mac, can run them in the background, and can keep going while Dustin is away. The overnight jobs belong here. The Assistant and the morning report may stay in the desktop app, where she talks to it like a person. Test both; decide from what happens.
+
+## How to test things
+
+- Card and drives on Dustin's Mac: the card mounts at `/Volumes/EOS_DIGITAL`; the RAID is `/Volumes/Big Kahuna` (always connected); test area is `/Volumes/Big Kahuna/The Engine Test/`. Never write anywhere else on that RAID without asking.
+- Safety core: `python3 plugins/the-engine/skills/studio-manager/scripts/backup.py --source /Volumes/EOS_DIGITAL --dest "/Volumes/Big Kahuna/The Engine Test" --name "Card test R5" [--second <cloud folder>] [--dry-run]`. Then spot-check with `shasum -a 256` on a couple of files yourself. Read `_studio/morning-report.md`.
+- Every "it works" claim comes with the file to open, not the grade.
+- Reel: `python3 .../make_reel.py --help`; grade with `grade_reel.py`. Watch the MP4 with sound before saying anything about it.
+
+## Housekeeping
+
+- Commit messages in plain words. Push to main only when main stays shippable.
+- `__pycache__` is ignored. No secrets in the repo, ever. Dustin's Mac password once appeared in a transcript; it is not stored anywhere and he was told to change it.
+- Project docs also live in the claude.ai Project "The Engine" (`engine/...`). When a doc here changes in a way the Project should know, say so; Dustin can paste it over.
