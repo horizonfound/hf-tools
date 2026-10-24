@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The sorter: arrange the verified copy on her drive into one folder per
+"""The sorter: arrange the verified copy on their drive into one folder per
 shoot, with every photo named for the shoot and its original filename kept
 inside the new one, in shooting order. Rule 1 in code:
 
@@ -14,8 +14,8 @@ inside the new one, in shooting order. Rule 1 in code:
     python3 sort.py "<session folder>" --dry-run      show the plan, touch nothing
     python3 sort.py "<session folder>"                do it, then re-verify
 
-Names come from _studio/names.json (what she said) or the suggested name in
-_studio/shoots.json (date-based) when she left one blank. A photo's sidecar
+Names come from _studio/names.json (what they said) or the suggested name in
+_studio/shoots.json (date-based) when they left one blank. A photo's sidecar
 (.xmp) travels with it. Files with no capture time stay where they are.
 """
 import argparse
@@ -33,7 +33,7 @@ import studio_file  # noqa: E402
 
 
 def say(msg):
-    """Print, but never let a closed pipe (someone ran us through `head`) stop the work on her files."""
+    """Print, but never let a closed pipe (someone ran us through `head`) stop the work on their files."""
     try:
         print(msg, flush=True)
     except BrokenPipeError:
@@ -88,7 +88,7 @@ def make_plan(session, studio):
                  f"{len(manifest.get('problems') or [])} problems). Nothing sorted.")
 
     by_file = {p["file"]: p for p in index["photos"]}
-    # her naming, from the Studio File: how folders are named, and whether photos keep their frame names
+    # their naming, from the Studio File: how folders are named, and whether photos keep their frame names
     naming = studio_file.load().get("naming", {})
     keep_names = naming.get("file_names", "shoot") == "original"
     # a photo the sorter already placed carries its original path; it is never planned again
@@ -212,7 +212,7 @@ def main():
     say(f"{log['done']} files moved in {time.time() - t0:.0f} s")
 
     # whatever was not sorted (camera housekeeping, anything with no capture time) is set aside
-    # inside _studio, original path kept, so her folder shows only the shoots. Nothing is deleted.
+    # inside _studio, original path kept, so their folder shows only the shoots. Nothing is deleted.
     aside = []
     if not log["problems"]:
         for rel in plan["untouched"]:

@@ -15,10 +15,10 @@ Safe to run again at any point; each step is skipped once its result exists.
 Exit codes: 0 done · 1 problems (read the report) · 2 stop (missing source
 or drive) · 3 paused (run again) · 4 needs Claude's look (read
 _studio/groups-sheet.png, write _studio/shoots.json, run again) · 5 needs
-setup (no Studio File yet: ask her drive and naming, save with
+setup (no Studio File yet: ask their drive and naming, save with
 studio_file.py, run again).
 
-Her drive, second copy and naming come from ~/.studio (studio_file.py), so
+Their drive, second copy and naming come from ~/.studio (studio_file.py), so
 after the first run the command is just:  night.py --source /Volumes/CARD
 A card the ledger (cards.py) already knows is not copied again.
 """
@@ -125,7 +125,7 @@ def main():
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
     a = ap.parse_args()
 
-    # her drive and second copy come from the Studio File unless given here
+    # their drive and second copy come from the Studio File unless given here
     sf = studio_file.load()
     drives = sf.get("drives", {})
     if a.source and not a.dest:
@@ -133,8 +133,8 @@ def main():
     if a.source and a.second is None and drives.get("second"):
         a.second = drives["second"]
     if a.source and not a.dest:
-        say("5. NEEDS SETUP. No Studio File yet: ask which drive her sessions go on (studio_file.py drives lists them), "
-            "whether she keeps a second copy, and how she names shoot folders, then save it with studio_file.py set.")
+        say("5. NEEDS SETUP. No Studio File yet: ask which drive their sessions go on (studio_file.py drives lists them), "
+            "whether they keep a second copy, and how they name shoot folders, then save it with studio_file.py set.")
         sys.exit(5)
     if a.source and not a.name:
         a.name = datetime.now().strftime("%A").lower() + " card"  # "saturday card"
@@ -156,7 +156,7 @@ def main():
         sys.exit("usage: --source [--dest --name], or --session <folder>")
     studio = session / "_studio"
 
-    # preflight: everything the night needs, checked before she walks away, so nothing stops it later
+    # preflight: everything the night needs, checked before they walk away, so nothing stops it later
     if a.source and not a.session:
         problems = preflight(Path(a.source), Path(a.dest), Path(a.second) if a.second else None)
         if problems:
@@ -232,7 +232,7 @@ def main():
         sys.exit(4)
     say("4. Shoots decided")
 
-    # 5. sort with the names there are (hers, or the suggested ones)
+    # 5. sort with the names there are (theirs, or the suggested ones)
     index = json.loads((studio / "index.json").read_text())
     if any(not p.get("original") for p in index["photos"] if p.get("taken")):
         say("5. Sorting into folders")
@@ -246,7 +246,7 @@ def main():
     if run("first_look.py", session) != 0 or run("report_page.py", session) != 0:
         sys.exit(1)
     say(f"\nDone. Report: {studio / 'report.html'}")
-    # so there is something nice on the screen when she comes back
+    # so there is something nice on the screen when they come back
     if not a.no_open:
         opener = {"darwin": ["open"], "win32": ["cmd", "/c", "start", ""], "linux": ["xdg-open"]}.get(sys.platform)
         if opener:

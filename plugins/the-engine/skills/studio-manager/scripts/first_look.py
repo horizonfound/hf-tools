@@ -7,7 +7,7 @@ Claude app has the mic); the boxes are there for a spelling.
 
 Reads _studio/groups.json (the time-gap groups and their previews) and
 _studio/shoots.json (which groups Claude merged into one shoot, a recap, a
-suggested name, and the folder once sorted). Names she locks in are kept
+suggested name, and the folder once sorted). Names they lock in are kept
 in _studio/names.json by serve_report.py and shown filled in next time.
 
     python3 first_look.py "<session folder>"     writes a one-line page that just opens report.html

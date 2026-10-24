@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn a session's _studio/manifest.json into a page she can look at:
+"""Turn a session's _studio/manifest.json into a page the photographer can look at:
 _studio/report.html. One file, no account; opens in the Claude desktop app or
 any browser. Problems first, then the good news, then a few teasers from the
 shoot itself (from _studio/previews/, picked in _studio/teasers.json).
@@ -226,7 +226,7 @@ def build(manifest, studio):
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]
 
-    # hero: the one line she needs
+    # hero: the one line they need
     out.append("<section class='wrap hero'>")
     out.append(f"<span class='eyebrow'>Morning report · {e(name)}</span>")
     if problems:

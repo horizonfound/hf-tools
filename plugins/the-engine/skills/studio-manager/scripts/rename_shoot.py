@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Rename a shoot that the sorter has already placed: the folder and every
-photo in it take her name, keeping the running number and the original
-filename. This is her one decision on the first look, made real.
+photo in it take their name, keeping the running number and the original
+filename. This is their one decision on the first look, made real.
 
     python3 rename_shoot.py "<session>" --shoot s2 --name "Brittan sunset palms"
     python3 rename_shoot.py "<session>" --from-names        apply _studio/names.json to every shoot whose name differs
     ...  --dry-run                                           show the plan, touch nothing
 
-Same promises as the sorter: only the copy on her drive, never the card;
+Same promises as the sorter: only the copy on their drive, never the card;
 a destination that exists stops it; renames on the same drive only; every
 move written to _studio/rename-log.json before it happens; every renamed
 photo re-read against the backup's hash for its original frame. The
@@ -40,7 +40,7 @@ def plan_rename(session, studio, shoot_id, new_name):
     if not shoot.get("folder"):
         sys.exit(f"STOP: {shoot_id} has not been sorted yet; run sort.py first.")
     old_folder = Path(shoot["folder"])
-    # her naming, from the Studio File: folder pattern, and whether photos keep their frame names
+    # their naming, from the Studio File: folder pattern, and whether photos keep their frame names
     naming = studio_file.load().get("naming", {})
     keep_names = naming.get("file_names", "shoot") == "original"
     in_folder = [p for p in index["photos"] if Path(p["file"]).parent == old_folder and p.get("original")]
@@ -222,7 +222,7 @@ def main():
             if want and want != (s.get("name") or ""):
                 jobs.append((s["id"], want))
         if not jobs:
-            say("Every shoot already has the name she gave it. Nothing to do.")
+            say("Every shoot already has the name the photographer gave it. Nothing to do.")
             return
     elif a.shoot and a.name:
         jobs.append((a.shoot, " ".join(a.name.split())))
