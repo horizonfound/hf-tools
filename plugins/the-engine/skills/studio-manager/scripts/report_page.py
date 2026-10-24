@@ -96,6 +96,9 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 @media(max-width:600px){.teasers{grid-template-columns:repeat(2,1fr)}.bar .when{display:none}}
 """
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
+
 PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
 ROTS = [-3, 2, -1.5, 2.5, -2, 1.5]
 
@@ -218,10 +221,9 @@ def build(manifest, studio):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>",
+           f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
-           + ("<a class='nav' href='first-look.html'>Show me my photos<span class='arr'>&#8599;</span></a>" if (studio / "first-look.html").exists() else "")
            + "</div></div>"]
 
     # hero: the one line she needs
@@ -254,8 +256,12 @@ def build(manifest, studio):
                f"<div class='stat'><b>{e(took) or '—'}</b><span class='eyebrow'>to finish</span></div>"
                "</div></div>")
 
-    # teasers from the shoot
-    if pics:
+    # the shoots, with their previews, recaps and name boxes (one page, not two)
+    shoots_html, shoots_script = (shoots_section(studio) or (None, ""))
+    if shoots_html:
+        out.append(shoots_html)
+    # with no shoots decided yet, a few teasers from the card instead
+    elif pics:
         out.append("<div class='wrap'><div class='teasers'>")
         for i, p in enumerate(pics):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
@@ -336,7 +342,8 @@ def build(manifest, studio):
     out.append("<script>if(location.protocol.startsWith('http')){let last=0;for(const a of document.querySelectorAll('a.where')){"
                "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
-               "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script></body></html>")
+               "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
+    out.append(shoots_script + "</body></html>")
     return "\n".join(out)
 
 

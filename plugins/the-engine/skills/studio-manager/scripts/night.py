@@ -4,7 +4,8 @@ when something is wrong or when Claude's one look is needed:
 
   copy + verify (backup.py)  ->  index  ->  groups  ->  contact sheet
   ->  [Claude reads the sheet, writes shoots.json]  ->  sort with the
-  suggested names  ->  first look  ->  morning report
+  suggested names  ->  the morning report (verdict, numbers, the shoots
+  with their previews and name boxes, where the photos are)
 
 Safe to run again at any point; each step is skipped once its result exists.
 
@@ -152,15 +153,15 @@ def main():
         say("5. Already sorted")
 
     # 6. the pages
-    say("6. Writing the first look and the report")
+    say("6. Writing the report")
     if run("first_look.py", session) != 0 or run("report_page.py", session) != 0:
         sys.exit(1)
-    say(f"\nDone. Report: {studio / 'report.html'}\n      First look: {studio / 'first-look.html'}")
+    say(f"\nDone. Report: {studio / 'report.html'}")
     # so there is something nice on the screen when she comes back
     if not a.no_open:
         opener = {"darwin": ["open"], "win32": ["cmd", "/c", "start", ""], "linux": ["xdg-open"]}.get(sys.platform)
         if opener:
-            subprocess.run([*opener, str(studio / "first-look.html")], check=False)
+            subprocess.run([*opener, str(studio / "report.html")], check=False)
 
 
 if __name__ == "__main__":
