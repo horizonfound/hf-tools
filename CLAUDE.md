@@ -32,6 +32,7 @@ Our job: copy the card to her drive, verify every file, keep errors from happeni
 - **A second copy is optional.** Setup asks once whether she has a second backup folder. If yes, `--second` points at it. If no, nothing nags. Most photographers will have one drive.
 - **Cloud backup is hers.** Dustin uses Backblaze (about $9/month, unlimited, backs up the drive on its own) and we may recommend it (they run an affiliate program, 10% recurring). The Studio Manager never touches it, never verifies it, and the report never mentions it. One Backblaze fact for the setup guide: an external drive unplugged for 30 days gets dropped from the cloud copy unless Extended Version History is on. At most, if she tells us she uses it, offer a reminder to plug the drive in. That is as far as we go.
 - **Report wording:** "Everything is on your drive and verified. The card is safe to format when you're ready." Say what we checked, nothing we didn't.
+- **Nothing starts without her saying so (Dustin, Oct 23).** A backup begins only when she says **"backup now"** (the cue; "card's in" was the earlier draft). A watcher may notice a card and nudge her with a notification, never copy on its own: browsing an old drive must never start a backup. Open question for Nicole: once she has said the word, do later cards the same night start on their own ("card 3 safe, next card when you're ready"), or does each card need the word?
 
 ## Repo layout
 
