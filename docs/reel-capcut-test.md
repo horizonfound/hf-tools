@@ -35,7 +35,7 @@ Paste into Claude Code: **"Get the latest from GitHub, then run the test in docs
 - **`reel.py sheet`:** 9 tall photos, sheet made through sips in 0.4 s.
 - **`reel.py make`:** with CapCut open it planned, then stopped with exit 8 and wrote nothing (CapCut's list unchanged by hash). The brief's `--rhythm` is now `--pace` (fixed above). After Dustin quit CapCut: "Kira test reel" written, 8 photos, 9.6 s, beats per photo 2,2,2,2,2,1,1,4, song from 2.93 s, every cut within 8 ms of a beat, at the top of CapCut's list, all photo and song paths present, list backed up first.
 - **Photo 4 (Dustin's screenshot):** the wide 1000x666 preview fills the 1080x1920 frame, cropped at the sides, no bars, no extra zoom. Scale 2.669 is right, so CapCut's scale 1.0 is "fit". It looks soft only because the test used a 1000-pixel preview.
-- **Not yet reported:** playing the Kira test reel, and an export.
+- **Dustin (Oct 25, about 2:45am): the Kira test reel plays on the beat, and the export worked.** Every question in this brief is now answered. (It was written before the slower build start landed, so it shows the old build pace.)
 
 ### How CapCut stores a library song (sample: `docs/capcut-samples/library-song.json`)
 
