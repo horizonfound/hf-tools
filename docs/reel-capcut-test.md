@@ -48,3 +48,7 @@ Dustin made a project ("1025 (1)") with a song from CapCut's library ("Woman's G
 ## Untested
 
 CapCut versions other than 9.6; Windows (projects folder `%LOCALAPPDATA%\CapCut\User Data\Projects\com.lveditor.draft`, file `draft_content.json`; the song needs ffmpeg or a .wav there); HEIC photos (sips handles them on a Mac); songs from CapCut's library inside a project we write (stored and readable, see above; not yet written by us).
+
+## CapCut library songs and the license (Oct 25)
+
+CapCut's Materials License Agreement (capcut.com/clause/material-license-agreement): standard Sounds only for "personal entertainment and non-commercial purposes" and not to promote a brand or business; Commercial Sounds are for businesses but only on CapCut, TikTok and TikTok for Business, and use anywhere else needs the rights holders' permission; library materials may be edited "only on the Platform." A photographer's business reel on Instagram fits neither. The reading and beat-matching work, but writing projects with library songs is on hold until Dustin and Nicole decide (skip it, or personal and TikTok use only, with a plain warning). Not legal advice; their call.
