@@ -137,7 +137,7 @@ This is the second moment: their edited photos, never the backup's raw files.
 2. Mark it finished: `edit_queue.py done "beach"` (it prints the backup and shoot for the next step). If it was not in the queue, skip this.
 3. Find the edited photos: `python3 <scripts>/find_exports.py --night "<backup>" --shoot <id>`. It looks where their exports went last time, then in and beside the shoot folder, then Pictures, Desktop and Downloads, matching by name or by when each photo was taken. Exit 7 means nothing found: ask "Where did you export them?" and look there.
 4. Confirm once, in one line with a yes/no: "Found 48 edited photos from the beach shoot in Exports on Big Kahuna. Those the ones?" On yes, `find_exports.py ... --remember "<that folder>"` so next time it looks there first. Mention anything the check printed (the same name twice, files that look too small) in plain words.
-5. Offer the next step: "Want me to turn these into a reel and a carousel?" That work starts from this folder of edited photos.
+5. Offer the next step: "Want me to turn your favorites into a reel?" [Yes (recommended)] [Not now]. On yes, the reel skill (`assistant-make-a-reel`) takes it from this folder of edited photos: Claude picks and orders the favorites, and the reel lands in CapCut cut on the beat of their song.
 
 ## When they want to see something
 
