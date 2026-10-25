@@ -183,6 +183,17 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
         for p in entry["problems"][:10]:
             say(f"    - {p}")
         sys.exit(1)
+    try:  # the editing queue shows the new name too
+        import edit_queue
+        q = edit_queue.load()
+        for x in q["shoots"]:
+            if x.get("studio") == str(studio) and x.get("shoot") == shoot["id"]:
+                x["name"], x["folder"] = new_name, str(session / new_folder)
+                edit_queue.save(q)
+                edit_queue.write_page(q)
+                break
+    except Exception:  # noqa: BLE001  the queue is a convenience; the rename is done
+        pass
     say("  All done.")
 
 
