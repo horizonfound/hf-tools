@@ -116,6 +116,7 @@ def _mixed(n, period, energy, hints, seed, meter=4):
         shapes, bar_shapes, bar, phrase = SHAPES, BAR_SHAPES, 4, 8
         u = max(1, unit_beats(period, 4) // 2)   # beats in one unit: a quick photo is one unit
     rng = random.Random(seed)
+    any_quick = "-" in hints[:n]
     phrase_beats = phrase * u
     med = sorted(energy)[len(energy) // 2] if energy else 0.0
     units = []
@@ -145,6 +146,23 @@ def _mixed(n, period, energy, hints, seed, meter=4):
                     s += 1.8 if slot <= 1 else (-0.2 if slot == 2 else -2.5)
                 elif slot == phrase:
                     s -= 1.5                  # a whole phrase on one photo only when asked for
+                elif slot == 1 and any_quick:
+                    s -= 0.6                  # Claude marked the ones to fly by; keep the quick spots for them
+            run = 0                           # quick photos in a row, counting the end of what's placed
+            for x in reversed(units):
+                if x != 1:
+                    break
+                run += 1
+            longest = 0
+            for j, slot in enumerate(shape):
+                if slot == 1:
+                    run += 1
+                    if hints[i + j] != "-":
+                        longest = max(longest, run)
+                else:
+                    run = 0
+            if longest > 3:
+                s -= 3.0                      # a burst is two to four quick photos, not a whole run of them
             if shape == last and len(shape) > 1:
                 s -= 2.0                      # the same pattern twice running (one long hold is not a pattern)
             elif last and len(shape) == len(last):
@@ -158,7 +176,8 @@ def _mixed(n, period, energy, hints, seed, meter=4):
         i += len(best)
         last = best
         first = False
-    units.append(phrase if hints[n - 1] == "+" else bar)   # the closer lands, ending on a bar
+    long_close = hints[n - 1] == "+" and phrase * u * period <= 4.0
+    units.append(phrase if long_close else bar)   # the closer lands on a bar; a "+" closer lingers, up to 4 s
     return [x * u for x in units]
 
 
