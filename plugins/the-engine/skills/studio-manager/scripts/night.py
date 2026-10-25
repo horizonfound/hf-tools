@@ -280,6 +280,8 @@ def main():
         session = studio  # every script finds the photos from the records now
         run("first_look.py", studio)
         run("report_page.py", studio)  # the report's "where your photos are" now points at the new place
+    # every shoot of the night goes on "your shoots" (the archive below the queue); the queue question comes when they're back
+    run("edit_queue.py", "register", "--night", studio)
     say(f"\nDone. Report: {studio / 'report.html'}")
     # so there is something nice on the screen when they come back: the night opens the report itself,
     # served by serve_report.py so its "Take me to the photos" button works, and it does not depend on

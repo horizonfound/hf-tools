@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""The editing queue: the shoots still to edit, with due dates, in the order
-the photographer wants to work on them.
+"""Your shoots: the editing queue on top (the shoots still to edit, with due
+dates, in the order the photographer wants to work on them) and, below the
+line, every shoot the Studio has backed up, newest first, each with a button
+that opens its folder. One page; "show my queue" and "show the archive" both
+open it.
 
 It is the bridge between the night and the reel: a night's shoots are added
 when the photographer says so (some shoots are just for them), "I'm done with
@@ -24,7 +27,14 @@ Nothing here ever touches a photo.
     python3 edit_queue.py setup --on|--off          keep a queue or not (asked once)
     python3 edit_queue.py status                    on, off, or never asked
     python3 edit_queue.py offers [--mark]           shoots ticked off on the page that still need "want a reel?"
-    python3 edit_queue.py serve                     the page, live: check off, drag, change dates
+    python3 edit_queue.py register --night "<night>"  put every shoot of a night in the archive (night.py does this)
+    python3 edit_queue.py scan                      find every night the Studio has done and register it (once, to backfill)
+    python3 edit_queue.py open "beach"              open that shoot's folder in Finder
+    python3 edit_queue.py serve                     the page, live: check off, drag, change dates, open folders
+
+A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
+"archived" (never queued: a shoot that was just for them). Finished and
+archived shoots are the archive.
 """
 import argparse
 import html
@@ -111,24 +121,35 @@ def due_date(when, base=None):
     sys.exit(f"STOP: I could not read '{when}' as a due date. Try 1w, 2w, 3w, this-week, or a date like 2026-11-07.")
 
 
+def is_waiting(s):
+    return s.get("status", "waiting") == "waiting"
+
+
 def waiting(q):
     """The shoots still to edit, in the photographer's order (or soonest due, until they move one)."""
-    w = [s for s in q["shoots"] if s.get("status") != "finished"]
+    w = [s for s in q["shoots"] if is_waiting(s)]
     if not q.get("manual_order"):
         w.sort(key=lambda s: (s.get("due") or "9999", s.get("added", "")))
     return w
 
 
+def archive(q):
+    """Every shoot not in the queue, newest shoot first (undated ones last)."""
+    rest = [s for s in q["shoots"] if not is_waiting(s)]
+    return sorted(rest, key=lambda s: (s.get("shot") or "", s.get("finished_at") or s.get("added") or ""), reverse=True)
+
+
 def finished(q):
+    """Shoots ticked off the queue, most recent first."""
     return sorted((s for s in q["shoots"] if s.get("status") == "finished"), key=lambda s: s.get("finished_at", ""), reverse=True)
 
 
 def reorder(q, ids):
     """Put the waiting shoots in this order; finished ones keep their place after them."""
     by_id = {s["id"]: s for s in q["shoots"]}
-    head = [by_id[i] for i in ids if i in by_id and by_id[i].get("status") != "finished"]
+    head = [by_id[i] for i in ids if i in by_id and is_waiting(by_id[i])]
     rest = [s for s in waiting(q) if s not in head]
-    q["shoots"] = head + rest + finished(q)
+    q["shoots"] = head + rest + archive(q)
     q["manual_order"] = True
 
 
@@ -140,12 +161,12 @@ def find(q, text, include_finished=True):
         return exact[0]
     hits = [s for s in pool if t in s["name"].lower()]
     if len(hits) > 1:
-        live = [s for s in hits if s.get("status") != "finished"]
+        live = [s for s in hits if is_waiting(s)]
         hits = live if len(live) == 1 else hits
     if len(hits) == 1:
         return hits[0]
     if not hits:
-        sys.exit(f"STOP: nothing in the queue matches '{text}'.")
+        sys.exit(f"STOP: no shoot matches '{text}'.")
     sys.exit("STOP: more than one shoot matches '" + text + "': " + "; ".join(s["name"] for s in hits) + ". Say which.")
 
 
@@ -175,33 +196,29 @@ def place(q, shoot):
         return
     pos = next((i for i, s in enumerate(w) if (s.get("due") or "9999") > (shoot.get("due") or "9999")), len(w))
     w.insert(pos, shoot)
-    q["shoots"] = w + finished(q)
+    q["shoots"] = w + archive(q)
 
 
 # ---------- adding ----------
 
-def add_from_night(q, night, shoot_id, when, name=None):
+def night_shoots(night):
+    """(root, studio, shoots, names, groups) for a night, before or after it settled."""
     from where import locate
     root, studio = locate(night)
     shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
-    s = next((x for x in shoots if x["id"] == shoot_id), None)
-    if not s:
-        sys.exit(f"STOP: no shoot {shoot_id} in that night. Its shoots: " + ", ".join(x["id"] for x in shoots))
     names = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
-    name = name or names.get(shoot_id) or s.get("name") or s.get("suggested") or shoot_id
     groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]} if (studio / "groups.json").exists() else {}
+    return root, studio, shoots, names, groups
+
+
+def existing(q, studio, shoot_id):
+    return next((x for x in q["shoots"] if x.get("studio") == str(studio) and x.get("shoot") == shoot_id), None)
+
+
+def build_entry(q, root, studio, s, names, groups, status, due=None):
+    name = names.get(s["id"]) or s.get("name") or s.get("suggested") or s["id"]
     gs = [groups[g] for g in s.get("groups", []) if g in groups]
-    shot = (gs[0]["start"][:10] if gs else None)
-    due, how = due_date(when)
-    # already queued from this night? then this is a new due date, not a second card
-    for x in q["shoots"]:
-        if x.get("studio") == str(studio) and x.get("shoot") == shoot_id:
-            x["due"], x["name"] = due, name
-            if x.get("status") == "finished":
-                x["status"] = "waiting"
-                x.pop("finished_at", None)
-            note_pick(q, how)
-            return x, False
+    shot = gs[0]["start"][:10] if gs else None
     sid = new_id(q, name, shot)
     pics = [p for g in gs for p in g.get("previews", [])]
     if len(pics) > 3:
@@ -214,13 +231,110 @@ def add_from_night(q, night, shoot_id, when, name=None):
             dst = THUMBS / sid / f"{i}{src.suffix.lower()}"
             shutil.copyfile(src, dst)  # a copy of a small preview, never the photo
             thumbs.append(dst.relative_to(HOME).as_posix())
-    entry = {"id": sid, "name": name, "shot": shot, "due": due, "count": s.get("photos"),
-             "folder": str(root / s["folder"]) if s.get("folder") else None,
-             "studio": str(studio), "shoot": shoot_id, "thumbs": thumbs, "status": "waiting",
-             "added": datetime.now().isoformat(timespec="seconds")}
+    return {"id": sid, "name": name, "shot": shot, "due": due, "count": s.get("photos"),
+            "folder": str(root / s["folder"]) if s.get("folder") else None,
+            "studio": str(studio), "shoot": s["id"], "thumbs": thumbs, "status": status,
+            "added": datetime.now().isoformat(timespec="seconds")}
+
+
+def add_from_night(q, night, shoot_id, when, name=None):
+    root, studio, shoots, names, groups = night_shoots(night)
+    s = next((x for x in shoots if x["id"] == shoot_id), None)
+    if not s:
+        sys.exit(f"STOP: no shoot {shoot_id} in that night. Its shoots: " + ", ".join(x["id"] for x in shoots))
+    if name:
+        names = dict(names, **{shoot_id: name})
+    due, how = due_date(when)
     note_pick(q, how)
+    x = existing(q, studio, shoot_id)
+    if x:  # already known (in the archive, finished, or queued): this puts it in the queue with this due date
+        was_waiting = is_waiting(x)
+        x["due"], x["name"] = due, names.get(shoot_id) or x["name"]
+        x["status"] = "waiting"
+        for k in ("finished_at", "finished_by", "offered", "reminded"):
+            x.pop(k, None)
+        if not was_waiting:
+            q["shoots"].remove(x)
+            place(q, x)
+        return x, False
+    entry = build_entry(q, root, studio, s, names, groups, "waiting", due)
     place(q, entry)
     return entry, True
+
+
+def register_night(q, night):
+    """Every shoot of a night goes in the archive (shoots already known are left as they are)."""
+    root, studio, shoots, names, groups = night_shoots(night)
+    added = 0
+    for s in shoots:
+        x = existing(q, studio, s["id"])
+        if x:
+            x["name"] = names.get(s["id"]) or s.get("name") or x["name"]
+            x["count"] = s.get("photos") or x.get("count")
+            continue
+        q["shoots"].append(build_entry(q, root, studio, s, names, groups, "archived"))
+        added += 1
+    return added
+
+
+def folder_of(s):
+    """Where the shoot's photos are right now: read from its night's records, so renames and settling are followed."""
+    if s.get("studio"):
+        try:
+            from where import locate
+            root, studio = locate(s["studio"])
+            for x in json.loads((studio / "shoots.json").read_text())["shoots"]:
+                if x["id"] == s.get("shoot") and x.get("folder"):
+                    return root / x["folder"]
+        except (SystemExit, OSError, ValueError, KeyError):
+            pass
+    return Path(s["folder"]) if s.get("folder") else None
+
+
+def open_folder(s):
+    """(ok, words) after asking Finder to open the shoot's folder."""
+    f = folder_of(s)
+    if not f:
+        return False, "I don't know where that shoot's folder is."
+    if not f.is_dir():
+        drive = f.parts[2] if len(f.parts) > 2 and f.parts[1] == "Volumes" else None
+        return False, (f"Plug in {drive} to open this one." if drive else "That folder isn't where it used to be.")
+    opener = {"darwin": ["open"], "win32": ["explorer"], "linux": ["xdg-open"]}.get(sys.platform)
+    if opener:
+        import subprocess
+        try:
+            subprocess.run([*opener, str(f)], check=False)
+        except OSError:
+            return False, f"Couldn't open Finder; the folder is {f}."
+
+    return True, f"Opened {f.name}."
+
+
+def nights_known():
+    """Every night's records the Studio can find: from the card ledger, and the hidden .studio folders where shoots settle."""
+    out = []
+    try:
+        import cards
+        for entry in cards.load().get("cards", {}).values():
+            out += [x["folder"] for x in entry.get("sessions", [])]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import studio_file
+        place_ = studio_file.load().get("drives", {}).get("session")
+        if place_ and Path(place_).is_dir():
+            recs = Path(place_) / ".studio"
+            if recs.is_dir():
+                out += [str(r) for r in recs.iterdir() if (r / "shoots.json").exists()]
+            out += [str(d) for d in Path(place_).iterdir() if (d / "_studio" / "shoots.json").exists()]
+    except Exception:  # noqa: BLE001
+        pass
+    seen, uniq = set(), []
+    for n in out:
+        if n not in seen:
+            seen.add(n)
+            uniq.append(n)
+    return uniq
 
 
 def add_manual(q, name, when, shot=None, folder=None):
@@ -337,16 +451,41 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 @keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .empty{background:var(--paper);border-radius:var(--r);padding:2.4rem;text-align:center;display:grid;gap:.4rem}
 .empty b{font:italic 400 30px/1.1 var(--display)}.empty span{color:var(--ink-2)}
-details.fin{margin:0 0 3rem;border-top:1px solid var(--line);padding-top:1rem}
-details.fin summary{cursor:pointer;font:600 14px/1 var(--sans);color:var(--ink-2);list-style:none;display:flex;gap:.5rem;align-items:center}
-details.fin summary::before{content:"\25B8";transition:transform .3s}details.fin[open] summary::before{transform:rotate(90deg)}
-.finlist{list-style:none;margin:.9rem 0 0;padding:0;display:grid;gap:.4rem}
-.finlist li{display:flex;gap:.8rem;align-items:baseline;color:var(--ink-2);font-size:14.5px}
-.finlist li s{color:var(--ink)}.finlist button{margin-left:auto;font:600 12.5px var(--sans);background:none;border:0;color:var(--coral-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.line{display:flex;align-items:center;gap:1rem;margin:1.6rem 0 0;color:var(--ink-2)}
+.line::before,.line::after{content:"";flex:1;height:1px;background:var(--line)}
+.line span{font:600 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
+.arch-head{display:flex;flex-wrap:wrap;gap:.8rem 1rem;align-items:center;justify-content:space-between;padding:1.2rem 0 .2rem}
+.arch-head .count{font:500 14px/1.4 var(--sans);color:var(--ink-2)}
+.search{display:flex;align-items:center;gap:.5rem;background:var(--paper);border:1.5px solid var(--line);border-radius:999px;padding:.45rem .9rem;min-width:min(280px,100%);transition:border-color .2s}
+.search:focus-within{border-color:var(--coral)}
+.search input{border:0;outline:0;background:transparent;font:500 14px var(--sans);color:var(--ink);width:100%}
+.search svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2;flex:none}
+.month{font:italic 400 17px/1 var(--display);color:var(--ink-2);margin:1.4rem 0 .5rem;padding-left:.2rem}
+.alist{display:block;margin:0;padding:0 0 3rem;list-style:none}
+.acard{display:grid;grid-template-columns:78px 1fr auto;gap:1rem;align-items:center;background:var(--paper);padding:.6rem 1rem .6rem .8rem;border-bottom:1px solid var(--line);transition:background .25s}
+.acard:hover{background:#FFFDF8}
+.month + .acard{border-top-left-radius:16px;border-top-right-radius:16px}
+.acard:has(+ .month),.acard:last-child{border-bottom:0;border-bottom-left-radius:16px;border-bottom-right-radius:16px;margin-bottom:.2rem}
+.acard .pics{height:52px}
+.acard .pics span{width:40px;height:44px;top:5px;border-width:2px;border-radius:9px;box-shadow:0 6px 12px -8px rgba(31,36,48,.45)}
+.acard .pics span:nth-child(1){left:0}.acard .pics span:nth-child(2){left:20px;width:44px;height:50px;top:0}.acard .pics span:nth-child(3){left:38px}
+.acard:hover .pics span:nth-child(1){transform:rotate(-7deg) translateX(-3px)}.acard:hover .pics span:nth-child(3){transform:rotate(8deg) translateX(3px)}
+.acard .pics .none{height:46px;width:70px;font-size:11px;border-radius:9px}
+.acard .info{display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .9rem}
+.acard .name{font:600 15.5px/1.3 var(--sans);letter-spacing:-.01em}
+.acard .meta{font-size:13px;gap:.2rem .7rem}
+.acts{display:flex;align-items:center;gap:1rem}
+.open-folder{font:600 13px/1 var(--sans);color:var(--coral-2);background:transparent;border:1.5px solid var(--coral);border-radius:999px;padding:.5rem .85rem;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
+.open-folder:hover{background:var(--coral);color:#fff}
+.requeue{font:500 12.5px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;white-space:nowrap}
+.requeue:hover{color:var(--coral-2)}
+.tag.edited{background:var(--ocean-l);color:#2F6F6B;padding:.25rem .55rem;font-size:11.5px}
+.nomatch{color:var(--ink-2);padding:1rem 0 3rem}
+.acard.fresh{animation:pop .6s var(--ease)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font:500 14px var(--sans);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .offline{background:var(--coral-l);color:var(--coral-2);border-radius:14px;padding:.7rem 1rem;font-size:14px;margin-top:.4rem}
-@media (max-width:720px){.card{grid-template-columns:auto 1fr auto;padding:.9rem}.pics{grid-column:2/3;height:96px}.info{grid-column:2/3}.right{grid-row:1/3;grid-column:3}.n{display:none}.ask{grid-column:1/-1}}
+@media (max-width:720px){.card{grid-template-columns:auto 1fr auto;padding:.9rem}.card .pics{grid-column:2/3;height:96px}.card .info{grid-column:2/3}.right{grid-row:1/3;grid-column:3}.n{display:none}.ask{grid-column:1/-1}.acard{grid-template-columns:84px 1fr;column-gap:.7rem;row-gap:.45rem;padding:.7rem .8rem}.acard .pics{grid-column:1;grid-row:1/3;align-self:start}.acard .info{grid-column:2}.acard .acts{grid-column:2;flex-wrap:wrap;gap:.4rem .9rem}.search{min-width:0;width:100%}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 """
 
@@ -392,18 +531,42 @@ function render(){
     li.querySelector('.check').onclick = () => finish(li, s);
     list.appendChild(li);
   });
-  const f = Q.finished;
-  $('#fin').hidden = !f.length;
-  $('#fincount').textContent = `Finished (${f.length})`;
-  $('#finlist').innerHTML = f.slice(0, 20).map(s => `<li><s>${esc(s.name)}</s><span>${s.finished_at ? 'finished ' + nice(s.finished_at.slice(0,10)) : ''}</span><button data-id="${esc(s.id)}">Undo</button></li>`).join('');
-  $('#finlist').querySelectorAll('button').forEach(b => b.onclick = async () => {if(await send({action:'undo', id:b.dataset.id})){render();toast('Back in the queue')}});
+  renderArchive();
+}
+let FILTER = '';
+function renderArchive(fresh){
+  const a = Q.archive, box = $('#alist');
+  $('#acount').textContent = a.length ? `${a.length} shoot${a.length==1?'':'s'}, newest first` : 'Shoots land here after a backup, and when you finish editing one.';
+  const f = FILTER.trim().toLowerCase();
+  const shown = f ? a.filter(s => s.name.toLowerCase().includes(f)) : a;
+  let html = '', month = null;
+  shown.forEach(s => {
+    const m = s.shot ? new Date(s.shot + 'T12:00:00').toLocaleDateString('en-US', {month:'long', year:'numeric'}) : 'No date';
+    if(m != month){ html += `<li class="month">${esc(m)}</li>`; month = m }
+    const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
+    html += `<li class="acard${fresh == s.id ? ' fresh' : ''}" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
+      <div class="info"><div class="name">${esc(s.name)}</div>
+        <div class="meta">${s.status == 'finished' ? `<span class="tag edited">Edited${s.finished_at ? ' ' + nice(s.finished_at.slice(0,10)) : ''}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
+      <div class="acts">${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
+        <button class="requeue" data-id="${esc(s.id)}">Put back in the queue</button></div></li>`;
+  });
+  box.innerHTML = html || (a.length ? '' : '');
+  $('#nomatch').hidden = !(f && !shown.length);
+  box.querySelectorAll('.open-folder').forEach(b => b.onclick = () => openFolder(b.dataset.id));
+  box.querySelectorAll('.requeue').forEach(b => b.onclick = async () => {
+    if(await send({action:'requeue', id:b.dataset.id})){render(); toast('Back in the queue, no due date yet'); window.scrollTo({top:0, behavior:'smooth'})}});
+}
+async function openFolder(id){
+  if(!LIVE){toast('Ask Claude to “show my shoots” to open folders from here');return}
+  try{const r = await fetch('/open?id=' + encodeURIComponent(id)); const j = await r.json(); toast(j.words)}
+  catch(e){toast('Could not open that folder.')}
 }
 function dueWords(iso){if(!iso) return 'no due date';const n = days(iso);if(n<0) return `${-n} day${n==-1?'':'s'} late`;if(n==0) return 'due today';if(n==1) return 'due tomorrow';if(n<=7) return `due in ${n} days`;return 'due ' + nice(iso)}
 async function finish(li, s){
   li.classList.add('done');
   if(!(await send({action:'done', id:s.id}))){li.classList.remove('done');return}
-  toast(`${s.name}: finished`);
-  setTimeout(() => {li.classList.add('leaving'); setTimeout(render, 600)}, 1400);
+  toast(`${s.name}: finished, moved to your shoots below`);
+  setTimeout(() => {li.classList.add('leaving'); setTimeout(() => {render(); renderArchive(s.id)}, 600)}, 1400);
 }
 // drag to reorder
 let dragId = null;
@@ -448,29 +611,37 @@ function askDue(id, dir){
   input.oninput = () => { go.disabled = !input.value || input.value == s.due };
   go.onclick = async () => { if(input.value && await send({action:'due', id, due:input.value})){render();toast('Due date changed to ' + nice(input.value))} };
 }
+$('#q').addEventListener('input', e => {FILTER = e.target.value; renderArchive()});
 if(!LIVE) $('#offline').hidden = false;
 render();
+if(location.hash == '#archive') setTimeout(() => document.getElementById('archive').scrollIntoView({behavior:'smooth'}), 200);
 """
 
 
 def state(q):
     def pub(s):
-        return {k: s.get(k) for k in ("id", "name", "shot", "due", "count", "thumbs", "finished_at")}
-    return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)], "finished": [pub(s) for s in finished(q)]}
+        d = {k: s.get(k) for k in ("id", "name", "shot", "due", "count", "thumbs", "finished_at", "status")}
+        d["has_folder"] = bool(s.get("studio") or s.get("folder"))
+        return d
+    return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)], "archive": [pub(s) for s in archive(q)]}
 
 
 def page_html(q):
     data = json.dumps(state(q)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>Editing queue · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<title>Your shoots · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
             "<span class='talk'>Drag a shoot up or down to change the order. If it passes another shoot's due date, you can pick a new one.</span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and reorder.</p></header>"
             "<ol class='list' id='list'></ol>"
-            "<details class='fin' id='fin' hidden><summary id='fincount'></summary><ul class='finlist' id='finlist'></ul></details></div>"
+            "<div class='line' id='archive'><span>Your shoots</span></div>"
+            "<div class='arch-head'><span class='count' id='acount'></span>"
+            "<label class='search'><svg viewBox='0 0 24 24'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>"
+            "<input id='q' type='search' placeholder='Find a shoot' autocomplete='off'></label></div>"
+            "<ul class='alist' id='alist'></ul><p class='nomatch' id='nomatch' hidden>No shoot by that name.</p></div>"
             "<div class='toast' id='toast'></div>"
             f"<script type='application/json' id='data'>{data}</script><script>{SCRIPT}</script></body></html>")
 
@@ -496,6 +667,17 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if p.startswith("/queue-thumbs/") and ".." not in p:
             return super().do_GET()
+        if p == "/open":
+            from urllib.parse import parse_qs
+            sid = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
+            s = next((x for x in load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
+            ok, words = open_folder(s) if s else (False, "I don't know that shoot.")
+            out = json.dumps({"ok": ok, "words": words}).encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+            return
         self.send_error(HTTPStatus.NOT_FOUND)  # nothing else in ~/.studio is served
 
     def do_POST(self):
@@ -507,15 +689,19 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             q = load()
             act = body.get("action")
-            if act in ("done", "undo", "due"):
+            if act in ("done", "undo", "due", "requeue"):
                 s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
                 if act == "done":
                     s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
                     s["finished_by"] = "page"
-                elif act == "undo":
+                elif act in ("undo", "requeue"):
                     s["status"] = "waiting"
-                    s.pop("finished_at", None)
-                    s.pop("finished_by", None)
+                    for k in ("finished_at", "finished_by", "offered", "reminded"):
+                        s.pop(k, None)
+                    if act == "requeue":
+                        s["due"] = body.get("due") and due_date(body["due"])[0]
+                    q["shoots"].remove(s)
+                    place(q, s)
                 else:
                     s["due"], how = due_date(body.get("due"))
                     s.pop("reminded", None)
@@ -567,8 +753,10 @@ def show(q, all_=False):
         extra = f", {s['count']:,} photos" if s.get("count") else ""
         say(f"{i}. {s['name']}: {due_words(s.get('due'))}{extra}")
     if all_:
-        for s in finished(q):
-            say(f"   finished: {s['name']} ({(s.get('finished_at') or '')[:10]})")
+        a = archive(q)
+        say(f"Your shoots ({len(a)}):")
+        for s in a:
+            say(f"   {s.get('shot') or 'no date'}  {s['name']}" + ("  (edited)" if s.get("status") == "finished" else ""))
 
 
 def main():
@@ -590,6 +778,9 @@ def main():
     g.add_argument("--on", action="store_true"); g.add_argument("--off", action="store_true")
     sub.add_parser("status")
     o = sub.add_parser("offers"); o.add_argument("--mark", action="store_true", help="remember they were offered")
+    rg = sub.add_parser("register"); rg.add_argument("--night", required=True)
+    sub.add_parser("scan")
+    op = sub.add_parser("open"); op.add_argument("which")
     s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=8770)
     a = ap.parse_args()
 
@@ -612,14 +803,16 @@ def main():
     elif a.cmd in ("done", "undo"):
         s = find(q, a.which)
         if a.cmd == "done":
-            if s.get("status") == "finished":
+            if not is_waiting(s):
                 say(f"{s['name']} was already finished.")
                 return
             s["status"], s["finished_at"], s["finished_by"] = "finished", datetime.now().isoformat(timespec="seconds"), "claude"
         else:
             s["status"] = "waiting"
-            s.pop("finished_at", None)
-            s.pop("finished_by", None)
+            for k in ("finished_at", "finished_by", "offered", "reminded"):
+                s.pop(k, None)
+            q["shoots"].remove(s)
+            place(q, s)
         save(q)
         write_page(q)
         say(f"{'Finished' if a.cmd == 'done' else 'Back in the queue'}: {s['name']}.")
@@ -661,6 +854,26 @@ def main():
         say("The editing queue is on." if a.on else "No editing queue. Ask any time to turn it on.")
     elif a.cmd == "status":
         say("on" if q.get("enabled") else ("off" if "enabled" in q else "never asked"))
+    elif a.cmd == "register":
+        n = register_night(q, a.night)
+        save(q)
+        write_page(q)
+        say(f"{n} shoot{'s' if n != 1 else ''} added to your shoots." if n else "Those shoots were already there.")
+    elif a.cmd == "scan":
+        total = 0
+        for night in nights_known():
+            try:
+                total += register_night(q, night)
+            except (SystemExit, OSError, ValueError, KeyError):
+                continue  # a night that never finished, or a drive that is not plugged in
+        save(q)
+        write_page(q)
+        say(f"Found {total} shoot{'s' if total != 1 else ''} not in your shoots yet; added. {len(archive(q))} in all, {len(waiting(q))} in the queue.")
+    elif a.cmd == "open":
+        ok, words = open_folder(find(q, a.which))
+        say(words)
+        if not ok:
+            sys.exit(1)
     elif a.cmd == "offers":
         hits = [s for s in finished(q) if s.get("finished_by") == "page" and not s.get("offered")]
         for s in hits:
