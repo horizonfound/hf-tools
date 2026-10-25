@@ -108,6 +108,15 @@ Students install from GitHub: `/plugin marketplace add horizonfound/hf-tools` th
 - **Date in folder names: year first stays (Dustin asked, Oct 24).** "2026-10-24 Smith Family" is the photo-industry habit (Lightroom's own import folders, Photo Mechanic) because it is the only way folders sort in date order in Finder; month-first puts every October together across years. Month-first is one tap away in setup ("I have my own way") for anyone who wants it.
 - **Plain words everywhere:** no "touched" ("nothing on your memory card will be changed"), no "she/he," no code-styled file names in anything the photographer sees.
 
+## The Assistant, re-scoped (Dustin, Oct 24, evening)
+
+The Assistant is a time saver, not a video editor. Our value is **selection and prep**: Claude picking the winners from a folder of finished photos (it has been good at seeing which images work), putting them in an order that flows, and laying them on the beat of the song. **The finished look comes from CapCut and Canva**, the tools photographers already use, with their built-in styles and templates, never from effects we build ourselves. Rendering reels with ffmpeg (the 0.3.x pipeline: motion, text drawn by us, our own mix) looked amateur next to what CapCut does, and is **parked**: the code stays, nothing new is built on it.
+
+- **The flow:** the Studio Manager fills a **favorites folder** when a shoot is delivered (the photographer's picks or the client's) → "want a reel?" → Claude picks and orders from that folder (contact sheet first, rule 6) → **an editable CapCut project** with the photos cut on the beat of the song, opened in CapCut for them to style and export. Carousels: the same picks, in order, into a **Canva** template.
+- **Proven already:** a script-written CapCut 9.6 project opens and exports on Dustin's Mac (Oct 21). Untested: Windows, Intel Macs, newer CapCut versions, where the song comes from (a file in the folder works; picking it in CapCut's library first is the idea, untested).
+- **Little or nothing to install:** writing a CapCut project is writing files. Beat finding needs the song as sound samples; a Mac decodes MP3/M4A to WAV with its own `afconvert`, and the beat finder can run in plain Python. So the reel route should need no ffmpeg; confirm on a clean Mac.
+- Hooks and captions in their voice stay, on request. No transitions, no effects, no photo motion (rule 4).
+
 ## Why we moved to Claude Code
 
 The Claude desktop app's workspace stops any process the moment a step finishes (180 s per step), so a long backup had to run as resumable chunks. Claude Code runs commands directly on the Mac, can run them in the background, and can keep going while Dustin is away. The overnight jobs belong here. The Assistant and the morning report may stay in the desktop app, where she talks to it like a person. Test both; decide from what happens.
