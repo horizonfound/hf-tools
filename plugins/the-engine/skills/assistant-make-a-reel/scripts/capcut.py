@@ -8,7 +8,7 @@ add in CapCut.
     python3 capcut.py songs                     songs from CapCut's own music used in their projects
     python3 capcut.py write --plan reel.json    make the project (CapCut must be closed)
         [--store <projects folder>]             somewhere else (tests)
-        [--ignore-open]                         tests only: skip the "is CapCut open" check
+        [--ignore-open]                         tests only: treat CapCut as closed
 
 The plan (reel.py writes it):
     {"name": "Black-sand beach reel",
@@ -17,12 +17,12 @@ The plan (reel.py writes it):
      "hook": {"text": "…", "dur": 2.4} or null}
 
 How: every CapCut project is a folder of plain files. This builds one from pieces
-CapCut itself wrote (references/capcut/), never edits a project they made, never
-overwrites a folder, and adds the new project to CapCut's list of projects after
-keeping a copy of that list. CapCut must be closed while it writes, or CapCut may
-write its old list back over the new one on quit.
+CapCut itself wrote (references/capcut/), never edits a project they made, and
+never overwrites a folder. If CapCut is open, it only writes the new project's
+folder and CapCut picks it up by itself; if CapCut is closed, it also adds the
+project to CapCut's list of projects, after keeping a copy of that list.
 
-Exit codes: 0 made · 2 stop (no CapCut found, a photo or the song missing) · 8 CapCut is open.
+Exit codes: 0 made · 2 stop (no CapCut found, a photo or the song missing).
 """
 import argparse
 import copy
@@ -269,6 +269,16 @@ def tr(start, dur):
     return {"start": int(round(start * US)), "duration": int(round(dur * US))}
 
 
+def us_f(frames, fps=30.0):
+    """A whole number of frames as CapCut writes it in microseconds (1 frame at 30 fps = 33333 or 33334)."""
+    return int(round(frames * US / fps))
+
+
+def tr_f(start_f, dur_f, fps=30.0):
+    a, b = us_f(start_f, fps), us_f(start_f + dur_f, fps)
+    return {"start": a, "duration": b - a}
+
+
 def build(plan, parts, platform):
     draft, meta, P = parts
     d = copy.deepcopy(draft)
@@ -287,6 +297,8 @@ def build(plan, parts, platform):
     vtrack["id"] = uid()
     vtrack["segments"] = []
     end = 0.0
+    end_us = 0
+    fps = float(d.get("fps") or 30.0)
     for ph in plan["photos"]:
         w, h = ph.get("w") or 0, ph.get("h") or 0
         if not (w and h):
@@ -303,12 +315,14 @@ def build(plan, parts, platform):
             refs.append(item["id"])
         seg = copy.deepcopy(P["photo_segment"])
         s = ph.get("scale") or (fill_scale(w, h) if ph.get("fill", True) else 1.0)
+        target = tr_f(ph["start_f"], ph["dur_f"], fps) if "start_f" in ph else tr(ph["start"], ph["dur"])
         seg.update({"id": uid(), "material_id": mat["id"], "extra_material_refs": refs,
-                    "target_timerange": tr(ph["start"], ph["dur"]), "source_timerange": tr(0, ph["dur"])})
+                    "target_timerange": target, "source_timerange": {"start": 0, "duration": target["duration"]}})
         seg["clip"]["scale"] = {"x": s, "y": s}
         seg["uniform_scale"] = {"on": True, "value": 1.0}
         vtrack["segments"].append(seg)
         end = max(end, ph["start"] + ph["dur"])
+        end_us = max(end_us, target["start"] + target["duration"])
         meta_items.append({"duration": 5 * US, "extra_info": Path(ph["path"]).name, "file_Path": ph["path"],
                            "height": h, "width": w, "metetype": "photo", "t": t0})
     d["tracks"].append(vtrack)
@@ -326,7 +340,8 @@ def build(plan, parts, platform):
         tm["content"] = json.dumps(content, ensure_ascii=False)
         mats["texts"].append(tm)
         ts = copy.deepcopy(P["text_segment"])
-        ts.update({"id": uid(), "material_id": tm["id"], "target_timerange": tr(0, min(hook.get("dur", 2.5), end))})
+        hook_us = us_f(hook["dur_f"], fps) if hook.get("dur_f") else int(round(hook.get("dur", 2.5) * US))
+        ts.update({"id": uid(), "material_id": tm["id"], "target_timerange": {"start": 0, "duration": min(hook_us, end_us)}})
         tt = copy.deepcopy(P["text_track"])
         tt.update({"id": uid(), "segments": [ts]})
         d["tracks"].append(tt)
@@ -379,9 +394,12 @@ def build(plan, parts, platform):
                                         "fade_type": 0, "id": fid, "type": "audio_fade"})
             refs.append(fid)
         aseg = copy.deepcopy(P["photo_segment"])
+        src0 = us_f(song["from_f"], fps) if song.get("from_f") is not None else int(round(song.get("from", 0.0) * US))
+        a_dur = min(end_us, int(round(dur * US))) if length else end_us
         aseg.update({"id": uid(), "material_id": aid, "extra_material_refs": refs, "clip": None,
                      "hdr_settings": None, "uniform_scale": None, "render_index": 0, "track_render_index": 0,
-                     "target_timerange": tr(0, dur), "source_timerange": tr(song.get("from", 0.0), dur),
+                     "target_timerange": {"start": 0, "duration": a_dur},
+                     "source_timerange": {"start": src0, "duration": a_dur},
                      "volume": 1.0, "enable_lut": False, "enable_adjust": False})
         d["tracks"].append({"attribute": 0, "flag": 0, "id": uid(), "is_default_name": True, "name": "",
                             "segments": [aseg], "type": "audio"})
@@ -389,7 +407,7 @@ def build(plan, parts, platform):
                            "extra_info": song.get("name") or Path(song["path"]).name,
                            "file_Path": song["path"], "height": 0, "width": 0, "metetype": "music", "t": t0})
 
-    d["duration"] = int(round(end * US))
+    d["duration"] = end_us
     d["update_time"] = now_us()
 
     m = copy.deepcopy(meta)
@@ -443,9 +461,11 @@ def native(p):
 
 
 def write(plan, store, ignore_open=False):
-    if not ignore_open and capcut_open():
-        say("CapCut is open. Close it first (CapCut menu, Quit CapCut), then tell me and I'll finish.")
-        sys.exit(8)
+    """Returns (project folder, draft). With CapCut open, only the new project's own folder is written and
+    CapCut adds it to its list by itself (seen on Dustin's Mac, CapCut 9.6, Oct 25: within two seconds, twice);
+    CapCut's list file is left alone, since an open CapCut writes its own copy of it. With CapCut closed, the
+    project is added to the list too, after a copy of the list is kept."""
+    is_open = False if ignore_open else bool(capcut_open())
     if not store.is_dir():
         say(f"STOP: I can't find CapCut's projects folder ({store}). Is CapCut installed, and has it been opened once?")
         sys.exit(2)
@@ -476,6 +496,9 @@ def write(plan, store, ignore_open=False):
     elif first and str(first).lower().endswith((".jpg", ".jpeg")) and os.path.getsize(first) < 4_000_000:
         shutil.copyfile(first, cover)
 
+    write.left_to_capcut = is_open
+    if is_open:
+        return dest, draft
     # add it to CapCut's list of projects, keeping a copy of the list as it was
     root = store / "root_meta_info.json"
     if root.is_file():
@@ -528,8 +551,10 @@ def main():
     secs = draft["duration"] / US
     n = len(plan["photos"])
     say(f"Made \"{dest.name}\" in CapCut: {n} photos, {secs:.1f} seconds"
-        + (f", on the beat of {Path(plan['song']['path']).name}" if plan.get("song") else "")
-        + ". Open CapCut and it's at the top of your projects.")
+        + (f", on the beat of {plan['song'].get('name') or Path(plan['song']['path']).name}" if plan.get("song") else "")
+        + ("." if getattr(write, "left_to_capcut", False) else ". Open CapCut and it's at the top of your projects."))
+    if getattr(write, "left_to_capcut", False):
+        say("CapCut is open, so it will add it to your projects by itself in a moment. If it isn't there, quit and reopen CapCut.")
 
 
 if __name__ == "__main__":

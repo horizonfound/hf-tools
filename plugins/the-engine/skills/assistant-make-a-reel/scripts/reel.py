@@ -32,7 +32,7 @@ about two seconds a photo, "fast" about half a second, "build" starts calm and
 quickens toward the end. No song: an even 100 beats a minute, so music can be
 added in CapCut or Instagram.
 
-Exit codes: 0 done · 2 stop (folder, photo or song missing) · 8 CapCut is open (close it, run again).
+Exit codes: 0 done · 2 stop (folder, photo or song missing).
 """
 import argparse
 import json
@@ -260,52 +260,66 @@ def cmd_songs(a):
 
 # ---------------------------------------------------------------- the plan
 
-def plan_reel(photos, song, feel="mixed", song_start=None, fit=False, hints=None, variation=0):
-    """photos: list of {path, w, h}. Returns (plan pieces, facts for Claude to tell them)."""
+FPS = 30   # CapCut's projects run at 30 frames a second; cuts are placed on whole frames
+
+
+def plan_reel(photos, song, feel="mixed", song_start=None, fit=False, hints=None, variation=0, beat_file=None):
+    """photos: list of {path, w, h}. Returns (plan pieces, facts for Claude to tell them).
+
+    Every cut is on a beat, the reel starts on the first beat of a bar, and every time is a whole video frame
+    (CapCut moves anything else onto its frame grid, which made cuts land late). Each cut is placed on the
+    frame at or just before its beat, never after: a cut that arrives with the beat, or a hair early, feels on
+    time; a frame late feels off."""
     if song:
-        info = beats_lite.analyze(song)
+        info = beats_lite.analyze(song, beat_file)
         if not info["ok"]:
             return None, {"problem": f"I couldn't find the beat in {Path(song).name}: {info.get('reason')}."}
         period = info["period"]
     else:
         period = 60.0 / EVEN_BPM
         info = {"beats": [i * period for i in range(1000)], "energy": [], "duration": 1000 * period,
-                "tempo": EVEN_BPM}
+                "tempo": EVEN_BPM, "meter": 4, "bar_pos": [(i % 4) + 1 for i in range(1000)]}
     beats, energy = info["beats"], info.get("energy") or []
+    meter = info.get("meter") or 4
+    pos = info.get("bar_pos") or [(i % meter) + 1 for i in range(len(beats))]
+    downbeats = [i for i, p in enumerate(pos) if p == 1] or list(range(len(beats)))
     n = len(photos)
     seed = hash_seed([p["path"] for p in photos], variation)
     # first pass with no sense of the song's loudness, to know roughly how long the reel runs
-    steps = pace.holds(n, period, feel, None, hints, seed)
+    steps = pace.holds(n, period, feel, None, hints, seed, meter)
     need = sum(steps) * period
     if song_start is None:
         start = beats_lite.best_start(info, need + period) if song else 0.0
     else:
         start = song_start
-    i0 = next((i for i, b in enumerate(beats) if b >= start - 0.02), None)
+    i0 = next((i for i in downbeats if beats[i] >= start - 0.02), None)
     if i0 is None or i0 + sum(steps) >= len(beats):
-        i0 = 0
+        i0 = downbeats[0]
     # second pass: the song's loudness from that first beat on shapes the mix
     if feel == "mixed" and energy:
-        steps = pace.holds(n, period, feel, energy[i0:], hints, seed)
+        steps = pace.holds(n, period, feel, energy[i0:], hints, seed, meter)
     if i0 + sum(steps) >= len(beats):
-        i0 = 0
-        if sum(steps) >= len(beats):
+        i0 = downbeats[0]
+        if i0 + sum(steps) >= len(beats):
             return None, {"problem": "That song is too short for this many photos. Pick fewer photos, a calmer pace "
                                      "or a longer song."}
-    start = beats[i0]
-    cuts = [beats[i0]]
-    j = i0
+    idx = [i0]
     for st in steps:
-        j += st
-        cuts.append(beats[j])
+        idx.append(idx[-1] + st)
+    from_f = int(beats[i0] * FPS + 1e-6)                  # the song starts on the frame at or before the first beat
+    song_from = from_f / FPS
+    cut_f = [int((beats[i] - song_from) * FPS + 1e-6) for i in idx]
+    cut_f[0] = 0
     out = []
-    for p, a, b in zip(photos, cuts, cuts[1:]):
-        out.append({"path": p["path"], "w": p.get("w", 0), "h": p.get("h", 0),
-                    "start": round(a - start, 4), "dur": round(b - a, 4), "fill": not fit})
+    for p, a, b in zip(photos, cut_f, cut_f[1:]):
+        out.append({"path": p["path"], "w": p.get("w", 0), "h": p.get("h", 0), "start_f": a, "dur_f": b - a,
+                    "start": round(a / FPS, 4), "dur": round((b - a) / FPS, 4), "fill": not fit})
     words, shortest, longest = pace.describe(steps, period, feel)
-    facts = {"tempo": info.get("tempo"), "feel": feel, "feel_words": words, "shortest": shortest,
-             "longest": longest, "beats": steps, "length": round(cuts[-1] - start, 2),
-             "song_from": round(start, 2) if song else None,
+    early = [round((beats[i] - song_from) - f / FPS, 3) for i, f in zip(idx, cut_f)]
+    facts = {"tempo": info.get("tempo"), "meter": meter, "feel": feel, "feel_words": words, "shortest": shortest,
+             "longest": longest, "beats": steps, "length": round(cut_f[-1] / FPS, 2),
+             "song_from": round(song_from, 3) if song else None, "song_from_f": from_f if song else None,
+             "cut_early_by": early, "beats_from": info.get("beats_from"),
              "wide": [i + 1 for i, p in enumerate(photos) if p.get("w", 0) > p.get("h", 0) * 1.05]}
     return out, facts
 
@@ -344,18 +358,22 @@ def cmd_make(a):
     if song and not Path(song).is_file():
         say(f"STOP: no song at {song}")
         sys.exit(2)
-    pieces, facts = plan_reel(photos, song, a.pace, a.song_start, a.fit, hints, a.variation)
+    beat_file = None
+    if picked and picked.get("beats"):
+        bp = (picked["beats"].get("ai_beats") or {}).get("beats_path")
+        beat_file = bp if bp and Path(bp).is_file() else None
+    pieces, facts = plan_reel(photos, song, a.pace, a.song_start, a.fit, hints, a.variation, beat_file)
     if pieces is None:
         say(facts["problem"])
         sys.exit(2)
     name = a.name or f"{a.shoot or Path(a.folder).name} reel"
     plan = {"name": name, "photos": pieces,
-            "song": ({"path": song, "from": facts["song_from"], "fade_out": 0.5,
+            "song": ({"path": song, "from": facts["song_from"], "from_f": facts["song_from_f"], "fade_out": 0.5,
                       "length": (picked["seconds"] if picked else capcut.song_length(song)),
                       "name": picked["name"] if picked else Path(song).name,
                       "capcut_material": picked["material"] if picked else None,
                       "capcut_beats": picked["beats"] if picked else None} if song else None),
-            "hook": {"text": a.hook, "dur": pieces[0]["dur"]} if a.hook else None}
+            "hook": {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]} if a.hook else None}
     wd = workdir(a.shoot, a.folder)
     (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1))
     when = ""
@@ -382,7 +400,11 @@ def cmd_make(a):
         return
     store = Path(a.store).expanduser() if a.store else capcut.default_store()
     dest, draft = capcut.write(plan, store, a.ignore_open)
-    say(f"Made \"{dest.name}\" in CapCut. Open CapCut and it's at the top of your projects.")
+    if getattr(capcut.write, "left_to_capcut", False):
+        say(f"Made \"{dest.name}\" in CapCut. CapCut is open, so it will show up in your projects by itself in a "
+            "moment; if it isn't there, quit and reopen CapCut.")
+    else:
+        say(f"Made \"{dest.name}\" in CapCut. Open CapCut and it's at the top of your projects.")
     rec = json.loads((wd / "reel.json").read_text())
     rec["capcut_project"] = str(dest)
     (wd / "reel.json").write_text(json.dumps(rec, indent=1))

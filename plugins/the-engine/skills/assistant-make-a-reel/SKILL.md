@@ -16,7 +16,7 @@ The scripts are in `scripts/` next to this file. Nothing has to be installed on 
 1. **Edited photos only.** A reel is made from the photos they exported after editing, never from the backup's raw files. If all you have is a backup, say "Whenever you're finished with your edits, let me know and I'll turn your favorites into a reel."
 2. **Every frame is theirs.** Hard cuts on the beat. No transitions, no effects, no zooms or motion, no generated anything. Their look comes from CapCut.
 3. **Always a new CapCut project.** Never open, change or overwrite one they made. The script will not.
-4. **CapCut closed while it writes.** The script checks. If CapCut is open it stops and you ask them to quit it for a moment.
+4. **CapCut can stay open.** If it is open, the script writes only the new project's folder and CapCut adds it to its projects by itself; if it is closed, the project is added to CapCut's list for next time. Never ask them to quit CapCut unless the new project doesn't show up.
 5. **One look at the sheet, not photo by photo.** The contact sheet is how you see the shoot and the strip is how you check the order. Open a single photo larger only to settle a close call, and never more than a handful.
 6. **Nothing posts, nothing sends.**
 
@@ -89,7 +89,9 @@ python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
 - `--dry-run` prints the plan and writes nothing.
 
-Exit 8 means CapCut is open: "CapCut is open. Quit it for a moment (CapCut menu, Quit CapCut) and tell me." Then run the same command again. Exit 2 is a stop: say what it printed.
+If the script says CapCut was open, tell them it will appear in their CapCut projects in a moment, and only if it doesn't: "Quit CapCut and open it again." Exit 2 is a stop: say what it printed.
+
+How the timing works, if they ask: the reel starts on the first beat of a bar, long holds land on the 1 of a bar (songs in 3, like a waltz, are counted in 3), and every cut sits on the video frame at or just before its beat, never after, so it never feels late. With a song from CapCut's music, the cuts follow CapCut's own beat marks.
 
 ## Step 7: hand it over
 

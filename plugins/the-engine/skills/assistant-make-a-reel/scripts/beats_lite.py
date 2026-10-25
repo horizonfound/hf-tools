@@ -295,18 +295,24 @@ def energy_per_beat(full, beats_hops):
     return out
 
 
-def best_start(info, need):
-    """Where to start the song for a reel `need` seconds long: the start of the loudest stretch that fits, on a
-    beat, nudged toward a moment the energy jumps (a chorus coming in, a drop). 0 when nothing is clearly better."""
+def best_start(info, need, downbeats_only=True):
+    """Where to start the song for a reel `need` seconds long: the start of the loudest stretch that fits, on the
+    first beat of a bar, nudged toward a moment the energy jumps (a chorus coming in, a drop). The first downbeat
+    when nothing is clearly better."""
     grid, energy = info.get("beats") or [], info.get("energy") or []
+    pos = info.get("bar_pos") or []
+    ok = (lambda i: pos[i] == 1) if (downbeats_only and len(pos) == len(grid)) else (lambda i: True)
+    first_down = next((grid[i] for i in range(len(grid)) if ok(i)), 0.0)
     dur = info.get("duration", 0)
     if not grid or not energy or need <= 0 or dur - need < 2.0:
-        return 0.0
+        return first_down
     n = len(grid)
-    best_i, best_score, first_score = 0, -1.0, None
+    best_i, best_score, first_score = None, -1.0, None
     for i in range(n):
         if grid[i] + need > dur:
             break
+        if not ok(i):
+            continue
         j = i
         while j < n and grid[j] < grid[i] + need:
             j += 1
@@ -320,12 +326,60 @@ def best_start(info, need):
             first_score = score
         if score > best_score:
             best_i, best_score = i, score
-    if first_score is not None and best_score <= first_score * 1.08:
-        return 0.0
+    if best_i is None or (first_score is not None and best_score <= first_score * 1.08):
+        return first_down
     return float(grid[best_i])
 
 
-def analyze(path):
+def accents(o_low, o_all, hops):
+    """How strongly each beat lands: the biggest jump near it, the kick and bass counted double."""
+    out = []
+    n = len(o_all)
+    for h in hops:
+        h = int(round(h))
+        w = range(max(0, h - 3), min(n, h + 4))
+        out.append(max((2.0 * o_low[i] + o_all[i] for i in w), default=0.0))
+    return out
+
+
+def meter_and_one(acc):
+    """Beats in a bar (3 or 4) and which beat is the 1, from how the accents repeat.
+    Most songs are in 4; it takes a clearly stronger three-beat pattern to say 3."""
+    n = len(acc)
+    if n < 16:
+        return 4, 0
+    mean = sum(acc) / n
+    c = [a - mean for a in acc]
+
+    def ac(lag):
+        return sum(c[i] * c[i + lag] for i in range(n - lag)) / (n - lag) if n > lag else 0.0
+    a3 = ac(3) + 0.5 * ac(6)
+    a4 = ac(4) + 0.5 * ac(8)
+    m = 3 if a3 > 0 and a3 > 1.25 * max(a4, 0.0) else 4
+    sums, cnt = [0.0] * m, [0] * m
+    for i, a in enumerate(acc):
+        sums[i % m] += a
+        cnt[i % m] += 1
+    one = max(range(m), key=lambda k: sums[k] / max(1, cnt[k]))
+    return m, one
+
+
+def capcut_beats(beat_file):
+    """CapCut's own beat list for a library song: times, and each beat's place in the bar (1, 2, 3...)."""
+    try:
+        j = json.loads(open(beat_file, encoding="utf-8").read())
+        times = [t / 1000.0 for t in j["time"]]
+        pos = [int(v) for v in j.get("value") or []]
+        if len(times) < 8 or len(pos) != len(times) or min(pos) < 1:
+            return None
+        return times, pos
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def analyze(path, beat_file=None):
+    """The song's beats, where each bar starts, and how loud each beat is. With CapCut's own beat list
+    (beat_file), its beats and bars are used, so the cuts match the beat marks CapCut shows."""
     a, how = decode(path)
     if a is None:
         return {"ok": False, "reason": how, "duration": 0, "tempo": 0, "period": 0, "beats": [], "energy": []}
@@ -336,6 +390,15 @@ def analyze(path):
     if not period:
         return {"ok": False, "reason": "the song is too short to find a beat", "duration": round(dur, 3),
                 "tempo": 0, "period": 0, "beats": [], "energy": [], "how": how}
+    cap = capcut_beats(beat_file) if beat_file else None
+    if cap:
+        times, pos = cap
+        hops = [t * FPS for t in times]
+        gaps = sorted(times[i + 1] - times[i] for i in range(len(times) - 1))
+        per_s = gaps[len(gaps) // 2]
+        return {"ok": True, "duration": round(dur, 3), "tempo": round(60 / per_s, 1), "period": round(per_s, 4),
+                "beats": [round(t, 3) for t in times], "bar_pos": pos, "meter": max(pos),
+                "energy": energy_per_beat(full, hops), "how": how, "beats_from": "capcut"}
     tracked = track(smooth(o, period), period)
     if len(tracked) < 4:
         return {"ok": False, "reason": "no steady beat (the song may be too quiet or too free-form)",
@@ -344,8 +407,12 @@ def analyze(path):
     per = gaps[len(gaps) // 2]
     hops = fill_gaps(tracked, per, len(o))
     beats = [round(h / FPS, 3) for h in hops]
+    o_low = onset_strength(bands[:2])
+    m, one = meter_and_one(accents(o_low, o, hops))
+    pos = [((i - one) % m) + 1 for i in range(len(beats))]
     return {"ok": True, "duration": round(dur, 3), "tempo": round(60 * FPS / per, 1),
-            "period": round(per / FPS, 4), "beats": beats, "energy": energy_per_beat(full, hops), "how": how}
+            "period": round(per / FPS, 4), "beats": beats, "bar_pos": pos, "meter": m,
+            "energy": energy_per_beat(full, hops), "how": how, "beats_from": "ours"}
 
 
 if __name__ == "__main__":
@@ -359,5 +426,6 @@ if __name__ == "__main__":
     if not res["ok"]:
         print("No beat found:", res.get("reason"))
         sys.exit(1)
-    print(f"{res['duration']:.1f} s · about {res['tempo']:.0f} beats a minute · {len(res['beats'])} beats ({res['how']})")
+    print(f"{res['duration']:.1f} s · about {res['tempo']:.0f} beats a minute, {res['meter']} to a bar · "
+          f"{len(res['beats'])} beats ({res['how']})")
     print(" ".join(f"{b:.2f}" for b in res["beats"][:32]) + (" ..." if len(res["beats"]) > 32 else ""))
