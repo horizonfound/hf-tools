@@ -21,6 +21,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from finder import open_folder as show_in_finder
+
 
 class Handler(SimpleHTTPRequestHandler):
     allowed = ()
@@ -36,7 +38,7 @@ class Handler(SimpleHTTPRequestHandler):
         if ok:
             now = time.monotonic()
             if now - self.last_open.get(str(target), 0) > 1.0:
-                subprocess.run(["open", str(target)], check=False)
+                show_in_finder(target)  # brings Finder to the front, so the click visibly does something
             self.last_open[str(target)] = now
         self.send_response(HTTPStatus.OK if ok else HTTPStatus.FORBIDDEN)
         self.send_header("Content-Type", "text/plain")

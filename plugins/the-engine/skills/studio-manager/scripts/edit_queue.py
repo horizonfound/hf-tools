@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Your shoots: the editing queue on top (the shoots still to edit, with due
-dates, in the order the photographer wants to work on them) and, below the
+dates, soonest due always on top) and, below the
 line, every shoot the Studio has backed up, newest first, each with a button
 that opens its folder. One page; "show my queue" and "show the archive" both
 open it.
@@ -16,11 +16,11 @@ Nothing here ever touches a photo.
 
     python3 edit_queue.py add --night "<the night's folder or records>" --shoot s1 --due 2w
     python3 edit_queue.py add-manual --name "Garcia family" --due 2026-11-07 [--shot 2026-10-18]
-    python3 edit_queue.py list                      what's waiting, in their order
+    python3 edit_queue.py list                      what's waiting, soonest due first
     python3 edit_queue.py done "beach"              mark finished (a word from the name is enough)
     python3 edit_queue.py undo "beach"
     python3 edit_queue.py due "beach" 1w            a new due date (1w 2w 3w, this-week, or 2026-11-07)
-    python3 edit_queue.py move "beach" --to 1       put it first
+    python3 edit_queue.py move "beach" --to 1       put it first among shoots due the same day
     python3 edit_queue.py options                   the due choices, their most-picked first
     python3 edit_queue.py reminders [--mark]        due in 3 days or late (--mark: for the daily check)
     python3 edit_queue.py page                      write ~/.studio/queue.html
@@ -126,10 +126,12 @@ def is_waiting(s):
 
 
 def waiting(q):
-    """The shoots still to edit, in the photographer's order (or soonest due, until they move one)."""
+    """The shoots still to edit, soonest due always first (Dustin, Oct 24). Shoots due the same
+    day keep the order they were dragged into; shoots with no due date come last."""
     w = [s for s in q["shoots"] if is_waiting(s)]
     if not q.get("manual_order"):
-        w.sort(key=lambda s: (s.get("due") or "9999", s.get("added", "")))
+        w.sort(key=lambda s: s.get("added", ""))
+    w.sort(key=lambda s: s.get("due") or "9999")  # stable: same-day shoots keep their order
     return w
 
 
@@ -299,15 +301,11 @@ def open_folder(s):
     if not f.is_dir():
         drive = f.parts[2] if len(f.parts) > 2 and f.parts[1] == "Volumes" else None
         return False, (f"Plug in {drive} to open this one." if drive else "That folder isn't where it used to be.")
-    opener = {"darwin": ["open"], "win32": ["explorer"], "linux": ["xdg-open"]}.get(sys.platform)
-    if opener:
-        import subprocess
-        try:
-            subprocess.run([*opener, str(f)], check=False)
-        except OSError:
-            return False, f"Couldn't open Finder; the folder is {f}."
-
-    return True, f"Opened {f.name}."
+    from finder import open_folder as show_in_finder
+    ok, _ = show_in_finder(f)
+    if not ok:
+        return False, f"Couldn't open Finder; the folder is {f}."
+    return True, f"Opened {f.name} in Finder."
 
 
 def nights_known():
@@ -513,10 +511,11 @@ async function send(body){
       if(!r.ok) throw 0; Q = await r.json(); return true}
   catch(e){toast('That did not save. Try again.');return false}
 }
-function render(){
-  const w = Q.waiting, list = $('#list');
+function render(order){
+  // order: ids to show while a moved shoot waits for its new due date (nothing is saved until a date is picked)
+  const w = order ? order.map(id => Q.waiting.find(s => s.id == id)) : Q.waiting, list = $('#list'), first = Q.waiting[0];
   $('#count').innerHTML = w.length ? `${w.length} shoot${w.length==1?'':'s'} to edit` : 'All caught up';
-  $('#next').innerHTML = w.length ? `Next up: <em>${esc(w[0].name)}</em>, ${esc(dueWords(w[0].due))}.` : '';
+  $('#next').innerHTML = first ? `Next up: <em>${esc(first.name)}</em>, ${esc(dueWords(first.due))}.` : '';
   list.innerHTML = w.length ? '' : '<li class="empty"><b>Nothing waiting.</b><span>New shoots land here when you add them after a backup.</span></li>';
   w.forEach((s, i) => {
     const li = document.createElement('li');
@@ -588,28 +587,31 @@ document.addEventListener('drop', async e => {
   // up past a shoot due sooner (theirs may need to come earlier), or down past one due later (theirs may need to move out)
   const wentUp = Q.waiting.filter(s => old.indexOf(s.id) < from && ids.indexOf(s.id) > at);
   const wentDown = Q.waiting.filter(s => old.indexOf(s.id) > from && ids.indexOf(s.id) < at);
-  const dir = !moved.due ? null
-    : wentUp.some(s => s.due && s.due < moved.due) ? 'up'
-    : wentDown.some(s => s.due && s.due > moved.due) ? 'down' : null;
-  if(await send({action:'order', ids})){render(); if(dir) askDue(dragId, dir)}
-  dragId = null;
+  // the soonest due date is always on top, so a move across another shoot's date only sticks with a new date
+  const key = s => s.due || '9999';
+  const dir = wentUp.some(s => key(s) < key(moved)) ? 'up'
+    : wentDown.some(s => key(s) > key(moved)) ? 'down' : null;
+  const id = dragId; dragId = null;
+  if(dir){ render(ids); askDue(id, dir); return }   // shown where they dropped it; Keep slides it back
+  if(await send({action:'order', ids})) render();
 });
 function askDue(id, dir){
   const s = Q.waiting.find(x => x.id == id);const li = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);if(!s || !li) return;
   const box = document.createElement('div');box.className = 'ask';
   box.innerHTML = `<b>Moved ${dir == 'down' ? 'down' : 'up'}. New due date?</b>
-    <button class="keep" data-v="keep">Keep ${esc(nice(s.due))}</button>
+    <button class="keep" data-v="keep">Keep ${s.due ? esc(nice(s.due)) : 'no due date'}</button>
     <button class="pick">Pick a date</button>
-    <span class="when" hidden><input type="date" min="${Q.today}" value="${esc(s.due)}"><button class="go" disabled>Change date</button></span>`;
+    <span class="when" hidden><input type="date" min="${Q.today}" value="${esc(s.due || '')}"><button class="go" disabled>Change date</button></span>`;
   li.appendChild(box);
   const when = box.querySelector('.when'), input = box.querySelector('input'), go = box.querySelector('.go');
-  box.querySelector('.keep').onclick = () => box.remove();
+  box.querySelector('.keep').onclick = () => { render(); toast(`Kept the date, so ${s.name} goes back in due-date order`) };
   box.querySelector('.pick').onclick = ev => {
     ev.target.hidden = true; when.hidden = false; input.focus();
     try{ input.showPicker() }catch(e){}   // opens the calendar where the browser allows it
   };
   input.oninput = () => { go.disabled = !input.value || input.value == s.due };
   go.onclick = async () => { if(input.value && await send({action:'due', id, due:input.value})){render();toast('Due date changed to ' + nice(input.value))} };
+  li.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
 $('#q').addEventListener('input', e => {FILTER = e.target.value; renderArchive()});
 if(!LIVE) $('#offline').hidden = false;
@@ -634,8 +636,8 @@ def page_html(q):
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
-            "<span class='talk'>Drag a shoot up or down to change the order. If it passes another shoot's due date, you can pick a new one.</span>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and reorder.</p></header>"
+            "<span class='talk'>The soonest due date is always on top. Drag a shoot up or down to give it a new due date.</span>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and change dates.</p></header>"
             "<ol class='list' id='list'></ol>"
             "<div class='line' id='archive'><span>Your shoots</span></div>"
             "<div class='arch-head'><span class='count' id='acount'></span>"
@@ -828,10 +830,17 @@ def main():
     elif a.cmd == "move":
         s = find(q, a.which, include_finished=False)
         ids = [x["id"] for x in waiting(q) if x["id"] != s["id"]]
-        ids.insert(max(0, min(len(ids), a.to - 1)), s["id"])
+        want = max(0, min(len(ids), a.to - 1))
+        ids.insert(want, s["id"])
         reorder(q, ids)
         save(q)
         write_page(q)
+        w = waiting(q)
+        at = [x["id"] for x in w].index(s["id"])
+        if at != want:  # soonest due is always on top, so a move across due dates needs a new date
+            other = w[want]
+            say(f"{s['name']} is {due_words(s.get('due'))} and {other['name']} is {due_words(other.get('due'))}, "
+                f"so the soonest stays on top. To move {s['name']} there, give it a new due date.")
         show(q)
     elif a.cmd == "options":
         say(json.dumps(options(q)))
