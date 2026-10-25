@@ -36,7 +36,7 @@ Never ask them to upload photos one by one, and never move, rename or touch the 
 
 ## Step 3: pick and order
 
-Look at the sheet the way Nicole would, then choose 6 to 10 photos and put them in order. The rules, from the playbook:
+Read `../../shared/curating.md` first. The photos are already edited and each one already looks great on its own; your main job is to make them look great as a group, flowing from one slide to the next in the most harmonious way possible. Look at the sheet the way Nicole would, then choose 6 to 10 photos and put them in order. The rules (curating.md has the full version):
 
 - **Most impactful first.** The first slide is the one that stops the scroll: the most beautiful, emotional or surprising frame. Not the safest one.
 - **Vary the distance.** Wide, medium, tight, and back again. Three tight crops in a row stalls the swipe; so do three wides.

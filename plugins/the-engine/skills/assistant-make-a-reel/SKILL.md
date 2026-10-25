@@ -1,109 +1,104 @@
 ---
 name: assistant-make-a-reel
-description: The Assistant by Horizon Found, the reel builder. Turns a session folder (finished photos, behind-the-scenes clips, a talking clip, a song) into an Instagram reel cut to the beat, with on-screen hook options in the photographer's voice, and extra versions for trial reels. Use this whenever the person says make a reel, build a reel, reel from this session, turn this into a reel, cut this to the beat, give me hooks, trial reels from this, or check my setup, even if they do not name the Assistant. Needs a Brand File from Start Here.
+description: The Studio by Horizon Found, the reel. Turns a photographer's edited, exported photos into a CapCut project cut on the beat of their song, with Claude picking and ordering the photos, ready for them to style and export in CapCut. Use this whenever the person says make a reel, turn these into a reel, reel from the beach shoot, yes to "want a reel?", cut these to a song, or trial reels from this shoot, even if they do not name the Studio.
 ---
 
 # Make a reel
 
-You help a photographer turn one session into a reel they could post tonight: their clips and photos, cut to the beat of a song, with a hook on screen in their voice, in their look. You plan it with them, build it, check it, and hand it back as a finished video. You suggest. They decide. Nothing posts.
+This is part of what the Studio Manager does, after the edit. The photographer has exported their edited photos; you pick the strongest ones, put them in an order that flows, and lay them on the beat of their song as a new CapCut project. They open CapCut, add their look (a text style, a filter, a template), and export. You save them the hour of choosing and cutting. You never make the look, and nothing posts.
 
-Nothing has to be installed. The Claude workspace on their computer already has what the scripts need (ffmpeg, Python, numpy, Pillow). The scripts live in `scripts/` next to this file.
+Talk the way the Studio Manager talks: short, plain words, the result first, one question at a time with buttons (the likely answer first, marked recommended) and the Other box always there. The photographer is "you" or "they", never "she" or "he". No file names in code styling, no settings talk.
 
-## Before you start
+The scripts are in `scripts/` next to this file. Nothing has to be installed on a Mac: the song is read with the Mac's own tools and everything else is plain Python.
 
-1. Read their Brand File. It lives in their Project. No Brand File, no reel: send them to Start Here first. The Look section gives you the hook font, color and placement; the Voice section gives you the hooks.
-2. Read `../../shared/playbook.md` and `../../shared/guardrails.md`. Every hook and caption gets checked against the guardrails before they see it. The playbook has the reel recipes and the trial-reel rule.
-3. Two voices. You talk to the photographer in Horizon Found's voice (`../../shared/voice-of-the-assistant.md`). Everything written for them (hooks, a caption) is in their voice and speaks to their client, never to other photographers.
+## The rules
 
-## "Check my setup" and "set up the reel tool"
+1. **Edited photos only.** A reel is made from the photos they exported after editing, never from the backup's raw files. If all you have is a backup, say "Whenever you're finished with your edits, let me know and I'll turn your favorites into a reel."
+2. **Every frame is theirs.** Hard cuts on the beat. No transitions, no effects, no zooms or motion, no generated anything. Their look comes from CapCut.
+3. **Always a new CapCut project.** Never open, change or overwrite one they made. The script will not.
+4. **CapCut closed while it writes.** The script checks. If CapCut is open it stops and you ask them to quit it for a moment.
+5. **One look at the sheet, not photo by photo.** The contact sheet is how you see the shoot and the strip is how you check the order. Open a single photo larger only to settle a close call, and never more than a handful.
+6. **Nothing posts, nothing sends.**
 
-Both mean the same thing now: run `python3 scripts/check_setup.py` and show the lines as they come out. It tells them Mac or PC, what it found, and how fast a reel will render on their computer. There is nothing to install; if a line says MISSING, that is a support case: ask for a screenshot and Mac or PC.
+## Step 1: the edited photos
 
-## Step 1: the session
+Usually you arrive here from the Studio Manager: they said "I'm done with the beach shoot," it found the export folder and they confirmed it. Use that folder. If they came straight here, ask which shoot; the Studio Manager's `find_exports.py` finds the folder (see its skill), or they tell you where it is. A folder of favorites or selects they made themselves is even better: use that.
 
-Ask which session. It has to be a connected folder in the Claude desktop app; connected folders are under `$HOME/mnt/<folder name>`. If theirs isn't there, ask them to add it with the Add folder button and tell you the name. One shoot per folder works best: finished photos, any behind-the-scenes clips, a talking clip if they filmed one, and the song if they have it, all at the top level.
-
-Run the contact sheet so you can see every photo at once and refer to them by number:
-
-```
-python3 ../assistant-make-a-carousel/scripts/contact_sheet.py "$HOME/mnt/<folder>"
-```
-
-Open the sheet and look at it properly. If there are clips, run `ffprobe` on each to know their length, and if a clip looks like a talking clip, say so.
-
-## Step 2: the song
-
-The reel is cut to the beat, so the song comes first. Three ways, in this order:
-
-1. **A song file in the session folder** (mp3, m4a, wav). The script finds it on its own.
-2. **A song they picked in CapCut.** CapCut keeps a copy of any song added to a project. Ask them to connect their CapCut folder, then run `python3 scripts/find_music.py "$HOME/mnt/<capcut folder>"` and show the newest few. Untested on a real CapCut install; say so the first time and tell Dustin what you found.
-3. **No song yet.** Say: "No song in mind? Drop one in the folder, or say no song and I'll cut at an even pace so you can add audio in Instagram." With no song the cuts land every 1.2 seconds (100 bpm, every second beat), which lines up with most pop tempos but not with a specific track.
-
-The script starts the song where it picks up (the chorus, the drop), not at 0:00, and says so ("starting the song at 41.3 s"). If they want a different moment, `--song-start 58` is seconds into the song; `--song-start 0` is the top.
-
-Never promise a trending Instagram audio can be used here; it can't be read from Instagram. Trial reels get their audio in the Instagram app anyway.
-
-## Step 3: the recipe, as a pick-one
-
-From the playbook, the kinds of reels a photographer posts. Offer the ones the folder supports, the likely one marked (Recommended), and always "Other, tell me":
-
-- **Behind the scenes into the photos** (Recommended when there is a clip): the talking or behind-the-scenes clip opens for about three seconds with the hook on it, then the photos land one every two beats. `--recipe hook-photos`
-- **Photo montage**: photos only, one every two beats. `--recipe montage`
-- **Behind the scenes cut to music**: the clips chopped on the beat, no photos. `--recipe bts`
-- **Behind the scenes then photos**: clip pieces on the beat, then the photos. `--recipe bts-photos`
-
-Then the photos: which ones and in what order, by sheet number. Pick for them first (most impactful first, vary wide and tight, let the color flow, end quiet; the carousel rules apply) and show the list with one short "why" each. Keep it to 8 to 14 photos so the reel stays under 20 seconds. They keep it or change it.
-
-## Step 4: the hook
-
-Write ten to twenty on-screen hook lines in their voice, from the Brand File. Rules from Nicole:
-
-- It speaks to their client about what she feels and wants, never about how the photographer works. "You're always the one taking the picture. This time you're in it." Not "I barely directed this session."
-- One short line, two at most. It has to read in a second on a phone.
-- Never the words of the spoken opener repeated. The text does a different job than the voice.
-- A real angle that only this photographer would say. If it could be any photographer's, cut it.
-- Never invent a client's name, a date, a price or an offer.
-
-Show them as a numbered list and ask them to pick one for the feed. The others are not wasted: four or five of them become trial reels of the same cut (Step 6). Also offer "no text, I'll add it myself in the app."
-
-Caption: only if they ask. If they do, a short story with a beginning, in their voice, the client's name only with their OK.
-
-## Step 5: build it
-
-Fill the command from the Brand File's Look section. The text style follows their headline font: a serif brand (Cormorant, Fraunces, anything with serifs) gets `--hook-style editorial`; a sans brand (Montserrat, DM Sans, Inter) gets `--hook-style clean`; `label` is the native Instagram pill, for anyone whose look is plain and bold. Leave color and position on auto unless the Brand File names a text color: the script looks at the frame behind the text, keeps it off faces and hands, picks cream or ink, and adds a soft gradient only when the background is bright. A kicker is optional: the couple's names or the place, small, above the line.
+Make the sheet:
 
 ```
-python3 scripts/make_reel.py --session "$HOME/mnt/<folder>" \
-  --recipe hook-photos --photos 7,3,9,1,5,8,2,6 \
-  --hook "the line they picked" --hook-style editorial --hook-kicker "Kira + James · Laguna" \
-  --end-text "@their.handle" --name "kira-beach"
+python3 scripts/reel.py sheet --folder "<edited photos>" --shoot "<shoot name>"
 ```
 
-Useful switches: `--clip <file>` to choose which clip opens · `--clip-sound mute` when the clip has no talking in it · `--song <file>` or `--song none` · `--song-start 58` · `--beats-per-photo 1` for a faster cut, `4` for a slow one · `--rhythm build` so the photos come faster toward the end · `--max-seconds 15` · `--hook-font "cormorant semibold italic"` or a .ttf path to override the style's font · `--hook-color "#2B2420"` · `--hook-position lower` · `--hook-persist` to keep the text on for the whole reel · `--end-text "@handle"` for a small line on the last photo · `--motion off` to hold photos still · `--dry-run` to print the plan without rendering.
+It writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Studio's own folder; their photo folder is not changed. Read the sheet image(s).
 
-What the script does on its own, so you can say it plainly: every cut lands on a beat; the opening clip ends on one; the dead air before they start talking is trimmed; the song is ducked under the voice with a smooth curve and the voice is cleaned up; photos move with a slow push, pull or sideways drift drawn to a fraction of a pixel; the text fades in with a small rise and fades out before the cut; the sound is encoded once.
+## Step 2: curate the set (your main job)
 
-Run `--dry-run` first and show the plan in one short table (what opens, how many photos, how long). Then render. A twenty-second reel takes about 20 seconds on a recent Mac, longer on older machines; the script says what it is doing. Everything goes into `<folder>/_assistant/reel-<name>/`. The originals are never touched.
+Read `../../shared/curating.md` first, every time. The photos are already edited and each one already looks great on its own; your job is to make them look great **as a group**, flowing from one to the next in the most harmonious way possible. That comes before everything else here.
 
-The script grades its own result (`grade_reel.py`) the way a picky editor would: every cut within two frames of a beat, the opening held, no clicks or clipping in the sound, the photo motion smooth (under 0.25 px a frame), the text readable against what is behind it (3:1 or better). If it says FAIL, read the reason, fix the cause, and build again. Never hand over a FAIL without saying what's off. Taste is not graded; that is theirs.
+Pick 8 to 14 and order them by those rules: open on the scroll-stopper; move between wides, mediums, close-ups and details, never three of one distance in a row; change one thing at a time from photo to photo (light, color, distance, direction), so every cut feels like the natural next one; let color and light travel somewhere instead of bouncing; no near-twins side by side; close on a quiet, final frame. A great photo that fights the flow stays out. For a reel, add one more: **tall photos first**, since the screen is tall and a wide photo loses its sides (one or two wide ones are fine if the subject sits near the middle).
 
-## Step 6: hand it back, then the trial reels
+While you order them, mark how long each one deserves: a `+` after a number to linger on it (the emotional peak, a wide with a lot to take in, the closer), a `-` to pass quickly (a run of details, two or three frames of one laugh in a burst). Most photos get no mark. With the "a little of everything" pace these marks decide where the long and quick moments fall, so the rhythm follows the photos instead of a formula.
 
-Say where the file is, how long it is, and the one-line check result. Tell them to watch it on their phone. Ask the one question that matters: anything feel off, too fast, text in the wrong place? Fix that one thing; don't rebuild from scratch for a tweak (the hook text is a `--hook` change, the order is a `--photos` change).
+Then check your order as it will play:
 
-Then offer the trial reels: put four of the other hooks they liked into a text file, one per line, and run the same command with `--variants hooks.txt`. Same cut, different opening line, one MP4 each, in seconds. Remind them, in one line, that trial reels go out as trial reels and never to the feed (playbook).
+```
+python3 scripts/reel.py strip --folder "<edited photos>" --shoot "<shoot name>" --picks 7,2,11+,4,9-,1-,5,12+
+```
 
-End with a line starting **Next:** (post it tonight, or make the carousel from the same session).
+Read the strip left to right. Fix any jolt (swap two neighbors, move a detail in as a breather, drop the one that fights) and draw it again if you changed anything.
 
-## Rules
+Show the pick in one short message: the numbers in order and a few words on how it flows ("Opens wide on the beach, moves in to the two of them, then hands and the ring, ends on the walk away"), plus one line for any trade-off ("Left out 14, lovely but a twin of 9"). Then one question: "Go with these?" [Make it (recommended)] [Change the picks]. If they change it ("swap 3 for 5", "start with the couple"), do it their way; mention once if it now puts near-twins or three close-ups together.
 
-- Never move, rename or overwrite their files. Write only into `_assistant/`.
-- No song, no beat promise. Say it plainly instead of pretending.
-- A talking clip longer than three seconds: the dead air at the start is trimmed, then only the first three seconds open the reel in this version. Say so. `--hook-hold 5` holds it longer; cutting the middle of a long talking clip comes later.
-- Never add music they didn't give you. Never generate a voice.
-- Keep your messages short. The reel is the deliverable, not the explanation.
-- Honest about what's untested: CapCut's music folder, iPhone HEIC photos on a PC, Intel Macs. Say "first time on this, tell me if it misbehaves" and keep going.
+## Step 3: the song
 
-## What's coming (don't promise, do mention if asked)
+Ask with buttons: "Which song?" [A song file on this computer] [No song for now] (and Other).
 
-An editable CapCut draft of the same reel (every layer still theirs), word-by-word captions for the talking clip, cutting the middle of a long talking clip, and the matching-moment finder that pairs a behind-the-scenes clip with its finished photo. Not in this version.
+- **A song file:** run `python3 scripts/reel.py songs` (it looks in Downloads, Music and Desktop, newest first). Offer the top three or four as buttons by name. Songs bought or streamed in Apple Music are locked and cannot be read; if that is the only copy, say so plainly and suggest a downloaded song.
+- **No song for now:** the cuts go at an even pace (100 beats a minute), so music can be added in CapCut or Instagram afterwards. Say that in one line.
+- **A song from CapCut's own music library** is not supported yet; if they ask, say it's coming and offer the two options above.
+
+The script starts the song where it picks up (the loudest stretch that fits, on a beat, nudged toward where the energy jumps) and says where. If they want a different moment, `--song-start 58` is seconds into the song, `--song-start 0` the very top.
+
+## Step 4: how it moves
+
+Ask with buttons: "How should it move?"
+- **A little of everything (recommended):** some quick, some long, never a formula. The changes fall where the music turns over, more cuts where the song is busy and fewer where it's quiet, and your `+` and `-` marks decide which photos linger and which fly by.
+- **Calm:** about two seconds a photo; room to look. Best with 6 to 9 photos.
+- **Fast:** about half a second a photo; quick and punchy. Best with 12 to 20 photos.
+- **Build:** starts calm, quickens toward the end, then lands on the last photo.
+
+Every cut lands on the beat whichever they pick. If they pick Fast and you chose fewer than 12 photos, offer a few more from the sheet; if Calm and more than 9, offer to trim.
+
+## Step 5: words on the first photo (optional)
+
+Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me options]. If yes, write five short options in their voice (their Brand File's Voice section if they have one). Rules from Nicole: it speaks to their client about what the client feels and wants, never about how the photographer works; one short line, readable in a second; a real angle only this photographer would say; never invent a name, date, price or offer. They pick one. It goes in as plain white text over the first photo; they restyle it with one of CapCut's text styles.
+
+## Step 6: make it
+
+```
+python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
+  --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"        (or --song none)
+  --pace mixed|calm|fast|build   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
+```
+
+- `--pace` is their answer from Step 4 (`mixed` is "a little of everything"). The first photo always holds long enough to read, and the last one lands.
+- `--variation 2` (3, 4...) gives another mix of the same picks with the same pace, if they want to see it move differently.
+- Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
+- `--dry-run` prints the plan and writes nothing.
+
+Exit 8 means CapCut is open: "CapCut is open. Quit it for a moment (CapCut menu, Quit CapCut) and tell me." Then run the same command again. Exit 2 is a stop: say what it printed.
+
+## Step 7: hand it over
+
+Two lines, their words: "It's in CapCut: Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off."
+
+Then one next step, as a question with buttons: a carousel from the same picks, or trial reels. **Trial reels** are the same cut with a different opening line: run `make` again with another `--hook` and `--name "<shoot> reel, take 2"`, one project each, in seconds. Remind them once that trial reels go out as trial reels, never to the feed.
+
+## Untested, honestly
+
+Proven on Dustin's Mac with CapCut 9.6: a project written this way opens and exports (Oct 21). The full flow here (sheet, pick, song, beat, project) has run on test photos only. Not yet tried: CapCut versions other than 9.6, Windows (the projects folder and the song reading are written for it, not run), HEIC photos, songs from CapCut's library. The first time on any of these, say "first time on this, tell me if anything looks off" and keep going.
+
+## Parked
+
+The earlier version rendered finished MP4s with ffmpeg (`make_reel.py`, `hooktext.py`, `grade_reel.py`, `beats.py`, `check_setup.py`). Next to CapCut's own looks it read as amateur, so it is parked: the code stays, nothing new is built on it, and you do not use it.
