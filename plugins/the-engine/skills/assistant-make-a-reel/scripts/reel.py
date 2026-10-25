@@ -7,6 +7,10 @@ on the beat. Claude does the choosing; this does the counting.
         plus photos.json: number, file, which way up. Nothing in the folder changes;
         the sheet goes in ~/.studio/reels/<shoot>/.
 
+    python3 reel.py strip --folder "<edited photos>" --picks 7,2,11,4,9,1 [--shoot ...]
+        The picks drawn in play order, numbered as on the sheet, so the flow from one
+        photo to the next can be checked in one look before anything is made.
+
     python3 reel.py songs [<folder> ...]
         Song files on this computer, newest first (Downloads, Music, Desktop, and any
         folders named), with their length.
@@ -97,7 +101,7 @@ def _thumb(src, size, tmp):
     return w, h, [raw[y * w * 3:(y + 1) * w * 3] for y in range(h)]
 
 
-def make_sheets(photos, out_dir, cell=200, per_row=6):
+def make_sheets(photos, out_dir, cell=200, per_row=6, labels=None, name="sheet"):
     import sheet
     tmp = out_dir / ".thumb.bmp"
     paths = []
@@ -109,7 +113,7 @@ def make_sheets(photos, out_dir, cell=200, per_row=6):
         H = rows_n * (cell + gap) + gap
         cv = sheet.Canvas(W, H, bg=(30, 30, 30))
         for i, p in enumerate(chunk):
-            n = s + i + 1
+            n = labels[s + i] if labels else s + i + 1
             x = gap + (i % per_row) * (cell + gap)
             y = gap + (i // per_row) * (cell + gap)
             t = _thumb(p, cell, tmp)
@@ -118,7 +122,7 @@ def make_sheets(photos, out_dir, cell=200, per_row=6):
                 cv.paste(x + (cell - w) // 2, y + (cell - h) // 2, w, h, rows)
             cv.rect(x, y, tag + 12 * len(str(n)), tag, (20, 20, 20))
             cv.text(x + 6, y + 6, str(n), scale=3, color=(240, 127, 90))
-        out = out_dir / f"sheet-{s // PER_SHEET + 1}.png"
+        out = out_dir / (f"{name}-{s // PER_SHEET + 1}.png" if name == "sheet" else f"{name}.png")
         sheet.write_png(out, W, H, cv.rows)
         paths.append(out)
     if tmp.exists():
@@ -145,6 +149,35 @@ def cmd_sheet(a):
     for s in sheets:
         say(f"Sheet: {s}")
     say(f"List: {wd / 'photos.json'}")
+
+
+def read_picks(a):
+    """The listing from the sheet, and the picked photos in order."""
+    listing_file = workdir(a.shoot, a.folder) / "photos.json"
+    if listing_file.is_file() and json.loads(listing_file.read_text()).get("folder") == str(Path(a.folder)):
+        listing = json.loads(listing_file.read_text())["photos"]
+    else:
+        listing = [{"n": i, "file": str(p), "w": 0, "h": 0} for i, p in enumerate(edited_photos(a.folder), 1)]
+    by_n = {x["n"]: x for x in listing}
+    try:
+        picks = [int(x) for x in re.split(r"[,\s]+", a.picks.strip()) if x]
+    except ValueError:
+        say("STOP: --picks is the photo numbers in order, like 7,2,11,4")
+        sys.exit(2)
+    bad = [n for n in picks if n not in by_n]
+    if bad or not picks:
+        say(f"STOP: no photo numbered {', '.join(map(str, bad))} on the sheet." if bad else "STOP: no photos picked.")
+        sys.exit(2)
+    return by_n, picks
+
+
+def cmd_strip(a):
+    """The picks in play order, one or two rows, numbered as on the sheet: read the flow in one look."""
+    by_n, picks = read_picks(a)
+    wd = workdir(a.shoot, a.folder)
+    per_row = len(picks) if len(picks) <= 8 else (len(picks) + 1) // 2
+    out = make_sheets([by_n[n]["file"] for n in picks], wd, cell=260, per_row=per_row, labels=picks, name="strip")
+    say(f"Strip: {out[0]}  (left to right, top row then bottom, the order the reel plays)")
 
 
 # ---------------------------------------------------------------- songs
@@ -237,21 +270,7 @@ def plan_reel(photos, song, rhythm="steady", song_start=None, fit=False):
 
 
 def cmd_make(a):
-    listing_file = workdir(a.shoot, a.folder) / "photos.json"
-    if listing_file.is_file() and json.loads(listing_file.read_text()).get("folder") == str(Path(a.folder)):
-        listing = json.loads(listing_file.read_text())["photos"]
-    else:
-        listing = [{"n": i, "file": str(p), "w": 0, "h": 0} for i, p in enumerate(edited_photos(a.folder), 1)]
-    by_n = {x["n"]: x for x in listing}
-    try:
-        picks = [int(x) for x in re.split(r"[,\s]+", a.picks.strip()) if x]
-    except ValueError:
-        say("STOP: --picks is the photo numbers in order, like 7,2,11,4")
-        sys.exit(2)
-    bad = [n for n in picks if n not in by_n]
-    if bad or not picks:
-        say(f"STOP: no photo numbered {', '.join(map(str, bad))} on the sheet." if bad else "STOP: no photos picked.")
-        sys.exit(2)
+    by_n, picks = read_picks(a)
     photos = []
     for n in picks:
         x = by_n[n]
@@ -306,6 +325,10 @@ def main():
     s = sub.add_parser("sheet")
     s.add_argument("--folder", required=True)
     s.add_argument("--shoot")
+    t = sub.add_parser("strip")
+    t.add_argument("--folder", required=True)
+    t.add_argument("--picks", required=True)
+    t.add_argument("--shoot")
     g = sub.add_parser("songs")
     g.add_argument("folders", nargs="*")
     m = sub.add_parser("make")
@@ -322,7 +345,7 @@ def main():
     m.add_argument("--store")
     m.add_argument("--ignore-open", action="store_true")
     a = ap.parse_args()
-    {"sheet": cmd_sheet, "songs": cmd_songs, "make": cmd_make}[a.cmd](a)
+    {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make}[a.cmd](a)
 
 
 if __name__ == "__main__":

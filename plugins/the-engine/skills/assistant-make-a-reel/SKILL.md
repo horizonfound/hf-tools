@@ -17,7 +17,7 @@ The scripts are in `scripts/` next to this file. Nothing has to be installed on 
 2. **Every frame is theirs.** Hard cuts on the beat. No transitions, no effects, no zooms or motion, no generated anything. Their look comes from CapCut.
 3. **Always a new CapCut project.** Never open, change or overwrite one they made. The script will not.
 4. **CapCut closed while it writes.** The script checks. If CapCut is open it stops and you ask them to quit it for a moment.
-5. **One look at the sheet, not photo by photo.** The contact sheet is how you see the shoot. Open a single photo larger only to settle a close call, and never more than a handful.
+5. **One look at the sheet, not photo by photo.** The contact sheet is how you see the shoot and the strip is how you check the order. Open a single photo larger only to settle a close call, and never more than a handful.
 6. **Nothing posts, nothing sends.**
 
 ## Step 1: the edited photos
@@ -32,17 +32,21 @@ python3 scripts/reel.py sheet --folder "<edited photos>" --shoot "<shoot name>"
 
 It writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Studio's own folder; their photo folder is not changed. Read the sheet image(s).
 
-## Step 2: pick and order
+## Step 2: curate the set (your main job)
 
-Pick 8 to 14 photos and put them in order. What makes a good reel of stills:
+Read `../../shared/curating.md` first, every time. The photos are already edited and each one already looks great on its own; your job is to make them look great **as a group**, flowing from one to the next in the most harmonious way possible. That comes before everything else here.
 
-- **Open on the scroll-stopper**: the most striking, emotional frame, readable at a glance on a phone.
-- **Vary it**: wide, then close, then a detail; posed, then candid. Never two near-identical frames back to back.
-- **Let the color and light flow** from one photo to the next rather than jumping.
-- **End on a closer**: a quiet, strong frame that feels like the last line.
-- **Tall photos first choice.** A reel is a tall screen; a wide photo gets zoomed to fill it and loses its sides. One or two wide ones are fine if they are strong and the subject is near the middle.
+Pick 8 to 14 and order them by those rules: open on the scroll-stopper; move between wides, mediums, close-ups and details, never three of one distance in a row; change one thing at a time from photo to photo (light, color, distance, direction), so every cut feels like the natural next one; let color and light travel somewhere instead of bouncing; no near-twins side by side; close on a quiet, final frame. A great photo that fights the flow stays out. For a reel, add one more: **tall photos first**, since the screen is tall and a wide photo loses its sides (one or two wide ones are fine if the subject sits near the middle).
 
-Show the pick in one short message: the numbers in order, and a few words on the opener and the closer ("Opening on 7, the laugh in the wind; closing on 12, the walk away"). Then one question: "Go with these?" [Make it (recommended)] [Change the picks]. If they change it ("swap 3 for 5", "start with the couple"), just do it.
+Then check your order as it will play:
+
+```
+python3 scripts/reel.py strip --folder "<edited photos>" --shoot "<shoot name>" --picks 7,2,11,4,9,1,5,12
+```
+
+Read the strip left to right. Fix any jolt (swap two neighbors, move a detail in as a breather, drop the one that fights) and draw it again if you changed anything.
+
+Show the pick in one short message: the numbers in order and a few words on how it flows ("Opens wide on the beach, moves in to the two of them, then hands and the ring, ends on the walk away"), plus one line for any trade-off ("Left out 14, lovely but a twin of 9"). Then one question: "Go with these?" [Make it (recommended)] [Change the picks]. If they change it ("swap 3 for 5", "start with the couple"), do it their way; mention once if it now puts near-twins or three close-ups together.
 
 ## Step 3: the song
 
