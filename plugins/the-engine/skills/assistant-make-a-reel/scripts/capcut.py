@@ -5,6 +5,7 @@ hard cuts, nothing added. The look (text styles, filters, templates) is theirs t
 add in CapCut.
 
     python3 capcut.py where                     where CapCut keeps projects, and whether it is open
+    python3 capcut.py songs                     songs from CapCut's own music used in their projects
     python3 capcut.py write --plan reel.json    make the project (CapCut must be closed)
         [--store <projects folder>]             somewhere else (tests)
         [--ignore-open]                         tests only: skip the "is CapCut open" check
@@ -107,6 +108,50 @@ def their_platform(store):
         return {k: d[k] for k in ("platform", "last_modified_platform", "version", "new_version") if k in d}
     except (OSError, ValueError):
         return None   # an unreadable project (a newer CapCut may lock its files) just means we use ours
+
+
+def _project_drafts(store):
+    """(modified time, project folder, draft json) for each project, newest first."""
+    out = []
+    for d in store.iterdir() if store.is_dir() else []:
+        if not d.is_dir() or d.name.startswith("."):
+            continue
+        cands = [d / "draft_info.json", d / "draft_content.json"] + sorted((d / "Timelines").glob("*/draft_info.json"))
+        files = [f for f in cands if f.is_file()]
+        if files:
+            f = max(files, key=lambda f: f.stat().st_mtime)
+            out.append((f.stat().st_mtime, d, f))
+    return sorted(out, reverse=True)
+
+
+def capcut_songs(store):
+    """Songs from CapCut's own music library used in their projects, newest project first, one per song.
+    Each: name, seconds, path (in CapCut's cache), present (file still there), project, material, beats."""
+    found, seen = [], set()
+    for mt, folder, f in _project_drafts(store):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        mats = d.get("materials", {})
+        by_id = {x.get("id"): (k, x) for k, v in mats.items() if isinstance(v, list) for x in v if isinstance(x, dict)}
+        for t in d.get("tracks", []):
+            if t.get("type") != "audio":
+                continue
+            for seg in t.get("segments", []):
+                k, m = by_id.get(seg.get("material_id"), (None, None))
+                if k != "audios" or m.get("type") != "music" or not m.get("music_id"):
+                    continue
+                if m["music_id"] in seen:
+                    continue
+                seen.add(m["music_id"])
+                beats = next((x for r in seg.get("extra_material_refs", [])
+                              for kk, x in [by_id.get(r, (None, None))] if kk == "beats"), None)
+                found.append({"name": m.get("name") or "Untitled", "seconds": (m.get("duration") or 0) / US,
+                              "path": m.get("path", ""), "present": bool(m.get("path")) and Path(m["path"]).is_file(),
+                              "project": d.get("name") or folder.name, "folder": folder.name,
+                              "material": m, "beats": beats})
+    return found
 
 
 # ---------------------------------------------------------------- photos
@@ -292,24 +337,42 @@ def build(plan, parts, platform):
         length = song.get("length") or song_length(song["path"])
         dur = min(end, max(0.0, length - song.get("from", 0.0))) if length else end
         aid = uid()
-        mats["audios"].append({
-            "app_id": 0, "category_id": "", "category_name": "local", "check_flag": 1,
-            "copyright_limit_type": "none", "duration": int(round((length or end) * US)), "effect_id": "",
-            "formula_id": "", "id": aid, "intensifies_path": "", "is_ai_clone_tone": False,
-            "is_text_edit_overdub": False, "is_ugc": False, "local_material_id": aid.lower(),
-            "music_id": aid.lower(), "name": Path(song["path"]).name, "path": song["path"], "query": "",
-            "request_id": "", "resource_id": "", "search_id": "", "source_from": "", "source_platform": 0,
-            "team_id": "", "text_id": "", "tone_category_id": "", "tone_category_name": "", "tone_effect_id": "",
-            "tone_effect_name": "", "tone_platform": "", "tone_second_category_id": "",
-            "tone_second_category_name": "", "tone_speaker": "", "tone_type": "", "type": "extract_music",
-            "video_id": "", "wave_points": []})
         refs = []
-        for ex in P["photo_extras"]:
-            if ex["list"] in ("speeds", "sound_channel_mappings", "vocal_separations", "loudnesses"):
-                item = copy.deepcopy(ex["item"])
-                item["id"] = uid()
-                mats[ex["list"]].append(item)
-                refs.append(item["id"])
+        if song.get("capcut_material"):
+            # a song from CapCut's own music: carried over as CapCut saved it, so it stays CapCut's library song
+            m = copy.deepcopy(song["capcut_material"])
+            m["id"] = aid
+            mats["audios"].append(m)
+            wanted = ("speeds", "placeholder_infos", "sound_channel_mappings", "vocal_separations")
+            for ex in P["photo_extras"]:
+                if ex["list"] in wanted:
+                    item = copy.deepcopy(ex["item"])
+                    item["id"] = uid()
+                    mats[ex["list"]].append(item)
+                    refs.append(item["id"])
+            if song.get("capcut_beats"):
+                b = copy.deepcopy(song["capcut_beats"])
+                b["id"] = uid()
+                mats["beats"].append(b)
+                refs.insert(2, b["id"])
+        else:
+            mats["audios"].append({
+                "app_id": 0, "category_id": "", "category_name": "local", "check_flag": 1,
+                "copyright_limit_type": "none", "duration": int(round((length or end) * US)), "effect_id": "",
+                "formula_id": "", "id": aid, "intensifies_path": "", "is_ai_clone_tone": False,
+                "is_text_edit_overdub": False, "is_ugc": False, "local_material_id": aid.lower(),
+                "music_id": aid.lower(), "name": Path(song["path"]).name, "path": song["path"], "query": "",
+                "request_id": "", "resource_id": "", "search_id": "", "source_from": "", "source_platform": 0,
+                "team_id": "", "text_id": "", "tone_category_id": "", "tone_category_name": "", "tone_effect_id": "",
+                "tone_effect_name": "", "tone_platform": "", "tone_second_category_id": "",
+                "tone_second_category_name": "", "tone_speaker": "", "tone_type": "", "type": "extract_music",
+                "video_id": "", "wave_points": []})
+            for ex in P["photo_extras"]:
+                if ex["list"] in ("speeds", "sound_channel_mappings", "vocal_separations", "loudnesses"):
+                    item = copy.deepcopy(ex["item"])
+                    item["id"] = uid()
+                    mats[ex["list"]].append(item)
+                    refs.append(item["id"])
         if song.get("fade_out"):
             fid = uid()
             mats["audio_fades"].append({"fade_in_duration": 0, "fade_out_duration": int(song["fade_out"] * US),
@@ -322,7 +385,8 @@ def build(plan, parts, platform):
                      "volume": 1.0, "enable_lut": False, "enable_adjust": False})
         d["tracks"].append({"attribute": 0, "flag": 0, "id": uid(), "is_default_name": True, "name": "",
                             "segments": [aseg], "type": "audio"})
-        meta_items.append({"duration": int(round((length or end) * US)), "extra_info": Path(song["path"]).name,
+        meta_items.append({"duration": int(round((length or end) * US)),
+                           "extra_info": song.get("name") or Path(song["path"]).name,
                            "file_Path": song["path"], "height": 0, "width": 0, "metetype": "music", "t": t0})
 
     d["duration"] = int(round(end * US))
@@ -438,6 +502,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     w = sub.add_parser("where")
     w.add_argument("--store")
+    sg = sub.add_parser("songs", help="songs from CapCut's music used in their projects")
+    sg.add_argument("--store")
     wr = sub.add_parser("write")
     wr.add_argument("--plan", required=True)
     wr.add_argument("--store")
@@ -451,6 +517,11 @@ def main():
         ver = (plat or {}).get("platform", {}).get("app_version", "unknown")
         say(json.dumps({"store": str(store), "found": store.is_dir(), "projects": n, "capcut_version": ver,
                         "capcut_open": open_}, indent=1))
+        return
+    if a.cmd == "songs":
+        for x in capcut_songs(store):
+            say(f"{x['name']}  ({int(x['seconds'] // 60)}:{int(x['seconds'] % 60):02d})  in \"{x['project']}\""
+                + ("" if x["present"] else "  (not downloaded right now)"))
         return
     plan = json.loads(Path(a.plan).read_text(encoding="utf-8"))
     dest, draft = write(plan, store, a.ignore_open)

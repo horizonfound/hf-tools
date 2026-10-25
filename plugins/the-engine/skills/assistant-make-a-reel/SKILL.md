@@ -52,11 +52,13 @@ Show the pick in one short message: the numbers in order and a few words on how 
 
 ## Step 3: the song
 
-Ask with buttons: "Which song?" [A song file on this computer] [No song for now] (and Other).
+Run `python3 scripts/reel.py songs` first. It lists songs from CapCut's own music that are in their CapCut projects (C1, C2...), then song files on the computer (Downloads, Music, Desktop, newest first).
 
-- **A song file:** run `python3 scripts/reel.py songs` (it looks in Downloads, Music and Desktop, newest first). Offer the top three or four as buttons by name. Songs bought or streamed in Apple Music are locked and cannot be read; if that is the only copy, say so plainly and suggest a downloaded song.
+Ask with buttons: "Which song?" [A song from CapCut's music] [A song file on this computer] [No song for now] (and Other). Put first whichever they used last time; a first-timer with CapCut songs listed gets CapCut's music first.
+
+- **A song from CapCut's music:** offer the songs listed (C1, C2...) as buttons by name. If the one they want isn't there: "Pick it in CapCut: start a new project, add the song from CapCut's music, then quit CapCut and tell me." The first time they choose CapCut's music (the list says "License note: not shown yet"), tell them once, plainly, before making anything: "CapCut's own songs come with CapCut's license: its regular songs are for personal, non-commercial posts, and its commercial songs are cleared for businesses only on CapCut and TikTok, not Instagram. Your call." Buttons: [Use it anyway] [Pick a different song]. On "Use it anyway", run `python3 scripts/reel.py capcut-ok` so the note isn't repeated, and carry on. It is their decision; don't lecture, don't repeat the note on later reels. Then make it with `--capcut-song "<song name>"` instead of `--song`. The song goes into the new project exactly as CapCut saved it (still CapCut's library song, with CapCut's own beat markers), and our cuts land on the same beats CapCut shows.
+- **A song file:** offer the top three or four files as buttons by name. Songs bought or streamed in Apple Music are locked and cannot be read; if that is the only copy, say so plainly and suggest a downloaded song. Licensed music services (Artlist, Epidemic Sound, Musicbed and the like) cover social posts; their downloads work here.
 - **No song for now:** the cuts go at an even pace (100 beats a minute), so music can be added in CapCut or Instagram afterwards. Say that in one line.
-- **A song from CapCut's own music library** is not supported yet; if they ask, say it's coming and offer the two options above.
 
 The script starts the song where it picks up (the loudest stretch that fits, on a beat, nudged toward where the energy jumps) and says where. If they want a different moment, `--song-start 58` is seconds into the song, `--song-start 0` the very top.
 
@@ -78,7 +80,7 @@ Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me opt
 
 ```
 python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
-  --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"        (or --song none)
+  --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"   (or --capcut-song "<name>", or --song none)
   --pace mixed|calm|fast|build   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
 ```
 
@@ -97,7 +99,7 @@ Then one next step, as a question with buttons: a carousel from the same picks, 
 
 ## Untested, honestly
 
-Proven on Dustin's Mac with CapCut 9.6: a project written this way opens and exports (Oct 21). The full flow here (sheet, pick, song, beat, project) has run on test photos only. Not yet tried: CapCut versions other than 9.6, Windows (the projects folder and the song reading are written for it, not run), HEIC photos, songs from CapCut's library. The first time on any of these, say "first time on this, tell me if anything looks off" and keep going.
+Proven on Dustin's Mac with CapCut 9.6: a project written this way opens and exports (Oct 21). The full flow here (sheet, pick, song, beat, project) has run on test photos only. Not yet tried: CapCut versions other than 9.6, Windows (the projects folder and the song reading are written for it, not run), HEIC photos. The first time on any of these, say "first time on this, tell me if anything looks off" and keep going.
 
 ## Parked
 

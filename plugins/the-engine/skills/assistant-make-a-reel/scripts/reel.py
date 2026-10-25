@@ -12,10 +12,13 @@ on the beat. Claude does the choosing; this does the counting.
         photo to the next can be checked in one look before anything is made.
 
     python3 reel.py songs [<folder> ...]
-        Song files on this computer, newest first (Downloads, Music, Desktop, and any
-        folders named), with their length.
+        Songs from CapCut's own music used in their CapCut projects (C1, C2...), then
+        song files on this computer, newest first (Downloads, Music, Desktop, and any
+        folders named), with their length. Says whether the CapCut license note has
+        been shown; `reel.py capcut-ok` records that they read it and chose to go ahead.
 
     python3 reel.py make --folder "<edited photos>" --picks 7,2,11,4,9,1 --song "<file>" | --song none
+                                                   | --capcut-song "<song name from CapCut's music>"
         [--shoot "Black-sand beach"] [--name "Black-sand beach reel"] [--hook "Words on the first photo"]
         [--pace mixed|calm|fast|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
         Finds the beat, starts the song where it picks up, lays the photos in that
@@ -190,7 +193,38 @@ def cmd_strip(a):
 
 # ---------------------------------------------------------------- songs
 
+CAPCUT_NOTE = ("CapCut's own songs come with CapCut's license: its regular songs are for personal, non-commercial "
+               "posts, and its commercial songs are cleared for businesses only on CapCut and TikTok, not Instagram. "
+               "Your call.")
+
+
+def note_seen():
+    try:
+        import studio_file
+        return bool(studio_file.load().get("capcut_music_noted"))
+    except Exception:
+        return False
+
+
+def cmd_capcut_ok(a):
+    """They have read the CapCut music note and chose to go ahead: don't repeat it every time."""
+    import studio_file
+    sf = studio_file.load()
+    sf["capcut_music_noted"] = True
+    studio_file.save(sf)
+    say("Noted: they've seen the CapCut music license note.")
+
+
 def cmd_songs(a):
+    store = Path(a.store).expanduser() if a.store else capcut.default_store()
+    cc = capcut.capcut_songs(store) if store.is_dir() else []
+    if cc:
+        say("Songs from CapCut's music, in your CapCut projects (newest first):")
+        for i, x in enumerate(cc[:8], 1):
+            secs = x["seconds"]
+            say(f"  C{i}. {x['name']}  ({int(secs // 60)}:{int(secs % 60):02d})  in \"{x['project']}\""
+                + ("" if x["present"] else "  (open that project in CapCut once so it downloads the song again)"))
+        say("  License note: " + ("already shown and accepted." if note_seen() else "not shown yet. Say it before using one: " + CAPCUT_NOTE))
     home = Path.home()
     places = [Path(x).expanduser() for x in a.folders] + [home / "Downloads", home / "Music", home / "Desktop"]
     found, seen = [], set()
@@ -211,9 +245,14 @@ def cmd_songs(a):
                     except OSError:
                         pass
     if not found:
-        say("No song files found. Download the song you want (mp3 or m4a) and tell me, or make the reel with no song.")
+        if cc:
+            return
+        say("No song files found. Download the song you want (mp3 or m4a) and tell me, pick one in CapCut, "
+            "or make the reel with no song.")
         sys.exit(7)
     found.sort(reverse=True)
+    if cc:
+        say("Song files on this computer:")
     for i, (mt, p) in enumerate(found[:12], 1):
         secs = capcut.song_length(p)
         say(f"{i:2}. {p.name}  ({int(secs // 60)}:{int(secs % 60):02d}, {time.strftime('%b %d', time.localtime(mt))})  {p.parent}")
@@ -284,7 +323,24 @@ def cmd_make(a):
         x = by_n[n]
         w, h = (x["w"], x["h"]) if x.get("w") else capcut.photo_size(x["file"])
         photos.append({"path": x["file"], "w": w, "h": h})
-    song = None if a.song.lower() in ("none", "no", "") else str(Path(a.song).expanduser())
+    picked = None
+    if a.capcut_song:
+        store = Path(a.store).expanduser() if a.store else capcut.default_store()
+        want = a.capcut_song.strip().lower()
+        cc = capcut.capcut_songs(store)
+        picked = (next((x for x in cc if x["name"].lower() == want or x["material"].get("music_id") == want), None)
+                  or next((x for x in cc if want in x["name"].lower()), None))
+        if not picked:
+            say(f"STOP: no song called \"{a.capcut_song}\" in your CapCut projects. "
+                "Add it to a project in CapCut, quit CapCut, and try again.")
+            sys.exit(2)
+        if not picked["present"]:
+            say(f"STOP: CapCut doesn't have \"{picked['name']}\" downloaded right now. Open \"{picked['project']}\" "
+                "in CapCut once so it downloads the song again, quit CapCut, and try again.")
+            sys.exit(2)
+        song = picked["path"]
+    else:
+        song = None if (a.song or "none").lower() in ("none", "no", "") else str(Path(a.song).expanduser())
     if song and not Path(song).is_file():
         say(f"STOP: no song at {song}")
         sys.exit(2)
@@ -295,7 +351,10 @@ def cmd_make(a):
     name = a.name or f"{a.shoot or Path(a.folder).name} reel"
     plan = {"name": name, "photos": pieces,
             "song": ({"path": song, "from": facts["song_from"], "fade_out": 0.5,
-                      "length": capcut.song_length(song)} if song else None),
+                      "length": (picked["seconds"] if picked else capcut.song_length(song)),
+                      "name": picked["name"] if picked else Path(song).name,
+                      "capcut_material": picked["material"] if picked else None,
+                      "capcut_beats": picked["beats"] if picked else None} if song else None),
             "hook": {"text": a.hook, "dur": pieces[0]["dur"]} if a.hook else None}
     wd = workdir(a.shoot, a.folder)
     (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1))
@@ -341,10 +400,13 @@ def main():
     t.add_argument("--shoot")
     g = sub.add_parser("songs")
     g.add_argument("folders", nargs="*")
+    g.add_argument("--store")
+    sub.add_parser("capcut-ok", help="they read the CapCut music note and chose to go ahead")
     m = sub.add_parser("make")
     m.add_argument("--folder", required=True)
     m.add_argument("--picks", required=True)
-    m.add_argument("--song", required=True)
+    m.add_argument("--song", help="a song file, or none")
+    m.add_argument("--capcut-song", help="the name of a song from CapCut's music, used in one of their CapCut projects")
     m.add_argument("--shoot")
     m.add_argument("--name")
     m.add_argument("--hook")
@@ -357,7 +419,8 @@ def main():
     m.add_argument("--store")
     m.add_argument("--ignore-open", action="store_true")
     a = ap.parse_args()
-    {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make}[a.cmd](a)
+    {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,
+     "capcut-ok": cmd_capcut_ok}[a.cmd](a)
 
 
 if __name__ == "__main__":
