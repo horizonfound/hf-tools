@@ -13,7 +13,7 @@ Built Oct 25 on the `reel-capcut` branch. A folder of edited photos goes in, a C
 
 A test project, **"Studio test reel"**, was written straight into Dustin's CapCut projects folder: the nine Kira photos plus one wide beach photo (from the backup's previews, as photo 4), the test song, the hook "Studio test: hard cuts on the beat". Beats were found in the cloud with ffmpeg, so `afconvert` has not run yet. CapCut was open at the time and added the project to its own list within two seconds of the files landing (it rewrote `root_meta_info.json` with our entry in it), so it recognizes the project; whether it opens and plays is Dustin's look.
 
-**Dustin, in CapCut:** is it listed, does it open, do the cuts land on the beat, and how does photo 4 look (should fill the screen, cropped at the sides; if it is hugely zoomed or small with black bars, the fill scale is wrong). Does the text show? Does it export?
+**Dustin opened it (Oct 25, 1:50am): listed, opens, plays, every cut on the beat, the text layer on top.** Still to answer: photo 4, and an export. **The original questions:** is it listed, does it open, do the cuts land on the beat, and how does photo 4 look (should fill the screen, cropped at the sides; if it is hugely zoomed or small with black bars, the fill scale is wrong). Does the text show? Does it export?
 
 ## For the Code session on the Mac
 
