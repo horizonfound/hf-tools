@@ -17,14 +17,16 @@ on the beat. Claude does the choosing; this does the counting.
 
     python3 reel.py make --folder "<edited photos>" --picks 7,2,11,4,9,1 --song "<file>" | --song none
         [--shoot "Black-sand beach"] [--name "Black-sand beach reel"] [--hook "Words on the first photo"]
-        [--rhythm steady|build] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
+        [--pace mixed|calm|fast|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
         Finds the beat, starts the song where it picks up, lays the photos in that
         order one cut per beat-step, and writes the CapCut project (capcut.py).
         --dry-run prints the plan and writes nothing.
 
-Rhythm: every photo holds the same number of beats (about a second each), the
-first and last hold twice as long. "build" quickens the last third, then
-settles on the last photo. No song: an even 100 beats a minute, so music can be
+Pace (pace.py): every cut is on a beat. "mixed" (the default) is a little of
+everything, some quick, some long, shaped by the song's phrases and loudness and
+by Claude's marks on the picks ("7+" lingers, "11-" passes quickly); "calm" is
+about two seconds a photo, "fast" about half a second, "build" starts calm and
+quickens toward the end. No song: an even 100 beats a minute, so music can be
 added in CapCut or Instagram.
 
 Exit codes: 0 done · 2 stop (folder, photo or song missing) · 8 CapCut is open (close it, run again).
@@ -43,12 +45,12 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent.parent / "studio-manager" / "scripts"))
 import beats_lite  # noqa: E402
 import capcut  # noqa: E402
+import pace  # noqa: E402
 
 PHOTOS = {".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff"}
 SONGS = {".mp3", ".m4a", ".aac", ".wav", ".aif", ".aiff", ".flac"}
 HOME = Path(os.environ.get("STUDIO_HOME") or Path.home() / ".studio")
 PER_SHEET = 48
-TARGET_HOLD = 1.1      # seconds a photo stays up, before rounding to whole beats
 EVEN_BPM = 100.0
 
 
@@ -152,28 +154,34 @@ def cmd_sheet(a):
 
 
 def read_picks(a):
-    """The listing from the sheet, and the picked photos in order."""
+    """The listing from the sheet, the picked photo numbers in order, and Claude's marks:
+    "7+" lingers on photo 7, "11-" passes it quickly."""
     listing_file = workdir(a.shoot, a.folder) / "photos.json"
     if listing_file.is_file() and json.loads(listing_file.read_text()).get("folder") == str(Path(a.folder)):
         listing = json.loads(listing_file.read_text())["photos"]
     else:
         listing = [{"n": i, "file": str(p), "w": 0, "h": 0} for i, p in enumerate(edited_photos(a.folder), 1)]
     by_n = {x["n"]: x for x in listing}
-    try:
-        picks = [int(x) for x in re.split(r"[,\s]+", a.picks.strip()) if x]
-    except ValueError:
-        say("STOP: --picks is the photo numbers in order, like 7,2,11,4")
-        sys.exit(2)
+    picks, hints = [], []
+    for tok in re.split(r"[,\s]+", a.picks.strip()):
+        if not tok:
+            continue
+        m = re.fullmatch(r"(\d+)([+-]?)", tok)
+        if not m:
+            say("STOP: --picks is the photo numbers in order, like 7+,2,11-,4 (+ to linger, - to pass quickly)")
+            sys.exit(2)
+        picks.append(int(m.group(1)))
+        hints.append(m.group(2) or None)
     bad = [n for n in picks if n not in by_n]
     if bad or not picks:
         say(f"STOP: no photo numbered {', '.join(map(str, bad))} on the sheet." if bad else "STOP: no photos picked.")
         sys.exit(2)
-    return by_n, picks
+    return by_n, picks, hints
 
 
 def cmd_strip(a):
     """The picks in play order, one or two rows, numbered as on the sheet: read the flow in one look."""
-    by_n, picks = read_picks(a)
+    by_n, picks, _ = read_picks(a)
     wd = workdir(a.shoot, a.folder)
     per_row = len(picks) if len(picks) <= 8 else (len(picks) + 1) // 2
     out = make_sheets([by_n[n]["file"] for n in picks], wd, cell=260, per_row=per_row, labels=picks, name="strip")
@@ -213,15 +221,7 @@ def cmd_songs(a):
 
 # ---------------------------------------------------------------- the plan
 
-def beats_per_photo(period):
-    """Whole beats closest to about a second a photo, never faster than 0.5 s."""
-    best = min((1, 2, 4), key=lambda k: abs(k * period - TARGET_HOLD))
-    while best * period < 0.5:
-        best *= 2
-    return best
-
-
-def plan_reel(photos, song, rhythm="steady", song_start=None, fit=False):
+def plan_reel(photos, song, feel="mixed", song_start=None, fit=False, hints=None, variation=0):
     """photos: list of {path, w, h}. Returns (plan pieces, facts for Claude to tell them)."""
     if song:
         info = beats_lite.analyze(song)
@@ -230,47 +230,55 @@ def plan_reel(photos, song, rhythm="steady", song_start=None, fit=False):
         period = info["period"]
     else:
         period = 60.0 / EVEN_BPM
-        info = {"beats": [i * period for i in range(400)], "energy": [], "duration": 400 * period, "tempo": EVEN_BPM}
-    k = beats_per_photo(period)
+        info = {"beats": [i * period for i in range(1000)], "energy": [], "duration": 1000 * period,
+                "tempo": EVEN_BPM}
+    beats, energy = info["beats"], info.get("energy") or []
     n = len(photos)
-    steps = [k] * n
-    if n >= 2:
-        steps[0] = 2 * k
-        steps[-1] = 2 * k
-    if rhythm == "build" and n >= 6 and k >= 2:
-        for i in range(n - 1 - n // 3, n - 1):
-            steps[i] = k // 2
-    need_beats = sum(steps)
-    need = need_beats * period
-    beats = info["beats"]
+    seed = hash_seed([p["path"] for p in photos], variation)
+    # first pass with no sense of the song's loudness, to know roughly how long the reel runs
+    steps = pace.holds(n, period, feel, None, hints, seed)
+    need = sum(steps) * period
     if song_start is None:
         start = beats_lite.best_start(info, need + period) if song else 0.0
     else:
         start = song_start
-    # start on the beat at or after the chosen moment
     i0 = next((i for i, b in enumerate(beats) if b >= start - 0.02), None)
-    if i0 is None or i0 + need_beats >= len(beats):
+    if i0 is None or i0 + sum(steps) >= len(beats):
         i0 = 0
-        if need_beats >= len(beats):
-            return None, {"problem": "That song is too short for this many photos. Pick fewer photos or a longer song."}
+    # second pass: the song's loudness from that first beat on shapes the mix
+    if feel == "mixed" and energy:
+        steps = pace.holds(n, period, feel, energy[i0:], hints, seed)
+    if i0 + sum(steps) >= len(beats):
+        i0 = 0
+        if sum(steps) >= len(beats):
+            return None, {"problem": "That song is too short for this many photos. Pick fewer photos, a calmer pace "
+                                     "or a longer song."}
     start = beats[i0]
     cuts = [beats[i0]]
     j = i0
-    for s in steps:
-        j += s
+    for st in steps:
+        j += st
         cuts.append(beats[j])
     out = []
     for p, a, b in zip(photos, cuts, cuts[1:]):
         out.append({"path": p["path"], "w": p.get("w", 0), "h": p.get("h", 0),
                     "start": round(a - start, 4), "dur": round(b - a, 4), "fill": not fit})
-    facts = {"tempo": info.get("tempo"), "beats_per_photo": k, "length": round(cuts[-1] - start, 2),
+    words, shortest, longest = pace.describe(steps, period, feel)
+    facts = {"tempo": info.get("tempo"), "feel": feel, "feel_words": words, "shortest": shortest,
+             "longest": longest, "beats": steps, "length": round(cuts[-1] - start, 2),
              "song_from": round(start, 2) if song else None,
              "wide": [i + 1 for i, p in enumerate(photos) if p.get("w", 0) > p.get("h", 0) * 1.05]}
     return out, facts
 
 
+def hash_seed(paths, variation):
+    """The same picks give the same reel; another variation gives another mix."""
+    import zlib
+    return zlib.crc32(("|".join(paths) + f"#{variation}").encode()) & 0xFFFFFFFF
+
+
 def cmd_make(a):
-    by_n, picks = read_picks(a)
+    by_n, picks, hints = read_picks(a)
     photos = []
     for n in picks:
         x = by_n[n]
@@ -280,7 +288,7 @@ def cmd_make(a):
     if song and not Path(song).is_file():
         say(f"STOP: no song at {song}")
         sys.exit(2)
-    pieces, facts = plan_reel(photos, song, a.rhythm, a.song_start, a.fit)
+    pieces, facts = plan_reel(photos, song, a.pace, a.song_start, a.fit, hints, a.variation)
     if pieces is None:
         say(facts["problem"])
         sys.exit(2)
@@ -300,12 +308,14 @@ def cmd_make(a):
             when = f", starting the song {f:.0f} seconds in"
         else:
             when = f", starting the song at {int(f // 60)}:{int(f % 60):02d}"
+    span = (f"{facts['shortest']:.1f} to {facts['longest']:.1f} seconds a photo"
+            if facts["shortest"] != facts["longest"] else f"{facts['shortest']:.1f} seconds a photo")
     if song:
-        say(f"Plan: {len(pieces)} photos, {facts['length']:.1f} seconds, a cut every {facts['beats_per_photo']} "
-            f"beat{'s' if facts['beats_per_photo'] > 1 else ''} at about {facts['tempo']:.0f} beats a minute{when}.")
+        say(f"Plan: {len(pieces)} photos, {facts['length']:.1f} seconds, {facts['feel_words']} ({span}), every cut "
+            f"on the beat at about {facts['tempo']:.0f} beats a minute{when}.")
     else:
-        say(f"Plan: {len(pieces)} photos, {facts['length']:.1f} seconds, a new photo every "
-            f"{pieces[min(1, len(pieces) - 1)]['dur']:.1f} seconds, no song (add one in CapCut or Instagram).")
+        say(f"Plan: {len(pieces)} photos, {facts['length']:.1f} seconds, {facts['feel_words']} ({span}), "
+            f"no song (add one in CapCut or Instagram).")
     if facts["wide"]:
         say(f"Wide photos zoomed to fill the screen: {', '.join(map(str, facts['wide']))} (slide them in CapCut if a face is cut off).")
     if a.dry_run:
@@ -338,7 +348,9 @@ def main():
     m.add_argument("--shoot")
     m.add_argument("--name")
     m.add_argument("--hook")
-    m.add_argument("--rhythm", choices=["steady", "build"], default="steady")
+    m.add_argument("--pace", choices=list(pace.FEELS), default="mixed",
+                   help="mixed (a little of everything), calm, fast, build, steady")
+    m.add_argument("--variation", type=int, default=0, help="another mix of the same picks (mixed pace)")
     m.add_argument("--song-start", type=float)
     m.add_argument("--fit", action="store_true", help="show whole wide photos with bars instead of filling the screen")
     m.add_argument("--dry-run", action="store_true")

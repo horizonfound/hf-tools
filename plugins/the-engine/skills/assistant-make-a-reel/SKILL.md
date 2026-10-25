@@ -38,10 +38,12 @@ Read `../../shared/curating.md` first, every time. The photos are already edited
 
 Pick 8 to 14 and order them by those rules: open on the scroll-stopper; move between wides, mediums, close-ups and details, never three of one distance in a row; change one thing at a time from photo to photo (light, color, distance, direction), so every cut feels like the natural next one; let color and light travel somewhere instead of bouncing; no near-twins side by side; close on a quiet, final frame. A great photo that fights the flow stays out. For a reel, add one more: **tall photos first**, since the screen is tall and a wide photo loses its sides (one or two wide ones are fine if the subject sits near the middle).
 
+While you order them, mark how long each one deserves: a `+` after a number to linger on it (the emotional peak, a wide with a lot to take in, the closer), a `-` to pass quickly (a run of details, two or three frames of one laugh in a burst). Most photos get no mark. With the "a little of everything" pace these marks decide where the long and quick moments fall, so the rhythm follows the photos instead of a formula.
+
 Then check your order as it will play:
 
 ```
-python3 scripts/reel.py strip --folder "<edited photos>" --shoot "<shoot name>" --picks 7,2,11,4,9,1,5,12
+python3 scripts/reel.py strip --folder "<edited photos>" --shoot "<shoot name>" --picks 7,2,11+,4,9-,1-,5,12+
 ```
 
 Read the strip left to right. Fix any jolt (swap two neighbors, move a detail in as a breather, drop the one that fights) and draw it again if you changed anything.
@@ -58,25 +60,36 @@ Ask with buttons: "Which song?" [A song file on this computer] [No song for now]
 
 The script starts the song where it picks up (the loudest stretch that fits, on a beat, nudged toward where the energy jumps) and says where. If they want a different moment, `--song-start 58` is seconds into the song, `--song-start 0` the very top.
 
-## Step 4: words on the first photo (optional)
+## Step 4: how it moves
+
+Ask with buttons: "How should it move?"
+- **A little of everything (recommended):** some quick, some long, never a formula. The changes fall where the music turns over, more cuts where the song is busy and fewer where it's quiet, and your `+` and `-` marks decide which photos linger and which fly by.
+- **Calm:** about two seconds a photo; room to look. Best with 6 to 9 photos.
+- **Fast:** about half a second a photo; quick and punchy. Best with 12 to 20 photos.
+- **Build:** starts calm, quickens toward the end, then lands on the last photo.
+
+Every cut lands on the beat whichever they pick. If they pick Fast and you chose fewer than 12 photos, offer a few more from the sheet; if Calm and more than 9, offer to trim.
+
+## Step 5: words on the first photo (optional)
 
 Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me options]. If yes, write five short options in their voice (their Brand File's Voice section if they have one). Rules from Nicole: it speaks to their client about what the client feels and wants, never about how the photographer works; one short line, readable in a second; a real angle only this photographer would say; never invent a name, date, price or offer. They pick one. It goes in as plain white text over the first photo; they restyle it with one of CapCut's text styles.
 
-## Step 5: make it
+## Step 6: make it
 
 ```
 python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
-  --picks 7,2,11,4,9,1,5,12 --song "<song file>"        (or --song none)
-  [--hook "the line they picked"] [--rhythm build] [--song-start 58] [--fit]
+  --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"        (or --song none)
+  --pace mixed|calm|fast|build   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
 ```
 
-- Every photo holds the same number of beats, about a second each; the first and last hold twice as long. `--rhythm build` quickens the last third and settles on the last photo; offer it if they want more energy.
+- `--pace` is their answer from Step 4 (`mixed` is "a little of everything"). The first photo always holds long enough to read, and the last one lands.
+- `--variation 2` (3, 4...) gives another mix of the same picks with the same pace, if they want to see it move differently.
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
 - `--dry-run` prints the plan and writes nothing.
 
 Exit 8 means CapCut is open: "CapCut is open. Quit it for a moment (CapCut menu, Quit CapCut) and tell me." Then run the same command again. Exit 2 is a stop: say what it printed.
 
-## Step 6: hand it over
+## Step 7: hand it over
 
 Two lines, their words: "It's in CapCut: Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off."
 

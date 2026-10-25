@@ -358,7 +358,8 @@ ROOT_ENTRY_KEYS = {
 
 
 def folder_name(store, name):
-    base = re.sub(r"[^\w\- ]+", "", name).strip() or "Studio reel"
+    base = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", name)        # characters Mac or Windows won't take in a folder name
+    base = re.sub(r"\s+", " ", base).strip().lstrip(".").strip() or "Studio reel"
     cand, n = base, 2
     while (store / cand).exists():
         cand = f"{base} {n}"
