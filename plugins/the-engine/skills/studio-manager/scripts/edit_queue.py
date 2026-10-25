@@ -330,7 +330,10 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .ask button:hover{background:var(--ink);color:#fff}
 .ask label{display:inline-flex;align-items:center;gap:.45rem;font:600 13px/1 var(--sans);color:var(--ink-2)}
 .ask button.keep{border-color:transparent;background:transparent;text-decoration:underline;text-underline-offset:3px}
-.ask input[type=date]{font:500 13px var(--sans);border:1.5px solid var(--ink);border-radius:999px;padding:.4rem .7rem;background:var(--paper)}
+.ask input[type=date]{font:500 14px var(--sans);border:1.5px solid var(--ink);border-radius:999px;padding:.45rem .8rem;background:var(--paper);color:var(--ink)}
+.ask .when{display:inline-flex;gap:.5rem;align-items:center}.ask .when[hidden]{display:none}
+.ask .go{background:var(--coral);border-color:var(--coral);color:#fff}.ask .go:hover{background:var(--coral-2);border-color:var(--coral-2)}
+.ask .go:disabled{opacity:.4;cursor:default;background:var(--coral);color:#fff}
 @keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .empty{background:var(--paper);border-radius:var(--r);padding:2.4rem;text-align:center;display:grid;gap:.4rem}
 .empty b{font:italic 400 30px/1.1 var(--display)}.empty span{color:var(--ink-2)}
@@ -429,13 +432,17 @@ function askDue(id){
   const box = document.createElement('div');box.className = 'ask';
   box.innerHTML = `<b>Moved up. New due date?</b>
     <button class="keep" data-v="keep">Keep ${esc(nice(s.due))}</button>
-    <button data-v="this-week">This week</button><button data-v="1w">1 week</button>
-    <label>Pick a date <input type="date" min="${Q.today}"></label>`;
+    <button class="pick">Pick a date</button>
+    <span class="when" hidden><input type="date" min="${Q.today}" value="${esc(s.due)}"><button class="go" disabled>Change date</button></span>`;
   li.appendChild(box);
-  box.querySelectorAll('button').forEach(b => b.onclick = async () => {
-    if(b.dataset.v == 'keep'){box.remove();return}
-    if(await send({action:'due', id, due:b.dataset.v})){render();toast('Due date updated')}});
-  box.querySelector('input').onchange = async ev => {if(ev.target.value && await send({action:'due', id, due:ev.target.value})){render();toast('Due date updated')}};
+  const when = box.querySelector('.when'), input = box.querySelector('input'), go = box.querySelector('.go');
+  box.querySelector('.keep').onclick = () => box.remove();
+  box.querySelector('.pick').onclick = ev => {
+    ev.target.hidden = true; when.hidden = false; input.focus();
+    try{ input.showPicker() }catch(e){}   // opens the calendar where the browser allows it
+  };
+  input.oninput = () => { go.disabled = !input.value || input.value == s.due };
+  go.onclick = async () => { if(input.value && await send({action:'due', id, due:input.value})){render();toast('Due date changed to ' + nice(input.value))} };
 }
 if(!LIVE) $('#offline').hidden = false;
 render();

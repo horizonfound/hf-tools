@@ -125,7 +125,7 @@ The night ran while they were away, so the queue questions wait for their next m
 ## The editing queue, any time
 
 - **"What's in my queue?" / "show my queue" / "what's due?"** Start `edit_queue.py serve` in the background (it prints the address and saves it in `~/.studio/queue-url.txt`), open that address with `open`, and if the app has a browser pane, load it there and bring it to the front too. Then one line: "4 shoots to edit. Next up: the Lee wedding, 4 days late." On the page they can drag to reorder, tick a shoot off, and change a due date when they move one up.
-- **"Move the Garcias to the top" / "make the beach one due Friday" / "add the Smith wedding, due the 14th"**: `edit_queue.py move "garcia" --to 1`, `edit_queue.py due "beach" friday`, `edit_queue.py add-manual ...`. When a move puts a shoot above one that is due sooner, ask once: "Want to move its due date up too?" [Keep <date>] [This week] [1 week] (Other: a date).
+- **"Move the Garcias to the top" / "make the beach one due Friday" / "add the Smith wedding, due the 14th"**: `edit_queue.py move "garcia" --to 1`, `edit_queue.py due "beach" friday`, `edit_queue.py add-manual ...`. When a move puts a shoot above one that is due sooner, ask once: "Want to change its due date too?" [Keep <date>] (Other: they type the new date).
 - Anything they ask in words works the same as on the page; refresh the page by re-running `edit_queue.py page` if it is open.
 
 ## When they're done editing: "I'm done with the beach shoot"
