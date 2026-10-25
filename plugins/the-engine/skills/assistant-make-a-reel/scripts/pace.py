@@ -66,8 +66,10 @@ def holds(n, period, feel="mixed", energy=None, hints=None, seed=0):
         return out
     if feel == "build":
         k = unit_beats(period)
-        calm = _closest(period, 1.8, (2, 4, 8), 1.2)
         quick = _closest(period, 0.55, (1, 2), 0.35)
+        calm = max(_closest(period, 1.8, (2, 4, 8), 1.2), 2 * k)   # clearly slower than the middle, so it builds
+        if quick >= k:
+            quick = max(1, k // 2)
         third = max(1, (n - 1) // 3)
         out = []
         for i in range(n - 1):
