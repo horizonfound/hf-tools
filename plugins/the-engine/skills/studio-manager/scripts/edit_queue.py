@@ -420,17 +420,21 @@ document.addEventListener('drop', async e => {
   let to = ids.indexOf(c.dataset.id) + (top ? 0 : 1);
   ids.splice(to, 0, dragId);
   const moved = Q.waiting.find(s => s.id == dragId);
-  const before = Q.waiting.slice(0, from).map(s => s.id);
-  // moved up past a shoot that is due sooner? offer a new due date
-  const passed = Q.waiting.filter(s => ids.indexOf(s.id) > ids.indexOf(dragId) && before.includes(s.id));
-  const sooner = moved.due && passed.some(s => s.due && s.due < moved.due);
-  if(await send({action:'order', ids})){render(); if(sooner) askDue(dragId)}
+  const old = Q.waiting.map(s => s.id), at = ids.indexOf(dragId);
+  // moved past a deadline that is now out of order? offer the moved shoot a new due date:
+  // up past a shoot due sooner (theirs may need to come earlier), or down past one due later (theirs may need to move out)
+  const wentUp = Q.waiting.filter(s => old.indexOf(s.id) < from && ids.indexOf(s.id) > at);
+  const wentDown = Q.waiting.filter(s => old.indexOf(s.id) > from && ids.indexOf(s.id) < at);
+  const dir = !moved.due ? null
+    : wentUp.some(s => s.due && s.due < moved.due) ? 'up'
+    : wentDown.some(s => s.due && s.due > moved.due) ? 'down' : null;
+  if(await send({action:'order', ids})){render(); if(dir) askDue(dragId, dir)}
   dragId = null;
 });
-function askDue(id){
+function askDue(id, dir){
   const s = Q.waiting.find(x => x.id == id);const li = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);if(!s || !li) return;
   const box = document.createElement('div');box.className = 'ask';
-  box.innerHTML = `<b>Moved up. New due date?</b>
+  box.innerHTML = `<b>Moved ${dir == 'down' ? 'down' : 'up'}. New due date?</b>
     <button class="keep" data-v="keep">Keep ${esc(nice(s.due))}</button>
     <button class="pick">Pick a date</button>
     <span class="when" hidden><input type="date" min="${Q.today}" value="${esc(s.due)}"><button class="go" disabled>Change date</button></span>`;
@@ -463,7 +467,7 @@ def page_html(q):
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
-            "<span class='talk'>Or just tell me: <i>“move the Garcias to the top”</i> <i>“the beach shoot is done”</i></span>"
+            "<span class='talk'>Drag a shoot up or down to change the order. If it passes another shoot's due date, you can pick a new one.</span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and reorder.</p></header>"
             "<ol class='list' id='list'></ol>"
             "<details class='fin' id='fin' hidden><summary id='fincount'></summary><ul class='finlist' id='finlist'></ul></details></div>"
