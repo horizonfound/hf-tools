@@ -65,15 +65,43 @@ def _resample(a, rate):
     return out
 
 
+def real_kind(path):
+    """The file extension that matches what is inside, from its first bytes, or None.
+    CapCut's library songs are saved as M4A with a .mp3 name, and afconvert goes by
+    the name, so it cannot open them until it is told the real kind."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+    except OSError:
+        return None
+    if head[4:8] == b"ftyp":
+        return ".m4a"
+    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        return ".mp3"
+    if head[:4] == b"RIFF":
+        return ".wav"
+    if head[:4] == b"FORM":
+        return ".aiff"
+    return None
+
+
 def decode(path):
     """(samples, how) or (None, reason). Samples are mono 16-bit at SR."""
     path = str(path)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
+    alias_dir = None
     try:
         how = None
         if shutil.which("afconvert"):
-            r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{SR}", "-c", "1", path, tmp.name],
+            src = path
+            kind = real_kind(path)
+            if kind and not path.lower().endswith(kind) and not (kind == ".aiff" and path.lower().endswith(".aif")):
+                # a link with the right name, in a temporary folder; the song itself is untouched
+                alias_dir = tempfile.mkdtemp()
+                src = os.path.join(alias_dir, "song" + kind)
+                os.symlink(os.path.abspath(path), src)
+            r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{SR}", "-c", "1", src, tmp.name],
                                capture_output=True, text=True)
             if r.returncode == 0 and os.path.getsize(tmp.name) > 44:
                 how = "afconvert"
@@ -96,6 +124,8 @@ def decode(path):
             os.unlink(tmp.name)
         except OSError:
             pass
+        if alias_dir:
+            shutil.rmtree(alias_dir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------- the pulse

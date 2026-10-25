@@ -28,6 +28,23 @@ Paste into Claude Code: **"Get the latest from GitHub, then run the test in docs
 7. **For the next step (song from CapCut's library):** ask Dustin to make a new CapCut project, add any song from CapCut's own music, and quit CapCut. Then copy that project's `draft_info.json` to `docs/capcut-samples/library-song.json` (it holds no personal data; check for paths under /Users and blank them) and commit it, so the cloud session can see how CapCut stores a library song.
 8. Nothing here writes outside `~/.studio/reels/` and CapCut's projects folder. The test projects can be deleted in CapCut like any project.
 
+## Ran on the Mac (Oct 25, about 2:40am, Claude Code)
+
+- **`capcut.py where`:** projects folder found, CapCut 9.6.0, 5 projects, open/closed read correctly.
+- **`beats_lite.py` on the test song:** 13.7 s, about 99 beats a minute, 23 beats, "(afconvert)", in 0.1 s. Matches.
+- **`reel.py sheet`:** 9 tall photos, sheet made through sips in 0.4 s.
+- **`reel.py make`:** with CapCut open it planned, then stopped with exit 8 and wrote nothing (CapCut's list unchanged by hash). The brief's `--rhythm` is now `--pace` (fixed above). After Dustin quit CapCut: "Kira test reel" written, 8 photos, 9.6 s, beats per photo 2,2,2,2,2,1,1,4, song from 2.93 s, every cut within 8 ms of a beat, at the top of CapCut's list, all photo and song paths present, list backed up first.
+- **Photo 4 (Dustin's screenshot):** the wide 1000x666 preview fills the 1080x1920 frame, cropped at the sides, no bars, no extra zoom. Scale 2.669 is right, so CapCut's scale 1.0 is "fit". It looks soft only because the test used a 1000-pixel preview.
+- **Not yet reported:** playing the Kira test reel, and an export.
+
+### How CapCut stores a library song (sample: `docs/capcut-samples/library-song.json`)
+
+Dustin made a project ("1025 (1)") with a song from CapCut's library ("Woman's Glow", category "Funny", 194.5 s). The song is a material of `"type": "music"` with `music_id`, `category_id`, `request_id` and a `path` into **CapCut's own cache: `~/Movies/CapCut/User Data/Cache/music/<hash>.mp3`**. The project also points at a `<hash>.beat` file there: CapCut's own beat list, JSON `{"time": [ms, ...]}`. `downLoadcfg` in that folder lists what was downloaded.
+
+- **The cached ".mp3" is really M4A (AAC).** afconvert goes by the file name and refused it ("Couldn't open input file"). Fixed in `beats_lite.py`: it now reads the first bytes, and when the name is wrong it hands afconvert a link with the right name in a temporary folder (the song is never touched). All seven songs in Dustin's CapCut cache now read with afconvert; the test song and an mp3 still work.
+- **Our beats match CapCut's own.** On "Woman's Glow": ours 139.7 beats a minute, 454 beats; CapCut's .beat file 451 beats. Every one of CapCut's beats has one of ours within 70 ms; 426 within 30 ms; median 9 ms.
+- **What this opens up:** the photographer can pick a song in CapCut's library, and the Studio can find it in the cache (newest `.mp3` there, or the `path` of the music material in their newest project), find its beats (ours, or CapCut's .beat as a check), and cut on them. Copyright: library songs are licensed for use inside CapCut; whether a project we write may reference one is for the next step to check.
+
 ## Untested
 
-CapCut versions other than 9.6; Windows (projects folder `%LOCALAPPDATA%\CapCut\User Data\Projects\com.lveditor.draft`, file `draft_content.json`; the song needs ffmpeg or a .wav there); HEIC photos (sips handles them on a Mac); songs from CapCut's library; whether CapCut's scale 1.0 is "fit" (assumed; photo 4 tells us).
+CapCut versions other than 9.6; Windows (projects folder `%LOCALAPPDATA%\CapCut\User Data\Projects\com.lveditor.draft`, file `draft_content.json`; the song needs ffmpeg or a .wav there); HEIC photos (sips handles them on a Mac); songs from CapCut's library inside a project we write (stored and readable, see above; not yet written by us).
