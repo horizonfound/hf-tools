@@ -1,17 +1,17 @@
 {
   "name": "the-engine",
-  "displayName": "The Assistant",
+  "displayName": "The Studio",
   "version": "0.3.1",
-  "description": "The Assistant by Horizon Found. You decide what to post; it makes it: a reel cut to the beat, a carousel in the right order, story frames, all in your voice and your look. Never posts. Your brand. Your voice. Just faster.",
+  "description": "The Studio by Horizon Found. Plug in your card, say backup now, and walk away: the Studio Manager backs it up, checks every photo, sorts and names your shoots, and leaves you a report. When your edits are done, it turns your favorites into a reel cut to the beat and a carousel. Never posts anything.",
   "author": {
     "name": "Horizon Found"
   },
   "keywords": [
     "photography",
-    "instagram",
+    "backup",
+    "memory card",
+    "organize",
     "reels",
-    "carousels",
-    "stories",
-    "brand voice"
+    "carousels"
   ]
 }
