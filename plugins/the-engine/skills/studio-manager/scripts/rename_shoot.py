@@ -209,6 +209,41 @@ def where_they_are(session, new_folder, moves):
     return out
 
 
+def resolve_phantoms(session, entry):
+    """A phantom is a move an older version planned twice for one sidecar (it saw .xmp and .XMP as two
+    files on a drive that ignores case). It never stood for a file of its own, but the old run may have
+    written problems about it. A phantom is resolved only with proof: its real twin (same name, any case)
+    was moved and checked, exactly one file by that name is on the drive, and that file's hash matches
+    the backup's. Then the proof goes in the log and the problems that name only that phantom are
+    dropped. Anything short of that and the problems stay. Returns True if the entry changed."""
+    moves = entry.get("moves", [])
+    phantoms = [m for m in moves if m.get("phantom") and not m.get("resolved")]
+    if not phantoms:
+        return False
+    changed = False
+    for ph in phantoms:
+        twin = next((m for m in moves if not m.get("phantom") and m["to"].lower() == ph["to"].lower()), None)
+        if not twin or not twin.get("moved") or not twin.get("checked") or not twin.get("sha256"):
+            continue
+        dst = session / twin["to"]
+        try:
+            on_disk = [n for n in os.listdir(dst.parent) if n.lower() == dst.name.lower()]
+        except OSError:
+            continue
+        if on_disk != [dst.name] or sha256_of(dst) != twin["sha256"]:
+            continue
+        ph["resolved"] = {"when": datetime.now().isoformat(timespec="seconds"),
+                          "why": "the same file as its twin on a drive that ignores case; never a file of its own",
+                          "twin": twin["to"], "sha256_matched": twin["sha256"]}
+        before = len(entry.get("problems", []))
+        entry["problems"] = [p for p in entry.get("problems", []) if ph["to"] not in p]
+        entry.setdefault("phantoms_resolved", []).append(
+            {"phantom": ph["to"], "twin": twin["to"], "problems_cleared": before - len(entry["problems"]),
+             "when": ph["resolved"]["when"]})
+        changed = True
+    return changed
+
+
 def finish_unfinished(session, studio):
     """A rename that was cut off (power, a closed pipe, a file in the way) leaves its log entry without
     'finished', or with moves not marked moved. Every move is in that entry, so finish it: move what is
@@ -228,6 +263,10 @@ def finish_unfinished(session, studio):
         real = [m for m in moves if not m.get("phantom")]
         pending = [m for m in real if not m.get("moved")]
         if entry.get("finished") and not pending:
+            if resolve_phantoms(session, entry):
+                log_path.write_text(json.dumps(log, indent=1))
+                say(f"Cleared {len(entry['phantoms_resolved'])} sidecar(s) the old renamer counted twice "
+                    f"({entry.get('to_name')}); each real one matched the backup.")
             continue
         say(f"Finishing a rename that was cut off: {entry.get('from_name')} -> {entry.get('to_name')}")
         new_folder = Path(real[0]["to"]).parent if real else None
@@ -273,6 +312,7 @@ def finish_unfinished(session, studio):
         names = load(studio, "names.json", required=False) or {}
         names[entry["shoot"]] = entry["to_name"]
         (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False))
+        resolve_phantoms(session, entry)
         entry["finished"] = datetime.now().isoformat(timespec="seconds") + " (finished on a later run)"
         log_path.write_text(json.dumps(log, indent=1))
         say(f"  {entry['verified']} of {len(real)} verified" + (f"; problems: {entry['problems'][:5]}" if entry["problems"] else ""))
