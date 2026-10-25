@@ -19,7 +19,7 @@ on the beat. Claude does the choosing; this does the counting.
 
     python3 reel.py make --folder "<edited photos>" --picks 7,2,11,4,9,1 --song "<file>" | --song none
                                                    | --capcut-song "<song name from CapCut's music>"
-        [--shoot "Black-sand beach"] [--name "Black-sand beach reel"] [--hook "Words on the first photo"]
+        [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo"]
         [--pace mixed|calm|fast|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
         Finds the beat, starts the song where it picks up, lays the photos in that
         order one cut per beat-step, and writes the CapCut project (capcut.py).
@@ -330,6 +330,45 @@ def hash_seed(paths, variation):
     return zlib.crc32(("|".join(paths) + f"#{variation}").encode()) & 0xFFFFFFFF
 
 
+def shoot_folder_name(night, shoot_id):
+    """The shoot's own folder name on their drive, read from its backup's records (renames and settling followed)."""
+    try:
+        from where import locate
+        root, studio = locate(night)
+        for x in json.loads((studio / "shoots.json").read_text())["shoots"]:
+            if x["id"] == shoot_id and x.get("folder"):
+                return Path(x["folder"]).name
+    except (SystemExit, OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def reel_name(a, photos):
+    """The reel is named after its shoot, so the CapCut project and the video CapCut exports
+    ("2022-06-24 Black-sand beach reel.mp4") sit beside the shoot folder of the same name.
+    1. the shoot's own folder name, when we know the backup it came from;
+    2. otherwise the shoot name in their own folder pattern, dated by the first photo taken;
+    3. otherwise the shoot name, or the export folder's name."""
+    if a.name:
+        return a.name
+    if a.night and a.shoot_id:
+        folder = shoot_folder_name(a.night, a.shoot_id)
+        if folder:
+            return f"{folder} reel"
+    if a.shoot:
+        try:
+            import exif_read
+            import studio_file
+            naming = studio_file.load().get("naming", {})
+            taken = sorted(t for t in ((exif_read.read(p["path"]) or {}).get("taken") for p in photos[:12]) if t)
+            if naming.get("folder_pattern") and taken:
+                return f"{studio_file.render(naming, a.shoot, taken[0])} reel"
+        except Exception:
+            pass
+        return f"{a.shoot} reel"
+    return f"{Path(a.folder).name} reel"
+
+
 def cmd_make(a):
     by_n, picks, hints = read_picks(a)
     photos = []
@@ -366,7 +405,7 @@ def cmd_make(a):
     if pieces is None:
         say(facts["problem"])
         sys.exit(2)
-    name = a.name or f"{a.shoot or Path(a.folder).name} reel"
+    name = reel_name(a, photos)
     plan = {"name": name, "photos": pieces,
             "song": ({"path": song, "from": facts["song_from"], "from_f": facts["song_from_f"], "fade_out": 0.5,
                       "length": (picked["seconds"] if picked else capcut.song_length(song)),
@@ -430,6 +469,8 @@ def main():
     m.add_argument("--song", help="a song file, or none")
     m.add_argument("--capcut-song", help="the name of a song from CapCut's music, used in one of their CapCut projects")
     m.add_argument("--shoot")
+    m.add_argument("--night", help="the backup the shoot came from, so the reel is named exactly like its folder")
+    m.add_argument("--shoot-id", help="the shoot's id in that backup (s1, s2...)")
     m.add_argument("--name")
     m.add_argument("--hook")
     m.add_argument("--pace", choices=list(pace.FEELS), default="mixed",

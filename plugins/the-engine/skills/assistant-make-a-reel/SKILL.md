@@ -81,9 +81,11 @@ Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me opt
 ```
 python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
   --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"   (or --capcut-song "<name>", or --song none)
-  --pace mixed|calm|fast|build   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
+  --pace mixed|calm|fast|build   [--night "<backup>" --shoot-id s1]
+  [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
 ```
 
+- **The reel is named after its shoot.** When you came from the Studio Manager, pass the backup and shoot id it gave you (`--night`, `--shoot-id`): the CapCut project is then called exactly like the shoot's folder plus "reel" ("2022-06-24 Black-sand beach reel"), and so is the video CapCut exports. Without those, the shoot name goes through their own folder pattern, dated by the first photo. A second reel of the same shoot gets "reel 2". Only use `--name` if they ask for a different name.
 - `--pace` is their answer from Step 4 (`mixed` is "a little of everything"). The first photo always holds long enough to read, and the last one lands.
 - `--variation 2` (3, 4...) gives another mix of the same picks with the same pace, if they want to see it move differently.
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
@@ -95,7 +97,7 @@ How the timing works, if they ask: the reel starts on the first beat of a bar, l
 
 ## Step 7: hand it over
 
-Two lines, their words: "It's in CapCut: Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off."
+Two lines, their words: "It's in CapCut: 2022-06-24 Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off."
 
 Then one next step, as a question with buttons: a carousel from the same picks, or trial reels. **Trial reels** are the same cut with a different opening line: run `make` again with another `--hook` and `--name "<shoot> reel, take 2"`, one project each, in seconds. Remind them once that trial reels go out as trial reels, never to the feed.
 
