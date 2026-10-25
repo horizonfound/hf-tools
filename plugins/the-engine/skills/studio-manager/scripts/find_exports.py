@@ -5,13 +5,13 @@ export to.
 After their edit they export JPEGs the way they always do and say "I'm done
 with the beach shoot." This looks for those JPEGs two ways:
 
-  1. By name. The night named every photo <Shoot>_<NNNN>_<camera name>, and
+  1. By name. The backup named every photo <Shoot>_<NNNN>_<camera name>, and
      Lightroom keeps the file name on export unless told otherwise, so
      "Black-sand-beach_0012_IMG_4471.jpg" is that shoot, edited. The camera's
      own name ("IMG_4471.jpg") counts too.
   2. By what the photo carries. If they rename on export, every JPEG still
      knows the moment it was taken and which camera took it; those are
-     matched against the night's index.
+     matched against the backup's index.
 
 It looks first where their exports went last time (remembered in the Studio
 File), then in and beside the shoot's folder, then Pictures, Desktop and
@@ -54,7 +54,7 @@ def shoot_photos(root, studio, shoot_id):
     shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
     s = next((x for x in shoots if x["id"] == shoot_id), None)
     if not s:
-        sys.exit(f"STOP: no shoot {shoot_id} in that night.")
+        sys.exit(f"STOP: no shoot {shoot_id} in that backup.")
     folder = s.get("folder")
     index = json.loads((studio / "index.json").read_text())["photos"]
     mine = [p for p in index if folder and Path(p["file"]).parent.as_posix() == folder]

@@ -155,7 +155,7 @@ def main():
                     open_report(held_studio, held_studio)
                 sys.exit(0)
             # copied and verified, but the night did not finish (Claude's look, the sort, the report): pick it up there
-            say(f"This card is already copied and verified, in {root}. Picking up where the night left off.")
+            say(f"This card is already copied and verified, in {root}. Picking up where the backup left off.")
             if a.check:
                 return
             a.session = str(root)
@@ -168,7 +168,7 @@ def main():
             except SystemExit:
                 root, st = None, None
             if st is not None and (st / "settled.json").exists():
-                say(f"This night is finished and settled: the shoots are in {root}.")
+                say(f"This backup is finished and settled: the shoots are in {root}.")
                 if not a.no_open:
                     open_report(st, st)
                 return
@@ -187,7 +187,7 @@ def main():
                 say(f"  - {p}")
             sys.exit(2)
         if a.check:
-            say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. Safe to walk away once it starts.")
+            say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
             return
 
     # 1. copy and verify (backup.py also builds the index and the report page)

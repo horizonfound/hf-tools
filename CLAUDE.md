@@ -6,6 +6,8 @@ Read this first, every session. It is the one place that says what we are buildi
 
 Dustin Damron (growth, tech, ads) and Nicole (creative lead, on camera, writes the lessons) run Horizon Found, a photography education company. Dustin is not a Claude Code regular: talk plainly, no jargon, no "tech bro" phrasing, short answers with the result first. Show him the file to watch or open, not the grade. When something is a judgment call for the two of them, say so and stop; never decide product questions for them.
 
+**Words: "the backup," not "the night"; "the report," not "the morning report" (Dustin, Oct 24).** It runs whenever a card goes in and takes 10 to 15 minutes for 4,000 photos, not overnight. In anything a photographer or Claude reads, the whole run (copy, check, sort, settle, report) is "the backup." Older notes below still say "the night"; that is history. Script names (`night.py`, `--night`) stay as they are, since no photographer sees them.
+
 **The photographer has no gender (Dustin, Oct 24).** The product is for every photographer. In anything a photographer can see (skills, scripts, pages, reports, task lists, progress lines) the photographer is "you" or "they," never "she" or "he." Older notes in this file and in `docs/` still say "she" from Nicole's briefs; that is history, not a style to copy.
 
 ## One name, one helper (Dustin and Nicole, Oct 24, evening)

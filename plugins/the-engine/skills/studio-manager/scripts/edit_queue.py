@@ -5,7 +5,7 @@ line, every shoot the Studio has backed up, newest first, each with a button
 that opens its folder. One page; "show my queue" and "show the archive" both
 open it.
 
-It is the bridge between the night and the reel: a night's shoots are added
+It is the bridge between the backup and the reel: a backup's shoots are added
 when the photographer says so (some shoots are just for them), "I'm done with
 the beach shoot" takes one off and starts the next step, and a heads-up comes
 three days before anything is due.
@@ -243,7 +243,7 @@ def add_from_night(q, night, shoot_id, when, name=None):
     root, studio, shoots, names, groups = night_shoots(night)
     s = next((x for x in shoots if x["id"] == shoot_id), None)
     if not s:
-        sys.exit(f"STOP: no shoot {shoot_id} in that night. Its shoots: " + ", ".join(x["id"] for x in shoots))
+        sys.exit(f"STOP: no shoot {shoot_id} in that backup. Its shoots: " + ", ".join(x["id"] for x in shoots))
     if name:
         names = dict(names, **{shoot_id: name})
     due, how = due_date(when)
@@ -819,7 +819,7 @@ def main():
         write_page(q)
         say(f"{'Finished' if a.cmd == 'done' else 'Back in the queue'}: {s['name']}.")
         if a.cmd == "done" and s.get("studio"):
-            say(f"night: {Path(s['studio'])}  shoot: {s['shoot']}")  # for the next step (finding the exports)
+            say(f"backup: {Path(s['studio'])}  shoot: {s['shoot']}")  # for the next step (finding the exports)
     elif a.cmd == "due":
         s = find(q, a.which, include_finished=False)
         s["due"], how = due_date(a.when)
@@ -886,7 +886,7 @@ def main():
     elif a.cmd == "offers":
         hits = [s for s in finished(q) if s.get("finished_by") == "page" and not s.get("offered")]
         for s in hits:
-            say(f"{s['name']}" + (f"  (night: {s['studio']}  shoot: {s['shoot']})" if s.get("studio") else ""))
+            say(f"{s['name']}" + (f"  (backup: {s['studio']}  shoot: {s['shoot']})" if s.get("studio") else ""))
             if a.mark:
                 s["offered"] = datetime.now().isoformat(timespec="seconds")
         if a.mark and hits:

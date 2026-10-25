@@ -281,7 +281,7 @@ def main():
     manifest["work_seconds"] = manifest.get("work_seconds", 0) + elapsed  # across resumed runs
     mpath.write_text(json.dumps(manifest, indent=1))
 
-    lines = [f"# Morning report · {folder}", ""]
+    lines = [f"# Report · {folder}", ""]
     if problems:
         lines += ["## Needs you first", ""] + [f"- {p}" for p in problems] + [""]
         lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. Nothing on the memory card has been changed; run it again when the problem is fixed and it picks up where it left off.", ""]

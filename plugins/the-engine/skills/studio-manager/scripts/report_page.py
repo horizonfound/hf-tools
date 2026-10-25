@@ -228,7 +228,7 @@ def build(manifest, studio):
 
     # hero: the one line they need
     out.append("<section class='wrap hero'>")
-    out.append(f"<span class='eyebrow'>Morning report · {e(name)}</span>")
+    out.append(f"<span class='eyebrow'>Backup report · {e(name)}</span>")
     if problems:
         out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
         out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. Nothing on the memory card has been changed; "

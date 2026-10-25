@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Show a session's morning report inside the Claude app (or any browser) at
+"""Show a backup's report inside the Claude app (or any browser) at
 http://127.0.0.1:<port>/report.html, and let its folder links open Finder.
 
 A page served from localhost is not allowed to open file:// links itself, so
@@ -90,7 +90,7 @@ def main():
             continue
     if not srv:
         sys.exit(f"STOP: no free port between {a.port} and {a.port + 19}.")
-    print(f"Morning report: http://127.0.0.1:{port}/report.html", flush=True)
+    print(f"Report: http://127.0.0.1:{port}/report.html", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
