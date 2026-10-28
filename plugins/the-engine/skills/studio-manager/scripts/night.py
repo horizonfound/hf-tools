@@ -123,7 +123,8 @@ def main():
     ap.add_argument("--session", help="an existing session folder, to continue")
     ap.add_argument("--gap", default="15", help="quiet minutes that start a new group")
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
-    ap.add_argument("--no-open", action="store_true", help="don't open the report when done (the Claude app shows it in its own pane)")
+    ap.add_argument("--no-open", action="store_true", help="(kept for old callers; the report is never opened by the backup now)")
+    ap.add_argument("--open", action="store_true", help="show the report of a finished backup in the browser (via serve_report.py in its own pane)")
     ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
     ap.add_argument("--no-peeks", action="store_true", help="skip the sneak peeks (the backup still finishes and settles)")
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
@@ -153,7 +154,7 @@ def main():
                 say(f"This card is already safe: {fp['count']:,} files backed up to {root} on {held['when'][:10]}. Nothing to do.")
                 say("(To copy it again anyway, run with --again.)")
                 say(f"Report: {held_studio / 'report.html'}")
-                if not a.check and not a.no_open:
+                if a.open:
                     open_report(held_studio, held_studio)
                 sys.exit(0)
             # copied and verified, but the night did not finish (Claude's look, the sort, the report): pick it up there
@@ -171,7 +172,7 @@ def main():
                 root, st = None, None
             if st is not None and (st / "settled.json").exists():
                 say(f"This backup is finished and settled: the shoots are in {root}.")
-                if not a.no_open:
+                if a.open:
                     open_report(st, st)
                 return
     elif a.source and a.dest and a.name:
@@ -273,7 +274,7 @@ def main():
 
     # 6b. the sneak peeks: the script thins each shoot to its moments and lays them on numbered pages;
     # Claude picks six per shoot (exit 7, then run again); then they are marked for Lightroom and shown
-    # on the report. The report is already on screen before this, so nothing waits on it if the look never comes.
+    # on the report. Nothing is on screen yet: Claude shows the report once, after the picks and the notes.
     if not a.no_peeks and not (studio / "sneak-peeks.json").exists():
         if not (studio / "peek-sheets.json").exists():
             say("6b. Thinning each shoot to its moments, for the sneak peeks")
@@ -312,11 +313,10 @@ def main():
     # every shoot of the night goes on "your shoots" (the archive below the queue); the queue question comes when they're back
     run("edit_queue.py", "register", "--night", studio)
     say(f"\nDone. Report: {studio / 'report.html'}")
-    # so there is something nice on the screen when they come back: the night opens the report itself,
-    # served by serve_report.py so its "Open photo folder" button works, and it does not depend on
-    # anyone remembering to open it afterwards
-    if not a.no_open:
-        open_report(session, studio)
+    # The report is not opened here. The backup is only the first half: Claude still picks the sneak
+    # peeks and writes the notes, and the report is shown once, by Claude, when all of that is done
+    # (Dustin, Oct 28: it opened early, twice, in two browsers). `night.py --open` shows it on request.
+    say("Not on screen yet: the sneak peeks and the notes come next, then the report is shown once.")
 
 
 def open_report(session, studio):

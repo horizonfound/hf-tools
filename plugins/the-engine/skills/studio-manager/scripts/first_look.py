@@ -230,7 +230,9 @@ def shoots_section(studio):
             rest = []
         lenses = sorted({l for g in gs for l in g.get("lenses", [])})
         bodies = max(g["bodies"] for g in gs)
-        val = names.get(s["id"], "")
+        # the box always shows the shoot's current name (locked in, or the suggested one it was filed under), so
+        # clicking clears it and shows that name underneath in grey (Dustin, Oct 28: a fresh backup showed an empty box)
+        val = names.get(s["id"]) or s.get("name") or s.get("suggested", "")
         def img(p, g):
             if g is None:
                 return f"<img src='sneak-peeks/{e(p)}' alt=''>"
