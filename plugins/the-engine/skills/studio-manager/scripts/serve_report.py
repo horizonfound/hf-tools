@@ -79,6 +79,36 @@ class Renames:
                 sys.stderr.write(f"report not rebuilt: {ex}\n")
 
 
+def queue_url():
+    """The live queue page's address. If no queue server answers, start one (edit_queue.py serve) and wait for its line."""
+    import urllib.request
+    try:
+        import edit_queue
+        f = edit_queue.HOME / "queue-url.txt"
+        if f.exists():
+            old = f.read_text().strip()
+            try:
+                urllib.request.urlopen(old, timeout=1).read(1)
+                return old
+            except Exception:  # noqa: BLE001
+                pass
+        log = open(edit_queue.HOME / "serve.log", "a")
+        subprocess.Popen([sys.executable, str(Path(__file__).resolve().parent / "edit_queue.py"), "serve"],
+                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        for _ in range(40):
+            time.sleep(0.1)
+            if f.exists():
+                url = f.read_text().strip()
+                try:
+                    urllib.request.urlopen(url, timeout=1).read(1)
+                    return url
+                except Exception:  # noqa: BLE001
+                    continue
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 class Handler(SimpleHTTPRequestHandler):
     allowed = ()
     renames = None
@@ -89,6 +119,16 @@ class Handler(SimpleHTTPRequestHandler):
         if parts.path == "/rename-status":
             body = json.dumps(self.renames.state if self.renames else {}).encode()
             self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parts.path == "/queue-url":
+            # the report's "Show my editing queue" link: the queue page's address, starting its server if it is not up
+            url = queue_url()
+            body = json.dumps({"url": url}).encode()
+            self.send_response(HTTPStatus.OK if url else HTTPStatus.SERVICE_UNAVAILABLE)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
@@ -140,6 +180,35 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"queued")
             sys.stderr.write(f"rename asked: {shoot} -> {name}\n")
+            return
+        if path == "/queue":
+            # the report's "Add to my editing queue" button: {"shoot": id, "due": "YYYY-MM-DD"}
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                d = json.loads(self.rfile.read(n) or b"{}")
+                shoot, due = str(d["shoot"])[:40], str(d["due"])[:10]
+                assert shoot and due
+            except (ValueError, KeyError, AssertionError, TypeError):
+                self.send_error(HTTPStatus.BAD_REQUEST, "expected {shoot, due}")
+                return
+            try:
+                import edit_queue
+                q = edit_queue.load()
+                entry, new = edit_queue.add_from_night(q, self.directory, shoot, due)
+                edit_queue.save(q)
+                edit_queue.write_page(q)
+                words = f"Added to your queue: {entry['name']}, {edit_queue.due_words(entry['due'])}."
+                out = {"ok": True, "due": entry["due"], "words": words}
+            except SystemExit as ex:
+                self.send_error(HTTPStatus.BAD_REQUEST, str(ex)[:200])
+                return
+            body = json.dumps(out).encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            sys.stderr.write(f"queue: {shoot} due {due}\n")
             return
         if path != "/names":
             self.send_error(HTTPStatus.NOT_FOUND)

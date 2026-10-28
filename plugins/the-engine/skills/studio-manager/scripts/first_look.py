@@ -74,6 +74,23 @@ CSS = """
 .name input::placeholder{color:#9AA0AB;font-weight:400;font-style:italic;font-family:var(--sans);font-size:.72em;letter-spacing:0}
 .name input.hint::placeholder{color:#B9BEC8;font-weight:600;font-style:normal;font-size:1em;letter-spacing:-.02em}
 .name small{color:var(--ink-2);font-size:13px}.name small b{color:var(--ink);font-weight:600}
+.queue{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem .8rem;margin-top:.9rem;font-size:14px;color:var(--ink-2)}
+.queue .add{font:600 14px/1 var(--sans);padding:.7rem 1.1rem;border-radius:999px;border:1.5px solid var(--coral);background:transparent;color:var(--coral-2);cursor:pointer;transition:background .2s,color .2s}
+.queue .add:hover{background:var(--coral);color:#fff}
+.queue .queued b{color:var(--ink)}
+.queue .change,.queue .never{font:500 13px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0}
+.queue .change:hover,.queue .never:hover{color:var(--coral-2)}
+.queue .queued{display:block;width:100%}
+.queue .show-queue{display:inline-flex;align-items:center;gap:.35rem;font:600 12.5px/1 var(--sans);color:var(--coral-2);text-decoration:none;margin:.7rem 0 0;padding:.42rem .75rem;border:1.5px solid rgba(212,100,63,.45);border-radius:999px;white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
+.queue .show-queue:hover{background:var(--coral);border-color:var(--coral);color:#fff}
+.queue .pick{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.6rem;background:var(--sun-l);border-radius:16px;padding:.55rem .8rem;animation:pop .4s var(--ease)}
+.queue .pick[hidden]{display:none}
+.queue .pick label{display:inline-flex;align-items:center;gap:.45rem;font:600 13px/1 var(--sans);color:var(--ink-2)}
+.queue input[type=date]{font:500 14px var(--sans);border:1.5px solid var(--ink);border-radius:999px;padding:.4rem .8rem;background:var(--paper);color:var(--ink)}
+.queue .save{font:600 13px/1 var(--sans);padding:.55rem .9rem;border-radius:999px;border:1.5px solid var(--coral);background:var(--coral);color:#fff;cursor:pointer}
+.queue .save:disabled{opacity:.4;cursor:default}
+.queue .qstate{font-size:13px;min-height:1.2em}.queue .qstate.bad{color:#b4472e}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.2rem 0 .6rem}
 .btn{display:inline-flex;align-items:center;gap:1.1rem;padding:.7rem .7rem .7rem 1.9rem;border-radius:999px;background:var(--coral);color:#fff;font:600 22px/1 var(--sans);letter-spacing:-.01em;border:1.5px solid var(--coral);cursor:pointer;box-shadow:0 18px 36px -20px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .btn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -109,6 +126,33 @@ document.querySelectorAll('.name input').forEach(i=>{i.addEventListener('keydown
  i.addEventListener('blur',ev=>{if(ev.relatedTarget&&ev.relatedTarget.dataset&&ev.relatedTarget.dataset.shoot===i.id)return;
   if(i.dataset.was!==undefined){i.value=i.dataset.was;i.placeholder=i.dataset.hint||'';i.classList.remove('hint');}});});
 if(location.protocol.startsWith('http'))poll();
+// the editing queue button: a calendar opens right there, they pick a date, it saves (Dustin, Oct 28)
+function niceDate(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+// "Show my editing queue": ask the Studio for the queue page's address (it starts the page if it isn't up) and open it
+async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>{ev.preventDefault();
+  if(!location.protocol.startsWith('http')){st.textContent='Ask Claude to show your editing queue.';st.className='qstate bad';return;}
+  try{const r=await fetch('/queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;location.href=d.url;}
+  catch(e){st.textContent='Could not open the queue page. Ask Claude to show your editing queue.';st.className='qstate bad';}});}
+document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
+document.querySelectorAll('.queue').forEach(q=>{
+ const id=q.dataset.shoot,pick=q.querySelector('.pick'),inp=q.querySelector('input'),save=q.querySelector('.save'),st=q.querySelector('.qstate');
+ const open=()=>{pick.hidden=false;const a=q.querySelector('.add');if(a)a.hidden=true;inp.focus();try{inp.showPicker()}catch(e){}};
+ const close=()=>{pick.hidden=true;const a=q.querySelector('.add');if(a)a.hidden=false;};
+ q.querySelectorAll('.add,.change').forEach(b=>b.addEventListener('click',open));
+ q.querySelector('.never').addEventListener('click',close);
+ inp.addEventListener('input',()=>{save.disabled=!inp.value});
+ save.addEventListener('click',async()=>{if(!inp.value)return;
+  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Studio to add it, or just tell Claude.';st.className='qstate bad';return;}
+  save.disabled=true;
+  try{const r=await fetch('/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
+   if(!r.ok)throw 0;const d=await r.json();
+   const was=q.querySelector('.queued');if(was)was.remove();const a=q.querySelector('.add');if(a)a.remove();
+   pick.hidden=true;
+   const span=document.createElement('span');span.className='queued';span.innerHTML='In your editing queue, due <b>'+niceDate(d.due)+'</b>. <button class="change" type="button">Change the date</button> <a class="show-queue" href="#">Show my editing queue <span aria-hidden="true">↗</span></a>';
+   q.insertBefore(span,pick);span.querySelector('.change').addEventListener('click',open);wireShow(span.querySelector('.show-queue'),st);
+   st.textContent=d.words||'';st.className='qstate';}
+  catch(e){st.textContent='Could not add it. Tell Claude instead.';st.className='qstate bad';save.disabled=false;}});
+});
 })();
 </script>"""
 
@@ -184,6 +228,15 @@ def note_card(note):
     return "\n".join(out)
 
 
+def nice_date(iso):
+    d = datetime.fromisoformat(iso)
+    return d.strftime("%a, %b ") + str(d.day)
+
+
+def today_iso():
+    return datetime.now().date().isoformat()
+
+
 def shoots_section(studio):
     """(html, script) for the shoots, or None when the card has not been grouped and decided yet.
     Each shoot is one block that builds downward: three photos framing the recap and the name box, then the
@@ -205,6 +258,14 @@ def shoots_section(studio):
         notes = all_notes(studio)
     except ImportError:
         notes = {}
+    queued = {}   # shoot id -> due date (ISO), for shoots already in the editing queue
+    try:
+        import edit_queue
+        for x in edit_queue.load()["shoots"]:
+            if x.get("studio") == str(studio) and x.get("shoot") and edit_queue.is_waiting(x):
+                queued[x["shoot"]] = x.get("due")
+    except Exception:  # noqa: BLE001  the queue is a convenience; the report still builds without it
+        pass
 
     out = ["<div class='wrap'><div class='shoots-head'><span class='eyebrow'>What's on the card</span>",
            f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total:,} photos</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
@@ -263,6 +324,13 @@ def shoots_section(studio):
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
+        # the editing queue, one button: click, pick a date on the calendar, done (Dustin, Oct 28)
+        due = queued.get(s["id"])
+        out.append(f"<div class='queue' data-shoot='{e(s['id'])}'>"
+                   + (f"<span class='queued'>In your editing queue, due <b>{e(nice_date(due))}</b>. <button class='change' type='button'>Change the date</button> <a class='show-queue' href='#'>Show my editing queue <span aria-hidden='true'>↗</span></a></span>" if due
+                      else "<button class='add' type='button'>Add to my editing queue</button>")
+                   + f"<span class='pick' hidden><label>Due <input type='date' min='{e(today_iso())}'></label><button class='save' type='button' disabled>Save</button><button class='never' type='button'>Never mind</button></span>"
+                   "<span class='qstate'></span></div>")
         out.append("</div></div>")   # copy, top
         if mine:
             out.append("<div class='more'>")
