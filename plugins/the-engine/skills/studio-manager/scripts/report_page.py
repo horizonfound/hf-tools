@@ -48,10 +48,10 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .h1{font:600 clamp(36px,5.4vw,64px)/1.02 var(--sans);letter-spacing:-.035em;text-wrap:balance;max-width:14em}
 .h1.bad{max-width:16em}
-.swap{font:italic 400 1.14em/1 var(--display);color:var(--ink);text-decoration:underline wavy var(--coral);text-decoration-thickness:.06em;text-underline-offset:.1em;letter-spacing:0}
+.swap{font:italic 400 1.14em/1 var(--display);color:var(--coral-2);letter-spacing:0}   /* the italic word in coral; the wavy underline read as a spelling error (Dustin, Oct 28) */
 .lede{font-size:clamp(16px,1.4vw,19px);color:var(--ink-2);max-width:36em;text-wrap:pretty}
 .hero{display:grid;gap:1.2rem;padding:clamp(2.2rem,5vw,4rem) 0 clamp(1.6rem,3vw,2.4rem)}
-.pill{display:inline-flex;align-items:center;gap:.7rem;padding:.4rem .4rem .4rem 1.1rem;border-radius:999px;font:500 14px/1 var(--sans);background:var(--paper);border:1.5px solid var(--ink);white-space:nowrap;width:max-content}
+.pill{display:inline-flex;align-items:center;gap:.7rem;padding:.4rem 1.2rem .4rem .45rem;border-radius:999px;font:500 14px/1 var(--sans);background:var(--paper);border:1.5px solid var(--ink);white-space:nowrap;width:max-content}
 .pill .dot{width:30px;height:30px;border-radius:50%;background:var(--lime);display:grid;place-items:center;flex:none;color:var(--ink)}
 .pill.bad{background:var(--coral);border-color:var(--coral);color:#fff}.pill.bad .dot{background:var(--paper);color:var(--coral)}
 .pill.wait{background:var(--sun-l);border-color:var(--sun)}.pill.wait .dot{background:var(--sun)}
