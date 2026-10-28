@@ -87,7 +87,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .notes{padding:clamp(1.2rem,2.6vw,2rem) 0 .6rem}
 .notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
 .note{background:#fff;border:1px solid var(--line,#e6e0d6);border-radius:22px;padding:1.4rem 1.5rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
-.note-wrap{display:flex;flex-direction:column;gap:.55rem}.note-label{font-size:13px;letter-spacing:.12em}.note .to{font-size:13px;color:var(--ink-2);display:flex;justify-content:flex-end;gap:1rem;align-items:baseline}
+.open-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font:500 14px var(--sans);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;z-index:60;max-width:90vw;text-align:center}.open-toast.on{opacity:1;transform:translateX(-50%) translateY(0)}.note-wrap{display:flex;flex-direction:column;gap:.55rem}.note-label{font-size:13px;letter-spacing:.12em}.note .to{font-size:13px;color:var(--ink-2);display:flex;justify-content:flex-end;gap:1rem;align-items:baseline}
 .note .subj{font-weight:600;font-size:15px}
 .note .body{white-space:pre-wrap;font-size:15px;line-height:1.55;margin:0;font-family:inherit}
 .note .row{display:flex;gap:.6rem;align-items:center;margin-top:.3rem;flex-wrap:wrap}
@@ -465,10 +465,15 @@ def build(manifest, studio):
                "<div class='wordmark'>The Studio</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.
-    out.append("<script>if(location.protocol.startsWith('http')){let last=0;for(const a of document.querySelectorAll('a.where')){"
-               "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
+    # The button says what happened, every time: opened, or why not (the drive unplugged, the Studio not running).
+    out.append("<div class='open-toast' id='open-toast'></div>"
+               "<script>if(location.protocol.startsWith('http')){let last=0;const t=document.getElementById('open-toast');"
+               "const tell=m=>{t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),3200)};"
+               "for(const a of document.querySelectorAll('a.where')){"
+               "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
-               "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
+               "try{const r=await fetch('/open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in Finder.':'Could not open it.'));}"
+               "catch(e){tell('The Studio isn\\'t running right now, so this button can\\'t open Finder. Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
     out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT + "</body></html>")
     return "\n".join(out)
 

@@ -302,9 +302,11 @@ def open_folder(s):
         drive = f.parts[2] if len(f.parts) > 2 and f.parts[1] == "Volumes" else None
         return False, (f"Plug in {drive} to open this one." if drive else "That folder isn't where it used to be.")
     from finder import open_folder as show_in_finder
-    ok, _ = show_in_finder(f)
+    ok, note = show_in_finder(f)
     if not ok:
         return False, f"Couldn't open Finder; the folder is {f}."
+    if note == "behind":
+        return True, f"Opened {f.name} in Finder, behind this window. Click Finder in the Dock to see it."
     return True, f"Opened {f.name} in Finder."
 
 

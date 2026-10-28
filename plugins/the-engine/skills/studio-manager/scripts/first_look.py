@@ -277,10 +277,7 @@ def shoots_section(studio):
         if card:
             out.append(card)
         out.append("</article>")
-    out.append("</div>")
-    out.append("<div class='wrap'>"
-               "<p class='undo'>Type a name and press Rename (or Enter): the shoot's folder and every photo in it take that name. Do them one after another; each waits its turn. "
-               "Nothing on the card is ever changed, and you can rename any shoot later by just asking.</p></div>")
+    out.append("</div>")   # no how-to paragraph under the shoots: not needed (Dustin, Oct 28)
     return "\n".join(out), SCRIPT
 
 

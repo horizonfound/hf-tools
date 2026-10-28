@@ -98,16 +98,28 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
         want = parse_qs(parts.query).get("path", [""])[0]
         target = Path(want).expanduser()
-        ok = target.is_dir() and any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
-        if ok:
+        allowed = any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
+        if not target.is_dir():
+            ok, words = False, f"That folder isn't there right now. Is {target.parts[2] if len(target.parts) > 2 and target.parts[1] == 'Volumes' else 'the drive'} plugged in?"
+        elif not allowed:
+            ok, words = False, "That isn't a folder this report names."
+        else:
             now = time.monotonic()
             if now - self.last_open.get(str(target), 0) > 1.0:
-                show_in_finder(target)  # brings Finder to the front, so the click visibly does something
+                ok, why = show_in_finder(target)  # opens it and brings Finder to the front when macOS allows
+                name = target.name or str(target)
+                words = (f"Opened {name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
+                         else f"Opened {name} in Finder.") if ok else f"Couldn't open Finder. The folder is {target}. ({why})"
+            else:
+                ok, words = True, f"Opened {target.name or str(target)} in Finder."
             self.last_open[str(target)] = now
-        self.send_response(HTTPStatus.OK if ok else HTTPStatus.FORBIDDEN)
-        self.send_header("Content-Type", "text/plain")
+        print(f"open asked: {target} -> {'ok' if ok else 'no'}: {words}", flush=True)
+        out = json.dumps({"ok": ok, "words": words}).encode()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(b"opened" if ok else b"not a folder this report names")
+        self.wfile.write(out)
 
     def do_POST(self):
         """The page sends one name to rename right away: {"shoot": id, "name": name} to /rename (queued, run one at a
