@@ -74,15 +74,11 @@ The Studio can tap you on the phone when a backup is done, or when it's time to 
 
 **6a. Install the Claude app on your phone.** From the App Store or Google Play. Sign in with the **same** Claude account you used on the Mac. When the phone asks whether Claude may send notifications, say **Allow**. **[shot]**
 
-**6b. Link your Mac to your phone.** Back on the Mac, in the Code message box, type this and press Return:
-
-```
-/remote-control
-```
+**6b. Link your Mac to your phone.** Back on the Mac, at the top right of the Code window, click the first of the small icons (the one that says **Show session rail** when you hover). A panel opens on the right. Under **Environment**, flip the **Remote Control** switch on. **[shot: the session rail with the switch on; Dustin's screenshot, Oct 28]**
 
 Your session now shows in the Claude app on your phone, under **Code**, with a small computer icon and a green dot. **[shot]**
 
-To have this happen on its own every time: open the Claude app's **Settings**, go to **Code**, and turn on **Connect new sessions to Remote Control**. **[check: exact label]**
+To have this happen on its own every time: open the Claude app's **Settings**, go to **Code**, and turn on **Connect new sessions to Remote Control**. **[check: exact label]** (Typing `/remote-control` in the message box does the same thing as the switch.)
 
 **6c. Turn on the phone taps.** In the message box on the Mac, paste each of these lines and press Return after each:
 
