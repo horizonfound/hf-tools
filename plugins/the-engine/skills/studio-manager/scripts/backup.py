@@ -302,7 +302,7 @@ def main():
     if second:
         lines.append(f"- Second copy: `{second}`" + ("" if ok_second == len(files) else f" ({ok_second} of {len(files)} checked)"))
     lines += ["", "## The card", "", "Nothing on it was changed. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
-              "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · your memory card hasn't been changed, and nothing has been shared or posted anywhere._"]
+              "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · your memory card is exactly as it was._"]
     report = "\n".join(lines) + "\n"
     (studio / "morning-report.md").write_text(report)
     # the index (when each photo was taken, which camera) and the same report as a
