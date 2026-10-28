@@ -87,7 +87,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .notes{padding:clamp(1.2rem,2.6vw,2rem) 0 .6rem}
 .notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
 .note{background:#fff;border:1px solid var(--line,#e6e0d6);border-radius:22px;padding:1.4rem 1.5rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
-.note .to{font-size:13px;color:var(--ink-2);display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
+.note-wrap{display:flex;flex-direction:column;gap:.55rem}.note-label{font-size:13px;letter-spacing:.12em}.note .to{font-size:13px;color:var(--ink-2);display:flex;justify-content:flex-end;gap:1rem;align-items:baseline}
 .note .subj{font-weight:600;font-size:15px}
 .note .body{white-space:pre-wrap;font-size:15px;line-height:1.55;margin:0;font-family:inherit}
 .note .row{display:flex;gap:.6rem;align-items:center;margin-top:.3rem;flex-wrap:wrap}

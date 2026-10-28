@@ -29,7 +29,7 @@ CSS = """
 .shoots-head{display:grid;gap:.5rem;padding-top:clamp(2rem,4vw,3rem)}
 .shoots-head .h2{font:600 clamp(28px,3.6vw,44px)/1.05 var(--sans);letter-spacing:-.03em;text-wrap:balance}
 .shoots{display:grid;gap:1.5rem;padding:1.6rem 0 1rem}
-.shoot{display:grid;gap:clamp(1.4rem,3vw,2.2rem);background:var(--paper);border-radius:var(--r);padding:clamp(1.2rem,2.6vw,2rem)}
+.shoot{display:grid;gap:clamp(.8rem,1.6vw,1.1rem);background:var(--paper);border-radius:var(--r);padding:clamp(1.2rem,2.6vw,2rem)}
 .shoot .top{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(1.2rem,3vw,2.4rem);align-items:center}
 .shoot:nth-child(even) .top{grid-template-columns:1fr 1.05fr}
 .shoot:nth-child(even) .pics{order:2}
@@ -146,8 +146,9 @@ def note_card(note):
     e = html.escape
     if not note or not (note.get("body") or note.get("to")):
         return None
-    out = ["<article class='note'>"]
-    out.append("<div class='to'><span>Note to your client</span>" + (f"<span>To {e(note['to'])}</span>" if note.get("to") else "<span>[Name] still to fill in</span>") + "</div>")
+    # the label sits above the box, in the report's coral, a touch larger than an eyebrow (Dustin, Oct 28)
+    out = ["<div class='note-wrap'><span class='eyebrow note-label'>Note to your client</span>", "<article class='note'>"]
+    out.append("<div class='to'>" + (f"<span>To {e(note['to'])}</span>" if note.get("to") else "<span>[Name] still to fill in</span>") + "</div>")
     if note.get("body"):
         if note.get("subject"):
             out.append(f"<div class='subj'>{e(note['subject'])}</div>")
@@ -157,7 +158,7 @@ def note_card(note):
                    + "<span class='did'></span></div>")
     else:
         out.append("<p class='empty'>Not written yet. Say “write the note for this one” and it'll be here.</p>")
-    out.append("</article>")
+    out.append("</article></div>")
     return "\n".join(out)
 
 
