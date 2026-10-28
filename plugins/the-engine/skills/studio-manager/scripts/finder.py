@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Open a folder in Finder and bring Finder to the front.
 
-A page's "Open photo folder" or "Take me to the photos" button asks a small
+A page's "Open photo folder" button asks a small
 local server to open the folder. Plain `open` from that server does open it,
 but the window lands behind the Claude app, so it looks as if nothing
 happened. Here Finder is asked to come forward as well. Opens only; never

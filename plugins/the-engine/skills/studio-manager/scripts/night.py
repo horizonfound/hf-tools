@@ -284,7 +284,7 @@ def main():
     run("edit_queue.py", "register", "--night", studio)
     say(f"\nDone. Report: {studio / 'report.html'}")
     # so there is something nice on the screen when they come back: the night opens the report itself,
-    # served by serve_report.py so its "Take me to the photos" button works, and it does not depend on
+    # served by serve_report.py so its "Open photo folder" button works, and it does not depend on
     # anyone remembering to open it afterwards
     if not a.no_open:
         open_report(session, studio)

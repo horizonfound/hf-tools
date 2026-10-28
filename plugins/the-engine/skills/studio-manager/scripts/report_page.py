@@ -463,7 +463,7 @@ def build(manifest, studio):
     out.append("<div class='card f-sand where-card'><span class='eyebrow'>Where your photos are</span>")
     out.append(f"<p class='path'>{e(where)}</p>")
     if url:
-        out.append(f"<a class='go where' href='{e(url)}' title='Open this folder in Finder'>Take me to the photos"
+        out.append(f"<a class='go where' href='{e(url)}' title='Open this folder in Finder'>Open photo folder"
                    "<span class='arr'>&#8599;</span></a>")
     if second:
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
