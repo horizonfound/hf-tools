@@ -43,7 +43,7 @@ The conversation, in this order (first find the card and run `studio_file.py dri
 
 **Question 2, where on the drive.** "Right on Big Kahuna, or inside a folder?" Choices: "Right on Big Kahuna (recommended)" first, unless the drive has an obvious shoot folder (a top-level folder named like Photo Shoots, Sessions, Clients, Weddings, or one whose contents are dated shoot folders), in which case that folder is first and recommended ("Photo Shoots, 212 shoots in there (recommended)"). Offer at most two such folders; never list the whole drive. Other is for a folder they name: look for it, and if it is there, confirm in one line what you found ("Found it: Photo Shoots, 212 folders in there. That's the spot?") with a yes/no pair before locking it in; if it is not there, say so and offer to make it. The chosen place is what goes in `--drive`.
 
-**Question 3, the second copy.** "Do you keep a second copy anywhere?" Choices: "No second copy (recommended if you don't have one)", then any Dropbox, Google Drive or iCloud folder you can actually see on the Mac, by name. Other is for any folder they want.
+**Question 3, the second copy.** "Do you copy your shoots to a second drive as well?" Choices: "No, just the one drive (recommended if you don't have one)", then every other connected drive by name with its free space, from `studio_file.py drives` (leave out the drive they just chose, the Mac's own disk, and any Time Machine or backup-software drive). Other is for a drive that isn't plugged in right now (say they can plug it in and you'll wait) or a folder they name. Never offer Dropbox, Google Drive or iCloud: raw files are far too big to sync, and nobody does it (Dustin, Oct 28). Cloud backup like Backblaze runs on its own behind the scenes and is not a second copy the Studio makes.
 
 **Question 4, how they name a shoot folder.** "Last one. How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If they pick their own way, or type in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
 
@@ -51,7 +51,7 @@ The conversation, in this order (first find the card and run `studio_file.py dri
 
 **Question 5, how they write to clients.** "When a shoot's for a client, I'll draft a note to send with the sneak peeks. You copy it into your email; nothing sends from here. How do you usually write to clients?" Choices: "Paste me a note you've sent before (recommended)", "Warm and personal", "Short and plain", "Playful". On the paste: take the text as it comes, read the sign-off off its last lines, and save `client_note.py setup --sample-file <the text saved to a file> --sign-off "<as they signed it>"`. On a tone: one more, "How do you sign off?" (Other: they type it, like "xo, Nicole"), then `client_note.py setup --tone warm|plain|playful --sign-off "..."`. If they'd rather not paste right now, a tone is fine and they can say "here's how I write to clients" any time later. There is no "no notes" choice: whether a shoot gets a note is decided shoot by shoot, by its deadline (see "When they come back to the report").
 
-Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --no-second] [--offered 1|2 | --example "<pasted>"] --file-names original|shoot`. Then the one question every backup gets, "How many memory cards for this shoot?" (buttons, see "backup now" step 2; on this first run there is no "like usual?", they just said where), then one sentence that says it is starting, with the numbers and the drive by name ("Starting now: 3,931 photos onto Big Kahuna, a second copy in your Dropbox. You can walk away."), and the backup runs as below. From now on "backup now" asks only the one-screen check-in.
+Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --no-second] [--offered 1|2 | --example "<pasted>"] --file-names original|shoot`. Then the one question every backup gets, "How many memory cards for this shoot?" (buttons, see "backup now" step 2; on this first run there is no "like usual?", they just said where), then one sentence that says it is starting, with the numbers and the drive by name ("Starting now: 3,931 photos onto Big Kahuna, a second copy on your LaCie. You can walk away."), and the backup runs as below. From now on "backup now" asks only the one-screen check-in.
 
 A full first backup, so the tone is clear:
 
@@ -68,9 +68,9 @@ A full first backup, so the tone is clear:
 > *click: Photo Shoots*
 >
 > Photo Shoots it is. Do you keep a second copy anywhere?
-> [ No second copy (recommended if you don't have one) ] [ Dropbox ] [ Other ]
+> [ No, just the one drive (recommended if you don't have one) ] [ LaCie Rugged, 1.2 TB free ] [ Other ]
 >
-> *click: No second copy*
+> *click: No, just the one drive*
 >
 > No problem, I'll say so in the report so you know where things stand. Last one: how do you like a shoot folder named?
 > [ 2026-10-18 Smith Family (recommended, keeps them in order) ] [ Smith Family, Oct 18 2026 ] [ I have my own way ] [ Other ]
