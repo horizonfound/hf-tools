@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Mark the Studio's picks with the keyword "Studio pick", so they are easy to find in Lightroom.
+"""The sneak peeks: mark them for Lightroom and make their previews for the report.
 
-The picks are the few photos Claude chose from a shoot for a first look and a
-quick note to the client. Each one gets a small sidecar file next to it
-(<same name>.xmp) carrying the keyword "Studio pick" and nothing else. Lightroom
-reads it on import, and filtering by the keyword finds exactly the picks. No star
-rating is written (Dustin, Oct 25): stars stay the photographer's.
+The sneak peeks are the few photos Claude chose from a shoot, for variety and
+flow, as the first thing the photographer sees in the report, the ones to edit
+first, and the ones that go to the client with a note. Each gets a small sidecar
+file next to it (<same name>.xmp) with the keyword "sneak peek" and one star
+(Dustin, Oct 28), so in Lightroom they are one filter away. The same photos are
+made into small previews in the records (sneak-peeks/) and the report shows them
+at the top.
 
 Rules:
   - The photo itself is never changed. Only a new, small sidecar file is made.
@@ -18,16 +20,20 @@ Rules:
     if it is still exactly what we wrote (Lightroom has not touched it).
   - A photo that is not where the records say stops the run before anything is written.
 
-    python3 mark_picks.py --night "<night folder or records>" [--picks picks.json] [--dry-run]
-    python3 mark_picks.py --night "<night>" --files "2022-06-24 Black-sand beach/Black-sand-beach_0182_062422_2291.CR2" ...
+    python3 sneak_peeks.py --night "<night folder or records>" [--picks sneak-peeks.json] [--dry-run] [--no-previews]
+    python3 sneak_peeks.py --night "<night>" --files "2022-06-24 Black-sand beach/Black-sand-beach_0182_062422_2291.CR2" ...
 
---picks defaults to the night's records/picks.json ({"picks": [{"file": "<path from the drive folder>"}]}).
+--picks defaults to the night's records/sneak-peeks.json:
+  {"picks": [{"file": "<path from the drive folder>", "shoot": "s1", "why": "..."}], "picked_by": "..."}
+("shoot" and "why" are optional; the older picks.json is read if that is all there is.)
+Previews go to records/sneak-peeks/<photo name>.jpg with the Mac's own sips (sidecars or not).
 Every run is logged to records/picks-log.json before anything is written.
 Exit codes: 0 done, 1 a problem (nothing written), 2 nothing to do.
 """
 import argparse
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,11 +44,14 @@ from where import locate  # noqa: E402
 
 TOOL = "The Studio, by Horizon Found"
 NO_SIDECAR = {".jpg", ".jpeg", ".heic", ".heif", ".dng", ".tif", ".tiff", ".png"}
-KEYWORD = "Studio pick"
+KEYWORD = "sneak peek"
+OLD_KEYWORD = "Studio pick"   # what the Oct 25 version called them
 SIDECAR = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
-    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmp:Rating="1">
    <dc:subject>
     <rdf:Bag>
      <rdf:li>{keyword}</rdf:li>
@@ -54,6 +63,18 @@ SIDECAR = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
 """
 # what earlier versions wrote, byte for byte: only these may be replaced, and only by us
 OLD_SIDECARS = ["""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:subject>
+    <rdf:Bag>
+     <rdf:li>{keyword}</rdf:li>
+    </rdf:Bag>
+   </dc:subject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+""", """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
@@ -86,7 +107,7 @@ def old_ours(sidecar):
         text = sidecar.read_text()
     except (OSError, UnicodeDecodeError):
         return False
-    return any(text == o.format(tool=TOOL, keyword=KEYWORD) for o in OLD_SIDECARS)
+    return any(text == o.format(tool=TOOL, keyword=OLD_KEYWORD) for o in OLD_SIDECARS)
 
 
 def say(msg):
@@ -154,6 +175,27 @@ def plan(root, files):
     return todo, upgrade, skipped, problems
 
 
+def make_previews(root, files, studio, size=1000):
+    """Small JPEGs of the sneak peeks for the report, with the Mac's own sips. Returns (made, names)."""
+    out = studio / "sneak-peeks"
+    out.mkdir(parents=True, exist_ok=True)
+    names, made = [], 0
+    for f in files:
+        photo = Path(f) if os.path.isabs(f) else root / f
+        dst = out / (photo.stem + ".jpg")
+        if dst.exists():
+            names.append(dst.name)
+            continue
+        r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", str(size),
+                            str(photo), "--out", str(dst)], capture_output=True, text=True)
+        if r.returncode == 0 and dst.exists():
+            names.append(dst.name)
+            made += 1
+        else:
+            say(f"Could not make a preview of {photo.name} (the photo is fine; the report just won't show it).")
+    return made, names
+
+
 def write_log(studio, entry):
     log = studio / "picks-log.json"
     data = []
@@ -174,15 +216,18 @@ def main():
     ap.add_argument("--picks")
     ap.add_argument("--files", nargs="+")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--no-previews", action="store_true", help="only the sidecars, no previews for the report")
     a = ap.parse_args()
 
     root, studio = locate(a.night)
     if a.files:
         files = a.files
     else:
-        pf = Path(a.picks) if a.picks else studio / "picks.json"
+        pf = Path(a.picks) if a.picks else studio / "sneak-peeks.json"
+        if not pf.exists() and not a.picks and (studio / "picks.json").exists():
+            pf = studio / "picks.json"
         if not pf.exists():
-            say(f"STOP: no picks to mark ({pf} is not there).")
+            say(f"STOP: no sneak peeks to mark ({pf} is not there).")
             return 1
         files = [p["file"] for p in json.loads(pf.read_text())["picks"]]
 
@@ -194,6 +239,9 @@ def main():
         return 1
     for f, why in skipped:
         say(f"Left alone: {Path(f).name} ({why}).")
+    if not a.dry_run and not a.no_previews:
+        made, names = make_previews(root, files, studio)
+        say(f"Previews for the report: {len(names)} ({made} new) in the records' sneak-peeks folder.")
     if not todo and not upgrade:
         say("Nothing to mark.")
         return 2
@@ -228,7 +276,7 @@ def main():
         tmp.write_text(current())
         os.replace(tmp, side)
         updated += 1
-    say(f"Done: {made} new, {updated} brought up to date. In Lightroom, filter by the keyword {KEYWORD!r} to jump to them.")
+    say(f"Done: {made} new, {updated} brought up to date. In Lightroom, filter by the keyword {KEYWORD!r} (or one star) to jump to them.")
     return 0
 
 

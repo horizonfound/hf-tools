@@ -70,6 +70,13 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .chip{position:absolute;padding:.55rem 1rem;border-radius:999px;font:500 13px/1 var(--sans);color:var(--ink);border:3px solid var(--paper);box-shadow:0 12px 26px -12px rgba(31,36,48,.4);transform:rotate(var(--rot,0deg));z-index:2}
 .f-sun{background:var(--sun-l)}.f-ocean{background:var(--ocean-l)}.f-lime{background:var(--lime)}.f-sand{background:var(--sand-l)}.f-paper{background:var(--paper)}
 .teaser-note{font-size:13px;color:var(--ink-2);margin-top:-.6rem}
+.peeks{padding:clamp(1.6rem,3vw,2.4rem) 0 .4rem}
+.peeks .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:clamp(.6rem,1.6vw,1.1rem);margin-top:1rem;align-items:end}
+.peeks .ph{border-radius:18px;overflow:hidden;aspect-ratio:4/5;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease);position:relative}
+.peeks .ph:hover{transform:rotate(0) translateY(-6px);box-shadow:var(--shadow)}
+.peeks .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.peeks .ph small{position:absolute;left:.6rem;bottom:.5rem;font-size:11px;color:#fff;background:rgba(0,0,0,.42);padding:.15rem .5rem;border-radius:999px;backdrop-filter:blur(4px)}
+.peeks .lede{margin-top:.4rem}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
 .where-card{justify-content:center}
 .where-card .path{font:400 14px/1.45 var(--sans);color:var(--ink-2);word-break:break-all;background:var(--paper);border-radius:14px;padding:.75rem .9rem}
@@ -200,6 +207,34 @@ def teasers(studio):
     return picks[:6], note
 
 
+def sneak_peeks(studio):
+    """The sneak peeks for the top of the report: [(preview path, shoot name or '')], and who picked them."""
+    folder = studio / "sneak-peeks"
+    pj = studio / "sneak-peeks.json"
+    if not pj.exists() and (studio / "picks.json").exists():
+        pj = studio / "picks.json"
+    if not pj.exists() or not folder.is_dir():
+        return [], ""
+    try:
+        d = json.loads(pj.read_text())
+    except (ValueError, OSError):
+        return [], ""
+    names = {}
+    try:
+        if (studio / "shoots.json").exists():
+            given = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
+            for sh in json.loads((studio / "shoots.json").read_text())["shoots"]:
+                names[sh["id"]] = given.get(sh["id"]) or sh.get("name") or sh.get("suggested", "")
+    except (ValueError, OSError, KeyError):
+        pass
+    out = []
+    for pk in d.get("picks", []):
+        pv = folder / (Path(pk["file"]).stem + ".jpg")
+        if pv.exists():
+            out.append((pv, names.get(pk.get("shoot", ""), "")))
+    return out, d.get("picked_by", "")
+
+
 def build(manifest, studio):
     files = manifest.get("files", {})
     total = len(files)
@@ -218,6 +253,7 @@ def build(manifest, studio):
     took = seconds_text(work) if work else duration(manifest.get("started"), finished)
     all_good = not problems and ok_dest == total and (ok_second == total if second else True)
     pics, pick_note = teasers(studio)
+    peeks, _ = sneak_peeks(studio)
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
@@ -256,12 +292,25 @@ def build(manifest, studio):
                f"<div class='stat'><b>{e(took) or '—'}</b><span class='eyebrow'>to finish</span></div>"
                "</div></div>")
 
+    # the sneak peeks: the first thing worth looking at, picked for variety and flow
+    if peeks:
+        many_shoots = len({sh for _, sh in peeks if sh}) > 1
+        out.append("<section class='wrap peeks'><span class='eyebrow'>Sneak peeks</span>"
+                   f"<h2 class='h2'>{len(peeks)} to edit <span class='swap'>first.</span></h2>"
+                   "<p class='lede'>Picked for variety and flow, so they look good together. In Lightroom they're one filter away: "
+                   "the keyword “sneak peek”, or one star. Edit these, send a few to your client with a note, and the rest can wait.</p>"
+                   "<div class='grid'>")
+        for i, (pv, sh) in enumerate(peeks):
+            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
+                       + (f"<small>{e(sh)}</small>" if sh and many_shoots else "") + "</div>")
+        out.append("</div></section>")
+
     # the shoots, with their previews, recaps and name boxes (one page, not two)
     shoots_html, shoots_script = (shoots_section(studio) or (None, ""))
     if shoots_html:
         out.append(shoots_html)
-    # with no shoots decided yet, a few teasers from the card instead
-    elif pics:
+    # with no shoots decided yet (and no sneak peeks), a few teasers from the card instead
+    elif pics and not peeks:
         out.append("<div class='wrap'><div class='teasers'>")
         for i, p in enumerate(pics):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
