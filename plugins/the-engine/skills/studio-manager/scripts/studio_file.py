@@ -89,7 +89,20 @@ def as_markdown(sf):
     else:
         lines += ["- Shoot folders: (not set)"]
     lines += [f"- Photos: {'keep their original frame names' if n.get('file_names', 'shoot') == 'original' else 'take the shoot name and a running number, with the original frame name kept at the end'}",
-              "", f"_Updated {sf.get('updated', '')}_", ""]
+              "", "## Client notes", ""]
+    c = sf.get("note", {})
+    if not c:
+        lines += ["- (not asked yet)"]
+    elif not c.get("on"):
+        lines += ["- No notes, thanks."]
+    else:
+        tones = {"warm": "warm and personal", "plain": "short and plain", "playful": "playful"}
+        lines += ["- A note to the client is drafted with the sneak peeks, for you to copy and send.",
+                  "- Written to match a note you sent before:" if c.get("sample") else f"- Tone: {tones.get(c.get('tone', 'warm'), 'warm and personal')}"]
+        if c.get("sample"):
+            lines += ["", "  > " + c["sample"].strip().replace("\n", "\n  > "), ""]
+        lines += [f"- Signed: {c['sign_off']}" if c.get("sign_off") else "- Sign-off: (not set)"]
+    lines += ["", f"_Updated {sf.get('updated', '')}_", ""]
     return "\n".join(lines)
 
 

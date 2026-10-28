@@ -77,6 +77,18 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .peeks .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .peeks .ph small{position:absolute;left:.6rem;bottom:.5rem;font-size:11px;color:#fff;background:rgba(0,0,0,.42);padding:.15rem .5rem;border-radius:999px;backdrop-filter:blur(4px)}
 .peeks .lede{margin-top:.4rem}
+.notes{padding:clamp(1.2rem,2.6vw,2rem) 0 .6rem}
+.notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
+.note{background:#fff;border:1px solid var(--line,#e6e0d6);border-radius:22px;padding:1.4rem 1.5rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
+.note .to{font-size:13px;color:var(--ink-2);display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
+.note .subj{font-weight:600;font-size:15px}
+.note .body{white-space:pre-wrap;font-size:15px;line-height:1.55;margin:0;font-family:inherit}
+.note .row{display:flex;gap:.6rem;align-items:center;margin-top:.3rem;flex-wrap:wrap}
+.note .copy{border:0;border-radius:999px;padding:.6rem 1.1rem;background:var(--ink,#1e1e22);color:#fff;font:inherit;font-size:14px;cursor:pointer}
+.note .copy.sub{background:transparent;color:var(--ink,#1e1e22);border:1px solid var(--line,#d8d1c6)}
+.note .did{font-size:13px;color:var(--ink-2);opacity:0;transition:opacity .3s}
+.note .did.on{opacity:1}
+.note .empty{font-size:14px;color:var(--ink-2);font-style:italic}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
 .where-card{justify-content:center}
 .where-card .path{font:400 14px/1.45 var(--sans);color:var(--ink-2);word-break:break-all;background:var(--paper);border-radius:14px;padding:.75rem .9rem}
@@ -235,6 +247,45 @@ def sneak_peeks(studio):
     return out, d.get("picked_by", "")
 
 
+def client_notes(studio):
+    """[(shoot name, note)] for every note written for this night, in shoot order."""
+    try:
+        from client_note import all_notes, shoot_names
+    except ImportError:
+        return []
+    names = shoot_names(studio)
+    notes = all_notes(studio)
+    order = list(names) + [k for k in notes if k not in names]
+    return [(names.get(k, k), notes[k]) for k in order if k in notes]
+
+
+NOTES_SCRIPT = """
+<script>
+(function(){
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText){ return navigator.clipboard.writeText(t); }
+    return new Promise(function(ok, bad){
+      var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try{ document.execCommand('copy') ? ok() : bad(); } catch(e){ bad(e); } document.body.removeChild(ta);
+    });
+  }
+  document.querySelectorAll('.note').forEach(function(card){
+    var body=card.querySelector('.body'), subj=card.querySelector('.subj'), did=card.querySelector('.did');
+    function flash(msg){ did.textContent=msg; did.classList.add('on'); setTimeout(function(){did.classList.remove('on')}, 2200); }
+    card.querySelectorAll('.copy').forEach(function(b){
+      b.onclick=function(){
+        var t = b.dataset.what==='subject' ? subj.textContent : body.textContent;
+        copyText(t).then(function(){ flash(b.dataset.what==='subject' ? 'Subject copied.' : 'Copied. Paste it into your email.'); },
+                         function(){ flash('Select the text and copy it.'); });
+      };
+    });
+  });
+})();
+</script>
+"""
+
+
 def build(manifest, studio):
     files = manifest.get("files", {})
     total = len(files)
@@ -254,6 +305,7 @@ def build(manifest, studio):
     all_good = not problems and ok_dest == total and (ok_second == total if second else True)
     pics, pick_note = teasers(studio)
     peeks, _ = sneak_peeks(studio)
+    notes = client_notes(studio)
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
@@ -303,6 +355,26 @@ def build(manifest, studio):
         for i, (pv, sh) in enumerate(peeks):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
                        + (f"<small>{e(sh)}</small>" if sh and many_shoots else "") + "</div>")
+        out.append("</div></section>")
+
+    # the note to the client, one per shoot, with a Copy button (nothing is ever sent)
+    if notes:
+        out.append("<section class='wrap notes'><span class='eyebrow'>Note to your client</span>"
+                   f"<h2 class='h2'>{'A note' if len(notes) == 1 else str(len(notes)) + ' notes'} to send with the <span class='swap'>sneak peeks.</span></h2>"
+                   "<p class='lede'>Written the way you write, from what's in the photos. Edit the sneak peeks, then copy this into your email and attach them. Nothing is sent from here.</p>"
+                   "<div class='grid'>")
+        for sh_name, n in notes:
+            out.append("<article class='note'>")
+            out.append(f"<div class='to'><span>{e(sh_name)}</span>" + (f"<span>To {e(n['to'])}</span>" if n.get("to") else "<span>[Name] still to fill in</span>") + "</div>")
+            if n.get("body"):
+                out.append(f"<div class='subj'>{e(n.get('subject', ''))}</div>" if n.get("subject") else "")
+                out.append(f"<pre class='body'>{e(n['body'].rstrip())}</pre>")
+                out.append("<div class='row'><button class='copy' data-what='body'>Copy the note</button>"
+                           + ("<button class='copy sub' data-what='subject'>Copy the subject</button>" if n.get("subject") else "")
+                           + "<span class='did'></span></div>")
+            else:
+                out.append("<p class='empty'>Not written yet. Say “write the note for this one” and it'll be here.</p>")
+            out.append("</article>")
         out.append("</div></section>")
 
     # the shoots, with their previews, recaps and name boxes (one page, not two)
@@ -392,7 +464,7 @@ def build(manifest, studio):
                "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
-    out.append(shoots_script + "</body></html>")
+    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + "</body></html>")
     return "\n".join(out)
 
 
