@@ -298,7 +298,7 @@ def build(manifest, studio):
         out.append("<section class='wrap peeks'><span class='eyebrow'>Sneak peeks</span>"
                    f"<h2 class='h2'>{len(peeks)} to edit <span class='swap'>first.</span></h2>"
                    "<p class='lede'>Picked for variety and flow, so they look good together. In Lightroom they're one filter away: "
-                   "the keyword “sneak peek”, or one star. Edit these, send a few to your client with a note, and the rest can wait.</p>"
+                   "the keyword “sneak peek”. Edit these, send a few to your client with a note, and the rest can wait.</p>"
                    "<div class='grid'>")
         for i, (pv, sh) in enumerate(peeks):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='sneak-peeks/{e(pv.name)}' alt=''>"

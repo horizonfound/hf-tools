@@ -4,8 +4,10 @@
 The sneak peeks are the few photos Claude chose from a shoot, for variety and
 flow, as the first thing the photographer sees in the report, the ones to edit
 first, and the ones that go to the client with a note. Each gets a small sidecar
-file next to it (<same name>.xmp) with the keyword "sneak peek" and one star
-(Dustin, Oct 28), so in Lightroom they are one filter away. The same photos are
+file next to it (<same name>.xmp) with the keyword "sneak peek" and nothing else,
+so in Lightroom they are one filter away. No star rating is written (Dustin,
+Oct 28): stars stay the photographer's, and a star filter would mix in older
+one-star photos. The same photos are
 made into small previews in the records (sneak-peeks/) and the report shows them
 at the top.
 
@@ -49,22 +51,6 @@ OLD_KEYWORD = "Studio pick"   # what the Oct 25 version called them
 SIDECAR = """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
-    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-    xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmp:Rating="1">
-   <dc:subject>
-    <rdf:Bag>
-     <rdf:li>{keyword}</rdf:li>
-    </rdf:Bag>
-   </dc:subject>
-  </rdf:Description>
- </rdf:RDF>
-</x:xmpmeta>
-"""
-# what earlier versions wrote, byte for byte: only these may be replaced, and only by us
-OLD_SIDECARS = ["""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
- <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <rdf:Description rdf:about=""
     xmlns:dc="http://purl.org/dc/elements/1.1/">
    <dc:subject>
     <rdf:Bag>
@@ -74,7 +60,9 @@ OLD_SIDECARS = ["""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>
-""", """<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
+"""
+# what earlier versions wrote, byte for byte (with either keyword): only these may be replaced, and only by us
+OLD_SIDECARS = ["""<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="{tool}">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""
     xmlns:xmp="http://ns.adobe.com/xap/1.0/"
@@ -107,7 +95,7 @@ def old_ours(sidecar):
         text = sidecar.read_text()
     except (OSError, UnicodeDecodeError):
         return False
-    return any(text == o.format(tool=TOOL, keyword=OLD_KEYWORD) for o in OLD_SIDECARS)
+    return any(text == o.format(tool=TOOL, keyword=k) for o in OLD_SIDECARS for k in (OLD_KEYWORD, KEYWORD))
 
 
 def say(msg):
@@ -276,7 +264,7 @@ def main():
         tmp.write_text(current())
         os.replace(tmp, side)
         updated += 1
-    say(f"Done: {made} new, {updated} brought up to date. In Lightroom, filter by the keyword {KEYWORD!r} (or one star) to jump to them.")
+    say(f"Done: {made} new, {updated} brought up to date. In Lightroom, filter by the keyword {KEYWORD!r} to jump to them.")
     return 0
 
 
