@@ -178,7 +178,7 @@ They will say it loosely: "the big one is the Smith family," "call the sunset on
 python3 <scripts>/rename_shoot.py "<session>" --shoot s2 --name "Kaia sunset"
 ```
 
-or, after they have typed names on the first look page and locked them in, `--from-names`. It renames the folder and every photo, keeps the original frame name inside each filename, re-checks every file, and prints "All done." Say that back in their words.
+It renames the folder and every photo, keeps the original frame name inside each filename, re-checks every file, and prints "All done." Say that back in their words. **On the report page they can do it themselves:** each shoot's name box has a Rename button (Enter works too); the Studio's little report server runs the rename right then, one shoot at a time if they press several, and the card shows "Renaming..." then "Done." or what stopped it. You don't need to run anything for those; if they tell you a rename on the page stopped, run the command above yourself and say what it said. (`--from-names` still applies `_studio/names.json` for the older page.)
 
 ## What lives where
 

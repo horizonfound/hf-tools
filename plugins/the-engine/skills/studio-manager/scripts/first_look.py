@@ -60,7 +60,12 @@ CSS = """
 .recap{font-size:16.5px;line-height:1.55;color:var(--ink-2);max-width:32em;text-wrap:pretty}
 .name{display:grid;gap:.45rem}
 .name label{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
-.name .field{position:relative}
+.name .field{position:relative;display:flex;gap:.6rem;align-items:stretch}
+.name .field input{flex:1;min-width:0}
+.name .go{flex:none;border:0;border-radius:18px;padding:0 1.3rem;background:var(--coral);color:#fff;font:600 16px/1 var(--sans);cursor:pointer;box-shadow:0 10px 24px -18px rgba(240,127,90,.9);transition:transform .3s var(--ease),opacity .3s}
+.name .go:hover{transform:translateY(-1px)}
+.name .go:disabled{opacity:.45;cursor:default;transform:none}
+.name .state{font-size:13px;color:var(--ink-2);min-height:1.2em}.name .state.on{color:var(--ink)}.name .state.bad{color:#b4472e}
 .name .pen{position:absolute;left:1.05rem;top:50%;transform:translateY(-50%);color:var(--coral);font-size:20px;pointer-events:none}
 .name input{font:600 clamp(22px,2.4vw,30px)/1.15 var(--sans);letter-spacing:-.02em;color:var(--ink);background:var(--paper);border:2px dashed var(--coral);border-radius:18px;padding:.75rem 1rem .75rem 2.9rem;width:100%;outline:none;cursor:text;box-shadow:0 10px 24px -18px rgba(240,127,90,.8);transition:border-color .3s,background .3s,box-shadow .3s}
 .name input:hover{background:var(--sun-l)}
@@ -78,16 +83,25 @@ CSS = """
 """
 
 SCRIPT = """<script>
-const toast=document.getElementById('toast');
-async function save(){const names={};for(const i of document.querySelectorAll('.name input')){if(i.value.trim())names[i.name]=i.value.trim();}
- if(!location.protocol.startsWith('http')){toast.textContent='Open this page through the Studio to save names, or just tell Claude.';return;}
- try{const r=await fetch('/names',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(names)});
-  toast.textContent=r.ok?(Object.keys(names).length+' name'+(Object.keys(names).length==1?'':'s')+' locked in. I\\'ll rename everything to match.'):'Could not save. Tell Claude the names instead.';}
- catch(e){toast.textContent='Could not save. Tell Claude the names instead.';}}
-document.getElementById('save').addEventListener('click',save);
-// Enter in a box moves to the next box; only the button saves, so nothing locks in by accident.
-const boxes=[...document.querySelectorAll('.name input')];
-boxes.forEach((i,k)=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();const nx=boxes[k+1];if(nx)nx.focus();else i.blur();}}));
+(()=>{
+const states={};
+const stateEl=id=>document.querySelector('.state[data-for="'+id+'"]');
+function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||'';el.className='state'+(st.state==='problem'?' bad':(st.state==='done'?' on':''));
+ const b=document.querySelector('.go[data-shoot="'+id+'"]');if(b)b.disabled=(st.state==='queued'||st.state==='running');}
+async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim();
+ if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
+ if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Studio to rename here, or just tell Claude the name.'});return;}
+ try{const r=await fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
+  if(!r.ok)throw 0;show(id,{state:'queued',line:'Renaming...'});poll();}
+ catch(e){show(id,{state:'problem',line:'Could not reach the Studio. Tell Claude the name instead.'});}}
+let timer=null;
+async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('/rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
+ for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
+ if(!busy){clearInterval(timer);timer=null;}}catch(e){}},1500);}
+document.querySelectorAll('.go').forEach(b=>b.addEventListener('click',()=>rename(b.dataset.shoot)));
+document.querySelectorAll('.name input').forEach(i=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();rename(i.id);}}));
+if(location.protocol.startsWith('http'))poll();
+})();
 </script>"""
 
 MIC = ("<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>"
@@ -230,7 +244,9 @@ def shoots_section(studio):
         out.append(f"<p class='recap'>{e(s.get('recap', ''))}</p>")
         out.append(f"<div class='name'><label for='{s['id']}'>What should I call this one?</label>"
                    f"<div class='field'><span class='pen'>&#9998;</span>"
-                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'></div>"
+                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'>"
+                   f"<button class='go' type='button' data-shoot='{e(s['id'])}'>Rename</button></div>"
+                   f"<span class='state' data-for='{e(s['id'])}'></span>"
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
@@ -253,10 +269,9 @@ def shoots_section(studio):
             out.append(card)
         out.append("</article>")
     out.append("</div>")
-    out.append("<div class='wrap'><div class='save'>"
-               "<button class='btn' id='save'>Lock the names in<span class='arr'>&#10003;</span></button>"
-               f"<span class='toast' id='toast'>{'All named.' if named == n and shoots else (f'{named} of {n} named so far.' if named else '')}</span></div>"
-               "<p class='undo'>Nothing on the card is ever changed. Names go on the copy on your drive, and you can rename any shoot later by just asking.</p></div>")
+    out.append("<div class='wrap'>"
+               "<p class='undo'>Type a name and press Rename (or Enter): the shoot's folder and every photo in it take that name. Do them one after another; each waits its turn. "
+               "Nothing on the card is ever changed, and you can rename any shoot later by just asking.</p></div>")
     return "\n".join(out), SCRIPT
 
 
