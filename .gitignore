@@ -3,3 +3,7 @@ __pycache__/
 .DS_Store
 .claude/launch.json
 .claude/skills/
+
+# screenshots for the setup guide hold test photos; they stay on the Mac, the index is enough for git
+docs/setup-guide-shots/*.png
+docs/setup-guide-shots/*.jpg

@@ -273,7 +273,12 @@ all.forEach(p=>p.parentElement.addEventListener('click',()=>{pics=all.filter(q=>
 big.querySelector('.x').onclick=()=>big.classList.remove('on');
 big.querySelector('.prev').onclick=ev=>{ev.stopPropagation();show(at-1)};big.querySelector('.next').onclick=ev=>{ev.stopPropagation();show(at+1)};
 big.addEventListener('click',ev=>{if(ev.target===big)big.classList.remove('on')});
-document.addEventListener('keydown',ev=>{if(!big.classList.contains('on'))return;if(ev.key==='Escape')big.classList.remove('on');if(ev.key==='ArrowLeft')show(at-1);if(ev.key==='ArrowRight')show(at+1)});})();</script>"""
+document.addEventListener('keydown',ev=>{if(!big.classList.contains('on'))return;if(ev.key==='Escape')big.classList.remove('on');if(ev.key==='ArrowLeft')show(at-1);if(ev.key==='ArrowRight')show(at+1)});
+// for the setup guide's screenshots only: ?show=big opens the first sneak peek big, ?show=calendar opens the queue calendar on the first shoot
+const q=new URLSearchParams(location.search).get('show');
+if(q==='big'&&pics.length){pics=all.filter(x=>x.parentElement.dataset.g===all[0].parentElement.dataset.g);show(0)}
+if(q==='calendar'){const a=document.querySelector('.queue .add');if(a){a.click();}}
+})();</script>"""
 
 NOTES_SCRIPT = """
 <script>
