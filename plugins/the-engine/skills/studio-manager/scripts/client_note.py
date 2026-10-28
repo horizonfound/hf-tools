@@ -11,6 +11,8 @@ the report. Nothing is ever sent; the photographer pastes it into their own emai
     python3 client_note.py setup --off                                     (no notes, don't ask again)
     python3 client_note.py status                                          on / off / never asked
 
+    python3 client_note.py told --night "<backup>" --text "Smith family at the beach, Sarah's the mom..."
+                                                                  what they said about the card, kept for the look and the note
     python3 client_note.py facts --night "<backup>" --shoot s1    what Claude has to write from (JSON)
     python3 client_note.py save --night "<backup>" --shoot s1 --to "Sarah" --subject "..." --body-file draft.txt
     python3 client_note.py save --night "<backup>" --shoot s1 --to "Sarah"      (just the name, before the draft)
@@ -179,6 +181,16 @@ def due_words(iso):
     return "in about a month"
 
 
+def told(studio):
+    p = studio / "told.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text()).get("text", "")
+        except ValueError:
+            pass
+    return ""
+
+
 def facts(night, shoot_id):
     root, studio = locate(night)
     shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
@@ -213,6 +225,7 @@ def facts(night, shoot_id):
         "due_words": due_words(due),
         "sneak_peeks": peeks,
         "to": note.get("to", ""),
+        "they_said": told(studio),
         "existing_note": bool(note.get("body")),
         "how_they_write": settings(),
     }
@@ -237,6 +250,7 @@ def main():
     st.add_argument("--off", action="store_true")
     sub.add_parser("status")
     f = sub.add_parser("facts"); f.add_argument("--night", required=True); f.add_argument("--shoot", required=True)
+    t = sub.add_parser("told"); t.add_argument("--night", required=True); t.add_argument("--text", required=True)
     sv = sub.add_parser("save"); sv.add_argument("--night", required=True); sv.add_argument("--shoot", required=True)
     sv.add_argument("--to"); sv.add_argument("--subject"); sv.add_argument("--body"); sv.add_argument("--body-file")
     sh = sub.add_parser("show"); sh.add_argument("--night", required=True); sh.add_argument("--shoot")
@@ -258,6 +272,16 @@ def main():
         return 0
     if a.cmd == "status":
         say(status())
+        return 0
+    if a.cmd == "told":
+        root, studio = locate(a.night)
+        p = studio / "told.json"
+        old = told(studio)
+        text = (old + "\n" + a.text.strip()).strip() if old else a.text.strip()
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(json.dumps({"text": text, "at": datetime.now().isoformat(timespec="seconds")}, indent=1, ensure_ascii=False))
+        os.replace(tmp, p)
+        say("Kept. It'll shape the names and the note.")
         return 0
     if a.cmd == "facts":
         d = facts(a.night, a.shoot)
