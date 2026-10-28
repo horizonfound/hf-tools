@@ -294,6 +294,10 @@ def main():
             say("   Pick six per shoot, in the order they will sit on the report: the hero first (a scroll-stopper that")
             say("   survives a square crop), two that set it off, three that keep changing (a wide, a medium, a close, a")
             say("   detail, a different look); no two neighbors alike; every one a frame they'd be glad to see.")
+            say("   First, the close look: shortlist 10 to 16 per shoot from the pages, then")
+            say(f"      python3 {HERE / 'peek_sheets.py'} closer \"{studio}\" s1=61,64,71,18,... s2=...")
+            say("   and read the -close pages it writes (four per page, full size). Drop anything soft, mid-blink, awkward,")
+            say("   or with crew in the frame. Choose the six from what is left.")
             say(f"   Then: python3 {HERE / 'peek_sheets.py'} pick \"{studio}\" s1=14,3,27,9,41,18 s2=...   and run this command again.")
             sys.exit(7)
     if (studio / "sneak-peeks.json").exists():

@@ -3,6 +3,7 @@
 sneak peeks with a few looks instead of thousands (rule 6: scripts shortlist, Claude looks).
 
     python3 peek_sheets.py make "<backup folder or records>" [--gap 3] [--max 100] [--per-page 20]
+    python3 peek_sheets.py closer "<backup>" s1=14,3,27,9,41,18,22,5,61,70 [s2=...]
     python3 peek_sheets.py pick "<backup>" s1=14,3,27,9,41,18 [s2=...] [--by "Claude, from the pages"]
 
 make: for every shoot, one frame per burst (a new burst starts after --gap seconds of quiet;
@@ -10,6 +11,10 @@ the middle frame of each burst is kept), at most --max moments spread across the
 preview of each (the Mac's own sips; nothing installed) into records/peeks/<shoot>/, and pages of
 --per-page numbered thumbnails into records/peek-sheets/<shoot>-p1.png, -p2.png ...
 A list of what is on each page goes in records/peek-sheets.json.
+
+closer: a shortlist (ten or so per shoot) laid out big, four to a page at full preview size, into
+records/peek-sheets/<shoot>-close1.png ..., so soft focus, a blink or a half-closed eye and an
+awkward expression can be seen before anything is chosen (the small pages hide all three).
 
 pick: turn the numbers Claude chose (the first is the hero) into records/sneak-peeks.json, in the
 shape sneak_peeks.py and the report read. Shoots not mentioned keep what they had.
@@ -166,6 +171,73 @@ def make(night, gap, cap, per_page, size):
     return 0
 
 
+def closer(night, picks):
+    """The shortlist, big: two columns, each photo at its full 700 px preview size, four to a page."""
+    root, studio = locate(night)
+    sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+    out_dir = studio / "peek-sheets"
+    tmp = out_dir / ".tmp.bmp"
+    cols, per_page, cell, pad, label_h = 2, 4, 700, 10, 28
+    for spec in picks:
+        sid, _, nums = spec.partition("=")
+        if sid not in sheets:
+            say(f"STOP: no shoot {sid} on the pages.")
+            return 1
+        by_n = {m["n"]: m for m in sheets[sid]["list"]}
+        want = []
+        for n in [x.strip() for x in nums.split(",") if x.strip()]:
+            m = by_n.get(int(n)) if n.isdigit() else None
+            if not m:
+                say(f"STOP: {sid} has no photo numbered {n}.")
+                return 1
+            want.append(m)
+        pages = []
+        for pi in range(0, len(want), per_page):
+            chunk = want[pi:pi + per_page]
+            rows_per = (len(chunk) + cols - 1) // cols
+            W = cols * (cell + pad) + pad
+            H = rows_per * (cell + label_h + pad) + pad
+            cv = sheet.Canvas(W, H)
+            for j, m in enumerate(chunk):
+                cx, cy = j % cols, j // cols
+                x = pad + cx * (cell + pad)
+                y = pad + cy * (cell + label_h + pad)
+                cv.rect(x, y, cell, label_h, (40, 40, 40))
+                cv.text(x + 6, y + 4, f"{m['n']}", scale=3, color=(240, 127, 90))
+                t = thumb_rows(studio / m["preview"], cell, tmp)
+                if not t:
+                    continue
+                w, h, rws = t
+                cv.paste(x + max(0, (cell - w) // 2), y + label_h + max(0, (cell - h) // 2), w, h, rws)
+            page = out_dir / f"{sid}-close{pi // per_page + 1}.png"
+            sheet.write_png(page, W, H, cv.rows)
+            pages.append(str(page))
+        say(f"{sid}: {len(want)} up close on {len(pages)} page(s)")
+        for pg in pages:
+            say(f"   {pg}")
+    if tmp.exists():
+        tmp.unlink()
+    return 0
+
+
+def current_path(studio, f):
+    """The photo's path now, if a rename moved it since the pages were made: same shoot number and
+    camera frame name, read from the index (which every rename keeps up to date)."""
+    try:
+        index = json.loads((studio / "index.json").read_text())["photos"]
+    except (OSError, ValueError):
+        return f
+    stem = Path(f).stem
+    tail = "_".join(stem.split("_")[-3:]) if stem.count("_") >= 2 else stem  # NNNN_<camera frame>
+    for p in index:
+        if p["file"] == f:
+            return f
+    for p in index:
+        if Path(p["file"]).stem.endswith(tail):
+            return p["file"]
+    return f
+
+
 def pick(night, picks, by):
     root, studio = locate(night)
     sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
@@ -184,7 +256,7 @@ def pick(night, picks, by):
             if not m:
                 say(f"STOP: {sid} has no photo numbered {n}.")
                 return 1
-            new.append({"file": m["file"], "shoot": sid, "n": m["n"]})
+            new.append({"file": current_path(studio, m["file"]), "shoot": sid, "n": m["n"]})
         chosen_shoots.add(sid)
     kept = [p for p in existing if p.get("shoot") not in chosen_shoots]
     pj.write_text(json.dumps({"picks": kept + new, "picked_by": by}, indent=1, ensure_ascii=False))
@@ -201,11 +273,14 @@ def main():
     m.add_argument("--max", type=int, default=100, help="most moments per shoot")
     m.add_argument("--per-page", type=int, default=20)
     m.add_argument("--thumb", type=int, default=240)
+    c = sub.add_parser("closer"); c.add_argument("night"); c.add_argument("picks", nargs="+", help="s1=14,3,27,9,41,18,22,5 (the shortlist)")
     k = sub.add_parser("pick"); k.add_argument("night"); k.add_argument("picks", nargs="+", help="s1=14,3,27,9,41,18 (hero first)")
     k.add_argument("--by", default="Claude, from the pages")
     a = ap.parse_args()
     if a.cmd == "make":
         return make(a.night, a.gap, a.max, a.per_page, a.thumb)
+    if a.cmd == "closer":
+        return closer(a.night, a.picks)
     return pick(a.night, a.picks, a.by)
 
 
