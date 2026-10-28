@@ -26,8 +26,57 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sort import safe_folder, slug, sha256_of, load, say  # noqa: E402
 import studio_file  # noqa: E402
+from sneak_peeks import TOOL as STUDIO_TOOL  # noqa: E402
 
 NUMBERED = re.compile(r"^(?P<prefix>.+?)_(?P<n>\d{4})_(?P<orig>.+)$")
+
+
+def on_disk(p):
+    """True only when a file by exactly this name, letter for letter, is in its folder. The drive may ignore
+    upper and lower case, so Path.exists() says yes to "black-sand-beach_0001.CR2" when the file on disk is
+    "Black-sand-beach_0001.CR2"; this does not."""
+    try:
+        return p.name in os.listdir(p.parent)
+    except OSError:
+        return False
+
+
+def studio_wrote(sidecar):
+    """True for a sidecar the Studio itself wrote (the sneak-peek keyword), by its own signature."""
+    try:
+        return STUDIO_TOOL in sidecar.read_text(errors="replace")
+    except OSError:
+        return False
+
+
+def follow_sneak_peeks(studio, new_path):
+    """After a rename, the sneak-peeks list and their report previews follow the photos to their new names."""
+    pj = studio / "sneak-peeks.json"
+    if not pj.exists():
+        return
+    try:
+        d = json.loads(pj.read_text())
+    except ValueError:
+        return
+    changed = False
+    for pk in d.get("picks", []):
+        to = new_path.get(pk.get("file"))
+        if not to:
+            continue
+        old_pv = studio / "sneak-peeks" / (Path(pk["file"]).stem + ".jpg")
+        new_pv = studio / "sneak-peeks" / (Path(to).stem + ".jpg")
+        if on_disk(old_pv) and old_pv != new_pv and (not new_pv.exists() or case_twin(old_pv, new_pv)):
+            os.rename(old_pv, new_pv)
+        pk["file"] = to
+        changed = True
+    if changed:
+        pj.write_text(json.dumps(d, indent=1, ensure_ascii=False))
+
+
+def case_twin(a, b):
+    """a and b are the same path apart from upper and lower case: on this kind of drive, the same file,
+    and renaming one to the other just changes the letters."""
+    return a != b and a.as_posix().lower() == b.as_posix().lower()
 
 
 def plan_rename(session, studio, shoot_id, new_name):
@@ -49,10 +98,11 @@ def plan_rename(session, studio, shoot_id, new_name):
     prefix = slug(new_name)
     if not (session / old_folder).is_dir():
         sys.exit(f"STOP: the folder {old_folder} is not there. Nothing renamed.")
-    if new_folder != old_folder and (session / new_folder).exists():
+    if new_folder != old_folder and (session / new_folder).exists() and not case_twin(session / old_folder, session / new_folder):
         sys.exit(f"STOP: a folder named {new_folder} already exists. Nothing renamed.")
 
     files = manifest["files"]
+    on_disk_names = {n.lower(): n for n in os.listdir(session / old_folder)}
     moves = []
     for p in in_folder:
         cur = Path(p["file"])
@@ -81,6 +131,16 @@ def plan_rename(session, studio, shoot_id, new_name):
                 moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(ext)).as_posix(),
                               "original": so, "sha256": files[so]["sha256"]})
                 break
+        else:
+            # a sidecar the Studio wrote itself (the sneak-peek keyword) is not in the backup's records;
+            # it travels along too, checked against its own hash, so Lightroom keeps pairing it with the photo.
+            # Found by name regardless of case, since an older rename could leave its case behind the photo's.
+            found = on_disk_names.get((cur.stem + ".xmp").lower())
+            if found:
+                sc = old_folder / found
+                if studio_wrote(session / sc):
+                    moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(Path(found).suffix)).as_posix(),
+                                  "original": None, "sha256": sha256_of(session / sc), "studio": True})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
     dests = [x["to"].lower() for x in moves]
@@ -128,11 +188,11 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     for m in moves:
         src = session / new_folder / Path(m["from"]).name
         dst = session / m["to"]
-        if dst.exists() and src != dst:
+        if dst.exists() and src != dst and not case_twin(src, dst):
             entry["problems"].append(f"{m['to']} already exists; not overwritten")
             break
         if src != dst:
-            os.rename(src, dst)
+            os.rename(src, dst)  # when only the letters' case changes, this changes just that
         m["moved"] = True
     log_path.write_text(json.dumps(log, indent=1))
     say(f"  renamed in {time.time() - t0:.0f} s; checking every file is the same file it was...")
@@ -140,7 +200,7 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     hashed = 0
     for m in moves:
         dst = session / m["to"]
-        if not dst.exists():
+        if not on_disk(dst):
             entry["problems"].append(f"after the rename, {m['to']} is not there")
             continue
         same = False
@@ -168,6 +228,7 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     for grp in g["groups"]:
         grp["files"] = [new_path.get(f, f) for f in grp["files"]]
     (studio / "groups.json").write_text(json.dumps(g, indent=1))
+    follow_sneak_peeks(studio, new_path)
     sh = load(studio, "shoots.json")
     for s in sh["shoots"]:
         if s["id"] == shoot["id"]:
@@ -202,7 +263,7 @@ def where_they_are(session, new_folder, moves):
     inside the renamed folder. Records must say where files are, never where they were meant to be."""
     out = {}
     for m in moves:
-        if m.get("moved") or (session / m["to"]).exists():
+        if m.get("moved") or on_disk(session / m["to"]):
             out[m["from"]] = m["to"]
         else:
             out[m["from"]] = (new_folder / Path(m["from"]).name).as_posix()
@@ -278,22 +339,25 @@ def finish_unfinished(session, studio):
         for m in real:
             dst = session / m["to"]
             src = session / new_folder / Path(m["from"]).name
-            if not m.get("moved") and src.exists() and not dst.exists():
+            if not m.get("moved") and on_disk(src) and src != dst and (not dst.exists() or case_twin(src, dst)):
                 os.rename(src, dst)
                 m["moved"] = True
-            if dst.exists() and not (src.exists() and src != dst):
+            if on_disk(dst) and not (on_disk(src) and src != dst):
                 m["moved"] = True
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
                     entry["verified"] += 1
                     m["checked"] = True
                 else:
                     entry["problems"].append(f"could not verify {m['to']}")
-            elif src.exists() and dst.exists():
+            elif on_disk(src) and on_disk(dst):
                 entry["problems"].append(f"{m['to']} is in the way of {src.name}; both left as they are")
-            elif src.exists():
+            elif on_disk(src):
                 entry["problems"].append(f"never moved: {m['from']}")
             else:
                 entry["problems"].append(f"missing: {m['from']}")
+        checked = {m["to"] for m in real if m.get("checked")}
+        tail = " already exists; not overwritten"
+        entry["problems"] = [q for q in entry["problems"] if not (q.endswith(tail) and q[:-len(tail)] in checked)]
         log_path.write_text(json.dumps(log, indent=1))
         new_path = where_they_are(session, new_folder, real) if new_folder else {}
         index = load(studio, "index.json")
@@ -304,6 +368,7 @@ def finish_unfinished(session, studio):
         for grp in g["groups"]:
             grp["files"] = [new_path.get(f, f) for f in grp["files"]]
         (studio / "groups.json").write_text(json.dumps(g, indent=1))
+        follow_sneak_peeks(studio, new_path)
         sh = load(studio, "shoots.json")
         for s in sh["shoots"]:
             if s["id"] == entry["shoot"] and new_folder:

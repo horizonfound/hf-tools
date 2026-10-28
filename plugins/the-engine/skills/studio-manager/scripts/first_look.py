@@ -32,7 +32,8 @@ CSS = """
 .shoot{display:grid;gap:clamp(.8rem,1.6vw,1.1rem);background:var(--paper);border-radius:var(--r);padding:clamp(1.2rem,2.6vw,2rem)}
 .shoot .top{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(1.2rem,3vw,2.4rem);align-items:center}
 .shoot:nth-child(even) .top{grid-template-columns:1fr 1.05fr}
-.shoot:nth-child(even) .pics{order:2}
+.shoot:nth-child(even) .gal{order:2}
+.gal{display:grid;gap:1.2rem;align-content:start}.gal .peeks-line{padding:0 .3rem}
 .pics.six{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);aspect-ratio:1/1.05;gap:.6rem}
 .pics.six .ph:first-child{grid-row:1/3;grid-column:1/3}
 .shoot:nth-child(even) .pics.six .ph:first-child{grid-column:2/4}
@@ -71,6 +72,7 @@ CSS = """
 .name input:hover{background:var(--sun-l)}
 .name input:focus{border-style:solid;border-color:var(--coral);background:var(--paper);box-shadow:0 0 0 4px rgba(240,127,90,.18)}
 .name input::placeholder{color:#9AA0AB;font-weight:400;font-style:italic;font-family:var(--sans);font-size:.72em;letter-spacing:0}
+.name input.hint::placeholder{color:#B9BEC8;font-weight:600;font-style:normal;font-size:1em;letter-spacing:-.02em}
 .name small{color:var(--ink-2);font-size:13px}.name small b{color:var(--ink);font-weight:600}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.2rem 0 .6rem}
 .btn{display:inline-flex;align-items:center;gap:1.1rem;padding:.7rem .7rem .7rem 1.9rem;border-radius:999px;background:var(--coral);color:#fff;font:600 22px/1 var(--sans);letter-spacing:-.01em;border:1.5px solid var(--coral);cursor:pointer;box-shadow:0 18px 36px -20px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
@@ -88,7 +90,8 @@ const states={};
 const stateEl=id=>document.querySelector('.state[data-for="'+id+'"]');
 function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||'';el.className='state'+(st.state==='problem'?' bad':(st.state==='done'?' on':''));
  const b=document.querySelector('.go[data-shoot="'+id+'"]');if(b)b.disabled=(st.state==='queued'||st.state==='running');}
-async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim();
+async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim()||(inp.dataset.was||'').trim();
+ if(name){inp.value=name;inp.dataset.was=name;inp.placeholder=inp.dataset.hint||inp.placeholder;inp.classList.remove('hint');inp.blur();}
  if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
  if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Studio to rename here, or just tell Claude the name.'});return;}
  try{const r=await fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
@@ -98,8 +101,13 @@ let timer=null;
 async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('/rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
  for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
  if(!busy){clearInterval(timer);timer=null;}}catch(e){}},1500);}
-document.querySelectorAll('.go').forEach(b=>b.addEventListener('click',()=>rename(b.dataset.shoot)));
-document.querySelectorAll('.name input').forEach(i=>i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();rename(i.id);}}));
+document.querySelectorAll('.go').forEach(b=>{b.addEventListener('mousedown',ev=>ev.preventDefault());b.addEventListener('click',()=>rename(b.dataset.shoot));});
+document.querySelectorAll('.name input').forEach(i=>{i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();rename(i.id);}});
+ // click in: the box clears and the current name waits underneath in grey; type to replace it, click away to keep it (Dustin, Oct 28)
+ i.addEventListener('focus',()=>{if(i.value){i.dataset.was=i.value;if(i.dataset.hint===undefined)i.dataset.hint=i.placeholder;i.placeholder=i.value;i.value='';i.classList.add('hint');}});
+ // click away without pressing Rename (or Enter): back to the name it had, typed or not. Only Rename makes a name stick.
+ i.addEventListener('blur',ev=>{if(ev.relatedTarget&&ev.relatedTarget.dataset&&ev.relatedTarget.dataset.shoot===i.id)return;
+  if(i.dataset.was!==undefined){i.value=i.dataset.was;i.placeholder=i.dataset.hint||'';i.classList.remove('hint');}});});
 if(location.protocol.startsWith('http'))poll();
 })();
 </script>"""
@@ -229,12 +237,15 @@ def shoots_section(studio):
             big = big_preview(studio, g, p)
             return f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if big else "") + ">"
         out.append("<article class='shoot'><div class='top'>")
+        out.append("<div class='gal'>")   # the gallery, with the sneak-peeks line under it (Dustin, Oct 28)
         out.append(f"<div class='pics{' six' if len(pics) == 6 else ''}'>" + "".join(
             f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>{img(p, g)}</div>"
             for j, (p, g) in enumerate(pics))
             + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
-            + (f"<span class='chip f-ocean' style='--rot:4deg;bottom:-.5rem;right:-.3rem'>{len(gs)} outfits or breaks</span>" if len(gs) > 1 else "")
-            + "</div>")
+            + "</div>")   # no "outfits or breaks" chip: a nice touch, not needed (Dustin, Oct 28)
+        if len(pics) == 6:
+            out.append("<p class='peeks-line'><b>These 6 are your sneak peeks, to edit first.</b> Picked for variety and flow, so they look good together. In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
+        out.append("</div>")   # gal
         out.append("<div class='copy'>")
         out.append(f"<span class='n'>{i:02d}</span>")
         out.append("<div class='meta'>"
@@ -250,8 +261,6 @@ def shoots_section(studio):
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
-        if len(pics) == 6:
-            out.append("<p class='peeks-line'><b>These 6 are your sneak peeks, to edit first.</b> Picked for variety and flow, so they look good together. In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
         out.append("</div></div>")   # copy, top
         if mine:
             out.append("<div class='more'>")
