@@ -68,7 +68,7 @@ CSS = """
 .name .go:disabled{opacity:.45;cursor:default;transform:none}
 .name .state{font-size:13px;color:var(--ink-2);min-height:1.2em}.name .state.on{color:var(--ink)}.name .state.bad{color:#b4472e}
 .name .pen{position:absolute;left:1.05rem;top:50%;transform:translateY(-50%);color:var(--coral);font-size:20px;pointer-events:none}
-.name input{font:600 clamp(22px,2.4vw,30px)/1.15 var(--sans);letter-spacing:-.02em;color:var(--ink);background:var(--paper);border:2px dashed var(--coral);border-radius:18px;padding:.75rem 1rem .75rem 2.9rem;width:100%;outline:none;cursor:text;box-shadow:0 10px 24px -18px rgba(240,127,90,.8);transition:border-color .3s,background .3s,box-shadow .3s}
+.name input{font:600 clamp(17px,1.7vw,21px)/1.2 var(--sans);letter-spacing:-.01em;color:var(--ink);background:var(--paper);border:2px dashed var(--coral);border-radius:18px;padding:.75rem 1rem .75rem 2.9rem;width:100%;outline:none;cursor:text;box-shadow:0 10px 24px -18px rgba(240,127,90,.8);transition:border-color .3s,background .3s,box-shadow .3s}
 .name input:hover{background:var(--sun-l)}
 .name input:focus{border-style:solid;border-color:var(--coral);background:var(--paper);box-shadow:0 0 0 4px rgba(240,127,90,.18)}
 .name input::placeholder{color:#9AA0AB;font-weight:400;font-style:italic;font-family:var(--sans);font-size:.72em;letter-spacing:0}

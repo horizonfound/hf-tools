@@ -149,8 +149,12 @@ def main():
         fp, held = cards.check(a.source)
         if held:
             root, held_studio = Path(held["root"]), Path(held["studio"])
-            if (held_studio / "settled.json").exists() or ((held_studio / "first-look.html").exists() and (held_studio / "sneak-peeks.json").exists()):
-                # the whole night ran on this card already: copied, verified, sorted, report written
+            # done means settled: the shoots moved up into their place and the day folder gone. first-look.html
+            # plus sneak-peeks.json is not enough (Oct 28: the picks are written before they are marked and before
+            # the settle, and that test called the backup done at that point, leaving the peeks unmarked and the
+            # day folder in place). An old backup that never settled picks up at the settle, which is right.
+            if (held_studio / "settled.json").exists():
+                # the whole night ran on this card already: copied, verified, sorted, settled, report written
                 say(f"This card is already safe: {fp['count']:,} files backed up to {root} on {held['when'][:10]}. Nothing to do.")
                 say("(To copy it again anyway, run with --again.)")
                 say(f"Report: {held_studio / 'report.html'}")
