@@ -17,6 +17,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+import subprocess
 
 CSS = """
 .talk{display:grid;grid-template-columns:auto 1fr;gap:1.1rem;align-items:center;background:var(--sun-l);border-radius:var(--r);padding:1.3rem 1.5rem;margin:1.8rem 0 0}
@@ -83,6 +84,29 @@ def day(iso):
     return datetime.fromisoformat(iso).strftime("%A, %B %-d, %Y")
 
 
+
+def big_preview(studio, g, p):
+    """A sharp copy (2000 px) of a group preview for the report's click-to-enlarge view, made once from
+    the photo itself with the Mac's own sips into groups/big/. Returns the path to use, or None when the
+    photo is not reachable (drive unplugged): the page then just shows the small preview bigger."""
+    big = studio / "groups" / "big" / p
+    if big.exists():
+        return f"groups/big/{p}"
+    stem = p[:-4].split("_", 1)[-1]  # "g01_062422_2111.jpg" -> "062422_2111", the camera's name kept in the file name
+    try:
+        from where import locate
+        root, _ = locate(studio)
+    except Exception:  # noqa: BLE001
+        return None
+    src = next((root / f for f in g.get("files", []) if Path(f).stem.endswith(stem)), None)
+    if not src or not src.is_file():
+        return None
+    big.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", "2000", str(src), "--out", str(big)],
+                       capture_output=True)
+    return f"groups/big/{p}" if r.returncode == 0 and big.exists() else None
+
+
 def shoots_section(studio):
     """(html, script) for the shoots, or None when the card has not been grouped and decided yet."""
     if not (studio / "groups.json").exists() or not (studio / "shoots.json").exists():
@@ -107,7 +131,7 @@ def shoots_section(studio):
     for i, s in enumerate(shoots, 1):
         gs = [groups[g] for g in s["groups"]]
         start = gs[0]["start"]
-        pics = [p for g in gs for p in g.get("previews", [])]
+        pics = [(p, g) for g in gs for p in g.get("previews", [])]
         if len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
             pics = [pics[len(pics) // 2], pics[0], pics[-1]]
         lenses = sorted({l for g in gs for l in g.get("lenses", [])})
@@ -115,7 +139,9 @@ def shoots_section(studio):
         val = names.get(s["id"], "")
         out.append("<article class='shoot'>")
         out.append("<div class='pics'>" + "".join(
-            f"<div class='ph' style='--rot:{ROTS[j % len(ROTS)]}deg'><img src='groups/{e(p)}' alt=''></div>" for j, p in enumerate(pics))
+            f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>"
+            f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if (big := big_preview(studio, g, p)) else "") + "></div>"
+            for j, (p, g) in enumerate(pics))
             + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
             + (f"<span class='chip f-ocean' style='--rot:4deg;bottom:-.5rem;right:-.3rem'>{len(gs)} outfits or breaks</span>" if len(gs) > 1 else "")
             + "</div>")

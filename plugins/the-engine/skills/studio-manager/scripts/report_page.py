@@ -77,7 +77,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .peeks .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .peeks .ph small{position:absolute;left:.6rem;bottom:.5rem;font-size:11px;color:#fff;background:rgba(0,0,0,.42);padding:.15rem .5rem;border-radius:999px;backdrop-filter:blur(4px)}
 .peeks .lede{margin-top:.4rem}
-.peeks .ph{cursor:zoom-in}
+.ph[data-g]{cursor:zoom-in}
 .big{position:fixed;inset:0;z-index:50;background:transparent;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:4vh 4vw}
 .big.on{display:flex}.big .card{position:relative;background:var(--paper);border-radius:22px;padding:14px;box-shadow:0 40px 100px -24px rgba(31,36,48,.45),0 0 0 1px var(--line);cursor:default}
 .big img{max-width:86vw;max-height:84vh;object-fit:contain;border-radius:12px;display:block}
@@ -267,9 +267,9 @@ def client_notes(studio):
 
 
 PEEK_SCRIPT = """<div class='big' id='big'><div class='card'><button class='x' aria-label='Close'>&#215;</button><button class='nav prev' aria-label='Previous'>&#8249;</button><img alt=''><button class='nav next' aria-label='Next'>&#8250;</button><small></small></div></div>
-<script>(()=>{const pics=[...document.querySelectorAll('.peeks .ph img')],big=document.getElementById('big'),img=big.querySelector('img'),cap=big.querySelector('small');let at=0;
-const show=i=>{at=(i+pics.length)%pics.length;img.src=pics[at].src;cap.textContent=(at+1)+' of '+pics.length;big.classList.add('on')};
-pics.forEach((p,i)=>p.parentElement.addEventListener('click',()=>show(i)));
+<script>(()=>{const all=[...document.querySelectorAll('.ph[data-g] img')],big=document.getElementById('big'),img=big.querySelector('img'),cap=big.querySelector('small');let pics=[],at=0;
+const show=i=>{at=(i+pics.length)%pics.length;img.src=pics[at].dataset.big||pics[at].src;cap.textContent=(at+1)+' of '+pics.length;big.classList.add('on')};
+all.forEach(p=>p.parentElement.addEventListener('click',()=>{pics=all.filter(q=>q.parentElement.dataset.g===p.parentElement.dataset.g);show(pics.indexOf(p))}));
 big.querySelector('.x').onclick=()=>big.classList.remove('on');
 big.querySelector('.prev').onclick=ev=>{ev.stopPropagation();show(at-1)};big.querySelector('.next').onclick=ev=>{ev.stopPropagation();show(at+1)};
 big.addEventListener('click',ev=>{if(ev.target===big)big.classList.remove('on')});
@@ -388,7 +388,7 @@ def build(manifest, studio):
                    "the keyword “sneak peek”. Edit these, send a few to your client with a note, and the rest can wait.</p>"
                    "<div class='grid'>")
         for i, (pv, sh) in enumerate(peeks):
-            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
+            out.append(f"<div class='ph' data-g='peeks' style='--rot:{ROTS[i % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
                        + (f"<small>{e(sh)}</small>" if sh and many_shoots else "") + "</div>")
         out.append("</div></section>")
 
@@ -481,7 +481,7 @@ def build(manifest, studio):
                "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
-    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if peeks else "") + "</body></html>")
+    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + "</body></html>")
     return "\n".join(out)
 
 
