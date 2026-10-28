@@ -302,6 +302,26 @@ NOTES_SCRIPT = """
 """
 
 
+# When the page is served by serve_report.py, it notices the report being rebuilt (a name locked in, a note
+# written) and reloads itself, so what Claude just did shows up without anyone pressing refresh.
+REFRESH_SCRIPT = """
+<script>
+(function(){
+  if(location.protocol!=='http:' && location.protocol!=='https:') return;
+  var seen=null;
+  function check(){
+    fetch(location.href,{method:'HEAD',cache:'no-store'}).then(function(r){
+      var m=r.headers.get('Last-Modified'); if(!m) return;
+      if(seen===null){ seen=m; return; }
+      if(m!==seen && !document.activeElement.matches('input,textarea')){ location.reload(); }
+    }).catch(function(){});
+  }
+  setInterval(check, 4000);
+})();
+</script>
+"""
+
+
 def build(manifest, studio):
     files = manifest.get("files", {})
     total = len(files)
@@ -481,7 +501,7 @@ def build(manifest, studio):
                "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
-    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + "</body></html>")
+    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT + "</body></html>")
     return "\n".join(out)
 
 
