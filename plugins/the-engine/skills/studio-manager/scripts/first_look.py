@@ -228,8 +228,8 @@ def shoots_section(studio):
         out.append("</div></div>")   # copy, top
         if mine:
             out.append("<div class='more'><span class='eyebrow'>Sneak peeks</span>"
-                       f"<p class='line'><b>{len(mine[:8])} to edit first.</b> Picked for variety and flow, so they look good together: "
-                       "the three above and these. In Lightroom they're one filter away, the keyword “sneak peek”. Edit these, send a few with the note, and the rest can wait.</p>")
+                       f"<p class='line'><b>These {len(mine[:8])}, to edit first.</b> Picked for variety and flow, so they look good together. "
+                       "In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
             if rest:
                 out.append("<div class='row'>" + "".join(
                     f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[(j + 3) % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(p)}' alt=''></div>"
