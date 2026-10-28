@@ -29,9 +29,18 @@ CSS = """
 .shoots-head{display:grid;gap:.5rem;padding-top:clamp(2rem,4vw,3rem)}
 .shoots-head .h2{font:600 clamp(28px,3.6vw,44px)/1.05 var(--sans);letter-spacing:-.03em;text-wrap:balance}
 .shoots{display:grid;gap:1.5rem;padding:1.6rem 0 1rem}
-.shoot{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(1.2rem,3vw,2.4rem);background:var(--paper);border-radius:var(--r);padding:clamp(1.2rem,2.6vw,2rem);align-items:center}
-.shoot:nth-child(even){grid-template-columns:1fr 1.05fr}
+.shoot{display:grid;gap:clamp(1.4rem,3vw,2.2rem);background:var(--paper);border-radius:var(--r);padding:clamp(1.2rem,2.6vw,2rem)}
+.shoot .top{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(1.2rem,3vw,2.4rem);align-items:center}
+.shoot:nth-child(even) .top{grid-template-columns:1fr 1.05fr}
 .shoot:nth-child(even) .pics{order:2}
+.more{display:grid;gap:.6rem}
+.more .row{display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(.6rem,1.6vw,1.1rem);padding:.6rem 0 .4rem;align-items:end}
+.more .ph{border-radius:18px;overflow:hidden;aspect-ratio:4/5;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease)}
+.more .ph:nth-child(2n){margin-bottom:1.1rem}
+.more .ph:hover{transform:rotate(0) translateY(-6px);box-shadow:var(--shadow);z-index:1}
+.more img{width:100%;height:100%;object-fit:cover;display:block}
+.more .line{font-size:14px;color:var(--ink-2);margin:0}.more .line b{color:var(--ink)}
+.shoot .note{margin:0}
 .pics{position:relative;display:grid;grid-template-columns:1.35fr 1fr;grid-template-rows:1fr 1fr;gap:.7rem;aspect-ratio:5/4}
 .pics .ph{border-radius:20px;overflow:hidden;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease)}
 .pics .ph:first-child{grid-row:1/3}
@@ -59,7 +68,8 @@ CSS = """
 .btn .arr{width:48px;height:48px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:22px}
 .toast{font-size:14px;color:var(--ink-2);min-height:1.2em}
 .undo{font-size:13px;color:var(--ink-2);max-width:40em;margin-bottom:1.5rem}
-@media(max-width:900px){.shoot,.shoot:nth-child(even){grid-template-columns:1fr}.shoot:nth-child(even) .pics{order:0}.talk{grid-template-columns:1fr}}
+@media(max-width:900px){.shoot .top,.shoot:nth-child(even) .top{grid-template-columns:1fr}.shoot:nth-child(even) .pics{order:0}.talk{grid-template-columns:1fr}.more .row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.more .row{grid-template-columns:repeat(2,1fr)}}
 """
 
 SCRIPT = """<script>
@@ -107,8 +117,49 @@ def big_preview(studio, g, p):
     return f"groups/big/{p}" if r.returncode == 0 and big.exists() else None
 
 
+def peeks_by_shoot(studio):
+    """{shoot id: [preview file names]} of the sneak peeks that have a preview, in the order they were picked."""
+    out = {}
+    pj = studio / "sneak-peeks.json"
+    if not pj.exists() and (studio / "picks.json").exists():
+        pj = studio / "picks.json"
+    if not pj.exists():
+        return out
+    try:
+        picks = json.loads(pj.read_text()).get("picks", [])
+    except ValueError:
+        return out
+    for pk in picks:
+        name = Path(pk["file"]).stem + ".jpg"
+        if (studio / "sneak-peeks" / name).exists():
+            out.setdefault(pk.get("shoot", ""), []).append(name)
+    return out
+
+
+def note_card(note):
+    """The note to the client as a card with Copy buttons; None when there is nothing to show."""
+    e = html.escape
+    if not note or not (note.get("body") or note.get("to")):
+        return None
+    out = ["<article class='note'>"]
+    out.append("<div class='to'><span>Note to your client</span>" + (f"<span>To {e(note['to'])}</span>" if note.get("to") else "<span>[Name] still to fill in</span>") + "</div>")
+    if note.get("body"):
+        if note.get("subject"):
+            out.append(f"<div class='subj'>{e(note['subject'])}</div>")
+        out.append(f"<pre class='body'>{e(note['body'].rstrip())}</pre>")
+        out.append("<div class='row'><button class='copy' data-what='body'>Copy the note</button>"
+                   + ("<button class='copy sub' data-what='subject'>Copy the subject</button>" if note.get("subject") else "")
+                   + "<span class='did'></span></div>")
+    else:
+        out.append("<p class='empty'>Not written yet. Say “write the note for this one” and it'll be here.</p>")
+    out.append("</article>")
+    return "\n".join(out)
+
+
 def shoots_section(studio):
-    """(html, script) for the shoots, or None when the card has not been grouped and decided yet."""
+    """(html, script) for the shoots, or None when the card has not been grouped and decided yet.
+    Each shoot is one block that builds downward: three photos framing the recap and the name box, then the
+    rest of its sneak peeks in a row, then the note to the client (Dustin, Oct 28)."""
     if not (studio / "groups.json").exists() or not (studio / "shoots.json").exists():
         return None
     groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]}
@@ -120,6 +171,12 @@ def shoots_section(studio):
     named = sum(1 for s in shoots if names.get(s["id"]))
     filed = all(s.get("folder") for s in shoots)
     n = len(shoots)
+    peeks = peeks_by_shoot(studio)
+    try:
+        from client_note import all_notes
+        notes = all_notes(studio)
+    except ImportError:
+        notes = {}
 
     out = ["<div class='wrap'><div class='shoots-head'><span class='eyebrow'>What's on the card</span>",
            f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total:,} photos</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
@@ -131,16 +188,26 @@ def shoots_section(studio):
     for i, s in enumerate(shoots, 1):
         gs = [groups[g] for g in s["groups"]]
         start = gs[0]["start"]
-        pics = [(p, g) for g in gs for p in g.get("previews", [])]
-        if len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
-            pics = [pics[len(pics) // 2], pics[0], pics[-1]]
+        mine = peeks.get(s["id"], [])
+        if len(mine) >= 3:   # the sneak peeks frame the card: the first is the hero, the next two beside it
+            pics = [(p, None) for p in mine[:3]]
+            rest = mine[3:8]
+        else:                # not picked yet: three previews spread across the shoot
+            pics = [(p, g) for g in gs for p in g.get("previews", [])]
+            if len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
+                pics = [pics[len(pics) // 2], pics[0], pics[-1]]
+            rest = []
         lenses = sorted({l for g in gs for l in g.get("lenses", [])})
         bodies = max(g["bodies"] for g in gs)
         val = names.get(s["id"], "")
-        out.append("<article class='shoot'>")
+        def img(p, g):
+            if g is None:
+                return f"<img src='sneak-peeks/{e(p)}' alt=''>"
+            big = big_preview(studio, g, p)
+            return f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if big else "") + ">"
+        out.append("<article class='shoot'><div class='top'>")
         out.append("<div class='pics'>" + "".join(
-            f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>"
-            f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if (big := big_preview(studio, g, p)) else "") + "></div>"
+            f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>{img(p, g)}</div>"
             for j, (p, g) in enumerate(pics))
             + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
             + (f"<span class='chip f-ocean' style='--rot:4deg;bottom:-.5rem;right:-.3rem'>{len(gs)} outfits or breaks</span>" if len(gs) > 1 else "")
@@ -158,7 +225,20 @@ def shoots_section(studio):
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
-        out.append("</div></article>")
+        out.append("</div></div>")   # copy, top
+        if mine:
+            out.append("<div class='more'><span class='eyebrow'>Sneak peeks</span>"
+                       f"<p class='line'><b>{len(mine[:8])} to edit first.</b> Picked for variety and flow, so they look good together: "
+                       "the three above and these. In Lightroom they're one filter away, the keyword “sneak peek”. Edit these, send a few with the note, and the rest can wait.</p>")
+            if rest:
+                out.append("<div class='row'>" + "".join(
+                    f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[(j + 3) % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(p)}' alt=''></div>"
+                    for j, p in enumerate(rest)) + "</div>")
+            out.append("</div>")
+        card = note_card(notes.get(s["id"]))
+        if card:
+            out.append(card)
+        out.append("</article>")
     out.append("</div>")
     out.append("<div class='wrap'><div class='save'>"
                "<button class='btn' id='save'>Lock the names in<span class='arr'>&#10003;</span></button>"

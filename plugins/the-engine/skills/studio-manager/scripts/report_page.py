@@ -399,39 +399,7 @@ def build(manifest, studio):
             out.append(f"<p class='teaser-note'>Teasers picked {e(pick_note)}.</p>")
         out.append("</div>")
 
-    # the sneak peeks, after the shoots: the backup and the sorting come first (Dustin, Oct 28). Click one to see it big.
-    if peeks:
-        many_shoots = len({sh for _, sh in peeks if sh}) > 1
-        out.append("<section class='wrap peeks'><span class='eyebrow'>Sneak peeks</span>"
-                   f"<h2 class='h2'>{len(peeks)} to edit <span class='swap'>first.</span></h2>"
-                   "<p class='lede'>Picked for variety and flow, so they look good together. In Lightroom they're one filter away: "
-                   "the keyword “sneak peek”. Edit these, send a few to your client with a note, and the rest can wait.</p>"
-                   "<div class='grid'>")
-        for i, (pv, sh) in enumerate(peeks):
-            out.append(f"<div class='ph' data-g='peeks' style='--rot:{ROTS[i % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
-                       + (f"<small>{e(sh)}</small>" if sh and many_shoots else "") + "</div>")
-        out.append("</div></section>")
-
-    # the note to the client, one per shoot, with a Copy button (nothing is ever sent)
-    if notes:
-        out.append("<section class='wrap notes'><span class='eyebrow'>Note to your client</span>"
-                   f"<h2 class='h2'>{'A note' if len(notes) == 1 else str(len(notes)) + ' notes'} to send with the <span class='swap'>sneak peeks.</span></h2>"
-                   "<p class='lede'>Written the way you write, from what's in the photos. Edit the sneak peeks, then copy this into your email and attach them. Nothing is sent from here.</p>"
-                   "<div class='grid'>")
-        for sh_name, n in notes:
-            out.append("<article class='note'>")
-            out.append(f"<div class='to'><span>{e(sh_name)}</span>" + (f"<span>To {e(n['to'])}</span>" if n.get("to") else "<span>[Name] still to fill in</span>") + "</div>")
-            if n.get("body"):
-                out.append(f"<div class='subj'>{e(n.get('subject', ''))}</div>" if n.get("subject") else "")
-                out.append(f"<pre class='body'>{e(n['body'].rstrip())}</pre>")
-                out.append("<div class='row'><button class='copy' data-what='body'>Copy the note</button>"
-                           + ("<button class='copy sub' data-what='subject'>Copy the subject</button>" if n.get("subject") else "")
-                           + "<span class='did'></span></div>")
-            else:
-                out.append("<p class='empty'>Not written yet. Say “write the note for this one” and it'll be here.</p>")
-            out.append("</article>")
-        out.append("</div></section>")
-
+    # the sneak peeks and the note live inside each shoot's block now (Dustin, Oct 28)
 
     # the details
     out.append("<div class='wrap'><div class='cards'>")
