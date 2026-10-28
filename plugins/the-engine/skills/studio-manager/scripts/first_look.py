@@ -33,6 +33,9 @@ CSS = """
 .shoot .top{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(1.2rem,3vw,2.4rem);align-items:center}
 .shoot:nth-child(even) .top{grid-template-columns:1fr 1.05fr}
 .shoot:nth-child(even) .pics{order:2}
+.pics.six{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);aspect-ratio:1/1.05;gap:.6rem}
+.pics.six .ph:first-child{grid-row:1/3;grid-column:1/3}
+.shoot:nth-child(even) .pics.six .ph:first-child{grid-column:2/4}
 .more{display:grid;gap:.6rem}
 .more .row{display:grid;grid-template-columns:repeat(5,1fr);gap:clamp(.6rem,1.6vw,1.1rem);padding:.6rem 0 .4rem;align-items:end}
 .more .ph{border-radius:18px;overflow:hidden;aspect-ratio:4/5;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease)}
@@ -41,6 +44,8 @@ CSS = """
 .more img{width:100%;height:100%;object-fit:cover;display:block}
 .more .line{font-size:14px;color:var(--ink-2);margin:0}.more .line b{color:var(--ink)}
 .shoot .note{margin:0}
+.peeks-line{font-size:14px;color:var(--ink-2);margin:0;line-height:1.5}.peeks-line b{color:var(--ink)}
+@media(max-width:900px){.pics.six{aspect-ratio:auto}}
 .pics{position:relative;display:grid;grid-template-columns:1.35fr 1fr;grid-template-rows:1fr 1fr;gap:.7rem;aspect-ratio:5/4}
 .pics .ph{border-radius:20px;overflow:hidden;background:var(--sand-l);transform:rotate(var(--rot,0deg));transition:transform .6s var(--ease),box-shadow .6s var(--ease)}
 .pics .ph:first-child{grid-row:1/3}
@@ -189,9 +194,12 @@ def shoots_section(studio):
         gs = [groups[g] for g in s["groups"]]
         start = gs[0]["start"]
         mine = peeks.get(s["id"], [])
-        if len(mine) >= 3:   # the sneak peeks frame the card: the first is the hero, the next two beside it
+        if len(mine) >= 6:   # the six sneak peeks as one mosaic: the hero, two beside it, three under
+            pics = [(p, None) for p in mine[:6]]
+            rest = []
+        elif len(mine) >= 3:   # fewer than six: three frame the card, the rest go in a row under it
             pics = [(p, None) for p in mine[:3]]
-            rest = mine[3:8]
+            rest = mine[3:6]
         else:                # not picked yet: three previews spread across the shoot
             pics = [(p, g) for g in gs for p in g.get("previews", [])]
             if len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
@@ -206,7 +214,7 @@ def shoots_section(studio):
             big = big_preview(studio, g, p)
             return f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if big else "") + ">"
         out.append("<article class='shoot'><div class='top'>")
-        out.append("<div class='pics'>" + "".join(
+        out.append(f"<div class='pics{' six' if len(pics) == 6 else ''}'>" + "".join(
             f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>{img(p, g)}</div>"
             for j, (p, g) in enumerate(pics))
             + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
@@ -225,11 +233,15 @@ def shoots_section(studio):
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
+        if len(pics) == 6:
+            out.append("<p class='peeks-line'><b>These 6 are your sneak peeks, to edit first.</b> Picked for variety and flow, so they look good together. In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
         out.append("</div></div>")   # copy, top
         if mine:
-            out.append("<div class='more'><span class='eyebrow'>Sneak peeks</span>"
-                       f"<p class='line'><b>These {len(mine[:8])}, to edit first.</b> Picked for variety and flow, so they look good together. "
-                       "In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
+            out.append("<div class='more'>")
+            if rest:
+                out.append("<span class='eyebrow'>Sneak peeks</span>"
+                           f"<p class='line'><b>These {len(mine[:6])}, to edit first.</b> Picked for variety and flow, so they look good together. "
+                           "In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
             if rest:
                 out.append("<div class='row'>" + "".join(
                     f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[(j + 3) % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(p)}' alt=''></div>"
