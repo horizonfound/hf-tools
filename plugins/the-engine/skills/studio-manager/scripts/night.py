@@ -16,7 +16,8 @@ Exit codes: 0 done · 1 problems (read the report) · 2 stop (missing source
 or drive) · 3 paused (run again) · 4 needs Claude's look (read
 _studio/groups-sheet.png, write _studio/shoots.json, run again) · 5 needs
 setup (no Studio File yet: ask their drive and naming, save with
-studio_file.py, run again).
+studio_file.py, run again) · 7 needs the sneak peeks (read the pages it names,
+peek_sheets.py pick ..., run again).
 
 Their drive, second copy and naming come from ~/.studio (studio_file.py), so
 after the first run the command is just:  night.py --source /Volumes/CARD
@@ -124,6 +125,7 @@ def main():
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
     ap.add_argument("--no-open", action="store_true", help="don't open the report when done (the Claude app shows it in its own pane)")
     ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
+    ap.add_argument("--no-peeks", action="store_true", help="skip the sneak peeks (the backup still finishes and settles)")
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
     a = ap.parse_args()
 
@@ -146,7 +148,7 @@ def main():
         fp, held = cards.check(a.source)
         if held:
             root, held_studio = Path(held["root"]), Path(held["studio"])
-            if (held_studio / "settled.json").exists() or (held_studio / "first-look.html").exists():
+            if (held_studio / "settled.json").exists() or ((held_studio / "first-look.html").exists() and (held_studio / "sneak-peeks.json").exists()):
                 # the whole night ran on this card already: copied, verified, sorted, report written
                 say(f"This card is already safe: {fp['count']:,} files backed up to {root} on {held['when'][:10]}. Nothing to do.")
                 say("(To copy it again anyway, run with --again.)")
@@ -268,6 +270,33 @@ def main():
     say("6. Writing the report")
     if run("first_look.py", session) != 0 or run("report_page.py", session) != 0:
         sys.exit(1)
+
+    # 6b. the sneak peeks: the script thins each shoot to its moments and lays them on numbered pages;
+    # Claude picks six per shoot (exit 7, then run again); then they are marked for Lightroom and shown
+    # on the report. The report is already on screen before this, so nothing waits on it if the look never comes.
+    if not a.no_peeks and not (studio / "sneak-peeks.json").exists():
+        if not (studio / "peek-sheets.json").exists():
+            say("6b. Thinning each shoot to its moments, for the sneak peeks")
+            if run("peek_sheets.py", "make", studio) != 0:
+                say("   (could not make the pages; going on without sneak peeks)")
+        if (studio / "peek-sheets.json").exists():
+            sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+            say("\n6b. NEEDS THE PICKS. For each shoot, read its page(s) and choose six sneak peeks by number:")
+            for sid, sh in sheets.items():
+                say(f"   {sid} {sh['name']}: {sh['moments']} moments on {len(sh['pages'])} page(s)")
+                for pg in sh["pages"]:
+                    say(f"      {pg}")
+            say("   Pick six per shoot, in the order they will sit on the report: the hero first (a scroll-stopper that")
+            say("   survives a square crop), two that set it off, three that keep changing (a wide, a medium, a close, a")
+            say("   detail, a different look); no two neighbors alike; every one a frame they'd be glad to see.")
+            say(f"   Then: python3 {HERE / 'peek_sheets.py'} pick \"{studio}\" s1=14,3,27,9,41,18 s2=...   and run this command again.")
+            sys.exit(7)
+    if (studio / "sneak-peeks.json").exists():
+        say("6b. Marking the sneak peeks for Lightroom")
+        if run("sneak_peeks.py", "--night", studio) not in (0, 2):
+            say("   (the sneak peeks could not all be marked; the report still shows them)")
+        run("first_look.py", session)
+        run("report_page.py", session)
 
     # 7. settle: the shoot folders go up into the place they chose, the day folder goes away,
     # the records move to a hidden .studio folder there. Left together (exit 6) only for a good reason.
