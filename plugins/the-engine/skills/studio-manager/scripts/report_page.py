@@ -77,6 +77,13 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .peeks .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .peeks .ph small{position:absolute;left:.6rem;bottom:.5rem;font-size:11px;color:#fff;background:rgba(0,0,0,.42);padding:.15rem .5rem;border-radius:999px;backdrop-filter:blur(4px)}
 .peeks .lede{margin-top:.4rem}
+.peeks .ph{cursor:zoom-in}
+.big{position:fixed;inset:0;z-index:50;background:transparent;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:4vh 4vw}
+.big.on{display:flex}.big .card{position:relative;background:var(--paper);border-radius:22px;padding:14px;box-shadow:0 40px 100px -24px rgba(31,36,48,.45),0 0 0 1px var(--line);cursor:default}
+.big img{max-width:86vw;max-height:84vh;object-fit:contain;border-radius:12px;display:block}
+.big .x{position:absolute;top:-14px;right:-14px;width:36px;height:36px;font:600 16px/1 var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:50%;box-shadow:var(--shadow);cursor:pointer}
+.big .nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;font:300 30px/1 var(--display);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:50%;box-shadow:var(--shadow);cursor:pointer;opacity:.9}.big .nav:hover{opacity:1}.big .prev{left:-22px}.big .next{right:-22px}
+.big small{position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);color:var(--ink-2);font:500 12px var(--sans)}
 .notes{padding:clamp(1.2rem,2.6vw,2rem) 0 .6rem}
 .notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
 .note{background:#fff;border:1px solid var(--line,#e6e0d6);border-radius:22px;padding:1.4rem 1.5rem 1.2rem;display:flex;flex-direction:column;gap:.7rem}
@@ -259,6 +266,15 @@ def client_notes(studio):
     return [(names.get(k, k), notes[k]) for k in order if k in notes]
 
 
+PEEK_SCRIPT = """<div class='big' id='big'><div class='card'><button class='x' aria-label='Close'>&#215;</button><button class='nav prev' aria-label='Previous'>&#8249;</button><img alt=''><button class='nav next' aria-label='Next'>&#8250;</button><small></small></div></div>
+<script>(()=>{const pics=[...document.querySelectorAll('.peeks .ph img')],big=document.getElementById('big'),img=big.querySelector('img'),cap=big.querySelector('small');let at=0;
+const show=i=>{at=(i+pics.length)%pics.length;img.src=pics[at].src;cap.textContent=(at+1)+' of '+pics.length;big.classList.add('on')};
+pics.forEach((p,i)=>p.parentElement.addEventListener('click',()=>show(i)));
+big.querySelector('.x').onclick=()=>big.classList.remove('on');
+big.querySelector('.prev').onclick=ev=>{ev.stopPropagation();show(at-1)};big.querySelector('.next').onclick=ev=>{ev.stopPropagation();show(at+1)};
+big.addEventListener('click',ev=>{if(ev.target===big)big.classList.remove('on')});
+document.addEventListener('keydown',ev=>{if(!big.classList.contains('on'))return;if(ev.key==='Escape')big.classList.remove('on');if(ev.key==='ArrowLeft')show(at-1);if(ev.key==='ArrowRight')show(at+1)});})();</script>"""
+
 NOTES_SCRIPT = """
 <script>
 (function(){
@@ -344,7 +360,26 @@ def build(manifest, studio):
                f"<div class='stat'><b>{e(took) or '—'}</b><span class='eyebrow'>to finish</span></div>"
                "</div></div>")
 
-    # the sneak peeks: the first thing worth looking at, picked for variety and flow
+    # the shoots, with their previews, recaps and name boxes (one page, not two)
+    shoots_html, shoots_script = (shoots_section(studio) or (None, ""))
+    if shoots_html:
+        out.append(shoots_html)
+    # with no shoots decided yet (and no sneak peeks), a few teasers from the card instead
+    elif pics and not peeks:
+        out.append("<div class='wrap'><div class='teasers'>")
+        for i, p in enumerate(pics):
+            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
+        chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", f"{media:,} photos"),
+                 ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
+                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good else "keep the card")]
+        for cls, rot, pos, text in chips:
+            out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
+        out.append("</div>")
+        if pick_note:
+            out.append(f"<p class='teaser-note'>Teasers picked {e(pick_note)}.</p>")
+        out.append("</div>")
+
+    # the sneak peeks, after the shoots: the backup and the sorting come first (Dustin, Oct 28). Click one to see it big.
     if peeks:
         many_shoots = len({sh for _, sh in peeks if sh}) > 1
         out.append("<section class='wrap peeks'><span class='eyebrow'>Sneak peeks</span>"
@@ -353,7 +388,7 @@ def build(manifest, studio):
                    "the keyword “sneak peek”. Edit these, send a few to your client with a note, and the rest can wait.</p>"
                    "<div class='grid'>")
         for i, (pv, sh) in enumerate(peeks):
-            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
+            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(pv.name)}' alt=''>"
                        + (f"<small>{e(sh)}</small>" if sh and many_shoots else "") + "</div>")
         out.append("</div></section>")
 
@@ -377,24 +412,6 @@ def build(manifest, studio):
             out.append("</article>")
         out.append("</div></section>")
 
-    # the shoots, with their previews, recaps and name boxes (one page, not two)
-    shoots_html, shoots_script = (shoots_section(studio) or (None, ""))
-    if shoots_html:
-        out.append(shoots_html)
-    # with no shoots decided yet (and no sneak peeks), a few teasers from the card instead
-    elif pics and not peeks:
-        out.append("<div class='wrap'><div class='teasers'>")
-        for i, p in enumerate(pics):
-            out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
-        chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", f"{media:,} photos"),
-                 ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
-                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good else "keep the card")]
-        for cls, rot, pos, text in chips:
-            out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
-        out.append("</div>")
-        if pick_note:
-            out.append(f"<p class='teaser-note'>Teasers picked {e(pick_note)}.</p>")
-        out.append("</div>")
 
     # the details
     out.append("<div class='wrap'><div class='cards'>")
@@ -464,7 +481,7 @@ def build(manifest, studio):
                "a.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "fetch('/open?path='+encodeURIComponent(p)).catch(()=>{});});}}</script>")
-    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + "</body></html>")
+    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if peeks else "") + "</body></html>")
     return "\n".join(out)
 
 

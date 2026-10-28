@@ -95,6 +95,8 @@ def old_ours(sidecar):
         text = sidecar.read_text()
     except (OSError, UnicodeDecodeError):
         return False
+    if text == SIDECAR.format(tool=TOOL, keyword=OLD_KEYWORD):  # today's format with the Oct 25 keyword
+        return True
     return any(text == o.format(tool=TOOL, keyword=k) for o in OLD_SIDECARS for k in (OLD_KEYWORD, KEYWORD))
 
 
@@ -163,8 +165,9 @@ def plan(root, files):
     return todo, upgrade, skipped, problems
 
 
-def make_previews(root, files, studio, size=1000):
-    """Small JPEGs of the sneak peeks for the report, with the Mac's own sips. Returns (made, names)."""
+def make_previews(root, files, studio, size=2000):
+    """JPEGs of the sneak peeks for the report, with the Mac's own sips. 2000 px on the long side, so the
+    click-to-enlarge view on the report is sharp on a big screen (about 0.6 s and 400 KB each). Returns (made, names)."""
     out = studio / "sneak-peeks"
     out.mkdir(parents=True, exist_ok=True)
     names, made = [], 0
