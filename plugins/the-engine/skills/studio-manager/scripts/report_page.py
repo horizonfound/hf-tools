@@ -363,8 +363,8 @@ def build(manifest, studio):
     elif all_good:
         where = "your drive and your second copy" if second else "your drive"
         out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
-        out.append(f"<p class='lede'>Every one was checked against the card, byte for byte. They're on {where}. "
-                   "Nothing deleted, nothing moved, nothing posted.</p>")
+        out.append(f"<p class='lede'>Every photo was copied to {where} and checked against the card, byte for byte. "
+                   "Your memory card hasn't been changed, and nothing has been shared or posted anywhere.</p>")
         out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
     else:
         out.append(f"<h1 class='h1'>Not finished <span class='swap'>yet.</span></h1>")
@@ -461,7 +461,7 @@ def build(manifest, studio):
     out.append("</div>")
     out.append("</div></div>")
 
-    out.append("<footer class='foot'><div class='wrap'>Nothing deleted, nothing moved, nothing posted.</div>"
+    out.append("<footer class='foot'><div class='wrap'>Your memory card hasn't been changed, and nothing has been shared or posted anywhere.</div>"
                "<div class='wordmark'>The Studio</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.
