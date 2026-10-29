@@ -25,10 +25,23 @@ the green pieces cover. Nothing here posts anything, ever (rule 5): dates only.
     python3 posting_queue.py reminders [--mark]          today's post, running low, pieces sitting in yellow
     python3 posting_queue.py page | serve
 
+    python3 posting_queue.py feed                        what the Studio knows of their real Instagram grid
+    python3 posting_queue.py feed --handle horizonfound  remember their handle (asked once)
+    python3 posting_queue.py grab-script                 the snippet that reads their profile page in the browser
+                                                         and hands the last posts to the Studio (POST /feed, localhost only)
+    python3 posting_queue.py feed --import tiles.json    the same, from a file
+    python3 posting_queue.py feed --clear
+
+The real grid: Instagram gives no simple way to read a profile's posts, so the Studio reads what is on
+screen in the photographer's own browser (the Claude app's browser pane, open on their profile, signed in
+or not): the grab script collects the last 15 tiles as small thumbnails and sends them to the Studio's
+local server. Nothing leaves the Mac; nothing is posted. Kept in ~/.studio/feed.json + ~/.studio/feed/.
+
 Kept in ~/.studio/posting.json with a thumbnail per piece in ~/.studio/posting-thumbs/.
 A piece is named "<shoot> reel" or "<shoot> carousel"; a word or two from that is enough to find it.
 """
 import argparse
+import base64
 import html
 import json
 import math
@@ -50,6 +63,10 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 PFILE = HOME / "posting.json"
 THUMBS = HOME / "posting-thumbs"
 PAGE = HOME / "posting.html"
+FEED = HOME / "feed.json"
+FEED_THUMBS = HOME / "feed"
+FEED_MAX = 15            # tiles read from their profile: five rows of three
+FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 KINDS = ("reel", "carousel")
 LOW_WEEKS = 1.0          # the running-low tap
@@ -309,6 +326,128 @@ def reminders(p, mark=False):
     return lines
 
 
+# ---------- their real grid ----------
+
+def load_feed():
+    if FEED.exists():
+        try:
+            f = json.loads(FEED.read_text())
+            f.setdefault("posts", [])
+            return f
+        except ValueError:
+            pass
+    return {"handle": None, "read_at": None, "posts": []}
+
+
+def save_feed(f):
+    HOME.mkdir(parents=True, exist_ok=True)
+    tmp = FEED.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(f, indent=1, ensure_ascii=False))
+    os.replace(tmp, FEED)
+
+
+def post_id(href):
+    """'/horizonfound/reel/DVv_ydTDP6x/' -> 'DVv_ydTDP6x'."""
+    m = re.search(r"/(?:p|reel|tv)/([A-Za-z0-9_-]+)", str(href))
+    return m.group(1) if m else re.sub(r"[^A-Za-z0-9_-]", "", str(href))[-24:]
+
+
+def import_feed(tiles, handle=None):
+    """The last posts as the browser saw them: [{href, data (a jpeg data URL), w, h, reel, carousel, pinned}].
+    Writes one small jpeg per post and replaces feed.json whole. Returns the feed. Thumbnails that are not a
+    jpeg data URL are refused (nothing else is ever written into the folder)."""
+    if not isinstance(tiles, list) or not tiles:
+        raise ValueError("no tiles")
+    FEED_THUMBS.mkdir(parents=True, exist_ok=True)
+    posts, seen = [], set()
+    for t in tiles[:FEED_MAX]:
+        pid = post_id(t.get("href", ""))
+        if not pid or pid in seen:
+            continue
+        data = str(t.get("data", ""))
+        if not data.startswith("data:image/jpeg;base64,"):
+            continue
+        raw = base64.b64decode(data.split(",", 1)[1], validate=True)
+        if not raw.startswith(b"\xff\xd8") or len(raw) > 400_000:
+            continue
+        (FEED_THUMBS / f"{pid}.jpg").write_bytes(raw)
+        seen.add(pid)
+        kind = "reel" if t.get("reel") else "carousel" if t.get("carousel") else "photo"
+        posts.append({"id": pid, "kind": kind, "pinned": bool(t.get("pinned")), "w": t.get("w"), "h": t.get("h"),
+                      "thumb": f"feed/{pid}.jpg"})
+    if not posts:
+        raise ValueError("no usable tiles")
+    old = load_feed()
+    for p_ in FEED_THUMBS.glob("*.jpg"):      # the old grid's tiles, no longer shown: set aside, not deleted
+        if p_.stem not in seen:
+            keep = FEED_THUMBS / "older"
+            keep.mkdir(exist_ok=True)
+            os.replace(p_, keep / p_.name)
+    f = {"handle": (handle or old.get("handle") or "").lstrip("@") or None, "read_at": now(), "posts": posts}
+    save_feed(f)
+    return f
+
+
+def grab_script(port=None, handle=None):
+    """The snippet to run on their profile page in the browser. It collects the first tiles of the grid as small
+    jpegs (drawn in the page, so the picture never leaves the browser as a link) and posts them to the Studio
+    on this Mac. Plain text body, so the browser sends it without a preflight; the Studio answers with CORS
+    headers for instagram.com only."""
+    if port is None:
+        try:
+            port = int(urlsplit((HOME / "posting-url.txt").read_text().strip()).port or 8790)
+        except (OSError, ValueError):
+            port = 8790
+    return r"""(() => {
+  const url = 'http://127.0.0.1:%d/feed';
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:12px;left:50%%;transform:translateX(-50%%);z-index:2147483647;background:#1F2430;color:#fff;font:600 14px/1.3 -apple-system,Helvetica,Arial,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.3)';
+  banner.textContent = 'The Studio is reading your grid...';
+  document.body.appendChild(banner);
+  const handle = (location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+  const links = [...document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]')].filter(a => a.querySelector('img')).slice(0, %d);
+  (async () => {
+    const tiles = [];
+    for (const a of links) {
+      const img = a.querySelector('img');
+      const href = a.getAttribute('href').split('?')[0];
+      try {
+        const res = await fetch(img.currentSrc || img.src, {mode: 'cors'});
+        const bmp = await createImageBitmap(await res.blob());
+        const c = document.createElement('canvas');
+        const s = 216 / Math.max(bmp.width, bmp.height);
+        c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        tiles.push({href, w: bmp.width, h: bmp.height, reel: href.includes('/reel/'),
+          carousel: !!a.querySelector('svg[aria-label="Carousel"]'), pinned: !!a.querySelector('svg[aria-label="Pinned post icon"]'),
+          data: c.toDataURL('image/jpeg', 0.72)});
+      } catch (e) {}
+    }
+    if (!tiles.length) { banner.textContent = 'No posts found on this page. Scroll to the grid and try again.'; return; }
+    try {
+      const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({handle, tiles})});
+      const j = await r.json();
+      banner.textContent = j.ok ? ('Got ' + j.posts + ' posts. The Studio has your grid.') : ('The Studio said: ' + (j.error || 'no'));
+    } catch (e) { banner.textContent = 'Could not reach the Studio on this Mac. Is the posting queue page open?'; }
+    setTimeout(() => banner.remove(), 6000);
+  })();
+  return 'reading ' + links.length + ' tiles' + (handle ? ' from @' + handle : '');
+})()""" % (port, FEED_MAX)
+
+
+def feed_words(f):
+    if not f["posts"]:
+        return "I haven't read your Instagram grid yet." + (f" Your handle is @{f['handle']}." if f.get("handle") else "")
+    when = f.get("read_at", "")[:10]
+    try:
+        when = nice_day(when)
+    except ValueError:
+        pass
+    pinned = sum(1 for x in f["posts"] if x.get("pinned"))
+    return (f"Your grid, read {when}: the last {len(f['posts'])} posts" + (f" on @{f['handle']}" if f.get("handle") else "")
+            + (f", {pinned} pinned" if pinned else "") + ".")
+
+
 # ---------- the page ----------
 
 CSS = r"""
@@ -341,7 +480,10 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .tile .d{position:absolute;bottom:6px;left:6px;right:6px;font:600 12px/1.2 var(--sans);color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 .tile.ghost{cursor:default;background:repeating-linear-gradient(45deg,#ECEAF6,#ECEAF6 6px,#E3E0F0 6px,#E3E0F0 12px)}
 .tile.ghost small{position:absolute;inset:0;display:grid;place-items:center;font:italic 400 12px/1.2 var(--display);color:var(--ink-2);text-align:center;padding:8px}
-.gridnote{font-size:13px;color:var(--ink-2);max-width:420px}
+.tile.real{cursor:default}.tile.real img{filter:saturate(.85)}
+.tile.real .k{background:rgba(255,255,255,.8);color:var(--ink)}
+.tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:var(--coral)}
+.gridnote{font-size:13px;color:var(--ink-2);max-width:420px;margin:0}
 .list{display:grid;gap:.7rem;padding:.8rem 0 1rem;margin:0;list-style:none}
 .row{display:grid;grid-template-columns:auto 64px 1fr auto;gap:.9rem;align-items:center;background:var(--paper);border-radius:18px;padding:.7rem .9rem;box-shadow:0 1px 0 var(--line)}
 .light{width:14px;height:14px;border-radius:50%;background:var(--sand-l)}
@@ -372,9 +514,16 @@ function render(S){
  $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell Claude to change it.`:`No posting rhythm yet. Tell Claude how often you like to post.`;
  const g=$('#grid');g.innerHTML='';
  const greens=S.greens.slice().reverse();  // Instagram shows the newest first: the last in line sits top-left
- greens.forEach(x=>{const t=document.createElement('div');t.className='tile';t.draggable=live;t.dataset.id=x.id;
+ const feed=S.feed&&S.feed.posts||[];const pinned=feed.filter(x=>x.pinned),rest=feed.filter(x=>!x.pinned);
+ const real=x=>{const t=document.createElement('div');t.className='tile real';t.innerHTML=`<img src="${x.thumb}" alt="">`+(x.pinned?`<span class="k">pinned</span>`:'');return t};
+ pinned.forEach(x=>g.appendChild(real(x)));   // Instagram keeps pinned posts at the top; new posts land after them
+ greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine';t.draggable=live;t.dataset.id=x.id;
   t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind}</span><span class="d">${nice(x.date)}</span>`;g.appendChild(t)});
- for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
+ if(feed.length){const want=Math.min(15,Math.max(9,Math.ceil((pinned.length+greens.length+Math.min(rest.length,3))/3)*3));
+  for(const x of rest){if(g.children.length>=want)break;g.appendChild(real(x))}
+  while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
+ else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
+ $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+S.feed.handle+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
   items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${x.status}"></span><span class="th">${x.thumb?`<img src="${x.thumb}" alt="">`:''}</span><div><div class="name">${x.shoot_name} ${x.kind}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${x.id}">Posted</button><button class="btn o" data-a="unready" data-id="${x.id}">Not ready yet</button>`});
@@ -383,12 +532,12 @@ function render(S){
  document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:'Posted. Nice.',ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);}
 function drag(S){if(!live)return;const g=$('#grid');let src=null;
- g.querySelectorAll('.tile:not(.ghost)').forEach(t=>{
+ g.querySelectorAll('.tile.mine').forEach(t=>{
   t.addEventListener('dragstart',e=>{src=t;t.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
   t.addEventListener('dragend',()=>{t.classList.remove('dragging');g.querySelectorAll('.over').forEach(x=>x.classList.remove('over'))});
   t.addEventListener('dragover',e=>{e.preventDefault();if(t!==src)t.classList.add('over')});
   t.addEventListener('dragleave',()=>t.classList.remove('over'));
-  t.addEventListener('drop',async e=>{e.preventDefault();if(!src||src===t)return;const tiles=[...g.querySelectorAll('.tile:not(.ghost)')];const from=tiles.indexOf(src),to=tiles.indexOf(t);
+  t.addEventListener('drop',async e=>{e.preventDefault();if(!src||src===t)return;const tiles=[...g.querySelectorAll('.tile.mine')];const from=tiles.indexOf(src),to=tiles.indexOf(t);
    tiles.splice(from,1);tiles.splice(to,0,src);const order=tiles.map(x=>x.dataset.id).reverse();  // back to line order (first to post first)
    const S2=await post({action:'order',ids:order});if(S2){render(S2);say('Moved. The dates follow the order.')}});});}
 if(!live)$('#offline').hidden=false;render(D);
@@ -413,8 +562,11 @@ def state(p):
     else:
         w = round(weeks, 1); w = int(w) if w == int(w) else w
         head = f"About {w} week{'s' if w != 1 else ''} of posts <em>ready.</em>"
+    f = load_feed()
+    feed = {"handle": f.get("handle"), "read_at": f.get("read_at"),
+            "posts": [{k: x.get(k) for k in ("id", "kind", "pinned", "thumb")} for x in f["posts"] if (FEED_THUMBS / f"{x['id']}.jpg").exists()]}
     return {"today": today().isoformat(), "interval": p.get("interval"), "interval_words": interval_words(p.get("interval")),
-            "weeks": weeks, "tank_head": head, "tank_line": tank_words(p),
+            "weeks": weeks, "tank_head": head, "tank_line": tank_words(p), "feed": feed,
             "greens": [pub(x) for x in greens(p)],
             "yellows": [pub(x) for x in p["pieces"] if x["status"] == "yellow"],
             "reds": [pub(x) for x in p["pieces"] if x["status"] == "red"]}
@@ -430,8 +582,8 @@ def page_html(p):
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show my posting queue” to change things.</p></header>"
-            "<section class='sec'><h2>Your grid, as it will look</h2><p>Newest on top, the way Instagram shows it. Drag a piece to a different spot and its posting date follows.</p>"
-            "<div class='grid' id='grid'></div></section>"
+            "<section class='sec'><h2>Your grid, as it will look</h2><p>Newest on top, the way Instagram shows it. The outlined tiles are yours to come: drag one to a different spot and its posting date follows.</p>"
+            "<div class='grid' id='grid'></div><p class='gridnote' id='gridnote'></p></section>"
             "<section class='sec'><h2>Ready to post</h2></section><ul class='list' id='greens'></ul>"
             "<section class='sec'><h2>In progress</h2><p>The Studio did its part. Finish it in CapCut or Canva, then press Ready.</p></section><ul class='list' id='yellows'></ul>"
             "<section class='sec'><h2>Not started</h2></section><ul class='list' id='reds'></ul>"
@@ -456,12 +608,32 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path.startswith("/posting-thumbs/") and ".." not in path:
+        if (path.startswith("/posting-thumbs/") or path.startswith("/feed/")) and ".." not in path:
             return super().do_GET()
         self.send_error(HTTPStatus.NOT_FOUND)
 
+    def cors(self):
+        """Only the grab script, running on instagram.com in their own browser, may talk to /feed from another origin."""
+        origin = self.headers.get("Origin", "")
+        if origin in FEED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+
+    def do_OPTIONS(self):
+        if urlsplit(self.path).path == "/feed":
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.cors()
+            self.send_header("Access-Control-Allow-Methods", "POST")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
     def do_POST(self):
-        if urlsplit(self.path).path != "/posting":
+        path = urlsplit(self.path).path
+        if path == "/feed":
+            return self.post_feed()
+        if path != "/posting":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         try:
@@ -492,6 +664,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(out)
+
+    def post_feed(self):
+        """The grab script's delivery: {handle, tiles:[...]}. Up to about 4 MB of small jpegs."""
+        out, code = {}, HTTPStatus.OK
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+            if n > 6_000_000:
+                raise ValueError("too big")
+            body = json.loads(self.rfile.read(n) or b"{}")
+            f = import_feed(body.get("tiles"), handle=body.get("handle"))
+            write_page(load())
+            out = {"ok": True, "posts": len(f["posts"]), "handle": f.get("handle")}
+        except (ValueError, TypeError, KeyError) as e:
+            out, code = {"ok": False, "error": "nothing usable in what the page sent"}, HTTPStatus.BAD_REQUEST
+            say(f"(feed refused: {str(e)[:120]})")
+        data = json.dumps(out).encode()
+        self.send_response(code)
+        self.cors()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(data)
 
     def log_message(self, fmt, *args):
         pass
@@ -571,8 +764,42 @@ def main():
     sub.add_parser("list"); sub.add_parser("tank"); sub.add_parser("page")
     r = sub.add_parser("reminders"); r.add_argument("--mark", action="store_true")
     s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=8790)
+    fd = sub.add_parser("feed"); fd.add_argument("--handle"); fd.add_argument("--import", dest="import_file"); fd.add_argument("--clear", action="store_true")
+    gs = sub.add_parser("grab-script"); gs.add_argument("--port", type=int)
     a = ap.parse_args()
     p = load()
+
+    if a.cmd == "feed":
+        f = load_feed()
+        if a.clear:
+            for p_ in FEED_THUMBS.glob("*.jpg"):
+                (FEED_THUMBS / "older").mkdir(parents=True, exist_ok=True)
+                os.replace(p_, FEED_THUMBS / "older" / p_.name)
+            save_feed({"handle": a.handle or f.get("handle"), "read_at": None, "posts": []})
+            write_page(p)
+            say("Forgot your grid. The page shows placeholders again until it's read once more.")
+            return 0
+        if a.import_file:
+            body = json.loads(Path(a.import_file).read_text())
+            tiles = body.get("tiles") if isinstance(body, dict) else body
+            try:
+                f = import_feed(tiles, handle=a.handle or (body.get("handle") if isinstance(body, dict) else None))
+            except ValueError as e:
+                say(f"STOP: nothing usable in that file ({e}).")
+                return 1
+            write_page(p)
+            say(feed_words(f))
+            return 0
+        if a.handle:
+            f["handle"] = a.handle.lstrip("@")
+            save_feed(f)
+            say(f"Your Instagram is @{f['handle']}. " + feed_words(f))
+            return 0
+        say(feed_words(f))
+        return 0
+    if a.cmd == "grab-script":
+        say(grab_script(a.port))
+        return 0
 
     if a.cmd == "interval":
         if not a.text:
