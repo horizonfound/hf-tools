@@ -30,6 +30,6 @@ How: the report page takes `?show=big` (opens the first sneak peek in the popup)
 13. "backup now" typed, with the first question's buttons.
 14. The walk-away message on screen.
 15. A phone tap on the lock screen.
-21. Lightroom with the keyword filter set to "sneak peek". Claude opened Lightroom but it holds another catalog, and importing the test shoot would change it, so this one is Dustin's.
+21. Lightroom (the cloud version Dustin uses, not Classic) with the keyword search set to "sneak peek". Dustin's shot; he confirmed the keyword shows up there.
 
 Claude's screen tool refuses the Claude app's own window, which is why 1 to 14 are Dustin's.
