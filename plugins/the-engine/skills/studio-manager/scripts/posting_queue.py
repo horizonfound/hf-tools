@@ -505,7 +505,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .tile.ghost small{position:absolute;inset:0;display:grid;place-items:center;font:italic 400 12px/1.2 var(--display);color:var(--ink-2);text-align:center;padding:8px}
 .tile.real{cursor:default}.tile.real img{filter:saturate(.85)}
 .tile.real .k{background:rgba(255,255,255,.8);color:var(--ink)}
-.tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:var(--coral)}
+.tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:rgba(0,0,0,.78);color:#fff}
 .gridnote{font-size:13px;color:var(--ink-2);max-width:820px;margin:0}
 .list{display:grid;gap:.7rem;padding:.8rem 0 1rem;margin:0;list-style:none}
 .row{display:grid;grid-template-columns:auto 64px 1fr auto;gap:.9rem;align-items:center;background:var(--paper);border-radius:18px;padding:.7rem .9rem;box-shadow:0 1px 0 var(--line)}
