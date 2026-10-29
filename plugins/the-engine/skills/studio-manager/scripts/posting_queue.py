@@ -210,21 +210,21 @@ def queue_shoot(text):
 
 
 def add_for_shoot(p, shoot, kinds):
-    """Red pieces for an edited shoot, one per kind, with a thumbnail from the queue's copies."""
+    """Red pieces for an edited shoot, one per kind, each with a different one of the queue's three previews
+    (the reel the first, the carousel the second), so a shoot's pieces never show the same photo twice in the grid."""
     made = []
-    for kind in kinds:
+    have = [HOME / t for t in (shoot.get("thumbs") or []) if (HOME / t).exists()]
+    for n, kind in enumerate(kinds):
         if any(x["shoot_id"] == shoot["id"] and x["kind"] == kind for x in p["pieces"]):
             continue
         pid = f"{shoot['id']}-{kind}"
         thumb = None
-        for t in shoot.get("thumbs") or []:
-            src = HOME / t
-            if src.exists():
-                THUMBS.mkdir(parents=True, exist_ok=True)
-                dst = THUMBS / f"{pid}{src.suffix.lower()}"
-                shutil.copyfile(src, dst)
-                thumb = dst.relative_to(HOME).as_posix()
-                break
+        if have:
+            src = have[n % len(have)]
+            THUMBS.mkdir(parents=True, exist_ok=True)
+            dst = THUMBS / f"{pid}{src.suffix.lower()}"
+            shutil.copyfile(src, dst)
+            thumb = dst.relative_to(HOME).as_posix()
         p["pieces"].append({"id": pid, "shoot_id": shoot["id"], "shoot_name": shoot["name"], "shot": shoot.get("shot"),
                             "kind": kind, "status": "red", "thumb": thumb, "added": now()})
         made.append(pid)
