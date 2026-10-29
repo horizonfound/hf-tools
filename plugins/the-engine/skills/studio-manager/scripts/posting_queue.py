@@ -27,15 +27,21 @@ the green pieces cover. Nothing here posts anything, ever (rule 5): dates only.
 
     python3 posting_queue.py feed                        what the Studio knows of their real Instagram grid
     python3 posting_queue.py feed --handle horizonfound  remember their handle (asked once)
-    python3 posting_queue.py grab-script                 the snippet that reads their profile page in the browser
-                                                         and hands the last posts to the Studio (POST /feed, localhost only)
-    python3 posting_queue.py feed --import tiles.json    the same, from a file
+    python3 posting_queue.py grab-script                 the snippet that reads their profile page in the browser:
+                                                         it returns the last 15 posts as a small list (post, picture address)
+    python3 posting_queue.py feed --import tiles.json    that list saved to a file: the Studio fetches each picture
+                                                         full size from Instagram's picture server and keeps it
     python3 posting_queue.py feed --clear
 
 The real grid: Instagram gives no simple way to read a profile's posts, so the Studio reads what is on
 screen in the photographer's own browser (the Claude app's browser pane, open on their profile, signed in
-or not): the grab script collects the last 15 tiles as small thumbnails and sends them to the Studio's
-local server. Nothing leaves the Mac; nothing is posted. Kept in ~/.studio/feed.json + ~/.studio/feed/.
+or not). The grab script collects the last 15 tiles as a small list: which post, and the address of its
+full-size picture. Claude saves what it returns to a file and `feed --import` fetches the pictures on this
+Mac. (The first version drew the tiles small in the page and posted them to the Studio's server; that can
+never work: instagram.com's page rules refuse any connection to 127.0.0.1, and the app's browser pane
+refuses local connections from an outside page too, websockets included. The POST /feed route stays
+for a browser outside the app with those rules relaxed, nothing more.) Nothing is posted. Kept in
+~/.studio/feed.json + ~/.studio/feed/ (the picture addresses are used once and not kept).
 
 Kept in ~/.studio/posting.json with a thumbnail per piece in ~/.studio/posting-thumbs/.
 A piece is named "<shoot> reel" or "<shoot> carousel"; a word or two from that is enough to find it.
@@ -48,6 +54,7 @@ import math
 import os
 import re
 import shutil
+import subprocess
 import sys
 from datetime import date, datetime, timedelta
 from functools import partial
@@ -67,6 +74,8 @@ FEED = HOME / "feed.json"
 FEED_THUMBS = HOME / "feed"
 FEED_MAX = 15            # tiles read from their profile: five rows of three
 FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
+FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram keeps the pictures themselves
+FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 KINDS = ("reel", "carousel")
 LOW_WEEKS = 1.0          # the running-low tap
@@ -352,10 +361,47 @@ def post_id(href):
     return m.group(1) if m else re.sub(r"[^A-Za-z0-9_-]", "", str(href))[-24:]
 
 
+def fetch_tile(src):
+    """One grid picture, full size, from Instagram's own picture server. Only that server, only https, only a
+    jpeg. Fetched with the computer's own curl (every Mac and every Windows 10+ PC has it): Python's own fetch
+    cannot check Instagram's certificate on a Mac whose Python came without root certificates."""
+    u = urlsplit(str(src))
+    if u.scheme != "https" or not u.hostname or not u.hostname.endswith(FEED_PICTURE_HOSTS):
+        raise ValueError("not an Instagram picture address")
+    r = subprocess.run(["curl", "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
+                        "-A", "The Studio by Horizon Found", "-o", "-", src], capture_output=True)
+    if r.returncode != 0:
+        raise ValueError(f"curl {r.returncode}: {r.stderr.decode(errors='replace')[:120]}")
+    raw = r.stdout
+    if not raw.startswith(b"\xff\xd8") or len(raw) > FEED_TILE_MAX:
+        raise ValueError("not a jpeg")
+    return raw
+
+
+def tile_bytes(t):
+    """The picture for one tile: fetched full size from its address when there is one, else the small jpeg the
+    first version drew in the page. None when neither works (the tile is left out, never a broken picture)."""
+    if t.get("src"):
+        try:
+            return fetch_tile(t["src"])
+        except (OSError, ValueError):
+            pass
+    data = str(t.get("data", ""))
+    if data.startswith("data:image/jpeg;base64,"):
+        try:
+            raw = base64.b64decode(data.split(",", 1)[1], validate=True)
+        except ValueError:
+            return None
+        if raw.startswith(b"\xff\xd8") and len(raw) <= 400_000:
+            return raw
+    return None
+
+
 def import_feed(tiles, handle=None):
-    """The last posts as the browser saw them: [{href, data (a jpeg data URL), w, h, reel, carousel, pinned}].
-    Writes one small jpeg per post and replaces feed.json whole. Returns the feed. Thumbnails that are not a
-    jpeg data URL are refused (nothing else is ever written into the folder)."""
+    """The last posts as the browser saw them: [{href, src (the full-size picture's address) or data (a jpeg data
+    URL), w, h, reel, carousel, pinned}]. Fetches or decodes one jpeg per post into the feed folder and replaces
+    feed.json whole. Returns the feed. Nothing but a jpeg is ever written into the folder; the addresses are
+    used once and not kept."""
     if not isinstance(tiles, list) or not tiles:
         raise ValueError("no tiles")
     FEED_THUMBS.mkdir(parents=True, exist_ok=True)
@@ -364,11 +410,8 @@ def import_feed(tiles, handle=None):
         pid = post_id(t.get("href", ""))
         if not pid or pid in seen:
             continue
-        data = str(t.get("data", ""))
-        if not data.startswith("data:image/jpeg;base64,"):
-            continue
-        raw = base64.b64decode(data.split(",", 1)[1], validate=True)
-        if not raw.startswith(b"\xff\xd8") or len(raw) > 400_000:
+        raw = tile_bytes(t)
+        if raw is None:
             continue
         (FEED_THUMBS / f"{pid}.jpg").write_bytes(raw)
         seen.add(pid)
@@ -389,50 +432,30 @@ def import_feed(tiles, handle=None):
 
 
 def grab_script(port=None, handle=None):
-    """The snippet to run on their profile page in the browser. It collects the first tiles of the grid as small
-    jpegs (drawn in the page, so the picture never leaves the browser as a link) and posts them to the Studio
-    on this Mac. Plain text body, so the browser sends it without a preflight; the Studio answers with CORS
-    headers for instagram.com only."""
-    if port is None:
-        try:
-            port = int(urlsplit((HOME / "posting-url.txt").read_text().strip()).port or 8790)
-        except (OSError, ValueError):
-            port = 8790
-    return r"""(() => {
-  const url = 'http://127.0.0.1:%d/feed';
-  const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:12px;left:50%%;transform:translateX(-50%%);z-index:2147483647;background:#1F2430;color:#fff;font:600 14px/1.3 -apple-system,Helvetica,Arial,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.3)';
-  banner.textContent = 'The Studio is reading your grid...';
-  document.body.appendChild(banner);
+    """The snippet to run on their profile page in the browser (the pane's javascript tool, or the console of any
+    browser). It scrolls once so the grid fills in, then returns the first tiles as a small list: which post, the
+    address of its full-size picture (the largest the page offers), reel / carousel / pinned. Nothing is sent
+    anywhere by the page: Claude saves what comes back to a file and `feed --import` fetches the pictures on
+    this Mac. (Pages on instagram.com are not allowed to talk to 127.0.0.1, and the app's browser pane allows
+    no local connection from an outside page at all, so the page cannot hand anything over itself.)"""
+    return r"""await (async () => {
+  for (let i = 0; i < 4; i++) { window.scrollBy(0, 1600); await new Promise(r => setTimeout(r, 1200)); }
+  window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 600));
   const handle = (location.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
   const links = [...document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]')].filter(a => a.querySelector('img')).slice(0, %d);
-  (async () => {
-    const tiles = [];
-    for (const a of links) {
-      const img = a.querySelector('img');
-      const href = a.getAttribute('href').split('?')[0];
-      try {
-        const res = await fetch(img.currentSrc || img.src, {mode: 'cors'});
-        const bmp = await createImageBitmap(await res.blob());
-        const c = document.createElement('canvas');
-        const s = 216 / Math.max(bmp.width, bmp.height);
-        c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
-        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-        tiles.push({href, w: bmp.width, h: bmp.height, reel: href.includes('/reel/'),
-          carousel: !!a.querySelector('svg[aria-label="Carousel"]'), pinned: !!a.querySelector('svg[aria-label="Pinned post icon"]'),
-          data: c.toDataURL('image/jpeg', 0.72)});
-      } catch (e) {}
-    }
-    if (!tiles.length) { banner.textContent = 'No posts found on this page. Scroll to the grid and try again.'; return; }
-    try {
-      const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({handle, tiles})});
-      const j = await r.json();
-      banner.textContent = j.ok ? ('Got ' + j.posts + ' posts. The Studio has your grid.') : ('The Studio said: ' + (j.error || 'no'));
-    } catch (e) { banner.textContent = 'Could not reach the Studio on this Mac. Is the posting queue page open?'; }
-    setTimeout(() => banner.remove(), 6000);
-  })();
-  return 'reading ' + links.length + ' tiles' + (handle ? ' from @' + handle : '');
-})()""" % (port, FEED_MAX)
+  const best = img => {
+    const c = (img.getAttribute('srcset') || '').split(',').map(x => x.trim().split(/\s+/)).filter(x => x[0])
+      .map(x => ({u: x[0], w: parseInt(x[1]) || 0})).sort((a, b) => b.w - a.w);
+    return c.length ? c[0].u : (img.currentSrc || img.src);
+  };
+  const tiles = links.map(a => {
+    const img = a.querySelector('img');
+    const href = a.getAttribute('href').split('?')[0];
+    return {href, src: best(img), reel: href.includes('/reel/'),
+      carousel: !!a.querySelector('svg[aria-label="Carousel"]'), pinned: !!a.querySelector('svg[aria-label="Pinned post icon"]')};
+  });
+  return JSON.stringify({handle, tiles});
+})()""" % FEED_MAX
 
 
 def feed_words(f):
@@ -472,7 +495,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .sec{padding:1.6rem 0 .4rem;display:grid;gap:.3rem}
 .sec h2{margin:0;font:600 22px/1.15 var(--sans);letter-spacing:-.02em}
 .sec p{margin:0;color:var(--ink-2);font-size:14.5px;max-width:40em}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:420px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:820px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
 .tile{position:relative;aspect-ratio:4/5;background:var(--sand-l);overflow:hidden;border-radius:6px;cursor:grab;user-select:none;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .tile:active{cursor:grabbing}.tile.dragging{opacity:.4}.tile.over{box-shadow:inset 0 0 0 3px var(--coral)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block}
@@ -483,7 +506,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .tile.real{cursor:default}.tile.real img{filter:saturate(.85)}
 .tile.real .k{background:rgba(255,255,255,.8);color:var(--ink)}
 .tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:var(--coral)}
-.gridnote{font-size:13px;color:var(--ink-2);max-width:420px;margin:0}
+.gridnote{font-size:13px;color:var(--ink-2);max-width:820px;margin:0}
 .list{display:grid;gap:.7rem;padding:.8rem 0 1rem;margin:0;list-style:none}
 .row{display:grid;grid-template-columns:auto 64px 1fr auto;gap:.9rem;align-items:center;background:var(--paper);border-radius:18px;padding:.7rem .9rem;box-shadow:0 1px 0 var(--line)}
 .light{width:14px;height:14px;border-radius:50%;background:var(--sand-l)}
@@ -519,8 +542,7 @@ function render(S){
  pinned.forEach(x=>g.appendChild(real(x)));   // Instagram keeps pinned posts at the top; new posts land after them
  greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine';t.draggable=live;t.dataset.id=x.id;
   t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind}</span><span class="d">${nice(x.date)}</span>`;g.appendChild(t)});
- if(feed.length){const want=Math.min(15,Math.max(9,Math.ceil((pinned.length+greens.length+Math.min(rest.length,3))/3)*3));
-  for(const x of rest){if(g.children.length>=want)break;g.appendChild(real(x))}
+ if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
  $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+S.feed.handle+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
