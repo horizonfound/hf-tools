@@ -497,7 +497,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .sec p{margin:0;color:var(--ink-2);font-size:14.5px;max-width:40em}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:820px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
 .tile{position:relative;aspect-ratio:4/5;background:var(--sand-l);overflow:hidden;border-radius:6px;cursor:grab;user-select:none;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
-.tile:active{cursor:grabbing}.tile.dragging{opacity:.4}.tile.over{box-shadow:inset 0 0 0 3px var(--coral)}
+.tile.mine{touch-action:none}body.lifting,body.lifting *{cursor:grabbing!important}.tile.dragging{opacity:.3;box-shadow:inset 0 0 0 3px var(--coral);outline:2px dashed var(--coral);outline-offset:-6px}.tile.over{box-shadow:inset 0 0 0 5px var(--sun);transform:scale(.94);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}.tile.lift{position:fixed;left:0;top:0;z-index:9999;margin:0;pointer-events:none;opacity:1;border-radius:8px;transform:scale(1.06);transition:none;box-shadow:inset 0 0 0 3px var(--coral),0 0 0 3px #fff,0 30px 60px -14px rgba(31,36,48,.6),0 8px 18px rgba(31,36,48,.25)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block}
 .tile .k{position:absolute;top:6px;left:6px;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);padding:4px 7px;border-radius:999px}
 .tile .d{position:absolute;bottom:6px;left:6px;right:6px;font:600 12px/1.2 var(--sans);color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}
@@ -553,15 +553,24 @@ function render(S){
  mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${x.shoot_name} ${x.kind}” to Claude.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${x.id}">Skip this one</button>`});
  document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:'Posted. Nice.',ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);}
-function drag(S){if(!live)return;const g=$('#grid');let src=null;
- g.querySelectorAll('.tile.mine').forEach(t=>{
-  t.addEventListener('dragstart',e=>{src=t;t.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
-  t.addEventListener('dragend',()=>{t.classList.remove('dragging');g.querySelectorAll('.over').forEach(x=>x.classList.remove('over'))});
-  t.addEventListener('dragover',e=>{e.preventDefault();if(t!==src)t.classList.add('over')});
-  t.addEventListener('dragleave',()=>t.classList.remove('over'));
-  t.addEventListener('drop',async e=>{e.preventDefault();if(!src||src===t)return;const tiles=[...g.querySelectorAll('.tile.mine')];const from=tiles.indexOf(src),to=tiles.indexOf(t);
-   tiles.splice(from,1);tiles.splice(to,0,src);const order=tiles.map(x=>x.dataset.id).reverse();  // back to line order (first to post first)
-   const S2=await post({action:'order',ids:order});if(S2){render(S2);say('Moved. The dates follow the order.')}});});}
+function drag(S){if(!live)return;const g=$('#grid');let src=null,lift=null,over=null,sx=0,sy=0,ox=0,oy=0,on=false;
+ // The Studio draws its own drag: a crisp copy of the tile with a border and a shadow follows the pointer, the tile it would
+ // take the place of gets a yellow stroke, and the empty spot it left stays dimmed. (The browser's own drag ghost was a
+ // half-see-through, stretched copy; Dustin, Oct 28.) Pointer events, so it works with a mouse, a trackpad and a finger.
+ const tiles=()=>[...g.querySelectorAll('.tile.mine')];
+ const mark=t=>{if(over===t)return;if(over)over.classList.remove('over');over=(t&&t!==src)?t:null;if(over)over.classList.add('over')};
+ const stop=()=>{if(lift)lift.remove();lift=null;if(src)src.classList.remove('dragging');mark(null);src=null;on=false;document.body.classList.remove('lifting')};
+ g.querySelectorAll('.tile.mine').forEach(t=>{t.draggable=false;
+  t.addEventListener('pointerdown',e=>{if(e.button!==0)return;src=t;sx=e.clientX;sy=e.clientY;const r=t.getBoundingClientRect();ox=e.clientX-r.left;oy=e.clientY-r.top;try{t.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
+  t.addEventListener('pointermove',e=>{if(src!==t)return;
+   if(!on){if(Math.hypot(e.clientX-sx,e.clientY-sy)<6)return;on=true;const r=t.getBoundingClientRect();lift=t.cloneNode(true);lift.classList.add('lift');lift.style.width=r.width+'px';lift.style.height=r.height+'px';document.body.appendChild(lift);t.classList.add('dragging');document.body.classList.add('lifting')}
+   lift.style.left=(e.clientX-ox)+'px';lift.style.top=(e.clientY-oy)+'px';
+   const el=document.elementFromPoint(e.clientX,e.clientY);mark(el&&el.closest('.tile.mine'))});
+  t.addEventListener('pointerup',async()=>{if(src!==t)return;const from=src,to=over,was=on;stop();if(!was||!to||to===from)return;
+   const list=tiles();const a=list.indexOf(from),b=list.indexOf(to);list.splice(a,1);list.splice(b,0,from);const order=list.map(x=>x.dataset.id).reverse();  // back to line order (first to post first)
+   const S2=await post({action:'order',ids:order});if(S2){render(S2);say('Moved. The dates follow the order.')}});
+  t.addEventListener('pointercancel',stop);});
+ if(!drag.esc){drag.esc=true;document.addEventListener('keydown',e=>{if(e.key==='Escape'&&src)stop()})}}
 if(!live)$('#offline').hidden=false;render(D);
 """
 
