@@ -36,6 +36,7 @@ Exit codes: 0 done · 2 stop (folder, photo or song missing).
 """
 import argparse
 import json
+import subprocess
 import os
 import re
 import shutil
@@ -447,6 +448,16 @@ def cmd_make(a):
     rec = json.loads((wd / "reel.json").read_text())
     rec["capcut_project"] = str(dest)
     (wd / "reel.json").write_text(json.dumps(rec, indent=1))
+    # the posting queue: this shoot's reel is now in progress (yellow). Best effort; the reel is made either way.
+    try:
+        pq = HERE.parent.parent / "studio-manager" / "scripts" / "posting_queue.py"
+        if pq.exists() and a.shoot:
+            r = subprocess.run([sys.executable, str(pq), "made", f"{a.shoot} reel", "--where", dest.name],
+                               capture_output=True, text=True, timeout=20)
+            if r.returncode == 0:
+                say("It's in your posting queue as in progress; say \"the reel is ready\" when it's exported.")
+    except Exception:
+        pass
 
 
 def main():
