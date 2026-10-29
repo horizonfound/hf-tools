@@ -499,13 +499,13 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .tile{position:relative;aspect-ratio:4/5;background:var(--sand-l);overflow:hidden;border-radius:6px;cursor:grab;user-select:none;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .tile.mine{touch-action:none}body.lifting,body.lifting *{cursor:grabbing!important}.tile.dragging{opacity:.3;box-shadow:inset 0 0 0 3px var(--coral)}.tile.over{box-shadow:inset 0 0 0 5px var(--sun);transform:scale(.94);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}.tile.lift{position:fixed;left:0;top:0;z-index:9999;margin:0;pointer-events:none;opacity:1;border-radius:8px;transform:scale(1.06);transition:none;box-shadow:inset 0 0 0 3px var(--coral),0 0 0 3px #fff,0 30px 60px -14px rgba(31,36,48,.6),0 8px 18px rgba(31,36,48,.25)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;pointer-events:none}
-.tile .k{position:absolute;top:6px;left:6px;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);padding:4px 7px;border-radius:999px}
-.tile .d{position:absolute;bottom:6px;left:6px;right:6px;font:600 12px/1.2 var(--sans);color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.tile .k{position:absolute;top:8px;left:8px;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);padding:5px 8px;border-radius:999px}
+.tile .d{position:absolute;bottom:8px;left:8px;max-width:calc(100% - 16px);font:600 11px/1 var(--sans);letter-spacing:.02em;color:#fff;background:rgba(0,0,0,.78);padding:6px 9px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile.next .d{background:var(--coral);color:#fff}.tile.mine::after{content:'';position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(to top,rgba(0,0,0,.38),rgba(0,0,0,0));pointer-events:none}.tile.mine .k,.tile.mine .d{z-index:1}.tile.mine:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 3px var(--coral),0 16px 28px -12px rgba(31,36,48,.5)}
 .tile.ghost{cursor:default;background:repeating-linear-gradient(45deg,#ECEAF6,#ECEAF6 6px,#E3E0F0 6px,#E3E0F0 12px)}
 .tile.ghost small{position:absolute;inset:0;display:grid;place-items:center;font:italic 400 12px/1.2 var(--display);color:var(--ink-2);text-align:center;padding:8px}
 .tile.real{cursor:default}.tile.real img{filter:saturate(.85)}
 .tile.real .k{background:rgba(255,255,255,.8);color:var(--ink)}
-.tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:rgba(0,0,0,.78);color:#fff}
+.tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:rgba(0,0,0,.78);color:#fff;text-transform:none;letter-spacing:.02em;font-size:11px}
 .gridnote{font-size:13px;color:var(--ink-2);max-width:820px;margin:0}
 .list{display:grid;gap:.7rem;padding:.8rem 0 1rem;margin:0;list-style:none}
 .row{display:grid;grid-template-columns:auto 64px 1fr auto;gap:.9rem;align-items:center;background:var(--paper);border-radius:18px;padding:.7rem .9rem;box-shadow:0 1px 0 var(--line)}
@@ -540,8 +540,9 @@ function render(S){
  const feed=S.feed&&S.feed.posts||[];const pinned=feed.filter(x=>x.pinned),rest=feed.filter(x=>!x.pinned);
  const real=x=>{const t=document.createElement('div');t.className='tile real';t.innerHTML=`<img src="${x.thumb}" alt="">`+(x.pinned?`<span class="k">pinned</span>`:'');return t};
  pinned.forEach(x=>g.appendChild(real(x)));   // Instagram keeps pinned posts at the top; new posts land after them
- greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine';t.draggable=live;t.dataset.id=x.id;
-  t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind}</span><span class="d">${nice(x.date)}</span>`;g.appendChild(t)});
+ const nextId=S.greens[0]&&S.greens[0].id;   // first in line: the next post
+ greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine'+(x.id===nextId?' next':'');t.dataset.id=x.id;
+  t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind==='reel'?'&#9654;&#xFE0E; Reel':'&#10697; Carousel'}</span><span class="d">${x.id===nextId?'Next up · ':''}${nice(x.date)}</span>`;g.appendChild(t)});
  if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
