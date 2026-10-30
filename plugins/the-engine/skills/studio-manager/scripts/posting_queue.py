@@ -699,7 +699,50 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
         if path.startswith("/content/") and ".." not in path:
             return self.serve_content(path[len("/content/"):])
+        if path == "/open":
+            return self.open_kit_folder(urlsplit(self.path).query)
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def open_kit_folder(self, query):
+        """A kit page's "Open the ... folder" button: only a kit in Content, or one of its own folders
+        (Photos may live elsewhere when the kit points at a Lightroom export folder)."""
+        from urllib.parse import parse_qs
+        import finder
+        import posts
+        import kit as kit_mod
+        q = parse_qs(query)
+        kit_name, sub = q.get("kit", [""])[0], q.get("sub", [""])[0]
+        h = posts.home()
+        ok, words = False, "That isn't a folder this kit names."
+        content = (h / posts.CONTENT_NAME).resolve() if h else None
+        kd = (content / kit_name).resolve() if content and kit_name and ".." not in kit_name else None
+        if kd and str(kd).startswith(str(content)) and kd.is_dir():
+            if sub == "":
+                target = kd
+            elif sub == "Photos":
+                target = kit_mod.photos_dir(kd)
+            elif sub in ("Singles", "Carousel", "Stories", "Covers"):
+                target = kd / sub
+            else:
+                target = None
+            if target is None:
+                pass
+            elif not target.is_dir():
+                ok, words = False, f"There's no {sub or 'kit'} folder yet." if sub != "Photos" else "The photos folder isn't there right now. Is the drive plugged in?"
+            else:
+                ok, why = finder.open_folder(target)
+                name = target.name
+                words = (f"Opened {name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
+                         else f"Opened {name} in Finder.") if ok else f"Couldn't open Finder. The folder is {target}. ({why})"
+        elif h is None or not content.is_dir():
+            words = "The Studio folder isn't there right now. Is the drive plugged in?"
+        say(f"open asked: {kit_name} / {sub or '(kit)'} -> {'ok' if ok else 'no'}: {words}")
+        out = json.dumps({"ok": ok, "words": words}).encode()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(out)
 
     def serve_content(self, rel):
         """A post kit's page and files, read-only, from The Studio/Content (kit.py), so the kit page opens

@@ -19,7 +19,7 @@ Claude does the choosing and the writing; this does the files. Nothing posts.
     python3 kit.py start --folder "<any folder of finished photos>" [--name "..."]
     python3 kit.py told "beach" --text "..."           what they said when asked about the shoot
     python3 kit.py sheet "beach"                       numbered contact sheets of the photos (reel.py's)
-    python3 kit.py picks "beach" --singles 3,17,22 --stories 5,9,30,41 --carousel 1,4,8,12,15,19,23 --reel 2,6,...
+    python3 kit.py picks "beach" --singles 3,17,22 --stories 5,9,30,41 --carousel 1,4,8,12,15,19,23 --reel 2,6,... [--cover 2]
     python3 kit.py build "beach"                       Singles, Carousel, Stories from the picks (reel via reel.py)
     python3 kit.py facts "beach"                       what Claude writes the words from (JSON)
     python3 kit.py words "beach" --file words.json     save the hooks, caption, short caption, story lines
@@ -49,10 +49,19 @@ import studio_file  # noqa: E402
 
 REEL_PY = HERE.parent.parent / "assistant-make-a-reel" / "scripts" / "reel.py"
 PHOTO = posts.PHOTO
-SINGLE = (1080, 1350)
-CAROUSEL = (1080, 1350)
-STORY = (1080, 1920)
-PAD = "1A1A1C"
+# Instagram's shapes, checked Oct 30, 2026 (Sked Social, posteverywhere.ai): feed posts 4:5 (1080x1350) are the
+# safe default; 3:4 is in-app only; the profile grid shows a 3:4 tile cut from the middle of each post, so a 4:5
+# post loses a sliver off each side there; every slide of a carousel takes the first slide's shape; stories and
+# reels are 9:16 (1080x1920), with the grid showing the middle 3:4 of a reel's cover.
+SINGLE = (1080, 1350)        # 4:5
+CAROUSEL = (1080, 1350)      # 4:5, every slide the same
+STORY = (1080, 1920)         # 9:16
+COVER = (1080, 1920)         # the reel cover, 9:16; the grid shows its middle 3:4
+GRID = (1080, 1440)          # 3:4, what the profile grid shows of a post
+WIDEST = 1.91                # the widest Instagram keeps a feed photo; wider gets trimmed
+PAD_DARK = "1A1A1C"
+PAD_WHITE = "FFFFFF"
+TOP_BIAS = 0.4               # when a tall photo is trimmed to 4:5, take 40% of the cut from the top, 60% from the bottom (faces sit high)
 KINDS = ("reel", "carousel", "singles", "stories")
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 
@@ -208,14 +217,16 @@ def parse_nums(s):
     return [int(x) for x in re.findall(r"\d+", s or "")]
 
 
-def set_picks(kit, singles, stories, carousel, reel):
+def set_picks(kit, singles, stories, carousel, reel, cover=None):
     by_n = numbered(kit)
     rec = load_rec(kit)
     picks = rec.get("picks", {})
-    for key, val in (("singles", singles), ("stories", stories), ("carousel", carousel), ("reel", reel)):
+    for key, val in (("singles", singles), ("stories", stories), ("carousel", carousel), ("reel", reel), ("cover", cover)):
         if val is None:
             continue
         ns = parse_nums(val)
+        if key == "cover":
+            ns = ns[:1]
         bad = [n for n in ns if n not in by_n]
         if bad:
             say(f"STOP: no photo numbered {bad[0]} on the sheet.")
@@ -243,19 +254,34 @@ def size_of(p):
         return None
 
 
-def fit(src, dst, box, pad=None):
-    """Fit the photo inside box (w, h), keeping its shape; pad to the box with a dark background if asked.
-    The Mac's own sips does it with nothing installed; Pillow elsewhere."""
+def _pad_rgb(hexs):
+    return tuple(int(hexs[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS):
+    """Make the photo fit Instagram's box (w, h) one of three ways, never stretching:
+      "fit"   the whole photo inside the box, its own shape, no padding (a tall photo comes out narrower than the box)
+      "pad"   the whole photo inside the box, padded to the box with a plain color
+      "crop"  the box filled, the extra trimmed (tall photos lose a little top and bottom, more from the bottom)
+    The Mac's own sips does all of it with nothing installed; Pillow elsewhere."""
     W, H = box
     size = size_of(src)
     if not size:
         return False
     w, h = size
-    scale = min(W / w, H / h, 1.0)
+    if how == "crop":
+        scale = max(W / w, H / h)
+    else:
+        scale = min(W / w, H / h, 1.0)
     nw, nh = max(1, round(w * scale)), max(1, round(h * scale))
+    cut_y = max(0, nh - H) if how == "crop" else 0
+    cut_x = max(0, nw - W) if how == "crop" else 0
+    off_y, off_x = round(cut_y * bias), cut_x // 2
     if shutil.which("sips"):
         cmd = ["sips", "-s", "format", "jpeg", "-s", "formatOptions", "92", "--resampleHeightWidth", str(nh), str(nw)]
-        if pad:
+        if how == "crop" and (cut_y or cut_x):
+            cmd += ["--cropOffset", str(off_y), str(off_x), "--cropToHeightWidth", str(H), str(W)]
+        elif how == "pad":
             cmd += ["--padToHeightWidth", str(H), str(W), "--padColor", pad]
         cmd += [str(src), "--out", str(dst)]
         r = subprocess.run(cmd, capture_output=True, text=True)
@@ -264,14 +290,47 @@ def fit(src, dst, box, pad=None):
         from PIL import Image, ImageOps
         im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
         im = im.resize((nw, nh), Image.LANCZOS)
-        if pad:
-            bg = Image.new("RGB", (W, H), tuple(int(pad[i:i + 2], 16) for i in (0, 2, 4)))
+        if how == "crop" and (cut_y or cut_x):
+            im = im.crop((off_x, off_y, off_x + W, off_y + H))
+        elif how == "pad":
+            bg = Image.new("RGB", (W, H), _pad_rgb(pad))
             bg.paste(im, ((W - nw) // 2, (H - nh) // 2))
             im = bg
         im.save(dst, "JPEG", quality=92)
         return True
     except Exception:
         return False
+
+
+def fit(src, dst, box, pad=None):
+    """Kept for the posting queue's thumbnails: fit, padded if a color is given."""
+    return shape(src, dst, box, "pad" if pad else "fit", pad or PAD_DARK)
+
+
+def single(src, dst):
+    """A single post: tall photos become 4:5 (a little trimmed, more from the bottom); square stays square;
+    wide photos keep their shape, trimmed only if wider than Instagram allows."""
+    size = size_of(src)
+    if not size:
+        return False
+    w, h = size
+    if h > w * 1.05:
+        return shape(src, dst, SINGLE, "crop")
+    if w > h * WIDEST:
+        return shape(src, dst, (1080, round(1080 / WIDEST)), "crop")
+    return shape(src, dst, (1080, 1080), "fit")
+
+
+def slide(src, dst, pad=PAD_WHITE):
+    """A carousel slide: every slide 4:5. Tall photos are trimmed to it; square and wide ones sit on a plain
+    background (white by default) so the whole photo shows."""
+    size = size_of(src)
+    if not size:
+        return False
+    w, h = size
+    if h > w * 1.05:
+        return shape(src, dst, CAROUSEL, "crop")
+    return shape(src, dst, CAROUSEL, "pad", pad)
 
 
 def build(kit):
@@ -282,7 +341,11 @@ def build(kit):
         return 2
     by_n = numbered(kit)
     made = {}
-    for key, box, pad, prefix in (("singles", SINGLE, None, "Single"), ("carousel", CAROUSEL, PAD, "Slide"), ("stories", STORY, PAD, "Story")):
+    pad = rec.get("slide_background", PAD_WHITE)
+    makers = {"singles": (lambda a, b: single(a, b), "Single"),
+              "carousel": (lambda a, b: slide(a, b, pad), "Slide"),
+              "stories": (lambda a, b: shape(a, b, STORY, "pad", PAD_DARK), "Story")}
+    for key, (maker, prefix) in makers.items():
         ns = picks.get(key) or []
         if not ns:
             continue
@@ -292,11 +355,21 @@ def build(kit):
         for i, n in enumerate(ns, 1):
             src = Path(by_n[n]["file"])
             dst = out / f"{prefix} {i:02d} ({src.stem}).jpg"
-            if dst.exists() or fit(src, dst, box, pad):
+            if dst.exists() or maker(src, dst):
                 files.append(dst.name)
             else:
                 say(f"(could not size {src.name} for {key})")
         made[key] = files
+    # the reel cover: 9:16 from the cover pick (or the first reel pick), plus what the grid will show of it
+    cover_n = picks.get("cover") or (picks.get("reel") or [None])[:1]
+    cover_n = cover_n[0] if isinstance(cover_n, list) else cover_n
+    if cover_n:
+        out = kit / "Covers"
+        out.mkdir(exist_ok=True)
+        src = Path(by_n[cover_n]["file"])
+        full, grid = out / "Reel cover.jpg", out / "Reel cover, as the grid shows it.jpg"
+        ok = (full.exists() or shape(src, full, COVER, "crop")) and (grid.exists() or shape(full, grid, GRID, "crop", bias=0.5))
+        made["covers"] = [full.name, grid.name] if ok else []
     rec["made_pieces"] = {**rec.get("made_pieces", {}), **made}
     rec["built"] = datetime.now().isoformat(timespec="seconds")
     save_rec(kit, rec)
@@ -422,7 +495,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .piece{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.4rem;align-items:start;background:var(--paper);border-radius:22px;padding:1.3rem;margin-top:1.2rem;box-shadow:0 1px 0 var(--line)}
 .piece h2{margin:0 0 .2rem;font:600 24px/1.1 var(--sans);letter-spacing:-.02em}
 .piece .sub{color:var(--ink-2);font-size:14px;margin:0 0 .8rem}
-.strip{display:flex;gap:6px;flex-wrap:wrap}.strip img{height:150px;width:auto;border-radius:10px;object-fit:cover;background:var(--sand-l);cursor:zoom-in;transition:transform .3s var(--ease)}.strip img:hover{transform:translateY(-2px)}
+.strip{display:flex;gap:6px;flex-wrap:wrap}.strip img{height:150px;width:auto;border-radius:10px;object-fit:cover;background:var(--sand-l);box-shadow:0 0 0 1px var(--line);cursor:zoom-in;transition:transform .3s var(--ease)}.strip img:hover{transform:translateY(-2px)}
 .strip.tall img{height:210px}
 .words{display:grid;gap:.8rem}
 .w{border:1px solid var(--line);border-radius:14px;padding:.8rem .95rem;position:relative}
@@ -434,6 +507,13 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .empty{font:italic 400 16px/1.3 var(--display);color:var(--ink-2)}
 .lean{font-size:13px;color:var(--ink-2);margin-top:1rem}
 .folder{font-size:13px;color:var(--ink-2)}
+.go{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:all .2s var(--ease)}
+.go:hover{border-color:var(--coral);color:var(--coral-2);transform:translateY(-1px)}
+.go.main{background:var(--ink);color:#fff;border-color:var(--ink)}.go.main:hover{background:var(--coral-2);border-color:var(--coral-2);color:#fff}
+.went{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:.4rem 0 0}
+.piece .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
+.piece .top h2{margin:0}
+.ratio{font:600 10px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:.3em .6em;margin-left:.5rem;vertical-align:middle}
 .big{position:fixed;inset:0;background:rgba(20,22,30,.92);display:none;place-items:center;z-index:50;cursor:zoom-out}.big.on{display:grid}.big img{max-width:92vw;max-height:92vh;border-radius:12px}
 @media(max-width:760px){.piece{grid-template-columns:1fr}}
 """
@@ -442,6 +522,12 @@ SCRIPT = """
 document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{const t=b.parentElement.querySelector('p').textContent;
  try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(b.parentElement.querySelector('p'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}
  b.textContent='Copied';b.classList.add('done');setTimeout(()=>{b.textContent='Copy';b.classList.remove('done')},1600)});
+const live=location.protocol.startsWith('http');const KIT=document.body.dataset.kit;
+document.querySelectorAll('.go').forEach(b=>b.onclick=async()=>{const line=b.closest('.piece,header').querySelector('.went');
+ if(!live){line.textContent='This is a saved copy. Say “show the '+document.body.dataset.name+' kit” to Claude and the buttons work.';return}
+ line.textContent='Opening...';
+ try{const r=await fetch('/open?kit='+encodeURIComponent(KIT)+'&sub='+encodeURIComponent(b.dataset.sub||''));const j=await r.json();line.textContent=j.words}
+ catch(e){line.textContent='Could not reach the Studio. Tell Claude instead.'}});
 const big=document.getElementById('big');document.querySelectorAll('.strip img').forEach(i=>i.onclick=()=>{big.querySelector('img').src=i.src;big.classList.add('on')});big.onclick=()=>big.classList.remove('on');
 """
 
@@ -482,18 +568,26 @@ def write_page(kit):
     reel_html = (f"<p>In CapCut as <b>{html.escape(reel['project'])}</b>. Open it there, style it, export it.</p>"
                  + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>"
     lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
+
+    def sec(title, sub, ratio, body, wrds, folder):
+        has = (kit / folder).is_dir()
+        btn = f"<button class='go' data-sub='{html.escape(folder)}'>Open the {html.escape(folder)} folder</button>" if has else ""
+        return (f"<section class='piece'><div><div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2>{btn}</div>"
+                f"<p class='sub'>{html.escape(sub)}</p>{body}<p class='went'></p></div><div class='words'>{wrds}</div></section>")
+
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(name)} · Post kit · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<title>{html.escape(name)} · Post kit · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<span class='when'>{html.escape(when_words)}</span></div>"
             f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>Everything for this shoot's posts, in one place. Copy the words, grab the files from the folders, post when you're ready. Nothing here posts itself.</p>"
-            f"<p class='folder'>In your Studio folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p></header>"
-            f"<section class='piece'><div><h2>Reel</h2><p class='sub'>Cut on the beat, in CapCut.</p>{reel_html}</div><div class='words'>{hooks}</div></section>"
-            f"<section class='piece'><div><h2>Carousel</h2><p class='sub'>The slides, in order, in the Carousel folder.</p>{strip('Carousel')}</div><div class='words'>{caption}{tags}</div></section>"
-            f"<section class='piece'><div><h2>Single posts</h2><p class='sub'>Sized for Instagram, in the Singles folder.</p>{strip('Singles')}</div><div class='words'>{short or caption or ''}</div></section>"
-            f"<section class='piece'><div><h2>Stories</h2><p class='sub'>Story frames, in the Stories folder.</p>{strip('Stories', tall=True)}</div><div class='words'>{story_lines or '<p class=empty>Not written yet.</p>'}</div></section>"
-            f"{lean}</div><div class='big' id='big'><img alt=''></div>"
+            f"<p class='folder'>In your Studio folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
+            f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
+            + sec("Reel", "Cut on the beat, in CapCut. The cover is in the Covers folder.", "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers")
+            + sec("Carousel", "The slides, in order, all the same shape, in the Carousel folder.", "4:5", strip("Carousel"), caption + tags, "Carousel")
+            + sec("Single posts", "Sized for Instagram, in the Singles folder. On your profile grid Instagram shows the middle of each one, so faces near the middle are safest.", "4:5", strip("Singles"), short or caption or "", "Singles")
+            + sec("Stories", "Story frames, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.", "9:16", strip("Stories", tall=True), story_lines or "<p class=empty>Not written yet.</p>", "Stories")
+            + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
             f"<script>{SCRIPT}</script></body></html>")
     (kit / "Post kit.html").write_text(page)
     return kit / "Post kit.html"
@@ -521,7 +615,7 @@ def main():
     t = sub.add_parser("told"); t.add_argument("words"); t.add_argument("--text", required=True)
     sub.add_parser("sheet").add_argument("words")
     pk = sub.add_parser("picks"); pk.add_argument("words")
-    for k in ("singles", "stories", "carousel", "reel"):
+    for k in ("singles", "stories", "carousel", "reel", "cover"):
         pk.add_argument(f"--{k}")
     sub.add_parser("build").add_argument("words")
     rl = sub.add_parser("reel-made"); rl.add_argument("words"); rl.add_argument("--project", required=True)
@@ -566,7 +660,7 @@ def main():
     if a.cmd == "sheet":
         return sheet(kit)
     if a.cmd == "picks":
-        p = set_picks(kit, a.singles, a.stories, a.carousel, a.reel)
+        p = set_picks(kit, a.singles, a.stories, a.carousel, a.reel, a.cover)
         say("Picks: " + ", ".join(f"{k} {len(v)}" for k, v in p.items() if v)); return 0
     if a.cmd == "build":
         return build(kit)
