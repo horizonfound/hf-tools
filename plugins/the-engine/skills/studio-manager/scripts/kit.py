@@ -487,6 +487,8 @@ CSS = """
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
+.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
+body:not(.live) .homelink{display:none}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
@@ -523,7 +525,7 @@ SCRIPT = """
 document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{const t=b.parentElement.querySelector('p').textContent;
  try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(b.parentElement.querySelector('p'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}
  b.textContent='Copied';b.classList.add('done');setTimeout(()=>{b.textContent='Copy';b.classList.remove('done')},1600)});
-const live=location.protocol.startsWith('http');const KIT=document.body.dataset.kit;
+const live=location.protocol.startsWith('http');if(live)document.body.classList.add('live');const KIT=document.body.dataset.kit;
 document.querySelectorAll('.go').forEach(b=>b.onclick=async()=>{const line=b.closest('.piece,header').querySelector('.went');
  if(!live){line.textContent='This is a saved copy. Say “show the '+document.body.dataset.name+' kit” to Claude and the buttons work.';return}
  line.textContent='Opening...';
@@ -584,7 +586,7 @@ def write_page(kit):
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{html.escape(name)} · Post kit · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
-            f"<span class='when'>{html.escape(when_words)}</span></div>"
+            f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when_words)}</span></div>"
             f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>Everything for this shoot's posts, in one place. Copy the words, grab the files from the folders, post when you're ready. Nothing here posts itself.</p>"
             f"<p class='folder'>In your Studio folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"

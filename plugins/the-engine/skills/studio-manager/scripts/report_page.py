@@ -41,6 +41,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .brand b{font:600 16px/1 var(--sans);letter-spacing:-.01em}
 .brand small{font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2);white-space:nowrap}
+.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
 .bar .nav{display:inline-flex;align-items:center;gap:.8rem;font:600 16px/1 var(--sans);color:#fff;text-decoration:none;padding:.5rem .5rem .5rem 1.3rem;border-radius:999px;background:var(--coral);border:1.5px solid var(--coral);white-space:nowrap;box-shadow:0 14px 28px -18px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .bar .nav .arr{width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:15px;transition:transform .35s var(--ease)}
 .bar .nav:hover{transform:translateY(-2px);box-shadow:var(--shadow)}.bar .nav:hover .arr{transform:translate(2px,-2px)}
@@ -327,6 +328,17 @@ REFRESH_SCRIPT = """
 """
 
 
+def home_link():
+    """A Home link to the Studio's home page, when its server has run (home.py keeps the address in posting-url.txt)."""
+    try:
+        f = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio")) / "posting-url.txt"
+        if f.exists():
+            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'>Home</a>"
+    except OSError:
+        pass
+    return ""
+
+
 def build(manifest, studio):
     files = manifest.get("files", {})
     total = len(files)
@@ -352,6 +364,7 @@ def build(manifest, studio):
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
            f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
+           home_link(),
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]
 

@@ -533,6 +533,7 @@ CSS = r"""
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
+.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
@@ -665,7 +666,7 @@ def page_html(p):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>Posting queue · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
-            f"<span class='when'>{html.escape(when)}</span></div>"
+            f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show my posting queue” to change things.</p></header>"
@@ -695,13 +696,66 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if (path.startswith("/posting-thumbs/") or path.startswith("/feed/")) and ".." not in path:
+        if path in ("/home", "/home.html"):
+            import home
+            body = home.page_html().encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if (path.startswith("/posting-thumbs/") or path.startswith("/feed/") or path.startswith("/queue-thumbs/") or path.startswith("/home-thumbs/")) and ".." not in path:
             return super().do_GET()
         if path.startswith("/content/") and ".." not in path:
             return self.serve_content(path[len("/content/"):])
         if path == "/open":
             return self.open_kit_folder(urlsplit(self.path).query)
+        if path == "/open-home":
+            return self.open_home_folder()
+        if path == "/open-shoot":
+            return self.open_shoot(urlsplit(self.path).query)
+        if path == "/queue-url":
+            return self.queue_url()
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def answer(self, obj, code=HTTPStatus.OK):
+        out = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(out)
+
+    def open_home_folder(self):
+        """The home page's "Open my Studio folder": The Studio folder itself (Drop a shoot here and Content)."""
+        import finder
+        import posts
+        h = posts.home()
+        if not h or not h.is_dir():
+            return self.answer({"ok": False, "words": "There's no Studio folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
+        ok, why = finder.open_folder(h)
+        words = (f"Opened {h.name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
+                 else f"Opened {h.name} in Finder.") if ok else f"Couldn't open Finder. The folder is {h}."
+        self.answer({"ok": ok, "words": words})
+
+    def open_shoot(self, query):
+        """The home page's "Open photo folder" on a recent shoot: the same lookup the queue page uses."""
+        from urllib.parse import parse_qs
+        import edit_queue
+        sid = parse_qs(query).get("id", [""])[0]
+        try:
+            s = next((x for x in edit_queue.load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
+            ok, words = edit_queue.open_folder(s) if s else (False, "I don't know that shoot.")
+        except Exception as e:  # noqa: BLE001
+            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask Claude."
+        self.answer({"ok": ok, "words": words})
+
+    def queue_url(self):
+        """The live editing-queue page's address, starting its server if needed (serve_report has the logic)."""
+        import serve_report
+        u = serve_report.queue_url()
+        self.answer({"url": u, "words": None if u else "Ask Claude: show my editing queue"})
 
     def open_kit_folder(self, query):
         """A kit page's "Open the ... folder" button: only a kit in Content, or one of its own folders
@@ -791,6 +845,15 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == "/feed":
             return self.post_feed()
+        if path == "/clicked":
+            import home
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                item = json.loads(self.rfile.read(n) or b"{}").get("item")
+                ok = home.record_click(item)
+            except (ValueError, TypeError):
+                ok = False
+            return self.answer({"ok": ok})
         if path != "/posting":
             self.send_error(HTTPStatus.NOT_FOUND)
             return

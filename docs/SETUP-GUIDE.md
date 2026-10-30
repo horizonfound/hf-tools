@@ -104,7 +104,11 @@ That's the setup. You never do it again.
 
 ---
 
-## Part 2: Your first backup
+## Part 2: Opening the Studio, and your first backup
+
+**Opening the Studio.** Click the Studio in the left column, start a new chat, and just say **hi** (or type **/studio**). The Studio answers with the day, what's due, what's queued to post, whether it sees a card, and opens its home page beside the chat: a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
+
+**Your first backup.**
 
 1. Put your memory card in.
 2. In the Code message box, type **backup now** and press Return. (You can also press the microphone key on your keyboard and say it. **[check: which dictation to point to; Claude's own `/voice` is documented for the terminal only]**)

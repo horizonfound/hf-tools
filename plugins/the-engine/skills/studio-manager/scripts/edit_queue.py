@@ -403,6 +403,7 @@ body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans);letter-spacing:-.01em}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
+.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
 .head{padding:clamp(2rem,5vw,3.6rem) 0 1.2rem;display:grid;gap:.7rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
@@ -630,13 +631,25 @@ def state(q):
     return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)], "archive": [pub(s) for s in archive(q)]}
 
 
+
+def home_link():
+    """A Home link to the Studio's home page, when its server has run (home.py; the address is kept in posting-url.txt)."""
+    try:
+        f = HOME / "posting-url.txt"
+        if f.exists():
+            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'>Home</a>"
+    except OSError:
+        pass
+    return ""
+
+
 def page_html(q):
     data = json.dumps(state(q)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>Your shoots · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
-            f"<span class='when'>{html.escape(when)}</span></div>"
+            f"{home_link()}<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
             "<span class='talk'>The soonest due date is always on top. Drag a shoot up or down to give it a new due date.</span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and change dates.</p></header>"
