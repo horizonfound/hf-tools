@@ -57,6 +57,10 @@ def fresh(a, b):
     return a.exists() and (not b.exists() or a.stat().st_mtime >= b.stat().st_mtime)
 
 
+def gb(n):
+    return f"{n / 1e12:.1f} TB" if n >= 1e12 else f"{n / 1e9:.0f} GB"
+
+
 def preflight(source, dest, second):
     """Plain-words problems that would stop the night, found now rather than at 2am."""
     problems = []
@@ -80,17 +84,27 @@ def preflight(source, dest, second):
             probe.unlink()
         except OSError:
             problems.append(f"Cannot write to the drive: {dest}")
-        st = os.statvfs(dest)
+    if second and not second.is_dir():
+        problems.append(f"The second-copy folder is not there: {second}")
+    # Room: the card's size plus a margin, per physical drive. The main drive and the second copy
+    # on one disk need room for both. Found now, before a byte is copied.
+    per_copy = need * 1.05 + 2 * 1024 ** 3
+    by_dev = {}
+    for label, root in (("the drive", dest), ("the second-copy drive", second)):
+        if root is None or not root.is_dir():
+            continue
+        dev = os.stat(root).st_dev
+        by_dev.setdefault(dev, {"labels": [], "root": root, "need": 0})
+        by_dev[dev]["labels"].append(label)
+        by_dev[dev]["need"] += per_copy
+    for d in by_dev.values():
+        st = os.statvfs(d["root"])
         free = st.f_frsize * st.f_bavail
-        if free < need * 1.05 + 2 * 1024 ** 3:
-            problems.append(f"Not enough room on the drive: the card holds {need / 1e9:.1f} GB, the drive has {free / 1e9:.1f} GB free.")
-    if second:
-        if not second.is_dir():
-            problems.append(f"The second-copy folder is not there: {second}")
-        else:
-            st = os.statvfs(second)
-            if st.f_frsize * st.f_bavail < need * 1.05 + 2 * 1024 ** 3:
-                problems.append(f"Not enough room in the second-copy folder: {second}")
+        if free < d["need"]:
+            both = len(d["labels"]) > 1
+            problems.append(f"Not enough room on {' and '.join(d['labels'])}{' (they are the same drive)' if both else ''}: "
+                            f"the card holds {gb(need)}{' and both copies go there' if both else ''}, about {gb(d['need'])} is needed, "
+                            f"and there is {gb(free)} free. Free up about {gb(d['need'] - free)} or pick another drive.")
     return problems
 
 

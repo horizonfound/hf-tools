@@ -217,15 +217,25 @@ def main():
         sys.exit(2)
 
     problems = []
-    for label, root in (("dest", dest.parent), ("second", second.parent if second else None)):
-        if root is None:
-            continue
+    roots = [("dest", dest.parent)] + ([("second", second.parent)] if second else [])
+    need_by_device = {}  # two folders on one physical drive need room for both copies
+    for label, root in roots:
         if not root.exists():
             problems.append(f"The {'session drive' if label == 'dest' else 'second copy'} folder {root} is not there. Is the drive plugged in?")
             continue
-        fb = free_bytes(root)
-        if fb is not None and fb < total_bytes * 1.05:
-            problems.append(f"Not enough room on {root}: {human(fb)} free, {human(total_bytes)} needed.")
+        try:
+            dev = os.stat(root).st_dev
+        except OSError:
+            dev = label
+        need_by_device.setdefault(dev, {"roots": [], "need": 0})
+        need_by_device[dev]["roots"].append(root)
+        need_by_device[dev]["need"] += total_bytes * 1.05 + 2 * 1024 ** 3
+    for d in need_by_device.values():
+        fb = free_bytes(d["roots"][0])
+        if fb is not None and fb < d["need"]:
+            where = " and ".join(str(r) for r in d["roots"])
+            problems.append(f"Not enough room on {where}: {human(fb)} free, about {human(d['need'])} needed "
+                            f"(the card holds {human(total_bytes)}). Free up about {human(d['need'] - fb)} or pick another drive.")
     if problems:
         for p in problems:
             say("STOP: " + p)
