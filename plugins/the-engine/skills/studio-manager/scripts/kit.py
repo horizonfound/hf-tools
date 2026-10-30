@@ -509,6 +509,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .folder{font-size:13px;color:var(--ink-2)}
 .go{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:all .2s var(--ease)}
 .go:hover{border-color:var(--coral);color:var(--coral-2);transform:translateY(-1px)}
+a.go{text-decoration:none}
 .go.main{background:var(--ink);color:#fff;border-color:var(--ink)}.go.main:hover{background:var(--coral-2);border-color:var(--coral-2);color:#fff}
 .went{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:.4rem 0 0}
 .piece .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
@@ -551,7 +552,7 @@ def write_page(kit):
         d = kit / folder_name
         if not d.is_dir():
             return "<p class='empty'>Not made yet.</p>"
-        fs = sorted(p for p in d.iterdir() if p.suffix.lower() == ".jpg")
+        fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg"), key=lambda p: ("(Canva)" not in p.name, p.name))
         if not fs:
             return "<p class='empty'>Not made yet.</p>"
         return f"<div class='strip{' tall' if tall else ''}'>" + "".join(f"<img src='{html.escape(folder_name)}/{html.escape(f.name)}' alt=''>" for f in fs) + "</div>"
@@ -569,10 +570,15 @@ def write_page(kit):
                  + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>"
     lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
 
-    def sec(title, sub, ratio, body, wrds, folder):
+    canva = rec.get("canva", {})
+
+    def sec(title, sub, ratio, body, wrds, folder, piece=None):
         has = (kit / folder).is_dir()
         btn = f"<button class='go' data-sub='{html.escape(folder)}'>Open the {html.escape(folder)} folder</button>" if has else ""
-        return (f"<section class='piece'><div><div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2>{btn}</div>"
+        cv = canva.get(piece) if piece else None
+        if cv and cv.get("edit_url"):
+            btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn
+        return (f"<section class='piece'><div><div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span>{btn}</span></div>"
                 f"<p class='sub'>{html.escape(sub)}</p>{body}<p class='went'></p></div><div class='words'>{wrds}</div></section>")
 
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -583,8 +589,8 @@ def write_page(kit):
             f"<p class='lede'>Everything for this shoot's posts, in one place. Copy the words, grab the files from the folders, post when you're ready. Nothing here posts itself.</p>"
             f"<p class='folder'>In your Studio folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
             f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
-            + sec("Reel", "Cut on the beat, in CapCut. The cover is in the Covers folder.", "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers")
-            + sec("Carousel", "The slides, in order, all the same shape, in the Carousel folder.", "4:5", strip("Carousel"), caption + tags, "Carousel")
+            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover")
+            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same shape, in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel")
             + sec("Single posts", "Sized for Instagram, in the Singles folder. On your profile grid Instagram shows the middle of each one, so faces near the middle are safest.", "4:5", strip("Singles"), short or caption or "", "Singles")
             + sec("Stories", "Story frames, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.", "9:16", strip("Stories", tall=True), story_lines or "<p class=empty>Not written yet.</p>", "Stories")
             + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
