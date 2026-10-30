@@ -77,7 +77,7 @@ FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
 FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram keeps the pictures themselves
 FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
-KINDS = ("reel", "carousel")
+KINDS = ("reel", "carousel", "single")
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
 
@@ -171,7 +171,7 @@ def slug(text):
 
 
 def piece_name(p):
-    return f"{p['shoot_name']} {p['kind']}"
+    return f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
 
 
 def find(p, text, statuses=None):
@@ -229,6 +229,56 @@ def add_for_shoot(p, shoot, kinds):
                             "kind": kind, "status": "red", "thumb": thumb, "added": now()})
         made.append(pid)
     return made
+
+
+def add_for_kit(p, kit_dir):
+    """The pieces of a post kit (kit.py): the reel and the carousel (in progress once made, waiting if not),
+    and one piece per single post, each with its own thumbnail. Stories don't go on the grid, so they stay
+    on the kit page only. Adding the same kit again updates what's there."""
+    import kit as kit_mod
+    rec = kit_mod.load_rec(kit_dir)
+    name = rec.get("name") or kit_dir.name
+    sid = "kit:" + slug(kit_dir.name)
+    made_p = rec.get("made_pieces", {})
+    THUMBS.mkdir(parents=True, exist_ok=True)
+    photos = kit_mod.photo_files(kit_mod.photos_dir(kit_dir, rec))
+
+    def thumb_of(src, pid):
+        if not src or not Path(src).exists():
+            return None
+        dst = THUMBS / f"{pid}.jpg"
+        if not kit_mod.fit(Path(src), dst, (360, 450)):
+            return None
+        return dst.relative_to(HOME).as_posix()
+
+    def upsert(pid, kind, status, thumb_src, where=None, n=None):
+        x = next((y for y in p["pieces"] if y["id"] == pid), None)
+        if x is None:
+            x = {"id": pid, "shoot_id": sid, "shoot_name": name, "shot": rec.get("date"), "kind": kind, "status": "red", "added": now(), "kit": str(kit_dir)}
+            if n is not None:
+                x["n"] = n
+            p["pieces"].append(x)
+        x["thumb"] = thumb_of(thumb_src, pid) or x.get("thumb")
+        if x["status"] in ("red", "yellow") and status != x["status"]:
+            set_status(p, x, status, by="kit", where=where)
+        return x
+
+    out = []
+    reel = rec.get("reel")
+    reel_pick = (rec.get("picks", {}).get("reel") or [None])[0]
+    by_n = {}
+    sheet_p = kit_dir / ".kit" / "sheet.json"
+    if sheet_p.exists():
+        by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text())["photos"]}
+    out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", by_n.get(reel_pick) or (photos[0] if photos else None),
+                      where=reel["project"] if reel else None))
+    slides = sorted((kit_dir / "Carousel").glob("*.jpg")) if (kit_dir / "Carousel").is_dir() else []
+    out.append(upsert(f"{sid}-carousel", "carousel", "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
+                      where="the Carousel folder" if slides else None))
+    singles = sorted((kit_dir / "Singles").glob("*.jpg")) if (kit_dir / "Singles").is_dir() else []
+    for i, f in enumerate(singles, 1):
+        out.append(upsert(f"{sid}-single-{i}", "single", "yellow", f, where="the Singles folder", n=i))
+    return out
 
 
 def greens(p):
@@ -548,7 +598,7 @@ function render(S){
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
  $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+S.feed.handle+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
-  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${x.status}"></span><span class="th">${x.thumb?`<img src="${x.thumb}" alt="">`:''}</span><div><div class="name">${x.shoot_name} ${x.kind}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
+  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${x.status}"></span><span class="th">${x.thumb?`<img src="${x.thumb}" alt="">`:''}</span><div><div class="name">${x.shoot_name} ${x.kind}${x.n?' '+x.n:''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${x.id}">Posted</button><button class="btn o" data-a="unready" data-id="${x.id}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+x.where:''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${x.id}">Ready to post</button>`});
  mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${x.shoot_name} ${x.kind}” to Claude.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${x.id}">Skip this one</button>`});
@@ -585,7 +635,7 @@ def state(p):
     schedule(p)
     weeks, n = tank(p)
     def pub(x):
-        d = {k: x.get(k) for k in ("id", "shoot_name", "kind", "status", "thumb", "date", "slot", "where")}
+        d = {k: x.get(k) for k in ("id", "shoot_name", "kind", "status", "thumb", "date", "slot", "where", "n")}
         if x["status"] == "yellow" and x.get("made_at"):
             d["days"] = (today() - date.fromisoformat(x["made_at"][:10])).days
         return d
@@ -647,7 +697,35 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if (path.startswith("/posting-thumbs/") or path.startswith("/feed/")) and ".." not in path:
             return super().do_GET()
+        if path.startswith("/content/") and ".." not in path:
+            return self.serve_content(path[len("/content/"):])
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def serve_content(self, rel):
+        """A post kit's page and files, read-only, from The Studio/Content (kit.py), so the kit page opens
+        in the app's browser pane like the report does."""
+        import mimetypes
+        from urllib.parse import unquote
+        try:
+            import posts
+            h = posts.home()
+        except Exception:
+            h = None
+        if not h:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        f = (h / posts.CONTENT_NAME / unquote(rel)).resolve()
+        if not str(f).startswith(str((h / posts.CONTENT_NAME).resolve())) or not f.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+        data = f.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
     def cors(self):
         """Only the grab script, running on instagram.com in their own browser, may talk to /feed from another origin."""
@@ -793,7 +871,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("interval"); i.add_argument("text", nargs="?")
-    a_ = sub.add_parser("add"); a_.add_argument("--shoot", required=True); a_.add_argument("--kinds", default="reel,carousel")
+    a_ = sub.add_parser("add"); a_.add_argument("--shoot"); a_.add_argument("--kit"); a_.add_argument("--kinds", default="reel,carousel")
     m = sub.add_parser("made"); m.add_argument("piece"); m.add_argument("--where")
     for c in ("ready", "unready", "posted", "skip"):
         sub.add_parser(c).add_argument("piece")
@@ -850,7 +928,17 @@ def main():
         schedule(p, reflow=True); save(p); write_page(p)
         say(f"Posting {interval_words(v)}. " + tank_words(p))
         return 0
+    if a.cmd == "add" and a.kit:
+        import kit as kit_mod
+        kd = kit_mod.find_kit(a.kit)
+        pieces = add_for_kit(p, kd)
+        schedule(p); save(p); write_page(p)
+        say(f"{pieces[0]['shoot_name']}: {len(pieces)} pieces in the posting queue (" + ", ".join(f"{x['kind']}{' ' + str(x['n']) if x.get('n') else ''}: {x['status']}" for x in pieces) + ").")
+        return 0
     if a.cmd == "add":
+        if not a.shoot:
+            say("STOP: say which (--shoot <words> or --kit <words>).")
+            return 1
         shoot = queue_shoot(a.shoot)
         kinds = [k.strip() for k in a.kinds.split(",") if k.strip() in KINDS]
         made = add_for_shoot(p, shoot, kinds)
