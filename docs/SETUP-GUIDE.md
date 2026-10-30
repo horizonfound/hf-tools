@@ -6,9 +6,10 @@
 
 ## Before you start
 
-You need three things:
+You need four things:
 
 - A Mac. (A Windows version is coming; see the end.)
+- **An external hard drive for your shoots.** If you already keep your photos on one, you're set. If your shoots live on your computer, this is the moment to change that: a computer can be dropped, die or get stolen, and the photos on it go with it, while a drive on the shelf is still fine. Raw files are also big, and a few shoots can fill a laptop and slow it down. Any external drive with room to spare works; the Studio asks for it by name on the first backup. (It will still work onto the computer if you have to, and it will say its piece about it once.)
 - A Claude plan. The Studio runs on your own Claude account, and it needs the **Pro** plan or higher. The free plan does not include Claude Code, which is the part of Claude the Studio lives in. **[check: plan names on the current pricing page]**
 - About twenty minutes, once. After this, every backup starts with two words.
 

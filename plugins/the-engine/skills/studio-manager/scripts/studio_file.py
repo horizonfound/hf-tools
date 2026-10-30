@@ -102,6 +102,8 @@ def as_markdown(sf):
         if c.get("sample"):
             lines += ["", "  > " + c["sample"].strip().replace("\n", "\n  > "), ""]
         lines += [f"- Signed: {c['sign_off']}" if c.get("sign_off") else "- Sign-off: (not set)"]
+    if sf.get("notes"):
+        lines += ["", "## Notes", ""] + [f"- {x['on']}: {x['note']}" for x in sf["notes"]]
     lines += ["", f"_Updated {sf.get('updated', '')}_", ""]
     return "\n".join(lines)
 
@@ -178,6 +180,25 @@ def drives():
     return out
 
 
+def on_internal_disk(path):
+    """True when a folder sits on the computer's own built-in disk rather than an external drive.
+    Mac: same device as the startup disk (and not under /Volumes). Windows: the system drive letter.
+    Used for the teachable moment in setup (Dustin, Oct 30): shoots belong on an external drive."""
+    p = Path(path).expanduser()
+    try:
+        if os.name == "nt":
+            sysdrive = (os.environ.get("SystemDrive") or "C:").upper()
+            return p.resolve().drive.upper() == sysdrive
+        if str(p).startswith("/Volumes/"):
+            return False  # an external drive, plugged in or not
+        here = p if p.exists() else next((q for q in p.parents if q.exists()), Path("/"))
+        if str(here.resolve()).startswith("/Volumes/"):
+            return False
+        return os.stat(here).st_dev == os.stat("/").st_dev
+    except OSError:
+        return False
+
+
 def learn_pattern(example):
     """From a folder name they pasted: where the date is, how it is written, what sits between."""
     ex = example.strip()
@@ -224,6 +245,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("show")
     sub.add_parser("drives")
+    i = sub.add_parser("internal", help="is this folder on the computer's own disk? prints yes or no")
+    i.add_argument("path")
     s = sub.add_parser("set")
     s.add_argument("--drive")
     s.add_argument("--second")
@@ -233,6 +256,7 @@ def main():
     s.add_argument("--date-format")
     s.add_argument("--offered", type=int, help="1 or 2: one of the two offered patterns")
     s.add_argument("--file-names", choices=["original", "shoot"])
+    s.add_argument("--note", help="a line to remember about their setup (e.g. shoots kept on the computer's own disk, said OK)")
     p = sub.add_parser("pattern")
     p.add_argument("example")
     r = sub.add_parser("render")
@@ -254,6 +278,9 @@ def main():
             for f in d["shoot_folders"]:
                 print(f"    shoot folder: {f['name']}   {f['shoots']} folders in there")
         return
+    if a.cmd == "internal":
+        print("yes" if on_internal_disk(a.path) else "no")
+        return
     if a.cmd == "pattern":
         got = learn_pattern(a.example)
         if not got:
@@ -268,6 +295,8 @@ def main():
     sf = load()
     d = sf.setdefault("drives", {})
     n = sf.setdefault("naming", {})
+    if a.note:
+        sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note": a.note})
     if a.drive:
         if not Path(a.drive).is_dir():
             sys.exit(f"STOP: {a.drive} is not a folder I can see.")

@@ -195,6 +195,15 @@ def main():
             sys.exit(2)
         if a.check:
             say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
+            try:  # the one gentle nudge for shoots kept on the computer's own disk (Dustin, Oct 30)
+                import studio_file
+                if studio_file.on_internal_disk(a.dest):
+                    st = os.statvfs(a.dest)
+                    if st.f_bavail / max(st.f_blocks, 1) < 0.15:
+                        say(f"NOTE: your shoots are on this computer's own disk and it is down to {st.f_frsize * st.f_bavail / 1e9:.0f} GB free. "
+                            "An external drive would keep the photos safe if anything happens to the computer and give it room to breathe.")
+            except Exception:
+                pass
             return
 
     # 1. copy and verify (backup.py also builds the index and the report page)
