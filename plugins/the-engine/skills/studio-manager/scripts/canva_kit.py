@@ -12,9 +12,14 @@ are moving bytes, and that is what this script is for, on the photographer's own
 
     python3 canva_kit.py fetch "<kit>" --into Carousel --urls urls.json [--names "Slide {n}"]
         Downloads a design export's files (the connector's list of download links, good for a day)
-        into that folder of the kit, numbered in order. Existing files are never overwritten:
-        the Canva files go in as "Slide 01 (Canva).jpg" beside the Studio's own, and the
-        kit page shows the Canva ones first.
+        into that folder of the kit, numbered in order. The Canva files go in as
+        "Slide 01 (Canva).jpg" beside the Studio's own, and the kit page shows the Canva ones first.
+        A fresh export (they fine-tuned the design in Canva, then said "export that again") takes
+        the same names; the earlier Canva files are set aside, dated, in the kit's hidden folder.
+        Nothing is ever deleted, and the Studio's own plain files are never touched.
+
+    python3 canva_kit.py which "<kit>" --piece carousel|cover
+        Which Canva design that piece is (so "export the beach carousel" needs no id).
 
     python3 canva_kit.py note "<kit>" --piece carousel|cover --design-id D... --edit-url "https://..." [--template "<name>"]
         Remembers which Canva design is which, so the kit page can say "Open in Canva".
@@ -75,33 +80,82 @@ def upload(path, url):
     return 0
 
 
+def set_aside_older(kit, into, folder):
+    """A fresh export replaces the earlier Canva files under the same names. The earlier ones are
+    moved (same drive, never deleted) into the kit's hidden folder, dated, so nothing is lost."""
+    older = [p for p in folder.iterdir() if p.is_file() and " (Canva)" in p.name and not p.name.endswith(".part")]
+    if not older:
+        return None
+    stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
+    dest = kit / ".kit" / "canva-older" / f"{into} {stamp}"
+    dest.mkdir(parents=True, exist_ok=True)
+    for p in sorted(older):
+        p.rename(dest / p.name)
+    return dest
+
+
 def fetch(kit, into, urls, names):
     folder = kit / into
     folder.mkdir(exist_ok=True)
-    got = []
+    # Download everything first (as .part files), and only then swap the earlier Canva files out.
+    # A failed download leaves the kit exactly as it was.
+    pending = []
     for i, u in enumerate(urls, 1):
         ext = ".jpg"
         m = re.search(r"\.(jpe?g|png|mp4|pdf)(?:\?|$)", u, re.I)
         if m:
             ext = "." + m.group(1).lower().replace("jpeg", "jpg")
         dst = folder / (names.format(n=f"{i:02d}") + f" (Canva){ext}")
-        if dst.exists():
-            got.append(dst.name)
-            continue
         tmp = dst.with_name(dst.name + ".part")
         r = subprocess.run([curl(), "-sS", "-L", "-m", "300", "-o", str(tmp), u, "-w", "%{http_code}"], capture_output=True, text=True)
         if r.returncode != 0 or not r.stdout.strip().startswith("200") or not tmp.exists() or tmp.stat().st_size == 0:
-            if tmp.exists():
-                tmp.unlink()
-            say(f"STOP: couldn't download file {i} from Canva ({r.stdout.strip() or r.stderr.strip()[:80]}). The links last a day; ask for a fresh export if it's older.")
+            for _, t in pending + [(dst, tmp)]:
+                if t.exists():
+                    t.unlink()
+            say(f"STOP: couldn't download file {i} from Canva ({r.stdout.strip() or r.stderr.strip()[:80]}). The links last a day; ask for a fresh export if it's older. Nothing in the kit changed.")
             return 1
+        pending.append((dst, tmp))
+    aside = set_aside_older(kit, into, folder)
+    got = []
+    for dst, tmp in pending:
         tmp.rename(dst)
         got.append(dst.name)
     rec = kit_mod.load_rec(kit)
-    rec.setdefault("canva", {}).setdefault("files", {})[into] = got
+    c = rec.setdefault("canva", {})
+    c.setdefault("files", {})[into] = got
+    c.setdefault("fetched", {})[into] = datetime.now().isoformat(timespec="seconds")
     kit_mod.save_rec(kit, rec)
     kit_mod.write_page(kit)
+    refresh_posting(kit)
     say(f"{len(got)} file{'s' if len(got) != 1 else ''} from Canva in {into}: " + ", ".join(got))
+    if aside:
+        say(f"The earlier Canva files from {into} were set aside (not deleted) in the kit's hidden folder.")
+    return 0
+
+
+def refresh_posting(kit):
+    """If this kit's pieces are already in the posting queue, their thumbnails follow the fresh files."""
+    try:
+        import posting_queue as pq
+        p = pq.load()
+        if not any(x.get("kit") == str(kit) for x in p.get("pieces", [])):
+            return
+        pq.add_for_kit(p, kit)
+        pq.save(p)
+        pq.write_page(p)
+    except Exception as e:  # the posting queue is a nicety here; the kit itself is already right
+        say(f"(The posting queue's thumbnails weren't refreshed: {e})")
+
+
+def design_for(kit, piece):
+    """Which Canva design a kit's piece is, so 'export that again' needs no id from anyone."""
+    rec = kit_mod.load_rec(kit)
+    d = (rec.get("canva") or {}).get(piece)
+    if not d:
+        say(json.dumps({"design_id": None, "note": f"This kit has no Canva {piece} yet."}))
+        return 1
+    say(json.dumps({"design_id": d.get("design_id"), "edit_url": d.get("edit_url"), "template": d.get("template"),
+                    "into": {"carousel": "Carousel", "cover": "Covers", "single": "Singles", "story": "Stories"}[piece]}))
     return 0
 
 
@@ -137,6 +191,7 @@ def main():
     n = sub.add_parser("note"); n.add_argument("kit"); n.add_argument("--piece", required=True, choices=["carousel", "cover", "single", "story"])
     n.add_argument("--design-id", required=True); n.add_argument("--edit-url", required=True); n.add_argument("--template")
     t = sub.add_parser("templates"); t.add_argument("--carousel"); t.add_argument("--cover")
+    w = sub.add_parser("which"); w.add_argument("kit"); w.add_argument("--piece", required=True, choices=["carousel", "cover", "single", "story"])
     a = ap.parse_args()
     if a.cmd == "upload":
         return upload(a.file, a.url)
@@ -154,6 +209,8 @@ def main():
         return fetch(k, a.into, urls, names)
     if a.cmd == "note":
         note(k, a.piece, a.design_id, a.edit_url, a.template); return 0
+    if a.cmd == "which":
+        return design_for(k, a.piece)
 
 
 if __name__ == "__main__":
