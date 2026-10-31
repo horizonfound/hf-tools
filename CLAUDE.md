@@ -20,6 +20,10 @@ Dustin Damron (growth, tech, ads) and Nicole (creative lead, on camera, writes t
 
 The full story: `docs/STUDIO-PLAN.md` (the plan and feasibility read), `docs/the-studio-brief-v3.md` (Nicole's brief, the one that counts), `docs/THE-ASSISTANT-BRIEF.md` (the Assistant, traced to who said what).
 
+## The test for anything a photographer sees (Dustin, Oct 30, 6pm)
+
+Before anything is called done, look at it and ask: **can a person who knows nothing about this figure out what to do from what is on the screen?** Then check every claim the screen makes against the screen itself. If a line says "the button below opens it," there must be a button right there, not three cards away. If it mentions a folder, the button that opens that folder sits next to the mention. If a click does something, the result shows next to the thing that was clicked, not at the bottom of the page. The words are the words a photographer uses, never Claude's; "Drop a shoot here and Content, where your post kits live" fails the test, "The folder on your hard drive where your posts are kept" passes. (From the home page: the Make posts card said a button opened the folder, and there was none on the card. Fixed; this rule is so it never happens again.)
+
 ## Rules that nothing may break
 
 1. **The memory card is never touched.** Nothing on it is edited, renamed, moved or deleted; it stays exactly as the camera wrote it. The Studio Manager only reads from it. Copy, verify, report. The worst outcome is a job that did not finish, never a lost photo. A file that already exists at the destination is compared, not replaced. She formats her own card, after the report says "safe in two places" (the card and her drive, verified identical; see "Where we draw the line"). **The copy on her drive is ours to organize**, once it is verified: sort it into session folders and rename, keeping the original filename inside the new one (`Smith-Family_IMG_4471.CR3`), so every photo can always be traced back to the card. Never delete or overwrite there either.

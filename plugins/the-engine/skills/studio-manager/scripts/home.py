@@ -185,7 +185,7 @@ MENU = [
      ["Put your memory card in.", "Paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
      "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
-     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. (It's inside your Studio folder. The button below opens it.)", "Paste this in the chat:"],
+     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. <button class='btn open-inline' data-open='/open-drop'>Open that folder</button>", "Paste this in the chat:"],
      "Nothing is posted. You post it when you're ready."),
     ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
     ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
@@ -200,7 +200,7 @@ CSS_EXTRA = r"""
 .item p{margin:0;color:var(--ink-2);font-size:14.5px}
 .item.open{box-shadow:inset 0 0 0 2px var(--coral),var(--shadow)}
 .howto{grid-column:1/-1;display:none;gap:.4rem;padding:18px 22px;border-radius:18px;background:var(--coral-l);color:var(--ink)}
-.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}
+.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:var(--paper)}
 .paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--paper);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
 .paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
 .howto small{color:var(--ink-2);font-size:13px}
@@ -215,7 +215,7 @@ CSS_EXTRA = r"""
 .shoot .acts{display:flex;gap:6px;flex-wrap:wrap}
 .btn{font:600 12.5px/1 var(--sans);padding:8px 11px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--ink)}.btn.solid{background:var(--ink);color:#fff;border-color:var(--ink)}
-.said{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}
+.said{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.note{display:block;font-size:13px;color:var(--ink-2);margin-top:6px}.howto .note{display:inline;margin-left:8px}
 .empty{padding:1rem 0 2rem;color:var(--ink-2);font-size:15px}
 """
 
@@ -228,16 +228,17 @@ function say(t){const e=$('#said');e.textContent=t||'';}
 function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(a);a.focus();a.select();const ok=document.execCommand('copy');a.remove();if(ok)return true;}catch(e){}
   if(navigator.clipboard){navigator.clipboard.writeText(t).catch(()=>{});return true;}return false;}
 async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
-async function openPath(q){if(!live){say('Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();say(d.words||'');}catch(e){say('The Studio isn\'t running right now. Ask Claude to open it.');}}
+function note(b,t){if(!b){say(t);return;}let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
+async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Studio isn\'t running right now. Ask Claude to open it.');}}
 document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async()=>{
   const item=b.dataset.item;clicked(item);
   document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
   document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
-  else if(item==='folder'){openPath('/open-home');}
+  else if(item==='folder'){openPath('/open-home',b.querySelector('p'));}
 });});
-document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open)));
+document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
 """

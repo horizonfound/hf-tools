@@ -713,6 +713,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.open_kit_folder(urlsplit(self.path).query)
         if path == "/open-home":
             return self.open_home_folder()
+        if path == "/open-drop":
+            return self.open_home_folder(drop=True)
         if path == "/open-shoot":
             return self.open_shoot(urlsplit(self.path).query)
         if path == "/queue-url":
@@ -727,13 +729,17 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(out)
 
-    def open_home_folder(self):
-        """The home page's "Open my Studio folder": The Studio folder itself (Drop a shoot here and Content)."""
+    def open_home_folder(self, drop=False):
+        """The home page's "Open my Studio folder": The Studio folder itself (Drop a shoot here and Content),
+        or, with drop, the Drop a shoot here folder inside it (the button in the Make posts steps)."""
         import finder
         import posts
         h = posts.home()
         if not h or not h.is_dir():
             return self.answer({"ok": False, "words": "There's no Studio folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
+        if drop:
+            h = h / posts.DROP_NAME
+            h.mkdir(exist_ok=True)
         ok, why = finder.open_folder(h)
         words = (f"Opened {h.name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
                  else f"Opened {h.name} in Finder.") if ok else f"Couldn't open Finder. The folder is {h}."
