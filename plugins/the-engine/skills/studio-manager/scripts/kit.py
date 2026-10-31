@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The post kit: everything for one shoot's social posts, in one folder, made at once.
 
-    Content/2026-06-24 Beach/
+    Your content/2026-06-24 Beach/
       Photos/                  the finished photos (moved in from the drop box, or left where
                                Lightroom exported them and pointed to; never changed)
       Singles/                 the single posts, sized for Instagram (fit within 1080 x 1350)

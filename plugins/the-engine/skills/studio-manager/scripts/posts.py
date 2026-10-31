@@ -5,7 +5,7 @@ The Studio makes one folder for them (asked once at setup, remembered in the Stu
 
     The Studio/
       Drop a shoot here/      empty, waiting. Drag any folder of finished photos in.
-      Content/                one folder per shoot, dated and named, each a post kit
+      Your content/           one folder per shoot, dated and named, each a post kit
 
 A drop can be anything: one tidy shoot, three shoots in one folder, a year of chaos.
 `look` reads the photos' capture times (nothing is opened by Claude), splits them into
@@ -54,7 +54,8 @@ import sheet  # noqa: E402
 import studio_file  # noqa: E402
 
 DROP_NAME = "Drop a shoot here"
-CONTENT_NAME = "Content"
+CONTENT_NAME = "Your content"
+OLD_CONTENT_NAMES = ("Content",)  # earlier name; renamed once, in place, the first time the Studio looks (Dustin, Oct 30)
 HOME_NAME = "The Studio"
 PHOTO = {".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff", ".webp"}
 RAW = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw"}
@@ -73,9 +74,21 @@ def say(msg):
 # ---------- the home ----------
 
 def home():
-    """The Studio folder, from the Studio File. None if never set up."""
+    """The Studio folder, from the Studio File. None if never set up. A folder still carrying the earlier
+    "Content" name is renamed to "Your content" here, once (a rename on the same drive; nothing copied or deleted)."""
     p = studio_file.load().get("posts", {}).get("home")
-    return Path(p) if p else None
+    if not p:
+        return None
+    h = Path(p)
+    try:
+        if h.is_dir() and not (h / CONTENT_NAME).exists():
+            for old in OLD_CONTENT_NAMES:
+                if (h / old).is_dir():
+                    (h / old).rename(h / CONTENT_NAME)
+                    break
+    except OSError:
+        pass
+    return h
 
 
 def places():

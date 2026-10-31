@@ -138,7 +138,7 @@ def refresh_posting(kit):
     try:
         import posting_queue as pq
         p = pq.load()
-        if not any(x.get("kit") == str(kit) for x in p.get("pieces", [])):
+        if not any(Path(x.get("kit", "")).name == kit.name for x in p.get("pieces", [])):
             return
         pq.add_for_kit(p, kit)
         pq.save(p)
