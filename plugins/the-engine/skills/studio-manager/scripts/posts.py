@@ -58,7 +58,11 @@ DROP_NAME = "Drop a shoot here"
 CONTENT_NAME = "Your content"
 OLD_CONTENT_NAMES = ("Content",)  # earlier name; renamed once, in place, the first time the Studio looks (Dustin, Oct 30)
 HOME_NAME = "The Studio"
-PHOTO = {".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff", ".webp"}
+# Only finished photos are ever copied: JPEGs, and HEIC/PNG/WebP for phone photos and screenshots.
+# Everything heavy or unfinished (RAW, TIFF, Photoshop, video) stays in the drop box and is named, never copied (Dustin, Oct 30).
+PHOTO = {".jpg", ".jpeg", ".heic", ".png", ".webp"}
+WORKING = {".tif": "TIFF", ".tiff": "TIFF", ".psd": "Photoshop file", ".psb": "Photoshop file", ".ai": "Illustrator file",
+           ".lrcat": "Lightroom catalog", ".lrdata": "Lightroom catalog", ".xmp": "edit sidecar"}
 RAW = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw"}
 VIDEO = {".mp4", ".mov", ".m4v", ".avi"}
 SKIP_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini"}
@@ -166,6 +170,8 @@ def kind(rel):
         return "raw"
     if ext in VIDEO:
         return "video"
+    if ext in WORKING:
+        return "working"
     return "other"
 
 
@@ -265,7 +271,7 @@ def look(h, gap_minutes=120, previews_per=4):
             ". Nothing new to sort. You can clear the drop box whenever you like.")
         return None
     top = sorted({rel.split("/")[0] for rel in files if "/" in rel})
-    photos, raws, videos, others = [], [], [], []
+    photos, raws, videos, working, others = [], [], [], [], []
     for rel in files:
         k = kind(rel)
         if k == "photo":
@@ -275,6 +281,8 @@ def look(h, gap_minutes=120, previews_per=4):
             raws.append(rel)
         elif k == "video":
             videos.append(rel)
+        elif k == "working":
+            working.append(rel)
         else:
             others.append(rel)
     groups, undated = groups_mod.find_groups(photos, gap_minutes)
@@ -292,7 +300,7 @@ def look(h, gap_minutes=120, previews_per=4):
     sheet_path = draw_sheet(studio, groups) if groups else None
     result = {"drop": str(drop), "looked": datetime.now().isoformat(timespec="seconds"), "gap_minutes": gap_minutes,
               "top_folders": top, "photos": len(photos), "groups": groups, "undated": undated,
-              "raws": raws, "videos": videos, "others": others, "sheet": str(sheet_path) if sheet_path else None,
+              "raws": raws, "videos": videos, "working": working, "others": others, "sheet": str(sheet_path) if sheet_path else None,
               "already_copied": len(done_before)}
     (studio / "look.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     return result
@@ -323,12 +331,17 @@ def summary(r):
     side = []
     if r["raws"]:
         side.append(plural(len(r["raws"]), "RAW file"))
+    by_kind = {}
+    for f in r.get("working", []):
+        by_kind[WORKING.get(Path(f).suffix.lower(), "working file")] = by_kind.get(WORKING.get(Path(f).suffix.lower(), "working file"), 0) + 1
+    for name, n in sorted(by_kind.items()):
+        side.append(plural(n, name))
     if r["videos"]:
         side.append(plural(len(r["videos"]), "video"))
     if r["others"]:
         side.append(plural(len(r["others"]), "other file"))
     if side:
-        lines.append("Also in there, left where they are for now: " + ", ".join(side) + ".")
+        lines.append("Left where they are, not copied: " + ", ".join(side) + ". The Studio only copies finished photos (JPEGs, and phone photos), so nothing big or unfinished comes along.")
     if r["sheet"]:
         lines.append(f"Contact sheet, one row per group: {r['sheet']}")
     lines.append("")
@@ -595,10 +608,11 @@ def do_sort(h, mode, specs, one_name, undated_to, dry_run):
     for s in shoots:
         say(f"  {s['folder']}   {s['photos']} photos")
     left = len(r["undated"]) if undated_to in (None, "leave") else 0
-    stay = left + len(r["raws"]) + len(r["videos"]) + len(r["others"])
+    stay = left + len(r["raws"]) + len(r["videos"]) + len(r.get("working", [])) + len(r["others"])
     if stay:
         say(f"  Left in the drop box: " + ", ".join(x for x in [
             plural(left, "undated photo") if left else "", plural(len(r["raws"]), "RAW file") if r["raws"] else "",
+            plural(len(r.get("working", [])), "working file (TIFF, Photoshop, catalogs)") if r.get("working") else "",
             plural(len(r["videos"]), "video") if r["videos"] else "", plural(len(r["others"]), "other file") if r["others"] else ""] if x))
     if dry_run:
         say("Dry run: nothing copied.")
