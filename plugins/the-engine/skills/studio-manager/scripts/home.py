@@ -154,7 +154,8 @@ def gather():
     try:
         import posting_queue
         p = posting_queue.load()
-        g["tank"] = posting_queue.tank_words(p)
+        if p.get("pieces") or p.get("interval"):
+            g["tank"] = posting_queue.tank_words(p)
         for r in posting_queue.reminders(p):
             g["notes"].append(("post", r if isinstance(r, str) else r.get("words", "")))
     except Exception:
@@ -177,7 +178,7 @@ def gather():
 # ---------- the page ----------
 
 # The two buttons that start a conversation: what to paste in the chat, and the steps before it.
-SAY = {"backup": "backup now", "posts": "I dropped something in"}
+SAY = {"backup": "backup now", "posts": "I dropped something in", "setup": "set up my Studio folder"}
 
 MENU = [
     ("backup", "Back up a card",
@@ -205,7 +206,7 @@ CSS_EXTRA = r"""
 .howto .note{color:rgba(244,241,234,.7)}.howto small{color:rgba(244,241,234,.6)}
 .howto .paste .words{background:#2A3040;color:#fff;border-color:rgba(255,255,255,.12)}
 .howto .paste .copy{background:var(--coral);color:#1F2430}.howto .paste .copy:hover{background:#F79672}
-.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:transparent;color:#F4F1EA;border-color:rgba(255,255,255,.4)}
+.howto.show{display:grid}.howto>p{margin:0;font-size:15.5px}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:transparent;color:#F4F1EA;border-color:rgba(255,255,255,.4)}
 .paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--cream);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
 .paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
 .howto small{color:var(--ink-2);font-size:13px}
@@ -241,7 +242,7 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
-  else if(item==='folder'){openPath('/open-home',b.querySelector('p'));}
+  else if(item==='folder'){if(!document.querySelector('.howto[data-for=folder]'))openPath('/open-home',b.querySelector('p'));}
 });});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
@@ -288,13 +289,20 @@ def page_html():
 
     # menu
     menu = []
+    no_folder = not g["home_folder"]
     for key, name, blurb, steps, note in MENU:
         first, rest = name.split(" ", 1)
         menu.append(f"<button class='item' data-item='{key}'><span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
-        if steps:
+        if no_folder and key in ("posts", "folder"):
+            # Nothing set up yet: the one step is to ask for the folder. The Studio makes it and says where.
+            steps = ["The Studio hasn't made your folder yet. It takes one question. Paste this in the chat:"]
+            words = SAY["setup"]
+            note = "The Studio asks where you'd like the folder, makes it, and tells you where it is."
+        elif steps:
             words = SAY[key]
-            step_html = "".join(f"<li>{t}</li>" for t in steps)
-            menu.append(f"<div class='howto' data-for='{key}'><ol>{step_html}</ol>"
+        if steps:
+            step_html = (f"<p>{steps[0]}</p>" if len(steps) == 1 else "<ol>" + "".join(f"<li>{t}</li>" for t in steps) + "</ol>")
+            menu.append(f"<div class='howto' data-for='{key}'>{step_html}"
                         f"<div class='paste'><span class='words'>{e(words)}</span><button class='copy' data-copy='{e(words)}'>Copy</button></div>"
                         f"<small>{e(note)}</small></div>")
     menu_html = "".join(menu)
