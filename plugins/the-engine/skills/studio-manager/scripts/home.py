@@ -185,7 +185,7 @@ MENU = [
      ["Put your memory card in.", "Paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
      "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
-     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. <button class='btn open-inline' data-open='/open-drop'>Open that folder</button>", "Paste this in the chat:"],
+     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. <button class='btn open-inline' data-open='/open-drop'>Open the folder</button>", "Paste this in the chat:"],
      "Nothing is posted. You post it when you're ready."),
     ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
     ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
