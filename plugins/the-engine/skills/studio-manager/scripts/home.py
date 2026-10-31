@@ -220,6 +220,10 @@ SCRIPT = r"""
 const live=location.protocol.startsWith('http');
 const $=s=>document.querySelector(s);
 function say(t){const e=$('#said');e.textContent=t||'';}
+// The Claude app's browser pane refuses navigator.clipboard.writeText (tested on Dustin's Mac, Oct 30) but honors the
+// older execCommand('copy') from a click, so that goes first; the modern call is the fallback for other browsers.
+function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(a);a.focus();a.select();const ok=document.execCommand('copy');a.remove();if(ok)return true;}catch(e){}
+  if(navigator.clipboard){navigator.clipboard.writeText(t).catch(()=>{});return true;}return false;}
 async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
 async function openPath(q){if(!live){say('Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();say(d.words||'');}catch(e){say('The Studio isn\'t running right now. Ask Claude to open it.');}}
 document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async()=>{
@@ -227,7 +231,7 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
   document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
   const h=document.querySelector('.howto[data-for="'+item+'"]');
-  if(h&&h.dataset.say&&navigator.clipboard){try{await navigator.clipboard.writeText(h.dataset.say);h.querySelector('.copied').hidden=false;h.querySelector('.notcopied').hidden=true;}catch(e){}}
+  if(h&&h.dataset.say&&copyText(h.dataset.say)){h.querySelector('.copied').hidden=false;h.querySelector('.notcopied').hidden=true;}
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
   else if(item==='folder'){openPath('/open-home');}
