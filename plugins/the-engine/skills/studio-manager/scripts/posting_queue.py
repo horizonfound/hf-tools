@@ -685,6 +685,27 @@ def write_page(p):
     return PAGE
 
 
+def open_capcut(rec):
+    """The kit page's "Open in CapCut" button. Opens CapCut (the Mac's own `open -a`), brings it forward, and says
+    which project to click: CapCut can't be told to open a project from outside, so the words do that part."""
+    import subprocess
+    project = (rec.get("reel") or {}).get("project")
+    if not project:
+        return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
+    if sys.platform == "darwin":
+        r = subprocess.run(["open", "-a", "CapCut"], capture_output=True, text=True, timeout=20)
+        if r.returncode != 0:
+            return False, "CapCut doesn't seem to be installed on this Mac. It's free from capcut.com."
+    elif os.name == "nt":
+        try:
+            os.startfile("CapCut")
+        except OSError:
+            return False, "Couldn't open CapCut. Open it yourself and look for the project named below."
+    else:
+        return False, "Opening CapCut only works on a Mac or a PC."
+    return True, f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
+
+
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
@@ -817,7 +838,10 @@ class Handler(SimpleHTTPRequestHandler):
         content = (h / posts.CONTENT_NAME).resolve() if h else None
         kd = (content / kit_name).resolve() if content and kit_name and ".." not in kit_name else None
         if kd and str(kd).startswith(str(content)) and kd.is_dir():
-            if sub == "":
+            if sub == "CapCut":
+                ok, words = open_capcut(kit_mod.load_rec(kd))
+                target = None
+            elif sub == "":
                 target = kd
             elif sub == "Photos":
                 target = kit_mod.photos_dir(kd)

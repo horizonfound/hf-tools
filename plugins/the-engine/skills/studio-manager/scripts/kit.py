@@ -607,7 +607,7 @@ def write_page(kit):
     tags = wbox("Hashtags", words["hashtags"]) if words.get("hashtags") else ""
     story_lines = "".join(wbox(f"Story {i}", s) for i, s in enumerate(words.get("stories", []), 1))
     reel = rec.get("reel")
-    reel_html = (f"<p>In CapCut as <b>{html.escape(reel['project'])}</b>. Open it there, style it, export it.</p>"
+    reel_html = (f"<p>Your reel is in CapCut, called <b>{html.escape(reel['project'])}</b>. Press Open in CapCut, click that project, style it the way you like, and export it from there.</p>"
                  + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>"
     lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
 
@@ -619,8 +619,12 @@ def write_page(kit):
         cv = canva.get(piece) if piece else None
         if cv and cv.get("edit_url"):
             btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn
+        if piece == "cover" and reel:
+            # The reel lives in CapCut, so the button opens CapCut (Dustin, Oct 30). CapCut can't be told which
+            # project to open from outside, so the line beside the button names it; it's at the top of the list.
+            btn = "<button class='go main' data-sub='CapCut'>Open in CapCut</button> " + btn
         return (f"<section class='piece'><div><div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span>{btn}</span></div>"
-                f"<p class='sub'>{html.escape(sub)}</p>{body}<p class='went'></p></div><div class='words'>{wrds}</div></section>")
+                f"<p class='went'></p><p class='sub'>{html.escape(sub)}</p>{body}</div><div class='words'>{wrds}</div></section>")
 
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{html.escape(name)} · Post kit · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
