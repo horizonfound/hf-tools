@@ -470,6 +470,11 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .right{display:flex;align-items:center;gap:.9rem}
 .ask{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.8rem 1rem;margin-top:.2rem;background:var(--sun-l);border-radius:16px;font-size:14px;animation:pop .45s var(--ease)}
 .ask b{font-weight:600;margin-right:.3rem}
+.addrow{margin-top:1rem}.addbtn{font:600 14px/1 var(--sans);padding:.65rem 1.1rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:.5rem}.addbtn:hover{background:var(--ink);color:#fff}.addbtn .plus{font-size:18px;line-height:1}
+.addform{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;padding:.9rem 1rem;background:var(--sun-l);border-radius:16px;animation:pop .45s var(--ease)}.addform[hidden]{display:none}
+.addform input[type=text]{flex:1 1 14em;font:500 15px/1.2 var(--sans);padding:.55rem .8rem;border:1.5px solid var(--sand);border-radius:10px;background:var(--paper)}.addform input[type=date]{font:500 14px/1.2 var(--sans);padding:.5rem .7rem;border:1.5px solid var(--sand);border-radius:10px;background:var(--paper)}
+.addform .go{font:600 13px/1 var(--sans);padding:.6rem 1rem;border-radius:999px;border:0;background:var(--coral);color:#fff;cursor:pointer}.addform .go:disabled{opacity:.45;cursor:default}.addform .cancel{font:600 13px/1 var(--sans);padding:.6rem .9rem;border-radius:999px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+.addform .hint{flex-basis:100%;font-size:13px;color:var(--ink-2)}.added{margin:.5rem 0 0;font-size:14px;color:var(--ink-2);min-height:1em}
 .setdue{font:600 12.5px/1 var(--sans);padding:.32rem .7rem;border-radius:999px;border:1.5px solid var(--sand);background:transparent;color:var(--ink-2);cursor:pointer}.setdue:hover{border-color:var(--ink);color:var(--ink)}
 .ask button{font:600 13px/1 var(--sans);padding:.55rem .9rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
 .ask button:hover{background:var(--ink);color:#fff}
@@ -662,6 +667,17 @@ function pickDue(li, s){
   box.querySelector('.keep').onclick = () => box.remove();
   li.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
+// "Add a shoot" (Dustin, Oct 31): a name and an optional date, right under the heading. No photos behind it yet.
+$('#addbtn').onclick = () => { const f = $('#addform'); f.hidden = !f.hidden; if(!f.hidden){ $('#addname').focus() } };
+$('#addcancel').onclick = () => { $('#addform').hidden = true; $('#addname').value = ''; $('#adddue').value = '' };
+$('#addform').onsubmit = async e => {
+  e.preventDefault(); const name = $('#addname').value.trim(), due = $('#adddue').value;
+  if(!name){ $('#addname').focus(); return }
+  if(!LIVE){ $('#added').textContent = 'This is a saved copy. Ask Claude to pull up your queue, then add it there.'; return }
+  if(await send({action:'add', name, due})){ render(); $('#addname').value = ''; $('#adddue').value = '';
+    $('#added').textContent = name + (due ? ' added, due ' + nice(due) + '.' : ' added, no due date yet.'); toast(name + ' is in your queue'); $('#addname').focus() }
+  else $('#added').textContent = 'Could not add it. Tell Claude instead.';
+};
 $('#q').addEventListener('input', e => {FILTER = e.target.value; renderArchive()});
 if(!LIVE) $('#offline').hidden = false;
 render();
@@ -698,6 +714,10 @@ def page_html(q):
             f"{home_link()}<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
             "<span class='talk'>The soonest due date is always on top. Shoots with no date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down.</span>"
+            "<div class='addrow'><button class='addbtn' id='addbtn' type='button'><span class='plus'>+</span> Add a shoot</button>"
+            "<form class='addform' id='addform' hidden><input type='text' id='addname' placeholder='Client or shoot name' maxlength='80' autocomplete='off'>"
+            "<input type='date' id='adddue' title='Due date (optional)'><button type='submit' class='go'>Add to the queue</button><button type='button' class='cancel' id='addcancel'>Cancel</button>"
+            "<span class='hint'>The date is optional. A shoot added here has no photos behind it yet, so its card shows no previews.</span></form><p class='added' id='added'></p></div>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and change dates.</p></header>"
             "<ol class='list' id='list'></ol>"
             "<div class='line' id='archive'><span>Your shoots</span></div>"
@@ -770,6 +790,11 @@ class Handler(SimpleHTTPRequestHandler):
                     s.pop("reminded", None)
             elif act == "order":
                 reorder(q, [str(i) for i in body.get("ids", [])])
+            elif act == "add":
+                name = " ".join(str(body.get("name", "")).split())
+                if not name:
+                    raise ValueError("a name is needed")
+                add_manual(q, name, body.get("due") or None)
             else:
                 raise ValueError(act)
             save(q)
