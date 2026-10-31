@@ -198,10 +198,10 @@ CSS_EXTRA = r"""
 .item:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
 .item .n{font:600 20px/1.15 var(--sans);letter-spacing:-.02em}.item .n em{font:italic 400 1.05em/1 var(--display);color:var(--coral-2)}
 .item p{margin:0;color:var(--ink-2);font-size:14.5px}
-.item.open{box-shadow:inset 0 0 0 2px var(--coral),var(--shadow)}
-.howto{grid-column:1/-1;display:none;gap:.4rem;padding:18px 22px;border-radius:18px;background:var(--coral-l);color:var(--ink)}
-.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:var(--paper)}
-.paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--paper);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
+.item.open{box-shadow:inset 0 0 0 2px var(--ink),var(--shadow)}
+.howto{grid-column:1/-1;display:none;gap:.4rem;padding:18px 22px;border-radius:18px;background:var(--paper);color:var(--ink);box-shadow:0 1px 0 var(--line);border:1.5px solid var(--line)}
+.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:var(--cream)}
+.paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--cream);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
 .paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
 .howto small{color:var(--ink-2);font-size:13px}
 .todayl{display:grid;gap:.5rem;margin:.6rem 0 0;padding:0;list-style:none}
