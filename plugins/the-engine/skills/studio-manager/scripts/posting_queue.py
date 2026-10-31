@@ -858,6 +858,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         f = (h / posts.CONTENT_NAME / unquote(rel)).resolve()
+        if not f.is_file() and f.name in ("Post kit.html", "Captions and hooks.txt", "Reel.txt"):
+            # The Studio's own files live in the kit's hidden folder (Oct 30); the page's address stays
+            # /content/<kit>/Post kit.html so its pictures (Carousel/..., Singles/...) still resolve beside it.
+            f = f.with_name(".kit") / f.name
         if not str(f).startswith(str((h / posts.CONTENT_NAME).resolve())) or not f.is_file():
             self.send_error(HTTPStatus.NOT_FOUND)
             return

@@ -7,9 +7,11 @@
       Singles/                 the single posts, sized for Instagram (fit within 1080 x 1350)
       Carousel/                the slides in order, all 1080 x 1350 (padded so they match)
       Stories/                 story frames, 1080 x 1920
-      Reel.txt                 which CapCut project the reel is, and the photos in it
-      Captions and hooks.txt   everything written, ready to paste
-      Post kit.html            the page: every piece with a Copy button
+      Covers/                  the reel cover
+      .kit/                    hidden: the Studio's own files, so the photographer sees only photo
+                               folders (Dustin, Oct 30). The kit page (Post kit.html, every piece with
+                               a Copy button), Captions and hooks.txt, Reel.txt, and the kit's records.
+                               The page is shown through the posting server, never opened as a file.
 
 Claude does the choosing and the writing; this does the files. Nothing posts.
 
@@ -84,10 +86,47 @@ def load_rec(kit):
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-def save_rec(kit, rec):
+def hidden(kit):
+    """The kit's hidden folder, made and hidden if it isn't yet."""
     d = kit / ".kit"
     d.mkdir(exist_ok=True)
     posts.hide(d)
+    return d
+
+
+# The Studio's own files in a kit. They used to sit at the top of the kit folder beside the photo folders;
+# since Oct 30 they live in the hidden folder, so the photographer sees only Photos, Singles, Carousel,
+# Stories and Covers. A kit made before that is tidied the next time its page is written: each of these
+# is moved into the hidden folder (never deleted, never overwritten).
+OWN_FILES = ("Post kit.html", "Captions and hooks.txt", "Reel.txt")
+
+
+def own_file(kit, name):
+    return hidden(kit) / name
+
+
+def page_path(kit):
+    return own_file(kit, "Post kit.html")
+
+
+def tidy_own_files(kit):
+    """Move the Studio's own files from the top of the kit into the hidden folder. Returns what moved."""
+    moved = []
+    for name in OWN_FILES:
+        old = kit / name
+        if old.is_file():
+            new = own_file(kit, name)
+            if new.exists():
+                new = own_file(kit, f"{Path(name).stem} (older){Path(name).suffix}")
+                if new.exists():
+                    continue
+            old.rename(new)
+            moved.append(name)
+    return moved
+
+
+def save_rec(kit, rec):
+    d = hidden(kit)
     tmp = d / "kit.json.tmp"
     tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False))
     os.replace(tmp, d / "kit.json")
@@ -386,7 +425,7 @@ def note_reel(kit, project_name, picks=None):
     rec = load_rec(kit)
     rec["reel"] = {"project": project_name, "picks": picks or rec.get("picks", {}).get("reel", []), "made": datetime.now().isoformat(timespec="seconds")}
     save_rec(kit, rec)
-    (kit / "Reel.txt").write_text(f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
+    own_file(kit, "Reel.txt").write_text(f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
                                   + ("Photos in it, in order: " + ", ".join(str(n) for n in rec["reel"]["picks"]) + "\n" if rec["reel"]["picks"] else ""))
     write_page(kit)
 
@@ -473,7 +512,7 @@ def save_words(kit, words):
         lines += ["HASHTAGS", "", words["hashtags"].strip(), ""]
     if words.get("leaned_on"):
         lines += ["", f"Written from: {words['leaned_on']}"]
-    (kit / "Captions and hooks.txt").write_text("\n".join(lines) + "\n")
+    own_file(kit, "Captions and hooks.txt").write_text("\n".join(lines) + "\n")
     write_page(kit)
 
 
@@ -597,8 +636,9 @@ def write_page(kit):
             + sec("Stories", "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.", "9:16", strip("Stories", tall=True), story_lines or "<p class=empty>Not written yet.</p>", "Stories")
             + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
             f"<script>{SCRIPT}</script></body></html>")
-    (kit / "Post kit.html").write_text(page)
-    return kit / "Post kit.html"
+    tidy_own_files(kit)
+    page_path(kit).write_text(page)
+    return page_path(kit)
 
 
 def show(kit):
@@ -613,7 +653,7 @@ def show(kit):
     if rec.get("reel"):
         say(f"  Reel: CapCut project \"{rec['reel']['project']}\"")
     say("  Words: " + ("written" if (kit / ".kit" / "words.json").exists() else "not yet"))
-    say(f"  Page: {kit / 'Post kit.html'}" if (kit / "Post kit.html").exists() else "  Page: not yet")
+    say(f"  Page: {page_path(kit)}" if page_path(kit).exists() else "  Page: not yet")
 
 
 def main():
@@ -677,7 +717,7 @@ def main():
     if a.cmd == "facts":
         say(json.dumps(facts(kit), indent=1, ensure_ascii=False)); return 0
     if a.cmd == "words":
-        save_words(kit, json.loads(Path(a.file).read_text())); say(f"Saved. Captions and hooks.txt and the kit page are updated: {kit / 'Post kit.html'}"); return 0
+        save_words(kit, json.loads(Path(a.file).read_text())); say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
     if a.cmd == "page":
         say(str(write_page(kit))); return 0
     if a.cmd == "show":
