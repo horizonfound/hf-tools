@@ -201,17 +201,16 @@ def gather():
 # ---------- the page ----------
 
 # The two buttons that start a conversation: what to paste in the chat, and the steps before it.
-SAY = {"backup": "backup now", "posts": "I dropped something in", "setup": "set up my Studio folder"}
+SAY = {"backup": "backup now", "posts": "make my posts", "setup": "set up my Studio folder"}
 
 MENU = [
     ("backup", "Back up a card",
      "Copies your memory card to your hard drive and double-checks every photo. Then it sorts the photos into shoots, names them, and picks a few to edit first.",
-     ["Put your memory card in.", "Paste this in the chat:"], "Nothing on your memory card is changed."),
+     ["Put your memory card in.", "Then paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
      "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
-     ["<button class='btn open-inline pick' data-pick='1'>Choose the folder your finished photos are in</button> <span class='after'>The Studio copies the photos in. Your originals stay where they are.</span>"
-      "<small class='alt'>Or drag the folder into <b>Drop a shoot here</b> yourself <button class='btn open-inline' data-open='/open-drop'>Open the folder</button>; hold the Option key while you drag so it copies instead of moves.</small>",
-      "Paste this in the chat:"],
+     ["<button class='btn open-inline pick' data-pick='1'>Select the folder with your finished photos</button> <span class='after'>The Studio copies the photos in (JPEGs only). Nothing is moved.</span>",
+      "Then paste this in the chat, and the Studio sorts them and makes your posts:"],
      "Nothing is posted. You post it when you're ready."),
     ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
     ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
