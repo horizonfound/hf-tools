@@ -4,24 +4,30 @@
 A page's "Open photo folder" button asks a small
 local server to open the folder. Plain `open` from that server does open it,
 but the window lands behind the Claude app, so it looks as if nothing
-happened. Here Finder is asked to come forward as well. Opens only; never
-changes anything in the folder.
+happened. Here Finder is asked to come forward as well, and every folder gets a
+window of its own (an open window showing it is reused, never a different one).
+Opens only; never changes anything in the folder.
 """
 import subprocess
 import sys
 import time
 
-# Open the folder, bring its window out of the Dock if it was minimized, put it in front of Finder's other
-# windows, and bring Finder in front of every app (asked two ways, since one can be refused when another app
-# is full screen or has the keyboard).
+# Open the folder in a window of its own, so a folder already open in another window stays as it was
+# (Dustin, Oct 30: several Finder windows at once, never one replacing the last). If a window already shows
+# this exact folder, that one is brought forward instead of a twin. Then bring it out of the Dock if it was
+# minimized, put it in front of Finder's other windows, and bring Finder in front of every app (asked two
+# ways, since one can be refused when another app is full screen or has the keyboard).
 _ACTIVATE = [
     "on run argv",
     "set f to POSIX file (item 1 of argv) as alias",
     'tell application "Finder"',
-    "open f",
-    "activate",
+    "set w to missing value",
     "try",
     "set w to first Finder window whose target is f",
+    "end try",
+    "if w is missing value then set w to make new Finder window to f",
+    "activate",
+    "try",
     "if collapsed of w then set collapsed of w to false",
     "set index of w to 1",
     "end try",
@@ -57,7 +63,7 @@ def open_folder(path):
                     if finder_in_front():
                         return True, ""
                     time.sleep(0.4)
-                    subprocess.run(["open", "-a", "Finder", path], capture_output=True, timeout=15)
+                    subprocess.run(["osascript", "-e", 'tell application "Finder" to activate'], capture_output=True, timeout=15)
                 return True, "" if finder_in_front() else "behind"
         except (OSError, subprocess.TimeoutExpired):
             pass
