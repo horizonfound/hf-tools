@@ -696,6 +696,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/home-state":
+            import home
+            body = home.fingerprint().encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in ("/home", "/home.html"):
             import home
             body = home.page_html().encode()

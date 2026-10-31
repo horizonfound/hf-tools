@@ -129,6 +129,29 @@ def card_in():
     return None
 
 
+def fingerprint():
+    """Changes when anything the page shows might have changed: the Studio File, the queues, the journey,
+    the Content folder, a card coming or going. The page polls this and reloads itself when it moves."""
+    parts = []
+    for f in ("studio.json", "queue.json", "posting.json", "journey.json", "posting-url.txt"):
+        try:
+            parts.append(str(int((HOME / f).stat().st_mtime)))
+        except OSError:
+            parts.append("-")
+    try:
+        import posts
+        h = posts.home()
+        parts.append(str(int((h / posts.CONTENT_NAME).stat().st_mtime)) if h and (h / posts.CONTENT_NAME).is_dir() else "nohome")
+    except Exception:
+        parts.append("?")
+    try:
+        c = card_in()
+        parts.append(c["name"] if c else "nocard")
+    except Exception:
+        parts.append("?")
+    return "|".join(parts)
+
+
 def gather():
     """Everything the page shows, read from what the Studio already keeps. Each part fails soft."""
     g = {"today": date.today().strftime("%A, %B ") + str(date.today().day), "notes": [], "due": [], "tank": None,
@@ -247,6 +270,10 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
+// Reload when anything changes (the folder gets made, a shoot lands, a queue moves), keeping the open card open.
+const STAMP=document.body.dataset.stamp;
+try{const o=sessionStorage.getItem('studio-home-open');if(o){const b=document.querySelector('.item[data-item="'+o+'"]');if(b&&document.querySelector('.howto[data-for="'+o+'"]')){b.classList.add('open');document.querySelector('.howto[data-for="'+o+'"]').classList.add('show');}sessionStorage.removeItem('studio-home-open');}}catch(e){}
+if(live){setInterval(async()=>{try{const r=await fetch('/home-state',{cache:'no-store'});const t=(await r.text()).trim();if(t&&STAMP&&t!==STAMP){const o=document.querySelector('.item.open');try{if(o)sessionStorage.setItem('studio-home-open',o.dataset.item);}catch(e){}location.reload();}}catch(e){}},4000);}
 """
 
 
@@ -339,7 +366,7 @@ def page_html():
     lede = "Here's where things stand. Click anything below to see what it does." if g["setup"] else \
         "Click anything below to see what it does. When you're ready, put a memory card in and we'll start there."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>The Studio</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body>"
+            f"<title>The Studio</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<span class='when'>{e(g['today'])}</span></div>"
             f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"
