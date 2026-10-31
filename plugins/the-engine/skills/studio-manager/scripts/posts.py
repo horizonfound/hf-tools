@@ -554,6 +554,34 @@ def finish_unfinished(h):
     return done_any
 
 
+def bring(h, folder):
+    """Copy the finished photos (and only those) from a folder they chose into the drop box, under the
+    folder's own name, checked file by file. The originals are never moved. Returns (copied, skipped_by_kind, dest)."""
+    src = Path(folder).expanduser()
+    if not src.is_dir():
+        say(f"STOP: {src} isn't a folder I can see.")
+        return None
+    drop = h / DROP_NAME
+    name = src.name or "Photos"
+    dest = drop / name
+    n = 2
+    while dest.exists() and any(dest.iterdir()):
+        dest = drop / f"{name} {n}"
+        n += 1
+    copied, skipped = 0, {}
+    for rel in walk(src):
+        k = kind(rel)
+        if k != "photo":
+            label = {"raw": "RAW file", "video": "video", "working": WORKING.get(Path(rel).suffix.lower(), "working file")}.get(k, "other file")
+            skipped[label] = skipped.get(label, 0) + 1
+            continue
+        if copy_checked(src / rel, dest / rel) is None:
+            say(f"STOP: {rel} did not match the original after copying. Nothing else was changed.")
+            return None
+        copied += 1
+    return copied, skipped, dest
+
+
 def write_kits(h, run):
     for s in run["shoots"]:
         kit = h / CONTENT_NAME / s["folder"]
@@ -682,11 +710,24 @@ def main():
     st = sub.add_parser("setup"); st.add_argument("--where"); st.add_argument("--home")
     sub.add_parser("show"); sub.add_parser("list")
     lk = sub.add_parser("look"); lk.add_argument("--gap", type=float, default=120); lk.add_argument("--previews", type=int, default=4)
+    br = sub.add_parser("bring", help="copy the finished photos from a folder into the drop box (originals untouched)")
+    br.add_argument("folder")
     so = sub.add_parser("sort")
     so.add_argument("--separate", action="store_true"); so.add_argument("--one"); so.add_argument("--only", action="store_true")
     so.add_argument("specs", nargs="*"); so.add_argument("--undated", default="leave"); so.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
+    if a.cmd == "bring":
+        h = need_home()
+        got = bring(h, a.folder)
+        if not got:
+            return 1
+        copied, skipped, dest = got
+        left = ", ".join(plural(n, k) for k, n in sorted(skipped.items()))
+        say(f"Copied {copied} finished photo{'s' if copied != 1 else ''} from \"{Path(a.folder).name}\" into the drop box, every one checked. Your originals weren't moved."
+            + (f" Left behind, not copied: {left}." if left else ""))
+        print(json.dumps({"copied": copied, "skipped": skipped, "dest": str(dest)}))
+        return 0 if copied else 3
     if a.cmd == "places":
         for p in places():
             say(f"{'* ' if p['recommended'] else '  '}{p['name']}: {p['path']}  ({p['why']})")

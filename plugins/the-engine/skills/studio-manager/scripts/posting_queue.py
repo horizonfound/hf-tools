@@ -728,6 +728,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.open_shoot(urlsplit(self.path).query)
         if path == "/queue-url":
             return self.queue_url()
+        if path == "/pick-folder":
+            return self.pick_folder()
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def answer(self, obj, code=HTTPStatus.OK):
@@ -765,6 +767,35 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask Claude."
         self.answer({"ok": ok, "words": words})
+
+    def pick_folder(self):
+        """The home page's "Choose the folder your finished photos are in": the Mac's own folder picker, then
+        posts.py bring copies only the finished photos into the drop box. The originals are never moved."""
+        import posts
+        h = posts.home()
+        if not h or not h.is_dir():
+            return self.answer({"ok": False, "words": "There's no Studio folder yet. Ask Claude to set one up."})
+        if sys.platform != "darwin":
+            return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
+        script = ('tell application "System Events" to activate\n'
+                  'set f to choose folder with prompt "Pick the folder your finished photos are in. The Studio copies the photos; nothing is moved."\n'
+                  'POSIX path of f')
+        try:
+            r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=300)
+        except (OSError, subprocess.TimeoutExpired):
+            return self.answer({"ok": False, "words": "The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the Option key so it copies)."})
+        folder = r.stdout.strip()
+        if r.returncode != 0 or not folder:
+            return self.answer({"ok": False, "words": "No folder chosen." if "-128" in (r.stderr or "") else "The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the Option key so it copies)."})
+        got = posts.bring(h, folder)
+        if not got:
+            return self.answer({"ok": False, "words": "Something stopped the copy. Tell Claude and it'll sort it out."})
+        copied, skipped, dest = got
+        left = ", ".join(posts.plural(n, k) for k, n in sorted(skipped.items()))
+        words = (f"Copied {copied} finished photo{'s' if copied != 1 else ''} from {Path(folder).name}. Your originals weren't moved." if copied
+                 else f"No finished photos (JPEGs) in {Path(folder).name}.") + (f" Left behind: {left}." if left else "")
+        say(f"pick-folder: {folder} -> {copied} copied, skipped {skipped}")
+        self.answer({"ok": bool(copied), "words": words, "copied": copied})
 
     def queue_url(self):
         """The live editing-queue page's address, starting its server if needed (serve_report has the logic)."""

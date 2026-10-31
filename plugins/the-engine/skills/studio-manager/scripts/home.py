@@ -209,7 +209,9 @@ MENU = [
      ["Put your memory card in.", "Paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
      "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
-     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. <button class='btn open-inline' data-open='/open-drop'>Open the folder</button>", "Paste this in the chat:"],
+     ["<button class='btn open-inline pick' data-pick='1'>Choose the folder your finished photos are in</button> <span class='after'>The Studio copies the photos in. Your originals stay where they are.</span>"
+      "<small class='alt'>Or drag the folder into <b>Drop a shoot here</b> yourself <button class='btn open-inline' data-open='/open-drop'>Open the folder</button>; hold the Option key while you drag so it copies instead of moves.</small>",
+      "Paste this in the chat:"],
      "Nothing is posted. You post it when you're ready."),
     ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
     ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
@@ -230,6 +232,7 @@ CSS_EXTRA = r"""
 .howto .paste .words{background:#2A3040;color:#fff;border-color:rgba(255,255,255,.12)}
 .howto .paste .copy{background:var(--coral);color:#1F2430}.howto .paste .copy:hover{background:#F79672}
 .howto.show{display:grid}.howto>p{margin:0;font-size:15.5px}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:transparent;color:#F4F1EA;border-color:rgba(255,255,255,.4)}
+.howto .pick{margin-left:0;background:var(--coral);color:#1F2430;border-color:var(--coral);font-weight:600}.howto .alt{display:block;margin-top:8px;color:rgba(244,241,234,.6);font-size:13px}.howto .pick+.note{display:block;margin:6px 0 4px;color:var(--coral)}.howto .after{display:block;margin-top:6px}.howto .alt .open-inline{font-size:11.5px;padding:6px 9px}
 .paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--cream);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
 .paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
 .howto small{color:var(--ink-2);font-size:13px}
@@ -268,6 +271,7 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   else if(item==='folder'){if(!document.querySelector('.howto[data-for=folder]'))openPath('/open-home',b.querySelector('p'));}
 });});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
+document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Studio isn\'t running right now. Ask Claude.');}}));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
 // Reload when anything changes (the folder gets made, a shoot lands, a queue moves), keeping the open card open.
