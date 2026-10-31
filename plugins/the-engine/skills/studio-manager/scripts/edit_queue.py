@@ -15,7 +15,9 @@ Kept in ~/.studio/queue.json with a few thumbnails per shoot copied to
 Nothing here ever touches a photo.
 
     python3 edit_queue.py add --night "<the night's folder or records>" --shoot s1 --due 2w
-    python3 edit_queue.py add-manual --name "Garcia family" --due 2026-11-07 [--shot 2026-10-18]
+    python3 edit_queue.py add-manual --name "Garcia family" [--due 2026-11-07] [--shot 2026-10-18]
+    python3 edit_queue.py add-list --file names.txt      a whole list, in their order, no dates needed
+    python3 edit_queue.py add-list --names "Cassandra, Toni, Sarah"   (a name can carry a date: "Toni: 2026-11-07")
     python3 edit_queue.py list                      what's waiting, soonest due first
     python3 edit_queue.py done "beach"              mark finished (a word from the name is enough)
     python3 edit_queue.py undo "beach"
@@ -95,7 +97,7 @@ def today():
     return date.fromisoformat(override) if override else date.today()
 
 
-def due_date(when, base=None):
+def due_date(when, base=None, _quiet=False):
     """1w 2w 3w ("1 week", "2 weeks"...), this-week (the coming Friday), or a date."""
     base = base or today()
     w = str(when).strip().lower().replace(" ", "")
@@ -118,6 +120,8 @@ def due_date(when, base=None):
             return d.isoformat(), "date"
         except ValueError:
             continue
+    if _quiet:
+        return None, None
     sys.exit(f"STOP: I could not read '{when}' as a due date. Try 1w, 2w, 3w, this-week, or a date like 2026-11-07.")
 
 
@@ -337,15 +341,40 @@ def nights_known():
     return uniq
 
 
-def add_manual(q, name, when, shot=None, folder=None):
-    due, how = due_date(when)
+def add_manual(q, name, when=None, shot=None, folder=None):
+    due, how = due_date(when) if when else (None, None)
     shot = date.fromisoformat(shot).isoformat() if shot else None
     entry = {"id": new_id(q, name, shot), "name": " ".join(name.split()), "shot": shot, "due": due, "count": None,
              "folder": folder, "studio": None, "shoot": None, "thumbs": [], "status": "waiting",
              "added": datetime.now().isoformat(timespec="seconds")}
-    note_pick(q, how)
+    if how:
+        note_pick(q, how)
     place(q, entry)
     return entry
+
+
+def add_list(q, names):
+    """A whole editing list at once (Dustin, Oct 31: a student keeps hers as a checklist in Apple Notes,
+    twenty first names in a row). Each line is a name, in their order; a line may end with a date after a
+    colon ("Toni: 2026-11-07", or 1w/2w/3w). Undated shoots keep that order below any dated ones (the
+    page's rule: soonest due on top). The same name twice makes two shoots; the caller says so."""
+    added = []
+    for raw in names:
+        raw = " ".join(str(raw).split()).strip(" -*\u2022\u25cb\u25cf\u2610\u2611")
+        if not raw:
+            continue
+        name, when = raw, None
+        if ":" in raw:
+            a, b = raw.rsplit(":", 1)
+            if b.strip() and due_date(b.strip(), _quiet=True)[0]:
+                name, when = a.strip(), b.strip()
+        if not name:
+            continue
+        seen = [s for s in q["shoots"] if s["name"].lower() == name.lower()]
+        entry = add_manual(q, name, when)
+        entry["dup_of"] = len(seen)  # how many of this name were already there (reported, not stored for long)
+        added.append(entry)
+    return added
 
 
 # ---------- words ----------
@@ -441,6 +470,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .right{display:flex;align-items:center;gap:.9rem}
 .ask{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.8rem 1rem;margin-top:.2rem;background:var(--sun-l);border-radius:16px;font-size:14px;animation:pop .45s var(--ease)}
 .ask b{font-weight:600;margin-right:.3rem}
+.setdue{font:600 12.5px/1 var(--sans);padding:.32rem .7rem;border-radius:999px;border:1.5px solid var(--sand);background:transparent;color:var(--ink-2);cursor:pointer}.setdue:hover{border-color:var(--ink);color:var(--ink)}
 .ask button{font:600 13px/1 var(--sans);padding:.55rem .9rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
 .ask button:hover{background:var(--ink);color:#fff}
 .ask label{display:inline-flex;align-items:center;gap:.45rem;font:600 13px/1 var(--sans);color:var(--ink-2)}
@@ -519,7 +549,7 @@ function render(order){
   const w = order ? order.map(id => Q.waiting.find(s => s.id == id)) : Q.waiting, list = $('#list'), first = Q.waiting[0];
   $('#count').innerHTML = w.length ? `${w.length} shoot${w.length==1?'':'s'} to edit` : 'All caught up';
   $('#next').innerHTML = first ? `Next up: <em>${esc(first.name)}</em>, ${esc(dueWords(first.due))}.` : '';
-  list.innerHTML = w.length ? '' : '<li class="empty"><b>Nothing waiting.</b><span>New shoots land here when you add them after a backup.</span></li>';
+  list.innerHTML = w.length ? '' : '<li class="empty"><b>Nothing waiting.</b><span>Shoots land here when you add them after a backup. Already have a list of clients to edit? Send Claude a screenshot of it, or type the names, and say "add these to my editing queue."</span></li>';
   w.forEach((s, i) => {
     const li = document.createElement('li');
     li.className = 'card'; li.dataset.id = s.id; li.draggable = true;
@@ -527,10 +557,11 @@ function render(order){
     li.innerHTML = `<span class="grip" title="Drag to reorder">&#8942;&#8942;</span>
       <div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
-        <div class="meta">${dueTag(s.due)}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
+        <div class="meta">${dueTag(s.due)}<button class="setdue" type="button">${s.due ? 'Change the date' : 'Set a due date'}</button>${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
       <div class="right"><span class="n">${String(i + 1).padStart(2, '0')}</span>
         <button class="check" title="Mark finished" aria-label="Mark ${esc(s.name)} finished"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
     li.querySelector('.check').onclick = () => finish(li, s);
+    li.querySelector('.setdue').onclick = () => pickDue(li, s);
     list.appendChild(li);
   });
   renderArchive();
@@ -616,6 +647,21 @@ function askDue(id, dir){
   go.onclick = async () => { if(input.value && await send({action:'due', id, due:input.value})){render();toast('Due date changed to ' + nice(input.value))} };
   li.scrollIntoView({block:'nearest', behavior:'smooth'});
 }
+function pickDue(li, s){
+  // "Set a due date" on a card (Dustin, Oct 31): the calendar opens right there; a date moves the shoot into date order.
+  if(li.querySelector('.ask')) return;
+  const box = document.createElement('div');box.className = 'ask';
+  box.innerHTML = `<b>${s.due ? 'New due date for ' + esc(s.name) + '?' : 'When is ' + esc(s.name) + ' due?'}</b>
+    <span class="when"><input type="date" min="${Q.today}" value="${esc(s.due || '')}"><button class="go" disabled>${s.due ? 'Change date' : 'Save'}</button></span>
+    <button class="keep">${s.due ? 'Keep ' + esc(nice(s.due)) : 'Not now'}</button>`;
+  li.appendChild(box);
+  const input = box.querySelector('input'), go = box.querySelector('.go');
+  input.focus(); try{ input.showPicker() }catch(e){}
+  input.oninput = () => { go.disabled = !input.value || input.value == s.due };
+  go.onclick = async () => { if(input.value && await send({action:'due', id:s.id, due:input.value})){render();toast(esc(s.name) + ' due ' + nice(input.value))} };
+  box.querySelector('.keep').onclick = () => box.remove();
+  li.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
 $('#q').addEventListener('input', e => {FILTER = e.target.value; renderArchive()});
 if(!LIVE) $('#offline').hidden = false;
 render();
@@ -651,7 +697,7 @@ def page_html(q):
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"{home_link()}<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
-            "<span class='talk'>The soonest due date is always on top. Drag a shoot up or down to give it a new due date.</span>"
+            "<span class='talk'>The soonest due date is always on top. Shoots with no date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down.</span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and change dates.</p></header>"
             "<ol class='list' id='list'></ol>"
             "<div class='line' id='archive'><span>Your shoots</span></div>"
@@ -781,8 +827,9 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     a1 = sub.add_parser("add"); a1.add_argument("--night", required=True); a1.add_argument("--shoot", required=True)
     a1.add_argument("--due", required=True); a1.add_argument("--name")
-    a2 = sub.add_parser("add-manual"); a2.add_argument("--name", required=True); a2.add_argument("--due", required=True)
+    a2 = sub.add_parser("add-manual"); a2.add_argument("--name", required=True); a2.add_argument("--due")
     a2.add_argument("--shot"); a2.add_argument("--folder")
+    a3 = sub.add_parser("add-list"); a3.add_argument("--file", help="one name per line"); a3.add_argument("--names", help="names separated by commas")
     l = sub.add_parser("list"); l.add_argument("--all", action="store_true")
     for c in ("done", "undo"):
         x = sub.add_parser(c); x.add_argument("which")
@@ -815,6 +862,21 @@ def main():
         save(q)
         write_page(q)
         say(f"Added: {entry['name']}, {due_words(entry['due'])}.")
+    elif a.cmd == "add-list":
+        names = Path(a.file).read_text().splitlines() if a.file else [n for n in (a.names or "").split(",")]
+        added = add_list(q, names)
+        if not added:
+            sys.exit("STOP: I didn't find any names in that list.")
+        save(q)
+        write_page(q)
+        say(f"Added {len(added)} shoot{'s' if len(added) != 1 else ''} to the editing queue, in this order:")
+        for e in added:
+            twin = f"  (there was already a {e['name']}; this is a second one)" if e.pop("dup_of", 0) else ""
+            say(f"  {e['name']}" + (f", {due_words(e['due'])}" if e.get("due") else "") + twin)
+        save(q)
+        dated = [e for e in added if e.get("due")]
+        if len(dated) < len(added):
+            say("No due dates yet on the rest; they sit in this order below anything with a date. Set one on the page (Set a due date on the shoot) or just say it: \"Cassandra's due Friday.\"")
     elif a.cmd == "list":
         show(q, a.all)
     elif a.cmd in ("done", "undo"):
