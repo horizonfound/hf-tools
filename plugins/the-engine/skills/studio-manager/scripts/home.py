@@ -176,17 +176,20 @@ def gather():
 
 # ---------- the page ----------
 
-# what the two conversation buttons put on the clipboard: the words to send
+# The two buttons that start a conversation: what to paste in the chat, and the steps before it.
 SAY = {"backup": "backup now", "posts": "I dropped something in"}
 
 MENU = [
-    ("backup", "Back up a card", "Put the card in and say the word. The Studio copies it to your drive, checks every photo, sorts and names the shoots, picks sneak peeks and leaves you a report.",
-     "Put the memory card in, then tell Claude: <b>backup now</b>", "Nothing on the card is ever changed."),
-    ("posts", "Make posts from a shoot", "Edited photos in, a post kit out: a reel cut to the beat, a carousel, singles, stories, and hooks and captions in your voice.",
-     "Drag a folder of edited photos into <b>Drop a shoot here</b> (in your Studio folder), then tell Claude: <b>I dropped something in</b>. Or, for a shoot the Studio backed up: <b>I'm done with the beach shoot</b>.", "Nothing is posted. Everything waits for you."),
-    ("queue", "My editing queue", "Every shoot still to edit, soonest due on top, and every shoot the Studio has ever backed up below it.", None, None),
-    ("posting", "My posting queue", "Your reels and carousels with a light each, your grid as it will look, and how many weeks of posts you have.", None, None),
-    ("folder", "Open my Studio folder", "Drop a shoot here and Content, where your post kits live.", None, None),
+    ("backup", "Back up a card",
+     "Copies your memory card to your hard drive and double-checks every photo. Then it sorts the photos into shoots, names them, and picks a few to edit first.",
+     ["Put your memory card in.", "Paste this in the chat:"], "Nothing on your memory card is changed."),
+    ("posts", "Make posts from a shoot",
+     "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
+     ["Drag a folder of your finished photos into the folder called <b>Drop a shoot here</b>. (It's inside your Studio folder. The button below opens it.)", "Paste this in the chat:"],
+     "Nothing is posted. You post it when you're ready."),
+    ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
+    ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
+    ("folder", "Open my Studio folder", "The folder on your hard drive where your posts are kept.", None, None),
 ]
 
 CSS_EXTRA = r"""
@@ -195,11 +198,11 @@ CSS_EXTRA = r"""
 .item:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
 .item .n{font:600 20px/1.15 var(--sans);letter-spacing:-.02em}.item .n em{font:italic 400 1.05em/1 var(--display);color:var(--coral-2)}
 .item p{margin:0;color:var(--ink-2);font-size:14.5px}
-.item .badge{justify-self:start;font:600 10px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:6px 9px;border-radius:999px;background:var(--sun-l);color:#8A6A12;margin-bottom:2px}
-.item .badge.new{background:var(--coral-l);color:var(--coral-2)}
 .item.open{box-shadow:inset 0 0 0 2px var(--coral),var(--shadow)}
 .howto{grid-column:1/-1;display:none;gap:.4rem;padding:18px 22px;border-radius:18px;background:var(--coral-l);color:var(--ink)}
-.howto.show{display:grid}.howto p{margin:0;font-size:15px}.howto .go{font:italic 400 20px/1.2 var(--display);color:var(--coral-2)}
+.howto.show{display:grid}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}
+.paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--paper);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
+.paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
 .howto small{color:var(--ink-2);font-size:13px}
 .todayl{display:grid;gap:.5rem;margin:.6rem 0 0;padding:0;list-style:none}
 .todayl li{display:flex;gap:.6rem;align-items:baseline;font-size:15px}.todayl li::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ocean);flex:none;transform:translateY(-1px)}
@@ -230,13 +233,12 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   const item=b.dataset.item;clicked(item);
   document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
   document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
-  const h=document.querySelector('.howto[data-for="'+item+'"]');
-  if(h&&h.dataset.say&&copyText(h.dataset.say)){h.querySelector('.copied').hidden=false;h.querySelector('.notcopied').hidden=true;}
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
   else if(item==='folder'){openPath('/open-home');}
 });});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open)));
+document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
 """
 
@@ -269,28 +271,26 @@ def page_html():
     # today
     today_items = []
     if g["card"]:
-        today_items.append(("card", f"A card is in: {g['card']['name']}, about {g['card']['files']:,} files. Say <b>backup now</b> when you're ready."))
+        today_items.append(("card", f"A card is in: {g['card']['name']}, about {g['card']['files']:,} files. Ready when you are."))
     for kind, words in g["notes"][:5]:
         today_items.append((kind, e(words)))
     if g["tank"]:
         today_items.append(("post", e(g["tank"])))
     if not today_items:
-        today_items.append(("", "Nothing due, nothing waiting. A good day to shoot, or to post."))
+        today_items.append(("", "Nothing due and nothing waiting."))
     today_html = "".join(f"<li class='{k}'>{w}</li>" for k, w in today_items)
 
     # menu
     menu = []
-    for key, name, blurb, howto, note in MENU:
-        d = done.get(key) or {}
-        badge = ""
-        if key in ("backup", "posts"):
-            badge = "<span class='badge new'>New to you</span>" if not d.get("count") else (f"<span class='badge'>Done once</span>" if d['count'] == 1 else f"<span class='badge'>Done {d['count']} times</span>")
+    for key, name, blurb, steps, note in MENU:
         first, rest = name.split(" ", 1)
-        menu.append(f"<button class='item' data-item='{key}'>{badge}<span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
-        if howto:
-            menu.append(f"<div class='howto' data-for='{key}' data-say='{e(SAY.get(key, ''))}'><p>{howto}</p>"
-                        f"<p class='go'><span class='copied' hidden>Copied “{e(SAY.get(key, ''))}”. Paste it in the chat and press send.</span>"
-                        f"<span class='notcopied'>Then tell Claude: {e(SAY.get(key, 'go'))}</span></p><small>{e(note)}</small></div>")
+        menu.append(f"<button class='item' data-item='{key}'><span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
+        if steps:
+            words = SAY[key]
+            step_html = "".join(f"<li>{t}</li>" for t in steps)
+            menu.append(f"<div class='howto' data-for='{key}'><ol>{step_html}</ol>"
+                        f"<div class='paste'><span class='words'>{e(words)}</span><button class='copy' data-copy='{e(words)}'>Copy</button></div>"
+                        f"<small>{e(note)}</small></div>")
     menu_html = "".join(menu)
 
     # recent shoots and kits
@@ -319,11 +319,11 @@ def page_html():
                       f"<div class='acts'><a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a></div></div>")
     recent_html = "".join(recent[:8]) if recent else ""
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
-                    else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your first backup, or the first shoot you drop in, shows up here.</p>")
+                    else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here after your first backup.</p>")
 
-    head_h1 = "Good to see <em>you.</em>" if g["setup"] else "Welcome to <em>The Studio.</em>"
-    lede = "Here's where things stand, and everything I can do. Click anything to see what it does." if g["setup"] else \
-        "Your studio manager, on your own computer. Click anything below to see what it does; when you're ready, put a card in and say backup now, and I'll walk you through the setup."
+    head_h1 = "Welcome <em>back.</em>" if g["setup"] else "Welcome to <em>The Studio.</em>"
+    lede = "Here's where things stand. Click anything below to see what it does." if g["setup"] else \
+        "Click anything below to see what it does. When you're ready, put a memory card in and we'll start there."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>The Studio</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body>"
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
@@ -331,7 +331,7 @@ def page_html():
             f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show the Studio” for the live one.</p></header>"
             f"<section class='sec'><h2>Today</h2><ul class='todayl'>{today_html}</ul></section>"
-            f"<section class='sec'><h2>What I can do</h2><p>Click one. If it's something we do together, I'll tell you what to say.</p></section><div class='menu'>{menu_html}</div><p class='said' id='said'></p>"
+            f"<section class='sec'><h2>What the Studio does</h2><p>Click one.</p></section><div class='menu'>{menu_html}</div><p class='said' id='said'></p>"
             f"{recent_block}"
             f"</div><script>{SCRIPT}</script></body></html>")
 

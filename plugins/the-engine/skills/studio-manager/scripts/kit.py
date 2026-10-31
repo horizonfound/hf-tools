@@ -588,13 +588,13 @@ def write_page(kit):
             "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
             f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when_words)}</span></div>"
             f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
-            f"<p class='lede'>Everything for this shoot's posts, in one place. Copy the words, grab the files from the folders, post when you're ready. Nothing here posts itself.</p>"
+            f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"
             f"<p class='folder'>In your Studio folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
             f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
             + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover")
-            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same shape, in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel")
-            + sec("Single posts", "Sized for Instagram, in the Singles folder. On your profile grid Instagram shows the middle of each one, so faces near the middle are safest.", "4:5", strip("Singles"), short or caption or "", "Singles")
-            + sec("Stories", "Story frames, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.", "9:16", strip("Stories", tall=True), story_lines or "<p class=empty>Not written yet.</p>", "Stories")
+            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same size. They are in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel")
+            + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
+            + sec("Stories", "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.", "9:16", strip("Stories", tall=True), story_lines or "<p class=empty>Not written yet.</p>", "Stories")
             + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
             f"<script>{SCRIPT}</script></body></html>")
     (kit / "Post kit.html").write_text(page)

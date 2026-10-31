@@ -670,10 +670,10 @@ def page_html(p):
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show my posting queue” to change things.</p></header>"
-            "<section class='sec'><h2>Your grid, as it will look</h2><p>Newest on top, the way Instagram shows it. The outlined tiles are yours to come: drag one to a different spot and its posting date follows.</p>"
+            "<section class='sec'><h2>Your Instagram grid, with your new posts in it</h2><p>Newest at the top, like Instagram. The outlined ones are your upcoming posts. Drag one to a different spot to change the order; the dates update to match.</p>"
             "<div class='grid' id='grid'></div><p class='gridnote' id='gridnote'></p></section>"
             "<section class='sec'><h2>Ready to post</h2></section><ul class='list' id='greens'></ul>"
-            "<section class='sec'><h2>In progress</h2><p>The Studio did its part. Finish it in CapCut or Canva, then press Ready.</p></section><ul class='list' id='yellows'></ul>"
+            "<section class='sec'><h2>Still finishing</h2><p>These are made but you're still working on them in CapCut or Canva. Press Ready when one is done.</p></section><ul class='list' id='yellows'></ul>"
             "<section class='sec'><h2>Not started</h2></section><ul class='list' id='reds'></ul>"
             "</div><div class='toast' id='toast'></div>"
             f"<script type='application/json' id='data'>{data}</script><script>{SCRIPT}</script></body></html>")
