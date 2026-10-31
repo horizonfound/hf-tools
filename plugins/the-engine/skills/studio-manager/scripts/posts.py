@@ -11,9 +11,10 @@ A drop can be anything: one tidy shoot, three shoots in one folder, a year of ch
 `look` reads the photos' capture times (nothing is opened by Claude), splits them into
 groups by day and by the gaps between photos, pulls a few previews per group and draws one
 contact sheet, and prints what it sees in plain words with the one question to ask.
-`sort` then moves the photos into Content under proper names: each group its own shoot,
-or everything as one, or just one of them. Moved, never copied, never deleted; the drop
-box is empty again afterwards. Log first; safe to run twice; a cut-off sort is finished
+`sort` then copies the photos into Your content under proper names: each group its own shoot,
+or everything as one, or just one of them. Copied and checked (a hash of every file, like the
+backup), never moved, never deleted: what they dropped stays in the drop box exactly as dropped, so a
+folder moved in by accident (Finder moves within one drive) can be dragged straight back. Log first; safe to run twice; a cut-off sort is finished
 by the next run. Anything that is not a finished photo (RAW files, videos, catalogs,
 undated screenshots) is left in the drop box and named in the summary, unless told where
 it goes.
@@ -33,7 +34,7 @@ it goes.
 
 Records: <home>/.studio/drop/ (look.json, previews, sheet.png) and <home>/.studio/drop-log.json;
 each shoot folder carries .kit/kit.json. Exit: 0 done, 1 problem, 2 nothing to do or no home,
-6 a name clash (nothing moved).
+6 a name clash (nothing copied).
 """
 import argparse
 import json
@@ -236,6 +237,33 @@ def look(h, gap_minutes=120, previews_per=4):
     if not files:
         say("The drop box is empty. Drag a folder of finished photos into \"Drop a shoot here\" and say the word.")
         return None
+    # Photos already copied into Your content by an earlier sort (same drop path, same size, same file time)
+    # are left out of the look, so a drop box nobody has cleared is not offered twice.
+    already = {}
+    for run in read_log(h).get("runs", []):
+        if run.get("status") == "done":
+            for m in run.get("moves", []):
+                if m.get("done") and m.get("size") is not None:
+                    already[m["src"]] = (m["size"], m.get("mtime"), m["dst"])
+    done_before = []
+    fresh = []
+    for rel in files:
+        a = already.get(rel)
+        if a:
+            try:
+                st = (drop / rel).stat()
+                if st.st_size == a[0] and int(st.st_mtime) == a[1] and (h / a[2]).exists():
+                    done_before.append(rel)
+                    continue
+            except OSError:
+                pass
+        fresh.append(rel)
+    files = fresh
+    if not files:
+        kits_named = sorted({already[r][2].split("/")[1] for r in done_before if "/" in already[r][2]})
+        say(f"Everything in the drop box has already been copied into {CONTENT_NAME}" + (f" ({', '.join(kits_named)})" if kits_named else "") +
+            ". Nothing new to sort. You can clear the drop box whenever you like.")
+        return None
     top = sorted({rel.split("/")[0] for rel in files if "/" in rel})
     photos, raws, videos, others = [], [], [], []
     for rel in files:
@@ -264,7 +292,8 @@ def look(h, gap_minutes=120, previews_per=4):
     sheet_path = draw_sheet(studio, groups) if groups else None
     result = {"drop": str(drop), "looked": datetime.now().isoformat(timespec="seconds"), "gap_minutes": gap_minutes,
               "top_folders": top, "photos": len(photos), "groups": groups, "undated": undated,
-              "raws": raws, "videos": videos, "others": others, "sheet": str(sheet_path) if sheet_path else None}
+              "raws": raws, "videos": videos, "others": others, "sheet": str(sheet_path) if sheet_path else None,
+              "already_copied": len(done_before)}
     (studio / "look.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
     return result
 
@@ -277,7 +306,7 @@ def summary(r):
     what = f"{n:,} photo{'s' if n != 1 else ''}"
     if r["top_folders"]:
         what += " in " + (f"\"{r['top_folders'][0]}\"" if len(r["top_folders"]) == 1 else f"{len(r['top_folders'])} folders")
-    lines.append(f"I looked through the {what} you dropped in.")
+    lines.append(f"I looked through the {what} you dropped in." + (f" ({r['already_copied']} others in the drop box were copied into {CONTENT_NAME} earlier and are left out.)" if r.get("already_copied") else ""))
     gs = r["groups"]
     days = sorted({g["start"][:10] for g in gs})
     if len(gs) == 1:
@@ -427,6 +456,37 @@ def identity(p):
     return [st.st_ino, st.st_size, int(st.st_mtime)]
 
 
+def copy_checked(src, dst):
+    """Copy src to dst the way the backup does: hash while writing to a partial file, rename into place,
+    read the copy back and compare. Returns the hash, or None if the copy did not match (the partial is removed).
+    dst already there: compared, never replaced; returns its hash if it matches src, else None."""
+    import hashlib
+    def sha(p):
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    want = sha(src)
+    if dst.exists():
+        return want if sha(dst) == want else None
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    part = dst.with_name(dst.name + ".studio-partial")
+    h = hashlib.sha256()
+    with open(src, "rb") as f, open(part, "wb") as out:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+            out.write(chunk)
+    if h.hexdigest() != want:
+        part.unlink(missing_ok=True)
+        return None
+    shutil.copystat(src, part)
+    os.rename(part, dst)
+    if sha(dst) != want:
+        return None
+    return want
+
+
 def log_path(h):
     return h / ".studio" / "drop-log.json"
 
@@ -449,31 +509,29 @@ def write_log(h, log):
 
 
 def finish_unfinished(h):
-    """A sort cut off mid-way: do the moves that still can be done, then mark the run done."""
+    """A sort cut off mid-way: do the copies that still can be done, then mark the run done."""
     log = read_log(h)
     done_any = False
     for run in log["runs"]:
-        if run.get("status") != "moving":
+        if run.get("status") != "copying":
             continue
         problems = []
         for m in run["moves"]:
             if m.get("done"):
                 continue
             src, dst = h / DROP_NAME / m["src"], h / m["dst"]
-            if dst.exists() and not src.exists():
-                m["done"] = True  # moved just before the cut
-                continue
             if not src.exists():
-                problems.append(f"{m['src']} is gone from the drop box and not at its new place")
+                if dst.exists():
+                    m["done"] = True  # copied just before the cut; the drop box has been tidied since
+                else:
+                    problems.append(f"{m['src']} is gone from the drop box and was never copied")
                 continue
-            if dst.exists():
-                problems.append(f"{m['dst']} already exists; left {m['src']} in the drop box")
-                continue
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            os.rename(src, dst)
-            m["done"] = identity(dst) == m["id"]
+            got = copy_checked(src, dst)
+            m["done"] = got is not None
             if not m["done"]:
-                problems.append(f"{m['dst']} is not the same file after the move")
+                problems.append(f"{m['dst']} did not match the original after copying")
+            else:
+                m["sha256"] = got
         run["problems"] = problems
         run["status"] = "problems" if problems else "done"
         write_kits(h, run)
@@ -531,7 +589,7 @@ def do_sort(h, mode, specs, one_name, undated_to, dry_run):
         return 1
     clashes = sorted({m["shoot"] for m in moves if (h / CONTENT_NAME / m["shoot"]).exists()})
     if clashes:
-        say("STOP: there's already a folder in Content called " + " and ".join(f"\"{c}\"" for c in clashes) + ". Give this one another name; nothing was moved.")
+        say(f"STOP: there's already a folder in {CONTENT_NAME} called " + " and ".join(f"\"{c}\"" for c in clashes) + ". Give this one another name; nothing was copied.")
         return 6
     say("The plan:")
     for s in shoots:
@@ -543,34 +601,39 @@ def do_sort(h, mode, specs, one_name, undated_to, dry_run):
             plural(left, "undated photo") if left else "", plural(len(r["raws"]), "RAW file") if r["raws"] else "",
             plural(len(r["videos"]), "video") if r["videos"] else "", plural(len(r["others"]), "other file") if r["others"] else ""] if x))
     if dry_run:
-        say("Dry run: nothing moved.")
+        say("Dry run: nothing copied.")
         return 0
     for m in moves:
-        m["id"] = identity(drop / m["src"])
+        try:
+            st = (drop / m["src"]).stat()
+            m["size"], m["mtime"] = st.st_size, int(st.st_mtime)
+        except OSError:
+            pass
     log = read_log(h)
-    run = {"started": datetime.now().isoformat(timespec="seconds"), "mode": mode, "status": "moving", "shoots": shoots, "moves": moves}
+    run = {"started": datetime.now().isoformat(timespec="seconds"), "mode": mode, "status": "copying", "shoots": shoots, "moves": moves}
     log["runs"].append(run)
     write_log(h, log)
     problems = []
     for m in moves:
         src, dst = drop / m["src"], h / m["dst"]
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        os.rename(src, dst)
-        m["done"] = identity(dst) == m["id"]
-        if not m["done"]:
-            problems.append(f"{m['dst']} is not the same file after the move")
+        got = copy_checked(src, dst)
+        m["done"] = got is not None
+        if m["done"]:
+            m["sha256"] = got
+        else:
+            problems.append(f"{m['dst']} did not match the original after copying")
     run["problems"] = problems
     run["status"] = "problems" if problems else "done"
     write_log(h, log)
     write_kits(h, run)
-    tidy_drop(h)
     (h / ".studio" / "drop" / "look.json").rename(h / ".studio" / "drop" / f"look-{run['started'].replace(':', '-')}.json")
     if problems:
         say("STOP: " + problems[0] + (f" (and {len(problems) - 1} more)" if len(problems) > 1 else ""))
         return 1
     n = sum(s["photos"] for s in shoots)
-    say(f"Done. Moved {n} photos into Content: " + "; ".join(f"\"{s['folder']}\" ({s['photos']})" for s in shoots)
-        + ". Nothing copied, nothing changed, nothing deleted." + (" The drop box still has the files set aside above." if stay else " The drop box is empty again."))
+    say(f"Done. Copied {n} photos into {CONTENT_NAME}: " + "; ".join(f"\"{s['folder']}\" ({s['photos']})" for s in shoots)
+        + ". Every copy was checked against the original. What you dropped is still in the drop box, exactly as you dropped it:"
+        " put it back where it came from if you moved it in by accident, or clear it out whenever you like.")
     return 0
 
 
