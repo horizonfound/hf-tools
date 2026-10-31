@@ -176,6 +176,9 @@ def gather():
 
 # ---------- the page ----------
 
+# what the two conversation buttons put on the clipboard: the words to send
+SAY = {"backup": "backup now", "posts": "I dropped something in"}
+
 MENU = [
     ("backup", "Back up a card", "Put the card in and say the word. The Studio copies it to your drive, checks every photo, sorts and names the shoots, picks sneak peeks and leaves you a report.",
      "Put the memory card in, then tell Claude: <b>backup now</b>", "Nothing on the card is ever changed."),
@@ -223,6 +226,8 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   const item=b.dataset.item;clicked(item);
   document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
   document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
+  const h=document.querySelector('.howto[data-for="'+item+'"]');
+  if(h&&h.dataset.say&&navigator.clipboard){try{await navigator.clipboard.writeText(h.dataset.say);h.querySelector('.copied').hidden=false;h.querySelector('.notcopied').hidden=true;}catch(e){}}
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
   else if(item==='folder'){openPath('/open-home');}
@@ -279,7 +284,9 @@ def page_html():
         first, rest = name.split(" ", 1)
         menu.append(f"<button class='item' data-item='{key}'>{badge}<span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
         if howto:
-            menu.append(f"<div class='howto' data-for='{key}'><p>{howto}</p><p class='go'>Then tell Claude: go</p><small>{e(note)}</small></div>")
+            menu.append(f"<div class='howto' data-for='{key}' data-say='{e(SAY.get(key, ''))}'><p>{howto}</p>"
+                        f"<p class='go'><span class='copied' hidden>Copied “{e(SAY.get(key, ''))}”. Paste it in the chat and press send.</span>"
+                        f"<span class='notcopied'>Then tell Claude: {e(SAY.get(key, 'go'))}</span></p><small>{e(note)}</small></div>")
     menu_html = "".join(menu)
 
     # recent shoots and kits
