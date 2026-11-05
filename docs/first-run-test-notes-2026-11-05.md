@@ -98,3 +98,21 @@ you clicked. There was no way to close it at all.
 - Tried in the app's pane at desktop and phone width: Back up a card, Make posts, and the folder card each
   open under their row with every card where it was; all four ways of closing work; going straight from
   one card to another works.
+
+## 5. No obvious way back to the welcome screen
+
+**What happened:** he clicked "My editing queue" on the welcome screen, landed on the queue page, and saw
+no clear way back.
+
+**Dustin:** the pane has its own back arrow up top, "but it's not that obvious." There should be a
+built-in back button so people don't get confused about how to get back to the welcome page.
+
+**Why it happened:** every page did have a link home, but it was a small outlined "Home" pill at the far
+right of the top bar, next to the date, where nobody looks for a way back.
+
+**Fixed the same day:** on the editing queue, the posting queue, the post kit and the report, the link is
+now a solid dark button at the top left, the first thing in the bar: "← Back to home" ("← Home" on a
+phone, where there's less room). Looked at in the app's pane on a copy of the earlier setup: the queue page
+and the posting page at desktop width, the queue page at phone width (nothing spills over), and a click on
+it lands on the welcome screen. The post kit and the report use the same button but were not looked at,
+since both pages are written when a kit or a backup is made; the next one made will have it.

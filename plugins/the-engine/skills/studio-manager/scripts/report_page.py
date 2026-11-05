@@ -41,7 +41,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .brand b{font:600 16px/1 var(--sans);letter-spacing:-.01em}
 .brand small{font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2);white-space:nowrap}
-.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
+.bar .homelink{display:inline-flex;align-items:center;gap:.45em;margin-right:.25rem;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.bar .homelink:hover{background:var(--coral-2)}.bar .homelink .short{display:none}@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
 .bar .nav{display:inline-flex;align-items:center;gap:.8rem;font:600 16px/1 var(--sans);color:#fff;text-decoration:none;padding:.5rem .5rem .5rem 1.3rem;border-radius:999px;background:var(--coral);border:1.5px solid var(--coral);white-space:nowrap;box-shadow:0 14px 28px -18px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .bar .nav .arr{width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--coral);display:grid;place-items:center;font-size:15px;transition:transform .35s var(--ease)}
 .bar .nav:hover{transform:translateY(-2px);box-shadow:var(--shadow)}.bar .nav:hover .arr{transform:translate(2px,-2px)}
@@ -334,7 +334,7 @@ def home_link():
     try:
         f = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio")) / "posting-url.txt"
         if f.exists():
-            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'>Home</a>"
+            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
     except OSError:
         pass
     return ""
@@ -364,8 +364,7 @@ def build(manifest, studio):
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
            f"<title>{e(brand.title(name))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
-           f"<div class='wrap'><div class='bar'>{brand.bar()}",
-           home_link(),
+           f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}",
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]
 

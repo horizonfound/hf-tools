@@ -527,7 +527,7 @@ CSS = """
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
-.bar .homelink{margin-left:auto;font:600 13px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid var(--coral-l)}.bar .homelink+.when{margin-left:0}
+.bar .homelink{display:inline-flex;align-items:center;gap:.45em;margin-right:.25rem;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.bar .homelink:hover{background:var(--coral-2)}.bar .homelink .short{display:none}@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
 body:not(.live) .homelink{display:none}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
@@ -630,8 +630,8 @@ def write_page(kit):
 
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{html.escape(brand.title(name + ' · Post kit'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
-            f"<div class='wrap'><div class='bar'>{brand.bar()}"
-            f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when_words)}</span></div>"
+            f"<div class='wrap'><div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>{brand.bar()}"
+            f"<span class='when'>{html.escape(when_words)}</span></div>"
             f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"
             f"<p class='folder'>In your {html.escape(brand.short())} folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
