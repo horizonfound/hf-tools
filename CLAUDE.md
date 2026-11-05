@@ -40,6 +40,7 @@ Before anything is called done, look at it and ask: **can a person who knows not
 8. **It is Claude, and we say so.** No hidden app.
 9. **Study Meg's engine (The Startup Mom), never bootleg it.**
 10. **Nothing goes to Nicole or Slack without Dustin's say-so.**
+11. **The words are theirs (Dustin and Nicole, Nov 5).** The Assistant holds the pen, never the idea. A note to a client, a caption, a hook, a story line is written from what the photographer says, in their voice, and nothing else: it asks "what do you want to say?", writes that down tidily, and hands it back for small edits. It never reads a story out of the photos, never adds a detail they did not give, never tries to be clever. The photos may supply facts only (how many, which day). Picking the strongest photos (sneak peeks, a reel's order) stays with the Assistant; that is selection, not words. Dustin: "making their life easier without trying to be too fancy." Older notes below about writing "from what is in the photos" are history.
 
 ## Where we draw the line (Dustin, Oct 23)
 
