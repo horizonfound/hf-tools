@@ -308,3 +308,21 @@ stay as the safety net.
 **To decide before wiring it in:** how long counts as away (5 minutes is the script's default; sitting
 still reading counts too, which is harmless if the reload only happens when the pane has lost its page),
 and that every wake-up is a small turn on their plan.
+
+## 14. A "Show the report" button as the last thing in the chat (Dustin's fix for note 12)
+
+**Dustin:** "Maybe the best thing is to just have the very bottom thing in the chat box, for when they
+return after a card backup, be a button that says show the report. That way it's either up on the screen
+or easy to launch if not."
+
+**Done the same day, in the Assistant's instructions:** every backup now ends with the app's next-step box
+under the closing message: a one-line recap, "Want to see the report?", and one button, Show the report.
+A click sends "Show the report," and the Assistant loads the page fresh and brings the pane forward every
+time, without checking whether it was still there. In a plain terminal, where there is no such box, the
+closing message ends with "Say "show me the report" any time to see it."
+
+**This replaces** the "press the play button" line proposed in note 12. The return watcher (note 13) stays
+as an experiment; the button is the answer that does not depend on anything staying alive.
+
+**To see for sure:** whether the box and its button are still under the last message after hours away and
+an app reload. The first one was shown at the end of this change; Dustin's next long break is the test.
