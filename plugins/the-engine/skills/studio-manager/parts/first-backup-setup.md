@@ -4,7 +4,7 @@ Part of the Assistant's instructions. The first-thing checks, the rules and how 
 
 ## The very first time: a short conversation, then never ask again
 
-If `python3 <scripts>/studio_file.py show` says there is no Studio File yet, have a short conversation **before** anything copies. It is a conversation, not a form: **one question per message, in plain words, with the Assistant's own pick already on the table so most people just say "yep."** Five questions and the card count, then go. This is a photographer who has never seen this before; they do not know what a Studio File, a pattern, a default or a frame name is, and they never need to.
+If `python3 <scripts>/studio_file.py show` says there is no Studio File yet, or its "Sessions go on" line says "(not set)" (a folder for posts can be set up before any backup has been), have a short conversation **before** anything copies. It is a conversation, not a form: **one question per message, in plain words, with the Assistant's own pick already on the table so most people just say "yep."** Six questions and the card count, then go. This is a photographer who has never seen this before; they do not know what a Studio File, a pattern, a default or a frame name is, and they never need to.
 
 How it reads:
 
@@ -26,7 +26,7 @@ The conversation, in this order (first find the card and run `studio_file.py dri
 
 **Question 3, the second copy.** "Do you copy your shoots to a second drive as well?" Choices: "No, just the one drive (recommended if you don't have one)", then every other connected drive by name with its free space, from `studio_file.py drives` (leave out the drive they just chose, the Mac's own disk, and any Time Machine or backup-software drive). Other is for a drive that isn't plugged in right now (say they can plug it in and you'll wait) or a folder they name. Never offer Dropbox, Google Drive or iCloud: raw files are far too big to sync, and nobody does it (Dustin, Oct 28). Cloud backup like Backblaze runs on its own behind the scenes and is not a second copy the Assistant makes.
 
-**Question 4, how they name a shoot folder.** "Last one. How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If they pick their own way, or type in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
+**Question 4, how they name a shoot folder.** "How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If they pick their own way, or type in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
 
 **The photo names are not a question.** Say what you'll do in one sentence and move on: "I'll name each photo after the shoot and keep your camera's number on the end, so nothing ever loses its place. If you'd rather keep the camera's names exactly as they are, just say so." Only if they say so do you set `--file-names original`.
 
@@ -34,7 +34,7 @@ The conversation, in this order (first find the card and run `studio_file.py dri
 
 **Question 6, how often they post.** "Last thing about you: how often do you like to post on Instagram? I'll keep your posts lined up at that pace and tell you when you're running low." Choices: "3 times a week (recommended)", "Every other day", "Once a week", "Every day". Other is for their own words ("twice a week", "every weekday"). Save it with `posting_queue.py interval "<their answer>"`. If it can't read the answer it says so; ask once more in their words.
 
-Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --no-second] [--offered 1|2 | --example "<pasted>"] --file-names original|shoot`. Then the one question every backup gets, "How many memory cards for this shoot?" (buttons, see step 2 in `parts/backup.md`; on this first run there is no "like usual?", they just said where), then one sentence that says it is starting, with the numbers and the drive by name ("Starting now: 3,931 photos onto Big Kahuna, a second copy on your LaCie. You can walk away."), and the backup runs as `parts/backup.md` says. From now on "backup now" asks only the one-screen check-in.
+Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --no-second] [--offered 1|2 | --example "<pasted>"] --file-names original|shoot` (`--offered 1` is the date-first name, "2026-10-18 Smith Family"; `--offered 2` is the name-first one, "Smith Family, Oct 18 2026"; `--example` is the folder name they pasted). Questions 5 and 6 are already saved by their own commands, above. Then the one question every backup gets, "How many memory cards for this shoot?" (buttons, see step 2 in `parts/backup.md`; on this first run there is no "like usual?", they just said where), then one sentence that says it is starting, with the numbers and the drive by name ("Starting now: 3,931 photos onto Big Kahuna, a second copy on your LaCie. You can walk away."), and the backup runs as `parts/backup.md` says. From now on "backup now" asks only the one-screen check-in.
 
 A full first backup, so the tone is clear:
 
@@ -57,7 +57,7 @@ A full first backup, so the tone is clear:
 >
 > *click: No, just the one drive*
 >
-> No problem, I'll say so in the report so you know where things stand. Last one: how do you like a shoot folder named?
+> No problem, I'll say so in the report so you know where things stand. Next: how do you like a shoot folder named?
 > [ 2026-10-18 Smith Family (recommended, keeps them in order) ] [ Smith Family, Oct 18 2026 ] [ I have my own way ] [ Other ]
 >
 > *click: I have my own way* → "Paste me the name of one of your past shoot folders and I'll match it." → *types: 2026.10.18_SmithFamily_Beach* → "So Smith Family on Oct 18 would be 2026.10.18_SmithFamily. That it?" [ That's it ] [ Not quite, let me fix it ]

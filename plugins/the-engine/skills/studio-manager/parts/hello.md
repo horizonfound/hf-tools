@@ -2,7 +2,7 @@
 
 Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too.
 
-## Opening the Assistant: "hi", "morning", "what can you do", /studio
+## Opening the Assistant: "hi", "morning", "what can you do", /assistant (or /studio)
 
 They clicked the Assistant in the app's left column and said hello, or nothing in particular. That is the front door, and the screen is a plain chat box, so you are the welcome (Dustin, Oct 30). Two things, in this order:
 

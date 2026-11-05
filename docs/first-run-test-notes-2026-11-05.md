@@ -357,3 +357,21 @@ before and after would say. The cost is one extra step to read the part.
 **Not done:** bundling the routine checks into one command; a link in the chat that opens the report with
 no thinking at all (untested whether the app opens it in the pane or in Chrome); which lighter model is
 good enough for the sneak peeks.
+
+**Note 15, the cold read (same day):** a fresh helper that had never seen the instructions was given the
+core only and twelve things a photographer might say (hi, backup now with and without setup, the backup
+stopping for the picks, what's in my queue, I'm done with the beach shoot, make my posts, export the
+carousel again, Show the report, the beach reel's ready, call the sunset one Kaia, a shorter note for
+Sarah). It chose the right part every time and had to guess only once (Show the report needs no part).
+Every script the parts name exists. It also found wording slips, most older than the split, now fixed:
+"five questions" where there are six; "Last one" on question four; "two button questions" on a screen with
+three; "rule 6" and "rule 11" for rules that are numbered differently; the first-backup trigger worded
+three ways (it is "no drive set," since a posts folder can exist before any backup); which naming choice
+is 1 and which is 2; where the curating notes and the reel script live; the folder button called two
+names; the queue page told to open in the regular browser against the pane-only rule; the sneak-peek part
+saying "run the same command again" without naming it; /assistant and /studio both named now.
+
+**Left for whoever knows the Canva connector best:** the Canva part names editing tools
+(`start-editing-transaction`, `perform-editing-operations`, `commit-editing-transaction`) that this Mac's
+Canva connector does not have (it has one `edit-design` tool). The part now says the names differ by
+version; the steps themselves want a check against the connector students will actually get.
