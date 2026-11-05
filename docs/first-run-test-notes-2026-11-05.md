@@ -326,3 +326,34 @@ as an experiment; the button is the answer that does not depend on anything stay
 
 **To see for sure:** whether the box and its button are still under the last message after hours away and
 an app reload. The first one was shown at the end of this change; Dustin's next long break is the test.
+
+## 15. Speed: where the waiting is, and the instructions split into parts
+
+**Dustin:** "Any way to speed some of these things up so there's less delay? Is it dependent on my
+computer speed?"
+
+**Measured from this chat's own log (Nov 5):** the Show the report button took 6 to 10 seconds from click
+to page; a hello 9 to 19; copying and checking 16 GB took 87 seconds; working out the shoots about 40;
+picking the sneak peeks one to two minutes; the whole backup about four and a half minutes. Only the copy
+depends on the Mac and its drives. Everything else is Claude's thinking, which happens on Anthropic's
+servers and depends on the model and on how much it has to read.
+
+**Dustin runs Fable 5.1 on high;** most students will be on a lighter model and will likely see quicker
+replies. This chat is also heavier than theirs: a day of conversation plus the whole project notes file,
+which students never load.
+
+**Done the same day (his call): the instructions are split.** The one 75 KB file every reply had to read
+is now a 9 KB core (the first-thing checks, the rules, how to talk, showing a page, and a table of which
+part to read) plus twelve parts in a `parts` folder: hello, first-backup-setup, backup, sneak-peeks,
+client-note, after-the-report, editing-queue, post-kit, photos-in, canva, posting-queue,
+where-things-live. The text was moved word for word; a line-by-line check found nothing lost and nothing
+doubled. Sentences that pointed at "the section below" now name the part. A hello now reads about 15 KB
+instead of 75; a backup after setup about 21.
+
+**What this does and does not buy:** less to read means less of their plan used on every reply, and less
+for the Assistant to wade through. How much faster replies get was not measured; a timed fresh chat
+before and after would say. The cost is one extra step to read the part.
+
+**Not done:** bundling the routine checks into one command; a link in the chat that opens the report with
+no thinking at all (untested whether the app opens it in the pane or in Chrome); which lighter model is
+good enough for the sneak peeks.
