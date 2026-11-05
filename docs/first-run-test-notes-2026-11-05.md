@@ -162,3 +162,33 @@ maker for the same mistake found no others. The check now passes on the test fol
 
 **Worth doing:** a one-line smoke test (`night.py --check` on a pretend card) before any push that touches
 the backup scripts, since a crash like this is invisible until someone says "backup now."
+
+## 9. The first backup felt like a questionnaire
+
+**What happened:** before the first backup started he answered eleven things: where the photos are, yes
+that folder, which drive, where on it, a second copy, folder naming, how he writes to clients, how he
+signs off, his name, how often he posts, and what's in the folder.
+
+**Dustin:** understandable the first time, but "they're thinking, oh, this is going to make my life so much
+easier, and then they're sitting there going through a whole questionnaire... they just want to back up
+their photos." Warm them up: since we've never done this before I need to ask a few questions so I know
+what to do, and I'll remember your preferences so it's quick and easy every time from now on. "And we'll
+try and streamline this as much as possible."
+
+**Fixed the same day, the warm-up:** the first-time opening now says, before any question: "Since we've
+never done this together, I need to ask you a few quick questions first, so I know where your photos go
+and how you like things named. It takes about a minute, and it's only this once: I'll remember your
+answers, so from now on a backup is just "backup now" and you can walk away."
+
+**Not changed yet, the streamlining (his and Nicole's call; these are what could go):**
+- **How often you post** has nothing to do with a backup. It could wait for the first time they make
+  posts. Saves one question.
+- **How you write to clients** could wait until the first shoot that gets a note. Dustin moved it into
+  setup on Oct 28 because asking at the end held the report up; asking it the first time they add a shoot
+  to the editing queue would keep it out of both places. Saves up to three (tone, sign-off, name).
+- **The sign-off took three steps** in this run (tone, "just my first name," then the name) because a
+  button can't carry a typed name. One plain question, "How do you sign your notes?", does it in one.
+- **Where on the drive** could be asked only when the drive has an obvious shoots folder; otherwise shoots
+  go right on the drive and the Assistant says so. Saves one for most people.
+- With all four, a first backup from a card is: drive, second copy, folder naming, how many cards, what's
+  on the card. Five, down from nine or more.

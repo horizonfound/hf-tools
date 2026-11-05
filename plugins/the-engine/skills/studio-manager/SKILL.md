@@ -67,7 +67,7 @@ How it reads:
 
 The conversation, in this order (first find the card and run `studio_file.py drives` so the names are real):
 
-**Opening, with the card found.** One short message before any question: what you found, that nothing is copied yet and nothing on the memory card will be changed, and that since it's the first time you have a few quick questions and then they can walk away.
+**Opening, with the card found: warm them up before the first question (Dustin, Nov 5).** They came to back up their photos and are about to get a run of questions; without a heads-up it feels like a questionnaire, the opposite of "this will make my life easier." So one short message before any question, in two parts. First what you found, that nothing is copied yet and nothing on the memory card will be changed. Then, in these words or close to them: "Since we've never done this together, I need to ask you a few quick questions first, so I know where your photos go and how you like things named. It takes about a minute, and it's only this once: I'll remember your answers, so from now on a backup is just "backup now" and you can walk away." Say it every first time, never skip it, and never start the questions cold. Keep the run itself as short as it can be: never ask something they already told you, and never add a question that isn't in the list below.
 
 **Question 1, the drive.** "Here are the drives I can see. Which one do your shoots go on?" Choices: every connected drive by name with its free space ("Big Kahuna, 18 TB free"), plus "A folder on this Mac". Leave out the Mac's own startup disk and any Time Machine or backup-software drive. The one marked "(recommended)" is the drive that already has shoots on it (a folder of dated subfolders full of photos is the tell); only when no drive shows that is the biggest free space the pick. Other is for a path or a drive that isn't plugged in yet; if they name one that isn't there, say they can plug it in now and you'll wait. Never assume the desktop.
 
@@ -89,7 +89,9 @@ Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --n
 
 A full first backup, so the tone is clear:
 
-> Found your card: 3,931 photos, 127 GB. Nothing's copied yet, and nothing on your memory card will be changed. Since this is our first time, I've got a few quick questions, then you can walk away.
+> Found your card: 3,931 photos, 127 GB. Nothing's copied yet, and nothing on your memory card will be changed.
+>
+> Since we've never done this together, I need to ask you a few quick questions first, so I know where your photos go and how you like things named. It takes about a minute, and it's only this once: I'll remember your answers, so from now on a backup is just "backup now" and you can walk away.
 >
 > Here are the drives I can see. Which one do your shoots go on?
 > [ Big Kahuna, 18 TB free (recommended) ] [ LaCie Rugged, 1.2 TB free ] [ A folder on this Mac ] [ Other ]
