@@ -221,3 +221,16 @@ with their photo.
 
 **This backup:** the 14 are still in the hidden records folder. Running the backup fresh with the fixed
 reader would sort all 442; that needs the two shoot folders from this run set aside first.
+
+## 11. The report talks about a memory card when the photos came from a folder (found by the test)
+
+**What happened:** this backup's source was a folder on a drive, not a card. The report still says "checked
+against the card," "your memory card is exactly as it was," "The card is safe to format when you're ready,"
+and "What's on the card." The backup's day folder was also named "thursday card."
+
+**Not fixed yet.** When the source is a folder, the report should say "the folder" (and name it), and there
+is nothing to format, so that button and line should not appear. Same for the first-time questions: "How
+many memory cards for this shoot?" does not apply to a folder and was skipped by hand in this run.
+
+**Also on this report:** it says "2 shoots, 428 photos" and nothing about the 14 photos left out (note 10).
+The top of the report is where that belongs.
