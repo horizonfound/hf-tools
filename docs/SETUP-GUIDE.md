@@ -106,7 +106,7 @@ That's the setup. You never do it again.
 
 ## Part 2: Opening the Assistant, and your first backup
 
-**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi** (or type **/assistant**). The Assistant answers with the day, what's due, what's queued to post, whether it sees a card, and opens its home page beside the chat: a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
+**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi** (or type **/assistant**). The first time, the Assistant introduces itself and opens its home page beside the chat; once you've done a few things together it answers with the day instead (what's due, what's queued to post, whether it sees a card). You don't need a memory card to start: if you have photos you've already finished, you can begin with posts. The home page has a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
 
 **Your first backup.**
 

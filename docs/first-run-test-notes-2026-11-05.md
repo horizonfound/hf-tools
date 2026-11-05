@@ -29,3 +29,31 @@ no "no card in". Something like:
 > No card handy? Click "Make posts from a shoot" and we'll start with photos you've already finished.
 
 The day's rundown (due, queued, card in) starts once they've done things, not on a second hello.
+
+## 2. Nothing should assume they have a memory card
+
+**What happened:** the new first-time hello said "The best place to start is your first backup," and the
+welcome screen said "When you're ready, put a memory card in and we'll start there."
+
+**Dustin:** the Assistant was first built as if everybody always has a fresh shoot on a card. A lot of the
+students don't shoot that often; they'll mostly use it for social media. A backup is still a fine place to
+start, but someone with no card should feel just as welcome to explore and start with what they have.
+
+**Fixed the same day:** the two ways in are offered side by side, finished photos first, and neither is
+"the" place to start.
+
+- The first hello now ends: "There are two good places to start, depending on what you have today. Got
+  photos you've already finished? Click "Make posts from a shoot" on the page and I'll turn them into a
+  reel, a carousel and captions. Just back from a shoot? Put the memory card in and say "backup now."
+  Or just look around first."
+- The second-hello line and the "nothing going on" line for regulars got the same treatment (the old one
+  still mentioned dragging photos in, which is no longer the way).
+- The welcome screen, for someone new: "Start with whatever you have today: photos you've already
+  finished, or a memory card from a shoot." Its empty "Your shoots" line no longer says "after your first
+  backup," and its Today section no longer says "Nothing due and nothing waiting" to someone who hasn't
+  started; it says what will show up there.
+- The setup guide's "Opening the Assistant" paragraph says you don't need a memory card to start.
+- The rule is in the skill: never assume they have a memory card.
+
+**Still worth a look (not changed):** the setup guide's Part 2 is titled "Opening the Assistant, and your
+first backup" and goes straight into a backup; a "your first posts" walk-through beside it would match.

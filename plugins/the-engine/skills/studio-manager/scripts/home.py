@@ -349,6 +349,7 @@ def page_html():
     done = g["done"]
 
     # today
+    known = g["setup"] or any(d.get("count") for d in g["done"].values()) or bool(g["kits"])
     today_items = []
     if g["card"]:
         today_items.append(("card", f"A card is in: {g['card']['name']}, about {g['card']['files']:,} files. Ready when you are."))
@@ -357,7 +358,9 @@ def page_html():
     if g["tank"]:
         today_items.append(("post", e(g["tank"])))
     if not today_items:
-        today_items.append(("", "Nothing due and nothing waiting."))
+        # never a list of what's empty for someone who hasn't started (Dustin, Nov 5)
+        today_items.append(("", "Nothing due and nothing waiting." if known else
+                            "Once you've backed up a shoot or made some posts, what's due and what's ready to post shows up here."))
     today_html = "".join(f"<li class='{k}'>{w}</li>" for k, w in today_items)
 
     # menu
@@ -415,12 +418,11 @@ def page_html():
                       f"<div class='acts'><a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a></div></div>")
     recent_html = "".join(recent[:8]) if recent else ""
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
-                    else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here after your first backup.</p>")
+                    else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here once you've backed up a memory card or made posts from a folder of photos.</p>")
 
-    known = g["setup"] or any(d.get("count") for d in g["done"].values()) or bool(g["kits"])
     head_h1 = "Welcome <em>back.</em>" if known else (f"Hi, I'm <em>{e(brand.own_name())}.</em>" if brand.own_name() else f"Welcome to <em>{e(brand.name())}.</em>")
     lede = "Here's where things stand. Click anything below to see what it does." if known else \
-        "Click anything below to see what it does. When you're ready, put a memory card in and we'll start there."
+        "Click anything below to see what it does. Start with whatever you have today: photos you've already finished, or a memory card from a shoot."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{e(brand.title())}</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
