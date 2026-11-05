@@ -65,6 +65,7 @@ from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import brand  # noqa: E402
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 PFILE = HOME / "posting.json"
@@ -664,8 +665,8 @@ def page_html(p):
     data = json.dumps(state(p)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>Posting queue · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
-            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
+            f"<title>{html.escape(brand.title('Posting queue'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
@@ -859,7 +860,7 @@ class Handler(SimpleHTTPRequestHandler):
                 words = (f"Opened {name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
                          else f"Opened {name} in Finder.") if ok else f"Couldn't open Finder. The folder is {target}. ({why})"
         elif h is None or not content.is_dir():
-            words = "The Studio folder isn't there right now. Is the drive plugged in?"
+            words = f"The {posts.HOME_NAME} folder isn't there right now. Is the drive plugged in?"
         say(f"open asked: {kit_name} / {sub or '(kit)'} -> {'ok' if ok else 'no'}: {words}")
         out = json.dumps({"ok": ok, "words": words}).encode()
         self.send_response(HTTPStatus.OK)

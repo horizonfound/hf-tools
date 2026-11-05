@@ -54,6 +54,7 @@ from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import brand  # noqa: E402
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 QFILE = HOME / "queue.json"
@@ -709,8 +710,8 @@ def page_html(q):
     data = json.dumps(state(q)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>Your shoots · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
-            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
+            f"<title>{html.escape(brand.title('Your shoots'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"{home_link()}<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
             "<span class='talk'>The soonest due date is always on top. Shoots with no date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down.</span>"

@@ -33,6 +33,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import brand  # noqa: E402
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JOURNEY = HOME / "journey.json"
@@ -325,9 +326,9 @@ def page_html():
         menu.append(f"<button class='item' data-item='{key}'><span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
         if no_folder and key in ("posts", "folder"):
             # Nothing set up yet: the one step is to ask for the folder. The Studio makes it and says where.
-            steps = ["The Studio hasn't made your folder yet. It takes one question. Paste this in the chat:"]
+            steps = [f"{brand.name()} hasn't made your folder yet. It takes one question. Paste this in the chat:"]
             words = SAY["setup"]
-            note = "The Studio asks where you'd like the folder, makes it, and tells you where it is."
+            note = f"{brand.name()} asks where you'd like the folder, makes it, and tells you where it is."
         elif steps:
             words = SAY[key]
         if steps:
@@ -365,12 +366,12 @@ def page_html():
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
                     else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here after your first backup.</p>")
 
-    head_h1 = "Welcome <em>back.</em>" if g["setup"] else "Welcome to <em>The Studio.</em>"
+    head_h1 = "Welcome <em>back.</em>" if g["setup"] else (f"Hi, I'm <em>{e(brand.own_name())}.</em>" if brand.own_name() else f"Welcome to <em>{e(brand.name())}.</em>")
     lede = "Here's where things stand. Click anything below to see what it does." if g["setup"] else \
         "Click anything below to see what it does. When you're ready, put a memory card in and we'll start there."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>The Studio</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
-            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
+            f"<title>{e(brand.title())}</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
+            f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when'>{e(g['today'])}</span></div>"
             f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"
             "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show the Studio” for the live one.</p></header>"

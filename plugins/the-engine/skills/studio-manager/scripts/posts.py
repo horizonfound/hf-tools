@@ -52,6 +52,7 @@ sys.path.insert(0, str(HERE))
 import exif_read  # noqa: E402
 import groups as groups_mod  # noqa: E402
 import sheet  # noqa: E402
+import brand  # noqa: E402
 import studio_file  # noqa: E402
 
 DROP_NAME = "Drop a shoot here"
@@ -341,7 +342,7 @@ def summary(r):
     if r["others"]:
         side.append(plural(len(r["others"]), "other file"))
     if side:
-        lines.append("Left where they are, not copied: " + ", ".join(side) + ". The Studio only copies finished photos (JPEGs, and phone photos), so nothing big or unfinished comes along.")
+        lines.append("Left where they are, not copied: " + ", ".join(side) + f". {brand.name()} only copies finished photos (JPEGs, and phone photos), so nothing big or unfinished comes along.")
     if r["sheet"]:
         lines.append(f"Contact sheet, one row per group: {r['sheet']}")
     lines.append("")

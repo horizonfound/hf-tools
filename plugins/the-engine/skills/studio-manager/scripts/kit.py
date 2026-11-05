@@ -46,6 +46,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import exif_read  # noqa: E402
+import brand  # noqa: E402
 import posts  # noqa: E402
 import studio_file  # noqa: E402
 
@@ -627,8 +628,8 @@ def write_page(kit):
                 f"<p class='went'></p><p class='sub'>{html.escape(sub)}</p>{body}</div><div class='words'>{wrds}</div></section>")
 
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(name)} · Post kit · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
-            "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>"
+            f"<title>{html.escape(brand.title(name + ' · Post kit'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
+            f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<a class='homelink' href='/home'>Home</a><span class='when'>{html.escape(when_words)}</span></div>"
             f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"

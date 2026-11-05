@@ -125,6 +125,7 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
+import brand  # noqa: E402
 
 PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
 ROTS = [-3, 2, -1.5, 2.5, -2, 1.5]
@@ -362,8 +363,8 @@ def build(manifest, studio):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(name)} · The Studio</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
-           "<div class='wrap'><div class='bar'><span class='brand'><b>The Studio</b><small>by Horizon Found</small></span>",
+           f"<title>{e(brand.title(name))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
+           f"<div class='wrap'><div class='bar'>{brand.bar()}",
            home_link(),
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]
@@ -480,7 +481,7 @@ def build(manifest, studio):
     out.append("</div></div>")
 
     out.append("<footer class='foot'><div class='wrap'>Your memory card is exactly as it was.</div>"
-               "<div class='wordmark'>The Studio</div></footer>")
+               f"<div class='wordmark'>{e(brand.name())}</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.
     # The button says what happened, every time: opened, or why not (the drive unplugged, the Studio not running).
@@ -491,7 +492,7 @@ def build(manifest, studio):
                "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "try{const r=await fetch('/open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in Finder.':'Could not open it.'));}"
-               "catch(e){tell('The Studio isn\\'t running right now, so this button can\\'t open Finder. Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
+               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open Finder. Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
     out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT + "</body></html>")
     return "\n".join(out)
 

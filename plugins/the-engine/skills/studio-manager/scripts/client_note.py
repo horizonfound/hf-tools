@@ -32,6 +32,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import brand  # noqa: E402
 import studio_file  # noqa: E402
 from where import locate  # noqa: E402
 
@@ -264,7 +265,7 @@ def main():
             sample = a.sample
         n = setup(sample, a.tone, a.sign_off, a.off)
         if not n.get("on"):
-            say("Client notes: off. The Studio won't ask again.")
+            say(f"Client notes: off. {brand.name()} won't ask again.")
         else:
             say("Client notes: on. "
                 + ("Matching the note you pasted" if n.get("sample") else f"Tone: {TONES.get(n.get('tone', 'warm'), 'warm and personal')}")

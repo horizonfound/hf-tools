@@ -77,7 +77,12 @@ def save(sf):
 
 def as_markdown(sf):
     d, n = sf.get("drives", {}), sf.get("naming", {})
-    lines = ["# Studio File", "", "What the Studio knows about you. Asked once; change any line by telling the Studio.", "",
+    import brand
+    who = brand.name()
+    lines = ["# Studio File", "", f"What {who} knows about you. Asked once; change any line by telling {who}.", ""]
+    if sf.get("name"):
+        lines += [f"- You call your helper **{sf['name']}**.", ""]
+    lines += [
              "## Drives", "",
              f"- Sessions go on: `{d.get('session', '(not set)')}`",
              f"- Second copy: `{d.get('second')}`" if d.get("second") else "- Second copy: none (that's fine)", "",
@@ -257,6 +262,7 @@ def main():
     s.add_argument("--offered", type=int, help="1 or 2: one of the two offered patterns")
     s.add_argument("--file-names", choices=["original", "shoot"])
     s.add_argument("--note", help="a line to remember about their setup (e.g. shoots kept on the computer's own disk, said OK)")
+    s.add_argument("--name", help='what they call their helper ("Sherman"); every page and message uses it. "" to go back to the product\'s name')
     p = sub.add_parser("pattern")
     p.add_argument("example")
     r = sub.add_parser("render")
@@ -297,6 +303,8 @@ def main():
     n = sf.setdefault("naming", {})
     if a.note:
         sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note": a.note})
+    if a.name is not None:
+        sf["name"] = " ".join(a.name.split())[:40]
     if a.drive:
         if not Path(a.drive).is_dir():
             sys.exit(f"STOP: {a.drive} is not a folder I can see.")
