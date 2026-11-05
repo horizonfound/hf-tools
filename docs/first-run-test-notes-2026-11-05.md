@@ -259,3 +259,22 @@ forward. By the time Dustin looked, the pane was blank with a play button. He pr
 **Still open:** a student whose pane comes back blank has no launch setting at all, so the play button will
 do nothing useful for them. The honest fix is in the guide and the hello: "If the page beside the chat is
 ever blank, say 'show me the report' or 'hi' and it comes back." Worth a line in the setup guide.
+
+**Note 12, the timing, from the session's own log:** the report was put on screen at 12:58 pm. Dustin's
+next message in this chat was at 3:14 pm, two hours and sixteen minutes later, and two other chats in this
+project were in use in between. The report's server ran the whole time; only the pane's page was gone.
+Whether it was the time away, switching to other chats, or the app reloading the chat cannot be told from
+here. It does not matter for the fix: "you can walk away" means the report has to be reachable when they
+come back hours later, whatever the pane did meanwhile.
+
+**Dustin: "we need to solve that issue somehow." Proposed, not built yet:**
+1. The closing chat message, which is always still there when they come back, ends with how to get the
+   page back: "If the page beside this chat is blank, press the play button in it, or say 'show me the
+   report.'"
+2. Make the play button work for students: at setup the Assistant writes the launch setting into the
+   folder they opened, so a blank pane's play button opens Home; and Home shows the latest backup at the
+   top with a "See the report" button.
+3. Whenever they say anything after a backup, the Assistant first checks that the pane is showing a page
+   and puts the report back if it is not.
+Ruled out earlier by Dustin (Oct 28): also opening the report in the Mac's regular browser, which would
+survive, but put pages in two places.
