@@ -18,6 +18,7 @@ first time, a short explanation and "want to dive in?"; later, pick up where the
     python3 home.py seen            mark them answered
     python3 home.py did <category> [--note "..."]   remember something done in a category
     python3 home.py journey         the whole record
+    python3 home.py hello [--mark]  which hello to give: a first-time introduction, or the day's rundown (JSON)
 
 Categories: backup, posts, queue, posting, reel, folder.
 """
@@ -60,7 +61,7 @@ def load_journey():
             return json.loads(JOURNEY.read_text())
         except ValueError:
             pass
-    return {"clicks": [], "done": {}}
+    return {"clicks": [], "done": {}, "hellos": {"first": None, "count": 0}}
 
 
 def save_journey(j):
@@ -110,6 +111,47 @@ def mark_seen():
     for c in j["clicks"]:
         c["seen"] = True
     save_journey(j)
+
+
+# ---------- the hello: an introduction the first time, the day's rundown once they know their way around ----------
+
+HELLO_WORDS = {
+    "first": "They have never been here. Introduce yourself with the first-time script in the skill. No rundown of the day.",
+    "new": "They've said hello before but haven't done anything yet. One warm line and the one first step. No introduction again, no rundown.",
+    "getting-started": "They've done one side but not the other. The day in a line or two if there is anything in it, then one line inviting them to what they haven't tried.",
+    "regular": "They know their way around. The day in two or three lines, then what they can say next.",
+}
+
+
+def hello(mark=False):
+    """Which hello to give (Dustin, Nov 5: a brand-new photographer who said hi got "nothing due, nothing
+    waiting, no card in", a status report on a day with nothing in it, where an introduction belonged).
+    The stage comes from what they have actually done, never from how many times they've said hello:
+    first (nothing done, never greeted), new (nothing done, greeted before), getting-started (a backup or
+    posts, not both), regular (both)."""
+    j = load_journey()
+    h = j.get("hellos") or {"first": None, "count": 0}
+    g = gather()
+    done = {c: d for c, d in (j.get("done") or {}).items() if d.get("count")}
+    did = {"backup": bool(g["setup"] or done.get("backup")),
+           "posts": bool(done.get("posts") or done.get("reel") or g["kits"])}
+    if not (did["backup"] or did["posts"] or done):
+        stage = "first" if not h.get("count") else "new"
+    elif did["backup"] and did["posts"]:
+        stage = "regular"
+    else:
+        stage = "getting-started"
+    out = {"stage": stage, "what_to_say": HELLO_WORDS[stage], "hellos_before": h.get("count", 0),
+           "name": brand.own_name(), "card_in": bool(g["card"]),
+           "not_tried": [k for k in ("backup", "posts") if not did[k]],
+           "done": {c: {"times": d["count"], "last_note": d.get("note")} for c, d in done.items()}}
+    if mark:
+        h["first"] = h.get("first") or now()
+        h["last"] = now()
+        h["count"] = h.get("count", 0) + 1
+        j["hellos"] = h
+        save_journey(j)
+    return out
 
 
 # ---------- what matters today ----------
@@ -375,8 +417,9 @@ def page_html():
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
                     else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here after your first backup.</p>")
 
-    head_h1 = "Welcome <em>back.</em>" if g["setup"] else (f"Hi, I'm <em>{e(brand.own_name())}.</em>" if brand.own_name() else f"Welcome to <em>{e(brand.name())}.</em>")
-    lede = "Here's where things stand. Click anything below to see what it does." if g["setup"] else \
+    known = g["setup"] or any(d.get("count") for d in g["done"].values()) or bool(g["kits"])
+    head_h1 = "Welcome <em>back.</em>" if known else (f"Hi, I'm <em>{e(brand.own_name())}.</em>" if brand.own_name() else f"Welcome to <em>{e(brand.name())}.</em>")
+    lede = "Here's where things stand. Click anything below to see what it does." if known else \
         "Click anything below to see what it does. When you're ready, put a memory card in and we'll start there."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{e(brand.title())}</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
@@ -428,6 +471,7 @@ def main():
     sub.add_parser("page"); sub.add_parser("url"); sub.add_parser("pending"); sub.add_parser("seen"); sub.add_parser("journey")
     d = sub.add_parser("did"); d.add_argument("category", choices=CATEGORIES); d.add_argument("--note")
     c = sub.add_parser("click"); c.add_argument("item", choices=CATEGORIES)
+    hl = sub.add_parser("hello"); hl.add_argument("--mark", action="store_true")
     a = ap.parse_args()
     if a.cmd == "page":
         say(str(write_page()))
@@ -447,6 +491,8 @@ def main():
         record_click(a.item); say("ok")
     elif a.cmd == "journey":
         say(json.dumps(load_journey(), indent=1))
+    elif a.cmd == "hello":
+        say(json.dumps(hello(a.mark), indent=1))
     return 0
 
 
