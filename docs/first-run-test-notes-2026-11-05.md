@@ -234,3 +234,28 @@ many memory cards for this shoot?" does not apply to a folder and was skipped by
 
 **Also on this report:** it says "2 shoots, 428 photos" and nothing about the 14 photos left out (note 10).
 The top of the report is where that belongs.
+
+## 12. The report wasn't on screen; the pane's play button showed a bare list of files
+
+**What happened:** when the backup finished, the report was loaded in the pane and the pane was brought
+forward. By the time Dustin looked, the pane was blank with a play button. He pressed it and got
+"Directory listing for /": first-look.html, from-the-card, index.json, manifest.json and so on.
+
+**Why it happened, as far as it can be traced:**
+- The pane lost its page between the report being shown and Dustin looking. The session's instructions
+  were re-read at that moment, which is what happens when the app reloads a session; a reloaded pane comes
+  back empty. That part is the app's doing, and the Assistant cannot speak first to put the page back.
+- The play button runs this project's own launch setting, a leftover from Oct 24 that pointed at the old
+  "Night test" backup. Its port was busy with today's report, so it started a second server on the next
+  port and opened that server's bare address, and the report server answered a bare address with a list of
+  the backup's record files.
+
+**Fixed the same day:**
+- A report server's bare address now opens the report, and it never lists a folder's files.
+- The home page server's bare address now opens the home page (it used to open the posting page).
+- This Mac's launch setting now starts the Assistant's home page, so the play button lands on Home. (That
+  file is Dustin's own, not part of what students get.)
+
+**Still open:** a student whose pane comes back blank has no launch setting at all, so the play button will
+do nothing useful for them. The honest fix is in the guide and the hello: "If the page beside the chat is
+ever blank, say 'show me the report' or 'hi' and it comes back." Worth a line in the setup guide.

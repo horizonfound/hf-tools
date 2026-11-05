@@ -710,7 +710,13 @@ def open_capcut(rec):
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
-        if path in ("/", "/posting.html"):
+        if path in ("", "/"):
+            # the bare address is the front door, the home page (it used to be the posting page)
+            self.send_response(HTTPStatus.FOUND)
+            self.send_header("Location", "/home")
+            self.end_headers()
+            return
+        if path == "/posting.html":
             body = page_html(load()).encode()
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")

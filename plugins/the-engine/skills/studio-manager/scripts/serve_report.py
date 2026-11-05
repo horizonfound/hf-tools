@@ -159,8 +159,20 @@ class Handler(SimpleHTTPRequestHandler):
     picks = None
     last_open = {}  # path -> time, so one click never opens two Finder windows
 
+    def list_directory(self, path):
+        # Never a bare list of the backup's records (Dustin, Nov 5: the pane's play button opened the server's
+        # bare address and he got "Directory listing for /" with index.json and manifest.json in it).
+        self.send_error(HTTPStatus.NOT_FOUND, "Nothing to show here")
+        return None
+
     def do_GET(self):
         parts = urlsplit(self.path)
+        if parts.path in ("", "/"):
+            # the bare address is the report
+            self.send_response(HTTPStatus.FOUND)
+            self.send_header("Location", "/report.html")
+            self.end_headers()
+            return
         if parts.path == "/rename-status":
             body = json.dumps(self.renames.state if self.renames else {}).encode()
             self.send_response(HTTPStatus.OK)
