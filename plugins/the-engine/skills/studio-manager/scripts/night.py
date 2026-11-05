@@ -210,7 +210,6 @@ def main():
         if a.check:
             say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
             try:  # the one gentle nudge for shoots kept on the computer's own disk (Dustin, Oct 30)
-                import studio_file
                 if studio_file.on_internal_disk(a.dest):
                     st = os.statvfs(a.dest)
                     if st.f_bavail / max(st.f_blocks, 1) < 0.15:

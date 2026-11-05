@@ -145,3 +145,20 @@ aren't touched"; "touched" is a word he ruled out on Oct 24, so it went in as "m
 - "The Assistant works from copies of your JPEGs, so your originals are never moved or changed."
 - "The Assistant makes its own copies of the JPEGs in that folder. Your originals aren't touched."
 - "Your originals stay put. The Assistant copies the JPEGs to work from."
+
+## 8. "Backup now" crashed before it started (found by the test, not by Dustin)
+
+**What happened:** the check that runs before a backup stopped with a code error, before anything was
+copied. Nothing was changed anywhere.
+
+**Why it happened:** the Oct 30 change that added the "your computer's disk is getting full" nudge put a
+second `import studio_file` inside the backup script's main routine. In Python that makes the name local to
+the whole routine, so the very first line that reads the Studio File failed. That change was written in
+the cloud and no backup had been run on the Mac since, so every "backup now" since Oct 30 would have
+stopped right here.
+
+**Fixed on the spot:** the stray import is gone. A scan of every script in the Assistant and the reel
+maker for the same mistake found no others. The check now passes on the test folder.
+
+**Worth doing:** a one-line smoke test (`night.py --check` on a pretend card) before any push that touches
+the backup scripts, since a crash like this is invisible until someone says "backup now."
