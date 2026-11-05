@@ -192,3 +192,32 @@ answers, so from now on a backup is just "backup now" and you can walk away."
   go right on the drive and the Assistant says so. Saves one for most people.
 - With all four, a first backup from a card is: drive, second copy, folder naming, how many cards, what's
   on the card. Five, down from nine or more.
+
+## 10. Fourteen photos were left out of their shoot and hidden (found by the test, not by Dustin)
+
+**What happened:** the test folder held 442 raw photos. 428 were sorted into two shoots. The other 14, with
+their 13 edit sidecars, were reported as "27 files that are not photos" and moved into the backup's hidden
+records folder. Nothing was lost: every one is on Big Kahuna, verified byte for byte, and the source folder
+is untouched. But a photographer would open the shoot, find 14 photos missing, and have no idea where
+they went. They were also the 14 that had been rated or edited in another program: the selects.
+
+**Why it happened, two things:**
+1. **The date reader only looked at the first megabyte of a raw file.** A program that saves ratings or
+   edits back into a CR2 (Capture One, Canon's software, Photo Mechanic) can move the file's directory to
+   the very end. Those 14 came back with no date, camera or lens.
+2. **The sorter treats "no date" as "not a photo."** Anything it could not date is set aside with the
+   camera's housekeeping files, out of sight, and the message says "not photos."
+
+**Fixed the same day (1):** the reader now finds the directory wherever it sits in the file. All 14 read
+correctly (Feb 5 2020, 6:01 to 6:26 am, the lookbook shoot), about half a second each; ordinary files are
+as fast as before.
+
+**Not fixed yet (2), and it matters beyond this case:** iPhone HEIC photos cannot be dated yet at all, so a
+card of them would be hidden wholesale. What it should do, for Dustin and Nicole to confirm: a photo is a
+photo by its file type, never by whether it has a date; photos with no readable date go in a visible folder
+of their own next to the shoots ("No date, from this backup") with their sidecars; and the report says so
+at the top in plain words ("14 photos had no date I could read. They're in ..."). Sidecars always travel
+with their photo.
+
+**This backup:** the 14 are still in the hidden records folder. Running the backup fresh with the fixed
+reader would sort all 442; that needs the two shoot folders from this run set aside first.

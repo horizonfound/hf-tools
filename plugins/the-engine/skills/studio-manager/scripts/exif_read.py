@@ -240,7 +240,23 @@ def read(path, head_bytes=1024 * 1024):
     if data[:2] == b"\xff\xd8":
         return _jpeg_exif(data)
     if data[:2] in (b"II", b"MM"):
-        return _read_tiff_blob(data)
+        rec = _read_tiff_blob(data)
+        if not rec.get("taken") and len(data) == head_bytes:
+            # A RAW that another program has written into (ratings or edits saved back into the file by
+            # Capture One, Canon's own software, Photo Mechanic) can have its directory moved to the END of
+            # the file, far past the first MB. Found on Dustin's first-run test, Nov 5: 14 such CR2s, his
+            # selects, came back with no date and were treated as not-photos. Map the whole file and read the
+            # directory wherever it is; only the pages it touches are read.
+            try:
+                import mmap
+                with open(path, "rb") as f:
+                    with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+                        whole = _read_tiff_blob(m)
+                if whole.get("taken") or len(whole) > len(rec):
+                    rec = whole
+            except (OSError, ValueError):
+                pass
+        return rec
     return {}
 
 
