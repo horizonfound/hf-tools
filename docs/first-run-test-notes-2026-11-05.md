@@ -130,3 +130,18 @@ which would say yes to either spelling. Tried on pretend folders (lowercase, the
 right, brand new, a fresh setup; a pretend photo inside came through unchanged), then on the real folder on
 Big Kahuna, which now reads "Your Content." The old "The Studio" folder from before the test was left
 alone; it gets the same rename if that setup is ever put back.
+
+## 7. "The Assistant copies the photos in (JPEGs only). Nothing is moved."
+
+**Dustin:** that line on the Make posts card could be said "a little bit more clearly and a little bit more
+user-friendly. Give me some options."
+
+**Fixed: he picked "Makes its own copies."** The line now reads: "The Assistant makes its own copies of the
+JPEGs in that folder. Your originals aren't moved or changed." (The option as offered ended "Your originals
+aren't touched"; "touched" is a word he ruled out on Oct 24, so it went in as "moved or changed.")
+
+**The options he chose from:**
+- "Your photos stay exactly where they are. The Assistant makes copies of the JPEGs to work from."
+- "The Assistant works from copies of your JPEGs, so your originals are never moved or changed."
+- "The Assistant makes its own copies of the JPEGs in that folder. Your originals aren't touched."
+- "Your originals stay put. The Assistant copies the JPEGs to work from."
