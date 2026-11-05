@@ -35,6 +35,7 @@ Exit codes: 0 done, 1 a problem (nothing written), 2 nothing to do.
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -45,6 +46,7 @@ sys.path.insert(0, str(HERE))
 from where import locate  # noqa: E402
 
 TOOL = "The Assistant, by Horizon Found"
+OLD_TOOLS = ("The Studio, by Horizon Found",)   # the name until Nov 5; sidecars written then are still ours
 NO_SIDECAR = {".jpg", ".jpeg", ".heic", ".heif", ".dng", ".tif", ".tiff", ".png"}
 KEYWORD = "sneak peek"
 OLD_KEYWORD = "Studio pick"   # what the Oct 25 version called them
@@ -95,9 +97,10 @@ def old_ours(sidecar):
         text = sidecar.read_text()
     except (OSError, UnicodeDecodeError):
         return False
-    if text == SIDECAR.format(tool=TOOL, keyword=OLD_KEYWORD):  # today's format with the Oct 25 keyword
+    tools = (TOOL,) + OLD_TOOLS
+    if any(text == SIDECAR.format(tool=t, keyword=k) for t in tools for k in (OLD_KEYWORD, KEYWORD)) and text != current():
         return True
-    return any(text == o.format(tool=TOOL, keyword=k) for o in OLD_SIDECARS for k in (OLD_KEYWORD, KEYWORD))
+    return any(text == o.format(tool=t, keyword=k) for o in OLD_SIDECARS for t in tools for k in (OLD_KEYWORD, KEYWORD))
 
 
 def say(msg):
@@ -177,14 +180,63 @@ def make_previews(root, files, studio, size=2000):
         if dst.exists():
             names.append(dst.name)
             continue
-        r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", str(size),
-                            str(photo), "--out", str(dst)], capture_output=True, text=True)
-        if r.returncode == 0 and dst.exists():
+        if shutil.which("sips"):
+            r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", str(size),
+                                str(photo), "--out", str(dst)], capture_output=True, text=True)
+            ok = r.returncode == 0 and dst.exists()
+        else:  # no sips (tests off the Mac): Pillow as a stand-in
+            try:
+                from PIL import Image
+                im = Image.open(photo); im.thumbnail((size, size)); im.convert("RGB").save(dst, quality=82); ok = True
+            except Exception:
+                ok = False
+        if ok:
             names.append(dst.name)
             made += 1
         else:
             say(f"Could not make a preview of {photo.name} (the photo is fine; the report just won't show it).")
     return made, names
+
+
+def set_aside_dropped(root, studio, files):
+    """A photo that was a sneak peek and no longer is (the photographer chose different ones) loses the
+    keyword: its sidecar, if it is still exactly ours, is moved (never deleted) into the records' folder
+    sidecars-set-aside/, so Lightroom's filter shows only the current picks. A sidecar that is not ours
+    any more (they rated or edited it in Lightroom) is left alone and named. Returns (moved, left)."""
+    log = studio / "picks-log.json"
+    try:
+        entries = json.loads(log.read_text()) if log.exists() else []
+    except ValueError:
+        entries = []
+    marked = set()
+    for e in entries:
+        for rel in e.get("marked", []) + e.get("updated", []):
+            marked.add(rel)
+        for rel in e.get("set_aside", []):
+            marked.discard(rel)
+    want = set()
+    for f in files:
+        photo = Path(f) if os.path.isabs(f) else root / f
+        want.add(str(photo.with_suffix(".xmp").relative_to(root)) if photo.is_relative_to(root) else str(photo.with_suffix(".xmp")))
+    moved, left = [], []
+    aside = studio / "sidecars-set-aside"
+    for rel in sorted(marked - want):
+        side = root / rel if not os.path.isabs(rel) else Path(rel)
+        if not side.is_file():
+            continue
+        if not (ours(side) or old_ours(side)):
+            left.append(rel)
+            continue
+        aside.mkdir(parents=True, exist_ok=True)
+        dst = aside / (Path(rel).stem + "_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".xmp")
+        try:
+            os.replace(side, dst)
+            moved.append(rel)
+        except OSError as ex:
+            left.append(f"{rel} ({ex})")
+    if moved:
+        write_log(studio, {"at": datetime.now().isoformat(timespec="seconds"), "set_aside": moved, "to": str(aside)})
+    return moved, left
 
 
 def write_log(studio, entry):
@@ -223,6 +275,12 @@ def main():
         files = [p["file"] for p in json.loads(pf.read_text())["picks"]]
 
     todo, upgrade, skipped, problems = plan(root, files)
+    if not a.dry_run and not a.files:
+        moved, left = set_aside_dropped(root, studio, files)
+        for rel in moved:
+            say(f"No longer a sneak peek: {Path(rel).stem} (its keyword was set aside, not deleted).")
+        for rel in left:
+            say(f"Left alone: {Path(rel).stem} was a sneak peek before, but its sidecar has your own changes in it.")
     if problems:
         say("STOP: nothing was written, because:")
         for p in problems:

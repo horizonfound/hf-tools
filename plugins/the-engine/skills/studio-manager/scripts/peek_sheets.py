@@ -24,12 +24,14 @@ Exit codes: 0 done, 1 a problem, 2 nothing to do.
 import argparse
 import json
 import os
+from datetime import datetime
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 sys.path.insert(0, str(HERE))
 from where import locate  # noqa: E402
 import sheet  # noqa: E402
@@ -178,6 +180,11 @@ def closer(night, picks):
     out_dir = studio / "peek-sheets"
     tmp = out_dir / ".tmp.bmp"
     cols, per_page, cell, pad, label_h = 2, 4, 700, 10, 28
+    short_f = studio / "peek-shortlist.json"
+    try:
+        shortlist = json.loads(short_f.read_text()) if short_f.exists() else {}
+    except ValueError:
+        shortlist = {}
     for spec in picks:
         sid, _, nums = spec.partition("=")
         if sid not in sheets:
@@ -191,6 +198,8 @@ def closer(night, picks):
                 say(f"STOP: {sid} has no photo numbered {n}.")
                 return 1
             want.append(m)
+        shortlist[sid] = [m["n"] for m in want]   # kept, so "Show me more" on the report can offer them
+        short_f.write_text(json.dumps(shortlist, indent=1))
         pages = []
         for pi in range(0, len(want), per_page):
             chunk = want[pi:pi + per_page]
@@ -238,6 +247,91 @@ def current_path(studio, f):
     return f
 
 
+def candidates(night, sid):
+    """For the report's "Show me more": the close-look shortlist for a shoot (or, before one exists, every
+    moment on its pages), each with its number, its preview path and whether it is a current pick."""
+    root, studio = locate(night)
+    sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+    if sid not in sheets:
+        return None
+    short_f = studio / "peek-shortlist.json"
+    try:
+        short = json.loads(short_f.read_text()).get(sid) if short_f.exists() else None
+    except ValueError:
+        short = None
+    by_n = {m["n"]: m for m in sheets[sid]["list"]}
+    nums = [n for n in (short or []) if n in by_n] or sorted(by_n)
+    pj = studio / "sneak-peeks.json"
+    picked = []
+    if pj.exists():
+        picked = [p["n"] for p in json.loads(pj.read_text()).get("picks", []) if p.get("shoot") == sid and "n" in p]
+    for n in picked:   # the current picks are always offered, even if the shortlist was drawn before them
+        if n in by_n and n not in nums:
+            nums.append(n)
+    return {"shoot": sid, "picked": picked, "from_shortlist": bool(short),
+            "photos": [{"n": n, "preview": by_n[n]["preview"], "taken": by_n[n].get("taken")} for n in nums]}
+
+
+def taste_file():
+    return HOME / "taste-notes.md"
+
+
+def add_taste_note(line):
+    """One line into the photographer's taste notes (Claude reads them before every pick)."""
+    f = taste_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    if not f.exists():
+        f.write_text("# Taste notes\n\nWhat you've told the Assistant about the photos you like, one line a time. It reads this before picking sneak peeks.\n\n")
+    with open(f, "a") as fh:
+        fh.write(f"- {datetime.now().strftime('%Y-%m-%d')}: {line.strip()}\n")
+
+
+def ask_again(night, sid, note):
+    """The report's "Pick again": remember the ask (Claude does the re-pick when they next talk) and keep
+    the note as taste."""
+    root, studio = locate(night)
+    f = studio / "peeks-asks.json"
+    try:
+        asks = json.loads(f.read_text()) if f.exists() else []
+    except ValueError:
+        asks = []
+    asks = [a for a in asks if a.get("shoot") != sid]
+    asks.append({"shoot": sid, "note": note.strip(), "at": datetime.now().isoformat(timespec="seconds"), "done": False})
+    f.write_text(json.dumps(asks, indent=1, ensure_ascii=False))
+    if note.strip():
+        shoots = {}
+        try:
+            shoots = {x["id"]: x for x in json.loads((studio / "shoots.json").read_text())["shoots"]}
+        except (OSError, ValueError, KeyError):
+            pass
+        name = shoots.get(sid, {}).get("name") or sid
+        add_taste_note(f"{name}: asked for different sneak peeks: \"{note.strip()}\"")
+    return len(asks)
+
+
+def pending_asks(night):
+    root, studio = locate(night)
+    f = studio / "peeks-asks.json"
+    try:
+        asks = json.loads(f.read_text()) if f.exists() else []
+    except ValueError:
+        asks = []
+    return [a for a in asks if not a.get("done")]
+
+
+def mark_asked_done(night, sid):
+    root, studio = locate(night)
+    f = studio / "peeks-asks.json"
+    try:
+        asks = json.loads(f.read_text()) if f.exists() else []
+    except ValueError:
+        return
+    for a in asks:
+        if a.get("shoot") == sid:
+            a["done"] = True
+    f.write_text(json.dumps(asks, indent=1, ensure_ascii=False))
+
+
 def pick(night, picks, by):
     root, studio = locate(night)
     sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
@@ -259,6 +353,14 @@ def pick(night, picks, by):
             new.append({"file": current_path(studio, m["file"]), "shoot": sid, "n": m["n"]})
         chosen_shoots.add(sid)
     kept = [p for p in existing if p.get("shoot") not in chosen_shoots]
+    if by == "photographer":
+        for sid in chosen_shoots:
+            before = [p["n"] for p in existing if p.get("shoot") == sid and "n" in p]
+            after = [p["n"] for p in new if p["shoot"] == sid]
+            if before and before != after:
+                name = sheets[sid].get("name") or sid
+                add_taste_note(f"{name}: chose their own sneak peeks; kept {sorted(set(before) & set(after))}, dropped {sorted(set(before) - set(after))}, added {sorted(set(after) - set(before))} (numbers on that shoot's pages; look at those frames to see what they went for)")
+            mark_asked_done(night, sid)
     pj.write_text(json.dumps({"picks": kept + new, "picked_by": by}, indent=1, ensure_ascii=False))
     for sid in chosen_shoots:
         say(f"{sid}: {sum(1 for p in new if p['shoot'] == sid)} sneak peeks")
@@ -276,11 +378,32 @@ def main():
     c = sub.add_parser("closer"); c.add_argument("night"); c.add_argument("picks", nargs="+", help="s1=14,3,27,9,41,18,22,5 (the shortlist)")
     k = sub.add_parser("pick"); k.add_argument("night"); k.add_argument("picks", nargs="+", help="s1=14,3,27,9,41,18 (hero first)")
     k.add_argument("--by", default="Claude, from the pages")
+    c2 = sub.add_parser("candidates", help="the shortlist for one shoot, as JSON (for the report's Show me more)"); c2.add_argument("night"); c2.add_argument("shoot")
+    q = sub.add_parser("ask", help="the report's Pick again: remember it and keep the note as taste"); q.add_argument("night"); q.add_argument("--shoot", required=True); q.add_argument("--note", default="")
+    sub.add_parser("asks", help="pick-again asks not yet done, as JSON").add_argument("night")
+    d = sub.add_parser("asked-done"); d.add_argument("night"); d.add_argument("--shoot", required=True)
+    t = sub.add_parser("taste", help="add a line to the taste notes, or print them"); t.add_argument("--add")
     a = ap.parse_args()
     if a.cmd == "make":
         return make(a.night, a.gap, a.max, a.per_page, a.thumb)
     if a.cmd == "closer":
         return closer(a.night, a.picks)
+    if a.cmd == "candidates":
+        c = candidates(a.night, a.shoot)
+        say(json.dumps(c, ensure_ascii=False) if c else json.dumps({"error": "no such shoot on the pages"}))
+        return 0 if c else 1
+    if a.cmd == "ask":
+        ask_again(a.night, a.shoot, a.note); say("Noted. Pick again when they next talk."); return 0
+    if a.cmd == "asks":
+        say(json.dumps(pending_asks(a.night), ensure_ascii=False)); return 0
+    if a.cmd == "asked-done":
+        mark_asked_done(a.night, a.shoot); return 0
+    if a.cmd == "taste":
+        if a.add:
+            add_taste_note(a.add)
+        f = taste_file()
+        say(f.read_text() if f.exists() else "(no taste notes yet)")
+        return 0
     return pick(a.night, a.picks, a.by)
 
 

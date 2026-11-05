@@ -91,6 +91,20 @@ CSS = """
 .queue .save:disabled{opacity:.4;cursor:default}
 .queue .qstate{font-size:13px;min-height:1.2em}.queue .qstate.bad{color:#b4472e}
 @keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.peeks-wrap{display:grid;gap:.6rem;padding:0 .3rem}.peeks-act{display:flex;gap:.5rem;flex-wrap:wrap}
+.pk{font:600 13px/1 var(--sans);padding:.5rem .9rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer}
+.pk.send,.pk.use{background:var(--coral);border-color:var(--coral);color:#fff}.pk:disabled{opacity:.4;cursor:default}
+.peeks-ask{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;background:var(--sun-l);border-radius:16px;padding:.6rem .8rem;animation:pop .4s var(--ease)}.peeks-ask[hidden]{display:none}
+.peeks-ask input{flex:1 1 16em;font:500 14px var(--sans);border:1.5px solid var(--sand);border-radius:10px;padding:.5rem .7rem;background:var(--paper)}
+.peeks-more{background:var(--sun-l);border-radius:16px;padding:.8rem;animation:pop .4s var(--ease)}.peeks-more[hidden]{display:none}
+.peeks-more .hint{margin:0 0 .6rem;font-size:13px;color:var(--ink-2)}
+.peeks-more .cands{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem}
+.peeks-more .cand{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1;background:var(--sand-l);cursor:pointer;outline:3px solid transparent;transition:outline-color .2s}
+.peeks-more .cand img{width:100%;height:100%;object-fit:cover;display:block}
+.peeks-more .cand.on{outline-color:var(--coral)}.peeks-more .cand .k{position:absolute;top:.35rem;left:.35rem;min-width:1.4rem;height:1.4rem;border-radius:999px;background:var(--coral);color:#fff;font:700 12px/1.4rem var(--sans);text-align:center;display:none;padding:0 .3rem}
+.peeks-more .cand.on .k{display:block}
+.peeks-more .pfoot{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.7rem;font-size:13px;color:var(--ink-2)}
+.peeks-state{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.peeks-state.bad{color:#b4472e}.peeks-state.on{color:var(--ink)}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.2rem 0 .6rem}
 .btn{display:inline-flex;align-items:center;gap:1.1rem;padding:.7rem .7rem .7rem 1.9rem;border-radius:999px;background:var(--coral);color:#fff;font:600 22px/1 var(--sans);letter-spacing:-.01em;border:1.5px solid var(--coral);cursor:pointer;box-shadow:0 18px 36px -20px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .btn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -134,6 +148,40 @@ async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>
   try{const r=await fetch('/queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;location.href=d.url;}
   catch(e){st.textContent='Could not open the queue page. Ask Claude to show your editing queue.';st.className='qstate bad';}});}
 document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
+// The sneak peeks are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
+document.querySelectorAll('.peeks-wrap').forEach(w=>{
+ const id=w.dataset.shoot,ask=w.querySelector('.peeks-ask'),more=w.querySelector('.peeks-more'),st=w.querySelector('.peeks-state'),inp=ask.querySelector('input');
+ const live=location.protocol.startsWith('http');
+ const say=(t,c)=>{st.textContent=t;st.className='peeks-state'+(c?' '+c:'')};
+ w.querySelector('.again').addEventListener('click',()=>{more.hidden=true;ask.hidden=!ask.hidden;if(!ask.hidden)inp.focus()});
+ ask.querySelector('.cancel').addEventListener('click',()=>{ask.hidden=true});
+ ask.querySelector('.send').addEventListener('click',async()=>{
+  if(!live){say('Open this page through the Assistant for this, or just tell Claude: "pick different sneak peeks for the beach shoot."','bad');return;}
+  try{const r=await fetch('/peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
+   if(!r.ok)throw 0;const d=await r.json();ask.hidden=true;say(d.words||'Got it.','on');}
+  catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
+ w.querySelector('.more').addEventListener('click',async()=>{
+  ask.hidden=true;if(!more.hidden){more.hidden=true;return;}
+  if(!live){say('Open this page through the Assistant for this, or tell Claude "show me more from the beach shoot."','bad');return;}
+  say('');
+  try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
+   const chosen=[...(d.picked||[])];
+   const draw=()=>{more.innerHTML='<p class="hint">'+(d.from_shortlist?'The ones I narrowed it to.':'Every moment of the shoot.')+' Click six in the order you want them (the first is the big one), then Use these.</p><div class="cands"></div><div class="pfoot"><button class="pk use" type="button">Use these</button><button class="pk cancel2" type="button">Never mind</button><span class="n"></span></div>';
+    const c=more.querySelector('.cands');d.photos.forEach(p=>{const el=document.createElement('div');el.className='cand'+(chosen.includes(p.n)?' on':'');el.dataset.n=p.n;el.innerHTML='<img src="'+p.preview+'" alt="" loading="lazy"><span class="k"></span>';c.appendChild(el);});
+    const upd=()=>{more.querySelectorAll('.cand').forEach(el=>{const i=chosen.indexOf(+el.dataset.n);el.classList.toggle('on',i>=0);el.querySelector('.k').textContent=i>=0?String(i+1):''});
+     more.querySelector('.n').textContent=chosen.length+' of 6 chosen';more.querySelector('.use').disabled=chosen.length!==6;};
+    more.querySelectorAll('.cand').forEach(el=>el.addEventListener('click',()=>{const n=+el.dataset.n,i=chosen.indexOf(n);if(i>=0)chosen.splice(i,1);else if(chosen.length<6)chosen.push(n);upd();}));
+    more.querySelector('.cancel2').addEventListener('click',()=>{more.hidden=true});
+    more.querySelector('.use').addEventListener('click',async()=>{
+     try{const r=await fetch('/peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:chosen})});if(!r.ok)throw 0;
+      more.hidden=true;say('Saving your picks...','on');
+      const t=setInterval(async()=>{try{const q=await fetch('/picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
+       if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
+     catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
+    upd();};
+   draw();more.hidden=false;}
+  catch(e){say('Could not load more right now. Tell Claude "show me more from this shoot."','bad');}});
+});
 document.querySelectorAll('.queue').forEach(q=>{
  const id=q.dataset.shoot,pick=q.querySelector('.pick'),inp=q.querySelector('input'),save=q.querySelector('.save'),st=q.querySelector('.qstate');
  const open=()=>{pick.hidden=false;const a=q.querySelector('.add');if(a)a.hidden=true;inp.focus();try{inp.showPicker()}catch(e){}};
@@ -307,7 +355,13 @@ def shoots_section(studio):
             + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
             + "</div>")   # no "outfits or breaks" chip: a nice touch, not needed (Dustin, Oct 28)
         if len(pics) == 6:
-            out.append("<p class='peeks-line'><b>These 6 are your sneak peeks, to edit first.</b> Picked for variety and flow, so they look good together. In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
+            out.append(f"<div class='peeks-wrap' data-shoot='{e(s['id'])}'>"
+                       "<p class='peeks-line'><b>I pulled six to get things rolling.</b> Not feeling them? Just say what you'd rather see. They're marked “sneak peek” in Lightroom.</p>"
+                       "<div class='peeks-act'><button class='pk again' type='button'>Pick again</button><button class='pk more' type='button'>Show me more</button></div>"
+                       "<div class='peeks-ask' hidden><input type='text' maxlength='300' placeholder='What would you rather see? (more wide shots, more of the kids, nothing backlit...)'>"
+                       "<button class='pk send' type='button'>Pick again</button><button class='pk cancel' type='button'>Never mind</button></div>"
+                       "<div class='peeks-more' hidden></div>"
+                       "<p class='peeks-state'></p></div>")
         out.append("</div>")   # gal
         out.append("<div class='copy'>")
         out.append(f"<span class='n'>{i:02d}</span>")

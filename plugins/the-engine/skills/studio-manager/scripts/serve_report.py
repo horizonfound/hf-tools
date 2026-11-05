@@ -109,9 +109,54 @@ def queue_url():
     return None
 
 
+class Picks:
+    """"Use these six" from the report, run in the background: record the picks as the photographer's,
+    mark them in Lightroom (and set aside the keyword of any dropped pick), make the previews, rebuild
+    the report. One at a time; the page polls /picks-status."""
+    def __init__(self, session, studio):
+        self.session, self.studio = session, studio
+        self.state = {}
+        self.queue = []
+        self.lock = threading.Lock()
+        self.worker = None
+
+    def ask(self, shoot_id, nums):
+        with self.lock:
+            self.state[shoot_id] = {"state": "queued", "line": "Saving your picks..."}
+            self.queue = [q for q in self.queue if q[0] != shoot_id] + [(shoot_id, nums)]
+            if not self.worker or not self.worker.is_alive():
+                self.worker = threading.Thread(target=self._run, daemon=True)
+                self.worker.start()
+
+    def _run(self):
+        while True:
+            with self.lock:
+                if not self.queue:
+                    return
+                shoot_id, nums = self.queue.pop(0)
+                self.state[shoot_id] = {"state": "running", "line": "Saving your picks and marking them in Lightroom..."}
+            spec = f"{shoot_id}=" + ",".join(str(n) for n in nums)
+            r = subprocess.run([sys.executable, str(HERE / "peek_sheets.py"), "pick", self.session, spec, "--by", "photographer"],
+                               capture_output=True, text=True)
+            ok = r.returncode == 0
+            if ok:
+                r2 = subprocess.run([sys.executable, str(HERE / "sneak_peeks.py"), "--night", self.session], capture_output=True, text=True)
+                ok = r2.returncode in (0, 2)
+                subprocess.run([sys.executable, str(HERE / "first_look.py"), self.session], capture_output=True, text=True)
+            with self.lock:
+                self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
+                                        else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell Claude and it'll sort it out."})
+            try:
+                import report_page
+                report_page.write_page(self.session)
+            except Exception as ex:
+                sys.stderr.write(f"report not rebuilt: {ex}\n")
+
+
 class Handler(SimpleHTTPRequestHandler):
     allowed = ()
     renames = None
+    picks = None
     last_open = {}  # path -> time, so one click never opens two Finder windows
 
     def do_GET(self):
@@ -119,6 +164,30 @@ class Handler(SimpleHTTPRequestHandler):
         if parts.path == "/rename-status":
             body = json.dumps(self.renames.state if self.renames else {}).encode()
             self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parts.path == "/picks-status":
+            body = json.dumps(self.picks.state if self.picks else {}).encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parts.path == "/peeks-more":
+            # the report's "Show me more": the close-look shortlist for one shoot, with previews
+            sid = parse_qs(parts.query).get("shoot", [""])[0][:40]
+            try:
+                import peek_sheets
+                c = peek_sheets.candidates(self.picks.session if self.picks else self.directory, sid)
+            except Exception as ex:  # noqa: BLE001
+                c = None
+                sys.stderr.write(f"peeks-more: {ex}\n")
+            body = json.dumps(c or {"error": "nothing to show for that shoot"}).encode()
+            self.send_response(HTTPStatus.OK if c else HTTPStatus.NOT_FOUND)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
@@ -210,6 +279,45 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             sys.stderr.write(f"queue: {shoot} due {due}\n")
             return
+        if path == "/peeks-again":
+            # "Pick again" with a note: remembered for Claude, kept as taste
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                d = json.loads(self.rfile.read(n) or b"{}")
+                shoot, note = str(d["shoot"])[:40], " ".join(str(d.get("note", "")).split())[:500]
+                assert shoot
+                import peek_sheets
+                peek_sheets.ask_again(self.picks.session if self.picks else self.directory, shoot, note)
+            except (ValueError, KeyError, AssertionError, TypeError) as ex:
+                self.send_error(HTTPStatus.BAD_REQUEST, str(ex)[:100])
+                return
+            words = ("Got it. Next time you say anything to me, I'll have another go at these" + (" with that in mind." if note else "."))
+            body = json.dumps({"ok": True, "words": words}).encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            sys.stderr.write(f"peeks-again: {shoot}: {note}\n")
+            return
+        if path == "/peeks-choose":
+            # "Use these six": {"shoot": id, "nums": [..]} in their order, the first is the hero
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                d = json.loads(self.rfile.read(n) or b"{}")
+                shoot = str(d["shoot"])[:40]
+                nums = [int(x) for x in d["nums"]][:12]
+                assert shoot and nums
+            except (ValueError, KeyError, AssertionError, TypeError):
+                self.send_error(HTTPStatus.BAD_REQUEST, "expected {shoot, nums}")
+                return
+            self.picks.ask(shoot, nums)
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"queued")
+            sys.stderr.write(f"peeks-choose: {shoot}: {nums}\n")
+            return
         if path != "/names":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -244,6 +352,7 @@ def main():
     manifest = json.loads((studio / "manifest.json").read_text())
     Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
     Handler.renames = Renames(a.session, studio)
+    Handler.picks = Picks(a.session, studio)
     # the asked-for port, or the next free one: another session's server may be holding it
     srv = None
     for port in range(a.port, a.port + 20):
