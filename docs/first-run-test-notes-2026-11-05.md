@@ -74,3 +74,27 @@ the first hello, the second-hello line and the regulars' quiet-day line.
 - "Have a memory card with new photos on it? Put it in and say "backup now.""
 - "Got a memory card to back up? Put it in and say "backup now.""
 - "Shot something new? Put the memory card in and say "backup now.""
+
+## 4. The welcome screen's cards jump around, and the explanation box won't close
+
+**What happened (two screenshots):** clicking "Make posts from a shoot" left a hole where the third card
+had been and pushed the other three cards under the dark explanation box; clicking "Back up a card" pushed
+all four other cards under it, in a different arrangement. And the box only went away by clicking a
+different card.
+
+**Dustin:** "There should be some form of continuity there, so that it's not so random." A click outside
+the selected card should unselect it, and so should a second click on the same card; click it again to
+bring it back.
+
+**Why it happened:** the box was placed right after the card that was clicked and stretched across the
+whole row, so every card after it in that row was shoved below. Which cards moved depended on which one
+you clicked. There was no way to close it at all.
+
+**Fixed the same day:**
+- The box now opens under the whole row its card sits in. No card ever changes place; only the rows below
+  slide down to make room. On a phone, where the cards are one per row, it opens right under its card.
+- It closes on a second click on the same card, a click anywhere outside the card and the box, or the
+  Escape key. Clicking inside the box (the Copy button) keeps it open.
+- Tried in the app's pane at desktop and phone width: Back up a card, Make posts, and the folder card each
+  open under their row with every card where it was; all four ways of closing work; going straight from
+  one card to another works.

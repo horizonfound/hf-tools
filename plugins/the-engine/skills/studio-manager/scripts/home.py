@@ -304,21 +304,33 @@ function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.
 async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
 function note(b,t){if(!b){say(t);return;}let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
 async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude to open it.');}}
-document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async()=>{
-  const item=b.dataset.item;clicked(item);
-  document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
-  document.querySelectorAll('.howto').forEach(h=>h.classList.toggle('show',h.dataset.for===item));
+const items=[...document.querySelectorAll('.item')];
+function howtoFor(item){return document.querySelector('.howto[data-for="'+item+'"]');}
+function closeAll(){items.forEach(x=>x.classList.remove('open'));document.querySelectorAll('.howto').forEach(h=>h.classList.remove('show'));}
+// The explanation opens under the whole row its card sits in, so no card ever changes place (Dustin, Nov 5: it used to
+// open right after the card, which pushed the cards beside it down or left a hole, differently for each card).
+function place(b){const h=howtoFor(b.dataset.item);if(!h)return;h.classList.remove('show');const top=b.offsetTop;let last=b;items.forEach(x=>{if(x.offsetTop===top)last=x;});last.after(h);h.classList.add('show');}
+function openItem(b){closeAll();b.classList.add('open');place(b);}
+items.forEach(b=>{b.addEventListener('click',async()=>{
+  const item=b.dataset.item;
+  // A second click on the open card closes it (only cards that open an explanation; the others just act).
+  if(howtoFor(item)&&b.classList.contains('open')){closeAll();return;}
+  clicked(item);openItem(b);
   if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
   else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
   else if(item==='folder'){if(!document.querySelector('.howto[data-for=folder]'))openPath('/open-home',b.querySelector('p'));}
 });});
+// A click anywhere else, or Escape, closes the open card.
+document.addEventListener('click',ev=>{if(!ev.target.closest('.item,.howto'))closeAll();});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeAll();});
+window.addEventListener('resize',()=>{const o=document.querySelector('.item.open');if(o)place(o);});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
 document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude.');}}));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
 // Reload when anything changes (the folder gets made, a shoot lands, a queue moves), keeping the open card open.
 const STAMP=document.body.dataset.stamp;
-try{const o=sessionStorage.getItem('studio-home-open');if(o){const b=document.querySelector('.item[data-item="'+o+'"]');if(b&&document.querySelector('.howto[data-for="'+o+'"]')){b.classList.add('open');document.querySelector('.howto[data-for="'+o+'"]').classList.add('show');}sessionStorage.removeItem('studio-home-open');}}catch(e){}
+try{const o=sessionStorage.getItem('studio-home-open');if(o){const b=document.querySelector('.item[data-item="'+o+'"]');if(b&&howtoFor(o)){openItem(b);}sessionStorage.removeItem('studio-home-open');}}catch(e){}
 if(live){setInterval(async()=>{try{const r=await fetch('/home-state',{cache:'no-store'});const t=(await r.text()).trim();if(t&&STAMP&&t!==STAMP){const o=document.querySelector('.item.open');try{if(o)sessionStorage.setItem('studio-home-open',o.dataset.item);}catch(e){}location.reload();}}catch(e){}},4000);}
 """
 
