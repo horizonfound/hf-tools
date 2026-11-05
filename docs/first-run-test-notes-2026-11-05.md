@@ -57,3 +57,20 @@ start, but someone with no card should feel just as welcome to explore and start
 
 **Still worth a look (not changed):** the setup guide's Part 2 is titled "Opening the Assistant, and your
 first backup" and goes straight into a backup; a "your first posts" walk-through beside it would match.
+
+## 3. "Just back from a shoot?" isn't the right line
+
+**Dustin:** "This is one line that I'm not in love with. Give me some options on other ways we could say it."
+
+**Why it's off:** it describes something they did today, and most students haven't just come back from a
+shoot. The line before it ("Got photos you've already finished?") describes what they have, which works
+whenever they shot.
+
+**Fixed: Dustin picked "Have a memory card with new photos on it? Put it in and say "backup now."**" It is in
+the first hello, the second-hello line and the regulars' quiet-day line.
+
+**The options he chose from:**
+- "Photos still on a memory card? Put it in and say "backup now.""
+- "Have a memory card with new photos on it? Put it in and say "backup now.""
+- "Got a memory card to back up? Put it in and say "backup now.""
+- "Shot something new? Put the memory card in and say "backup now.""
