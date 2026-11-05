@@ -116,3 +116,17 @@ phone, where there's less room). Looked at in the app's pane on a copy of the ea
 and the posting page at desktop width, the queue page at phone width (nothing spills over), and a click on
 it lands on the welcome screen. The post kit and the report use the same button but were not looked at,
 since both pages are written when a kit or a backup is made; the next one made will have it.
+
+## 6. "Your Content," with a capital C
+
+**Dustin:** "For the Your content folder, capitalize the C, and update it everywhere it says that,
+throughout all of your code."
+
+**Fixed the same day:** the folder is "Your Content" in the code, in everything the Assistant says, and in
+its instructions. A folder already made as "Your content" (or the older "Content") is renamed in place the
+first time the Assistant looks: a rename on the same drive, nothing copied or deleted. Because most drives
+ignore capital letters, the check reads the folder's exact listing rather than asking "does it exist,"
+which would say yes to either spelling. Tried on pretend folders (lowercase, the oldest name, already
+right, brand new, a fresh setup; a pretend photo inside came through unchanged), then on the real folder on
+Big Kahuna, which now reads "Your Content." The old "The Studio" folder from before the test was left
+alone; it gets the same rename if that setup is ever put back.

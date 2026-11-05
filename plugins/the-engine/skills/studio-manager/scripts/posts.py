@@ -5,13 +5,13 @@ The Studio makes one folder for them (asked once at setup, remembered in the Stu
 
     The Studio/
       Drop a shoot here/      empty, waiting. Drag any folder of finished photos in.
-      Your content/           one folder per shoot, dated and named, each a post kit
+      Your Content/           one folder per shoot, dated and named, each a post kit
 
 A drop can be anything: one tidy shoot, three shoots in one folder, a year of chaos.
 `look` reads the photos' capture times (nothing is opened by Claude), splits them into
 groups by day and by the gaps between photos, pulls a few previews per group and draws one
 contact sheet, and prints what it sees in plain words with the one question to ask.
-`sort` then copies the photos into Your content under proper names: each group its own shoot,
+`sort` then copies the photos into Your Content under proper names: each group its own shoot,
 or everything as one, or just one of them. Copied and checked (a hash of every file, like the
 backup), never moved, never deleted: what they dropped stays in the drop box exactly as dropped, so a
 folder moved in by accident (Finder moves within one drive) can be dragged straight back. Log first; safe to run twice; a cut-off sort is finished
@@ -56,8 +56,10 @@ import brand  # noqa: E402
 import studio_file  # noqa: E402
 
 DROP_NAME = "Drop a shoot here"
-CONTENT_NAME = "Your content"
-OLD_CONTENT_NAMES = ("Content",)  # earlier name; renamed once, in place, the first time the Studio looks (Dustin, Oct 30)
+CONTENT_NAME = "Your Content"   # capital C (Dustin, Nov 5)
+# Earlier names; a folder still carrying one is renamed once, in place, the first time the Assistant looks
+# ("Content" until Oct 30, "Your content" until Nov 5). Nothing is copied or deleted.
+OLD_CONTENT_NAMES = ("Your content", "Content")
 HOME_NAME = "The Assistant"  # Nov 5. A folder already made as "The Studio" stays as it is (its path is in the Studio File).
 # Only finished photos are ever copied: JPEGs, and HEIC/PNG/WebP for phone photos and screenshots.
 # Everything heavy or unfinished (RAW, TIFF, Photoshop, video) stays in the drop box and is named, never copied (Dustin, Oct 30).
@@ -79,22 +81,52 @@ def say(msg):
 
 # ---------- the home ----------
 
+def rename_exact(h, old, new):
+    """Rename h/old to h/new when the two may differ only in capital letters. Most drives ignore case, so
+    "is it there" means the exact name is in the folder's listing, never exists() (which says yes to either
+    spelling; the same trap the shoot renamer fell into on Oct 28). A plain rename changes the case on a Mac's
+    drives; if the listing still shows the old spelling, go through a spare name."""
+    def names():
+        return set(os.listdir(h))
+    if new in names() or old not in names():
+        return new in names()
+    try:
+        (h / old).rename(h / new)
+    except OSError:
+        pass
+    if new not in names() and old in names():
+        spare = h / (new + ".renaming")
+        if spare.name not in names():
+            (h / old).rename(spare)
+            spare.rename(h / new)
+    return new in names()
+
+
 def home():
-    """The Studio folder, from the Studio File. None if never set up. A folder still carrying the earlier
-    "Content" name is renamed to "Your content" here, once (a rename on the same drive; nothing copied or deleted)."""
+    """The Assistant's folder, from the Studio File. None if never set up. A content folder still carrying an
+    earlier name ("Content", "Your content") is renamed to "Your Content" here, once: a rename on the same
+    drive, nothing copied or deleted."""
     p = studio_file.load().get("posts", {}).get("home")
     if not p:
         return None
     h = Path(p)
     try:
-        if h.is_dir() and not (h / CONTENT_NAME).exists():
+        if h.is_dir() and CONTENT_NAME not in os.listdir(h):
             for old in OLD_CONTENT_NAMES:
-                if (h / old).is_dir():
-                    (h / old).rename(h / CONTENT_NAME)
+                if old in os.listdir(h) and (h / old).is_dir():
+                    rename_exact(h, old, CONTENT_NAME)
                     break
     except OSError:
         pass
     return h
+
+
+def current_dst(dst):
+    """A place written in an older log ("Your content/Beach/Photos/a.jpg"), under today's folder name."""
+    for old in OLD_CONTENT_NAMES:
+        if dst.startswith(old + "/"):
+            return CONTENT_NAME + dst[len(old):]
+    return dst
 
 
 def places():
@@ -244,7 +276,7 @@ def look(h, gap_minutes=120, previews_per=4):
     if not files:
         say("The drop box is empty. Drag a folder of finished photos into \"Drop a shoot here\" and say the word.")
         return None
-    # Photos already copied into Your content by an earlier sort (same drop path, same size, same file time)
+    # Photos already copied into Your Content by an earlier sort (same drop path, same size, same file time)
     # are left out of the look, so a drop box nobody has cleared is not offered twice.
     already = {}
     for run in read_log(h).get("runs", []):
@@ -509,7 +541,12 @@ def read_log(h):
     p = log_path(h)
     if p.exists():
         try:
-            return json.loads(p.read_text())
+            log = json.loads(p.read_text())
+            for run in log.get("runs", []):          # older logs name the content folder as it was called then
+                for m in run.get("moves", []):
+                    if isinstance(m.get("dst"), str):
+                        m["dst"] = current_dst(m["dst"])
+            return log
         except ValueError:
             pass
     return {"runs": []}
@@ -743,14 +780,14 @@ def main():
     if a.cmd == "show":
         h = home()
         if not h:
-            say("No Studio folder yet (needs setup).")
+            say(f"No {HOME_NAME} folder yet (needs setup).")
             return 2
-        say(f"The Studio folder: {h}" + ("" if h.is_dir() else "  (not there right now; drive unplugged?)"))
+        say(f"{HOME_NAME} folder: {h}" + ("" if h.is_dir() else "  (not there right now; drive unplugged?)"))
         if h.is_dir():
             waiting = walk(h / DROP_NAME) if (h / DROP_NAME).is_dir() else []
             say(f"Drop a shoot here: {len(waiting)} file{'s' if len(waiting) != 1 else ''} waiting" if waiting else "Drop a shoot here: empty")
             ks = kits(h)
-            say(f"Content: {len(ks)} shoot{'s' if len(ks) != 1 else ''}")
+            say(f"{CONTENT_NAME}: {len(ks)} shoot{'s' if len(ks) != 1 else ''}")
         return 0
     if a.cmd == "list":
         h = need_home()
