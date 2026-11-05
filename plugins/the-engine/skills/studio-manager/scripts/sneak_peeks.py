@@ -44,7 +44,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from where import locate  # noqa: E402
 
-TOOL = "The Studio, by Horizon Found"
+TOOL = "The Assistant, by Horizon Found"
 NO_SIDECAR = {".jpg", ".jpeg", ".heic", ".heif", ".dng", ".tif", ".tiff", ".png"}
 KEYWORD = "sneak peek"
 OLD_KEYWORD = "Studio pick"   # what the Oct 25 version called them

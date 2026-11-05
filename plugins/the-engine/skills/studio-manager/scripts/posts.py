@@ -58,7 +58,7 @@ import studio_file  # noqa: E402
 DROP_NAME = "Drop a shoot here"
 CONTENT_NAME = "Your content"
 OLD_CONTENT_NAMES = ("Content",)  # earlier name; renamed once, in place, the first time the Studio looks (Dustin, Oct 30)
-HOME_NAME = "The Studio"
+HOME_NAME = "The Assistant"  # Nov 5. A folder already made as "The Studio" stays as it is (its path is in the Studio File).
 # Only finished photos are ever copied: JPEGs, and HEIC/PNG/WebP for phone photos and screenshots.
 # Everything heavy or unfinished (RAW, TIFF, Photoshop, video) stays in the drop box and is named, never copied (Dustin, Oct 30).
 PHOTO = {".jpg", ".jpeg", ".heic", ".png", ".webp"}
@@ -138,10 +138,10 @@ def setup(where=None, home_path=None):
 def need_home():
     h = home()
     if not h:
-        say("STOP: the Studio folder isn't set up yet. Run setup first (needs setup).")
+        say(f"STOP: the {HOME_NAME} folder isn't set up yet. Run setup first (needs setup).")
         sys.exit(2)
     if not h.is_dir():
-        say(f"STOP: the Studio folder should be at {h} but it isn't there. Is the drive plugged in?")
+        say(f"STOP: the {HOME_NAME} folder should be at {h} but it isn't there. Is the drive plugged in?")
         sys.exit(2)
     for sub in (h / DROP_NAME, h / CONTENT_NAME, h / ".studio"):
         sub.mkdir(parents=True, exist_ok=True)

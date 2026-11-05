@@ -202,7 +202,7 @@ def gather():
 # ---------- the page ----------
 
 # The two buttons that start a conversation: what to paste in the chat, and the steps before it.
-SAY = {"backup": "backup now", "posts": "make my posts", "setup": "set up my Studio folder"}
+SAY = {"backup": "backup now", "posts": "make my posts", "setup": "set up my Assistant folder"}
 
 MENU = [
     ("backup", "Back up a card",
@@ -210,12 +210,12 @@ MENU = [
      ["Put your memory card in.", "Then paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
      "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
-     ["<button class='btn open-inline pick' data-pick='1'>Select the folder with your finished photos</button> <span class='after'>The Studio copies the photos in (JPEGs only). Nothing is moved.</span>",
-      "Then paste this in the chat, and the Studio sorts them and makes your posts:"],
+     ["<button class='btn open-inline pick' data-pick='1'>Select the folder with your finished photos</button> <span class='after'>{NAME} copies the photos in (JPEGs only). Nothing is moved.</span>",
+      "Then paste this in the chat, and {the_name} sorts them and makes your posts:"],
      "Nothing is posted. You post it when you're ready."),
     ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
     ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
-    ("folder", "Open my Studio folder", "The folder on your hard drive where your posts are kept.", None, None),
+    ("folder", "Open my {HOME} folder", "The folder on your hard drive where your posts are kept.", None, None),
 ]
 
 CSS_EXTRA = r"""
@@ -261,7 +261,7 @@ function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.
   if(navigator.clipboard){navigator.clipboard.writeText(t).catch(()=>{});return true;}return false;}
 async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
 function note(b,t){if(!b){say(t);return;}let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
-async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Studio isn\'t running right now. Ask Claude to open it.');}}
+async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude to open it.');}}
 document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async()=>{
   const item=b.dataset.item;clicked(item);
   document.querySelectorAll('.item').forEach(x=>x.classList.toggle('open',x===b));
@@ -271,7 +271,7 @@ document.querySelectorAll('.item').forEach(b=>{b.addEventListener('click',async(
   else if(item==='folder'){if(!document.querySelector('.howto[data-for=folder]'))openPath('/open-home',b.querySelector('p'));}
 });});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
-document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Studio isn\'t running right now. Ask Claude.');}}));
+document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude.');}}));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
 // Reload when anything changes (the folder gets made, a shoot lands, a queue moves), keeping the open card open.
@@ -321,7 +321,16 @@ def page_html():
     # menu
     menu = []
     no_folder = not g["home_folder"]
+    import posts as posts_mod
+    fill = {"{NAME}": brand.name(), "{the_name}": brand.the_name(), "{HOME}": brand.short()}
+    def f_(t):
+        for k, v in fill.items():
+            t = t.replace(k, v)
+        return t
     for key, name, blurb, steps, note in MENU:
+        name, blurb = f_(name), f_(blurb)
+        steps = [f_(t) for t in steps] if steps else steps
+        note = f_(note) if note else note
         first, rest = name.split(" ", 1)
         menu.append(f"<button class='item' data-item='{key}'><span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
         if no_folder and key in ("posts", "folder"):
@@ -374,9 +383,9 @@ def page_html():
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when'>{e(g['today'])}</span></div>"
             f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show the Studio” for the live one.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show the Assistant” for the live one.</p></header>"
             f"<section class='sec'><h2>Today</h2><ul class='todayl'>{today_html}</ul></section>"
-            f"<section class='sec'><h2>What the Studio does</h2><p>Click one.</p></section><div class='menu'>{menu_html}</div><p class='said' id='said'></p>"
+            f"<section class='sec'><h2>What {e(brand.the_name())} does</h2><p>Click one.</p></section><div class='menu'>{menu_html}</div><p class='said' id='said'></p>"
             f"{recent_block}"
             f"</div><script>{SCRIPT}</script></body></html>")
 
@@ -425,7 +434,7 @@ def main():
     elif a.cmd == "url":
         u = url()
         if not u:
-            say("STOP: couldn't start the Studio's page server.")
+            say(f"STOP: couldn't start {brand.the_name()}'s page server.")
             return 2
         say(u)
     elif a.cmd == "pending":

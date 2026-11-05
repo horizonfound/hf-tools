@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """The product's name, in one place.
 
-Dustin and Nicole are still deciding what to call it (Nov 5: "The Studio" or "The Assistant"), so no page or
-message spells the name out itself; they all ask here. Change PRODUCT and every page, title and line follows.
+Dustin and Nicole settled on "The Assistant" (Nov 5), no sub-names, after going back and forth; no page or
+message spells the name out itself, they all ask here, so a change of heart is one line. Change PRODUCT and every page, title and line follows.
 
 A photographer can also give their helper a name of their own ("call yourself Sherman": photographers name
 their first assistant), kept in the Studio File as "name". When they have, the pages and messages use that
-name, and the product's name sits small beside it ("Sherman · The Studio by Horizon Found").
+name, and the product's name sits small beside it ("Sherman · The Assistant by Horizon Found").
 
-Folder names on their drive (the "The Studio" folder) and the tool tag inside XMP sidecars are not here on
-purpose: renaming those would move their files or rewrite sidecars, which the Studio never does on a whim.
+The folder on their drive follows posts.HOME_NAME (an existing "The Studio" folder is kept as it is, never
+renamed, since moving their files on a whim is not something the Assistant does).
 """
 import sys
 from pathlib import Path
@@ -17,7 +17,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-PRODUCT = "The Studio"          # the product's name (one line to change)
+PRODUCT = "The Assistant"       # the product's name (one line to change). Decided Nov 5: The Assistant, no sub-names.
 MAKER = "by Horizon Found"
 
 
@@ -42,6 +42,14 @@ def the_name():
     if n:
         return n
     return ("the " + PRODUCT[4:]) if PRODUCT.lower().startswith("the ") else PRODUCT
+
+
+def short():
+    """The name without a leading "The", for "my Assistant folder": "Assistant", or their own name."""
+    n = own_name()
+    if n:
+        return n
+    return PRODUCT[4:] if PRODUCT.lower().startswith("the ") else PRODUCT
 
 
 def title(page=None):

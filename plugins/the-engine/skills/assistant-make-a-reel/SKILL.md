@@ -1,13 +1,13 @@
 ---
 name: assistant-make-a-reel
-description: The Studio by Horizon Found, the reel. Turns a photographer's edited, exported photos into a CapCut project cut on the beat of their song, with Claude picking and ordering the photos, ready for them to style and export in CapCut. Use this whenever the person says make a reel, turn these into a reel, reel from the beach shoot, yes to "want a reel?", cut these to a song, or trial reels from this shoot, even if they do not name the Studio.
+description: The Assistant by Horizon Found, the reel. Turns a photographer's edited, exported photos into a CapCut project cut on the beat of their song, with Claude picking and ordering the photos, ready for them to style and export in CapCut. Use this whenever the person says make a reel, turn these into a reel, reel from the beach shoot, yes to "want a reel?", cut these to a song, or trial reels from this shoot, even if they do not name the Assistant.
 ---
 
 # Make a reel
 
-This is part of what the Studio Manager does, after the edit. The photographer has exported their edited photos; you pick the strongest ones, put them in an order that flows, and lay them on the beat of their song as a new CapCut project. They open CapCut, add their look (a text style, a filter, a template), and export. You save them the hour of choosing and cutting. You never make the look, and nothing posts.
+This is part of what the Assistant does, after the edit. The photographer has exported their edited photos; you pick the strongest ones, put them in an order that flows, and lay them on the beat of their song as a new CapCut project. They open CapCut, add their look (a text style, a filter, a template), and export. You save them the hour of choosing and cutting. You never make the look, and nothing posts.
 
-Talk the way the Studio Manager talks: short, plain words, the result first, one question at a time with buttons (the likely answer first, marked recommended) and the Other box always there. The photographer is "you" or "they", never "she" or "he". No file names in code styling, no settings talk.
+Talk the way the Assistant talks: short, plain words, the result first, one question at a time with buttons (the likely answer first, marked recommended) and the Other box always there. The photographer is "you" or "they", never "she" or "he". No file names in code styling, no settings talk.
 
 The scripts are in `scripts/` next to this file. Nothing has to be installed on a Mac: the song is read with the Mac's own tools and everything else is plain Python.
 
@@ -22,7 +22,7 @@ The scripts are in `scripts/` next to this file. Nothing has to be installed on 
 
 ## Step 1: the edited photos
 
-Usually you arrive here from the Studio Manager: they said "I'm done with the beach shoot," it found the export folder and they confirmed it. Use that folder. If they came straight here, ask which shoot; the Studio Manager's `find_exports.py` finds the folder (see its skill), or they tell you where it is. A folder of favorites or selects they made themselves is even better: use that.
+Usually you arrive here from the Assistant: they said "I'm done with the beach shoot," it found the export folder and they confirmed it. Use that folder. If they came straight here, ask which shoot; the Assistant's `find_exports.py` finds the folder (see its skill), or they tell you where it is. A folder of favorites or selects they made themselves is even better: use that.
 
 Make the sheet:
 
@@ -30,7 +30,7 @@ Make the sheet:
 python3 scripts/reel.py sheet --folder "<edited photos>" --shoot "<shoot name>"
 ```
 
-It writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Studio's own folder; their photo folder is not changed. Read the sheet image(s).
+It writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Assistant's own folder; their photo folder is not changed. Read the sheet image(s).
 
 ## Step 2: curate the set (your main job)
 
@@ -85,7 +85,7 @@ python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
 ```
 
-- **The reel is named after its shoot.** When you came from the Studio Manager, pass the backup and shoot id it gave you (`--night`, `--shoot-id`): the CapCut project is then called exactly like the shoot's folder plus "reel" ("2022-06-24 Black-sand beach reel"), and so is the video CapCut exports. Without those, the shoot name goes through their own folder pattern, dated by the first photo. A second reel of the same shoot gets "reel 2". Only use `--name` if they ask for a different name.
+- **The reel is named after its shoot.** When you came from the Assistant, pass the backup and shoot id it gave you (`--night`, `--shoot-id`): the CapCut project is then called exactly like the shoot's folder plus "reel" ("2022-06-24 Black-sand beach reel"), and so is the video CapCut exports. Without those, the shoot name goes through their own folder pattern, dated by the first photo. A second reel of the same shoot gets "reel 2". Only use `--name` if they ask for a different name.
 - `--pace` is their answer from Step 4 (`mixed` is "a little of everything"). The first photo always holds long enough to read, and the last one lands.
 - `--variation 2` (3, 4...) gives another mix of the same picks with the same pace, if they want to see it move differently.
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.

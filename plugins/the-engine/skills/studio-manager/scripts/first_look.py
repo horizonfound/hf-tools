@@ -110,10 +110,10 @@ function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||
 async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim()||(inp.dataset.was||'').trim();
  if(name){inp.value=name;inp.dataset.was=name;inp.placeholder=inp.dataset.hint||inp.placeholder;inp.classList.remove('hint');inp.blur();}
  if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
- if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Studio to rename here, or just tell Claude the name.'});return;}
+ if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell Claude the name.'});return;}
  try{const r=await fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
   if(!r.ok)throw 0;show(id,{state:'queued',line:'Renaming...'});poll();}
- catch(e){show(id,{state:'problem',line:'Could not reach the Studio. Tell Claude the name instead.'});}}
+ catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell Claude the name instead.'});}}
 let timer=null;
 async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('/rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
  for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
@@ -128,7 +128,7 @@ document.querySelectorAll('.name input').forEach(i=>{i.addEventListener('keydown
 if(location.protocol.startsWith('http'))poll();
 // the editing queue button: a calendar opens right there, they pick a date, it saves (Dustin, Oct 28)
 function niceDate(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
-// "Show my editing queue": ask the Studio for the queue page's address (it starts the page if it isn't up) and open it
+// "Show my editing queue": ask the Assistant for the queue page's address (it starts the page if it isn't up) and open it
 async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>{ev.preventDefault();
   if(!location.protocol.startsWith('http')){st.textContent='Ask Claude to show your editing queue.';st.className='qstate bad';return;}
   try{const r=await fetch('/queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;location.href=d.url;}
@@ -142,7 +142,7 @@ document.querySelectorAll('.queue').forEach(q=>{
  q.querySelector('.never').addEventListener('click',close);
  inp.addEventListener('input',()=>{save.disabled=!inp.value});
  save.addEventListener('click',async()=>{if(!inp.value)return;
-  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Studio to add it, or just tell Claude.';st.className='qstate bad';return;}
+  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell Claude.';st.className='qstate bad';return;}
   save.disabled=true;
   try{const r=await fetch('/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();

@@ -420,7 +420,7 @@ def fetch_tile(src):
     if u.scheme != "https" or not u.hostname or not u.hostname.endswith(FEED_PICTURE_HOSTS):
         raise ValueError("not an Instagram picture address")
     r = subprocess.run(["curl", "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
-                        "-A", "The Studio by Horizon Found", "-o", "-", src], capture_output=True)
+                        "-A", "The Assistant by Horizon Found", "-o", "-", src], capture_output=True)
     if r.returncode != 0:
         raise ValueError(f"curl {r.returncode}: {r.stderr.decode(errors='replace')[:120]}")
     raw = r.stdout
@@ -582,7 +582,7 @@ const $=s=>document.querySelector(s);const toast=$('#toast');let tt;
 function say(m){toast.textContent=m;toast.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove('on'),2400)}
 function nice(iso){if(!iso)return'';const d=new Date(iso+'T12:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
 async function post(body){if(!live){say('This is a saved copy. Ask Claude to “show my posting queue” to change things.');return null}
- try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Studio. Tell Claude instead.');return null}}
+ try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell Claude instead.');return null}}
 function render(S){
  $('#tankh').innerHTML=S.tank_head;$('#tankp').textContent=S.tank_line;
  const bar=$('#tankbar');bar.className='tankbar'+(S.weeks===null?'':S.weeks<=1?' low':S.weeks<=2?' mid':'');bar.firstElementChild.style.width=(S.weeks===null?0:Math.min(100,S.weeks/4*100))+'%';
@@ -769,7 +769,7 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": "There's no Studio folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
         if drop:
             h = h / posts.DROP_NAME
             h.mkdir(exist_ok=True)
@@ -796,11 +796,11 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": "There's no Studio folder yet. Ask Claude to set one up."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up."})
         if sys.platform != "darwin":
             return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
         script = ('tell application "System Events" to activate\n'
-                  'set f to choose folder with prompt "Pick the folder your finished photos are in. The Studio copies the photos; nothing is moved."\n'
+                  'set f to choose folder with prompt "Pick the folder your finished photos are in. The Assistant copies the photos; nothing is moved."\n'
                   'POSIX path of f')
         try:
             r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=300)
