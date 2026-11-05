@@ -278,3 +278,33 @@ come back hours later, whatever the pane did meanwhile.
    and puts the report back if it is not.
 Ruled out earlier by Dustin (Oct 28): also opening the report in the Mac's regular browser, which would
 survive, but put pages in two places.
+
+## 13. Can the Assistant tell when they come back, and put the report back itself? (Dustin's idea)
+
+**Dustin:** "Is there a way for you to tell if the Claude app goes inactive and becomes active again when
+someone returns? Can that be a cue to reload the pane?"
+
+**What's true:** Claude cannot watch the app; it only runs when something wakes it. But a script on the Mac
+can read, with no permission prompt, which app is in front, how long the keyboard and mouse have been
+still, and whether the screen is locked. And a background command finishing does wake Claude. So
+`return_watch.py` (new, in the scripts folder, not wired into the backup yet) waits until they have been
+away, then until they are back in the Claude app, then exits; Claude wakes, reloads the report, and brings
+the pane forward.
+
+**Two short tests on the Mac, Nov 5:**
+- First, 60 seconds away: nothing happened. The watcher never saw a full minute away. Its log was too thin
+  to say whether Dustin was back sooner or the switch was missed, so it now logs every time the Claude app
+  leaves or returns to the front.
+- Second, 20 seconds: **it worked.** The pane had been closed. The watcher counted him away (keyboard and
+  mouse still), saw him back at 3:33:07, and the report was back on screen by 3:33:12, five seconds later,
+  without a word typed. Note it was stillness that counted as away, not a switch to another app; the
+  app-switch path has not been seen working yet.
+
+**Not proven:** the case that matters, hours away with the app reloading the chat in between. If the app
+drops the watcher or the wake-up when that happens, this fails exactly then. A long test is running
+(counts a return after 30 minutes away). Until that passes, the closing chat line and the play button
+stay as the safety net.
+
+**To decide before wiring it in:** how long counts as away (5 minutes is the script's default; sitting
+still reading counts too, which is harmless if the reload only happens when the pane has lost its page),
+and that every wake-up is a small turn on their plan.
