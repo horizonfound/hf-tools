@@ -700,7 +700,7 @@ DESIGN_TEXT_CSS = """
 .selbox.tx-sides .h.tl{top:calc(50% - 7px);cursor:ew-resize}
 .selbox.tx-sides .h.br{bottom:auto;top:calc(50% - 7px);cursor:ew-resize}
 .tx-ln{position:absolute;white-space:pre;pointer-events:none;font-kerning:auto}
-.tx-words{font:400 14px/1.35 var(--sans);width:220px;max-width:100%;height:26px;min-height:26px;max-height:160px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:#fff;color:var(--ink)}
+.tx-words{font:400 14px/1.35 var(--sans);width:220px;max-width:100%;height:26px;min-height:26px;max-height:160px;resize:vertical;white-space:pre;overflow:hidden;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:#fff;color:var(--ink)}
 .tx-num{width:60px;font:400 13.5px/1.2 var(--sans);border:1px solid var(--line);border-radius:8px;padding:3px 6px;background:#fff;color:var(--ink)}
 .tx-words:focus,.tx-num:focus,.fp-search:focus{outline:2px solid var(--sel);outline-offset:-1px}
 .tb.tx-b{font-weight:800}
