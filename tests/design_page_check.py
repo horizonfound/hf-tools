@@ -278,7 +278,7 @@ def check_page(case, work):
     urls = set(re.findall(r"https?://[^\s'\"<>)]+", page))
     case("designer page: no address on the internet in it but Google Fonts (for slide text only)",
          all(u.startswith(("https://fonts.googleapis.com", "https://fonts.gstatic.com")) for u in urls), sorted(urls))
-    case("designer page: this stage's page names no address on the internet at all", not urls, sorted(urls))
+    case("designer page: the page itself names no address on the internet at all (Google's arrives with the state, from the Assistant)", not urls, sorted(urls))
     case("designer page: no script, picture or frame from another address", not re.search(r"<script[^>]*\ssrc=", page) and "@import" not in page and "<img src" not in page and "<iframe" not in page)
     for word in ("draggable", "ondragstart", "dataTransfer", "dragover", "localStorage", "sessionStorage", "indexedDB", "document.cookie",
                  "navigator.clipboard", "innerHTML", "insertAdjacentHTML", "document.write", "eval(", "navigator.onLine"):
@@ -292,7 +292,7 @@ def check_page(case, work):
     case("designer styles: no web font for the page's own chrome (the system's own, as the pickers have it)",
          not re.search(r"Fraunces|DM Sans|Georgia|googleapis|gstatic|font-family", dp.DESIGN_CSS) and "var(--sans)" in dp.DESIGN_CSS)
     case("designer styles: the selected thing is Nicole's blue, on the pickers' own colours", "--sel:#2f7cf6" in dp.DESIGN_CSS and "var(--panel)" in dp.DESIGN_CSS and "var(--accent)" in dp.DESIGN_CSS)
-    case("designer page: the scripts go on in order (the rules, the core, the strip) and the page starts last",
+    case("designer page: the scripts go on in order (the rules, the core, the strip, then the later parts) and the page starts last",
          names[:3] == ["DESIGN_MODEL_JS", "DESIGN_CORE_JS", "DESIGN_EDIT_JS"]
          and page.index(src["DESIGN_MODEL_JS"]) < page.index(src["DESIGN_CORE_JS"]) < page.index(src["DESIGN_EDIT_JS"]) < page.index(dp.DESIGN_START_JS)
          and page.rstrip().endswith("</script></body></html>"))
@@ -949,7 +949,7 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             press("left")
             case("changed elsewhere: carrying on from the newest saves as usual, and the line goes away", settled() and blk(disk()["state"], ids6[1])["w"] == 540 and c.js("document.getElementById('d-note').hidden") is True)
 
-            # ================= a text box, before the text part of the page exists =================
+            # ================= a text box among the photos (the text part's own checks are in design_text_check.py) =================
             tokens[0] += 1
             words = {"id": 2, "type": "text", "text": "Your title", "font": "Playfair Display", "size": 150, "weight": 700, "italic": True, "upper": True,
                      "al": "left", "ls": 8, "lh": 1.3, "color": "#2a2622", "x": 1170, "y": 260, "w": 900, "h": 195}
@@ -959,22 +959,28 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                 DT = out["design"]["id"]
                 c.open(f"{base[0]}/design.html?kit={KQ}&design={DT}")
                 ready()
+                try:
+                    # its font arrives from Google, or is given up on (no internet): either way its lines are then drawn
+                    c.wait_for("Designer.type.status(Designer.st.blocks[1]) !== 'wait' && Designer.type.fit(Designer.st) === Designer.st && Designer.save.idle()", 25)
+                except cd.Timeout:
+                    pass
                 T0 = st()
-                case("text box: it is drawn as a plain dashed box with its words (the real drawing comes with the text part)",
-                     c.count("#strip .blk.other[data-id='2']") == 1 and c.text("#strip .blk.other[data-id='2']") == "Your title" and close(box(2), words))
+                shown = J("Array.prototype.map.call(document.querySelectorAll(\"#strip .blk.words[data-id='2'] .tx-ln\"), function(e){ return e.textContent; })")
+                case("text box: it is drawn by the text part, as its own lines in capitals, where the design says (the stand-in is gone)",
+                     c.count("#strip .blk.words[data-id='2']") == 1 and c.count("#strip .blk.other") == 0 and "".join(shown).replace(" ", "") == "YOURTITLE"
+                     and close(box(2), blk(T0, 2)) and blk(T0, 2)["h"] == round(len(shown) * 150 * 1.3, 2), (shown, box(2), blk(T0, 2)))
                 c.click(centre(2))
-                case("text box: selected, it has no corner handles and no photo buttons; the help line says what it is",
-                     c.js("Designer.sel") == 2 and c.js("getComputedStyle(document.querySelector('#over .selbox .h')).display") == "none"
-                     and c.js("document.getElementById('sel-photo').hidden && document.getElementById('sel-crop').hidden && !document.getElementById('sel-all').hidden") is True
-                     and c.text("#selhint") == "A text box. Drag to move it.", c.text("#selhint"))
+                case("text box: selected, it has handles, the text buttons and the buttons every thing has, and not the photo ones",
+                     c.js("Designer.sel") == 2 and c.js("getComputedStyle(document.querySelector('#over .selbox .h')).display") != "none"
+                     and c.js("document.getElementById('sel-photo').hidden && document.getElementById('sel-crop').hidden && !document.getElementById('sel-all').hidden && !document.getElementById('sel-text').hidden") is True
+                     and c.text("#selhint").find("Text. Type in the box") >= 0, c.text("#selhint"))
                 x, y = centre(2)
                 c.drag((x, y), (x + 20, y + 30), steps=3, alt=True)
-                c.double_click(centre(2))
                 c.wheel(centre(2), -120)
                 tb = blk(st(), 2)
                 same_but = dict(tb, x=words["x"], y=words["y"])
                 case("text box: it can be moved, and every other thing about it is kept exactly (font, size, weight, slant, capitals, side, spacing, color, words)",
-                     same_but == words and abs(tb["x"] - (1170 + round(20 / scale(), 2))) < 0.011 and abs(tb["y"] - (260 + round(30 / scale(), 2))) < 0.011 and c.js("Designer.adjust") is False, tb)
+                     same_but == blk(T0, 2) and abs(tb["x"] - (1170 + round(20 / scale(), 2))) < 0.011 and abs(tb["y"] - (260 + round(30 / scale(), 2))) < 0.011 and c.js("Designer.adjust") is False, tb)
                 case("text box: saved back to the drive with nothing lost", settled() and blk(disk()["state"], 2) == tb and blk(disk()["state"], 1) == T0["blocks"][0])
                 press("back")
                 press("dup")
@@ -1070,10 +1076,11 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
 
             # ================= the whole run =================
             case("the page threw no error and logged none, in the whole run", c.page_errors() == [], c.page_errors()[:4])
-            outside = c.outside_requests()
-            case("the page made no request to any address but its own, in the whole run", outside == [], outside[:4])
+            # (a text box's font is asked of Google Fonts, by a stylesheet link: the one thing this page may load from outside)
+            outside = [u for u in c.outside_requests() if not u.startswith(("https://fonts.googleapis.com/css2?family=", "https://fonts.gstatic.com/"))]
+            case("the page made no request to any address but its own and Google Fonts (for a text box's font), in the whole run", outside == [], outside[:4])
             asked = sorted(set(re.sub(r"\?.*", "", re.sub(r"^https?://[^/]+", "", r["url"])) for r in c.requests if "127.0.0.1" in r["url"]))
-            case("every request it made was for the page, its state, a made copy of a photo, or a save", set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/favicon.ico"}, asked)
+            case("every request it made was for the page, its state, a made copy of a photo, or a save", set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/design-font-file", "/favicon.ico"}, asked)
             case("the Finder was never asked for (/open was not requested)", not any("/open" in r["url"] for r in c.requests))
     finally:
         srv.stop()

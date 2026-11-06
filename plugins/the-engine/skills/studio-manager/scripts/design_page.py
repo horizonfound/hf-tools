@@ -12,14 +12,21 @@ files, so nothing Python does can change a character of it:
     design_js_core.py    DESIGN_CORE_JS    the state, one way to change it, one drawing pass, one save queue,
                                            Undo, and the places other parts add themselves (window.Designer)
     design_js_edit.py    DESIGN_EDIT_JS    the strip, the frames, the buttons, the keys, the tray of photos
+    design_js_type.py    DESIGN_TYPE_JS    the rules for words, with no page in them (window.DesignType): where
+                                           lines break, a font's name, a new text box
+    design_js_text.py    DESIGN_TEXT_JS    text boxes, their style, the fonts and the font list (Designer.type)
+    design_js_brand.py   DESIGN_BRAND_JS   the brand colors
 
 SCRIPTS below is the order they go on the page. A later part (text and fonts; designs, templates and Save
 slides) adds its own string to that list, after the ones here: it finds window.Designer ready, and the page
 starts (Designer.start()) only after every part is in place.
 
 The look is the pickers' (arrange_page.CSS: Nicole's colours, the system's own font, light only) with the
-designer's own pieces in DESIGN_CSS. The page's own chrome loads nothing from the internet. Nothing that
-matters is kept in the browser: every change is saved to the kit by POST /design.
+designer's own pieces in DESIGN_CSS (and the text and brand-color parts' own, beside their scripts). The
+page's own chrome loads nothing from the internet. The ONE thing the page may load from the internet is a
+Google Fonts stylesheet and its font files, for the words on the slides, and only through the address the
+Assistant sends with the state (design.GOOGLE_CSS): no address on the internet is written in this page.
+Nothing that matters is kept in the browser: every change is saved to the kit by POST /design.
 """
 import html
 import sys
@@ -29,9 +36,12 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import arrange_page  # noqa: E402
 import brand  # noqa: E402
+from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
 from design_js_core import DESIGN_CORE_JS  # noqa: E402
 from design_js_edit import DESIGN_EDIT_JS  # noqa: E402
 from design_js_model import DESIGN_MODEL_JS  # noqa: E402
+from design_js_text import DESIGN_TEXT_CSS, DESIGN_TEXT_JS  # noqa: E402
+from design_js_type import DESIGN_TYPE_JS  # noqa: E402
 
 DESIGN_CSS = """
 :root{--sel:#2f7cf6;--wide:1320px}
@@ -131,9 +141,14 @@ SCRIPTS = [
     ("DESIGN_MODEL_JS", DESIGN_MODEL_JS),
     ("DESIGN_CORE_JS", DESIGN_CORE_JS),
     ("DESIGN_EDIT_JS", DESIGN_EDIT_JS),
-    # HOOK (stage C): ("DESIGN_TEXT_JS", ...)  text boxes, fonts, brand colors
+    ("DESIGN_TYPE_JS", DESIGN_TYPE_JS),
+    ("DESIGN_TEXT_JS", DESIGN_TEXT_JS),
+    ("DESIGN_BRAND_JS", DESIGN_BRAND_JS),
     # HOOK (stage D): ("DESIGN_DESIGNS_JS", ...)  designs bar, gallery, templates, shoot menu, preview, Save slides
 ]
+
+# The styles of the parts added after the strip, in the order their scripts go on the page.
+PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS
 
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))
@@ -153,7 +168,7 @@ def plain_page(words):
 def _shell(title, body_attrs, inner, scripts=""):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>" + html.escape(title) + "</title><style>" + arrange_page.CSS + DESIGN_CSS + "</style></head>"
+            "<title>" + html.escape(title) + "</title><style>" + arrange_page.CSS + DESIGN_CSS + PART_CSS + "</style></head>"
             "<body class='designer'" + body_attrs + ">"
             "<div class='wrap'><div class='bar'>" + arrange_page.BACK_HOME + brand.bar()
             + inner + scripts + "</body></html>")
@@ -178,8 +193,9 @@ def page_html(kit_name):
         "<div class='group' id='g-design'><span class='lbl'>Design</span><b class='dname' id='d-name'></b>"
         "<span class='savestate' id='d-status' role='status'></span></div>"
         "</div>"
-        # The second row: the whole carousel. HOOK (stage C): brand colors and + Add text; HOOK (stage D):
-        # Preview swipe and Save slides; both with Designer.tools.group(id, label) (it adds to this row).
+        # The second row: the whole carousel. The scripts add to it with Designer.tools.group(id, label): the
+        # brand colors (put beside Background) and + Add text are there; HOOK (stage D): Preview swipe and
+        # Save slides.
         "<div class='d-tools' id='tools-main'>"
         "<div class='group' id='g-slides'><span class='lbl'>Slides</span>"
         "<button class='tb' id='slides-minus' type='button' aria-label='One fewer slide'>&minus;</button><b id='slides-count'></b>"
