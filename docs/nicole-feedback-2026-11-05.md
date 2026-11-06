@@ -46,6 +46,32 @@ and the stories.
 
 **Claude's read:** worth building next. It is real work (a day's, not an hour's), so it waits for a yes.
 
+### 1-top-b. A carousel you can lay out: "a mini Canva, inside of Claude"
+
+**Her words (9:27pm, 9:28pm):** "wondering if something like this is possible? that would be really cool"
+and "In a way, it would almost be like a mini Canva. Inside of Claude."
+
+**What she asked her Claude for, in full (dictated):** "when people do carousels, they try to make them cool
+and interactive... we want to see this your carousel grid look similar to an Instagram grid... there should
+be the ability to kind of drag your photo around... if you had a horizontal, it could go across two images.
+So, for example, let's say we had photo number 1 and then photo number 2 and 3 was actually a horizontal. So
+that people, when they're swiping through, they see those two photos as one... you could even put two
+horizontals stacked on top of each other. Or you could just kind of play around with it a little bit."
+
+**What that is:** the carousel shown as real slides you arrange by hand, with two layouts photographers
+already make by hand elsewhere: one wide photo running across two slides (it reads as one picture when
+swiped), and two wide photos stacked on one slide.
+
+**Is it possible:** yes. The Assistant already sizes and crops every slide; splitting one photo across two
+slides, or stacking two on one, is the same kind of work. It would live on the same page as the reel picker
+and share its drag-and-drop.
+
+**The question underneath, for the two of you:** how far it goes. On Oct 24 the line was drawn that the
+finished look comes from CapCut and Canva, and the Assistant does the choosing and the prep. Arranging the
+photographer's own photos on slides sits on the Assistant's side of that line. Fonts, text styling, stickers
+and templates sit on Canva's side, and the Assistant already hands a carousel to Canva for those. Claude
+told Nicole it expects the line there and that it is theirs to draw.
+
 ### 1a. Her photos ended up in three places
 
 **Her words (8:42pm, 8:49pm):** "theyre already on my hard drive in another location. it wouldnt make sense
