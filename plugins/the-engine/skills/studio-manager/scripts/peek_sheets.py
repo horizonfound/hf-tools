@@ -247,9 +247,9 @@ def current_path(studio, f):
     return f
 
 
-def candidates(night, sid):
-    """For the report's "Show me more": the close-look shortlist for a shoot (or, before one exists, every
-    moment on its pages), each with its number, its preview path and whether it is a current pick."""
+def candidates(night, sid, everything=False):
+    """For the report's "Show me more": the close-look shortlist for a shoot (or, before one exists or when
+    they ask to see every moment, all of its pages), each with its number and its preview path."""
     root, studio = locate(night)
     sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
     if sid not in sheets:
@@ -260,7 +260,7 @@ def candidates(night, sid):
     except ValueError:
         short = None
     by_n = {m["n"]: m for m in sheets[sid]["list"]}
-    nums = [n for n in (short or []) if n in by_n] or sorted(by_n)
+    nums = ([] if everything else [n for n in (short or []) if n in by_n]) or sorted(by_n)
     pj = studio / "sneak-peeks.json"
     picked = []
     if pj.exists():
@@ -268,7 +268,7 @@ def candidates(night, sid):
     for n in picked:   # the current picks are always offered, even if the shortlist was drawn before them
         if n in by_n and n not in nums:
             nums.append(n)
-    return {"shoot": sid, "picked": picked, "from_shortlist": bool(short),
+    return {"shoot": sid, "picked": picked, "from_shortlist": bool(short) and not everything, "moments": len(by_n),
             "photos": [{"n": n, "preview": by_n[n]["preview"], "taken": by_n[n].get("taken")} for n in nums]}
 
 

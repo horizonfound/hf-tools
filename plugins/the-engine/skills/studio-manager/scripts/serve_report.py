@@ -252,7 +252,8 @@ class Handler(SimpleHTTPRequestHandler):
             sid = parse_qs(parts.query).get("shoot", [""])[0][:40]
             try:
                 import peek_sheets
-                c = peek_sheets.candidates(self.picks.session if self.picks else self.directory, sid)
+                c = peek_sheets.candidates(self.picks.session if self.picks else self.directory, sid,
+                                           everything=parse_qs(parts.query).get("all", [""])[0] == "1")
             except Exception as ex:  # noqa: BLE001
                 c = None
                 sys.stderr.write(f"peeks-more: {ex}\n")

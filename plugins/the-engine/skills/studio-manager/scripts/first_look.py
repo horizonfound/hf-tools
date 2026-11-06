@@ -107,6 +107,40 @@ CSS = """
 .peeks-more .cand{transition:outline-color .2s,opacity .25s}.peeks-more .cands.full .cand:not(.on){opacity:.42}
 .peeks-more .pfoot .n.warn{color:var(--coral-2);font-weight:600}.peeks-more .pk[hidden]{display:none}
 .peeks-more .pfoot{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.7rem;font-size:13px;color:var(--ink-2)}
+.peeks-more .hint b{color:var(--ink)}
+.peeks-more .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:.1rem 0 1rem}
+.peeks-more .slot{position:relative;aspect-ratio:1;border-radius:12px;background:rgba(255,255,255,.6);outline:2px dashed rgba(31,36,48,.22);outline-offset:-2px;display:grid;place-items:center;transition:transform .15s}
+.peeks-more .slot .cand{position:absolute;inset:0;aspect-ratio:auto;border-radius:12px}
+.peeks-more .slot>.k{position:absolute;top:.35rem;left:.35rem;min-width:1.4rem;height:1.4rem;border-radius:999px;background:rgba(31,36,48,.45);color:#fff;font:700 12px/1.4rem var(--sans);text-align:center;padding:0 .3rem}
+.peeks-more .slot .empty{font-size:12.5px;line-height:1.3;color:var(--ink-2);text-align:center;padding:1.2rem .6rem 0}
+.peeks-more .slot.over{outline:3px solid #E9B93B;outline-offset:2px;transform:scale(.95)}
+.peeks-more .cand{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;outline:0}
+.peeks-more .cand img{pointer-events:none;-webkit-user-drag:none}
+.peeks-more .cand .k{display:block}
+.peeks-more .cand.dragging{opacity:.28}
+.peeks-more .cand:hover{box-shadow:0 0 0 3px var(--coral)}
+.peeks-more .cands{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));border-radius:12px;max-height:60vh;overflow:auto;padding:3px}
+.peeks-more .cands.over{outline:2px dashed var(--coral);outline-offset:3px}
+.peeks-more .plabel{margin:0 0 .5rem;font:600 12.5px/1.2 var(--sans);color:var(--ink);display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.peeks-more .plabel .c{font-weight:400;color:var(--ink-2)}
+.peeks-more .lk{margin-left:auto;border:0;background:none;padding:0;font:600 12.5px/1.2 var(--sans);color:var(--coral-2);text-decoration:underline;cursor:pointer}
+body.pk-drag,body.pk-drag *{cursor:grabbing!important}
+.pk-lift{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;border-radius:12px;overflow:hidden;box-shadow:0 0 0 3px #fff,0 24px 48px -12px rgba(31,36,48,.55)}
+.pk-lift img{width:100%;height:100%;object-fit:cover;display:block}
+.pkbig{position:fixed;inset:0;z-index:9998;background:rgba(20,22,28,.84);display:none;place-items:center;padding:3vh 6vw}
+.pkbig.on{display:grid}
+.pkbig .box{position:relative;display:grid;gap:.8rem;justify-items:center}
+.pkbig img{max-width:min(88vw,900px);max-height:72vh;border-radius:14px;display:block;background:#222}
+.pkbig .acts{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;justify-content:center;color:#fff;font:500 14px/1.2 var(--sans)}
+.pkbig .acts .sep{margin-left:.7rem;opacity:.75}
+.pkbig .pk{background:#fff;border-color:#fff}
+.pkbig .pk.spot{min-width:2.3rem;padding:.5rem 0}
+.pkbig .pk.spot.cur{background:var(--coral);border-color:var(--coral);color:#fff;opacity:1}
+.pkbig .pk.out{margin-left:.7rem;background:transparent;color:#fff}
+.pkbig .x,.pkbig .nav{position:absolute;border:0;background:rgba(255,255,255,.94);color:#1F2430;width:2.5rem;height:2.5rem;border-radius:999px;font-size:1.5rem;line-height:1;cursor:pointer}
+.pkbig .x{top:-.9rem;right:-.9rem}.pkbig .nav{top:calc(36vh - 1.25rem)}.pkbig .prev{left:-3.2rem}.pkbig .next{right:-3.2rem}
+.peeks-more .cand .now{white-space:nowrap}
+@media(max-width:700px){.pkbig .prev{left:-.6rem}.pkbig .next{right:-.6rem}}
 .peeks-state{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.peeks-state.bad{color:#b4472e}.peeks-state.on{color:var(--ink)}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.2rem 0 .6rem}
 .btn{display:inline-flex;align-items:center;gap:1.1rem;padding:.7rem .7rem .7rem 1.9rem;border-radius:999px;background:var(--coral);color:#fff;font:600 22px/1 var(--sans);letter-spacing:-.01em;border:1.5px solid var(--coral);cursor:pointer;box-shadow:0 18px 36px -20px rgba(240,127,90,.9);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
@@ -117,6 +151,98 @@ CSS = """
 @media(max-width:900px){.shoot .top,.shoot:nth-child(even) .top{grid-template-columns:1fr}.shoot:nth-child(even) .pics{order:0}.talk{grid-template-columns:1fr}.more .row{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.more .row{grid-template-columns:repeat(2,1fr)}}
 """
+
+PICKER = r"""<script>
+// "Show me more" (Dustin, Nov 5, third pass). Your six sit in numbered spots, in order. Drag one to move it,
+// drag a photo from below onto a spot to swap it in, drag one out to empty its spot. Click any photo to see it
+// big; from there it can be put in a spot or taken out without dragging at all.
+window.peekPicker=function(more,id,d,say){
+ if(more._ac)more._ac.abort();if(more._big)more._big.remove();
+ const ac=more._ac=new AbortController(),sig={signal:ac.signal};
+ const E=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+ let photos=d.photos.slice(),by={};const index=()=>{by={};photos.forEach(p=>{by[p.n]=p;});};index();
+ const start=(d.picked||[]).filter(n=>by[n]).slice(0,6);while(start.length<6)start.push(null);
+ let slots=start.slice(),showingAll=!d.from_shortlist;
+ const pool=()=>photos.filter(p=>!slots.includes(p.n));
+ const changed=()=>slots.join()!==start.join();
+ more.innerHTML='';
+ const hint=E('p','hint'),row=E('div','slots'),lab=E('p','plabel'),grid=E('div','cands'),foot=E('div','pfoot');
+ hint.innerHTML='<b>Your six, in order.</b> Drag one to move it. Drag a photo from below onto a spot to swap it in. Click any photo to see it big.';
+ foot.innerHTML='<button class="pk use" type="button">Use these</button><button class="pk reset" type="button">Put it back the way it was</button><button class="pk cancel2" type="button">Never mind</button><span class="n"></span>';
+ more.append(hint,row,lab,grid,foot);
+ const tile=(n,k)=>{const t=E('div','cand');t.dataset.n=n;t.innerHTML='<img src="'+by[n].preview+'" alt="" draggable="false">'+(k?'<span class="k">'+k+'</span>':'')+(k===1?'<span class="now">the big one</span>':'');return t;};
+ function draw(){
+  row.innerHTML='';
+  slots.forEach((n,i)=>{const s=E('div','slot');s.dataset.i=i;if(n!=null)s.appendChild(tile(n,i+1));else s.innerHTML='<span class="k">'+(i+1)+'</span><span class="empty">Drag a photo here</span>';row.appendChild(s);});
+  grid.innerHTML='';pool().forEach(p=>grid.appendChild(tile(p.n,0)));
+  const extra=d.moments&&d.moments>photos.length&&!showingAll;
+  lab.innerHTML=(showingAll?'Every moment from this shoot':'The others I narrowed it to')+' <span class="c">'+pool().length+'</span>'+(extra?'<button class="lk all" type="button">See every moment ('+d.moments+')</button>':'');
+  const a=lab.querySelector('.all');if(a)a.addEventListener('click',loadAll);
+  const empty=slots.indexOf(null),nn=foot.querySelector('.n');
+  nn.textContent=empty>=0?'Spot '+(empty+1)+' is empty. Drag a photo into it.':(changed()?'Happy with these? Press Use these.':'These are the six on the report now.');
+  foot.querySelector('.use').disabled=empty>=0||!changed();foot.querySelector('.reset').hidden=!changed();
+ }
+ async function loadAll(){
+  try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id)+'&all=1',{cache:'no-store'});if(!r.ok)throw 0;const x=await r.json();photos=x.photos;index();showingAll=true;draw();}
+  catch(e){foot.querySelector('.n').textContent='Could not load them all right now.';}}
+ // photo n into spot i: from below, whatever was there goes back below; from another spot, the two trade places
+ function put(n,i){const j=slots.indexOf(n);if(j===i)return;if(j>=0){slots[j]=slots[i];slots[i]=n;}else slots[i]=n;draw();}
+ function takeOut(n){const j=slots.indexOf(n);if(j>=0){slots[j]=null;draw();}}
+
+ // dragging, drawn by the page itself (the app's pane and the browser's own drag do not get along)
+ let dg=null;
+ const clearMarks=()=>{row.querySelectorAll('.over').forEach(o=>o.classList.remove('over'));grid.classList.remove('over');};
+ more.addEventListener('pointerdown',e=>{const t=e.target.closest('.cand');if(!t||e.button)return;dg={t,n:+t.dataset.n,x:e.clientX,y:e.clientY,on:false,to:null};e.preventDefault();},sig);
+ document.addEventListener('pointermove',e=>{if(!dg)return;
+  if(!dg.on){if(Math.hypot(e.clientX-dg.x,e.clientY-dg.y)<7)return;dg.on=true;const r=dg.t.getBoundingClientRect();dg.ox=dg.x-r.left;dg.oy=dg.y-r.top;
+   dg.lift=E('div','pk-lift','<img src="'+by[dg.n].preview+'" alt="">');dg.lift.style.width=r.width+'px';dg.lift.style.height=r.height+'px';document.body.appendChild(dg.lift);
+   dg.t.classList.add('dragging');document.body.classList.add('pk-drag');}
+  dg.lift.style.transform='translate('+(e.clientX-dg.ox)+'px,'+(e.clientY-dg.oy)+'px) scale(1.06)';
+  const u=document.elementFromPoint(e.clientX,e.clientY),s=u&&u.closest('.slot'),g=u&&u.closest('.cands'),from=slots.indexOf(dg.n);
+  clearMarks();dg.to=null;
+  if(s&&row.contains(s)&&+s.dataset.i!==from){s.classList.add('over');dg.to=+s.dataset.i;}
+  else if(g===grid&&from>=0){grid.classList.add('over');dg.to='out';}
+ },sig);
+ const drop=cancel=>{if(!dg)return;const x=dg;dg=null;document.body.classList.remove('pk-drag');clearMarks();
+  if(!x.on){if(!cancel)openBig(x.n);return;}
+  x.lift.remove();x.t.classList.remove('dragging');
+  if(cancel||x.to==null)return;if(x.to==='out')takeOut(x.n);else put(x.n,x.to);};
+ document.addEventListener('pointerup',()=>drop(false),sig);
+ document.addEventListener('pointercancel',()=>drop(true),sig);
+ window.addEventListener('blur',()=>drop(true),sig);
+
+ // seeing one big, and moving it without dragging
+ const big=more._big=E('div','pkbig','<div class="box"><button class="x" type="button" aria-label="Close">&#215;</button><button class="nav prev" type="button" aria-label="Previous">&#8249;</button><img alt=""><button class="nav next" type="button" aria-label="Next">&#8250;</button><div class="acts"></div></div>');
+ document.body.appendChild(big);
+ let at=null;
+ const order=()=>slots.filter(n=>n!=null).concat(pool().map(p=>p.n));
+ const spots=cur=>[0,1,2,3,4,5].map(k=>'<button class="pk spot'+(k===cur?' cur':'')+'" type="button" data-k="'+k+'"'+(k===cur?' disabled':'')+'>'+(k+1)+'</button>').join('');
+ const closeBig=()=>big.classList.remove('on');
+ function openBig(n){at=n;const i=slots.indexOf(n);big.querySelector('img').src=by[n].preview;
+  big.querySelector('.acts').innerHTML=i>=0
+   ?'<span>Number '+(i+1)+' of your six'+(i===0?', the big one':'')+'.</span><span class="sep">Move it to spot</span>'+spots(i)+'<button class="pk out" type="button">Take it out</button>'
+   :'<span>Not one of your six.</span><span class="sep">Put it in spot</span>'+spots(-1);
+  big.classList.add('on');}
+ big.addEventListener('click',e=>{const b=e.target.closest('button');
+  if(!b){if(e.target===big)closeBig();return;}
+  if(b.classList.contains('x'))closeBig();
+  else if(b.classList.contains('nav')){const o=order(),i=o.indexOf(at);openBig(o[(i+(b.classList.contains('next')?1:-1)+o.length)%o.length]);}
+  else if(b.classList.contains('out')){takeOut(at);openBig(at);}
+  else if(b.classList.contains('spot')){put(at,+b.dataset.k);openBig(at);}});
+ document.addEventListener('keydown',e=>{if(!big.classList.contains('on'))return;
+  if(e.key==='Escape'){e.stopPropagation();closeBig();}else if(e.key==='ArrowRight')big.querySelector('.next').click();else if(e.key==='ArrowLeft')big.querySelector('.prev').click();},sig);
+
+ foot.querySelector('.reset').addEventListener('click',()=>{slots=start.slice();draw();});
+ foot.querySelector('.cancel2').addEventListener('click',()=>{closeBig();more.hidden=true;});
+ foot.querySelector('.use').addEventListener('click',async()=>{
+  try{const r=await fetch('/peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:slots})});if(!r.ok)throw 0;
+   closeBig();more.hidden=true;say('Saving your picks...','on');
+   const t=setInterval(async()=>{try{const q=await fetch('/picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
+    if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
+  catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
+ draw();
+};
+</script>"""
 
 SCRIPT = """<script>
 (()=>{
@@ -168,26 +294,7 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
   if(!live){say('Open this page through the Assistant for this, or tell Claude "show me more from the beach shoot."','bad');return;}
   say('');
   try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
-   // Starts with nothing chosen (Dustin, Nov 5: it opened with the current six already numbered, so a click on any
-   // other photo did nothing until one was taken out). The current six carry a quiet tag instead.
-   const chosen=[];const now=new Set(d.picked||[]);
-   const draw=()=>{more.innerHTML='<p class="hint">'+(d.from_shortlist?'The ones I narrowed it to.':'Every moment of the shoot.')+' Click six, in the order you want them. The first one you click is the big one.'+(now.size?' The ones tagged <b>on the report now</b> are the six there today.':'')+'</p><div class="cands"></div><div class="pfoot"><button class="pk use" type="button">Use these</button><button class="pk clear2" type="button">Start over</button><button class="pk cancel2" type="button">Never mind</button><span class="n"></span></div>';
-    const c=more.querySelector('.cands');d.photos.forEach(p=>{const el=document.createElement('div');el.className='cand'+(chosen.includes(p.n)?' on':'');el.dataset.n=p.n;el.innerHTML='<img src="'+p.preview+'" alt="" loading="lazy"><span class="k"></span>'+(now.has(p.n)?'<span class="now">on the report now</span>':'');c.appendChild(el);});
-    const upd=()=>{more.querySelectorAll('.cand').forEach(el=>{const i=chosen.indexOf(+el.dataset.n);el.classList.toggle('on',i>=0);el.querySelector('.k').textContent=i>=0?String(i+1):''});
-     const left=6-chosen.length,nn=more.querySelector('.n');nn.classList.remove('warn');
-     nn.textContent=chosen.length===0?'Nothing chosen yet. Click the six you want.':(left>0?chosen.length+' of 6 chosen. '+left+' to go.':'6 of 6. Press Use these, or click one of your six to swap it out.');
-     more.querySelector('.cands').classList.toggle('full',left===0);more.querySelector('.use').disabled=left!==0;more.querySelector('.clear2').hidden=chosen.length===0;};
-    more.querySelectorAll('.cand').forEach(el=>el.addEventListener('click',()=>{const n=+el.dataset.n,i=chosen.indexOf(n);if(i>=0){chosen.splice(i,1);upd();}else if(chosen.length<6){chosen.push(n);upd();}else{const nn=more.querySelector('.n');nn.textContent='You already have six. Click one of your six to take it out, then pick this one.';nn.classList.add('warn');}}));
-    more.querySelector('.clear2').addEventListener('click',()=>{chosen.length=0;upd();});
-    more.querySelector('.cancel2').addEventListener('click',()=>{more.hidden=true});
-    more.querySelector('.use').addEventListener('click',async()=>{
-     try{const r=await fetch('/peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:chosen})});if(!r.ok)throw 0;
-      more.hidden=true;say('Saving your picks...','on');
-      const t=setInterval(async()=>{try{const q=await fetch('/picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
-       if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
-     catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
-    upd();};
-   draw();more.hidden=false;}
+   window.peekPicker(more,id,d,say);more.hidden=false;}
   catch(e){say('Could not load more right now. Tell Claude "show me more from this shoot."','bad');}});
 });
 document.querySelectorAll('.queue').forEach(q=>{
@@ -410,7 +517,7 @@ def shoots_section(studio):
             out.append(card)
         out.append("</article>")
     out.append("</div>")   # no how-to paragraph under the shoots: not needed (Dustin, Oct 28)
-    return "\n".join(out), SCRIPT
+    return "\n".join(out), PICKER + SCRIPT
 
 
 def write_page(session_dir):

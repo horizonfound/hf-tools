@@ -536,3 +536,32 @@ One flaw found and fixed in the testing: a restarted server first took its "whic
 at its first page request, not when it started, so it could miss a change that landed in between.
 
 No more "stop and start the server after an update," for Dustin or for students.
+
+## 23. "Show me more," third pass: numbered spots, drag and drop, click to enlarge
+
+**Dustin:** the photos should be numbered one to six in the order they are on the report; it should be drag
+and drop; and clicking a small photo should enlarge it, "because you can't even choose them, seeing them
+that small... We need a better system here, because it's currently a little bit clunky and almost useless."
+
+**Rebuilt the same day:**
+- **Your six sit in six numbered spots, in their order on the report,** three across and as large as the
+  photos below them. Spot 1 is tagged "the big one."
+- **Drag and drop.** Drag a photo from below onto a spot and it swaps in; the one it replaced goes back
+  below. Drag one spot onto another and they trade places. Drag one down out of its spot to empty it.
+- **Click any photo to see it big,** with arrows to step through them all. Under the big photo: "Put it in
+  spot 1 2 3 4 5 6," or for one already in the six, "Move it to spot..." and "Take it out." So everything
+  can be done without dragging.
+- **"See every moment (100)"** swaps the short list below for every moment of the shoot, keeping the six.
+- The line at the bottom says where things stand; "Use these" lights up once something changed and all six
+  spots are full; "Put it back the way it was" undoes everything.
+- The page draws the drag itself (a lifted copy of the photo follows the pointer, the spot it would land in
+  gets a yellow outline), as on the posting page, because the app's pane and the browser's own drag do not
+  get along.
+
+**Tried in the pane with real drags and clicks:** a photo dragged from below into spot 3; spot 5 dragged
+onto spot 1 (traded); spot 6 dragged out (emptied, Use these went grey); a click opened the big view; put
+in spot 6 from there; next photo; moved to spot 1; taken out; Escape; every moment (95 below); put back;
+never mind. Each step did what it says. "Use these" was not pressed, so the six on the report are his.
+
+**Not done, his call:** choosing more than six. The report's mosaic is built for exactly six (his decision
+on Oct 28: hero, two beside, three under). More than six would need a different layout.
