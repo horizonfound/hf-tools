@@ -368,7 +368,9 @@ def reminders(p, mark=False):
             if mark:
                 rem[f"late:{x['id']}"] = t
     weeks, n = tank(p)
-    if weeks is not None and weeks <= LOW_WEEKS and rem.get("low") != t:
+    # Running low is a nudge for someone who has posts going. Someone who has never made a piece is not
+    # "running low"; telling them so is a list of what's empty (seen on Dustin's Home after a first backup, Nov 5).
+    if weeks is not None and weeks <= LOW_WEEKS and rem.get("low") != t and p.get("pieces"):
         if n == 0:
             lines.append("Nothing ready to post. Time to get something in the pipeline.")
         else:
@@ -756,6 +758,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.open_shoot(urlsplit(self.path).query)
         if path == "/queue-url":
             return self.queue_url()
+        if path == "/report-url":
+            return self.report_url(urlsplit(self.path).query)
         if path == "/pick-folder":
             return self.pick_folder()
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -795,6 +799,34 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask Claude."
         self.answer({"ok": ok, "words": words})
+
+    def report_url(self, query):
+        """The home page's "See the report": the report of the backup a shoot came from, its server started if
+        it isn't up. Only by a shoot's id, never a path from the page."""
+        from urllib.parse import parse_qs
+        import edit_queue
+        q = parse_qs(query)
+        sid = q.get("id", [""])[0]
+        try:
+            shoots = edit_queue.load()["shoots"]
+            if sid == "latest":
+                with_report = [x for x in shoots if x.get("studio")]
+                s = max(with_report, key=lambda x: x.get("added", "")) if with_report else None
+            else:
+                s = next((x for x in shoots if x["id"] == sid), None)
+            if not s or not s.get("studio"):
+                return self.answer({"ok": False, "words": "There's no report for this one. It didn't come from a backup."})
+            studio = Path(s["studio"])
+            if not studio.is_dir():
+                drive = studio.parts[2] if len(studio.parts) > 2 and studio.parts[1] == "Volumes" else "the drive"
+                return self.answer({"ok": False, "words": f"Plug in {drive} to see this report."})
+            import serve_report
+            url = serve_report.report_url(studio)
+            if not url:
+                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and Claude will."})
+            return self.answer({"ok": True, "url": url + (f"#{s['shoot']}" if sid != "latest" and s.get("shoot") else "")})
+        except Exception as e:  # noqa: BLE001
+            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and Claude will."})
 
     def pick_folder(self):
         """The home page's "Choose the folder your finished photos are in": the Mac's own folder picker, then

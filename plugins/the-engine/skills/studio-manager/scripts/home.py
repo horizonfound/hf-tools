@@ -214,7 +214,14 @@ def gather():
         shoots = sorted(q["shoots"], key=lambda s: (s.get("shot") or "", s.get("added", "")), reverse=True)
         for s in shoots[:6]:
             g["recent"].append({"id": s["id"], "name": s["name"], "shot": s.get("shot"), "count": s.get("count"),
-                                "thumbs": [t for t in (s.get("thumbs") or [])[:3] if (HOME / t).exists()], "status": s.get("status")})
+                                "thumbs": [t for t in (s.get("thumbs") or [])[:3] if (HOME / t).exists()], "status": s.get("status"),
+                                "report": bool(s.get("studio"))})
+        # the newest backup, so its report is one click away from Home (Dustin, Nov 5)
+        backed = [s for s in q["shoots"] if s.get("studio")]
+        if backed:
+            last = max(backed, key=lambda s: s.get("added", ""))
+            same = [s for s in backed if s.get("studio") == last["studio"]]
+            g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same)}
     except Exception:
         pass
     try:
@@ -286,7 +293,7 @@ CSS_EXTRA = r"""
 .shoot .ph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.shoot .ph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--sand-l);display:block}
 .shoot .ph i{display:block;aspect-ratio:1;border-radius:8px;background:var(--sand-l)}
 .shoot b{font:600 15px/1.2 var(--sans)}.shoot small{color:var(--ink-2);font-size:12.5px}
-.shoot .acts{display:flex;gap:6px;flex-wrap:wrap}
+.shoot .acts{display:flex;gap:6px;flex-wrap:wrap}.btn.inline{margin-left:6px;padding:5px 11px;font-size:12.5px;vertical-align:baseline}
 .btn{font:600 12.5px/1 var(--sans);padding:8px 11px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--ink)}.btn.solid{background:var(--ink);color:#fff;border-color:var(--ink)}
 .said{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.note{display:block;font-size:13px;color:var(--ink-2);margin-top:6px}.howto .note{display:inline;margin-left:8px}
@@ -302,7 +309,7 @@ function say(t){const e=$('#said');e.textContent=t||'';}
 function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(a);a.focus();a.select();const ok=document.execCommand('copy');a.remove();if(ok)return true;}catch(e){}
   if(navigator.clipboard){navigator.clipboard.writeText(t).catch(()=>{});return true;}return false;}
 async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
-function note(b,t){if(!b){say(t);return;}let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
+function note(b,t){if(!b){say(t);return;}const row=b.closest('.acts');if(row)b=row;let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
 async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude to open it.');}}
 const items=[...document.querySelectorAll('.item')];
 function howtoFor(item){return document.querySelector('.howto[data-for="'+item+'"]');}
@@ -325,6 +332,8 @@ document.addEventListener('click',ev=>{if(!ev.target.closest('.item,.howto'))clo
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeAll();});
 window.addEventListener('resize',()=>{const o=document.querySelector('.item.open');if(o)place(o);});
 document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
+// "See the report": the report of the backup this shoot came from, opened right here in the pane.
+document.querySelectorAll('[data-report]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude: show me the report');return;}note(b,'Opening the report...');try{const r=await fetch('/report-url?id='+encodeURIComponent(b.dataset.report));const d=await r.json();if(d.url){location.href=d.url;}else note(b,d.words||'Ask Claude: show me the report');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude: show me the report');}}));
 document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude.');}}));
 document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
 if(!live){$('#offline').hidden=false;}
@@ -367,7 +376,17 @@ def page_html():
         today_items.append(("card", f"A card is in: {g['card']['name']}, about {g['card']['files']:,} files. Ready when you are."))
     for kind, words in g["notes"][:5]:
         today_items.append((kind, e(words)))
-    if g["tank"]:
+    lb = g.get("last_backup")
+    if lb:
+        try:
+            d = date.fromisoformat(lb["when"])
+            when = "today" if d == date.today() else ("yesterday" if (date.today() - d).days == 1 else d.strftime("%A, %b ") + str(d.day))
+        except ValueError:
+            when = ""
+        n = lb["shoots"]
+        today_items.append(("", f"Your last backup{', ' + when if when else ''}: {n} shoot{'s' if n != 1 else ''}, {lb['photos']:,} photos. "
+                                f"<button class='btn inline' data-report='latest'>See the report</button>"))
+    if g["tank"] and not g["tank"].startswith("Nothing ready") and not any(k == "post" for k, _ in today_items):
         today_items.append(("post", e(g["tank"])))
     if not today_items:
         # never a list of what's empty for someone who hasn't started (Dustin, Nov 5)
@@ -417,6 +436,8 @@ def page_html():
                 when = ""
         meta = " · ".join(x for x in (when, f"{s['count']:,} photos" if s.get("count") else "", {"waiting": "to edit", "finished": "edited", "archived": "just for you"}.get(s.get("status"), "")) if x)
         acts = f"<button class='btn' data-open='/open-shoot?id={e(s['id'])}'>Open photo folder</button>"
+        if s.get("report"):
+            acts += f"<button class='btn' data-report='{e(s['id'])}'>See the report</button>"
         k = kits_by_name.get(s["name"].lower())
         if k:
             acts += f"<a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a>"

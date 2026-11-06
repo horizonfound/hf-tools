@@ -79,6 +79,43 @@ class Renames:
                 sys.stderr.write(f"report not rebuilt: {ex}\n")
 
 
+def report_url(studio):
+    """The live report's address for one backup, starting its little server if none answers for it. Used by the
+    home page's "See the report" (Dustin, Nov 5: once he pressed Back to home there was no way back to the
+    report). A port can be taken over by another backup's server later, so "alive" is not enough: the server
+    has to say it serves this backup (/which)."""
+    import urllib.request
+    studio = Path(studio)
+    f = studio / "report-url.txt"
+
+    def serving(url):
+        try:
+            d = json.loads(urllib.request.urlopen(url.rsplit("/", 1)[0] + "/which", timeout=1).read())
+            return Path(d.get("studio", "")).resolve() == studio.resolve()
+        except Exception:  # noqa: BLE001
+            return False
+
+    if f.exists():
+        old = f.read_text().strip()
+        if old and serving(old):
+            return old
+    if not (studio / "report.html").exists():
+        return None
+    try:
+        log = open(studio / "serve.log", "a")
+        subprocess.Popen([sys.executable, str(Path(__file__).resolve()), str(studio)],
+                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    except OSError:
+        return None
+    for _ in range(60):
+        time.sleep(0.1)
+        if f.exists():
+            url = f.read_text().strip()
+            if url and serving(url):
+                return url
+    return None
+
+
 def queue_url():
     """The live queue page's address. If no queue server answers, start one (edit_queue.py serve) and wait for its line."""
     import urllib.request
@@ -154,6 +191,7 @@ class Picks:
 
 
 class Handler(SimpleHTTPRequestHandler):
+    studio = ""
     allowed = ()
     renames = None
     picks = None
@@ -172,6 +210,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_response(HTTPStatus.FOUND)
             self.send_header("Location", "/report.html")
             self.end_headers()
+            return
+        if parts.path == "/which":
+            body = json.dumps({"studio": self.studio}).encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
             return
         if parts.path == "/rename-status":
             body = json.dumps(self.renames.state if self.renames else {}).encode()
@@ -365,6 +411,7 @@ def main():
     Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
     Handler.renames = Renames(a.session, studio)
     Handler.picks = Picks(a.session, studio)
+    Handler.studio = str(studio)
     # the asked-for port, or the next free one: another session's server may be holding it
     srv = None
     for port in range(a.port, a.port + 20):
@@ -375,6 +422,10 @@ def main():
             continue
     if not srv:
         sys.exit(f"STOP: no free port between {a.port} and {a.port + 19}.")
+    try:  # where this backup's report can be found, for the home page's "See the report"
+        (studio / "report-url.txt").write_text(f"http://127.0.0.1:{port}/report.html\n")
+    except OSError:
+        pass
     print(f"Report: http://127.0.0.1:{port}/report.html", flush=True)
     try:
         srv.serve_forever()

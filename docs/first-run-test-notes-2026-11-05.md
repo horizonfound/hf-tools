@@ -385,3 +385,27 @@ shown there."
 **Fixed the same day:** a name longer than the box now ends in "..." ("Lookbook on the patterne..."), and
 hovering over the box shows the whole name. Clicking into the box to type still shows all of it. Seen on
 the real report in the pane. Reports written before this keep the old look until they are rebuilt.
+
+## 17. No way back to the report after leaving it
+
+**Dustin:** "Once I exit the report, there's no way for me to get back to it." The report is where shoots
+get renamed, so someone who leaves it by accident is stuck. He suggested the "Your recent shoots" area.
+
+**Fixed the same day, on the home page:**
+- Every recent shoot that came from a backup has a "See the report" button beside "Open photo folder." It
+  opens the report of the backup that shoot came from, right in the pane, scrolled to that shoot.
+- Under Today, one line names the newest backup ("Your last backup, today: 2 shoots, 428 photos.") with
+  its own "See the report" button.
+- If that report's little server isn't running, the click starts it. If the drive is unplugged it says
+  "Plug in Big Kahuna to see this report." A report server now says which backup it serves, so a click
+  never lands on some other backup's report.
+- Tried in the pane: a click on a shoot's button landed on the report at that shoot, and Back to home came
+  back. Asking twice starts only one server.
+
+**Also fixed while there:** after a first backup, Today said "Nothing ready to post. Time to get something
+in the pipeline." and "Nothing ready to post yet." to someone who has never made a post. The running-low
+nudge now waits until they have made at least one piece, and Today no longer lists an empty tank. And the
+"Opened ... in Finder" line on a shoot card now sits under the buttons, not between them.
+
+**Not done:** the same button on the editing queue's "Your shoots" list, which would give a way back from
+there too.
