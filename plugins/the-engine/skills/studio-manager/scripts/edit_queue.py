@@ -880,6 +880,8 @@ def main():
     s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=8770)
     a = ap.parse_args()
 
+    if a.cmd != "serve":
+        fresh.announce()
     if a.cmd == "serve":
         write_page(load())
         return serve(a.port)

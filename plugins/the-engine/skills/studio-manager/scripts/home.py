@@ -513,6 +513,8 @@ def main():
     c = sub.add_parser("click"); c.add_argument("item", choices=CATEGORIES)
     hl = sub.add_parser("hello"); hl.add_argument("--mark", action="store_true")
     a = ap.parse_args()
+    import fresh
+    fresh.announce()                       # this folder is where the Assistant's code is now (see fresh.py)
     if a.cmd == "page":
         say(str(write_page()))
     elif a.cmd == "url":

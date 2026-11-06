@@ -67,16 +67,13 @@ Voice first, everywhere, not just for naming. She talks to the Studio Manager th
 
 ```
 .claude-plugin/marketplace.json     marketplace "hf-tools", one plugin: the-engine
-plugins/the-engine/                 the plugin (displayName "The Assistant", version in .claude-plugin/plugin.json)
-  skills/assistant-start-here/      the 40-minute interview that writes the Brand File
+plugins/the-engine/                 the plugin (displayName "The Assistant"; no version number on purpose, see "Getting it ready for Nicole")
   skills/assistant-make-a-reel/     scripts/: reel.py, capcut.py, beats_lite.py, pace.py (the CapCut route); make_reel.py, hooktext.py, grade_reel.py, beats.py, check_setup.py (parked ffmpeg route); references/capcut/ (CapCut 9.6 pieces)
-  skills/assistant-make-a-carousel/
-  skills/assistant-make-stories/
-  skills/assistant-menu/
   skills/studio-manager/scripts/     backup.py (the safety core), report_page.py (the morning report as a page), previews.py (JPEGs from RAW via sips), and the rest
   skills/studio-manager/SKILL.md     the short core: checks, rules, and which part to read
   skills/studio-manager/parts/       the instructions themselves, one file per kind of request
   shared/                           playbook, guardrails, the Assistant's voice, fonts
+retired-skills/                     four October skills set aside Nov 5 (old menu, Start Here interview, old carousel and stories); not installed
 docs/                               briefs, plan, test notes (copied from the claude.ai Project "The Engine")
 ```
 
@@ -259,6 +256,18 @@ Some photographers will point the first backup at the computer's own disk. That 
 ## The instructions come in parts (Dustin, Nov 5)
 
 `skills/studio-manager/SKILL.md` had grown to 75 KB, read in full on every reply. It is now a short core (about 9 KB: the first-thing checks, the rules, how to talk, showing a page, remembering what got done, and a table of which part to read when) plus twelve parts in `skills/studio-manager/parts/`: `hello`, `first-backup-setup`, `backup`, `sneak-peeks` (step 8b), `client-note` (step 8c), `after-the-report` (each shoot, renaming, naming the helper), `editing-queue`, `post-kit` (done editing and the kit), `photos-in` (the drop box and the folder picker), `canva`, `posting-queue`, `where-things-live`. The core tells Claude to read the part in full before acting, every conversation. **When you change how the Assistant behaves, edit the part, not the core; a new kind of request needs a row in the core's table.** Anything every part needs (a rule, a way of talking) goes in the core. The split moved text word for word (checked line by line). Why: less to read per reply means less of the photographer's plan and less to wade through; replies are mostly Claude's thinking time, not the Mac (measured Nov 5: the Show the report button 6 to 10 s, a hello 9 to 19 s, a 16 GB backup about 4.5 minutes of which the copy was 87 s). How much faster the split makes replies is not measured yet.
+
+## Getting it ready for Nicole (Dustin, Nov 5, evening)
+
+Dustin wants Nicole to test from scratch on her own Mac. What was checked and changed first:
+
+- **It runs on the Python a new Mac comes with (3.9).** A whole pretend backup (18 real raw photos: copy, check, look, sort, sneak peeks, settle), a rename, client-note facts, the queues, bringing finished photos in, a post kit, a reel plan, and every page through its server all ran under Apple's own Python 3.9.6 with nothing else on the path. Dustin's Mac uses 3.12, so this had never been tried. **A Mac that has never had Python shows Apple's "command line developer tools" window first;** the core instructions now say what to tell the photographer (click Install, five to ten minutes, "tell me when it's done"), and the guide has a paragraph for it. That window itself is untested: no Mac here lacks the tools.
+- **Four October skills are out of the install:** the old menu (it also answered to "hi"), the 40-minute Start Here interview, the old carousel and stories. They are in `retired-skills/` at the top of the project, not deleted. Whether Start Here comes back is Dustin and Nicole's call. The plugin now installs two skills: studio-manager and assistant-make-a-reel.
+- **The plugin has no version number anymore.** With `"version": "0.3.1"` fixed in plugin.json, an installed copy only updates when that text changes, so nothing pushed since October would have reached anyone. With no version, each push counts as a new version (Claude Code docs, "Versions and updates"). **Auto-update is still off by default for a marketplace like ours;** the photographer turns it on once (guide, Step 4). The older line in this file that installed copies "auto-update from main" is true only after that.
+- **Pages follow an update into its new folder.** An installed copy updates into a new folder per version, so a running page server would never have seen the newer files beside it. Commands Claude runs now note where the Assistant lives (`fresh.announce()` → `~/.studio/code-home.txt`), and a server running from anywhere else starts over from there on the next page request. Tested with a pretend installed copy: both servers moved by themselves.
+- **The guide is Draft 2:** the full web address in the install line (the short form can ask for a GitHub account), the Apple window, a first-posts walk-through beside the first backup, the Show the report button and the blank pane, Show me more, Back to home and See the report, and how to get the latest right now. Steps nobody has clicked through are still marked [check].
+- **The plugin's one-line description offers both ways in,** finished photos first (it said "Plug in your card").
+- **Still unproven until the dress rehearsal:** the two install lines typed into the desktop app, the auto-update switch there, "get the latest" there, and whether /assistant shows up under that name (the docs suggest /the-engine:assistant; "hi" is what the guide teaches).
 
 ## Why we moved to Claude Code
 

@@ -1,6 +1,6 @@
 # Setting up The Assistant
 
-**Draft 1, Oct 28, 2026.** For the printable guide and the walkthrough video. Plain words, one thing per step, every step something to click or paste. Lines marked **[check]** come from the official Claude docs but have not been clicked through in the desktop app yet; confirm each on a fresh Mac before this goes out. Screenshots to add where marked **[shot]**.
+**Draft 2, Nov 5, 2026** (first draft Oct 28). For the printable guide and the walkthrough video. Plain words, one thing per step, every step something to click or paste. Lines marked **[check]** come from the official Claude docs but have not been clicked through in the desktop app yet; confirm each on a fresh Mac before this goes out. Screenshots to add where marked **[shot]**.
 
 ---
 
@@ -36,7 +36,7 @@ The first time you open Code, there is a row of choices under the message box: w
 1. Click in the message box and paste this line, then press Return:
 
    ```
-   /plugin marketplace add horizonfound/hf-tools
+   /plugin marketplace add https://github.com/horizonfound/hf-tools
    ```
 
    It answers "Successfully added marketplace: hf-tools."
@@ -47,7 +47,7 @@ The first time you open Code, there is a row of choices under the message box: w
    /plugin install the-engine@hf-tools
    ```
 
-   If it asks who the plugin is for, choose **Install for you**. **[check: whether the desktop message box accepts these two lines, or whether the + button beside the message box and "Add plugins" is the way; the docs show both the lines and a plugin browser, and say the browser lists only the official marketplaces]**
+   If it asks who the plugin is for, choose **Install for you**. (The full web address in the first line matters: the short form can ask for a GitHub account, which you don't need.) **[check: whether the desktop message box accepts these two lines, or whether the + button beside the message box and "Add plugins" is the way; the docs show both the lines and a plugin browser, and say the browser lists only the official marketplaces]**
 
 ### Step 4: Keep The Assistant up to date
 
@@ -56,7 +56,9 @@ The Assistant gets better every week. Turn on updates once and you never think a
 1. In the message box, type `/plugin` and press Return.
 2. Open the **Marketplaces** tab, choose **hf-tools**, and turn on **Enable auto-update**. **[check: this is the documented path inside a session; confirm the desktop app shows the same tabs]**
 
-Updates arrive on their own a few minutes after you start a session, and take effect the next time you open Code.
+Updates arrive on their own a few minutes after your first message in a session, and take effect the next time you open Code.
+
+**To get the latest right now** (when we tell you something was just fixed): type `/plugin`, open **Marketplaces**, choose **hf-tools**, and press **Update marketplace**. Then type `/reload-plugins` and press Return. **[check: click this through in the desktop app; the docs describe it for a session but don't say it works from the desktop message box]**
 
 ### Step 5: Let the Assistant work while you're away
 
@@ -106,18 +108,31 @@ That's the setup. You never do it again.
 
 ## Part 2: Opening the Assistant, and your first backup
 
-**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi** (or type **/assistant**). The first time, the Assistant introduces itself and opens its home page beside the chat; once you've done a few things together it answers with the day instead (what's due, what's queued to post, whether it sees a card). You don't need a memory card to start: if you have photos you've already finished, you can begin with posts. The home page has a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
+**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi**. **[check: whether typing /assistant also works from an installed copy; the docs suggest it shows up as /the-engine:assistant, so "hi" is the one to teach]** The first time, the Assistant introduces itself and opens its home page beside the chat; once you've done a few things together it answers with the day instead (what's due, what's queued to post, whether it sees a card). You don't need a memory card to start: if you have photos you've already finished, you can begin with posts. The home page has a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
+
+**The very first time, on a newer Mac: one free piece from Apple.** The Assistant runs on a small piece of software that Apple supplies but doesn't put on every Mac ahead of time. If yours doesn't have it yet, a window from Apple pops up the first time you say hi, asking to install "command line developer tools." Click **Install**, then **Agree**. It takes five to ten minutes. When it says it's done, tell the Assistant "done" and it picks up where it left off. You never see this again. **[check on a Mac that has never had it: the window's exact words, and how long it takes]** **[shot]**
+
+**Your first posts (no memory card needed).**
+
+1. On the home page, click **Make posts from a shoot**. A box opens under it that tells you what to do.
+2. The first time, it asks you to paste **set up my Assistant folder** into the chat. The Assistant asks where your posts should be kept (your photo drive is the usual answer) and makes one folder there, called The Assistant, with Your Content inside it.
+3. Back on the home page, click **Make posts from a shoot** again, then **Select the folder with your finished photos**. Pick the folder you exported from Lightroom. The Assistant makes its own copies of the JPEGs in it; your originals aren't moved or changed.
+4. Paste **make my posts** into the chat. The Assistant looks through what you brought, asks what to call the shoot, and asks one open question: anything you'd want to say about it. Say as much or as little as you like. The words in your captions come from what you tell it.
+5. It makes a post kit: single posts, a carousel, stories and a reel cover, all sized for Instagram, plus hooks and a caption, on one page with a Copy button on each. The reel is a project waiting in CapCut, cut to the beat, for you to style and export. **[check: on a Mac other than Dustin's, with that Mac's CapCut]**
+
+Nothing is ever posted for you. The kit is yours to post from.
 
 **Your first backup.**
 
 1. Put your memory card in.
 2. In the Code message box, type **backup now** and press Return. (You can also press the microphone key on your keyboard and say it. **[check: which dictation to point to; Claude's own `/voice` is documented for the terminal only]**)
-3. The first time, the Assistant asks you five quick questions, one at a time, with buttons:
+3. The first time, the Assistant tells you it has a few quick questions, only this once, and asks them one at a time, with buttons:
    - Which drive your shoots go on.
    - Right on that drive, or inside a folder.
    - Whether you copy shoots to a second drive too.
    - How you like a shoot folder named.
    - How you write to clients, so it can draft notes in your voice.
+   - How often you like to post.
 4. Then two questions it asks every time: how many cards for this shoot, and what's on the card. Say what's on it however you'd say it ("Smith family, beach session, Sarah's the mom, due in two weeks"), or skip.
 5. Then it says:
 
@@ -127,16 +142,19 @@ From then on, "backup now" asks only those two quick questions.
 
 ### When you come back
 
-Your phone has tapped you, and the report is on the Mac's screen. Top to bottom: every photo backed up and checked, byte for byte, and the card is safe to format; what's on the card, one block per shoot, each with six sneak peeks picked to edit first; a note to your client, ready to copy; and a button that opens the folder your photos are in.
+Your phone has tapped you, and the last thing in the chat is a button: **Show the report**. Click it. (If you were away a long while, the page beside the chat may have gone blank. That's normal; the button brings the report back.) Top to bottom: every photo backed up and checked, byte for byte, and the card is safe to format; what's on the card, one block per shoot, each with six sneak peeks picked to edit first; a note to your client, ready to copy; and a button that opens the folder your photos are in.
 
 On each shoot:
 
 - **Click any photo** to see it big.
 - **The name box:** click in it, type a better name, press **Rename**. The folder and every photo in it are renamed to match.
+- **The six sneak peeks** are a first pass, to get you rolling. **Pick again** lets you say what you'd rather see. **Show me more** lets you choose your own: drag a photo onto one of the six numbered spots, or click any photo to see it big and place it from there.
 - **Add to my editing queue:** click, pick a date on the calendar, Save. **Show my editing queue** opens your list of shoots to edit.
 - **Copy the note** puts the client note on your clipboard, ready to paste into an email. Nothing is ever sent from the Assistant.
 
 In Lightroom, the sneak peeks are one filter away: the keyword **sneak peek**.
+
+**Getting around.** Every page has a **Back to home** button at the top left. On the home page, your recent shoots each have **See the report**, so you can always get back to a report to rename a shoot or change its sneak peeks.
 
 ### Things to say to the Assistant
 
@@ -149,6 +167,8 @@ In Lightroom, the sneak peeks are one filter away: the keyword **sneak peek**.
 
 ## If something goes wrong
 
+- **The page beside the chat is blank, or shows a play button.** Don't press the play button. Say **show the Assistant** (or **show me the report**) and the page comes back.
+- **A window from Apple asks to install "command line developer tools."** That's the one free piece the Assistant runs on. Click Install. See "The very first time" in Part 2.
 - **The backup stopped.** The report says why, first thing, in plain words. Fix that (plug the drive in, clear space) and say **backup now** again. It picks up where it left off; nothing is copied twice.
 - **No phone tap came.** See "Good to know about the taps" in Step 6.
 - **Claude keeps asking permission.** Step 5 wasn't done, or the mode slipped back to Manual. Check the row under the message box.

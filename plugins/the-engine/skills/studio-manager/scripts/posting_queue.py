@@ -1207,6 +1207,8 @@ def main():
         return 0
     if a.cmd == "page":
         say(str(write_page(p))); return 0
+    if a.cmd != "serve":
+        fresh.announce()
     if a.cmd == "serve":
         serve(a.port); return 0
 

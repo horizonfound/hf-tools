@@ -583,3 +583,25 @@ your editing queue. No due date yet." or "Back in your editing queue. No due dat
 **Tried:** on the real page (both shoots show the button), and the click on a throwaway copy of the queue:
 both shoots went up into the queue with "Set a due date"; one ticked off came back down as "Edited" with
 the "Put back" link. His real queue was not changed.
+
+## 25. Getting it ready for Nicole
+
+**What Dustin said:** "I want to get this thing ready to pass along to Nicole so that she can really test
+it out from scratch... any other loose ends that need to be tied up?"
+
+**Found, and fixed the same evening:**
+- Everything had only ever run from the project folder on Dustin's Mac, on his newer Python. A full pretend
+  backup, a post kit, a reel plan and every page were run on the older Python a new Mac comes with: all
+  passed, nothing needed changing.
+- A Mac that has never had Python puts up a window from Apple first. The Assistant now knows what to say,
+  and the guide explains it. Not tried for real: no Mac here is missing it.
+- Four October skills (old menu, Start Here interview, old carousel, old stories) would have installed
+  beside the Assistant, and the old menu also answered to "hi." Moved to `retired-skills/`, not deleted.
+- The plugin's fixed version number meant no update would ever have reached an installed copy. Removed, so
+  every push counts. Auto-update still has to be switched on once by the photographer (guide, Step 4).
+- After an update, the pages would have kept running the old copy from its old folder. They now move to
+  the new one by themselves.
+- The setup guide was the Oct 28 draft. Now Draft 2.
+
+**Not done, needs Dustin at the keyboard:** the dress rehearsal. Install it the way Nicole will, in a
+fresh folder, and say hi. Only he can type the install lines into the app.

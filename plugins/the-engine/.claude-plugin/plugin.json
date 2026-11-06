@@ -1,8 +1,7 @@
 {
   "name": "the-engine",
   "displayName": "The Assistant",
-  "version": "0.3.1",
-  "description": "The Assistant by Horizon Found. Plug in your card, say backup now, and walk away: it backs the card up, checks every photo, sorts and names your shoots, and leaves you a report. When your edits are done, it turns your favorites into a reel cut to the beat, a carousel and posts, in your voice. Never posts anything itself.",
+  "description": "The Assistant by Horizon Found. Two ways in. Bring it photos you've already finished and it makes your posts: a reel cut to the beat, a carousel, stories, and captions in your voice. Or plug in a memory card, say backup now, and walk away: it backs the card up, checks every photo, sorts and names your shoots, and leaves you a report. Never posts anything itself.",
   "author": {
     "name": "Horizon Found"
   },

@@ -12,9 +12,16 @@ it answers with a one-line "one moment" page that tries again by itself, and sta
 port with the code on disk. If the code on disk does not even compile (a half-written file), it stays
 as it is and says so in its log: an old page beats no page.
 
+An installed copy updates into a NEW folder (one folder per version), so a running server would never see
+newer files beside itself. So the commands Claude runs say where the Assistant lives now (announce(), a
+line in ~/.studio/code-home.txt), and a server that finds itself running from somewhere else starts over
+from there. The folder comes from that file on this Mac, never from a web request.
+
     in a server's do_GET:
         if fresh.page_path(path) and fresh.stale() and fresh.restart(self):
             return
+    in a command's main() (never a server's):
+        fresh.announce()
 """
 import os
 import sys
@@ -23,6 +30,35 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+POINTER = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio")) / "code-home.txt"
+
+
+def announce():
+    """Called by the commands Claude runs, never by a server: this folder is where the Assistant's code is
+    now. Quiet about any trouble; a page a little out of date beats a command that fails."""
+    try:
+        try:
+            if POINTER.read_text().strip() == str(HERE):
+                return
+        except OSError:
+            pass
+        POINTER.parent.mkdir(parents=True, exist_ok=True)
+        tmp = POINTER.with_name(POINTER.name + ".part")
+        tmp.write_text(str(HERE) + "\n")
+        os.replace(tmp, POINTER)
+    except OSError:
+        pass
+
+
+def moved():
+    """The folder the Assistant runs from now, when that is not this one and it holds this server's script."""
+    try:
+        there = Path(POINTER.read_text().strip())
+    except OSError:
+        return None
+    if not str(there) or there == HERE or not there.is_dir():
+        return None
+    return there if (there / Path(sys.argv[0]).name).is_file() else None
 
 
 def code_stamp():
@@ -49,7 +85,7 @@ def stale():
         return _last["stale"]
     stamp = code_stamp()
     _last["t"] = now
-    _last["stale"] = stamp != STARTED_WITH and now - stamp / 1e9 > 1.0
+    _last["stale"] = bool(moved()) or (stamp != STARTED_WITH and now - stamp / 1e9 > 1.0)
     return _last["stale"]
 
 
@@ -58,9 +94,9 @@ def page_path(path):
     return path in ("", "/", "/home") or path.endswith(".html")
 
 
-def code_ok():
-    """None if every script here compiles; otherwise which one does not."""
-    for f in sorted(HERE.glob("*.py")):
+def code_ok(folder=None):
+    """None if every script in the folder (this one, unless told) compiles; otherwise which one does not."""
+    for f in sorted((folder or HERE).glob("*.py")):
         try:
             compile(f.read_text(), str(f), "exec")
         except (SyntaxError, ValueError, OSError) as e:
@@ -96,7 +132,8 @@ def restart(handler):
     if _restarting.is_set():
         _send_wait(handler)
         return True
-    bad = code_ok()
+    there = moved()
+    bad = code_ok(there)
     if bad:
         sys.stderr.write(f"fresh: newer code on disk does not compile ({bad}); staying on what is loaded\n")
         _last["t"] = time.time() + 30      # ask again in half a minute, not on every page
@@ -120,6 +157,9 @@ def restart(handler):
                 continue
             argv.append(a)
         argv += ["--port", str(port)]      # the same address the open pages are pointing at
+        if there:                          # an update landed in a new folder: run this same server from there
+            argv[0] = str(there / Path(argv[0]).name)
+            sys.stderr.write(f"fresh: the Assistant now lives in {there}\n")
         sys.stderr.write("fresh: the Assistant was updated; starting over with the new code\n")
         try:
             sys.stderr.flush()
