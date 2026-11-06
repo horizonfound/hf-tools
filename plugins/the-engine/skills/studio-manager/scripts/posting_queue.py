@@ -824,7 +824,9 @@ class Handler(SimpleHTTPRequestHandler):
             url = serve_report.report_url(studio)
             if not url:
                 return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and Claude will."})
-            return self.answer({"ok": True, "url": url + (f"#{s['shoot']}" if sid != "latest" and s.get("shoot") else "")})
+            # always the top of the report (Dustin, Nov 5: jumping to the shoot's name box opened it "scrolled
+            # half way down the page", which read as a glitch)
+            return self.answer({"ok": True, "url": url})
         except Exception as e:  # noqa: BLE001
             return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and Claude will."})
 

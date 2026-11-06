@@ -393,7 +393,8 @@ get renamed, so someone who leaves it by accident is stuck. He suggested the "Yo
 
 **Fixed the same day, on the home page:**
 - Every recent shoot that came from a backup has a "See the report" button beside "Open photo folder." It
-  opens the report of the backup that shoot came from, right in the pane, scrolled to that shoot.
+  opens the report of the backup that shoot came from, right in the pane, at the top. (It first jumped to
+  that shoot's name box; Dustin: "it opens scrolled half way down the page." Changed within the hour.)
 - Under Today, one line names the newest backup ("Your last backup, today: 2 shoots, 428 photos.") with
   its own "See the report" button.
 - If that report's little server isn't running, the click starts it. If the drive is unplugged it says
