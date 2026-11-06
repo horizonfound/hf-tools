@@ -257,21 +257,25 @@ if (SCENARIO === 'down') SERVER.mode = 'down';
 
 // ---- helpers for the checks ----
 var byId = function(id){ return document.getElementById(id); };
-var rowEl = byId('row'), poolEl = byId('pool'), panel = byId('panel'), poolSec = byId('poolsec'), wrap = byId('rowwrap');
+var rowEl = byId('row'), poolEl = byId('pool'), panel = byId('panel'), poolSec = byId('poolsec'), wrap = byId('rowwrap'), dock = byId('dock');
 function rowNums(){ return rowEl.querySelectorAll('.rt').map(function(t){ return Number(t.dataset.n); }); }
 function rowTile(n){ return rowEl.querySelectorAll('.rt').filter(function(t){ return Number(t.dataset.n) === n; })[0]; }
 function poolTile(n){ return poolEl.querySelectorAll('.pt').filter(function(t){ return Number(t.dataset.n) === n; })[0]; }
 function lifted(){ return document.body.querySelectorAll('.arr-lift').length; }
 function text(id){ return byId(id).textContent; }
 function lastPost(){ return SERVER.posts[SERVER.posts.length - 1]; }
-// lay the page out: the sticky panel on top, the row's tiles on lines of `perLine`, the photos below
+// lay the page out: the sticky panel on top, the row's tiles on lines of `perLine`, the photos below, and
+// the bar of buttons held at the bottom of the window (here the window is 1100 tall), over the photos below
 // (the row's own box is 190 tall unless told otherwise: about one line of photos, as on the real page)
+// A row tile and its picture are the same box, 2 wide to 3 tall: the Normal / Longer / Quicker bar lies on
+// the photo, not under it. The panel still has 100 px under the row's box: the lines under the row.
 function layout(perLine, boxH){
   boxH = boxH || 190;
   box(panel, 0, 0, 800, 40 + boxH + 100); box(wrap, 10, 40, 780, boxH); box(rowEl, 10, 40, 780, 400); box(poolSec, 0, 360, 800, 3000); box(poolEl, 0, 400, 800, 2900);
+  box(dock, 0, 1000, 800, 100);
   rowEl.querySelectorAll('.rt').forEach(function(t, i){
     var x = 20 + (i % perLine) * 100, y = 50 + Math.floor(i / perLine) * 170;
-    box(t, x, y, 90, 160); box(t.querySelector('.ph'), x, y, 90, 132);
+    box(t, x, y, 90, 135); box(t.querySelector('.ph'), x, y, 90, 135);
   });
   poolEl.querySelectorAll('.pt').forEach(function(t, i){ box(t, 10 + (i % 7) * 110, 410 + Math.floor(i / 7) * 160, 100, 150); });
 }
@@ -524,6 +528,8 @@ settle();
 check('opens with the Assistant’s pick in the row', eq(rowNums(), [1, 6, 11, 16, 21]), rowNums());
 check('every photo of the shoot is below', poolEl.querySelectorAll('.pt').length === 30, poolEl.querySelectorAll('.pt').length);
 check('a picked photo below is dimmed and carries its place', poolTile(11).classList.contains('in') && poolTile(11).querySelector('.pos').textContent === '3' && !poolTile(2).classList.contains('in'));
+check('every photo below carries its own number, as #12', poolTile(12).querySelector('.num').textContent === '#12' && poolTile(11).querySelector('.num').textContent === '#11', poolTile(12).querySelector('.num').textContent);
+check('a photo in the row says its place, then its own number', rowTile(11).querySelector('.pos').textContent === '3 \u00b7 #11' && rowTile(1).querySelector('.pos').textContent === '1 \u00b7 #1', rowTile(11).querySelector('.pos').textContent);
 check('the heading is the shoot and the piece', text('title') === 'Fake beach reel', text('title'));
 check('the count line', text('count') === '5 photos' && text('advice') === '8 to 14 works best', text('count') + ' / ' + text('advice'));
 check('status reads Saved on opening', text('status') === 'Saved', text('status'));
@@ -578,6 +584,7 @@ layout(10);
 dragTo(rowTile(21), rowTile(1).rect.left + 5, 100);       // the last one to the very front
 release(rowTile(1).rect.left + 5, 100);
 check('a row photo dragged to the front moves there', eq(rowNums(), [21, 1, 6, 11, 30]), rowNums());
+check('and every place on the row is counted again', rowTile(21).querySelector('.pos').textContent === '1 \u00b7 #21' && rowTile(30).querySelector('.pos').textContent === '5 \u00b7 #30' && poolTile(21).querySelector('.pos').textContent === '1', rowTile(21).querySelector('.pos').textContent);
 layout(10);
 dragTo(rowTile(21), 790, 100);                             // past the end of the line
 release(790, 100);
@@ -620,10 +627,10 @@ dragTo(poolTile(9), 400, 900); release(400, 900);
 check('a photo from below dropped below: nothing changes', eq(rowNums(), was));
 dragTo(rowTile(2), 900, 100); release(900, 100);
 check('dropped outside both: nothing changes', eq(rowNums(), was));
-// only the row's own box takes a drop: the heading above it and the buttons below it do not
+// only the row's own box takes a drop: the heading above it and the lines below it do not
 layout(10); was = rowNums();
-dragTo(poolTile(9), 400, 300);                               // on the buttons under the row box (the box ends at 230)
-check('over the buttons under the row there is no bar', !rowEl.querySelector('.ins').classList.contains('on'));
+dragTo(poolTile(9), 400, 300);                               // on the lines under the row box (the box ends at 230)
+check('over the lines under the row there is no bar', !rowEl.querySelector('.ins').classList.contains('on'));
 release(400, 300);
 check('and a photo dropped there is not added', eq(rowNums(), was), rowNums());
 dragTo(poolTile(9), 400, 20); release(400, 20);              // on the heading above the row box
@@ -635,9 +642,23 @@ release(30, 300);
 check('so nothing lands where no bar was showing', eq(rowNums(), was), rowNums());
 layout(10); box(poolSec, 0, 200, 800, 3000);                 // the page scrolled: the photos below pass under the panel
 dragTo(rowTile(2), 400, 300);
-check('a row photo held over the panel\u2019s buttons is not about to be taken out', !poolSec.classList.contains('out'));
+check('a row photo held over the lines under the row is not about to be taken out', !poolSec.classList.contains('out'));
 release(400, 300);
 check('and dropping it there changes nothing', eq(rowNums(), was), rowNums());
+layout(10);
+// the bar of buttons at the bottom of the window floats over the photos below: a drop on it does nothing
+dragTo(rowTile(2), 400, 1050);
+check('a row photo held over the bar of buttons at the bottom is not about to be taken out', !poolSec.classList.contains('out') && document.body.querySelector('.arr-lift').querySelector('.say').textContent === '');
+release(400, 1050);
+check('and dropping it on that bar changes nothing', eq(rowNums(), was) && lifted() === 0, rowNums());
+dragTo(rowTile(2), 400, 1050); move(400, 990);               // off the bar again, back over the photos below
+check('just above that bar it is the photos below again', poolSec.classList.contains('out'));
+fire(document, 'keydown', {key: 'Escape'});
+box(dock, 0, 150, 800, 100);                                 // a very short window: the bar lies over the row itself
+dragTo(poolTile(9), 400, 200);
+check('where the bar of buttons covers the row, no landing place is set', !rowEl.querySelector('.ins').classList.contains('on'));
+release(400, 200);
+check('so nothing lands under it', eq(rowNums(), was), rowNums());
 layout(10);
 
 // every way of cancelling
@@ -736,9 +757,9 @@ fire(document, 'pointercancel', {pointerId: PID});
 
 // the row scrolling inside its panel while a photo is held near its top or bottom
 layout(10); wrap.scrollHeight = 600; wrap.clientHeight = 190; wrap.scrollTop = 0;
-dragTo(poolTile(13), 400, 300);                              // on its way up: over the buttons under the row box
+dragTo(poolTile(13), 400, 300);                              // on its way up: over the lines under the row box
 runFrame(); wait(400); runFrame(); runFrame();
-check('carried over the buttons under the row, however slowly: the row does not scroll', wrap.scrollTop === 0, wrap.scrollTop);
+check('carried over the lines under the row, however slowly: the row does not scroll', wrap.scrollTop === 0, wrap.scrollTop);
 move(400, 215);                                              // inside the row box, 15 px above its bottom edge
 runFrame(); wait(100); runFrame();
 check('passing through the bottom edge of the row: it does not scroll yet', wrap.scrollTop === 0, wrap.scrollTop);
@@ -939,6 +960,29 @@ def check_scripts(work):
     case("a kit name is html-escaped on its way into the page", "data-kit='&lt;b&gt; &amp; &#x27;x&#x27;'" in ap.page_html("<b> & 'x'", "reel"))
     case("the plain page has the Back to home button and the words", "href='/home'" in plain and "Back to home" in plain and "I can&#x27;t find that shoot&#x27;s posts." in plain)
     case("the styles carry no backslash", "\\" not in ap.CSS)
+    # the look (Nov 6): the system's own font, a PC's as well as a Mac's; no web font; light only
+    case("the styles name the system font for a Mac and for a PC, and no web font",
+         '-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif' in ap.CSS
+         and not re.search(r"Fraunces|DM Sans|Iowan|Palatino|Georgia|serif|googleapis|gstatic", ap.CSS.replace("sans-serif", "")))
+    case("the styles are light only (no dark version switches itself on)", "prefers-color-scheme" not in ap.CSS and "data-theme" not in ap.CSS and "color-scheme" not in ap.CSS)
+    # one whole line of the row always fits the row's own box, so the Normal / Longer / Quicker bar on the
+    # first line is never cut off: a row photo is never taller than --rh, the box never shorter than that
+    # plus its padding, and the panel itself never scrolls (the row's box is the only scroller in it)
+    panel_rule = re.search(r"\n\.panel\{([^}]*)\}", ap.CSS)
+    case("the styles: a row photo is never taller than the row's own box, and the panel is not a second scroller",
+         ".rt .ph{position:relative;width:100%;aspect-ratio:2/3;max-height:var(--rh);" in ap.CSS
+         and ".rowwrap{min-height:calc(var(--rh) + 12px);max-height:max(calc(var(--rh) + 12px)," in ap.CSS
+         and bool(panel_rule) and "position:sticky" in panel_rule.group(1)
+         and "overflow" not in panel_rule.group(1) and "max-height" not in panel_rule.group(1))
+    # the bar of buttons is drawn at the bottom of the window but comes before the photos below in the page,
+    # so the Tab key reaches the buttons first; every line a press brings is inside that bar
+    dock = re.search(r"<div class='dock' id='dock'>(.*?)<section class='poolsec'", page, re.S)
+    case("the picker page: the bar of buttons comes before the photos below in the page, and after the row",
+         bool(dock) and page.index("id='rowwrap'") < page.index("id='dock'") < page.index("id='pool'"))
+    case("the picker page: both buttons, and every line a press brings, are inside that bar",
+         bool(dock) and all(f"id='{i}'" in dock.group(1) for i in ("back", "happy", "why", "status", "doneline", "openfolder", "openline", "canvaline", "note")))
+    case("the picker page: the row's own lines stay in the row's panel",
+         bool(re.search(r"<section class='panel' id='panel'>(?:(?!</section>).)*id='rowwrap'(?:(?!</section>).)*id='rowline'(?:(?!</section>).)*id='legend'(?:(?!</section>).)*</section>", page, re.S)))
     case("the styles fetch nothing (no url(...), no @font-face)", "url(" not in ap.CSS and "@font-face" not in ap.CSS)
 
     # each script parses under the Mac's own JavaScript engine
