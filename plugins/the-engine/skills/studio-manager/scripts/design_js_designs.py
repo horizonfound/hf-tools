@@ -11,7 +11,8 @@ DESIGN_DESIGNS_JS (put on the page by design_page.py after the drawing script) a
                       little picture drawn with this shoot's photos, and the tick "Put this shoot's photos in the
                       frames for me". IT ALWAYS MAKES A NEW DESIGN; the open one is saved first and stays as it is.
     Save as template  the layout with its photos taken out (the Assistant does the taking out), for any shoot
-    Fill N empty frames   every empty frame given the next unused photo whose shape fits
+    Fill N empty frames   every empty frame given the next unused photo whose shape fits; it sits in the first line
+                      of the bar for the selected thing, and only while the design has an empty frame
 
 There is no way to delete a design or a template here, on purpose.
 
@@ -120,10 +121,14 @@ DESIGN_DESIGNS_JS = r"""
       m.addEventListener('pointerdown', function(e){ if (e.target === m) D.modals.close(m); });      // a press beside the sheet
       return m;
     },
+    // A sheet over the page: the page behind stays exactly where it is while it is open (D.lockPage), and
+    // closing puts the keyboard back on what had it (the button the sheet came from, as a rule).
     open: function(m, onClose){
       closePops();
-      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-      modals.push({el: m, onClose: onClose || null});
+      var was = document.activeElement;
+      if (was && was.blur) was.blur();
+      modals.push({el: m, onClose: onClose || null, was: was});
+      D.lockPage();
       m.hidden = false;
     },
     close: function(m){
@@ -131,7 +136,9 @@ DESIGN_DESIGNS_JS = r"""
         if (modals[i].el !== m) continue;
         var x = modals.splice(i, 1)[0];
         m.hidden = true;
+        if (!modals.length) D.unlockPage();
         if (x.onClose) x.onClose();
+        if (document.activeElement === document.body && x.was && x.was !== document.body && x.was.isConnected && !x.was.disabled) D.focus(x.was);
         return;
       }
     },
@@ -146,7 +153,7 @@ DESIGN_DESIGNS_JS = r"""
     var open = pops.filter(function(p){ return p.open; });
     if (open.length) {
       e.preventDefault(); e.stopPropagation();
-      open.forEach(function(p){ closePop(p); try { p.btn.focus(); } catch (x) {} });
+      open.forEach(function(p){ closePop(p); D.focus(p.btn); });
       return;
     }
     if (modals.length) { e.preventDefault(); e.stopPropagation(); D.modals.close(modals[modals.length - 1].el); }
@@ -201,6 +208,7 @@ DESIGN_DESIGNS_JS = r"""
   var gShoot = el('div', 'group'); gShoot.id = 'g-shoot';
   gShoot.appendChild(el('span', 'lbl', DW.shoot));
   var shootBtn = button('', 'shoot-btn', 'dz-strong');
+  shootBtn.setAttribute('aria-label', DW.shoot);
   gShoot.appendChild(shootBtn);
   var gDesign = $('g-design');
   gDesign.parentNode.insertBefore(gShoot, gDesign);
@@ -266,13 +274,14 @@ DESIGN_DESIGNS_JS = r"""
     if (document.activeElement !== nameBox || nameBox.value === '') nameBox.value = d.name;
     nameBox.disabled = false;
     shootBtn.textContent = ((D.S && D.S.name) || D.KIT) + ' ▾';
+    shootBtn.setAttribute('aria-label', DW.shoot + ': ' + ((D.S && D.S.name) || D.KIT));
     say('');
     if (D.S && D.S.fell_back) { D.S.fell_back = false; D.note(DW.fellBack, false); }
   });
 
   // ---------- My designs, Duplicate ----------
-  var designsBtn = button(DW.myDesigns + ' ▾', 'designs-btn');
-  var dupBtn = button(DW.dup, 'dup-design'); dupBtn.title = DW.dupTitle;
+  var designsBtn = button(DW.myDesigns + ' ▾', 'designs-btn'); designsBtn.setAttribute('aria-label', DW.myDesigns);
+  var dupBtn = button(DW.dup, 'dup-design'); dupBtn.title = DW.dupTitle; D.label(dupBtn, DW.dup);
   gDesign.appendChild(designsBtn); gDesign.appendChild(dupBtn);
   function when(t){
     if (!(t > 0)) return '';
@@ -343,13 +352,16 @@ DESIGN_DESIGNS_JS = r"""
     makeDesign({copy: D.design.id}).then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
   });
 
-  // ---------- + New design, Save as template, Fill empty frames ----------
+  // ---------- + New design, Save as template (the top row); Fill empty frames (the selection bar's first line) ----------
   var gNew = D.tools.group('g-new', '', 'tools-designs');
-  var newBtn = D.tools.button(gNew, DW.newDesign, 'new-design'); newBtn.title = DW.newTitle;
+  var newBtn = D.tools.button(gNew, DW.newDesign, 'new-design'); newBtn.title = DW.newTitle; D.label(newBtn, DW.newDesign);
   var tplBtn = D.tools.button(gNew, DW.saveTpl, 'save-template');
-  var fillBtn = D.tools.button(gNew, DW.fill(0), 'fill-holes'); fillBtn.title = DW.fillTitle; fillBtn.disabled = true;
+  // Fill empty frames and its line: in the first line of the bar for the selected thing, shown only while there is
+  // an empty frame to fill, so it takes no room (and moves nothing) when there is none
   var line = el('span', 'gline'); line.id = 'designs-line'; line.setAttribute('role', 'status');
-  gNew.appendChild(line);
+  D.selbar.cap(line);
+  var fillBtn = button(DW.fill(0), 'fill-holes'); fillBtn.title = DW.fillTitle; fillBtn.disabled = true; fillBtn.hidden = true;
+  D.selbar.cap(fillBtn);
   function say(text){ line.textContent = text || ''; }
   D.on('change', function(){ say(''); });
   fillBtn.addEventListener('click', function(){
@@ -361,9 +373,10 @@ DESIGN_DESIGNS_JS = r"""
     say(left ? DW.fillSome(left) : '');         // said after the change, which wipes the line of the press before
   });
   D.on('render', function(){
-    var k = P.holes(D.st).length, text = DW.fill(k);
-    if (fillBtn.textContent !== text) fillBtn.textContent = text;
+    var k = P.holes(D.st).length;
+    D.label(fillBtn, DW.fill(k));
     fillBtn.disabled = D.blocked || !k;
+    fillBtn.hidden = !k;
     tplBtn.disabled = D.blocked;
     if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; }
   });
@@ -375,7 +388,7 @@ DESIGN_DESIGNS_JS = r"""
   head.appendChild(el('h2', '', DW.galleryTitle));
   var gSub = el('p', 'hint'); gSub.id = 'gallery-sub'; head.appendChild(gSub);
   var acts = el('div', 'dz-acts'), tickLabel = el('label', 'hint'), tick = el('input');
-  tick.type = 'checkbox'; tick.id = 'gallery-fill'; tick.checked = true;
+  tick.type = 'checkbox'; tick.id = 'gallery-fill'; tick.checked = true; tick.setAttribute('aria-label', DW.fillTick);
   tickLabel.appendChild(tick); tickLabel.appendChild(document.createTextNode(' ' + DW.fillTick));
   var gClose = button(DW.close, 'gallery-close');
   acts.appendChild(tickLabel); acts.appendChild(gClose);
@@ -446,11 +459,11 @@ DESIGN_DESIGNS_JS = r"""
       if (busy) { giveUp(); setBusy(false); sheet.classList.remove('dz-busy'); }
       if (cardShelf) { D.paint.letGo(cardShelf, null); cardShelf = null; }
       Object.keys(secs).forEach(function(k){ secs[k].textContent = ''; });
-      try { newBtn.focus(); } catch (e) {}
+      D.focus(newBtn);
     });
     buildGallery();
     sheet.scrollTop = 0;
-    try { gClose.focus(); } catch (e) {}
+    D.focus(gClose);
     refresh().then(function(changed){ if (changed && D.modals.isOpen(gallery) && !busy) buildGallery(); });
   });
   gClose.addEventListener('click', closeGallery);
@@ -493,8 +506,8 @@ DESIGN_DESIGNS_JS = r"""
     tName.disabled = empty; tSave.disabled = empty;
     tCancel.textContent = empty ? DW.close : DW.cancel;
     tLine.textContent = empty ? DW.tplEmpty : '';
-    D.modals.open(tplModal, function(){ try { tplBtn.focus(); } catch (e) {} });
-    try { if (empty) tCancel.focus(); else { tName.focus(); tName.select(); } } catch (e) {}
+    D.modals.open(tplModal, function(){ D.focus(tplBtn); });
+    if (empty) D.focus(tCancel); else { D.focus(tName); try { tName.select(); } catch (e) {} }
   });
   tCancel.addEventListener('click', function(){ D.modals.close(tplModal); });
   function saveTemplate(){
@@ -511,7 +524,7 @@ DESIGN_DESIGNS_JS = r"""
         tLine.textContent = j.words || '';
         tName.disabled = true;
         tCancel.textContent = DW.close;         // saved: nothing more to do here but close
-        try { tCancel.focus(); } catch (e) {}
+        D.focus(tCancel);
         return;
       }
       tSave.disabled = false;
@@ -527,7 +540,7 @@ DESIGN_DESIGNS_JS = r"""
 
 # The styles of the designs part: the name box, the pop-up lists, the sheets over the page, the gallery's cards.
 DESIGN_DESIGNS_CSS = """
-.dz-name{font:650 14.5px/1.3 var(--sans);width:200px;max-width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;color:var(--ink)}
+.dz-name{font:650 14px/1.2 var(--sans);width:200px;max-width:100%;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;color:var(--ink)}
 .dz-name:focus,.dz-in:focus{outline:2px solid var(--sel);outline-offset:-1px}
 .tb.dz-strong{font-weight:650;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dz-popwrap{position:relative;display:inline-flex;max-width:100%}

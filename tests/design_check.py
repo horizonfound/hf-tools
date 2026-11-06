@@ -37,6 +37,11 @@ Carousel folder are never moved out or cleared; "Already saved" only when the ve
 (a photo exported again, a font, a new name); unfinished saves never lock Save slides; a drive that will not
 take a change is said as that; the line for Claude after a folder is renamed; names in any alphabet.
 
+A sixth part, tests/design_layout_check.py (--only layout runs just it, on --port + 20): the page's arrangement
+after the hand test of Nov 6, measured at four window sizes and two narrow ones: two rows of tools, one bar for
+the selected thing that never moves the strip, the strip's starting size and the Size slider, the clip at the
+strip's edges, the sheets that never scroll the page behind, and the names a screen reader hears.
+
 Exit 0 when every case passes, 1 otherwise. When there is no Chrome the parts that drive the real page are
 skipped, and the last line says so: a run like that has not looked at the page.
 """
@@ -1147,12 +1152,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen", "layout"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
                          "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks); "
                          "wire: only the kit page, the posting queue, the links and the line for Claude; fixes: what the first reviewers found (safety); "
-                         "screen: what the second reviewers found (matching Nicole's, and what is on the screen)")
+                         "screen: what the second reviewers found (matching Nicole's, and what is on the screen); "
+                         "layout: the arrangement (the rows, the selection bar, the strip's size, the sheets, the names), measured at six window sizes")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1170,7 +1176,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen")):
+    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1189,6 +1195,7 @@ def main():
     case("design.py names the encoding of every text file it reads or writes", not re.search(r"\.(read_text|write_text)\((?![^)]*encoding=)", src) and not re.search(r"open\([^)]*\"[rwa]\"\s*\)", src))
     import chrome_drive
     import design_fix_check
+    import design_layout_check
     import design_page_check
     import design_save_check
     import design_screen_check
@@ -1251,6 +1258,8 @@ def main():
             case("the real-browser checks of text, fonts and brand colors ran to the end", False, f"{type(e).__name__}: {e}")
     if a.only in (None, "page", "screen"):
         design_screen_check.check_screen_page(case, work)
+    if a.only in (None, "page", "layout"):
+        design_layout_check.check_layout_page(case, work)
     if a.only in (None, "browser", "screen"):
         # what the second reviewers found (the screen, and matching Nicole's): its own pretend shoot and page server
         real_page("the page's own lines, the keyboard, words over a seam, the folder button's answer")
@@ -1259,6 +1268,14 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of what is on the screen ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "layout"):
+        # the arrangement, measured in a hidden Chrome at six window sizes: its own pretend shoot and page server
+        real_page("the arrangement at six window sizes")
+        try:
+            design_layout_check.check_layout_browser(case, work, a.port + 20, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of the arrangement ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     if a.only in (None, "browser", "designs"):
         # designs, templates, the preview and Save slides: two more pretend shoots (one from photos drawn
         # here, so every saved pixel is known) and a page server on the port after those

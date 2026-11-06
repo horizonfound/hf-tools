@@ -77,8 +77,8 @@ def check_screen_page(case, work):
          and page.count("id='d-note'") == 1)
     case("screen: the save status beside the name is one fixed width that cannot wrap",
          re.search(r"\.savestate\{[^}]*width:\d+px[^}]*white-space:nowrap", design_page.DESIGN_CSS) is not None)
-    case("screen: the Smaller / Bigger buttons are not labelled 'Size' (a text box has a Size of its own)",
-         "<span class='lbl'>Size</span>" not in page and "<span class='lbl'>View</span>" in page)
+    case("screen: the strip's Size slider (Smaller / Bigger before Nov 6) is told apart from a text box's Size by its name for a screen reader",
+         "<span class='lbl'>View</span>" not in page and "id='view-size'" in page and "aria-label='How big the slides look'" in page)
     case("screen: a design saved again is '<name> (2)'", design.SET_AGAIN.format(base="Beach carousel 1", k=2) == "Beach carousel 1 (2)"
          and design.safe_base("Beach carousel 1 (2)") == "Beach carousel 1 (2)")
     long_name = "A very long shoot name about the Garcia family sunset session by the water in June"

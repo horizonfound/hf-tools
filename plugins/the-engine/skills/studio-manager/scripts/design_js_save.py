@@ -364,12 +364,12 @@ DESIGN_SAVE_JS = r"""
       pv.open = false; pv.drag = null;
       if (pv.shelf) D.paint.letGo(pv.shelf, null);
       pv.shelf = null; pv.cvs = []; track.textContent = '';
-      try { prevBtn.focus(); } catch (e) {}
+      D.focus(prevBtn);
     });
     go(0);
     track.getBoundingClientRect();            // the first place is taken at once; the slide comes with later moves
     track.classList.remove('pv-held');
-    try { bClose.focus(); } catch (e) {}
+    D.focus(bClose);
   });
   bClose.addEventListener('click', closePreview);
   bPrev.addEventListener('click', function(){ if (pv.open) go(pv.i - 1); });

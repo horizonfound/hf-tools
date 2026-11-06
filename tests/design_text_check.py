@@ -815,8 +815,9 @@ def check_type_browser(case, work, port, make_kit, Server, post, get_json):
             c.click("#brand-row .bc-sw")
             case("brand: with nothing selected, a click on it colors the background", st()["bg"] == "#aa3366" and c.js("getComputedStyle(document.getElementById('strip')).backgroundColor") == "rgb(170, 51, 102)")
             c.click(centre(1))
-            case("brand: with a text box selected the group says the colors are for the text, and the same swatches sit beside the text color",
-                 c.text("#brand-label") == "Brand colors (for the text)" and c.count("#t-brand .bc-sw") == 1 and c.count("#t-brand .bc-off") == 0)
+            case("brand: with a text box selected the group says the colors are for the text (in its tooltip and its name for a screen reader; its label keeps its length), and the same swatches sit beside the text color",
+                 c.text("#brand-label") == "Brand colors" and c.js("document.getElementById('brand-label').title") == "Brand colors (for the text)" and c.js("document.getElementById('g-brand').getAttribute('aria-label')") == "Brand colors (for the text)"
+                 and c.count("#t-brand .bc-sw") == 1 and c.count("#t-brand .bc-off") == 0)
             c.set_value("#brand-pick", "#00aa77")
             c.wait_for("document.querySelectorAll('#brand-row .bc-sw').length === 2", 5)
             c.click("#brand-row .bc-sw", nth=1)

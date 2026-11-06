@@ -20,7 +20,11 @@ Undo, and the places later parts add themselves:
     D.blockTypes[kind]              how one kind of block is drawn and handled (design_js_edit.py adds 'photo'
                                     and a plain stand-in 'other'; stage C adds 'text')
     D.hints[kind]                   function(block) -> the line of help for a selected block of that kind
-    D.tools.group(id, label, row)   a new group of buttons in a toolbar row ('tools-designs' or 'tools-main')
+    D.tools.group(id, label, row, before)   a new group of buttons in a toolbar row ('tools-designs' or 'tools-main'),
+                                    at its end or before the group named
+    D.selbar.cap(node)              something for the selection bar's first line (Fill empty frames)
+    D.label(button, words)          the button's words, and its name for a screen reader
+    D.lockPage() / D.unlockPage()   the page behind a sheet stays put; D.focus(e) focuses without moving the page
     D.selbar.group(id, label, when) a new group in the bar for the selected thing; when(kind, block) -> shown?
     D.quiet.push(fn)                fn() true while a pop-up is open: the strip's keys are then left alone
     D.load(id)                      open another of this shoot's designs (saves the open one first)
@@ -381,12 +385,17 @@ DESIGN_CORE_JS = r"""
   }
 
   // ---- places for buttons ----
+  // A button's name for a screen reader is its visible words, even when a longer explanation sits in its
+  // tooltip (a reader may otherwise take the tooltip for the name).
+  D.label = function(b, words){ if (b.textContent !== words) b.textContent = words; if (b.getAttribute('aria-label') !== words) b.setAttribute('aria-label', words); };
   D.tools = {
-    // a new group of buttons at the end of a toolbar row ('tools-designs' is the top row, 'tools-main' the second)
-    group: function(id, label, row){
+    // a new group of buttons in a toolbar row ('tools-designs' is the top row, 'tools-main' the second), at the
+    // end of the row, or before the group whose id is given
+    group: function(id, label, row, before){
       var g = el('div', 'group'); g.id = id;
       if (label) g.appendChild(el('span', 'lbl', label));
-      $(row || 'tools-main').appendChild(g);
+      var r = $(row || 'tools-main'), at = before ? $(before) : null;
+      if (at && at.parentNode === r) r.insertBefore(g, at); else r.appendChild(g);
       return g;
     },
     button: function(group, text, id, cls){ var b = el('button', 'tb' + (cls ? ' ' + cls : ''), text); b.type = 'button'; if (id) b.id = id; group.appendChild(b); return b; },
@@ -395,26 +404,50 @@ DESIGN_CORE_JS = r"""
   var selGroups = [];
   D.selbar = {
     // a new group in the bar for the selected thing. when(kind, block) says whether it shows; with nothing
-    // selected it is asked with kind 'photo' and no block, and what shows is greyed out (so the bar never jumps).
+    // selected no group shows: the help line sits alone in the room held for them (so the bar never jumps).
     group: function(id, label, when){
-      var bar = $('selbar'), g = el('div', 'group needsel'); g.id = id;
+      var rows = $('selrows'), g = el('div', 'group needsel'); g.id = id;
       if (label) g.appendChild(el('span', 'lbl', label));
       var all = $('sel-all');
-      bar.insertBefore(g, all && id !== 'sel-all' ? all : $('selline'));
+      if (all && id !== 'sel-all') rows.insertBefore(g, all); else rows.appendChild(g);
       selGroups.push({el: g, when: when});
       return g;
     },
-    button: function(group, text, act, title){ var b = el('button', 'tb', text); b.type = 'button'; b.dataset.a = act; if (title) b.title = title; group.appendChild(b); return b; },
+    button: function(group, text, act, title){ var b = el('button', 'tb', text); b.type = 'button'; b.dataset.a = act; if (title) { b.title = title; b.setAttribute('aria-label', text); } group.appendChild(b); return b; },
+    // something that belongs in the bar's first line, after the help line (Fill empty frames and its line)
+    cap: function(node){ $('selcap').appendChild(node); return node; },
     line: function(text){ $('selline').textContent = text || ''; }
   };
   D.on('render', function(){
     var b = D.selected(), kind = b ? D.typeOf(b) : 'photo';
     $('selbar').classList.toggle('off', !b);
-    // with nothing selected the groups are greyed out, and out of the Tab key's and a screen reader's way
-    selGroups.forEach(function(g){ g.el.hidden = !g.when(kind, b); g.el.inert = !b; if (b) g.el.removeAttribute('aria-disabled'); else g.el.setAttribute('aria-disabled', 'true'); });
-    var hint = D.hints[b ? kind : 'none'];
-    $('selhint').textContent = hint ? hint(b) : '';
+    // with nothing selected the groups are hidden, and out of the Tab key's and a screen reader's way
+    selGroups.forEach(function(g){ g.el.hidden = !b || !g.when(kind, b); g.el.inert = !b; if (b) g.el.removeAttribute('aria-disabled'); else g.el.setAttribute('aria-disabled', 'true'); });
+    var hint = D.hints[b ? kind : 'none'], h = $('selhint'), words = hint ? hint(b) : '';
+    h.textContent = words;
+    h.title = words;                 // the whole line, for when the line is cut short at its end
   });
+
+  // ---- the page behind a sheet stays where it is ----
+  // While a sheet is open over the page (the gallery, the preview, Save as template) the page behind does not
+  // scroll: not with the wheel, not with the keys, and not when the sheet's own buttons take the keyboard.
+  // Closing puts the page back exactly where it was.
+  var lock = null;
+  D.lockPage = function(){
+    if (lock) return;
+    lock = {x: window.scrollX, y: window.scrollY};
+    document.documentElement.classList.add('d-locked');
+  };
+  D.unlockPage = function(){
+    if (!lock) return;
+    var l = lock; lock = null;
+    document.documentElement.classList.remove('d-locked');
+    window.scrollTo(l.x, l.y);
+  };
+  D.pageLocked = function(){ return !!lock; };
+  window.addEventListener('scroll', function(){ if (lock && (window.scrollX !== lock.x || window.scrollY !== lock.y)) window.scrollTo(lock.x, lock.y); });
+  // Put the keyboard on something without moving the page (a thing in a sheet, or the button a sheet came from).
+  D.focus = function(e){ if (!e || !e.focus) return; try { e.focus({preventScroll: true}); } catch (x) { try { e.focus(); } catch (y) {} } };
 
   D.start = start;
 })();

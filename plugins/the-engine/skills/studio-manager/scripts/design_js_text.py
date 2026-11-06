@@ -393,8 +393,8 @@ DESIGN_TEXT_JS = r"""
     return p ? edit(p, name ? run(name) : undefined) : false;
   }
 
-  // + Add text, in the row of tools for the whole carousel
-  var gAdd = D.tools.group('g-text', '', 'tools-main');
+  // + Add text, in the row of tools for the whole carousel, before the Size slider
+  var gAdd = D.tools.group('g-text', '', 'tools-main', 'g-view');
   var addBtn = D.tools.button(gAdd, TW.addText, 'add-text');
   var addLine = el('span', 'gline'); addLine.id = 'text-line'; addLine.setAttribute('role', 'status');
   gAdd.appendChild(addLine);
@@ -535,6 +535,7 @@ DESIGN_TEXT_JS = r"""
     setVal(lhR, M.clamp(Math.round(b.lh * 100), T.RULES.lhSlider[0], T.RULES.lhSlider[1]));
     setVal(colorIn, colorOf(b));
     fontBtn.textContent = b.font + ' ▾';
+    fontBtn.setAttribute('aria-label', TW.fontButton + ': ' + b.font);        // its words, and what the press does
     fontBtn.style.fontFamily = stateOf(b.font) === 'ok' ? T.familyString(b.font) : '';
     var bold = b.weight >= 700, can = hasBold(b.font) || bold;
     boldBtn.classList.toggle('on', bold);
@@ -578,7 +579,7 @@ DESIGN_TEXT_JS = r"""
     // kept inside the window at any width
     var r = pop.getBoundingClientRect(), over = r.right - (document.documentElement.clientWidth - 8);
     if (over > 0) pop.style.left = -Math.min(over, Math.max(0, r.left - 8)) + 'px';
-    try { search.focus(); } catch (e) {}
+    D.focus(search);              // without moving the page
   }
   function build(){
     var q = search.value.replace(/\s+/g, ' ').trim().toLowerCase(), b = selText(), F = fontsOf(), exact = false;
@@ -674,7 +675,7 @@ DESIGN_TEXT_JS = r"""
   // a press anywhere else, or Escape, closes the list
   document.addEventListener('pointerdown', function(e){ if (open && !fp.contains(e.target)) closeFonts(); }, true);
   document.addEventListener('keydown', function(e){
-    if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFonts(); try { fontBtn.focus(); } catch (x) {} }
+    if (open && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFonts(); D.focus(fontBtn); }
   }, true);
 
   D.type = {
@@ -698,13 +699,13 @@ DESIGN_TEXT_CSS = """
 .selbox.tx-sides .h.tl{top:calc(50% - 7px);cursor:ew-resize}
 .selbox.tx-sides .h.br{bottom:auto;top:calc(50% - 7px);cursor:ew-resize}
 .tx-ln{position:absolute;white-space:pre;pointer-events:none;font-kerning:auto}
-.tx-words{font:400 14px/1.35 var(--sans);width:220px;max-width:100%;height:36px;min-height:34px;max-height:160px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;color:var(--ink)}
-.tx-num{width:64px;font:400 13.5px/1.2 var(--sans);border:1px solid var(--line);border-radius:8px;padding:6px;background:#fff;color:var(--ink)}
+.tx-words{font:400 14px/1.35 var(--sans);width:220px;max-width:100%;height:26px;min-height:26px;max-height:160px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:#fff;color:var(--ink)}
+.tx-num{width:60px;font:400 13.5px/1.2 var(--sans);border:1px solid var(--line);border-radius:8px;padding:3px 6px;background:#fff;color:var(--ink)}
 .tx-words:focus,.tx-num:focus,.fp-search:focus{outline:2px solid var(--sel);outline-offset:-1px}
 .tb.tx-b{font-weight:800}
 .tb.tx-i{font-style:italic}
 .fp{position:relative;display:inline-flex}
-.fp-btn{min-width:150px;max-width:230px;text-align:left;font-weight:400;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp-btn{min-width:150px;max-width:230px;text-align:left;font-weight:400;font-size:14px;padding-top:3px;padding-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:30000;width:300px;max-width:calc(100vw - 24px);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px}
 .fp-pop[hidden]{display:none}
 .fp-search{width:100%;font:400 14px/1.3 var(--sans);border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink);margin-bottom:6px}

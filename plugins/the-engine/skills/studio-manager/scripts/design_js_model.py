@@ -31,7 +31,11 @@ DESIGN_MODEL_JS = r"""
     nudge: 5, nudgeBig: 50, // an arrow key, and with Shift
     undo: 60,               // steps of Undo kept
     wheel: 1.05,            // one turn of the wheel zooms by this much
-    view: {min: 90, max: 480, step: 1.25}     // how wide one slide may be drawn on screen, and one press of Smaller / Bigger
+    // how wide one slide may be drawn on screen: the Size slider runs from "every slide fits across the window"
+    // (never under min, and never over few when there are only a few slides) up to max; one keyboard step of the
+    // slider is step; the strip starts with a slide about a third of the window tall, between start[0] and
+    // start[1] pixels tall
+    view: {min: 40, max: 480, step: 1.25, few: 140, start: [230, 460]}
   };
   function useLimits(l){
     if (!l) return;
@@ -359,12 +363,20 @@ DESIGN_MODEL_JS = r"""
   // ---- how wide one slide is drawn ----
   // To start with: about three slides across the space there is, and no taller than about a third of the window
   // (the bars of buttons sit above the strip and the photos below it).
+  // Where the strip starts: a slide about a third of the window tall (between 230 and 460 px), however many
+  // slides there are and however wide the window is; the strip scrolls sideways for the rest. -> the slide's width
   function viewStart(avail, winH){
-    var w = Math.min(avail / 3.2, (winH * 0.34) * W / H);
-    return clamp(Math.round(w) || 0, RULES.view.min, RULES.view.max);
+    var h = clamp((Number(winH) || 0) / 3, RULES.view.start[0], RULES.view.start[1]);
+    return clamp(Math.round(h * W / H) || 0, RULES.view.min, RULES.view.max);
   }
-  function viewStep(cur, dir){
-    return clamp(Math.round(dir > 0 ? cur * RULES.view.step : cur / RULES.view.step), RULES.view.min, RULES.view.max);
+  // The small end of the Size slider: every slide fits across the room there is (avail screen pixels), but never
+  // under min, and never over few (a design of two slides would otherwise have no small end at all).
+  function viewLow(avail, slides){
+    return clamp(Math.floor((Number(avail) || 0) / Math.max(1, slides || 1)), RULES.view.min, RULES.view.few);
+  }
+  // One step of the slider's keys: a quarter bigger or smaller, between lo (the slider's small end) and max.
+  function viewStep(cur, dir, lo){
+    return clamp(Math.round(dir > 0 ? cur * RULES.view.step : cur / RULES.view.step), lo > 0 ? lo : RULES.view.min, RULES.view.max);
   }
 
   root.DesignModel = {
@@ -377,7 +389,7 @@ DESIGN_MODEL_JS = r"""
     act: act, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,
     used: used, firstEmptySlide: firstEmptySlide, nextHole: nextHole, swapPhoto: swapPhoto, addPhoto: addPhoto,
     clickPhoto: clickPhoto, dropAt: dropAt, pickSize: pickSize, screenCopy: screenCopy,
-    history: history, viewStart: viewStart, viewStep: viewStep
+    history: history, viewStart: viewStart, viewLow: viewLow, viewStep: viewStep
   };
 })(typeof window !== 'undefined' ? window : this);
 """

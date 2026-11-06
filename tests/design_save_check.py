@@ -533,9 +533,10 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                  and c.js("(function(a, b){ return a.parentNode === b.parentNode && a.parentNode.id === 'g-design'; })(document.getElementById('d-name-box'), document.getElementById('d-status'))"))
             case("first visit: the shoot's own button names the shoot, before the design",
                  c.text("#shoot-btn").startswith("Fake beach") and c.js("document.getElementById('g-shoot').nextElementSibling.id") == "g-design")
-            case("first visit: My designs, Duplicate design, + New design, Save as template and Fill empty frames are in the top row",
-                 all(c.js("document.getElementById('tools-designs').contains(document.getElementById(%s))" % json.dumps(i)) for i in ("designs-btn", "dup-design", "new-design", "save-template", "fill-holes"))
-                 and c.text("#fill-holes") == "Fill empty frames" and c.js("document.getElementById('fill-holes').disabled") is True)
+            case("first visit: My designs, Duplicate design, + New design and Save as template are in the top row; Fill empty frames is in the selection bar's first line, out of sight while no frame is empty",
+                 all(c.js("document.getElementById('tools-designs').contains(document.getElementById(%s))" % json.dumps(i)) for i in ("designs-btn", "dup-design", "new-design", "save-template"))
+                 and c.js("document.getElementById('selcap').contains(document.getElementById('fill-holes'))")
+                 and c.text("#fill-holes") == "Fill empty frames" and c.js("document.getElementById('fill-holes').disabled") is True and hidden("#fill-holes"))
             case("first visit: Preview swipe and Save slides are in the bar at the bottom of the window, which stays in sight",
                  c.rect("#save-slides")["bottom"] <= 900 and c.rect("#save-slides")["y"] > 780 and c.rect("#preview-btn")["y"] > 780 and c.js("document.getElementById('save-slides').disabled") is False)
             case("first visit: nothing is said beside Save slides, and its question buttons and the folder button are not showing",
@@ -908,10 +909,11 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                  abs(lr["x"] - sr["x"]) < 0.6 and abs(lr["w"] / s - 33.75) < 1.5 and abs((rr["right"] - sr["x"]) / s - W) < 1.5 and abs(rr["w"] / s - 33.75) < 1.5
                  and abs(lr["h"] - sr["h"]) < 1.5, (lr["w"] / s, rr["w"] / s))
             case("grid crop: it changes nothing in the design (only a way of looking)", st() == disk(seam)["state"] and c.js("Designer.save.idle()"))
-            c.click("#view-bigger")
+            c.js("document.getElementById('view-size').focus({preventScroll: true})")
+            c.key("ArrowRight")
             s2_ = c.js("Designer.scale")
             case("grid crop: it follows the strip when the strip is drawn bigger", abs(c.rect("#over .sv-crop.sv-l")["w"] / s2_ - 33.75) < 1.5 and s2_ > s)
-            c.click("#view-smaller")
+            c.key("ArrowLeft")
             c.click("#gridcrop")
             case("grid crop: unticked, it is gone", c.js("getComputedStyle(document.querySelector('#over .sv-crop.sv-l')).display") == "none")
 
@@ -1040,10 +1042,11 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                 c2.wait_for("window.Designer && Designer.saver && Designer.st && Designer.S", 20)
                 c2.wait_for("Designer.st.blocks.every(function(b){ return Designer.type.status(b) === 'ready'; }) && Designer.type.fit(Designer.st) === Designer.st && Designer.save.idle()", 20,
                             tell="JSON.stringify(Designer.st.blocks.map(function(b){ return Designer.type.status(b); }))")
+                c2.js("document.getElementById('view-size').focus({preventScroll: true})")
                 for _ in range(8):
-                    if c2.js("document.getElementById('view-bigger').disabled"):
+                    if c2.js("Designer.view() >= Designer.M.RULES.view.max"):
                         break
-                    c2.click("#view-bigger")
+                    c2.key("ArrowRight")
                 c2.js("window.scrollTo(0, document.getElementById('stage').offsetTop - 4)")
                 c2.js("document.getElementById('stage').scrollLeft = 0")
                 c2.mouse_move(5, 5)

@@ -10,7 +10,7 @@ everything a hand does on it:
     double-click, or "Move photo inside": drag the picture inside its frame, wheel or slider to zoom
     the one-click buttons, arrow keys, Delete, Cmd/Ctrl+Z, Escape
     the tray: every photo numbered as in the pickers; drag one onto a frame or a slide, or click it
-    Slides - / +, the background, Smaller / Bigger, Undo
+    Slides - / +, the background, the Size slider (how large the slides are drawn), Undo
 
 Dragging is drawn by the page itself with pointer events (the browser's own drag-and-drop does not work in
 the Claude app's pane), modelled on arrange_page.DRAG_JS. WHILE A DRAG IS GOING ON ONLY THE DRAGGED THING'S OWN
@@ -40,8 +40,12 @@ DESIGN_EDIT_JS = r"""
 
   var nodes = {};       // block id -> its element on the strip (kept between draws, so no picture is fetched twice)
   var seams = [], guides = [], tiles = {};
-  var selbox = el('div', 'selbox');
-  ['tl', 'tr', 'bl', 'br'].forEach(function(c){ var h = el('div', 'h ' + c); h.dataset.h = c; selbox.appendChild(h); });
+  // The selection box: a ring (the outline) and four handles. The ring is cut off at the strip's edges, so a
+  // frame pulled past the top or bottom is not drawn over the slide labels or the page; a handle whose corner
+  // is off the strip is not drawn either, while one on the strip's very edge shows whole.
+  var selbox = el('div', 'selbox'), ring = el('i', 'ring'), handles = [];
+  selbox.appendChild(ring);
+  ['tl', 'tr', 'bl', 'br'].forEach(function(c){ var h = el('div', 'h ' + c); h.dataset.h = c; selbox.appendChild(h); handles.push(h); });
   var slidemark = el('div', 'slidemark');
   over.appendChild(slidemark); over.appendChild(selbox);
   var G = null;         // the press or drag in hand
@@ -141,6 +145,19 @@ DESIGN_EDIT_JS = r"""
     node.style.left = b.x * s + 'px'; node.style.top = b.y * s + 'px';
     node.style.width = b.w * s + 'px'; node.style.height = b.h * s + 'px';
   }
+  // The selection box around b: its ring stops at the strip's edges (3 px outside the box where the box's own
+  // edge is on the strip, so the 2 px outline shows), and a handle is drawn only where its corner is on the strip.
+  // A text box's two handles sit at mid-height on its sides.
+  function placeSel(b, s){
+    place(selbox, b, s);
+    var sw = D.st.slides * W, T = D.blockTypes[D.typeOf(b)];
+    var cut = function(v){ return (v > 0 ? v * s : -3) + 'px'; };
+    ring.style.clipPath = 'inset(' + cut(-b.y) + ' ' + cut(b.x + b.w - sw) + ' ' + cut(b.y + b.h - H) + ' ' + cut(-b.x) + ')';
+    handles.forEach(function(h){
+      var c = h.dataset.h, px = c.charAt(1) === 'l' ? b.x : b.x + b.w, py = T.widthOnly ? b.y + b.h / 2 : (c.charAt(0) === 't' ? b.y : b.y + b.h);
+      h.classList.toggle('out', px < -0.5 || px > sw + 0.5 || py < -0.5 || py > H + 0.5);
+    });
+  }
   function clearGuides(){ guides.forEach(function(g){ g.remove(); }); guides = []; }
   function showGuides(gx, gy){
     clearGuides();
@@ -191,7 +208,7 @@ DESIGN_EDIT_JS = r"""
     for (var k = 0; k < st.slides; k++) labels.children[k].style.left = (k + 0.5) * W * s + 'px';
     var b = D.selected();
     if (b) {
-      place(selbox, b, s);
+      placeSel(b, s);
       selbox.className = 'selbox on' + (D.adjust ? ' adj' : '') + (D.blockTypes[D.typeOf(b)].fixed ? ' fixed' : '');
     } else selbox.className = 'selbox';
     if (!G || !G.on) { clearGuides(); clearDropMarks(); }
@@ -279,15 +296,43 @@ DESIGN_EDIT_JS = r"""
   bgc.addEventListener('blur', function(){ D.render(); });
   $('undo').addEventListener('click', function(){ D.undo(); });
 
+  // ---------- how large the slides are drawn: the Size slider ----------
+  // From every slide fitting across the window (its small end, which follows the window and the number of
+  // slides) up to large. Dragging it draws the strip at that size at once, keeping the middle of what is showing
+  // in the middle; its arrow keys step by a quarter (what Smaller and Bigger did), Home and End go to its ends.
+  var sizeR = $('view-size');
+  function room(){ return stage.clientWidth - 2 * wrap.offsetLeft; }        // the room across the stage, inside its padding
+  function viewLow(){ return M.viewLow(room(), D.st ? D.st.slides : M.RULES.slides[0]); }
+  function syncSize(){
+    var lo = viewLow(), hi = M.RULES.view.max;
+    if (Number(sizeR.min) !== lo) sizeR.min = String(lo);
+    if (Number(sizeR.max) !== hi) sizeR.max = String(hi);
+    var v = String(M.clamp(Math.round(view), lo, hi));
+    if (sizeR.value !== v) sizeR.value = v;
+  }
   function setView(px){
-    if (!D.st || px === view) return;
+    if (!D.st || !(px > 0) || px === view) return;
     var old = D.scale, mid = stage.scrollLeft + stage.clientWidth / 2 - wrap.offsetLeft;
     view = px; D.scale = px / W;
     D.render();
     stage.scrollLeft = Math.max(0, mid * (D.scale / old) - stage.clientWidth / 2 + wrap.offsetLeft);
   }
-  $('view-smaller').addEventListener('click', function(){ setView(M.viewStep(view, -1)); });
-  $('view-bigger').addEventListener('click', function(){ setView(M.viewStep(view, 1)); });
+  sizeR.addEventListener('input', function(){ setView(M.clamp(Number(sizeR.value) || view, M.RULES.view.min, M.RULES.view.max)); });
+  sizeR.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey || !D.st) return;
+    var lo = viewLow(), to = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageUp') to = M.viewStep(view, 1, lo);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'PageDown') to = M.viewStep(view, -1, lo);
+    else if (e.key === 'Home') to = lo;
+    else if (e.key === 'End') to = M.RULES.view.max;
+    if (to === null) return;
+    e.preventDefault();
+    setView(to);
+    syncSize();
+  });
+  window.addEventListener('resize', function(){ if (D.st) syncSize(); });
+  D.setView = setView;
+  D.view = function(){ return view; };
   function snapOn(){ return $('snap').checked; }
 
   D.on('render', function(){
@@ -300,9 +345,8 @@ DESIGN_EDIT_JS = r"""
     Array.prototype.forEach.call(document.querySelectorAll('#g-bg .sw'), function(x){ x.classList.toggle('on', x.dataset.c === st.bg); });
     if (document.activeElement !== bgc) bgc.value = st.bg;
     $('undo').disabled = off || !D.canUndo();
-    $('view-smaller').disabled = view <= M.RULES.view.min;
-    $('view-bigger').disabled = view >= M.RULES.view.max;
-    adjBtn.textContent = D.adjust ? WORDS.insideDone : WORDS.inside;
+    syncSize();
+    D.label(adjBtn, D.adjust ? WORDS.insideDone : WORDS.inside);
     adjBtn.classList.toggle('on', D.adjust);
     var photo = !!b && D.typeOf(b) === 'photo' && !M.isHole(b);
     adjBtn.disabled = !!b && !photo;
@@ -424,7 +468,7 @@ DESIGN_EDIT_JS = r"""
       var live = M.merge(b0, res);
       place(node, live, D.scale);
       T.draw(node, live, D.scale, true);
-      place(selbox, live, D.scale);
+      placeSel(live, D.scale);
       showGuides(res.gx, res.gy);
     }
     begin(e, {
@@ -535,8 +579,8 @@ DESIGN_EDIT_JS = r"""
     if (a.rebuild) { Object.keys(nodes).forEach(function(id){ nodes[id].remove(); }); nodes = {}; ready = {}; asked = {}; buildTray(); }
     else D.S.photos.forEach(function(p){ if (tiles[p.n]) tilePic(tiles[p.n], p); });
     if (!view) {
-      // the first look: about three slides across the space there is
-      view = M.viewStart(stage.clientWidth - 2 * wrap.offsetLeft, window.innerHeight);
+      // the first look: a slide about a third of the window tall, however many slides there are
+      view = M.viewStart(room(), window.innerHeight);
       D.scale = view / W;
     }
   });

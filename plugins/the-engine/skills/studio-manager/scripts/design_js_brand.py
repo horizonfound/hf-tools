@@ -4,6 +4,8 @@
 DESIGN_BRAND_JS (put on the page by design_page.py after the text script) adds a "Brand colors" group beside
 Background: the colors the photographer has saved, shared by every shoot.
 
+    The label always reads "Brand colors": with a text box selected the group's tooltip and its name for a screen
+    reader say "Brand colors (for the text)" (the longer words in the row itself used to push Undo onto a new row).
     "+" opens the color box; the color chosen there is saved (POST /design-brand {add}), up to the number the
     Assistant allows (16), with a plain line at the limit.
     A click on a color colors the background, or, when a text box is selected, that text. The same colors
@@ -40,6 +42,7 @@ DESIGN_BRAND_JS = r"""
   var bg = $('g-bg');
   if (bg && bg.parentNode) bg.parentNode.insertBefore(g, bg.nextSibling);       // beside Background
   var label = el('span', 'lbl', BW.label); label.id = 'brand-label';
+  g.setAttribute('role', 'group'); g.setAttribute('aria-label', BW.label);
   var row = el('span', 'bc-row'); row.id = 'brand-row';
   var addBtn = el('button', 'tb', '+'); addBtn.type = 'button'; addBtn.id = 'brand-add';
   addBtn.setAttribute('aria-label', BW.add); addBtn.title = BW.addTitle;
@@ -105,7 +108,11 @@ DESIGN_BRAND_JS = r"""
   }
   function draw(){
     var text = !!selText(), key = colors().join(',') + '|' + text;
-    label.textContent = text ? BW.labelText : BW.label;
+    // the label's words never change length (a longer label pushed the buttons after it onto another row): with
+    // a text box selected the group says so in its tooltip and its name for a screen reader, and each color's
+    // own name says what a press does
+    label.title = text ? BW.labelText : '';
+    g.setAttribute('aria-label', text ? BW.labelText : BW.label);
     if (key === shownKey) return;
     shownKey = key;
     fill(row, true, text);

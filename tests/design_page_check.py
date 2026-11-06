@@ -247,8 +247,9 @@ h.clear(); h.push('a', 'k'); h.pop(); h.push('b', 'k');
 t('undo: an Undo ends the run', h.size() === 1 && h.pop() === 'b');
 
 // ---- the rest ----
-t('view: to start with, about three slides across the space, and no taller than about a third of the window', M.viewStart(1000, 900) === 245 && M.viewStart(300, 800) === 94 && M.viewStart(100, 800) === 90 && M.viewStart(5000, 3000) === 480, [M.viewStart(1000, 900), M.viewStart(300, 800)]);
-t('view: Bigger and Smaller go by a quarter, between 90 and 480', M.viewStep(230, 1) === 288 && M.viewStep(230, -1) === 184 && M.viewStep(470, 1) === 480 && M.viewStep(100, -1) === 90);
+t('view: to start with, a slide about a third of the window tall, never under 230 or over 460, whatever the room across (a 900 px window: 300 tall, 240 wide)', M.viewStart(1000, 900) === 240 && M.viewStart(300, 900) === 240 && M.viewStart(1000, 768) === 205 && M.viewStart(1000, 500) === 184 && M.viewStart(5000, 3000) === 368, [M.viewStart(1000, 900), M.viewStart(300, 900), M.viewStart(1000, 768), M.viewStart(1000, 500), M.viewStart(5000, 3000)]);
+t('view: the Size slider\'s small end is every slide across the room there is, never under 40, never over 140', M.viewLow(956, 7) === 136 && M.viewLow(956, 20) === 47 && M.viewLow(300, 20) === 40 && M.viewLow(956, 2) === 140, [M.viewLow(956, 7), M.viewLow(956, 20), M.viewLow(300, 20), M.viewLow(956, 2)]);
+t('view: the slider\'s keys go by a quarter, between its small end and 480', M.viewStep(230, 1) === 288 && M.viewStep(230, -1) === 184 && M.viewStep(470, 1) === 480 && M.viewStep(100, -1, 90) === 90 && M.viewStep(45, -1) === 40 && M.viewStep(100, -1, 136) === 136);
 var td = M.tidy({slides: 3, bg: '#ffffff', blocks: [{id: 1, n: 2, x: 0, y: 0, w: 100, h: 100}, TX(2, 0, 0, 500, 100)]});
 t('a layout from the Assistant is given its crop where none is written, and text boxes are left as they are', td.blocks[0].ox === 0.5 && td.blocks[0].oy === 0.5 && td.blocks[0].zoom === 1 && !('ox' in td.blocks[1]));
 t('patch: no difference gives the very same layout back', M.patch(one, 1, {x: 0, y: 0}) === one && M.patch(one, 1, {x: 1}) !== one && M.patch(one, 5, {x: 1}) === one);
@@ -303,8 +304,8 @@ def check_page(case, work):
     # the lines a press brings sit beside the buttons that were pressed
     case("designer page: the line a Slides press brings is inside the Slides group, beside its buttons",
          bool(re.search(r"<div class='group' id='g-slides'>(?:(?!</div>).)*id='slides-plus'(?:(?!</div>).)*id='slides-line'(?:(?!</div>).)*</div>", page, re.S)))
-    case("designer page: the line a selection button brings, and the help line, are inside the selection's own bar",
-         bool(re.search(r"<div class='d-tools selbar off' id='selbar'>(?:(?!</div>).)*id='selline'(?:(?!</div>).)*id='selhint'(?:(?!</div>).)*</div>", page, re.S)))
+    case("designer page: the line a selection button brings, and the help line, are inside the selection's own bar, in its first line",
+         bool(re.search(r"<div class='selbar off' id='selbar'><div class='selcap' id='selcap'>(?:(?!</div>).)*id='selline'(?:(?!</div>).)*id='selhint'(?:(?!</div>).)*</div>", page, re.S)))
     case("designer page: the line a tray click brings is on the tray's own heading line",
          bool(re.search(r"<div class='trayhead'>(?:(?!</div>).)*id='trayname'(?:(?!</div>).)*id='trayline'(?:(?!</div>).)*</div>", page, re.S)))
     case("designer page: the save status sits beside the design's name", bool(re.search(r"id='d-name'></b><span class='savestate' id='d-status'", page)))
@@ -468,8 +469,8 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             case("first visit: wide photos take two places in the tray", J("Array.prototype.map.call(document.querySelectorAll('#thumbs .th.wide'), function(t){ return +t.dataset.n; })") == [1, 10, 13])
             s = scale()
             sr, stg = c.rect("#strip"), c.rect("#stage")
-            case("first visit: the strip is sized to the window (about three slides across, the whole of its height in sight)",
-                 abs(s * W - 245) < 1.5 and stg["bottom"] <= 900 and sr["bottom"] <= 900 and abs(sr["w"] - 7 * W * s) < 1, (s * W, stg, sr))
+            case("first visit: the strip is sized to the window (a slide a third of a 900 px window tall: 300, so 240 wide; the whole of its height in sight)",
+                 abs(s * W - 240) < 1.5 and stg["bottom"] <= 900 and sr["bottom"] <= 900 and abs(sr["w"] - 7 * W * s) < 1 and abs(sr["h"] - 300) < 1.5, (s * W, stg, sr))
             # the photo covers its frame, laid out from the picture's own size
             b1 = S0["blocks"][0]["id"]
             im = J(f"(function(){{ var i = document.querySelector(\"#strip .blk[data-id='{b1}'] img\"), r = i.getBoundingClientRect(), f = i.parentNode.getBoundingClientRect(); return {{nw: i.naturalWidth, nh: i.naturalHeight, w: r.width, h: r.height, dx: r.left - f.left, dy: r.top - f.top, fw: f.width, fh: f.height, src: i.getAttribute('src')}}; }})()")
@@ -871,24 +872,28 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             c.js("document.getElementById('stage').scrollLeft = 0")
             before, rev_b = st(), disk()["rev"]
             w0 = c.rect("#strip")["w"]
-            c.click("#view-bigger")
+            c.js("document.getElementById('view-size').focus({preventScroll: true})")
+            c.key("ArrowRight")
             w1 = c.rect("#strip")["w"]
-            c.click("#view-smaller")
-            c.click("#view-smaller")
+            c.key("ArrowLeft")
+            c.key("ArrowLeft")
             w2 = c.rect("#strip")["w"]
-            c.click("#view-bigger")
-            case("Bigger and Smaller change how large the slides are drawn, and nothing else (no change to the design, nothing saved)",
+            c.key("ArrowRight")
+            case("the Size slider's arrow keys change how large the slides are drawn by a quarter, and nothing else (no change to the design, nothing saved)",
                  abs(w1 / w0 - 1.25) < 0.01 and w2 < w0 and st() == before and c.js("Designer.save.idle()") and disk()["rev"] == rev_b, (w0, w1, w2))
             s = scale()
             for _ in range(12):
-                c.click("#view-bigger", check=False)
+                c.key("ArrowRight")
             big = scale() * W
-            case("Bigger stops at 480 px a slide and its button goes grey", abs(big - 480) < 0.5 and c.js("document.getElementById('view-bigger').disabled") is True, big)
+            case("the slider stops at 480 px a slide (its large end)", abs(big - 480) < 0.5 and c.js("Number(document.getElementById('view-size').value)") == 480, big)
+            lo = c.js("Number(document.getElementById('view-size').min)")
             for _ in range(14):
-                c.click("#view-smaller", check=False)
+                c.key("ArrowLeft")
             small = scale() * W
-            case("Smaller stops at 90 px a slide and its button goes grey", abs(small - 90) < 0.5 and c.js("document.getElementById('view-smaller').disabled") is True, small)
+            case("the slider stops at its small end, where every slide fits across the window", abs(small - lo) < 0.5 and lo == c.js("Designer.M.viewLow(document.getElementById('stage').clientWidth - 2 * document.getElementById('stripwrap').offsetLeft, 7)"), (small, lo))
             case("...and at that size the whole carousel is in sight", c.rect("#strip")["right"] <= c.rect("#stage")["right"])
+            c.set_value("#view-size", "240")
+            case("the slider dragged (set to 240) draws the slides 240 wide", abs(scale() * W - 240) < 0.5, scale() * W)
 
             # ================= a reload, and a restart on another port =================
             D5, A5 = fresh("reload")

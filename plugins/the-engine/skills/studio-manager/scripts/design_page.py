@@ -11,7 +11,7 @@ files, so nothing Python does can change a character of it:
     design_js_model.py   DESIGN_MODEL_JS   the rules, with no page in them (window.DesignModel)
     design_js_core.py    DESIGN_CORE_JS    the state, one way to change it, one drawing pass, one save queue,
                                            Undo, and the places other parts add themselves (window.Designer)
-    design_js_edit.py    DESIGN_EDIT_JS    the strip, the frames, the buttons, the keys, the tray of photos
+    design_js_edit.py    DESIGN_EDIT_JS    the strip, the frames, the buttons, the Size slider, the keys, the tray of photos
     design_js_type.py    DESIGN_TYPE_JS    the rules for words, with no page in them (window.DesignType): where
                                            lines break, a font's name, a new text box
     design_js_text.py    DESIGN_TEXT_JS    text boxes, their style, the fonts and the font list (Designer.type)
@@ -55,40 +55,70 @@ from design_js_text import DESIGN_TEXT_CSS, DESIGN_TEXT_JS  # noqa: E402
 from design_js_type import DESIGN_TYPE_JS  # noqa: E402
 
 DESIGN_CSS = """
-:root{--sel:#2f7cf6;--wide:1320px}
+:root{--sel:#2f7cf6;--wide:1320px;--row:34px}
+html{scrollbar-gutter:stable}
+html.d-locked{overflow:hidden}
 body.designer .bar,body.designer .head{max-width:var(--wide)}
-body.designer .head{padding:10px 0 10px}
-body.designer h1{font-size:19px}
-body.designer .lede{font-size:13.5px}
-.d-tools,.stage,.tray{flex:none;width:100%;max-width:var(--wide);margin-left:auto;margin-right:auto}
-.d-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
-.group{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:38px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 7px}
-.group .lbl{color:var(--soft);font-size:12.5px;margin-right:2px}
+body.designer .bar{min-height:40px;padding:4px 0}
+body.designer .bar .homelink{padding:5px 12px 5px 10px}
+body.designer .head{padding:6px 0 4px;grid-template-columns:auto 1fr;column-gap:10px;row-gap:1px;align-items:baseline}
+body.designer .head .eyebrow{grid-column:1}
+body.designer h1{grid-column:2;font-size:19px}
+body.designer .lede,body.designer .topline{grid-column:1/-1}
+body.designer .lede{font-size:13.5px;line-height:1.4}
+body.designer .topline{margin-top:6px}
+.d-tools,.selbar,.stage,.tray{flex:none;width:100%;max-width:var(--wide);margin-left:auto;margin-right:auto}
+.d-tools{display:flex;flex-wrap:wrap;gap:4px;align-items:stretch;margin-bottom:4px}
+.group{position:relative;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:var(--row);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px 7px}
+.group .lbl{color:var(--soft);font-size:12.5px;margin-right:1px;white-space:nowrap}
 .group b{font-weight:650}
 #slides-count{display:inline-block;min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
-.tb{font:600 13px/1.2 var(--sans);border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:8px;padding:6px 9px;cursor:pointer}
+.tb{font:600 13px/1.2 var(--sans);border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:8px;padding:4px 8px;cursor:pointer;white-space:nowrap}
 .tb:hover{border-color:var(--soft)}
 .tb:disabled{opacity:.4;cursor:default}
 .tb:disabled:hover{border-color:var(--line)}
 .tb.main{background:var(--accent);border-color:var(--accent);color:#fff}
 .tb.on{background:var(--sel);border-color:var(--sel);color:#fff}
-@media(pointer:coarse){.tb{padding:10px 12px}}
-.sw{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid var(--line);cursor:pointer}
+@media(pointer:coarse){.tb{padding:9px 12px}}
+.sw{width:22px;height:22px;border-radius:50%;padding:0;border:2px solid var(--line);cursor:pointer}
 .sw.on{border-color:var(--sel)}
-.group input[type=color]{width:28px;height:28px;border:0;padding:0;background:none;cursor:pointer}
-.group input[type=range]{width:110px}
+.group input[type=color]{width:26px;height:26px;border:0;padding:0;background:none;cursor:pointer}
+.group input[type=range]{width:96px;margin:0}
+#view-size{width:90px}
 .hint{color:var(--soft);font-size:12.5px;margin:0}
-label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
-.gline{font-size:13.5px;color:var(--accent-d)}
+label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.gline{font-size:13px;color:var(--accent-d)}
 .gline:empty{display:none}
+.gline .tb{padding:2px 8px;font-size:12.5px}
 .dname{font:650 14.5px/1.3 var(--sans);overflow-wrap:anywhere}
 .savestate{display:inline-block;width:86px;font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .savestate.bad{color:var(--accent-d)}
-.selbar{min-height:50px;margin-bottom:18px}
-.selbar.off .needsel{opacity:.4;pointer-events:none}
-.selbar #selhint{flex:1 0 100%;min-height:18px}
+#toolline{margin:0 0 5px}
+/* the bar for the selected thing: one line of words (the help line, the line a press brings, and Fill empty frames
+   while there are any), then its buttons; with nothing selected, the help line alone in a quiet box */
+.selbar{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.selcap{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-height:24px;font-size:12.5px;color:var(--soft)}
+.selcap #selhint{flex:1 4 auto;min-width:0}
+.selcap #selline,.selcap #designs-line{flex:0 1 auto;min-width:0;max-width:100%}
+.selcap #fill-holes{flex:none;margin-left:auto}
+.selrows{display:flex;flex-wrap:wrap;gap:4px;align-items:stretch}
+.selbar.off .selrows{display:none}
+.selbar.off .selcap{flex:1 1 auto;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:10px;padding:6px 12px}
+.selbar.off .selcap #selhint{flex:0 1 auto}
+.selbar.off .selcap #fill-holes{margin-left:0}
+@media(max-width:1023px){.selcap #fill-holes{margin-left:0}}
+@media(min-width:1024px){
+.selbar{min-height:calc(var(--row) * 2 + 32px)}
+.selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
+.selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap #selline,.selbar:not(.off) .selcap #designs-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a line a press on a tool brings sits right under its own group, over the room held for the bar below, so it moves nothing */
+.d-tools .group>.gline{position:absolute;left:0;top:calc(100% + 5px);z-index:12;width:max-content;max-width:calc(100vw - 48px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--accent-l);border-radius:8px;padding:2px 9px;line-height:18px;box-shadow:var(--shadow)}
+.d-tools .group>.gline:empty{display:none}
+}
+/* between 1024 and 1180 the rows are tight: narrower boxes and sliders, a little less padding on a button */
+@media(max-width:1179px){.group{padding:3px 6px}.group .dz-name{width:150px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:72px}.tb{padding:4px 6px}.sw{width:20px;height:20px}}
 
-.stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:30px 18px 18px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -14px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(42,38,34,.45)}
+.stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(42,38,34,.45)}
 .stripwrap{position:relative;display:inline-block;vertical-align:top}
 .labels{position:absolute;left:0;top:-22px;height:20px;width:100%;pointer-events:none}
 .labels span{position:absolute;top:0;font-size:12px;color:var(--soft);transform:translateX(-50%);white-space:nowrap}
@@ -104,9 +134,11 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .blk.adj{cursor:grab}
 .blk.droptarget{outline:3px solid var(--accent);outline-offset:-3px}
 .blk.other{background:transparent;outline:1.5px dashed rgba(120,110,100,.7);outline-offset:-1px;color:var(--ink);white-space:pre-wrap;text-align:center;line-height:1.15}
-.selbox{position:absolute;display:none;outline:2px solid var(--sel);pointer-events:none}
+.selbox{position:absolute;display:none;pointer-events:none}
 .selbox.on{display:block}
-.selbox.adj{outline:2px dashed #f0a020}
+.selbox .ring{position:absolute;top:0;right:0;bottom:0;left:0;outline:2px solid var(--sel);pointer-events:none}
+.selbox.adj .ring{outline:2px dashed #f0a020}
+.h.out{display:none}
 .h{position:absolute;width:14px;height:14px;background:#fff;border:2px solid var(--sel);border-radius:3px;pointer-events:auto;touch-action:none}
 .h::after{content:'';position:absolute;top:-6px;right:-6px;bottom:-6px;left:-6px}
 .h.tl{left:-7px;top:-7px;cursor:nwse-resize}.h.br{right:-7px;bottom:-7px;cursor:nwse-resize}
@@ -118,7 +150,7 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .d-note.quiet{color:var(--soft)}
 .blk:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 
-.tray{flex:1 0 auto;margin-top:18px;padding-bottom:28px}
+.tray{flex:1 0 auto;margin-top:14px;padding-bottom:28px}
 .trayhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 2px}
 .tray h2{margin:0;font:650 16px/1.3 var(--sans)}
 .tray .prep{font-size:13.5px;color:var(--soft)}
@@ -181,9 +213,10 @@ SNAP_TITLE = ("Photos line up with the slides and with each other as you drag. "
 # The bar at the bottom of the window: looking at the carousel as Instagram will show it, and saving it.
 PREVIEW = "Preview swipe"
 GRID_CROP = "Profile grid crop"
-# The label of the Smaller / Bigger buttons: how large the slides are drawn on this page (a text box has a
-# "Size" of its own, so this one is not called that).
-VIEW = "View"
+# The label of the slider that sets how large the slides are drawn on this page ("Size", as on Nicole's page; a
+# text box has a Size of its own, so the slider's name for a screen reader says which this one is).
+VIEW = "Size"
+VIEW_LABEL = "How big the slides look"
 SAVE_SLIDES = "Save slides"
 SAVE_ANYWAY = "Save anyway"
 GO_BACK = "Go back"
@@ -217,15 +250,15 @@ def page_html(kit_name):
         "<p class='topline' id='l-reach' hidden></p><p class='topline' id='l-missing' hidden></p><p class='topline' id='l-dropped' hidden></p>"
         "</header>"
         # The top row: the shoot and the open design. The scripts put the shoot menu before #g-design, a box to
-        # type the name in beside #d-name (which is then hidden), and My designs, Duplicate design, + New design,
-        # Save as template and Fill empty frames after it.
+        # type the name in beside #d-name (which is then hidden), and My designs, Duplicate design after it, then
+        # + New design and Save as template in a group of their own.
         "<div class='d-tools' id='tools-designs'>"
         "<div class='group' id='g-design'><span class='lbl'>Design</span><b class='dname' id='d-name'></b>"
         "<span class='savestate' id='d-status' role='status'></span></div>"
         "</div>"
         # The second row: the whole carousel. The scripts add to it with Designer.tools.group(id, label): the
-        # brand colors (put beside Background) and + Add text are there. Preview swipe and Save slides are
-        # in the bar at the bottom of the window.
+        # brand colors (put beside Background) and + Add text (before Size) are there. Preview swipe and Save
+        # slides are in the bar at the bottom of the window.
         "<div class='d-tools' id='tools-main'>"
         "<div class='group' id='g-slides'><span class='lbl'>Slides</span>"
         "<button class='tb' id='slides-minus' type='button' aria-label='One fewer slide'>&minus;</button><b id='slides-count'></b>"
@@ -234,16 +267,19 @@ def page_html(kit_name):
         "<div class='group' id='g-bg'><span class='lbl'>Background</span>" + swatches +
         "<input type='color' id='bgc' value='#ffffff' aria-label='Pick any background color' title='Pick any color'></div>"
         "<div class='group' id='g-view'><span class='lbl'>" + html.escape(VIEW) + "</span>"
-        "<button class='tb' id='view-smaller' type='button'>Smaller</button><button class='tb' id='view-bigger' type='button'>Bigger</button></div>"
+        "<input type='range' id='view-size' min='40' max='480' value='230' aria-label='" + html.escape(VIEW_LABEL, quote=True) + "' title='" + html.escape(VIEW_LABEL, quote=True) + "'></div>"
         "<div class='group' id='g-snap'><label class='hint' title='" + html.escape(SNAP_TITLE, quote=True) + "'>"
-        "<input type='checkbox' id='snap' checked> Snap into line</label></div>"
+        "<input type='checkbox' id='snap' checked aria-label='Snap into line'> Snap into line</label></div>"
         "<div class='group' id='g-undo'><button class='tb' id='undo' type='button' disabled>Undo</button></div>"
         "</div>"
         "<p class='gline' id='toolline' role='status'></p>"
-        # The bar for the selected thing: its groups are added by the scripts (Designer.selbar.group). The line a
-        # press brings (#selline) and the help line (#selhint) sit in the bar itself, beside the buttons.
-        "<div class='d-tools selbar off' id='selbar'><span class='gline' id='selline' role='status'></span>"
-        "<span class='hint' id='selhint'></span></div>"
+        # The bar for the selected thing. One line first: the line a press brings (#selline), the help line
+        # (#selhint), and, while the design has an empty frame, "Fill N empty frames" with its own line (both
+        # put here by the designs script). Under it, the groups of buttons for the selected thing, added by the
+        # scripts (Designer.selbar.group) into #selrows. With nothing selected the groups are hidden and the
+        # help line sits alone in the room held for them, so the strip never moves when the selection changes.
+        "<div class='selbar off' id='selbar'><div class='selcap' id='selcap'><span class='gline' id='selline' role='status'></span>"
+        "<span class='hint' id='selhint'></span></div><div class='selrows' id='selrows'></div></div>"
         "<section class='stage' id='stage'><div class='stripwrap' id='stripwrap'><div class='labels' id='labels'></div>"
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
@@ -264,7 +300,7 @@ def page_html(kit_name):
         "<p class='d-note quiet' id='grid-line' hidden></p>"
         "</div><div class='sv-in'>"
         "<button class='tb' id='preview-btn' type='button' disabled>" + html.escape(PREVIEW) + "</button>"
-        "<label class='hint'><input type='checkbox' id='gridcrop'> " + html.escape(GRID_CROP) + "</label>"
+        "<label class='hint'><input type='checkbox' id='gridcrop' aria-label='" + html.escape(GRID_CROP, quote=True) + "'> " + html.escape(GRID_CROP) + "</label>"
         "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_SLIDES) + "</button>"
         "<span class='gline' id='save-line' role='status'></span>"
         "<button class='tb main sv-ans' id='save-yes' type='button' hidden>" + html.escape(SAVE_ANYWAY) + "</button>"
