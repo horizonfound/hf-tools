@@ -1,0 +1,17 @@
+name: Check the plugin
+# Runs the same check Claude's uploader does on every push that touches the plugin,
+# so a header that is too long (what refused Nicole's upload on Nov 5, 2026) is caught within a minute.
+on:
+  push:
+    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py"]
+  pull_request:
+    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py"]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - run: python3 tools/check_plugin.py
