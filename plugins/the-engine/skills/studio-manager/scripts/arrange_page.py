@@ -20,6 +20,12 @@ than --rh, and the box is never shorter than that plus its padding. The panel it
 row's box is the only scroller in it. The X and (on a narrow or touch screen) the Normal / Longer / Quicker
 bar take a press a few pixels outside what is drawn, so a near miss does not open the big view instead.
 
+A Mac and a PC (read through for the PC pass, Nov 6): nothing in the page is Mac-only. No Finder, Dock or
+Option words and no key names on the page (Tab, Enter, space, Escape and the arrows, which it answers to, are on
+both); every address
+is the page server's own, with forward slashes, never a file:// path; the font list names Windows' own (Segoe UI)
+beside the Mac's. Not yet seen on a PC: how the Claude app's pane there draws it and passes on the pointer.
+
 Three scripts, in this order on the page:
   MODEL_JS    the row as a list, and where a drop lands. No page in it, so it can be tested by itself.
   DRAG_JS     dragging drawn by the page itself with pointer events and a lifted copy (the browser's own

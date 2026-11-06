@@ -7,6 +7,7 @@ check-pc.yml), which is how a PC gets tested without anyone here owning one: no 
 CapCut, no Claude app, but real Windows.
 
     python3 tests/pc_smoke.py        Pillow is the only add-on it uses, and only for the checks that need it
+    python3 tests/pc_smoke.py --only posts      just the posts part (below), in a few seconds
 
 The pretend photos are drawn here in plain Python, so it runs on the Mac's own Python 3.9 with nothing
 installed (the Mac way: sips). A check that needs Pillow and does not have it says SKIP and why; so does any
@@ -19,6 +20,8 @@ PC's older code page). A script that hangs is stopped after 10 minutes and its c
     ASSISTANT_SMOKE_DIR=<folder>    where the scratch folder goes (default: this computer's temporary folder)
     ASSISTANT_SMOKE_KEEP=<folder>   when something FAILED, the scratch folder is also copied here (GitHub uploads it)
     ASSISTANT_STRICT_MF=1           hold Windows' own Media Foundation to PASS or FAIL like the other ways
+    ASSISTANT_SMOKE_PORT=<port>     the first of two ports for the posts part's little servers (default: two the
+                                    computer hands out as free)
 
 What it tries:
   - the helper that knows both computers: dates in words, safe names, names Windows keeps for itself, long
@@ -37,6 +40,22 @@ What it tries:
     plain words when Pillow is missing;
   - the reel's sound: the length of every test song in tests/fixtures, hearing the WAV (always) and the MP3
     and M4A songs when this computer has a way to (which way is printed; with none, SKIP, never FAIL);
+  - posts: a post kit started from a folder of finished photos (its folder named with an accent, a curly apostrophe
+    and an emoji); what they said kept word for word from a file (with the mark some PC editors put first) and from
+    --text; the kit's facts with the day in words; then, the PC way (Pillow; on a Mac with sips switched off), the
+    kit built (singles, carousel slides, stories, the reel cover, each its size, and a photo the camera stored
+    sideways the right way up in every one), a new carousel order made (the earlier slides set aside, byte for
+    byte, under the slides lock), the reel and carousel pickers' small copies (upright, never blown up), and the
+    kit's pieces in the posting queue with their small pictures; the posting queue with an emoji and curly quotes
+    (rhythm, add, made, ready, the day's reminder once, the page), every file UTF-8; a lock held by one program
+    keeping a second one out and let go when the holder dies (this_computer.try_lock, still_running; a computer
+    with no lock on its own disk FAILs, never SKIPs); Canva's downloads (canva_kit.py fetch, with Windows' own
+    curl.exe on a PC, which must be there) from a stand-in on 127.0.0.1, never the internet: in under their
+    names, a fresh export setting the earlier ones aside, a dead link changing nothing; and the posting server
+    started in the background, serving the home page, the posting page, a kit page (never its records, its hidden
+    folder or a photo; a name with a colon refused, and the folder button opening nothing for one) and a piece's
+    picture, then stopped by its own number (on the port it said). On a computer without Pillow the PC-way part
+    says SKIP;
   - a whole backup start to finish (copy and check, index, groups and contact sheet, the look, the sort, the
     sneak-peek pages, the pick, the sneak peeks, the settle), every photo checked against the card, the card
     unchanged, the records hidden, then a rename to an accented name and two renames of capital letters only.
@@ -45,10 +64,12 @@ What it tries:
 
 What it does NOT try: the beat of each song (tests/fixtures/check_sound.py), made-up RAW files from six makers
 (tests/pc_pictures.py), the page servers (tests/pc_servers.py), the backup's own promises in depth
-(tests/backup_safety.py), CapCut. docs/pc-readiness-2026-11-06.md has the list.
+(tests/backup_safety.py), CapCut, the pickers' pages in a browser (tests/arrange_check.py, on a Mac), the folder
+picker's window, Canva itself, Instagram. docs/pc-readiness-2026-11-06.md has the list.
 """
 import contextlib
 import hashlib
+import html
 import importlib.util
 import json
 import os
@@ -781,6 +802,602 @@ def whole_backup(work, how_pictures):
     check("after all of it, the card still holds exactly what it held", card_snapshot(card) == before)
 
 
+# ---------------------------------------------------------------- posts: a post kit, the pickers, the posting queue, Canva
+
+KIT_NAME = "Zoë’s beach 🌊"                 # an accent, a curly apostrophe and an emoji, in a folder name too
+POSTS_SHOOT = "Zoë’s “golden hour” 🌊"      # the same, with curly double quotes
+RED = (230, 20, 20)
+
+
+def smoke_ports(n):
+    """n ports for this test's own little servers: ASSISTANT_SMOKE_PORT and the ones after it when that is set,
+    otherwise ports the computer hands out as free right now."""
+    import socket
+    base = os.environ.get("ASSISTANT_SMOKE_PORT")
+    if base:
+        return [int(base) + i for i in range(n)]
+    out, held = [], []
+    try:
+        for _ in range(n):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("127.0.0.1", 0))
+            held.append(s)
+            out.append(s.getsockname()[1])
+    finally:
+        for s in held:
+            s.close()
+    return out
+
+
+def kit_photos(folder):
+    """Three finished photos, taken Monday June 1, 2026 in the evening: a wide one, a tall one, and one the camera
+    stored sideways (600 x 400 in the file, Exif orientation 6: it shows 400 x 600). The sideways one has a red block
+    in the top-left corner of its stored pixels, which shows top-right once it is the right way up."""
+    folder.mkdir(parents=True)
+    t = datetime(2026, 6, 1, 17, 30)
+
+    def marked(bx, by):
+        return RED if bx < 20 and by < 20 else (40 + bx * 2, 90 + by, 160)
+    (folder / "Beach 01.jpg").write_bytes(jpeg_bytes(600, 400, lambda bx, by: (40, 120, 200), exif_blob(t)))
+    (folder / "Beach 02.jpg").write_bytes(jpeg_bytes(400, 600, lambda bx, by: (200, 160, 40), exif_blob(t + timedelta(minutes=5))))
+    (folder / "Beach 03 sideways.jpg").write_bytes(jpeg_bytes(600, 400, marked, exif_blob(t + timedelta(minutes=9), orientation=6)))
+
+
+def _is_red(c):
+    r, g, b = c[:3]
+    return r > 150 and g < 90 and b < 90
+
+
+def red_corners(path, pad=None):
+    """Which corners of the photo inside a picture are red: a set of "top-left", "top-right", "bottom-left",
+    "bottom-right". pad: the colour a padded picture is filled with, so the photo inside it is found first."""
+    from PIL import Image
+    try:
+        with Image.open(path) as im0:
+            im = im0.convert("RGB")
+    except Exception:  # noqa: BLE001
+        return set()
+    w, h = im.size
+    x0, y0, x1, y1 = 0, 0, w, h
+    if pad:
+        def is_pad(c):
+            return all(abs(a - b) <= 12 for a, b in zip(c, pad))
+        xs = [x for x in range(0, w, 2) if not is_pad(im.getpixel((x, h // 2)))]
+        ys = [y for y in range(0, h, 2) if not is_pad(im.getpixel((w // 2, y)))]
+        if not xs or not ys:
+            return set()
+        x0, x1, y0, y1 = min(xs), max(xs) + 1, min(ys), max(ys) + 1
+    bw, bh = x1 - x0, y1 - y0
+    spots = {"top-left": (0.08, 0.08), "top-right": (0.92, 0.08), "bottom-left": (0.08, 0.92), "bottom-right": (0.92, 0.92)}
+    return {k for k, (fx, fy) in spots.items() if _is_red(im.getpixel((x0 + int(fx * bw), y0 + int(fy * bh))))}
+
+
+def size_on_disk(path):
+    """(width, height) of a picture, or None when it is not one this test can open."""
+    from PIL import Image
+    try:
+        with Image.open(path) as im:
+            return im.size
+    except Exception:  # noqa: BLE001  (a picture that can't be opened FAILs its check; it never stops the test)
+        return None
+
+
+def content_box(path, pad):
+    """(width, height) of the photo inside a padded picture."""
+    from PIL import Image
+    try:
+        with Image.open(path) as im0:
+            im = im0.convert("RGB")
+    except Exception:  # noqa: BLE001
+        return (0, 0)
+    w, h = im.size
+
+    def is_pad(c):
+        return all(abs(a - b) <= 12 for a, b in zip(c, pad))
+    xs = [x for x in range(w) if not is_pad(im.getpixel((x, h // 2)))]
+    ys = [y for y in range(h) if not is_pad(im.getpixel((w // 2, y)))]
+    return (max(xs) - min(xs) + 1, max(ys) - min(ys) + 1) if xs and ys else (0, 0)
+
+
+def half_made(folder):
+    """Scratch pictures left anywhere under a folder: kit.py's '.part-<process>-<name>', pictures.make_jpeg's
+    '<name>.part', and the pickers' PC-way '.p-<tag>.jpg' (arrange.py). Empty when there are none."""
+    return sorted(p.name for p in folder.rglob("*")
+                  if p.name.startswith((".part", ".p-")) or p.name.endswith(".part"))
+
+
+def shows(page, name):
+    """Whether a page carries a name: as it is, as the page's HTML writes it, or inside the JSON its script reads."""
+    return any(form in page for form in (name, html.escape(name), json.dumps(name)[1:-1]))
+
+
+def listing(folder):
+    """The names in a folder as Windows or the Mac keeps them, accents written one way (NFC)."""
+    import unicodedata
+    try:
+        return sorted(unicodedata.normalize("NFC", n) for n in os.listdir(folder))
+    except OSError:
+        return []
+
+
+class _StandIn:
+    """A stand-in for Canva's download links: a little server on 127.0.0.1 that hands out the bytes it is given
+    for each path, and 404 for anything else. Nothing here goes near the internet."""
+
+    def __init__(self, port):
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        files, seen = {}, []
+
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = self.path.split("?", 1)[0]
+                seen.append(self.path)
+                body = files.get(path)
+                self.send_response(200 if body is not None else 404)
+                self.send_header("Content-Type", "image/jpeg" if body is not None else "text/plain")
+                self.send_header("Content-Length", str(len(body or b"")))
+                self.end_headers()
+                self.wfile.write(body or b"")
+
+            def log_message(self, *a):
+                pass
+        self.files, self.seen = files, seen
+        self.srv = HTTPServer(("127.0.0.1", port), H)
+        self.port = self.srv.server_address[1]
+        self.thread = threading.Thread(target=self.srv.serve_forever)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def url(self, path, sig):
+        return f"http://127.0.0.1:{self.port}{path}?X-Amz-Signature={sig}"
+
+    def stop(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+def lock_checks(work):
+    """A lock held by one program keeps a second one out, and is let go when the holder dies: this_computer.try_lock
+    (the Mac's fcntl.flock; on a PC msvcrt.locking), what kit.py and arrange.py hold while slides are changed."""
+    print("\n-- a lock held by one program, across two programs")
+    folder = work / "lock Côte"
+    folder.mkdir()
+    lock = folder / "slides.lock"
+    code = ("import sys, time\n"
+            f"sys.path.insert(0, {str(SCRIPTS)!r})\n"
+            "import this_computer as tc\n"
+            f"f = open({str(lock)!r}, 'a+b')\n"
+            "got = tc.try_lock(f)\n"
+            "print('held' if got is True else 'not held: %r' % (got,), flush=True)\n"
+            "time.sleep(120)\n")
+    holder = subprocess.Popen([sys.executable, "-c", code], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, env=child_env())
+    line = [""]
+    reader = threading.Thread(target=lambda: line.__setitem__(0, holder.stdout.readline().decode("utf-8", "replace")))
+    reader.daemon = True
+    reader.start()
+    reader.join(30)
+    f2 = None
+    try:
+        if line[0].strip() != "held":
+            # Never a SKIP (Nov 6, test review): this folder is the test's own scratch folder on the computer's own
+            # disk (NTFS on a PC, APFS on a Mac), which always has locks. None there means the lock code itself went
+            # wrong (on a PC: msvcrt.locking raised something other than "busy"), and kit.py and arrange.py would
+            # then change slides with no lock at all.
+            why = line[0].strip() or "no answer within 30 s"
+            if "not held: None" in why:
+                why = (f"try_lock said None on this computer's own disk ({work}), which always has locks"
+                       + ("; ASSISTANT_SMOKE_DIR points somewhere else: try a folder on this computer's own disk"
+                          if os.environ.get("ASSISTANT_SMOKE_DIR") else ""))
+            check("the first program takes the lock", False, why)
+            return
+        f2 = open(lock, "a+b")
+        second = tc.try_lock(f2)
+        check("while one program holds the lock, a second one is kept out (try_lock says busy)", second is False, repr(second))
+        if second is True:
+            tc.unlock(f2)
+        alive = tc.still_running(holder.pid)
+        check("and the holder is seen as still running", alive is True, repr(alive))
+        holder.kill()
+        holder.wait(30)
+        got, t0 = None, time.monotonic()
+        while time.monotonic() - t0 < 15:          # Windows lets go of a dead program's locks "depending on resources"
+            got = tc.try_lock(f2)
+            if got is True:
+                break
+            time.sleep(0.2)
+        check("once the holder has died, the lock is let go and the second program takes it", got is True,
+              f"{got!r} after {time.monotonic() - t0:.1f} s")
+        if got is True:
+            tc.unlock(f2)
+        gone = tc.still_running(holder.pid)
+        check("and the holder is seen as ended", gone is False, repr(gone))
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+            holder.wait(30)
+        try:
+            holder.stdout.close()
+        except OSError:
+            pass
+        if f2 is not None:
+            f2.close()
+
+
+def posts_checks(work):
+    """A post kit made and built (the PC way: Pillow, the photo the right way up), its words, the picker's small
+    copies, the posting queue with an emoji and curly quotes, a lock across two programs, Canva's downloads from a
+    stand-in on 127.0.0.1, and the posting server started, serving the home page, and stopped."""
+    print("\n-- posts: a post kit, the picker's small copies, the posting queue, Canva, the posting server")
+    home = work / "posts studio-home"
+    home.mkdir()
+    pc_way = {"ASSISTANT_NO_SIPS": "1"} if pictures.use_sips() else {}
+    can_build = pillow_here()
+    env = dict(pc_way, STUDIO_HOME=str(home)) if can_build else {"STUDIO_HOME": str(home)}
+    photos = work / "kit photos"
+    kit_photos(photos)
+    photos_before = {p.name: sha(p) for p in photos.iterdir()}
+    (work / "kit drive").mkdir()
+    code, out = run("posts.py", "setup", "--home", work / "kit drive" / "The Assistant", env=env)
+    check("the folder for their posts is made (posts.py setup)", code == 0, out[-300:])
+    code, out = run("kit.py", "start", "--folder", photos, "--name", KIT_NAME, env=env)
+    content = work / "kit drive" / "The Assistant" / "Your Content"
+    want = "2026-06-01 " + KIT_NAME
+    check("a post kit is started from a folder of finished photos, its folder named exactly (accent, curly apostrophe, emoji)",
+          code == 0 and want in listing(content), f"{code} {listing(content)} {out[-300:]}")
+    if code != 0:
+        return
+    kit = content / want
+    said = work / "said by them.txt"
+    said.write_bytes("\ufeffThe Garcias 🌊, a “windy” morning\n".encode("utf-8"))   # with the mark some PC editors put first
+    code, out = run("kit.py", "told", "beach", "--text-file", said, env=env)
+    code2, out2 = run("kit.py", "told", "beach", "--text", "and a lot of laughing 😄", env=env)
+    try:
+        told = json.loads((kit / ".kit" / "told.json").read_bytes().decode("utf-8"))["text"]
+    except (OSError, ValueError, KeyError) as e:
+        told = f"(unreadable: {e})"
+    check("what they said about the shoot is kept word for word from a file (emoji, curly quotes; the mark at the start dropped)",
+          code == 0 and told.startswith("The Garcias 🌊, a “windy” morning"), f"{code} {told!r} {out[-200:]}")
+    check("and from --text, an emoji and all, added after it", code2 == 0 and told == "The Garcias 🌊, a “windy” morning\nand a lot of laughing 😄",
+          f"{code2} {told!r} {out2[-200:]}")
+    code, out = run("kit.py", "facts", "beach", env=env)
+    try:
+        facts = json.loads(out[out.find("{"):out.rfind("}") + 1])   # the JSON alone, whatever a newer Python warns about
+    except ValueError:
+        facts = {}
+    check('the kit\'s facts give the day in words, with no leading zero ("Monday, June 1, 2026")',
+          code == 0 and facts.get("day") == "Monday, June 1, 2026" and facts.get("photos") == 3, f"{facts.get('day')!r} {out[-300:]}")
+    check("and what they said, exactly", facts.get("they_said") == told, repr(facts.get("they_said")))
+
+    built = False
+    if not can_build:
+        skip("a post kit built the PC way, the picker's small copies, and the posting queue's kit pictures",
+             "Pillow is not installed for this Python; the PC way needs it (python -m pip install pillow)")
+    else:
+        built = build_checks(kit, env)
+    posting_checks(home, env)
+    lock_checks(work)
+    canva_checks(work, kit, env, built)
+    server_checks(work, home, kit, env, built)
+    check("the finished photos were only ever read", {p.name: sha(p) for p in photos.iterdir()} == photos_before)
+
+
+def build_checks(kit, env):
+    """The kit's pieces made the PC way, sizes checked and the sideways photo upright; a new carousel order made;
+    the picker's small copies; the kit's pieces in the posting queue. True when the kit was built."""
+    code, out = run("kit.py", "sheet", "beach", env=env)
+    check("the kit's numbered sheet is made the PC way", code == 0 and (kit / ".kit" / "sheet.json").is_file(), out[-300:])
+    code, out = run("kit.py", "picks", "beach", "--singles", "1,2,3", "--stories", "3,1", "--carousel", "3,1,2",
+                    "--reel", "1,2,3+", "--cover", "3", env=env)
+    check("the picks are kept", code == 0, out[-300:])
+    code, out = run("kit.py", "build", "beach", env=env)
+    check("the kit is built: singles, a carousel, stories and the reel cover",
+          code == 0 and "Singles: 3 made." in out and "Carousel: 3 made." in out and "Stories: 2 made." in out
+          and "Covers: 2 made." in out, out[-500:])
+    if code != 0:
+        return False
+    sideways = "Beach 03 sideways"
+    sing, car, sto, cov = kit / "Singles", kit / "Carousel", kit / "Stories", kit / "Covers"
+    wide = size_on_disk(sing / "Single 01 (Beach 01).jpg") or (1, 1)
+    check("a wide photo's single keeps its own shape (3:2), within 1080 x 1350 and never blown up",
+          wide[0] <= 1080 and wide[1] <= 1350 and abs(wide[0] / wide[1] - 1.5) < 0.01, str(wide))
+    check("a tall photo's single is 1080 x 1350", size_on_disk(sing / "Single 02 (Beach 02).jpg") == (1080, 1350),
+          str(size_on_disk(sing / "Single 02 (Beach 02).jpg")))
+    s3 = sing / f"Single 03 ({sideways}).jpg"
+    check("the sideways photo's single is 1080 x 1350 and the right way up (its red corner top-right)",
+          size_on_disk(s3) == (1080, 1350) and red_corners(s3) == {"top-right"}, f"{size_on_disk(s3)} {red_corners(s3)}")
+    slides = [n for n in listing(car) if not n.startswith(".")]
+    check("every carousel slide is 1080 x 1350, in the order picked",
+          slides == [f"Slide 01 ({sideways}).jpg", "Slide 02 (Beach 01).jpg", "Slide 03 (Beach 02).jpg"]
+          and all(size_on_disk(car / n) == (1080, 1350) for n in slides), str(slides))
+    check("the sideways photo's slide is the right way up", red_corners(car / f"Slide 01 ({sideways}).jpg") == {"top-right"},
+          str(red_corners(car / f"Slide 01 ({sideways}).jpg")))
+    st1 = sto / f"Story 01 ({sideways}).jpg"
+    dark = (0x1A, 0x1A, 0x1C)
+    box = content_box(st1, dark)
+    stories = [n for n in listing(sto) if not n.startswith(".")]
+    check("both stories are there, in the order picked, each 1080 x 1920",     # never all() of an empty folder
+          stories == [f"Story 01 ({sideways}).jpg", "Story 02 (Beach 01).jpg"]
+          and all(size_on_disk(sto / n) == (1080, 1920) for n in stories),
+          str([(n, size_on_disk(sto / n)) for n in listing(sto)]))
+    check("the sideways photo's story stands upright (taller than wide, its red corner top-right)",
+          box[1] > box[0] > 0 and red_corners(st1, pad=dark) == {"top-right"}, f"{box} {red_corners(st1, pad=dark)}")
+    check("the reel cover is 1080 x 1920, upright, and the grid's view of it 1080 x 1440",
+          size_on_disk(cov / "Reel cover.jpg") == (1080, 1920) and red_corners(cov / "Reel cover.jpg") == {"top-right"}
+          and size_on_disk(cov / "Reel cover, as the grid shows it.jpg") == (1080, 1440),
+          f"{size_on_disk(cov / 'Reel cover.jpg')} {red_corners(cov / 'Reel cover.jpg')}")
+
+    # a new carousel order: new slides made first in the kit's hidden folder, the earlier ones set aside (never
+    # deleted, never written over), under the slides lock (on a PC msvcrt.locking, and a rename that refuses a name
+    # already taken)
+    earlier = {n: sha(car / n) for n in slides}
+    code, out = run("kit.py", "picks", "beach", "--carousel", "2,3", env=env)
+    code2, out2 = run("kit.py", "build", "beach", env=env)
+    now = [n for n in listing(car) if not n.startswith(".")]
+    aside = {}
+    for p in (kit / ".kit" / "slides-older").rglob("*.jpg"):
+        aside[p.name] = sha(p)
+    check("a new carousel order: the new slides in place, the earlier ones set aside in the kit's hidden folder, byte for byte",
+          code == 0 and code2 == 0 and "Carousel: 2 made." in out2
+          and now == ["Slide 01 (Beach 02).jpg", f"Slide 02 ({sideways}).jpg"]
+          and all(size_on_disk(car / n) == (1080, 1350) for n in now) and aside == earlier,
+          f"{now} {sorted(aside)} {out2[-300:]}")
+    check("no half-made picture is left anywhere in the kit", not half_made(kit), str(half_made(kit)))
+
+    # the picker's small copies (arrange.py): the PC way, upright, never blown up
+    code, out = run("arrange.py", "previews", "beach", env=env)
+    prev = kit / ".kit" / "previews"
+    big = sorted(prev.glob("0003-1600-*.jpg"))
+    small = sorted(prev.glob("0003-520-*.jpg"))
+    sizes = [size_on_disk(p) for p in big + small]
+    check("the picker's small copies are made (two for each of the 3 photos)",
+          code == 0 and len(list(prev.glob("*.jpg"))) == 6, f"{code} {listing(prev)} {out[-300:]}")
+    check("and no half-made copy is left behind (the PC way's own .p- scratch names too)", not half_made(kit),
+          str(half_made(kit)))
+    check("the sideways photo's copies stand upright: 400 x 600 (never blown up) and 347 x 520, red corner top-right",
+          sizes == [(400, 600), (347, 520)] and all(red_corners(p) == {"top-right"} for p in big + small),
+          f"{sizes} {[red_corners(p) for p in big + small]}")
+
+    # the kit's pieces in the posting queue, each with its own small picture (on a PC "kit_..." in the file name,
+    # since Windows takes no colon in one)
+    code, out = run("posting_queue.py", "add", "--kit", "beach", env=env)
+    try:
+        pieces = [x for x in json.loads((Path(env["STUDIO_HOME"]) / "posting.json").read_bytes().decode("utf-8"))["pieces"]
+                  if x.get("id", "").startswith("kit:")]
+    except (OSError, ValueError, KeyError):
+        pieces = []
+    thumbs = [Path(env["STUDIO_HOME"]) / x["thumb"] for x in pieces if x.get("thumb")]
+    check("the kit's pieces go in the posting queue (reel, carousel, three singles), each with a small picture",
+          code == 0 and len(pieces) == 5 and len(thumbs) == 5 and all(p.is_file() and sha(p) for p in thumbs)
+          and all(max(size_on_disk(p) or (999, 999)) <= 450 and (size_on_disk(p) or (999,))[0] <= 360 for p in thumbs), f"{code} {len(pieces)} {out[-300:]}")
+    if tc.WINDOWS:
+        check("on a PC no picture's file name has a colon in it", not any(":" in p.name for p in thumbs), str([p.name for p in thumbs]))
+    return True
+
+
+def posting_checks(home, env):
+    """The posting queue with an emoji and curly quotes in a shoot's name: interval, add, made, ready, reminders,
+    the page; every file it writes UTF-8."""
+    code, out = run("edit_queue.py", "add-manual", "--name", POSTS_SHOOT, "--due", "2w", env=env)
+    check("a shoot with an emoji and curly quotes goes in the editing queue", code == 0, out[-300:])
+    code, out = run("posting_queue.py", "interval", "3 a week", env=env)
+    check("the posting rhythm is kept (3 a week)", code == 0 and "3 a week" in out, out[-300:])
+    code, out = run("posting_queue.py", "add", "--shoot", "golden", env=env)
+    check("the shoot's reel and carousel go in the posting queue", code == 0 and "2 pieces waiting" in out and POSTS_SHOOT in out, out[-300:])
+    code, out = run("posting_queue.py", "made", "golden reel", "--where", POSTS_SHOOT + " reel", env=env)
+    try:
+        reel = next(x for x in json.loads((home / "posting.json").read_bytes().decode("utf-8"))["pieces"]
+                    if x.get("shoot_name") == POSTS_SHOOT and x.get("kind") == "reel")
+    except (OSError, ValueError, KeyError, StopIteration):
+        reel = {}
+    check("the reel is marked made (in progress, where it is kept)", code == 0 and "in progress" in out
+          and reel.get("status") == "yellow", f"{reel.get('status')} {out[-300:]}")
+    code, out = run("posting_queue.py", "ready", "golden reel", env=env)
+    check("and ready to post, with a date", code == 0 and "ready to post, down for" in out, out[-300:])
+    try:
+        raw = (home / "posting.json").read_bytes().decode("utf-8")
+        green = [x for x in json.loads(raw)["pieces"] if x["status"] == "green"]
+    except (OSError, ValueError, KeyError) as e:
+        raw, green = f"(unreadable: {e})", []
+    check("the posting queue's file is UTF-8 and keeps the name exactly", POSTS_SHOOT in raw and len(green) == 1
+          and green[0]["shoot_name"] == POSTS_SHOOT and green[0].get("date"), raw[:300])
+    if not green:
+        return
+    day = green[0]["date"]
+    code, out = run("posting_queue.py", "reminders", "--mark", env=dict(env, STUDIO_TODAY=day))
+    code2, out2 = run("posting_queue.py", "reminders", "--mark", env=dict(env, STUDIO_TODAY=day))
+    check("on its day a reminder names the post exactly, once a day",
+          code == 0 and f"Today's post: the {POSTS_SHOOT} reel." in out and code2 == 0 and "Today's post" not in out2,
+          (out + " | " + out2)[-400:])
+    code, out = run("posting_queue.py", "page", env=env)
+    try:
+        page = (home / "posting.html").read_bytes().decode("utf-8")
+        ok = shows(page, POSTS_SHOOT)
+    except (OSError, UnicodeDecodeError):
+        ok = False
+    check("the posting page is written as UTF-8, the name with it", code == 0 and ok, out[-300:])
+
+
+def canva_checks(work, kit, env, built):
+    """canva_kit.py fetch from a stand-in for Canva's download links on 127.0.0.1 (never the internet): the files go
+    in under their Canva names, a fresh export sets the earlier ones aside, a dead link changes nothing."""
+    own_curl = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "curl.exe"
+    curl_here = own_curl.is_file() if tc.WINDOWS else shutil.which("curl")
+    if not curl_here:
+        if tc.WINDOWS:
+            # Windows 10 (1803 on) and 11 come with it, and canva_kit.py asks for it by this full path: missing here
+            # means the test or canva_kit.curl() looks in the wrong place, never a PC to skip (Nov 6, test review)
+            check("Windows' own curl.exe is where canva_kit.py looks for it", False, str(own_curl))
+        else:
+            skip("Canva's downloads into a kit", "this computer has no curl, which canva_kit.py uses")
+        return
+    print("\n-- Canva's downloads into the kit, from a stand-in on 127.0.0.1 (never the internet)")
+    # which curl canva_kit.py runs: on a PC Windows' own, by its full path (never a curl.exe in the current folder,
+    # nor another one earlier on the PATH, like Git's); on a Mac the one on the PATH, as always
+    code, out = run_python(["-c", f"import sys; sys.path.insert(0, {str(SCRIPTS)!r}); import canva_kit; print(canva_kit.curl())"], env=env)
+    want = str(own_curl) if tc.WINDOWS else str(curl_here)
+    said = out.strip().splitlines()[-1] if out.strip() else ""
+    check("canva_kit.py runs " + ("Windows' own curl.exe, by its full path" if tc.WINDOWS else "the curl on the PATH"),
+          code == 0 and os.path.normcase(said) == os.path.normcase(want), f"{code} {said!r}, wanted {want!r}")
+    stand_in = _StandIn(smoke_ports(1)[0])
+    car = kit / "Carousel"
+    plain = {n: sha(car / n) for n in listing(car) if "(Canva)" not in n and not n.startswith(".")} if built else {}
+    env = dict(env, NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost")
+    try:
+        v1 = [jpeg_bytes(64, 80, lambda bx, by, k=k: (30 * k, 90, 200 - 30 * k)) for k in (1, 2)]
+        v2 = [jpeg_bytes(64, 80, lambda bx, by, k=k: (200 - 30 * k, 60, 30 * k)) for k in (1, 2)]
+        stand_in.files.update({"/export/a1.jpg": v1[0], "/export/a2.jpg": v1[1], "/export/b1.jpg": v2[0], "/export/b2.jpg": v2[1]})
+        links = work / "links one.json"
+        links.write_bytes(("\ufeff" + json.dumps([stand_in.url("/export/a1.jpg", "one"), stand_in.url("/export/a2.jpg", "two")])).encode("utf-8"))
+        code, out = run("canva_kit.py", "fetch", "beach", "--into", "Carousel", "--urls", links, env=env)
+        got = {n: sha(car / n) for n in ("Slide 01 (Canva).jpg", "Slide 02 (Canva).jpg") if n in listing(car)}   # exact names
+        check("Canva's downloads go into the kit's Carousel folder under their Canva names, byte for byte (links read from a file)",
+              code == 0 and got == {"Slide 01 (Canva).jpg": hashlib.sha256(v1[0]).hexdigest(),
+                                    "Slide 02 (Canva).jpg": hashlib.sha256(v1[1]).hexdigest()}, f"{code} {listing(car)} {out[-300:]}")
+        links2 = work / "links two.json"
+        links2.write_text(json.dumps({"urls": [stand_in.url("/export/b1.jpg", "three"), stand_in.url("/export/b2.jpg", "four")]}), encoding="utf-8")
+        code, out = run("canva_kit.py", "fetch", "beach", "--into", "Carousel", "--urls", links2, env=env)
+        aside = {p.name: sha(p) for p in (kit / ".kit" / "canva-older").rglob("*.jpg")} if (kit / ".kit" / "canva-older").is_dir() else {}
+        now = {n: sha(car / n) for n in ("Slide 01 (Canva).jpg", "Slide 02 (Canva).jpg") if n in listing(car)}
+        check("a fresh export takes the same names, and the earlier Canva files are set aside in the kit's hidden folder, not deleted",
+              code == 0 and now == {"Slide 01 (Canva).jpg": hashlib.sha256(v2[0]).hexdigest(), "Slide 02 (Canva).jpg": hashlib.sha256(v2[1]).hexdigest()}
+              and sorted(aside.values()) == sorted(hashlib.sha256(b).hexdigest() for b in v1), f"{code} {sorted(aside)} {out[-300:]}")
+        before = {n: sha(car / n) for n in listing(car)}
+        links3 = work / "links three.json"
+        links3.write_text(json.dumps([stand_in.url("/export/b1.jpg", "five"), stand_in.url("/export/gone.jpg", "six")]), encoding="utf-8")
+        code, out = run("canva_kit.py", "fetch", "beach", "--into", "Carousel", "--urls", links3, env=env)
+        check("a dead link stops it with plain words, and the Carousel folder is exactly as it was",
+              code == 1 and "STOP" in out and {n: sha(car / n) for n in listing(car)} == before, f"{code} {listing(car)} {out[-300:]}")
+        if built:
+            check("the kit's own plain slides were never touched", {n: sha(car / n) for n in plain if (car / n).is_file()} == plain)
+        asked = [s.split("?", 1)[0] for s in stand_in.seen]
+        check("each link was asked of the stand-in on 127.0.0.1 once, in order (the dead one last)",
+              asked == ["/export/a1.jpg", "/export/a2.jpg", "/export/b1.jpg", "/export/b2.jpg", "/export/b1.jpg", "/export/gone.jpg"],
+              str(asked))
+    finally:
+        stand_in.stop()
+
+
+def server_checks(work, home, kit, env, built):
+    """The posting server (the home page's own) started in the background the way the Assistant starts it, serving
+    the home page, the posting page, a kit page and a piece's picture, then stopped by its own number."""
+    print("\n-- the posting server (the home page's own)")
+    import urllib.error
+    import urllib.request
+    from urllib.parse import quote
+    code, out = run("kit.py", "page", "beach", env=env)
+    try:
+        page = (kit / ".kit" / "Post kit.html").read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        page = ""
+    check('the kit page is written as UTF-8, with the kit\'s name and its day in words ("June 1, 2026")',
+          code == 0 and shows(page, KIT_NAME) and "June 1, 2026" in page, out[-300:])
+    port = smoke_ports(2)[1]
+    url_file = home / "posting-url.txt"
+    if url_file.exists():
+        url_file.unlink()
+    log_path = work / "posting server.log"
+    log = open(log_path, "wb")
+    srv = tc.popen_detached([sys.executable, str(SCRIPTS / "posting_queue.py"), "serve", "--port", str(port)],
+                            stdout=log, stderr=subprocess.STDOUT, env=child_env(env))
+    from urllib.parse import urlsplit
+    served_on = port
+    try:
+        base = None
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < 30 and srv.poll() is None:
+            try:
+                said = url_file.read_text(encoding="utf-8").strip()
+            except OSError:
+                said = ""
+            if said:              # an empty file is one caught mid-write: wait for the address itself
+                base = said.rsplit("/", 1)[0]
+                break
+            time.sleep(0.2)
+        check("the posting server starts in the background and says its address", bool(base) and srv.poll() is None,
+              log_path.read_bytes().decode("utf-8", "replace")[-400:])
+        if not base:
+            return
+        # the port it really took: serve moves up to the next free one when the asked port is busy (Nov 6, test
+        # review: the last check knocked on the asked port, so a moved server was never knocked on at all)
+        try:
+            served_on = urlsplit(base).port or port
+        except ValueError:
+            served_on = port
+        if served_on != port:
+            info("the posting server took another port", f"asked for {port}, it said {served_on}")
+
+        def get(path):
+            try:
+                with urllib.request.urlopen(base + path, timeout=20) as r:
+                    return r.status, r.read()
+            except urllib.error.HTTPError as e:
+                return e.code, b""
+            except OSError as e:
+                return None, str(e).encode()
+        code, body = get("/home")
+        text = body.decode("utf-8", "replace")
+        check("it serves the home page (UTF-8, the shoot's name on it)",
+              code == 200 and "/home-state" in text and shows(text, POSTS_SHOOT), f"{code} {text[:200]}")
+        code, body = get("/posting.html")
+        text = body.decode("utf-8", "replace")
+        check("and the posting page", code == 200 and "Back to home" in text and shows(text, POSTS_SHOOT),
+              f"{code} {text[:200]}")
+        code, body = get("/content/" + quote(kit.name) + "/" + quote("Post kit.html"))
+        check("and the kit's page, read-only from Your Content", code == 200 and b"<html" in body[:400].lower(), f"{code} {body[:200]!r}")
+        code, body = get("/content/" + quote(kit.name) + "/" + quote("kit.json"))
+        check("but never the kit's own records", code == 404, str(code))
+        # nor its hidden folder, nor the photos themselves (Nov 6, test review: only kit.json was asked for)
+        refused = {}
+        for rel in (".kit/kit.json", ".kit/told.json", ".kit/Post kit.html"):
+            refused[rel] = get("/content/" + quote(kit.name) + "/" + quote(rel))[0]
+        # this kit points at the folder it was started from; a kit made from the drop box keeps its photos in its
+        # own Photos folder, so one is put there (a copy) to make sure a real photo at that address is refused
+        own_photos = kit / "Photos"
+        if not sorted(own_photos.glob("*.jpg")):
+            own_photos.mkdir(exist_ok=True)
+            shutil.copyfile(work / "kit photos" / "Beach 01.jpg", own_photos / "Beach 01.jpg")
+        photo = sorted(own_photos.glob("*.jpg"))[0]
+        refused["Photos/" + photo.name] = get("/content/" + quote(kit.name) + "/Photos/" + quote(photo.name))[0]
+        check("nor anything in the kit's hidden folder, nor a photo itself", all(c == 404 for c in refused.values()),
+              str(refused))
+        # a colon in a name: on a PC another drive or a hidden stream inside a file, refused before the drive is
+        # looked at (posting_queue.py serve_content and open_kit_folder). Asked on both computers; on a Mac no such
+        # kit is there either, so only a PC tries the refusal itself. Neither ever opens a window.
+        code, body = get("/content/" + quote(kit.name + ":x") + "/" + quote("Post kit.html"))
+        code2, body2 = get("/content/" + quote(kit.name) + "/Carousel/" + quote("x:Slide 01.jpg"))
+        check("a kit or picture name with a colon in it is refused", code == 404 and code2 == 404, f"{code} {code2}")
+        opened = {}
+        for k in (r"C:\Windows", kit.name + ":x"):
+            c, b = get("/open?kit=" + quote(k, safe=""))
+            try:
+                opened[k] = (c, json.loads(b.decode("utf-8")).get("ok"))
+            except (ValueError, UnicodeDecodeError, AttributeError):
+                opened[k] = (c, b[:80])
+        check("and the folder button refuses a drive or a colon name, opening nothing",
+              all(v == (200, False) for v in opened.values()), str(opened))
+        if built:
+            pieces = json.loads((home / "posting.json").read_bytes().decode("utf-8"))["pieces"]
+            thumb = next((x["thumb"] for x in pieces if x.get("id", "").startswith("kit:") and x.get("thumb")), None)
+            code, body = get("/" + quote(thumb)) if thumb else (None, b"")
+            check("and a kit piece's small picture", code == 200 and body[:2] == b"\xff\xd8", f"{thumb} {code}")
+    finally:
+        srv.terminate()
+        try:
+            srv.wait(15)
+        except subprocess.TimeoutExpired:
+            srv.kill()
+            srv.wait(15)
+        log.close()
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", served_on), timeout=2):
+            answered = True
+    except OSError:
+        answered = False
+    check("and once stopped by its own number, nothing answers on its port", not answered, f"port {served_on}")
+
+
 # ---------------------------------------------------------------- a page server outliving its starter
 
 _STARTER = """import subprocess, sys, time
@@ -891,6 +1508,13 @@ def main():
     home = work / "studio-home"
     home.mkdir()
     env = {"STUDIO_HOME": str(home)}
+    if ONLY == "posts":
+        try:
+            posts_checks(work)
+        except Exception:  # noqa: BLE001
+            import traceback
+            check("the posts checks ran to the end", False, traceback.format_exc()[-1500:])
+        return finish(work)
 
     # ---- the helper
     d = datetime(2026, 10, 4, 9, 5)
@@ -1060,6 +1684,11 @@ def main():
     held_rename_checks(work)
     pictures_checks(work)
     sound_checks()
+    try:
+        posts_checks(work)
+    except Exception:  # noqa: BLE001  (a fault in one check FAILs here and the whole backups still run)
+        import traceback
+        check("the posts checks ran to the end", False, traceback.format_exc()[-1500:])
 
     # ---- whole backups: this computer's own way; on a Mac also the PC way
     print("\n-- a whole backup, start to finish" + (" (the Mac's own way: sips)" if pictures.use_sips() else ""))
@@ -1074,7 +1703,11 @@ def main():
                 skip("a whole backup", "Pillow is not installed for this Python; the PC way needs it (python -m pip install pillow)")
         finally:
             _tag[0] = ""
+    return finish(work)
 
+
+def finish(work):
+    """The count, and the scratch folder: kept (and copied for GitHub) when something FAILED, else cleared away."""
     failed = results.count(False)
     print(f"\n{sum(results)} of {len(results)} passed" + (f", {len(skipped)} skipped (each says why above)" if skipped else "") + "."
           + ("" if not failed else f"  {failed} FAILED: see the lines above."))
@@ -1092,5 +1725,11 @@ def main():
     return 1 if failed else 0
 
 
+# python3 tests/pc_smoke.py --only posts: just the post kit, the pickers, the posting queue, Canva and the posting
+# server (a minute, not ten), for trying a change to those.
+ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv[1:-1] else None
+
 if __name__ == "__main__":
+    if ONLY not in (None, "posts"):
+        sys.exit("--only takes: posts")
     sys.exit(main())

@@ -8,7 +8,10 @@ name: Check it on a Windows PC
 #                            CR3-style RAWs, a turned JPEG, a see-through PNG, a fake iPhone photo); the reel's
 #                            song lengths and hearing them; then a whole backup start to finish (pictures, sort,
 #                            sneak peeks, settle, every photo checked against the card, the records hidden),
-#                            renames, and on Windows a settle and a rename while a photo is held open
+#                            renames, and on Windows a settle and a rename while a photo is held open; posts: a
+#                            post kit built the PC way (sizes, a sideways photo upright), its words and day, the
+#                            pickers' small copies, the posting queue with an emoji, a lock across two programs,
+#                            Canva's downloads from a stand-in on 127.0.0.1, the posting server started and stopped
 #   tests/pc_pictures.py     made-up RAW files from six camera makers, junk and damaged files
 #   tests/backup_safety.py   never write over a file, never mix two cards, carry on a cut-off backup,
 #                            never copy a card onto itself

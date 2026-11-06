@@ -37,7 +37,7 @@ The real grid: Instagram gives no simple way to read a profile's posts, so the S
 screen in the photographer's own browser (the Claude app's browser pane, open on their profile, signed in
 or not). The grab script collects the last 15 tiles as a small list: which post, and the address of its
 full-size picture. Claude saves what it returns to a file and `feed --import` fetches the pictures on this
-Mac. (The first version drew the tiles small in the page and posted them to the Studio's server; that can
+computer. (The first version drew the tiles small in the page and posted them to the Studio's server; that can
 never work: instagram.com's page rules refuse any connection to 127.0.0.1, and the app's browser pane
 refuses local connections from an outside page too, websockets included. The POST /feed route stays
 for a browser outside the app with those rules relaxed, nothing more.) Nothing is posted. Kept in
@@ -48,6 +48,7 @@ A piece is named "<shoot> reel" or "<shoot> carousel"; a word or two from that i
 """
 import argparse
 import base64
+import errno
 import html
 import json
 import math
@@ -59,7 +60,7 @@ import sys
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -67,6 +68,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
+REEL_SCRIPTS = HERE.parent.parent / "assistant-make-a-reel" / "scripts"   # capcut.py, for "Open in CapCut"
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 PFILE = HOME / "posting.json"
@@ -91,6 +95,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 # ---------- the file ----------
@@ -98,7 +107,7 @@ def say(msg):
 def load():
     if PFILE.exists():
         try:
-            p = json.loads(PFILE.read_text())
+            p = json.loads(PFILE.read_text(encoding="utf-8"))
             p.setdefault("pieces", [])
             p.setdefault("interval", None)
             p.setdefault("reminded", {})
@@ -111,8 +120,8 @@ def load():
 def save(p):
     HOME.mkdir(parents=True, exist_ok=True)
     tmp = PFILE.with_name(f"{PFILE.name}.{os.getpid()}.tmp")     # a name of this process's own: two writers never share a half-written file
-    tmp.write_text(json.dumps(p, indent=1, ensure_ascii=False))
-    os.replace(tmp, PFILE)
+    tmp.write_text(json.dumps(p, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, PFILE)    # on a PC, waits a moment if the page server is reading it right then
 
 
 def today():
@@ -178,6 +187,17 @@ def piece_name(p):
     return f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
 
 
+def thumb_file(pid, suffix=".jpg"):
+    """Where a piece's thumbnail is kept. A post kit's pieces have ids like "kit:<kit>-reel". A Mac keeps the
+    file name it always had. On a PC the colon becomes "_" in the file name only (the id in the records stays
+    as it is): Windows does not allow a colon in a file name, and on NTFS "kit:<...>.jpg" would mean a hidden
+    stream inside a file called "kit" (Microsoft, "Naming Files, Paths, and Namespaces" and "File Streams
+    (Local File Systems)"). No id has "_" in it otherwise (ids are letters, digits and dashes), so two pieces
+    never share a file. Unproven on a real PC."""
+    name = pid.replace(":", "_") if this_computer.WINDOWS else pid
+    return THUMBS / f"{name}{suffix}"
+
+
 def find(p, text, statuses=None):
     """One piece from a few words ("beach reel", "beach", "garcia carousel"). A shoot word alone with two
     pieces returns the one that fits best in context, else asks for the kind."""
@@ -226,7 +246,7 @@ def add_for_shoot(p, shoot, kinds):
         if have:
             src = have[n % len(have)]
             THUMBS.mkdir(parents=True, exist_ok=True)
-            dst = THUMBS / f"{pid}{src.suffix.lower()}"
+            dst = thumb_file(pid, src.suffix.lower())
             shutil.copyfile(src, dst)
             thumb = dst.relative_to(HOME).as_posix()
         p["pieces"].append({"id": pid, "shoot_id": shoot["id"], "shoot_name": shoot["name"], "shot": shoot.get("shot"),
@@ -250,7 +270,7 @@ def add_for_kit(p, kit_dir):
     def thumb_of(src, pid):
         if not src or not Path(src).exists():
             return None
-        dst = THUMBS / f"{pid}.jpg"
+        dst = thumb_file(pid)
         if not kit_mod.fit(Path(src), dst, (360, 450)):
             return None
         return dst.relative_to(HOME).as_posix()
@@ -273,7 +293,7 @@ def add_for_kit(p, kit_dir):
     by_n = {}
     sheet_p = kit_dir / ".kit" / "sheet.json"
     if sheet_p.exists():
-        by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text())["photos"]}
+        by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text(encoding="utf-8"))["photos"]}
     out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", by_n.get(reel_pick) or (photos[0] if photos else None),
                       where=reel["project"] if reel else None))
     slides = sorted(f for f in (kit_dir / "Carousel").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Carousel").is_dir() else []
@@ -300,7 +320,7 @@ def refresh_kit_carousel(kit_dir):
     thumb = None
     if slides:
         THUMBS.mkdir(parents=True, exist_ok=True)
-        dst = THUMBS / f"{pid}.jpg"
+        dst = thumb_file(pid)
         if kit_mod.fit(slides[0], dst, (360, 450)):
             thumb = dst.relative_to(HOME).as_posix()
     p = load()                                        # read afresh, change one piece, save: nothing in between
@@ -427,7 +447,7 @@ def reminders(p, mark=False):
 def load_feed():
     if FEED.exists():
         try:
-            f = json.loads(FEED.read_text())
+            f = json.loads(FEED.read_text(encoding="utf-8"))
             f.setdefault("posts", [])
             return f
         except ValueError:
@@ -438,8 +458,8 @@ def load_feed():
 def save_feed(f):
     HOME.mkdir(parents=True, exist_ok=True)
     tmp = FEED.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(f, indent=1, ensure_ascii=False))
-    os.replace(tmp, FEED)
+    tmp.write_text(json.dumps(f, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, FEED)
 
 
 def post_id(href):
@@ -448,17 +468,32 @@ def post_id(href):
     return m.group(1) if m else re.sub(r"[^A-Za-z0-9_-]", "", str(href))[-24:]
 
 
+def curl_program():
+    """The computer's own curl. A Mac finds it on its PATH, as always. A PC (Windows 10 from 2018 on, and 11)
+    keeps it in System32 (Microsoft, "Tar and Curl Come to Windows!"); it is named there in full, because
+    Windows looks in the current folder before System32 for a bare name, and so that PowerShell's own "curl"
+    (a different thing, and only inside PowerShell) never comes into it. Unproven on a real PC."""
+    if this_computer.WINDOWS:
+        system32 = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "curl.exe"
+        return str(system32) if system32.is_file() else "curl.exe"
+    return "curl"
+
+
 def fetch_tile(src):
     """One grid picture, full size, from Instagram's own picture server. Only that server, only https, only a
     jpeg. Fetched with the computer's own curl (every Mac and every Windows 10+ PC has it): Python's own fetch
-    cannot check Instagram's certificate on a Mac whose Python came without root certificates."""
+    cannot check Instagram's certificate on a Mac whose Python came without root certificates. (curl on a PC
+    checks it against Windows' own certificates.)"""
     u = urlsplit(str(src))
     if u.scheme != "https" or not u.hostname or not u.hostname.endswith(FEED_PICTURE_HOSTS):
         raise ValueError("not an Instagram picture address")
-    r = subprocess.run(["curl", "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
-                        "-A", "The Assistant by Horizon Found", "-o", "-", src], capture_output=True)
+    # On a PC no window of its own (CREATE_NO_WINDOW, Microsoft's "Process Creation Flags"), even when the page
+    # server that asks has none. Unproven on a real PC. A Mac: exactly as before.
+    quiet = {"creationflags": 0x08000000} if this_computer.WINDOWS else {}
+    r = subprocess.run([curl_program(), "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
+                        "-A", "The Assistant by Horizon Found", "-o", "-", src], capture_output=True, **quiet)
     if r.returncode != 0:
-        raise ValueError(f"curl {r.returncode}: {r.stderr.decode(errors='replace')[:120]}")
+        raise ValueError(f"curl {r.returncode}: {r.stderr.decode('utf-8', errors='replace')[:120]}")
     raw = r.stdout
     if not raw.startswith(b"\xff\xd8") or len(raw) > FEED_TILE_MAX:
         raise ValueError("not a jpeg")
@@ -512,7 +547,7 @@ def import_feed(tiles, handle=None):
         if p_.stem not in seen:
             keep = FEED_THUMBS / "older"
             keep.mkdir(exist_ok=True)
-            os.replace(p_, keep / p_.name)
+            this_computer.replace(p_, keep / p_.name)   # on a PC, waits a moment if the page is showing it right then
     f = {"handle": (handle or old.get("handle") or "").lstrip("@") or None, "read_at": now(), "posts": posts}
     save_feed(f)
     return f
@@ -523,7 +558,7 @@ def grab_script(port=None, handle=None):
     browser). It scrolls once so the grid fills in, then returns the first tiles as a small list: which post, the
     address of its full-size picture (the largest the page offers), reel / carousel / pinned. Nothing is sent
     anywhere by the page: Claude saves what comes back to a file and `feed --import` fetches the pictures on
-    this Mac. (Pages on instagram.com are not allowed to talk to 127.0.0.1, and the app's browser pane allows
+    this computer. (Pages on instagram.com are not allowed to talk to 127.0.0.1, and the app's browser pane allows
     no local connection from an outside page at all, so the page cannot hand anything over itself.)"""
     return r"""await (async () => {
   for (let i = 0; i < 4; i++) { window.scrollBy(0, 1600); await new Promise(r => setTimeout(r, 1200)); }
@@ -564,7 +599,7 @@ CSS = r"""
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;
 --ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;--line:rgba(31,36,48,.12);
 --red:#E0635A;--yellow:#E8B84A;--green:#4FB286;
---shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;--r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
+--shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
 *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
@@ -718,35 +753,71 @@ def page_html(p):
 
 def write_page(p):
     HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html(p))
+    PAGE.write_text(page_html(p), encoding="utf-8")
     return PAGE
 
 
 def open_capcut(rec):
-    """The kit page's "Open in CapCut" button. Opens CapCut (the Mac's own `open -a`), brings it forward, and says
-    which project to click: CapCut can't be told to open a project from outside, so the words do that part."""
-    import subprocess
+    """The kit page's "Open in CapCut" button. Starts CapCut through capcut.py (on a Mac its own `open -a`, as
+    before; on a PC the CapCut program found where it installs itself), and says which project to click:
+    CapCut can't be told to open a project from outside, so the words do that part. capcut.py also adds a reel
+    that is still waiting for CapCut's list (one made while CapCut was open on a PC, or while the list couldn't
+    be saved) when CapCut is surely closed, and its note about that is passed on."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
         return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
-    if sys.platform == "darwin":
-        r = subprocess.run(["open", "-a", "CapCut"], capture_output=True, text=True, timeout=20)
-        if r.returncode != 0:
-            return False, "CapCut doesn't seem to be installed on this Mac. It's free from capcut.com."
-    elif os.name == "nt":
-        try:
-            os.startfile("CapCut")
-        except OSError:
-            return False, "Couldn't open CapCut. Open it yourself and look for the project named below."
-    else:
+    if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
-    return True, f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
+    capcut = _capcut()
+    damaged = False
+    try:
+        ok, why = capcut.open_capcut()
+    except Exception as e:  # noqa: BLE001  (a damaged list of waiting reels must never leave the button without an answer)
+        say(f"open CapCut: the list of reels waiting for CapCut couldn't be used ({e.__class__.__name__}); starting CapCut without it")
+        damaged = True
+        ok, why = capcut.launch()
+        why = "Opened CapCut. The newest project is at the top of its list." if ok else f"STOP: {why}."
+    say(f"open CapCut: {'ok' if ok else 'no'}: {why}")
+    if not ok:
+        if this_computer.MAC:   # the words a Mac always gave
+            return False, f"CapCut doesn't seem to be installed on this {this_computer.COMPUTER}. It's free from capcut.com."
+        return False, (f"I couldn't open CapCut on this {this_computer.COMPUTER}. Open it from the Start menu, then click "
+                       f"“{project}” in its project list (near the top, newest first). CapCut is free from capcut.com.")
+    words = f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
+    base = "Opened CapCut. The newest project is at the top of its list."
+    extra = why[len(base):].strip() if why.startswith(base) else ""
+    if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
+        words += " " + extra
+    if damaged:                                  # pressing again would meet the same damaged list: Claude sorts it out
+        return True, words + " If it isn't in the list, tell Claude and it'll sort it out."
+    try:
+        waiting = capcut._waiting(capcut.default_store())     # still not in CapCut's list: CapCut was open
+    except Exception:  # noqa: BLE001  (a hint, never a reason for the button to fail)
+        waiting = []
+    if waiting and not extra:
+        words += f" If it isn't in the list, {capcut.QUIT} CapCut and press Open in CapCut again, and I'll add it."
+    return True, words
+
+
+def _capcut():
+    """capcut.py, from the reel scripts beside these. When it loads, capcut.py puts its own folder and this one at
+    the front of Python's search list; the list is put back as it was straight after (anything new kept, at the
+    end), so in a running page server a reel script can never stand in for a module imported later. No name is
+    shared between the two folders today (checked Nov 6)."""
+    if str(REEL_SCRIPTS) not in sys.path:
+        sys.path.append(str(REEL_SCRIPTS))
+    saved = list(sys.path)
+    try:
+        import capcut
+    finally:
+        sys.path[:] = saved + [x for x in sys.path if x not in saved]
+    return capcut
 
 
 class Handler(SimpleHTTPRequestHandler):
     def ours(self):
         """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)?
-        Every page here is opened that way. A web page on another site that has been pointed at this Mac by
+        Every page here is opened that way. A web page on another site that has been pointed at this computer by
         a trick of names still carries its own name in Host, and is refused before any route is looked at."""
         port = self.server.server_address[1]
         host = (self.headers.get("Host") or "").strip().lower()
@@ -842,8 +913,9 @@ class Handler(SimpleHTTPRequestHandler):
             h = h / posts.DROP_NAME
             h.mkdir(exist_ok=True)
         ok, why = finder.open_folder(h)
-        words = (f"Opened {h.name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
-                 else f"Opened {h.name} in Finder.") if ok else f"Couldn't open Finder. The folder is {h}."
+        app = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
+        words = (f"Opened {h.name} in {app}, behind this window. Click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
+                 else f"Opened {h.name} in {app}.") if ok else f"Couldn't open {app}. The folder is {h}."
         self.answer({"ok": ok, "words": words})
 
     def open_shoot(self, query):
@@ -876,7 +948,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.answer({"ok": False, "words": "There's no report for this one. It didn't come from a backup."})
             studio = Path(s["studio"])
             if not studio.is_dir():
-                drive = studio.parts[2] if len(studio.parts) > 2 and studio.parts[1] == "Volumes" else "the drive"
+                drive = this_computer.drive_words(studio) or "the drive"   # "Big Kahuna"; on a PC "the drive that was E:"
                 return self.answer({"ok": False, "words": f"Plug in {drive} to see this report."})
             import serve_report
             url = serve_report.report_url(studio)
@@ -889,31 +961,34 @@ class Handler(SimpleHTTPRequestHandler):
             return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and Claude will."})
 
     def pick_folder(self):
-        """The home page's "Choose the folder your finished photos are in": the Mac's own folder picker, then
-        posts.py bring copies only the finished photos into the drop box. The originals are never moved."""
+        """The home page's "Choose the folder your finished photos are in": the computer's own folder picker
+        (this_computer.pick_folder: the Mac's choose folder, as before; on a PC Windows' own folder window), then
+        posts.py bring copies only the finished photos into the drop box. The originals are never moved.
+        A PC is never told to drag the folder in: there, as on a Mac, a folder dragged within one drive is moved."""
         import posts
         h = posts.home()
         if not h or not h.is_dir():
             return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up."})
-        if sys.platform != "darwin":
+        if not (this_computer.MAC or this_computer.WINDOWS):
             return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
-        script = ('tell application "System Events" to activate\n'
-                  'set f to choose folder with prompt "Pick the folder your finished photos are in. The Assistant copies the photos; nothing is moved."\n'
-                  'POSIX path of f')
-        try:
-            r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=300)
-        except (OSError, subprocess.TimeoutExpired):
-            return self.answer({"ok": False, "words": "The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the Option key so it copies)."})
-        folder = r.stdout.strip()
-        if r.returncode != 0 or not folder:
-            return self.answer({"ok": False, "words": "No folder chosen." if "-128" in (r.stderr or "") else "The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the Option key so it copies)."})
+        if this_computer.WINDOWS:
+            no_window = ("The folder window didn't open. Tell Claude which folder your finished photos are in (you can copy its "
+                         f"address from the top of its {this_computer.FILES_APP} window), and it'll copy the photos for you.")
+        else:
+            no_window = f"The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the {this_computer.COPY_KEY} key so it copies)."
+        folder, why = this_computer.pick_folder("Pick the folder your finished photos are in. The Assistant copies the photos; nothing is moved.")
+        if not folder:
+            return self.answer({"ok": False, "words": "No folder chosen." if why == "cancelled" else no_window})
         got = posts.bring(h, folder)
         if not got:
             return self.answer({"ok": False, "words": "Something stopped the copy. Tell Claude and it'll sort it out."})
         copied, skipped, dest = got
         left = ", ".join(posts.plural(n, k) for k, n in sorted(skipped.items()))
-        words = (f"Copied {copied} finished photo{'s' if copied != 1 else ''} from {Path(folder).name}. Your originals weren't moved." if copied
-                 else f"No finished photos (JPEGs) in {Path(folder).name}.") + (f" Left behind: {left}." if left else "")
+        label = Path(folder).name
+        if not label and this_computer.WINDOWS:     # the top of a drive ("E:\") has no name of its own: say "E:"
+            label = folder.rstrip("\\/")
+        words = (f"Copied {copied} finished photo{'s' if copied != 1 else ''} from {label}. Your originals weren't moved." if copied
+                 else f"No finished photos (JPEGs) in {label}.") + (f" Left behind: {left}." if left else "")
         say(f"pick-folder: {folder} -> {copied} copied, skipped {skipped}")
         self.answer({"ok": bool(copied), "words": words, "copied": copied})
 
@@ -935,8 +1010,11 @@ class Handler(SimpleHTTPRequestHandler):
         h = posts.home()
         ok, words = False, "That isn't a folder this kit names."
         content = (h / posts.CONTENT_NAME).resolve() if h else None
-        kd = (content / kit_name).resolve() if content and kit_name and ".." not in kit_name else None
-        if kd and str(kd).startswith(str(content)) and kd.is_dir():
+        named = kit_name and ".." not in kit_name and not (this_computer.WINDOWS and ":" in kit_name)   # a PC: a colon is another drive or a hidden stream, never a kit
+        kd = (content / kit_name).resolve() if content and named else None
+        # inside Your Content, folder by folder: a text match let "Your Content old/..." beside it through (both
+        # computers); a path compare also ignores upper and lower case and the kind of slash on a PC
+        if kd and content in kd.parents and kd.is_dir():
             if sub == "CapCut":
                 ok, words = open_capcut(kit_mod.load_rec(kd))
                 target = None
@@ -955,8 +1033,9 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 ok, why = finder.open_folder(target)
                 name = target.name
-                words = (f"Opened {name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
-                         else f"Opened {name} in Finder.") if ok else f"Couldn't open Finder. The folder is {target}. ({why})"
+                app = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
+                words = (f"Opened {name} in {app}, behind this window. Click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
+                         else f"Opened {name} in {app}.") if ok else f"Couldn't open {app}. The folder is {target}. ({why})"
         elif h is None or not content.is_dir():
             words = f"The {posts.HOME_NAME} folder isn't there right now. Is the drive plugged in?"
         say(f"open asked: {kit_name} / {sub or '(kit)'} -> {'ok' if ok else 'no'}: {words}")
@@ -984,6 +1063,10 @@ class Handler(SimpleHTTPRequestHandler):
             h = None
         parts = unquote(rel).split("/")
         ok = bool(h) and len(parts) in (2, 3) and all(x and not x.startswith(".") and "\\" not in x and "\x00" not in x for x in parts)
+        if ok and this_computer.WINDOWS:
+            # no real name on a PC has a colon in it; one would mean another drive, or a hidden stream inside a
+            # file (Microsoft, "Naming Files, Paths, and Namespaces"). Unproven on a real PC.
+            ok = not any(":" in x for x in parts)
         if ok and len(parts) == 2:
             ok = parts[1] in KIT_OWN_FILES
         elif ok:
@@ -1116,14 +1199,16 @@ def serve(port):
     HOME.mkdir(parents=True, exist_ok=True)
     for pt in range(port, port + 20):
         try:
-            srv = ThreadingHTTPServer(("127.0.0.1", pt), partial(Handler, directory=str(HOME)))
+            # fresh.Server: Python's own server on a Mac, exactly as before; on a PC one that never shares its
+            # port with another server (Windows would let two listen on 8790 and answer from either).
+            srv = fresh.Server(("127.0.0.1", pt), partial(Handler, directory=str(HOME)))
             break
         except OSError:
             continue
     else:
         sys.exit(f"STOP: no free port between {port} and {port + 19}.")
     url = f"http://127.0.0.1:{pt}/posting.html"
-    (HOME / "posting-url.txt").write_text(url)
+    (HOME / "posting-url.txt").write_text(url, encoding="utf-8")
     print(f"Posting queue: {url}", flush=True)
     try:
         srv.serve_forever()
@@ -1196,13 +1281,13 @@ def main():
         if a.clear:
             for p_ in FEED_THUMBS.glob("*.jpg"):
                 (FEED_THUMBS / "older").mkdir(parents=True, exist_ok=True)
-                os.replace(p_, FEED_THUMBS / "older" / p_.name)
+                this_computer.replace(p_, FEED_THUMBS / "older" / p_.name)
             save_feed({"handle": a.handle or f.get("handle"), "read_at": None, "posts": []})
             write_page(p)
             say("Forgot your grid. The page shows placeholders again until it's read once more.")
             return 0
         if a.import_file:
-            body = json.loads(Path(a.import_file).read_text())
+            body = json.loads(Path(a.import_file).read_text(encoding="utf-8-sig"))   # -sig: a file Claude saved may start with a byte-order mark
             tiles = body.get("tiles") if isinstance(body, dict) else body
             try:
                 f = import_feed(tiles, handle=a.handle or (body.get("handle") if isinstance(body, dict) else None))
