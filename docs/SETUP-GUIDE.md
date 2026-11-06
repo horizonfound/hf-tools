@@ -31,34 +31,22 @@ The first time you open Code, there is a row of choices under the message box: w
 
 1. Under **folder**, choose **Open folder…** and pick your Pictures folder, or make a new folder called **Assistant** anywhere you like. This is only where the Assistant keeps its own notes; your photos never go here. **[shot]**
 
-### Step 3: Install The Assistant
+### Step 3: Add The Assistant to Claude
 
-1. Click in the message box and paste this line, then press Return:
+**Corrected Nov 5, 8pm, from Nicole's first try.** Pasting a `/plugin` line into the desktop app's message box does not install anything: it opens Settings on Customize, Plugins. That Settings box is the way in (it is also how the Engine was installed in October).
 
-   ```
-   /plugin marketplace add https://github.com/horizonfound/hf-tools
-   ```
+1. Click the **gear** at the bottom left of the Claude window, next to your name. Settings opens.
+2. In the list on the left, click **Customize**. Then click **Plugins** at the top.
+3. Click **+ Add** at the top right. Choose **Add marketplace**, then **Add from a repository**. **[check: the exact words in the + Add menu; these are from the October install notes]**
+4. Paste `horizonfound/hf-tools` and click **Sync**.
+5. Click **Discover**, and type **Assistant** in the search box.
+6. Click the **+** on **The Assistant**. Close Settings.
 
-   It answers "Successfully added marketplace: hf-tools."
+If it says hf-tools is already added, find it in the list and click **Sync**. If "The Engine" shows and "The Assistant" does not, the October copy is still there and has not synced.
 
-2. Paste this line and press Return:
+### Step 4: Getting updates
 
-   ```
-   /plugin install the-engine@hf-tools
-   ```
-
-   If it asks who the plugin is for, choose **Install for you**. (The full web address in the first line matters: the short form can ask for a GitHub account, which you don't need.) **[check: whether the desktop message box accepts these two lines, or whether the + button beside the message box and "Add plugins" is the way; the docs show both the lines and a plugin browser, and say the browser lists only the official marketplaces]**
-
-### Step 4: Keep The Assistant up to date
-
-The Assistant gets better every week. Turn on updates once and you never think about it again.
-
-1. In the message box, type `/plugin` and press Return.
-2. Open the **Marketplaces** tab, choose **hf-tools**, and turn on **Enable auto-update**. **[check: this is the documented path inside a session; confirm the desktop app shows the same tabs]**
-
-Updates arrive on their own a few minutes after your first message in a session, and take effect the next time you open Code.
-
-**To get the latest right now** (when we tell you something was just fixed): type `/plugin`, open **Marketplaces**, choose **hf-tools**, and press **Update marketplace**. Then type `/reload-plugins` and press Return. **[check: click this through in the desktop app; the docs describe it for a session but don't say it works from the desktop message box]**
+**[check, all of it]** Installed this way, the Assistant lives on the Claude account, not in a folder Claude Code manages, so the `/plugin` auto-update switch from Draft 2 does not apply. The October notes say updates arrive on their own and that an **Update** button on the plugin's page (Settings, Customize, Plugins, Yours, The Assistant) forces one. But Dustin's account was still on the Oct 16 copy (0.2.4) on Nov 5, after 0.3.1 was pushed Oct 21, so "on their own" did not happen at least once. Until this is seen working: after we push a fix, the photographer opens that page and clicks **Sync** on hf-tools and **Update** on The Assistant.
 
 ### Step 5: Let the Assistant work while you're away
 
