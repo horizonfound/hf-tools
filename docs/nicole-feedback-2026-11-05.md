@@ -84,6 +84,31 @@ kept here as the reference for building it properly:
 **It exists only in her chat session.** Claude asked her to have her Claude zip the designer and the reel
 picker and drop the zip in Slack, so the real thing can be built in and not rebuilt from a picture.
 
+**10pm: the line moved. Words and fonts are on the slides now.** Nicole asked her Claude for brand colors
+and fonts, and it added them (her handoff v2, 10:04pm): "+ Add text," 30 fonts in Serif, Sans and Script
+groups plus any Google Font by name, size, bold, italic, all caps, left, center, right, letter and line
+spacing, color; and brand colors that are saved once and applied to text or background. Her preview now
+looks like an Instagram post with her handle on it. Her words: "i asked if it could add brand colors and
+fonts and it did" ... "im dead" ... "would be good to have a brand fonts section too" ... "i cant even
+breathe" ... "to be able to have THIS" ... "this is SO FUCKING INSANE."
+
+**Dustin, in Slack (10:04pm to 10:07pm), three wants of his own:**
+- "a font library built in that runs off Google Fonts would be amazing. Their favorites can be stored inside
+  The Assistant itself"
+- "even a separate little area where they can dial in their 'brand kit' with colors and font hierarchy....
+  header, subheader, paragraph etc"
+- "can even have some suggested ones that go well together"
+
+**What this changes.** On Oct 24 the line was "the finished look comes from CapCut and Canva." Tonight both
+of you are asking for type and a brand kit inside the Assistant. Claude is treating Nicole's v2 (text, fonts,
+brand colors) as part of what "start building" covers, since it comes with her designer, and is holding
+Dustin's three as wants until he says build them. Two honest notes: fonts come from Google over the
+internet, so with no connection the text falls back to a plain font; and the words on a slide are typed by
+the photographer, which keeps rule 11 (the ideas are theirs).
+
+**Her Claude's own list of what isn't built:** saved layout templates, text effects (shadow, a box behind
+text), and handing a layout to Canva.
+
 **The question underneath, for the two of you:** how far it goes. On Oct 24 the line was drawn that the
 finished look comes from CapCut and Canva, and the Assistant does the choosing and the prep. Arranging the
 photographer's own photos on slides sits on the Assistant's side of that line. Fonts, text styling, stickers
