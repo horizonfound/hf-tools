@@ -68,7 +68,7 @@ CSS = """
 .name .go:disabled{opacity:.45;cursor:default;transform:none}
 .name .state{font-size:13px;color:var(--ink-2);min-height:1.2em}.name .state.on{color:var(--ink)}.name .state.bad{color:#b4472e}
 .name .pen{position:absolute;left:1.05rem;top:50%;transform:translateY(-50%);color:var(--coral);font-size:20px;pointer-events:none}
-.name input{font:600 clamp(17px,1.7vw,21px)/1.2 var(--sans);letter-spacing:-.01em;color:var(--ink);background:var(--paper);border:2px dashed var(--coral);border-radius:18px;padding:.75rem 1rem .75rem 2.9rem;width:100%;outline:none;cursor:text;box-shadow:0 10px 24px -18px rgba(240,127,90,.8);transition:border-color .3s,background .3s,box-shadow .3s}
+.name input{text-overflow:ellipsis;font:600 clamp(17px,1.7vw,21px)/1.2 var(--sans);letter-spacing:-.01em;color:var(--ink);background:var(--paper);border:2px dashed var(--coral);border-radius:18px;padding:.75rem 1rem .75rem 2.9rem;width:100%;outline:none;cursor:text;box-shadow:0 10px 24px -18px rgba(240,127,90,.8);transition:border-color .3s,background .3s,box-shadow .3s}
 .name input:hover{background:var(--sun-l)}
 .name input:focus{border-style:solid;border-color:var(--coral);background:var(--paper);box-shadow:0 0 0 4px rgba(240,127,90,.18)}
 .name input::placeholder{color:#9AA0AB;font-weight:400;font-style:italic;font-family:var(--sans);font-size:.72em;letter-spacing:0}
@@ -372,7 +372,7 @@ def shoots_section(studio):
         out.append(f"<p class='recap'>{e(s.get('recap', ''))}</p>")
         out.append(f"<div class='name'><label for='{s['id']}'>What should I call this one?</label>"
                    f"<div class='field'><span class='pen'>&#9998;</span>"
-                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'>"
+                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'>"
                    f"<button class='go' type='button' data-shoot='{e(s['id'])}'>Rename</button></div>"
                    f"<span class='state' data-for='{e(s['id'])}'></span>"
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"

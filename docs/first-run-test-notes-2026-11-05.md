@@ -375,3 +375,13 @@ saying "run the same command again" without naming it; /assistant and /studio bo
 (`start-editing-transaction`, `perform-editing-operations`, `commit-editing-transaction`) that this Mac's
 Canva connector does not have (it has one `edit-design` tool). The part now says the names differ by
 version; the steps themselves want a check against the connector students will actually get.
+
+## 16. A long shoot name was cut off mid-letter in the name box
+
+**Dustin:** the name box on the report showed "Lookbook on the patterned" with the last word sliced off at
+the edge. "It would be good to have like a ... or something that shows that it's longer than what is
+shown there."
+
+**Fixed the same day:** a name longer than the box now ends in "..." ("Lookbook on the patterne..."), and
+hovering over the box shows the whole name. Clicking into the box to type still shows all of it. Seen on
+the real report in the pane. Reports written before this keep the old look until they are rebuilt.
