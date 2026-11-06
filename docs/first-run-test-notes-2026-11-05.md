@@ -420,3 +420,27 @@ app-switch path works; the first test's "nothing happened" was a return in under
 run's folders on Big Kahuna (The Assistant folder, the two shoot folders, the backup's records) were
 renamed into `The Engine Test/set aside 2026-11-05 first-run 5/`, with a note inside saying where each
 came from. Nothing deleted or copied.
+
+## 18. Fresh run 5: the source drive dropped out mid-copy, and the backup stopped the right way
+
+**What happened:** on the second first-timer run the TETHER drive was plugged in at the "where are your
+photos" question, the six setup questions were answered, and the copy began. On the very first photo the
+drive disconnected ("Device not configured"). It had also gone missing once earlier in the afternoon,
+between runs, so it looks like a loose cable, a hub, or the drive going to sleep.
+
+**What the Assistant did, which is what it should:** stopped at once, copied nothing further, said so at
+the top of its report, and left the one half-written file marked as partial. Nothing on TETHER was
+changed. Running the same backup again picks up where it left off.
+
+**Small things seen on this run:**
+- The "Starting now... You can walk away" message came out after the backup had already stopped, because
+  the backup was launched before the message was written. The message should go out first, or in the same
+  breath as the launch.
+- Keeping what they said about the shoots ("told") was refused for the first half minute because the
+  backup's records did not exist yet; it had to be retried. It should wait for the records itself, or the
+  backup should take the words as it starts.
+- A drive with a lot on it: the quick count of every folder took under a second and the question offered
+  the four likeliest folders. That worked well.
+- For a stop like this, the useful button under the last message is "Backup now" (try again), not only
+  "Show the report." Worth changing in the instructions.
+- The warm-up before the questions and the one-step sign-off question both ran as written today.
