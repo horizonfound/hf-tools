@@ -14,7 +14,7 @@ right route (the October guide and the README). The lesson is at the bottom.
 | 1 | Pasting the install line opened Settings and installed nothing | The guide | Yes |
 | 2 | "This marketplace is already added" | Her Claude still held October's copy | Worked around |
 | 3 | "Find it in that list": there was no list | Claude's Slack message | Yes |
-| 4 | Discover offered "The Engine", not "The Assistant" | The October copy never refreshed | Worked around, cause being investigated |
+| 4 | Discover offered "The Engine", not "The Assistant" | Claude never went back to GitHub after Oct 16 | Worked around; cause found, fix not yet tried |
 | 5 | Upload refused: "description... must be at most 1024 characters" | The plugin | Yes, and now checked automatically |
 | 6 | A grey line, "The archive must contain...", looked like an error | Claude's screen; the guide didn't warn | Yes |
 | 7 | "Couldn't access Documents" when she typed hi | The guide | Yes |
@@ -62,16 +62,36 @@ that list and click Sync." She replied: "dont know what list its talking about."
 **What she saw:** under Discover, one entry: "The Engine, by hf-tools... Your brand. Your voice. Just fa..."
 That is the plugin as it was on October 16.
 
-**Why:** her account's copy of hf-tools has not refreshed since October 16, although the October guide said
-"Leave Sync automatically on" and "updates happen on their own." Dustin's account was frozen on the same
-copy. What is known: Dustin's Claude app log shows the last refresh request on Oct 16 at 2:03pm, and its
-own check every 20 minutes since then found nothing new to download. **Why the refresh stopped is being
-investigated; the finding goes here when it is in.**
+**Why (found by the investigation, Nov 5, 9pm):** Claude's servers copied hf-tools from GitHub once, on
+October 16 at 2:03pm, and have not gone back since. Nothing was ever telling them to.
+- **"Sync automatically" has nothing behind it.** It waits for GitHub to announce each change, and no such
+  announcement is set up on our GitHub project. Claude's own help says "Nothing syncs on a schedule."
+  Proof: a change pushed four minutes after that last sync, with the switch already on, never arrived.
+  Neither did any of the hundreds since.
+- **The Claude app's own check every 20 minutes can't help.** It only downloads what Claude's servers
+  already hold. It never asks them to look at GitHub again.
+- **Adding the marketplace again can't help either.** "This marketplace is already added" is the app
+  turning you away before it contacts anything.
+- **It was not the too-long description.** That fault (and three smaller header faults) sat in the plugin
+  from October 24 until tonight, and would likely have blocked a refresh if anyone had tried one. But 54
+  good versions from the week before it never arrived either, so it is not why the copy froze.
+
+Checked by: Claude's own saved record of the marketplace on Dustin's Mac (last sync started Oct 16,
+succeeded, no errors, nothing since), the app's logs, the app's own code, and GitHub. Five investigators,
+then a skeptic tried to knock down each finding; all five held. Nicole's account could not be looked at.
+
+**The fix that should work, not yet tried:** a button called **Check for updates**. In Settings, Customize,
+Plugins: **+ Add**, **Manage marketplaces**, the **...** on the hf-tools row, **Check for updates**. Best
+done at claude.ai in a web browser; other people report it failing from the Code tab's screen. A real
+refresh answers "Updated to" and a short code. These labels were read out of the app's code; nobody has
+clicked them yet.
 
 **Fix that night:** upload the Assistant as a file.
 
-**What this means for students:** until a refresh is seen to work, "updates happen on their own" is not a
-claim we can make. Each update is a new file.
+**What this means for students:** "updates happen on their own" is not true today, and CLAUDE.md said it
+was. Until automatic sync is made to work (it needs the Claude GitHub App given access to our GitHub
+project, and other people report even that not working), every update means each photographer pressing
+Check for updates, or being sent a new file.
 
 ## 5. The upload was refused
 
