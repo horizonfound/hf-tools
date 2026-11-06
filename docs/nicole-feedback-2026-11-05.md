@@ -12,6 +12,26 @@ whats happening."
 
 ## 1. To decide together
 
+### 1-top. A drag-and-drop picker for the reel (her biggest reaction of the night)
+
+**Her words (8:53pm):** "and it did it" ... "holy shit. we need to add this cause this will help so much."
+
+**What happened:** the Assistant showed its 12 picks for the reel as a numbered strip and a paragraph of
+numbers ("19, 4, 10, 14, 6, 41...") and asked "Go with these?" She chose Change the picks, was shown
+numbered contact sheets, and typed: "can you make it interactive so i can move them around rather than
+look at a contact sheet." Her Claude then built a page on the spot: "Your reel" across the top in order,
+each photo with an X and a bar to set Normal, Longer or Quicker; all 52 photos below, click to add or take
+out, a corner button to see one bigger; "Back to my pick" and "I'm happy with this order."
+
+**Why it matters:** this is the same idea as the sneak-peek picker Dustin called "freaking awesome" earlier
+the same day. Changing picks by typing numbers off a contact sheet is the part she rejected.
+
+**What it isn't yet:** part of the product. Her Claude made it up for her, which took about a minute and a
+half, used her plan, and would come out a little different each time. Built in, it would open at once and
+work the same for everyone. The carousel, singles and stories pick the same way and would want it too.
+
+**Claude's read:** worth building next. It is real work (a day's, not an hour's), so it waits for a yes.
+
 ### 1a. Her photos ended up in three places
 
 **Her words (8:42pm, 8:49pm):** "theyre already on my hard drive in another location. it wouldnt make sense
@@ -50,6 +70,9 @@ it feels like it is."
 **What happens today:** one request makes the whole kit: reel, carousel, singles, stories, covers, captions
 (Dustin, Oct 30: "as much done for you as possible").
 
+**What she did next:** she typed "i want to do a reel first," and the Assistant went along with it without
+fuss. So one at a time already works when asked; the opening just doesn't offer it.
+
 **Worth talking about:** the two aims pull against each other. Her note is about feeling in control, which
 is also rule 11 (the photographer is behind the wheel). A middle way exists: ask "What do you want to make
 first?" with the whole kit as one of the choices.
@@ -80,7 +103,25 @@ Not from Nicole, but tonight showed it needs deciding.
   nobody has pressed it yet. If it works, students could install from the marketplace with no file at all,
   and update with one click. **Try it on Dustin's account first.**
 
-### 1e. The Start Here interview
+### 1e. Songs: a lesson on screen recording, and what the Assistant found on her Mac
+
+**Her words (8:56pm):** "should we remove this song from the folder? the other thing we were talking about
+was me showing them how to add a song to their projects by screen recording."
+
+**What happened:** asked which song, the Assistant said "The only full song in your CapCut projects is
+Monkeys Spinning Monkeys (the rest are sound effects), and I didn't find any song files on this Mac," and
+offered: pick one in CapCut, use that song, or no song for now.
+
+**Told her:** that song is not ours and did not come with the Assistant; it was found in her own CapCut
+projects, so there is nothing to remove.
+
+**To talk about:** the screen-recording route (record a post with the song you want, hand the recording to
+the Assistant). It was proven once by hand on Oct 25 and is not built: no "save this song for my next
+reel," and pulling the song out still needs a tool most Macs don't have. If Nicole is going to teach it,
+the Assistant has to be able to do it. A student with no songs anywhere would have landed on "no song for
+now" tonight.
+
+### 1f. The Start Here interview
 
 Set aside on Nov 5 with three other October skills so the install has one helper. Whether the 40-minute
 interview comes back is yours to say.
@@ -108,6 +149,19 @@ the same thing again in a box with two buttons. One is enough.
 Her 8:51pm note is a request for more narration: at each step, what the Assistant is doing and what she
 will see next. The install guide now does this. The Assistant itself could do more of it at the moments
 that surprised her: making folders, copying photos, opening Instagram.
+
+### 2e. Say the song question is coming
+
+**Her words (8:56pm):** "it is making the reel and asked to make the reel but never asked what song i wanted
+until after i had to select make the reel. would be helpful to have it say it will choose the song next or
+something."
+
+**Fix:** when it asks "Go with these?", add one line: "Next I'll ask which song to cut it to."
+
+### 2f. The picks, said plainer
+
+Its explanation of the reel picks was one dense paragraph with fourteen photo numbers in it. Shorter, and
+the picture doing the work, would read better. (A picker, 1-top, would replace most of it.)
 
 ### 2d. "Click Plugins first, then Yours"
 
