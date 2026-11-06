@@ -181,6 +181,21 @@ found that the filter button on Plugins has a Source list with "My Uploads" in i
 
 ## 3. Already fixed tonight
 
+- **Her reel's song showed "File not accessible" in CapCut (9:12pm).** Her words: "i screen recorded a video
+  and loaded it into my folder with the photos.. claude renamed and file and since it did that it wouldnt
+  access the file cause it links to the file name... so we cant have claude rename screen recordings or
+  anything that is going to turn into exported audio for capcut." And to her Claude: "the audio track
+  shouldnt be in the music folder it should remain in the same folder as the screen recording that i loaded."
+  **What happened:** getting a song out of a screen recording was never built, so her Claude made it up: it
+  pulled the sound out and saved it in her Music folder. CapCut could not open it there and asked her to
+  link it by hand. (Whether the Mac was guarding Music or the file had been renamed after the reel was made,
+  we could not tell from her screenshots; the fix covers both.)
+  **Fixed:** the reel script now puts its own checked copy of the song inside the CapCut project's folder
+  and points CapCut at that, so CapCut can always open it and nothing done to the original afterwards can
+  break the reel. There is now a proper command for "use the sound from this video" (it never moves or
+  renames the recording, and never writes into Music, Downloads, Desktop or Documents). The Assistant is
+  told never to move a song to fix a reel. Tested with a real video and a pretend CapCut folder. **Not yet
+  opened in real CapCut.**
 - The upload was refused over a description two characters too long. Fixed, and now checked automatically
   before any file can be built.
 - "Couldn't access Documents": the guide now puts the Assistant's folder in the home folder.

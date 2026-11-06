@@ -460,6 +460,38 @@ def cmd_make(a):
         pass
 
 
+def cmd_sound(a):
+    """The sound of a video or screen recording, as a song file in this reel's own working folder
+    (~/.studio/reels/<shoot>/). The recording itself is never moved, renamed or changed. Never write the
+    song into Music, Downloads, Desktop or Documents: the Mac guards those (Nicole's first reel, Nov 5)."""
+    src = Path(a.video).expanduser()
+    if not src.is_file():
+        say(f"STOP: no file at {src}")
+        sys.exit(2)
+    if not shutil.which("afconvert"):
+        say("STOP: this computer has no way to pull the sound out of a video yet (the Mac's own afconvert is missing).")
+        sys.exit(2)
+    d = HOME / "reels" / slug(a.shoot)
+    d.mkdir(parents=True, exist_ok=True)
+    out = d / f"{src.stem} sound.m4a"
+    n = 2
+    while out.exists():
+        out = d / f"{src.stem} sound {n}.m4a"
+        n += 1
+    r = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(src), str(out)], capture_output=True, text=True)
+    if r.returncode != 0 or not out.is_file() or out.stat().st_size < 2000:
+        try:
+            out.unlink(missing_ok=True)            # our own failed output, nothing of theirs
+        except OSError:
+            pass
+        say("STOP: I couldn't read any sound in that video. " + (r.stderr.strip().split("\n")[-1][:160] if r.stderr.strip() else ""))
+        sys.exit(2)
+    secs = capcut.song_length(str(out)) or 0
+    say(f"Sound: {out}")
+    say(f"{secs:.0f} seconds, pulled from \"{src.name}\". The recording is where it was, unchanged.")
+    say("Use it with: reel.py make --song \"" + str(out) + "\" ...   (the script puts its own copy inside the CapCut project)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -474,6 +506,9 @@ def main():
     g.add_argument("folders", nargs="*")
     g.add_argument("--store")
     sub.add_parser("capcut-ok", help="they read the CapCut music note and chose to go ahead")
+    sd = sub.add_parser("sound", help="pull the sound out of a video or screen recording, to use as the song")
+    sd.add_argument("--from", dest="video", required=True)
+    sd.add_argument("--shoot", required=True)
     m = sub.add_parser("make")
     m.add_argument("--folder", required=True)
     m.add_argument("--picks", required=True)
@@ -494,7 +529,7 @@ def main():
     m.add_argument("--ignore-open", action="store_true")
     a = ap.parse_args()
     {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,
-     "capcut-ok": cmd_capcut_ok}[a.cmd](a)
+     "capcut-ok": cmd_capcut_ok, "sound": cmd_sound}[a.cmd](a)
 
 
 if __name__ == "__main__":

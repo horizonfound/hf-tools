@@ -455,6 +455,15 @@ def write_json(path, obj):
     os.replace(tmp, path)
 
 
+def file_hash(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def native(p):
     """A path the way CapCut writes it on this computer."""
     return str(p).replace("\\", "/") if os.name == "nt" else str(p)
@@ -476,10 +485,33 @@ def write(plan, store, ignore_open=False):
         say("STOP: these files are not where the plan says: " + ", ".join(missing[:5]))
         sys.exit(2)
 
-    draft, meta = build(plan, load_parts(), their_platform(store))
     fold = folder_name(store, plan["name"])
     dest = store / fold
     dest.mkdir()
+    # A song file goes INTO the project's own folder, and the project points at that copy. CapCut can always
+    # open its own folder; it cannot always open where the song was (Nicole's first reel, Nov 5: the song sat
+    # in her Music folder, CapCut showed "File not accessible" and asked her to link it by hand). It also means
+    # nothing done to the original afterwards (moved, renamed, tidied) can break the reel.
+    song = plan.get("song")
+    if song and not song.get("capcut_material"):
+        src = Path(song["path"])
+        kept = dest / src.name
+        try:
+            shutil.copyfile(src, kept)
+            same = kept.stat().st_size == src.stat().st_size and file_hash(kept) == file_hash(src)
+        except OSError as e:
+            same = False
+            say(f"STOP: I couldn't put the song into the CapCut project ({e}).")
+        if not same:
+            try:
+                kept.unlink(missing_ok=True)       # our own half-made copy, in the folder we just made
+                dest.rmdir()
+            except OSError:
+                pass
+            say("STOP: the song's copy inside the CapCut project didn't match the original, so I made nothing. Try again.")
+            sys.exit(2)
+        plan = dict(plan, song=dict(song, path=native(kept), name=song.get("name") or src.name, original=str(src)))
+    draft, meta = build(plan, load_parts(), their_platform(store))
     draft["name"] = meta["draft_name"] = fold
     t = now_us()
     meta.update({"draft_fold_path": native(dest), "draft_root_path": native(store),
