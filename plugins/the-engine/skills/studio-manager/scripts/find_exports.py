@@ -24,6 +24,7 @@ Downloads. It only reads; nothing is moved or changed.
 Exit codes: 0 found · 7 nothing found (ask where they exported).
 """
 import argparse
+import errno
 import json
 import os
 import re
@@ -36,7 +37,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import exif_read  # noqa: E402
 import studio_file  # noqa: E402
-from where import locate  # noqa: E402
+from where import locate, place_key  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 EDITED = {".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff"}
 SKIP = {".photoslibrary", ".lrdata", ".lrcat-data", ".app", ".Trash", "Library", "node_modules", "_studio", ".studio"}
@@ -48,18 +51,23 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def shoot_photos(root, studio, shoot_id):
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     s = next((x for x in shoots if x["id"] == shoot_id), None)
     if not s:
         sys.exit(f"STOP: no shoot {shoot_id} in that backup.")
     folder = s.get("folder")
-    index = json.loads((studio / "index.json").read_text())["photos"]
+    index = json.loads((studio / "index.json").read_text(encoding="utf-8"))["photos"]
     mine = [p for p in index if folder and Path(p["file"]).parent.as_posix() == folder]
     if not mine:  # not sorted into a folder: take the shoot's groups instead
-        groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]}
+        groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]}
         files = {f for g in s.get("groups", []) for f in groups.get(g, {}).get("files", [])}
         mine = [p for p in index if p["file"] in files]
     return s, folder, mine
@@ -86,11 +94,12 @@ def candidate_folders(root, folder, remembered):
     if folder:
         out.append((root / folder, 3))
     out.append((root, 2))
-    out += [(home / "Pictures", 3), (home / "Desktop", 3), (home / "Downloads", 2)]
+    kf = this_computer.known_folder   # on a PC these are often inside OneDrive, not the home folder
+    out += [(kf("Pictures"), 3), (kf("Desktop"), 3), (kf("Downloads"), 2)]
     seen, ordered = set(), []
     for p, d in out:
-        if p.is_dir() and str(p) not in seen:
-            seen.add(str(p))
+        if p.is_dir() and place_key(p) not in seen:   # on a PC, one folder written two ways is looked at once
+            seen.add(place_key(p))
             ordered.append((p, d))
     return ordered
 
@@ -114,6 +123,23 @@ def edited_files(top, depth, newer_than):
                 pass
 
 
+# FILE_ATTRIBUTE_OFFLINE, _RECALL_ON_OPEN and _RECALL_ON_DATA_ACCESS: a file kept in the cloud (OneDrive's
+# "online-only"), which Windows downloads in full the moment it is read
+_IN_THE_CLOUD = 0x00001000 | 0x00040000 | 0x00400000
+
+
+def online_only(f):
+    """True on a PC for a photo that is only in the cloud (OneDrive), not on this PC (unproven on a real PC).
+    Looking at its name and date costs nothing; opening it to read when it was taken would download it, and a
+    search over Pictures could quietly pull gigabytes. So those are matched by name only. A Mac: never."""
+    if not this_computer.WINDOWS:
+        return False
+    try:
+        return bool(getattr(os.stat(f), "st_file_attributes", 0) & _IN_THE_CLOUD)
+    except OSError:
+        return True   # cannot even be looked at: certainly not opened
+
+
 def find(root, studio, shoot_id, remembered, max_reads=400):
     s, folder, photos = shoot_photos(root, studio, shoot_id)
     if not photos:
@@ -129,14 +155,16 @@ def find(root, studio, shoot_id, remembered, max_reads=400):
     looked = set()
     for top, depth in candidate_folders(root, folder, remembered):
         for f in edited_files(top, depth, newer):
-            if str(f) in looked:
+            if place_key(f) in looked:
                 continue
-            looked.add(str(f))
+            looked.add(place_key(f))
             per_folder[str(f.parent)]["files"].append(f)
     # 1. by name
     for fol, rec in per_folder.items():
         for f in rec["files"]:
             stem = f.stem.lower()
+            if this_computer.WINDOWS:   # File Explorer's copies: "IMG_4471 - Copy", "IMG_4471 - Copy (2)" (unproven on a real PC)
+                stem = re.sub(r" - copy( \(\d+\))?$", "", stem)
             stem = re.sub(r"(-edit|-\d+| copy)$", "", stem)  # Lightroom's "-Edit", "-2" and Finder's " copy"
             if stem in keys:
                 rec["by_name"].add(keys[stem]["file"])
@@ -145,7 +173,8 @@ def find(root, studio, shoot_id, remembered, max_reads=400):
     for fol, rec in sorted(per_folder.items(), key=lambda kv: -len(kv[1]["files"])):
         if rec["by_name"] or reads >= max_reads:
             continue
-        for f in rec["files"][:60]:
+        sample = [f for f in rec["files"] if not online_only(f)][:60]   # on a Mac: the first 60, as always
+        for f in sample:
             if reads >= max_reads:
                 break
             reads += 1
@@ -155,7 +184,7 @@ def find(root, studio, shoot_id, remembered, max_reads=400):
                 if not p.get("serial") or not facts.get("serial") or p["serial"] == facts.get("serial"):
                     rec["by_time"].add(p["file"])
                     break
-        if rec["by_time"] and len(rec["by_time"]) * 3 >= min(len(rec["files"]), 60):  # most of the sample matches
+        if rec["by_time"] and len(rec["by_time"]) * 3 >= len(sample):  # most of the sample matches
             rec["by_time_all"] = True
     results = []
     for fol, rec in per_folder.items():
@@ -182,7 +211,7 @@ def check(folder):
 
 def remember(folder):
     sf = studio_file.load()
-    spots = [s for s in sf.get("exports", []) if s != str(Path(folder).parent)]
+    spots = [s for s in sf.get("exports", []) if place_key(s) != place_key(Path(folder).parent)]
     sf["exports"] = [str(Path(folder).parent)] + spots[:4]  # where exports tend to land, newest first
     studio_file.save(sf)
 

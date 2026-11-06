@@ -31,7 +31,7 @@ Nothing here ever touches a photo.
     python3 edit_queue.py offers [--mark]           shoots ticked off on the page that still need "want a reel?"
     python3 edit_queue.py register --night "<night>"  put every shoot of a night in the archive (night.py does this)
     python3 edit_queue.py scan                      find every night the Studio has done and register it (once, to backfill)
-    python3 edit_queue.py open "beach"              open that shoot's folder in Finder
+    python3 edit_queue.py open "beach"              open that shoot's folder in Finder (File Explorer on a PC)
     python3 edit_queue.py serve                     the page, live: check off, drag, change dates, open folders
 
 A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
@@ -39,16 +39,18 @@ A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
 archived shoots are the archive.
 """
 import argparse
+import errno
 import html
 import json
 import os
 import re
 import shutil
 import sys
+import threading
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -56,6 +58,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+from where import place_key, same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 QFILE = HOME / "queue.json"
@@ -63,6 +68,7 @@ THUMBS = HOME / "queue-thumbs"
 PAGE = HOME / "queue.html"
 HEADS_UP_DAYS = 3
 DUE_CHOICES = {"1w": ("1 week", 7), "2w": ("2 weeks", 14), "3w": ("3 weeks", 21)}
+_QUEUE_LOCK = threading.Lock()   # the page server answers two presses at once: one reads, changes and saves at a time
 
 
 def say(msg):
@@ -70,6 +76,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 # ---------- the list ----------
@@ -77,7 +88,7 @@ def say(msg):
 def load():
     if QFILE.exists():
         try:
-            q = json.loads(QFILE.read_text())
+            q = json.loads(QFILE.read_text(encoding="utf-8"))
             q.setdefault("shoots", [])
             q.setdefault("picks", {})
             q.setdefault("manual_order", False)
@@ -89,9 +100,19 @@ def load():
 
 def save(q):
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = QFILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False))
-    os.replace(tmp, QFILE)  # never a half-written list
+    # A scratch name of this program's and this thread's own (as posting_queue.write_whole): the page server
+    # answers two presses at once, and with one shared name ("queue.json.tmp", before Nov 6) one press could take
+    # the other's file away mid-save and go unanswered. The bytes saved are the same as ever.
+    tmp = QFILE.with_name(f"{QFILE.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, QFILE)  # never a half-written list (on a PC, waits a moment if a page is reading it)
+    except BaseException:
+        try:
+            tmp.unlink()                   # only the scratch copy just written here, never the list itself
+        except OSError:
+            pass
+        raise
 
 
 def today():
@@ -213,14 +234,14 @@ def night_shoots(night):
     """(root, studio, shoots, names, groups) for a night, before or after it settled."""
     from where import locate
     root, studio = locate(night)
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
-    names = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
-    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]} if (studio / "groups.json").exists() else {}
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
+    names = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
+    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]} if (studio / "groups.json").exists() else {}
     return root, studio, shoots, names, groups
 
 
 def existing(q, studio, shoot_id):
-    return next((x for x in q["shoots"] if x.get("studio") == str(studio) and x.get("shoot") == shoot_id), None)
+    return next((x for x in q["shoots"] if same_place(x.get("studio"), studio) and x.get("shoot") == shoot_id), None)
 
 
 def build_entry(q, root, studio, s, names, groups, status, due=None):
@@ -291,7 +312,7 @@ def folder_of(s):
         try:
             from where import locate
             root, studio = locate(s["studio"])
-            for x in json.loads((studio / "shoots.json").read_text())["shoots"]:
+            for x in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]:
                 if x["id"] == s.get("shoot") and x.get("folder"):
                     return root / x["folder"]
         except (SystemExit, OSError, ValueError, KeyError):
@@ -300,20 +321,21 @@ def folder_of(s):
 
 
 def open_folder(s):
-    """(ok, words) after asking Finder to open the shoot's folder."""
+    """(ok, words) after asking Finder (File Explorer on a PC) to open the shoot's folder."""
     f = folder_of(s)
     if not f:
         return False, "I don't know where that shoot's folder is."
     if not f.is_dir():
-        drive = f.parts[2] if len(f.parts) > 2 and f.parts[1] == "Volumes" else None
+        drive = this_computer.drive_words(f)
         return False, (f"Plug in {drive} to open this one." if drive else "That folder isn't where it used to be.")
     from finder import open_folder as show_in_finder
+    APP = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
     ok, note = show_in_finder(f)
     if not ok:
-        return False, f"Couldn't open Finder; the folder is {f}."
+        return False, f"Couldn't open {APP}; the folder is {f}."
     if note == "behind":
-        return True, f"Opened {f.name} in Finder, behind this window. Click Finder in the Dock to see it."
-    return True, f"Opened {f.name} in Finder."
+        return True, f"Opened {f.name} in {APP}, behind this window. Click {APP} in {this_computer.APP_BAR} to see it."
+    return True, f"Opened {f.name} in {APP}."
 
 
 def nights_known():
@@ -337,8 +359,8 @@ def nights_known():
         pass
     seen, uniq = set(), []
     for n in out:
-        if n not in seen:
-            seen.add(n)
+        if place_key(n) not in seen:   # on a PC, one folder written two ways is still one folder
+            seen.add(place_key(n))
             uniq.append(n)
     return uniq
 
@@ -426,7 +448,7 @@ FONTS = ("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9
 CSS = r"""
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;
 --ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;--line:rgba(31,36,48,.12);
---shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;
+--shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;
 --r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
@@ -704,7 +726,7 @@ def home_link():
     try:
         f = HOME / "posting-url.txt"
         if f.exists():
-            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
+            return f"<a class='homelink' href='{f.read_text(encoding='utf-8').strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
     except OSError:
         pass
     return ""
@@ -736,14 +758,50 @@ def page_html(q):
 
 def write_page(q):
     HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html(q))
+    PAGE.write_text(page_html(q), encoding="utf-8")
     return PAGE
 
 
 # ---------- the live page ----------
 
+def _thumb_wanted(p):
+    """One small picture the queue page shows (queue-thumbs/<shoot>/<n>.jpg), checked after the address is
+    decoded, part by part: the same rule as the posting server's (posting_queue.thumb_wanted). Before Nov 6 the
+    check was for ".." in the address as sent, so "%2e%2e" (the same two dots, written another way) reached the
+    Studio File and the queue, and "/queue-thumbs/" listed the folder (both computers)."""
+    import posting_queue
+    return p.startswith("/queue-thumbs/") and posting_queue.thumb_wanted(p)
+
+
 class Handler(SimpleHTTPRequestHandler):
+    def ours(self):
+        """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)? The queue
+        page is always opened that way. A web page on another site pointed at this computer by a trick of names
+        still carries its own name in Host, and is refused before anything is looked at (as the posting server)."""
+        port = self.server.server_address[1]
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return True
+        self.send_error(HTTPStatus.FORBIDDEN)
+        return False
+
+    def list_directory(self, path):
+        """Never a folder's list of files (Python's own server makes one for a folder's address)."""
+        self.send_error(HTTPStatus.NOT_FOUND)
+        return None
+
+    def do_HEAD(self):
+        # only for the pictures a GET would serve (no page here asks for HEAD; before Nov 6 it told any file's
+        # size and date in the Studio folder)
+        if not self.ours():
+            return
+        if _thumb_wanted(urlsplit(self.path).path):
+            return super().do_HEAD()
+        self.send_error(HTTPStatus.NOT_FOUND)
+
     def do_GET(self):
+        if not self.ours():
+            return
         p = urlsplit(self.path).path
         if fresh.page_path(p) and fresh.stale() and fresh.restart(self):
             return
@@ -755,8 +813,11 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if p.startswith("/queue-thumbs/") and ".." not in p:
-            return super().do_GET()
+        if p.startswith("/queue-thumbs/"):
+            if _thumb_wanted(p):                # one small picture the page shows, nothing else
+                return super().do_GET()
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         if p == "/open":
             from urllib.parse import parse_qs
             sid = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
@@ -771,45 +832,54 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)  # nothing else in ~/.studio is served
 
     def do_POST(self):
+        if not self.ours():
+            return
         if urlsplit(self.path).path != "/queue":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(n) or b"{}")
-            q = load()
-            act = body.get("action")
-            if act in ("done", "undo", "due", "requeue"):
-                s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
-                if act == "done":
-                    s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
-                    s["finished_by"] = "page"
-                elif act in ("undo", "requeue"):
-                    s["status"] = "waiting"
-                    for k in ("finished_at", "finished_by", "offered", "reminded"):
-                        s.pop(k, None)
-                    if act == "requeue":
-                        s["due"] = body.get("due") and due_date(body["due"])[0]
-                    q["shoots"].remove(s)
-                    place(q, s)
+            with _QUEUE_LOCK:               # two presses at once: the second reads the queue the first saved
+                q = load()
+                act = body.get("action")
+                if act in ("done", "undo", "due", "requeue"):
+                    s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
+                    if act == "done":
+                        s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
+                        s["finished_by"] = "page"
+                    elif act in ("undo", "requeue"):
+                        s["status"] = "waiting"
+                        for k in ("finished_at", "finished_by", "offered", "reminded"):
+                            s.pop(k, None)
+                        if act == "requeue":
+                            s["due"] = body.get("due") and due_date(body["due"])[0]
+                        q["shoots"].remove(s)
+                        place(q, s)
+                    else:
+                        s["due"], how = due_date(body.get("due"))
+                        s.pop("reminded", None)
+                elif act == "order":
+                    reorder(q, [str(i) for i in body.get("ids", [])])
+                elif act == "add":
+                    name = " ".join(str(body.get("name", "")).split())
+                    if not name:
+                        raise ValueError("a name is needed")
+                    add_manual(q, name, body.get("due") or None)
                 else:
-                    s["due"], how = due_date(body.get("due"))
-                    s.pop("reminded", None)
-            elif act == "order":
-                reorder(q, [str(i) for i in body.get("ids", [])])
-            elif act == "add":
-                name = " ".join(str(body.get("name", "")).split())
-                if not name:
-                    raise ValueError("a name is needed")
-                add_manual(q, name, body.get("due") or None)
-            else:
-                raise ValueError(act)
-            save(q)
-            write_page(q)
-        except (StopIteration, ValueError, SystemExit, TypeError) as e:
+                    raise ValueError(act)
+                save(q)
+                write_page(q)
+                out = json.dumps(state(q)).encode()
+        except (StopIteration, ValueError, SystemExit, TypeError, AttributeError) as e:   # AttributeError: a body that isn't {...}
             self.send_error(HTTPStatus.BAD_REQUEST, str(e)[:200])
             return
-        out = json.dumps(state(q)).encode()
+        except OSError as e:
+            # the queue couldn't be saved (on a PC, another program held it longer than a few seconds; a full
+            # drive): an answer all the same, never a dropped connection
+            say(f"queue: couldn't save the editing queue ({e.__class__.__name__}: {str(e)[:160]})")
+            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The editing queue couldn't be saved just now")
+            return
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -823,14 +893,14 @@ def serve(port):
     HOME.mkdir(parents=True, exist_ok=True)
     for p in range(port, port + 20):
         try:
-            srv = ThreadingHTTPServer(("127.0.0.1", p), partial(Handler, directory=str(HOME)))
+            srv = fresh.Server(("127.0.0.1", p), partial(Handler, directory=str(HOME)))  # Python's own on a Mac
             break
         except OSError:
             continue
     else:
         sys.exit(f"STOP: no free port between {port} and {port + 19}.")
     url = f"http://127.0.0.1:{p}/queue.html"
-    (HOME / "queue-url.txt").write_text(url)
+    (HOME / "queue-url.txt").write_text(url, encoding="utf-8")
     print(f"Editing queue: {url}", flush=True)
     try:
         srv.serve_forever()
@@ -897,7 +967,7 @@ def main():
         write_page(q)
         say(f"Added: {entry['name']}, {due_words(entry['due'])}.")
     elif a.cmd == "add-list":
-        names = Path(a.file).read_text().splitlines() if a.file else [n for n in (a.names or "").split(",")]
+        names = Path(a.file).read_text(encoding="utf-8").splitlines() if a.file else [n for n in (a.names or "").split(",")]
         added = add_list(q, names)
         if not added:
             sys.exit("STOP: I didn't find any names in that list.")

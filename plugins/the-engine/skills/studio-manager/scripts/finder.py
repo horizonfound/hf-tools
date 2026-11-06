@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open a folder in Finder and bring Finder to the front.
+"""Open a folder in Finder and bring Finder to the front (on a PC: File Explorer, which Windows brings forward or not).
 
 A page's "Open photo folder" button asks a small
 local server to open the folder. Plain `open` from that server does open it,
@@ -11,6 +11,8 @@ Opens only; never changes anything in the folder.
 import subprocess
 import sys
 import time
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 # Open the folder in a window of its own, so a folder already open in another window stays as it was
 # (Dustin, Oct 30: several Finder windows at once, never one replacing the last). If a window already shows
@@ -39,8 +41,8 @@ _ACTIVATE = [
 
 def finder_in_front():
     try:
-        r = subprocess.run(["osascript", "-e", 'tell application "System Events" to get name of first process whose frontmost is true'],
-                           capture_output=True, text=True, timeout=10)
+        r = subprocess.run(["osascript", "-e", 'tell application "System Events" to get name of first process whose frontmost is true'],  # pc-ok: only asked from the Mac branch below
+                           capture_output=True, encoding="utf-8", errors="replace", timeout=10)
         return r.stdout.strip() == "Finder"
     except (OSError, subprocess.TimeoutExpired):
         return True  # cannot tell; assume the best
@@ -53,29 +55,42 @@ def open_folder(path):
     nothing can force past it); not ok means it could not be opened, and note says why."""
     path = str(path)
     if sys.platform == "darwin":
-        cmd = ["osascript"]
+        cmd = ["osascript"]  # pc-ok: the Mac branch
         for line in _ACTIVATE:
             cmd += ["-e", line]
         try:
-            r = subprocess.run(cmd + [path], capture_output=True, text=True, timeout=15)
+            r = subprocess.run(cmd + [path], capture_output=True, encoding="utf-8", errors="replace", timeout=15)
             if r.returncode == 0:
                 for _ in range(2):  # it is open; is it in front? if not, ask once more
                     if finder_in_front():
                         return True, ""
                     time.sleep(0.4)
-                    subprocess.run(["osascript", "-e", 'tell application "Finder" to activate'], capture_output=True, timeout=15)
+                    subprocess.run(["osascript", "-e", 'tell application "Finder" to activate'], capture_output=True, timeout=15)  # pc-ok: the Mac branch
                 return True, "" if finder_in_front() else "behind"
         except (OSError, subprocess.TimeoutExpired):
             pass
         # Finder could not be asked (for example, permission to control it was declined): open it the plain way.
         try:
-            r = subprocess.run(["open", path], capture_output=True, text=True, timeout=15)
+            r = subprocess.run(["open", path], capture_output=True, encoding="utf-8", errors="replace", timeout=15)  # pc-ok: the Mac branch
             return r.returncode == 0, (r.stderr or "").strip()
         except (OSError, subprocess.TimeoutExpired) as e:
             return False, str(e)
-    opener = {"win32": ["explorer"]}.get(sys.platform, ["xdg-open"])
+    if sys.platform == "win32":
+        # unproven on a real PC.
+        # File Explorer wants the path its own way (backslashes), and handed one it cannot read it opens
+        # Documents instead without a word, so the folder is checked first. Windows decides whether the
+        # window comes to the front; nothing here can tell, so it is never reported as "behind".
+        import os
+        path = os.path.normpath(path)
+        if not os.path.isdir(path):
+            return False, "that folder is not there"
+        try:
+            os.startfile(path)
+            return True, ""
+        except OSError as e:
+            return False, str(e)
     try:
-        subprocess.run([*opener, path], check=False, timeout=15)
+        subprocess.run(["xdg-open", path], check=False, timeout=15)
         return True, ""
     except (OSError, subprocess.TimeoutExpired) as e:
         return False, str(e)

@@ -37,11 +37,11 @@ each shoot folder carries .kit/kit.json. Exit: 0 done, 1 problem, 2 nothing to d
 6 a name clash (nothing copied).
 """
 import argparse
+import errno
 import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from collections import Counter
 from datetime import datetime
@@ -54,6 +54,9 @@ import groups as groups_mod  # noqa: E402
 import sheet  # noqa: E402
 import brand  # noqa: E402
 import studio_file  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 DROP_NAME = "Drop a shoot here"
 CONTENT_NAME = "Your Content"   # capital C (Dustin, Nov 5)
@@ -98,7 +101,11 @@ def rename_exact(h, old, new):
         spare = h / (new + ".renaming")
         if spare.name not in names():
             (h / old).rename(spare)
-            spare.rename(h / new)
+            try:
+                spare.rename(h / new)
+            except OSError:
+                spare.rename(h / old)       # never left under the spare name (a PC refuses while a window has it open)
+                raise
     return new in names()
 
 
@@ -135,38 +142,66 @@ def places():
     out, seen = [], set()
     sess = sf.get("drives", {}).get("session")
     if sess and Path(sess).is_dir():
-        out.append({"path": sess, "name": Path(sess).name, "why": "the drive your photos are on", "recommended": True})
+        out.append({"path": sess, "name": Path(sess).name or drive_shown(sess), "why": "the drive your photos are on",
+                    "recommended": True})
         seen.add(sess)
     for d in studio_file.drives():
         if d["path"] not in seen:
             out.append({"path": d["path"], "name": d["name"], "why": f"{d['free_gb']} GB free", "recommended": False})
             seen.add(d["path"])
-    pics = Path.home() / "Pictures"
+    pics = this_computer.known_folder("Pictures")
     if pics.is_dir():
-        out.append({"path": str(pics), "name": "Pictures", "why": "on this Mac", "recommended": not out})
+        out.append({"path": str(pics), "name": "Pictures", "why": f"on this {this_computer.COMPUTER}", "recommended": not out})
     if out and not any(o["recommended"] for o in out):
         out[0]["recommended"] = True
     return out
 
 
+def drive_shown(path):
+    """How to name the top of a drive, which has no folder name of its own: on a PC "E:\\" is "Big Kahuna (E:)",
+    as `studio_file.py drives` says it. (A Mac's drives always have a name in their path, so this is not asked
+    there.) The path itself when no drive matches."""
+    for v in this_computer.volumes():
+        if this_computer.same_place(v["path"], path):
+            return v["shown"]
+    return str(path)
+
+
 def hide(p):
-    if sys.platform == "darwin":
-        subprocess.run(["chflags", "hidden", str(p)], capture_output=True)
+    this_computer.hide(p)
 
 
 def named_place(where):
     """A drive or place given by its NAME ("G PAPA", "Pictures") is the same as its path. `posts.py places`
     lists them by name, so a name has to work here too (Nicole's first run, Nov 5: --where "G PAPA" was
-    refused because only /Volumes/G PAPA is a folder)."""
-    p = Path(where).expanduser()
+    refused because only /Volumes/G PAPA is a folder). A blank name is never a place: it stops, rather than
+    making the folder wherever Claude happens to be working (an empty path is "here" to Python)."""
+    if not str(where or "").strip():
+        raise SystemExit(f"STOP: say which drive or folder \"{HOME_NAME}\" should go on. Nothing made.")
+    p = this_computer.drive_root(where).expanduser()   # a bare "E:" means the top of drive E
     if p.is_dir():
         return p
-    want = str(where).strip().strip("/").lower()
+    want = str(where).strip().strip("/\\" if this_computer.WINDOWS else "/").lower()
     for o in places():
         if o["name"].lower() == want:
             return Path(o["path"])
-    vol = Path("/Volumes") / str(where).strip().strip("/")
-    return vol if vol.is_dir() else p
+    if not this_computer.WINDOWS:
+        # A Mac, exactly as before: a drive's name, or its name and then a folder on it ("Big Kahuna/Social").
+        vol = Path("/Volumes") / str(where).strip().strip("/")  # pc-ok: never reached on a PC (the branch above)
+        return vol if vol.is_dir() else p
+    # Unproven on a real PC. A drive's name ("Big Kahuna", "E:", "Big Kahuna (E:)"), or its name and then a
+    # folder on it ("Big Kahuna\Social", "Big Kahuna/Social"). Anything else is handed back as it was given,
+    # and setup stops on it in plain words.
+    vol = this_computer.volume_by_name(where)
+    if vol:
+        return Path(vol["path"])
+    first, _, rest = str(where).strip().replace("/", "\\").partition("\\")
+    vol = this_computer.volume_by_name(first) if rest.strip("\\") else None
+    if vol:
+        inside = Path(vol["path"]) / rest.strip("\\")
+        if inside.is_dir():
+            return inside
+    return p
 
 
 def setup(where=None, home_path=None):
@@ -203,7 +238,7 @@ def walk(top):
     for root, dirs, files in os.walk(top):
         dirs[:] = sorted(d for d in dirs if not d.startswith(".") and Path(d).suffix.lower() not in LIBRARY_SUFFIX)
         for f in sorted(files):
-            if f.startswith(".") or f in SKIP_NAMES:
+            if f.startswith(".") or f in SKIP_NAMES or f.endswith(".studio-partial"):   # a copy of ours, not yet finished
                 continue
             p = Path(root) / f
             out.append(p.relative_to(top).as_posix())
@@ -224,30 +259,21 @@ def kind(rel):
 
 
 def preview(src, dst, size=700):
-    if shutil.which("sips"):
-        return groups_mod.make_preview(src, dst, size)
-    try:
-        from PIL import Image
-        im = Image.open(src)
-        im.thumbnail((size, size))
-        im.convert("RGB").save(dst, quality=80)
-        return True
-    except Exception:
-        return False
+    """A small JPEG of a dropped photo: the Mac's own sips, or on a PC Pillow (pictures.py)."""
+    return groups_mod.make_preview(src, dst, size)
 
 
 def thumb_rows(src, size, tmp):
-    if shutil.which("sips"):
-        return sheet.thumb(src, size, tmp)
-    try:
-        from PIL import Image
-        im = Image.open(src).convert("RGB")
-        im.thumbnail((size, size))
-        w, h = im.size
-        raw = im.tobytes()
-        return w, h, [raw[y * w * 3:(y + 1) * w * 3] for y in range(h)]
-    except Exception:
-        return None
+    """(w, h, rows) for the contact sheet: sips to BMP on a Mac, Pillow on a PC (both through sheet.thumb)."""
+    return sheet.thumb(src, size, tmp)
+
+
+def save_text(path, text):
+    """Written whole under a scratch name, then given its name: a page reading it never sees half of it, and a
+    PC that has it open for a moment is waited for (this_computer.replace)."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    this_computer.replace(tmp, path)
 
 
 def draw_sheet(studio, groups, per_row=4, size=220):
@@ -280,7 +306,7 @@ def draw_sheet(studio, groups, per_row=4, size=220):
 
 def day_words(iso):
     d = datetime.fromisoformat(iso)
-    return d.strftime("%B %-d, %Y")
+    return this_computer.strftime(d, "%B %-d, %Y")
 
 
 def look(h, gap_minutes=120, previews_per=4):
@@ -334,10 +360,19 @@ def look(h, gap_minutes=120, previews_per=4):
         else:
             others.append(rel)
     groups, undated = groups_mod.find_groups(photos, gap_minutes)
+    if groups:
+        ok, words = pictures.ready()
+        if not ok:
+            say(f"STOP: {words} Nothing was copied or changed; once it is in, look again.")
+            sys.exit(1)
     pv_dir = studio / "previews"
     if pv_dir.exists():
-        shutil.rmtree(pv_dir)
-    pv_dir.mkdir()
+        try:
+            shutil.rmtree(pv_dir)                    # our own previews from the last look, never a photo
+        except OSError:                              # a PC with one of them open right now: clear what it can
+            shutil.rmtree(pv_dir, ignore_errors=True)
+    pv_dir.mkdir(exist_ok=True)
+    unshown = {}
     for g in groups:
         g["previews"] = []
         g["folders"] = sorted({f.split("/")[0] for f in g["files"] if "/" in f})
@@ -345,12 +380,18 @@ def look(h, gap_minutes=120, previews_per=4):
             dst = pv_dir / f"{g['id']}_{Path(f).stem}.jpg"
             if preview(drop / f, dst):
                 g["previews"].append(dst.name)
+            else:
+                why = pictures.why_not(drop / f)    # only ever words on a PC (an iPhone photo with no add-on)
+                if why:
+                    unshown[why] = unshown.get(why, 0) + 1
     sheet_path = draw_sheet(studio, groups) if groups else None
     result = {"drop": str(drop), "looked": datetime.now().isoformat(timespec="seconds"), "gap_minutes": gap_minutes,
               "top_folders": top, "photos": len(photos), "groups": groups, "undated": undated,
               "raws": raws, "videos": videos, "working": working, "others": others, "sheet": str(sheet_path) if sheet_path else None,
               "already_copied": len(done_before)}
-    (studio / "look.json").write_text(json.dumps(result, indent=1, ensure_ascii=False))
+    if unshown:
+        result["not_shown"] = unshown
+    save_text(studio / "look.json", json.dumps(result, indent=1, ensure_ascii=False))
     return result
 
 
@@ -390,6 +431,8 @@ def summary(r):
         side.append(plural(len(r["others"]), "other file"))
     if side:
         lines.append("Left where they are, not copied: " + ", ".join(side) + f". {brand.name()} only copies finished photos (JPEGs, and phone photos), so nothing big or unfinished comes along.")
+    for why, n in sorted((r.get("not_shown") or {}).items()):
+        lines.append(f"{plural(n, 'photo')} could not be shown on the contact sheet: {why}")
     if r["sheet"]:
         lines.append(f"Contact sheet, one row per group: {r['sheet']}")
     lines.append("")
@@ -410,7 +453,7 @@ def load_look(h):
     if not p.exists():
         say("STOP: look first (posts.py look), then sort.")
         sys.exit(2)
-    return json.loads(p.read_text())
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 def parse_specs(specs):
@@ -517,6 +560,59 @@ def identity(p):
     return [st.st_ino, st.st_size, int(st.st_mtime)]
 
 
+def into_place(part, dst):
+    """Give a finished copy its real name, never over a file that is already there (one could appear between
+    the check and the rename). True when it has the name; False when something else already had it (the copy
+    is left under its partial name for the caller). On a PC a rename refuses an existing name by itself; on a
+    Mac a link does (a plain rename would replace), and a drive with no links (exFAT, some network drives)
+    is checked first. (The two ways live in this_computer.rename_new.)"""
+    return this_computer.rename_new(part, dst)
+
+
+def could_not(ex):
+    """Why a copy could not be made right now, in plain words."""
+    if isinstance(ex, PermissionError):
+        if this_computer.WINDOWS:
+            # Unproven on a real PC: a file another program holds open, or a folder that can't be written to.
+            return ("another program has it open, or that folder can't be written to (close Lightroom or any "
+                    f"{this_computer.FILES_APP} window showing it)")
+        # A Mac never refuses because a program or a Finder window has a file open. Its usual reasons are its
+        # privacy settings for the Claude app, or a locked or read-only file or drive; the Mac's own reason is kept.
+        return (f"the {this_computer.COMPUTER} wouldn't let me read or write there ({ex.strerror or 'permission denied'}). "
+                "If it's on the Desktop, in Documents or Downloads, or on an external drive, the Claude app may need "
+                "permission in System Settings, Privacy & Security, Files & Folders")
+    if getattr(ex, "errno", None) == errno.ENOSPC:
+        return "the drive is full"
+    return ex.strerror or str(ex)
+
+
+class CopyHeld(Exception):
+    """A copy that could not be made right now (a file held open, a folder that can't be written to, a full
+    drive), as opposed to one that did not match. The sort stays "copying" in its log, so the next look or
+    sort finishes it, as a cut-off sort always has been."""
+    def __init__(self, what, ex):
+        self.what, self.ex = what, ex
+        super().__init__(f"{what} could not be copied: {could_not(ex)}")
+
+    def words(self):
+        return (f"STOP: {self.what} could not be copied: {could_not(self.ex)}. Nothing is lost: what's copied so far "
+                "is checked, and once that's sorted, running it again finishes the job.")
+
+
+def copy_move(m, src, dst, problems):
+    """One copy of a sort, recorded on its move. A copy that did not match is a problem for the report; one
+    that could not be made right now raises CopyHeld and the move stays not done."""
+    try:
+        got = copy_checked(src, dst)
+    except OSError as ex:
+        raise CopyHeld(m["dst"], ex)
+    m["done"] = got is not None
+    if m["done"]:
+        m["sha256"] = got
+    else:
+        problems.append(f"{m['dst']} did not match the original after copying")
+
+
 def copy_checked(src, dst):
     """Copy src to dst the way the backup does: hash while writing to a partial file, rename into place,
     read the copy back and compare. Returns the hash, or None if the copy did not match (the partial is removed).
@@ -534,15 +630,32 @@ def copy_checked(src, dst):
     dst.parent.mkdir(parents=True, exist_ok=True)
     part = dst.with_name(dst.name + ".studio-partial")
     h = hashlib.sha256()
-    with open(src, "rb") as f, open(part, "wb") as out:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-            out.write(chunk)
+    try:
+        with open(src, "rb") as f, open(part, "wb") as out:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+                out.write(chunk)
+    except OSError:
+        try:
+            part.unlink()                        # our own half-made copy (a full drive); the original is untouched
+        except OSError:
+            pass
+        raise
     if h.hexdigest() != want:
         part.unlink(missing_ok=True)
         return None
     shutil.copystat(src, part)
-    os.rename(part, dst)
+    try:
+        placed = into_place(part, dst)
+    except OSError:
+        try:
+            part.unlink()                        # our own copy under its partial name; the next run makes it again
+        except OSError:
+            pass
+        raise
+    if not placed:                               # something took the name meanwhile: compared, never replaced
+        part.unlink(missing_ok=True)
+        return want if sha(dst) == want else None
     if sha(dst) != want:
         return None
     return want
@@ -556,7 +669,7 @@ def read_log(h):
     p = log_path(h)
     if p.exists():
         try:
-            log = json.loads(p.read_text())
+            log = json.loads(p.read_text(encoding="utf-8"))
             for run in log.get("runs", []):          # older logs name the content folder as it was called then
                 for m in run.get("moves", []):
                     if isinstance(m.get("dst"), str):
@@ -570,68 +683,114 @@ def read_log(h):
 def write_log(h, log):
     p = log_path(h)
     tmp = p.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(log, indent=1, ensure_ascii=False))
-    os.replace(tmp, p)
+    tmp.write_text(json.dumps(log, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, p)
 
 
 def finish_unfinished(h):
-    """A sort cut off mid-way: do the copies that still can be done, then mark the run done."""
+    """A sort cut off mid-way: do the copies that still can be done, then mark the run done. Returns the runs
+    it finished (empty when there were none). A copy that still can't be made right now raises CopyHeld,
+    with what did get done saved and the run still "copying" for the next time."""
     log = read_log(h)
-    done_any = False
+    finished = []
     for run in log["runs"]:
         if run.get("status") != "copying":
             continue
         problems = []
-        for m in run["moves"]:
-            if m.get("done"):
-                continue
-            src, dst = h / DROP_NAME / m["src"], h / m["dst"]
-            if not src.exists():
-                if dst.exists():
-                    m["done"] = True  # copied just before the cut; the drop box has been tidied since
-                else:
-                    problems.append(f"{m['src']} is gone from the drop box and was never copied")
-                continue
-            got = copy_checked(src, dst)
-            m["done"] = got is not None
-            if not m["done"]:
-                problems.append(f"{m['dst']} did not match the original after copying")
-            else:
-                m["sha256"] = got
+        try:
+            for m in run["moves"]:
+                if m.get("done"):
+                    continue
+                src, dst = h / DROP_NAME / m["src"], h / m["dst"]
+                if not src.exists():
+                    if dst.exists():
+                        m["done"] = True  # copied just before the cut; the drop box has been tidied since
+                    else:
+                        problems.append(f"{m['src']} is gone from the drop box and was never copied")
+                    continue
+                copy_move(m, src, dst, problems)
+        except CopyHeld:
+            write_log(h, log)
+            raise
         run["problems"] = problems
         run["status"] = "problems" if problems else "done"
         write_kits(h, run)
-        done_any = True
-    if done_any:
+        finished.append(run)
+    if finished:
         write_log(h, log)
-    return done_any
+    return finished
+
+
+def stopped_brings(h):
+    """Brings that stopped part way because a copy couldn't be made right then (written only when that
+    happens): (the record's path, its list)."""
+    p = h / ".studio" / "drop" / "bring-stopped.json"
+    try:
+        return p, json.loads(p.read_text(encoding="utf-8")).get("brings", [])
+    except (OSError, ValueError, AttributeError):
+        return p, []
 
 
 def bring(h, folder):
     """Copy the finished photos (and only those) from a folder they chose into the drop box, under the
-    folder's own name, checked file by file. The originals are never moved. Returns (copied, skipped_by_kind, dest)."""
+    folder's own name, checked file by file. The originals are never moved. Returns (copied, skipped_by_kind, dest).
+    A bring of the same folder that stopped part way (a file held open, a full drive) carries on into the same
+    folder in the drop box: what's already there is compared, never replaced, so nothing is copied twice."""
     src = Path(folder).expanduser()
     if not src.is_dir():
         say(f"STOP: {src} isn't a folder I can see.")
         return None
     drop = h / DROP_NAME
     name = src.name or "Photos"
-    dest = drop / name
-    n = 2
-    while dest.exists() and any(dest.iterdir()):
-        dest = drop / f"{name} {n}"
-        n += 1
+    where_from = str(src.resolve())
+    rec, stopped = stopped_brings(h)
+    again = next((b for b in stopped if b.get("status") == "stopped" and b.get("into")
+                  and this_computer.same_place(b.get("from", ""), where_from) and (drop / b["into"]).is_dir()), None)
+    if again:
+        dest = drop / again["into"]
+    else:
+        dest = drop / name
+        n = 2
+        while dest.exists() and any(dest.iterdir()):
+            dest = drop / f"{name} {n}"
+            n += 1
+
+    def note(entry):
+        if entry not in stopped:
+            stopped.append(entry)
+        rec.parent.mkdir(parents=True, exist_ok=True)
+        save_text(rec, json.dumps({"brings": stopped}, indent=1, ensure_ascii=False))
+
+    files = walk(src)
+    total = sum(1 for rel in files if kind(rel) == "photo")
     copied, skipped = 0, {}
-    for rel in walk(src):
+    for rel in files:
         k = kind(rel)
         if k != "photo":
             label = {"raw": "RAW file", "video": "video", "working": WORKING.get(Path(rel).suffix.lower(), "working file")}.get(k, "other file")
             skipped[label] = skipped.get(label, 0) + 1
             continue
-        if copy_checked(src / rel, dest / rel) is None:
+        try:
+            got = copy_checked(src / rel, dest / rel)
+        except OSError as ex:
+            entry = again or {"from": where_from, "into": dest.name}
+            entry.update({"status": "stopped", "when": datetime.now().isoformat(timespec="seconds"),
+                          "copied": copied, "of": total})
+            note(entry)
+            say(f"STOP: {rel} could not be copied: {could_not(ex)}. {copied} of {total} photos copied so far, each one "
+                "checked; once that's sorted, running it again copies the rest into the same folder (nothing is copied "
+                "twice). Your originals weren't moved.")
+            return None
+        if got is None:
+            if again:                            # this folder can't be finished as it is: the next bring starts a fresh one
+                again["status"] = "did not match"
+                note(again)
             say(f"STOP: {rel} did not match the original after copying. Nothing else was changed.")
             return None
         copied += 1
+    if again:
+        again.update({"status": "finished", "finished": datetime.now().isoformat(timespec="seconds"), "copied": copied})
+        note(again)
     return copied, skipped, dest
 
 
@@ -643,8 +802,9 @@ def write_kits(h, run):
         rec = kit / ".kit"
         rec.mkdir(exist_ok=True)
         hide(rec)
-        photos = sorted(p.name for p in (kit / "Photos").iterdir() if p.is_file() and not p.name.startswith(".")) if (kit / "Photos").is_dir() else []
-        (rec / "kit.json").write_text(json.dumps({
+        photos = sorted(p.name for p in (kit / "Photos").iterdir() if p.is_file() and not p.name.startswith(".")
+                        and not p.name.endswith(".studio-partial")) if (kit / "Photos").is_dir() else []
+        save_text(rec / "kit.json", json.dumps({
             "name": s["name"], "date": s["date"], "folder": s["folder"], "source": "drop",
             "dropped_as": s.get("source_folders", []), "photos": photos, "made": run["started"]}, indent=1, ensure_ascii=False))
 
@@ -658,9 +818,12 @@ def tidy_drop(h):
         for f in files:
             if f in SKIP_NAMES or f.startswith("._"):
                 aside.mkdir(parents=True, exist_ok=True)
-                dst = aside / f"{rp.relative_to(drop).as_posix().replace('/', '_')}_{f}".lstrip("._")
+                name = f"{rp.relative_to(drop).as_posix().replace('/', '_')}_{f}".lstrip("._")
+                dst, n = aside / name, 2
+                while os.path.lexists(dst):              # one set aside earlier under that name: keep both
+                    dst, n = aside / f"{n}_{name}", n + 1
                 try:
-                    os.rename(rp / f, dst)
+                    into_place(rp / f, dst)
                 except OSError:
                     pass
         if rp != drop:
@@ -670,12 +833,42 @@ def tidy_drop(h):
                 pass
 
 
+def put_look_away(h, run):
+    """The look a finished sort came from is kept beside it under the sort's time, as every sort does."""
+    this_computer.replace(h / ".studio" / "drop" / "look.json", h / ".studio" / "drop" / f"look-{run['started'].replace(':', '-')}.json")
+
+
+def sorted_words(run):
+    """The end of a sort in plain words, and its exit: 0 done, 1 a copy that did not match."""
+    problems, shoots = run.get("problems") or [], run["shoots"]
+    if problems:
+        say("STOP: " + problems[0] + (f" (and {len(problems) - 1} more)" if len(problems) > 1 else ""))
+        return 1
+    n = sum(s["photos"] for s in shoots)
+    say(f"Done. Copied {n} photos into {CONTENT_NAME}: " + "; ".join(f"\"{s['folder']}\" ({s['photos']})" for s in shoots)
+        + ". Every copy was checked against the original. What you dropped is still in the drop box, exactly as you dropped it:"
+        " put it back where it came from if you moved it in by accident, or clear it out whenever you like.")
+    return 0
+
+
 def do_sort(h, mode, specs, one_name, undated_to, dry_run):
-    if finish_unfinished(h):
+    try:
+        finished = finish_unfinished(h)
+    except CopyHeld as held:
+        say(held.words())
+        return 1
+    if finished:
         say("Finished a sort that was cut off earlier.")
     r = load_look(h)
     drop = h / DROP_NAME
     shoots, moves = plan(h, r, mode, specs, one_name, undated_to)
+    # The very sort that was just finished (it stopped part way, and they ran it again): it is done now, so
+    # say how it went rather than stopping on its own folders as a name clash.
+    want = [(m["src"], m["dst"]) for m in moves]
+    same = next((run for run in finished if [(m.get("src"), m.get("dst")) for m in run.get("moves", [])] == want), None)
+    if same is not None and not dry_run:
+        put_look_away(h, same)
+        return sorted_words(same)
     # everything still there, nothing in the way
     gone = [m["src"] for m in moves if not (drop / m["src"]).exists()]
     if gone:
@@ -709,27 +902,19 @@ def do_sort(h, mode, specs, one_name, undated_to, dry_run):
     log["runs"].append(run)
     write_log(h, log)
     problems = []
-    for m in moves:
-        src, dst = drop / m["src"], h / m["dst"]
-        got = copy_checked(src, dst)
-        m["done"] = got is not None
-        if m["done"]:
-            m["sha256"] = got
-        else:
-            problems.append(f"{m['dst']} did not match the original after copying")
+    try:
+        for m in moves:
+            copy_move(m, drop / m["src"], h / m["dst"], problems)
+    except CopyHeld as held:
+        write_log(h, log)        # still "copying", with what's done marked: the next look or sort finishes the rest
+        say(held.words())
+        return 1
     run["problems"] = problems
     run["status"] = "problems" if problems else "done"
     write_log(h, log)
     write_kits(h, run)
-    (h / ".studio" / "drop" / "look.json").rename(h / ".studio" / "drop" / f"look-{run['started'].replace(':', '-')}.json")
-    if problems:
-        say("STOP: " + problems[0] + (f" (and {len(problems) - 1} more)" if len(problems) > 1 else ""))
-        return 1
-    n = sum(s["photos"] for s in shoots)
-    say(f"Done. Copied {n} photos into {CONTENT_NAME}: " + "; ".join(f"\"{s['folder']}\" ({s['photos']})" for s in shoots)
-        + ". Every copy was checked against the original. What you dropped is still in the drop box, exactly as you dropped it:"
-        " put it back where it came from if you moved it in by accident, or clear it out whenever you like.")
-    return 0
+    put_look_away(h, run)
+    return sorted_words(run)
 
 
 # ---------- what's there ----------
@@ -746,7 +931,7 @@ def kits(h):
         info = {}
         if rec.exists():
             try:
-                info = json.loads(rec.read_text())
+                info = json.loads(rec.read_text(encoding="utf-8"))
             except ValueError:
                 pass
         photos = len([p for p in (d / "Photos").iterdir() if p.is_file() and not p.name.startswith(".")]) if (d / "Photos").is_dir() else 0
@@ -815,8 +1000,12 @@ def main():
         return 0
     if a.cmd == "look":
         h = need_home()
-        if finish_unfinished(h):
-            say("Finished a sort that was cut off earlier.")
+        try:
+            if finish_unfinished(h):
+                say("Finished a sort that was cut off earlier.")
+        except CopyHeld as held:
+            say(held.words())
+            return 1
         r = look(h, a.gap, a.previews)
         if r is None:
             return 2

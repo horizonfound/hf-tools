@@ -23,11 +23,12 @@ first time, a short explanation and "want to dive in?"; later, pick up where the
 Categories: backup, posts, queue, posting, reel, folder.
 """
 import argparse
+import errno
 import html
 import json
 import os
-import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, date
 from pathlib import Path
@@ -35,6 +36,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JOURNEY = HOME / "journey.json"
@@ -47,6 +51,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def now():
@@ -55,41 +64,68 @@ def now():
 
 # ---------- the journey: what they've pressed and done ----------
 
+# One read, change and save of the record at a time in this program: the page server answers two clicks at once,
+# and on a PC a save can't put the new record in place while another thread has the old one open to read it
+# (seen on GitHub's Windows machines, Nov 6: six threads saving at once lost 16 to 31 of 240 saves). A Mac never
+# refused, and gives the same bytes either way.
+_JOURNEY_LOCK = threading.RLock()
+
+
 def load_journey():
-    if JOURNEY.exists():
+    for i in range(25):
         try:
-            return json.loads(JOURNEY.read_text())
+            if not JOURNEY.exists():
+                break
+            return json.loads(JOURNEY.read_text(encoding="utf-8"))
         except ValueError:
-            pass
+            break
+        except PermissionError:
+            # on a PC, opening the record in the instant another program puts a new one in place is refused:
+            # wait a moment (about three seconds in all). A Mac never refuses; a real refusal is passed on.
+            if not this_computer.WINDOWS or i == 24:
+                raise
+            time.sleep(0.01 * (i + 1))
     return {"clicks": [], "done": {}, "hellos": {"first": None, "count": 0}}
 
 
 def save_journey(j):
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = JOURNEY.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False))
-    tmp.replace(JOURNEY)
+    # A scratch name of this program's and this thread's own: a command (`home.py did`, `hello --mark`) and a
+    # click on the home page can save at the same moment, and with one shared name ("journey.json.tmp", before
+    # Nov 6) one could take the other's file away mid-save. The bytes saved are the same as ever.
+    tmp = JOURNEY.with_name(f"{JOURNEY.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, JOURNEY)   # on a PC, waits a moment if the page server is reading it right then
+    except BaseException:
+        try:
+            tmp.unlink()                      # only the scratch copy just written here, never the record itself
+        except OSError:
+            pass
+        raise
 
 
 def record_click(item):
     if item not in CATEGORIES:
         return False
-    j = load_journey()
-    j["clicks"].append({"at": now(), "item": item, "seen": False})
-    j["clicks"] = j["clicks"][-50:]
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        j["clicks"].append({"at": now(), "item": item, "seen": False})
+        j["clicks"] = j["clicks"][-50:]
+        save_journey(j)
     return True
 
 
 def record_done(category, note=None):
-    j = load_journey()
-    d = j["done"].setdefault(category, {"first": None, "count": 0})
-    d["first"] = d["first"] or now()
-    d["last"] = now()
-    d["count"] += 1
-    if note:
-        d["note"] = note
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        d = j["done"].setdefault(category, {"first": None, "count": 0})
+        d["first"] = d["first"] or now()
+        d["last"] = now()
+        d["count"] += 1
+        if note:
+            d["note"] = note
+        save_journey(j)
     return d
 
 
@@ -107,10 +143,11 @@ def pending():
 
 
 def mark_seen():
-    j = load_journey()
-    for c in j["clicks"]:
-        c["seen"] = True
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        for c in j["clicks"]:
+            c["seen"] = True
+        save_journey(j)
 
 
 # ---------- the hello: an introduction the first time, the day's rundown once they know their way around ----------
@@ -146,11 +183,14 @@ def hello(mark=False):
            "not_tried": [k for k in ("backup", "posts") if not did[k]],
            "done": {c: {"times": d["count"], "last_note": d.get("note")} for c, d in done.items()}}
     if mark:
-        h["first"] = h.get("first") or now()
-        h["last"] = now()
-        h["count"] = h.get("count", 0) + 1
-        j["hellos"] = h
-        save_journey(j)
+        with _JOURNEY_LOCK:
+            j = load_journey()               # read again: a click may have been saved while the day was gathered
+            h = j.get("hellos") or {"first": None, "count": 0}
+            h["first"] = h.get("first") or now()
+            h["last"] = now()
+            h["count"] = h.get("count", 0) + 1
+            j["hellos"] = h
+            save_journey(j)
     return out
 
 
@@ -158,17 +198,13 @@ def hello(mark=False):
 
 def card_in():
     """A memory card mounted right now: a volume with a DCIM folder. Name and rough count, or None."""
-    vols = Path("/Volumes")
-    if not vols.is_dir():
-        return None
-    for v in vols.iterdir():
-        if (v / "DCIM").is_dir():
-            n = 0
-            for root, _, files in os.walk(v / "DCIM"):
-                n += len([f for f in files if not f.startswith(".")])
-                if n > 20000:
-                    break
-            return {"name": v.name, "files": n}
+    for c in this_computer.cards():   # /Volumes on a Mac, drive letters on a PC
+        n = 0
+        for root, _, files in os.walk(Path(c["path"]) / "DCIM"):
+            n += len([f for f in files if not f.startswith(".")])
+            if n > 20000:
+                break
+        return {"name": c["shown"], "files": n}
     return None
 
 
@@ -225,7 +261,7 @@ def gather():
         backed = [s for s in q["shoots"] if s.get("studio")]
         if backed:
             last = max(backed, key=lambda s: s.get("added", ""))
-            same = [s for s in backed if s.get("studio") == last["studio"]]
+            same = [s for s in backed if same_place(s.get("studio"), last["studio"])]
             g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same)}
     except Exception:
         pass
@@ -349,6 +385,14 @@ if(live){setInterval(async()=>{try{const r=await fetch('/home-state',{cache:'no-
 """
 
 
+def _in_address(t):
+    """A kit folder's name (or a picture named after it) as part of a page address: the three characters that
+    would cut the address short or change it ("#", "?" and "%") written the way addresses write them, and
+    nothing else, so every other name is exactly as before. A kit named "Smith #2" lost its pictures and its
+    Open the post kit button before Nov 6 (both computers): the address stopped at the "#"."""
+    return str(t).replace("%", "%25").replace("#", "%23").replace("?", "%3F")
+
+
 def kit_thumbs(k):
     """Three small previews of a kit's photos, in ~/.studio/home-thumbs/, made once."""
     try:
@@ -445,15 +489,15 @@ def page_html():
             acts += f"<button class='btn' data-report='{e(s['id'])}'>See the report</button>"
         k = kits_by_name.get(s["name"].lower())
         if k:
-            acts += f"<a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a>"
+            acts += f"<a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a>"
         recent.append(f"<div class='shoot'><div class='ph'>{ph}</div><b>{e(s['name'])}</b><small>{e(meta)}</small><div class='acts'>{acts}</div></div>")
     for k in g["kits"]:
         if k["name"].lower() in {s["name"].lower() for s in g["recent"]}:
             continue
-        th = "".join(f"<img src='{e(t)}' alt=''>" for t in kit_thumbs(k))
+        th = "".join(f"<img src='{e(_in_address(t))}' alt=''>" for t in kit_thumbs(k))
         th += "<i></i>" * (3 - th.count("<img"))
         recent.append(f"<div class='shoot'><div class='ph'>{th}</div><b>{e(k['name'])}</b><small>{k['photos']} photos · post kit</small>"
-                      f"<div class='acts'><a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a></div></div>")
+                      f"<div class='acts'><a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a></div></div>")
     recent_html = "".join(recent[:8]) if recent else ""
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
                     else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here once you've backed up a memory card or made posts from a folder of photos.</p>")
@@ -475,31 +519,36 @@ def page_html():
 
 def write_page():
     HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html())
+    PAGE.write_text(page_html(), encoding="utf-8")
     return PAGE
 
 
 def url():
     """The live home page: on the posting server, started if it isn't running."""
-    import urllib.request
     f = HOME / "posting-url.txt"
     def alive(u):
         try:
-            urllib.request.urlopen(u, timeout=1).read(1)
+            # Never through a proxy (this_computer.open_local): a proxy can't see this computer's own pages, so the
+            # check would fail and a second page server be started on the next address. With no proxy set (every
+            # Mac and PC at home) this is exactly what it was.
+            this_computer.open_local(u, timeout=1).read(1)
             return True
         except Exception:  # noqa: BLE001
             return False
     if f.exists():
-        base = f.read_text().strip().rsplit("/", 1)[0]
+        base = f.read_text(encoding="utf-8").strip().rsplit("/", 1)[0]
         if alive(base + "/home"):
             return base + "/home"
     HOME.mkdir(parents=True, exist_ok=True)
-    log = open(HOME / "posting-serve.log", "a")
-    subprocess.Popen([sys.executable, str(HERE / "posting_queue.py"), "serve"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    import fresh
+    try:  # its log is ~/.studio/logs/posting.log (fresh.server_log); the address comes from posting-url.txt
+        fresh.start_server([sys.executable, str(HERE / "posting_queue.py"), "serve"], "posting")
+    except OSError:
+        return None
     for _ in range(50):
         time.sleep(0.1)
         if f.exists():
-            base = f.read_text().strip().rsplit("/", 1)[0]
+            base = f.read_text(encoding="utf-8").strip().rsplit("/", 1)[0]
             if alive(base + "/home"):
                 return base + "/home"
     return None

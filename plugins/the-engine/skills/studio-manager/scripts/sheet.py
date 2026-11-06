@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
 """One contact sheet for Claude's one look: a row per time-gap group, a few
 previews each, the group number drawn in the corner. Written as
-_studio/groups-sheet.png with nothing installed: `sips` (on every Mac) turns
-each preview into a small uncompressed BMP, and this file lays them out and
-writes the PNG with Python's own zlib.
+_studio/groups-sheet.png with nothing installed on a Mac: `sips` (on every Mac)
+turns each preview into a small uncompressed BMP, and this file lays them out and
+writes the PNG with Python's own zlib. On a PC the small copies come from
+pictures.py (Pillow); the layout and the PNG are the same.
 
     python3 sheet.py "<session folder>" [--thumb 220] [--per-row 4]
 
 Rule 6 in practice: 4,000 photos become one image for the model to read.
+Every contact sheet the Assistant draws (this one, the sneak-peek pages, the reel's
+sheet, the drop box's sheet) gets its small copies from thumb() below.
+Exit codes: 0 done, 1 this computer cannot make the small copies yet (it says why).
 """
 import argparse
 import json
 import struct
-import subprocess
 import sys
 import zlib
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 # a tiny 5x7 font, just digits, for the row numbers
 DIGITS = {
@@ -32,42 +38,14 @@ DIGITS = {
 }
 
 
-def bmp_pixels(path):
-    """(width, height, rows of RGB bytes) from a 24- or 32-bit uncompressed BMP."""
-    d = Path(path).read_bytes()
-    if d[:2] != b"BM":
-        raise ValueError("not a BMP")
-    off = struct.unpack_from("<I", d, 10)[0]
-    w, h = struct.unpack_from("<ii", d, 18)
-    bpp = struct.unpack_from("<H", d, 28)[0]
-    if bpp not in (24, 32) or struct.unpack_from("<I", d, 30)[0] != 0:
-        raise ValueError("unexpected BMP layout")
-    top_down = h < 0
-    h = abs(h)
-    step = bpp // 8
-    stride = (w * step + 3) & ~3
-    rows = []
-    for y in range(h):
-        src = off + y * stride
-        row = bytearray(w * 3)
-        for x in range(w):
-            b, g, r = d[src + x * step], d[src + x * step + 1], d[src + x * step + 2]
-            row[x * 3:x * 3 + 3] = bytes((r, g, b))
-        rows.append(bytes(row))
-    if not top_down:
-        rows.reverse()
-    return w, h, rows
+# Kept under its old name: the BMP reader lives in pictures.py now, beside the Mac's sips call that makes the BMP.
+bmp_pixels = pictures.bmp_pixels
 
 
 def thumb(src, size, tmp):
-    """A small BMP of the preview, via sips."""
-    r = subprocess.run(["sips", "-s", "format", "bmp", "-Z", str(size), str(src), "--out", str(tmp)], capture_output=True)
-    if r.returncode != 0 or not tmp.exists():
-        return None
-    try:
-        return bmp_pixels(tmp)
-    except ValueError:
-        return None
+    """(width, height, rows of RGB bytes) for a small copy of the photo, its long edge `size`, or None.
+    On a Mac: sips to a small BMP at tmp, read back, exactly as before. On a PC: Pillow (pictures.py)."""
+    return pictures.thumb_rows(src, size, tmp)
 
 
 def write_png(path, w, h, rows):
@@ -113,8 +91,12 @@ def main():
     ap.add_argument("--thumb", type=int, default=220, help="longest edge of each preview on the sheet")
     ap.add_argument("--per-row", type=int, default=4)
     a = ap.parse_args()
+    ok, words = pictures.ready()
+    if not ok:
+        print(f"STOP: {words}", flush=True)
+        return 1
     studio = Path(a.session) / "_studio"
-    groups = json.loads((studio / "groups.json").read_text())["groups"]
+    groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
     tmp = studio / "groups" / ".sheet-tmp.bmp"
 
     cell_w, cell_h, label_w, gap = a.thumb, int(a.thumb * 0.68), 70, 6
@@ -142,7 +124,8 @@ def main():
     out = studio / "groups-sheet.png"
     write_png(out, W, H, cv.rows)
     print(f"{out}  ({W}x{H}, {len(groups)} rows)")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

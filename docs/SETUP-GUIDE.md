@@ -10,7 +10,7 @@
 
 You need four things:
 
-- A Mac. (A Windows version is coming; see the end.)
+- A Mac. (There's a separate guide for a Windows PC; see the end.)
 - **An external hard drive for your shoots.** If you already keep your photos on one, you're set. If your shoots live on your computer, this is the moment to change that: a computer can be dropped, die or get stolen, and the photos on it go with it, while a drive on the shelf is still fine. Raw files are also big, and a few shoots can fill a laptop and slow it down. Any external drive with room to spare works; the Assistant asks for it by name on the first backup. (It will still work onto the computer if you have to, and it will say its piece about it once.)
 - A Claude plan. The Assistant runs on your own Claude account, and it needs the **Pro** plan or higher. The free plan does not include Claude Code, which is the part of Claude the Assistant lives in. **[check: plan names on the current pricing page]**
 - About twenty minutes, once. After this, every backup starts with two words.
@@ -34,6 +34,8 @@ The first time you open Code, there is a row of choices under the message box: w
 1. Under the message box, click the folder choice, choose **Open folder…**, press **Command + Shift + H** to jump to your home folder, and make a new folder there called **Assistant**. This is only where the Assistant keeps its own notes; your photos never go here. **Not inside Documents, Desktop or Downloads:** the Mac guards those and blocked Claude on Nicole's first try ("Couldn't access Documents", Nov 5). **[shot]**
 
 ### Step 3: Add The Assistant to Claude
+
+> **Superseded later on Nov 5: the PDF guide installs from a file instead** (+ Add, **Upload plugin**, The-Assistant.zip). The steps below use Add marketplace, and Claude's copy of hf-tools from that route has not refreshed since Oct 16 (`docs/install-issues-2026-11-05.md`, item 4). Kept as a record; follow the PDF.
 
 **Corrected Nov 5, 8pm, from Nicole's first try.** Pasting a `/plugin` line into the desktop app's message box does not install anything: it opens Settings on Customize, Plugins. That Settings box is the way in (it is also how the Engine was installed in October).
 
@@ -168,7 +170,9 @@ In Lightroom, the sneak peeks are one filter away: the keyword **sneak peek**.
 
 ## Windows
 
-The Assistant launches for Mac and PC together. The Windows guide is written separately once the PC version is tested. **[to do]**
+The Assistant launches for Mac and PC together. Setting it up on a Windows PC has its own guide, with the two extra things a PC needs.
+
+> **For Dustin:** the PC edition is `docs/SETUP-GUIDE-PC.md` (Draft 1, Nov 6, 2026). It installs the way the PDF does (Upload plugin, not the Add marketplace steps above), adds Python from the Microsoft Store and the Pillow add-on for pictures, and has a box of what doesn't work on a PC yet. Nothing in it has been tried on a PC; it is the script for the first PC walk-through, not a guide to send.
 
 ---
 

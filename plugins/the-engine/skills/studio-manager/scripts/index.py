@@ -18,6 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import exif_read  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw", ".jpg", ".jpeg", ".heic", ".png",
          ".tif", ".tiff", ".mov", ".mp4", ".m4v"}
@@ -26,7 +28,7 @@ MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef",
 def build(session_dir):
     session_dir = Path(session_dir)
     studio = session_dir / "_studio"
-    manifest = json.loads((studio / "manifest.json").read_text()) if (studio / "manifest.json").exists() else {"files": {}}
+    manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8")) if (studio / "manifest.json").exists() else {"files": {}}
     hashes = {k: v.get("sha256") for k, v in manifest.get("files", {}).items()}
     t0 = time.time()
     records, unreadable = [], []
@@ -60,13 +62,13 @@ def build(session_dir):
         "no_date": unreadable,
         "photos": records,
     }
-    (studio / "index.json").write_text(json.dumps(index, indent=1))
+    (studio / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8")
     return index
 
 
 def nice(iso):
     try:
-        return datetime.fromisoformat(iso).strftime("%a %b %-d, %Y %-I:%M %p").replace("AM", "am").replace("PM", "pm")
+        return this_computer.strftime(datetime.fromisoformat(iso), "%a %b %-d, %Y %-I:%M %p").replace("AM", "am").replace("PM", "pm")
     except (TypeError, ValueError):
         return "?"
 

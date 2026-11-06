@@ -23,6 +23,8 @@ Claude does the choosing and the writing; this does the files. Nothing posts.
                                                        makes the kit folder, points Photos at the exports
     python3 kit.py start --folder "<any folder of finished photos>" [--name "..."]
     python3 kit.py told "beach" --text "..."           what they said when asked about the shoot
+    python3 kit.py told "beach" --text-file said.txt   the same, from a UTF-8 file (best on a PC: their words never
+                                                       pass through the command line, which can change quotes and $)
     python3 kit.py sheet "beach"                       numbered contact sheets of the photos (reel.py's)
     python3 kit.py picks "beach" --singles 3,17,22 --stories 5,9,30,41 --carousel 1,4,8,12,15,19,23 --reel 2,6,... [--cover 2]
     python3 kit.py build "beach"                       Singles, Carousel, Stories from the picks (reel via reel.py)
@@ -34,6 +36,11 @@ Claude does the choosing and the writing; this does the files. Nothing posts.
     python3 kit.py show "beach"
 
 Exit: 0 done, 1 problem, 2 nothing there, 7 the export folder could not be found (ask).
+
+A Mac and a PC (Nov 6): the pictures are the Mac's own sips on a Mac, exactly as before, and on a PC Pillow
+through pictures.py (the photo the right way up, Adobe RGB turned into sRGB, HEIC when pillow-heif is there).
+Everything else the two computers do differently (saving over a file, giving a file its name, the lock, "has
+that run ended?", how long a path may be) goes through this_computer.py. Every text file is UTF-8 on both.
 """
 import argparse
 import contextlib
@@ -57,8 +64,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import exif_read  # noqa: E402
 import brand  # noqa: E402
+import pictures  # noqa: E402
 import posts  # noqa: E402
 import studio_file  # noqa: E402
+import this_computer  # noqa: E402
 
 REEL_PY = HERE.parent.parent / "assistant-make-a-reel" / "scripts" / "reel.py"
 PHOTO = posts.PHOTO
@@ -85,6 +94,13 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only: when whatever reads this output has gone away, Windows' C runtime reports it as "invalid
+        # argument" (EINVAL), not as a broken pipe: the pipe's ERROR_NO_DATA is not in its list of errors, and
+        # Microsoft's errno docs say an unlisted one becomes EINVAL. The work goes on, as it does on a Mac.
+        # A Mac: anything else is raised, exactly as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 # ---------- finding a kit ----------
@@ -95,7 +111,7 @@ def rec_path(kit):
 
 def load_rec(kit):
     p = rec_path(kit)
-    return json.loads(p.read_text()) if p.exists() else {}
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
 
 def hidden(kit):
@@ -132,7 +148,10 @@ def tidy_own_files(kit):
                 new = own_file(kit, f"{Path(name).stem} (older){Path(name).suffix}")
                 if new.exists():
                     continue
-            old.rename(new)
+            try:
+                this_computer.rename(old, new)          # a Mac: exactly os.rename; a PC: patient if it is held open
+            except (FileExistsError, this_computer.HeldOpen):
+                continue        # only ever on a PC (a name taken a moment ago, or the file held open): left where it is, for next time
             moved.append(name)
     return moved
 
@@ -140,8 +159,39 @@ def tidy_own_files(kit):
 def save_rec(kit, rec):
     d = hidden(kit)
     tmp = d / f"kit.json.{os.getpid()}.tmp"     # a name of this process's own, so two commands never share a half-written file
-    tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False))
-    os.replace(tmp, d / "kit.json")
+    try:
+        tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, d / "kit.json")
+    except BaseException:
+        # A save that fails (a full drive; on a PC, kit.json held open by another program) leaves the record as it
+        # was, and its scratch copy is dropped: the next try is another process, which would never reuse its name.
+        _drop_scratch(tmp)
+        raise
+
+
+def _drop_scratch(tmp):
+    """Remove one of the Assistant's own scratch files, made a moment ago by this process; never a real file."""
+    try:
+        tmp.unlink()
+    except OSError:
+        pass
+
+
+def _write_text_whole(path, text):
+    """A text file of the kit's, in UTF-8 on both computers, written in full under a scratch name beside it and
+    only then put in its place. A failure part way (a full drive, a character the old way could not write) leaves
+    the earlier file exactly as it was, never an empty or half-written one."""
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        this_computer.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()        # our own scratch copy, never the real file
+        except OSError:
+            pass
+        raise
 
 
 def find_kit(words):
@@ -178,6 +228,61 @@ def photo_files(folder):
     return sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in PHOTO and not p.name.startswith("."))
 
 
+# ---------- how long a path may be (a PC only) ----------
+#
+# On a PC a file whose full address (the drive, every folder on the way, its own name) passes 260 characters
+# can't be opened in File Explorer, and the Assistant's own hidden files can't pass it either unless long paths
+# are switched on. So a kit, or a piece of one, that would be that long is stopped in plain words before
+# anything is made or moved. A Mac has no such limit: none of this ever stops anything there.
+
+LONG_WORDS = ("on a PC a file's full address, counting the drive, every folder on the way and its own name, can be "
+              "at most 260 characters")
+
+
+def _scratch(p):
+    """The scratch name a picture is written under before it gets its own (see shape())."""
+    p = Path(p)
+    return p.with_name(f".part-{os.getpid()}-{p.name}")
+
+
+def _too_long(shown=(), own=()):
+    """The paths a PC could not take, from `shown` (files the photographer opens: held to 260 characters, as File
+    Explorer is) and `own` (the Assistant's hidden files and scratch pictures: 260 too, unless long paths are on).
+    A Mac: none, ever."""
+    if not this_computer.WINDOWS:
+        return []
+    return ([Path(p) for p in shown if this_computer.path_too_long(p)]
+            + [Path(p) for p in own if this_computer.records_path_too_long(p)])
+
+
+# The longest name the photo pickers keep in a kit's hidden folder (.kit/previews): arrange.failed_mark, a photo's
+# number, the big copy's size, a six-letter tag, the photo's size in bytes (room for ten digits, up to 9 GB) and its
+# time to the billionth of a second (nineteen digits). It does not depend on the photo's own name, so a kit that has
+# room for it when it is made has room for every picker record. (arrange.py checks again on its own, in plain words.)
+PICKER_LONGEST = f"0000-1600-000000-{'0' * 10}-{'0' * 19}.failed"
+
+
+def _kit_too_long(kit):
+    """On a PC: a kit folder here would sit too deep (its own address, and room for its hidden files: the longest of
+    them are the photo pickers' records and a carousel slide being made, which needs room even with the shortest
+    photo name there can be). Stopped when the kit is made, rather than later at the picker or the slides. A Mac:
+    never."""
+    return bool(this_computer.path_too_long(kit, folder=True)
+                or _too_long(own=[kit / ".kit" / f".Captions and hooks.txt.{os.getpid()}.tmp",
+                                  _scratch(kit / ".kit" / "slides-new" / LONGEST_STAMP / "Slide 01 ().jpg"),
+                                  kit / ".kit" / "previews" / PICKER_LONGEST]))
+
+
+def _stop_kit_too_long(night=False):
+    """A PC only. night: the kit is named after the backup's shoot folder (start --night takes no --name)."""
+    fix = ("The kit takes its name from the shoot's folder, so a shorter name for the shoot (rename it)"
+           if night else "A shorter name for the kit (--name)")
+    say(f"STOP: that kit's folder would sit too deep in folders for this {this_computer.COMPUTER}: {LONG_WORDS}, "
+        f"and the kit's own files, inside it, need room too. {fix}, or the {brand.short()} folder nearer the top "
+        "of the drive, puts it right. Nothing was made.")
+    sys.exit(1)
+
+
 # ---------- start ----------
 
 def start_from_folder(folder, name=None):
@@ -198,6 +303,8 @@ def start_from_folder(folder, name=None):
     if kit.exists() and not (kit / ".kit").is_dir():
         say(f"STOP: there's already a folder in Content called \"{folder_name}\" that isn't a kit. Give this one another name.")
         sys.exit(6)
+    if not kit.exists() and _kit_too_long(kit):
+        _stop_kit_too_long()            # a PC only
     kit.mkdir(parents=True, exist_ok=True)
     rec = load_rec(kit) or {"name": nm, "date": when[:10], "folder": folder_name, "source": "folder", "made": datetime.now().isoformat(timespec="seconds")}
     rec["photos_dir"] = str(folder)
@@ -211,23 +318,28 @@ def start_from_night(night, shoot_id):
     from where import locate
     import find_exports
     root, studio = locate(night)
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     s = next((x for x in shoots if x["id"] == shoot_id), None)
     if not s:
         say(f"STOP: no shoot {shoot_id} in that backup.")
         sys.exit(1)
-    names = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
+    names = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
     name = names.get(shoot_id) or s.get("name") or s.get("suggested") or shoot_id
-    remembered = studio_file.load().get("exports")
-    found = find_exports.find(root, studio, shoot_id, remembered)
-    if not found or not found.get("folder"):
+    # Fixed Nov 6 (it stopped with an error on every computer since Oct 30): the Studio File may have no export
+    # spot saved yet, and find_exports.find gives (shoot, photos, the folders it found, best first). The folder
+    # taken is its best one, the same one find_exports.py itself shows and Claude confirms with them.
+    remembered = studio_file.load().get("exports") or []
+    _, _, found = find_exports.find(root, studio, shoot_id, remembered)
+    if not found or not found[0].get("folder"):
         say("STOP: I couldn't find the edited photos for this shoot. Where did you export them? (exit 7)")
         sys.exit(7)
-    folder = Path(found["folder"])
+    folder = Path(found[0]["folder"])
     sh_folder = s.get("folder")
     folder_name = Path(sh_folder).name if sh_folder else posts.folder_name(name, s.get("start") or datetime.now().isoformat())
     h = posts.need_home()
     kit = h / posts.CONTENT_NAME / folder_name
+    if not kit.exists() and _kit_too_long(kit):
+        _stop_kit_too_long(night=True)  # a PC only
     kit.mkdir(parents=True, exist_ok=True)
     rec = load_rec(kit) or {"name": name, "date": (s.get("start") or "")[:10], "folder": folder_name, "source": "backup",
                             "made": datetime.now().isoformat(timespec="seconds")}
@@ -242,19 +354,23 @@ def sheet(kit):
     rec = load_rec(kit)
     folder = photos_dir(kit, rec)
     r = subprocess.run([sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)],
-                       capture_output=True, text=True)
+                       capture_output=True, encoding="utf-8", errors="replace")
     say(r.stdout.strip())
     if r.returncode != 0:
         say(r.stderr.strip())
         return 1
     m = re.search(r"List: (.+)", r.stdout)
     if m and Path(m.group(1).strip()).exists():
-        listing = json.loads(Path(m.group(1).strip()).read_text())
+        listing = json.loads(Path(m.group(1).strip()).read_text(encoding="utf-8"))
         # whole or not at all: a page that reads the list while it is being re-made must see the old one or
         # the new one, never half of one (arrange.py takes a list it can't read as "not ready")
         tmp = kit / ".kit" / f"sheet.json.{os.getpid()}.tmp"
-        shutil.copyfile(m.group(1).strip(), tmp)
-        os.replace(tmp, kit / ".kit" / "sheet.json")
+        try:
+            shutil.copyfile(m.group(1).strip(), tmp)
+            this_computer.replace(tmp, kit / ".kit" / "sheet.json")
+        except BaseException:
+            _drop_scratch(tmp)      # the list stays as it was; no scratch copy is left behind (see save_rec)
+            raise
         rec["numbered"] = len(listing["photos"])
         save_rec(kit, rec)
     return 0
@@ -265,7 +381,7 @@ def numbered(kit):
     if not p.exists():
         say("STOP: make the sheet first (kit.py sheet), so the picks have numbers.")
         sys.exit(2)
-    return {x["n"]: x for x in json.loads(p.read_text())["photos"]}
+    return {x["n"]: x for x in json.loads(p.read_text(encoding="utf-8"))["photos"]}
 
 
 def parse_nums(s):
@@ -287,6 +403,34 @@ def reel_picks_text(rec):
     """The reel's picks as one line for reel.py make --picks, marks in place: 19,4,10+,14-"""
     marks = rec.get("reel_marks") or {}
     return ",".join(f"{n}{marks.get(str(n), '') if marks.get(str(n)) in ('+', '-') else ''}" for n in rec.get("picks", {}).get("reel") or [])
+
+
+# What a PC's command line reads as its own inside quotes (a command there runs in PowerShell or in Git Bash,
+# parts/on-a-pc.md). Inside double quotes: $ and the backtick in both, a double quote (PowerShell takes the curly
+# ones for one too), and in Git Bash a backslash. Inside single quotes: only an apostrophe (PowerShell takes the
+# curly ones for one too); everything else is read as it is, in both.
+_PC_IN_DOUBLE = set('$`"\\“”„')
+_PC_IN_SINGLE = set("'‘’‚‛")
+
+
+def _pc_arg(text):
+    """A PC only: one value for a line of a command Claude is handed, quoted so it reaches the script exactly as it
+    is in PowerShell or in Git Bash. Double quotes when nothing in it means anything there; else single quotes when
+    it holds no apostrophe; else PowerShell's own way, every apostrophe doubled inside single quotes (as on-a-pc.md
+    says), which Git Bash would read differently: only for a value with both an apostrophe and a $, a backtick, a
+    double quote or a backslash in it, which should be rare (paths come here with forward slashes)."""
+    text = str(text)
+    if not _PC_IN_DOUBLE.intersection(text):
+        return f'"{text}"'
+    if not _PC_IN_SINGLE.intersection(text):
+        return f"'{text}'"
+    return "'" + "".join(c + c if c in _PC_IN_SINGLE else c for c in text) + "'"
+
+
+def _pc_both_ways(text):
+    """True for a value no one way of quoting can carry through both PowerShell and Git Bash (_pc_arg's last case)."""
+    text = str(text)
+    return bool(_PC_IN_DOUBLE.intersection(text) and _PC_IN_SINGLE.intersection(text))
 
 
 def set_picks(kit, singles, stories, carousel, reel, cover=None):
@@ -321,12 +465,13 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
 # ---------- building the pieces ----------
 
 def size_of(p):
-    if shutil.which("sips"):
-        r = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(p)], capture_output=True, text=True)
-        w = re.search(r"pixelWidth: (\d+)", r.stdout)
-        h = re.search(r"pixelHeight: (\d+)", r.stdout)
-        if w and h:
-            return int(w.group(1)), int(h.group(1))
+    """(width, height) of a photo, or None.
+    A Mac: the Mac's own sips, the same command as always (pictures.size_of runs it), and its two numbers as they
+    are, not turned for a photo shot sideways; Pillow's plain size if sips gave none and Pillow is here, as before.
+    A PC: pictures.size_of, the right way up, which is how the PC's pictures are made too (shape())."""
+    got = pictures.size_of(p)
+    if got or not pictures.use_sips():
+        return got
     try:
         from PIL import Image
         with Image.open(p) as im:
@@ -341,26 +486,17 @@ def _pad_rgb(hexs):
 
 def place(tmp, dst):
     """Give a finished file its final name, only if that name is free. Never writes over anything.
-    True if the file now has that name. A hard link is tried first, because it fails by itself when the
-    name is taken, whatever else is going on; a drive with no hard links (exFAT) gets a look, then a rename."""
-    tmp, dst = Path(tmp), Path(dst)
-    try:
-        os.link(tmp, dst)
-    except FileExistsError:
-        return False
-    except OSError:
-        if os.path.lexists(dst):
-            return False
-        os.rename(tmp, dst)
-        return True
-    os.unlink(tmp)          # the same file has its final name now; this only drops the scratch name
-    return True
+    True if the file now has that name. On a Mac a hard link is tried first, because it fails by itself when the
+    name is taken, whatever else is going on; a drive with no hard links (exFAT) gets a look, then a rename. On a
+    PC a rename, which Windows itself refuses onto a name that is taken. Both ways are this_computer.rename_new
+    (the Mac's is exactly what this did before Nov 6)."""
+    return this_computer.rename_new(Path(tmp), Path(dst))
 
 
 def _finish_shape(tmp, dst, ok, replace):
     """The end of shape(): the scratch file becomes the real one, or is dropped."""
     if ok and replace:
-        os.replace(tmp, dst)
+        this_computer.replace(tmp, dst)
         return True
     if ok and place(tmp, dst):
         return True
@@ -377,14 +513,17 @@ def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS, replace=False):
       "fit"   the whole photo inside the box, its own shape, no padding (a tall photo comes out narrower than the box)
       "pad"   the whole photo inside the box, padded to the box with a plain color
       "crop"  the box filled, the extra trimmed (tall photos lose a little top and bottom, more from the bottom)
-    The Mac's own sips does all of it with nothing installed; Pillow elsewhere.
+    A Mac: its own sips does all of it with nothing installed, exactly the command it always ran (a photo shot
+    sideways keeps the camera's turn mark, as sips keeps it). A PC: Pillow, through pictures._open, so the photo
+    is the right way up, Adobe RGB is turned into sRGB and HEIC opens when pillow-heif is there; the sizes come
+    out the same as sips makes them, from the same sums.
     The picture is written under a scratch name beside dst ('.part-<process>-<name>', which every listing
     here skips) and gets its real name only when it is whole, and only if that name is free: a run that is
     cut off leaves no half-made file under a real name, and nothing is ever written over. replace=True is
     for the Assistant's own small thumbnails, which follow the files they are made from."""
     W, H = box
     dst = Path(dst)
-    tmp = dst.with_name(f".part-{os.getpid()}-{dst.name}")
+    tmp = _scratch(dst)
     size = size_of(src)
     if not size:
         return False
@@ -397,30 +536,38 @@ def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS, replace=False):
     cut_y = max(0, nh - H) if how == "crop" else 0
     cut_x = max(0, nw - W) if how == "crop" else 0
     off_y, off_x = round(cut_y * bias), cut_x // 2
-    if shutil.which("sips"):
-        cmd = ["sips", "-s", "format", "jpeg", "-s", "formatOptions", "92", "--resampleHeightWidth", str(nh), str(nw)]
+    if pictures.use_sips():
+        cmd = ["sips", "-s", "format", "jpeg", "-s", "formatOptions", "92", "--resampleHeightWidth", str(nh), str(nw)]  # pc-ok: a Mac only (pictures.use_sips), the same command as always
         if how == "crop" and (cut_y or cut_x):
             cmd += ["--cropOffset", str(off_y), str(off_x), "--cropToHeightWidth", str(H), str(W)]
         elif how == "pad":
             cmd += ["--padToHeightWidth", str(H), str(W), "--padColor", pad]
         cmd += [str(src), "--out", str(tmp)]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True)
+            r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
             ok = r.returncode == 0 and tmp.is_file() and tmp.stat().st_size > 0
         except OSError:
             ok = False
         return _finish_shape(tmp, dst, ok, replace)
     try:
-        from PIL import Image, ImageOps
-        im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
-        im = im.resize((nw, nh), Image.LANCZOS)
+        Image = pictures._pillow()
+        # Opened at least twice the size it is made at (Pillow's own thumbnail does the same): a big JPEG is
+        # read small, many times quicker, with room left for a clean resize.
+        im = pictures._open(src, 2 * max(nw, nh)) if Image is not None else None
+        if im is None:
+            return _finish_shape(tmp, dst, False, replace)
+        icc = im.info.get("icc_profile")
+        im = im.resize((nw, nh), pictures._const(Image, "Resampling", "LANCZOS"))
         if how == "crop" and (cut_y or cut_x):
             im = im.crop((off_x, off_y, off_x + W, off_y + H))
         elif how == "pad":
             bg = Image.new("RGB", (W, H), _pad_rgb(pad))
             bg.paste(im, ((W - nw) // 2, (H - nh) // 2))
             im = bg
-        im.save(tmp, "JPEG", quality=92)
+        kw = {"quality": 92}
+        if icc:
+            kw["icc_profile"] = icc     # the photo's own colours, labelled as sips keeps them
+        im.save(tmp, "JPEG", **kw)
         return _finish_shape(tmp, dst, True, replace)
     except Exception:
         return _finish_shape(tmp, dst, False, replace)
@@ -469,6 +616,7 @@ def slide(src, dst, pad=PAD_WHITE):
 
 SLIDE_NAME = re.compile(r"^Slide (\d\d) \((.+)\)\.jpg$")
 MOVED = "moved.json"
+LONGEST_STAMP = "0000-00-00 000000 99"     # as long as a run's own folder name gets (a date, a time, a count): for the PC's length check
 
 
 def _test_stop(name):
@@ -480,7 +628,7 @@ def _test_stop(name):
     if once:
         if os.path.exists(once):
             return
-        Path(once).write_text(name)
+        Path(once).write_text(name, encoding="utf-8")
     os._exit(9)
 
 
@@ -523,41 +671,37 @@ def _sha(path):
 
 
 def _write_whole(path, obj):
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    """A record of the kit's, as JSON in UTF-8, written in full under a scratch name and only then put in place
+    (_write_text_whole does the same for its text files, and drops its scratch copy the same way on a failure)."""
+    _write_text_whole(path, json.dumps(obj, indent=1, ensure_ascii=False))
 
 
 @contextlib.contextmanager
 def _held(lock_file, wait):
-    """Hold a lock on a file for as long as the work takes, across processes; the Mac lets go of it even if
-    the holder dies. Yields "held" when it is held, "none" when it can't be had at all (a drive with no such
+    """Hold a lock on a file for as long as the work takes, across processes; the computer lets go of it even
+    if the holder dies. Yields "held" when it is held, "none" when it can't be had at all (a drive with no such
     locks, a folder that isn't there: the work goes on without one), and False when something else kept it
-    for longer than `wait` seconds. The lock file's folder is never made here."""
+    for longer than `wait` seconds. The lock file's folder is never made here.
+    The lock itself is this_computer.try_lock: on a Mac fcntl.flock, exactly as before; on a PC msvcrt.locking
+    on the file's first byte (unproven on a real PC)."""
     try:
-        import fcntl
-    except ImportError:
-        fcntl = None
-    f = None
-    if fcntl is not None:
-        try:
-            f = open(lock_file, "a")
-        except OSError:
-            f = None
+        f = open(lock_file, "ab")           # never written: only held
+    except OSError:
+        f = None
     got = "held"
     end = time.time() + wait
     while f is not None:
-        try:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        mine = this_computer.try_lock(f)
+        if mine:
             break
-        except BlockingIOError:
+        if mine is False:                   # something else holds it right now
             if time.time() > end:
                 got = False
                 break
             time.sleep(0.05)
-        except OSError:                     # no locks on this drive
-            f.close()
-            f = None
+            continue
+        f.close()                           # None: no locks on this drive (or this computer)
+        f = None
     if f is None:
         got = "none"
     try:
@@ -565,10 +709,7 @@ def _held(lock_file, wait):
     finally:
         if f is not None:
             if got:
-                try:
-                    fcntl.flock(f, fcntl.LOCK_UN)
-                except OSError:
-                    pass
+                this_computer.unlock(f)
             f.close()
 
 
@@ -585,16 +726,11 @@ def update_rec(kit, change):
 
 
 def _pid_gone(pid):
-    """Has this process ended? Only ever True when the Mac says so."""
-    if os.name == "nt" or pid <= 0:
-        return False                # a PC has no harmless way to ask
-    try:
-        os.kill(pid, 0)
+    """Has this process ended? Only ever True when the computer says so (this_computer.still_running: on a Mac
+    os.kill(pid, 0) as before; on a PC the process is opened just to read whether it has ended)."""
+    if pid <= 0:
         return False
-    except ProcessLookupError:
-        return True
-    except OSError:
-        return False
+    return this_computer.still_running(pid) is False
 
 
 PART_NAME = re.compile(r"^\.part-(\d+)-")
@@ -602,15 +738,16 @@ PART_NAME = re.compile(r"^\.part-(\d+)-")
 
 def _sweep_parts(folder):
     """Drop the Assistant's own half-made scratch pictures ('.part-<process>-...') left in a folder by a run
-    that was killed: only ones whose process has ended (on a PC, where that can't be asked: ones over a day
-    old). They never had a real name; no photo, slide or file of the photographer's is ever touched here."""
+    that was killed: only ones whose process has ended (on a PC also ones over a day old, since a PC soon gives a
+    finished program's number to a new one). They never had a real name; no photo, slide or file of the
+    photographer's is ever touched here."""
     for name in _listing(folder):
         m = PART_NAME.match(name)
         if not m:
             continue
         p = Path(folder) / name
         try:
-            stale = _pid_gone(int(m.group(1))) or (os.name == "nt" and time.time() - p.stat().st_mtime > 86400)
+            stale = _pid_gone(int(m.group(1))) or (this_computer.WINDOWS and time.time() - p.stat().st_mtime > 86400)
             if stale and p.is_file() and not p.is_symlink():
                 p.unlink()
         except OSError:
@@ -936,6 +1073,20 @@ SLIDES_WAIT = 120.0          # seconds to wait for another run that is changing 
 
 def _plain_os(e):
     """Trouble with the drive, in a few plain words and never a path."""
+    winerror = getattr(e, "winerror", None) if this_computer.WINDOWS else None     # a Mac: always None
+    if isinstance(e, this_computer.HeldOpen) or winerror in (32, 33):
+        # a PC only (unproven on a real PC): another program has the file open (ERROR_SHARING_VIOLATION 32,
+        # ERROR_LOCK_VIOLATION 33)
+        return ("another program has one of these pictures open (a photo viewer, or a folder window showing it), "
+                "so close that first")
+    if winerror == 5:
+        # a PC only (unproven on a real PC): ERROR_ACCESS_DENIED, after this_computer's few seconds of trying again.
+        # Windows gives it for a folder that truly can't be written to, and also when a file is saved over or moved
+        # while another program has it open: Python, and most programs, open a file without letting it be replaced
+        # meanwhile, and that is how a replace onto it is refused (kit.json, moved.json, the kit page). Which of the
+        # two it was can't be told from here, so the words name the likely one first and the other after it.
+        return ("another program may have one of this kit's files open (a photo viewer, or a folder window showing "
+                "it), so close that first; if nothing has, a folder in this kit can't be written to")
     if e.errno == errno.ENOSPC:
         return "the drive is full"
     if e.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
@@ -948,7 +1099,7 @@ def _plain_os(e):
 def rebuild_carousel(kit, nums=None, say_status=None, take=None):
     """One run at a time for a kit's slides, across processes (the page's own job and a command of Claude's
     must never both be moving files): a lock held on .kit/slides.lock for as long as the work takes, which
-    the Mac lets go of even if the run dies. A drive with no such locks is worked on without one.
+    the computer lets go of even if the run dies. A drive with no such locks is worked on without one.
 
     take, when given, is called with that lock still held as soon as the slides are in the order asked for
     ("done" or "same"): it is how the caller writes the order down as the kit's own pick, so the slides and
@@ -991,9 +1142,13 @@ def _rebuild_carousel(kit, nums=None, say_status=None, sure=True):
 
     Returns {"state": "done" | "same" | "none" | "problem", "count", "made", "aside", "why", "photos", "detail",
     "files", "put_back", "left"}. A problem leaves the Carousel folder exactly as it was ("why": "sheet",
-    "photo", "make", "clash", "redo"; for "clash", "files" names what is in the way, and "put_back" says a
-    move had begun and was put back; "redo" is a move put back because a slide just made had gone from the
-    hidden folder). Only trouble with the drive itself leaves a move unfinished (see rebuild_carousel)."""
+    "photo", "make", "clash", "redo", and on a PC only "long" and "tools"; for "clash", "files" names what is in
+    the way, and "put_back" says a move had begun and was put back; "redo" is a move put back because a slide
+    just made had gone from the hidden folder; "long": a slide's full address would pass what a PC allows,
+    "photos" and "files" say which, and "deep": True when only the hidden folders it passes through are too
+    long, not its own name in Carousel; "tools": the PC has no way to make pictures yet, "detail" says what to add).
+    On a PC "detail" may also carry plain words for "photo" and "make" (pictures.why_not). Only trouble with the
+    drive itself leaves a move unfinished (see rebuild_carousel)."""
     out = {"state": "same", "count": 0, "made": 0, "aside": 0}
     finished = 0
     undone = None
@@ -1027,11 +1182,31 @@ def _rebuild_carousel(kit, nums=None, say_status=None, sure=True):
         return dict(out, state="done" if finished else "same")
     if plan["clash"]:
         return dict(out, state="problem", why="clash", files=plan["clash"], put_back=bool(undone), left=(undone or {}).get("left") or [])
-    # every photo a new slide needs must be readable BEFORE anything is made
     need = plan["make"]
+    # a PC only, before anything is made: a way to make pictures, and every new slide's full address (in the
+    # Carousel folder, in the hidden folders it passes through, under its scratch name) within what a PC allows
+    ready, words = pictures.ready() if need else (True, "")
+    if not ready:
+        return dict(out, state="problem", why="tools", detail=words)
+    # Two different troubles, told apart so the words are true: a slide whose own name in the Carousel folder would
+    # be too long to open, or (the usual one where long paths are off) a kit that sits too deep for the hidden
+    # folders a slide passes through on its way in, under longer names than the one it ends up with ("deep").
+    run = kit / ".kit" / "slides-new" / LONGEST_STAMP
+    aside_to = kit / ".kit" / "slides-older" / LONGEST_STAMP
+    long_shown = [name for name in need if _too_long(shown=[kit / "Carousel" / name])]
+    if long_shown:
+        return dict(out, state="problem", why="long", photos=[plan["n_of"][name] for name in long_shown], files=long_shown)
+    long_own = ([name for name in need if _too_long(own=[run / name, _scratch(run / name)])]
+                + [name for name in plan["aside"] if _too_long(own=[aside_to / f"{Path(name).stem} (99).jpg"])])
+    if long_own:
+        return dict(out, state="problem", why="long", deep=True,
+                    photos=[plan["n_of"][name] for name in long_own if name in plan["n_of"]], files=long_own)
+    # every photo a new slide needs must be readable BEFORE anything is made
     cant = [plan["n_of"][name] for name in need if not plan["src"][name].is_file() or not size_of(plan["src"][name])]
     if cant:
-        return dict(out, state="problem", why="photo", photos=cant)
+        first = next(plan["src"][name] for name in need if plan["n_of"][name] == cant[0])
+        why_not = pictures.why_not(first) if first.is_file() else None     # None on a Mac: the words stay as they were
+        return dict(out, state="problem", why="photo", photos=cant, **({"detail": why_not} if why_not else {}))
     stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
     k = 1
     while (kit / ".kit" / "slides-new" / stamp).exists() or (older_root / stamp).exists():
@@ -1058,7 +1233,9 @@ def _rebuild_carousel(kit, nums=None, say_status=None, sure=True):
                     failed.append(plan["n_of"][name])
     if failed:
         _clear_making(kit, only=stamp)  # the slides that did get made were for nothing: not left behind
-        return dict(out, state="problem", why="make", photos=failed)
+        first = next(plan["src"][name] for name in need if plan["n_of"][name] == failed[0])
+        why_not = pictures.why_not(first)  # None on a Mac: the words stay as they were
+        return dict(out, state="problem", why="make", photos=failed, **({"detail": why_not} if why_not else {}))
     _test_stop("after-make")
     car = kit / "Carousel"
     car.mkdir(exist_ok=True)
@@ -1086,10 +1263,23 @@ def carousel_trouble(res):
     """A problem from rebuild_carousel, in a line Claude can read."""
     why, photos = res.get("why"), res.get("photos") or []
     which = "photo " + ", ".join(str(n) for n in photos) if photos else "a photo"
+    more = f" {res['detail']}" if res.get("detail") and why in ("photo", "make") else ""   # a PC only (pictures.why_not)
     if why == "photo":
-        return f"(could not make the carousel slides: {which} can't be read right now. The Carousel folder was left as it was.)"
+        return f"(could not make the carousel slides: {which} can't be read right now. The Carousel folder was left as it was.{more})"
     if why == "make":
-        return f"(could not make the carousel slides: {which} couldn't be sized. The Carousel folder was left as it was.)"
+        return f"(could not make the carousel slides: {which} couldn't be sized. The Carousel folder was left as it was.{more})"
+    if why == "long" and res.get("deep"):
+        return (f"(could not make the carousel slides: this kit's folder sits too deep in folders for the slides to be made "
+                f"on this {this_computer.COMPUTER}. The new slides are made, and the earlier ones set aside, in the kit's "
+                f"hidden folder first, under longer names than the ones in the Carousel folder, and {LONG_WORDS}. The "
+                "Carousel folder was left as it was. A shorter name for this kit's folder, shorter photo names, or the "
+                f"{brand.short()} folder nearer the top of the drive puts it right.)")
+    if why == "long":
+        return (f"(could not make the carousel slides: the slide for {which} would have a name too long for this "
+                f"{this_computer.COMPUTER} to open: {LONG_WORDS}. The Carousel folder was left as it was. Shorter photo "
+                "names, or a shorter name for this kit's folder, put it right.)")
+    if why == "tools":
+        return f"(could not make the carousel slides: {res.get('detail') or 'pictures cannot be made on this computer yet.'} The Carousel folder was left as it was.)"
     if why == "sheet":
         return "(could not make the carousel slides: the numbered list can't be read. The Carousel folder was left as it was.)"
     if why == "busy":
@@ -1121,6 +1311,35 @@ def build(kit):
         return 2
     by_n = numbered(kit)
     made = {}
+    # the reel cover: 9:16 from the cover pick (or the first reel pick), plus what the grid will show of it
+    cover_n = picks.get("cover") or (picks.get("reel") or [None])[:1]
+    cover_n = cover_n[0] if isinstance(cover_n, list) else cover_n
+    # Before anything is made or moved (both only ever stop a PC; a Mac always has its own sips and no length
+    # limit): a way to make pictures at all, and no piece whose full address would be longer than a PC allows
+    # (the carousel's slides are checked on their own road, in rebuild_carousel).
+    ready, words = pictures.ready()
+    if not ready:
+        say(f"STOP: {words} Nothing was made.")
+        return 1
+    planned = [kit / key.capitalize() / f"{prefix} {i:02d} ({Path(by_n[n]['file']).stem}).jpg"
+               for key, prefix in (("singles", "Single"), ("stories", "Story"))
+               for i, n in enumerate(picks.get(key) or [], 1) if n in by_n]
+    if cover_n:
+        planned += [kit / "Covers" / "Reel cover.jpg", kit / "Covers" / "Reel cover, as the grid shows it.jpg"]
+    names = [p.name for p in planned if _too_long(shown=[p])]
+    if names:
+        say(f"STOP: {len(names)} of this kit's pictures would have a name too long for this {this_computer.COMPUTER} to "
+            f"open (\"{names[0]}\"" + (f" and {len(names) - 1} more" if len(names) > 1 else "") + f"): {LONG_WORDS}. "
+            "Shorter photo names, or a shorter name for this kit's folder, put it right. Nothing was made.")
+        return 1
+    # the picture's own name fits, but the slightly longer name it is made under first does not (long paths off)
+    names = [p.name for p in planned if _too_long(own=[_scratch(p)])]
+    if names:
+        say(f"STOP: this kit's folder sits too deep in folders for its pictures to be made on this {this_computer.COMPUTER} "
+            f"(\"{names[0]}\"" + (f" and {len(names) - 1} more" if len(names) > 1 else "") + "): each picture is made "
+            f"first under a slightly longer working name, and {LONG_WORDS}. Shorter photo names, a shorter name for this "
+            f"kit's folder, or the {brand.short()} folder nearer the top of the drive puts it right. Nothing was made.")
+        return 1
     # The carousel first, by its own careful road: a new pick makes new slides and sets the earlier ones
     # aside (they used to be left in the folder, out of date). It reads the kit's pick itself, with the
     # slides lock held, so a pick the page's own job has just written is the one it goes by.
@@ -1141,11 +1360,9 @@ def build(kit):
             if dst.exists() or maker(src, dst):
                 files.append(dst.name)
             else:
-                say(f"(could not size {src.name} for {key})")
+                why_not = pictures.why_not(src) if src.is_file() else None      # None on a Mac: the line stays as it was
+                say(f"(could not size {src.name} for {key})" + (f" {why_not}" if why_not else ""))
         made[key] = files
-    # the reel cover: 9:16 from the cover pick (or the first reel pick), plus what the grid will show of it
-    cover_n = picks.get("cover") or (picks.get("reel") or [None])[:1]
-    cover_n = cover_n[0] if isinstance(cover_n, list) else cover_n
     if cover_n:
         out = kit / "Covers"
         out.mkdir(exist_ok=True)
@@ -1153,6 +1370,11 @@ def build(kit):
         src = Path(by_n[cover_n]["file"])
         full, grid = out / "Reel cover.jpg", out / "Reel cover, as the grid shows it.jpg"
         ok = (full.exists() or shape(src, full, COVER, "crop")) and (grid.exists() or shape(full, grid, GRID, "crop", bias=0.5))
+        if not ok:
+            failed = full if full.exists() else src
+            why_not = pictures.why_not(failed) if failed.is_file() else None    # None on a Mac: nothing new is said
+            if why_not:
+                say(f"(could not make the reel cover from {src.name}) {why_not}")
         made["covers"] = [full.name, grid.name] if ok else []
     # Sizing takes a while, and the page's own job may have written the record meanwhile (a new carousel
     # order, its slides). So the record is read afresh for the save, and only what this run made goes in:
@@ -1173,8 +1395,24 @@ def build(kit):
         if k in lines:
             say(lines[k])
     if picks.get("reel"):
-        say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
-            + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
+        if this_computer.WINDOWS:
+            # A PC only (unproven on a real PC): every value quoted so the line works as it is in PowerShell (which
+            # cuts a bare comma list into pieces) or in Git Bash, and paths with forward slashes, which every PC
+            # takes (parts/on-a-pc.md). A Mac's line, below, is exactly as it always was.
+            vals = [Path(photos_dir(kit, rec)).as_posix(), rec.get("name")]
+            if rec.get("night"):
+                vals += [Path(rec["night"]).as_posix(), rec["shoot_id"]]
+            # --shoot only with a name: Windows PowerShell 5.1 drops an empty "" when it starts a program, which
+            # would leave --shoot with nothing after it (reel.py treats no --shoot and an empty one the same)
+            say("Reel: run reel.py make with these picks: " + _pc_arg(reel_picks_text(rec))
+                + f" --folder {_pc_arg(vals[0])}" + (f" --shoot {_pc_arg(vals[1])}" if vals[1] else "")
+                + (f" --night {_pc_arg(vals[2])} --shoot-id {_pc_arg(vals[3])}" if rec.get("night") else "")
+                + (" (one of these has an apostrophe and also a $, a backtick, a backslash or a quote mark in it, so "
+                   "it is written here the PowerShell way; in Git Bash, quote it as on a Mac: parts/on-a-pc.md)"
+                   if any(_pc_both_ways(v) for v in vals) else ""))
+        else:
+            say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
+                + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
     write_page(kit)
     return 0
 
@@ -1185,8 +1423,8 @@ def note_reel(kit, project_name, picks=None):
     if not picks:
         rec["reel"]["picks_text"] = reel_picks_text(rec)      # the same picks with Longer (+) and Quicker (-) in place
     save_rec(kit, rec)
-    own_file(kit, "Reel.txt").write_text(f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
-                                  + ("Photos in it, in order: " + ", ".join(str(n) for n in rec["reel"]["picks"]) + "\n" if rec["reel"]["picks"] else ""))
+    _write_text_whole(own_file(kit, "Reel.txt"), f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
+                      + ("Photos in it, in order: " + ", ".join(str(n) for n in rec["reel"]["picks"]) + "\n" if rec["reel"]["picks"] else ""))
     write_page(kit)
 
 
@@ -1212,11 +1450,21 @@ def set_voice(sample=None, never=None, audience=None, hashtags=None):
     return v
 
 
+def told_text(kit):
+    """What they have said about this shoot so far ("" when nothing). An empty told.json counts as nothing said:
+    that is what an earlier version left when a write failed part way (an emoji in an old code page)."""
+    p = kit / ".kit" / "told.json"
+    if not p.exists():
+        return ""
+    raw = p.read_text(encoding="utf-8")
+    return json.loads(raw).get("text", "") if raw.strip() else ""
+
+
 def told(kit, text):
     p = kit / ".kit" / "told.json"
-    old = json.loads(p.read_text()).get("text", "") if p.exists() else ""
+    old = told_text(kit)
     t = (old + "\n" + text.strip()).strip() if old else text.strip()
-    p.write_text(json.dumps({"text": t, "at": datetime.now().isoformat(timespec="seconds")}, indent=1, ensure_ascii=False))
+    _write_whole(p, {"text": t, "at": datetime.now().isoformat(timespec="seconds")})   # whole or not at all, UTF-8
 
 
 def time_words(times):
@@ -1235,13 +1483,12 @@ def facts(kit):
     times = sorted(e["taken"] for e in exifs if e.get("taken"))
     lenses = sorted({e["lens"] for e in exifs if e.get("lens")})
     cams = sorted({e["camera"] for e in exifs if e.get("camera")})
-    told_p = kit / ".kit" / "told.json"
     out = {
         "name": rec.get("name"), "folder": kit.name, "date": rec.get("date"), "photos": len(files),
-        "day": datetime.fromisoformat(times[0]).strftime("%A, %B %-d, %Y") if times else "",
+        "day": this_computer.strftime(datetime.fromisoformat(times[0]), "%A, %B %-d, %Y") if times else "",
         "time_of_day": time_words(times), "span_minutes": round((datetime.fromisoformat(times[-1]) - datetime.fromisoformat(times[0])).total_seconds() / 60) if len(times) > 1 else 0,
         "lenses": lenses, "cameras": cams,
-        "they_said": json.loads(told_p.read_text()).get("text", "") if told_p.exists() else "",
+        "they_said": told_text(kit),
         "picks": rec.get("picks", {}), "numbered_list": str(kit / ".kit" / "sheet.json"),
         "voice": voice(), "client_note_voice": studio_file.load().get("note", {}),
         "existing_words": bool((kit / ".kit" / "words.json").exists()),
@@ -1260,7 +1507,7 @@ def save_words(kit, words):
     for k in ("hooks", "caption", "short", "stories"):
         words.setdefault(k, [] if k in ("hooks", "stories") else "")
     words["written"] = datetime.now().isoformat(timespec="seconds")
-    (kit / ".kit" / "words.json").write_text(json.dumps(words, indent=1, ensure_ascii=False))
+    _write_whole(kit / ".kit" / "words.json", words)       # whole or not at all, UTF-8
     lines = ["HOOKS (pick one, or write your own)", ""]
     lines += [f"{i}. {h}" for i, h in enumerate(words["hooks"], 1)]
     lines += ["", "CAPTION", "", words["caption"].strip(), ""]
@@ -1272,7 +1519,7 @@ def save_words(kit, words):
         lines += ["HASHTAGS", "", words["hashtags"].strip(), ""]
     if words.get("leaned_on"):
         lines += ["", f"Written from: {words['leaned_on']}"]
-    own_file(kit, "Captions and hooks.txt").write_text("\n".join(lines) + "\n")
+    _write_text_whole(own_file(kit, "Captions and hooks.txt"), "\n".join(lines) + "\n")
     write_page(kit)
 
 
@@ -1280,7 +1527,7 @@ def save_words(kit, words):
 
 CSS = """
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;--sand-l:#ECEAF6;--line:rgba(31,36,48,.12);
---display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;--ease:cubic-bezier(.2,.7,.2,1)}
+--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--ease:cubic-bezier(.2,.7,.2,1)}
 *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 4rem}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
@@ -1366,11 +1613,11 @@ def rel(kit, p):
 
 def write_page(kit):
     rec = load_rec(kit)
-    words = json.loads((kit / ".kit" / "words.json").read_text()) if (kit / ".kit" / "words.json").exists() else {}
+    words = json.loads((kit / ".kit" / "words.json").read_text(encoding="utf-8")) if (kit / ".kit" / "words.json").exists() else {}
     name = rec.get("name", kit.name)
     when = rec.get("date") or ""
     try:
-        when_words = date.fromisoformat(when).strftime("%B %-d, %Y")
+        when_words = this_computer.strftime(date.fromisoformat(when), "%B %-d, %Y")
     except ValueError:
         when_words = when
     made = rec.get("made_pieces", {})
@@ -1411,7 +1658,7 @@ def write_page(kit):
             btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}' title='{html.escape(LAY_OUT_TITLE, quote=True)}'>{html.escape(LAY_OUT)}</a> " + btn)
         if arrange and can_arrange and (rec.get("picks") or {}).get(arrange):
             # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
-            # every 'go' button asks the Assistant to open a folder in Finder. Shown only when the page is
+            # every 'go' button asks the Assistant to open a folder in Finder (File Explorer on a PC). Shown only when the page is
             # served live (a saved copy has nowhere to go).
             btn = (f"<a class='arr' href='/arrange.html?kit={html.escape(quote(kit.name))}&amp;piece={arrange}'>Change the photos</a> " + btn)
         cv = canva.get(piece) if piece else None
@@ -1441,7 +1688,7 @@ def write_page(kit):
             + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
             f"<script>{SCRIPT}</script></body></html>")
     tidy_own_files(kit)
-    page_path(kit).write_text(page)
+    _write_text_whole(page_path(kit), page)     # whole or not at all, UTF-8 (the page says charset utf-8)
     return page_path(kit)
 
 
@@ -1460,11 +1707,22 @@ def show(kit):
     say(f"  Page: {page_path(kit)}" if page_path(kit).exists() else "  Page: not yet")
 
 
+def read_their_file(path):
+    """A file Claude wrote for a command (their words, a caption list): UTF-8, with or without the mark some PC
+    editors put at the start ("-sig")."""
+    return Path(path).read_text(encoding="utf-8-sig")
+
+
 def main():
+    this_computer.utf8_output()
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     st = sub.add_parser("start"); st.add_argument("words", nargs="?"); st.add_argument("--night"); st.add_argument("--shoot"); st.add_argument("--folder"); st.add_argument("--name")
-    t = sub.add_parser("told"); t.add_argument("words"); t.add_argument("--text", required=True)
+    t = sub.add_parser("told"); t.add_argument("words")
+    tt = t.add_mutually_exclusive_group(required=True)
+    tt.add_argument("--text", help="what they said, word for word")
+    tt.add_argument("--text-file", help="the same, read from a UTF-8 text file (so on a PC it never passes through "
+                                        "the command line, which can change quotes and $)")
     sub.add_parser("sheet").add_argument("words")
     pk = sub.add_parser("picks"); pk.add_argument("words")
     for k in ("singles", "stories", "carousel", "reel", "cover"):
@@ -1479,8 +1737,8 @@ def main():
     a = ap.parse_args()
 
     if a.cmd == "voice":
-        sample = Path(a.sample_file).read_text() if a.sample_file else None
-        never = Path(a.never_file).read_text() if a.never_file else None
+        sample = read_their_file(a.sample_file) if a.sample_file else None
+        never = read_their_file(a.never_file) if a.never_file else None
         vv = set_voice(sample, never, a.audience, a.hashtags)
         say(f"Voice: {len(vv.get('samples', []))} captions of theirs, {len(vv.get('never', []))} they'd never write, for {vv.get('audience', 'both')}"
             + (f", hashtags kept" if vv.get("hashtags") else "") + ".")
@@ -1508,7 +1766,14 @@ def main():
         return 0
     kit = find_kit(a.words)
     if a.cmd == "told":
-        told(kit, a.text); say("Kept. It'll shape the captions."); return 0
+        said = a.text
+        if a.text_file:
+            try:
+                said = read_their_file(a.text_file)
+            except (OSError, UnicodeDecodeError) as e:
+                say(f"STOP: I couldn't read {a.text_file} ({e.__class__.__name__}). Nothing kept.")
+                return 1
+        told(kit, said); say("Kept. It'll shape the captions."); return 0
     if a.cmd == "sheet":
         return sheet(kit)
     if a.cmd == "picks":
@@ -1521,7 +1786,7 @@ def main():
     if a.cmd == "facts":
         say(json.dumps(facts(kit), indent=1, ensure_ascii=False)); return 0
     if a.cmd == "words":
-        save_words(kit, json.loads(Path(a.file).read_text())); say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
+        save_words(kit, json.loads(read_their_file(a.file))); say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
     if a.cmd == "page":
         say(str(write_page(kit))); return 0
     if a.cmd == "show":

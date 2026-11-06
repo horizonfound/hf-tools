@@ -8,8 +8,9 @@ sneak peeks with a few looks instead of thousands (rule 6: scripts shortlist, Cl
 
 make: for every shoot, one frame per burst (a new burst starts after --gap seconds of quiet;
 the middle frame of each burst is kept), at most --max moments spread across the shoot, a small
-preview of each (the Mac's own sips; nothing installed) into records/peeks/<shoot>/, and pages of
---per-page numbered thumbnails into records/peek-sheets/<shoot>-p1.png, -p2.png ...
+preview of each (the Mac's own sips, nothing installed; on a PC, pictures.py and Pillow) into
+records/peeks/<shoot>/, and pages of --per-page numbered thumbnails into
+records/peek-sheets/<shoot>-p1.png, -p2.png ...
 A list of what is on each page goes in records/peek-sheets.json.
 
 closer: a shortlist (ten or so per shoot) laid out big, four to a page at full preview size, into
@@ -22,12 +23,12 @@ Reads the verified copy only. Nothing on the card is ever opened, nothing is cha
 Exit codes: 0 done, 1 a problem, 2 nothing to do.
 """
 import argparse
+import errno
 import json
 import os
 from datetime import datetime
-import shutil
-import subprocess
 import sys
+import threading
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -35,6 +36,9 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 sys.path.insert(0, str(HERE))
 from where import locate  # noqa: E402
 import sheet  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 PHOTO = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".jpg", ".jpeg", ".heic", ".tif", ".tiff"}
 
@@ -44,44 +48,36 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def preview(src, dst, size):
-    """A small JPEG of the photo. sips on a Mac; Pillow only as a stand-in where sips does not exist (tests)."""
-    if shutil.which("sips"):
-        r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "80", "-Z", str(size), str(src), "--out", str(dst)],
-                           capture_output=True)
-        return r.returncode == 0 and dst.exists()
-    try:
-        from PIL import Image
-        im = Image.open(src)
-        im.thumbnail((size, size))
-        im.convert("RGB").save(dst, quality=80)
-        return True
-    except Exception:
-        return False
+    """A small JPEG of the photo: the Mac's own sips, or on a PC the JPEG inside the RAW and Pillow."""
+    return pictures.make_jpeg(src, dst, size, 80)
 
 
 def thumb_rows(src, size, tmp):
-    """(w, h, rows) for the page: sips to BMP on a Mac, Pillow as the stand-in elsewhere."""
-    if shutil.which("sips"):
-        return sheet.thumb(src, size, tmp)
-    try:
-        from PIL import Image
-        im = Image.open(src).convert("RGB")
-        im.thumbnail((size, size))
-        w, h = im.size
-        raw = im.tobytes()
-        return w, h, [raw[y * w * 3:(y + 1) * w * 3] for y in range(h)]
-    except Exception:
-        return None
+    """(w, h, rows) for the page: sips to BMP on a Mac, Pillow on a PC (both through sheet.thumb)."""
+    return sheet.thumb(src, size, tmp)
+
+
+def save_json(path, data, **kw):
+    """Written whole, then given its name, so the report's page server never reads half a list. The scratch
+    name is this process's and this thread's own, so two saves at once (the page and a command) never mix."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}-{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(data, **kw), encoding="utf-8")
+    this_computer.replace(tmp, path)
 
 
 def seconds(iso):
     from datetime import datetime
     try:
         return datetime.fromisoformat(iso).timestamp()
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OSError, OverflowError):   # OSError: a PC refuses times before 1970 (a camera clock never set)
         return None
 
 
@@ -109,10 +105,14 @@ def spread(items, n):
 
 
 def make(night, gap, cap, per_page, size):
+    ok, words = pictures.ready()
+    if not ok:
+        say(f"STOP: {words}")
+        return 1
     root, studio = locate(night)
-    index = json.loads((studio / "index.json").read_text())
-    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]}
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
+    index = json.loads((studio / "index.json").read_text(encoding="utf-8"))
+    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]}
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     by_file = {p["file"]: p for p in index["photos"]}
     out_dir = studio / "peek-sheets"
     out_dir.mkdir(exist_ok=True)
@@ -135,11 +135,15 @@ def make(night, gap, cap, per_page, size):
         chosen = spread(moments(photos, gap), cap)
         pdir = studio / "peeks" / s["id"]
         pdir.mkdir(parents=True, exist_ok=True)
-        listed = []
+        listed, unshown = [], []
         for i, p in enumerate(chosen, 1):
             dst = pdir / f"{i:03d}.jpg"
             if dst.exists() or preview(root / p["file"], dst, 700):
                 listed.append({"n": i, "file": p["file"], "taken": p["taken"], "preview": f"peeks/{s['id']}/{dst.name}"})
+            else:
+                why = pictures.why_not(root / p["file"])
+                if why:
+                    unshown.append(why)
         pages = []
         for pi in range(0, len(listed), per_page):
             chunk = listed[pi:pi + per_page]
@@ -166,23 +170,28 @@ def make(night, gap, cap, per_page, size):
         result["shoots"][s["id"]] = {"name": s.get("name") or s.get("suggested", ""), "photos": len(photos),
                                      "moments": len(listed), "pages": pages, "list": listed}
         say(f"{s['id']} {s.get('name') or s.get('suggested', '')}: {len(photos):,} photos, {len(listed)} moments on {len(pages)} page(s)")
+        for why in sorted(set(unshown)):
+            say(f"   {unshown.count(why)} could not be shown here: {why}")
     if tmp.exists():
         tmp.unlink()
-    p = studio / "peek-sheets.json"
-    p.write_text(json.dumps(result, indent=1, ensure_ascii=False))
+    save_json(studio / "peek-sheets.json", result, indent=1, ensure_ascii=False)
     return 0
 
 
 def closer(night, picks):
     """The shortlist, big: two columns, each photo at its full 700 px preview size, four to a page."""
+    ok, words = pictures.ready()
+    if not ok:
+        say(f"STOP: {words}")
+        return 1
     root, studio = locate(night)
-    sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+    sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
     out_dir = studio / "peek-sheets"
     tmp = out_dir / ".tmp.bmp"
     cols, per_page, cell, pad, label_h = 2, 4, 700, 10, 28
     short_f = studio / "peek-shortlist.json"
     try:
-        shortlist = json.loads(short_f.read_text()) if short_f.exists() else {}
+        shortlist = json.loads(short_f.read_text(encoding="utf-8")) if short_f.exists() else {}
     except ValueError:
         shortlist = {}
     for spec in picks:
@@ -199,7 +208,7 @@ def closer(night, picks):
                 return 1
             want.append(m)
         shortlist[sid] = [m["n"] for m in want]   # kept, so "Show me more" on the report can offer them
-        short_f.write_text(json.dumps(shortlist, indent=1))
+        save_json(short_f, shortlist, indent=1)
         pages = []
         for pi in range(0, len(want), per_page):
             chunk = want[pi:pi + per_page]
@@ -233,7 +242,7 @@ def current_path(studio, f):
     """The photo's path now, if a rename moved it since the pages were made: same shoot number and
     camera frame name, read from the index (which every rename keeps up to date)."""
     try:
-        index = json.loads((studio / "index.json").read_text())["photos"]
+        index = json.loads((studio / "index.json").read_text(encoding="utf-8"))["photos"]
     except (OSError, ValueError):
         return f
     stem = Path(f).stem
@@ -251,12 +260,12 @@ def candidates(night, sid, everything=False):
     """For the report's "Show me more": the close-look shortlist for a shoot (or, before one exists or when
     they ask to see every moment, all of its pages), each with its number and its preview path."""
     root, studio = locate(night)
-    sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+    sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
     if sid not in sheets:
         return None
     short_f = studio / "peek-shortlist.json"
     try:
-        short = json.loads(short_f.read_text()).get(sid) if short_f.exists() else None
+        short = json.loads(short_f.read_text(encoding="utf-8")).get(sid) if short_f.exists() else None
     except ValueError:
         short = None
     by_n = {m["n"]: m for m in sheets[sid]["list"]}
@@ -264,7 +273,7 @@ def candidates(night, sid, everything=False):
     pj = studio / "sneak-peeks.json"
     picked = []
     if pj.exists():
-        picked = [p["n"] for p in json.loads(pj.read_text()).get("picks", []) if p.get("shoot") == sid and "n" in p]
+        picked = [p["n"] for p in json.loads(pj.read_text(encoding="utf-8")).get("picks", []) if p.get("shoot") == sid and "n" in p]
     for n in picked:   # the current picks are always offered, even if the shortlist was drawn before them
         if n in by_n and n not in nums:
             nums.append(n)
@@ -281,8 +290,8 @@ def add_taste_note(line):
     f = taste_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     if not f.exists():
-        f.write_text("# Taste notes\n\nWhat you've told the Assistant about the photos you like, one line a time. It reads this before picking sneak peeks.\n\n")
-    with open(f, "a") as fh:
+        f.write_text("# Taste notes\n\nWhat you've told the Assistant about the photos you like, one line a time. It reads this before picking sneak peeks.\n\n", encoding="utf-8")
+    with open(f, "a", encoding="utf-8") as fh:
         fh.write(f"- {datetime.now().strftime('%Y-%m-%d')}: {line.strip()}\n")
 
 
@@ -292,16 +301,16 @@ def ask_again(night, sid, note):
     root, studio = locate(night)
     f = studio / "peeks-asks.json"
     try:
-        asks = json.loads(f.read_text()) if f.exists() else []
+        asks = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
     except ValueError:
         asks = []
     asks = [a for a in asks if a.get("shoot") != sid]
     asks.append({"shoot": sid, "note": note.strip(), "at": datetime.now().isoformat(timespec="seconds"), "done": False})
-    f.write_text(json.dumps(asks, indent=1, ensure_ascii=False))
+    save_json(f, asks, indent=1, ensure_ascii=False)
     if note.strip():
         shoots = {}
         try:
-            shoots = {x["id"]: x for x in json.loads((studio / "shoots.json").read_text())["shoots"]}
+            shoots = {x["id"]: x for x in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]}
         except (OSError, ValueError, KeyError):
             pass
         name = shoots.get(sid, {}).get("name") or sid
@@ -313,7 +322,7 @@ def pending_asks(night):
     root, studio = locate(night)
     f = studio / "peeks-asks.json"
     try:
-        asks = json.loads(f.read_text()) if f.exists() else []
+        asks = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
     except ValueError:
         asks = []
     return [a for a in asks if not a.get("done")]
@@ -323,20 +332,20 @@ def mark_asked_done(night, sid):
     root, studio = locate(night)
     f = studio / "peeks-asks.json"
     try:
-        asks = json.loads(f.read_text()) if f.exists() else []
+        asks = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
     except ValueError:
         return
     for a in asks:
         if a.get("shoot") == sid:
             a["done"] = True
-    f.write_text(json.dumps(asks, indent=1, ensure_ascii=False))
+    save_json(f, asks, indent=1, ensure_ascii=False)
 
 
 def pick(night, picks, by):
     root, studio = locate(night)
-    sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+    sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
     pj = studio / "sneak-peeks.json"
-    existing = json.loads(pj.read_text()).get("picks", []) if pj.exists() else []
+    existing = json.loads(pj.read_text(encoding="utf-8")).get("picks", []) if pj.exists() else []
     chosen_shoots = set()
     new = []
     for spec in picks:
@@ -361,7 +370,7 @@ def pick(night, picks, by):
                 name = sheets[sid].get("name") or sid
                 add_taste_note(f"{name}: chose their own sneak peeks; kept {sorted(set(before) & set(after))}, dropped {sorted(set(before) - set(after))}, added {sorted(set(after) - set(before))} (numbers on that shoot's pages; look at those frames to see what they went for)")
             mark_asked_done(night, sid)
-    pj.write_text(json.dumps({"picks": kept + new, "picked_by": by}, indent=1, ensure_ascii=False))
+    save_json(pj, {"picks": kept + new, "picked_by": by}, indent=1, ensure_ascii=False)
     for sid in chosen_shoots:
         say(f"{sid}: {sum(1 for p in new if p['shoot'] == sid)} sneak peeks")
     return 0
@@ -402,7 +411,7 @@ def main():
         if a.add:
             add_taste_note(a.add)
         f = taste_file()
-        say(f.read_text() if f.exists() else "(no taste notes yet)")
+        say(f.read_text(encoding="utf-8") if f.exists() else "(no taste notes yet)")
         return 0
     return pick(a.night, a.picks, a.by)
 

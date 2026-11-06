@@ -6,9 +6,21 @@ add in CapCut.
 
     python3 capcut.py where                     where CapCut keeps projects, and whether it is open
     python3 capcut.py songs                     songs from CapCut's own music used in their projects
-    python3 capcut.py write --plan reel.json    make the project (CapCut must be closed)
+    python3 capcut.py open                      start CapCut (their newest project is at the top of its list);
+                                                first adds any reel still waiting to CapCut's list
+    python3 capcut.py write --plan reel.json    make the project
         [--store <projects folder>]             somewhere else (tests)
         [--ignore-open]                         tests only: treat CapCut as closed
+
+On a PC (unproven: nobody here has seen a CapCut project made on Windows; docs/pc-readiness-2026-11-06.md,
+rows I1 to I7): the projects are looked for in %LOCALAPPDATA%\\CapCut\\User Data\\Projects\\com.lveditor.draft,
+the project file is called draft_content.json instead of draft_info.json, every path inside it is written
+with forward slashes (C:/Users/...), and "is CapCut open" asks Windows' tasklist for CapCut.exe. All of
+that comes from community notes, never from CapCut itself. If CapCut for Windows locks its project files,
+this route cannot work there as built. Only CapCut on a Mac has been seen adding a new project folder to its
+list by itself while open, so on a PC a reel made with CapCut open waits and is added to the list the next
+time CapCut is closed (the next reel, or `capcut.py open`). Text gets CapCut for Windows' own default font
+file when it can be found, else no font path (the template's is the Mac app's).
 
 The plan (reel.py writes it):
     {"name": "Black-sand beach reel",
@@ -26,6 +38,7 @@ Exit codes: 0 made · 2 stop (no CapCut found, a photo or the song missing).
 """
 import argparse
 import copy
+import errno
 import json
 import os
 import re
@@ -36,12 +49,19 @@ import sys
 import time
 import uuid
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "studio-manager" / "scripts"))
+import pictures  # noqa: E402  (small pictures and a photo's size, on a Mac or a PC)
+import sound  # noqa: E402  (a song's length, on a Mac or a PC)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 HERE = Path(__file__).resolve().parent
 REF = HERE.parent / "references" / "capcut"
 US = 1_000_000
 CANVAS = (1080, 1920)
 PHOTO_LENGTH = 10_800_000_000   # CapCut gives a still photo three hours of "length" to cut from
+QUIT = "close" if this_computer.WINDOWS else "quit"     # what you do to CapCut to make it stop, in their words
 
 
 def say(msg):
@@ -49,6 +69,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def uid():
@@ -65,6 +90,8 @@ def default_store():
     if sys.platform == "darwin":
         return Path.home() / "Movies" / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
     if os.name == "nt":
+        # unproven on a real PC: the default place, per community notes [K27]. CapCut's settings may let them
+        # move it; if so, `capcut.py where` says "found": false and --store points at the right one.
         base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(base) / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
     return Path.home() / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
@@ -74,18 +101,111 @@ def capcut_open():
     """True if CapCut is running, False if not, None if we cannot tell."""
     try:
         if sys.platform == "darwin":
-            r = subprocess.run(["pgrep", "-x", "CapCut"], capture_output=True, text=True)
+            r = subprocess.run(["pgrep", "-x", "CapCut"], capture_output=True, encoding="utf-8", errors="replace")  # pc-ok: Mac branch
             return r.returncode == 0
         if os.name == "nt":
-            r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq CapCut.exe"], capture_output=True, text=True)
-            return "CapCut.exe" in r.stdout
-    except OSError:
+            # unproven on a real PC: CapCut's program is believed to be called CapCut.exe (community notes, not
+            # seen). tasklist prints in the PC's own code page; the name looked for is plain letters, so any
+            # reading of it finds it. CSV with no header: one quoted line per matching program.
+            r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq CapCut.exe", "/FO", "CSV", "/NH"],
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=20,
+                               creationflags=0x08000000)            # CREATE_NO_WINDOW
+            if r.returncode != 0:
+                return None
+            return '"capcut.exe"' in (r.stdout or "").lower()
+    except (OSError, subprocess.SubprocessError):
         return None
     return None
 
 
+def _windows_capcut_programs():
+    """Where CapCut's program might be on a PC, likeliest first. Unproven: from community notes, not seen.
+    CapCut installs for one person under %LOCALAPPDATA%\\CapCut\\Apps, with a launcher at the top and one
+    folder per version; the Start menu has a shortcut."""
+    local = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    apps = local / "CapCut" / "Apps"
+    out = [apps / "CapCut.exe"]
+
+    def version(p):
+        return [int(x) if x.isdigit() else 0 for x in re.split(r"[.\-]", p.parent.name)]
+    try:
+        out += sorted(apps.glob("*/CapCut.exe"), key=version, reverse=True)
+    except OSError:
+        pass
+    roaming = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    menu = roaming / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+    out += [menu / "CapCut" / "CapCut.lnk", menu / "CapCut.lnk"]
+    for pf in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if pf:
+            out.append(Path(pf) / "CapCut" / "CapCut.exe")
+    return out
+
+
+def launch():
+    """Start CapCut. (True, "") or (False, why in plain words). It cannot be told which project to open;
+    the newest is at the top of its list. Afterwards launch.slow is True when the Mac's `open` was still
+    waiting after 20 seconds: CapCut was there and asked to start, and may yet appear (the first start of a
+    newly downloaded CapCut, while the Mac checks it), so the words for that are "taking a while", not "not
+    installed"; and launch.missing is True when no CapCut was found to start (the Mac's `open` didn't know it,
+    or none was where a PC's CapCut installs itself), so a caller needn't read the words to tell."""
+    launch.slow = launch.missing = False
+    try:
+        if sys.platform == "darwin":
+            # open answers within a second; the 20-second limit (the posting page's own, before Nov 6) only keeps
+            # a stuck one from holding the button for ever
+            r = subprocess.run(["open", "-a", "CapCut"], capture_output=True, encoding="utf-8", errors="replace",  # pc-ok: Mac branch
+                               timeout=20)
+            if r.returncode == 0:
+                return True, ""
+            launch.missing = True
+            return False, "CapCut isn't installed on this Mac"
+        if os.name == "nt":
+            for p in _windows_capcut_programs():            # unproven on a real PC
+                if p.is_file():
+                    os.startfile(str(p))                     # pc-ok: Windows branch; starts it like a double-click
+                    return True, ""
+            launch.missing = True
+            return False, "I couldn't find CapCut on this PC. Open it from the Start menu"
+    except subprocess.TimeoutExpired:
+        # stopping `open` doesn't stop CapCut starting: it may still appear in a moment
+        launch.slow = True
+        return False, "CapCut didn't start within 20 seconds; it may still be starting"
+    except OSError as e:
+        return False, f"CapCut didn't start ({e})"
+    return False, "I can't start CapCut on this computer"
+
+
+launch.slow = launch.missing = False
+
+
+def _windows_default_font():
+    """The font CapCut on a PC puts on new text, as a path written CapCut's way, or "" (let CapCut choose).
+    The text piece was taken from CapCut on a Mac and names the Mac app's own font file
+    (/Applications/CapCut.app/.../SystemFont/en.ttf), which no PC has. Guessed, unproven: CapCut for Windows
+    keeps the same file under its version folder (...\\CapCut\\Apps\\<version>\\Resources\\Font\\SystemFont\\en.ttf);
+    if it isn't there, the path is left empty for CapCut to use its own default (readiness row I4)."""
+    for prog in _windows_capcut_programs():
+        if prog.suffix.lower() != ".exe":
+            continue
+        font = prog.parent / "Resources" / "Font" / "SystemFont" / "en.ttf"
+        try:
+            if font.is_file():
+                return native(font)
+        except OSError:
+            pass
+    return ""
+
+
 def draft_file_name():
+    # A PC's CapCut is believed to keep draft_content.json (community notes [K27]; one says newer versions keep
+    # draft_info.json beside it). Unproven: whether a project with only this file opens there is not known.
     return "draft_content.json" if os.name == "nt" else "draft_info.json"
+
+
+def _read_json(path):
+    """CapCut's own JSON, or an error. utf-8-sig: the same as utf-8 for every file a Mac's CapCut writes, and
+    it also takes a byte-order mark, which Windows programs sometimes put at the front."""
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
 def their_platform(store):
@@ -104,9 +224,9 @@ def their_platform(store):
     if not best:
         return None
     try:
-        d = json.loads(best[1].read_text(encoding="utf-8"))
+        d = _read_json(best[1])
         return {k: d[k] for k in ("platform", "last_modified_platform", "version", "new_version") if k in d}
-    except (OSError, ValueError):
+    except (OSError, ValueError, AttributeError, TypeError):
         return None   # an unreadable project (a newer CapCut may lock its files) just means we use ours
 
 
@@ -130,8 +250,10 @@ def capcut_songs(store):
     found, seen = [], set()
     for mt, folder, f in _project_drafts(store):
         try:
-            d = json.loads(f.read_text(encoding="utf-8"))
+            d = _read_json(f)
         except (OSError, ValueError):
+            continue
+        if not isinstance(d, dict):
             continue
         mats = d.get("materials", {})
         by_id = {x.get("id"): (k, x) for k, v in mats.items() if isinstance(v, list) for x in v if isinstance(x, dict)}
@@ -215,13 +337,10 @@ def photo_size(f):
                 return struct.unpack(">II", head[16:24])
     except OSError:
         pass
-    if shutil.which("sips"):  # HEIC, TIFF and anything else, on a Mac
-        r = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", f], capture_output=True, text=True)
-        w = re.search(r"pixelWidth:\s*(\d+)", r.stdout)
-        h = re.search(r"pixelHeight:\s*(\d+)", r.stdout)
-        if w and h:
-            return int(w.group(1)), int(h.group(1))
-    return 0, 0
+    # HEIC, TIFF and anything else: the Mac's own sips, as always; on a PC, Pillow (pictures.py), turned the
+    # right way up. Without Pillow on a PC this is "unknown" and the photo is fitted, not filled.
+    got = pictures.size_of(f)
+    return (int(got[0]), int(got[1])) if got else (0, 0)
 
 
 def fill_scale(w, h):
@@ -235,24 +354,32 @@ def fill_scale(w, h):
 
 
 def song_length(path):
-    """Length of the song in seconds, from the Mac's own afinfo, ffprobe if present, or a wav header."""
+    """Length of the song in seconds: read from the file itself (sound.py, the same on a Mac and a PC, and the
+    same number the Mac's own afinfo gives for WAV, AIFF, MP3 and Apple's M4A); then afinfo, ffprobe if
+    present, or a wav header, for anything sound.py cannot read."""
     p = str(path)
-    if shutil.which("afinfo"):
-        r = subprocess.run(["afinfo", p], capture_output=True, text=True)
+    d = sound.duration(p)
+    if d:
+        return float(f"{d:f}")      # to the microsecond, written the way afinfo writes it, so records match a Mac's
+    if shutil.which("afinfo"):  # pc-ok: only a Mac has afinfo; anything sound.py could not read
+        r = subprocess.run(["afinfo", p], capture_output=True, encoding="utf-8", errors="replace")  # pc-ok: only a Mac has afinfo
         m = re.search(r"estimated duration:\s*([\d.]+)", r.stdout)
         if m:
             return float(m.group(1))
     if shutil.which("ffprobe"):
         r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
-                            "default=nw=1:nk=1", p], capture_output=True, text=True)
+                            "default=nw=1:nk=1", p], capture_output=True, encoding="utf-8", errors="replace")
         try:
             return float(r.stdout.strip())
         except ValueError:
             pass
     if p.lower().endswith(".wav"):
         import wave
-        with wave.open(p, "rb") as w:
-            return w.getnframes() / w.getframerate()
+        try:
+            with wave.open(p, "rb") as w:
+                return w.getnframes() / w.getframerate()
+        except (OSError, EOFError, wave.Error, ZeroDivisionError, RuntimeError, struct.error):
+            pass                    # (Python 3.9's wave raises RuntimeError for a WAV with damaged chunk names)
     return 0.0
 
 
@@ -284,6 +411,13 @@ def build(plan, parts, platform):
     d = copy.deepcopy(draft)
     if platform:
         d.update(copy.deepcopy(platform))
+    elif os.name == "nt":
+        # unproven on a real PC: no project of theirs to copy from, and the pieces were taken from CapCut on a
+        # Mac, so at least say which computer this is. CapCut for Windows' own values are not known yet.
+        import platform as _platform
+        for k in ("platform", "last_modified_platform"):
+            if isinstance(d.get(k), dict):
+                d[k] = dict(d[k], os="windows", os_version=_platform.version())
     mats = d["materials"]
     draft_id = uid()
     d["id"] = draft_id
@@ -304,7 +438,7 @@ def build(plan, parts, platform):
         if not (w and h):
             w, h = photo_size(ph["path"])
         mat = copy.deepcopy(P["photo_material"])
-        mat.update({"id": uid(), "path": ph["path"], "material_name": Path(ph["path"]).stem,
+        mat.update({"id": uid(), "path": native(ph["path"]), "material_name": Path(ph["path"]).stem,
                     "width": w, "height": h, "duration": PHOTO_LENGTH, "type": "photo"})
         mats["videos"].append(mat)
         refs = []
@@ -323,7 +457,7 @@ def build(plan, parts, platform):
         vtrack["segments"].append(seg)
         end = max(end, ph["start"] + ph["dur"])
         end_us = max(end_us, target["start"] + target["duration"])
-        meta_items.append({"duration": 5 * US, "extra_info": Path(ph["path"]).name, "file_Path": ph["path"],
+        meta_items.append({"duration": 5 * US, "extra_info": Path(ph["path"]).name, "file_Path": native(ph["path"]),
                            "height": h, "width": w, "metetype": "photo", "t": t0})
     d["tracks"].append(vtrack)
 
@@ -332,6 +466,8 @@ def build(plan, parts, platform):
     if hook and hook.get("text"):
         tm = copy.deepcopy(P["text_material"])
         tm["id"] = uid()
+        if os.name == "nt" and str(tm.get("font_path", "")).startswith("/Applications/"):
+            tm["font_path"] = _windows_default_font()        # unproven on a real PC (row I4)
         content = json.loads(tm["content"])
         style = content["styles"][0]
         style["range"] = [0, len(hook["text"])]
@@ -376,7 +512,7 @@ def build(plan, parts, platform):
                 "copyright_limit_type": "none", "duration": int(round((length or end) * US)), "effect_id": "",
                 "formula_id": "", "id": aid, "intensifies_path": "", "is_ai_clone_tone": False,
                 "is_text_edit_overdub": False, "is_ugc": False, "local_material_id": aid.lower(),
-                "music_id": aid.lower(), "name": Path(song["path"]).name, "path": song["path"], "query": "",
+                "music_id": aid.lower(), "name": Path(song["path"]).name, "path": native(song["path"]), "query": "",
                 "request_id": "", "resource_id": "", "search_id": "", "source_from": "", "source_platform": 0,
                 "team_id": "", "text_id": "", "tone_category_id": "", "tone_category_name": "", "tone_effect_id": "",
                 "tone_effect_name": "", "tone_platform": "", "tone_second_category_id": "",
@@ -405,7 +541,7 @@ def build(plan, parts, platform):
                             "segments": [aseg], "type": "audio"})
         meta_items.append({"duration": int(round((length or end) * US)),
                            "extra_info": song.get("name") or Path(song["path"]).name,
-                           "file_Path": song["path"], "height": 0, "width": 0, "metetype": "music", "t": t0})
+                           "file_Path": native(song["path"]), "height": 0, "width": 0, "metetype": "music", "t": t0})
 
     d["duration"] = end_us
     d["update_time"] = now_us()
@@ -439,9 +575,22 @@ ROOT_ENTRY_KEYS = {
     "tm_draft_cloud_space_id": -1, "tm_draft_cloud_user_id": -1, "tm_draft_removed": 0}
 
 
+def _not_reserved_windows(name):
+    """A name Windows keeps for itself (CON, AUX, NUL, COM1, LPT1...) gets an underscore straight after that
+    word, before any dot: Windows reads "Con.Beach reel" as CON too, so "Con.Beach reel_" would still fail and
+    "Con_.Beach reel" doesn't. (this_computer.unreserved does exactly this now, for every script.)"""
+    return this_computer.unreserved(name)
+
+
 def folder_name(store, name):
     base = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", name)        # characters Mac or Windows won't take in a folder name
     base = re.sub(r"\s+", " ", base).strip().lstrip(".").strip() or "Studio reel"
+    if this_computer.WINDOWS:
+        # unproven on a real PC. A PC drops a dot or space at the end of a folder name, and refuses its few
+        # reserved names; and it stops at 260 characters for a whole path unless long paths were switched on,
+        # while CapCut's own folder is already about 90 deep (C:\Users\<name>\AppData\Local\CapCut\User Data\...)
+        base = _not_reserved_windows(base.strip(" .") or "Studio reel")
+        base = base[:80].rstrip(" .") or "Studio reel"
     cand, n = base, 2
     while (store / cand).exists():
         cand = f"{base} {n}"
@@ -452,7 +601,14 @@ def folder_name(store, name):
 def write_json(path, obj):
     tmp = path.with_name(path.name + ".studio-tmp")
     tmp.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        this_computer.replace(tmp, path)     # on a PC, waits a moment if another program has the file open
+    except OSError:
+        try:
+            tmp.unlink()                     # our own half-step; the file it was to replace is untouched
+        except OSError:
+            pass
+        raise
 
 
 def file_hash(path):
@@ -473,7 +629,11 @@ def write(plan, store, ignore_open=False):
     """Returns (project folder, draft). With CapCut open, only the new project's own folder is written and
     CapCut adds it to its list by itself (seen on Dustin's Mac, CapCut 9.6, Oct 25: within two seconds, twice);
     CapCut's list file is left alone, since an open CapCut writes its own copy of it. With CapCut closed, the
-    project is added to the list too, after a copy of the list is kept."""
+    project is added to the list too, after a copy of the list is kept.
+    Afterwards: write.listed (in CapCut's list now), write.left_to_capcut (a Mac's open CapCut adds it),
+    write.waiting (noted in root_meta_info.studio-waiting.json, to be added the next time CapCut is closed:
+    on a PC whenever CapCut was open, since a PC's CapCut hasn't been seen adding folders by itself, and on
+    either computer when the list couldn't be saved), write.note (plain words to pass on, or None)."""
     is_open = False if ignore_open else bool(capcut_open())
     if not store.is_dir():
         say(f"STOP: I can't find CapCut's projects folder ({store}). Is CapCut installed, and has it been opened once?")
@@ -485,9 +645,15 @@ def write(plan, store, ignore_open=False):
         say("STOP: these files are not where the plan says: " + ", ".join(missing[:5]))
         sys.exit(2)
 
+    write.left_to_capcut, write.note = is_open, None
+    write.waiting = write.listed = False
     fold = folder_name(store, plan["name"])
     dest = store / fold
-    dest.mkdir()
+    try:
+        dest.mkdir()
+    except OSError as e:
+        say(f"STOP: I couldn't make the project's folder in CapCut's projects folder ({e}). Nothing was written.")
+        sys.exit(2)
     # A song file goes INTO the project's own folder, and the project points at that copy. CapCut can always
     # open its own folder; it cannot always open where the song was (Nicole's first reel, Nov 5: the song sat
     # in her Music folder, CapCut showed "File not accessible" and asked her to link it by hand). It also means
@@ -523,33 +689,181 @@ def write(plan, store, ignore_open=False):
         encoding="utf-8")
     cover = dest / "draft_cover.jpg"
     first = plan["photos"][0]["path"] if plan["photos"] else None
-    if first and shutil.which("sips"):
-        subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(cover)], capture_output=True)
+    if first and pictures.use_sips():
+        subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(cover)], capture_output=True)  # pc-ok: Mac branch
+    elif first and pictures.make_jpeg(first, cover, 720):
+        pass                                 # a PC: the same small cover, made with Pillow
     elif first and str(first).lower().endswith((".jpg", ".jpeg")) and os.path.getsize(first) < 4_000_000:
         shutil.copyfile(first, cover)
 
-    write.left_to_capcut = is_open
-    if is_open:
-        return dest, draft
-    # add it to CapCut's list of projects, keeping a copy of the list as it was
-    root = store / "root_meta_info.json"
-    if root.is_file():
-        r = json.loads(root.read_text(encoding="utf-8"))
-        first_backup = store / "root_meta_info.before-studio.json"
-        if not first_backup.exists():
-            shutil.copyfile(root, first_backup)
-        shutil.copyfile(root, store / "root_meta_info.studio-backup.json")
-    else:
-        r = {"all_draft_store": [], "draft_ids": 0, "root_path": native(store)}
     entry = dict(ROOT_ENTRY_KEYS)
     entry.update({"draft_cover": native(cover), "draft_fold_path": native(dest), "draft_id": draft["id"],
                   "draft_json_file": native(dest / draft_file_name()), "draft_name": fold,
                   "draft_root_path": native(store), "tm_draft_create": t, "tm_draft_modified": t,
                   "tm_duration": draft["duration"]})
-    r.setdefault("all_draft_store", []).insert(0, entry)
-    r["draft_ids"] = int(r.get("draft_ids") or 0) + 1
-    write_json(root, r)
+    if is_open:
+        if this_computer.WINDOWS:
+            # unproven on a real PC (row I7): only CapCut on a Mac has been seen adding a new project folder to
+            # its list by itself. So on a PC the reel waits, and is added to the list the next time this runs
+            # with CapCut closed (the next reel, or `capcut.py open`, which adds it and then starts CapCut).
+            write.left_to_capcut = False
+            if _wait(store, entry):
+                write.waiting = True
+                write.note = ("CapCut is open, so I didn't touch its list of projects; it may add the reel by itself "
+                              "in a moment. If it isn't there, close CapCut and I'll add it.")
+            else:
+                write.note = (f"CapCut is open, so I didn't touch its list of projects. If the reel isn't in CapCut "
+                              f"in a moment, {QUIT} and reopen CapCut.")
+        return dest, draft
+    listed, write.note = add_to_list(store, [entry])
+    write.listed = listed
+    if not listed and write.note is None:
+        # something (on a PC, most likely CapCut itself) had the list open: their list stays as it was
+        write.waiting = _wait(store, entry)
+        write.note = ("I couldn't add the reel to CapCut's list of projects just now (another program had the list "
+                      "open), so I left the list as it was."
+                      + (" Open CapCut; if the reel isn't at the top, " + QUIT + " CapCut and I'll add it."
+                         if write.waiting else f" Open CapCut; if the reel isn't at the top, {QUIT} and reopen CapCut once."))
     return dest, draft
+
+
+WAITING = "root_meta_info.studio-waiting.json"      # reels made while the list couldn't be written, to add later
+WAITING_HINT = ("NOTE: once CapCut is closed, `capcut.py open` adds the waiting reel to CapCut's list of projects "
+                "and then starts CapCut.")
+
+
+def _is_number(t):
+    return isinstance(t, (int, float)) and not isinstance(t, bool)
+
+
+def _waiting(store):
+    try:
+        got = _read_json(store / WAITING)
+        # A draft id is always text (uid()) and a time always a number (write()): an entry with anything else in
+        # a hand-damaged list is left out, never a crash, and never copied into CapCut's own list, which then
+        # only ever gets what this script wrote.
+        return [x for x in got if isinstance(x, dict) and x.get("draft_id") and isinstance(x["draft_id"], str)
+                and ("tm_draft_create" not in x or _is_number(x["tm_draft_create"]))] \
+            if isinstance(got, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def waiting(store=None):
+    """The reels still waiting to be added to CapCut's list of projects (made while CapCut was open on a PC, or
+    while the list couldn't be saved): a list of CapCut's own list entries, [] when none. For other scripts
+    (the posting page's "Open in CapCut"); never raises for a damaged or missing list."""
+    return _waiting(Path(store) if store else default_store())
+
+
+def _wait(store, entry):
+    """Note a reel that isn't in CapCut's list yet, to add it next time. True when noted."""
+    try:
+        write_json(store / WAITING, [x for x in _waiting(store) if x.get("draft_id") != entry["draft_id"]] + [entry])
+        return True
+    except OSError:
+        return False
+
+
+def _made_when(w):
+    """When a waiting reel was made, for putting them in order: 0 for anything that isn't a number (a list
+    damaged by hand), so the sort never meets text beside a number. A number sorts exactly as before."""
+    t = w.get("tm_draft_create")
+    return t if isinstance(t, (int, float)) else 0
+
+
+def add_to_list(store, entries):
+    """Add these reels, and any still waiting from before, to CapCut's list of projects (newest at the top),
+    after keeping a copy of the list as it was. CapCut must be closed. (True, None) when the list was saved;
+    (False, None) when it couldn't be saved; (False, plain words) when the list was left alone on purpose.
+    A waiting reel whose folder is gone, or that CapCut already lists, is not added again."""
+    root = store / "root_meta_info.json"
+    if root.is_file():
+        try:
+            r = _read_json(root)
+            if not isinstance(r, dict):
+                raise ValueError("not a list of projects")
+        except (OSError, ValueError):
+            # their list is in a form this can't read (a newer CapCut may lock it): it is left exactly as it is
+            return False, ("CapCut's own list of projects is in a form I can't read, so I left it alone. If the "
+                           f"reel isn't in CapCut when you open it, {QUIT} and reopen CapCut once.")
+        try:
+            first_backup = store / "root_meta_info.before-studio.json"
+            if not first_backup.exists():
+                shutil.copyfile(root, first_backup)
+            shutil.copyfile(root, store / "root_meta_info.studio-backup.json")
+        except OSError:
+            return False, None                       # no copy kept, so the list isn't touched
+    else:
+        r = {"all_draft_store": [], "draft_ids": 0, "root_path": native(store)}
+    waiting = _waiting(store)
+    listed = r.setdefault("all_draft_store", [])
+    have = {x.get("draft_id") for x in listed if isinstance(x, dict)}
+    mine = {e["draft_id"] for e in entries}
+    late = [w for w in waiting if w["draft_id"] not in mine and w["draft_id"] not in have
+            and Path(str(w.get("draft_json_file", ""))).is_file()]
+    for e in sorted(late, key=_made_when) + list(entries):   # oldest first, so the newest ends on top
+        if e["draft_id"] not in have:
+            listed.insert(0, e)
+            r["draft_ids"] = int(r.get("draft_ids") or 0) + 1
+    try:
+        write_json(root, r)
+    except OSError:
+        return False, None
+    if waiting:
+        try:
+            write_json(store / WAITING, [])           # all of them are in CapCut's list now (or gone)
+        except OSError:
+            pass
+    return True, None
+
+
+OPENED = "Opened CapCut. The newest project is at the top of its list."   # open_capcut's words when it worked
+
+
+def open_capcut(store=None, closed=False):
+    """Start CapCut, first adding any reel still waiting to its list (made while CapCut was open on a PC, or
+    while the list couldn't be saved) when CapCut is surely closed. (True, words) or (False, "STOP: ...").
+    On success the words are OPENED, then one sentence about a waiting reel if there was one to add.
+    closed=True: the photographer has said CapCut is closed (`capcut.py open --closed`), so this computer isn't
+    asked, for when it couldn't tell (open_capcut.unsure).
+
+    Afterwards, for a caller that wants to know without reading the words:
+      open_capcut.added    True: a waiting reel was added to CapCut's list just now. False: it was tried and
+                           couldn't be. None: nothing was tried (nothing waiting, or CapCut was open or unsure).
+      open_capcut.running  True when a reel was waiting and CapCut was already open, so it wasn't added. Else False.
+      open_capcut.unsure   True when a reel was waiting but whether CapCut was open couldn't be told (on a PC,
+                           Windows' tasklist didn't answer), so nothing was added: pressing again won't help;
+                           the reel goes in with `capcut.py open --closed` once they say CapCut is closed. Else False.
+      open_capcut.waiting  the reels still waiting afterwards (as waiting() gives them)."""
+    store = Path(store) if store else default_store()
+    added = ""
+    open_capcut.added, open_capcut.unsure, open_capcut.running = None, False, False
+    if _waiting(store):
+        running = False if closed else capcut_open()
+        open_capcut.running = running is True
+        if running is False:
+            ok, why = add_to_list(store, [])
+            open_capcut.added = ok
+            added = (" The reel that was waiting is in its list now." if ok else
+                     " " + (why or "I still couldn't add the waiting reel to CapCut's list of projects."))
+        elif running is None:
+            open_capcut.unsure = True
+    open_capcut.waiting = _waiting(store)
+    ok, why = launch()
+    return (True, OPENED + added) if ok else (False, f"STOP: {why}.")
+
+
+open_capcut.added, open_capcut.unsure, open_capcut.running, open_capcut.waiting = None, False, False, []
+
+# For Claude, after `capcut.py open`, when a waiting reel is still waiting (never part of open_capcut's own
+# words, which the posting page passes on to the photographer)
+STILL_WAITING_UNSURE = ("NOTE: a reel is still waiting to go into CapCut's list of projects. I couldn't tell whether "
+                        "CapCut was already open, so I left it (CapCut can undo a change to its list made while it is "
+                        f"open). Ask them to {QUIT} CapCut, and once they say it's closed, run `capcut.py open --closed`: "
+                        "it adds the waiting reel, then starts CapCut again.")
+STILL_WAITING_RUNNING = ("NOTE: a reel is still waiting to go into CapCut's list of projects: CapCut was already open, "
+                         f"so I left it. Ask them to {QUIT} CapCut, then run `capcut.py open` again.")
 
 
 def main():
@@ -563,8 +877,20 @@ def main():
     wr.add_argument("--plan", required=True)
     wr.add_argument("--store")
     wr.add_argument("--ignore-open", action="store_true")
+    op = sub.add_parser("open", help="start CapCut (first adding any reel still waiting to its list)")
+    op.add_argument("--store")
+    op.add_argument("--closed", action="store_true",
+                    help="they've said CapCut is closed: add a waiting reel without asking this computer")
     a = ap.parse_args()
     store = Path(a.store).expanduser() if a.store else default_store()
+    if a.cmd == "open":
+        ok, words = open_capcut(store, closed=a.closed)
+        say(words)
+        if ok and open_capcut.waiting and open_capcut.unsure:
+            say(STILL_WAITING_UNSURE)
+        elif ok and open_capcut.waiting and open_capcut.running:
+            say(STILL_WAITING_RUNNING)
+        sys.exit(0 if ok else 2)
     if a.cmd == "where":
         open_ = capcut_open()
         n = len([p for p in store.iterdir() if p.is_dir() and not p.name.startswith(".")]) if store.is_dir() else 0
@@ -584,9 +910,13 @@ def main():
     n = len(plan["photos"])
     say(f"Made \"{dest.name}\" in CapCut: {n} photos, {secs:.1f} seconds"
         + (f", on the beat of {plan['song'].get('name') or Path(plan['song']['path']).name}" if plan.get("song") else "")
-        + ("." if getattr(write, "left_to_capcut", False) else ". Open CapCut and it's at the top of your projects."))
-    if getattr(write, "left_to_capcut", False):
-        say("CapCut is open, so it will add it to your projects by itself in a moment. If it isn't there, quit and reopen CapCut.")
+        + (". Open CapCut and it's at the top of your projects." if write.listed else "."))
+    if write.left_to_capcut:
+        say(f"CapCut is open, so it will add it to your projects by itself in a moment. If it isn't there, {QUIT} and reopen CapCut.")
+    if write.note:
+        say(write.note)
+    if write.waiting:
+        say(WAITING_HINT)
 
 
 if __name__ == "__main__":

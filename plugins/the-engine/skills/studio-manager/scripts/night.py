@@ -37,6 +37,8 @@ sys.path.insert(0, str(HERE))
 import cards  # noqa: E402
 import studio_file  # noqa: E402
 from where import locate  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 
 def say(msg):
@@ -45,10 +47,9 @@ def say(msg):
 
 def run(script, *args):
     """Run one of the scripts beside this one, streaming its output; return its exit code.
-    On a Mac, under caffeinate, so the Mac does not doze off in the middle of a long copy."""
-    cmd = [sys.executable, str(HERE / script), *map(str, args)]
-    if sys.platform == "darwin" and Path("/usr/bin/caffeinate").exists():
-        cmd = ["/usr/bin/caffeinate", "-i", *cmd]
+    The computer is asked not to doze off in the middle of a long copy (the Mac's caffeinate; on a PC,
+    Windows' own request, made in this_computer.py)."""
+    cmd = this_computer.awake_command([sys.executable, str(HERE / script), *map(str, args)])
     return subprocess.run(cmd).returncode
 
 
@@ -61,9 +62,40 @@ def gb(n):
     return f"{n / 1e12:.1f} TB" if n >= 1e12 else f"{n / 1e9:.0f} GB"
 
 
+def pictures_missing():
+    """None when this computer can make the small pictures the backup needs; otherwise what is missing, in
+    plain words (pictures.ready()). Only ever asked where the Mac's own picture tool is not used: on a Mac
+    nothing here runs. A pictures.py that cannot be loaded is not the photographer's problem, so it never
+    stops the backup here; the preview step says so loudly if it really is broken."""
+    try:
+        import pictures
+        if pictures.use_sips():
+            return None
+        ok, how = pictures.ready()
+        return None if ok else how
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def stop_without_pictures():
+    """Exit 2 with plain words when this computer cannot make the backup's previews (see pictures_missing).
+    Used where a backup is picked up again, so there is nothing to copy and no preflight runs."""
+    why = pictures_missing()
+    if why:
+        say("STOP, before going on:")
+        say(f"  - {why}")
+        sys.exit(2)
+
+
 def preflight(source, dest, second):
     """Plain-words problems that would stop the night, found now rather than at 2am."""
     problems = []
+    why = pictures_missing()
+    if why:
+        # On a PC the previews, the contact sheet and the sneak peeks need one add-on (Pillow). Without it the
+        # backup would copy everything and then stop at the first preview, so it is said now, before a byte is
+        # copied. (A Mac makes them with its own tool, so on a Mac this never says anything.)
+        problems.append(why)
     if not source.is_dir():
         problems.append(f"The card is not there: {source}")
         return problems
@@ -75,12 +107,24 @@ def preflight(source, dest, second):
         problems.append(f"Nothing on the card to copy: {source}")
         return problems
     need = sum(s for _, s in files)
+    # Never onto the card itself (on a PC the card can get the letter the photo drive had yesterday). Asked
+    # before the test file below is written, so not even that ever lands on the card.
+    from backup import onto_itself
+    onto_card = onto_itself(source, dest, "the backup")
+    if onto_card:
+        problems.append(onto_card)
+    if second is not None:
+        why = onto_itself(source, second, "the second copy")
+        if why:
+            problems.append(why)
     if not dest.is_dir():
         problems.append(f"The drive is not plugged in or the folder is not there: {dest}")
+    elif onto_card:
+        pass
     else:
         try:
             probe = dest / ".studio-write-test"
-            probe.write_text("ok")
+            probe.write_text("ok", encoding="utf-8")
             probe.unlink()
         except OSError:
             problems.append(f"Cannot write to the drive: {dest}")
@@ -98,8 +142,10 @@ def preflight(source, dest, second):
         by_dev[dev]["labels"].append(label)
         by_dev[dev]["need"] += per_copy
     for d in by_dev.values():
-        st = os.statvfs(d["root"])
-        free = st.f_frsize * st.f_bavail
+        free = this_computer.free_bytes(d["root"])
+        if free is None:
+            problems.append(f"Cannot tell how much room is on {' and '.join(d['labels'])}: {d['root']}")
+            continue
         if free < d["need"]:
             both = len(d["labels"]) > 1
             problems.append(f"Not enough room on {' and '.join(d['labels'])}{' (they are the same drive)' if both else ''}: "
@@ -108,11 +154,22 @@ def preflight(source, dest, second):
     return problems
 
 
+def another_card(studio, source, name):
+    """Plain words when this backup's folder already holds a backup made from a different card
+    (backup.not_this_card); None when it holds nothing yet, or this card's own."""
+    mpath = studio / "manifest.json"
+    if not mpath.exists():
+        return None
+    from backup import inventory, not_this_card
+    files, _ = inventory(source)
+    return not_this_card(json.loads(mpath.read_text(encoding="utf-8")), source, files, name)
+
+
 def check_shoots(studio):
     """shoots.json must give every group to exactly one shoot, with a suggested name each."""
-    groups = [g["id"] for g in json.loads((studio / "groups.json").read_text())["groups"]]
+    groups = [g["id"] for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]]
     try:
-        shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
+        shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     except (ValueError, KeyError, OSError) as e:
         return f"shoots.json could not be read ({e.__class__.__name__})"
     seen = []
@@ -147,6 +204,8 @@ def main():
     # their drive and second copy come from the Studio File unless given here
     sf = studio_file.load()
     drives = sf.get("drives", {})
+    dest_from_file = bool(a.source and not a.dest)       # the usual drive, not one named for this backup only
+    second_from_file = bool(a.source and a.second is None and drives.get("second"))
     if a.source and not a.dest:
         a.dest = drives.get("session")
     if a.source and a.second is None and drives.get("second"):
@@ -157,6 +216,12 @@ def main():
         sys.exit(5)
     if a.source and not a.name:
         a.name = datetime.now().strftime("%A").lower() + " card"  # "saturday card"
+    if this_computer.WINDOWS:
+        # unproven on a real PC: a bare "E:" means the top of drive E; Python alone reads it as wherever it last
+        # was on E. (A Mac's paths are left exactly as given.)
+        for k in ("source", "dest", "second"):
+            if getattr(a, k):
+                setattr(a, k, str(this_computer.drive_root(getattr(a, k))))
 
     # the ledger: a card already backed up is not copied again
     if a.source and not a.session and not a.again:
@@ -178,6 +243,20 @@ def main():
             # copied and verified, but the night did not finish (Claude's look, the sort, the report): pick it up there
             say(f"This card is already copied and verified, in {root}. Picking up where the backup left off.")
             if a.check:
+                stop_without_pictures()
+                return
+            if held_studio.name != "_studio":
+                # The settle had already moved the records into <their place>/.studio/<night> when it stopped (the
+                # power went, or it ended "done with problems"): only the settle is left to finish. Without this,
+                # root is their place itself, which holds no _studio, so the whole card was copied again into a new
+                # folder and index.py then stopped on a missing index (found Nov 6). Nothing is copied here.
+                code = run("settle.py", held_studio)
+                if code not in (0, 6):
+                    sys.exit(1)
+                run("first_look.py", held_studio)
+                run("report_page.py", held_studio)
+                run("edit_queue.py", "register", "--night", held_studio)
+                say(f"\nDone. Report: {held_studio / 'report.html'}")
                 return
             a.session = str(root)
 
@@ -194,14 +273,26 @@ def main():
                     open_report(st, st)
                 return
     elif a.source and a.dest and a.name:
-        session = Path(a.dest).expanduser() / f"{a.date} {a.name}"
+        session = Path(a.dest).expanduser() / this_computer.safe_name(f"{a.date} {a.name.strip()}", limit=120)
     else:
         sys.exit("usage: --source [--dest --name], or --session <folder>")
     studio = session / "_studio"
+    if a.session:
+        stop_without_pictures()   # picking up a backup: the next steps make previews (on a Mac this says nothing)
 
     # preflight: everything the night needs, checked before they walk away, so nothing stops it later
     if a.source and not a.session:
-        problems = preflight(Path(a.source), Path(a.dest), Path(a.second) if a.second else None)
+        # On a PC, the usual drive's letter may belong to another drive today (often the memory card itself).
+        # Asked first, so not even the preflight's test file lands on the wrong drive. Never on a Mac (None there).
+        moved = [w for w in (studio_file.drive_moved(drives, "session") if dest_from_file else None,
+                             studio_file.drive_moved(drives, "second") if second_from_file else None) if w]
+        problems = moved or preflight(Path(a.source), Path(a.dest), Path(a.second) if a.second else None)
+        if Path(a.source).is_dir() and not moved:
+            # a folder of the same name from earlier today may hold a different card's backup (two cards, no name
+            # given: both "<weekday> card"); the card ledger did not know this card, so it is checked here
+            why = another_card(studio, Path(a.source), a.name)
+            if why:
+                problems.append(why)
         if problems:
             say("STOP, before anything is copied:")
             for p in problems:
@@ -211,9 +302,9 @@ def main():
             say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
             try:  # the one gentle nudge for shoots kept on the computer's own disk (Dustin, Oct 30)
                 if studio_file.on_internal_disk(a.dest):
-                    st = os.statvfs(a.dest)
-                    if st.f_bavail / max(st.f_blocks, 1) < 0.15:
-                        say(f"NOTE: your shoots are on this computer's own disk and it is down to {st.f_frsize * st.f_bavail / 1e9:.0f} GB free. "
+                    total, free = this_computer.disk(a.dest)
+                    if free / max(total, 1) < 0.15:
+                        say(f"NOTE: your shoots are on this computer's own disk and it is down to {free / 1e9:.0f} GB free. "
                             "An external drive would keep the photos safe if anything happens to the computer and give it room to breathe.")
             except Exception:
                 pass
@@ -223,8 +314,16 @@ def main():
     manifest = studio / "manifest.json"
     done = False
     if manifest.exists():
-        m = json.loads(manifest.read_text())
+        m = json.loads(manifest.read_text(encoding="utf-8"))
         done = not m.get("problems") and all(v.get("dest", {}).get("ok") for v in m.get("files", {}).values()) and bool(m.get("files"))
+        if done and a.source and Path(a.source).is_dir():
+            # Done means every file on the card is copied and checked, not just every file the records reached: a
+            # backup cut off part way (paused, or the computer went off mid-copy) has only good records, and was
+            # taken for finished, so the rest of the card was never copied (found Nov 6). It carries on now.
+            from backup import inventory, not_copied
+            card_files, _ = inventory(Path(a.source))
+            if not_copied(m, Path(a.source), card_files):
+                done = False
     if not done:
         if not (a.source and a.dest and a.name):
             sys.exit(f"STOP: {session} is not fully backed up, and I need --source, --dest and --name to continue it.")
@@ -266,7 +365,7 @@ def main():
 
     # 4. Claude's one look
     if not (studio / "shoots.json").exists():
-        groups = json.loads((studio / "groups.json").read_text())["groups"]
+        groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
         say("\n4. NEEDS A LOOK. Read this image: " + str(studio / "groups-sheet.png"))
         say("   One row per group, in this order:")
         for i, g in enumerate(groups, 1):
@@ -285,7 +384,7 @@ def main():
     say("4. Shoots decided")
 
     # 5. sort with the names there are (theirs, or the suggested ones)
-    index = json.loads((studio / "index.json").read_text())
+    index = json.loads((studio / "index.json").read_text(encoding="utf-8"))
     if any(not p.get("original") for p in index["photos"] if p.get("taken")):
         say("5. Sorting into folders")
         if run("sort.py", session) != 0:
@@ -307,7 +406,7 @@ def main():
             if run("peek_sheets.py", "make", studio) != 0:
                 say("   (could not make the pages; going on without sneak peeks)")
         if (studio / "peek-sheets.json").exists():
-            sheets = json.loads((studio / "peek-sheets.json").read_text())["shoots"]
+            sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
             say("\n6b. NEEDS THE PICKS. For each shoot, read its page(s) and choose six sneak peeks by number:")
             for sid, sh in sheets.items():
                 say(f"   {sid} {sh['name']}: {sh['moments']} moments on {len(sh['pages'])} page(s)")
@@ -355,7 +454,7 @@ def open_report(session, studio):
     url_file = studio / "report-url.txt"
     url = None
     if url_file.exists():
-        old = url_file.read_text().strip()
+        old = url_file.read_text(encoding="utf-8").strip()
         try:  # is that server still alive?
             import urllib.request
             urllib.request.urlopen(old, timeout=1).read(1)
@@ -363,13 +462,16 @@ def open_report(session, studio):
         except Exception:
             url = None
     if not url:
-        log = open(studio / "serve.log", "a")
         try:
-            subprocess.Popen([sys.executable, str(HERE / "serve_report.py"), str(session)],
-                             stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            # The server's log lives in ~/.studio/logs, not in the backup's records: on a PC a log held open by the
+            # running server would stop the settle step from moving that folder. It is one file per backup that
+            # grows, so only what this server writes after it starts is read.
+            import fresh
+            from serve_report import log_name
+            log, before = fresh.start_server([sys.executable, str(HERE / "serve_report.py"), str(session)], log_name(studio))
             for _ in range(30):  # the server prints its address on the first line
                 time.sleep(0.1)
-                text = (studio / "serve.log").read_text()
+                text = fresh.log_since(log, before)
                 hit = [ln for ln in text.splitlines() if "http://" in ln]
                 if hit:
                     url = hit[-1].split("http://", 1)[1].split()[0]
@@ -378,11 +480,19 @@ def open_report(session, studio):
         except Exception:
             url = None
     if url:
-        url_file.write_text(url)
+        url_file.write_text(url, encoding="utf-8")
     target = url or str(studio / "report.html")
-    opener = {"darwin": ["open"], "win32": ["cmd", "/c", "start", ""], "linux": ["xdg-open"]}.get(sys.platform)
-    if opener:
-        subprocess.run([*opener, target], check=False)
+    if this_computer.WINDOWS:
+        # unproven on a real PC. Windows' own "open this with whatever opens it". Not `cmd /c start`, which reads
+        # the & in an address as the start of another command.
+        try:
+            os.startfile(target)
+        except OSError as e:
+            say(f"(could not open it: {e})")
+    else:
+        opener = {"darwin": ["open"], "linux": ["xdg-open"]}.get(sys.platform)  # pc-ok: Mac and Linux branch
+        if opener:
+            subprocess.run([*opener, target], check=False)
     say(f"Report on screen: {target}")
 
 

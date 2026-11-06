@@ -12,6 +12,8 @@ import struct
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 TAG_MAKE, TAG_MODEL, TAG_EXIF_IFD = 0x010F, 0x0110, 0x8769
 TAG_DATETIME_ORIGINAL, TAG_DATETIME_DIGITIZED, TAG_DATETIME = 0x9003, 0x9004, 0x0132
@@ -204,8 +206,14 @@ def _mp4_time(data):
                     ver = data[s2]
                     secs = struct.unpack_from(">Q" if ver == 1 else ">I", data, s2 + 4)[0]
                     if secs:
-                        utc = datetime(1904, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=secs)
-                        local = utc.astimezone().replace(tzinfo=None)  # this Mac's clock, same as the photos' camera time
+                        try:
+                            utc = datetime(1904, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=secs)
+                            local = utc.astimezone().replace(tzinfo=None)  # this computer's clock, same as the photos' camera time
+                        except (OSError, OverflowError, ValueError):
+                            # Windows cannot turn a date before 1970 into its own time (a camera whose clock was
+                            # never set writes one), and a damaged clip can carry a date past the year 9999.
+                            # No date, rather than a guessed one (or the whole index stopping on one clip).
+                            return {}
                         return {"taken": local.isoformat(timespec="seconds"), "clip": True}
     return {}
 
