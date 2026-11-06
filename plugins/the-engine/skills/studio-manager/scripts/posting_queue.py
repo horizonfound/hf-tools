@@ -798,6 +798,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path in ("/design.html", "/design-state", "/design-font-file"):
+            # the carousel designer: every one of its requests is design.py's to answer
+            import design
+            return design.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/arrange.html", "/design.html", "/arrange-state", "/kit-photo"):
             # the pages for arranging a kit's photos: every one of their requests is arrange.py's to answer
             import arrange
@@ -1037,6 +1041,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path in ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit"):
+            # the carousel designer: design.py checks each of these the way arrange.py does (below)
+            import design
+            return design.handle_post(self, path, urlsplit(self.path).query)
         if path in ("/arrange", "/design", "/design-slide", "/design-commit"):
             # the pages for arranging a kit's photos. arrange.py checks the Host itself (and the type and the
             # size), reads a refused body away, and answers in the page's own words.

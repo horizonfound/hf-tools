@@ -85,8 +85,8 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 WAITING = HOME / "arrange-waiting.json"
 LOG = HOME / "arrange.log"
 
-SIZES = {"s": 520, "l": 1600}           # the long edge of each copy, never larger than the photo's own
-QUALITY = {520: "82", 1600: "86"}
+SIZES = {"s": 520, "l": 1600, "x": 2400, "xx": 4320}    # the long edge of each copy, never larger than the photo's own
+QUALITY = {520: "82", 1600: "86", 2400: "90", 4320: "92"}     # x and xx are for the designer's finished slides: made only when asked for (big_copy)
 PIECES = ("reel", "carousel")           # the pieces that have a page so far
 LIMITS = {"reel": {"min": 2, "max": 60, "best": [8, 14]},
           "carousel": {"min": 2, "max": 20, "best": [5, 8]}}
@@ -430,9 +430,9 @@ def make_one(kit, row, size, src=None, rec=None, retry=False):
         got = kit_mod.size_of(src)
         own = max(got) if got else own
     edge = min(size, own) if own > 0 else size
-    if size == SIZES["l"]:
+    if size >= SIZES["l"]:
         got = _sips_copy(src, dst, edge, size)
-        if got is None:
+        if got is None and size == SIZES["l"]:
             try:
                 make_folder(mark.parent)
                 mark.touch()
@@ -492,6 +492,28 @@ def start_previews(kit):
             return True
         except OSError:
             return False
+
+
+_BIG = threading.Lock()                 # one large copy at a time: sips on a 45-megapixel photo is heavy
+
+
+def big_copy(kit, rec, row, size):
+    """The designer's two larger copies (2400 and 4320 on the long edge), made the first time one is asked
+    for, one at a time. A photo that is no larger than the next size down already has all of itself in that
+    copy, so that copy is the answer and no second one is made. Returns the file to send, or None."""
+    own = max(row.get("w") or 0, row.get("h") or 0)
+    while size > SIZES["l"]:
+        below = max(v for v in SIZES.values() if v < size)
+        if not 0 < own <= below:
+            break
+        size = below
+    f = copy_to_serve(kit, rec, row, size)
+    if f is None:
+        with _BIG:
+            if make_one(kit, row, size, rec=rec) is None:
+                return None
+        f = copy_to_serve(kit, rec, row, size)
+    return f
 
 
 # ---------- the record of an arrangement ----------
@@ -730,7 +752,7 @@ def waiting():
 
 def waiting_line(w):
     n = w.get("count") or 0
-    return f"ARRANGED: {w['kit']} | {w['piece']} | {n} photo{'s' if n != 1 else ''}"
+    return f"ARRANGED: {w['kit']} | {w['piece']} | {n} {'slide' if w['piece'] == 'design' else 'photo'}{'s' if n != 1 else ''}"
 
 
 def add_waiting(kit_name, name, piece, count):
@@ -907,6 +929,8 @@ def _get_photo(handler, q):
     if row is None:
         return handler.send_error(404)
     f = copy_to_serve(kit, kit_mod.load_rec(kit), row, size)
+    if f is None and size > SIZES["l"]:
+        f = big_copy(kit, kit_mod.load_rec(kit), row, size)
     if f is None:
         return handler.send_error(404)
     try:

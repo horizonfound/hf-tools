@@ -1238,7 +1238,7 @@ def check_server(work, port, photos):
                     ("n=0", f"/kit-photo?kit={KQ}&n=0&size=s"), ("n=-1", f"/kit-photo?kit={KQ}&n=-1&size=s"),
                     ("n=9999", f"/kit-photo?kit={KQ}&n=9999&size=s"), ("n=abc", f"/kit-photo?kit={KQ}&n=abc&size=s"),
                     ("n=3.0", f"/kit-photo?kit={KQ}&n=3.0&size=s"), ("a file name for n", f"/kit-photo?kit={KQ}&n=beach-003.jpg&size=s"),
-                    ("size=xl", f"/kit-photo?kit={KQ}&n=3&size=xl"), ("size=x (a later stage)", f"/kit-photo?kit={KQ}&n=3&size=x"),
+                    ("size=xl", f"/kit-photo?kit={KQ}&n=3&size=xl"), ("size=xxx (x and xx are the designer's larger copies; tests/design_check.py has those)", f"/kit-photo?kit={KQ}&n=3&size=xxx"),
                     ("no size", f"/kit-photo?kit={KQ}&n=3"), ("no question at all", "/kit-photo")]
         for label, path in refusals:
             code, h, data = ask(P, "GET", path)
@@ -1247,7 +1247,7 @@ def check_server(work, port, photos):
         code, h, data = ask(P, "GET", "/kit-photo?kit=A%20link%20to%20the%20kit&n=3&size=s")
         case("photo route refuses: a link to a kit, even inside Your Content", code == 404, code)
         os.unlink(str(kit.parent / "A link to the kit"))           # the link this check made a moment ago
-        for path in ("/.kit/", "/previews/", f"/kit-photo/", "/arrange-state/", "/design.html"):
+        for path in ("/.kit/", "/previews/", f"/kit-photo/", "/arrange-state/", "/design-staging/"):
             code, h, data = ask(P, "GET", path)
             case(f"nothing lists a folder or answers at {path}", code == 404, code)
 
@@ -1398,9 +1398,10 @@ def check_server(work, port, photos):
         case("save refuses: an empty body", " 400 " in line, line)
         code, h, data = ask(P, "OPTIONS", "/arrange")
         case("an OPTIONS request to /arrange answers 404 (so another website's request stops there)", code == 404, code)
-        for path in ("/design", "/design-slide", "/design-commit"):
+        for path, want in (("/design", 404), ("/design-slide", 415), ("/design-commit", 404)):
+            # the designer's routes (design.py; tests/design_check.py has their own cases): an empty request is refused
             code, h, data = ask(P, "POST", path, body=b"{}", headers=J)
-            case(f"a later stage's route is not here yet: POST {path} answers 404", code == 404, code)
+            case(f"the designer's route refuses an empty request: POST {path} answers {want}", code == want and b'"ok": false' in data, (code, data[:80]))
         case("after the refusals the record is unchanged", arr.read_bytes() == saved_before_refusals)
         code, j = post(good, {"Content-Type": "application/json", "Origin": "http://evil.example"})
         if enforced:
