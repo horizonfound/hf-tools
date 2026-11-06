@@ -64,12 +64,27 @@ def now():
 
 # ---------- the journey: what they've pressed and done ----------
 
+# One read, change and save of the record at a time in this program: the page server answers two clicks at once,
+# and on a PC a save can't put the new record in place while another thread has the old one open to read it
+# (seen on GitHub's Windows machines, Nov 6: six threads saving at once lost 16 to 31 of 240 saves). A Mac never
+# refused, and gives the same bytes either way.
+_JOURNEY_LOCK = threading.RLock()
+
+
 def load_journey():
-    if JOURNEY.exists():
+    for i in range(25):
         try:
+            if not JOURNEY.exists():
+                break
             return json.loads(JOURNEY.read_text(encoding="utf-8"))
         except ValueError:
-            pass
+            break
+        except PermissionError:
+            # on a PC, opening the record in the instant another program puts a new one in place is refused:
+            # wait a moment (about three seconds in all). A Mac never refuses; a real refusal is passed on.
+            if not this_computer.WINDOWS or i == 24:
+                raise
+            time.sleep(0.01 * (i + 1))
     return {"clicks": [], "done": {}, "hellos": {"first": None, "count": 0}}
 
 
@@ -93,22 +108,24 @@ def save_journey(j):
 def record_click(item):
     if item not in CATEGORIES:
         return False
-    j = load_journey()
-    j["clicks"].append({"at": now(), "item": item, "seen": False})
-    j["clicks"] = j["clicks"][-50:]
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        j["clicks"].append({"at": now(), "item": item, "seen": False})
+        j["clicks"] = j["clicks"][-50:]
+        save_journey(j)
     return True
 
 
 def record_done(category, note=None):
-    j = load_journey()
-    d = j["done"].setdefault(category, {"first": None, "count": 0})
-    d["first"] = d["first"] or now()
-    d["last"] = now()
-    d["count"] += 1
-    if note:
-        d["note"] = note
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        d = j["done"].setdefault(category, {"first": None, "count": 0})
+        d["first"] = d["first"] or now()
+        d["last"] = now()
+        d["count"] += 1
+        if note:
+            d["note"] = note
+        save_journey(j)
     return d
 
 
@@ -126,10 +143,11 @@ def pending():
 
 
 def mark_seen():
-    j = load_journey()
-    for c in j["clicks"]:
-        c["seen"] = True
-    save_journey(j)
+    with _JOURNEY_LOCK:
+        j = load_journey()
+        for c in j["clicks"]:
+            c["seen"] = True
+        save_journey(j)
 
 
 # ---------- the hello: an introduction the first time, the day's rundown once they know their way around ----------
@@ -165,11 +183,14 @@ def hello(mark=False):
            "not_tried": [k for k in ("backup", "posts") if not did[k]],
            "done": {c: {"times": d["count"], "last_note": d.get("note")} for c, d in done.items()}}
     if mark:
-        h["first"] = h.get("first") or now()
-        h["last"] = now()
-        h["count"] = h.get("count", 0) + 1
-        j["hellos"] = h
-        save_journey(j)
+        with _JOURNEY_LOCK:
+            j = load_journey()               # read again: a click may have been saved while the day was gathered
+            h = j.get("hellos") or {"first": None, "count": 0}
+            h["first"] = h.get("first") or now()
+            h["last"] = now()
+            h["count"] = h.get("count", 0) + 1
+            j["hellos"] = h
+            save_journey(j)
     return out
 
 
