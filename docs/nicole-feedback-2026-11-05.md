@@ -66,6 +66,24 @@ swiped), and two wide photos stacked on one slide.
 slides, or stacking two on one, is the same kind of work. It would live on the same page as the reel picker
 and share its drag-and-drop.
 
+**Four minutes later her Claude had built it (9:31pm).** Her words: "OMFG" ... "cme up here" ... "this is
+fucking insa[ne]." Her screenshot shows a page titled "Hannah carousel designer," and this is what is on it,
+kept here as the reference for building it properly:
+- **The slides, side by side on one long strip,** each a 4:5 box labelled Slide 1, Slide 2... A photo can sit
+  across the line between two slides. In her screenshot one wide photo runs across slides 2 and 3, slide 4
+  holds two wide photos stacked, and another photo straddles slides 5 and 6.
+- **Start from:** Example layout, One photo per slide, Blank. **Slides:** minus, a count, plus.
+- **Background:** five colour dots. **Size** slider. **Snap** on or off. **Profile grid crop** on or off.
+- **Undo, Preview swipe, Save slides** (it was saying "Making slide 5 of 7...").
+- **For the selected photo:** Fill slide, Across 2 slides, Top half, Bottom half, Left half, Right half, Add
+  border. **Crop:** Move photo inside, Zoom. **Bring forward, Send back, Duplicate, Remove.**
+- A line of help: "Drag to move it, or pull a corner to resize. Double-click to move the photo inside its
+  frame."
+- **All 52 photos below,** numbered, ticked when used: "Drag one onto a slide, or onto a photo to swap it."
+
+**It exists only in her chat session.** Claude asked her to have her Claude zip the designer and the reel
+picker and drop the zip in Slack, so the real thing can be built in and not rebuilt from a picture.
+
 **The question underneath, for the two of you:** how far it goes. On Oct 24 the line was drawn that the
 finished look comes from CapCut and Canva, and the Assistant does the choosing and the prep. Arranging the
 photographer's own photos on slides sits on the Assistant's side of that line. Fonts, text styling, stickers
