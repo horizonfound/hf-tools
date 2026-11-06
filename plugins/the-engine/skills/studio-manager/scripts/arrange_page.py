@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The picker page: the photos in a reel, in the order they play, with every photo of the shoot below.
+"""The picker page: the photos in a reel or a carousel, in order, with every photo of the shoot below.
 
     page_html(kit_name, piece)     the page (served live by posting_queue.py through arrange.handle_get)
     plain_page(words)              a small page with the Back to home button, for "can't find that shoot"
@@ -74,9 +74,14 @@ h1{margin:0;font:600 clamp(28px,4.2vw,46px)/1.05 var(--sans);letter-spacing:-.03
 .why{font-size:13px;color:var(--ink-2)}
 .status{margin-left:auto;font-size:13px;color:var(--ink-2);white-space:nowrap}
 .status.bad{color:#b4472e;white-space:normal}
-.doneline{margin:.4rem 0 0;font-size:14.5px;font-weight:600;color:var(--ink)}
+.donerow{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .7rem;margin:.4rem 0 0}
+.donerow .btn{padding:.45rem .9rem;font-size:13.5px}
+.doneline{margin:0;font-size:14.5px;font-weight:600;color:var(--ink)}
 .doneline:empty{display:none}
 .doneline.since{font-weight:400;color:var(--coral-2)}
+.openline{margin:.3rem 0 0;font-size:13px;color:var(--ink-2)}
+.openline:empty{display:none}
+.canvaline{margin:.3rem 0 0;font-size:13.5px;color:#9a3d22}
 .note{margin:.4rem 0 0;font-size:13.5px;color:#9a3d22;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 .note .btn{padding:.4rem .8rem;font-size:13px}
 
@@ -355,7 +360,10 @@ PICKER_JS = r"""
       help: 'Your carousel, in the order people swipe. Drag a photo to move it. Drag one up from below to add it. Click any photo to see it big.',
       legend: 'The first photo is the one people see in their feed, so lead with your strongest.',
       few: 'A carousel needs at least 2', full: 'Instagram allows up to 20. Take one out first.',
-      done: 'Saved.', doneAgain: 'Saved.'
+      done: 'Saved.', doneAgain: 'Saved.',
+      making: 'Making your slides...', same: 'Your slides are already in this order.',
+      slow: 'This is taking longer than it should. Tell Claude.',
+      canva: 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.'
     }
   };
   var T = WORDS[PIECE] || WORDS.reel;
@@ -383,6 +391,13 @@ PICKER_JS = r"""
   var rowNodes = {}, poolNodes = {};
   var saving = false, dirty = false, wantDone = false, timer = null, retryT = null, pollT = null, watchT = null;
   var target = null;            // what a drop would do right now
+  // The carousel only: its final button has the slides made, by a job of the Assistant's own.
+  var jobWait = null;           // the counter of the order whose slides this page is waiting for
+  var jobSince = 0;             // when the waiting began, by the clock (never by counting timer turns)
+  var jobWords = '';            // what to show while waiting, when the Assistant gave words for it
+  var jobT = null;
+  var shown = null;             // the last result: {rev: the order it is about, kind: done | same | problem, line}
+  var JOB_LIMIT = 180000;       // three minutes
 
   $('eyebrow').textContent = T.label;
   $('help').textContent = T.help;
@@ -466,15 +481,76 @@ PICKER_JS = r"""
     else if (n > lim.best[1]) adv = lim.best[0] + ' to ' + lim.best[1] + ' usually works best';
     $('advice').textContent = adv;
     backBtn.hidden = M.same(row, first);
-    happyBtn.disabled = blocked || n < min();
-    $('why').textContent = n < min() ? T.few : '';
-    var d = $('doneline'), text = '', since = false;
-    if (happyRev != null) {
+    // too few, or more than this piece holds (an older pick can be over-long): the button is off, and the
+    // line beside it says why and what to do
+    happyBtn.disabled = blocked || n < min() || n > max();
+    $('why').textContent = n < min() ? T.few : n > max() ? T.full : '';
+    var d = $('doneline'), text = '', since = false, folder = false, canva = false;
+    if (PIECE === 'carousel') {
+      // the line is about the slides: being made, made (with the folder's button beside it), or why not
+      if (wantDone) text = '';
+      else if (jobWait != null) text = jobWords || T.making;
+      else if (shown && shown.rev === rev && !dirty && !saving) {
+        text = shown.line;
+        folder = shown.kind === 'done' || shown.kind === 'same';
+        // S.canva is true only while the Canva slides were made from another order than this one
+        canva = folder && !!(S && S.canva);
+      }
+      else if (shown || (happyRev != null && happyRev !== rev)) { text = SINCE; since = true; }
+    } else if (happyRev != null) {
       if (happyRev === rev && !dirty && !saving) text = S && S.reel_made && PIECE === 'reel' ? T.doneAgain : T.done;
       else if (!wantDone) { text = SINCE; since = true; }
     }
     d.textContent = text; d.classList.toggle('since', since);
+    var ob = $('openfolder'), ol = $('openline'), cl = $('canvaline');
+    if (ob) { ob.hidden = !folder; if (!folder && ol) ol.textContent = ''; }
+    if (cl) { cl.hidden = !canva; cl.textContent = canva ? T.canva : ''; }
   }
+  // ---- the carousel's slides being made ----
+  function ended(J){ return J.state === 'done' || J.state === 'same' || J.state === 'problem'; }
+  // What the Assistant says about its slide-making job, taken in. While this page waits for an order's
+  // slides, only that order's result ends the wait (or three minutes by the clock). Not waiting: a result
+  // for the order now on the page is shown (the slides may have been made from the chat, or before a
+  // reload), and a job at work on it is waited for.
+  function takeJob(J){
+    if (PIECE !== 'carousel') return;
+    if (jobWait != null) {
+      if (J && ended(J) && J.rev === jobWait) { shown = {rev: J.rev, kind: J.state, line: J.line}; jobWait = null; stopJobPoll(); return; }
+      // The Assistant has moved on to a NEWER order (the button was pressed in another window, or Claude
+      // made the slides): no result for the order this page pressed on will ever come, so the wait is over.
+      // What is said next is worked out below, and the page takes the newer order as soon as it is idle.
+      if (J && typeof J.rev === 'number' && J.rev > jobWait) { jobWait = null; jobWords = ''; stopJobPoll(); }
+      else {
+        if (Date.now() - jobSince > JOB_LIMIT) { shown = {rev: jobWait, kind: 'slow', line: T.slow}; jobWait = null; stopJobPoll(); }
+        return;
+      }
+    }
+    if (!J || J.rev !== rev) return;
+    if (ended(J)) shown = {rev: J.rev, kind: J.state, line: J.line};
+    // a job still at work on this order is waited for, unless this page has already said it is taking too
+    // long (it then stays said, and the result is shown whenever it does arrive)
+    else if (!(shown && shown.kind === 'slow' && shown.rev === J.rev)) { jobWait = J.rev; jobSince = Date.now(); jobWords = ''; shown = null; jobPoll(); }
+  }
+  function jobPoll(){
+    if (jobT) return;
+    jobT = setInterval(function(){
+      if (jobWait == null) { stopJobPoll(); return; }
+      getState().then(function(j){
+        if (jobWait == null) return;
+        if (j && j.ok && j.stamp !== S.stamp) { jobWait = null; stopJobPoll(); photosChanged(); return; }
+        // a newer order than this page's (made in another window, or by Claude): taken at once when nothing
+        // here is unsaved, exactly as the page's slower look does, so the wait never outlives its order
+        if (j && j.ok && j.rev !== rev && idle()) { adopt(j); status(SAVED); return; }
+        if (j && j.ok) { S.canva = j.canva; S.job = j.job; }
+        takeJob(j && j.ok ? j.job : null);
+        lines();
+      }).catch(function(){
+        // the Assistant is not answering (it may be starting over; the job is a process of its own and goes on)
+        takeJob(null); lines();
+      });
+    }, 1200);
+  }
+  function stopJobPoll(){ if (jobT) { clearInterval(jobT); jobT = null; } }
   function status(text, bad){ var s = $('status'); s.textContent = text || ''; s.classList.toggle('bad', !!bad); }
   function rowLine(text){ $('rowline').textContent = text || ''; }
   function note(text, reload){
@@ -505,6 +581,8 @@ PICKER_JS = r"""
     row = M.fromLists(j.now.nums, j.now.marks).filter(known);
     first = M.fromLists(j.first.nums, j.first.marks).filter(known);
     rev = j.rev; happyRev = j.happy ? j.happy.rev : null;
+    jobWait = null; shown = null; jobWords = ''; stopJobPoll();     // worked out again from what the Assistant says now
+    takeJob(j.job);
     $('title').textContent = j.name + ' ' + T.thing;
     document.title = j.name + ' ' + T.thing;
     var kl = $('kitlink');
@@ -547,12 +625,13 @@ PICKER_JS = r"""
     if (j.rev !== rev) { adopt(j); status(SAVED); return; }
     var h = j.happy ? j.happy.rev : null;
     if (h !== happyRev || j.reel_made !== S.reel_made) { happyRev = h; S.reel_made = j.reel_made; lines(); }
+    if (PIECE === 'carousel') { S.canva = j.canva; S.job = j.job; takeJob(j.job); lines(); }
   }
   // while the page sits open, ask every few seconds, so it follows without a reload
   function watch(){
     if (watchT) return;
     watchT = setInterval(function(){
-      if (pollT || document.hidden || !idle()) return;
+      if (pollT || jobT || document.hidden || !idle()) return;
       var asked = rev;
       getState().then(function(j){
         if (j && j.ok && idle() && rev === asked) follow(j);
@@ -578,6 +657,7 @@ PICKER_JS = r"""
   function stopPoll(){ if (pollT) { clearInterval(pollT); pollT = null; } }
   function photosChanged(){
     blocked = true; dirty = false; wantDone = false;
+    jobWait = null; shown = null; stopJobPoll();
     clearTimeout(timer); clearTimeout(retryT);
     status('');
     note('The photos in this shoot changed since this page opened.', true);
@@ -601,7 +681,7 @@ PICKER_JS = r"""
   function send(){
     clearTimeout(timer); clearTimeout(retryT);
     if (saving || blocked || !S) return;
-    if (wantDone && row.length < min()) wantDone = false;
+    if (wantDone && (row.length < min() || row.length > max())) wantDone = false;
     if (!dirty && !wantDone) return;
     var done = wantDone;
     saving = true; dirty = false;
@@ -620,7 +700,15 @@ PICKER_JS = r"""
         var j = res.j || {};
         if (res.code === 200 && j.ok) {
           if (typeof j.rev === 'number') rev = j.rev;
-          if (done) { wantDone = false; happyRev = rev; }
+          if (done) {
+            wantDone = false; happyRev = rev;
+            if (PIECE === 'carousel') {
+              // the Assistant either set a job to making the slides, or says they are already in this order
+              stopJobPoll();
+              if (j.job) { jobWait = rev; jobSince = Date.now(); jobWords = j.line || ''; shown = null; jobPoll(); }
+              else { jobWait = null; shown = {rev: rev, kind: j.same ? 'same' : 'problem', line: j.line || T.same}; }
+            }
+          }
           if (dirty || wantDone) { send(); return; }
           status(SAVED); lines();
           return;
@@ -665,10 +753,21 @@ PICKER_JS = r"""
   });
   backBtn.addEventListener('click', function(){ changed(first.slice()); });
   happyBtn.addEventListener('click', function(){
-    if (blocked || row.length < min()) return;
+    if (blocked || row.length < min() || row.length > max()) return;
     wantDone = true;
     status(SAVING); lines();
     send();
+  });
+
+  // "Open the Carousel folder", beside the line that says the slides are there; its answer shows right under it
+  var openBtn = $('openfolder');
+  if (openBtn) openBtn.addEventListener('click', function(){
+    var line = $('openline');
+    line.textContent = 'Opening...';
+    fetch('/open?' + Q + '&sub=Carousel', {cache: 'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){ line.textContent = (j && j.words) || CANT_REACH; })
+      .catch(function(){ line.textContent = CANT_REACH; });
   });
 
   // ---- dragging ----
@@ -849,7 +948,10 @@ def page_html(kit_name, piece):
         "<span class='why' id='why'></span>"
         "<button class='btn' id='back' type='button' hidden>Back to my pick</button>"
         "<span class='status' id='status'></span></div>"
-        "<p class='doneline' id='doneline'></p>"
+        "<div class='donerow'><p class='doneline' id='doneline'></p>"
+        "<button class='btn' id='openfolder' type='button' hidden>Open the Carousel folder</button></div>"
+        "<p class='openline' id='openline'></p>"
+        "<p class='canvaline' id='canvaline' hidden></p>"
         "<p class='note' id='note' hidden></p>"
         "</section>"
         "<section class='poolsec' id='poolsec'><div class='poolhead'><h2 id='poolname'></h2></div>"

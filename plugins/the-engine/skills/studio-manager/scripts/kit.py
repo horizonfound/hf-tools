@@ -12,6 +12,9 @@
                                folders (Dustin, Oct 30). The kit page (Post kit.html, every piece with
                                a Copy button), Captions and hooks.txt, Reel.txt, and the kit's records.
                                The page is shown through the posting server, never opened as a file.
+                               Also here: slides-older/<time>/ (plain carousel slides a new order
+                               replaced: moved here, never deleted, with moved.json saying what moved)
+                               and slides-new/ (where new slides are made before any goes into Carousel).
 
 Claude does the choosing and the writing; this does the files. Nothing posts.
 
@@ -33,6 +36,9 @@ Claude does the choosing and the writing; this does the files. Nothing posts.
 Exit: 0 done, 1 problem, 2 nothing there, 7 the export folder could not be found (ask).
 """
 import argparse
+import contextlib
+import errno
+import hashlib
 import html
 import json
 import os
@@ -40,8 +46,12 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date
 from pathlib import Path
+from urllib.parse import quote
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -65,6 +75,7 @@ WIDEST = 1.91                # the widest Instagram keeps a feed photo; wider ge
 PAD_DARK = "1A1A1C"
 PAD_WHITE = "FFFFFF"
 TOP_BIAS = 0.4               # when a tall photo is trimmed to 4:5, take 40% of the cut from the top, 60% from the bottom (faces sit high)
+CAROUSEL_MOST = 20           # Instagram's own limit for one carousel (arrange.py's LIMITS says the same to the page)
 KINDS = ("reel", "carousel", "singles", "stories")
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 
@@ -296,6 +307,9 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
         if bad:
             say(f"STOP: no photo numbered {bad[0]} on the sheet.")
             sys.exit(1)
+        if key == "carousel" and len(ns) > CAROUSEL_MOST:
+            say(f"STOP: Instagram allows up to {CAROUSEL_MOST} photos in a carousel, and this pick has {len(ns)}. Nothing was changed.")
+            sys.exit(1)
         picks[key] = ns         # plain numbers, always; the reel's marks sit beside the picks, never inside
         if marks is not None:
             rec["reel_marks"] = marks       # replaced whole whenever --reel is given
@@ -325,13 +339,52 @@ def _pad_rgb(hexs):
     return tuple(int(hexs[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS):
+def place(tmp, dst):
+    """Give a finished file its final name, only if that name is free. Never writes over anything.
+    True if the file now has that name. A hard link is tried first, because it fails by itself when the
+    name is taken, whatever else is going on; a drive with no hard links (exFAT) gets a look, then a rename."""
+    tmp, dst = Path(tmp), Path(dst)
+    try:
+        os.link(tmp, dst)
+    except FileExistsError:
+        return False
+    except OSError:
+        if os.path.lexists(dst):
+            return False
+        os.rename(tmp, dst)
+        return True
+    os.unlink(tmp)          # the same file has its final name now; this only drops the scratch name
+    return True
+
+
+def _finish_shape(tmp, dst, ok, replace):
+    """The end of shape(): the scratch file becomes the real one, or is dropped."""
+    if ok and replace:
+        os.replace(tmp, dst)
+        return True
+    if ok and place(tmp, dst):
+        return True
+    try:
+        if tmp.exists():
+            tmp.unlink()    # our own scratch file: half-made, or made for a name someone took a moment ago
+    except OSError:
+        pass
+    return bool(ok) and dst.is_file()
+
+
+def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS, replace=False):
     """Make the photo fit Instagram's box (w, h) one of three ways, never stretching:
       "fit"   the whole photo inside the box, its own shape, no padding (a tall photo comes out narrower than the box)
       "pad"   the whole photo inside the box, padded to the box with a plain color
       "crop"  the box filled, the extra trimmed (tall photos lose a little top and bottom, more from the bottom)
-    The Mac's own sips does all of it with nothing installed; Pillow elsewhere."""
+    The Mac's own sips does all of it with nothing installed; Pillow elsewhere.
+    The picture is written under a scratch name beside dst ('.part-<process>-<name>', which every listing
+    here skips) and gets its real name only when it is whole, and only if that name is free: a run that is
+    cut off leaves no half-made file under a real name, and nothing is ever written over. replace=True is
+    for the Assistant's own small thumbnails, which follow the files they are made from."""
     W, H = box
+    dst = Path(dst)
+    tmp = dst.with_name(f".part-{os.getpid()}-{dst.name}")
     size = size_of(src)
     if not size:
         return False
@@ -350,9 +403,13 @@ def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS):
             cmd += ["--cropOffset", str(off_y), str(off_x), "--cropToHeightWidth", str(H), str(W)]
         elif how == "pad":
             cmd += ["--padToHeightWidth", str(H), str(W), "--padColor", pad]
-        cmd += [str(src), "--out", str(dst)]
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        return r.returncode == 0 and dst.exists()
+        cmd += [str(src), "--out", str(tmp)]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            ok = r.returncode == 0 and tmp.is_file() and tmp.stat().st_size > 0
+        except OSError:
+            ok = False
+        return _finish_shape(tmp, dst, ok, replace)
     try:
         from PIL import Image, ImageOps
         im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
@@ -363,15 +420,16 @@ def shape(src, dst, box, how, pad=PAD_DARK, bias=TOP_BIAS):
             bg = Image.new("RGB", (W, H), _pad_rgb(pad))
             bg.paste(im, ((W - nw) // 2, (H - nh) // 2))
             im = bg
-        im.save(dst, "JPEG", quality=92)
-        return True
+        im.save(tmp, "JPEG", quality=92)
+        return _finish_shape(tmp, dst, True, replace)
     except Exception:
-        return False
+        return _finish_shape(tmp, dst, False, replace)
 
 
 def fit(src, dst, box, pad=None):
-    """Kept for the posting queue's thumbnails: fit, padded if a color is given."""
-    return shape(src, dst, box, "pad" if pad else "fit", pad or PAD_DARK)
+    """Kept for the Assistant's own thumbnails (the posting queue's, the home page's), which are re-made
+    whenever the piece they show changes: fit, padded if a color is given."""
+    return shape(src, dst, box, "pad" if pad else "fit", pad or PAD_DARK, replace=True)
 
 
 def single(src, dst):
@@ -399,6 +457,621 @@ def slide(src, dst, pad=PAD_WHITE):
         return shape(src, dst, CAROUSEL, "crop")
     return shape(src, dst, CAROUSEL, "pad", pad)
 
+# ---------- the carousel's plain slides: made new, the earlier ones set aside, never written over ----------
+#
+# A carousel's slides are files called "Slide 01 (<photo name>).jpg", so a new order means new names. The
+# slides a new order needs are made first, in the kit's hidden folder (.kit/slides-new/<time>/). Only when
+# every one is whole does anything in the Carousel folder change: what moves, and where, is written down
+# (.kit/slides-older/<time>/moved.json) BEFORE the first file moves; the earlier plain slides are moved into
+# that folder (a move on the same drive: the same bytes under a new address, checked by hash); the new ones
+# are moved into Carousel. A run that is cut off anywhere is finished by the next run, from what was written
+# down. Nothing is deleted, nothing is written over, and a file the Assistant did not make stays where it is.
+
+SLIDE_NAME = re.compile(r"^Slide (\d\d) \((.+)\)\.jpg$")
+MOVED = "moved.json"
+
+
+def _test_stop(name):
+    """For the tests only: stop dead at a named point, the way a power cut or a kill would.
+    ARRANGE_TEST_STOP names the point; ARRANGE_TEST_STOP_ONCE (a file to make) limits it to one time."""
+    if os.environ.get("ARRANGE_TEST_STOP") != name:
+        return
+    once = os.environ.get("ARRANGE_TEST_STOP_ONCE")
+    if once:
+        if os.path.exists(once):
+            return
+        Path(once).write_text(name)
+    os._exit(9)
+
+
+def _nf(name):
+    """A name in one normal form. Drives keep an accented letter in different ways (an HFS+ drive always as
+    the plain letter followed by its accent, others as it was typed), so the same name can come back from a
+    folder's listing as a different string of letters. Names are compared through this, never letter for letter."""
+    return unicodedata.normalize("NFC", name)
+
+
+def _fold(name):
+    """For asking "would a drive that ignores capitals take these two for the same name?"."""
+    return _nf(name).casefold()
+
+
+def _listing(folder):
+    """The names in a folder, exactly as the drive lists them."""
+    try:
+        return set(os.listdir(folder))
+    except OSError:
+        return set()
+
+
+def _names(folder):
+    """{a name in its normal form: the same name as the drive lists it}. A drive that ignores capitals says
+    yes to any spelling; its listing does not, so "is it there" is always asked of the listing."""
+    return {_nf(n): n for n in _listing(folder)}
+
+
+def _has(folder, name):
+    return _nf(name) in _names(folder)
+
+
+def _sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _write_whole(path, obj):
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+@contextlib.contextmanager
+def _held(lock_file, wait):
+    """Hold a lock on a file for as long as the work takes, across processes; the Mac lets go of it even if
+    the holder dies. Yields "held" when it is held, "none" when it can't be had at all (a drive with no such
+    locks, a folder that isn't there: the work goes on without one), and False when something else kept it
+    for longer than `wait` seconds. The lock file's folder is never made here."""
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
+    f = None
+    if fcntl is not None:
+        try:
+            f = open(lock_file, "a")
+        except OSError:
+            f = None
+    got = "held"
+    end = time.time() + wait
+    while f is not None:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.time() > end:
+                got = False
+                break
+            time.sleep(0.05)
+        except OSError:                     # no locks on this drive
+            f.close()
+            f = None
+    if f is None:
+        got = "none"
+    try:
+        yield got
+    finally:
+        if f is not None:
+            if got:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            f.close()
+
+
+def update_rec(kit, change):
+    """Read the kit record, change it (change(rec)), and save it, as one step that no other command of the
+    Assistant's can get in the middle of. Every writer that works alongside another (the page's slide job,
+    kit.py build, Claude's apply) changes the record this way, and only the keys that are its own, so one
+    never puts back an older copy over what another has just written."""
+    with _held(kit / ".kit" / "kit.lock", 10.0):
+        rec = load_rec(kit)
+        change(rec)
+        save_rec(kit, rec)
+        return rec
+
+
+def _pid_gone(pid):
+    """Has this process ended? Only ever True when the Mac says so."""
+    if os.name == "nt" or pid <= 0:
+        return False                # a PC has no harmless way to ask
+    try:
+        os.kill(pid, 0)
+        return False
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+
+
+PART_NAME = re.compile(r"^\.part-(\d+)-")
+
+
+def _sweep_parts(folder):
+    """Drop the Assistant's own half-made scratch pictures ('.part-<process>-...') left in a folder by a run
+    that was killed: only ones whose process has ended (on a PC, where that can't be asked: ones over a day
+    old). They never had a real name; no photo, slide or file of the photographer's is ever touched here."""
+    for name in _listing(folder):
+        m = PART_NAME.match(name)
+        if not m:
+            continue
+        p = Path(folder) / name
+        try:
+            stale = _pid_gone(int(m.group(1))) or (os.name == "nt" and time.time() - p.stat().st_mtime > 86400)
+            if stale and p.is_file() and not p.is_symlink():
+                p.unlink()
+        except OSError:
+            pass
+
+
+def _sheet_or_none(kit):
+    """The numbered photos by number, or None when the list is not there or cannot be read. Never exits."""
+    try:
+        return {x["n"]: x for x in json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))["photos"]}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _moving(kit):
+    """The moves that are written down and not finished (their folders' names), oldest first."""
+    older = kit / ".kit" / "slides-older"
+    out = []
+    for d in sorted(_listing(older)):
+        try:
+            j = json.loads((older / d / MOVED).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(j, dict) and j.get("state") == "moving":
+            out.append(d)
+    return out
+
+
+def carousel_plan(kit, rec=None, nums=None):
+    """What a carousel in this order needs done. Reads only; never exits (the page server asks it too).
+    nums is the order (photo numbers); left out, it is the kit's own carousel pick.
+      {"ok": True, "nums", "wanted": [slide names in order], "src": {name: where its photo is},
+       "n_of": {name: photo number}, "make": [wanted names not in Carousel yet],
+       "aside": [earlier plain slides that are not wanted now, named as the drive lists them],
+       "clash": [files that will still be in Carousel and that the drive would take for a new slide's name],
+       "moving": [records of a move that was cut off]}
+      {"ok": False, "why": "sheet" | "photo", "photos": [numbers not on the list]}
+    An earlier plain slide is a .jpg in Carousel that is not wanted now and is either one this kit's record
+    says it made, or is named "Slide NN (<a photo of this shoot>).jpg". Canva's slides and anything else
+    that was put there stay. Names are compared in one normal form (_nf), so a drive that keeps accented
+    letters its own way is read right."""
+    rec = rec if rec is not None else load_rec(kit)
+    by_n = _sheet_or_none(kit)
+    if not by_n:
+        return {"ok": False, "why": "sheet", "photos": []}
+    nums = list(nums if nums is not None else (rec.get("picks") or {}).get("carousel") or [])
+    bad = [n for n in nums if n not in by_n]
+    if bad:
+        return {"ok": False, "why": "photo", "photos": bad}
+    folder = photos_dir(kit, rec)
+    wanted, src, n_of = [], {}, {}
+    for i, n in enumerate(nums, 1):
+        listed = Path(by_n[n]["file"])
+        name = f"Slide {i:02d} ({listed.stem}).jpg"
+        here = folder / listed.name        # the folder the kit names now, the file name from the list
+        wanted.append(name)
+        src[name] = here if here.is_file() else listed
+        n_of[name] = n
+    have = _names(kit / "Carousel")
+    wanted_nf = {_nf(n) for n in wanted}
+    ours = {_nf(x) for x in (rec.get("made_pieces") or {}).get("carousel") or []}
+    stems = {_nf(Path(x["file"]).stem) for x in by_n.values()}
+    aside = []
+    for key in sorted(have):
+        if key.startswith(".") or not key.endswith(".jpg") or key in wanted_nf or "(Canva)" in key:
+            continue
+        m = SLIDE_NAME.match(key)
+        if key in ours or (m and m.group(2) in stems):
+            aside.append(have[key])
+    make = [n for n in wanted if _nf(n) not in have]
+    # A new slide can only be put in if the drive does not take its name for that of a file that is staying
+    # (the Mac's own disk and most photo drives ignore capitals). Found out here, before anything is made or moved.
+    staying = {_fold(a): a for a in have.values() if a not in aside}
+    clash = [staying[_fold(n)] for n in make if _fold(n) in staying]
+    return {"ok": True, "nums": nums, "wanted": wanted, "src": src, "n_of": n_of,
+            "make": make, "aside": aside, "clash": clash, "moving": _moving(kit)}
+
+
+def carousel_in_order(kit, nums):
+    """Are the plain slides in the Carousel folder already exactly this order, with the kit's record saying
+    the same and no move left unfinished? Reads only; never exits."""
+    try:
+        rec = load_rec(kit)
+        plan = carousel_plan(kit, rec, nums)
+        return bool(plan.get("ok") and nums and not plan["make"] and not plan["aside"] and not plan["moving"]
+                    and list((rec.get("picks") or {}).get("carousel") or []) == list(nums)
+                    and list((rec.get("made_pieces") or {}).get("carousel") or []) == plan["wanted"])
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+
+
+def canva_behind(rec):
+    """Do this kit's Canva carousel slides show an earlier choice of photos than the plain slides do now?
+    True only when a Canva carousel is on record AND the carousel has changed since it was made:
+      * the Canva record carries the pick it was made from (canva_kit.py note writes it): behind when that
+        is not the kit's pick now. No clock comes into it, and going back to that order makes it false again.
+      * an older Canva record without one: behind when the plain slides were last changed after it was made."""
+    c = (rec.get("canva") or {}).get("carousel")
+    if not isinstance(c, dict) or not c:
+        return False
+    if isinstance(c.get("picks"), list):
+        return list(c["picks"]) != list((rec.get("picks") or {}).get("carousel") or [])
+    changed, made = rec.get("carousel_changed"), c.get("made")
+    if changed and made:
+        return str(changed) > str(made)
+    return bool(changed)
+
+
+def _move_one(src, dst):
+    """One file to its new address, never over another. "moved", "there" (already done), or a word for
+    what is in the way: "clash" (another file has that name), "gone" (it is in neither place)."""
+    in_src = _has(src.parent, src.name)
+    in_dst = _has(dst.parent, dst.name)
+    if in_src and in_dst:
+        try:
+            same = os.path.samefile(src, dst)
+        except OSError:
+            same = False
+        if not same:
+            return "clash"
+        os.unlink(src)          # one file under two names (a move cut off half way): drop the old name
+        return "moved"
+    if in_dst:
+        return "there"
+    if not in_src:
+        return "gone"
+    return "moved" if place(src, dst) else "clash"
+
+
+def _undo_move(kit, stamp, j, blocked):
+    """A move that cannot be finished (a file turned up in the Carousel folder under a name a new slide
+    needs, or a new slide is no longer where it was made) is put back, so nothing is ever left half way for
+    good: the new slides already put in go back to the making folder, and the earlier slides come back from
+    the set-aside folder under their own names. Nothing is deleted and nothing is written over; an earlier
+    slide whose name has been taken meanwhile stays set aside and is named in the record. The record ends
+    as "undone". Safe to cut off: until that is written the record still says "moving", and the next run
+    starts again from the top."""
+    older = kit / ".kit" / "slides-older" / stamp
+    new = kit / ".kit" / "slides-new" / stamp
+    car = kit / "Carousel"
+    made_sums = j.get("made_sums") or {}
+    to = j.get("aside_to") or {}
+    for name in j.get("place") or []:
+        if _has(car, name) and not _has(new, name):
+            # only a file that is the slide this run made goes back (by its hash, written down before the move)
+            if made_sums.get(name) and _sha(car / name) == made_sums[name]:
+                new.mkdir(parents=True, exist_ok=True)
+                _move_one(car / name, new / name)
+    left = []
+    for name in j.get("aside") or []:
+        if _move_one(older / to.get(name, name), car / name) == "clash":
+            left.append(name)
+    j["state"] = "undone"
+    j["blocked_by"] = blocked
+    j["left_aside"] = left
+    j["finished"] = datetime.now().isoformat(timespec="seconds")
+    _write_whole(older / MOVED, j)
+    return {"undone": True, "blocked": blocked, "left": left}
+
+
+def _finish_move(kit, stamp):
+    """Carry out (or finish) the move written down in .kit/slides-older/<stamp>/moved.json. Safe to run
+    any number of times. It always ends: None when the move is done, or what _undo_move returns when it
+    could not be and was put back. Trouble with the drive itself (full, read-only, gone) is raised as OSError
+    and leaves the record saying "moving", for the next run."""
+    older = kit / ".kit" / "slides-older" / stamp
+    new = kit / ".kit" / "slides-new" / stamp
+    car = kit / "Carousel"
+    j = json.loads((older / MOVED).read_text(encoding="utf-8"))
+    sums = j.get("sums") or {}
+    made_sums = j.get("made_sums") or {}
+    gone = list(j.get("gone") or [])
+    differs = list(j.get("differs") or [])
+    to = dict(j.get("aside_to") or {})
+    for i, name in enumerate(j.get("aside") or []):
+        got = _move_one(car / name, older / to.get(name, name))
+        if got == "clash":
+            # something else has that name in the set-aside folder: the slide goes in beside it under a free
+            # name, which is written down before the file moves
+            k = 2
+            while _has(older, f"{Path(name).stem} ({k}).jpg"):
+                k += 1
+            to[name] = f"{Path(name).stem} ({k}).jpg"
+            j["aside_to"] = to
+            _write_whole(older / MOVED, j)
+            got = _move_one(car / name, older / to[name])
+        if got == "gone":
+            if name not in gone:
+                gone.append(name)       # someone took it out of the folder themselves; there is nothing to set aside
+            continue
+        if got == "clash":
+            raise OSError(f"could not set {name} aside")
+        if sums.get(name) and name not in differs and _sha(older / to.get(name, name)) != sums[name]:
+            differs.append(name)        # it was changed between being written down and being moved: kept as it is now, and noted
+        if i == 0:
+            _test_stop("mid-aside")
+    _test_stop("after-aside")
+    for i, name in enumerate(j.get("place") or []):
+        got = _move_one(new / name, car / name)
+        if got == "there" and made_sums.get(name) and _sha(car / name) != made_sums[name]:
+            got = "clash"               # a file is there under that name, and it is not the slide this run made
+        if got in ("clash", "gone"):
+            j["gone"], j["differs"] = gone, differs
+            in_way = _names(car).get(_nf(name)) or next((a for a in _listing(car) if _fold(a) == _fold(name)), name)
+            return _undo_move(kit, stamp, j, in_way if got == "clash" else "")
+        if i == 0:
+            _test_stop("mid-place")
+    _test_stop("after-place")
+    wanted = list(j.get("wanted") or [])
+    changed = bool(j.get("place") or j.get("aside"))
+
+    def note(rec):
+        made = dict(rec.get("made_pieces") or {})
+        made["carousel"] = wanted
+        rec["made_pieces"] = made
+        if changed:
+            rec["carousel_changed"] = datetime.now().isoformat(timespec="seconds")
+
+    update_rec(kit, note)
+    _test_stop("after-record")
+    write_page(kit)
+    _refresh_posting(kit)
+    j["state"] = "done"
+    j["gone"], j["differs"] = gone, differs
+    j["finished"] = datetime.now().isoformat(timespec="seconds")
+    _write_whole(older / MOVED, j)
+    try:
+        os.rmdir(new)               # our own making folder, empty now (left alone if anything is still in it)
+    except OSError:
+        pass
+    return None
+
+
+MAKING_YOUNG = 600.0         # seconds: with no lock to go by, a making folder younger than this may be another run's
+
+
+def _clear_making(kit, sure=True, only=None):
+    """Slides a run made and never put in (a photo failed half way through, or the run was cut off before it
+    wrote down a move) are the Assistant's own scratch: they never had a place in the Carousel folder, and
+    the next run makes its own afresh from the photos. They are dropped here, so a run that fails again and
+    again (a nearly full drive) does not eat what room is left. Only the making folder (.kit/slides-new) is
+    looked at, only folders with no move still written down as unfinished, and only files named like a slide
+    or like a scratch picture; anything else found there is left. Called by the run that holds the slides
+    lock. sure=False (this drive has no locks, so another run could be at work): a folder touched in the
+    last ten minutes is left for a later run. only names this run's own making folder, to clear just that."""
+    root = kit / ".kit" / "slides-new"
+    moving = set(_moving(kit))
+    for d in sorted(_listing(root)):
+        folder = root / d
+        if d in moving or folder.is_symlink() or not folder.is_dir() or (only is not None and d != only):
+            continue
+        if only is None and not sure:
+            try:
+                if time.time() - folder.stat().st_mtime < MAKING_YOUNG:
+                    continue
+            except OSError:
+                continue
+        for name in _listing(folder):
+            p = folder / name
+            if (SLIDE_NAME.match(_nf(name)) or PART_NAME.match(name)) and p.is_file() and not p.is_symlink():
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
+        try:
+            os.rmdir(folder)
+        except OSError:
+            pass
+
+
+def _refresh_posting(kit):
+    """If this kit's carousel is already in the posting queue, its picture there follows the new first slide.
+    A nicety: the kit itself is already right, so any trouble here is left for the next time."""
+    try:
+        import posting_queue as pq
+        return pq.refresh_kit_carousel(kit)
+    except (Exception, SystemExit):  # noqa: BLE001
+        return False
+
+
+SLIDES_WAIT = 120.0          # seconds to wait for another run that is changing this kit's slides
+
+
+def _plain_os(e):
+    """Trouble with the drive, in a few plain words and never a path."""
+    if e.errno == errno.ENOSPC:
+        return "the drive is full"
+    if e.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
+        return "a folder in this kit can't be written to"
+    if e.errno in (errno.ENOENT, errno.ENOTDIR, errno.EIO, errno.ENXIO):
+        return "the kit's folder can't be reached (is the drive plugged in?)"
+    return "the drive refused (" + (e.strerror or e.__class__.__name__).lower() + ")"
+
+
+def rebuild_carousel(kit, nums=None, say_status=None, take=None):
+    """One run at a time for a kit's slides, across processes (the page's own job and a command of Claude's
+    must never both be moving files): a lock held on .kit/slides.lock for as long as the work takes, which
+    the Mac lets go of even if the run dies. A drive with no such locks is worked on without one.
+
+    take, when given, is called with that lock still held as soon as the slides are in the order asked for
+    ("done" or "same"): it is how the caller writes the order down as the kit's own pick, so the slides and
+    the pick change together and no other run can come between the two.
+
+    Trouble with the drive itself (full, read-only, unplugged) never comes out as an error: it is a problem
+    like any other, in plain words, with "why": "move" when a move is written down and unfinished (the next
+    run finishes it) and "write" when nothing in the Carousel folder had been changed."""
+    blank = {"state": "problem", "count": 0, "made": 0, "aside": 0}
+    try:
+        lock_file = hidden(kit) / "slides.lock"
+    except OSError as e:
+        return dict(blank, why="write", detail=_plain_os(e))
+    with _held(lock_file, SLIDES_WAIT) as mine:
+        if not mine:
+            return dict(blank, why="busy")
+        try:
+            res = _rebuild_carousel(kit, nums, say_status, sure=(mine == "held"))
+        except OSError as e:
+            try:
+                moving = bool(_moving(kit)) or not (kit / ".kit").is_dir()
+            except OSError:
+                moving = True
+            return dict(blank, why="move" if moving else "write", detail=_plain_os(e))
+        if take is not None and res["state"] in ("done", "same"):
+            take()
+        return res
+
+
+def _rebuild_carousel(kit, nums=None, say_status=None, sure=True):
+    """Make the plain slides in the Carousel folder match an order: the kit's own carousel pick, or nums.
+    The pick itself (rec['picks']) is not written here; whoever chose the order writes it (rebuild_carousel's take).
+
+    In order: finish any move an earlier run was cut off in (or put it back, if it can't be finished); drop
+    the scratch of runs that failed; work out what this order needs; if nothing, change nothing; refuse, with
+    nothing touched, if a file that is staying has a name a new slide needs; make the new slides in the kit's
+    hidden folder; write down what will move; set the earlier plain slides aside and put the new ones in.
+    Then the kit's record, the kit page and the posting queue's picture follow. Safe to run twice and safe
+    to cut off at any point.
+
+    Returns {"state": "done" | "same" | "none" | "problem", "count", "made", "aside", "why", "photos", "detail",
+    "files", "put_back", "left"}. A problem leaves the Carousel folder exactly as it was ("why": "sheet",
+    "photo", "make", "clash", "redo"; for "clash", "files" names what is in the way, and "put_back" says a
+    move had begun and was put back; "redo" is a move put back because a slide just made had gone from the
+    hidden folder). Only trouble with the drive itself leaves a move unfinished (see rebuild_carousel)."""
+    out = {"state": "same", "count": 0, "made": 0, "aside": 0}
+    finished = 0
+    undone = None
+    plan = carousel_plan(kit, None, nums)
+    if not plan.get("ok") and plan.get("why") == "sheet":
+        return dict(out, state="problem", why="sheet")
+    older_root = kit / ".kit" / "slides-older"
+    for stamp in _moving(kit):
+        got = _finish_move(kit, stamp)
+        if got:
+            undone = got
+        finished += 1
+    _clear_making(kit, sure)
+    rec = load_rec(kit)
+    plan = carousel_plan(kit, rec, nums)
+    if not plan.get("ok"):
+        return dict(out, state="problem", why=plan.get("why"), photos=plan.get("photos") or [])
+    wanted = plan["wanted"]
+    out["count"] = len(wanted)
+    if not wanted:
+        return dict(out, state="none")
+    if not plan["make"] and not plan["aside"]:
+        if list((rec.get("made_pieces") or {}).get("carousel") or []) != wanted:
+            def note(r):                                      # the folder is right and only the record was behind
+                made = dict(r.get("made_pieces") or {})
+                made["carousel"] = wanted
+                r["made_pieces"] = made
+            update_rec(kit, note)
+            write_page(kit)
+            finished += 1
+        return dict(out, state="done" if finished else "same")
+    if plan["clash"]:
+        return dict(out, state="problem", why="clash", files=plan["clash"], put_back=bool(undone), left=(undone or {}).get("left") or [])
+    # every photo a new slide needs must be readable BEFORE anything is made
+    need = plan["make"]
+    cant = [plan["n_of"][name] for name in need if not plan["src"][name].is_file() or not size_of(plan["src"][name])]
+    if cant:
+        return dict(out, state="problem", why="photo", photos=cant)
+    stamp = datetime.now().strftime("%Y-%m-%d %H%M%S")
+    k = 1
+    while (kit / ".kit" / "slides-new" / stamp).exists() or (older_root / stamp).exists():
+        k += 1
+        stamp = datetime.now().strftime("%Y-%m-%d %H%M%S") + f" {k}"
+    new = kit / ".kit" / "slides-new" / stamp
+    hidden(kit)
+    new.mkdir(parents=True)
+    pad = rec.get("slide_background", PAD_WHITE)
+    done = [0]
+
+    def make(name):
+        ok = slide(plan["src"][name], new / name, pad)
+        done[0] += 1
+        if say_status:
+            say_status(done[0], len(need))
+        return name, ok
+
+    failed = []
+    if need:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            for name, ok in ex.map(make, need):
+                if not ok or not _has(new, name):
+                    failed.append(plan["n_of"][name])
+    if failed:
+        _clear_making(kit, only=stamp)  # the slides that did get made were for nothing: not left behind
+        return dict(out, state="problem", why="make", photos=failed)
+    _test_stop("after-make")
+    car = kit / "Carousel"
+    car.mkdir(exist_ok=True)
+    older = older_root / stamp
+    older.mkdir(parents=True)
+    journal = {"state": "moving", "aside": plan["aside"], "place": need, "wanted": wanted, "picks": plan["nums"],
+               "picks_before": list((rec.get("picks") or {}).get("carousel") or []),
+               "sums": {name: _sha(car / name) for name in plan["aside"]},
+               "made_sums": {name: _sha(new / name) for name in need},
+               "at": datetime.now().isoformat(timespec="seconds")}
+    _write_whole(older / MOVED, journal)
+    _test_stop("after-journal")
+    got = _finish_move(kit, stamp)
+    if got:
+        # it could not be finished and was put back: a file turned up in the way between the look and the
+        # move ("clash"), or a slide just made was no longer there to be put in ("redo")
+        _clear_making(kit, only=stamp)
+        if got.get("blocked"):
+            return dict(out, state="problem", why="clash", files=[got["blocked"]], put_back=True, left=got.get("left") or [])
+        return dict(out, state="problem", why="redo", left=got.get("left") or [])
+    return dict(out, state="done", made=len(need), aside=len(plan["aside"]))
+
+
+def carousel_trouble(res):
+    """A problem from rebuild_carousel, in a line Claude can read."""
+    why, photos = res.get("why"), res.get("photos") or []
+    which = "photo " + ", ".join(str(n) for n in photos) if photos else "a photo"
+    if why == "photo":
+        return f"(could not make the carousel slides: {which} can't be read right now. The Carousel folder was left as it was.)"
+    if why == "make":
+        return f"(could not make the carousel slides: {which} couldn't be sized. The Carousel folder was left as it was.)"
+    if why == "sheet":
+        return "(could not make the carousel slides: the numbered list can't be read. The Carousel folder was left as it was.)"
+    if why == "busy":
+        return "(the carousel's slides are being changed by something else right now. Nothing was changed; try again in a moment.)"
+    if why == "write":
+        return f"(could not make the carousel slides: {res.get('detail') or 'the drive refused'}. The Carousel folder was left as it was.)"
+    if why == "clash":
+        files = ", ".join(f'"{n}"' for n in res.get("files") or []) or "a file"
+        left = res.get("left") or []
+        if res.get("put_back"):
+            return (f"(could not change the carousel slides: {files} is in the Carousel folder under a name a new slide needs. "
+                    "The earlier slides were put back, so the Carousel folder is as it was" +
+                    (f", except {len(left)} earlier slide{'s' if len(left) != 1 else ''} whose name had been taken, kept in the kit's hidden folder (.kit/slides-older)" if left else "") +
+                    ". Ask them to rename or move that file, then run this again.)")
+        return (f"(could not make the carousel slides: {files} in the Carousel folder has a name a new slide needs "
+                "(this drive takes capital and small letters for the same). The Carousel folder was left as it was. "
+                "Ask them to rename or move that file, then run this again.)")
+    if why == "redo":
+        return ("(the carousel's slides were not changed: a slide that had just been made was no longer in the kit's hidden folder "
+                "when it was needed. The earlier slides were put back, so the Carousel folder is as it was. Run this again.)")
+    return f"(the carousel's slides were not finished: {res.get('detail') or 'something was in the way'}. Nothing was lost; run this again to finish.)"
+
 
 def build(kit):
     rec = load_rec(kit)
@@ -408,9 +1081,11 @@ def build(kit):
         return 2
     by_n = numbered(kit)
     made = {}
-    pad = rec.get("slide_background", PAD_WHITE)
+    # The carousel first, by its own careful road: a new pick makes new slides and sets the earlier ones
+    # aside (they used to be left in the folder, out of date). It reads the kit's pick itself, with the
+    # slides lock held, so a pick the page's own job has just written is the one it goes by.
+    car = rebuild_carousel(kit) if picks.get("carousel") else None
     makers = {"singles": (lambda a, b: single(a, b), "Single"),
-              "carousel": (lambda a, b: slide(a, b, pad), "Slide"),
               "stories": (lambda a, b: shape(a, b, STORY, "pad", PAD_DARK), "Story")}
     for key, (maker, prefix) in makers.items():
         ns = picks.get(key) or []
@@ -418,6 +1093,7 @@ def build(kit):
             continue
         out = kit / key.capitalize()
         out.mkdir(exist_ok=True)
+        _sweep_parts(out)
         files = []
         for i, n in enumerate(ns, 1):
             src = Path(by_n[n]["file"])
@@ -433,15 +1109,29 @@ def build(kit):
     if cover_n:
         out = kit / "Covers"
         out.mkdir(exist_ok=True)
+        _sweep_parts(out)
         src = Path(by_n[cover_n]["file"])
         full, grid = out / "Reel cover.jpg", out / "Reel cover, as the grid shows it.jpg"
         ok = (full.exists() or shape(src, full, COVER, "crop")) and (grid.exists() or shape(full, grid, GRID, "crop", bias=0.5))
         made["covers"] = [full.name, grid.name] if ok else []
-    rec["made_pieces"] = {**rec.get("made_pieces", {}), **made}
-    rec["built"] = datetime.now().isoformat(timespec="seconds")
-    save_rec(kit, rec)
-    for k, fs in made.items():
-        say(f"{k.capitalize()}: {len(fs)} made.")
+    # Sizing takes a while, and the page's own job may have written the record meanwhile (a new carousel
+    # order, its slides). So the record is read afresh for the save, and only what this run made goes in:
+    # the copy read at the start is never put back over anything.
+    def note(r):
+        r["made_pieces"] = {**r.get("made_pieces", {}), **made}
+        r["built"] = datetime.now().isoformat(timespec="seconds")
+
+    rec = update_rec(kit, note)
+    lines = {k: f"{k.capitalize()}: {len(fs)} made." for k, fs in made.items()}
+    if car is not None:
+        if car["state"] == "problem":
+            lines["carousel"] = carousel_trouble(car)
+        else:
+            lines["carousel"] = f"Carousel: {car['count']} made." + (
+                f" ({car['aside']} earlier slide{'s' if car['aside'] != 1 else ''} set aside in the kit's hidden folder, not deleted.)" if car.get("aside") else "")
+    for k in ("singles", "carousel", "stories", "covers"):
+        if k in lines:
+            say(lines[k])
     if picks.get("reel"):
         say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
             + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
@@ -587,6 +1277,9 @@ a.go{text-decoration:none}
 .piece .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
 .piece .top h2{margin:0}
 .ratio{font:600 10px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:.3em .6em;margin-left:.5rem;vertical-align:middle}
+.arr{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);text-decoration:none;cursor:pointer;transition:all .2s var(--ease)}
+.arr:hover{border-color:var(--coral);color:var(--coral-2);transform:translateY(-1px)}
+body:not(.live) .arr{display:none}
 .big{position:fixed;inset:0;background:rgba(20,22,30,.92);display:none;place-items:center;z-index:50;cursor:zoom-out}.big.on{display:grid}.big img{max-width:92vw;max-height:92vh;border-radius:12px}
 @media(max-width:760px){.piece{grid-template-columns:1fr}}
 """
@@ -624,7 +1317,7 @@ def write_page(kit):
         d = kit / folder_name
         if not d.is_dir():
             return "<p class='empty'>Not made yet.</p>"
-        fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg"), key=lambda p: ("(Canva)" not in p.name, p.name))
+        fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg" and not p.name.startswith(".")), key=lambda p: ("(Canva)" not in p.name, p.name))
         if not fs:
             return "<p class='empty'>Not made yet.</p>"
         return f"<div class='strip{' tall' if tall else ''}'>" + "".join(f"<img src='{html.escape(folder_name)}/{html.escape(f.name)}' alt=''>" for f in fs) + "</div>"
@@ -643,10 +1336,16 @@ def write_page(kit):
     lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
 
     canva = rec.get("canva", {})
+    can_arrange = (kit / ".kit" / "sheet.json").is_file()      # the page that moves photos needs the numbered list
 
-    def sec(title, sub, ratio, body, wrds, folder, piece=None):
+    def sec(title, sub, ratio, body, wrds, folder, piece=None, arrange=None):
         has = (kit / folder).is_dir()
         btn = f"<button class='go' data-sub='{html.escape(folder)}'>Open the {html.escape(folder)} folder</button>" if has else ""
+        if arrange and can_arrange and (rec.get("picks") or {}).get(arrange):
+            # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
+            # every 'go' button asks the Assistant to open a folder in Finder. Shown only when the page is
+            # served live (a saved copy has nowhere to go).
+            btn = (f"<a class='arr' href='/arrange.html?kit={html.escape(quote(kit.name))}&amp;piece={arrange}'>Change the photos</a> " + btn)
         cv = canva.get(piece) if piece else None
         if cv and cv.get("edit_url"):
             btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn
@@ -665,8 +1364,8 @@ def write_page(kit):
             f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"
             f"<p class='folder'>In your {html.escape(brand.short())} folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
             f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
-            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover")
-            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same size. They are in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel")
+            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
+            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same size. They are in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel", arrange="carousel")
             + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
             + sec("Stories", ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva.get("stories") else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle."), "9:16",
                   strip("Stories", tall=True) + ("<p class='canva-links'>" + " ".join(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>Story {int(n)} in Canva</a>" for n, d in sorted((canva.get("stories") or {}).items(), key=lambda x: int(x[0])) if d.get("edit_url")) + "</p>" if canva.get("stories") else ""),

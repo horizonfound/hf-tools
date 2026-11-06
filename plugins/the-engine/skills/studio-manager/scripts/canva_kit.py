@@ -188,6 +188,10 @@ def note(kit, piece, design_id, edit_url, template, n=None):
     if piece == "story":
         c.setdefault("stories", {})[str(n or 1)] = entry
     else:
+        if piece == "carousel":
+            # which photos, in which order, these Canva slides were filled from: how the Assistant knows
+            # later whether they still match the carousel (kit.canva_behind)
+            entry["picks"] = list((rec.get("picks") or {}).get("carousel") or [])
         c[piece] = entry
     kit_mod.save_rec(kit, rec)
     kit_mod.write_page(kit)

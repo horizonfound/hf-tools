@@ -110,7 +110,7 @@ def load():
 
 def save(p):
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = PFILE.with_suffix(".json.tmp")
+    tmp = PFILE.with_name(f"{PFILE.name}.{os.getpid()}.tmp")     # a name of this process's own: two writers never share a half-written file
     tmp.write_text(json.dumps(p, indent=1, ensure_ascii=False))
     os.replace(tmp, PFILE)
 
@@ -276,13 +276,44 @@ def add_for_kit(p, kit_dir):
         by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text())["photos"]}
     out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", by_n.get(reel_pick) or (photos[0] if photos else None),
                       where=reel["project"] if reel else None))
-    slides = sorted((kit_dir / "Carousel").glob("*.jpg")) if (kit_dir / "Carousel").is_dir() else []
+    slides = sorted(f for f in (kit_dir / "Carousel").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Carousel").is_dir() else []
     out.append(upsert(f"{sid}-carousel", "carousel", "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
                       where="the Carousel folder" if slides else None))
-    singles = sorted((kit_dir / "Singles").glob("*.jpg")) if (kit_dir / "Singles").is_dir() else []
+    singles = sorted(f for f in (kit_dir / "Singles").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Singles").is_dir() else []
     for i, f in enumerate(singles, 1):
         out.append(upsert(f"{sid}-single-{i}", "single", "yellow", f, where="the Singles folder", n=i))
     return out
+
+
+def refresh_kit_carousel(kit_dir):
+    """A kit's carousel slides were re-made: its piece here gets the new first slide as its picture, and
+    nothing else in the queue is looked at. The picture is made FIRST (that is the slow part); only then is
+    the queue read, that one piece changed, and the queue saved, in one quick step, so a change made to the
+    queue meanwhile (a piece marked ready to post, say) is never put back to how it was.
+    False when this kit's carousel is not in the queue."""
+    import kit as kit_mod
+    pid = f"kit:{slug(kit_dir.name)}-carousel"
+    if not any(x.get("id") == pid for x in load().get("pieces", [])):
+        return False
+    car = kit_dir / "Carousel"
+    slides = sorted(f for f in car.glob("*.jpg") if not f.name.startswith(".")) if car.is_dir() else []
+    thumb = None
+    if slides:
+        THUMBS.mkdir(parents=True, exist_ok=True)
+        dst = THUMBS / f"{pid}.jpg"
+        if kit_mod.fit(slides[0], dst, (360, 450)):
+            thumb = dst.relative_to(HOME).as_posix()
+    p = load()                                        # read afresh, change one piece, save: nothing in between
+    x = next((y for y in p["pieces"] if y.get("id") == pid), None)
+    if x is None:
+        return False
+    x["thumb"] = thumb or x.get("thumb")
+    status = "yellow" if slides else "red"
+    if x["status"] in ("red", "yellow") and status != x["status"]:
+        set_status(p, x, status, by="kit", where="the Carousel folder" if slides else None)
+    save(p)
+    write_page(p)
+    return True
 
 
 def greens(p):

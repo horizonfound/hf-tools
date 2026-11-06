@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Arranging a post kit's photos on a page: which photos are in the reel, and in what order.
+"""Arranging a post kit's photos on a page: which photos are in the reel or the carousel, and in what order.
 
 The Assistant picks; the photographer can move things. The page (arrange_page.py) is served by the page
 server (posting_queue.py), which hands every request for it to handle_get / handle_post here. This file
@@ -7,9 +7,16 @@ holds the records, the commands and the route handlers. It holds no page code.
 
     python3 arrange.py show "beach"                    the kit's name, how many photos, the list's stamp
     python3 arrange.py previews "beach"                small JPEG copies of every photo, for the page to show
-    python3 arrange.py open "beach" --piece reel       get the page ready and print its address
+    python3 arrange.py open "beach" --piece reel       get the page ready and print its address (or --piece carousel)
     python3 arrange.py apply "beach" --piece reel      take the order from the page into the kit; prints the
                                                        picks the way reel.py wants them ("Reel picks: 19,4,10+,14-")
+    python3 arrange.py apply "beach" --piece carousel  the carousel: take the order into the kit and make the plain
+                                                       slides match it (new ones made, earlier ones set aside,
+                                                       nothing deleted). When the final button was pressed and is
+                                                       waiting, it is the order the button was pressed on;
+                                                       --as-it-is takes the order on the page right now instead.
+                                                       --job is how the page's own button runs it, on its own,
+                                                       with a status the page reads.
     python3 arrange.py waiting                         orders they pressed "I'm happy with this order" on
     python3 arrange.py took "beach" [--piece reel]     that one has been dealt with
     python3 arrange.py earlier "beach" --piece reel    orders that were replaced (nothing is ever thrown away)
@@ -34,6 +41,15 @@ Records:
                               moves on (by one, for every accepted change); from = {page, base} says which open
                               page saved it and which counter that page had last seen
   <kit>/.kit/arrange.lock     an empty file the writers hold while they work (never removed)
+  <kit>/.kit/arrange-job.json {"state": "queued"|"running"|"done"|"same"|"problem", "line": plain words for the page,
+                              "rev": the counter of the order it is for, "count", "pid", "at", "t"}: the slide-making
+                              job the carousel's final button starts. "queued" is written by the page server just
+                              before it starts the job; everything after by the job itself. On disk, so a server
+                              that starts over loses nothing.
+  <kit>/.kit/arrange-job.lock an empty file the job holds for as long as it lives (the Mac lets go of it when the
+                              job ends, however it ends), which is how anyone knows whether a job is still at work
+  <kit>/.kit/slides.lock, kit.lock   kit.py's own: held while slides are moved, and while the kit record is read,
+                              changed and saved (kit.update_rec), so no writer puts an older copy back over another's
   ~/.studio/arrange-waiting.json   a pointer for Claude: which kit's order is waiting (the order is in the kit)
   ~/.studio/arrange.log       what the page's requests carried (their Origin), for reading after a problem
 
@@ -71,7 +87,7 @@ LOG = HOME / "arrange.log"
 
 SIZES = {"s": 520, "l": 1600}           # the long edge of each copy, never larger than the photo's own
 QUALITY = {520: "82", 1600: "86"}
-PIECES = ("reel",)                      # the pieces that have a page so far
+PIECES = ("reel", "carousel")           # the pieces that have a page so far
 LIMITS = {"reel": {"min": 2, "max": 60, "best": [8, 14]},
           "carousel": {"min": 2, "max": 20, "best": [5, 8]}}
 MARKS = ("", "+", "-")                  # Normal, Longer, Quicker: reel.py's own marks
@@ -94,6 +110,19 @@ CANT_REACH = "Could not reach the Assistant. Tell Claude instead."
 PHOTOS_CHANGED = "The photos in this shoot changed since this page opened."
 NEWER = "This order was changed somewhere else. Here's the newest."
 NOT_UNDERSTOOD = "That didn't arrive the way it should have. Reload the page and try again."
+TOO_MANY = {"reel": "A reel holds up to 60 photos. Take one out first.",
+            "carousel": "Instagram allows up to 20. Take one out first."}       # the page's own words for a full row
+# the carousel's final button: what the page shows under it (the job's own words, read from its status)
+MAKING = "Making your slides..."
+ALREADY_MAKING = "Your slides are already being made. One moment."
+IN_ORDER = "Your slides are already in this order."
+LEFT_AS_WAS = "Your Carousel folder was left as it was."
+NOT_FINISHED = "Couldn't finish changing your slides. Nothing was lost. Tell Claude and it'll sort it out."
+IN_THE_WAY = "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."
+JOB_STOPPED = "Making your slides was interrupted. Press \"I'm happy with this order\" again and it will finish."
+JOB_BOOT = 20.0                         # seconds a job may take to start before "queued" means it never did
+JOB_OLD = 300.0                         # where the Mac's locks can't be used: a job older than this is taken for dead
+JOB_LOOPS = 6                           # how many newer orders one job will take on before it stops
 
 _LOCK = threading.RLock()               # one writer at a time for arrange.json and the waiting list (this process)
 _held = {}                              # lock file -> [its open handle, how deep]; only touched while _LOCK is held
@@ -125,7 +154,7 @@ def locked(lock_file):
         f = None
         if fcntl is not None:
             try:
-                lock_file.parent.mkdir(parents=True, exist_ok=True)
+                make_folder(lock_file.parent)
                 f = open(lock_file, "a")
             except OSError:
                 f = None
@@ -153,6 +182,23 @@ def locked(lock_file):
                 except OSError:
                     pass
                 f.close()
+
+
+def make_folder(folder):
+    """Make one of the Assistant's own folders if it isn't there yet. A folder inside a kit's hidden folder
+    is only ever made when the kit's own folder is there: if the kit has been renamed, or its drive is gone,
+    this raises (FileNotFoundError) and makes nothing, so a look-alike of the kit is never left at its old
+    address with nothing in it but our records."""
+    folder = Path(folder)
+    parts = folder.parts
+    if ".kit" not in parts:
+        folder.mkdir(parents=True, exist_ok=True)
+        return
+    i = parts.index(".kit")
+    d = Path(*parts[:i])
+    for part in parts[i:]:
+        d = d / part
+        d.mkdir(exist_ok=True)          # plain: it fails by itself when the kit's own folder is not there
 
 
 def kit_lock(kit):
@@ -184,7 +230,7 @@ def log(line):
 
 def write_whole(path, obj):
     """A file written whole or not at all: a temp name no one else is using, then a rename."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    make_folder(path.parent)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)
@@ -331,7 +377,10 @@ def _sips_copy(src, dst, edge, size):
     """One JPEG copy by sips, written under a dot-name and renamed into place only when it is whole."""
     if dst.is_file():
         return "there"
-    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        make_folder(dst.parent)
+    except OSError:
+        return None
     tmp = dst.with_name(f".part-{os.getpid()}-{threading.get_ident()}-{dst.name}")
     cmd = ["sips", "-s", "format", "jpeg", "-s", "formatOptions", QUALITY.get(size, "85"), "-Z", str(max(1, edge)), str(src), "--out", str(tmp)]
     try:
@@ -385,7 +434,7 @@ def make_one(kit, row, size, src=None, rec=None, retry=False):
         got = _sips_copy(src, dst, edge, size)
         if got is None:
             try:
-                mark.parent.mkdir(parents=True, exist_ok=True)
+                make_folder(mark.parent)
                 mark.touch()
             except OSError:
                 pass
@@ -416,7 +465,12 @@ def make_previews(kit, workers=4, retry=False):
         return "made" if "made" in (a, b) else "there"
 
     if rows:
-        previews_dir(kit).mkdir(parents=True, exist_ok=True)
+        try:
+            make_folder(previews_dir(kit))
+        except OSError:
+            rows = []                   # the kit's folder is not there right now: nothing to make, and nothing is made
+            out["missing"] = out["of"]
+    if rows:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             for res in ex.map(one, rows):
                 out[res] += 1
@@ -657,8 +711,8 @@ def state_for_page(kit, piece):
         "now": {"nums": p["now"]["nums"], "marks": p["now"]["marks"]},
         "happy": {"rev": happy["rev"]} if isinstance(happy, dict) and type(happy.get("rev")) is int else None,
         "dropped": list(p.get("dropped_nums") or []) or [0] * len(p.get("dropped") or []),
-        "limits": LIMITS[piece], "previews": {"made": made, "of": len(rows)}, "job": None,
-        "reel_made": bool(rec.get("reel")), "canva": bool((rec.get("canva") or {}).get("carousel")),
+        "limits": LIMITS[piece], "previews": {"made": made, "of": len(rows)}, "job": job_for_page(kit, piece),
+        "reel_made": bool(rec.get("reel")), "canva": kit_mod.canva_behind(rec),
         "kit_page": kit_mod.rec_path(kit).with_name("Post kit.html").is_file(),
     }
 
@@ -694,6 +748,126 @@ def took(kit_name, piece=None):
         if len(rest) != len(was):
             write_whole(WAITING, rest)
         return len(was) - len(rest)
+
+
+# ---------- the carousel's slide-making job ----------
+
+def job_path(kit):
+    return kit / ".kit" / "arrange-job.json"
+
+
+def job_lock(kit):
+    return kit / ".kit" / "arrange-job.lock"
+
+
+def read_job(kit):
+    try:
+        j = json.loads(job_path(kit).read_text(encoding="utf-8"))
+        return j if isinstance(j, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def write_job(kit, state, line, rev, count=0):
+    write_whole(job_path(kit), {"state": state, "line": line, "rev": rev, "count": count, "pid": os.getpid(),
+                                "at": now_iso(), "t": time.time()})
+
+
+def _pid_alive(pid):
+    if type(pid) is not int or pid <= 0:
+        return False
+    if os.name == "nt":
+        return True                                # a PC has no harmless way to ask; the job's age decides there
+    try:
+        got, _ = os.waitpid(pid, os.WNOHANG)      # a job this server started and that has ended is cleared away here
+        return got != pid
+    except ChildProcessError:
+        pass                                       # not ours to wait for: ask the Mac whether it exists
+    except OSError:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def job_running(kit):
+    """Is a slide-making job at work on this kit right now? The job holds a lock on .kit/arrange-job.lock for
+    as long as it lives; anyone asking tries to share that lock for an instant. Where the Mac's locks can't be
+    used (a drive without them), the job's own number is asked after instead, for at most five minutes."""
+    with _LOCK:
+        if fcntl is not None:
+            try:
+                with open(job_lock(kit), "a") as f:
+                    try:
+                        fcntl.flock(f, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        return True
+                    except OSError:
+                        pass
+                    else:
+                        fcntl.flock(f, fcntl.LOCK_UN)
+                        return False
+            except OSError:
+                pass
+        j = read_job(kit) or {}
+        if j.get("state") not in ("queued", "running"):
+            return False
+        return time.time() - float(j.get("t") or 0) < JOB_OLD and (j.get("state") == "queued" or _pid_alive(j.get("pid")))
+
+
+def job_for_page(kit, piece):
+    """The job as the page should see it: its state, its plain line, and the counter of the order it is for.
+    A job that says it is at work but is not (it was killed, or the Mac was shut down) is told as a problem,
+    with what to do about it. No path, no file name, no process number."""
+    if piece != "carousel":
+        return None
+    j = read_job(kit)
+    if not j or j.get("state") not in ("queued", "running", "done", "same", "problem"):
+        return None
+    state, line = j["state"], j.get("line") or ""
+    if state in ("queued", "running") and not job_running(kit):
+        if state == "running" or time.time() - float(j.get("t") or 0) > JOB_BOOT:
+            state, line = "problem", JOB_STOPPED
+    return {"state": state, "line": line, "rev": j.get("rev") if type(j.get("rev")) is int else -1, "count": j.get("count") or 0}
+
+
+def start_job(kit):
+    """From the server: the slides are made in a process of their own, so no request waits on sips and a
+    server that starts over does not take the work down with it."""
+    try:
+        HOME.mkdir(parents=True, exist_ok=True)
+        with open(LOG, "a") as out:
+            subprocess.Popen([sys.executable, str(HERE / "arrange.py"), "apply", str(kit), "--piece", "carousel", "--job"],
+                             stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+        return True
+    except OSError as e:
+        log(f"the slide job could not be started: {e}")
+        return False
+
+
+def carousel_done(kit, rev, nums):
+    """The carousel's final button, on the server, with the kit's arrangement held. Returns what the page is
+    told: {"job": is a job at work for this, "same": the slides were already in this order, "line": words}.
+      * a job is already at work: it is left to it (before it stops, the job looks for a newer order)
+      * the slides are already in this order: nothing is started
+      * otherwise the job is written down as queued and started."""
+    if job_running(kit):
+        return {"job": True, "same": False, "line": ALREADY_MAKING}
+    j = read_job(kit) or {}
+    if j.get("state") == "queued" and j.get("rev") == rev and time.time() - float(j.get("t") or 0) < JOB_BOOT:
+        return {"job": True, "same": False, "line": MAKING}        # started a moment ago and still getting going
+    if kit_mod.carousel_in_order(kit, nums):
+        write_job(kit, "same", IN_ORDER, rev, len(nums))
+        return {"job": False, "same": True, "line": IN_ORDER}
+    write_job(kit, "queued", MAKING, rev, len(nums))
+    if not start_job(kit):
+        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, len(nums))
+        return {"job": False, "same": False, "line": "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."}
+    return {"job": True, "same": False, "line": MAKING}
 
 
 # ---------- the routes ----------
@@ -901,7 +1075,12 @@ def save_from_page(body):
             return _bad(PHOTOS_CHANGED, 409, why="photos")
         nums = body.get("nums")
         lim = LIMITS[piece]
-        if not isinstance(nums, list) or len(nums) > lim["max"]:
+        if not isinstance(nums, list):
+            return _bad()
+        # More than this piece holds is refused, with one way through: an order that is ALREADY over-long
+        # (an older pick of Claude's) may be re-ordered and made shorter here, never longer, so the page can
+        # be used to bring it down. The final button stays refused until it fits, with the reason said.
+        if len(nums) > lim["max"] and len(nums) > len(p["now"]["nums"]):
             return _bad()
         if any(type(n) is not int or n not in on_sheet for n in nums) or len(set(nums)) != len(nums):
             return _bad()
@@ -922,6 +1101,8 @@ def save_from_page(body):
             return _bad()
         if done and len(nums) < lim["min"]:
             return _bad()
+        if done and len(nums) > lim["max"]:
+            return _bad(TOO_MANY[piece], 400, why="many")
         stored = p["now"]
         stored_rev = int(stored.get("rev") or 0)
         same = stored["nums"] == nums and stored["marks"] == marks
@@ -930,14 +1111,17 @@ def save_from_page(body):
         if not same and base != stored_rev and not own:
             return _bad(NEWER, 409, why="newer", state=state_for_page(kit, piece))
         rec_name = kit_mod.load_rec(kit).get("name") or kit.name
+        answer = {"ok": True, "words": "Saved", "job": False}
         if same:
             # what is stored already (the same save arriving twice because its answer was lost): nothing to write
             if done:
                 if (p.get("happy") or {}).get("rev") != stored_rev:
-                    p["happy"] = {"rev": stored_rev, "at": now_iso()}
+                    p["happy"] = {"rev": stored_rev, "at": now_iso(), "nums": list(nums), "stamp": p["stamp"]}
                     save(kit, data)
                 add_waiting(kit.name, rec_name, piece, len(nums))
-            return 200, {"ok": True, "words": "Saved", "rev": stored_rev, "job": False}
+                if piece == "carousel":
+                    answer.update(carousel_done(kit, stored_rev, nums))
+            return 200, dict(answer, rev=stored_rev)
         rev = stored_rev + 1
         new = {"nums": nums, "marks": marks}
         is_first = _same(new, p["first"])
@@ -945,13 +1129,17 @@ def save_from_page(body):
             _keep_earlier(p, stored, "back to the first pick")
         p["now"] = _order(nums, marks, rev=rev, by="assistant" if is_first else "you", **{"from": {"page": page, "base": base}})
         if done:
-            p["happy"] = {"rev": rev, "at": now_iso()}
+            # the order the button was pressed on is kept with it (and which numbered list its numbers are
+            # from): the carousel's job makes exactly that one
+            p["happy"] = {"rev": rev, "at": now_iso(), "nums": list(nums), "stamp": p["stamp"]}
         p["dropped"], p["dropped_nums"] = [], []
         p["names"] = _names_for(p, {n: photo_name(x) for n, x in on_sheet.items()})
         save(kit, data)
         if done:
             add_waiting(kit.name, rec_name, piece, len(nums))
-        return 200, {"ok": True, "words": "Saved", "rev": rev, "job": False}
+            if piece == "carousel":
+                answer.update(carousel_done(kit, rev, nums))
+        return 200, dict(answer, rev=rev)
 
 
 def _post_arrange(handler):
@@ -1062,18 +1250,246 @@ def apply_reel(kit, dry=False):
             # The reel cover is made once and not re-made (kit.py build makes it from the cover pick, or from
             # the reel's first photo when there is none). So when the first photo changes and no cover pick is
             # written down, write down the OLD first photo: the record then stays true of the cover file.
-            if (not picks.get("cover") and (kit / "Covers" / "Reel cover.jpg").exists()
-                    and old and type(old[0]) is int and old[0] != nums[0]):
-                picks["cover"] = [old[0]]
-            picks["reel"] = nums
-            rec["picks"] = picks
-            rec["reel_marks"] = new_marks
-            kit_mod.save_rec(kit, rec)
+            keep_cover = (not picks.get("cover") and (kit / "Covers" / "Reel cover.jpg").exists()
+                          and old and type(old[0]) is int and old[0] != nums[0])
+
+            def note(r):
+                pk = dict(r.get("picks") or {})
+                if keep_cover and not pk.get("cover"):
+                    pk["cover"] = [old[0]]
+                pk["reel"] = nums
+                r["picks"] = pk
+                r["reel_marks"] = new_marks
+
+            kit_mod.update_rec(kit, note)
         if p.get("synced") != text:
             p["synced"] = text
             save(kit, data)
         took(kit.name, "reel")
     say("Reel picks: " + text)
+    return 0
+
+
+def _job_line(res, n):
+    """What the page shows under the final button for a result from kit.rebuild_carousel."""
+    if res["state"] == "done":
+        return "done", f"Done. {n} slide{'s' if n != 1 else ''} {'are' if n != 1 else 'is'} in your Carousel folder."
+    if res["state"] in ("same", "none"):
+        return "same", IN_ORDER
+    photos = res.get("photos") or []
+    if res.get("why") in ("photo", "make") and photos:
+        return "problem", f"Couldn't make the slides: photo {photos[0]} can't be read. Is the drive plugged in? " + LEFT_AS_WAS
+    if res.get("why") == "move" or res.get("left"):
+        return "problem", NOT_FINISHED
+    if res.get("why") == "clash":
+        return "problem", IN_THE_WAY
+    return "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."
+
+
+def _pressed(p):
+    """The order the final button was last pressed on, when its numbers can still be trusted: {"rev", "nums"}
+    from the record's "happy", or None. Its numbers are from the numbered list that was current at the press;
+    if the photos have been numbered again since, they mean other photos now, and it is not used."""
+    h = p.get("happy") if isinstance(p, dict) else None
+    if not isinstance(h, dict) or type(h.get("rev")) is not int or not isinstance(h.get("nums"), list):
+        return None
+    if h.get("stamp") != p.get("stamp") or any(type(n) is not int for n in h["nums"]):
+        return None
+    return h
+
+
+def _take_carousel(kit, nums):
+    """With the kit's arrangement held: the order the slides were made in becomes the kit's own carousel pick,
+    and the record notes that it has seen it (so it is not taken for a fresh pick of Claude's)."""
+    data, p = sync(kit, "carousel")
+    if list((kit_mod.load_rec(kit).get("picks") or {}).get("carousel") or []) != list(nums):
+        def note(rec):
+            picks = dict(rec.get("picks") or {})
+            picks["carousel"] = list(nums)
+            rec["picks"] = picks
+        kit_mod.update_rec(kit, note)
+    if p is not None and p.get("synced") != pick_text(nums):
+        p["synced"] = pick_text(nums)
+        save(kit, data)
+    return p
+
+
+@contextlib.contextmanager
+def _job_hold(kit, wait):
+    """Hold the job's lock for as long as the work takes. Yields True when it is held (or when this drive has
+    no such locks), False when another job kept it for longer than `wait` seconds."""
+    f = None
+    if fcntl is not None:
+        try:
+            make_folder(job_lock(kit).parent)
+            f = open(job_lock(kit), "a")
+        except OSError:
+            f = None
+    got = True
+    end = time.time() + wait
+    while f is not None:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.time() > end:
+                got = False
+                break
+            time.sleep(0.05)
+        except OSError:                     # no locks on this drive
+            f.close()
+            f = None
+    try:
+        yield got
+    finally:
+        if f is not None:
+            if got:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            f.close()
+
+
+def run_carousel_job(kit):
+    """The carousel's final button, carried out: started by the page server as a process of its own. It makes
+    the slides for the order the button was pressed on, and before it stops it looks, with the kit's
+    arrangement held, for a button pressed on a newer order while it worked; if there is one it makes that
+    too. Its state is always written down for the page, whatever goes wrong short of being killed (and a
+    killed job is told from its lock having been let go)."""
+    with _job_hold(kit, 3.0) as mine:
+        if not mine:
+            log(f"slide job for {kit.name}: another job is at work; left to it")
+            return 0
+        # A problem met before the order has been read must still reach the page that is waiting, and that
+        # page takes only a result that carries the counter it pressed on. The server wrote that counter down
+        # ("queued") just before it started this job, so that is where the counter starts from.
+        was = read_job(kit) or {}
+        queued = was.get("state") == "queued" and type(was.get("rev")) is int
+        rev = was["rev"] if queued else -1
+        n = was.get("count") if queued and type(was.get("count")) is int else 0
+        loops = 0
+        try:
+            while True:
+                loops += 1
+                with locked(kit_lock(kit)):
+                    data, p = sync(kit, "carousel")
+                    if p is None:
+                        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, n)
+                        return 1
+                    happy = _pressed(p)
+                    if happy:
+                        nums, rev = list(happy["nums"]), happy["rev"]
+                    else:               # no button on record (or the photos were numbered again since): the order as it is now
+                        nums, rev = list(p["now"]["nums"]), int(p["now"].get("rev") or 0)
+                    n = len(nums)
+                    was = read_job(kit) or {}
+                    if loops == 1 and was.get("state") in ("done", "same") and was.get("rev") == rev and kit_mod.carousel_in_order(kit, nums):
+                        return 0                                # a job that started beside this one has already done it
+                    write_job(kit, "running", MAKING, rev, n)
+
+                def take(nums=nums):
+                    with locked(kit_lock(kit)):
+                        _take_carousel(kit, nums)
+
+                # not with the arrangement held: the page goes on saving meanwhile. The order becomes the kit's
+                # own pick (take) while the slides are still held, so the slides and the pick change together.
+                res = kit_mod.rebuild_carousel(kit, nums, take=take)
+                state, line = _job_line(res, n)
+                with locked(kit_lock(kit)):
+                    p = sync(kit, "carousel")[1]
+                    newer = _pressed(p)
+                    if newer and newer["rev"] != rev and loops < JOB_LOOPS:
+                        continue                                # the button was pressed again on a newer order
+                    write_job(kit, state, line, rev, n)         # written with the arrangement held: a press after this starts a new job
+                    log(f"slide job for {kit.name}: {state} (counter {rev}, {n} slides; {res.get('made', 0)} made, {res.get('aside', 0)} set aside"
+                        + (f"; {res.get('why')}: {res.get('detail') or res.get('files') or res.get('photos')}" if state == "problem" else "") + ")")
+                    return 0 if state != "problem" else 1
+        except (Exception, SystemExit) as e:  # noqa: BLE001
+            log(f"slide job for {kit.name} failed: {e.__class__.__name__}: {str(e)[:200]}")
+            try:
+                moving = bool(kit_mod._moving(kit)) or not (kit / ".kit").is_dir()
+            except (Exception, SystemExit):  # noqa: BLE001
+                moving = True
+            try:
+                write_job(kit, "problem", NOT_FINISHED if moving else "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, n)
+            except OSError as e2:       # the kit's own folder is not there to write in: nothing is made in its place
+                log(f"slide job for {kit.name}: its state could not be written down ({e2.__class__.__name__})")
+            return 1
+
+
+def apply_carousel(kit, dry=False, as_it_is=False):
+    """Claude's own command: the page's carousel order into the kit, and the plain slides made to match.
+    Prints the order and what was done. Running it twice changes nothing. Clears the line that was waiting.
+
+    Which order: when the final button was pressed and that press is still waiting for Claude, the order the
+    button was pressed ON, even if they have moved photos on the page since (the page has told them "Press
+    the button again when it's right", so what they moved afterwards is not finished and stays on the page).
+    With no press waiting, or with as_it_is, the order as it is on the page now."""
+    with locked(kit_lock(kit)):
+        data, p = sync(kit, "carousel")
+        if p is None:
+            say("STOP: couldn't read this shoot's numbered list (kit.py sheet makes it). Nothing was changed.")
+            return 2
+        pressed = None if as_it_is else _pressed(p)
+        if pressed and any(w["kit"] == kit.name and w["piece"] == "carousel" for w in waiting()):
+            nums, rev = list(pressed["nums"]), pressed["rev"]
+        else:
+            nums, rev = list(p["now"]["nums"]), int(p["now"].get("rev") or 0)
+        moved_since = nums != list(p["now"]["nums"])
+    lim = LIMITS["carousel"]
+    if len(nums) < lim["min"]:
+        say("STOP: a carousel needs at least 2 photos, and this one has " + str(len(nums)) + ". Nothing was changed.")
+        return 2
+    if len(nums) > lim["max"]:
+        say(f"STOP: Instagram allows up to {lim['max']} photos in a carousel, and this one has {len(nums)}. Nothing was changed.")
+        return 2
+    if dry:
+        plan = kit_mod.carousel_plan(kit, kit_mod.load_rec(kit), nums)
+        say("Carousel picks: " + pick_text(nums))
+        if plan.get("ok"):
+            say(f"Would make {len(plan['make'])} new slide{'s' if len(plan['make']) != 1 else ''} and set {len(plan['aside'])} earlier one{'s' if len(plan['aside']) != 1 else ''} aside. Nothing was changed.")
+        return 0
+    with _job_hold(kit, 120.0) as mine:
+        if not mine:
+            say("STOP: this shoot's slides are being made by the page right now. Nothing was changed. Try again in a moment.")
+            return 2
+
+        def take():
+            with locked(kit_lock(kit)):
+                _take_carousel(kit, nums)
+
+        res = kit_mod.rebuild_carousel(kit, nums, take=take)
+        state, line = _job_line(res, len(nums))
+        if state == "problem":
+            say("Carousel picks: " + pick_text(nums))
+            say("STOP: " + kit_mod.carousel_trouble(res).strip("()"))
+            return 1
+        with locked(kit_lock(kit)):
+            p = sync(kit, "carousel")[1]
+            write_job(kit, state, line, rev, len(nums))        # an open page shows the same true line
+            newer = _pressed(p)
+            again = bool(newer) and newer["rev"] > rev and list(newer["nums"]) != nums
+            if again:
+                # the page's button was pressed on a newer order while this worked: that one is made next, by
+                # the page's own job, and stays waiting for Claude
+                write_job(kit, "queued", MAKING, newer["rev"], len(newer["nums"]))
+            else:
+                took(kit.name, "carousel")
+    if again:
+        start_job(kit)
+    say("Carousel picks: " + pick_text(nums))
+    if state == "same":
+        say(f"Carousel: the {len(nums)} slides were already in this order. Nothing was changed.")
+    else:
+        say(f"Carousel: {len(nums)} slides are in the Carousel folder, in this order ({res.get('made', 0)} new; "
+            f"{res.get('aside', 0)} earlier one{'s' if res.get('aside', 0) != 1 else ''} set aside in the kit's hidden folder, not deleted).")
+    if moved_since and not again:
+        say("Page: they have moved photos on the page since they pressed the button, and have not pressed it again. "
+            "These slides are the order the button was pressed on; what they moved since is still on the page, not made.")
+    if kit_mod.canva_behind(kit_mod.load_rec(kit)):
+        # said whenever it is true, whether this run changed the slides or the page's own job already had
+        say("Canva: this kit's Canva slides were made from the earlier photos and still show them.")
     return 0
 
 
@@ -1096,6 +1512,8 @@ def main():
     pv = sub.add_parser("previews"); pv.add_argument("words"); pv.add_argument("--quiet-on-unreadable", action="store_true", help="the page's own background run: do not try again a photo that could not be read last time")
     o = sub.add_parser("open"); o.add_argument("words"); o.add_argument("--piece", default="reel")
     a_ = sub.add_parser("apply"); a_.add_argument("words"); a_.add_argument("--piece", default="reel"); a_.add_argument("--dry", action="store_true")
+    a_.add_argument("--job", action="store_true", help="how the carousel page's own button runs it: on its own, writing its state for the page")
+    a_.add_argument("--as-it-is", action="store_true", help="the carousel: make the order as it is on the page right now, even if the button was pressed on an earlier one")
     sub.add_parser("waiting")
     t = sub.add_parser("took"); t.add_argument("words"); t.add_argument("--piece")
     e = sub.add_parser("earlier"); e.add_argument("words"); e.add_argument("--piece", default="reel")
@@ -1111,7 +1529,7 @@ def main():
             say("Nothing is waiting.")
         return 0
     if getattr(a, "piece", None) and a.piece not in PIECES and a.cmd in ("open", "apply", "earlier"):
-        say(f"STOP: only the reel has a page so far (asked for: {a.piece}).")
+        say(f"STOP: only the reel and the carousel have a page so far (asked for: {a.piece}).")
         return 1
     kit = kit_mod.find_kit(a.words)
     if a.cmd == "show":
@@ -1136,6 +1554,8 @@ def main():
         if a.cmd == "open":
             return cmd_open(kit, a.piece)
         if a.cmd == "apply":
+            if a.piece == "carousel":
+                return run_carousel_job(kit) if a.job else apply_carousel(kit, a.dry, a.as_it_is)
             return apply_reel(kit, a.dry)
         if a.cmd == "took":
             n = took(kit.name, a.piece)
@@ -1144,6 +1564,9 @@ def main():
     except Busy:
         say("STOP: this shoot's order is being written by something else right now. Nothing was changed. Try again in a moment.")
         return 2
+    except OSError as e:
+        say(f"STOP: {kit_mod._plain_os(e)}. Nothing was lost. Run this again once that is put right.")
+        return 1
     if a.cmd == "earlier":
         return cmd_earlier(kit, a.piece)
     return 0
