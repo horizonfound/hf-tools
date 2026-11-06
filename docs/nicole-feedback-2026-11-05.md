@@ -103,6 +103,21 @@ breathe" ... "to be able to have THIS" ... "this is SO FUCKING INSANE."
 slides in the Hannah folder, under Carousel." Dustin: "that's going to help you build ads too" and "this is
 the energy we need!!!!!!!!!!!" **An idea in that, not asked for yet:** the same designer for ads.
 
+**10:17pm: designs now save like projects (her handoff v3).** Her question to her Claude: "is it possible
+to have this carousel designer page for hannah saved somehow? like it would be if you were in canva? or will
+it disappear." What it built: every change saves by itself; each design has a name; a "My designs" list,
+newest first; Duplicate; and "New design" always starts a fresh one and never replaces the open one. No
+delete button, on purpose. Designs are kept in the Assistant's hidden folder on the photo drive, so the
+shoot's own folder holds only photos. Her words: "it can now save your designs just like canva can so you
+can go back and access them and wont lose anything and start new ones" ... "it needs tweaking but this is so
+fucking cool."
+
+**Next thing her Claude offered her (10:22pm), not built when she posted:** a shoot menu, so one designer
+works across shoots, plus layout templates kept in one shared place ("a great layout from one shoot is
+always one click away in the next").
+
+**What "it needs tweaking" means is not known yet.** Worth asking her when she is done for the night.
+
 **What this changes.** On Oct 24 the line was "the finished look comes from CapCut and Canva." Tonight both
 of you are asking for type and a brand kit inside the Assistant. Claude is treating Nicole's v2 (text, fonts,
 brand colors) as part of what "start building" covers, since it comes with her designer, and is holding
