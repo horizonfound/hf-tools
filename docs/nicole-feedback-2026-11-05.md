@@ -116,6 +116,23 @@ fucking cool."
 works across shoots, plus layout templates kept in one shared place ("a great layout from one shoot is
 always one click away in the next").
 
+**10:34pm: every shoot, and templates (her handoff v4).** Her question: "if I were to do another shoot, is
+that going to be a completely new carousel designer?" She pictured 20 shoots, wanted "saved example
+layouts" anyone could start from, and wanted to save her own and "apply it on different carousels... across
+different photo shoots." What her Claude built:
+- **A shoot menu:** every shoot in Your Content, with its photo count and its own designs.
+- **"+ New design" opens a gallery:** Blank, One photo per slide, her own templates, and 11 starters (Story
+  mix, Panorama opener, Stacked horizontals, Seam peek, Four-photo grid, Title slide, Film strip, Editorial
+  borders, Side by side, Big and small, One wide across three), each previewed with the current shoot's
+  photos.
+- **"Put this shoot's photos in the frames for me":** wide frames get wide photos, tall frames tall ones.
+- **"Save as template":** the layout without the photos, usable in any shoot.
+- **Empty frames** that say "Drop a photo," and a button to fill them all.
+- Templates, like designs, cannot be deleted from the page.
+
+It now reads the Assistant's own Your Content folder directly. That makes v4 the version to build into the
+Assistant: it already works the way the built-in one must.
+
 **What "it needs tweaking" means is not known yet.** Worth asking her when she is done for the night.
 
 **What this changes.** On Oct 24 the line was "the finished look comes from CapCut and Canva." Tonight both
