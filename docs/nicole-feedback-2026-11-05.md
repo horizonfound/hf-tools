@@ -39,6 +39,11 @@ below had to be clicked in. She wants to drag a photo from the bottom straight u
 that way: drag a photo from below onto a numbered spot, drag between spots to reorder, click to see it
 big. A reel picker would reuse that.
 
+**And a carousel picker (9:24pm):** "oh wow now it even has a carousel picker hahaha" ... "perfect." Her
+Claude made a second page of the same kind for the carousel, unasked. Dustin, in Slack: "fuck this is going
+to be cool" ... "keep shredding." So the want is one picker that serves the reel, the carousel, the singles
+and the stories.
+
 **Claude's read:** worth building next. It is real work (a day's, not an hour's), so it waits for a yes.
 
 ### 1a. Her photos ended up in three places
@@ -149,6 +154,38 @@ from a screen recording of an Instagram post.
   to read, and that route was improvised on her Mac, not tested. If it guessed the beat, the cuts would feel
   disconnected from the music, which is what she describes. **Not known:** asked her for the line the
   Assistant prints when it makes a reel ("every cut on the beat at about N beats a minute").
+
+**What settled it (9:23pm, from her screenshots).** She told her Claude "the pace of the reel is way way too
+slow." It did not use the Assistant's own faster pace; it wrote a script of its own and cut on every HALF
+beat (reel 3). Her reply: "thats not following the beat." It apologized ("your song doesn't have a hit on
+most half beats, so many of the cuts landed on nothing"), measured the beat as about 0.7 seconds, and made
+reel 4: a photo on every beat, the first held two beats, the last four, about 7 seconds for 10 photos. Her
+answer: "Yes, that's it." And in Slack: "perfect."
+
+**So it was the pace, not the beat finder.** Worked out afterwards with her numbers (10 photos, a beat every
+0.7 seconds), this is what each of the Assistant's paces gives:
+
+| Pace | Seconds a photo, on her song |
+|---|---|
+| A little of everything (the default) | about 1.7 |
+| Calm | about 1.7 |
+| Steady | about 1.7 |
+| Build | about 2.0 |
+| **Fast** | **about 1.0, most photos 0.7** |
+
+**Her "perfect" is the Assistant's own Fast,** nearly cut for cut. The default was two and a half times
+slower than what she wanted, and nothing told her Fast existed.
+
+**Dustin and Nicole in Slack (9:23pm).** Dustin: "if it feels super slow we could even build in a rule like
+'don't let a photo sit on screen for more than 1 second or something.'" Nicole: "i dont even think we need a
+rule cause some people will want different things."
+
+**To decide:** what the starting pace is. One photo a beat as the default, with the gentler ones a choice?
+Or keep the default and make the question impossible to miss? The table above is the evidence.
+
+**Fixed already (not a decision):** the Assistant now must ask the pace question every time and say each
+choice in seconds for that song; "too slow" means make it again at Fast; and it may never cut on half beats
+or write its own script to make a reel.
 
 **Also from this:** the speed itself delighted her ("made both my reels in two seconds").
 

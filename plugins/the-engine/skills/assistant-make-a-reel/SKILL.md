@@ -75,6 +75,10 @@ Ask with buttons: "How should it move?"
 - **Fast:** about half a second a photo; quick and punchy. Best with 12 to 20 photos.
 - **Build:** starts calm, quickens toward the end, then lands on the last photo.
 
+**Always ask this question; never skip it and never pick for them.** Say what each means in seconds for THIS song, because the same word is a different speed on a different song (the script's plan line gives the numbers; `--dry-run` shows them without making anything). On a slower song, "a little of everything" and "calm" can sit near two seconds a photo, which reads as slow on Instagram; "fast" is one photo on every beat.
+
+**"Too slow", "faster", "more energy" (Nicole's first reel, Nov 5).** Make it again with `--pace fast`: one photo on every beat, the first held two beats and the last a little longer. That is what she called "perfect." If it is already fast and still too slow, the song is slow: say so and offer a quicker song, or more photos. **Never cut on half beats, and never write your own script to do it:** most songs have no hit there, the cuts land on nothing, and it stops feeling like the music (her third reel: "thats not following the beat"). Every cut the Assistant makes comes from `reel.py make`.
+
 Every cut lands on the beat whichever they pick. If they pick Fast and you chose fewer than 12 photos, offer a few more from the sheet; if Calm and more than 9, offer to trim.
 
 ## Step 5: words on the first photo (optional)
