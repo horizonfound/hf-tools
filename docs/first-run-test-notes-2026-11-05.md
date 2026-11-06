@@ -444,3 +444,24 @@ changed. Running the same backup again picks up where it left off.
 - For a stop like this, the useful button under the last message is "Backup now" (try again), not only
   "Show the report." Worth changing in the instructions.
 - The warm-up before the questions and the one-step sign-off question both ran as written today.
+
+## 19. Fresh run 5, second try: all 442 photos sorted
+
+**What happened:** with TETHER plugged back in, "backup now" asked nothing (the answers were saved) and
+picked up where it had stopped. 455 files copied and checked in 62 seconds; two shoots found; every one of
+the 442 photos sorted, including the 14 that were hidden on the earlier run (note 10). Nothing was set
+aside as "not a photo." Four photos re-read against the originals on TETHER, two of them from the 14: all
+match. Nothing on TETHER was changed.
+
+**What they said about the card did its job:** "the first shoot is a holiday lookbook for HAH... the second
+is portraits of Nicole for Horizon Found" named both shoots: "2020-02-05 HAH holiday lookbook" and
+"2020-04-14 Nicole portraits," in the date-first naming he picked.
+
+**One of the Assistant's six picks for the lookbook was already a 5-star of the photographer's own.** That
+photo came with its own rating sidecar from 2020, so the Assistant left it exactly as it was and did not
+add its keyword. Worth saying on the report when it happens ("one of these was already a 5-star of yours").
+
+**No notes written:** neither shoot has a due date yet, so neither is in the editing queue. The lookbook
+is a client shoot; its note waits for "Add to my editing queue" on the report and for who it goes to.
+
+**Still wrong on the report (note 11):** it says "memory card" and "safe to format" for a folder source.
