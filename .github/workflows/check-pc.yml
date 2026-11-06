@@ -12,6 +12,16 @@ name: Check it on a Windows PC
 #                            post kit built the PC way (sizes, a sideways photo upright), its words and day, the
 #                            pickers' small copies, the posting queue with an emoji, a lock across two programs,
 #                            Canva's downloads from a stand-in on 127.0.0.1, the posting server started and stopped
+#                            (never the Studio folder's files through "%2e%2e", nothing for another host, a network
+#                            path refused at once); the PC follow-up of Nov 6: curl run exactly as given (one more
+#                            try only when Windows can't ask about a withdrawn certificate), the Instagram grid's
+#                            list saved the PowerShell way (UTF-16), saving from six threads at once, never through
+#                            a proxy, the editing queue's page server, CapCut's waiting list, the folder window's
+#                            answer read back from a real Windows PowerShell, quoting for PowerShell
+#   tests/pc_arrange.py      the photo pickers' own machinery (arrange.py): small copies upright and never blown
+#                            up, the lock across four programs, "is a slide job at work?", a child that outlives
+#                            its starter, saving a record while it is open, a kit too deep for 260 characters, a
+#                            copy held by the virus checker ("later"), a full drive, a background run's log lines
 #   tests/pc_pictures.py     made-up RAW files from six camera makers, junk and damaged files
 #   tests/backup_safety.py   never write over a file, never mix two cards, carry on a cut-off backup,
 #                            never copy a card onto itself
@@ -20,6 +30,8 @@ name: Check it on a Windows PC
 #   tests/fixtures/check_sound.py   the reel's sound: lengths, the beat, Windows' own Media Foundation
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
+# Every script must also compile on the oldest Python we promise (3.9: a Mac's own, and a running page server
+# that has loaded the reel's scripts only starts over onto new code that compiles there).
 # Every test runs even when one before it failed (if: !cancelled()), so one red line never hides the rest.
 # A failed pc_smoke keeps its scratch folder, and it is uploaded with the results ("pc-smoke-...").
 # Python lanes on Windows: 3.9 (the oldest we promise, a Mac's own) and 3.14 (the newest that still uses the
@@ -60,6 +72,9 @@ jobs:
       - name: No new Mac-only lines
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tools/check_pc.py
+      - name: Every script compiles on this Python
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python -m compileall -q plugins/the-engine/skills tests tools
       - name: What this PC looks like to the Assistant
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python plugins/the-engine/skills/studio-manager/scripts/this_computer.py
@@ -80,6 +95,9 @@ jobs:
       - name: The page servers (restart after an update, never two on one port)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/pc_servers.py
+      - name: The photo pickers' own machinery (locks, the job check, small copies, saving while open, a held copy)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/pc_arrange.py
       - name: The reel's sound (lengths, the beat, Windows' own Media Foundation)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/fixtures/check_sound.py
@@ -130,6 +148,14 @@ jobs:
       - name: The page servers
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_servers.py
+      - name: The photo pickers' own machinery, the Mac's way of making pictures (sips)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/pc_arrange.py
+      - name: The photo pickers' own machinery again, the PC's way of making pictures (Pillow; a held copy, a full drive)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        env:
+          ASSISTANT_NO_SIPS: "1"
+        run: /tmp/v/bin/python tests/pc_arrange.py
       - name: The reel's sound
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/fixtures/check_sound.py
@@ -138,6 +164,12 @@ jobs:
         env:
           ASSISTANT_SMOKE_KEEP: ${{ runner.temp }}/pc-smoke-kept
         run: /usr/bin/python3 tests/pc_smoke.py
+      - name: The photo pickers' locks and job check on the Mac's own Python 3.9 (the parts that draw photos say SKIP)
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 tests/pc_arrange.py
+      - name: Every script compiles on the Mac's own Python 3.9
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 -m compileall -q plugins/the-engine/skills tests tools
       - name: Keep what a failed pc_smoke left behind
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6

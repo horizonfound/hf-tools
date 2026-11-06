@@ -628,24 +628,157 @@ def pick_folder(prompt):
                 return folder, ""
             return None, "cancelled" if "-128" in (r.stderr or "") else "the folder window did not open"
         if WINDOWS:
+            # unproven on a real PC [check on a PC with a folder named "Café “shoot” 🌊"]. The folder comes back
+            # as base64 of its UTF-8 bytes (A-Z, a-z, 0-9, + / =), never as the name itself: Windows PowerShell 5.1
+            # writes to a pipe in the console's old code page unless told otherwise, and accounts differ on what
+            # telling it does (UTF-8, or UTF-8 with a byte-order mark in front). Those few letters read the same in
+            # every code page, so an accent, a curly quote or an emoji in a folder's name comes back exactly.
+            # The prompt goes in through the environment, which Windows keeps in Unicode, so it needs none of this.
             ps = ("Add-Type -AssemblyName System.Windows.Forms; "
                   "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
                   "$d.Description = $env:ASSISTANT_PICK_PROMPT; $d.ShowNewFolderButton = $false; "
                   "$top = New-Object System.Windows.Forms.Form; $top.TopMost = $true; "
-                  "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
-                  "if ($d.ShowDialog($top) -eq 'OK') { Write-Output $d.SelectedPath } else { Write-Output '::cancelled::' }")
+                  "if ($d.ShowDialog($top) -eq 'OK') { "
+                  "Write-Output ('::folder::' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d.SelectedPath))) "
+                  "} else { Write-Output '::cancelled::' }")
             env = dict(os.environ, ASSISTANT_PICK_PROMPT=prompt)
             r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True,
-                               encoding="utf-8", errors="replace", timeout=300, env=env)
-            folder = (r.stdout or "").strip()
-            if folder == "::cancelled::":
-                return None, "cancelled"
-            if r.returncode == 0 and folder and Path(folder).is_dir():
-                return folder, ""
-            return None, "the folder window did not open"
+                               timeout=300, env=env)
+            return _picked(r.returncode, r.stdout)
     except (OSError, subprocess.SubprocessError):
         pass
     return None, "the folder window did not open"
+
+
+_B64_LINE = re.compile(r"[A-Za-z0-9+/]*={0,2}")      # one line of base64, as PowerShell writes it
+
+
+def _picked(code, out):
+    """What a PC's folder window answered, from Windows PowerShell's output as bytes: (folder, "") when they
+    chose one that is there, (None, "cancelled") when they closed it, else (None, "the folder window did not
+    open"). A byte-order mark in front, the output in UTF-16, the line broken in two, or a line PowerShell
+    printed after it (a warning) are all read the same."""
+    import base64
+    out = out or b""
+    if out[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in out[:64]:
+        text = out.decode("utf-16", "replace")
+    else:
+        text = out.decode("utf-8", "replace")
+    text = text.replace("\ufeff", "")                     # no byte-order mark, wherever it landed
+    if "::cancelled::" in "".join(text.split()):
+        return None, "cancelled"
+    if code == 0 and "::folder::" in text:
+        # The base64 is the rest of the marker's line, and the lines straight after it that are made only of
+        # base64's own letters (one long line broken in two). The first line with anything else in it, or an
+        # empty one, ends it, so a warning PowerShell printed after it is never read as part of the folder.
+        lines = text.split("::folder::", 1)[1].splitlines() or [""]
+        got = []
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not _B64_LINE.fullmatch(line) or (i and not line):
+                break
+            got.append(line)
+            if line.endswith("="):                        # the padding: the base64 ends here
+                break
+        try:
+            folder = base64.b64decode("".join(got), validate=True).decode("utf-8")
+        except ValueError:                                # not base64, or not UTF-8 (both are ValueErrors)
+            folder = ""
+        if folder and Path(folder).is_dir():
+            return folder, ""
+    return None, "the folder window did not open"
+
+
+# ---------------------------------------------------------------- curl, the same way on both computers
+
+# How Windows' own curl.exe (Schannel) says it could not ASK whether a site's certificate has been withdrawn:
+# CRYPT_E_NO_REVOCATION_CHECK (0x80092012) and CRYPT_E_REVOCATION_OFFLINE (0x80092013), and the same two as
+# Windows' certificate-chain check names them. Older curl.exe prints only the number ("Unknown error
+# (0x80092012)"), newer the name as well, so both are looked for. Never CRYPT_E_REVOKED (0x80092010): a
+# certificate that HAS been withdrawn always stops, the first time and every time.
+_CANT_ASK_REVOKED = ("0x80092012", "0x80092013", "crypt_e_no_revocation_check", "crypt_e_revocation_offline",
+                     "cert_trust_revocation_status_unknown", "cert_trust_is_offline_revocation")
+_WITHDRAWN = ("0x80092010", "crypt_e_revoked", "cert_trust_is_revoked")   # any of these: never a second try
+
+
+def _as_text(b):
+    if b is None:
+        return ""
+    return b.decode("utf-8", "replace") if isinstance(b, (bytes, bytearray)) else str(b)
+
+
+def _rewinder(src):
+    """How to send stdin again from where it started: a function, None when there is nothing to send again
+    (no stdin, PIPE, DEVNULL, or input= which subprocess sends anew each time), or False when it can't be."""
+    if src is None or (isinstance(src, int) and src < 0):
+        return None
+    try:
+        if isinstance(src, int):                        # a raw file descriptor
+            pos = os.lseek(src, 0, os.SEEK_CUR)
+            return lambda: os.lseek(src, pos, os.SEEK_SET)
+        pos = src.tell()
+        return lambda: src.seek(pos)
+    except (AttributeError, OSError, ValueError):
+        return False
+
+
+def run_curl(cmd, **kw):
+    """Run a curl command (cmd[0] is the curl program, as the caller found it) and return exactly what
+    subprocess.run(cmd, **kw) returns: a CompletedProcess, with .args the command that ran last.
+
+    A Mac (and Linux): exactly subprocess.run(cmd, **kw). Nothing added, nothing run twice.
+
+    A PC (unproven on a real PC): Windows' own curl.exe asks each site's certificate issuer whether the
+    certificate has been withdrawn, and on a network that blocks that question (some offices, schools, hotels)
+    it stops with exit 35 and CRYPT_E_NO_REVOCATION_CHECK or CRYPT_E_REVOCATION_OFFLINE, though nothing is wrong
+    with the site. Then, and only then, it is run once more with --ssl-revoke-best-effort (curl 7.70 on: skips
+    that one question only when it can't be asked; a withdrawn certificate still stops it, and the certificate
+    is still checked in every other way). A curl.exe older than 7.70 (Windows 10 1803 came with 7.55; Windows
+    Update has brought newer ones since) refuses that option at once (exit 2, "is unknown", nothing sent), and
+    then the first try's own answer is the one returned: curl's reason, for the caller's plain words. It is never
+    run with --ssl-no-revoke, which turns the question off altogether, withdrawn certificates included: that is a
+    security call for Dustin, not made here (the review of Nov 6). Any other failure is returned as it came,
+    never tried again.
+
+    The reason is read from curl's own error line, so pass -S (or leave out -s) and capture stderr
+    (capture_output=True, or stderr=subprocess.PIPE); without it there is no second try. A stdin that is a file
+    is put back where it started before a second try (a stream that can't be gets none); input= is sent anew.
+    check=True raises only for the try returned. timeout= applies to each try. cmd is a list; a command given
+    as one string is run as it is, once."""
+    if not WINDOWS or isinstance(cmd, (str, bytes)):
+        return subprocess.run(cmd, **kw)
+    cmd = list(cmd)
+    check = kw.pop("check", False)
+    rewind = _rewinder(kw.get("stdin"))
+    r = subprocess.run(cmd, **kw)
+    err = _as_text(r.stderr).lower()
+    if (r.returncode in (35, 60) and any(m in err for m in _CANT_ASK_REVOKED)
+            and not any(m in err for m in _WITHDRAWN) and rewind is not False):
+        try:
+            if rewind:
+                rewind()
+            again = subprocess.run(cmd[:1] + ["--ssl-revoke-best-effort"] + cmd[1:], **kw)
+        except (OSError, ValueError):
+            again = None
+        # an old curl.exe that doesn't know the option sent nothing and said only that: the first answer stands
+        if again is not None and not (again.returncode == 2
+                                      and "ssl-revoke-best-effort" in _as_text(again.stderr).lower()):
+            r = again
+    if check:
+        r.check_returncode()
+    return r
+
+
+# ---------------------------------------------------------------- this computer's own pages
+
+def open_local(url, timeout=1):
+    """Open one of the Assistant's own pages on this computer (http://127.0.0.1:<port>/...), never through a
+    proxy, as urllib.request.urlopen would otherwise. Python's own opener takes the computer's proxy settings
+    (on a PC from Windows' settings, where '<local>' leaves 127.0.0.1 out: only names with no dot count), and a
+    proxy can't see this computer's own pages, so "is that page server up?" would always say no and another
+    server would be started. With no proxy set (a Mac, and a PC at home) it is exactly urlopen(url, timeout)."""
+    import urllib.request
+    return urllib.request.build_opener(urllib.request.ProxyHandler({})).open(url, timeout=timeout)
 
 
 # ---------------------------------------------------------------- a quick look, for a new computer

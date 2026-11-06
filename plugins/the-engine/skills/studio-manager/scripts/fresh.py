@@ -83,10 +83,9 @@ def moved():
     return there if (there / Path(sys.argv[0]).name).is_file() else None
 
 
-def code_stamp():
-    """When the newest script in this folder was last written."""
+def _newest(folder):
     newest = 0
-    for f in HERE.glob("*.py"):
+    for f in folder.glob("*.py"):
         try:
             newest = max(newest, f.stat().st_mtime_ns)
         except OSError:
@@ -94,20 +93,52 @@ def code_stamp():
     return newest
 
 
+def code_stamp():
+    """When the newest script in this folder was last written."""
+    return _newest(HERE)
+
+
+def _reel_folder(scripts=None):
+    """The reel's scripts (capcut.py, sound.py...) beside these: ../../assistant-make-a-reel/scripts."""
+    return (scripts or HERE).parent.parent / "assistant-make-a-reel" / "scripts"
+
+
+def _reel_loaded():
+    """True once this process has loaded one of the reel's scripts. Only the posting server does, when "Open in
+    CapCut" is pressed (capcut.py, and sound.py with it); the report and queue servers never do, so for them
+    nothing here changes. Such a server also starts over when only the reel's scripts were updated."""
+    folder = _reel_folder()
+    try:
+        names = [f.stem for f in folder.glob("*.py")]
+        want = os.path.normcase(os.path.realpath(str(folder)))
+    except OSError:
+        return False
+    for name in names:
+        f = getattr(sys.modules.get(name), "__file__", None)
+        if f and os.path.normcase(os.path.dirname(os.path.realpath(f))) == want:
+            return True
+    return False
+
+
 STARTED_WITH = code_stamp()
+REEL_STARTED_WITH = _newest(_reel_folder())
 _last = {"t": 0.0, "stale": False}
 _restarting = threading.Event()
 
 
 def stale():
     """True when the code on disk is newer than what this process loaded (looked at most every 2 s, and only
-    once the newest file has been still for a second, so a file being written is not caught half way)."""
+    once the newest file has been still for a second, so a file being written is not caught half way). A server
+    that has loaded the reel's scripts looks at those too."""
     now = time.time()
     if now - _last["t"] < 2:
         return _last["stale"]
     stamp = code_stamp()
     _last["t"] = now
     _last["stale"] = bool(moved()) or (stamp != STARTED_WITH and now - stamp / 1e9 > 1.0)
+    if not _last["stale"] and _reel_loaded():
+        reel = _newest(_reel_folder())
+        _last["stale"] = reel != REEL_STARTED_WITH and now - reel / 1e9 > 1.0
     return _last["stale"]
 
 
@@ -117,12 +148,18 @@ def page_path(path):
 
 
 def code_ok(folder=None):
-    """None if every script in the folder (this one, unless told) compiles; otherwise which one does not."""
-    for f in sorted((folder or HERE).glob("*.py")):
-        try:
-            compile(f.read_text(encoding="utf-8"), str(f), "exec")
-        except (SyntaxError, ValueError, OSError) as e:
-            return f"{f.name}: {e}"
+    """None if every script in the folder (this one, unless told) compiles; otherwise which one does not. A
+    server that has loaded the reel's scripts asks the same of the reel's scripts beside that folder."""
+    folders = [folder or HERE]
+    if _reel_loaded():
+        folders.append(_reel_folder(folder))
+    for d in folders:
+        for f in sorted(d.glob("*.py")):
+            try:
+                compile(f.read_text(encoding="utf-8"), str(f), "exec")
+            except (SyntaxError, ValueError, OSError) as e:
+                # the log says which folder, for one of the reel's scripts (the server's own: as it always was)
+                return f"{f.name}: {e}" if d is folders[0] else f"the reel's {f.name}, in {d}: {e}"
     return None
 
 

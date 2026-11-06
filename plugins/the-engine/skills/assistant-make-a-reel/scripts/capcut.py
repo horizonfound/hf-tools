@@ -38,6 +38,7 @@ Exit codes: 0 made · 2 stop (no CapCut found, a photo or the song missing).
 """
 import argparse
 import copy
+import errno
 import json
 import os
 import re
@@ -68,6 +69,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def uid():
@@ -137,20 +143,39 @@ def _windows_capcut_programs():
 
 def launch():
     """Start CapCut. (True, "") or (False, why in plain words). It cannot be told which project to open;
-    the newest is at the top of its list."""
+    the newest is at the top of its list. Afterwards launch.slow is True when the Mac's `open` was still
+    waiting after 20 seconds: CapCut was there and asked to start, and may yet appear (the first start of a
+    newly downloaded CapCut, while the Mac checks it), so the words for that are "taking a while", not "not
+    installed"; and launch.missing is True when no CapCut was found to start (the Mac's `open` didn't know it,
+    or none was where a PC's CapCut installs itself), so a caller needn't read the words to tell."""
+    launch.slow = launch.missing = False
     try:
         if sys.platform == "darwin":
-            r = subprocess.run(["open", "-a", "CapCut"], capture_output=True, encoding="utf-8", errors="replace")  # pc-ok: Mac branch
-            return (True, "") if r.returncode == 0 else (False, "CapCut isn't installed on this Mac")
+            # open answers within a second; the 20-second limit (the posting page's own, before Nov 6) only keeps
+            # a stuck one from holding the button for ever
+            r = subprocess.run(["open", "-a", "CapCut"], capture_output=True, encoding="utf-8", errors="replace",  # pc-ok: Mac branch
+                               timeout=20)
+            if r.returncode == 0:
+                return True, ""
+            launch.missing = True
+            return False, "CapCut isn't installed on this Mac"
         if os.name == "nt":
             for p in _windows_capcut_programs():            # unproven on a real PC
                 if p.is_file():
                     os.startfile(str(p))                     # pc-ok: Windows branch; starts it like a double-click
                     return True, ""
+            launch.missing = True
             return False, "I couldn't find CapCut on this PC. Open it from the Start menu"
+    except subprocess.TimeoutExpired:
+        # stopping `open` doesn't stop CapCut starting: it may still appear in a moment
+        launch.slow = True
+        return False, "CapCut didn't start within 20 seconds; it may still be starting"
     except OSError as e:
         return False, f"CapCut didn't start ({e})"
     return False, "I can't start CapCut on this computer"
+
+
+launch.slow = launch.missing = False
 
 
 def _windows_default_font():
@@ -707,12 +732,28 @@ WAITING_HINT = ("NOTE: once CapCut is closed, `capcut.py open` adds the waiting 
                 "and then starts CapCut.")
 
 
+def _is_number(t):
+    return isinstance(t, (int, float)) and not isinstance(t, bool)
+
+
 def _waiting(store):
     try:
         got = _read_json(store / WAITING)
-        return [x for x in got if isinstance(x, dict) and x.get("draft_id")] if isinstance(got, list) else []
+        # A draft id is always text (uid()) and a time always a number (write()): an entry with anything else in
+        # a hand-damaged list is left out, never a crash, and never copied into CapCut's own list, which then
+        # only ever gets what this script wrote.
+        return [x for x in got if isinstance(x, dict) and x.get("draft_id") and isinstance(x["draft_id"], str)
+                and ("tm_draft_create" not in x or _is_number(x["tm_draft_create"]))] \
+            if isinstance(got, list) else []
     except (OSError, ValueError):
         return []
+
+
+def waiting(store=None):
+    """The reels still waiting to be added to CapCut's list of projects (made while CapCut was open on a PC, or
+    while the list couldn't be saved): a list of CapCut's own list entries, [] when none. For other scripts
+    (the posting page's "Open in CapCut"); never raises for a damaged or missing list."""
+    return _waiting(Path(store) if store else default_store())
 
 
 def _wait(store, entry):
@@ -722,6 +763,13 @@ def _wait(store, entry):
         return True
     except OSError:
         return False
+
+
+def _made_when(w):
+    """When a waiting reel was made, for putting them in order: 0 for anything that isn't a number (a list
+    damaged by hand), so the sort never meets text beside a number. A number sorts exactly as before."""
+    t = w.get("tm_draft_create")
+    return t if isinstance(t, (int, float)) else 0
 
 
 def add_to_list(store, entries):
@@ -754,8 +802,8 @@ def add_to_list(store, entries):
     mine = {e["draft_id"] for e in entries}
     late = [w for w in waiting if w["draft_id"] not in mine and w["draft_id"] not in have
             and Path(str(w.get("draft_json_file", ""))).is_file()]
-    for e in sorted(late, key=lambda w: w.get("tm_draft_create") or 0) + list(entries):   # oldest first, so
-        if e["draft_id"] not in have:                                                      # the newest ends on top
+    for e in sorted(late, key=_made_when) + list(entries):   # oldest first, so the newest ends on top
+        if e["draft_id"] not in have:
             listed.insert(0, e)
             r["draft_ids"] = int(r.get("draft_ids") or 0) + 1
     try:
@@ -770,17 +818,52 @@ def add_to_list(store, entries):
     return True, None
 
 
-def open_capcut(store=None):
+OPENED = "Opened CapCut. The newest project is at the top of its list."   # open_capcut's words when it worked
+
+
+def open_capcut(store=None, closed=False):
     """Start CapCut, first adding any reel still waiting to its list (made while CapCut was open on a PC, or
-    while the list couldn't be saved) when CapCut is surely closed. (True, words) or (False, "STOP: ...")."""
+    while the list couldn't be saved) when CapCut is surely closed. (True, words) or (False, "STOP: ...").
+    On success the words are OPENED, then one sentence about a waiting reel if there was one to add.
+    closed=True: the photographer has said CapCut is closed (`capcut.py open --closed`), so this computer isn't
+    asked, for when it couldn't tell (open_capcut.unsure).
+
+    Afterwards, for a caller that wants to know without reading the words:
+      open_capcut.added    True: a waiting reel was added to CapCut's list just now. False: it was tried and
+                           couldn't be. None: nothing was tried (nothing waiting, or CapCut was open or unsure).
+      open_capcut.running  True when a reel was waiting and CapCut was already open, so it wasn't added. Else False.
+      open_capcut.unsure   True when a reel was waiting but whether CapCut was open couldn't be told (on a PC,
+                           Windows' tasklist didn't answer), so nothing was added: pressing again won't help;
+                           the reel goes in with `capcut.py open --closed` once they say CapCut is closed. Else False.
+      open_capcut.waiting  the reels still waiting afterwards (as waiting() gives them)."""
     store = Path(store) if store else default_store()
     added = ""
-    if _waiting(store) and capcut_open() is False:
-        ok, why = add_to_list(store, [])
-        added = (" The reel that was waiting is in its list now." if ok else
-                 " " + (why or "I still couldn't add the waiting reel to CapCut's list of projects."))
+    open_capcut.added, open_capcut.unsure, open_capcut.running = None, False, False
+    if _waiting(store):
+        running = False if closed else capcut_open()
+        open_capcut.running = running is True
+        if running is False:
+            ok, why = add_to_list(store, [])
+            open_capcut.added = ok
+            added = (" The reel that was waiting is in its list now." if ok else
+                     " " + (why or "I still couldn't add the waiting reel to CapCut's list of projects."))
+        elif running is None:
+            open_capcut.unsure = True
+    open_capcut.waiting = _waiting(store)
     ok, why = launch()
-    return (True, "Opened CapCut. The newest project is at the top of its list." + added) if ok else (False, f"STOP: {why}.")
+    return (True, OPENED + added) if ok else (False, f"STOP: {why}.")
+
+
+open_capcut.added, open_capcut.unsure, open_capcut.running, open_capcut.waiting = None, False, False, []
+
+# For Claude, after `capcut.py open`, when a waiting reel is still waiting (never part of open_capcut's own
+# words, which the posting page passes on to the photographer)
+STILL_WAITING_UNSURE = ("NOTE: a reel is still waiting to go into CapCut's list of projects. I couldn't tell whether "
+                        "CapCut was already open, so I left it (CapCut can undo a change to its list made while it is "
+                        f"open). Ask them to {QUIT} CapCut, and once they say it's closed, run `capcut.py open --closed`: "
+                        "it adds the waiting reel, then starts CapCut again.")
+STILL_WAITING_RUNNING = ("NOTE: a reel is still waiting to go into CapCut's list of projects: CapCut was already open, "
+                         f"so I left it. Ask them to {QUIT} CapCut, then run `capcut.py open` again.")
 
 
 def main():
@@ -796,11 +879,17 @@ def main():
     wr.add_argument("--ignore-open", action="store_true")
     op = sub.add_parser("open", help="start CapCut (first adding any reel still waiting to its list)")
     op.add_argument("--store")
+    op.add_argument("--closed", action="store_true",
+                    help="they've said CapCut is closed: add a waiting reel without asking this computer")
     a = ap.parse_args()
     store = Path(a.store).expanduser() if a.store else default_store()
     if a.cmd == "open":
-        ok, words = open_capcut(store)
+        ok, words = open_capcut(store, closed=a.closed)
         say(words)
+        if ok and open_capcut.waiting and open_capcut.unsure:
+            say(STILL_WAITING_UNSURE)
+        elif ok and open_capcut.waiting and open_capcut.running:
+            say(STILL_WAITING_RUNNING)
         sys.exit(0 if ok else 2)
     if a.cmd == "where":
         open_ = capcut_open()

@@ -159,8 +159,22 @@ def tidy_own_files(kit):
 def save_rec(kit, rec):
     d = hidden(kit)
     tmp = d / f"kit.json.{os.getpid()}.tmp"     # a name of this process's own, so two commands never share a half-written file
-    tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, d / "kit.json")
+    try:
+        tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, d / "kit.json")
+    except BaseException:
+        # A save that fails (a full drive; on a PC, kit.json held open by another program) leaves the record as it
+        # was, and its scratch copy is dropped: the next try is another process, which would never reuse its name.
+        _drop_scratch(tmp)
+        raise
+
+
+def _drop_scratch(tmp):
+    """Remove one of the Assistant's own scratch files, made a moment ago by this process; never a real file."""
+    try:
+        tmp.unlink()
+    except OSError:
+        pass
 
 
 def _write_text_whole(path, text):
@@ -241,13 +255,22 @@ def _too_long(shown=(), own=()):
             + [Path(p) for p in own if this_computer.records_path_too_long(p)])
 
 
+# The longest name the photo pickers keep in a kit's hidden folder (.kit/previews): arrange.failed_mark, a photo's
+# number, the big copy's size, a six-letter tag, the photo's size in bytes (room for ten digits, up to 9 GB) and its
+# time to the billionth of a second (nineteen digits). It does not depend on the photo's own name, so a kit that has
+# room for it when it is made has room for every picker record. (arrange.py checks again on its own, in plain words.)
+PICKER_LONGEST = f"0000-1600-000000-{'0' * 10}-{'0' * 19}.failed"
+
+
 def _kit_too_long(kit):
     """On a PC: a kit folder here would sit too deep (its own address, and room for its hidden files: the longest of
-    them is a carousel slide being made, which needs room even with the shortest photo name there can be). A Mac:
+    them are the photo pickers' records and a carousel slide being made, which needs room even with the shortest
+    photo name there can be). Stopped when the kit is made, rather than later at the picker or the slides. A Mac:
     never."""
     return bool(this_computer.path_too_long(kit, folder=True)
                 or _too_long(own=[kit / ".kit" / f".Captions and hooks.txt.{os.getpid()}.tmp",
-                                  _scratch(kit / ".kit" / "slides-new" / LONGEST_STAMP / "Slide 01 ().jpg")]))
+                                  _scratch(kit / ".kit" / "slides-new" / LONGEST_STAMP / "Slide 01 ().jpg"),
+                                  kit / ".kit" / "previews" / PICKER_LONGEST]))
 
 
 def _stop_kit_too_long(night=False):
@@ -342,8 +365,12 @@ def sheet(kit):
         # whole or not at all: a page that reads the list while it is being re-made must see the old one or
         # the new one, never half of one (arrange.py takes a list it can't read as "not ready")
         tmp = kit / ".kit" / f"sheet.json.{os.getpid()}.tmp"
-        shutil.copyfile(m.group(1).strip(), tmp)
-        this_computer.replace(tmp, kit / ".kit" / "sheet.json")
+        try:
+            shutil.copyfile(m.group(1).strip(), tmp)
+            this_computer.replace(tmp, kit / ".kit" / "sheet.json")
+        except BaseException:
+            _drop_scratch(tmp)      # the list stays as it was; no scratch copy is left behind (see save_rec)
+            raise
         rec["numbered"] = len(listing["photos"])
         save_rec(kit, rec)
     return 0
@@ -376,6 +403,34 @@ def reel_picks_text(rec):
     """The reel's picks as one line for reel.py make --picks, marks in place: 19,4,10+,14-"""
     marks = rec.get("reel_marks") or {}
     return ",".join(f"{n}{marks.get(str(n), '') if marks.get(str(n)) in ('+', '-') else ''}" for n in rec.get("picks", {}).get("reel") or [])
+
+
+# What a PC's command line reads as its own inside quotes (a command there runs in PowerShell or in Git Bash,
+# parts/on-a-pc.md). Inside double quotes: $ and the backtick in both, a double quote (PowerShell takes the curly
+# ones for one too), and in Git Bash a backslash. Inside single quotes: only an apostrophe (PowerShell takes the
+# curly ones for one too); everything else is read as it is, in both.
+_PC_IN_DOUBLE = set('$`"\\“”„')
+_PC_IN_SINGLE = set("'‘’‚‛")
+
+
+def _pc_arg(text):
+    """A PC only: one value for a line of a command Claude is handed, quoted so it reaches the script exactly as it
+    is in PowerShell or in Git Bash. Double quotes when nothing in it means anything there; else single quotes when
+    it holds no apostrophe; else PowerShell's own way, every apostrophe doubled inside single quotes (as on-a-pc.md
+    says), which Git Bash would read differently: only for a value with both an apostrophe and a $, a backtick, a
+    double quote or a backslash in it, which should be rare (paths come here with forward slashes)."""
+    text = str(text)
+    if not _PC_IN_DOUBLE.intersection(text):
+        return f'"{text}"'
+    if not _PC_IN_SINGLE.intersection(text):
+        return f"'{text}'"
+    return "'" + "".join(c + c if c in _PC_IN_SINGLE else c for c in text) + "'"
+
+
+def _pc_both_ways(text):
+    """True for a value no one way of quoting can carry through both PowerShell and Git Bash (_pc_arg's last case)."""
+    text = str(text)
+    return bool(_PC_IN_DOUBLE.intersection(text) and _PC_IN_SINGLE.intersection(text))
 
 
 def set_picks(kit, singles, stories, carousel, reel, cover=None):
@@ -978,10 +1033,20 @@ SLIDES_WAIT = 120.0          # seconds to wait for another run that is changing 
 
 def _plain_os(e):
     """Trouble with the drive, in a few plain words and never a path."""
-    if isinstance(e, this_computer.HeldOpen) or (this_computer.WINDOWS and getattr(e, "winerror", None) in (32, 33)):
-        # a PC only: another program has the file open (ERROR_SHARING_VIOLATION 32, ERROR_LOCK_VIOLATION 33)
+    winerror = getattr(e, "winerror", None) if this_computer.WINDOWS else None     # a Mac: always None
+    if isinstance(e, this_computer.HeldOpen) or winerror in (32, 33):
+        # a PC only (unproven on a real PC): another program has the file open (ERROR_SHARING_VIOLATION 32,
+        # ERROR_LOCK_VIOLATION 33)
         return ("another program has one of these pictures open (a photo viewer, or a folder window showing it), "
                 "so close that first")
+    if winerror == 5:
+        # a PC only (unproven on a real PC): ERROR_ACCESS_DENIED, after this_computer's few seconds of trying again.
+        # Windows gives it for a folder that truly can't be written to, and also when a file is saved over or moved
+        # while another program has it open: Python, and most programs, open a file without letting it be replaced
+        # meanwhile, and that is how a replace onto it is refused (kit.json, moved.json, the kit page). Which of the
+        # two it was can't be told from here, so the words name the likely one first and the other after it.
+        return ("another program may have one of this kit's files open (a photo viewer, or a folder window showing "
+                "it), so close that first; if nothing has, a folder in this kit can't be written to")
     if e.errno == errno.ENOSPC:
         return "the drive is full"
     if e.errno in (errno.EACCES, errno.EPERM, errno.EROFS):
@@ -1290,8 +1355,24 @@ def build(kit):
         if k in lines:
             say(lines[k])
     if picks.get("reel"):
-        say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
-            + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
+        if this_computer.WINDOWS:
+            # A PC only (unproven on a real PC): every value quoted so the line works as it is in PowerShell (which
+            # cuts a bare comma list into pieces) or in Git Bash, and paths with forward slashes, which every PC
+            # takes (parts/on-a-pc.md). A Mac's line, below, is exactly as it always was.
+            vals = [Path(photos_dir(kit, rec)).as_posix(), rec.get("name")]
+            if rec.get("night"):
+                vals += [Path(rec["night"]).as_posix(), rec["shoot_id"]]
+            # --shoot only with a name: Windows PowerShell 5.1 drops an empty "" when it starts a program, which
+            # would leave --shoot with nothing after it (reel.py treats no --shoot and an empty one the same)
+            say("Reel: run reel.py make with these picks: " + _pc_arg(reel_picks_text(rec))
+                + f" --folder {_pc_arg(vals[0])}" + (f" --shoot {_pc_arg(vals[1])}" if vals[1] else "")
+                + (f" --night {_pc_arg(vals[2])} --shoot-id {_pc_arg(vals[3])}" if rec.get("night") else "")
+                + (" (one of these has an apostrophe and also a $, a backtick, a backslash or a quote mark in it, so "
+                   "it is written here the PowerShell way; in Git Bash, quote it as on a Mac: parts/on-a-pc.md)"
+                   if any(_pc_both_ways(v) for v in vals) else ""))
+        else:
+            say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
+                + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
     write_page(kit)
     return 0
 

@@ -27,7 +27,7 @@ So the right answers are known: about 99 to 100 beats a minute, 17 beats, 4 to a
 | `click-100bpm-vbr-noheader.mp3` | MP3, variable bit rate, no header frame | ffmpeg with libmp3lame | Length by counting every frame |
 | `click-100bpm-22k-vbr.mp3` | MP3 (MPEG-2), 22,050 a second, variable bit rate, with a Xing header | ffmpeg with libmp3lame (`-ar 22050`) | Frames of 576 samples, the same length as LAME's delay: the shape a review found Windows' trimming missed (added Nov 6) |
 
-Each file is under 250 KB; all nine together are about 690 KB.
+Each file is under 250 KB; all nine together are about 730 KB.
 
 ## The right lengths
 
@@ -40,13 +40,13 @@ These are the true lengths, worked out from what is inside each file, and what `
 | The 22,050-a-second MP3 | 10.057143 s (385 frames of 576 samples) |
 | Constant-rate MP3 without a header | 10.031 s (from its size and bit rate) |
 
-The Mac's own `afinfo` agrees for six of the eight. It gets two wrong, which is why `sound.py` reads lengths itself: for the M4A named `.mp3` it says 0.34 s (it goes by the name and reads the file as an MP3), and for the variable-rate MP3 without a header it says 11.7 s (it guesses from the first frames' bit rate). ffmpeg says 10.000 for the two MP3s with a header, because it also leaves out the encoder's padding at the ends. For the M4A it says 10.054, because it counts the AAC encoder's warm-up.
+The Mac's own `afinfo` agrees for seven of the nine. It gets two wrong, which is why `sound.py` reads lengths itself: for the M4A named `.mp3` it says 0.34 s (it goes by the name and reads the file as an MP3), and for the variable-rate MP3 without a header it says 11.7 s (it guesses from the first frames' bit rate). ffmpeg says 10.000 for the two MP3s with a header, because it also leaves out the encoder's padding at the ends. For the M4A it says 10.054, because it counts the AAC encoder's warm-up.
 
 ## Checking them
 
     python3 tests/fixtures/check_sound.py
 
-Standard library only. On a Mac it tries the Mac's own route (`afconvert`) and the plain-Python route. On Windows it tries the plain-Python route and Windows' own Media Foundation, with ffmpeg switched off so Media Foundation really runs. A machine without Media Foundation says SKIP for those lines, not FAIL. Besides the beat (the beat finder works in steps of 11.6 ms), every decode's clicks are measured against the WAV's to a tenth of a millisecond (`clicks.py`) and must be within 2 ms. One known exception prints as NOTE, not PASS or FAIL: the Mac's own `afconvert` keeps LAME's 576 samples at the front of an MP3, so its clicks are 13.1 ms late; whether to take those off on a Mac is Dustin's to decide.
+Standard library only. On a Mac it tries the Mac's own route (`afconvert`) and the plain-Python route. On Windows it tries the plain-Python route and Windows' own Media Foundation, with ffmpeg switched off so Media Foundation really runs. A machine without Media Foundation says SKIP for those lines, not FAIL. Besides the beat (the beat finder works in steps of 11.6 ms), every decode's clicks are measured against the WAV's to a tenth of a millisecond (`clicks.py`) and must be within 2 ms. One known exception prints as NOTE, not PASS or FAIL: the Mac's own `afconvert` keeps LAME's 576 samples at the front of an MP3, so its clicks are 13.1 ms late (26.1 ms in the 22,050-a-second MP3: the same 576 samples at half the rate); whether to take those off on a Mac is Dustin's to decide.
 
     python3 tests/fixtures/decode_report.py
 

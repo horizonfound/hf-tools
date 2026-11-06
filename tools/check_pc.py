@@ -135,6 +135,12 @@ RULES = [
     ("st_flags", re.compile(r"\.st_flags\b"), "st_flags (the Mac's hidden flag) does not exist on Windows: use getattr(st, \"st_flags\", 0) or this_computer"),
     ("os.popen", re.compile(r"\bos\.popen\("), 'os.popen reads in the PC\'s own code page: use subprocess.run with encoding="utf-8"'),
     ("execv", re.compile(r"os\.exec[lv]p?e?\("), None),    # only fresh.py, which has its Windows branch beside it
+    # Nov 6 follow-up: Python's own urlopen takes the computer's proxy (on a PC from Windows' own settings, where
+    # "<local>" leaves 127.0.0.1 out), and a proxy can't see this computer's pages, so "is the page server up?"
+    # said no and another server was started. Nothing here fetches from the internet with urllib either.
+    ("urlopen", re.compile(r"\burlopen\("),
+     "urllib's urlopen goes through a proxy set on the computer (on a PC, Windows' own settings): this computer's "
+     "own pages through this_computer.open_local(url, timeout), the internet through curl (this_computer.run_curl)"),
 ]
 # Texts written or read with no encoding: found in the syntax tree, never by guessing from the line.
 ENCODING = "no encoding"
@@ -150,7 +156,12 @@ ENCODING_WORDS = {
 # Lines in scripts already through the PC pass that this check only learned to see on Nov 6 (second review).
 # (script, short name): (how many there are today, what to do). One more of the same kind in that script stops
 # the check; fewer gives a NOTE to lower the number.
-KNOWN = {}   # empty since Nov 6: night.py's open_report line got its pc-ok marker
+KNOWN = {   # night.py's open_report line got its pc-ok marker on Nov 6; these two came with the urlopen rule (Nov 6 follow-up)
+    ("night.py", "urlopen"): (1, "open_report's \"is the report server up?\": this_computer.open_local(old, timeout=1) "
+                                 "(the change is written out in the follow-up's needs_from_others)"),
+    ("serve_report.py", "urlopen"): (3, "report_url() and queue_url(): this_computer.open_local in place of each "
+                                        "urllib.request.urlopen (the change is written out in the follow-up's needs_from_others)"),
+}
 
 
 # ---------------------------------------------------------------- reading a script
@@ -487,6 +498,12 @@ SELF_TESTS = [   # (made-up script, the short names it must give, in any order; 
     ('import subprocess\nsubprocess.run(["pgrep", "-x", "CapCut"])\n', {"pgrep"}),
     ('import subprocess\nsubprocess.run(["sips", "a"])  # not pc-ok yet\n', {"sips"}),
     ('STATES = ("open", "closed")\ns = "x"\nok = s in ("open", "done")\nd = {"open": 1}\n', set()),
+    # Nov 6 follow-up: a page of this computer's own asked for through urllib's own opener, which takes a proxy
+    ('import urllib.request\nurllib.request.urlopen("http://127.0.0.1:8790/home", timeout=1).read(1)\n', {"urlopen"}),
+    ('import urllib.request\nr = urllib.request.urlopen(\n    "http://127.0.0.1/", timeout=1)\nfrom urllib.request import urlopen\n'
+     'y = urlopen("http://127.0.0.1/")\n', {"urlopen"}),
+    ('import this_computer\nthis_computer.open_local("http://127.0.0.1:8790/home", timeout=1).read(1)\n'
+     '# urllib.request.urlopen(u) is only mentioned here\n', set()),
 ]
 
 

@@ -62,6 +62,12 @@ Python 3.9, standard library only on a Mac. A Mac and a PC (Nov 6):
     .failed mark, so it is tried again by the next open once the add-on is there. A PC with long paths off
     (Windows' own setting) whose kit sits too deep for the copies' names (cant_make) makes and marks nothing,
     and says so in plain words; a PC's scratch copy has a short name, so it is never the longest one.
+    On a PC a new copy that something holds for longer than this_computer.replace waits (most often the virus
+    checker reading a file just written), or that could not be written though the photo opens, is "later": no
+    mark, tried again a few seconds on, and otherwise left for the next run. A Mac never gets "later".
+  * the background runs' output: on a Mac they write to arrange.log through the server's own handle, as before;
+    on a PC they open arrange.log for themselves (_own_output), because Windows' "add at the end" belongs to
+    each program's own handle and a shared one would write over the server's lines.
   * the locks: this_computer.try_lock (a Mac's flock, exactly the call made before; a PC's msvcrt.locking).
   * "is that job still running?": a Mac's own waitpid and kill(pid, 0), as before; a PC asks
     this_computer.still_running (and, when it can't say, the job's age decides).
@@ -143,6 +149,9 @@ JOB_STOPPED = "Making your slides was interrupted. Press \"I'm happy with this o
 JOB_BOOT = 20.0                         # seconds a job may take to start before "queued" means it never did
 JOB_OLD = 300.0                         # where locks can't be used: a job older than this is taken for dead
 JOB_LOOPS = 6                           # how many newer orders one job will take on before it stops
+LATER_WAITS = (2.0, 4.0)                # a PC only: copies something held ("later") are tried again after these pauses
+FULL_BYTES = 50_000_000                 # a PC only: less room than this on the kit's drive, and "later" means a full drive
+CHILD_LOG = "ASSISTANT_ARRANGE_OWN_LOG"  # a PC only: set by the server for its background runs (_own_output)
 
 _LOCK = threading.RLock()               # one writer at a time for arrange.json and the waiting list (this process)
 _held = {}                              # lock file -> [its open handle, how deep]; only touched while _LOCK is held
@@ -395,16 +404,30 @@ def _is_jpeg(p):
         return False
 
 
+def _opens(src):
+    """A PC only: can this computer open the photo at all? Asked only after pictures.make_jpeg said no, which it
+    says both when the photo can't be opened and when its new copy couldn't be written or put in place (the virus
+    checker holding it, a full drive). Only the first is about the photo. pictures.thumb_rows opens it the same
+    way make_jpeg does (the same reader, every JPEG a RAW keeps tried in turn), only smaller, so it is quick."""
+    try:
+        return pictures.thumb_rows(src, 64) is not None
+    except Exception:  # noqa: BLE001  (a photo Pillow chokes on is one that can't be opened, never a crash)
+        return False
+
+
 def _jpeg_copy(src, dst, edge, size):
     """One JPEG copy, written under a dot-name and renamed into place only when it is whole.
     A Mac: the Mac's own sips, the same command as always (its copy keeps the photo's turn mark).
-    A PC: pictures.make_jpeg, the photo turned upright in the pixels and never made bigger than it is."""
+    A PC: pictures.make_jpeg, the photo turned upright in the pixels and never made bigger than it is.
+    Returns "made", "there" (someone else made it), None (no copy can be made of this photo as it is) or, on a
+    PC only, "later": the photo opens, but its new copy couldn't be written or put in place this time."""
     if dst.is_file():
         return "there"
     try:
         make_folder(dst.parent)
     except OSError:
         return None
+    later = False
     if pictures.use_sips():
         tmp = dst.with_name(f".part-{os.getpid()}-{threading.get_ident()}-{dst.name}")
         cmd = ["sips", "-s", "format", "jpeg", "-s", "formatOptions", QUALITY.get(size, "85"), "-Z", str(max(1, edge)), str(src), "--out", str(tmp)]  # pc-ok: a Mac only (pictures.use_sips); a PC goes through pictures.make_jpeg below
@@ -420,24 +443,41 @@ def _jpeg_copy(src, dst, edge, size):
         # so on a PC the longest name written here is the copy's own ".failed" mark, which cant_make has measured.
         tag = hashlib.sha1(f"{os.getpid()}-{threading.get_ident()}-{dst.name}".encode("utf-8")).hexdigest()[:10]
         tmp = dst.with_name(f".p-{tag}.jpg")
+        made = None
         try:
-            good = (pictures.make_jpeg(src, tmp, max(1, edge), int(QUALITY.get(size, "85")))
-                    and tmp.is_file() and tmp.stat().st_size > 100 and _is_jpeg(tmp))
+            made = pictures.make_jpeg(src, tmp, max(1, edge), int(QUALITY.get(size, "85")))
+            good = made and tmp.is_file() and tmp.stat().st_size > 100 and _is_jpeg(tmp)
         except Exception:  # noqa: BLE001  (a picture Pillow chokes on is a photo that can't be read, never a crash)
             good = False
+        # make_jpeg said no, yet the photo opens: its copy couldn't be written or put in place this time (the
+        # virus checker held it for longer than this_computer.replace waits, a full drive). Not the photo's fault,
+        # so it gets no mark. unproven on a real PC.
+        later = not good and not made and _opens(src)
     if not good:
         try:
             tmp.unlink()        # our own half-made scratch file
         except OSError:
             pass
-        return None
+        return "later" if later else None
     if dst.exists():
         try:
             tmp.unlink()        # someone made the same copy a moment ago; theirs stays
         except OSError:
             pass
         return "there"
-    this_computer.replace(tmp, dst)
+    try:
+        this_computer.replace(tmp, dst)
+    except PermissionError:
+        # A PC only: something (most often the virus checker reading the new copy) held it for longer than
+        # this_computer.replace waits. The photo is fine, so no mark: "later". A Mac's os.replace never refuses
+        # like this, and anything a Mac raises is raised as before. unproven on a real PC.
+        if not this_computer.WINDOWS:
+            raise
+        try:
+            tmp.unlink()        # our own scratch copy (if it is still held, it stays; it is never shown)
+        except OSError:
+            pass
+        return "there" if dst.is_file() else "later"
     return "made"
 
 
@@ -499,7 +539,8 @@ def cant_make(kit, rows, rec=None):
 def make_one(kit, row, size, src=None, rec=None, retry=False):
     """One copy of one photo. 1600 comes from the photo; 520 comes from the 1600 copy. The long edge is never
     larger than the photo's own (sips would blow a small photo up; on a PC pictures.make_jpeg never does, so
-    nothing is measured there). Returns "made", "there" or None."""
+    nothing is measured there). Returns "made", "there" or None; on a PC also "later" (_jpeg_copy), which gets
+    no mark."""
     if src is None:
         src = photo_path(kit, rec or kit_mod.load_rec(kit), row)
     if src is None:
@@ -540,8 +581,10 @@ def make_one(kit, row, size, src=None, rec=None, retry=False):
                 pass
         return got
     big = preview_file(kit, row, SIZES["l"], src)
-    if not big.is_file() and make_one(kit, row, SIZES["l"], src, retry=retry) is None:
-        return None
+    if not big.is_file():
+        first = make_one(kit, row, SIZES["l"], src, retry=retry)
+        if first is None or first == "later":       # "later": a PC only; the big copy isn't there to make it from
+            return first
     return _jpeg_copy(big, dst, edge, size)
 
 
@@ -552,8 +595,10 @@ def make_previews(kit, workers=4, retry=False):
     A computer that can't make pictures at all (a PC without Pillow, or a kit too deep in folders for a PC's
     limit: cant_make) makes nothing and marks nothing: "cant" then holds the plain words and "cant_kind" says
     which ("addon" or "deep"), and the copies are made once that is put right. On a PC, "why" holds
-    pictures.why_not's words for a photo that could not be read, an add-on's words first (a Mac never sets any
-    of these)."""
+    pictures.why_not's words for a photo that could not be read, an add-on's words first, and "later" counts the
+    photos whose copies something kept busy even after LATER_WAITS (no mark: the next run makes them); "full" is
+    True when the kit's drive has (all but) no room left, which is then why, and nothing waits. A Mac never sets
+    any of these."""
     t0 = time.time()
     rec = kit_mod.load_rec(kit)
     rows = sheet_rows(kit)
@@ -581,7 +626,9 @@ def make_previews(kit, workers=4, retry=False):
         if src is None:
             return "missing"
         a = make_one(kit, row, SIZES["l"], src, retry=retry)
-        b = make_one(kit, row, SIZES["s"], src, retry=retry) if a else None
+        b = make_one(kit, row, SIZES["s"], src, retry=retry) if a in ("made", "there") else None
+        if "later" in (a, b):
+            return "later"      # a PC only: no mark, and no "why" (the photo itself opens)
         if not a or not b:
             # unproven on a real PC. The words for a missing add-on win: they say what puts it right.
             if not a and not pictures.use_sips() and ("why" not in out or needs_addon(src)):
@@ -597,10 +644,61 @@ def make_previews(kit, workers=4, retry=False):
             out["missing"] = out["of"]
     if rows:
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            for res in ex.map(one, rows):
-                out[res] += 1
+            got = list(ex.map(one, rows))
+            # A PC only (a Mac never gets "later", so this asks nothing there and never waits): a copy something
+            # held is tried again after a short pause, twice at most, then left for the next run.
+            for pause in LATER_WAITS:
+                again = [i for i, res in enumerate(got) if res == "later"]
+                if not again:
+                    break
+                if _drive_full(kit):
+                    out["full"] = True  # waiting won't make room: say so, and leave them for the next run
+                    break
+                time.sleep(pause)
+                for i, res in zip(again, ex.map(one, [rows[i] for i in again])):
+                    got[i] = res
+        for res in got:
+            out[res] = out.get(res, 0) + 1
     out["seconds"] = round(time.time() - t0, 2)
     return out
+
+
+def _drive_full(kit):
+    """A PC only, asked once copies came back "later": is the kit's drive full (under FULL_BYTES free)? A copy that
+    couldn't be written is then most likely that, not the virus checker, and a pause won't help."""
+    try:
+        free = this_computer.free_bytes(kit)
+    except OSError:
+        return False
+    return free is not None and free < FULL_BYTES
+
+
+def _child_env():
+    """What the server adds when it starts a background run (the small copies, the slide job). A Mac: nothing,
+    exactly as before. A PC: a note telling the run to write to arrange.log through a handle of its own
+    (_own_output). The run is still given the server's handle too, so a run that fails before it gets that far
+    still leaves its words in the log."""
+    if not this_computer.WINDOWS:
+        return {}
+    return {"env": dict(os.environ, **{CHILD_LOG: "1"})}         # unproven on a real PC
+
+
+def _own_output():
+    """A PC only, in a background run the server started (_child_env): from here on, its output goes into
+    arrange.log through a handle of its own, opened to add at the end.
+
+    Why: the server hands the run its own handle to arrange.log as the run's output. On a Mac that handle adds at
+    the end for everyone who shares it. On a PC "add at the end" is done by each program for its own handles, and
+    a handle passed to another program keeps one place in the file for both (Microsoft's DuplicateHandle and
+    _open pages), so the run would write over any line the server or another run added since it started."""
+    if not (this_computer.WINDOWS and os.environ.get(CHILD_LOG) == "1"):
+        return
+    os.environ.pop(CHILD_LOG, None)          # not passed on to anything this run starts
+    try:                                     # unproven on a real PC
+        f = open(LOG, "a", encoding="utf-8", buffering=1)   # line by line, each one added at the end as it is written
+    except OSError:
+        return                               # the server's handle stays: the run's words still reach the log
+    sys.stdout = sys.stderr = f
 
 
 def start_previews(kit):
@@ -615,7 +713,7 @@ def start_previews(kit):
                 # a Mac: start_new_session, exactly as before; a PC: no window, a process group of its own
                 _children[str(kit)] = this_computer.popen_detached(
                     [sys.executable, str(HERE / "arrange.py"), "previews", str(kit), "--quiet-on-unreadable"],
-                    stdout=out, stderr=subprocess.STDOUT)
+                    stdout=out, stderr=subprocess.STDOUT, **_child_env())
             return True
         except OSError:
             return False
@@ -972,7 +1070,7 @@ def start_job(kit):
         with open(LOG, "a", encoding="utf-8") as out:
             # a Mac: start_new_session, exactly as before; a PC: no window, a process group of its own
             this_computer.popen_detached([sys.executable, str(HERE / "arrange.py"), "apply", str(kit), "--piece", "carousel", "--job"],
-                                         stdout=out, stderr=subprocess.STDOUT)
+                                         stdout=out, stderr=subprocess.STDOUT, **_child_env())
         return True
     except OSError as e:
         log(f"the slide job could not be started: {e}")
@@ -1318,16 +1416,17 @@ def handle_post(handler, path, query):
 def page_address(kit, piece):
     """The picker's address on the page server, which is started if it isn't running (as home.py does)."""
     import home
-    import urllib.request
     u = home.url()
     if not u:
         return None
     base = u.rsplit("/", 1)[0]
     # A server that was running older code starts over when a page is asked for (fresh.py), and is gone for
     # a moment while it does. Wait until the home page itself answers, so the address printed here works.
+    # Never through a proxy (this_computer.open_local, as home.url): a proxy can't see this computer's own
+    # pages, so every try would fail. With no proxy set (every Mac and PC at home) this is exactly what it was.
     for _ in range(40):
         try:
-            if b"<title>One moment</title>" not in urllib.request.urlopen(base + "/home", timeout=3).read(700):
+            if b"<title>One moment</title>" not in this_computer.open_local(base + "/home", timeout=3).read(700):
                 break
         except Exception:  # noqa: BLE001
             pass
@@ -1353,6 +1452,12 @@ def cmd_open(kit, piece):
         say(f"({got['missing'] + got['failed']} of {got['of']} photos couldn't be read right now; the page will say so.)")
         if got.get("why"):
             say(f"({got['why']})")
+    if got.get("later") and got.get("full"):     # a PC only
+        say(f"({got['later']} of {got['of']} photos weren't ready yet: the drive this post kit is on is full. Once "
+            "there's some room on it, opening the page again makes them.)")
+    elif got.get("later"):      # a PC only
+        say(f"({got['later']} of {got['of']} photos weren't ready yet: something on this {this_computer.COMPUTER} kept "
+            "their copies busy, most often the virus checker. The page makes them when it opens.)")
     _, p = sync(kit, piece)
     if p is None:
         say("STOP: couldn't read this shoot's numbered list. Nothing was changed.")
@@ -1674,6 +1779,7 @@ def main():
     t = sub.add_parser("took"); t.add_argument("words"); t.add_argument("--piece")
     e = sub.add_parser("earlier"); e.add_argument("words"); e.add_argument("--piece", default="reel")
     a = ap.parse_args()
+    _own_output()                          # a PC's background run only; nothing anywhere else
     import fresh
     fresh.announce()                       # this folder is where the Assistant's code is now (see fresh.py)
 
@@ -1710,7 +1816,15 @@ def main():
             say(f"couldn't be read: {got['failed']}")
             if got.get("why"):
                 say(f"  {got['why']}")
-        return 0 if not got["failed"] else 1
+        if got.get("later"):    # a PC only
+            say(f"not made yet: {got['later']}")
+            if got.get("full"):
+                say("  The drive this post kit is on is full. None of them was marked as unreadable; once there's "
+                    "some room on it, running this again makes them.")
+            else:
+                say(f"  Something on this {this_computer.COMPUTER} kept their copies busy, most often the virus checker. "
+                    "None of them was marked as unreadable; running this again makes them.")
+        return 0 if not got["failed"] and not got.get("later") else 1
     try:
         if a.cmd == "open":
             return cmd_open(kit, a.piece)

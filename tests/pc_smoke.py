@@ -8,6 +8,7 @@ CapCut, no Claude app, but real Windows.
 
     python3 tests/pc_smoke.py        Pillow is the only add-on it uses, and only for the checks that need it
     python3 tests/pc_smoke.py --only posts      just the posts part (below), in a few seconds
+    python3 tests/pc_smoke.py --only followup   just the PC follow-up's part (below), in a few seconds
 
 The pretend photos are drawn here in plain Python, so it runs on the Mac's own Python 3.9 with nothing
 installed (the Mac way: sips). A check that needs Pillow and does not have it says SKIP and why; so does any
@@ -20,8 +21,9 @@ PC's older code page). A script that hangs is stopped after 10 minutes and its c
     ASSISTANT_SMOKE_DIR=<folder>    where the scratch folder goes (default: this computer's temporary folder)
     ASSISTANT_SMOKE_KEEP=<folder>   when something FAILED, the scratch folder is also copied here (GitHub uploads it)
     ASSISTANT_STRICT_MF=1           hold Windows' own Media Foundation to PASS or FAIL like the other ways
-    ASSISTANT_SMOKE_PORT=<port>     the first of two ports for the posts part's little servers (default: two the
-                                    computer hands out as free)
+    ASSISTANT_SMOKE_PORT=<port>     the first of five ports for the little servers of the posts part and the
+                                    follow-up's part, this one and the four after it (default: ports the computer
+                                    hands out as free)
 
 What it tries:
   - the helper that knows both computers: dates in words, safe names, names Windows keeps for itself, long
@@ -53,9 +55,24 @@ What it tries:
     curl.exe on a PC, which must be there) from a stand-in on 127.0.0.1, never the internet: in under their
     names, a fresh export setting the earlier ones aside, a dead link changing nothing; and the posting server
     started in the background, serving the home page, the posting page, a kit page (never its records, its hidden
-    folder or a photo; a name with a colon refused, and the folder button opening nothing for one) and a piece's
-    picture, then stopped by its own number (on the port it said). On a computer without Pillow the PC-way part
-    says SKIP;
+    folder or a photo; a name with a colon refused, and the folder button opening nothing for one, nor for a
+    network path like //computer/share, and saying so at once) and a piece's picture, never the Studio folder's
+    own files through a picture folder ("%2e%2e") nor a folder's list, nothing at all for a request naming another
+    host, then stopped by its own number (on the port it said); a dead Canva link into a folder the kit didn't
+    have leaving no empty folder behind; on a PC the build's "Reel:" line quoted for PowerShell and Git Bash. On a
+    computer without Pillow the PC-way part says SKIP;
+  - the PC follow-up of Nov 6 (also alone: --only followup): this_computer.run_curl running this computer's own
+    curl exactly as given (on a PC one more try, with --ssl-revoke-best-effort, only when Windows can't ask
+    whether a certificate was withdrawn; a stand-in curl shows each case on both computers); the Instagram grid's
+    list read from a file saved the Windows PowerShell way (UTF-16) or exactly as the browser pane gave it;
+    the posting queue and the home page's record saved from six threads at once; this computer's own pages
+    opened straight, never through a proxy set in the environment (open_local, home.url, the picker's wait);
+    the editing queue's page server (only its own small pictures, never "%2e%2e" or a folder's list, nothing for
+    another host, 100 presses at once all answered); CapCut's waiting list (a hand-damaged entry left out, and
+    `capcut.py open --closed` adding a waiting reel without asking whether CapCut is open: on a Mac with a
+    stand-in for `open`, on a PC with no CapCut installed); the PC folder window's answer read back (a mark in
+    front, UTF-16, a line broken in two, a warning after it; on Windows a real Windows PowerShell writing a
+    folder named "Café “shoot” 🌊"); and the PC quoting of a command's values (kit._pc_arg);
   - a whole backup start to finish (copy and check, index, groups and contact sheet, the look, the sort, the
     sneak-peek pages, the pick, the sneak peeks, the settle), every photo checked against the card, the card
     unchanged, the records hidden, then a rename to an accented name and two renames of capital letters only.
@@ -64,9 +81,11 @@ What it tries:
 
 What it does NOT try: the beat of each song (tests/fixtures/check_sound.py), made-up RAW files from six makers
 (tests/pc_pictures.py), the page servers (tests/pc_servers.py), the backup's own promises in depth
-(tests/backup_safety.py), CapCut, the pickers' pages in a browser (tests/arrange_check.py, on a Mac), the folder
-picker's window, Canva itself, Instagram. docs/pc-readiness-2026-11-06.md has the list.
+(tests/backup_safety.py), the pickers' own machinery in depth (tests/pc_arrange.py), CapCut itself, the pickers'
+pages in a browser (tests/arrange_check.py, on a Mac), the folder picker's window, Canva itself, Instagram.
+docs/pc-readiness-2026-11-06.md has the list.
 """
+import base64
 import contextlib
 import hashlib
 import html
@@ -956,6 +975,30 @@ class _StandIn:
         self.srv.server_close()
 
 
+def ask(port, method, path, host=None, body=None):
+    """(status, body) of one request to a page server of the Assistant's on 127.0.0.1, sent exactly as given: the
+    address is not tidied (so "%2e%2e" arrives as written), and Host is this one when given (a page on another site
+    that has been pointed at this computer still carries its own name there). (None, why) when nothing answered."""
+    import http.client
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+    try:
+        c.putrequest(method, path, skip_host=True, skip_accept_encoding=True)
+        c.putheader("Host", host or f"127.0.0.1:{port}")
+        if body is not None:
+            b = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+            c.putheader("Content-Type", "application/json")
+            c.putheader("Content-Length", str(len(b)))
+            c.endheaders(b)
+        else:
+            c.endheaders()
+        r = c.getresponse()
+        return r.status, r.read()
+    except OSError as e:
+        return None, str(e).encode("utf-8", "replace")
+    finally:
+        c.close()
+
+
 def lock_checks(work):
     """A lock held by one program keeps a second one out, and is let go when the holder dies: this_computer.try_lock
     (the Mac's fcntl.flock; on a PC msvcrt.locking), what kit.py and arrange.py hold while slides are changed."""
@@ -1096,6 +1139,13 @@ def build_checks(kit, env):
           and "Covers: 2 made." in out, out[-500:])
     if code != 0:
         return False
+    if tc.WINDOWS:
+        # the line Claude is handed for the reel: PowerShell cuts a bare comma list into pieces, so on a PC the picks
+        # are in double quotes, and the folder is written with forward slashes, which every PC takes (kit._pc_arg)
+        reel = next((ln for ln in out.splitlines() if ln.startswith("Reel: ")), "")
+        folder = reel.split(" --folder ", 1)[1].split(" --shoot ", 1)[0] if " --folder " in reel else ""
+        check("(a PC) the build's Reel line has the picks in double quotes and the folder with forward slashes only",
+              ': "1,2,3+" --folder "' in reel and folder and "\\" not in folder, reel)
     sideways = "Beach 03 sideways"
     sing, car, sto, cov = kit / "Singles", kit / "Carousel", kit / "Stories", kit / "Covers"
     wide = size_on_disk(sing / "Single 01 (Beach 01).jpg") or (1, 1)
@@ -1274,6 +1324,22 @@ def canva_checks(work, kit, env, built):
         check("each link was asked of the stand-in on 127.0.0.1 once, in order (the dead one last)",
               asked == ["/export/a1.jpg", "/export/a2.jpg", "/export/b1.jpg", "/export/b2.jpg", "/export/b1.jpg", "/export/gone.jpg"],
               str(asked))
+        # a dead link into a folder the kit doesn't have yet: the folder this run made is taken away again, so "nothing
+        # in the kit changed" is true (Nov 6 follow-up: an empty Stories folder was left, and the kit page then
+        # offered to open it)
+        # (a kit of its own, one photo, never built, so it has no Stories folder whatever this computer could build)
+        one = work / "fresh photos"
+        one.mkdir()
+        (one / "Fresh 01.jpg").write_bytes(jpeg_bytes(64, 48, lambda bx, by: (90, 140, 60), exif_blob(datetime(2026, 6, 2, 10, 0))))
+        code, out = run("kit.py", "start", "--folder", one, "--name", "Fresh one", env=env)
+        fresh_kit = kit.parent / "2026-06-02 Fresh one"
+        links4 = work / "links four.json"
+        links4.write_text(json.dumps([stand_in.url("/export/gone.jpg", "seven")]), encoding="utf-8")
+        before_kit = listing(fresh_kit)
+        code2, out2 = run("canva_kit.py", "fetch", "fresh one", "--into", "Stories", "--urls", links4, env=env)
+        check("a dead link into a folder the kit didn't have yet (Stories): plain words, and no empty folder left behind",
+              code == 0 and before_kit and "Stories" not in before_kit and code2 == 1 and "STOP" in out2
+              and listing(fresh_kit) == before_kit, f"{code} {code2} {before_kit} -> {listing(fresh_kit)} {(out + out2)[-300:]}")
     finally:
         stand_in.stop()
 
@@ -1376,6 +1442,38 @@ def server_checks(work, home, kit, env, built):
                 opened[k] = (c, b[:80])
         check("and the folder button refuses a drive or a colon name, opening nothing",
               all(v == (200, False) for v in opened.values()), str(opened))
+        # a network path (on a PC, looking one up reaches out to that computer first), a slash or a dot name: refused
+        # as words, at once, before any folder is looked up (Nov 6 follow-up)
+        at_once = {}
+        for k in ("//127.0.0.1/c$", "\\\\127.0.0.1\\c$", "a/b", ".kit", "..", "."):
+            t0 = time.monotonic()
+            c, b = get("/open?kit=" + quote(k, safe=""))
+            took = time.monotonic() - t0
+            try:
+                said = json.loads(b.decode("utf-8"))
+                at_once[k] = (c, said.get("ok"), said.get("words"), round(took, 1))
+            except (ValueError, UnicodeDecodeError, AttributeError):
+                at_once[k] = (c, None, b[:80], round(took, 1))
+        check("and refuses a network path, a slash or a dot name at once, in plain words",
+              all(c == 200 and ok is False and w == "That isn't a folder this kit names." and t < 5
+                  for c, ok, w, t in at_once.values()), str(at_once))
+        # the picture folders serve pictures only: never the Studio folder's own files through "%2e%2e" (the same two
+        # dots, written the way addresses may write them), never a folder's list, never a HEAD for anything else; and
+        # nothing at all for a request naming another host (Nov 6 follow-up: before, all of these were answered)
+        leaks = {}
+        for path in ("/feed/%2e%2e/studio.json", "/posting-thumbs/%2e%2e/posting.json", "/home-thumbs/%2e%2e/studio.json",
+                     "/queue-thumbs/%2e%2e/queue.json", "/feed/", "/posting-thumbs/", "/feed/older/"):
+            c, b = ask(served_on, "GET", path)
+            leaks["GET " + path] = (c, b"pieces" in b or b"posts" in b)
+        for path in ("/studio.json", "/posting.json"):
+            leaks["HEAD " + path] = (ask(served_on, "HEAD", path)[0], False)
+        check("the picture folders never hand out the Studio folder's own files or a folder's list (%2e%2e, a folder's address, HEAD)",
+              all(c == 404 and not leaked for c, leaked in leaks.values()), str(leaks))
+        c, b = ask(served_on, "GET", "/feed/%2e%2e/studio.json", host=f"evil.example:{served_on}")
+        c2, _ = ask(served_on, "GET", "/home", host=f"evil.example:{served_on}")
+        c3, _ = ask(served_on, "GET", "/home", host=f"localhost:{served_on}")
+        check("a request naming another host is refused (403), and the page still answers to localhost",
+              c == 403 and c2 == 403 and c3 == 200 and b"posts" not in b, f"{c} {c2} {c3}")
         if built:
             pieces = json.loads((home / "posting.json").read_bytes().decode("utf-8"))["pieces"]
             thumb = next((x["thumb"] for x in pieces if x.get("id", "").startswith("kit:") and x.get("thumb")), None)
@@ -1396,6 +1494,456 @@ def server_checks(work, home, kit, env, built):
     except OSError:
         answered = False
     check("and once stopped by its own number, nothing answers on its port", not answered, f"port {served_on}")
+
+
+# ---------------------------------------------------------------- the PC follow-up of Nov 6
+
+def followup_checks(work):
+    """The PC follow-up of Nov 6, where a machine with no screen can see it. Each part's fault FAILs that part
+    only; the parts after it still run."""
+    print("\n-- the PC follow-up: curl, the grid's list from a PC file, saving from six threads, never through a proxy, "
+          "the queue's page server, CapCut's waiting list, the folder window's answer, quoting for a PC")
+    home = work / "follow-up studio-home"
+    home.mkdir()
+    env = {"STUDIO_HOME": str(home)}
+    ports = smoke_ports(5)
+    for part in (curl_checks, feed_checks, saving_checks, proxy_checks, queue_server_checks, capcut_checks,
+                 picker_answer_checks, quoting_checks):
+        try:
+            part(work, home, env, ports)
+        except Exception:  # noqa: BLE001  (a fault in one part FAILs here; the next part still runs)
+            import traceback
+            check(f"{part.__name__} ran to the end", False, traceback.format_exc()[-1500:])
+
+
+def curl_checks(work, home, env, ports):
+    """this_computer.run_curl (canva_kit.py and the Instagram grid's pictures go through it): on a Mac exactly the
+    command it is given, run once; on a PC one more try, with --ssl-revoke-best-effort, only when Windows couldn't
+    ask whether the site's certificate was withdrawn; never --ssl-no-revoke."""
+    import types
+    data = os.urandom(70_000)
+    f = work / "curl-picture.bin"
+    f.write_bytes(data)
+    if tc.WINDOWS:
+        own = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "curl.exe"
+        prog = str(own) if own.is_file() else None
+    else:
+        prog = shutil.which("curl")
+    if prog:
+        cmd = [prog, "-sS", f.as_uri()]
+        r = tc.run_curl(cmd, capture_output=True, timeout=60)
+        check("run_curl runs this computer's own curl on a local file exactly as it is given, once: every byte comes back",
+              r.returncode == 0 and r.stdout == data and list(r.args) == cmd,
+              f"{r.returncode} {len(r.stdout or b'')} bytes {r.args} {(r.stderr or b'')[:200]!r}")
+    elif tc.WINDOWS:
+        check("Windows' own curl.exe is there for run_curl", False, "no System32\\curl.exe")
+    else:
+        skip("run_curl with this computer's own curl", "this computer has no curl")
+    # every case, with a stand-in for curl's answers (this process only): which command ran, how many times
+    calls, answers = [], []
+
+    def stand_in(cmd, **kw):
+        calls.append((list(cmd), dict(kw)))
+        code, err = answers.pop(0) if answers else (0, "")    # a try nobody expected: answered, so its check FAILs
+        return subprocess.CompletedProcess(cmd, code, b"", err.encode("utf-8"))
+    cmd = ["curl", "-sS", "--fail", "-o", "-", "https://pictures.example.invalid/a.jpg"]
+    kw = {"capture_output": True, "timeout": 25}
+    cant_ask = ("curl: (35) schannel: next InitializeSecurityContext failed: Unknown error (0x80092012) - The revocation "
+                "function was unable to check revocation for the certificate.")
+    real_sub, real_win = tc.subprocess, tc.WINDOWS
+    tc.subprocess = types.SimpleNamespace(run=stand_in)
+    try:
+        tc.WINDOWS = False
+        calls.clear()
+        answers[:] = [(35, cant_ask)]
+        r = tc.run_curl(cmd, **kw)
+        check("a Mac: run_curl runs exactly the command and settings it is given, once, whatever curl answers",
+              calls == [(cmd, kw)] and r.returncode == 35, str(calls))
+        tc.WINDOWS = True
+        calls.clear()
+        answers[:] = [(35, cant_ask), (0, "")]
+        r = tc.run_curl(cmd, **kw)
+        check("a PC whose network won't let curl ask whether the certificate was withdrawn: one more try, with "
+              "--ssl-revoke-best-effort right after the program, the same settings",
+              [c for c, _ in calls] == [cmd, cmd[:1] + ["--ssl-revoke-best-effort"] + cmd[1:]]
+              and all(k == kw for _, k in calls) and r.returncode == 0, str(calls))
+        calls.clear()
+        # withdrawn, and (for another certificate in the chain) "couldn't ask" in the same words: withdrawn wins
+        answers[:] = [(35, "curl: (35) schannel: next InitializeSecurityContext failed: CRYPT_E_REVOKED (0x80092010) - "
+                           "The certificate is revoked. (CERT_TRUST_IS_REVOKED, CERT_TRUST_REVOCATION_STATUS_UNKNOWN)")]
+        r = tc.run_curl(cmd, **kw)
+        check("a PC: a certificate that HAS been withdrawn stops it at once, never a second try (even beside \"couldn't ask\")",
+              len(calls) == 1 and r.returncode == 35, str(calls))
+        calls.clear()
+        answers[:] = [(35, cant_ask), (2, "curl: option --ssl-revoke-best-effort: is unknown\ncurl: try 'curl --help' for more information")]
+        r = tc.run_curl(cmd, **kw)
+        check("a PC with an older curl.exe that doesn't know that option: the first answer (curl's own reason) is the one given back",
+              len(calls) == 2 and r.returncode == 35 and b"0x80092012" in r.stderr, f"{calls} {r.returncode}")
+        calls.clear()
+        answers[:] = [(6, "curl: (6) Could not resolve host: pictures.example.invalid")]
+        r = tc.run_curl(cmd, **kw)
+        check("a PC: any other failure is given back as it came, never tried again", len(calls) == 1 and r.returncode == 6, str(calls))
+        check("and nothing ever runs it with --ssl-no-revoke", not any("--ssl-no-revoke" in c for c, _ in calls))
+    finally:
+        tc.subprocess, tc.WINDOWS = real_sub, real_win
+
+
+def feed_checks(work, home, env, ports):
+    """posting_queue.py feed --import, from the kinds of file Claude may save the snippet's answer in. The tiles here
+    carry their pictures in the file itself (data: addresses), so nothing is fetched and the internet is never asked."""
+    jpg = jpeg_bytes(64, 64, lambda bx, by: (40, 90, 160))
+    data = "data:image/jpeg;base64," + base64.b64encode(jpg).decode("ascii")
+    tiles = [{"href": "/someone/p/AAA111/", "data": data, "pinned": True}, {"href": "/someone/reel/BBB_22-x/", "data": data, "reel": True}]
+
+    def posts():
+        try:
+            return [p["id"] for p in json.loads((home / "feed.json").read_bytes().decode("utf-8"))["posts"]]
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+    f16 = work / "grid saved by PowerShell.json"
+    f16.write_bytes(json.dumps({"handle": "someone", "tiles": tiles}).encode("utf-16"))   # a mark first, as PowerShell 5.1's ">" saves it
+    code, out = run("posting_queue.py", "feed", "--import", f16, env=env)
+    got = (home / "feed" / "AAA111.jpg").read_bytes() if (home / "feed" / "AAA111.jpg").is_file() else b""
+    check("the grid's list read from a file saved the Windows PowerShell way (UTF-16 with its mark): both pictures in",
+          code == 0 and posts() == ["AAA111", "BBB_22-x"] and got == jpg, f"{code} {posts()} {out[-300:]}")
+    fq = work / "grid as the pane gave it.json"
+    fq.write_text(json.dumps(json.dumps({"handle": "someone", "tiles": tiles[:1] + ["not a tile", 5]})), encoding="utf-8")
+    code, out = run("posting_queue.py", "feed", "--import", fq, env=env)
+    check("and saved exactly as the browser pane's tool gave it (one quoted string), anything that isn't a tile left out",
+          code == 0 and posts() == ["AAA111"] and "Traceback" not in out, f"{code} {posts()} {out[-300:]}")
+    before = (home / "feed.json").read_bytes()
+    fb = work / "not the list.json"
+    fb.write_bytes(b"\xff\x00 not a list at all")
+    code, out = run("posting_queue.py", "feed", "--import", fb, env=env)
+    check("a file that isn't the list: a plain STOP, nothing changed, no traceback",
+          code == 1 and "STOP: that file isn't the list the snippet returned" in out and "Traceback" not in out
+          and (home / "feed.json").read_bytes() == before, f"{code} {out[-300:]}")
+
+
+_SIX_THREADS = """import json, sys, threading
+sys.path.insert(0, {scripts!r})
+import {module} as m
+errors = []
+def go(n):
+    for i in range(40):
+        try:
+            {call}
+        except Exception as e:
+            errors.append(type(e).__name__ + ": " + str(e)[:80])
+ts = [threading.Thread(target=go, args=(n,)) for n in range(6)]
+for t in ts:
+    t.start()
+for t in ts:
+    t.join()
+print("ERRORS " + json.dumps(errors[:3]) + " " + str(len(errors)))
+"""
+
+
+def saving_checks(work, home, env, ports):
+    """The posting queue and the home page's record, each saved from six threads at once (the page server answers two
+    presses at once; a command can save while a page does): every save goes through, the file reads back whole, and
+    no scratch copy is left behind. Before Nov 6 the threads shared one scratch name and took each other's away."""
+    for module, call, name, what in (
+            ("posting_queue", "m.save({{'pieces': [], 'interval': n, 'reminded': {{}}, 'i': i}})", "posting.json",
+             "the posting queue"),
+            ("home", "m.record_click('posts') if i % 2 else m.record_done('reel', note=str(n) + '-' + str(i))",
+             "journey.json", "the home page's record of what was pressed and done")):
+        code, out = run_python(["-c", _SIX_THREADS.format(scripts=str(SCRIPTS), module=module, call=call.format())], env=env)
+        line = next((ln for ln in out.splitlines() if ln.startswith("ERRORS ")), "")
+        try:
+            whole = json.loads((home / name).read_bytes().decode("utf-8")) is not None
+        except (OSError, ValueError):
+            whole = False
+        left = sorted(p.name for p in home.iterdir() if p.name.startswith(name) and p.name.endswith(".tmp"))
+        check(f"{what}, saved from six threads at once 240 times: every save goes through, the file whole, no scratch copy left",
+              code == 0 and line == "ERRORS [] 0" and whole and not left, f"{code} {line or out[-300:]} left {left}")
+
+
+_PROXY_CHILD = """import json, sys, time
+sys.path.insert(0, {scripts!r})
+import fresh
+def no_server(*a, **k):
+    raise OSError("this test starts no page server")
+fresh.start_server = no_server
+import home, arrange
+from pathlib import Path
+t0 = time.time()
+u = home.url()
+t1 = time.time()
+a = arrange.page_address(Path("2026-06-01 Kit"), "reel")
+print("ANSWER " + json.dumps({{"url": u, "url_s": round(t1 - t0, 2), "address": a, "address_s": round(time.time() - t1, 2)}}))
+"""
+
+
+def proxy_checks(work, home, env, ports):
+    """this computer's own pages are never asked for through a proxy (this_computer.open_local, and home.url and the
+    picker's wait, which use it). Python's own fetch takes the proxy from the environment, and on a PC from Windows'
+    own settings, where 127.0.0.1 is not left out; a proxy can't see this computer's pages, so the Assistant would
+    think its page server was down and start another. A stand-in proxy on 127.0.0.1 counts what it is sent."""
+    import urllib.error
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    seen = []
+
+    class Proxy(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(self.path)
+            self.send_response(502)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+    proxy = HTTPServer(("127.0.0.1", ports[4]), Proxy)
+    t = threading.Thread(target=proxy.serve_forever)
+    t.daemon = True
+    t.start()
+    page = _StandIn(ports[3])
+    page.files["/home"] = b"<title>The Assistant</title>"
+    url = f"http://127.0.0.1:{page.port}/home"
+    proxy_at = f"http://127.0.0.1:{proxy.server_address[1]}"
+    names = ("http_proxy", "HTTP_PROXY", "no_proxy", "NO_PROXY", "all_proxy", "ALL_PROXY")
+    kept = {k: os.environ.get(k) for k in names}
+    try:
+        for k in names:
+            os.environ.pop(k, None)
+        os.environ["http_proxy"] = proxy_at
+        try:
+            # a fresh opener, as a program just started has: urlopen's own is made once and keeps the proxies it saw then
+            with urllib.request.build_opener().open(url, timeout=10) as r:
+                plain = r.status
+        except urllib.error.HTTPError as e:
+            plain = e.code
+        except OSError as e:
+            plain = str(e)
+        if not seen:
+            skip("this computer's own pages never go through a proxy",
+                 f"this Python's own fetch didn't use the proxy set in the environment either ({plain}), so there is nothing to show")
+            return
+        seen.clear()
+        try:
+            with tc.open_local(url, timeout=10) as r:
+                st, body = r.status, r.read()
+        except Exception as e:  # noqa: BLE001
+            st, body = repr(e)[:200], b""
+        check("this_computer.open_local opens a page of this computer's own straight, never through a proxy in the environment",
+              st == 200 and body == b"<title>The Assistant</title>" and not seen, f"{st} {body[:60]!r} the proxy was sent {seen}")
+        # home.url and the picker's address, in a program of their own, with the proxy set the same way: they find the
+        # page server already answering (posting-url.txt points at the stand-in) and start nothing
+        (home / "posting-url.txt").write_text(url, encoding="utf-8")
+        seen.clear()
+        code, out = run_python(["-c", _PROXY_CHILD.format(scripts=str(SCRIPTS))], env=dict(env, http_proxy=proxy_at))
+        line = next((ln for ln in out.splitlines() if ln.startswith("ANSWER ")), "")
+        try:
+            got = json.loads(line[len("ANSWER "):])
+        except ValueError:
+            got = {}
+        check("home.url finds this computer's own page server through a proxy set in the environment, and starts no other",
+              code == 0 and got.get("url") == url and not seen, f"{code} {got} the proxy was sent {seen} {out[-300:]}")
+        check("and the picker's address comes back at once (no waiting on a proxy that can't see the page)",
+              str(got.get("address", "")).startswith(url.rsplit("/", 1)[0] + "/arrange.html?") and got.get("address_s", 99) < 5,
+              str(got))
+    finally:
+        for k in names:
+            os.environ.pop(k, None)
+        for k, v in kept.items():
+            if v is not None:
+                os.environ[k] = v
+        proxy.shutdown()
+        proxy.server_close()
+        page.stop()
+        try:
+            (home / "posting-url.txt").unlink()
+        except OSError:
+            pass
+
+
+def queue_server_checks(work, home, env, ports):
+    """The editing queue's page server (edit_queue.py serve), started and stopped by its own number: only its own
+    small pictures, never the Studio File through "%2e%2e" or a folder's list, nothing for a request naming another
+    host, and two presses at once both answered (Nov 6 follow-up: one in three was dropped)."""
+    qhome = work / "queue studio-home"
+    (qhome / "queue-thumbs" / "smith-2026-10-24").mkdir(parents=True)
+    thumb = jpeg_bytes(16, 16, lambda bx, by: (200, 120, 40))
+    (qhome / "queue-thumbs" / "smith-2026-10-24" / "0.jpg").write_bytes(thumb)
+    (qhome / "studio.json").write_text('{"secret": "the Studio File"}', encoding="utf-8")
+    q = {"shoots": [{"id": "smith-2026-10-24", "name": "Smith family 🌊", "shot": "2026-10-24", "due": "2026-11-20", "count": 12,
+                     "folder": None, "studio": None, "shoot": None, "thumbs": ["queue-thumbs/smith-2026-10-24/0.jpg"],
+                     "status": "waiting", "added": "2026-10-24T10:00:00"}], "picks": {}, "manual_order": False}
+    (qhome / "queue.json").write_text(json.dumps(q, ensure_ascii=False), encoding="utf-8")
+    log = open(work / "queue server.log", "wb")
+    srv = subprocess.Popen([sys.executable, str(SCRIPTS / "edit_queue.py"), "serve", "--port", str(ports[2])],
+                           stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                           env=child_env({"STUDIO_HOME": str(qhome)}))
+    try:
+        port, t0 = None, time.monotonic()
+        while time.monotonic() - t0 < 30 and srv.poll() is None:
+            try:
+                said = (qhome / "queue-url.txt").read_text(encoding="utf-8").strip()
+            except OSError:
+                said = ""
+            if said:
+                from urllib.parse import urlsplit
+                port = urlsplit(said).port
+                if ask(port, "GET", "/nothing-here")[0] is not None:
+                    break
+            time.sleep(0.2)
+        check("the editing queue's page server starts and says its address", port is not None and srv.poll() is None,
+              (work / "queue server.log").read_bytes().decode("utf-8", "replace")[-300:])
+        if port is None:
+            return
+        st, b = ask(port, "GET", "/queue-thumbs/smith-2026-10-24/0.jpg")
+        check("it serves a queued shoot's small picture", st == 200 and b == thumb, str(st))
+        leaks = {}
+        for path in ("/queue-thumbs/%2e%2e/studio.json", "/queue-thumbs/%2e%2e/queue.json", "/queue-thumbs/",
+                     "/queue-thumbs/smith-2026-10-24/", "/queue-thumbs/%2e%2e/",
+                     "/queue-thumbs/smith-2026-10-24/%2e%2e/%2e%2e/studio.json"):
+            st, b = ask(port, "GET", path)
+            leaks["GET " + path] = (st, b"secret" in b or b"shoots" in b)
+        for path in ("/studio.json", "/queue.json"):
+            leaks["HEAD " + path] = (ask(port, "HEAD", path)[0], False)
+        check("never the Studio folder's own files or a folder's list (%2e%2e, a folder's address, HEAD)",
+              all(st == 404 and not leaked for st, leaked in leaks.values()), str(leaks))
+        st, b = ask(port, "GET", "/queue-thumbs/%2e%2e/studio.json", host=f"evil.example:{port}")
+        st2, _ = ask(port, "POST", "/queue", host=f"evil.example:{port}", body={"action": "done", "id": "smith-2026-10-24"})
+        saved = json.loads((qhome / "queue.json").read_bytes().decode("utf-8"))
+        st3, _ = ask(port, "GET", "/queue.html", host=f"localhost:{port}")
+        check("a request naming another host is refused (403) and changes nothing; the page still answers to localhost",
+              st == 403 and b"secret" not in b and st2 == 403 and saved["shoots"][0]["status"] == "waiting" and st3 == 200,
+              f"{st} {st2} {saved['shoots'][0]['status']} {st3}")
+        answered, errors = [0], []
+        lock = threading.Lock()
+
+        def presses(n):
+            for i in range(25):
+                st, _ = ask(port, "POST", "/queue", body={"action": "due", "id": "smith-2026-10-24",
+                                                         "due": f"2026-12-{(n * 25 + i) % 28 + 1:02d}"})
+                with lock:
+                    if st == 200:
+                        answered[0] += 1
+                    else:
+                        errors.append(st)
+        ts = [threading.Thread(target=presses, args=(n,)) for n in range(4)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        try:
+            whole = json.loads((qhome / "queue.json").read_bytes().decode("utf-8"))["shoots"][0]["name"] == "Smith family 🌊"
+        except (OSError, ValueError, KeyError, IndexError):
+            whole = False
+        left = sorted(p.name for p in qhome.iterdir() if p.name.endswith(".tmp"))
+        check("100 presses at once: every one answered, the queue whole (its emoji too), no scratch copy left",
+              answered[0] == 100 and not errors and whole and not left, f"{answered[0]} answered, {errors[:5]} {left}")
+    finally:
+        srv.terminate()
+        try:
+            srv.wait(15)
+        except subprocess.TimeoutExpired:
+            srv.kill()
+            srv.wait(15)
+        log.close()
+
+
+def capcut_checks(work, home, env, ports):
+    """CapCut's waiting list (reels made while CapCut's own list couldn't be written): an entry damaged by hand is
+    left out; `capcut.py open --closed` adds a waiting reel to a pretend CapCut list without asking whether CapCut is
+    open. Never the real CapCut: on a Mac a stand-in for `open` (and for `pgrep`, which must not be asked), on a PC
+    only where no CapCut is installed (else SKIP), and the list is a pretend one in this test's folder."""
+    if str(REEL) not in sys.path:
+        sys.path.insert(0, str(REEL))
+    import capcut
+    store = work / "pretend CapCut store"
+    (store / "Reel A").mkdir(parents=True)
+    (store / "Reel A" / "draft_info.json").write_text("{}", encoding="utf-8")
+    good = {"draft_id": "AAA-1", "draft_json_file": str(store / "Reel A" / "draft_info.json"), "draft_name": "Reel A",
+            "tm_draft_create": 1700000000000000}
+    (store / capcut.WAITING).write_text(json.dumps([good, dict(good, draft_id="BBB-2", tm_draft_create="soon")]), encoding="utf-8")
+    waiting = getattr(capcut, "waiting", None) or (lambda s: capcut._waiting(Path(s)))   # (an older capcut.py: its own)
+    got = [x.get("draft_id") for x in waiting(store)]
+    check("CapCut's waiting list: an entry damaged by hand (its time not a number) is left out", got == ["AAA-1"], str(got))
+    child = {}
+    stub_log = work / "stand-in tools.log"
+    if tc.MAC:
+        stubs = work / "stand-in tools"
+        stubs.mkdir()
+        for tool in ("open", "pgrep"):
+            (stubs / tool).write_text(f"#!/bin/sh\nprintf '{tool} %s\\n' \"$*\" >> \"$STAND_IN_LOG\"\nexit {0 if tool == 'open' else 1}\n",
+                                      encoding="utf-8")
+            os.chmod(stubs / tool, 0o755)
+        child = {"PATH": str(stubs) + os.pathsep + os.environ.get("PATH", ""), "STAND_IN_LOG": str(stub_log)}
+        want_code, want_words = 0, "The reel that was waiting is in its list now."
+    elif tc.WINDOWS:
+        if any(p.is_file() for p in capcut._windows_capcut_programs()):
+            skip("capcut.py open --closed", "CapCut is installed on this PC, and this would start it")
+            return
+        want_code, want_words = 2, "couldn't find CapCut"
+    else:
+        skip("capcut.py open --closed", "neither a Mac nor a PC")
+        return
+    code, out = run_python([REEL / "capcut.py", "open", "--closed", "--store", store], env=dict(env, **child))
+    try:
+        listed = [x.get("draft_id") for x in json.loads((store / "root_meta_info.json").read_bytes().decode("utf-8"))["all_draft_store"]]
+    except (OSError, ValueError, KeyError, TypeError):
+        listed = None
+    tools = stub_log.read_text(encoding="utf-8").splitlines() if stub_log.is_file() else []
+    check("`capcut.py open --closed` adds the waiting reel (only the good one) to CapCut's list without asking whether "
+          "CapCut is open, then starts it" + (" (a stand-in for the Mac's open)" if tc.MAC else " (none here: it says so)"),
+          code == want_code and want_words in out and listed == ["AAA-1"] and waiting(store) == []
+          and (not tc.MAC or tools == ["open -a CapCut"]), f"{code} {listed} {tools} {out[-300:]}")
+
+
+def picker_answer_checks(work, home, env, ports):
+    """What a PC's folder window answers, read back (this_computer._picked): the folder comes back as base64 of its
+    UTF-8 bytes, so a name with an accent, curly quotes and an emoji comes back exactly whatever Windows PowerShell
+    does to its output. On Windows, a real Windows PowerShell writes it (the window itself needs a screen)."""
+    d = work / "pick" / "Café “shoot” 🌊"
+    d.mkdir(parents=True)
+    b64 = base64.b64encode(str(d).encode("utf-8")).decode("ascii")
+    line = ("::folder::" + b64 + "\r\n").encode("ascii")
+    for name, out in (("as it is", line), ("a byte-order mark in front", b"\xef\xbb\xbf" + line),
+                      ("in UTF-16", ("\ufeff::folder::" + b64 + "\r\n").encode("utf-16-le")),
+                      ("a line broken in two", line[:25] + b"\r\n" + line[25:]),
+                      ("a warning printed after it", line + b"WARNING: something to say\r\n")):
+        got = tc._picked(0, out)
+        check(f"the folder window's answer is read back exactly: {name}", got == (str(d), ""), repr(got))
+    got = tc._picked(0, b"::cancelled::\r\n")
+    check("closing the folder window reads as cancelled", got == (None, "cancelled"), repr(got))
+    if not tc.WINDOWS:
+        skip("a real Windows PowerShell writing the folder's name", f"this is a {tc.COMPUTER}")
+        return
+    ps = "Write-Output ('::folder::' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($env:ASSISTANT_PICK_TEST)))"
+    for name, cmd in (("as it comes", ps), ("with a warning after it", ps + "; Write-Warning 'something to say'")):
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, timeout=120,
+                               env=dict(os.environ, ASSISTANT_PICK_TEST=str(d)))
+            got, raw, err = tc._picked(r.returncode, r.stdout), r.stdout[:120], r.stderr[:200]
+        except (OSError, subprocess.SubprocessError) as e:
+            got, raw, err = None, b"", str(e)
+        check(f"(a PC) Windows PowerShell's own output, {name}, gives the folder back exactly", got == (str(d), ""),
+              f"{got!r} out={raw!r} err={err!r}")
+
+
+_QUOTING_CHILD = """import json, sys
+sys.path.insert(0, {scripts!r})
+import kit
+print("ANSWER " + json.dumps([kit._pc_arg(v) for v in json.loads(sys.argv[1])]))
+"""
+
+
+def quoting_checks(work, home, env, ports):
+    """How a value is quoted in a line of a command Claude is handed on a PC (kit._pc_arg): PowerShell cuts a bare
+    comma list into pieces, and reads $ and backticks inside double quotes."""
+    want = {"1,2,3+": '"1,2,3+"', "Zoë’s beach 🌊": '"Zoë’s beach 🌊"', "C:/Users/Zoë/Your Content": '"C:/Users/Zoë/Your Content"',
+            "Smith $5 shoot": "'Smith $5 shoot'", "Bob's $5": "'Bob''s $5'"}
+    code, out = run_python(["-c", _QUOTING_CHILD.format(scripts=str(SCRIPTS)), json.dumps(list(want))], env=env)
+    line = next((ln for ln in out.splitlines() if ln.startswith("ANSWER ")), "")
+    try:
+        got = dict(zip(want, json.loads(line[len("ANSWER "):])))
+    except ValueError:
+        got = {}
+    check("on a PC each value of a command line is quoted so it arrives whole in PowerShell or Git Bash "
+          "(a comma list in double quotes; a $ in single ones; an apostrophe beside a $ doubled)", got == want, f"{got} {out[-300:]}")
 
 
 # ---------------------------------------------------------------- a page server outliving its starter
@@ -1514,6 +2062,9 @@ def main():
         except Exception:  # noqa: BLE001
             import traceback
             check("the posts checks ran to the end", False, traceback.format_exc()[-1500:])
+        return finish(work)
+    if ONLY == "followup":
+        followup_checks(work)
         return finish(work)
 
     # ---- the helper
@@ -1689,6 +2240,7 @@ def main():
     except Exception:  # noqa: BLE001  (a fault in one check FAILs here and the whole backups still run)
         import traceback
         check("the posts checks ran to the end", False, traceback.format_exc()[-1500:])
+    followup_checks(work)
 
     # ---- whole backups: this computer's own way; on a Mac also the PC way
     print("\n-- a whole backup, start to finish" + (" (the Mac's own way: sips)" if pictures.use_sips() else ""))
@@ -1726,10 +2278,10 @@ def finish(work):
 
 
 # python3 tests/pc_smoke.py --only posts: just the post kit, the pickers, the posting queue, Canva and the posting
-# server (a minute, not ten), for trying a change to those.
+# server (a minute, not ten), for trying a change to those. --only followup: just the PC follow-up's part.
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv[1:-1] else None
 
 if __name__ == "__main__":
-    if ONLY not in (None, "posts"):
-        sys.exit("--only takes: posts")
+    if ONLY not in (None, "posts", "followup"):
+        sys.exit("--only takes: posts, followup")
     sys.exit(main())

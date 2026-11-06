@@ -39,12 +39,14 @@ A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
 archived shoots are the archive.
 """
 import argparse
+import errno
 import html
 import json
 import os
 import re
 import shutil
 import sys
+import threading
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
@@ -66,6 +68,7 @@ THUMBS = HOME / "queue-thumbs"
 PAGE = HOME / "queue.html"
 HEADS_UP_DAYS = 3
 DUE_CHOICES = {"1w": ("1 week", 7), "2w": ("2 weeks", 14), "3w": ("3 weeks", 21)}
+_QUEUE_LOCK = threading.Lock()   # the page server answers two presses at once: one reads, changes and saves at a time
 
 
 def say(msg):
@@ -73,6 +76,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 # ---------- the list ----------
@@ -92,9 +100,19 @@ def load():
 
 def save(q):
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = QFILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, QFILE)  # never a half-written list (on a PC, waits a moment if a page is reading it)
+    # A scratch name of this program's and this thread's own (as posting_queue.write_whole): the page server
+    # answers two presses at once, and with one shared name ("queue.json.tmp", before Nov 6) one press could take
+    # the other's file away mid-save and go unanswered. The bytes saved are the same as ever.
+    tmp = QFILE.with_name(f"{QFILE.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, QFILE)  # never a half-written list (on a PC, waits a moment if a page is reading it)
+    except BaseException:
+        try:
+            tmp.unlink()                   # only the scratch copy just written here, never the list itself
+        except OSError:
+            pass
+        raise
 
 
 def today():
@@ -746,8 +764,44 @@ def write_page(q):
 
 # ---------- the live page ----------
 
+def _thumb_wanted(p):
+    """One small picture the queue page shows (queue-thumbs/<shoot>/<n>.jpg), checked after the address is
+    decoded, part by part: the same rule as the posting server's (posting_queue.thumb_wanted). Before Nov 6 the
+    check was for ".." in the address as sent, so "%2e%2e" (the same two dots, written another way) reached the
+    Studio File and the queue, and "/queue-thumbs/" listed the folder (both computers)."""
+    import posting_queue
+    return p.startswith("/queue-thumbs/") and posting_queue.thumb_wanted(p)
+
+
 class Handler(SimpleHTTPRequestHandler):
+    def ours(self):
+        """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)? The queue
+        page is always opened that way. A web page on another site pointed at this computer by a trick of names
+        still carries its own name in Host, and is refused before anything is looked at (as the posting server)."""
+        port = self.server.server_address[1]
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return True
+        self.send_error(HTTPStatus.FORBIDDEN)
+        return False
+
+    def list_directory(self, path):
+        """Never a folder's list of files (Python's own server makes one for a folder's address)."""
+        self.send_error(HTTPStatus.NOT_FOUND)
+        return None
+
+    def do_HEAD(self):
+        # only for the pictures a GET would serve (no page here asks for HEAD; before Nov 6 it told any file's
+        # size and date in the Studio folder)
+        if not self.ours():
+            return
+        if _thumb_wanted(urlsplit(self.path).path):
+            return super().do_HEAD()
+        self.send_error(HTTPStatus.NOT_FOUND)
+
     def do_GET(self):
+        if not self.ours():
+            return
         p = urlsplit(self.path).path
         if fresh.page_path(p) and fresh.stale() and fresh.restart(self):
             return
@@ -759,8 +813,11 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if p.startswith("/queue-thumbs/") and ".." not in p:
-            return super().do_GET()
+        if p.startswith("/queue-thumbs/"):
+            if _thumb_wanted(p):                # one small picture the page shows, nothing else
+                return super().do_GET()
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         if p == "/open":
             from urllib.parse import parse_qs
             sid = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
@@ -775,45 +832,54 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)  # nothing else in ~/.studio is served
 
     def do_POST(self):
+        if not self.ours():
+            return
         if urlsplit(self.path).path != "/queue":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(n) or b"{}")
-            q = load()
-            act = body.get("action")
-            if act in ("done", "undo", "due", "requeue"):
-                s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
-                if act == "done":
-                    s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
-                    s["finished_by"] = "page"
-                elif act in ("undo", "requeue"):
-                    s["status"] = "waiting"
-                    for k in ("finished_at", "finished_by", "offered", "reminded"):
-                        s.pop(k, None)
-                    if act == "requeue":
-                        s["due"] = body.get("due") and due_date(body["due"])[0]
-                    q["shoots"].remove(s)
-                    place(q, s)
+            with _QUEUE_LOCK:               # two presses at once: the second reads the queue the first saved
+                q = load()
+                act = body.get("action")
+                if act in ("done", "undo", "due", "requeue"):
+                    s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
+                    if act == "done":
+                        s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
+                        s["finished_by"] = "page"
+                    elif act in ("undo", "requeue"):
+                        s["status"] = "waiting"
+                        for k in ("finished_at", "finished_by", "offered", "reminded"):
+                            s.pop(k, None)
+                        if act == "requeue":
+                            s["due"] = body.get("due") and due_date(body["due"])[0]
+                        q["shoots"].remove(s)
+                        place(q, s)
+                    else:
+                        s["due"], how = due_date(body.get("due"))
+                        s.pop("reminded", None)
+                elif act == "order":
+                    reorder(q, [str(i) for i in body.get("ids", [])])
+                elif act == "add":
+                    name = " ".join(str(body.get("name", "")).split())
+                    if not name:
+                        raise ValueError("a name is needed")
+                    add_manual(q, name, body.get("due") or None)
                 else:
-                    s["due"], how = due_date(body.get("due"))
-                    s.pop("reminded", None)
-            elif act == "order":
-                reorder(q, [str(i) for i in body.get("ids", [])])
-            elif act == "add":
-                name = " ".join(str(body.get("name", "")).split())
-                if not name:
-                    raise ValueError("a name is needed")
-                add_manual(q, name, body.get("due") or None)
-            else:
-                raise ValueError(act)
-            save(q)
-            write_page(q)
-        except (StopIteration, ValueError, SystemExit, TypeError) as e:
+                    raise ValueError(act)
+                save(q)
+                write_page(q)
+                out = json.dumps(state(q)).encode()
+        except (StopIteration, ValueError, SystemExit, TypeError, AttributeError) as e:   # AttributeError: a body that isn't {...}
             self.send_error(HTTPStatus.BAD_REQUEST, str(e)[:200])
             return
-        out = json.dumps(state(q)).encode()
+        except OSError as e:
+            # the queue couldn't be saved (on a PC, another program held it longer than a few seconds; a full
+            # drive): an answer all the same, never a dropped connection
+            say(f"queue: couldn't save the editing queue ({e.__class__.__name__}: {str(e)[:160]})")
+            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The editing queue couldn't be saved just now")
+            return
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
         self.end_headers()

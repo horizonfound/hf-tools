@@ -41,7 +41,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import unicodedata
 from datetime import datetime
@@ -96,10 +95,14 @@ def upload(path, url):
     except OSError as e:
         say(f"STOP: I couldn't read {p.name} ({e.strerror or e}).")
         return 2
+    # this_computer.run_curl: a Mac runs it once, exactly as before. On a PC, a network that stops Windows' curl from
+    # asking whether Canva's certificate was withdrawn gets one more try that skips only that question (unproven on a
+    # real PC); nothing reached Canva on the first try, so the one-use link is still good, and the photo is sent again
+    # from its start.
     with f:
-        r = subprocess.run([curl(), "-sS", "-m", "180", "-X", "POST", "-H", "Content-Type: application/octet-stream",
-                            "--data-binary", "@-", url, "-w", "\n%{http_code}"], stdin=f, capture_output=True,
-                           encoding="utf-8", errors="replace")
+        r = this_computer.run_curl([curl(), "-sS", "-m", "180", "-X", "POST", "-H", "Content-Type: application/octet-stream",
+                                    "--data-binary", "@-", url, "-w", "\n%{http_code}"], stdin=f, capture_output=True,
+                                   encoding="utf-8", errors="replace")
     body, _, code = r.stdout.rpartition("\n")
     if r.returncode != 0 or not code.startswith(("200", "201")):
         say(f"STOP: Canva didn't take {p.name} ({code or r.stderr.strip()[:120]}). Ask for a fresh upload link and try once more.")
@@ -268,7 +271,13 @@ def fetch(kit, into, urls, names, start=1):
             f"nearer the top of the drive, fixes it.{theirs}")
         return 1
     c_url = curl()
-    folder.mkdir(exist_ok=True)
+    made = False   # whether this run made the folder (a kit with no cover yet has no Covers folder)
+    try:
+        folder.mkdir()
+        made = True
+    except OSError:   # already there, as usual (the same as mkdir(exist_ok=True))
+        if not folder.is_dir():
+            raise
     # Download everything first (as .part files), and only then swap the earlier Canva files out.
     # A failed download leaves the kit exactly as it was.
     pending = []
@@ -276,11 +285,18 @@ def fetch(kit, into, urls, names, start=1):
         # A scratch copy left by a run cut off at just the wrong moment can share its bytes with a kept file (the
         # Mac gives a file its name by a link, then drops the old name); it goes first, so curl never writes into those.
         _drop(tmp)
-        r = subprocess.run([c_url, "-sS", "-L", "-m", "300", "-o", tmp.name, u, "-w", "%{http_code}"], cwd=str(folder),
-                           capture_output=True, encoding="utf-8", errors="replace")
+        # run_curl: a Mac runs it once, exactly as before; on a PC, one more try only when Windows' curl couldn't ask
+        # whether the certificate was withdrawn (this_computer.run_curl; unproven on a real PC).
+        r = this_computer.run_curl([c_url, "-sS", "-L", "-m", "300", "-o", tmp.name, u, "-w", "%{http_code}"],
+                                   cwd=str(folder), capture_output=True, encoding="utf-8", errors="replace")
         if r.returncode != 0 or not r.stdout.strip().startswith("200") or not tmp.exists() or tmp.stat().st_size == 0:
             for _, t in pending + [(dst, tmp)]:
                 _drop(t)
+            if made:   # the folder this run made goes too, so "nothing changed" is true; only ever an empty one
+                try:
+                    os.rmdir(folder)
+                except OSError:   # something is in it after all (or a PC has it open): it stays, nothing lost
+                    pass
             say(f"STOP: couldn't download file {i} from Canva ({r.stdout.strip() or r.stderr.strip()[:80]}). The links last a day; ask for a fresh export if it's older. Nothing in the kit changed.")
             return 1
         pending.append((dst, tmp))

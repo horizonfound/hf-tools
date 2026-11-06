@@ -57,12 +57,13 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -88,6 +89,14 @@ KIT_OWN_FILES = ("Post kit.html", "Captions and hooks.txt", "Reel.txt")   # what
 KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
+# The small pictures the pages show, and how deep each folder's go: a piece's ("posting-thumbs/<piece>.jpg"), a feed
+# tile's ("feed/<post>.jpg"), a queued shoot's ("queue-thumbs/<shoot>/0.jpg") and a kit's on the home page
+# ("home-thumbs/<kit>-1.jpg"). Nothing else in the Studio folder is served from these addresses.
+THUMB_FOLDERS = {"posting-thumbs": 1, "feed": 1, "queue-thumbs": 2, "home-thumbs": 1}
+PICTURE_SUFFIXES = (".jpg", ".jpeg", ".png")
+_POSTING_LOCK = threading.Lock()   # the page server answers two presses at once: one reads, changes and saves the queue at a time
+_CAPCUT_LOCK = threading.Lock()    # one "Open in CapCut" at a time, so what capcut.py notes about a press is that press's own
+_CLICK_LOCK = threading.Lock()     # one home-page click recorded at a time (each reads, adds to and saves home.py's record)
 
 
 def say(msg):
@@ -117,11 +126,28 @@ def load():
     return {"pieces": [], "interval": None, "reminded": {}}
 
 
-def save(p):
+def write_whole(path, text):
+    """Write a file whole: under a scratch name of this program's and this thread's own beside it, then put in
+    place in one step. Two writers (a command and the page server, or two presses the server answers at once)
+    never share a half-written file; the name had only the program's number before, so two presses at once could
+    take each other's file away mid-save and one went unanswered (seen on a Mac too, Nov 6). On a PC
+    this_computer.replace waits a moment if the page server is reading the file right then. The bytes written
+    are the same as ever. If the save fails, the scratch copy is taken away and the error is passed on."""
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = PFILE.with_name(f"{PFILE.name}.{os.getpid()}.tmp")     # a name of this process's own: two writers never share a half-written file
-    tmp.write_text(json.dumps(p, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, PFILE)    # on a PC, waits a moment if the page server is reading it right then
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        this_computer.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()                     # only the scratch copy just written here, never the file itself
+        except OSError:
+            pass
+        raise
+
+
+def save(p):
+    write_whole(PFILE, json.dumps(p, indent=1, ensure_ascii=False))
 
 
 def today():
@@ -456,10 +482,7 @@ def load_feed():
 
 
 def save_feed(f):
-    HOME.mkdir(parents=True, exist_ok=True)
-    tmp = FEED.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(f, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, FEED)
+    write_whole(FEED, json.dumps(f, indent=1, ensure_ascii=False))
 
 
 def post_id(href):
@@ -490,8 +513,11 @@ def fetch_tile(src):
     # On a PC no window of its own (CREATE_NO_WINDOW, Microsoft's "Process Creation Flags"), even when the page
     # server that asks has none. Unproven on a real PC. A Mac: exactly as before.
     quiet = {"creationflags": 0x08000000} if this_computer.WINDOWS else {}
-    r = subprocess.run([curl_program(), "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
-                        "-A", "The Assistant by Horizon Found", "-o", "-", src], capture_output=True, **quiet)
+    # this_computer.run_curl: on a Mac exactly subprocess.run, the same command. On a PC, when Windows' curl.exe
+    # stops only because the network won't let it ask whether Instagram's certificate was withdrawn (exit 35,
+    # CRYPT_E_NO_REVOCATION_CHECK), it is asked once more with that one question skipped. Unproven on a real PC.
+    r = this_computer.run_curl([curl_program(), "-sS", "--fail", "--max-time", "25", "--max-filesize", str(FEED_TILE_MAX),
+                                "-A", "The Assistant by Horizon Found", "-o", "-", src], capture_output=True, **quiet)
     if r.returncode != 0:
         raise ValueError(f"curl {r.returncode}: {r.stderr.decode('utf-8', errors='replace')[:120]}")
     raw = r.stdout
@@ -500,14 +526,19 @@ def fetch_tile(src):
     return raw
 
 
-def tile_bytes(t):
+def tile_bytes(t, why=None):
     """The picture for one tile: fetched full size from its address when there is one, else the small jpeg the
-    first version drew in the page. None when neither works (the tile is left out, never a broken picture)."""
+    first version drew in the page. None when neither works (the tile is left out, never a broken picture).
+    When the fetch fails, the reason is added to `why` (a list), so a run where nothing came in can say why."""
     if t.get("src"):
         try:
             return fetch_tile(t["src"])
-        except (OSError, ValueError):
-            pass
+        except OSError as e:                     # curl itself couldn't be started (not on this computer)
+            if why is not None:
+                why.append(f"curl couldn't be started ({e.strerror or e.__class__.__name__})")
+        except ValueError as e:                  # curl's own error, or not an Instagram picture
+            if why is not None:
+                why.append(" ".join(str(e).split()))
     data = str(t.get("data", ""))
     if data.startswith("data:image/jpeg;base64,"):
         try:
@@ -527,12 +558,16 @@ def import_feed(tiles, handle=None):
     if not isinstance(tiles, list) or not tiles:
         raise ValueError("no tiles")
     FEED_THUMBS.mkdir(parents=True, exist_ok=True)
-    posts, seen = [], set()
+    posts, seen, why = [], set(), []
     for t in tiles[:FEED_MAX]:
+        if not isinstance(t, dict):
+            continue      # not a tile (a list saved wrongly): left out, as an unusable tile always was
         pid = post_id(t.get("href", ""))
         if not pid or pid in seen:
             continue
-        raw = tile_bytes(t)
+        if this_computer.WINDOWS and this_computer.unreserved(pid) != pid:
+            continue      # a PC: "CON.jpg" or "NUL.jpg" would be a device, not a file. Real post codes never are one.
+        raw = tile_bytes(t, why)
         if raw is None:
             continue
         (FEED_THUMBS / f"{pid}.jpg").write_bytes(raw)
@@ -541,7 +576,9 @@ def import_feed(tiles, handle=None):
         posts.append({"id": pid, "kind": kind, "pinned": bool(t.get("pinned")), "w": t.get("w"), "h": t.get("h"),
                       "thumb": f"feed/{pid}.jpg"})
     if not posts:
-        raise ValueError("no usable tiles")
+        # say why when the pictures couldn't be fetched (curl's own words: no network, a certificate it can't check,
+        # no curl on this computer), so Claude can tell them more than "nothing usable"
+        raise ValueError("no usable tiles" + (f"; the first picture couldn't be fetched: {why[0]}" if why else ""))
     old = load_feed()
     for p_ in FEED_THUMBS.glob("*.jpg"):      # the old grid's tiles, no longer shown: set aside, not deleted
         if p_.stem not in seen:
@@ -752,8 +789,7 @@ def page_html(p):
 
 
 def write_page(p):
-    HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html(p), encoding="utf-8")
+    write_whole(PAGE, page_html(p))
     return PAGE
 
 
@@ -769,33 +805,51 @@ def open_capcut(rec):
     if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
     capcut = _capcut()
-    damaged = False
-    try:
-        ok, why = capcut.open_capcut()
-    except Exception as e:  # noqa: BLE001  (a damaged list of waiting reels must never leave the button without an answer)
-        say(f"open CapCut: the list of reels waiting for CapCut couldn't be used ({e.__class__.__name__}); starting CapCut without it")
-        damaged = True
-        ok, why = capcut.launch()
-        why = "Opened CapCut. The newest project is at the top of its list." if ok else f"STOP: {why}."
+    damaged = unsure = False
+    with _CAPCUT_LOCK:                 # one press at a time: what capcut.py notes about a press is read before the next
+        try:
+            ok, why = capcut.open_capcut()
+            # True when a reel was waiting but whether CapCut was open couldn't be told (on a PC, Windows' list of
+            # running programs didn't answer): nothing was added, and pressing again would do the same
+            unsure = bool(getattr(capcut.open_capcut, "unsure", False))
+        except Exception as e:  # noqa: BLE001  (a damaged list of waiting reels must never leave the button without an answer)
+            say(f"open CapCut: the list of reels waiting for CapCut couldn't be used ({e.__class__.__name__}); starting CapCut without it")
+            damaged = True
+            ok, why = capcut.launch()
+            why = capcut.OPENED if ok else f"STOP: {why}."
+        # True when the Mac's `open` was still waiting after capcut.py's 20 seconds: CapCut was asked to start and
+        # may yet appear, so "couldn't open" would be wrong
+        slow = bool(getattr(capcut.launch, "slow", False))
+        missing = bool(getattr(capcut.launch, "missing", False))      # no CapCut found to start
     say(f"open CapCut: {'ok' if ok else 'no'}: {why}")
     if not ok:
-        if this_computer.MAC:   # the words a Mac always gave
+        if slow:
+            return False, (f"CapCut is taking a while to start on this {this_computer.COMPUTER}. Give it a moment, then "
+                           f"click “{project}” in its project list (near the top, newest first).")
+        if this_computer.MAC and missing:   # the words a Mac always gave when `open -a` found no CapCut
             return False, f"CapCut doesn't seem to be installed on this {this_computer.COMPUTER}. It's free from capcut.com."
-        return False, (f"I couldn't open CapCut on this {this_computer.COMPUTER}. Open it from the Start menu, then click "
+        # it is there but didn't start, or a PC
+        where = "the Start menu" if this_computer.WINDOWS else "your Applications folder"
+        return False, (f"I couldn't open CapCut on this {this_computer.COMPUTER}. Open it from {where}, then click "
                        f"“{project}” in its project list (near the top, newest first). CapCut is free from capcut.com.")
     words = f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
-    base = "Opened CapCut. The newest project is at the top of its list."
+    base = capcut.OPENED                         # capcut.py's own words when it opened; anything after them is its note
     extra = why[len(base):].strip() if why.startswith(base) else ""
     if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
         words += " " + extra
     if damaged:                                  # pressing again would meet the same damaged list: Claude sorts it out
         return True, words + " If it isn't in the list, tell Claude and it'll sort it out."
     try:
-        waiting = capcut._waiting(capcut.default_store())     # still not in CapCut's list: CapCut was open
+        waiting = capcut.waiting()               # still not in CapCut's list: CapCut was open (or it couldn't be told)
     except Exception:  # noqa: BLE001  (a hint, never a reason for the button to fail)
         waiting = []
     if waiting and not extra:
-        words += f" If it isn't in the list, {capcut.QUIT} CapCut and press Open in CapCut again, and I'll add it."
+        if unsure:
+            # pressing again would not help (this computer can't tell whether CapCut is open): Claude adds it with
+            # `capcut.py open --closed` once they say CapCut is closed (parts/on-a-pc.md)
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell Claude “add my waiting reel”."
+        else:
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and press Open in CapCut again, and I'll add it."
     return True, words
 
 
@@ -814,6 +868,45 @@ def _capcut():
     return capcut
 
 
+def thumb_wanted(path):
+    """Is this address (the path part, as sent) one small picture a page here shows, and nothing else? Checked
+    after the address is decoded, part by part, the way Python's own server reads it: a folder named in
+    THUMB_FOLDERS, then a picture's file name (or, for a queued shoot, its folder and a picture), each part a
+    plain name: not empty, not starting with a dot (so never "." or ".."), no backslash, and on a PC no colon
+    (another drive, or a hidden stream inside a file) and no word Windows keeps for a device (CON, NUL...). Never
+    a folder, and never a link that leads out of its own folder.
+    Before Nov 6 the check was for ".." in the address as sent, so "%2e%2e" (the same two dots, written the way
+    addresses may write them) reached the Studio File and the queues, and "/feed/" listed the folder; and a kit
+    named "Beach... sunset" had no pictures on the home page, since its name has two dots in a row."""
+    try:
+        decoded = unquote(path, errors="surrogatepass")    # exactly as SimpleHTTPRequestHandler.translate_path
+    except UnicodeDecodeError:
+        decoded = unquote(path)
+    parts = decoded.split("/")
+    if len(parts) < 3 or parts[0] != "" or parts[1] not in THUMB_FOLDERS:
+        return False
+    folder, rest = parts[1], parts[2:]
+    if len(rest) > THUMB_FOLDERS[folder]:
+        return False
+    for x in rest:
+        if not x or x.startswith(".") or "\\" in x or "\x00" in x:
+            return False
+        if this_computer.WINDOWS and (":" in x or this_computer.unreserved(x) != x):
+            return False
+    if Path(rest[-1]).suffix.lower() not in PICTURE_SUFFIXES:
+        return False
+    base = HOME / folder
+    f = base.joinpath(*rest)
+    try:
+        if f.is_symlink() or f.exists():
+            if not f.is_file():
+                return False                                # a folder (or anything that isn't a file) is never served
+            f.resolve().relative_to(base.resolve())         # and never anything outside its own folder
+    except (OSError, ValueError):
+        return False
+    return True                                             # a picture that isn't there: Python's own "not found"
+
+
 class Handler(SimpleHTTPRequestHandler):
     def ours(self):
         """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)?
@@ -828,8 +921,18 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_HEAD(self):
-        if self.ours():
-            super().do_HEAD()
+        # only for the pictures a GET would serve (no page here asks for HEAD; before Nov 6 it told any file's size
+        # and date in the Studio folder, and answered for a folder)
+        if not self.ours():
+            return
+        if thumb_wanted(urlsplit(self.path).path):
+            return super().do_HEAD()
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def list_directory(self, path):
+        """Never a folder's list of files (Python's own server makes one for a folder's address)."""
+        self.send_error(HTTPStatus.NOT_FOUND)
+        return None
 
     def do_GET(self):
         if not self.ours():
@@ -873,9 +976,14 @@ class Handler(SimpleHTTPRequestHandler):
             # the pages for arranging a kit's photos: every one of their requests is arrange.py's to answer
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
-        if (path.startswith("/posting-thumbs/") or path.startswith("/feed/") or path.startswith("/queue-thumbs/") or path.startswith("/home-thumbs/")) and ".." not in path:
-            return super().do_GET()
-        if path.startswith("/content/") and ".." not in path:
+        if path.startswith(("/posting-thumbs/", "/feed/", "/queue-thumbs/", "/home-thumbs/")):
+            if thumb_wanted(path):                     # one small picture a page shows, nothing else (see thumb_wanted)
+                return super().do_GET()
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        if path.startswith("/content/"):
+            # serve_content decodes the address and checks it part by part (never "." or ".."). The old check here,
+            # for ".." anywhere in the address as sent, only kept out a kit named like "Beach... sunset" (Nov 6).
             return self.serve_content(path[len("/content/"):])
         if path == "/open":
             return self.open_kit_folder(urlsplit(self.path).query)
@@ -1010,8 +1118,20 @@ class Handler(SimpleHTTPRequestHandler):
         h = posts.home()
         ok, words = False, "That isn't a folder this kit names."
         content = (h / posts.CONTENT_NAME).resolve() if h else None
-        named = kit_name and ".." not in kit_name and not (this_computer.WINDOWS and ":" in kit_name)   # a PC: a colon is another drive or a hidden stream, never a kit
-        kd = (content / kit_name).resolve() if content and named else None
+        # A kit is one folder's name inside Your Content, so it is checked as text before any path is made from it:
+        # no slash (on a PC "//computer/share" would be another computer's shared folder, and asking Windows about
+        # it, which resolve() does, reaches out to that computer before anything here could refuse it), no name
+        # starting with a dot (never a kit; "." and ".." are folders around it). On a PC also no backslash, no
+        # colon (another drive, or a hidden stream inside a file) and no word Windows keeps for a device (CON...).
+        # ".." inside a name is fine: a kit named like "Beach... sunset" has two dots in a row (its buttons did
+        # nothing before Nov 6), and the folder-by-folder check below keeps everything inside Your Content.
+        named = (kit_name and "\x00" not in kit_name and "/" not in kit_name and not kit_name.startswith(".")
+                 and not (this_computer.WINDOWS and ("\\" in kit_name or ":" in kit_name
+                                                     or this_computer.unreserved(kit_name) != kit_name)))
+        try:
+            kd = (content / kit_name).resolve() if content and named else None
+        except (OSError, ValueError):      # a name a PC can't even look up (a stray ? or *): not a kit
+            kd = None
         # inside Your Content, folder by folder: a text match let "Your Content old/..." beside it through (both
         # computers); a path compare also ignores upper and lower case and the kind of slash on a PC
         if kd and content in kd.parents and kd.is_dir():
@@ -1134,8 +1254,12 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 n = int(self.headers.get("Content-Length", "0"))
                 item = json.loads(self.rfile.read(n) or b"{}").get("item")
-                ok = home.record_click(item)
-            except (ValueError, TypeError):
+                with _CLICK_LOCK:          # two clicks at once: the second reads the record the first saved
+                    ok = home.record_click(item)
+            except (ValueError, TypeError, AttributeError):
+                ok = False
+            except OSError as e:           # the record couldn't be saved: an answer all the same
+                say(f"clicked: couldn't save the record ({e.__class__.__name__})")
                 ok = False
             return self.answer({"ok": ok})
         if path != "/posting":
@@ -1144,27 +1268,34 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(n) or b"{}")
-            p = load()
-            act = body.get("action")
-            if act in ("ready", "unready", "posted", "skip"):
-                x = next(y for y in p["pieces"] if y["id"] == body.get("id"))
-                set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
-            elif act == "order":
-                ids = [str(i) for i in body.get("ids", [])]
-                g = {x["id"]: x for x in greens(p)}
-                for i, pid in enumerate([i for i in ids if i in g], 1):
-                    g[pid]["slot"] = i
-                renumber(p)
-                schedule(p, reflow=True)
-            else:
-                raise ValueError(act)
-            schedule(p)
-            save(p)
-            write_page(p)
+            with _POSTING_LOCK:            # two presses at once: the second reads the queue the first saved
+                p = load()
+                act = body.get("action")
+                if act in ("ready", "unready", "posted", "skip"):
+                    x = next(y for y in p["pieces"] if y["id"] == body.get("id"))
+                    set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
+                elif act == "order":
+                    ids = [str(i) for i in body.get("ids", [])]
+                    g = {x["id"]: x for x in greens(p)}
+                    for i, pid in enumerate([i for i in ids if i in g], 1):
+                        g[pid]["slot"] = i
+                    renumber(p)
+                    schedule(p, reflow=True)
+                else:
+                    raise ValueError(act)
+                schedule(p)
+                save(p)
+                write_page(p)
+                out = json.dumps(state(p)).encode()
         except (StopIteration, ValueError, TypeError) as e:
             self.send_error(HTTPStatus.BAD_REQUEST, str(e)[:200])
             return
-        out = json.dumps(state(p)).encode()
+        except OSError as e:
+            # the queue couldn't be saved (on a PC, another program held it longer than a few seconds; a full disk):
+            # an answer all the same, never a dropped connection. The page says to tell Claude.
+            say(f"posting: couldn't save the posting queue ({e.__class__.__name__}: {str(e)[:160]})")
+            self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The posting queue couldn't be saved just now")
+            return
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -1181,9 +1312,9 @@ class Handler(SimpleHTTPRequestHandler):
             f = import_feed(body.get("tiles"), handle=body.get("handle"))
             write_page(load())
             out = {"ok": True, "posts": len(f["posts"]), "handle": f.get("handle")}
-        except (ValueError, TypeError, KeyError) as e:
+        except (ValueError, TypeError, KeyError, AttributeError) as e:   # AttributeError: a body that isn't {handle, tiles}
             out, code = {"ok": False, "error": "nothing usable in what the page sent"}, HTTPStatus.BAD_REQUEST
-            say(f"(feed refused: {str(e)[:120]})")
+            say(f"(feed refused: {str(e)[:300]})")         # long enough for curl's reason when no picture came in
         data = json.dumps(out).encode()
         self.send_response(code)
         self.cors()
@@ -1287,7 +1418,20 @@ def main():
             say("Forgot your grid. The page shows placeholders again until it's read once more.")
             return 0
         if a.import_file:
-            body = json.loads(Path(a.import_file).read_text(encoding="utf-8-sig"))   # -sig: a file Claude saved may start with a byte-order mark
+            try:
+                # read as bytes: json finds UTF-8, UTF-8 with a byte-order mark, and UTF-16 or -32 by itself (a list
+                # saved on a PC through Windows PowerShell's ">" is UTF-16 with a mark)
+                body = json.loads(Path(a.import_file).read_bytes())
+                if isinstance(body, str):
+                    # the browser pane's javascript tool hands the snippet's text back as one quoted string; saved
+                    # exactly as it came, that string is the list, so it is read once more
+                    body = json.loads(body)
+            except FileNotFoundError:
+                say(f"STOP: there's no file at {a.import_file}. Nothing changed.")
+                return 1
+            except (OSError, ValueError) as e:
+                say(f"STOP: that file isn't the list the snippet returned ({e.__class__.__name__}). Nothing changed.")
+                return 1
             tiles = body.get("tiles") if isinstance(body, dict) else body
             try:
                 f = import_feed(tiles, handle=a.handle or (body.get("handle") if isinstance(body, dict) else None))

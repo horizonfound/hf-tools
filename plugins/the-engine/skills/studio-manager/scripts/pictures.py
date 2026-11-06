@@ -90,6 +90,13 @@ def ready():
         return True, "Pillow"
     # Ends in a full stop, with the command inside the brackets so the stop is never read as part of it:
     # callers add their own sentence after these words.
+    if this_computer.MAC and not os.environ.get("ASSISTANT_NO_SIPS"):
+        # A Mac whose own picture tool is missing: never seen (every Mac comes with sips). Its words say so, and
+        # give the Mac's own name for Python (a Mac has no "python"). ASSISTANT_NO_SIPS, the PC way tried on a
+        # Mac, keeps the PC's words below: showing those is what it is for.
+        return False, ("This Mac's own picture tool (sips, which every Mac comes with) can't be found, so I can't "
+                       "make previews of your photos. One free add-on can do the same job: Pillow (one command adds "
+                       "it: python3 -m pip install pillow).")
     return False, (f"This {this_computer.COMPUTER} needs one free add-on before I can make previews of your photos. "
                    "It is called Pillow (one command adds it: python -m pip install pillow).")
 
@@ -113,8 +120,10 @@ def why_not(src):
         return words
     ext = Path(src).suffix.lower()
     if ext in HEIC and not heic_ok():
-        return (f"iPhone photos (HEIC) need one more free add-on on a {this_computer.COMPUTER} before I can show them; "
-                "the command is: python -m pip install pillow-heif (or export them as JPEGs). Nothing was changed.")
+        # No install command here: whether a PC gets that add-on (pillow-heif) is Dustin and Nicole's call, still
+        # open, and parts/on-a-pc.md has Claude suggest exported JPEGs meanwhile. These words say the same.
+        return (f"iPhone photos (HEIC) can't be shown on a {this_computer.COMPUTER} yet: that takes one more add-on "
+                "(pillow-heif), which isn't part of the Assistant yet. Exported as JPEGs, they can be. Nothing was changed.")
     if ext in RAW:
         gen = _raw_jpegs(src)
         try:

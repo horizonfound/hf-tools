@@ -23,10 +23,12 @@ first time, a short explanation and "want to dive in?"; later, pick up where the
 Categories: backup, posts, queue, posting, reel, folder.
 """
 import argparse
+import errno
 import html
 import json
 import os
 import sys
+import threading
 import time
 from datetime import datetime, date
 from pathlib import Path
@@ -49,6 +51,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def now():
@@ -68,9 +75,19 @@ def load_journey():
 
 def save_journey(j):
     HOME.mkdir(parents=True, exist_ok=True)
-    tmp = JOURNEY.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, JOURNEY)   # on a PC, waits a moment if the page server is reading it right then
+    # A scratch name of this program's and this thread's own: a command (`home.py did`, `hello --mark`) and a
+    # click on the home page can save at the same moment, and with one shared name ("journey.json.tmp", before
+    # Nov 6) one could take the other's file away mid-save. The bytes saved are the same as ever.
+    tmp = JOURNEY.with_name(f"{JOURNEY.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, JOURNEY)   # on a PC, waits a moment if the page server is reading it right then
+    except BaseException:
+        try:
+            tmp.unlink()                      # only the scratch copy just written here, never the record itself
+        except OSError:
+            pass
+        raise
 
 
 def record_click(item):
@@ -347,6 +364,14 @@ if(live){setInterval(async()=>{try{const r=await fetch('/home-state',{cache:'no-
 """
 
 
+def _in_address(t):
+    """A kit folder's name (or a picture named after it) as part of a page address: the three characters that
+    would cut the address short or change it ("#", "?" and "%") written the way addresses write them, and
+    nothing else, so every other name is exactly as before. A kit named "Smith #2" lost its pictures and its
+    Open the post kit button before Nov 6 (both computers): the address stopped at the "#"."""
+    return str(t).replace("%", "%25").replace("#", "%23").replace("?", "%3F")
+
+
 def kit_thumbs(k):
     """Three small previews of a kit's photos, in ~/.studio/home-thumbs/, made once."""
     try:
@@ -443,15 +468,15 @@ def page_html():
             acts += f"<button class='btn' data-report='{e(s['id'])}'>See the report</button>"
         k = kits_by_name.get(s["name"].lower())
         if k:
-            acts += f"<a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a>"
+            acts += f"<a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a>"
         recent.append(f"<div class='shoot'><div class='ph'>{ph}</div><b>{e(s['name'])}</b><small>{e(meta)}</small><div class='acts'>{acts}</div></div>")
     for k in g["kits"]:
         if k["name"].lower() in {s["name"].lower() for s in g["recent"]}:
             continue
-        th = "".join(f"<img src='{e(t)}' alt=''>" for t in kit_thumbs(k))
+        th = "".join(f"<img src='{e(_in_address(t))}' alt=''>" for t in kit_thumbs(k))
         th += "<i></i>" * (3 - th.count("<img"))
         recent.append(f"<div class='shoot'><div class='ph'>{th}</div><b>{e(k['name'])}</b><small>{k['photos']} photos · post kit</small>"
-                      f"<div class='acts'><a class='btn solid' href='/content/{e(k['folder'])}/Post%20kit.html'>Open the post kit</a></div></div>")
+                      f"<div class='acts'><a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a></div></div>")
     recent_html = "".join(recent[:8]) if recent else ""
     recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
                     else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here once you've backed up a memory card or made posts from a folder of photos.</p>")
@@ -479,11 +504,13 @@ def write_page():
 
 def url():
     """The live home page: on the posting server, started if it isn't running."""
-    import urllib.request
     f = HOME / "posting-url.txt"
     def alive(u):
         try:
-            urllib.request.urlopen(u, timeout=1).read(1)
+            # Never through a proxy (this_computer.open_local): a proxy can't see this computer's own pages, so the
+            # check would fail and a second page server be started on the next address. With no proxy set (every
+            # Mac and PC at home) this is exactly what it was.
+            this_computer.open_local(u, timeout=1).read(1)
             return True
         except Exception:  # noqa: BLE001
             return False
