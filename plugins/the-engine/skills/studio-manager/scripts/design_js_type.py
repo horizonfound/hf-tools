@@ -22,6 +22,7 @@ which calls it, so the words break in the same places in both.
     T.layout(b, measure) -> {lines: [{t, w, x}], lh, h}     x = where the line starts inside the box
     T.baseline(lh, ascent, descent)     how far below a line's top its letters stand
     T.newText(id, slide, bg, defaults)  the box "+ Add text" makes
+    T.freeSpot(b, others, height)  the y a new text box takes so it is never exactly on top of another
     T.style(b, key, value)         one change to a box's style, held inside the limits; null when it is not one
     T.sig(b)                       everything about a box that decides its lines, as one string
 """
@@ -156,6 +157,21 @@ DESIGN_TYPE_JS = r"""
             size: f.size, weight: 400, italic: false, upper: false, al: 'center', ls: 0, lh: f.lh, color: isDark(bg) ? f.light : f.dark,
             x: slide * W + (W - f.w) / 2, y: r2(H * f.y), w: f.w, h: r2(f.size * f.lh)};
   }
+  // Where a new text box goes so that it is never exactly on top of one that is already there: under the box
+  // in its way (and under the next one, if that spot is taken too), or above them when the slide has no room
+  // below. others = the text boxes already there; height = the slide's. -> the new box's y
+  function freeSpot(b, others, height){
+    var near = 12, y, o, n;
+    function hit(at){
+      for (var i = 0; i < others.length; i++) { if (Math.abs(others[i].x - b.x) < near && Math.abs(others[i].y - at) < near) return others[i]; }
+      return null;
+    }
+    for (y = b.y, n = 0; (o = hit(y)) && n <= others.length; n++) y = r2(o.y + o.h);
+    if (!hit(y) && y + b.h <= height) return y;
+    for (y = b.y, n = 0; (o = hit(y)) && n <= others.length; n++) y = r2(o.y - b.h);
+    if (!hit(y) && y >= 0) return y;
+    return b.y;
+  }
   // One change to a box's style: {key: the value held inside its limits}, or null when it is not a change
   // this page makes.
   function style(b, key, value){
@@ -178,7 +194,7 @@ DESIGN_TYPE_JS = r"""
     W: W, H: H, RULES: RULES, useLimits: useLimits,
     fontOk: fontOk, fontString: fontString, familyString: familyString, googleHref: googleHref, tidyName: tidyName,
     cleanText: cleanText, shown: shown, letters: letters, wrapLines: wrapLines, heightOf: heightOf, layout: layout,
-    baseline: baseline, sig: sig, isDark: isDark, newText: newText, style: style
+    baseline: baseline, sig: sig, isDark: isDark, newText: newText, freeSpot: freeSpot, style: style
   };
 })(typeof window !== 'undefined' ? window : this);
 """

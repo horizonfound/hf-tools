@@ -59,11 +59,12 @@ body.designer .bar,body.designer .head{max-width:var(--wide)}
 body.designer .head{padding:10px 0 10px}
 body.designer h1{font-size:19px}
 body.designer .lede{font-size:13.5px}
-.d-tools,.stage,.tray,.d-note{flex:none;width:100%;max-width:var(--wide);margin-left:auto;margin-right:auto}
+.d-tools,.stage,.tray{flex:none;width:100%;max-width:var(--wide);margin-left:auto;margin-right:auto}
 .d-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
 .group{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:38px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 7px}
 .group .lbl{color:var(--soft);font-size:12.5px;margin-right:2px}
 .group b{font-weight:650}
+#slides-count{display:inline-block;min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
 .tb{font:600 13px/1.2 var(--sans);border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:8px;padding:6px 9px;cursor:pointer}
 .tb:hover{border-color:var(--soft)}
 .tb:disabled{opacity:.4;cursor:default}
@@ -80,7 +81,7 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .gline{font-size:13.5px;color:var(--accent-d)}
 .gline:empty{display:none}
 .dname{font:650 14.5px/1.3 var(--sans);overflow-wrap:anywhere}
-.savestate{font-size:12.5px;color:var(--soft);min-width:52px}
+.savestate{display:inline-block;width:86px;font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .savestate.bad{color:var(--accent-d)}
 .selbar{min-height:50px;margin-bottom:18px}
 .selbar.off .needsel{opacity:.4;pointer-events:none}
@@ -112,7 +113,9 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .selbox.adj .h,.selbox.fixed .h{display:none}
 .guide{position:absolute;background:#f0508c;pointer-events:none}
 .slidemark{position:absolute;top:0;bottom:0;display:none;outline:3px solid var(--accent);outline-offset:-3px;background:rgba(196,104,63,.14);pointer-events:none}
-.d-note{margin-top:10px;font-size:13.5px;color:var(--accent-d);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.d-note{margin:0 0 8px;font-size:13.5px;color:var(--accent-d);display:flex;flex-wrap:wrap;gap:8px;align-items:center;overflow-wrap:anywhere}
+.d-note.quiet{color:var(--soft)}
+.blk:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 
 .tray{flex:1 0 auto;margin-top:18px;padding-bottom:28px}
 .trayhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 2px}
@@ -174,6 +177,9 @@ SNAP_TITLE = ("Photos line up with the slides and with each other as you drag. "
 # The bar at the bottom of the window: looking at the carousel as Instagram will show it, and saving it.
 PREVIEW = "Preview swipe"
 GRID_CROP = "Profile grid crop"
+# The label of the Smaller / Bigger buttons: how large the slides are drawn on this page (a text box has a
+# "Size" of its own, so this one is not called that).
+VIEW = "View"
 SAVE_SLIDES = "Save slides"
 SAVE_ANYWAY = "Save anyway"
 GO_BACK = "Go back"
@@ -223,7 +229,7 @@ def page_html(kit_name):
         "<span class='gline' id='slides-line' role='status'></span></div>"
         "<div class='group' id='g-bg'><span class='lbl'>Background</span>" + swatches +
         "<input type='color' id='bgc' value='#ffffff' aria-label='Pick any background color' title='Pick any color'></div>"
-        "<div class='group' id='g-view'><span class='lbl'>Size</span>"
+        "<div class='group' id='g-view'><span class='lbl'>" + html.escape(VIEW) + "</span>"
         "<button class='tb' id='view-smaller' type='button'>Smaller</button><button class='tb' id='view-bigger' type='button'>Bigger</button></div>"
         "<div class='group' id='g-snap'><label class='hint' title='" + html.escape(SNAP_TITLE, quote=True) + "'>"
         "<input type='checkbox' id='snap' checked> Snap into line</label></div>"
@@ -236,7 +242,6 @@ def page_html(kit_name):
         "<span class='hint' id='selhint'></span></div>"
         "<section class='stage' id='stage'><div class='stripwrap' id='stripwrap'><div class='labels' id='labels'></div>"
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
-        "<p class='d-note' id='d-note' hidden></p>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
         "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span></div>"
         "<p class='hint' id='trayhint'>" + html.escape(TRAY_HINT) + "</p>"
@@ -245,7 +250,15 @@ def page_html(kit_name):
         # "Open the Carousel folder" with the answer it brings, are here, beside the button that was pressed.
         # The bar is pinned to the bottom and grows upward, so the three buttons that are always there never
         # move when a line arrives.
-        "<div class='sv-bar' id='savebar'><div class='sv-in'>"
+        # Above its buttons the bar also holds every line the page says by itself (#d-note: a save that was
+        # refused, a design changed somewhere else, the photos changed, with Reload beside it; #d-trouble: why
+        # the last change is not saved yet; the fonts' line is put after these by its own script; #grid-line:
+        # what the profile grid's tick shows). The bar is always in sight, and a line coming here moves nothing.
+        "<div class='sv-bar' id='savebar'><div class='sv-notes' id='notes'>"
+        "<p class='d-note' id='d-note' role='alert' hidden></p>"
+        "<p class='d-note' id='d-trouble' role='status' hidden></p>"
+        "<p class='d-note quiet' id='grid-line' hidden></p>"
+        "</div><div class='sv-in'>"
         "<button class='tb' id='preview-btn' type='button' disabled>" + html.escape(PREVIEW) + "</button>"
         "<label class='hint'><input type='checkbox' id='gridcrop'> " + html.escape(GRID_CROP) + "</label>"
         "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_SLIDES) + "</button>"

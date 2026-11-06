@@ -43,6 +43,8 @@ DESIGN_DESIGNS_JS = r"""
     gallerySub: function(shoot){ return 'Pick a starting point for ' + shoot + '. This makes a new design. The one you have open stays as it is.'; },
     fillTick: 'Put this shoot’s photos in the frames for me',
     close: 'Close', use: 'Use', making: 'Making your new design...',
+    makeLate: 'Can’t reach the Assistant right now, so no new design was made. Your open design is still here. Try again in a moment.',
+    makeSlow: 'The Assistant is taking a long time. Look in My designs in a moment: your new design may be there.',
     secFresh: 'Start fresh', secMine: 'Your templates', secStarters: 'Starter templates',
     blank: 'Blank', blankSub: function(k){ return k + ' empty slides'; },
     onePer: 'One photo per slide', slidesSub: function(k){ return k + ' slides'; },
@@ -305,24 +307,40 @@ DESIGN_DESIGNS_JS = r"""
     D.load(bt.dataset.design).then(done, done);
   });
   // A NEW design from the Assistant, then opened. body = what /design-new is sent (the token is added here).
-  // -> a promise of '' when it opened, or the words to show when it did not.
+  // -> a promise of '' when it opened, 'unsaved' or 'gone' when it was not made and nothing more is to be
+  // said, or the words to show when it did not open.
+  // A press is given up on after MAKE_WAIT, or when its gallery is closed (giveUp): from then on nothing it
+  // was waiting for can make or open a design, so one never appears by itself long after the press.
+  var MAKE_WAIT = 20000, making = 0;
+  function giveUp(){ making += 1; }
   function makeDesign(body){
-    return D.save.flush().then(function(ok){
-      if (!ok) return 'unsaved';        // the open design could not be saved: the line under the slides says why
+    var mine = ++making, sent = false;
+    var gone = function(){ return mine !== making; };
+    var work = D.save.flush().then(function(ok){
+      if (gone()) return 'gone';
+      if (!ok) return 'unsaved';        // the open design could not be saved: the line at the bottom of the window says why
       body.kit = D.KIT; body.token = newToken('n');
+      sent = true;
       return post('/design-new', body, 3).then(function(res){
+        if (gone()) return 'gone';
         var j = res.j;
         if (j && j.ok && j.design && typeof j.design.id === 'string') return D.load(j.design.id).then(function(){ return ''; });
         if (j && j.why === 'photos') { D.note(j.words || D.WORDS.photosChanged, true); return 'unsaved'; }
         return (j && j.words) || D.WORDS.cantReach;
       });
     });
+    var late = new Promise(function(ok){ setTimeout(ok, MAKE_WAIT); }).then(function(){
+      if (gone()) return 'gone';
+      giveUp();
+      return sent ? DW.makeSlow : DW.makeLate;
+    });
+    return Promise.race([work, late]).then(function(words){ if (!gone()) giveUp(); return words; });
   }
   dupBtn.addEventListener('click', function(){
     if (busy || !D.design || D.blocked) return;
     setBusy(true);
     var done = function(){ setBusy(false); };
-    makeDesign({copy: D.design.id}).then(function(words){ if (words && words !== 'unsaved') D.note(words, false); }).then(done, done);
+    makeDesign({copy: D.design.id}).then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
   });
 
   // ---------- + New design, Save as template, Fill empty frames ----------
@@ -347,6 +365,7 @@ DESIGN_DESIGNS_JS = r"""
     if (fillBtn.textContent !== text) fillBtn.textContent = text;
     fillBtn.disabled = D.blocked || !k;
     tplBtn.disabled = D.blocked;
+    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; }
   });
 
   // the gallery
@@ -423,6 +442,8 @@ DESIGN_DESIGNS_JS = r"""
     gLine.textContent = '';
     sheet.classList.remove('dz-busy');
     D.modals.open(gallery, function(){
+      // closed while a new design was still being asked for: that press is given up on, and the buttons work again
+      if (busy) { giveUp(); setBusy(false); sheet.classList.remove('dz-busy'); }
       if (cardShelf) { D.paint.letGo(cardShelf, null); cardShelf = null; }
       Object.keys(secs).forEach(function(k){ secs[k].textContent = ''; });
       try { newBtn.focus(); } catch (e) {}
@@ -444,9 +465,11 @@ DESIGN_DESIGNS_JS = r"""
     gLine.textContent = DW.making;
     var done = function(){ setBusy(false); sheet.classList.remove('dz-busy'); };
     makeDesign(start()).then(function(words){
-      if (!words || words === 'unsaved') { closeGallery(); return; }
+      if (words === 'gone') return false;       // given up on (the gallery was closed): another press may be at work by now
+      if (!words || words === 'unsaved') { closeGallery(); return true; }
       gLine.textContent = words;          // it could not be made: the gallery stays, with the reason
-    }).then(done, done);
+      return true;
+    }).then(function(mine){ if (mine) done(); }, done);
   });
 
   // Save as template

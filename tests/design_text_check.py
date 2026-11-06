@@ -391,9 +391,9 @@ def check_type_browser(case, work, port, make_kit, Server, post, get_json):
             c.js("document.getElementById('stage').scrollLeft = 0")
             c.click("#add-text")
             b = sel()
-            case("add text: a text box is added in the middle of the slide in view, selected, on top, with the Assistant's starting words",
+            case("add text: a text box is added in the middle of the first slide in sight, selected, on top, with the Assistant's starting words",
                  b is not None and b["type"] == "text" and b["text"] == "Your words here" and len(st()["blocks"]) == n0 + 1 and st()["blocks"][-1]["id"] == b["id"]
-                 and b["w"] == 820 and b["y"] == 567 and (b["x"] - 130) % W == 0 and b["x"] // W == c.js("Designer.viewSlide()"), b)
+                 and b["w"] == 820 and b["y"] == 567 and (b["x"] - 130) % W == 0 and b["x"] // W == 0 and c.js("Designer.firstSlide()") == 0, b)
             tid = b["id"]
             case("add text: the cursor is in the words box, with the starting words selected so typing replaces them",
                  c.js("document.activeElement.id") == "t-words" and c.js("(function(){ var t = document.getElementById('t-words'); return t.selectionStart === 0 && t.selectionEnd === t.value.length && t.value === 'Your words here'; })()"))

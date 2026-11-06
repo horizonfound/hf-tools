@@ -17,8 +17,10 @@ SAVE SLIDES, IN ORDER (every line it says is beside the button):
     3. nothing changed since the last set: "Already saved as ...", and nothing is drawn. "Nothing changed"
        is the Assistant's word (the same layout, name and edit of every photo, every file still there) plus
        the page's own: the same fonts are missing now as then. A photo exported again since this page opened
-       stops the save before anything is drawn, with Reload at the top of the page.
-    4. an empty frame or a bare slide is asked about IN THE PAGE (Save anyway / Go back); so is a font that
+       stops the save before anything is drawn, with Reload just above the button, in the same bar.
+    4. an empty frame or a bare slide is asked about IN THE PAGE (Save anyway / Go back); so is a text box
+       that still says the words the Assistant put there to start it off ("Your words here", a starter's
+       "Your title": words they never wrote must not land on a finished slide unasked); so is a font that
        could not be loaded (those words would be saved in Georgia)
     5. each slide: one canvas, the background, everything on that slide in list order (Designer.paint), JPEG
        at 0.93, sent to staging, one at a time, "Making slide 3 of 7..."; pictures the next slide does not
@@ -50,6 +52,12 @@ DESIGN_SAVE_JS = r"""
       return slides.length === 1 ? 'Slide ' + slides[0] + ' has nothing on it. It will be saved as a plain slide.'
                                  : 'Slides ' + P.list(slides) + ' have nothing on them. They will be saved as plain slides.';
     },
+    // a text box that still says what the Assistant put there to start it off
+    standIn: function(found){
+      if (found.length === 1) return 'The text on slide ' + found[0].slide + ' still says “' + found[0].text + '”, the words it started with. It will be saved like that.';
+      var slides = []; found.forEach(function(f){ if (slides.indexOf(f.slide) < 0) slides.push(f.slide); });
+      return found.length + ' text boxes still say the words they started with (' + (slides.length === 1 ? 'slide ' : 'slides ') + P.list(slides) + '). They will be saved like that.';
+    },
     fellBack: function(names){
       var q = names.map(function(n){ return '“' + n + '”'; });
       var list = q.length <= 1 ? q.join('') : q.slice(0, -1).join(', ') + ' and ' + q[q.length - 1];
@@ -62,13 +70,14 @@ DESIGN_SAVE_JS = r"""
     late: 'Couldn’t reach the Assistant to finish saving. Nothing was lost. Press Save slides again and it will finish.',
     // the Assistant's own words for these two, for when the page knows before it has to ask
     changed: 'The design changed while its slides were being made. Nothing was added to your Carousel folder. Press Save slides again.',
-    photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload at the top of this page, then Save slides again.',
+    photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
+    cantOpen: 'Couldn’t open the folder from here. Ask Claude to open your Carousel folder.',
     // the preview
     previewLabel: 'Preview', count: function(i, n){ return i + ' of ' + n; },
     prev: 'Previous slide', next: 'Next slide', close: 'Close',
     previewHint: 'Swipe, use the arrows, or the arrow keys.',
-    gridTitle: 'Your profile grid shows the first slide a little narrower. The shaded edges on slide 1 are what it leaves out.'
+    gridTitle: 'Your profile grid shows the first slide a little narrower. The striped edges on slide 1 are what it leaves out.'
   };
   var TRIES = 3, WAIT = 2000, FLUSH_WAIT = 20000, COMMIT_WAIT = 75000, QUALITY = 0.93;
 
@@ -94,6 +103,17 @@ DESIGN_SAVE_JS = r"""
   var stats = {held: 0, peak: 0, slides: 0, ms: 0, runs: 0};      // what the last save held and took (for the checks)
 
   function say(text){ if (line.textContent !== (text || '')) line.textContent = text || ''; }
+  // The text boxes that still say, letter for letter, words the Assistant put there: what "+ Add text"
+  // starts a box with, and the words in the starter templates. -> [{slide, text}], in reading order
+  function standIns(st){
+    var theirs = {};
+    var add = function(s){ s = typeof s === 'string' ? s.trim() : ''; if (s) theirs[s] = true; };
+    add(D.S && D.S.text && D.S.text.text);
+    ((D.S && D.S.starters) || []).forEach(function(t){ ((t && t.template && t.template.blocks) || []).forEach(function(b){ if (M.isText(b)) add(b.text); }); });
+    return st.blocks.filter(function(b){ return M.isText(b) && Object.prototype.hasOwnProperty.call(theirs, String(b.text || '').trim()); })
+      .map(function(b){ return {slide: M.clamp(Math.floor((b.x + b.w / 2) / W), 0, st.slides - 1) + 1, text: String(b.text).trim(), x: b.x, y: b.y}; })
+      .sort(function(a, b){ return a.slide - b.slide || a.y - b.y || a.x - b.x; });
+  }
   function showOpen(on){ openWrap.hidden = !on; openLine.textContent = ''; }
   function wait(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
   // A question, in the page, beside the button -> a promise of true (Save anyway) or false (Go back).
@@ -206,6 +226,8 @@ DESIGN_SAVE_JS = r"""
     var hs = P.holeSlides(st), bare = P.bareSlides(st), q = [];
     if (hs.count) q.push(SW.holes(hs.count, hs.slides));
     if (bare.length) q.push(SW.bare(bare));
+    var kept = standIns(st);
+    if (kept.length) q.push(SW.standIn(kept));
     if (q.length && !(await ask(q.join(' ')))) { say(''); return; }
     if (fonts.fellBack && fonts.fellBack.length && !(await ask(SW.fellBack(fonts.fellBack)))) { say(''); return; }
     if (changed) { say(''); return; }
@@ -254,18 +276,31 @@ DESIGN_SAVE_JS = r"""
     openLine.textContent = '';
     fetch('/open?' + D.Q + '&sub=Carousel', {cache: 'no-store'})
       .then(function(r){ return r.json(); })
-      .then(function(j){ openLine.textContent = (j && j.words) || D.WORDS.cantReach; }, function(){ openLine.textContent = D.WORDS.cantReach; });
+      .then(function(j){
+        var words = (j && j.words) || D.WORDS.cantReach;
+        // this page never shows where a folder is on the computer: an answer that spells a path out is
+        // said in the page's own words instead
+        if (!(j && j.ok) && /[\/\\]/.test(words)) words = SW.cantOpen;
+        openLine.textContent = words;
+      }, function(){ openLine.textContent = D.WORDS.cantReach; });
   });
+  // the answer has been read by the next press or key anywhere else: it goes, so it never sits over anything
+  document.addEventListener('pointerdown', function(e){ if (openLine.textContent && !(e.target && openWrap.contains(e.target))) openLine.textContent = ''; }, true);
+  document.addEventListener('keydown', function(){ if (openLine.textContent) openLine.textContent = ''; }, true);
   D.on('render', function(){ if (!busy) saveBtn.disabled = D.blocked; prevBtn.disabled = !D.st; });
 
   // ---------- the profile grid's crop, on slide 1 ----------
   var over = $('over'), cropL = el('div', 'sv-crop sv-l'), cropR = el('div', 'sv-crop sv-r');
   over.appendChild(cropL); over.appendChild(cropR);
+  // what the tick shows is said in words in the bar for as long as it is on (a title alone is never seen by
+  // a finger or a keyboard)
+  var gridLine = $('grid-line');
   grid.parentNode.title = SW.gridTitle;
   grid.addEventListener('change', function(){ D.render(); });
   D.on('render', function(){
     var on = grid.checked && !!D.st, s = D.scale, trim = P.gridTrim();
     cropL.classList.toggle('on', on); cropR.classList.toggle('on', on);
+    if (gridLine.hidden !== !on) { gridLine.textContent = on ? SW.gridTitle : ''; gridLine.hidden = !on; }
     if (!on) return;
     cropL.style.left = '0px'; cropL.style.width = trim * s + 'px';
     cropR.style.left = (W - trim) * s + 'px'; cropR.style.width = trim * s + 'px';
@@ -377,16 +412,17 @@ DESIGN_SAVE_JS = r"""
 # The styles of the bar at the bottom of the window, the profile grid's crop and the preview.
 DESIGN_SAVE_CSS = """
 .sv-bar{flex:none;position:sticky;bottom:0;z-index:25;margin:0 -16px;padding:10px 16px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -6px 16px -12px rgba(42,38,34,.4)}
+.sv-notes{max-width:var(--wide);margin:0 auto}
 .sv-in{max-width:var(--wide);margin:0 auto;display:flex;flex-wrap:nowrap;gap:8px;align-items:flex-end;min-height:34px}
 .sv-in>*{flex:none}
 .sv-in>label{padding-bottom:8px}
 .sv-in>.gline{flex:0 1 auto;min-width:0;padding-bottom:7px;overflow-wrap:break-word}
 .sv-open{position:relative;display:inline-flex}
 .sv-open[hidden]{display:none}
-.sv-bub{position:absolute;bottom:calc(100% + 8px);right:0;width:max-content;max-width:320px;background:var(--ink);color:#fff;font:600 12.5px/1.35 var(--sans);padding:7px 10px;border-radius:8px;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);overflow-wrap:break-word}
+.sv-bub{position:absolute;bottom:calc(100% + 8px);left:0;right:0;background:var(--ink);color:#fff;font:600 12.5px/1.35 var(--sans);padding:7px 10px;border-radius:8px;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);white-space:normal;overflow-wrap:anywhere}
 .sv-bub:empty{display:none}
-@media(max-width:900px){.sv-in{flex-wrap:wrap-reverse}.sv-in>.sv-ans{order:2}.sv-in>.gline{order:3;flex:1 1 100%;padding-bottom:0}.sv-bub{right:auto;left:0;max-width:calc(100vw - 32px)}}
-.sv-crop{position:absolute;top:0;bottom:0;display:none;background:rgba(220,60,60,.16);pointer-events:none}
+@media(max-width:900px){.sv-in{flex-wrap:wrap-reverse;align-items:flex-start;align-content:flex-start}.sv-in>.sv-ans{order:2}.sv-in>.gline{order:3;flex:1 1 100%;padding-bottom:0}.sv-in>.sv-open{order:4;flex:1 1 100%}.sv-bub{right:auto;width:max-content;max-width:min(420px,calc(100vw - 32px))}}
+.sv-crop{position:absolute;top:0;bottom:0;display:none;background:repeating-linear-gradient(135deg,rgba(200,40,40,.62) 0 4px,rgba(255,255,255,.55) 4px 8px);pointer-events:none}
 .sv-crop.on{display:block}
 .sv-crop.sv-l{border-right:1px solid rgba(220,60,60,.85)}
 .sv-crop.sv-r{border-left:1px solid rgba(220,60,60,.85)}

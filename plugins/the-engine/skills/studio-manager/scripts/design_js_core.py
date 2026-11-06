@@ -40,6 +40,9 @@ DESIGN_CORE_JS = r"""
   // Every line of words this page says by itself. (What the Assistant refuses with comes with its answer.)
   var WORDS = {
     saved: 'Saved', saving: 'Saving...', retry: 'Not saved yet. Trying again...',
+    // the short word beside the design's name while a change is not saved (the sentence that says why is in
+    // the bar at the bottom of the window), and while the page has stopped until it is reloaded
+    notSaved: 'Not saved', needsReload: 'Needs reload',
     cantReach: 'Could not reach the Assistant. Tell Claude instead.',
     newer: 'This design was changed somewhere else. Here\'s the newest.',
     photosChanged: 'The photos in this shoot changed since this page opened.',
@@ -49,6 +52,10 @@ DESIGN_CORE_JS = r"""
     prep: function(made, total){ return 'Getting your photos ready: ' + made + ' of ' + total; },
     dropped: function(k){ return k === 1 ? '1 photo is no longer in this shoot, so its frame is empty now.' : k + ' photos are no longer in this shoot, so their frames are empty now.'; },
     slide: function(k){ return 'Slide ' + k; },
+    // what each thing on the slides is called for someone using the Tab key and a screen reader
+    namePhoto: function(n, k){ return 'Photo ' + n + ' on slide ' + k; },
+    nameHole: function(k){ return 'Empty frame on slide ' + k; },
+    nameText: function(words, k){ return 'Text on slide ' + k + (words ? ': ' + words : ''); },
     dropHere: 'Drop a photo',
     allPhotos: function(k){ return 'All ' + k + (k === 1 ? ' photo' : ' photos'); },
     // what the lifted photo says it will do
@@ -142,12 +149,30 @@ DESIGN_CORE_JS = r"""
   D.canUndo = function(){ return hist.size() > 0; };
 
   // ---- the lines at the top, and the line about a save ----
-  function status(text, bad){ var s = $('d-status'); s.textContent = text || ''; s.classList.toggle('bad', !!bad); }
+  // The place beside the design's name is one fixed size and only ever holds a short word, so no wording can
+  // push the buttons after it onto another row. A sentence that says why a change is not saved (bad = true)
+  // goes in the bar at the bottom of the window, which is always in sight and moves nothing when it comes.
+  function status(text, bad){
+    var s = $('d-status'), t = $('d-trouble');
+    s.textContent = bad ? WORDS.notSaved : (text || '');
+    s.classList.toggle('bad', !!bad);
+    t.textContent = bad ? (text || '') : '';
+    t.hidden = !(bad && text);
+  }
+  // A short word beside the name in the warning color, when the words that say why are in the note.
+  function flag(word){
+    var s = $('d-status'), t = $('d-trouble');
+    s.textContent = word; s.classList.add('bad');
+    t.textContent = ''; t.hidden = true;
+  }
+  // A line the page says by itself, with Reload beside it when that is the way out. It is in the bar at the
+  // bottom of the window, so it is in sight wherever the page is scrolled to.
   function note(text, reload){
     var n = $('d-note'); n.textContent = '';
     if (!text) { n.hidden = true; return; }
     n.appendChild(el('span', '', text));
-    if (reload) { var b = el('button', 'tb', WORDS.reload); b.type = 'button'; b.addEventListener('click', function(){ location.reload(); }); n.appendChild(b); }
+    // (Reload is the main button once the page has stopped: it is the one thing left to do)
+    if (reload) { var b = el('button', D.blocked ? 'tb main' : 'tb', WORDS.reload); b.type = 'button'; b.id = 'd-reload'; b.addEventListener('click', function(){ location.reload(); }); n.appendChild(b); }
     n.hidden = false;
   }
   function reach(text){ var a = $('l-reach'); a.textContent = text || ''; a.hidden = !text; }
@@ -239,7 +264,7 @@ DESIGN_CORE_JS = r"""
         // refused: say so. What they can put right themselves is sent again with their next change; anything
         // else gets the Reload button beside the words.
         dirty = true;
-        status('');
+        flag(WORDS.notSaved);
         note(j.words || WORDS.cantReach, !SOFT[j.why]);
         settle(false);
       })
@@ -253,7 +278,7 @@ DESIGN_CORE_JS = r"""
   function photosChanged(words){
     D.blocked = true; dirty = false;
     clearTimeout(timer); clearTimeout(retryT);
-    status('');
+    flag(WORDS.needsReload);
     note(words || WORDS.photosChanged, true);
     settle(false);
     D.render();
@@ -385,7 +410,8 @@ DESIGN_CORE_JS = r"""
   D.on('render', function(){
     var b = D.selected(), kind = b ? D.typeOf(b) : 'photo';
     $('selbar').classList.toggle('off', !b);
-    selGroups.forEach(function(g){ g.el.hidden = !g.when(kind, b); });
+    // with nothing selected the groups are greyed out, and out of the Tab key's and a screen reader's way
+    selGroups.forEach(function(g){ g.el.hidden = !g.when(kind, b); g.el.inert = !b; if (b) g.el.removeAttribute('aria-disabled'); else g.el.setAttribute('aria-disabled', 'true'); });
     var hint = D.hints[b ? kind : 'none'];
     $('selhint').textContent = hint ? hint(b) : '';
   });

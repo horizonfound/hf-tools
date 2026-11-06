@@ -130,8 +130,12 @@ DEFAULT_TEXT = "Your words here"
 DEFAULT_FONT = "Playfair Display"
 FALLBACK_FONT = "Georgia"               # what text is drawn in when its font can't be loaded
 GOOGLE_CSS = "https://fonts.googleapis.com/css2"
+OPEN_NEW = "NEW: this shoot had no design, so one was made just now, with one photo on each slide."
+OPEN_THEIRS = "THEIRS: this design was already here. It is as they left it."
 SET_NAME = "{base} - slide {i:02d}.jpg"         # a saved slide's file name in the Carousel folder
-SET_AGAIN = "{base} {k}"                        # the same design saved again: "<name> 2", "<name> 3"
+SET_AGAIN = "{base} ({k})"                      # the same design saved again: "<name> (2)", "<name> (3)". In brackets,
+                                                # because a design's own name often ends in a number
+                                                # ("Beach carousel 1"), and "Beach carousel 1 2" reads like a mistake
 POST_CAP = 262144                       # bytes in a JSON save
 SMALL_CAP = 4096                        # bytes in the small JSON posts (a color, a font name, a commit)
 SLIDE_CAP = 12 * 1024 * 1024            # bytes in one finished slide
@@ -190,7 +194,7 @@ DRIVE = "Couldn't save the slides: {why}. Nothing was lost. Press Save slides ag
 CANT_SAVE = "Your changes can't be saved right now: {why}. They'll be saved by themselves once that is put right."
 CANT_KEEP = "That couldn't be saved: {why}."
 PHOTO_NEWER = ("A photo on these slides was exported again since this page opened, so no slides were made. "
-               "Nothing was added to your Carousel folder. Press Reload at the top of this page, then Save slides again.")
+               "Nothing was added to your Carousel folder. Press Reload, then Save slides again.")
 WHY_WORDS = {"many": TOO_MANY_BLOCKS, "long": TEXT_TOO_LONG, "font": FONT_BAD, "name": NAME_BAD}
 
 # ---------- the fonts ----------
@@ -689,7 +693,12 @@ def next_name(shoot_name, designs, stem=None):
             name = f"{stem} {k}"
         return name
     room = NAME_MAX - len(" carousel 999")
-    base = (clean_name(str(shoot_name)[:NAME_MAX]) or "My")[:room].rstrip()
+    base = clean_name(str(shoot_name)[:NAME_MAX]) or "My"
+    if len(base) > room:
+        # a long shoot name is cut at the end of a word, not in the middle of one (the design's name becomes
+        # the slides' file name)
+        cut = base[:room + 1].rsplit(" ", 1)[0] if " " in base[:room + 1] else base[:room]
+        base = (cut if len(cut) >= room // 2 else base[:room]).rstrip(" ,;:-") or base[:room].rstrip()
     k = 1
     while kit_mod._fold(f"{base} carousel {k}") in taken:
         k += 1
@@ -1208,7 +1217,7 @@ def staged_ok(kit, did, token, count):
 
 
 def free_base(kit, name):
-    """The set's name: the design's name made safe for a file, or that name with 2, 3... after it. The first
+    """The set's name: the design's name made safe for a file, or that name with (2), (3)... after it. The first
     for which the Carousel folder's own listing holds no file that starts "<name> - slide ", compared the way
     a drive that ignores capitals and keeps accents its own way would compare them."""
     base0 = safe_base(name)
@@ -1953,6 +1962,7 @@ def cmd_open(kit, did=None):
     if did is not None and load_design(kit, did) is None:
         say(f"STOP: this shoot has no design with the id {did}. (design.py show lists them.)")
         return 1
+    had = count_designs(kit)
     d = load_design(kit, did) if did else ensure_design(kit)
     if d is None:
         say("STOP: couldn't read this shoot's numbered list. Nothing was changed.")
@@ -1963,6 +1973,9 @@ def cmd_open(kit, did=None):
         return 2
     n = count_designs(kit)
     say(f"{n} design{'s' if n != 1 else ''} for this shoot. Opening \"{d['name']}\" ({d['state']['slides']} slides).")
+    # which of the two things to tell the photographer (parts/arrange.md): a design made this minute with one
+    # photo on each slide, or one they have already worked on
+    say(OPEN_NEW if had == 0 and n >= 1 else OPEN_THEIRS)
     say(addr)
     return 0
 

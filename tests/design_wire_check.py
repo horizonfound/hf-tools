@@ -354,7 +354,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         case("...and every laid-out file is still there, unchanged", nothing_changed() == [], nothing_changed())
         time.sleep(1.1)
         (code, out), S3 = save(change=True, color=2)
-        BASE3 = f"{NAME2} 2"
+        BASE3 = f"{NAME2} (2)"
         set3 = [f"{BASE3} - slide {i:02d}.jpg" for i in range(1, N + 1)]
         got, sub, sec = shown()
         case("a laid-out set saved after that Canva carousel is the one shown", code == 200 and out.get("base") == BASE3 and got == set3 and f"saved as “{BASE3}”" in sub, (code, out, got))

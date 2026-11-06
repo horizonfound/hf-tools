@@ -289,17 +289,17 @@ def check_fixes(case, work, port, make_kit, Server, post, get_json, ask, run, jp
             marks2 = dict(marks)
             marks2[key] = v2[key]
             code, o = commit(P_["id"], t2, P_["rev"], {"photos": marks2, "fell": []})
-            case("photo exported again: slides drawn from the new picture become a new set beside the first", code == 200 and o.get("base") == "Marks 2" and not o.get("already")
-                 and len(in_car("Marks 2 - ")) == n_sl and len(in_car("Marks - ")) == n_sl, (code, o))
+            case("photo exported again: slides drawn from the new picture become a new set beside the first", code == 200 and o.get("base") == "Marks (2)" and not o.get("already")
+                 and len(in_car("Marks (2) - ")) == n_sl and len(in_car("Marks - ")) == n_sl, (code, o))
             case("...and now it is 'Already saved' again", state(P_["id"])["design"]["set"]["same"] is True)
             code, o = save(P_["id"], P_["rev"], n_sl, 840, drawn={"photos": marks2, "fell": ["Lora"]})
             s3 = state(P_["id"])["design"]["set"]
             case("font: a set saved while a font could not be loaded is written down as such, and the page is told which font",
-                 code == 200 and o.get("base") == "Marks 3" and s3.get("fell") == ["Lora"] and s3["same"] is True, (code, o, s3))
+                 code == 200 and o.get("base") == "Marks (3)" and s3.get("fell") == ["Lora"] and s3["same"] is True, (code, o, s3))
             code, o = commit(P_["id"], tok(), P_["rev"], {"photos": marks2, "fell": []})
             case("font: once the font is there, a commit is NOT answered 'already saved' (the words would be drawn in the real font now)", code == 400 and o.get("why") == "missing", (code, o))
             code, o = commit(P_["id"], tok(), P_["rev"], {"photos": marks2, "fell": ["Lora"]})
-            case("font: with the same font still missing it is 'already saved'", code == 200 and o.get("already") is True and o.get("base") == "Marks 3", (code, o))
+            case("font: with the same font still missing it is 'already saved'", code == 200 and o.get("already") is True and o.get("base") == "Marks (3)", (code, o))
             for label, bad in (("a number", 5), ("photos as a list", {"photos": []}), ("a photo key that is no number", {"photos": {"x": "abcdef12"}}),
                                ("a mark that is no mark", {"photos": {"1": "../../etc"}}), ("a font that is no font's name", {"photos": {}, "fell": ["<script>"]}),
                                ("too many fonts", {"photos": {}, "fell": ["Lora"] * 41})):
@@ -590,12 +590,12 @@ def check_fixes_browser(case, work, port, make_kit, Server, post, get_json, jpeg
             try:
                 c.click("#slides-plus")
                 try:
-                    c.wait_for("document.getElementById('d-status').textContent.indexOf('can\\'t be saved right now') >= 0", 8)
-                    said = c.text("#d-status")
+                    c.wait_for("document.getElementById('d-trouble').textContent.indexOf('can\\'t be saved right now') >= 0", 8)
+                    said = c.text("#d-trouble")
                 except cd.Timeout:
-                    said = c.text("#d-status")
-                case("drive: when the kit's folder can't be written, the line beside the name says why (not 'Trying again')",
-                     said.startswith("Your changes can't be saved right now: a folder in this kit can't be written to") and "Trying again" not in said and "/" not in said, said)
+                    said = c.text("#d-trouble")
+                case("drive: when the kit's folder can't be written, the name has 'Not saved' beside it and the line in the bar at the bottom says why (not 'Trying again')",
+                     c.text("#d-status") == "Not saved" and said.startswith("Your changes can't be saved right now: a folder in this kit can't be written to") and "Trying again" not in said and "/" not in said, said)
                 line = press_save(30)
                 case("drive: Save slides then says the design couldn't be saved and nothing was added, and makes nothing", "couldn’t be saved" in line and "Nothing was added" in line and in_car("Out of sight") == [], line)
             finally:
@@ -638,14 +638,14 @@ def check_fixes_browser(case, work, port, make_kit, Server, post, get_json, jpeg
                 c.click("#save-yes")
                 c.wait_for("!Designer.saver.busy()", 60)
                 line = c.text("#save-line")
-            second = in_car("Reexport 2 - ")
+            second = in_car("Reexport (2) - ")
             case("re-export: after Reload, Save slides makes a new set from the new edit (not 'Already saved')",
-                 "Saved 2 slides" in line and "Reexport 2" in line and len(second) == 2 and in_car("Reexport - ") == first and _sha(car / first[0]) == h1, (line, in_car("Reexport")))
+                 "Saved 2 slides" in line and "Reexport (2)" in line and len(second) == 2 and in_car("Reexport - ") == first and _sha(car / first[0]) == h1, (line, in_car("Reexport")))
             if second:
                 px = Image.open(car / second[0]).convert("RGB").getpixel((540, 675))
                 case("re-export: the new slide shows the new edit", abs(px[0] - 250) < 14 and abs(px[1] - 30) < 14 and abs(px[2] - 200) < 14, px)
             line = press_save()
-            case("re-export: and pressed once more it is Already saved, under the new set's name", "Already saved as \"Reexport 2\"" in line, line)
+            case("re-export: and pressed once more it is Already saved, under the new set's name", "Already saved as \"Reexport (2)\"" in line, line)
 
             # ---- a new name ----
             c.js("(function(e){ e.focus(); e.select(); })(document.getElementById('d-name-box'))")

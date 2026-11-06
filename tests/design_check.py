@@ -848,10 +848,10 @@ def check_all(work, port):
         for i in (1, 2, 3):
             slide("settoken03", i, 3, S[5 + i])
         code, out = commit("settoken03", count=3)
-        BASE2 = f"{BASE1} 2"
+        BASE2 = f"{BASE1} (2)"
         names2 = [f"{BASE2} - slide {i:02d}.jpg" for i in (1, 2, 3)]
         now = tree_print(car)
-        case("a second, changed save makes '<design name> 2' beside the first", code == 200 and out.get("base") == BASE2 and new_in_car(before=car_after1) == names2, (code, out, new_in_car(before=car_after1)))
+        case("a second, changed save makes '<design name> (2)' beside the first", code == 200 and out.get("base") == BASE2 and new_in_car(before=car_after1) == names2, (code, out, new_in_car(before=car_after1)))
         case("...and the first set and everything else is byte for byte as it was", all(now.get(k) == v for k, v in car_after1.items()))
         rec = json.loads(rec_file.read_text(encoding="utf-8"))
         case("...and the kit's record names the second as the newest and lists both", rec["carousel_set"]["base"] == BASE2 and [x["base"] for x in rec["laid_out"]] == [BASE1, BASE2], rec.get("laid_out"))
@@ -868,7 +868,7 @@ def check_all(work, port):
             slide("settoken04", i, 3, S[8 + i])
         car_b = tree_print(car)
         code, o = run(env, "design.py", "commit", str(kit), "--design", DID, "--set", "settoken04", "--rev", str(REV[0]), more={"DESIGN_TEST_STOP": "after-2"})
-        BASE3 = f"{BASE1} 3"
+        BASE3 = f"{BASE1} (3)"
         j4 = json.loads((designs / "sets" / f"{DID}-settoken04.json").read_text(encoding="utf-8"))
         case("cut off after two files: the run died, two of the three slides are in, and it is written down as not finished",
              code == 9 and new_in_car(before=car_b) == [f"{BASE3} - slide 01.jpg", f"{BASE3} - slide 02.jpg"] and j4["state"] == "moving" and j4["base"] == BASE3, (code, new_in_car(before=car_b), j4.get("state")))
@@ -892,7 +892,7 @@ def check_all(work, port):
             slide("settoken05", i, 3, S[11 + i])
         car_b = tree_print(car)
         code, o = run(env, "design.py", "commit", str(kit), "--design", DID, "--set", "settoken05", "--rev", str(REV[0]), more={"DESIGN_TEST_STOP": "after-1"})
-        BASE4 = f"{BASE1} 4"
+        BASE4 = f"{BASE1} (4)"
         # the page was reloaded: it knows nothing of that set, and presses Save slides afresh
         code, out = commit("settoken06", count=3)
         case("cut off, then the page reloaded and Save slides pressed afresh: the cut-off set is finished under its own name, and the words say saved",
@@ -910,13 +910,13 @@ def check_all(work, port):
         car_b, rec_b = tree_print(car), rec_file.read_bytes()
         code, o = run(env, "design.py", "commit", str(kit), "--design", DID, "--set", "settoken08", "--rev", str(REV[0]), more={"DESIGN_TEST_STOP": "after-journal"})
         case("cut off before any file moved: nothing is in the Carousel folder yet, and the name is already written down", code == 9 and tree_print(car) == car_b
-             and json.loads((designs / "sets" / f"{DID}-settoken08.json").read_text(encoding="utf-8"))["base"] == f"{BASE1} 5")
+             and json.loads((designs / "sets" / f"{DID}-settoken08.json").read_text(encoding="utf-8"))["base"] == f"{BASE1} (5)")
         code, o = run(env, "design.py", "commit", str(kit), "--design", DID, "--set", "settoken08", "--rev", str(REV[0]), more={"DESIGN_TEST_STOP": "after-record"})
         case("cut off after the kit's record, before the set was marked done: the files are all in", code == 9 and len(new_in_car(before=car_b)) == 3
              and json.loads((designs / "sets" / f"{DID}-settoken08.json").read_text(encoding="utf-8"))["state"] == "moving")
         rec_c, car_c = rec_file.read_bytes(), tree_print(car)
         code, out = commit("settoken08", count=3)
-        case("...and the next try only marks it done: the same name, no file and no record changed", code == 200 and out.get("base") == f"{BASE1} 5" and tree_print(car) == car_c and rec_file.read_bytes() == rec_c, (code, out))
+        case("...and the next try only marks it done: the same name, no file and no record changed", code == 200 and out.get("base") == f"{BASE1} (5)" and tree_print(car) == car_c and rec_file.read_bytes() == rec_c, (code, out))
 
         # a file turns up in the way of a set that was cut off: it is put back, never written over
         STATE, REV[0] = change()
@@ -924,11 +924,11 @@ def check_all(work, port):
             slide("settoken10", i, 3, S[20 + i])
         car_b = tree_print(car)
         run(env, "design.py", "commit", str(kit), "--design", DID, "--set", "settoken10", "--rev", str(REV[0]), more={"DESIGN_TEST_STOP": "after-1"})
-        BASE6 = f"{BASE1} 6"
+        BASE6 = f"{BASE1} (6)"
         theirs = jpeg(seed=777)
         (car / f"{BASE6} - slide 02.jpg").write_bytes(theirs)
         code, out = commit("settoken10", count=3)
-        BASE7 = f"{BASE1} 7"
+        BASE7 = f"{BASE1} (7)"
         now = tree_print(car)
         case("a file of theirs has the name a cut-off set needs: their file is untouched, and ours that was already in under that name is taken back out",
              now.get(f"{BASE6} - slide 02.jpg") == sha(theirs) and f"{BASE6} - slide 01.jpg" not in now and all(now.get(k) == v for k, v in car_b.items()), sorted(set(now) - set(car_b)))
@@ -969,7 +969,7 @@ def check_all(work, port):
         car_b = tree_print(car)
         code, out = commit("settoken13", count=3)
         case("a design whose name differs from saved sets only in capitals: the first free name is counted without regard to capitals",
-             code == 200 and out.get("base") == "BEACH DAY ONE 8" and len(new_in_car(before=car_b)) == 3 and all(tree_print(car).get(k) == v for k, v in car_b.items()), (code, out))
+             code == 200 and out.get("base") == "BEACH DAY ONE (8)" and len(new_in_car(before=car_b)) == 3 and all(tree_print(car).get(k) == v for k, v in car_b.items()), (code, out))
 
         zcar = kit2 / "Carousel"
         zstate, zstamp = stz["design"]["state"], stz["stamp"]
@@ -983,7 +983,7 @@ def check_all(work, port):
              and all(fold(n) == fold(f"{zbase} - slide {i:02d}.jpg") for i, n in enumerate(znew, 1)), (code, out, znew))
         # a drive that keeps accents its own way, and ignores capitals, would list a set like this one: the
         # next name must be counted as taken
-        nfd = unicodedata.normalize("NFD", f"{zbase} 2 - slide 01.jpg").upper()
+        nfd = unicodedata.normalize("NFD", f"{zbase} (2) - slide 01.jpg").upper()
         (zcar / nfd).write_bytes(jpeg(seed=555))
         zs = copy.deepcopy(zstate)
         zs["bg"] = "#111111"
@@ -993,8 +993,8 @@ def check_all(work, port):
         zbefore = tree_print(zcar)
         code, out = commit("zsettoken2", did=Z_ID, rev=1, count=zslides, kitname=kit2_name)
         znow = tree_print(zcar)
-        case("the accented shoot: a name already there with its accents kept another way and in capitals is counted as taken (the save becomes '... 3')",
-             code == 200 and fold(out.get("base", "")) == fold(f"{zbase} 3") and all(znow.get(k) == v for k, v in zbefore.items()) and len(znow) == len(zbefore) + zslides, (code, out))
+        case("the accented shoot: a name already there with its accents kept another way and in capitals is counted as taken (the save becomes '... (3)')",
+             code == 200 and fold(out.get("base", "")) == fold(f"{zbase} (3)") and all(znow.get(k) == v for k, v in zbefore.items()) and len(znow) == len(zbefore) + zslides, (code, out))
         case("the accented shoot: its saves went to its own Carousel folder, not the other shoot's", not [n for n in os.listdir(car) if "Été" in unicodedata.normalize("NFC", n)])
 
         # ---------- two saves at once ----------
@@ -1017,7 +1017,7 @@ def check_all(work, port):
             t.join(120)
         bases = sorted(x[1].get("base", "") for x in got.values() if x[1])
         now = tree_print(car)
-        case("two designs with the same name saved at the same moment: two whole sets under two names", len(got) == 2 and all(x[0] == 200 for x in got.values()) and bases == ["Twin", "Twin 2"]
+        case("two designs with the same name saved at the same moment: two whole sets under two names", len(got) == 2 and all(x[0] == 200 for x in got.values()) and bases == ["Twin", "Twin (2)"]
              and len(new_in_car(before=car_b)) == 4, (got, new_in_car(before=car_b)))
         by = {got["a"][1]["base"]: (S[1], S[2]), got["b"][1]["base"]: (S[3], S[4])} if len(got) == 2 and all(x[1] and x[1].get("base") for x in got.values()) else {}
         case("...each set holds its own design's slides, and nothing was written over", by and all([now.get(f"{b} - slide 01.jpg"), now.get(f"{b} - slide 02.jpg")] == [sha(p[0]), sha(p[1])] for b, p in by.items())
@@ -1147,11 +1147,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
                          "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks); "
-                         "wire: only the kit page, the posting queue, the links and the line for Claude")
+                         "wire: only the kit page, the posting queue, the links and the line for Claude; fixes: what the first reviewers found (safety); "
+                         "screen: what the second reviewers found (matching Nicole's, and what is on the screen)")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1169,7 +1170,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser")):
+    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1190,6 +1191,7 @@ def main():
     import design_fix_check
     import design_page_check
     import design_save_check
+    import design_screen_check
     import design_text_check
     import design_wire_check
     have_chrome = bool(chrome_drive.find_chrome())
@@ -1247,6 +1249,16 @@ def main():
             design_text_check.check_type_browser(case, work, a.port + 8, make_kit, Server, post, get_json)
         except Exception as e:  # noqa: BLE001
             case("the real-browser checks of text, fonts and brand colors ran to the end", False, f"{type(e).__name__}: {e}")
+    if a.only in (None, "page", "screen"):
+        design_screen_check.check_screen_page(case, work)
+    if a.only in (None, "browser", "screen"):
+        # what the second reviewers found (the screen, and matching Nicole's): its own pretend shoot and page server
+        real_page("the page's own lines, the keyboard, words over a seam, the folder button's answer")
+        try:
+            design_screen_check.check_screen_browser(case, work, a.port + 16, make_kit, Server, post, get_json, run)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of what is on the screen ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     if a.only in (None, "browser", "designs"):
         # designs, templates, the preview and Save slides: two more pretend shoots (one from photos drawn
         # here, so every saved pixel is known) and a page server on the port after those

@@ -204,8 +204,8 @@ def check_designs_page(case, work):
         case(f"{n}: no script, frame or link is ever added to the page", not re.search(r"createElement\(\s*['\"](script|iframe|object|embed|link)['\"]", s))
         case(f"{n}: no address on the internet is written in it", not re.search(r"https?://|googleapis|gstatic", s))
     case("the rules and the drawing wait on no timer at all", "setTimeout" not in src["DESIGN_PLAN_JS"] and "setTimeout" not in src["DESIGN_PAINT_JS"])
-    case("the only timers are waits between tries: two in the designs script (a POST with no answer; leaving for another shoot), one in the saving script",
-         src["DESIGN_DESIGNS_JS"].count("setTimeout(") == 2 and src["DESIGN_SAVE_JS"].count("setTimeout(") == 1,
+    case("the only timers are waits between tries and one giving-up limit: three in the designs script (a POST with no answer; leaving for another shoot; giving up on a new design the Assistant never answered), one in the saving script",
+         src["DESIGN_DESIGNS_JS"].count("setTimeout(") == 3 and "setTimeout(ok, MAKE_WAIT)" in src["DESIGN_DESIGNS_JS"] and src["DESIGN_SAVE_JS"].count("setTimeout(") == 1,
          (src["DESIGN_DESIGNS_JS"].count("setTimeout("), src["DESIGN_SAVE_JS"].count("setTimeout(")))
     d, sv, pt = src["DESIGN_DESIGNS_JS"], src["DESIGN_SAVE_JS"], src["DESIGN_PAINT_JS"]
     case("drawing: a photo is laid out by the strip's own rule from the loaded picture's own size, and words by the text part's own drawing",
@@ -225,7 +225,7 @@ def check_designs_page(case, work):
     case("there is no way to delete a design or a template on the page", not re.search(r"[Dd]elete|[Tt]rash|/design-delete|/design-remove", d + sv))
     # the bar at the bottom: every line Save slides says is beside the button that was pressed
     case("designer page: the Save slides line, its two answers, and Open the Carousel folder with its own line are in one bar with the button, in that order",
-         bool(re.search(r"<div class='sv-bar' id='savebar'><div class='sv-in'>(?:(?!</div>).)*id='preview-btn'(?:(?!</div>).)*id='gridcrop'(?:(?!</div>).)*id='save-slides'(?:(?!</div>).)*id='save-line'"
+         bool(re.search(r"<div class='sv-bar' id='savebar'><div class='sv-notes' id='notes'>(?:(?!</div>).)*</div><div class='sv-in'>(?:(?!</div>).)*id='preview-btn'(?:(?!</div>).)*id='gridcrop'(?:(?!</div>).)*id='save-slides'(?:(?!</div>).)*id='save-line'"
                         r"(?:(?!</div>).)*id='save-yes'(?:(?!</div>).)*id='save-no'(?:(?!</div>).)*id='open-carousel'(?:(?!</div>).)*id='open-line'(?:(?!</div>).)*</div></div>", page, re.S)))
     case("designer page: one main (terracotta) button shows at a time in that bar: Save slides, or Save anyway while a question is up",
          page.count("class='tb main") == 2 and "id='save-yes' type='button' hidden" in page)
@@ -744,10 +744,10 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             settled()
             case("a change takes away the line about the last save, and the folder button with it", c.text("#save-line") == "" and hidden("#open-wrap") and c.text("#open-line") == "")
             line = press_save()
-            case("changed and saved again: a new set named '... 2' beside the first, which is untouched",
-                 line == f"Saved 4 slides in your Carousel folder, named \"{got_name} 2\". Nothing was replaced."
-                 and car() == sorted(before + [f"{got_name} 2 - slide {i:02d}.jpg" for i in range(1, 5)]) and note_files(), (line, car()))
-            im = slide(f"{got_name} 2 - slide 01.jpg")
+            case("changed and saved again: a new set named '... (2)' beside the first, which is untouched",
+                 line == f"Saved 4 slides in your Carousel folder, named \"{got_name} (2)\". Nothing was replaced."
+                 and car() == sorted(before + [f"{got_name} (2) - slide {i:02d}.jpg" for i in range(1, 5)]) and note_files(), (line, car()))
+            im = slide(f"{got_name} (2) - slide 01.jpg")
             case("changed and saved again: slide 1 now has its photo on it", min(e[0] for e in ImageStat.Stat(im).extrema) < 200)
 
             # ---- a bare slide is asked about too ----
@@ -1142,7 +1142,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                 line = done(90)
                 new = [n for n in car() if n not in before]
                 case("cut off: a fresh press saves one whole set, and only one",
-                     line == f"Saved 8 slides in your Carousel folder, named \"{seeded_name} 2\". Nothing was replaced." and new == [f"{seeded_name} 2 - slide {i:02d}.jpg" for i in range(1, 9)] and note_files(), (line, new))
+                     line == f"Saved 8 slides in your Carousel folder, named \"{seeded_name} (2)\". Nothing was replaced." and new == [f"{seeded_name} (2) - slide {i:02d}.jpg" for i in range(1, 9)] and note_files(), (line, new))
 
             # ---- the connection drops at the very last step: the same press finishes as one set ----
             c.click("#g-bg .sw[data-c='#111111']")
@@ -1164,7 +1164,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                 line = done(60)
                 new = [n for n in car() if n not in before]
                 case("dropped at the last step: the page asked again by itself under the same name for the press, and one set was saved, once",
-                     line == f"Saved 8 slides in your Carousel folder, named \"{seeded_name} 3\". Nothing was replaced." and new == [f"{seeded_name} 3 - slide {i:02d}.jpg" for i in range(1, 9)] and note_files(), (line, new))
+                     line == f"Saved 8 slides in your Carousel folder, named \"{seeded_name} (3)\". Nothing was replaced." and new == [f"{seeded_name} (3) - slide {i:02d}.jpg" for i in range(1, 9)] and note_files(), (line, new))
 
             # ---- the commit itself is cut off part way: the next press finishes it under the same name ----
             srv.stop()
@@ -1180,16 +1180,16 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                 part = [n for n in car() if n not in before]
                 case("interrupted commit: stopped dead after three of seven files, the line says nothing was lost and to press again",
                      once.exists() and line == "Couldn't finish saving your slides. Nothing was lost. Press Save slides again and it will finish."
-                     and part == [f"{seeded_name} 4 - slide {i:02d}.jpg" for i in range(1, 4)], (line, part))
+                     and part == [f"{seeded_name} (4) - slide {i:02d}.jpg" for i in range(1, 4)], (line, part))
                 sent_before = sum(1 for r_ in list(c.requests) if "/design-slide" in r_["url"])
                 line = press_save(90)
                 sent_after = sum(1 for r_ in list(c.requests) if "/design-slide" in r_["url"])
                 new = [n for n in car() if n not in before]
                 case("interrupted commit: the next press finishes the SAME set under the SAME name (no '... 5', nothing drawn again, nothing replaced)",
-                     line == f"Saved 7 slides in your Carousel folder, named \"{seeded_name} 4\". Nothing was replaced." and new == [f"{seeded_name} 4 - slide {i:02d}.jpg" for i in range(1, 8)]
-                     and note_files() and not any(n.startswith(f"{seeded_name} 5") for n in car()) and sent_after == sent_before and sent_before >= 7, (line, new, sent_before, sent_after))
+                     line == f"Saved 7 slides in your Carousel folder, named \"{seeded_name} (4)\". Nothing was replaced." and new == [f"{seeded_name} (4) - slide {i:02d}.jpg" for i in range(1, 8)]
+                     and note_files() and not any(n.startswith(f"{seeded_name} (5)") for n in car()) and sent_after == sent_before and sent_before >= 7, (line, new, sent_before, sent_after))
                 line = press_save(60)
-                case("interrupted commit: pressed once more it is 'Already saved as ...'", line == f"Already saved as \"{seeded_name} 4\". Change something to save a new set." and [n for n in car() if n not in before] == new, line)
+                case("interrupted commit: pressed once more it is 'Already saved as ...'", line == f"Already saved as \"{seeded_name} (4)\". Change something to save a new set." and [n for n in car() if n not in before] == new, line)
             srv.stop()
             srv = Server(env, port)
             P4 = srv.start()
@@ -1258,10 +1258,10 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             always = [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")]
             line = press_save(60)
             lr_ = c.rect("#save-line")
-            case("phone width: the line Save slides brings is whole, inside the screen, in the bar, above the buttons, with the folder button under it",
+            case("phone width: the line Save slides brings is whole, inside the screen, in the bar, above the buttons, with the folder button on a row of its own over it (so its answer never covers the line)",
                  line.startswith("Already saved as \"Seam test\"") and lr_["x"] >= 0 and lr_["right"] <= 390 and lr_["bottom"] <= 844 and no_sideways()
                  and c.rect("#open-carousel")["right"] <= 390 and c.rect("#open-carousel")["bottom"] <= 844
-                 and lr_["bottom"] <= c.rect("#open-carousel")["y"] + 1 and c.rect("#open-carousel")["bottom"] <= c.rect("#save-slides")["y"] + 1, (line, lr_, c.rect("#open-carousel")))
+                 and c.rect("#open-carousel")["y"] >= 0 and c.rect("#open-carousel")["bottom"] <= lr_["y"] + 1 and lr_["bottom"] <= c.rect("#save-slides")["y"] + 1, (line, lr_, c.rect("#open-carousel")))
             case("phone width: Preview swipe, the grid tick and Save slides did not move when the line came", [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")] == always,
                  ([c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")], always))
             c.click("#open-carousel")

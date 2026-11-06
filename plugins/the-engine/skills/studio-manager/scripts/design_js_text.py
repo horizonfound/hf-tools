@@ -53,7 +53,7 @@ DESIGN_TEXT_JS = r"""
     color: 'Color', colorLabel: 'Text color',
     noBold: 'This font has no bold.',
     hint: 'Text. Type in the box next to “Text” here, or double-click the words. Drag to move it, or pull a side to make it wider or narrower.',
-    hintFallback: function(font){ return 'This text is showing in Georgia for now, because “' + font + '” couldn’t be loaded. '; },
+    hintFallback: function(font){ return 'This text is showing in Georgia for now, because “' + font + '” couldn’t be loaded. You can still type, move and style it.'; },
     manyTexts: function(k){ return 'A design holds up to ' + k + ' text boxes. Remove one first.'; },
     // the font list
     fontButton: 'Choose a font', search: 'Search, or type any Google font', searchLabel: 'Search fonts',
@@ -254,6 +254,9 @@ DESIGN_TEXT_JS = r"""
     ctx.font = T.fontString(b, b.size);
     try { ctx.letterSpacing = (b.ls || 0) + 'px'; } catch (e) {}
     try { ctx.fontKerning = 'normal'; } catch (e) {}
+    // and to shape the words as the page does: left at 'auto' a canvas leaves out the joins a script font
+    // makes across a space (a long line in Caveat came out up to 9 pixels wider than the page shows it)
+    try { ctx.textRendering = 'optimizeLegibility'; } catch (e) {}
   }
   function measurer(b){
     likePage(MC, b);
@@ -360,7 +363,7 @@ DESIGN_TEXT_JS = r"""
     },
     dblclick: function(){ focusWords(); }
   };
-  D.hints.text = function(b){ return (status(b) === 'fallback' ? TW.hintFallback(b.font) : '') + TW.hint; };
+  D.hints.text = function(b){ return status(b) === 'fallback' ? TW.hintFallback(b.font) : TW.hint; };
 
   // A change the strip made (a corner pulled, a duplicate) may leave a text box's height behind its lines:
   // it is put right at once, as part of the same step.
@@ -400,12 +403,20 @@ DESIGN_TEXT_JS = r"""
     addLine.textContent = '';
     if (D.st.blocks.length >= M.RULES.blocks) { addLine.textContent = D.WORDS.many; return; }
     if (D.st.blocks.filter(M.isText).length >= T.RULES.texts) { addLine.textContent = TW.manyTexts(T.RULES.texts); return; }
-    var b = T.newText(M.nextId(D.st), D.viewSlide(), D.st.bg, D.S.text);
-    D.setState(function(st){ return fit(M.merge(st, {blocks: st.blocks.concat([b])})); }, {sel: b.id, adjust: false});
+    // on the slide of whatever is selected (they are working there), else on the first slide in sight
+    var cur = D.selected();
+    var b = T.newText(M.nextId(D.st), cur ? D.slideOf(cur) : D.firstSlide(), D.st.bg, D.S.text);
+    D.setState(function(st){
+      var next = fit(M.merge(st, {blocks: st.blocks.concat([b])})), mine = M.find(next, b.id);
+      // never exactly on top of a text box that is already there: under it (above it when there is no room)
+      var y = T.freeSpot(mine, st.blocks.filter(M.isText), M.H);
+      return y === mine.y ? next : M.patch(next, b.id, {y: y});
+    }, {sel: b.id, adjust: false});
     D.reveal(b.id);
     focusWords();
   });
   D.on('change', function(){ addLine.textContent = ''; });
+  D.on('render', function(){ addBtn.disabled = !!D.blocked; });
 
   // the bar for a selected text box
   var isText = function(kind){ return kind === 'text'; };
@@ -534,8 +545,8 @@ DESIGN_TEXT_JS = r"""
     alBtns.forEach(function(x){ x.classList.toggle('on', x.dataset.v === (b.al || 'center')); });
   });
 
-  // The line on the page when some words are not in their own font. It sits under the strip, where the
-  // words are, so its coming and going never moves the buttons above from under the pointer.
+  // The line on the page when some words are not in their own font. It sits with the page's other lines in
+  // the bar at the bottom of the window: always in sight, and its coming and going moves no button.
   var lf = el('p', 'd-note'); lf.id = 'l-fonts'; lf.hidden = true; lf.setAttribute('role', 'status');
   var after = $('d-note');
   after.parentNode.insertBefore(lf, after.nextSibling);

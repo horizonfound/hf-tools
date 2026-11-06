@@ -152,6 +152,13 @@ DESIGN_EDIT_JS = r"""
     slidemark.style.display = 'none';
     Object.keys(nodes).forEach(function(id){ nodes[id].classList.remove('droptarget'); });
   }
+  // What a thing on the strip is called for someone who cannot see it: "Photo 5 on slide 2".
+  function slideOf(b){ return M.clamp(Math.floor((b.x + b.w / 2) / W), 0, D.st.slides - 1) + 1; }
+  function blockName(b){
+    var k = slideOf(b);
+    if (M.isText(b)) return WORDS.nameText(String(b.text || '').replace(/\s+/g, ' ').trim().slice(0, 60), k);
+    return M.isHole(b) ? WORDS.nameHole(k) : WORDS.namePhoto(b.n, k);
+  }
   function draw(){
     var st = D.st, s = D.scale;
     strip.style.width = st.slides * W * s + 'px';
@@ -161,7 +168,13 @@ DESIGN_EDIT_JS = r"""
     st.blocks.forEach(function(b, i){
       var kind = D.typeOf(b), T = D.blockTypes[kind], node = nodes[b.id];
       if (node && node.dataset.kind !== kind) { node.remove(); node = null; }
-      if (!node) { node = T.make(b); node.dataset.id = b.id; node.dataset.kind = kind; nodes[b.id] = node; strip.appendChild(node); }
+      if (!node) {
+        node = T.make(b); node.dataset.id = b.id; node.dataset.kind = kind; nodes[b.id] = node; strip.appendChild(node);
+        // each thing on the strip can be reached with the Tab key, and says what it is
+        node.tabIndex = 0; node.setAttribute('role', 'button');
+      }
+      var name = blockName(b);
+      if (node.getAttribute('aria-label') !== name) node.setAttribute('aria-label', name);
       node.style.zIndex = i + 1;          // stacking is the order of the list: the last is on top
       place(node, b, s);
       T.draw(node, b, s, false);
@@ -310,6 +323,15 @@ DESIGN_EDIT_JS = r"""
     else if (right > stage.scrollLeft + stage.clientWidth - 24) stage.scrollLeft = right - stage.clientWidth + 24;
   }
   D.reveal = reveal;
+  // The first slide that is wholly in sight (the one in the middle of what shows when none is): where a new
+  // text box goes when nothing is selected.
+  D.firstSlide = function(){
+    if (!D.st) return 0;
+    var one = W * D.scale, from = stage.scrollLeft - wrap.offsetLeft, k = Math.max(0, Math.ceil(from / one - 0.02));
+    if (k > D.st.slides - 1 || (k + 1) * one > from + stage.clientWidth + 1) return D.viewSlide();
+    return k;
+  };
+  D.slideOf = function(b){ return slideOf(b) - 1; };
   D.viewSlide = function(){
     if (!D.st) return 0;
     return M.clamp(Math.floor((stage.scrollLeft + stage.clientWidth / 2 - wrap.offsetLeft) / (W * D.scale)), 0, D.st.slides - 1);
@@ -423,6 +445,23 @@ DESIGN_EDIT_JS = r"""
         if (!D.setState(function(st){ return M.patch(st, b0.id, p); })) D.render();
       }
     });
+  });
+  // Reached with the Tab key, a thing on the strip is selected, so its buttons and the arrow keys work on it
+  // with no mouse. Return does what a double-click does: on a text box it puts the cursor in its words, on a
+  // photo it turns "Move photo inside" on or off.
+  strip.addEventListener('focusin', function(e){
+    var bd = e.target.closest ? e.target.closest('.blk') : null;
+    if (!bd || G || !D.st || D.blocked) return;
+    var id = Number(bd.dataset.id);
+    if (D.sel !== id && M.find(D.st, id)) { D.select(id); reveal(id); }
+  });
+  strip.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey || !D.st || D.blocked || D.keysOff()) return;
+    var bd = e.target.closest ? e.target.closest('.blk') : null, b = bd ? M.find(D.st, Number(bd.dataset.id)) : null;
+    if (!b) return;
+    var T = D.blockTypes[D.typeOf(b)];
+    if (T.dblclick) { e.preventDefault(); D.select(b.id); T.dblclick(b); }
+    else if (T.pan && !M.isHole(b)) { e.preventDefault(); D.select(b.id, {adjust: !D.adjust}); }
   });
   strip.addEventListener('dblclick', function(e){
     if (!D.st || D.blocked) return;

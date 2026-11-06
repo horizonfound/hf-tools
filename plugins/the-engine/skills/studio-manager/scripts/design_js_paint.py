@@ -74,8 +74,21 @@ DESIGN_PAINT_JS = r"""
     wanted(P.slideBlocks(st, k), out, cap).forEach(function(w){ o[w.key] = true; });
     return o;
   }
+  // How far a block's ink can reach. A frame's is its own box (the photo is cut off at its edge). Words are
+  // not cut off at their box on the strip, so they are not here either: a word wider than its box, a slanted
+  // letter, a line taller than its row all show on whichever slide they run onto, in a saved slide as on screen.
+  function inkBox(b){
+    if (!M.isText(b)) return b;
+    var pad = (b.size > 0 ? b.size : 0) * 0.6, lo = 0, hi = b.w, h = b.h;
+    if (D.type) {
+      var L = D.type.layout(b);
+      L.lines.forEach(function(ln){ if (ln.t) { if (ln.x < lo) lo = ln.x; if (ln.x + ln.w > hi) hi = ln.x + ln.w; } });
+      if (L.h > h) h = L.h;
+    }
+    return {x: b.x + lo - pad, y: b.y - pad, w: hi - lo + 2 * pad, h: h + 2 * pad};
+  }
   function reaches(st, x0, width){
-    return st.blocks.filter(function(b){ return b.x + b.w > x0 && b.x < x0 + width && b.y + b.h > 0 && b.y < H; });
+    return st.blocks.filter(function(b){ var k = inkBox(b); return k.x + k.w > x0 && k.x < x0 + width && k.y + k.h > 0 && k.y < H; });
   }
 
   // Everything is drawn in slide pixels; the canvas is told how many of its own pixels one of those is.
@@ -125,8 +138,10 @@ DESIGN_PAINT_JS = r"""
   function region(ctx, st, x0, width, o){
     o = o || {};
     if (!(o.out > 0)) o.out = 1;
-    var sh = o.shelf || shelf(), blocks = reaches(st, x0, width), want = wanted(blocks, o.out, o.cap);
-    var fonts = o.fonts === false || o.text === false || !D.type || !blocks.some(M.isText) ? Promise.resolve() : D.type.fonts.ready(st);
+    // the pictures are decided now (a frame's reach is its box); what is drawn is decided again once the fonts
+    // are in, because how far words reach depends on the font they are measured in
+    var sh = o.shelf || shelf(), want = wanted(reaches(st, x0, width), o.out, o.cap);
+    var fonts = o.fonts === false || o.text === false || !D.type || !st.blocks.some(M.isText) ? Promise.resolve() : D.type.fonts.ready(st);
     return fonts.then(function(){
       return Promise.all(want.map(function(w){
         if (!D.by[w.n]) return o.soft ? null : Promise.reject({photo: w.n});
@@ -135,7 +150,7 @@ DESIGN_PAINT_JS = r"""
     }).then(function(imgs){
       var pics = {};
       want.forEach(function(w, i){ pics[w.b.id] = imgs[i]; });
-      paint(ctx, st, blocks, pics, x0, width, o);
+      paint(ctx, st, reaches(st, x0, width), pics, x0, width, o);
       return want.map(function(w){ return w.key; });
     });
   }

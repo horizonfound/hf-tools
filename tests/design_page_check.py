@@ -994,12 +994,13 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             c.click(centre(ids6[2]))
             press("right")
             try:
-                c.wait_for("document.getElementById('d-status').textContent === 'Not saved yet. Trying again...'", 8)
+                c.wait_for("document.getElementById('d-trouble').textContent === 'Not saved yet. Trying again...'", 8)
                 said = True
             except cd.Timeout:
                 said = False
             held = st()
-            case("no answer from the Assistant: the line says 'Not saved yet. Trying again...', and the change stays on the page", said and blk(held, ids6[2])["w"] == 540, c.text("#d-status"))
+            case("no answer from the Assistant: 'Not saved' beside the name, the line in the bar at the bottom says 'Not saved yet. Trying again...', and the change stays on the page",
+                 said and c.text("#d-status") == "Not saved" and blk(held, ids6[2])["w"] == 540, (c.text("#d-status"), c.text("#d-trouble")))
             srv = Server(env, P)
             got = srv.start()
             if got == P:
