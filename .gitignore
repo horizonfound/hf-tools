@@ -8,3 +8,4 @@ __pycache__/
 docs/setup-guide-shots/*.png
 docs/setup-guide-shots/*.jpg
 dist/
+reference-private/
