@@ -103,6 +103,9 @@ CSS = """
 .peeks-more .cand img{width:100%;height:100%;object-fit:cover;display:block}
 .peeks-more .cand.on{outline-color:var(--coral)}.peeks-more .cand .k{position:absolute;top:.35rem;left:.35rem;min-width:1.4rem;height:1.4rem;border-radius:999px;background:var(--coral);color:#fff;font:700 12px/1.4rem var(--sans);text-align:center;display:none;padding:0 .3rem}
 .peeks-more .cand.on .k{display:block}
+.peeks-more .cand .now{position:absolute;left:.35rem;bottom:.35rem;font:600 10.5px/1 var(--sans);letter-spacing:.01em;background:rgba(31,36,48,.78);color:#fff;padding:4px 7px;border-radius:999px;pointer-events:none}
+.peeks-more .cand{transition:outline-color .2s,opacity .25s}.peeks-more .cands.full .cand:not(.on){opacity:.42}
+.peeks-more .pfoot .n.warn{color:var(--coral-2);font-weight:600}.peeks-more .pk[hidden]{display:none}
 .peeks-more .pfoot{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.7rem;font-size:13px;color:var(--ink-2)}
 .peeks-state{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.peeks-state.bad{color:#b4472e}.peeks-state.on{color:var(--ink)}
 .save{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;padding:1.2rem 0 .6rem}
@@ -165,12 +168,17 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
   if(!live){say('Open this page through the Assistant for this, or tell Claude "show me more from the beach shoot."','bad');return;}
   say('');
   try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
-   const chosen=[...(d.picked||[])];
-   const draw=()=>{more.innerHTML='<p class="hint">'+(d.from_shortlist?'The ones I narrowed it to.':'Every moment of the shoot.')+' Click six in the order you want them (the first is the big one), then Use these.</p><div class="cands"></div><div class="pfoot"><button class="pk use" type="button">Use these</button><button class="pk cancel2" type="button">Never mind</button><span class="n"></span></div>';
-    const c=more.querySelector('.cands');d.photos.forEach(p=>{const el=document.createElement('div');el.className='cand'+(chosen.includes(p.n)?' on':'');el.dataset.n=p.n;el.innerHTML='<img src="'+p.preview+'" alt="" loading="lazy"><span class="k"></span>';c.appendChild(el);});
+   // Starts with nothing chosen (Dustin, Nov 5: it opened with the current six already numbered, so a click on any
+   // other photo did nothing until one was taken out). The current six carry a quiet tag instead.
+   const chosen=[];const now=new Set(d.picked||[]);
+   const draw=()=>{more.innerHTML='<p class="hint">'+(d.from_shortlist?'The ones I narrowed it to.':'Every moment of the shoot.')+' Click six, in the order you want them. The first one you click is the big one.'+(now.size?' The ones tagged <b>on the report now</b> are the six there today.':'')+'</p><div class="cands"></div><div class="pfoot"><button class="pk use" type="button">Use these</button><button class="pk clear2" type="button">Start over</button><button class="pk cancel2" type="button">Never mind</button><span class="n"></span></div>';
+    const c=more.querySelector('.cands');d.photos.forEach(p=>{const el=document.createElement('div');el.className='cand'+(chosen.includes(p.n)?' on':'');el.dataset.n=p.n;el.innerHTML='<img src="'+p.preview+'" alt="" loading="lazy"><span class="k"></span>'+(now.has(p.n)?'<span class="now">on the report now</span>':'');c.appendChild(el);});
     const upd=()=>{more.querySelectorAll('.cand').forEach(el=>{const i=chosen.indexOf(+el.dataset.n);el.classList.toggle('on',i>=0);el.querySelector('.k').textContent=i>=0?String(i+1):''});
-     more.querySelector('.n').textContent=chosen.length+' of 6 chosen';more.querySelector('.use').disabled=chosen.length!==6;};
-    more.querySelectorAll('.cand').forEach(el=>el.addEventListener('click',()=>{const n=+el.dataset.n,i=chosen.indexOf(n);if(i>=0)chosen.splice(i,1);else if(chosen.length<6)chosen.push(n);upd();}));
+     const left=6-chosen.length,nn=more.querySelector('.n');nn.classList.remove('warn');
+     nn.textContent=chosen.length===0?'Nothing chosen yet. Click the six you want.':(left>0?chosen.length+' of 6 chosen. '+left+' to go.':'6 of 6. Press Use these, or click one of your six to swap it out.');
+     more.querySelector('.cands').classList.toggle('full',left===0);more.querySelector('.use').disabled=left!==0;more.querySelector('.clear2').hidden=chosen.length===0;};
+    more.querySelectorAll('.cand').forEach(el=>el.addEventListener('click',()=>{const n=+el.dataset.n,i=chosen.indexOf(n);if(i>=0){chosen.splice(i,1);upd();}else if(chosen.length<6){chosen.push(n);upd();}else{const nn=more.querySelector('.n');nn.textContent='You already have six. Click one of your six to take it out, then pick this one.';nn.classList.add('warn');}}));
+    more.querySelector('.clear2').addEventListener('click',()=>{chosen.length=0;upd();});
     more.querySelector('.cancel2').addEventListener('click',()=>{more.hidden=true});
     more.querySelector('.use').addEventListener('click',async()=>{
      try{const r=await fetch('/peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:chosen})});if(!r.ok)throw 0;

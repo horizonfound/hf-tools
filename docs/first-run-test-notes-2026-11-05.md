@@ -465,3 +465,25 @@ add its keyword. Worth saying on the report when it happens ("one of these was a
 is a client shoot; its note waits for "Add to my editing queue" on the report and for who it goes to.
 
 **Still wrong on the report (note 11):** it says "memory card" and "safe to format" for a folder source.
+
+## 20. "Show me more" opened already full, so clicking a photo did nothing
+
+**Dustin:** pressing Show me more showed the current six numbered one to six. "Instinctively I want to click
+on other unselected images to add more, and it won't let me unless I click one of the images to unselect
+it... not the most intuitive." He suggested starting with none selected, and to "figure out a better way."
+
+**Fixed the same day:**
+- It opens with nothing chosen. The six that are on the report today carry a small tag, "on the report
+  now," so they can be picked again or passed over.
+- The line under the photos always says where things stand: "Nothing chosen yet. Click the six you want.",
+  "3 of 6 chosen. 3 to go.", "6 of 6. Press Use these, or click one of your six to swap it out."
+- At six, the photos not chosen fade back, and a click on one of them says why nothing happened: "You
+  already have six. Click one of your six to take it out, then pick this one."
+- A "Start over" button clears the choices. "Never mind" closes it and keeps the six on the report.
+- Tried in the pane on the Nicole portraits: open, one, six, a seventh, swap, start over. Each step read
+  right. "Use these" was not pressed, so the six on the report are unchanged.
+
+**A slip of mine along the way:** the first version of this change had an apostrophe that broke the report
+page's script for about two minutes, so no button on the report worked until it was fixed. Every script on
+the rebuilt page was then checked with the Mac's own JavaScript engine. That check should run every time a
+page is built (not done yet).
