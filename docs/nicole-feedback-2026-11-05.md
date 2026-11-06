@@ -199,37 +199,38 @@ from a screen recording of an Instagram post.
   disconnected from the music, which is what she describes. **Not known:** asked her for the line the
   Assistant prints when it makes a reel ("every cut on the beat at about N beats a minute").
 
-**What settled it (9:23pm, from her screenshots).** She told her Claude "the pace of the reel is way way too
-slow." It did not use the Assistant's own faster pace; it wrote a script of its own and cut on every HALF
-beat (reel 3). Her reply: "thats not following the beat." It apologized ("your song doesn't have a hit on
-most half beats, so many of the cuts landed on nothing"), measured the beat as about 0.7 seconds, and made
-reel 4: a photo on every beat, the first held two beats, the last four, about 7 seconds for 10 photos. Her
-answer: "Yes, that's it." And in Slack: "perfect."
+**What settled it (the handoff note her Claude wrote at 9:46pm; this replaces what Claude first worked
+out, which was wrong).** The song was 15 seconds of sound from a screen recording, at about 85 beats a
+minute, a beat every 0.71 seconds. Four reels were made:
 
-**So it was the pace, not the beat finder.** Worked out afterwards with her numbers (10 photos, a beat every
-0.7 seconds), this is what each of the Assistant's paces gives:
+| Reel | How it was cut | What she said |
+|---|---|---|
+| 1 | The Assistant's Fast, all 10 photos (0.7 to 2.1 seconds each, about 10 seconds) | "way way too slow" |
+| 2 | A little of everything, 8 photos (0.7 to 2.8 seconds) | "way way too slow" |
+| 3 | Her Claude's own script, a cut every half beat (about 0.35 seconds) | "thats not following the beat" |
+| **4** | **One photo on every beat (0.71 seconds), the last held longer, about 7 seconds** | **"Yes, that's it" ... "perfect"** |
 
-| Pace | Seconds a photo, on her song |
-|---|---|
-| A little of everything (the default) | about 1.7 |
-| Calm | about 1.7 |
-| Steady | about 1.7 |
-| Build | about 2.0 |
-| **Fast** | **about 1.0, most photos 0.7** |
+**Claude's mistake, corrected with Nicole in Slack at 9:51pm:** from her screenshots Claude concluded her
+"perfect" was the Assistant's own Fast and told both of them her Claude "never used it." The handoff note
+shows reel 1 WAS Fast, and she rejected it. Fast holds the first photo two beats and the last two photos
+three and two; on her song that is nearly three seconds of lingering she did not want.
 
-**Her "perfect" is the Assistant's own Fast,** nearly cut for cut. The default was two and a half times
-slower than what she wanted, and nothing told her Fast existed.
+**So:** it was the pace, not the beat finder (it found the same beat an independent check did). And none of
+the Assistant's five paces gave her what she wanted. The closest, Fast, was still too slow.
 
 **Dustin and Nicole in Slack (9:23pm).** Dustin: "if it feels super slow we could even build in a rule like
 'don't let a photo sit on screen for more than 1 second or something.'" Nicole: "i dont even think we need a
 rule cause some people will want different things."
 
-**To decide:** what the starting pace is. One photo a beat as the default, with the gentler ones a choice?
-Or keep the default and make the question impossible to miss? The table above is the evidence.
+**Fixed already:** a sixth pace, **one photo on every beat**, first to last, the last held one beat longer.
+On her song: 0.7 seconds a photo, 7.8 seconds for 10 photos (Fast was 9.9, the default 17). "Too slow" now
+means that pace. The Assistant must ask the pace every time and say each choice in seconds for that song,
+and may never cut on half beats or write its own script.
 
-**Fixed already (not a decision):** the Assistant now must ask the pace question every time and say each
-choice in seconds for that song; "too slow" means make it again at Fast; and it may never cut on half beats
-or write its own script to make a reel.
+**To decide:** what the starting pace is, and what the choices are called. Her reel 4 also had one extra
+quick cut where the song had a real extra hit; the Assistant does not do that yet (it would need to listen
+for hits between beats). And the default refused 10 photos on her 15-second song as "too short," though one
+a beat fits easily.
 
 **Also from this:** the speed itself delighted her ("made both my reels in two seconds").
 
@@ -307,6 +308,23 @@ found that the filter button on Plugins has a Source list with "My Uploads" in i
 - The guide's install steps, rewritten to the route that worked on her Mac.
 
 ---
+
+## 3b. From her Claude's handoff note (9:46pm): four things her session hit that nobody had mentioned
+
+- **The drive's name was refused. Fixed.** The Assistant lists drives by name ("G PAPA") but then would only
+  accept the full path. A name now works.
+- **One shoot was split into three days** (Sept 23, Oct 2, Oct 6). Every photo was from one beach session;
+  the dates looked like export dates, not shooting dates. The Assistant got it right once it looked at the
+  contact sheet, but the first read misled. **Not fixed; worth a look:** photos that all came in as one
+  folder should probably start as one shoot unless the pictures say otherwise.
+- **"Read my Instagram grid" did not spot her pinned posts.** None of the 12 came back marked pinned,
+  though the top three were out of date order. Instagram has likely changed how it marks them. **Not fixed.**
+- **Her kit was left half finished:** the question about the shoot was never answered, so the carousel,
+  singles, stories and captions were not made. Worth knowing when she comes back to it.
+
+Also in the note, useful for the build: once CapCut has opened a project it keeps its own copy of where the
+files are, so a broken song link cannot be repaired from outside afterwards. The song has to be right when
+the reel is first made (it now is).
 
 ## 4. Not known yet
 

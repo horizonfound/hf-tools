@@ -5,6 +5,9 @@ every cut lands on the beat. Four feels the photographer picks from:
   calm    every photo about two seconds; room to look
   fast    about half a second a photo; quick and punchy (best with more photos)
   build   starts calm, quickens toward the end, lands on the last photo
+  beat    one photo on every beat, start to finish, the last one held a beat longer. No long opener and
+          no stretched photo before the end. (Nicole's first reel, Nov 5: "fast" held the first and last
+          photos two and three beats and she called it "way way too slow"; one photo a beat was "that's it".)
   mixed   a little of everything: some quick, some long, never a formula
 
 How "mixed" stays musical rather than random: the reel starts on the first beat
@@ -36,7 +39,7 @@ SHAPES_3 = [
     [1, 1, 1, 1, 2], [2, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
 ]
 BAR_SHAPES_3 = [[3], [1, 1, 1], [2, 1], [1, 2]]
-FEELS = ("mixed", "calm", "fast", "build", "steady")
+FEELS = ("mixed", "calm", "fast", "build", "steady", "beat")
 
 
 def _closest(period, target, options, floor):
@@ -91,6 +94,11 @@ def holds(n, period, feel="mixed", energy=None, hints=None, seed=0, meter=4):
             out.append(calm if i < third else quick if i >= n - 1 - third else k)
         out.append(_closest(period, 2.2, o["long"], 1.5))
         return land(out, meter)
+    if feel == "beat":
+        k = 1 if period >= 0.33 else 2          # a beat shorter than a third of a second is too quick to see
+        out = [k] * n
+        out[-1] = 2 * k
+        return out                              # no landing stretch: every photo but the last is one beat
     if feel == "steady":
         k = unit_beats(period, meter)
         out = [k] * n
@@ -187,5 +195,5 @@ def describe(beats, period, feel):
     mid = beats[1:-1] if len(beats) > 2 else beats
     secs = [b * period for b in mid]
     words = {"mixed": "a little of everything", "calm": "calm", "fast": "fast", "build": "building",
-             "steady": "steady"}[feel]
+             "steady": "steady", "beat": "one photo on every beat"}[feel]
     return words, round(min(secs), 1), round(max(secs), 1)

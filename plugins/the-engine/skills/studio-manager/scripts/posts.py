@@ -154,8 +154,23 @@ def hide(p):
         subprocess.run(["chflags", "hidden", str(p)], capture_output=True)
 
 
+def named_place(where):
+    """A drive or place given by its NAME ("G PAPA", "Pictures") is the same as its path. `posts.py places`
+    lists them by name, so a name has to work here too (Nicole's first run, Nov 5: --where "G PAPA" was
+    refused because only /Volumes/G PAPA is a folder)."""
+    p = Path(where).expanduser()
+    if p.is_dir():
+        return p
+    want = str(where).strip().strip("/").lower()
+    for o in places():
+        if o["name"].lower() == want:
+            return Path(o["path"])
+    vol = Path("/Volumes") / str(where).strip().strip("/")
+    return vol if vol.is_dir() else p
+
+
 def setup(where=None, home_path=None):
-    h = Path(home_path) if home_path else Path(where) / HOME_NAME
+    h = Path(home_path) if home_path else named_place(where) / HOME_NAME
     if not h.parent.is_dir():
         raise SystemExit(f"STOP: {h.parent} isn't a folder I can see. Nothing made.")
     for sub in (h, h / DROP_NAME, h / CONTENT_NAME, h / ".studio"):

@@ -520,7 +520,7 @@ def main():
     m.add_argument("--name")
     m.add_argument("--hook")
     m.add_argument("--pace", choices=list(pace.FEELS), default="mixed",
-                   help="mixed (a little of everything), calm, fast, build, steady")
+                   help="mixed (a little of everything), calm, fast, build, steady, beat (one photo on every beat)")
     m.add_argument("--variation", type=int, default=0, help="another mix of the same picks (mixed pace)")
     m.add_argument("--song-start", type=float)
     m.add_argument("--fit", action="store_true", help="show whole wide photos with bars instead of filling the screen")
