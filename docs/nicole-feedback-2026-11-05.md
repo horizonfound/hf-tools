@@ -99,6 +99,10 @@ breathe" ... "to be able to have THIS" ... "this is SO FUCKING INSANE."
   header, subheader, paragraph etc"
 - "can even have some suggested ones that go well together"
 
+**Saving worked on her Mac (10:08pm).** "all i did was press save slides and it did." Her screen: "Saved 10
+slides in the Hannah folder, under Carousel." Dustin: "that's going to help you build ads too" and "this is
+the energy we need!!!!!!!!!!!" **An idea in that, not asked for yet:** the same designer for ads.
+
 **What this changes.** On Oct 24 the line was "the finished look comes from CapCut and Canva." Tonight both
 of you are asking for type and a brand kit inside the Assistant. Claude is treating Nicole's v2 (text, fonts,
 brand colors) as part of what "start building" covers, since it comes with her designer, and is holding
