@@ -752,13 +752,16 @@ def waiting():
 
 def waiting_line(w):
     n = w.get("count") or 0
-    return f"ARRANGED: {w['kit']} | {w['piece']} | {n} {'slide' if w['piece'] == 'design' else 'photo'}{'s' if n != 1 else ''}"
+    return (f"ARRANGED: {w['kit']} | {w['piece']} | {n} {'slide' if w['piece'] == 'design' else 'photo'}{'s' if n != 1 else ''}"
+            + (f" | {w['base']}" if w.get("base") else ""))      # a set of laid-out slides is named, last
 
 
-def add_waiting(kit_name, name, piece, count):
+def add_waiting(kit_name, name, piece, count, base=None):
     with locked(WAITING_LOCK):
         rest = [x for x in waiting() if not (x["kit"] == kit_name and x["piece"] == piece)]
         rest.append({"kit": kit_name, "name": name, "piece": piece, "count": count, "at": now_iso()})
+        if base:
+            rest[-1]["base"] = str(base)                         # the name the slides were saved under (design.py)
         write_whole(WAITING, rest[-KEEP_WAITING:])
 
 

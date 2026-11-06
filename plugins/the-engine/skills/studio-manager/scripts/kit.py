@@ -702,6 +702,42 @@ def carousel_in_order(kit, nums):
         return False
 
 
+def carousel_shown(kit, rec=None):
+    """Which slides are "the carousel" on the kit page and in the posting queue: the one rule for both.
+    Reads only; never exits. The Carousel folder can hold plain slides, Canva's slides and any number of
+    sets laid out in the designer (design.py), side by side; nothing in it is ever taken away to choose.
+      * the newest laid-out set (rec["carousel_set"], kind "laid-out"), when every one of its files is in the
+        folder's own listing and no Canva carousel was fetched after it was saved: those files, in order;
+      * otherwise today's listing (every .jpg, Canva's first) without any file of any laid-out set.
+    A new order from the picker or from kit.py build sets carousel_set back to plain (_finish_move), which
+    puts the plain slides back as the ones shown and touches no laid-out file.
+    {"kind": "laid-out" | "listing", "files": [paths], "base": the set's name or "", "others": how many other
+     pictures are in the folder, "laid_out": how many laid-out slides are in the folder and not shown}"""
+    rec = rec if rec is not None else load_rec(kit)
+    car = kit / "Carousel"
+    have = _names(car)
+    sets = [x for x in (rec.get("laid_out") or []) if isinstance(x, dict)]
+    cs = rec.get("carousel_set")
+    if isinstance(cs, dict) and cs.get("kind") == "laid-out":
+        sets = sets + [cs]
+    in_sets = {_nf(str(n)) for x in sets for n in (x.get("files") or [])}
+    listed = sorted((have[k] for k in have if k.lower().endswith(".jpg") and not k.startswith(".")),
+                    key=lambda n: ("(Canva)" not in n, n))
+    if isinstance(cs, dict) and cs.get("kind") == "laid-out" and cs.get("files"):
+        mine = [_nf(str(n)) for n in cs["files"]]
+        fetched = str(((rec.get("canva") or {}).get("fetched") or {}).get("Carousel") or "")
+        if all(n in have for n in mine) and not (fetched and fetched > str(cs.get("shown") or cs.get("saved") or "")):
+            return {"kind": "laid-out", "files": [car / have[n] for n in mine], "base": str(cs.get("base") or ""),
+                    "others": len([n for n in listed if _nf(n) not in set(mine)]), "laid_out": 0}
+    plain = [n for n in listed if _nf(n) not in in_sets]
+    return {"kind": "listing", "files": [car / n for n in plain], "base": "", "others": 0, "laid_out": len(listed) - len(plain)}
+
+
+def carousel_files(kit, rec=None):
+    """The carousel's slides as the kit page and the posting queue show them, in order (see carousel_shown)."""
+    return carousel_shown(kit, rec)["files"]
+
+
 def canva_behind(rec):
     """Do this kit's Canva carousel slides show an earlier choice of photos than the plain slides do now?
     True only when a Canva carousel is on record AND the carousel has changed since it was made:
@@ -828,6 +864,10 @@ def _finish_move(kit, stamp):
         rec["made_pieces"] = made
         if changed:
             rec["carousel_changed"] = datetime.now().isoformat(timespec="seconds")
+            if isinstance(rec.get("carousel_set"), dict) and rec["carousel_set"].get("kind") == "laid-out":
+                # a new order: the plain slides are the carousel shown again (carousel_shown). The slides laid
+                # out in the designer stay in the folder, and in rec["laid_out"], exactly as they are.
+                rec["carousel_set"] = {"kind": "plain", "at": rec["carousel_changed"]}
 
     update_rec(kit, note)
     _test_stop("after-record")
@@ -1298,6 +1338,28 @@ const big=document.getElementById('big');document.querySelectorAll('.strip img')
 """
 
 
+LAY_OUT = "Lay out the slides"
+LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
+
+
+def _src(name):
+    """A file's name as it goes into a picture's address on the kit page. Only the three characters that
+    would cut an address short are changed, so every address written before reads the same."""
+    return name.replace("%", "%25").replace("#", "%23").replace("?", "%3F")
+
+
+def carousel_line(shown, canva):
+    """The line under the Carousel heading on the kit page: which slides the page is showing, said truly."""
+    if shown["kind"] == "laid-out":
+        return (f"The slides you laid out, saved as \u201c{shown['base']}\u201d. They are in the Carousel folder"
+                + (", and the other slides in that folder are all still there." if shown["others"] else "."))
+    line = ("Made in Canva from your template; the plain slides are there too." if canva
+            else "The slides, in order, all the same size. They are in the Carousel folder.")
+    if shown["laid_out"]:
+        line += " The slides you laid out are in that folder too."
+    return line
+
+
 def rel(kit, p):
     return html.escape(Path(p).relative_to(kit).as_posix()) if str(p).startswith(str(kit)) else html.escape(str(p))
 
@@ -1313,14 +1375,15 @@ def write_page(kit):
         when_words = when
     made = rec.get("made_pieces", {})
 
-    def strip(folder_name, tall=False):
+    def strip(folder_name, tall=False, fs=None):
         d = kit / folder_name
         if not d.is_dir():
             return "<p class='empty'>Not made yet.</p>"
-        fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg" and not p.name.startswith(".")), key=lambda p: ("(Canva)" not in p.name, p.name))
+        if fs is None:
+            fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg" and not p.name.startswith(".")), key=lambda p: ("(Canva)" not in p.name, p.name))
         if not fs:
             return "<p class='empty'>Not made yet.</p>"
-        return f"<div class='strip{' tall' if tall else ''}'>" + "".join(f"<img src='{html.escape(folder_name)}/{html.escape(f.name)}' alt=''>" for f in fs) + "</div>"
+        return f"<div class='strip{' tall' if tall else ''}'>" + "".join(f"<img src='{html.escape(folder_name)}/{html.escape(_src(f.name))}' alt=''>" for f in fs) + "</div>"
 
     def wbox(k, text, cls=""):
         return f"<div class='w {cls}'><div class='k'>{html.escape(k)}</div><p>{html.escape(text)}</p><button class='copy'>Copy</button></div>"
@@ -1337,10 +1400,15 @@ def write_page(kit):
 
     canva = rec.get("canva", {})
     can_arrange = (kit / ".kit" / "sheet.json").is_file()      # the page that moves photos needs the numbered list
+    shown = carousel_shown(kit, rec)                            # which slides are the carousel today
 
     def sec(title, sub, ratio, body, wrds, folder, piece=None, arrange=None):
         has = (kit / folder).is_dir()
         btn = f"<button class='go' data-sub='{html.escape(folder)}'>Open the {html.escape(folder)} folder</button>" if has else ""
+        if arrange == "carousel" and can_arrange:
+            # The page where they lay the slides out themselves (design.py): a plain link of class 'arr' too,
+            # never 'go'. It is put in first, so it sits after "Change the photos" and before the folder's button.
+            btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}' title='{html.escape(LAY_OUT_TITLE, quote=True)}'>{html.escape(LAY_OUT)}</a> " + btn)
         if arrange and can_arrange and (rec.get("picks") or {}).get(arrange):
             # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
             # every 'go' button asks the Assistant to open a folder in Finder. Shown only when the page is
@@ -1365,7 +1433,7 @@ def write_page(kit):
             f"<p class='folder'>In your {html.escape(brand.short())} folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
             f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
             + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
-            + sec("Carousel", ("Made in Canva from your template; the plain slides are there too." if canva.get("carousel") else "The slides, in order, all the same size. They are in the Carousel folder."), "4:5", strip("Carousel"), caption + tags, "Carousel", "carousel", arrange="carousel")
+            + sec("Carousel", carousel_line(shown, bool(canva.get("carousel"))), "4:5", strip("Carousel", fs=shown["files"]), caption + tags, "Carousel", "carousel", arrange="carousel")
             + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
             + sec("Stories", ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva.get("stories") else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle."), "9:16",
                   strip("Stories", tall=True) + ("<p class='canva-links'>" + " ".join(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>Story {int(n)} in Canva</a>" for n, d in sorted((canva.get("stories") or {}).items(), key=lambda x: int(x[0])) if d.get("edit_url")) + "</p>" if canva.get("stories") else ""),

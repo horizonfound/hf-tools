@@ -348,6 +348,7 @@ if (SCENARIO === 'preparing') {
   check('carousel: no Normal / Longer / Quicker bar under a photo, and the X is there', rowEl.querySelectorAll('.mk').length === 0 && !!rowTile(6).querySelector('.x'));
   check('carousel: 5 photos needs no advice', text('count') === '5 photos' && text('advice') === '', text('advice'));
   check('carousel: before the final button there is no line, no folder button, no Canva line', text('doneline') === '' && byId('openfolder').hidden && byId('canvaline').hidden && text('openline') === '');
+  check('carousel: and no Lay out the slides link', byId('layout').hidden && byId('layout').href === '');
   layout(10);
   dragTo(poolTile(30), rowTile(21).rect.left - 4, 100); release(rowTile(21).rect.left - 4, 100);
   check('carousel: a photo dragged up lands between the 4th and 5th', eq(rowNums(), [1, 6, 11, 16, 30, 21]), rowNums());
@@ -376,6 +377,7 @@ if (SCENARIO === 'preparing') {
   settle();
   R = SERVER.st.rev;
   check('carousel: the line reads Making your slides... and there is no folder button yet', text('doneline') === 'Making your slides...' && byId('openfolder').hidden && text('status') === 'Saved', text('doneline'));
+  check('carousel: while the slides are being made there is no Lay out the slides link', byId('layout').hidden);
   SERVER.st.job = {state: 'queued', line: 'Making your slides...', rev: R, count: 4};
   var g1 = SERVER.gets; runIntervals();
   check('carousel: the page asks how the slides are getting on', SERVER.gets === g1 + 1 && text('doneline') === 'Making your slides...', SERVER.gets - g1);
@@ -384,6 +386,8 @@ if (SCENARIO === 'preparing') {
   SERVER.st.job = {state: 'done', line: 'Done. 4 slides are in your Carousel folder.', rev: R, count: 4}; runIntervals();
   check('carousel: done: the result, with Open the Carousel folder on the same line', text('doneline') === 'Done. 4 slides are in your Carousel folder.' && !byId('openfolder').hidden, text('doneline'));
   check('carousel: the folder button sits beside the line it belongs to (same row of the page)', DONE_ROW_HOLDS_BUTTON === true);
+  check('carousel: done: Lay out the slides appears with it, a link to this shoot\u2019s designer by the kit\u2019s name only', !byId('layout').hidden && byId('layout').href === '/design.html?kit=A%20kit', byId('layout').href);
+  check('carousel: and showing that link asked the Assistant for nothing (no folder is opened)', SERVER.opens.length === 0);
   check('carousel: the quick asking stops once the result is in', _timers.length === 1 && _timers[0].every, _timers.length);
   check('carousel: no Canva line when the kit has no Canva slides', byId('canvaline').hidden);
   clickButton(byId('openfolder'));
@@ -397,11 +401,13 @@ if (SCENARIO === 'preparing') {
   layout(10);
   clickButton(rowTile(21).querySelector('.x')); settle();
   check('carousel: a change afterwards: the line says so, and the folder button and its answer go', text('doneline') === 'You’ve changed it since. Press the button again when it’s right.' && byId('openfolder').hidden && text('openline') === '', text('doneline') + ' / ' + text('openline'));
+  check('carousel: a change afterwards: the Lay out the slides link goes too', byId('layout').hidden);
 
   // pressed with the slides already in that order
   SERVER.doneAnswer = {job: false, same: true, line: 'Your slides are already in this order.'};
   clickButton(byId('happy')); settle();
   check('carousel: slides already in this order: the line says so, with the folder button, and nothing is asked', text('doneline') === 'Your slides are already in this order.' && !byId('openfolder').hidden && _timers.length === 1, text('doneline'));
+  check('carousel: slides already in this order: the Lay out the slides link is there too', !byId('layout').hidden && byId('layout').href === '/design.html?kit=A%20kit', byId('layout').href);
 
   // a problem
   SERVER.doneAnswer = {job: true, same: false, line: 'Making your slides...'};
@@ -412,6 +418,7 @@ if (SCENARIO === 'preparing') {
   var TROUBLE = 'Couldn’t make the slides: photo 12 can’t be read. Is the drive plugged in? Your Carousel folder was left as it was.';
   SERVER.st.job = {state: 'problem', line: TROUBLE, rev: R, count: 4}; runIntervals();
   check('carousel: a problem shows its plain words, with no folder button', text('doneline') === TROUBLE && byId('openfolder').hidden, text('doneline'));
+  check('carousel: a problem: no Lay out the slides link either', byId('layout').hidden);
 
   // a result for an older order does not end the wait for a newer one
   layout(10);
@@ -811,6 +818,7 @@ settle();
 check('only then does the line under the button appear', text('doneline').indexOf('Go back to the chat and say') > 0 && text('doneline').indexOf('which song') > 0 && text('status') === 'Saved', text('doneline'));
 check('the Assistant recorded it', SERVER.st.happy && SERVER.st.happy.rev === SERVER.st.rev);
 check('the reel\u2019s line has no folder button and no Canva line beside it (those are the carousel\u2019s)', byId('openfolder').hidden && byId('canvaline').hidden && SERVER.opens.length === 0);
+check('the reel\u2019s line has no Lay out the slides link (that is the carousel\u2019s)', byId('layout').hidden);
 clickButton(rowTile(21).querySelector('.mk')); settle();
 check('a change afterwards: the line says so', text('doneline') === 'You’ve changed it since. Press the button again when it’s right.', text('doneline'));
 clickButton(byId('happy')); settle();
@@ -954,8 +962,12 @@ def check_scripts(work):
     case("the two pages are the same page but for the piece and the title", untitled(car_page).replace("data-piece='carousel'", "data-piece='reel'") == untitled(page) and car_page != page)
     # the on-screen rule: the folder's button is on the same line as the words about the folder, and its
     # answer is the very next thing under them
-    beside = bool(re.search(r"<div class='donerow'><p class='doneline' id='doneline'></p><button class='btn' id='openfolder' type='button' hidden>Open the Carousel folder</button></div><p class='openline' id='openline'></p>", car_page))
+    beside = bool(re.search(r"<div class='donerow'><p class='doneline' id='doneline'></p><button class='btn' id='openfolder' type='button' hidden>Open the Carousel folder</button><a class='btn' id='layout' title='[^'<>]+' hidden>Lay out the slides</a></div><p class='openline' id='openline'></p>", car_page))
     case("the carousel's page: Open the Carousel folder sits on the result's own line, its answer directly under", beside)
+    lay = re.search(r"<a ([^>]*)>Lay out the slides</a>", car_page)
+    case("the carousel's page: 'Lay out the slides' is a plain link on that same line, hidden until the slides are made, with no address written into the page",
+         beside and bool(lay) and "id='layout'" in lay.group(1) and " hidden" in lay.group(1) and "href" not in lay.group(1) and "draggable" not in lay.group(1))
+    case("the styles: a link that looks like a button is not underlined", "a.btn{text-decoration:none}" in ap.CSS)
     case("the picker page: only the kit's folder name and the piece are put into it", "data-kit='A kit'" in page and "data-piece='reel'" in page)
     case("a kit name is html-escaped on its way into the page", "data-kit='&lt;b&gt; &amp; &#x27;x&#x27;'" in ap.page_html("<b> & 'x'", "reel"))
     case("the plain page has the Back to home button and the words", "href='/home'" in plain and "Back to home" in plain and "I can&#x27;t find that shoot&#x27;s posts." in plain)
@@ -980,7 +992,7 @@ def check_scripts(work):
     case("the picker page: the bar of buttons comes before the photos below in the page, and after the row",
          bool(dock) and page.index("id='rowwrap'") < page.index("id='dock'") < page.index("id='pool'"))
     case("the picker page: both buttons, and every line a press brings, are inside that bar",
-         bool(dock) and all(f"id='{i}'" in dock.group(1) for i in ("back", "happy", "why", "status", "doneline", "openfolder", "openline", "canvaline", "note")))
+         bool(dock) and all(f"id='{i}'" in dock.group(1) for i in ("back", "happy", "why", "status", "doneline", "openfolder", "layout", "openline", "canvaline", "note")))
     case("the picker page: the row's own lines stay in the row's panel",
          bool(re.search(r"<section class='panel' id='panel'>(?:(?!</section>).)*id='rowwrap'(?:(?!</section>).)*id='rowline'(?:(?!</section>).)*id='legend'(?:(?!</section>).)*</section>", page, re.S)))
     case("the styles fetch nothing (no url(...), no @font-face)", "url(" not in ap.CSS and "@font-face" not in ap.CSS)

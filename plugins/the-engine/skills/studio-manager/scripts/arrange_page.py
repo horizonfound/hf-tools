@@ -80,6 +80,7 @@ h1{margin:0;font:650 22px/1.25 var(--sans);overflow-wrap:anywhere}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px 16px;font:600 15px/1.2 var(--sans);cursor:pointer;transition:background .15s,border-color .15s}
 .btn:hover{background:var(--chip)}
+a.btn{text-decoration:none}
 .btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.main:hover{background:#b35c36;border-color:#b35c36}
 .btn:disabled{opacity:.45;cursor:default}
@@ -535,8 +536,10 @@ PICKER_JS = r"""
       else if (!wantDone) { text = SINCE; since = true; }
     }
     d.textContent = text; d.classList.toggle('since', since);
-    var ob = $('openfolder'), ol = $('openline'), cl = $('canvaline');
+    var ob = $('openfolder'), ol = $('openline'), cl = $('canvaline'), lo = $('layout');
     if (ob) { ob.hidden = !folder; if (!folder && ol) ol.textContent = ''; }
+    // "Lay out the slides": a plain link to this shoot's designer, there whenever the folder's button is
+    if (lo) { lo.hidden = !folder; if (folder) lo.href = '/design.html?' + Q; }
     if (cl) { cl.hidden = !canva; cl.textContent = canva ? T.canva : ''; }
   }
   // ---- the carousel's slides being made ----
@@ -948,6 +951,10 @@ PICKER_JS = r"""
 })();
 """
 
+# The link on the carousel's Done line to the page where the slides are laid out (design.py).
+LAY_OUT = "Lay out the slides"
+LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
+
 BACK_HOME = ("<a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span>"
              "<span class='long'>Back to home</span><span class='short'>Home</span></a>")
 
@@ -989,7 +996,8 @@ def page_html(kit_name, piece):
         "<button class='btn main' id='happy' type='button' disabled>I&rsquo;m happy with this order</button>"
         "<span class='side'><span class='why' id='why'></span><span class='status' id='status'></span></span></div>"
         "<div class='donerow'><p class='doneline' id='doneline'></p>"
-        "<button class='btn' id='openfolder' type='button' hidden>Open the Carousel folder</button></div>"
+        "<button class='btn' id='openfolder' type='button' hidden>Open the Carousel folder</button>"
+        "<a class='btn' id='layout' title='" + html.escape(LAY_OUT_TITLE, quote=True) + "' hidden>" + html.escape(LAY_OUT) + "</a></div>"
         "<p class='openline' id='openline'></p>"
         "<p class='canvaline' id='canvaline' hidden></p>"
         "<p class='note' id='note' hidden></p>"

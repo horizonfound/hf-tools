@@ -1182,7 +1182,7 @@ def _finish(kit, j):
         except (Exception, SystemExit) as e:  # noqa: BLE001
             arrange.log(f"design set for {kit.name}: {nicety.__name__} failed: {e.__class__.__name__}: {str(e)[:160]}")
     try:
-        arrange.add_waiting(kit.name, kit_mod.load_rec(kit).get("name") or kit.name, "design", len(files))
+        arrange.add_waiting(kit.name, kit_mod.load_rec(kit).get("name") or kit.name, "design", len(files), base=j["base"])
     except (arrange.Busy, OSError) as e:
         arrange.log(f"design set for {kit.name}: the line for Claude could not be written ({e.__class__.__name__})")
     try:
@@ -1191,6 +1191,38 @@ def _finish(kit, j):
         pass
     arrange.log(f"design set {j['base']!r} for {kit.name}: {len(files)} slides are in the Carousel folder")
     return _result("done", j, words=SAVED_SET.format(n=len(files), base=j["base"]))
+
+
+def _is_shown(kit, j, rec=None):
+    """Is this saved set the one the kit page and the posting queue show as the carousel now? Reads only."""
+    rec = rec if rec is not None else kit_mod.load_rec(kit)
+    cs = rec.get("carousel_set") if isinstance(rec.get("carousel_set"), dict) else {}
+    return kit_mod.carousel_shown(kit, rec)["kind"] == "laid-out" and cs.get("design") == j["design"] and cs.get("token") == j["token"]
+
+
+def _show_again(kit, j):
+    """Save slides was pressed on a design whose slides are already saved, and the kit is showing other
+    slides as its carousel (a new order from the picker put the plain ones back, another design was saved
+    since, or a Canva carousel was fetched): this set is the one shown again. No file is made, moved or
+    changed; only the kit's record says which set is shown, and the kit page and the posting queue's picture
+    follow. Run by the commit command (a process of its own), with the slides lock held."""
+    files = [f["final"] for f in j["files"]]
+    entry = {"kind": "laid-out", "base": j["base"], "files": files, "saved": j["at"], "design": j["design"],
+             "token": j["token"], "name": j.get("name") or j["base"]}
+    if _is_shown(kit, j):
+        return False                    # it is the set shown already: nothing is written
+
+    def note(r):
+        r["carousel_set"] = dict(entry, shown=now_iso())
+
+    kit_mod.update_rec(kit, note)
+    for nicety in (kit_mod.write_page, kit_mod._refresh_posting):
+        try:
+            nicety(kit)
+        except (Exception, SystemExit) as e:  # noqa: BLE001
+            arrange.log(f"design set for {kit.name}: {nicety.__name__} failed: {e.__class__.__name__}: {str(e)[:160]}")
+    arrange.log(f"design set {j['base']!r} for {kit.name} is the carousel shown again")
+    return True
 
 
 def commit(kit, did, token, rev=None):
@@ -1238,6 +1270,7 @@ def _commit(kit, did, token, rev):
     if last and last["layout"] == d["state"] and _set_there(kit, last):
         if (last["design"], last["token"]) in finished_now:
             return _result("done", last, words=SAVED_SET.format(n=len(last["files"]), base=last["base"]))
+        _show_again(kit, last)
         return _result("already", last, words=ALREADY.format(base=last["base"]))
     count = d["state"]["slides"]
     if not staged_ok(kit, did, token, count):
@@ -1558,8 +1591,11 @@ def _post_commit(body):
             return _answer_for(_result("problem", why="changed", words=CHANGED))
         last = last_done(kit, did)
         if last and last["layout"] == d["state"] and _set_there(kit, last):
-            return _answer_for(_result("already", last, words=ALREADY.format(base=last["base"])))
-        if not staged_ok(kit, did, token, d["state"]["slides"]):
+            if _is_shown(kit, last):
+                return _answer_for(_result("already", last, words=ALREADY.format(base=last["base"])))
+            # already saved, but the kit is showing other slides as its carousel: the commit below makes
+            # this set the one shown again (it writes the kit's record, so it is a process of its own)
+        elif not staged_ok(kit, did, token, d["state"]["slides"]):
             return _answer_for(_result("problem", why="missing", words=MISSING))
     try:
         arrange.HOME.mkdir(parents=True, exist_ok=True)

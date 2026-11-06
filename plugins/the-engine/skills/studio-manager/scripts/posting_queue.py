@@ -276,7 +276,7 @@ def add_for_kit(p, kit_dir):
         by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text())["photos"]}
     out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", by_n.get(reel_pick) or (photos[0] if photos else None),
                       where=reel["project"] if reel else None))
-    slides = sorted(f for f in (kit_dir / "Carousel").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Carousel").is_dir() else []
+    slides = kit_mod.carousel_files(kit_dir, rec)     # the slides the kit page shows as the carousel (kit.py's one rule)
     out.append(upsert(f"{sid}-carousel", "carousel", "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
                       where="the Carousel folder" if slides else None))
     singles = sorted(f for f in (kit_dir / "Singles").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Singles").is_dir() else []
@@ -295,8 +295,7 @@ def refresh_kit_carousel(kit_dir):
     pid = f"kit:{slug(kit_dir.name)}-carousel"
     if not any(x.get("id") == pid for x in load().get("pieces", [])):
         return False
-    car = kit_dir / "Carousel"
-    slides = sorted(f for f in car.glob("*.jpg") if not f.name.startswith(".")) if car.is_dir() else []
+    slides = kit_mod.carousel_files(kit_dir)          # the slides the kit page shows as the carousel (kit.py's one rule)
     thumb = None
     if slides:
         THUMBS.mkdir(parents=True, exist_ok=True)

@@ -169,9 +169,12 @@ DESIGN_SAVE_JS = r"""
       if (first.ok) { finished(first); return; }
       if (first.why !== 'missing') { say(first.words); return; }
     } else if (D.design.set && D.design.set.same) {
-      // 3. nothing has changed since the last set
+      // 3. nothing has changed since the last set: nothing is drawn or sent, and the line is said at once.
+      // The Assistant is still told (and not waited for), so that this set is the one the kit page shows
+      // again if other slides had taken its place since (a new order of the plain slides, a Canva carousel).
       say(D.design.set.words || SW.already(D.design.set.base));
       showOpen(true);
+      commit(id, token, rev, n).catch(function(){});
       return;
     }
     // 4. the questions, in the page
