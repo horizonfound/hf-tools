@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -27,24 +28,41 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sort import safe_folder, slug, sha256_of, load, say  # noqa: E402
 import studio_file  # noqa: E402
 from sneak_peeks import TOOL as STUDIO_TOOL  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 NUMBERED = re.compile(r"^(?P<prefix>.+?)_(?P<n>\d{4})_(?P<orig>.+)$")
 
 
 def on_disk(p):
-    """True only when a file by exactly this name, letter for letter, is in its folder. The drive may ignore
-    upper and lower case, so Path.exists() says yes to "black-sand-beach_0001.CR2" when the file on disk is
-    "Black-sand-beach_0001.CR2"; this does not."""
+    """True only when a file (or folder) by exactly this name, letter for letter, is in its folder. The drive
+    may ignore upper and lower case, so Path.exists() says yes to "black-sand-beach_0001.CR2" when the file on
+    disk is "Black-sand-beach_0001.CR2"; this does not. A Mac's older drives (Mac OS Extended) store an
+    accented letter in pieces (the é of "Côte" as e plus an accent) and list it that way, so on a Mac the two
+    spellings of the same letter count as the same; a PC's drives keep a name exactly as it was written."""
     try:
-        return p.name in os.listdir(p.parent)
+        names = os.listdir(p.parent)
     except OSError:
         return False
+    if p.name in names:
+        return True
+    if this_computer.WINDOWS:  # unproven on a real PC
+        return False
+    want = unicodedata.normalize("NFC", p.name)
+    return any(unicodedata.normalize("NFC", n) == want for n in names)
+
+
+def same_text(a, b):
+    """Two paths spelled exactly alike, letter for letter. On a PC, Python's own path comparison ignores upper
+    and lower case (as the drive does), which would hide a rename that only changes the case; this never does.
+    On a Mac it is the same as comparing the paths, as before."""
+    return Path(a).as_posix() == Path(b).as_posix()
 
 
 def studio_wrote(sidecar):
     """True for a sidecar the Studio itself wrote (the sneak-peek keyword), by its own signature."""
     try:
-        return STUDIO_TOOL in sidecar.read_text(errors="replace")
+        return STUDIO_TOOL in sidecar.read_text(errors="replace", encoding="utf-8")
     except OSError:
         return False
 
@@ -55,7 +73,7 @@ def follow_sneak_peeks(studio, new_path):
     if not pj.exists():
         return
     try:
-        d = json.loads(pj.read_text())
+        d = json.loads(pj.read_text(encoding="utf-8"))
     except ValueError:
         return
     changed = False
@@ -65,18 +83,21 @@ def follow_sneak_peeks(studio, new_path):
             continue
         old_pv = studio / "sneak-peeks" / (Path(pk["file"]).stem + ".jpg")
         new_pv = studio / "sneak-peeks" / (Path(to).stem + ".jpg")
-        if on_disk(old_pv) and old_pv != new_pv and (not new_pv.exists() or case_twin(old_pv, new_pv)):
-            os.rename(old_pv, new_pv)
+        if on_disk(old_pv) and not same_text(old_pv, new_pv) and (not new_pv.exists() or case_twin(old_pv, new_pv)):
+            try:
+                this_computer.rename(old_pv, new_pv)
+            except OSError:  # only the report's small copy; the photo and its record matter, and they move on
+                pass
         pk["file"] = to
         changed = True
     if changed:
-        pj.write_text(json.dumps(d, indent=1, ensure_ascii=False))
+        pj.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
 
 
 def case_twin(a, b):
     """a and b are the same path apart from upper and lower case: on this kind of drive, the same file,
     and renaming one to the other just changes the letters."""
-    return a != b and a.as_posix().lower() == b.as_posix().lower()
+    return not same_text(a, b) and a.as_posix().lower() == b.as_posix().lower()
 
 
 def plan_rename(session, studio, shoot_id, new_name):
@@ -98,7 +119,7 @@ def plan_rename(session, studio, shoot_id, new_name):
     prefix = slug(new_name)
     if not (session / old_folder).is_dir():
         sys.exit(f"STOP: the folder {old_folder} is not there. Nothing renamed.")
-    if new_folder != old_folder and (session / new_folder).exists() and not case_twin(session / old_folder, session / new_folder):
+    if not same_text(new_folder, old_folder) and (session / new_folder).exists() and not case_twin(session / old_folder, session / new_folder):
         sys.exit(f"STOP: a folder named {new_folder} already exists. Nothing renamed.")
 
     files = manifest["files"]
@@ -152,8 +173,34 @@ def plan_rename(session, studio, shoot_id, new_name):
         to_name, from_name = Path(x["to"]).name, Path(x["from"]).name
         if to_name.lower() != from_name.lower() and to_name.lower() in old_names:
             sys.exit(f"STOP: {to_name} is already in {old_folder}. Nothing renamed.")
-    if new_folder == old_folder and all(Path(x["to"]).name == Path(x["from"]).name for x in moves):
+    if same_text(new_folder, old_folder) and all(Path(x["to"]).name == Path(x["from"]).name for x in moves):
         return shoot, old_folder, new_folder, []
+    # on a PC, a place longer than File Explorer can open would stop the rename part way: found now, before anything
+    # moves. Three kinds of place: the new folder; each photo's new name in it; and, since the folder takes its new
+    # name first, each photo's old name inside the renamed folder, where every photo sits for a moment (a longer
+    # folder with a shorter prefix can pass the first two and fail there).
+    long = [x["to"] for x in moves if this_computer.path_too_long(session / x["to"])]
+    if not same_text(new_folder, old_folder):
+        long += [(new_folder / Path(x["from"]).name).as_posix() for x in moves
+                 if this_computer.path_too_long(session / new_folder / Path(x["from"]).name)]
+    if this_computer.path_too_long(session / new_folder, folder=True):
+        long.insert(0, new_folder.as_posix())
+    # the report's small copies of the sneak peeks take the photos' new names too (follow_sneak_peeks), inside the
+    # backup's records, which sit deeper than the photos: the Assistant's own files, held to what Python can make
+    if this_computer.WINDOWS:  # unproven on a real PC
+        to_of = {x["from"]: x["to"] for x in moves}
+        try:
+            picks = json.loads((studio / "sneak-peeks.json").read_text(encoding="utf-8")).get("picks", [])
+        except (OSError, ValueError):
+            picks = []
+        for pk in picks:
+            to = to_of.get(pk.get("file"))
+            if to and this_computer.records_path_too_long(studio / "sneak-peeks" / (Path(to).stem + ".jpg")):
+                long.append((studio / "sneak-peeks" / (Path(to).stem + ".jpg")).name)
+    if long:
+        say(f"  too long for this {this_computer.COMPUTER}: {long[0]}" + (f" (and {len(long) - 1} more)" if len(long) > 1 else ""))
+        sys.exit(f"STOP: the new name would make a photo's place longer than {this_computer.FILES_APP} can open "
+                 "(260 characters, counting the drive and every folder on the way). Nothing renamed. A shorter name fixes it.")
     return shoot, old_folder, new_folder, moves
 
 
@@ -168,11 +215,11 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
         say("  Dry run. Nothing renamed.")
         return
     log_path = studio / "rename-log.json"
-    log = json.loads(log_path.read_text()) if log_path.exists() else {"renames": []}
+    log = json.loads(log_path.read_text(encoding="utf-8")) if log_path.exists() else {"renames": []}
     entry = {"shoot": shoot["id"], "from_name": shoot.get("name"), "to_name": new_name,
              "started": datetime.now().isoformat(timespec="seconds"), "moves": moves, "verified": 0, "problems": []}
     log["renames"].append(entry)
-    log_path.write_text(json.dumps(log, indent=1))
+    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
 
     t0 = time.time()
     # each file's identity on the drive before anything moves: a rename never rewrites bytes, so the
@@ -183,18 +230,29 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             m["ident"] = [st.st_ino, st.st_size, st.st_mtime_ns]
         except OSError:
             m["ident"] = None
-    if new_folder != old_folder:
-        os.rename(session / old_folder, session / new_folder)  # one atomic move of the whole folder
-    for m in moves:
-        src = session / new_folder / Path(m["from"]).name
-        dst = session / m["to"]
-        if dst.exists() and src != dst and not case_twin(src, dst):
-            entry["problems"].append(f"{m['to']} already exists; not overwritten")
-            break
-        if src != dst:
-            os.rename(src, dst)  # when only the letters' case changes, this changes just that
-        m["moved"] = True
-    log_path.write_text(json.dumps(log, indent=1))
+    folder_moved = same_text(new_folder, old_folder)
+    try:
+        if not folder_moved:
+            this_computer.rename(session / old_folder, session / new_folder)  # one atomic move of the whole folder
+            folder_moved = True
+        for m in moves:
+            src = session / new_folder / Path(m["from"]).name
+            dst = session / m["to"]
+            if dst.exists() and not same_text(src, dst) and not case_twin(src, dst):
+                entry["problems"].append(f"{m['to']} already exists; not overwritten")
+                break
+            if not same_text(src, dst):
+                try:
+                    this_computer.rename(src, dst)  # when only the letters' case changes, this changes just that
+                except FileExistsError:  # a PC refuses a name that is there (a Mac is checked just above); unproven on a real PC
+                    entry["problems"].append(f"{m['to']} already exists; not overwritten")
+                    break
+            m["moved"] = True
+    except this_computer.HeldOpen as e:
+        stopped(session, studio, log, log_path, entry, e, new_folder, moves, folder_moved)
+    except OSError as e:
+        failed(session, studio, log, log_path, entry, e, new_folder, moves, folder_moved)
+    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
     say(f"  renamed in {time.time() - t0:.0f} s; checking every file is the same file it was...")
     t1 = time.time()
     hashed = 0
@@ -204,7 +262,7 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             entry["problems"].append(f"after the rename, {m['to']} is not there")
             continue
         same = False
-        if m.get("ident"):
+        if m.get("ident") and m["ident"][0]:  # a drive that numbers no file (0) proves nothing by it
             st = os.stat(dst)
             same = [st.st_ino, st.st_size, st.st_mtime_ns] == m["ident"]
         if not same:  # could not prove it by identity: read it in full. Never a pass without one or the other.
@@ -219,43 +277,31 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     entry["hashed_in_full"] = hashed
     say(f"  {entry['verified']} of {len(moves)} checked in {time.time() - t1:.0f} s" + (f" ({hashed} read in full)" if hashed else ""))
 
-    new_path = where_they_are(session, new_folder, moves)
-    index = load(studio, "index.json")
-    for p in index["photos"]:
-        p["file"] = new_path.get(p["file"], p["file"])
-    (studio / "index.json").write_text(json.dumps(index, indent=1))
-    g = load(studio, "groups.json")
-    for grp in g["groups"]:
-        grp["files"] = [new_path.get(f, f) for f in grp["files"]]
-    (studio / "groups.json").write_text(json.dumps(g, indent=1))
-    follow_sneak_peeks(studio, new_path)
-    sh = load(studio, "shoots.json")
-    for s in sh["shoots"]:
-        if s["id"] == shoot["id"]:
-            s["name"], s["folder"] = new_name, new_folder.as_posix()
-    (studio / "shoots.json").write_text(json.dumps(sh, indent=1))
-    names = load(studio, "names.json", required=False) or {}
-    names[shoot["id"]] = new_name
-    (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False))
+    write_records(session, studio, shoot["id"], new_folder, moves, new_name)
     entry["finished"] = datetime.now().isoformat(timespec="seconds")
-    log_path.write_text(json.dumps(log, indent=1))
+    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
     if entry["problems"]:
         say("  PROBLEMS (every move is in rename-log.json):")
         for p in entry["problems"][:10]:
             say(f"    - {p}")
         sys.exit(1)
-    try:  # the editing queue shows the new name too
+    update_queue(session, studio, shoot["id"], new_name, new_folder)
+    say("  All done.")
+
+
+def update_queue(session, studio, shoot_id, new_name, new_folder):
+    """The editing queue shows the new name and folder too."""
+    try:
         import edit_queue
         q = edit_queue.load()
         for x in q["shoots"]:
-            if x.get("studio") == str(studio) and x.get("shoot") == shoot["id"]:
+            if this_computer.same_place(x.get("studio") or "", studio) and x.get("shoot") == shoot_id:
                 x["name"], x["folder"] = new_name, str(session / new_folder)
                 edit_queue.save(q)
                 edit_queue.write_page(q)
                 break
     except Exception:  # noqa: BLE001  the queue is a convenience; the rename is done
         pass
-    say("  All done.")
 
 
 def where_they_are(session, new_folder, moves):
@@ -268,6 +314,72 @@ def where_they_are(session, new_folder, moves):
         else:
             out[m["from"]] = (new_folder / Path(m["from"]).name).as_posix()
     return out
+
+
+def write_records(session, studio, shoot_id, new_folder, moves, new_name=None):
+    """The index, the groups, the sneak peeks and the shoot's folder follow the files to where they are now.
+    With a new_name the rename is done: the shoot takes the name. Without one, a rename stopped part way
+    (only once the folder itself has its new name): every file is recorded where it really is, and the shoot
+    keeps its old name until the next run finishes the job."""
+    new_path = where_they_are(session, new_folder, moves)
+    # a rename that stopped part way recorded some photos in the renamed folder under their old names
+    for m in moves:
+        between = (new_folder / Path(m["from"]).name).as_posix()
+        if between != m["from"]:
+            new_path.setdefault(between, new_path[m["from"]])
+    index = load(studio, "index.json")
+    for p in index["photos"]:
+        p["file"] = new_path.get(p["file"], p["file"])
+    (studio / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8")
+    g = load(studio, "groups.json")
+    for grp in g["groups"]:
+        grp["files"] = [new_path.get(f, f) for f in grp["files"]]
+    (studio / "groups.json").write_text(json.dumps(g, indent=1), encoding="utf-8")
+    follow_sneak_peeks(studio, new_path)
+    sh = load(studio, "shoots.json")
+    for s in sh["shoots"]:
+        if s["id"] == shoot_id:
+            s["folder"] = new_folder.as_posix()
+            if new_name is not None:
+                s["name"] = new_name
+    (studio / "shoots.json").write_text(json.dumps(sh, indent=1), encoding="utf-8")
+    if new_name is not None:
+        names = load(studio, "names.json", required=False) or {}
+        names[shoot_id] = new_name
+        (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def stopped(session, studio, log, log_path, entry, e, new_folder, moves, folder_moved):
+    """A PC would not rename the folder or a photo because another program had something in it open
+    (this_computer.HeldOpen). The log keeps every move and which ones happened; the entry stays unfinished, so
+    the next run of this script finishes it before anything else. Never a problem in the log: it is not one."""
+    entry.setdefault("stops", []).append({"when": datetime.now().isoformat(timespec="seconds"),
+                                          "file": e.src, "detail": str(e)})
+    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
+    if folder_moved:
+        write_records(session, studio, entry["shoot"], new_folder, moves)
+    say(f"  stopped part way: the {this_computer.COMPUTER} would not rename {Path(e.src).name} ({e.cause}). "
+        "Every move so far is in rename-log.json.")
+    say(e.words)
+    sys.exit(1)
+
+
+FAILED = ("STOP: the rename stopped part way on something unexpected. Nothing is lost: every photo is still in the "
+          "shoot's folder, and the backup's records say where each one is now.")
+
+
+def failed(session, studio, log, log_path, entry, e, new_folder, moves, folder_moved):
+    """A move failed for a reason that is not "another program has it open" and not "something is already there"
+    (the drive went away, a name the drive will not take). Stop loudly, never guess (rule 2): the details go in the
+    log, the records are written where the files really are (if the folder had already moved, so nothing names a
+    folder that is gone), and the entry stays unfinished, so nothing settles and the next run tries to finish it."""
+    entry.setdefault("stops", []).append({"when": datetime.now().isoformat(timespec="seconds"), "unexpected": True,
+                                          "file": getattr(e, "filename", None), "detail": f"{e.__class__.__name__}: {e}"})
+    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
+    if folder_moved:
+        write_records(session, studio, entry["shoot"], new_folder, moves)
+    say(f"  stopped part way: {e.__class__.__name__}: {e}. Every move so far is in rename-log.json.")
+    sys.exit(FAILED)
 
 
 def resolve_phantoms(session, entry):
@@ -313,7 +425,7 @@ def finish_unfinished(session, studio):
     log_path = studio / "rename-log.json"
     if not log_path.exists():
         return
-    log = json.loads(log_path.read_text())
+    log = json.loads(log_path.read_text(encoding="utf-8"))
     for entry in log.get("renames", []):
         moves = entry["moves"]
         # a move planned twice for one file (an older version saw .xmp and .XMP as two files) is a phantom
@@ -325,24 +437,44 @@ def finish_unfinished(session, studio):
         pending = [m for m in real if not m.get("moved")]
         if entry.get("finished") and not pending:
             if resolve_phantoms(session, entry):
-                log_path.write_text(json.dumps(log, indent=1))
+                log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
                 say(f"Cleared {len(entry['phantoms_resolved'])} sidecar(s) the old renamer counted twice "
                     f"({entry.get('to_name')}); each real one matched the backup.")
             continue
         say(f"Finishing a rename that was cut off: {entry.get('from_name')} -> {entry.get('to_name')}")
         new_folder = Path(real[0]["to"]).parent if real else None
+        old_folder = Path(real[0]["from"]).parent if real else None
         # the old run's own notes about what it had not got to yet, and about phantoms, are not problems
         phantom_names = [m["to"] for m in moves if m.get("phantom")]
         entry["problems"] = [p for p in entry.get("problems", [])
                              if not p.startswith("after the rename, ") and not any(ph in p for ph in phantom_names)]
         entry["verified"] = 0
+        folder_moved = bool(new_folder) and (same_text(new_folder, old_folder) or on_disk(session / new_folder))
+        try:
+            if new_folder and not folder_moved and on_disk(session / old_folder):
+                # it stopped before the folder itself could take the new name (on a PC, something had a photo
+                # in it open): the folder goes first, exactly as the first run would have done it
+                if (session / new_folder).exists() and not case_twin(session / old_folder, session / new_folder):
+                    entry["problems"].append(f"a folder named {new_folder} is in the way of {old_folder}; both left as they are")
+                    log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
+                    say(f"  problems: {entry['problems'][-1:]}")
+                    sys.exit(1)
+                this_computer.rename(session / old_folder, session / new_folder)
+                folder_moved = True
+            for m in real:
+                dst = session / m["to"]
+                src = session / new_folder / Path(m["from"]).name
+                if not m.get("moved") and on_disk(src) and not same_text(src, dst) and (not dst.exists() or case_twin(src, dst)):
+                    this_computer.rename(src, dst)
+                    m["moved"] = True
+        except this_computer.HeldOpen as e:
+            stopped(session, studio, log, log_path, entry, e, new_folder, real, folder_moved)
+        except OSError as e:
+            failed(session, studio, log, log_path, entry, e, new_folder, real, folder_moved)
         for m in real:
             dst = session / m["to"]
             src = session / new_folder / Path(m["from"]).name
-            if not m.get("moved") and on_disk(src) and src != dst and (not dst.exists() or case_twin(src, dst)):
-                os.rename(src, dst)
-                m["moved"] = True
-            if on_disk(dst) and not (on_disk(src) and src != dst):
+            if on_disk(dst) and not (on_disk(src) and not same_text(src, dst)):
                 m["moved"] = True
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
                     entry["verified"] += 1
@@ -358,31 +490,21 @@ def finish_unfinished(session, studio):
         checked = {m["to"] for m in real if m.get("checked")}
         tail = " already exists; not overwritten"
         entry["problems"] = [q for q in entry["problems"] if not (q.endswith(tail) and q[:-len(tail)] in checked)]
-        log_path.write_text(json.dumps(log, indent=1))
-        new_path = where_they_are(session, new_folder, real) if new_folder else {}
-        index = load(studio, "index.json")
-        for p in index["photos"]:
-            p["file"] = new_path.get(p["file"], p["file"])
-        (studio / "index.json").write_text(json.dumps(index, indent=1))
-        g = load(studio, "groups.json")
-        for grp in g["groups"]:
-            grp["files"] = [new_path.get(f, f) for f in grp["files"]]
-        (studio / "groups.json").write_text(json.dumps(g, indent=1))
-        follow_sneak_peeks(studio, new_path)
-        sh = load(studio, "shoots.json")
-        for s in sh["shoots"]:
-            if s["id"] == entry["shoot"] and new_folder:
-                s["name"], s["folder"] = entry["to_name"], new_folder.as_posix()
-        (studio / "shoots.json").write_text(json.dumps(sh, indent=1))
-        names = load(studio, "names.json", required=False) or {}
-        names[entry["shoot"]] = entry["to_name"]
-        (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False))
+        log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
+        if new_folder:
+            write_records(session, studio, entry["shoot"], new_folder, real, entry["to_name"])
+        else:
+            names = load(studio, "names.json", required=False) or {}
+            names[entry["shoot"]] = entry["to_name"]
+            (studio / "names.json").write_text(json.dumps(names, indent=1, ensure_ascii=False), encoding="utf-8")
         resolve_phantoms(session, entry)
         entry["finished"] = datetime.now().isoformat(timespec="seconds") + " (finished on a later run)"
-        log_path.write_text(json.dumps(log, indent=1))
+        log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
         say(f"  {entry['verified']} of {len(real)} verified" + (f"; problems: {entry['problems'][:5]}" if entry["problems"] else ""))
         if entry["problems"]:
             sys.exit(1)
+        if entry.get("stops") and new_folder:  # it stopped on a PC (a file held open) and is now done: the queue follows
+            update_queue(session, studio, entry["shoot"], entry["to_name"], new_folder)
 
 
 def main():

@@ -25,6 +25,8 @@ import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JSON = HOME / "studio.json"
@@ -62,7 +64,7 @@ DATE_FORMS = [
 def load():
     if JSON.exists():
         try:
-            return json.loads(JSON.read_text())
+            return json.loads(JSON.read_text(encoding="utf-8"))
         except ValueError:
             pass
     return {}
@@ -71,8 +73,8 @@ def load():
 def save(sf):
     HOME.mkdir(parents=True, exist_ok=True)
     sf["updated"] = datetime.now().isoformat(timespec="seconds")
-    JSON.write_text(json.dumps(sf, indent=1, ensure_ascii=False))
-    MD.write_text(as_markdown(sf))
+    JSON.write_text(json.dumps(sf, indent=1, ensure_ascii=False), encoding="utf-8")
+    MD.write_text(as_markdown(sf), encoding="utf-8")
 
 
 def as_markdown(sf):
@@ -84,8 +86,9 @@ def as_markdown(sf):
         lines += [f"- You call your helper **{sf['name']}**.", ""]
     lines += [
              "## Drives", "",
-             f"- Sessions go on: `{d.get('session', '(not set)')}`",
-             f"- Second copy: `{d.get('second')}`" if d.get("second") else "- Second copy: none (that's fine)", "",
+             f"- Sessions go on: `{d.get('session', '(not set)')}`" + (f" ({d['session_label']})" if d.get("session_label") else ""),
+             (f"- Second copy: `{d.get('second')}`" + (f" ({d['second_label']})" if d.get("second_label") else ""))
+             if d.get("second") else "- Second copy: none (that's fine)", "",
              "## Naming", ""]
     if n.get("folder_pattern"):
         lines += [f"- Shoot folders look like: **{render(n, 'Smith Family', date(2026, 10, 18))}**",
@@ -158,25 +161,22 @@ def shoot_folders(drive, limit=2):
 
 
 def drives():
-    """Volumes they might mean; the Mac itself, camera cards, Time Machine and tiny helper volumes left out.
+    """Volumes they might mean; the computer's own disk, camera cards, Time Machine and tiny helper volumes left out.
     Each carries its likely shoot folders; the one that already has shoots on it is `recommended`."""
     out = []
-    if not Path("/Volumes").is_dir():
-        return out
-    for v in Path("/Volumes").iterdir():
+    for vol in this_computer.volumes():   # /Volumes on a Mac, drive letters on a PC
+        v = Path(vol["path"])
+        total, free = vol["total"], vol["free"]
         try:
-            st = os.statvfs(v)
+            if total < 8 * 1024 ** 3 or vol["system"] or (v / "DCIM").is_dir():
+                continue  # too small to be a session drive, the computer itself, or a camera card
+            if (v / "Backups.backupdb").is_dir() or (v / ".com.apple.timemachine.supported").exists():
+                continue  # Time Machine
         except OSError:
             continue
-        total = st.f_frsize * st.f_blocks
-        free = st.f_frsize * st.f_bavail
-        if total < 8 * 1024 ** 3 or v.name in ("Macintosh HD", "Recovery") or (v / "DCIM").is_dir():
-            continue  # too small to be a session drive, the Mac itself, or a camera card
-        if (v / "Backups.backupdb").is_dir() or (v / ".com.apple.timemachine.supported").exists():
-            continue  # Time Machine
         folders = shoot_folders(v)
         root_score, _ = _looks_like_shoot(v)
-        out.append({"path": str(v), "name": v.name, "total_gb": round(total / 1024 ** 3),
+        out.append({"path": str(v), "name": vol["shown"], "total_gb": round(total / 1024 ** 3),
                     "free_gb": round(free / 1024 ** 3), "shoot_folders": folders,
                     "has_shoots": bool(folders) or root_score >= 3, "recommended": False})
     out.sort(key=lambda d: (-int(d["has_shoots"]), -d["total_gb"]))
@@ -194,14 +194,79 @@ def on_internal_disk(path):
         if os.name == "nt":
             sysdrive = (os.environ.get("SystemDrive") or "C:").upper()
             return p.resolve().drive.upper() == sysdrive
-        if str(p).startswith("/Volumes/"):
+        if str(p).startswith("/Volumes/"):  # pc-ok: the Mac branch; a PC returned above
             return False  # an external drive, plugged in or not
         here = p if p.exists() else next((q for q in p.parents if q.exists()), Path("/"))
-        if str(here.resolve()).startswith("/Volumes/"):
+        if str(here.resolve()).startswith("/Volumes/"):  # pc-ok: the Mac branch
             return False
         return os.stat(here).st_dev == os.stat("/").st_dev
     except OSError:
         return False
+
+
+# ---------------------------------------------------------------- a PC's drive letters move
+
+def _letter(path):
+    """The drive letter a PC path starts with ("E" for "E:\\Photo Shoots"), or None."""
+    m = re.match(r"\s*([A-Za-z]):", str(path or ""))
+    return m.group(1).upper() if m else None
+
+
+def drive_facts(path):
+    """(the drive's name, its own number) for the drive a saved folder is on. Only on a PC, where the Studio File
+    keeps the drive by its letter and Windows hands letters out as things are plugged in, so another day the
+    memory card can get the letter the photo drive had. A Mac's drive name is in the path itself: (None, None)."""
+    if not this_computer.WINDOWS:
+        return None, None
+    letter = _letter(path)
+    for v in this_computer.volumes() if letter else []:   # unproven on a real PC
+        if _letter(v["path"]) == letter:
+            return v.get("name"), v.get("id")
+    return None, None
+
+
+def keep_drive_facts(d, key):
+    """Saved beside drives[key] at setup, on a PC only: which drive that letter was (its name and number)."""
+    for k in (f"{key}_label", f"{key}_id"):
+        d.pop(k, None)
+    if this_computer.WINDOWS and d.get(key):
+        label, vid = drive_facts(d[key])
+        if label:
+            d[f"{key}_label"] = label
+        if vid:
+            d[f"{key}_id"] = vid
+
+
+def drive_moved(d, key):
+    """On a PC, plain words when the drive at the saved letter today is not the drive saved at setup (the card,
+    or another drive, took its letter); None when it is the same drive, when nothing was saved to compare with
+    (a Studio File from before Nov 6), or on a Mac. Never a guess: a drive is the same only when its own number
+    matches. A drive that is simply not plugged in is left to the preflight, which says so."""
+    if not this_computer.WINDOWS:
+        return None
+    saved, path = d.get(f"{key}_id"), d.get(key)
+    letter = _letter(path)
+    if not saved or not letter:
+        return None
+    vols = this_computer.volumes()   # unproven on a real PC
+    here = next((v for v in vols if _letter(v["path"]) == letter), None)
+    if here and here.get("id") == saved:
+        return None
+    elsewhere = next((v for v in vols if v.get("id") == saved), None)
+    if here is None and elsewhere is None:
+        return None
+    name = d.get(f"{key}_label") or ("your photo drive" if key == "session" else "your second-copy drive")
+    there = f"{name} is {_letter(elsewhere['path'])}: now" if elsewhere else f"{name} isn't plugged in"
+    if here:
+        try:
+            card = (Path(here["path"]) / "DCIM").is_dir()
+        except OSError:
+            card = False
+        now = f"{letter}: is {'the memory card' if card else here.get('name') or 'another drive'} today"
+    else:
+        now = f"nothing is at {letter}: today"
+    return (f"Windows gave your drives different letters today: {there}, and {now}. I won't start until we're sure "
+            "where your photos are going.")
 
 
 def learn_pattern(example):
@@ -241,8 +306,9 @@ def render(naming, shoot, when):
     fmt = naming.get("date_format") or "%b %-d %Y"
     if isinstance(when, str):
         when = datetime.fromisoformat(when[:19] if len(when) > 10 else when)
-    out = pat.replace("{date}", when.strftime(fmt)).replace("{shoot}", shoot.replace(" ", naming.get("space", " ")))
-    return re.sub(r'[\\/:*?"<>|]+', " ", out).strip(" .")
+    out = pat.replace("{date}", this_computer.strftime(when, fmt)).replace("{shoot}", shoot.replace(" ", naming.get("space", " ")))
+    out = re.sub(r'[\\/:*?"<>|]+', " ", out).strip(" .")
+    return this_computer.unreserved(out)   # "Nul_. Family", not "Nul. Family_" (which Windows still reads as NUL)
 
 
 def main():
@@ -250,6 +316,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("show")
     sub.add_parser("drives")
+    sub.add_parser("cards", help="memory cards in right now: one line each, the path first")
     i = sub.add_parser("internal", help="is this folder on the computer's own disk? prints yes or no")
     i.add_argument("path")
     s = sub.add_parser("set")
@@ -274,13 +341,20 @@ def main():
         sf = load()
         print(as_markdown(sf) if sf else "No Studio File yet. The first 'backup now' sets it up.")
         return
+    if a.cmd == "cards":
+        found = this_computer.cards()
+        if not found:
+            print("No memory card in right now.")
+        for c in found:
+            print(f"{c['path']}   {c['shown']}")
+        return
     if a.cmd == "drives":
         found = drives()
         if not found:
-            print("No drives plugged in besides the Mac itself.")
+            print(f"No drives plugged in besides the {this_computer.COMPUTER} itself.")
         for d in found:
             tag = "   (recommended: already has shoots on it)" if d["recommended"] and d["has_shoots"] else ("   (recommended)" if d["recommended"] else "")
-            print(f"{d['path']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free{tag}")
+            print(f"{d['path']}   {d['name']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free{tag}")
             for f in d["shoot_folders"]:
                 print(f"    shoot folder: {f['name']}   {f['shoots']} folders in there")
         return
@@ -305,16 +379,21 @@ def main():
         sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note": a.note})
     if a.name is not None:
         sf["name"] = " ".join(a.name.split())[:40]
+    # drive_root: on a PC a bare "E:" means the top of drive E (Python alone would read it as wherever it last
+    # was on E). On a Mac it is the path as given, exactly as before.
     if a.drive:
-        if not Path(a.drive).is_dir():
+        if not this_computer.drive_root(a.drive).is_dir():
             sys.exit(f"STOP: {a.drive} is not a folder I can see.")
-        d["session"] = str(Path(a.drive).expanduser().resolve())
+        d["session"] = str(this_computer.drive_root(a.drive).expanduser().resolve())
+        keep_drive_facts(d, "session")   # a PC: which drive that letter is (its name and number); a Mac: nothing
     if a.second:
-        if not Path(a.second).is_dir():
+        if not this_computer.drive_root(a.second).is_dir():
             sys.exit(f"STOP: {a.second} is not a folder I can see.")
-        d["second"] = str(Path(a.second).expanduser().resolve())
+        d["second"] = str(this_computer.drive_root(a.second).expanduser().resolve())
+        keep_drive_facts(d, "second")
     if a.no_second:
         d["second"] = None
+        keep_drive_facts(d, "second")
     if a.example:
         got = learn_pattern(a.example)
         if not got:

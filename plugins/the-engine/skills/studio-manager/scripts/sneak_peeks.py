@@ -28,15 +28,14 @@ Rules:
 --picks defaults to the night's records/sneak-peeks.json:
   {"picks": [{"file": "<path from the drive folder>", "shoot": "s1", "why": "..."}], "picked_by": "..."}
 ("shoot" and "why" are optional; the older picks.json is read if that is all there is.)
-Previews go to records/sneak-peeks/<photo name>.jpg with the Mac's own sips (sidecars or not).
+Previews go to records/sneak-peeks/<photo name>.jpg with the Mac's own sips, or on a PC through
+pictures.py (the JPEG inside the RAW, sized with Pillow), sidecars or not.
 Every run is logged to records/picks-log.json before anything is written.
 Exit codes: 0 done, 1 a problem (nothing written), 2 nothing to do.
 """
 import argparse
 import json
 import os
-import shutil
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +43,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from where import locate  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 TOOL = "The Assistant, by Horizon Found"
 OLD_TOOLS = ("The Studio, by Horizon Found",)   # the name until Nov 5; sidecars written then are still ours
@@ -94,7 +96,7 @@ def current():
 
 def old_ours(sidecar):
     try:
-        text = sidecar.read_text()
+        text = sidecar.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
     tools = (TOOL,) + OLD_TOOLS
@@ -124,14 +126,14 @@ def existing_sidecar(photo):
 
 def ours(sidecar):
     try:
-        return sidecar.read_text() == current()
+        return sidecar.read_text(encoding="utf-8") == current()
     except (OSError, UnicodeDecodeError):
         return False
 
 
 def rating_in(sidecar):
     try:
-        text = sidecar.read_text(errors="replace")
+        text = sidecar.read_text(errors="replace", encoding="utf-8")
     except OSError:
         return None
     i = text.find("xmp:Rating=")
@@ -169,8 +171,14 @@ def plan(root, files):
 
 
 def make_previews(root, files, studio, size=2000):
-    """JPEGs of the sneak peeks for the report, with the Mac's own sips. 2000 px on the long side, so the
-    click-to-enlarge view on the report is sharp on a big screen (about 0.6 s and 400 KB each). Returns (made, names)."""
+    """JPEGs of the sneak peeks for the report: the Mac's own sips, or on a PC the JPEG inside the RAW sized
+    with Pillow (pictures.py). 2000 px on the long side, so the click-to-enlarge view on the report is sharp
+    on a big screen (about 0.6 s and 400 KB each on a Mac; on a PC never bigger than what the camera stored).
+    Returns (made, names)."""
+    ok, words = pictures.ready()
+    if not ok:
+        say(f"No previews of the sneak peeks for the report yet: {words}")
+        return 0, []
     out = studio / "sneak-peeks"
     out.mkdir(parents=True, exist_ok=True)
     names, made = [], 0
@@ -180,21 +188,12 @@ def make_previews(root, files, studio, size=2000):
         if dst.exists():
             names.append(dst.name)
             continue
-        if shutil.which("sips"):
-            r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", str(size),
-                                str(photo), "--out", str(dst)], capture_output=True, text=True)
-            ok = r.returncode == 0 and dst.exists()
-        else:  # no sips (tests off the Mac): Pillow as a stand-in
-            try:
-                from PIL import Image
-                im = Image.open(photo); im.thumbnail((size, size)); im.convert("RGB").save(dst, quality=82); ok = True
-            except Exception:
-                ok = False
-        if ok:
+        if pictures.make_jpeg(photo, dst, size, 82):
             names.append(dst.name)
             made += 1
         else:
-            say(f"Could not make a preview of {photo.name} (the photo is fine; the report just won't show it).")
+            why = pictures.why_not(photo)
+            say(f"Could not make a preview of {photo.name} (the photo is fine; the report just won't show it)." + (f" {why}" if why else ""))
     return made, names
 
 
@@ -205,7 +204,7 @@ def set_aside_dropped(root, studio, files):
     any more (they rated or edited it in Lightroom) is left alone and named. Returns (moved, left)."""
     log = studio / "picks-log.json"
     try:
-        entries = json.loads(log.read_text()) if log.exists() else []
+        entries = json.loads(log.read_text(encoding="utf-8")) if log.exists() else []
     except ValueError:
         entries = []
     marked = set()
@@ -217,7 +216,9 @@ def set_aside_dropped(root, studio, files):
     want = set()
     for f in files:
         photo = Path(f) if os.path.isabs(f) else root / f
-        want.add(str(photo.with_suffix(".xmp").relative_to(root)) if photo.is_relative_to(root) else str(photo.with_suffix(".xmp")))
+        # spelled with forward slashes like the log's records, on a PC too (where str() would give backslashes
+        # and every current sneak peek would look dropped)
+        want.add(photo.with_suffix(".xmp").relative_to(root).as_posix() if photo.is_relative_to(root) else str(photo.with_suffix(".xmp")))
     moved, left = [], []
     aside = studio / "sidecars-set-aside"
     for rel in sorted(marked - want):
@@ -230,7 +231,7 @@ def set_aside_dropped(root, studio, files):
         aside.mkdir(parents=True, exist_ok=True)
         dst = aside / (Path(rel).stem + "_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".xmp")
         try:
-            os.replace(side, dst)
+            this_computer.replace(side, dst)
             moved.append(rel)
         except OSError as ex:
             left.append(f"{rel} ({ex})")
@@ -244,13 +245,13 @@ def write_log(studio, entry):
     data = []
     if log.exists():
         try:
-            data = json.loads(log.read_text())
+            data = json.loads(log.read_text(encoding="utf-8"))
         except ValueError:
             data = []
     data.append(entry)
     tmp = log.with_name(log.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False))
-    os.replace(tmp, log)
+    tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, log)
 
 
 def main():
@@ -272,7 +273,7 @@ def main():
         if not pf.exists():
             say(f"STOP: no sneak peeks to mark ({pf} is not there).")
             return 1
-        files = [p["file"] for p in json.loads(pf.read_text())["picks"]]
+        files = [p["file"] for p in json.loads(pf.read_text(encoding="utf-8"))["picks"]]
 
     todo, upgrade, skipped, problems = plan(root, files)
     if not a.dry_run and not a.files:
@@ -301,7 +302,7 @@ def main():
             say(f"Would update: {Path(f).name} ({side.name} is still exactly as the Studio wrote it)")
         say(f"Dry run: {len(todo)} new, {len(upgrade)} brought up to date; nothing was written.")
         return 0
-    rel = lambda side: str(side.relative_to(root)) if side.is_relative_to(root) else str(side)
+    rel = lambda side: side.relative_to(root).as_posix() if side.is_relative_to(root) else str(side)
 
     write_log(studio, {"at": datetime.now().isoformat(timespec="seconds"),
                        "marked": [rel(side) for _, _, side in todo],
@@ -311,7 +312,8 @@ def main():
     made = 0
     for f, photo, side in todo:
         try:
-            with open(side, "x") as fh:  # "x": never replaces a file that appeared meanwhile
+            # "x": never replaces a file that appeared meanwhile. newline: the same bytes on a Mac and a PC.
+            with open(side, "x", encoding="utf-8", newline="\n") as fh:
                 fh.write(current())
             made += 1
         except FileExistsError:
@@ -322,8 +324,9 @@ def main():
             say(f"Left alone: {photo.name} (its sidecar changed while working; not touched).")
             continue
         tmp = side.with_name(side.name + ".studio-partial")
-        tmp.write_text(current())
-        os.replace(tmp, side)
+        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(current())
+        this_computer.replace(tmp, side)
         updated += 1
     say(f"Done: {made} new, {updated} brought up to date. In Lightroom, filter by the keyword {KEYWORD!r} to jump to them.")
     return 0

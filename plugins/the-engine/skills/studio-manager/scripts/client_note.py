@@ -13,6 +13,7 @@ the report. Nothing is ever sent; the photographer pastes it into their own emai
 
     python3 client_note.py told --night "<backup>" --text "Smith family at the beach, Sarah's the mom..."
                                                                   what they said about the card, kept for the look and the note
+    python3 client_note.py told --night "<backup>" --text-file said.txt     the same, from a UTF-8 file (best on a PC)
     python3 client_note.py facts --night "<backup>" --shoot s1    what Claude has to write from (JSON)
     python3 client_note.py save --night "<backup>" --shoot s1 --to "Sarah" --subject "..." --body-file draft.txt
     python3 client_note.py save --night "<backup>" --shoot s1 --to "Sarah"      (just the name, before the draft)
@@ -25,7 +26,6 @@ Exit codes: 0 done, 1 a problem, 2 nothing there.
 """
 import argparse
 import json
-import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -34,7 +34,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import studio_file  # noqa: E402
-from where import locate  # noqa: E402
+from where import locate, same_place  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 TONES = {"warm": "warm and personal", "plain": "short and plain", "playful": "playful"}
 
@@ -87,7 +89,7 @@ def load_note(studio, shoot_id):
     p = notes_dir(studio) / f"{shoot_id}.json"
     if p.exists():
         try:
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8"))
         except ValueError:
             pass
     return {}
@@ -98,8 +100,8 @@ def save_note(studio, shoot_id, note):
     d.mkdir(parents=True, exist_ok=True)
     p = d / f"{shoot_id}.json"
     tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(json.dumps(note, indent=1, ensure_ascii=False))
-    os.replace(tmp, p)
+    tmp.write_text(json.dumps(note, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, p)   # on a PC, waits a moment if the report's server is reading it right then
     return p
 
 
@@ -110,7 +112,7 @@ def all_notes(studio):
     if d.is_dir():
         for p in sorted(d.glob("*.json")):
             try:
-                out[p.stem] = json.loads(p.read_text())
+                out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
             except ValueError:
                 pass
     return out
@@ -121,8 +123,8 @@ def shoot_names(studio):
     names = {}
     if not (studio / "shoots.json").exists():
         return names
-    given = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
-    for sh in json.loads((studio / "shoots.json").read_text())["shoots"]:
+    given = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
+    for sh in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]:
         names[sh["id"]] = given.get(sh["id"]) or sh.get("name") or sh.get("suggested") or sh["id"]
     return names
 
@@ -155,11 +157,11 @@ def time_of_day(start, end):
 def due_for(studio, shoot_id):
     """The due date from the editing queue, if the shoot is in it."""
     try:
-        q = json.loads((studio_file.HOME / "queue.json").read_text())
+        q = json.loads((studio_file.HOME / "queue.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     for s in q.get("shoots", []):
-        if s.get("studio") == str(studio) and s.get("shoot") == shoot_id:
+        if same_place(s.get("studio"), studio) and s.get("shoot") == shoot_id:
             return s.get("due")
     return None
 
@@ -186,7 +188,7 @@ def told(studio):
     p = studio / "told.json"
     if p.exists():
         try:
-            return json.loads(p.read_text()).get("text", "")
+            return json.loads(p.read_text(encoding="utf-8")).get("text", "")
         except ValueError:
             pass
     return ""
@@ -194,11 +196,11 @@ def told(studio):
 
 def facts(night, shoot_id):
     root, studio = locate(night)
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     s = next((x for x in shoots if x["id"] == shoot_id), None)
     if not s:
         return None
-    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]} if (studio / "groups.json").exists() else {}
+    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]} if (studio / "groups.json").exists() else {}
     gs = [groups[g] for g in s.get("groups", []) if g in groups]
     start = gs[0]["start"] if gs else ""
     end = gs[-1].get("end", "") if gs else ""
@@ -206,7 +208,7 @@ def facts(night, shoot_id):
     pj = studio / "sneak-peeks.json"
     if pj.exists():
         try:
-            for pk in json.loads(pj.read_text()).get("picks", []):
+            for pk in json.loads(pj.read_text(encoding="utf-8")).get("picks", []):
                 if pk.get("shoot", shoot_id) == shoot_id:
                     peeks.append({"file": Path(pk["file"]).name, "why": pk.get("why", ""),
                                   "preview": str(studio / "sneak-peeks" / (Path(pk["file"]).stem + ".jpg"))})
@@ -251,7 +253,11 @@ def main():
     st.add_argument("--off", action="store_true")
     sub.add_parser("status")
     f = sub.add_parser("facts"); f.add_argument("--night", required=True); f.add_argument("--shoot", required=True)
-    t = sub.add_parser("told"); t.add_argument("--night", required=True); t.add_argument("--text", required=True)
+    t = sub.add_parser("told"); t.add_argument("--night", required=True)
+    tt = t.add_mutually_exclusive_group(required=True)
+    tt.add_argument("--text", help="what they said, word for word")
+    tt.add_argument("--text-file", help="the same, read from a UTF-8 text file (so on a PC it never passes through "
+                                        "the command line, which can change quotes and $)")
     sv = sub.add_parser("save"); sv.add_argument("--night", required=True); sv.add_argument("--shoot", required=True)
     sv.add_argument("--to"); sv.add_argument("--subject"); sv.add_argument("--body"); sv.add_argument("--body-file")
     sh = sub.add_parser("show"); sh.add_argument("--night", required=True); sh.add_argument("--shoot")
@@ -260,7 +266,7 @@ def main():
     if a.cmd == "setup":
         sample = None
         if a.sample_file:
-            sample = Path(a.sample_file).read_text()
+            sample = Path(a.sample_file).read_text(encoding="utf-8")
         elif a.sample:
             sample = a.sample
         n = setup(sample, a.tone, a.sign_off, a.off)
@@ -278,10 +284,17 @@ def main():
         root, studio = locate(a.night)
         p = studio / "told.json"
         old = told(studio)
-        text = (old + "\n" + a.text.strip()).strip() if old else a.text.strip()
+        said = a.text
+        if a.text_file:
+            try:
+                said = Path(a.text_file).read_text(encoding="utf-8-sig")   # -sig: a PC's editors may start it with a BOM
+            except (OSError, UnicodeDecodeError) as e:
+                say(f"STOP: I couldn't read {a.text_file} ({e.__class__.__name__}). Nothing kept.")
+                return 1
+        text = (old + "\n" + said.strip()).strip() if old else said.strip()
         tmp = p.with_name(p.name + ".tmp")
-        tmp.write_text(json.dumps({"text": text, "at": datetime.now().isoformat(timespec="seconds")}, indent=1, ensure_ascii=False))
-        os.replace(tmp, p)
+        tmp.write_text(json.dumps({"text": text, "at": datetime.now().isoformat(timespec="seconds")}, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, p)
         say("Kept. It'll shape the names and the note.")
         return 0
     if a.cmd == "facts":
@@ -301,7 +314,7 @@ def main():
             note["to"] = a.to.strip()
         if a.subject is not None:
             note["subject"] = a.subject.strip()
-        body = Path(a.body_file).read_text() if a.body_file else a.body
+        body = Path(a.body_file).read_text(encoding="utf-8") if a.body_file else a.body
         if body is not None:
             note["body"] = body.strip() + "\n"
             note["written"] = datetime.now().isoformat(timespec="seconds")

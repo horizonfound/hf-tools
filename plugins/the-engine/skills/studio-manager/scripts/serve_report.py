@@ -1,33 +1,45 @@
 #!/usr/bin/env python3
 """Show a backup's report inside the Claude app (or any browser) at
-http://127.0.0.1:<port>/report.html, and let its folder links open Finder.
+http://127.0.0.1:<port>/report.html, and let its folder links open Finder (File Explorer on a PC).
 
 A page served from localhost is not allowed to open file:// links itself, so
 the page asks this server to do it: GET /open?path=<folder>. Only folders the
 report names (the source, their drive, the second copy) or folders inside them
-may be opened; anything else is refused. Listens on 127.0.0.1 only, so nothing outside this Mac can
+may be opened; anything else is refused. Listens on 127.0.0.1 only, so nothing outside this computer can
 reach it. Opened by double-click in Safari, the same links work on their own.
+
+Its log is ~/.studio/logs/report <backup> <tag>.log (log_name), never inside the backup's records.
 
     python3 serve_report.py "<session folder>" [--port 8765]
 """
 import argparse
+import hashlib
 import json
 import subprocess
 import threading
-import subprocess
 import sys
 import time
 from functools import partial
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from finder import open_folder as show_in_finder
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 
 HERE = Path(__file__).resolve().parent
+
+
+def quiet():
+    """How this server runs its helpers (a rename, the report rebuilt): on a PC with no window of their own
+    (unproven on a real PC). A server started from a page has no console, and Windows gives every console program
+    such a process starts a new, visible black window; closing it by hand would cut a rename off half way.
+    CREATE_NO_WINDOW gives the helper a console with no window instead. A Mac: nothing changes."""
+    return {"creationflags": 0x08000000} if this_computer.WINDOWS else {}   # CREATE_NO_WINDOW
 
 
 class Renames:
@@ -59,7 +71,7 @@ class Renames:
                 shoot_id, name = self.queue.pop(0)
                 self.state[shoot_id] = {"state": "running", "name": name, "line": "Renaming the folder and every photo in it..."}
             r = subprocess.run([sys.executable, str(HERE / "rename_shoot.py"), self.session, "--shoot", shoot_id, "--name", name],
-                               capture_output=True, text=True)
+                               capture_output=True, encoding="utf-8", errors="replace", **quiet())
             out = (r.stdout + r.stderr).strip().splitlines()
             last = out[-1] if out else ""
             ok = r.returncode == 0
@@ -70,7 +82,7 @@ class Renames:
                     self.state[shoot_id] = {"state": "done", "name": name, "line": "Done. Folder and photos renamed."}
                 else:
                     why = last.replace("STOP: ", "")
-                    if not why or "/" in why:   # no file paths on the page
+                    if not why or "/" in why or "\\" in why:   # no file paths on the page (a PC's use backslashes)
                         why = "Something stopped the rename, and nothing was changed."
                     self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell Claude and it'll sort it out."}
             try:  # the report shows the new name and folder
@@ -85,9 +97,24 @@ def rebuild_report(session):
     "Use these" on Show me more rebuilt the report and a change made minutes earlier was gone from it). A
     fresh process always uses the code on disk."""
     r = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "report_page.py"), str(session)],
-                       capture_output=True, text=True)
+                       capture_output=True, encoding="utf-8", errors="replace", **quiet())
     if r.returncode != 0:
         raise RuntimeError((r.stderr or r.stdout).strip()[-300:])
+
+
+def log_name(studio):
+    """The name of the log for one backup's report server: "report <the backup's name> <a short tag>". Kept in
+    ~/.studio/logs (fresh.server_log), not in the backup's records, which the settle step moves: on a PC a log a
+    running server holds open would stop that move. The tag tells two backups with the same name apart."""
+    studio = Path(studio)
+    night = studio.parent.name if studio.name == "_studio" else studio.name
+    try:
+        whole = studio.resolve()
+    except OSError:
+        whole = studio
+    from where import place_key
+    tag = hashlib.sha1(place_key(whole).encode("utf-8", "replace")).hexdigest()[:8]
+    return f"report {night[:60]} {tag}"
 
 
 def report_url(studio):
@@ -107,21 +134,19 @@ def report_url(studio):
             return False
 
     if f.exists():
-        old = f.read_text().strip()
+        old = f.read_text(encoding="utf-8").strip()
         if old and serving(old):
             return old
     if not (studio / "report.html").exists():
         return None
     try:
-        log = open(studio / "serve.log", "a")
-        subprocess.Popen([sys.executable, str(Path(__file__).resolve()), str(studio)],
-                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        fresh.start_server([sys.executable, str(Path(__file__).resolve()), str(studio)], log_name(studio))
     except OSError:
         return None
     for _ in range(60):
         time.sleep(0.1)
         if f.exists():
-            url = f.read_text().strip()
+            url = f.read_text(encoding="utf-8").strip()
             if url and serving(url):
                 return url
     return None
@@ -134,19 +159,17 @@ def queue_url():
         import edit_queue
         f = edit_queue.HOME / "queue-url.txt"
         if f.exists():
-            old = f.read_text().strip()
+            old = f.read_text(encoding="utf-8").strip()
             try:
                 urllib.request.urlopen(old, timeout=1).read(1)
                 return old
             except Exception:  # noqa: BLE001
                 pass
-        log = open(edit_queue.HOME / "serve.log", "a")
-        subprocess.Popen([sys.executable, str(Path(__file__).resolve().parent / "edit_queue.py"), "serve"],
-                         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        fresh.start_server([sys.executable, str(Path(__file__).resolve().parent / "edit_queue.py"), "serve"], "queue")
         for _ in range(40):
             time.sleep(0.1)
             if f.exists():
-                url = f.read_text().strip()
+                url = f.read_text(encoding="utf-8").strip()
                 try:
                     urllib.request.urlopen(url, timeout=1).read(1)
                     return url
@@ -185,12 +208,14 @@ class Picks:
                 self.state[shoot_id] = {"state": "running", "line": "Saving your picks and marking them in Lightroom..."}
             spec = f"{shoot_id}=" + ",".join(str(n) for n in nums)
             r = subprocess.run([sys.executable, str(HERE / "peek_sheets.py"), "pick", self.session, spec, "--by", "photographer"],
-                               capture_output=True, text=True)
+                               capture_output=True, encoding="utf-8", errors="replace", **quiet())
             ok = r.returncode == 0
             if ok:
-                r2 = subprocess.run([sys.executable, str(HERE / "sneak_peeks.py"), "--night", self.session], capture_output=True, text=True)
+                r2 = subprocess.run([sys.executable, str(HERE / "sneak_peeks.py"), "--night", self.session], capture_output=True,
+                                    encoding="utf-8", errors="replace", **quiet())
                 ok = r2.returncode in (0, 2)
-                subprocess.run([sys.executable, str(HERE / "first_look.py"), self.session], capture_output=True, text=True)
+                subprocess.run([sys.executable, str(HERE / "first_look.py"), self.session], capture_output=True, encoding="utf-8",
+                               errors="replace", **quiet())
             with self.lock:
                 self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
                                         else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell Claude and it'll sort it out."})
@@ -278,9 +303,12 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
         want = parse_qs(parts.query).get("path", [""])[0]
         target = Path(want).expanduser()
-        allowed = any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
+        try:   # a name Windows cannot even look up (a stray ? or *) is simply not a folder this report names
+            allowed = any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
+        except (OSError, ValueError):
+            allowed = False
         if not target.is_dir():
-            ok, words = False, f"That folder isn't there right now. Is {target.parts[2] if len(target.parts) > 2 and target.parts[1] == 'Volumes' else 'the drive'} plugged in?"
+            ok, words = False, f"That folder isn't there right now. Is {this_computer.drive_words(target) or 'the drive'} plugged in?"
         elif not allowed:
             ok, words = False, "That isn't a folder this report names."
         else:
@@ -288,10 +316,11 @@ class Handler(SimpleHTTPRequestHandler):
             if now - self.last_open.get(str(target), 0) > 1.0:
                 ok, why = show_in_finder(target)  # opens it and brings Finder to the front when macOS allows
                 name = target.name or str(target)
-                words = (f"Opened {name} in Finder, behind this window. Click Finder in the Dock to see it." if why == "behind"
-                         else f"Opened {name} in Finder.") if ok else f"Couldn't open Finder. The folder is {target}. ({why})"
+                APP = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
+                words = (f"Opened {name} in {APP}, behind this window. Click {APP} in {this_computer.APP_BAR} to see it." if why == "behind"
+                         else f"Opened {name} in {APP}.") if ok else f"Couldn't open {APP}. The folder is {target}. ({why})"
             else:
-                ok, words = True, f"Opened {target.name or str(target)} in Finder."
+                ok, words = True, f"Opened {target.name or str(target)} in {this_computer.FILES_APP}."
             self.last_open[str(target)] = now
         print(f"open asked: {target} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()
@@ -400,7 +429,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(HTTPStatus.BAD_REQUEST, "expected {shoot id: name}")
             return
         clean = {k[:40]: " ".join(v.split())[:120] for k, v in names.items() if v.strip()}
-        (Path(self.directory) / "names.json").write_text(json.dumps(clean, indent=1, ensure_ascii=False))
+        (Path(self.directory) / "names.json").write_text(json.dumps(clean, indent=1, ensure_ascii=False), encoding="utf-8")
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
@@ -420,7 +449,7 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from where import locate
     _, studio = locate(a.session)
-    manifest = json.loads((studio / "manifest.json").read_text())
+    manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
     Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
     Handler.renames = Renames(a.session, studio)
     Handler.picks = Picks(a.session, studio)
@@ -429,14 +458,14 @@ def main():
     srv = None
     for port in range(a.port, a.port + 20):
         try:
-            srv = ThreadingHTTPServer(("127.0.0.1", port), partial(Handler, directory=str(studio)))
+            srv = fresh.Server(("127.0.0.1", port), partial(Handler, directory=str(studio)))  # Python's own on a Mac
             break
         except OSError:
             continue
     if not srv:
         sys.exit(f"STOP: no free port between {a.port} and {a.port + 19}.")
     try:  # where this backup's report can be found, for the home page's "See the report"
-        (studio / "report-url.txt").write_text(f"http://127.0.0.1:{port}/report.html\n")
+        (studio / "report-url.txt").write_text(f"http://127.0.0.1:{port}/report.html\n", encoding="utf-8")
     except OSError:
         pass
     print(f"Report: http://127.0.0.1:{port}/report.html", flush=True)

@@ -1,0 +1,17 @@
+# The test songs are sound, never text: a Windows checkout must not touch their line endings (git already
+# takes them for binary, since they hold zero bytes; this says so for good, and for any test file added later).
+# The text files here (the checks, the README) keep plain line endings on every computer. Order matters: the
+# general line first, the binary ones after it, so they win.
+* text=auto eol=lf
+*.mp3 binary
+*.m4a binary
+*.wav binary
+*.aiff binary
+*.aif binary
+*.flac binary
+*.aac binary
+*.mp4 binary
+*.mov binary
+*.jpg binary
+*.jpeg binary
+*.png binary

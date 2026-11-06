@@ -17,7 +17,9 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-import subprocess
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 CSS = """
 .talk{display:grid;grid-template-columns:auto 1fr;gap:1.1rem;align-items:center;background:var(--sun-l);border-radius:var(--r);padding:1.3rem 1.5rem;margin:1.8rem 0 0}
@@ -325,14 +327,15 @@ ROTS = [-2.5, 2, -1.5]
 
 
 def day(iso):
-    return datetime.fromisoformat(iso).strftime("%A, %B %-d, %Y")
+    return this_computer.strftime(datetime.fromisoformat(iso), "%A, %B %-d, %Y")
 
 
 
 def big_preview(studio, g, p):
     """A sharp copy (2000 px) of a group preview for the report's click-to-enlarge view, made once from
-    the photo itself with the Mac's own sips into groups/big/. Returns the path to use, or None when the
-    photo is not reachable (drive unplugged): the page then just shows the small preview bigger."""
+    the photo itself into groups/big/ (the Mac's own sips; on a PC the JPEG the camera stored in the RAW,
+    which for a few cameras is smaller than 2000 px). Returns the path to use, or None when the photo is
+    not reachable (drive unplugged) or cannot be read here: the page then just shows the small preview bigger."""
     big = studio / "groups" / "big" / p
     if big.exists():
         return f"groups/big/{p}"
@@ -345,10 +348,10 @@ def big_preview(studio, g, p):
     src = next((root / f for f in g.get("files", []) if Path(f).stem.endswith(stem)), None)
     if not src or not src.is_file():
         return None
+    if not pictures.ready()[0]:
+        return None
     big.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "82", "-Z", "2000", str(src), "--out", str(big)],
-                       capture_output=True)
-    return f"groups/big/{p}" if r.returncode == 0 and big.exists() else None
+    return f"groups/big/{p}" if pictures.make_jpeg(src, big, 2000, 82) else None
 
 
 def peeks_by_shoot(studio):
@@ -360,7 +363,7 @@ def peeks_by_shoot(studio):
     if not pj.exists():
         return out
     try:
-        picks = json.loads(pj.read_text()).get("picks", [])
+        picks = json.loads(pj.read_text(encoding="utf-8")).get("picks", [])
     except ValueError:
         return out
     for pk in picks:
@@ -406,9 +409,9 @@ def shoots_section(studio):
     rest of its sneak peeks in a row, then the note to the client (Dustin, Oct 28)."""
     if not (studio / "groups.json").exists() or not (studio / "shoots.json").exists():
         return None
-    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]}
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
-    names = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
+    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]}
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
+    names = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
     e = html.escape
     total = sum(s["photos"] for s in shoots)
     days = sorted({groups[g]["start"][:10] for s in shoots for g in s["groups"]})
@@ -425,7 +428,7 @@ def shoots_section(studio):
     try:
         import edit_queue
         for x in edit_queue.load()["shoots"]:
-            if x.get("studio") == str(studio) and x.get("shoot") and edit_queue.is_waiting(x):
+            if this_computer.same_place(x.get("studio") or "", studio) and x.get("shoot") and edit_queue.is_waiting(x):
                 queued[x["shoot"]] = x.get("due")
     except Exception:  # noqa: BLE001  the queue is a convenience; the report still builds without it
         pass
@@ -526,7 +529,7 @@ def write_page(session_dir):
     from where import locate
     _, studio = locate(session_dir)
     page = studio / "first-look.html"
-    page.write_text("<!doctype html><meta http-equiv='refresh' content='0; url=report.html'><a href='report.html'>The report</a>")
+    page.write_text("<!doctype html><meta http-equiv='refresh' content='0; url=report.html'><a href='report.html'>The report</a>", encoding="utf-8")
     return page
 
 

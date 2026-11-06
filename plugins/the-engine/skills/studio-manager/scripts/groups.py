@@ -14,11 +14,13 @@ renamed here; this only describes what is on the card.
 """
 import argparse
 import json
-import subprocess
 import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+this_computer.utf8_output()
 
 
 def spread(items, count):
@@ -61,13 +63,11 @@ def find_groups(photos, gap_minutes):
 
 
 def make_preview(src, dst, size=700):
-    r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "80", "-Z", str(size), str(src), "--out", str(dst)],
-                       capture_output=True, text=True)
-    return r.returncode == 0 and dst.exists()
+    return pictures.make_jpeg(src, dst, size, 80)
 
 
 def clock(iso):
-    return datetime.fromisoformat(iso).strftime("%-I:%M %p").replace("AM", "am").replace("PM", "pm")
+    return this_computer.strftime(datetime.fromisoformat(iso), "%-I:%M %p").replace("AM", "am").replace("PM", "pm")
 
 
 def main():
@@ -78,10 +78,16 @@ def main():
     a = ap.parse_args()
     session = Path(a.session)
     studio = session / "_studio"
-    index = json.loads((studio / "index.json").read_text())
+    index = json.loads((studio / "index.json").read_text(encoding="utf-8"))
     groups, undated = find_groups(index["photos"], a.gap)
 
     if a.previews:
+        ok, words = pictures.ready()
+        if not ok:
+            # stop before groups.json is written, so the next run (once the add-on is in) does this step again
+            print(f"STOP: {words} The photos are already backed up and checked. Once it is in, run the backup again "
+                  "and it picks up right here.", flush=True)
+            return 1
         folder = studio / "groups"
         folder.mkdir(exist_ok=True)
         for g in groups:
@@ -90,25 +96,30 @@ def main():
                 dst = folder / f"{g['id']}_{Path(f).stem}.jpg"
                 if dst.exists() or make_preview(session / f, dst):
                     g["previews"].append(dst.name)
+                else:
+                    why = pictures.why_not(session / f)
+                    if why:
+                        print(f"could not show {Path(f).name}: {why}", flush=True)
 
     (studio / "groups.json").write_text(json.dumps({
         "session": index.get("session"), "gap_minutes": a.gap,
         "built": datetime.now().isoformat(timespec="seconds"),
-        "groups": groups, "undated": undated}, indent=1))
+        "groups": groups, "undated": undated}, indent=1), encoding="utf-8")
 
     day = None
     for g in groups:
         d = g["start"][:10]
         if d != day:
             day = d
-            print(f"\n{datetime.fromisoformat(g['start']).strftime('%A, %B %-d, %Y')}")
+            print(f"\n{this_computer.strftime(datetime.fromisoformat(g['start']), '%A, %B %-d, %Y')}")
         gap = f"after a {g['gap_before_min']} min gap" if g["gap_before_min"] is not None else "first of the day"
         bodies = f", {g['bodies']} cameras" if g["bodies"] > 1 else ""
         print(f"  {g['id']}  {clock(g['start'])} to {clock(g['end'])}  {g['count']:>5} photos  {g['minutes']:>4} min   {gap}{bodies}")
     if undated:
         print(f"\n{len(undated)} files with no date, left out of the groups")
     print(f"\n{len(groups)} groups at a {a.gap:g} minute gap. Written to {studio / 'groups.json'}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

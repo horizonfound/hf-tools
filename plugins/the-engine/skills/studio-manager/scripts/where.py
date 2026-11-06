@@ -17,9 +17,29 @@ are one level up, and so is the root. So every script asks locate() for
     root, studio = locate("<the night's folder, its records folder, or the old day folder>")
 """
 import json
+import os
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 RECORDS = ".studio"  # the hidden folder in their place that keeps every settled night's records
+
+
+def place_key(path):
+    """A folder path as text, spelled one way, for comparing two paths that were written down at different
+    times. On a PC "e:\\photos" and "E:\\Photos" are the same folder (Windows ignores capital letters and takes
+    either slash), so the text is evened out there. On a Mac the text is kept exactly as it is, as before."""
+    s = str(path)
+    if this_computer.WINDOWS:   # unproven on a real PC
+        return os.path.normcase(os.path.normpath(s))
+    return s
+
+
+def same_place(a, b):
+    """True when two recorded paths name the same folder (see place_key). None or "" never matches."""
+    if not a or not b:
+        return False
+    return place_key(a) == place_key(b)
 
 
 def locate(arg):
@@ -49,7 +69,7 @@ def locate(arg):
                 f = r / marker
                 if f.exists():
                     try:
-                        if json.loads(f.read_text()).get("session_was") == str(p):
+                        if same_place(json.loads(f.read_text(encoding="utf-8")).get("session_was"), p):
                             return p.parent, r
                     except (ValueError, OSError):
                         pass

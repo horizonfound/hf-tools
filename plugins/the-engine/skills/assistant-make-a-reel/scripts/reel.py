@@ -39,7 +39,6 @@ import json
 import subprocess
 import os
 import re
-import shutil
 import sys
 import time
 from pathlib import Path
@@ -50,6 +49,11 @@ sys.path.insert(0, str(HERE.parent.parent / "studio-manager" / "scripts"))
 import beats_lite  # noqa: E402
 import capcut  # noqa: E402
 import pace  # noqa: E402
+import pictures  # noqa: E402  (small pictures, on a Mac or a PC)
+import sound  # noqa: E402  (a song's sound and length, on a Mac or a PC)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
+QUIT = capcut.QUIT
 
 PHOTOS = {".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff"}
 SONGS = {".mp3", ".m4a", ".aac", ".wav", ".aif", ".aiff", ".flac"}
@@ -83,7 +87,10 @@ def edited_photos(folder):
 
 
 def workdir(shoot, folder):
-    d = HOME / "reels" / slug(shoot or Path(folder).name)
+    name = slug(shoot or Path(folder).name)
+    if this_computer.WINDOWS:
+        name = this_computer.unreserved(name)      # a shoot called "Con" or "Aux" is a name Windows keeps for itself
+    d = HOME / "reels" / name
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -91,20 +98,16 @@ def workdir(shoot, folder):
 # ---------------------------------------------------------------- the contact sheet
 
 def _thumb(src, size, tmp):
-    """(w, h, rows) of a small copy: sips on a Mac, Pillow if it happens to be there."""
-    if shutil.which("sips"):
-        import sheet
-        return sheet.thumb(src, size, tmp)
-    try:
-        from PIL import Image, ImageOps
-    except ImportError:
-        return None
-    with Image.open(src) as im:
-        im = ImageOps.exif_transpose(im).convert("RGB")
-        im.thumbnail((size, size))
-        w, h = im.size
-        raw = im.tobytes()
-    return w, h, [raw[y * w * 3:(y + 1) * w * 3] for y in range(h)]
+    """(w, h, rows) of a small copy: the Mac's own sips, as always; on a PC, Pillow, the right way up and in
+    sRGB (sheet.thumb -> pictures.thumb_rows does both). None if the photo can't be read here."""
+    import sheet
+    return sheet.thumb(src, size, tmp)
+
+
+def _pictures_note():
+    """Plain words for Claude to pass on when this computer can't draw the photos on a sheet, else None."""
+    ok, why = pictures.ready()
+    return None if ok else "NOTE: the sheet shows numbers but no photos. " + why
 
 
 def make_sheets(photos, out_dir, cell=200, per_row=6, labels=None, name="sheet"):
@@ -144,7 +147,7 @@ def cmd_sheet(a):
         w, h = capcut.photo_size(p)
         way = "tall" if h > w * 1.05 else "wide" if w > h * 1.05 else "square"
         listing.append({"n": i, "file": str(p), "w": w, "h": h, "way": way})
-    (wd / "photos.json").write_text(json.dumps({"folder": str(Path(a.folder)), "photos": listing}, indent=1))
+    (wd / "photos.json").write_text(json.dumps({"folder": str(Path(a.folder)), "photos": listing}, indent=1), encoding="utf-8")
     try:
         sheets = make_sheets(photos, wd)
     except Exception as e:  # a sheet is a convenience; the numbered list still works
@@ -154,6 +157,9 @@ def cmd_sheet(a):
     say(f"{len(photos)} edited photos ({tall} tall, {len(photos) - tall} wide or square).")
     for s in sheets:
         say(f"Sheet: {s}")
+    note = _pictures_note() if sheets else None
+    if note:
+        say(note)
     say(f"List: {wd / 'photos.json'}")
 
 
@@ -161,8 +167,9 @@ def read_picks(a):
     """The listing from the sheet, the picked photo numbers in order, and Claude's marks:
     "7+" lingers on photo 7, "11-" passes it quickly."""
     listing_file = workdir(a.shoot, a.folder) / "photos.json"
-    if listing_file.is_file() and json.loads(listing_file.read_text()).get("folder") == str(Path(a.folder)):
-        listing = json.loads(listing_file.read_text())["photos"]
+    same = os.path.normcase      # on a PC, E:\Photos and e:\photos are the same folder; on a Mac this changes nothing
+    if listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
+        listing = json.loads(listing_file.read_text(encoding="utf-8"))["photos"]
     else:
         listing = [{"n": i, "file": str(p), "w": 0, "h": 0} for i, p in enumerate(edited_photos(a.folder), 1)]
     by_n = {x["n"]: x for x in listing}
@@ -190,6 +197,9 @@ def cmd_strip(a):
     per_row = len(picks) if len(picks) <= 8 else (len(picks) + 1) // 2
     out = make_sheets([by_n[n]["file"] for n in picks], wd, cell=260, per_row=per_row, labels=picks, name="strip")
     say(f"Strip: {out[0]}  (left to right, top row then bottom, the order the reel plays)")
+    note = _pictures_note()
+    if note:
+        say(note)
 
 
 # ---------------------------------------------------------------- songs
@@ -227,7 +237,7 @@ def cmd_songs(a):
                 + ("" if x["present"] else "  (open that project in CapCut once so it downloads the song again)"))
         say("  License note: " + ("already shown and accepted." if note_seen() else "not shown yet. Say it before using one: " + CAPCUT_NOTE))
     home = Path.home()
-    places = [Path(x).expanduser() for x in a.folders] + [home / "Downloads", home / "Music", home / "Desktop"]
+    places = [Path(x).expanduser() for x in a.folders] + [this_computer.known_folder("Downloads"), this_computer.known_folder("Music"), this_computer.known_folder("Desktop")]
     found, seen = [], set()
     for top in places:
         if not top.is_dir():
@@ -336,7 +346,7 @@ def shoot_folder_name(night, shoot_id):
     try:
         from where import locate
         root, studio = locate(night)
-        for x in json.loads((studio / "shoots.json").read_text())["shoots"]:
+        for x in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]:
             if x["id"] == shoot_id and x.get("folder"):
                 return Path(x["folder"]).name
     except (SystemExit, OSError, ValueError, KeyError):
@@ -386,11 +396,11 @@ def cmd_make(a):
                   or next((x for x in cc if want in x["name"].lower()), None))
         if not picked:
             say(f"STOP: no song called \"{a.capcut_song}\" in your CapCut projects. "
-                "Add it to a project in CapCut, quit CapCut, and try again.")
+                f"Add it to a project in CapCut, {QUIT} CapCut, and try again.")
             sys.exit(2)
         if not picked["present"]:
             say(f"STOP: CapCut doesn't have \"{picked['name']}\" downloaded right now. Open \"{picked['project']}\" "
-                "in CapCut once so it downloads the song again, quit CapCut, and try again.")
+                f"in CapCut once so it downloads the song again, {QUIT} CapCut, and try again.")
             sys.exit(2)
         song = picked["path"]
     else:
@@ -415,7 +425,7 @@ def cmd_make(a):
                       "capcut_beats": picked["beats"] if picked else None} if song else None),
             "hook": {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]} if a.hook else None}
     wd = workdir(a.shoot, a.folder)
-    (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1))
+    (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1), encoding="utf-8")
     when = ""
     if song:
         f = facts["song_from"]
@@ -440,20 +450,26 @@ def cmd_make(a):
         return
     store = Path(a.store).expanduser() if a.store else capcut.default_store()
     dest, draft = capcut.write(plan, store, a.ignore_open)
-    if getattr(capcut.write, "left_to_capcut", False):
+    if capcut.write.left_to_capcut:                  # a Mac with CapCut open: CapCut adds it by itself (seen)
         say(f"Made \"{dest.name}\" in CapCut. CapCut is open, so it will show up in your projects by itself in a "
-            "moment; if it isn't there, quit and reopen CapCut.")
-    else:
+            f"moment; if it isn't there, {QUIT} and reopen CapCut.")
+    elif capcut.write.listed:
         say(f"Made \"{dest.name}\" in CapCut. Open CapCut and it's at the top of your projects.")
-    rec = json.loads((wd / "reel.json").read_text())
+    else:                                            # not in CapCut's list yet: the note says why and what to do
+        say(f"Made \"{dest.name}\" in CapCut.")
+    if capcut.write.note:
+        say(capcut.write.note)
+    if capcut.write.waiting:
+        say(capcut.WAITING_HINT)
+    rec = json.loads((wd / "reel.json").read_text(encoding="utf-8"))
     rec["capcut_project"] = str(dest)
-    (wd / "reel.json").write_text(json.dumps(rec, indent=1))
+    (wd / "reel.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
     # the posting queue: this shoot's reel is now in progress (yellow). Best effort; the reel is made either way.
     try:
         pq = HERE.parent.parent / "studio-manager" / "scripts" / "posting_queue.py"
         if pq.exists() and a.shoot:
             r = subprocess.run([sys.executable, str(pq), "made", f"{a.shoot} reel", "--where", dest.name],
-                               capture_output=True, text=True, timeout=20)
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=20)
             if r.returncode == 0:
                 say("It's in your posting queue as in progress; say \"the reel is ready\" when it's exported.")
     except Exception:
@@ -463,28 +479,22 @@ def cmd_make(a):
 def cmd_sound(a):
     """The sound of a video or screen recording, as a song file in this reel's own working folder
     (~/.studio/reels/<shoot>/). The recording itself is never moved, renamed or changed. Never write the
-    song into Music, Downloads, Desktop or Documents: the Mac guards those (Nicole's first reel, Nov 5)."""
+    song into Music, Downloads, Desktop or Documents: the Mac guards those (Nicole's first reel, Nov 5).
+    How (sound.extract_audio): the Mac's own afconvert as always; else ffmpeg (the sound copied as it is);
+    on a PC with neither, Windows' own media parts write it as a .wav (unproven on a real PC)."""
     src = Path(a.video).expanduser()
     if not src.is_file():
         say(f"STOP: no file at {src}")
         sys.exit(2)
-    if not shutil.which("afconvert"):
-        say("STOP: this computer has no way to pull the sound out of a video yet (the Mac's own afconvert is missing).")
-        sys.exit(2)
-    d = HOME / "reels" / slug(a.shoot)
-    d.mkdir(parents=True, exist_ok=True)
+    d = workdir(a.shoot, a.shoot)
     out = d / f"{src.stem} sound.m4a"
     n = 2
     while out.exists():
         out = d / f"{src.stem} sound {n}.m4a"
         n += 1
-    r = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(src), str(out)], capture_output=True, text=True)
-    if r.returncode != 0 or not out.is_file() or out.stat().st_size < 2000:
-        try:
-            out.unlink(missing_ok=True)            # our own failed output, nothing of theirs
-        except OSError:
-            pass
-        say("STOP: I couldn't read any sound in that video. " + (r.stderr.strip().split("\n")[-1][:160] if r.stderr.strip() else ""))
+    out, how = sound.extract_audio(src, out)       # nothing of theirs is written over; a failed try leaves nothing
+    if not out:
+        say("STOP: " + how)
         sys.exit(2)
     secs = capcut.song_length(str(out)) or 0
     say(f"Sound: {out}")

@@ -30,7 +30,7 @@ CSS = """
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--ink-deep:#2F6F6B;
 --coral:#F07F5A;--coral-2:#D4643F;--ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;
 --line:rgba(31,36,48,.12);--shadow:0 30px 60px -30px rgba(31,36,48,.35);
---display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;--r:30px;--ease:cubic-bezier(.2,.7,.2,1);
+--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--r:30px;--ease:cubic-bezier(.2,.7,.2,1);
 color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
@@ -126,6 +126,8 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
 import brand  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
 ROTS = [-3, 2, -1.5, 2.5, -2, 1.5]
@@ -141,7 +143,7 @@ def human(n):
 def nice_time(iso):
     try:
         d = datetime.fromisoformat(iso)
-        return d.strftime("%A, %B %-d · %-I:%M %p").replace("AM", "am").replace("PM", "pm")
+        return this_computer.strftime(d, "%A, %B %-d · %-I:%M %p").replace("AM", "am").replace("PM", "pm")
     except (TypeError, ValueError):
         return ""
 
@@ -167,7 +169,7 @@ def sort_aside(studio):
     if not p.exists():
         return []
     try:
-        return [a["from"] for a in json.loads(p.read_text()).get("set_aside", [])]
+        return [a["from"] for a in json.loads(p.read_text(encoding="utf-8")).get("set_aside", [])]
     except (ValueError, OSError):
         return []
 
@@ -178,17 +180,17 @@ def index_facts(studio):
     if not p.exists():
         return None
     try:
-        ix = json.loads(p.read_text())
+        ix = json.loads(p.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return None
     if not ix.get("first"):
         return None
 
     def day(iso):
-        return datetime.fromisoformat(iso).strftime("%b %-d, %Y")
+        return this_computer.strftime(datetime.fromisoformat(iso), "%b %-d, %Y")
 
     def clock(iso):
-        return datetime.fromisoformat(iso).strftime("%-I:%M %p").replace("AM", "am").replace("PM", "pm")
+        return this_computer.strftime(datetime.fromisoformat(iso), "%-I:%M %p").replace("AM", "am").replace("PM", "pm")
 
     first, last = ix["first"], ix["last"]
     if first[:10] == last[:10]:
@@ -214,7 +216,7 @@ def teasers(studio):
     tj = studio / "teasers.json"
     if tj.exists():
         try:
-            d = json.loads(tj.read_text())
+            d = json.loads(tj.read_text(encoding="utf-8"))
             picks = [folder / f for f in d.get("files", []) if (folder / f).exists()]
             note = d.get("picked_by", "")
         except (ValueError, OSError):
@@ -237,14 +239,14 @@ def sneak_peeks(studio):
     if not pj.exists() or not folder.is_dir():
         return [], ""
     try:
-        d = json.loads(pj.read_text())
+        d = json.loads(pj.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return [], ""
     names = {}
     try:
         if (studio / "shoots.json").exists():
-            given = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
-            for sh in json.loads((studio / "shoots.json").read_text())["shoots"]:
+            given = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
+            for sh in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]:
                 names[sh["id"]] = given.get(sh["id"]) or sh.get("name") or sh.get("suggested", "")
     except (ValueError, OSError, KeyError):
         pass
@@ -334,7 +336,7 @@ def home_link():
     try:
         f = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio")) / "posting-url.txt"
         if f.exists():
-            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
+            return f"<a class='homelink' href='{f.read_text(encoding='utf-8').strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
     except OSError:
         pass
     return ""
@@ -437,7 +439,8 @@ def build(manifest, studio):
     else:
         out.append("<p>Taken: dates will show here once the index is built.</p>")
     if skipped:
-        out.append(f"<p>{skipped} hidden Mac system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
+        mac = "Mac " if this_computer.MAC else ""   # "hidden Mac system files" on a Mac, as always; on a PC just "hidden system files"
+        out.append(f"<p>{skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
     aside = sort_aside(studio)
     if aside:
         out.append(f"<p>{len(aside)} file{'s' if len(aside) != 1 else ''} that aren't photos "
@@ -453,7 +456,7 @@ def build(manifest, studio):
         ixp = studio / "index.json"
         if ixp.exists():
             try:
-                paths = [p["file"] for p in json.loads(ixp.read_text()).get("photos", [])] or paths
+                paths = [p["file"] for p in json.loads(ixp.read_text(encoding="utf-8")).get("photos", [])] or paths
             except (ValueError, OSError):
                 pass
         parents = {Path(k).parent for k in paths if Path(k).suffix.lower() in MEDIA}
@@ -463,13 +466,16 @@ def build(manifest, studio):
         return str(Path(root) / common) if str(common) not in (".", "") else root
 
     # one card, one button: where the photos ended up, and a way to go there.
-    # Opens the folder in Finder: from Safari on its own, or via serve_report.py inside the app.
+    # Opens the folder in Finder (File Explorer on a PC): from Safari on its own, or via serve_report.py inside the app.
     where = photos_folder(manifest.get("dest", ""))
     url = Path(where).as_uri() + "/" if where else ""
     out.append("<div class='card f-sand where-card'><span class='eyebrow'>Where your photos are</span>")
     out.append(f"<p class='path'>{e(where)}</p>")
     if url:
-        out.append(f"<a class='go where' href='{e(url)}' title='Open this folder in Finder'>Open photo folder"
+        # On a PC the folder also rides along as it is written there (E:\...), because the file:// address of a
+        # drive letter does not turn back into a folder by itself (unproven on a real PC). A Mac's page is as before.
+        plain = f" data-path='{e(str(where))}'" if this_computer.WINDOWS else ""
+        out.append(f"<a class='go where' href='{e(url)}'{plain} title='Open this folder in {this_computer.FILES_APP}'>Open photo folder"
                    "<span class='arr'>&#8599;</span></a>")
     if second:
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
@@ -489,9 +495,9 @@ def build(manifest, studio):
                "const tell=m=>{t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),3200)};"
                "for(const a of document.querySelectorAll('a.where')){"
                "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
-               "const p=decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
-               "try{const r=await fetch('/open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in Finder.':'Could not open it.'));}"
-               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open Finder. Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
+               "const p=" + ("a.dataset.path||" if this_computer.WINDOWS else "") + "decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
+               "try{const r=await fetch('/open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
+               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
     out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT + "</body></html>")
     return "\n".join(out)
 
@@ -500,9 +506,9 @@ def write_page(session_dir):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from where import locate
     _, studio = locate(session_dir)
-    manifest = json.loads((studio / "manifest.json").read_text())
+    manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
     page = studio / "report.html"
-    page.write_text(build(manifest, studio))
+    page.write_text(build(manifest, studio), encoding="utf-8")
     return page
 
 

@@ -26,7 +26,6 @@ import argparse
 import html
 import json
 import os
-import subprocess
 import sys
 import time
 from datetime import datetime, date
@@ -35,6 +34,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JOURNEY = HOME / "journey.json"
@@ -58,7 +60,7 @@ def now():
 def load_journey():
     if JOURNEY.exists():
         try:
-            return json.loads(JOURNEY.read_text())
+            return json.loads(JOURNEY.read_text(encoding="utf-8"))
         except ValueError:
             pass
     return {"clicks": [], "done": {}, "hellos": {"first": None, "count": 0}}
@@ -67,8 +69,8 @@ def load_journey():
 def save_journey(j):
     HOME.mkdir(parents=True, exist_ok=True)
     tmp = JOURNEY.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False))
-    tmp.replace(JOURNEY)
+    tmp.write_text(json.dumps(j, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, JOURNEY)   # on a PC, waits a moment if the page server is reading it right then
 
 
 def record_click(item):
@@ -158,17 +160,13 @@ def hello(mark=False):
 
 def card_in():
     """A memory card mounted right now: a volume with a DCIM folder. Name and rough count, or None."""
-    vols = Path("/Volumes")
-    if not vols.is_dir():
-        return None
-    for v in vols.iterdir():
-        if (v / "DCIM").is_dir():
-            n = 0
-            for root, _, files in os.walk(v / "DCIM"):
-                n += len([f for f in files if not f.startswith(".")])
-                if n > 20000:
-                    break
-            return {"name": v.name, "files": n}
+    for c in this_computer.cards():   # /Volumes on a Mac, drive letters on a PC
+        n = 0
+        for root, _, files in os.walk(Path(c["path"]) / "DCIM"):
+            n += len([f for f in files if not f.startswith(".")])
+            if n > 20000:
+                break
+        return {"name": c["shown"], "files": n}
     return None
 
 
@@ -225,7 +223,7 @@ def gather():
         backed = [s for s in q["shoots"] if s.get("studio")]
         if backed:
             last = max(backed, key=lambda s: s.get("added", ""))
-            same = [s for s in backed if s.get("studio") == last["studio"]]
+            same = [s for s in backed if same_place(s.get("studio"), last["studio"])]
             g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same)}
     except Exception:
         pass
@@ -475,7 +473,7 @@ def page_html():
 
 def write_page():
     HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html())
+    PAGE.write_text(page_html(), encoding="utf-8")
     return PAGE
 
 
@@ -490,16 +488,19 @@ def url():
         except Exception:  # noqa: BLE001
             return False
     if f.exists():
-        base = f.read_text().strip().rsplit("/", 1)[0]
+        base = f.read_text(encoding="utf-8").strip().rsplit("/", 1)[0]
         if alive(base + "/home"):
             return base + "/home"
     HOME.mkdir(parents=True, exist_ok=True)
-    log = open(HOME / "posting-serve.log", "a")
-    subprocess.Popen([sys.executable, str(HERE / "posting_queue.py"), "serve"], stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    import fresh
+    try:  # its log is ~/.studio/logs/posting.log (fresh.server_log); the address comes from posting-url.txt
+        fresh.start_server([sys.executable, str(HERE / "posting_queue.py"), "serve"], "posting")
+    except OSError:
+        return None
     for _ in range(50):
         time.sleep(0.1)
         if f.exists():
-            base = f.read_text().strip().rsplit("/", 1)[0]
+            base = f.read_text(encoding="utf-8").strip().rsplit("/", 1)[0]
             if alive(base + "/home"):
                 return base + "/home"
     return None

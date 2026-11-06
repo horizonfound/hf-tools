@@ -31,7 +31,7 @@ Nothing here ever touches a photo.
     python3 edit_queue.py offers [--mark]           shoots ticked off on the page that still need "want a reel?"
     python3 edit_queue.py register --night "<night>"  put every shoot of a night in the archive (night.py does this)
     python3 edit_queue.py scan                      find every night the Studio has done and register it (once, to backfill)
-    python3 edit_queue.py open "beach"              open that shoot's folder in Finder
+    python3 edit_queue.py open "beach"              open that shoot's folder in Finder (File Explorer on a PC)
     python3 edit_queue.py serve                     the page, live: check off, drag, change dates, open folders
 
 A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
@@ -48,7 +48,7 @@ import sys
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -56,6 +56,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+from where import place_key, same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 QFILE = HOME / "queue.json"
@@ -77,7 +80,7 @@ def say(msg):
 def load():
     if QFILE.exists():
         try:
-            q = json.loads(QFILE.read_text())
+            q = json.loads(QFILE.read_text(encoding="utf-8"))
             q.setdefault("shoots", [])
             q.setdefault("picks", {})
             q.setdefault("manual_order", False)
@@ -90,8 +93,8 @@ def load():
 def save(q):
     HOME.mkdir(parents=True, exist_ok=True)
     tmp = QFILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False))
-    os.replace(tmp, QFILE)  # never a half-written list
+    tmp.write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, QFILE)  # never a half-written list (on a PC, waits a moment if a page is reading it)
 
 
 def today():
@@ -213,14 +216,14 @@ def night_shoots(night):
     """(root, studio, shoots, names, groups) for a night, before or after it settled."""
     from where import locate
     root, studio = locate(night)
-    shoots = json.loads((studio / "shoots.json").read_text())["shoots"]
-    names = json.loads((studio / "names.json").read_text()) if (studio / "names.json").exists() else {}
-    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text())["groups"]} if (studio / "groups.json").exists() else {}
+    shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
+    names = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
+    groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]} if (studio / "groups.json").exists() else {}
     return root, studio, shoots, names, groups
 
 
 def existing(q, studio, shoot_id):
-    return next((x for x in q["shoots"] if x.get("studio") == str(studio) and x.get("shoot") == shoot_id), None)
+    return next((x for x in q["shoots"] if same_place(x.get("studio"), studio) and x.get("shoot") == shoot_id), None)
 
 
 def build_entry(q, root, studio, s, names, groups, status, due=None):
@@ -291,7 +294,7 @@ def folder_of(s):
         try:
             from where import locate
             root, studio = locate(s["studio"])
-            for x in json.loads((studio / "shoots.json").read_text())["shoots"]:
+            for x in json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]:
                 if x["id"] == s.get("shoot") and x.get("folder"):
                     return root / x["folder"]
         except (SystemExit, OSError, ValueError, KeyError):
@@ -300,20 +303,21 @@ def folder_of(s):
 
 
 def open_folder(s):
-    """(ok, words) after asking Finder to open the shoot's folder."""
+    """(ok, words) after asking Finder (File Explorer on a PC) to open the shoot's folder."""
     f = folder_of(s)
     if not f:
         return False, "I don't know where that shoot's folder is."
     if not f.is_dir():
-        drive = f.parts[2] if len(f.parts) > 2 and f.parts[1] == "Volumes" else None
+        drive = this_computer.drive_words(f)
         return False, (f"Plug in {drive} to open this one." if drive else "That folder isn't where it used to be.")
     from finder import open_folder as show_in_finder
+    APP = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
     ok, note = show_in_finder(f)
     if not ok:
-        return False, f"Couldn't open Finder; the folder is {f}."
+        return False, f"Couldn't open {APP}; the folder is {f}."
     if note == "behind":
-        return True, f"Opened {f.name} in Finder, behind this window. Click Finder in the Dock to see it."
-    return True, f"Opened {f.name} in Finder."
+        return True, f"Opened {f.name} in {APP}, behind this window. Click {APP} in {this_computer.APP_BAR} to see it."
+    return True, f"Opened {f.name} in {APP}."
 
 
 def nights_known():
@@ -337,8 +341,8 @@ def nights_known():
         pass
     seen, uniq = set(), []
     for n in out:
-        if n not in seen:
-            seen.add(n)
+        if place_key(n) not in seen:   # on a PC, one folder written two ways is still one folder
+            seen.add(place_key(n))
             uniq.append(n)
     return uniq
 
@@ -426,7 +430,7 @@ FONTS = ("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9
 CSS = r"""
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;
 --ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;--line:rgba(31,36,48,.12);
---shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;
+--shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;
 --r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
@@ -704,7 +708,7 @@ def home_link():
     try:
         f = HOME / "posting-url.txt"
         if f.exists():
-            return f"<a class='homelink' href='{f.read_text().strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
+            return f"<a class='homelink' href='{f.read_text(encoding='utf-8').strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
     except OSError:
         pass
     return ""
@@ -736,7 +740,7 @@ def page_html(q):
 
 def write_page(q):
     HOME.mkdir(parents=True, exist_ok=True)
-    PAGE.write_text(page_html(q))
+    PAGE.write_text(page_html(q), encoding="utf-8")
     return PAGE
 
 
@@ -823,14 +827,14 @@ def serve(port):
     HOME.mkdir(parents=True, exist_ok=True)
     for p in range(port, port + 20):
         try:
-            srv = ThreadingHTTPServer(("127.0.0.1", p), partial(Handler, directory=str(HOME)))
+            srv = fresh.Server(("127.0.0.1", p), partial(Handler, directory=str(HOME)))  # Python's own on a Mac
             break
         except OSError:
             continue
     else:
         sys.exit(f"STOP: no free port between {port} and {port + 19}.")
     url = f"http://127.0.0.1:{p}/queue.html"
-    (HOME / "queue-url.txt").write_text(url)
+    (HOME / "queue-url.txt").write_text(url, encoding="utf-8")
     print(f"Editing queue: {url}", flush=True)
     try:
         srv.serve_forever()
@@ -897,7 +901,7 @@ def main():
         write_page(q)
         say(f"Added: {entry['name']}, {due_words(entry['due'])}.")
     elif a.cmd == "add-list":
-        names = Path(a.file).read_text().splitlines() if a.file else [n for n in (a.names or "").split(",")]
+        names = Path(a.file).read_text(encoding="utf-8").splitlines() if a.file else [n for n in (a.names or "").split(",")]
         added = add_list(q, names)
         if not added:
             sys.exit("STOP: I didn't find any names in that list.")

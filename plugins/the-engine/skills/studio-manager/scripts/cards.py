@@ -23,18 +23,23 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
+this_computer.utf8_output()
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 LEDGER = HOME / "cards.json"
-SKIP_DIRS = {".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", "System Volume Information", "_studio"}
+SKIP_DIRS = {".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems", "System Volume Information", "$RECYCLE.BIN", "_studio"}
 
 
 def volume_uuid(path):
+    if this_computer.WINDOWS:
+        return this_computer.volume_id(path)  # a PC's own number for the card (unproven on a real PC)
     try:
-        out = subprocess.run(["diskutil", "info", "-plist", str(path)], capture_output=True, timeout=10).stdout
+        out = subprocess.run(["diskutil", "info", "-plist", str(path)], capture_output=True, timeout=10).stdout  # pc-ok: a PC returned above
         return plistlib.loads(out).get("VolumeUUID")
     except Exception:  # noqa: BLE001  (not a Mac, not a volume, diskutil missing)
-        return None
+        return this_computer.volume_id(path)  # None anywhere but a PC
 
 
 def files_on(root):
@@ -86,7 +91,7 @@ def key(fp):
 def load():
     if LEDGER.exists():
         try:
-            return json.loads(LEDGER.read_text())
+            return json.loads(LEDGER.read_text(encoding="utf-8"))
         except ValueError:
             pass
     return {"cards": {}}
@@ -94,7 +99,7 @@ def load():
 
 def save(ledger):
     HOME.mkdir(parents=True, exist_ok=True)
-    LEDGER.write_text(json.dumps(ledger, indent=1))
+    LEDGER.write_text(json.dumps(ledger, indent=1), encoding="utf-8")
 
 
 def check(root):
@@ -124,7 +129,7 @@ def register(root, session):
     entry = ledger["cards"].setdefault(key(fp), {"fingerprint": fp, "sessions": []})
     entry["fingerprint"] = fp
     folder = str(Path(session).resolve())
-    if not any(s["folder"] == folder for s in entry["sessions"]):
+    if not any(same_place(s["folder"], folder) for s in entry["sessions"]):
         entry["sessions"].append({"folder": folder, "when": datetime.now().isoformat(timespec="seconds")})
     save(ledger)
     return fp

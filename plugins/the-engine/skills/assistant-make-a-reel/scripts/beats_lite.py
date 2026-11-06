@@ -5,9 +5,10 @@ with nothing to install.
     python3 beats_lite.py song.m4a            tempo and the first beats
     python3 beats_lite.py song.m4a --json     {ok, duration, tempo, period, beats, energy, how}
 
-How it hears the song: the Mac's own afconvert turns it into plain sound samples
-(mp3, m4a, aac, wav, aiff all work). On a computer without afconvert it uses
-ffmpeg if that happens to be there, and reads a .wav file by itself either way.
+How it hears the song: sound.py turns it into plain sound samples. On a Mac that is
+the Mac's own afconvert, as always (mp3, m4a, aac, wav, aiff all work). Elsewhere:
+ffmpeg if this computer has it, then the imageio-ffmpeg add-on's ffmpeg, then a WAV
+or AIFF read in plain Python, then on a PC Windows' own media parts (unproven).
 Everything after that is plain Python: no numpy, no ffmpeg needed.
 
 How it finds the beat: it listens for the moments the sound jumps (a kick, a
@@ -16,15 +17,15 @@ jumps repeat at, then walks through the song placing each beat on a real jump
 near where the pulse says the next one should be (Ellis's beat tracker, 2007).
 So a song that drifts a little stays on the beat all the way through.
 """
-import array
 import json
 import math
-import os
-import shutil
-import subprocess
 import sys
-import tempfile
-import wave
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "studio-manager" / "scripts"))
+import sound  # noqa: E402  (a song's sound and length, on a Mac or a PC)
+import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+this_computer.utf8_output()
 
 SR = 11025          # samples per second we listen at; plenty for rhythm
 HOP = 128           # one envelope value every 11.6 ms
@@ -33,99 +34,19 @@ FPS = SR / HOP
 
 # ---------------------------------------------------------------- hearing it
 
-def _read_wav(path):
-    """Mono 16-bit samples from a .wav file, plus its sample rate."""
-    with wave.open(str(path), "rb") as w:
-        ch, width, rate, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
-        raw = w.readframes(n)
-    if width != 2:
-        raise ValueError("only 16-bit wav")
-    a = array.array("h")
-    a.frombytes(raw)
-    if sys.byteorder == "big":
-        a.byteswap()
-    if ch > 1:  # average the channels
-        a = array.array("h", (sum(a[i:i + ch]) // ch for i in range(0, len(a) - ch + 1, ch)))
-    return a, rate
+_read_wav = sound._read_wav
+real_kind = sound.real_kind     # kept under its old name; it lives in sound.py now
 
 
 def _resample(a, rate):
     """Crude but fine for rhythm: average blocks down to about SR."""
-    if rate == SR:
-        return a
-    step = rate / SR
-    out = array.array("h")
-    i = 0.0
-    n = len(a)
-    while i + step <= n:
-        lo, hi = int(i), int(i + step)
-        seg = a[lo:hi] or a[lo:lo + 1]
-        out.append(sum(seg) // len(seg))
-        i += step
-    return out
-
-
-def real_kind(path):
-    """The file extension that matches what is inside, from its first bytes, or None.
-    CapCut's library songs are saved as M4A with a .mp3 name, and afconvert goes by
-    the name, so it cannot open them until it is told the real kind."""
-    try:
-        with open(path, "rb") as f:
-            head = f.read(12)
-    except OSError:
-        return None
-    if head[4:8] == b"ftyp":
-        return ".m4a"
-    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
-        return ".mp3"
-    if head[:4] == b"RIFF":
-        return ".wav"
-    if head[:4] == b"FORM":
-        return ".aiff"
-    return None
+    return sound._resample(a, rate, SR)
 
 
 def decode(path):
-    """(samples, how) or (None, reason). Samples are mono 16-bit at SR."""
-    path = str(path)
-    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    tmp.close()
-    alias_dir = None
-    try:
-        how = None
-        if shutil.which("afconvert"):
-            src = path
-            kind = real_kind(path)
-            if kind and not path.lower().endswith(kind) and not (kind == ".aiff" and path.lower().endswith(".aif")):
-                # a link with the right name, in a temporary folder; the song itself is untouched
-                alias_dir = tempfile.mkdtemp()
-                src = os.path.join(alias_dir, "song" + kind)
-                os.symlink(os.path.abspath(path), src)
-            r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{SR}", "-c", "1", src, tmp.name],
-                               capture_output=True, text=True)
-            if r.returncode == 0 and os.path.getsize(tmp.name) > 44:
-                how = "afconvert"
-        if not how and shutil.which("ffmpeg"):
-            r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-vn", "-ac", "1", "-ar", str(SR),
-                                "-c:a", "pcm_s16le", tmp.name], capture_output=True, text=True)
-            if r.returncode == 0 and os.path.getsize(tmp.name) > 44:
-                how = "ffmpeg"
-        if how:
-            a, rate = _read_wav(tmp.name)
-            return _resample(a, rate), how
-        if path.lower().endswith(".wav"):
-            a, rate = _read_wav(path)
-            return _resample(a, rate), "wav"
-        return None, "this computer has no way to read that kind of song file (a .wav would work)"
-    except (OSError, ValueError, wave.Error, EOFError) as e:
-        return None, f"could not read the song ({e})"
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except OSError:
-            pass
-        if alias_dir:
-            shutil.rmtree(alias_dir, ignore_errors=True)
+    """(samples, how) or (None, reason). Samples are mono 16-bit at SR. On a Mac this is afconvert, exactly
+    as before; sound.decode has the other routes."""
+    return sound.decode(path, SR)
 
 
 # ---------------------------------------------------------------- the pulse
@@ -384,6 +305,9 @@ def analyze(path, beat_file=None):
     if a is None:
         return {"ok": False, "reason": how, "duration": 0, "tempo": 0, "period": 0, "beats": [], "energy": []}
     dur = len(a) / SR
+    if len(a) < HOP:                     # nothing came out (a damaged or half-downloaded file): say so, never crash
+        return {"ok": False, "reason": "there's no sound in that file (it may be damaged or only partly downloaded)",
+                "duration": round(dur, 3), "tempo": 0, "period": 0, "beats": [], "energy": [], "how": how}
     bands, full = envelopes(a)
     o = onset_strength(bands)
     period = tempo_period(o)
