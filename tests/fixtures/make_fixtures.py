@@ -97,6 +97,9 @@ def main():
         run(lame + ["-q:a", "6", str(out / "click-100bpm-vbr.mp3")])
         run(lame + ["-b:a", "48k", "-write_xing", "0", str(out / "click-100bpm-cbr-noheader.mp3")])
         run(lame + ["-q:a", "6", "-write_xing", "0", str(out / "click-100bpm-vbr-noheader.mp3")])
+        # MPEG-2 (22,050 a second, frames of 576 samples, the same length as LAME's delay): variable rate with a
+        # Xing header, added Nov 6 when a review found Windows' trimming rule missed this shape
+        run(lame + ["-ar", "22050", "-q:a", "6", str(out / "click-100bpm-22k-vbr.mp3")])
         # what CapCut's library songs look like: an M4A file with a .mp3 name
         shutil.copyfile(out / "click-100bpm.m4a", out / "click-100bpm-m4a-named.mp3")
     finally:

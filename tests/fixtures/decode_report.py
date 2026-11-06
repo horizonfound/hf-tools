@@ -30,7 +30,8 @@ import sound  # noqa: E402
 from clicks import late_ms  # noqa: E402
 
 TRUE = {"click-100bpm.m4a": 10.0, "click-100bpm-m4a-named.mp3": 10.0, "click-100bpm-cbr.mp3": 10.031,
-        "click-100bpm-vbr.mp3": 10.031, "click-100bpm-cbr-noheader.mp3": 10.031, "click-100bpm-vbr-noheader.mp3": 10.031}
+        "click-100bpm-vbr.mp3": 10.031, "click-100bpm-cbr-noheader.mp3": 10.031, "click-100bpm-vbr-noheader.mp3": 10.031,
+        "click-100bpm-22k-vbr.mp3": 10.057}
 
 
 class Seen:

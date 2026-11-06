@@ -12,8 +12,8 @@ plain-Python route and Windows' own Media Foundation, with ffmpeg switched off s
 really runs. A Windows machine without Media Foundation (some server and "N" editions) says SKIP for those
 lines, not FAIL. Besides the beat (whose steps are 11.6 ms), each decode's clicks are measured against the
 WAV's to a tenth of a millisecond (clicks.py) and must be within 2 ms; the one exception is the Mac's own
-route on an MP3, which keeps LAME's 13 ms at the front and says so on a NOTE line until Dustin decides
-(docs/pc-readiness-2026-11-06.md). Exit 0 when nothing failed.
+route on an MP3, which keeps LAME's 576 samples at the front (13 ms at 44.1 kHz, 26 ms at 22.05 kHz) and says
+so on a NOTE line until Dustin decides (docs/pc-readiness-2026-11-06.md). Exit 0 when nothing failed.
 """
 import os
 import sys
@@ -32,7 +32,8 @@ LENGTHS = {   # the true lengths, in seconds (afinfo gets two wrong: 0.34 for th
               # variable-rate MP3 with no header; ffmpeg gives 10.000 for the two MP3s with a header)
     "click-100bpm.wav": 10.0, "click-100bpm.aiff": 10.0, "click-100bpm.m4a": 10.0,
     "click-100bpm-m4a-named.mp3": 10.0, "click-100bpm-cbr.mp3": 10.03102, "click-100bpm-vbr.mp3": 10.03102,
-    "click-100bpm-cbr-noheader.mp3": 10.031, "click-100bpm-vbr-noheader.mp3": 10.03102}
+    "click-100bpm-cbr-noheader.mp3": 10.031, "click-100bpm-vbr-noheader.mp3": 10.03102,
+    "click-100bpm-22k-vbr.mp3": 10.05714}
 KINDS = {"click-100bpm.wav": ".wav", "click-100bpm.aiff": ".aiff", "click-100bpm.m4a": ".m4a",
          "click-100bpm-m4a-named.mp3": ".m4a"}
 results = []
@@ -66,6 +67,14 @@ def beats_of(path, env):
     return with_env(env, lambda: beats_lite.analyze(str(path)))
 
 
+def lame_ms(path):
+    """LAME's 576 samples of delay at the front of an MP3, in milliseconds at that file's own rate."""
+    with open(path, "rb") as f:
+        b = f.read(1024 * 1024)
+    p, h = sound._first_frame(b, sound._id3_end(b[:10]))
+    return 576 * 1000 / h[2] if h else None
+
+
 def main():
     print(f"Python {sys.version.split()[0]} on {'Windows' if WINDOWS else sys.platform}")
     for name, want in LENGTHS.items():
@@ -90,7 +99,7 @@ def main():
     if WINDOWS:
         routes.append(("Windows' own Media Foundation", plain))
     songs = ("click-100bpm.m4a", "click-100bpm-m4a-named.mp3", "click-100bpm-cbr.mp3", "click-100bpm-vbr.mp3",
-             "click-100bpm-cbr-noheader.mp3", "click-100bpm-vbr-noheader.mp3")
+             "click-100bpm-cbr-noheader.mp3", "click-100bpm-vbr-noheader.mp3", "click-100bpm-22k-vbr.mp3")
     for label, env in routes:
         mac = label == "the Mac's own route"
         for name in songs:
@@ -102,8 +111,10 @@ def main():
             off = (max(abs(a - b) for a, b in zip(r["beats"], truth)) * 1000
                    if r["ok"] and truth and len(r["beats"]) == len(truth) else None)
             # the beat finder's steps are 11.6 ms, so one step either way is allowed; the Mac's own route keeps
-            # LAME's 13 ms on an MP3 (see the NOTE below), which can show as two steps
-            ok = r["ok"] and abs(r["tempo"] - 99.4) < 1.5 and off is not None and off <= (30 if mac and mp3 else 15)
+            # LAME's 576 samples on an MP3 (see the NOTE below), so that much more is allowed there
+            lame = lame_ms(HERE / name) if mp3 else None
+            allow = 15 + (lame if mac and lame else 0)
+            ok = r["ok"] and abs(r["tempo"] - 99.4) < 1.5 and off is not None and off <= allow
             check(f"the beat of {name}, {label}", ok, f"{r.get('how')}: {r.get('tempo')} bpm, "
                   f"{len(r.get('beats', []))} beats, furthest from the WAV's {off if off is None else round(off)} ms "
                   f"{r.get('reason', '')}")
@@ -112,7 +123,7 @@ def main():
             late = late_ms(a) if a is not None else None
             what = f"the clicks of {name} land where the WAV's do, {label}"
             detail = f"{how if a is not None else 'not heard'}: " + ("not measured" if late is None else f"{late:+.1f} ms")
-            if mac and mp3 and late is not None and 12.0 <= late <= 14.0:
+            if mac and lame and late is not None and abs(late - lame) <= 1.0:
                 note(what, detail + ", LAME's 576 samples kept by the Mac's afconvert; Dustin's to decide")
             else:
                 check(what, late is not None and abs(late) <= 2.0, detail)

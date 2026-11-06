@@ -21,10 +21,12 @@ in a temporary folder; the song itself is never renamed or changed.
 To try the other routes on a Mac: ASSISTANT_NO_AFCONVERT=1 skips afconvert, ASSISTANT_NO_FFMPEG=1 skips both
 ffmpegs (then WAV and AIFF are read in plain Python and anything else says so plainly).
 
-Nothing here has run on a real PC (Nov 6, 2026). The Media Foundation code is written from Microsoft's
-documentation (Tutorial: Decoding Audio; the IMFSourceReader, IMFAttributes, IMFSample and IMFMediaBuffer
-method orders in mfreadwrite.h and mfobjects.h) and is unproven; any failure there comes back as plain
-words, never a crash and never a guess.
+The Media Foundation code is written from Microsoft's documentation (Tutorial: Decoding Audio; the
+IMFSourceReader, IMFAttributes, IMFSample and IMFMediaBuffer method orders in mfreadwrite.h and mfobjects.h).
+It first ran on GitHub's Windows machines on Nov 6, 2026 (Windows Server 2025, Python 3.9 to 3.15): every
+test song in tests/fixtures heard, its clicks within 0.1 ms of where they belong, and the sound pulled out
+of a file. Not yet on a photographer's own PC. Any failure there comes back as plain words, never a crash
+and never a guess.
 """
 import array
 import math
@@ -759,7 +761,7 @@ def decode(path, rate=11025):
                 return _resample(_to_mono16(raw, layout, ch), src_rate, rate), kind[1:]
             damaged = _looks_damaged(path, kind)
         if WINDOWS:
-            a, why = _decode_windows(path, rate)    # unproven on a real PC
+            a, why = _decode_windows(path, rate)    # run on GitHub's Windows machines
             if a is not None:
                 return a, "windows"
             return None, (_DAMAGED_WORDS if damaged else why)
@@ -803,7 +805,7 @@ def extract_audio(video, out):
     """The sound of a video or screen recording as a song file. (path written, how) or (None, reason in plain
     words). The video is only ever read. `out` is the .m4a to make, and must not exist yet; nothing that is
     already there is written over. On a PC with no ffmpeg, Windows' own media parts write it as a .wav beside
-    it instead (unproven on a real PC)."""
+    it instead (run on GitHub's Windows machines, not yet on a photographer's PC)."""
     video, out = str(video), Path(out)
     if out.exists():
         return None, f"there is already a file called {out.name} there"
@@ -834,7 +836,7 @@ def extract_audio(video, out):
             if "matches no streams" in (r.stderr or ""):
                 return None, "There's no sound in that video."
     if WINDOWS:
-        wav, why, saving = _extract_windows(video, out.with_suffix(".wav"))     # unproven on a real PC
+        wav, why, saving = _extract_windows(video, out.with_suffix(".wav"))     # run on GitHub's Windows
         if wav:
             return wav, "windows"
         if why == _NO_SOUND:                         # the add-on wouldn't help: there's nothing to pull out
@@ -851,9 +853,10 @@ def extract_audio(video, out):
                   "(mp3, m4a or wav).")
 
 
-# ---------------------------------------------------------------- Windows' own Media Foundation (unproven)
+# ---------------------------------------------------------------- Windows' own Media Foundation
 #
-# Everything below runs only on a PC and has never run on one. Written from Microsoft's documentation:
+# Everything below runs only on a PC; it has run on GitHub's Windows machines (Nov 6, 2026), not yet on a
+# photographer's PC. Written from Microsoft's documentation:
 # "Tutorial: Decoding Audio" for the steps, and the method order of each interface from the Windows SDK
 # headers (mfreadwrite.h: IMFSourceReader; mfobjects.h: IMFAttributes, IMFMediaType, IMFSample,
 # IMFMediaBuffer). A COM method is called through the object's table of functions, by its place in that table:
@@ -899,24 +902,30 @@ _MF_WORDS = {
 # ---------------------------------------------------------------- the encoder's warm-up at the start
 #
 # An AAC song starts with about 2,112 samples (48 ms) of the encoder warming up, and an MP3 with the LAME
-# encoder's delay plus the decoder's own 529 samples (about 25 ms). The file says how much, and afconvert and
-# ffmpeg leave it out; a decoder that keeps it hears every beat that much late, and a cut placed on a late
-# beat lands after it (the fault Dustin turned down on Oct 25). _drop_warmup checks what Windows' own Media
-# Foundation gave against the lengths a decode could have: when it is a decode that kept the warm-up, the
-# warm-up comes off the front; when Windows already took it off, nothing is dropped; when it is neither,
-# nothing is dropped either (a song a few milliseconds late beats a song cut short).
+# encoder's delay plus the decoder's own 529 samples (about 25 ms). The file says how much. A decoder that
+# keeps it hears every beat that much late, and a cut placed on a late beat lands after it (the fault Dustin
+# turned down on Oct 25). Measured to 0.1 ms on the test songs (tests/fixtures/clicks.py): afconvert and
+# ffmpeg take all of it off an M4A; on an MP3 afconvert keeps LAME's 576 samples (13.1 ms late), and ffmpeg
+# takes it all off when the file has a LAME note but keeps all of it (25 ms late) when it has none. Those are
+# the Mac's routes (and ffmpeg a PC's when one is installed) and are not changed here: Dustin's to decide.
+#
+# _drop_warmup checks what Windows' own Media Foundation gave against the lengths a decode could have: when
+# it is a decode that kept the warm-up, the warm-up comes off the front; when Windows already took it off,
+# nothing is dropped; when it is neither, nothing is dropped either (a song a few milliseconds late beats a
+# song cut short).
 #
 # Seen on GitHub's Windows machines (Nov 6, 2026, Windows Server 2025, the test songs in tests/fixtures):
-# for an MP3, Media Foundation takes the decoder's own 529 samples off the front, as the Mac's afconvert does,
-# but keeps LAME's delay (576 samples, 13 ms), so what comes back is 529 samples shorter than a decode that
+# Media Foundation keeps an M4A's warm-up (2,112 samples) and says nothing about it: the M4A's own note says
+# how much, and it comes off here. For an MP3 it takes (about) the decoder's 529 samples off the front,
+# as afconvert does, but keeps LAME's 576, so what comes back is 528 or 529 samples shorter than a decode that
 # kept everything; for a constant-rate MP3 it also plays the silent Info frame first (26 ms more). Before this
-# was known, MP3 beats came back a step (variable rate) and three steps (constant rate) later than on the Mac,
-# whose own clicks are 13.1 ms late (measured to 0.1 ms with tests/fixtures/decode_report.py). So for that
-# shape only LAME's delay (and the Info frame) comes off. The Mac's afconvert is the Mac's route and is not
-# changed here.
+# was known, MP3 clicks came back 13 ms (variable rate) and 39 ms (constant rate) late. With LAME's delay (and
+# the Info frame) taken off, every test song's clicks land within 0.1 ms of the WAV's
+# (tests/fixtures/decode_report.py, run on Windows by .github/workflows/check-pc.yml).
 
-_MP3_DECODER_DELAY = 529     # samples every MP3 decoder adds at the front
+_MP3_DECODER_DELAY = 529     # samples every MP3 decoder adds at the front (Media Foundation took 528 off)
 _LAME_DELAY = 576            # LAME's own delay, the usual one; used only when the file doesn't say
+
 
 def _itunes_note(b):
     """The iTunes gapless note (iTunSMPB) as (encoder delay, padding, samples played), or None."""
@@ -1034,7 +1043,8 @@ def _mp3_warmup(path):
     True at the end when that first frame is a header frame, which some decoders play as a frame of silence.
     A file with no note at all has its frames counted and LAME's usual delay assumed (most MP3s are LAME's;
     another encoder's few milliseconds more or less are the most it can be off by). None when the file can't
-    be measured (Fraunhofer's VBRI header, a header with no frame count, a frame count that can't be trusted)."""
+    be measured (not Layer III, Fraunhofer's VBRI header, a header with no frame count, a delay no LAME or
+    ffmpeg encoder writes, a frame count that can't be trusted)."""
     size = os.path.getsize(path)
     with open(path, "rb") as f:
         b = f.read(min(size, 1024 * 1024))
@@ -1046,7 +1056,7 @@ def _mp3_warmup(path):
     if p is None:
         return None
     flen, spf, rate, bitrate, mpeg1, mono = h
-    if not rate:
+    if not rate or (b[p + 1] >> 1) & 3 != 1:       # Layer I and II have neither LAME's delay nor its note
         return None
     x = p + 4 + ((17 if mono else 32) if mpeg1 else (9 if mono else 17))
     if b[x:x + 4] in (b"Xing", b"Info"):
@@ -1059,6 +1069,8 @@ def _mp3_warmup(path):
         q = x + 8 + 4 + (4 if flags & 2 else 0) + (100 if flags & 4 else 0) + (4 if flags & 8 else 0)
         if b[q:q + 4] in (b"LAME", b"Lavf", b"Lavc") and q + 24 <= len(b):
             delay = int.from_bytes(b[q + 21:q + 24], "big") >> 12
+            if delay > 1152:                          # more than a frame: a damaged or very old note
+                return None
         else:
             delay = _LAME_DELAY
         return (delay + _MP3_DECODER_DELAY) / rate, [frames * spf / rate], spf / rate, True
@@ -1073,7 +1085,8 @@ def _mp3_warmup(path):
 
 def _drop_warmup(raw, layout, channels, rate, path, first_time):
     """raw without the encoder's warm-up at the front, when Windows left it in. first_time: the first sound's
-    time from Windows, in 100-nanosecond steps (below 0 means "this much is warm-up"). Unproven on a real PC."""
+    time from Windows, in 100-nanosecond steps (below 0 means "this much is warm-up"). Run on GitHub's Windows
+    machines; not yet on a photographer's PC."""
     width = (1 if layout == "u8" else {"s16": 2, "s24": 3, "s32": 4, "f32": 4, "f64": 8}[layout[:3]]) * channels
     frames = len(raw) // width
     drop = 0
@@ -1091,12 +1104,15 @@ def _drop_warmup(raw, layout, channels, rate, path, first_time):
             base = [(round(x * rate), round(front * rate)) for x in lengths]
             kept = list(base)                        # (length of a decode that kept the warm-up, how much to drop)
             gone = [n - f for n, f in base]          # lengths of the same decodes with the warm-up already off
+            whole = list(base)
             if may_play_first:                       # an MP3 decoder that also played the silent first frame
                 one = round(frame * rate)
+                whole += [(n + one, f + one) for n, f in base]
                 kept += [(n + one, f + one) for n, f in base]
-                gone += [n + one - f for n, f in base]       # ... and took the warm-up off after it
+                kept += [(n + one - f, one) for n, f in base]    # ... and took the warm-up off after it: the
+                #                                                   silent frame is still in front
             if kind == ".mp3":                       # Media Foundation: the decoder's 529 off, the encoder's kept
-                kept += [(n - _MP3_DECODER_DELAY, f - _MP3_DECODER_DELAY) for n, f in list(kept)]
+                kept += [(n - _MP3_DECODER_DELAY, f - _MP3_DECODER_DELAY) for n, f in whole]
             for n, f in kept:
                 if abs(frames - n) <= near and all(abs(frames - g) > near for g in gone):
                     drop = f
@@ -1108,7 +1124,8 @@ def _drop_warmup(raw, layout, channels, rate, path, first_time):
 
 def _mf_read_pcm(path, longest):
     """(raw bytes, layout like "s16le", channels, rate) of the first sound track of a song or video, decoded by
-    Windows' own Media Foundation. Raises _WindowsSoundError in plain words. Unproven on a real PC."""
+    Windows' own Media Foundation. Raises _WindowsSoundError in plain words. Run on GitHub's Windows
+    machines, not yet on a photographer's PC."""
     import ctypes
     import uuid
     from ctypes import POINTER, byref, c_int, c_long, c_longlong, c_uint32, c_ulong, c_void_p, c_wchar_p
@@ -1258,7 +1275,8 @@ def _named_right(path, kind, work):
 
 
 def _decode_windows(path, rate):
-    """(samples, "windows") or (None, reason). Unproven on a real PC."""
+    """(samples, "windows") or (None, reason). Run on GitHub's Windows machines, not yet on a photographer's
+    PC."""
     work = tempfile.mkdtemp()
     try:
         src = _named_right(path, real_kind(path), work)
@@ -1276,7 +1294,7 @@ def _extract_windows(video, wav):
     """The sound of a video written as a 16-bit .wav named like wav, or "<name> 2.wav" and so on if that name
     is taken by the time the sound is ready (decoding can take minutes, and nothing already there is ever
     written over or removed). (path written, "", False) or (None, why, whether it was the saving that failed).
-    Unproven on a real PC."""
+    Run on GitHub's Windows machines, not yet on a photographer's PC."""
     try:
         raw, layout, ch, rate = _mf_read_pcm(video, LONGEST_VIDEO)
         if layout != "s16le":                        # every channel kept, as plain 16-bit
