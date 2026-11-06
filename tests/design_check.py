@@ -16,8 +16,10 @@ Run it with a Python that has Pillow (python3, 3.12 on this Mac): the finished s
 1080x1350 JPEGs drawn here, and fake_kit.py needs Pillow too. Pillow is used by this test only, never by the
 plugin.
 
-What it cannot do: the page itself (the next stages of the build), and so nothing a browser does: drawing a
-slide, loading a font, a pointer. It checks what the server takes, keeps, refuses and puts on the drive.
+Three parts (--only server | page | browser runs one): the server side, by requests (below); the page's own
+scripts by themselves, under the Mac's own JavaScript engine; and the real page in a hidden Chrome driven by
+tests/chrome_drive.py (SKIP when there is no Chrome). The last two are in tests/design_page_check.py. The
+browser part uses --port + 5 and --port + 7 for a page server of its own.
 
 Exit 0 when every case passes, 1 otherwise.
 """
@@ -1125,6 +1127,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
+    ap.add_argument("--only", choices=["server", "page", "browser"],
+                    help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1142,7 +1146,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if (work / "fake").exists():
+    if (work / "fake").exists() or (work / "browser").exists():
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1150,14 +1154,24 @@ def main():
     os.environ["STUDIO_HOME"] = str(work / "no-studio")
     r = subprocess.run([PY, str(ROOT / "tools" / "check_plugin.py")], capture_output=True, text=True)
     case("tools/check_plugin.py prints CLEAN", r.returncode == 0 and "CLEAN" in r.stdout, r.stdout[-300:])
-    for f in ("design.py", "design_page.py", "arrange.py", "posting_queue.py"):
+    for f in ("design.py", "design_page.py", "design_js_model.py", "design_js_core.py", "design_js_edit.py", "arrange.py", "posting_queue.py"):
         r = subprocess.run([APPLE, "-c", "import sys; compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1], 'exec')", str(SCRIPTS / f)], capture_output=True, text=True)
         case(f"{f} compiles under the Mac's own /usr/bin/python3", r.returncode == 0, r.stderr[-200:])
     src = (SCRIPTS / "design.py").read_text(encoding="utf-8")
     code_only = "\n".join(ln.split("#")[0] for ln in re.sub(r'"""(?:.|\n)*?"""', '""', src).splitlines())
     case("design.py runs no Mac-only program and uses no Mac-only call of its own", not re.search(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only), re.findall(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only)[:5])
     case("design.py names the encoding of every text file it reads or writes", not re.search(r"\.(read_text|write_text)\((?![^)]*encoding=)", src) and not re.search(r"open\([^)]*\"[rwa]\"\s*\)", src))
-    check_all(work, a.port)
+    import design_page_check
+    if a.only in (None, "page"):
+        design_page_check.check_page(case, work)
+    if a.only in (None, "server"):
+        check_all(work, a.port)
+    if a.only in (None, "browser"):
+        # its own pretend kit and its own page server, a little above the server check's ports
+        try:
+            design_page_check.check_browser(case, work, a.port + 5, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            case("the real-browser checks ran to the end", False, f"{type(e).__name__}: {e}")
     bad = [n for n, ok in results if not ok]
     print()
     print(f"{len(results)} cases, {len(results) - len(bad)} passed, {len(bad)} failed." + (f"  Work folder: {work}" if bad or a.work else f"  Work folder (safe to throw away): {work}"))
