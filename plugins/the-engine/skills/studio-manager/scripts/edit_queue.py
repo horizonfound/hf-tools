@@ -517,6 +517,8 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .open-folder:hover{background:var(--coral);color:#fff}
 .requeue{font:500 12.5px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;white-space:nowrap}
 .requeue:hover{color:var(--coral-2)}
+.requeue.addq{font:600 13px/1 var(--sans);color:var(--ink);background:transparent;border:1.5px solid var(--ink-2);border-radius:999px;padding:.5rem .85rem;text-decoration:none;transition:background .2s,color .2s,border-color .2s}
+.requeue.addq:hover{background:var(--ink);border-color:var(--ink);color:#fff}
 .tag.edited{background:var(--ocean-l);color:#2F6F6B;padding:.25rem .55rem;font-size:11.5px}
 .nomatch{color:var(--ink-2);padding:1rem 0 3rem}
 .acard.fresh{animation:pop .6s var(--ease)}
@@ -588,13 +590,14 @@ function renderArchive(fresh){
       <div class="info"><div class="name">${esc(s.name)}</div>
         <div class="meta">${s.status == 'finished' ? `<span class="tag edited">Edited${s.finished_at ? ' ' + nice(s.finished_at.slice(0,10)) : ''}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
       <div class="acts">${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
-        <button class="requeue" data-id="${esc(s.id)}">Put back in the queue</button></div></li>`;
+        ${s.status == 'finished' ? `<button class="requeue" data-id="${esc(s.id)}">Put back in my editing queue</button>` : `<button class="requeue addq" data-id="${esc(s.id)}">Add to my editing queue</button>`}</div></li>`;
   });
   box.innerHTML = html || (a.length ? '' : '');
   $('#nomatch').hidden = !(f && !shown.length);
   box.querySelectorAll('.open-folder').forEach(b => b.onclick = () => openFolder(b.dataset.id));
   box.querySelectorAll('.requeue').forEach(b => b.onclick = async () => {
-    if(await send({action:'requeue', id:b.dataset.id})){render(); toast('Back in the queue, no due date yet'); window.scrollTo({top:0, behavior:'smooth'})}});
+    const added = b.classList.contains('addq');
+    if(await send({action:'requeue', id:b.dataset.id})){render(); toast(added ? 'Added to your editing queue. No due date yet.' : 'Back in your editing queue. No due date yet.'); window.scrollTo({top:0, behavior:'smooth'})}});
 }
 async function openFolder(id){
   if(!LIVE){toast('Ask Claude to “show my shoots” to open folders from here');return}

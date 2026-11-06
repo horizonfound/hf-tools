@@ -565,3 +565,21 @@ never mind. Each step did what it says. "Use these" was not pressed, so the six 
 
 **Not done, his call:** choosing more than six. The report's mosaic is built for exactly six (his decision
 on Oct 28: hero, two beside, three under). More than six would need a different layout.
+
+## 24. "Put back in the queue" on shoots that were never in it
+
+**What Dustin said:** on the editing queue page, the two shoots just backed up "have not been put in the
+queue at all, yet, it still says put back in the queue. So have it just say put in editing queue or
+something... add to editing queue as like a button."
+
+**Why:** the list under "Your shoots" used one link for every shoot, whether it had been ticked off as
+edited or had never been in the queue.
+
+**Fixed:** a shoot that has never been in the queue gets a real button, "Add to my editing queue" (the same
+words as the button on the report). A shoot ticked off as edited keeps the quiet link, now "Put back in my
+editing queue," since for that one "back" is true. The line that pops up after the click matches: "Added to
+your editing queue. No due date yet." or "Back in your editing queue. No due date yet."
+
+**Tried:** on the real page (both shoots show the button), and the click on a throwaway copy of the queue:
+both shoots went up into the queue with "Set a due date"; one ticked off came back down as "Edited" with
+the "Put back" link. His real queue was not changed.
