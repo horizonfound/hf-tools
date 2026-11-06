@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Setting up The Assistant</title>
+<style>
+@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Regular.ttf");font-weight:400;font-style:normal}
+@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Italic.ttf");font-weight:400;font-style:italic}
+@font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-Regular.ttf");font-weight:400}
+@font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-SemiBold.ttf");font-weight:600}
+@page{size:8.5in 11in;margin:0}
+:root{--cream:#F7F3EC;--paper:#FFFDF8;--ink:#1F2430;--ink-2:#6B7280;--line:#E6DFD2;--coral:#EE7B5B;--coral-2:#D55D3C;--coral-l:#FCE6DC;--ocean:#4F9A95;--ocean-l:#DCEEEC;--sun:#F8EBC6;
+  --display:"Fraunces",Georgia,serif;--sans:"DM Sans",-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);font:400 12.5pt/1.5 var(--sans)}
+.page{position:relative;width:8.5in;height:11in;padding:.62in .72in .7in;overflow:hidden;break-after:page;background:var(--cream)}
+.page:last-child{break-after:auto}
+.foot{position:absolute;left:.72in;right:.72in;bottom:.34in;display:flex;justify-content:space-between;font-size:8.5pt;color:var(--ink-2);border-top:1px solid var(--line);padding-top:7px}
+.foot b{font-weight:600;color:var(--ink)}
+
+/* headings */
+.eyebrow{font:600 9pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
+h1{font:400 44pt/1.02 var(--display);letter-spacing:-.02em;margin:.18in 0 .12in}
+h1 em{font-style:italic;color:var(--coral-2)}
+.step{display:flex;align-items:center;gap:.2in;margin-bottom:.14in}
+.num{flex:none;width:.62in;height:.62in;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:400 24pt/1 var(--display)}
+.step h2{font:400 25pt/1.08 var(--display);letter-spacing:-.015em;margin:0}
+.step .of{font:600 8.5pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2);margin-bottom:5px}
+.lede{font-size:12.5pt;color:var(--ink-2);margin:0 0 .16in;max-width:6.4in}
+.lede b{color:var(--ink);font-weight:600}
+
+/* the steps */
+ol.do{list-style:none;margin:0;padding:0;counter-reset:d}
+ol.do>li{counter-increment:d;position:relative;padding:0 0 0 .44in;margin:0 0 .13in;font-size:12.5pt}
+ol.do>li::before{content:counter(d);position:absolute;left:0;top:1px;width:.29in;height:.29in;border-radius:50%;background:var(--coral);color:#fff;font:600 10.5pt/.29in var(--sans);text-align:center}
+ol.do b{font-weight:600}
+.key{display:inline-block;font:600 9.5pt/1 var(--sans);background:var(--paper);border:1.2px solid #CFC7B8;border-bottom-width:2.5px;border-radius:6px;padding:4px 7px;margin:0 1px;vertical-align:1px}
+.paste{margin:.07in 0 .03in;background:var(--ink);color:#fff;border-radius:11px;padding:11px 14px;font:500 10.4pt/1.35 var(--mono);white-space:nowrap;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.plabel{font:600 7.8pt/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--coral-2);margin:.1in 0 -.02in}
+.paste span{font:600 7.5pt/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:#F4B9A5;flex:none}
+.say{display:inline-block;background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:3px 10px;font:600 12.5pt/1.3 var(--sans)}
+.ok{display:flex;gap:10px;align-items:flex-start;background:var(--ocean-l);border-radius:12px;padding:10px 13px;font-size:11pt;margin-top:.12in}
+.ok::before{content:"";flex:none;width:17px;height:17px;border-radius:50%;margin-top:2px;background:var(--ocean) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/13px no-repeat}
+.ok b{font-weight:600}
+.tip{background:var(--sun);border-radius:12px;padding:10px 13px;font-size:11pt;margin-top:.12in}
+.tip b{font-weight:600}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:.24in}
+figure{margin:.14in 0 0}
+figcaption{font-size:8.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
+
+/* mock-up: a window */
+.win{background:#fff;border:1px solid #D9D2C4;border-radius:11px;overflow:hidden;font:400 8.5pt/1.35 var(--sans);color:#2B2F38;zoom:1.16}
+.bar{height:24px;background:#EFEBE3;border-bottom:1px solid #DDD6C8;display:flex;align-items:center;gap:6px;padding:0 10px;font:600 8pt/1 var(--sans);color:#6B7280}
+.bar i{width:9px;height:9px;border-radius:50%;background:#E1675B;display:block}.bar i+i{background:#E9B341}.bar i+i+i{background:#58B55B}
+.bar span{margin:0 auto;transform:translateX(-22px)}
+.app{display:grid;grid-template-columns:1.8in 1fr}
+.side{background:#F6F3EC;border-right:1px solid #E4DDCF;padding:10px 9px;min-height:2.1in}
+.tabs{display:flex;gap:3px;background:#E9E4D9;border-radius:8px;padding:3px;margin-bottom:10px}
+.tabs b{flex:1;text-align:center;font:600 8pt/1 var(--sans);padding:6px 0;border-radius:6px;color:#6B7280}
+.tabs b.on{background:#fff;color:var(--ink)}
+.side p{margin:0 0 5px;padding:5px 7px;border-radius:6px;color:#6B7280}
+.side p.on{background:#E9E4D9;color:var(--ink);font-weight:600}
+.main{padding:14px 16px 12px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;min-height:2.1in;background:#fff}
+.box{border:1.3px solid #D9D2C4;border-radius:12px;padding:10px 12px;min-height:.52in;color:#9AA0AA;background:#fff;position:relative}
+.box.typed{color:var(--ink);font:500 7.6pt/1.3 var(--mono);white-space:nowrap}
+.box .send{position:absolute;right:8px;bottom:8px;width:20px;height:20px;border-radius:50%;background:var(--coral)}
+.box .send::after{content:"";position:absolute;left:6px;top:5px;border:5px solid transparent;border-bottom-color:#fff;border-top:0;transform:translateY(1px)}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.2px solid #D9D2C4;border-radius:999px;padding:4px 9px;font:600 7.8pt/1 var(--sans);color:#4B5563;background:#fff;white-space:nowrap}
+.chip::after{content:" ▾";color:#9AA0AA;font-size:7pt}
+.msg{align-self:flex-start;max-width:86%;background:#F3EFE7;border-radius:10px;padding:7px 10px}
+.msg.you{align-self:flex-end;background:var(--ink);color:#fff}
+.hit{outline:2.6px solid var(--coral);outline-offset:3px;border-radius:9px;position:relative}
+.chip.hit{border-radius:999px}
+.tag{position:absolute;top:-11px;right:-11px;width:19px;height:19px;border-radius:50%;background:var(--coral);color:#fff;font:600 8.5pt/19px var(--sans);text-align:center;border:0}
+.menu{border:1px solid #D9D2C4;border-radius:10px;background:#fff;padding:4px;width:1.75in;zoom:1.16;font:500 8.5pt/1 var(--sans)}
+.menu div{padding:7px 9px;border-radius:6px;color:#4B5563}
+.menu div.on{background:var(--coral-l);color:var(--ink);font-weight:600}
+.panel{padding:12px 14px;background:#fff}
+.ptabs{display:flex;gap:14px;border-bottom:1px solid #E4DDCF;margin-bottom:10px;font:600 8.5pt/1 var(--sans);color:#9AA0AA}
+.ptabs b{padding:0 0 7px}.ptabs b.on{color:var(--ink);border-bottom:2px solid var(--ink)}
+.prow{display:flex;justify-content:space-between;align-items:center;border:1px solid #E4DDCF;border-radius:9px;padding:8px 10px;margin-bottom:6px}
+.prow small{display:block;color:#9AA0AA;font-size:7.5pt;margin-top:2px}
+.tog{width:30px;height:17px;border-radius:999px;background:var(--ocean);position:relative;flex:none}
+.tog::after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+.btnm{display:inline-block;border-radius:7px;padding:6px 12px;font:600 8.5pt/1 var(--sans);background:#fff;border:1px solid #CFC7B8;color:#4B5563}
+.btnm.pri{background:#2F6FE4;border-color:#2F6FE4;color:#fff}
+.dialog{width:3.1in;margin:0 auto;background:#F4F2EE;border:1px solid #D0CABD;border-radius:13px;padding:16px 16px 13px;zoom:1.1;text-align:center;font:400 8.6pt/1.4 var(--sans)}
+.dialog .ico{width:34px;height:34px;border-radius:9px;margin:0 auto 8px;background:linear-gradient(#8F97A6,#5F6676)}
+.dialog b{display:block;font-weight:600;font-size:9pt;margin-bottom:4px}
+.dialog .acts{display:flex;gap:8px;justify-content:center;margin-top:11px}
+.finder{padding:14px;display:flex;gap:18px;background:#fff;min-height:1.05in;align-items:flex-start}
+.fold{text-align:center;font-size:8pt;color:#4B5563;width:.8in}
+.fold i{display:block;width:.56in;height:.42in;margin:0 auto 5px;border-radius:5px;background:#7CB7E8;position:relative}
+.fold i::before{content:"";position:absolute;left:0;top:-5px;width:.24in;height:7px;border-radius:4px 4px 0 0;background:#7CB7E8}
+.fold.new span{background:#2F6FE4;color:#fff;border-radius:4px;padding:1px 5px}
+/* the home page, small */
+.home{background:var(--cream);padding:11px 12px;min-height:2.1in}
+.home h5{font:400 13pt/1.1 var(--display);margin:0 0 3px}.home h5 em{font-style:italic;color:var(--coral-2)}
+.home small{color:var(--ink-2);font-size:7.3pt}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+.cards div{background:var(--paper);border-radius:8px;padding:7px 8px;font:600 7.6pt/1.2 var(--sans);box-shadow:0 1px 0 var(--line)}
+.split{display:grid;grid-template-columns:1fr 1.1fr}
+.split .main{border-right:1px solid #E4DDCF;min-height:2.1in}
+
+/* cover */
+.cover{display:flex;flex-direction:column}
+.brand{display:flex;justify-content:space-between;align-items:baseline;font:600 9pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
+.brand span{color:var(--coral-2)}
+.need{display:grid;grid-template-columns:1fr 1fr;gap:.16in;margin-top:.22in}
+.need div{background:var(--paper);border-radius:16px;padding:14px 16px;box-shadow:0 1px 0 var(--line)}
+.need b{display:block;font:600 12.5pt/1.2 var(--sans);margin-bottom:4px}
+.need p{margin:0;font-size:10.8pt;color:var(--ink-2)}
+.need .n{font:italic 400 15pt/1 var(--display);color:var(--coral-2);margin-bottom:6px;display:block}
+.map{margin-top:.24in;background:var(--ink);color:#F4F1EA;border-radius:18px;padding:16px 20px}
+.map h3{font:400 15pt/1 var(--display);margin:0 0 10px;color:#fff}
+.map ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;counter-reset:m}
+.map li{counter-increment:m;font-size:11pt;display:flex;gap:9px;align-items:baseline}
+.map li::before{content:counter(m);color:var(--coral);font-weight:600;flex:none;width:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:.2in;margin-top:.1in}
+.way{background:var(--paper);border-radius:16px;padding:13px 17px;box-shadow:0 1px 0 var(--line)}
+.way h4{font:400 15.5pt/1.15 var(--display);margin:0 0 6px}
+.way h4 em{font-style:italic;color:var(--coral-2)}
+.way p{margin:0 0 7px;font-size:10.8pt;color:var(--ink-2)}
+.way ol{margin:0;padding-left:18px;font-size:10.8pt}.way li{margin-bottom:4px}
+table.fix{width:100%;border-collapse:collapse;font-size:10.6pt;margin-top:.06in}
+table.fix td{vertical-align:top;padding:6px 10px;border-top:1px solid var(--line)}
+table.fix td:first-child{width:38%;font-weight:600}
+h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<section class="page cover">
+  <div class="brand"><b>The Assistant</b><span>by Horizon Found</span></div>
+  <div style="margin-top:.5in">
+    <div class="eyebrow">Setup guide · Mac</div>
+    <h1>Setting up<br><em>The Assistant</em></h1>
+    <p class="lede" style="font-size:14pt;max-width:5.9in">Six short steps, about fifteen minutes, and you only do it once. Every step is one thing to click or one line to paste. Go in order and don't skip ahead.</p>
+  </div>
+
+  <div class="eyebrow" style="margin-top:.2in">Before you start, you need</div>
+  <div class="need">
+    <div><span class="n">one</span><b>A Mac</b><p>Any recent Mac. A Windows guide comes later.</p></div>
+    <div><span class="n">two</span><b>A Claude plan, Pro or higher</b><p>The Assistant runs on your own Claude account. The free plan doesn't include the part of Claude it lives in.</p></div>
+    <div><span class="n">three</span><b>An external hard drive</b><p>Where your shoots are kept. If your photos live on your computer for now, it still works, and the Assistant will talk to you about it once.</p></div>
+    <div><span class="n">four</span><b>Fifteen quiet minutes</b><p>And your internet on. Nothing here costs anything extra.</p></div>
+  </div>
+
+  <div class="map">
+    <h3>The six steps</h3>
+    <ol>
+      <li>Install Claude on your Mac</li>
+      <li>Make a folder for the Assistant</li>
+      <li>Install the Assistant (two lines to paste)</li>
+      <li>Turn on updates</li>
+      <li>Let it work while you're away</li>
+      <li>Say hi</li>
+    </ol>
+  </div>
+  <p style="font-size:10pt;color:var(--ink-2);margin-top:.16in">The pictures in this guide are drawings, not photos of the screen. Yours may look a little different. The words to click are the same.</p>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Draft · November 5, 2026</span></div>
+</section>
+
+<!-- ===================== STEP 1 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">1</div><div><div class="of">Step 1 of 6 · about 3 minutes</div><h2>Install Claude on your Mac</h2></div></div>
+  <p class="lede">Claude is the app the Assistant lives inside. If Claude is already on your Mac and you're signed in, skip to number 4.</p>
+  <ol class="do">
+    <li>Open Safari and go to <b>claude.ai/download</b>.</li>
+    <li>Click the download for <b>Mac</b>. When it finishes, open the downloaded file and drag <b>Claude</b> into your <b>Applications</b> folder.</li>
+    <li>Open <b>Claude</b> from Applications and <b>sign in</b> with your Claude account.</li>
+    <li>Look at the top of the left column. Click <b>Code</b>.</li>
+  </ol>
+  <figure>
+    <div class="win">
+      <div class="bar"><i></i><i></i><i></i><span>Claude</span></div>
+      <div class="app">
+        <div class="side">
+          <div class="tabs"><b>Chat</b><b>Cowork</b><b class="on hit">Code<span class="tag">4</span></b></div>
+          <p>+ New session</p><p>Search</p><p style="margin-top:14px;font-size:7.5pt;letter-spacing:.08em;text-transform:uppercase">Recents</p>
+        </div>
+        <div class="main">
+          <div class="box">Describe what you want to do…<div class="send"></div></div>
+          <div class="row"><span class="chip">Local</span><span class="chip">Select folder</span><span class="chip">Manual</span><span class="chip">Model</span></div>
+        </div>
+      </div>
+    </div>
+    <figcaption>Drawing. The word to click is <b>Code</b>, at the top of the left column.</figcaption>
+  </figure>
+  <div class="ok"><div><b>You'll know it worked when</b> you see a big message box with a row of small choices under it.</div></div>
+  <div class="tip"><b>If it asks you to upgrade:</b> your Claude plan doesn't include Code yet. You need Pro or higher. <b>If it asks you to sign in online:</b> follow the link, then come back to the app.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 1 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 2 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">2</div><div><div class="of">Step 2 of 6 · about 1 minute</div><h2>Make a folder for the Assistant</h2></div></div>
+  <p class="lede">The Assistant needs one small folder of its own to keep its notes in. <b>Your photos never go in this folder.</b></p>
+  <ol class="do">
+    <li>In the row under the message box, click the <b>folder</b> choice. (It may say "Select folder".)</li>
+    <li>Click <b>Open folder…</b> A window opens showing your files.</li>
+    <li>On the left of that window, click <b>Documents</b>.</li>
+    <li>Click <b>New Folder</b> at the bottom left. Type <span class="say">Assistant</span> and click <b>Create</b>.</li>
+    <li>With the new <b>Assistant</b> folder selected, click <b>Open</b>.</li>
+  </ol>
+  <div class="cols">
+    <figure>
+      <div class="win">
+        <div class="main" style="min-height:1.25in">
+          <div class="box">Describe what you want to do…<div class="send"></div></div>
+          <div class="row"><span class="chip">Local</span><span class="chip hit">Select folder<span class="tag">1</span></span><span class="chip">Manual</span></div>
+        </div>
+      </div>
+      <figcaption>Drawing. The folder choice, under the message box.</figcaption>
+    </figure>
+    <figure>
+      <div class="win">
+        <div class="bar"><i></i><i></i><i></i><span>Documents</span></div>
+        <div class="finder">
+          <div class="fold"><i></i>Invoices</div>
+          <div class="fold"><i></i>Contracts</div>
+          <div class="fold new hit" style="padding:4px 0"><i></i><span>Assistant</span><span class="tag" style="background:var(--coral)">4</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid #E4DDCF;background:#F6F3EC"><span class="btnm">New Folder</span><span><span class="btnm">Cancel</span> <span class="btnm pri">Open</span></span></div>
+      </div>
+      <figcaption>Drawing. Make the folder, then click Open.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> the folder choice under the message box now says <b>Assistant</b>.</div></div>
+  <div class="tip"><b>Why a new, empty folder?</b> It keeps the Assistant separate from everything else on your Mac. You'll come back to this same folder every time you open it.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 2 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 3 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">3</div><div><div class="of">Step 3 of 6 · about 2 minutes</div><h2>Install the Assistant</h2></div></div>
+  <p class="lede">Two lines to paste, one after the other. Copy each one <b>exactly</b>, from the first slash to the last letter.</p>
+  <ol class="do">
+    <li>Click inside the message box. Copy this line, paste it in, and press <span class="key">Return</span>.
+      <div class="plabel">Line 1 · copy all of it</div><div class="paste">/plugin marketplace add https://github.com/horizonfound/hf-tools</div>
+    </li>
+    <li>Wait for the reply. It says it <b>added hf-tools</b>.</li>
+    <li>Copy this second line, paste it in, and press <span class="key">Return</span>.
+      <div class="plabel">Line 2 · copy all of it</div><div class="paste">/plugin install the-engine@hf-tools</div>
+    </li>
+    <li>If it asks who to install it for, choose <b>Install for you</b>.</li>
+  </ol>
+  <div class="cols">
+    <figure>
+      <div class="win">
+        <div class="main" style="min-height:1.5in">
+          <div class="msg" style="white-space:nowrap;max-width:none;font-size:8pt">Successfully added marketplace: <b>hf-tools</b></div>
+          <div class="box typed hit">/plugin install the-engine@hf-tools<span class="tag">3</span><div class="send"></div></div>
+        </div>
+      </div>
+      <figcaption>Drawing. The reply to line 1, and line 2 pasted in.</figcaption>
+    </figure>
+    <figure>
+      <div class="win">
+        <div class="panel" style="min-height:1.5in">
+          <div style="font-weight:600;margin-bottom:8px">Install the-engine</div>
+          <div class="menu" style="width:auto;zoom:1">
+            <div class="on hit" style="position:relative">Install for you<span class="tag">4</span></div>
+            <div>Install for everyone on this project</div>
+            <div>Install for this folder only</div>
+          </div>
+        </div>
+      </div>
+      <figcaption>Drawing. If you're asked, pick the first one.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> the reply says the-engine was <b>installed</b>. ("the-engine" is the Assistant's behind-the-scenes name.)</div></div>
+  <div class="tip"><b>If a line does nothing or you get an error:</b> check that nothing was cut off when you copied it, and that there's no space before the first slash. Then paste it again.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 3 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 4 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">4</div><div><div class="of">Step 4 of 6 · about 1 minute</div><h2>Turn on updates</h2></div></div>
+  <p class="lede">The Assistant gets better every week. Updates are <b>off</b> until you switch them on. Do it once and you never think about it again.</p>
+  <ol class="do">
+    <li>Click inside the message box, type <span class="say">/plugin</span> and press <span class="key">Return</span>. A panel opens.</li>
+    <li>At the top of the panel, click <b>Marketplaces</b>.</li>
+    <li>Click <b>hf-tools</b>.</li>
+    <li>Turn on <b>Enable auto-update</b>.</li>
+    <li>Close the panel. (Press <span class="key">Esc</span>.)</li>
+  </ol>
+  <figure style="max-width:5in;margin-top:.2in">
+    <div class="win">
+      <div class="panel">
+        <div class="ptabs"><b>Discover</b><b>Installed</b><b class="on hit" style="position:relative;padding:0 6px 7px">Marketplaces<span class="tag" style="right:-16px">2</span></b></div>
+        <div class="prow hit" style="position:relative"><div><b>hf-tools</b><small>Horizon Found · 1 plugin installed</small></div><span class="tag">3</span></div>
+        <div class="prow" style="border:0;padding:6px 10px 0"><div>Enable auto-update</div><div class="tog hit" style="border-radius:999px;position:relative"><span class="tag">4</span></div></div>
+        <div style="padding:8px 10px 2px"><span class="btnm">Update marketplace</span></div>
+      </div>
+    </div>
+    <figcaption>Drawing. Marketplaces, then hf-tools, then the switch.</figcaption>
+  </figure>
+  <div class="ok"><div><b>You'll know it worked when</b> the switch next to <b>Enable auto-update</b> is on.</div></div>
+  <div class="tip"><b>Good to know:</b> updates arrive on their own a few minutes after you start talking to the Assistant, and take effect the next time you open Claude. If we ever tell you "we just fixed that," come back to this same panel and click <b>Update marketplace</b>.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 4 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 5 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">5</div><div><div class="of">Step 5 of 6 · about 30 seconds</div><h2>Let it work while you're away</h2></div></div>
+  <p class="lede">This is the step that makes "walk away" true. Without it, Claude stops every few seconds to ask "may I do this?", and a backup can't finish while you're out of the room.</p>
+  <ol class="do">
+    <li>In the row under the message box, find the choice that says <b>Manual</b>. Click it.</li>
+    <li>In the list that opens, click <b>Auto</b>.</li>
+  </ol>
+  <div class="cols" style="grid-template-columns:1.25fr 1fr;align-items:end">
+    <figure>
+      <div class="win">
+        <div class="main" style="min-height:1.2in">
+          <div class="box">Describe what you want to do…<div class="send"></div></div>
+          <div class="row"><span class="chip">Local</span><span class="chip">Assistant</span><span class="chip hit">Manual<span class="tag">1</span></span><span class="chip">Model</span></div>
+        </div>
+      </div>
+      <figcaption>Drawing. Click Manual.</figcaption>
+    </figure>
+    <figure>
+      <div class="menu">
+        <div>Manual</div><div>Accept edits</div><div>Plan</div>
+        <div class="on hit" style="position:relative">Auto<span class="tag">2</span></div>
+      </div>
+      <figcaption>Drawing. Then click Auto.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> that choice now says <b>Auto</b>. Claude remembers it for your Assistant folder.</div></div>
+  <div class="tip"><b>Is this safe?</b> Auto means Claude does the backup's steps without asking each time, with its own safety checks running. And the Assistant has its own rule that nothing may break, in any mode: <b>nothing on your memory card is ever deleted, moved or changed.</b></div>
+  <div class="tip" style="background:var(--paper);border:1px solid var(--line)"><b>Don't see Auto in the list?</b> In the same row, click the <b>Model</b> choice and pick the newest Claude model. Then look again.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 5 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 6 ===================== -->
+<section class="page">
+  <div class="step"><div class="num">6</div><div><div class="of">Step 6 of 6 · you're there</div><h2>Say hi</h2></div></div>
+  <p class="lede">That's the setup. Now meet your Assistant.</p>
+  <ol class="do">
+    <li>Click inside the message box, type <span class="say">hi</span> and press <span class="key">Return</span>.</li>
+    <li>Give it a few seconds. The Assistant introduces itself, and its home page opens beside the chat.</li>
+  </ol>
+  <figure>
+    <div class="win">
+      <div class="bar"><i></i><i></i><i></i><span>Claude</span></div>
+      <div class="split">
+        <div class="main">
+          <div class="msg you">hi</div>
+          <div class="msg">Hi, I'm your Assistant. I take care of everything around your photos…</div>
+          <div class="box" style="min-height:.4in">Reply…<div class="send"></div></div>
+        </div>
+        <div class="home">
+          <h5>Hi, I'm <em>your Assistant</em></h5><small>Start with whatever you have today.</small>
+          <div class="cards"><div>Back up a card</div><div>Make posts from a shoot</div><div>My editing queue</div><div>My posting queue</div><div>Open my Assistant folder</div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption>Drawing. The chat on the left, the Assistant's home page on the right.</figcaption>
+  </figure>
+
+  <h3 class="sub">One thing you might see first, on a newer Mac</h3>
+  <div class="cols" style="grid-template-columns:1.15fr 1fr;align-items:center">
+    <div style="font-size:11.5pt">
+      A window from Apple may pop up asking to install <b>command line developer tools</b>. That's one free piece from Apple that the Assistant runs on.
+      <ol class="do" style="margin-top:.1in">
+        <li style="font-size:11.5pt;margin-bottom:.1in">Click <b>Install</b>, then <b>Agree</b>.</li>
+        <li style="font-size:11.5pt;margin-bottom:.1in">Wait five to ten minutes until it says it's done.</li>
+        <li style="font-size:11.5pt;margin-bottom:0">Go back to Claude and type <span class="say">done</span>.</li>
+      </ol>
+    </div>
+    <figure style="margin:0">
+      <div class="dialog"><div class="ico"></div><b>The "python3" command requires the command line developer tools.</b>Would you like to install the tools now?
+        <div class="acts"><span class="btnm">Cancel</span><span class="btnm pri hit" style="position:relative">Install</span></div></div>
+      <figcaption style="text-align:center">Drawing. You only ever see this once.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You're set up.</b> From now on, opening the Assistant is: open Claude, click <b>Code</b>, click your <b>Assistant</b> folder, say <b>hi</b>.</div></div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 6 of 6</span></div>
+</section>
+
+<!-- ===================== WHAT NOW ===================== -->
+<section class="page">
+  <div class="eyebrow">You're in</div>
+  <h1 style="font-size:32pt;margin:.08in 0 .08in">Two good places to <em>start</em></h1>
+  <p class="lede">You don't need a memory card to begin. Start with whatever you have today. You talk to the Assistant in your own words, the way you'd talk to a person.</p>
+  <div class="two">
+    <div class="way">
+      <h4>Photos you've <em>already finished</em></h4>
+      <p>Edited and exported, sitting in a folder.</p>
+      <ol>
+        <li>On the home page, click <b>Make posts from a shoot</b>.</li>
+        <li>Follow the box that opens. The first time, it has you paste <b>set up my Assistant folder</b>.</li>
+        <li>Click <b>Select the folder with your finished photos</b> and pick your exports.</li>
+        <li>Paste <b>make my posts</b> in the chat.</li>
+      </ol>
+      <p style="margin-top:8px">You get single posts, a carousel, stories and a reel, with captions written from what you tell it. Your originals aren't moved or changed.</p>
+    </div>
+    <div class="way">
+      <h4>A <em>memory card</em> with new photos</h4>
+      <p>Straight out of the camera.</p>
+      <ol>
+        <li>Put the card in and plug in your drive.</li>
+        <li>Type <b>backup now</b> in the chat.</li>
+        <li>The first time only, it asks a few quick questions with buttons.</li>
+        <li>When it says <b>You can walk away</b>, walk away.</li>
+      </ol>
+      <p style="margin-top:8px">When you're back, click <b>Show the report</b> in the chat. Every photo is copied and checked, sorted into named shoots, with six sneak peeks picked to edit first.</p>
+    </div>
+  </div>
+
+  <h3 class="sub">If something isn't right</h3>
+  <table class="fix">
+    <tr><td>The page beside the chat is blank, or shows a play button</td><td>Don't press the play button. Type <b>show the Assistant</b> and the page comes back.</td></tr>
+    <tr><td>Claude keeps asking "may I run this?"</td><td>Step 5 slipped back. In the row under the message box, change <b>Manual</b> to <b>Auto</b>.</td></tr>
+    <tr><td>A window from Apple asks to install something</td><td>That's the one free piece the Assistant runs on. Click <b>Install</b>. See Step 6.</td></tr>
+    <tr><td>A backup stopped</td><td>The Assistant says why, first thing, in plain words. Fix that (plug the drive in, clear space) and say <b>backup now</b> again. Nothing is copied twice.</td></tr>
+    <tr><td>You're not sure what to do next</td><td>Say <b>hi</b>. It tells you where things stand and what you can say.</td></tr>
+  </table>
+  <div class="tip" style="margin-top:.1in"><b>Three promises:</b> nothing on your memory card is ever changed. Nothing is ever deleted. Nothing is ever posted or sent for you.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>After setup</span></div>
+</section>
+
+</body>
+</html>
