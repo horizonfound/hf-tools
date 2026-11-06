@@ -66,6 +66,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 PFILE = HOME / "posting.json"
@@ -712,6 +713,8 @@ def open_capcut(rec):
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
+        if fresh.page_path(path) and fresh.stale() and fresh.restart(self):
+            return
         if path in ("", "/"):
             # the bare address is the front door, the home page (it used to be the posting page)
             self.send_response(HTTPStatus.FOUND)

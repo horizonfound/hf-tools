@@ -55,6 +55,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
 
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 QFILE = HOME / "queue.json"
@@ -741,6 +742,8 @@ def write_page(q):
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         p = urlsplit(self.path).path
+        if fresh.page_path(p) and fresh.stale() and fresh.restart(self):
+            return
         if p in ("/", "/queue.html"):
             body = page_html(load()).encode()
             self.send_response(HTTPStatus.OK)

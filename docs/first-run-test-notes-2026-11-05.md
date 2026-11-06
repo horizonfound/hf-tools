@@ -517,3 +517,22 @@ the old pages until they are stopped and started again. That has needed a manual
 today. A proper fix, not built: each server notes how new its code was when it started, and whoever asks
 for its address (`home.py url` and the like) restarts it if the code on disk is newer. For students this
 matters the day after an update lands while a page server is still running.
+
+**Note 22, the rest of it, done the same day (Dustin: "Yes, fix those too"):** all three page servers (home
+and posting, the editing queue, a backup's report) now notice when the Assistant's code on disk is newer
+than what they loaded. On the next page request they answer with a one-line "One moment. The Assistant just
+got an update" page that retries by itself, and start over with the new code on the same address. New
+helper: `fresh.py`. An open home page reloads into the new version without a click.
+
+Tested on all three, on the Mac:
+- A change lands on disk: the next page load shows "One moment," and the real page is back about two
+  seconds later, on the same address. Each server's log says "starting over with the new code."
+- A half-written (broken) file lands in the folder: every server keeps serving its pages and logs that it
+  is staying on what it has. An old page beats no page.
+- The broken file goes away: no needless restart. A good update after that: restarts as it should.
+- The small background questions a page asks do not restart anything; only a page request does.
+
+One flaw found and fixed in the testing: a restarted server first took its "which code did I load" reading
+at its first page request, not when it started, so it could miss a change that landed in between.
+
+No more "stop and start the server after an update," for Dustin or for students.

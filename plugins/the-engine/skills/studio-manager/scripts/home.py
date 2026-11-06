@@ -176,6 +176,11 @@ def fingerprint():
     """Changes when anything the page shows might have changed: the Studio File, the queues, the journey,
     the Content folder, a card coming or going. The page polls this and reloads itself when it moves."""
     parts = []
+    try:  # an update to the Assistant counts as a change too, so an open home page reloads into the new one
+        import fresh
+        parts.append(str(fresh.code_stamp()))
+    except Exception:
+        parts.append("?")
     for f in ("studio.json", "queue.json", "posting.json", "journey.json", "posting-url.txt"):
         try:
             parts.append(str(int((HOME / f).stat().st_mtime)))
