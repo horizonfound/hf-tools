@@ -12,6 +12,9 @@ here. This file holds no page code.
                                                        put a staged set of slides into the Carousel folder (the
                                                        page's Save slides runs this, as a process of its own)
     python3 design.py took "beach"                     Claude has told them about the save: clear the waiting line
+                                                       (the kit name exactly as the line gives it also works when the
+                                                       folder has been renamed since)
+    python3 design.py tidy "beach"                     clear the waiting slides of saves that were never finished
 
 Rules this file keeps:
   * Everything the page knows is on disk, saved as they work, with a counter (rev). A reload, a server that
@@ -24,7 +27,13 @@ Rules this file keeps:
     one has arrived, and go into the Carousel folder as a whole set, under a name chosen from what is in that
     folder and written down BEFORE the first file moves. A save that was cut off is finished under the same
     name by the next try. A second save makes a new set beside the first. The plain slides, Canva's slides
-    and anything else in that folder are never touched.
+    and anything else in that folder are never touched. Once a slide of a set has been put in the Carousel
+    folder, what happens to it there is the photographer's business: a slide they rename, move or change is
+    left as it is, and no other slide is moved because of it. A set that could not be finished part way is
+    put back to wait, and a slide that came back that way is never cleared (it is set aside, see below).
+    The only files ever cleared are slides that never reached the Carousel folder, from saves nobody finished.
+  * "Already saved" is said only when saving now would make the very same slides: the same layout, under the
+    same name, from the same edit of every photo, with the same fonts, and every file still in the folder.
   * kit.json is written only by commands (this file's commit, run as a process of its own), never by a
     server thread.
   * Every POST goes through arrange.guard (Host, Origin, Content-Type, Content-Length) and is checked field
@@ -41,9 +50,15 @@ Records (<kit> is the shoot's folder in Your Content; <studio> is STUDIO_HOME, ~
                                          one press of Save slides: the set's name, its files and their hashes, and
                                          the layout that made it. Written "moving" before the first file moves,
                                          "done" when the set is whole, "undone" when it had to be put back. "n"
-                                         numbers the kit's saves in the order they were written down.
+                                         numbers the kit's saves in the order they were written down. "drawn" is
+                                         what the slides were drawn from (each photo's mark, fonts that fell back
+                                         to Georgia); "theirs" names slides the photographer changed by hand after
+                                         they were put in; "back" names slides an undone set took back to staging.
   <kit>/.kit/design-staging/<id>-<token>/slide-NN.jpg
                                          slides that have arrived and are waiting for their set
+  <kit>/.kit/design-slides-older/<when> <set name>/<the slide's name>
+                                         slides of a set that could not be finished, which had already been in
+                                         the Carousel folder: set aside here a day later, never cleared
   <kit>/.kit/design.lock                 held for every read-change-write of a design
   <kit>/.kit/slides.lock                 kit.py's own: held while files go into the Carousel folder
   <kit>/.kit/kit.json                    "carousel_set" (the newest laid-out set) and "laid_out" (every one)
@@ -55,12 +70,14 @@ Records (<kit> is the shoot's folder in Your Content; <studio> is STUDIO_HOME, ~
 Python 3.9, standard library only.
 """
 import argparse
+import errno
 import hashlib
 import json
 import math
 import os
 import random
 import re
+import socket
 import struct
 import subprocess
 import sys
@@ -121,6 +138,8 @@ SLIDE_CAP = 12 * 1024 * 1024            # bytes in one finished slide
 SLIDE_MIN = 1000
 STAGING_KEEP = 86400.0                  # seconds a set that never finished arriving is kept before it is cleared
 STAGING_MOST = 60                       # unfinished sets waiting in one kit
+STAGING_PRESSED = 3600.0                # when that many are waiting, ones left alone for an hour are cleared too
+COMMIT_CAP = 16384                      # bytes in a commit (it says which photos and fonts the slides were drawn from)
 COMMIT_WAIT = 60.0                      # seconds the page's Save slides waits for the set to be placed
 
 ID = re.compile(r"[a-z][a-z0-9]{5,23}")                 # a design or template id, made here
@@ -168,6 +187,10 @@ TRY_AGAIN = "The Assistant is busy with this shoot right now. Try again in a mom
 NOT_FINISHED = "Couldn't finish saving your slides. Nothing was lost. Press Save slides again and it will finish."
 IN_THE_WAY = "Couldn't save the slides: a file in your Carousel folder has a name one of them needs. Nothing was replaced. Press Save slides again."
 DRIVE = "Couldn't save the slides: {why}. Nothing was lost. Press Save slides again once that is put right."
+CANT_SAVE = "Your changes can't be saved right now: {why}. They'll be saved by themselves once that is put right."
+CANT_KEEP = "That couldn't be saved: {why}."
+PHOTO_NEWER = ("A photo on these slides was exported again since this page opened, so no slides were made. "
+               "Nothing was added to your Carousel folder. Press Reload at the top of this page, then Save slides again.")
 WHY_WORDS = {"many": TOO_MANY_BLOCKS, "long": TEXT_TOO_LONG, "font": FONT_BAD, "name": NAME_BAD}
 
 # ---------- the fonts ----------
@@ -209,6 +232,23 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except UnicodeEncodeError:          # an output that can't spell a name (a PC's own code page): spell it out instead
+        try:
+            print(str(msg).encode("ascii", "backslashreplace").decode("ascii"), flush=True)
+        except (OSError, ValueError):
+            pass
+
+
+def utf8_output():
+    """What this file prints holds the photographer's own names (a design, a shoot), in any alphabet. A PC's
+    piped output is in the PC's own code page unless told otherwise, and a name outside it would stop a
+    command dead in the middle of its report. (The other scripts get this from this_computer.utf8_output()
+    in the PC pass; when design.py is merged with that, this can become the same call.)"""
+    for s in (sys.stdout, sys.stderr):
+        try:
+            s.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
 
 
 def now_iso():
@@ -240,30 +280,45 @@ def new_id(prefix):
 
 # ---------- names ----------
 
+TURNERS = set("\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u061c\ufeff")   # marks that turn the reading direction, and the byte-order mark
+
+
+def _unseen(c):
+    """A character nobody can see (a zero-width mark, a direction mark): Unicode's "format" kind."""
+    return unicodedata.category(c) == "Cf"
+
+
 def clean_name(v):
     """A design's or a template's name as it is kept: one line, no control characters, 1 to 80 letters.
-    None when it is not a usable name."""
+    Marks that turn the reading direction are dropped (they come along when a name is pasted, and can make a
+    name read differently from what is stored), and so is anything unseen at either end. None when it is not
+    a usable name."""
     if not isinstance(v, str):
         return None
     s = unicodedata.normalize("NFC", v)
-    s = "".join(" " if (ord(c) < 32 or ord(c) == 127) else c for c in s)
+    s = "".join(" " if (ord(c) < 32 or ord(c) == 127) else c for c in s if c not in TURNERS)
     s = re.sub(r"\s+", " ", s).strip()
+    while s and (_unseen(s[0]) or _unseen(s[-1])):
+        s = (s[1:] if _unseen(s[0]) else s[:-1]).strip()
     return s if 1 <= len(s) <= NAME_MAX else None
 
 
 def safe_base(name):
     """A design's name as the start of a file name that any drive, a Mac and a PC will take: no slash, colon,
     star, question mark, quote, angle bracket or bar; no dot or space at either end; not one of the names
-    Windows keeps for itself; and never the words "(Canva)", which canva_kit.py takes for a Canva slide."""
+    Windows keeps for itself; and never the words "(Canva)", which canva_kit.py takes for a Canva slide.
+    No character nobody can see either: a drive like Big Kahuna leaves those out when it compares two names,
+    so a name that differs from a saved set's only by one of them could never be given a file."""
     s = unicodedata.normalize("NFC", str(name))
     s = re.sub(r"\(canva\)", " ", s, flags=re.I)
-    s = "".join(" " if (c in '/\\:*?"<>|' or ord(c) < 32 or ord(c) == 127) else c for c in s)
+    s = "".join(" " if (c in '/\\:*?"<>|' or ord(c) < 32 or ord(c) == 127) else c for c in s if not _unseen(c))
     s = re.sub(r"\s+", " ", s).strip(" .")
     s = s[:NAME_MAX].rstrip(" .")
     if not s:
         s = "Carousel"
-    if s.split(".")[0].strip().upper() in RESERVED:
-        s += "_"
+    head, dot, rest = s.partition(".")
+    if head.strip().upper() in RESERVED:
+        s = head.rstrip() + "_" + dot + rest        # Windows judges by what stands before the first dot ("aux_.txt", "Con_")
     return s
 
 
@@ -751,7 +806,7 @@ def save_from_page(body):
             _store(kit, d, old)
         info = set_info(kit, d)
         return 200, {"ok": True, "words": SAVED_WORD, "rev": d["rev"], "updated": d.get("updated"), "t": d.get("t"),
-                     "set": info, "unfinished": _unfinished(kit, did)}
+                     "set": info, "unfinished": _unfinished(kit, did), "marks": photo_marks(kit, d["state"], rows)}
 
 
 # ---------- templates, brand colors, fonts: shared by every shoot ----------
@@ -958,20 +1013,101 @@ def last_done(kit, did):
 
 
 def _set_there(kit, j):
-    have = kit_mod._names(kit / "Carousel")
-    return all(kit_mod._nf(f["final"]) in have for f in j["files"])
+    """Is every slide of this set in the Carousel folder: its name in the folder's own listing, and a file of
+    the size written down (so another design's slides under the same names are not taken for this one's)?"""
+    car = kit / "Carousel"
+    have = kit_mod._names(car)
+    for f in j["files"]:
+        real = have.get(kit_mod._nf(f["final"]))
+        if real is None:
+            return False
+        try:
+            if type(f.get("size")) is int and os.path.getsize(car / real) != f["size"]:
+                return False
+        except OSError:
+            return False
+    return True
+
+
+def photo_marks(kit, state, rows=None, rec=None):
+    """{a photo's number, as text: the mark of that photo as it is on the drive now}, for the photos a layout
+    uses. The mark is the one the page is given with each photo (arrange.state_for_page's "v"): it changes
+    when the photo is exported again under the same name. It is how a save knows which edit of a photo its
+    slides were drawn from."""
+    used = sorted({b["n"] for b in state["blocks"] if b.get("type") != "text" and b.get("n") is not None})
+    if not used:
+        return {}
+    rows = rows if rows is not None else arrange.sheet_rows(kit)
+    rec = rec if rec is not None else kit_mod.load_rec(kit)
+    by = {x["n"]: x for x in rows}
+    try:
+        names = set(os.listdir(arrange.previews_dir(kit)))
+    except OSError:
+        names = set()
+    small, out = arrange.SIZES["s"], {}
+    for n in used:
+        row, name = by.get(n), ""
+        if row is not None:
+            src = arrange.photo_path(kit, rec, row)
+            if src is not None:
+                try:
+                    name = arrange.preview_file(kit, row, small, src).name
+                except OSError:
+                    src = None
+            if src is None:
+                name = arrange._older_copy(names, row, small) or ""
+        out[str(n)] = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8] if name else ""
+    return out
+
+
+def drawn_ok(v):
+    """What a page says a set of slides was drawn from, checked: {"photos": {number: mark}, "fell": [fonts that
+    could not be loaded, so their words were drawn in Georgia]}. None when it is not that."""
+    if not isinstance(v, dict):
+        return None
+    photos, fell = v.get("photos"), v.get("fell", [])
+    if not isinstance(photos, dict) or len(photos) > MAX_BLOCKS or not isinstance(fell, list) or len(fell) > MAX_TEXTS:
+        return None
+    for k, m in photos.items():
+        if not (isinstance(k, str) and re.fullmatch(r"[0-9]{1,6}", k) and isinstance(m, str) and re.fullmatch(r"[0-9a-f]{0,8}", m)):
+            return None
+    if not all(font_ok(f) for f in fell):
+        return None
+    return {"photos": {k: photos[k] for k in sorted(photos)}, "fell": sorted(set(fell))}
+
+
+def _fell(j):
+    d = j.get("drawn") if isinstance(j.get("drawn"), dict) else {}
+    return sorted(f for f in (d.get("fell") or []) if font_ok(f))
+
+
+def _same_as(kit, d, j, drawn=None):
+    """Would saving this design now make the very slides of set j again? Only when the layout is the one that
+    made them, the design still has the name they were saved under, every photo on them is the same edit of
+    that photo (a photo exported again since is a change), the same fonts were missing then as now (when the
+    page says which are, in drawn), and every one of the set's files is still in the Carousel folder."""
+    if j["layout"] != d["state"]:
+        return False
+    if kit_mod._fold(safe_base(d["name"])) != kit_mod._fold(safe_base(j.get("name") or "")):
+        return False
+    was = j.get("drawn") if isinstance(j.get("drawn"), dict) else None
+    if was is None or was.get("photos") != photo_marks(kit, d["state"]):
+        return False
+    if drawn is not None and sorted(drawn.get("fell") or []) != _fell(j):
+        return False
+    return _set_there(kit, j)
 
 
 def set_info(kit, d):
     """What the page needs to know about the last set saved from a design: its name, how many slides, when,
-    and "same": is the layout now exactly the one that made it, with every one of its files still in the
-    Carousel folder (so pressing Save slides would make nothing new)."""
+    "same" (pressing Save slides would make nothing new: see _same_as) and "fell" (the fonts that could not
+    be loaded when it was saved; the page knows which can't be loaded now, and a difference is a change)."""
     j = last_done(kit, d["id"])
     if not j:
         return None
-    same = j["layout"] == d["state"] and _set_there(kit, j)
+    same = _same_as(kit, d, j)
     return {"base": j["base"], "count": len(j["files"]), "at": j.get("finished") or j.get("at"), "same": same,
-            "words": ALREADY.format(base=j["base"]) if same else ""}
+            "fell": _fell(j), "words": ALREADY.format(base=j["base"]) if same else ""}
 
 
 def _unfinished(kit, did):
@@ -1026,8 +1162,10 @@ def stage_slide(kit, did, token, i, of, data):
         return 409, {"ok": False, "why": "changed", "words": CHANGED}
     root = staging_dir(kit)
     folder = root / f"{did}-{token}"
-    if not kit_mod._has(root, folder.name) and len(kit_mod._listing(root)) >= STAGING_MOST:
-        return 503, {"ok": False, "why": "waiting", "words": SLIDES_WAITING}
+    if not kit_mod._has(root, folder.name) and len(waiting_sets(kit)) >= STAGING_MOST:
+        tidy(kit, STAGING_PRESSED, wait=2.0)        # unfinished saves nobody came back to are cleared first
+        if len(waiting_sets(kit)) >= STAGING_MOST:
+            return 503, {"ok": False, "why": "waiting", "words": SLIDES_WAITING}
     j = _journal(kit, did, token)
     if j and j["state"] in ("moving", "done"):
         return 409, {"ok": False, "why": "again", "words": SLIDE_AGAIN}       # this set is already on its way in
@@ -1084,37 +1222,84 @@ def free_base(kit, name):
         k += 1
 
 
-def _sweep_staging(kit):
+SET_FOLDER = re.compile(r"([a-z][a-z0-9]{5,23})-([a-z0-9]{8,24})")
+
+
+def waiting_sets(kit):
+    """The sets of slides waiting in the kit's hidden staging folder: only folders this file names."""
+    root = staging_dir(kit)
+    return sorted(n for n in kit_mod._listing(root) if SET_FOLDER.fullmatch(n) and (root / n).is_dir() and not (root / n).is_symlink())
+
+
+def kept_dir(kit, j):
+    """Where slides that had been in the Carousel folder, and were put back because their set could not be
+    finished, are set aside for good: a folder named for when that happened and the name the set had."""
+    last = ([x for x in (j.get("undone") or []) if isinstance(x, dict)] or [{}])[-1]
+    when = re.sub(r"[^0-9T-]", "", str(last.get("at") or j.get("finished") or ""))[:17] or "undated"
+    return kit / ".kit" / "design-slides-older" / f"{when} {safe_base(last.get('base') or j['base'])}"
+
+
+def _sweep_staging(kit, keep=STAGING_KEEP):
     """With the slides lock held: slides that arrived for a set that never finished arriving, and were never
     put into the Carousel folder, are the Assistant's own scratch. A day after the last one arrived they are
     cleared, so abandoned saves do not eat the drive. Only folders this file names, only files named like a
-    staged slide or a scratch file, never a set that is written down as on its way in."""
+    staged slide or a scratch file, never a set that is written down as on its way in. A slide that HAD been
+    in the Carousel folder (its set could not be finished, and it was put back) is never cleared: it is set
+    aside in the kit's hidden design-slides-older folder, under the name it had. Returns how many sets went."""
     root = staging_dir(kit)
-    for name in sorted(kit_mod._listing(root)):
-        m = re.fullmatch(r"([a-z][a-z0-9]{5,23})-([a-z0-9]{8,24})", name)
+    went = 0
+    for name in waiting_sets(kit):
+        m = SET_FOLDER.fullmatch(name)
         folder = root / name
-        if not m or folder.is_symlink() or not folder.is_dir():
-            continue
         j = _journal(kit, m.group(1), m.group(2))
         if j and j["state"] == "moving":
             continue
         try:
-            old = time.time() - folder.stat().st_mtime > STAGING_KEEP
+            old = time.time() - folder.stat().st_mtime > keep
         except OSError:
             continue
         if not old and not (j and j["state"] == "done"):
             continue
-        for f in kit_mod._listing(folder):
+        back = set(j.get("back") or []) if j and j["state"] == "undone" else set()
+        final_of = {f["staged"]: f["final"] for f in j["files"]} if j else {}
+        for f in sorted(kit_mod._listing(folder)):
             p = folder / f
-            if (STAGED.fullmatch(f) or f.startswith(".part-")) and p.is_file() and not p.is_symlink():
-                try:
+            if not ((STAGED.fullmatch(f) or f.startswith(".part-")) and p.is_file() and not p.is_symlink()):
+                continue
+            try:
+                if f in back and f in final_of:
+                    dst = kept_dir(kit, j)
+                    arrange.make_folder(dst)
+                    kit_mod._move_one(p, dst / final_of[f])     # never over another file; if it can't go, it stays here
+                else:
                     p.unlink()
-                except OSError:
-                    pass
+            except OSError:
+                pass
         try:
             os.rmdir(folder)
+            went += 1
         except OSError:
             pass
+    return went
+
+
+def tidy(kit, keep=STAGING_KEEP, wait=0.0):
+    """Clear the waiting slides of saves that were never finished (see _sweep_staging), if nothing else is
+    changing this kit's slides right now. Returns how many sets were cleared, or None when it could not look."""
+    if not waiting_sets(kit):
+        return 0
+    try:
+        lock_file = kit / ".kit" / "slides.lock"    # kit.py's own lock; the hidden folder is there, since staging is in it
+        with kit_mod._held(lock_file, wait) as mine:
+            return _sweep_staging(kit, keep) if mine else None
+    except (OSError, arrange.Busy):
+        return None
+
+
+def _saved_words(j):
+    """"Saved N slides ...": N is how many of the set are in the folder under their names (a slide the
+    photographer has since renamed, moved or changed is theirs, and is not counted)."""
+    return SAVED_SET.format(n=len(j["files"]) - len(j.get("theirs") or []), base=j["base"])
 
 
 def _result(state, j=None, why="", words="", **more):
@@ -1127,15 +1312,21 @@ def _undo(kit, j, why, blocked=""):
     """A set that cannot be finished under its name (a file turned up in the Carousel folder under a name
     one of its slides needs, or a staged slide is gone or is not the one written down) is put back: every
     slide of it already in the Carousel folder goes back to staging, known by its hash. Nothing is deleted,
-    nothing is written over, and the record ends as "undone". The next try picks a name afresh."""
+    nothing is written over, and the record ends as "undone". The next try picks a name afresh. This is only
+    ever done to a set that was still PART WAY in (see _finish): the slides it takes back are written down
+    ("back"), and the day-old clearing of staging sets those aside instead of clearing them."""
     car = kit / "Carousel"
     stag = staging_dir(kit) / f"{j['design']}-{j['token']}"
     arrange.make_folder(stag)
+    back = set(j.get("back") or [])
     for f in j["files"]:
         if kit_mod._has(car, f["final"]) and not kit_mod._has(stag, f["staged"]) and kit_mod._sha(car / f["final"]) == f["sha256"]:
+            back.add(f["staged"])       # written down in the record below: this slide has been in the Carousel folder
+            j["back"] = sorted(back)
+            arrange.write_whole(_journal_path(kit, j["design"], j["token"]), j)
             kit_mod._move_one(car / f["final"], stag / f["staged"])
     undone = list(j.get("undone") or []) + [{"base": j["base"], "why": why, "blocked_by": blocked, "at": now_iso()}]
-    j.update(state="undone", undone=undone[-10:], finished=now_iso())
+    j.update(state="undone", undone=undone[-10:], finished=now_iso(), back=sorted(back))
     arrange.write_whole(_journal_path(kit, j["design"], j["token"]), j)
     arrange.log(f"design set {j['base']!r} for {kit.name} was put back ({why})")
     return _result("problem", j, why=why, words=IN_THE_WAY if why == "clash" else NOT_FINISHED)
@@ -1149,15 +1340,48 @@ def _finish(kit, j):
     car = kit / "Carousel"
     stag = staging_dir(kit) / f"{j['design']}-{j['token']}"
     car.mkdir(exist_ok=True)
+    seen = {}
+
+    def placed_before(k):
+        """Had slide k already been put in the Carousel folder by an earlier run of this same save? Slides go
+        in in order and leave staging only by going in, so: its staged copy is not in staging, and either a
+        later slide of the set is in the Carousel folder, or no slide of the set is left in staging at all and
+        at least one is in the folder. Then whatever has happened to slide k since is the photographer's own
+        doing in their own folder (renamed, moved, edited), and no other slide is moved because of it."""
+        if "left" not in seen:
+            seen["left"] = {kit_mod._nf(n) for n in kit_mod._listing(stag)}
+            names = kit_mod._names(car)
+            seen["there"] = set()
+            for i, x in enumerate(j["files"], 1):
+                real = names.get(kit_mod._nf(x["final"]))
+                try:
+                    if real is not None and kit_mod._sha(car / real) == x["sha256"]:
+                        seen["there"].add(i)
+                except OSError:
+                    pass
+        left = {x["staged"] for x in j["files"]} & seen["left"]
+        if j["files"][k - 1]["staged"] in left:
+            return False
+        return any(i > k for i in seen["there"]) or (not left and bool(seen["there"]))
+
+    theirs = list(j.get("theirs") or [])         # slides the photographer has since renamed, moved or changed
     for k, f in enumerate(j["files"], 1):
         got = kit_mod._move_one(stag / f["staged"], car / f["final"])
-        if got in ("moved", "there") and kit_mod._sha(car / f["final"]) != f["sha256"]:
-            got = "clash"               # a file has that name, and it is not the slide this save made
-        if got == "clash":
+        if got == "there" and kit_mod._sha(car / f["final"]) != f["sha256"]:
+            got = "different"           # a file has that name, and it is not the slide this save made
+        elif got == "moved" and kit_mod._sha(car / f["final"]) != f["sha256"]:
+            got = "clash"
+        if got in ("gone", "different") and placed_before(k):
+            if f["final"] not in theirs:
+                theirs.append(f["final"])
+            got = "theirs"
+        if got in ("clash", "different"):
             return _undo(kit, j, "clash", f["final"])
         if got == "gone":
             return _undo(kit, j, "redo")
         _test_stop(f"after-{k}")
+    if theirs:
+        j["theirs"] = theirs
     files = [f["final"] for f in j["files"]]
     entry = {"kind": "laid-out", "base": j["base"], "files": files, "saved": j["at"], "design": j["design"],
              "token": j["token"], "name": j.get("name") or j["base"]}
@@ -1176,6 +1400,7 @@ def _finish(kit, j):
     _test_stop("after-record")
     j.update(state="done", finished=j.get("finished") if j.get("state") == "done" else now_iso())
     arrange.write_whole(_journal_path(kit, j["design"], j["token"]), j)
+    _test_stop("after-done")
     for nicety in (kit_mod.write_page, kit_mod._refresh_posting):
         try:
             nicety(kit)                 # the kit is already right; any trouble here is left for the next time
@@ -1189,8 +1414,9 @@ def _finish(kit, j):
         os.rmdir(stag)                  # our own staging folder, empty now (left alone if anything is still in it)
     except OSError:
         pass
-    arrange.log(f"design set {j['base']!r} for {kit.name}: {len(files)} slides are in the Carousel folder")
-    return _result("done", j, words=SAVED_SET.format(n=len(files), base=j["base"]))
+    arrange.log(f"design set {j['base']!r} for {kit.name}: {len(files) - len(theirs)} slides are in the Carousel folder"
+                + (f" ({len(theirs)} more were renamed, moved or changed by hand since they were put there; left as they are)" if theirs else ""))
+    return _result("done", j, words=_saved_words(j))
 
 
 def _is_shown(kit, j, rec=None):
@@ -1225,7 +1451,7 @@ def _show_again(kit, j):
     return True
 
 
-def commit(kit, did, token, rev=None):
+def commit(kit, did, token, rev=None, drawn=None):
     """Put a staged set of slides into the Carousel folder. One run at a time for a kit's Carousel folder,
     across processes (kit.py's slides lock, which the plain-slide maker holds too). Returns
     {"state": "done" | "already" | "problem", "base", "count", "why", "words"}. Never raises for trouble
@@ -1238,7 +1464,7 @@ def commit(kit, did, token, rev=None):
         if not mine:
             return _result("problem", why="busy", words=BUSY)
         try:
-            return _commit(kit, did, token, rev)
+            return _commit(kit, did, token, rev, drawn)
         except arrange.Busy:
             return _result("problem", why="busy", words=BUSY)
         except OSError as e:
@@ -1246,12 +1472,14 @@ def commit(kit, did, token, rev=None):
             return _result("problem", why="drive", words=DRIVE.format(why=kit_mod._plain_os(e)))
 
 
-def _commit(kit, did, token, rev):
+def _commit(kit, did, token, rev, drawn=None):
     """With the slides lock held. In order: finish any save an earlier run was cut off in (under the name it
     had written down); clear old scratch; if this very set is already in, say so again; refuse if the design
-    has changed since the slides were drawn; if the layout is the one that made the design's last set and
-    that set is still there, make nothing new; refuse unless every slide has arrived; choose the name from
-    the folder's own listing; write everything down; then move the files."""
+    has changed since the slides were drawn, or a photo on them was exported again since the page that drew
+    them opened (drawn, when the page says what it drew from); if saving now would make the very slides of
+    the design's last set again (_same_as), make nothing new; refuse unless every slide has arrived; choose
+    the name from the folder's own listing; write everything down, with what the slides were drawn from;
+    then move the files."""
     finished_now = []
     for j in _journals(kit):
         if j["state"] == "moving":
@@ -1263,13 +1491,16 @@ def _commit(kit, did, token, rev):
         return _result("problem", why="design", words=NO_DESIGN)
     mine = _journal(kit, did, token)
     if mine and mine["state"] == "done":
-        return _result("done", mine, words=SAVED_SET.format(n=len(mine["files"]), base=mine["base"]))
+        return _result("done", mine, words=_saved_words(mine))
     if rev is not None and rev != d["rev"]:
         return _result("problem", why="changed", words=CHANGED)
+    marks = photo_marks(kit, d["state"])
+    if drawn is not None and drawn["photos"] != marks:
+        return _result("problem", why="photos", words=PHOTO_NEWER)
     last = last_done(kit, did)
-    if last and last["layout"] == d["state"] and _set_there(kit, last):
+    if last and _same_as(kit, d, last, drawn):
         if (last["design"], last["token"]) in finished_now:
-            return _result("done", last, words=SAVED_SET.format(n=len(last["files"]), base=last["base"]))
+            return _result("done", last, words=_saved_words(last))
         _show_again(kit, last)
         return _result("already", last, words=ALREADY.format(base=last["base"]))
     count = d["state"]["slides"]
@@ -1284,6 +1515,7 @@ def _commit(kit, did, token, rev):
     j = {"v": 1, "n": 1 + max([_order(x)[0] for x in _journals(kit)] or [0]),
          "design": did, "token": token, "name": d["name"], "rev": d["rev"], "stamp": d.get("stamp"), "base": base,
          "state": "moving", "files": files, "layout": d["state"], "at": now_iso(),
+         "drawn": {"photos": marks, "fell": sorted((drawn or {}).get("fell") or [])},
          "undone": list((mine or {}).get("undone") or [])}
     arrange.write_whole(_journal_path(kit, did, token), j)      # written down BEFORE the first file moves
     _test_stop("after-journal")
@@ -1399,6 +1631,7 @@ def _get_page(handler, q):
         return _send_page(handler, design_page.plain_page(NOT_READY))
     if st["previews"]["made"] < st["previews"]["of"] and any(not x["have"] and not x["missing"] for x in st["photos"]):
         arrange.start_previews(kit)
+    tidy(kit)                           # day-old slides of saves that were never finished (the Assistant's own scratch)
     _send_page(handler, design_page.page_html(kit.name))
 
 
@@ -1558,7 +1791,9 @@ def _post_slide(handler, query):
     arrange._send_json(handler, out, code)
 
 
-_STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500}
+DRIVE_TROUBLE = (errno.ENOSPC, errno.EDQUOT, errno.EACCES, errno.EPERM, errno.EROFS, errno.ENOENT, errno.ENOTDIR, errno.EIO, errno.ENXIO)
+_STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500,
+           "photos": 409}
 
 
 def _answer_for(res):
@@ -1579,6 +1814,11 @@ def _post_commit(body):
     if (not isinstance(did, str) or not ID.fullmatch(did) or not isinstance(token, str) or not TOKEN.fullmatch(token)
             or type(rev) is not int or rev < 0 or (count is not None and (type(count) is not int or not SLIDES_MIN <= count <= SLIDES_MAX))):
         return 400, {"ok": False, "why": "commit", "words": NOT_UNDERSTOOD}
+    drawn = None
+    if "drawn" in body:                 # what the page drew the slides from: each photo's mark, and fonts that fell back
+        drawn = drawn_ok(body.get("drawn"))
+        if drawn is None:
+            return 400, {"ok": False, "why": "commit", "words": NOT_UNDERSTOOD}
     d = load_design(kit, did)
     if d is None:
         return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
@@ -1586,21 +1826,28 @@ def _post_commit(body):
     if not moving:
         mine = _journal(kit, did, token)
         if mine and mine["state"] == "done":
-            return _answer_for(_result("done", mine, words=SAVED_SET.format(n=len(mine["files"]), base=mine["base"])))
+            return _answer_for(_result("done", mine, words=_saved_words(mine)))
         if rev != d["rev"] or (count is not None and count != d["state"]["slides"]):
             return _answer_for(_result("problem", why="changed", words=CHANGED))
+        if drawn is not None and drawn["photos"] != photo_marks(kit, d["state"]):
+            return _answer_for(_result("problem", why="photos", words=PHOTO_NEWER))
         last = last_done(kit, did)
-        if last and last["layout"] == d["state"] and _set_there(kit, last):
+        if last and _same_as(kit, d, last, drawn):
             if _is_shown(kit, last):
                 return _answer_for(_result("already", last, words=ALREADY.format(base=last["base"])))
             # already saved, but the kit is showing other slides as its carousel: the commit below makes
             # this set the one shown again (it writes the kit's record, so it is a process of its own)
         elif not staged_ok(kit, did, token, d["state"]["slides"]):
             return _answer_for(_result("problem", why="missing", words=MISSING))
+    cmd = [sys.executable, str(HERE / "design.py"), "commit", str(kit), "--design", did, "--set", token, "--rev", str(rev)]
+    if drawn is not None:
+        cmd += ["--drawn", json.dumps(drawn)]       # plain ASCII, whatever the names in the design
+    # On a PC the page server has no window of its own, and a command started from it would open a black one
+    # for a moment at every Save slides: it is started with none. (Written from Microsoft's docs; not run on a PC.)
+    own = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}     # CREATE_NO_WINDOW
     try:
         arrange.HOME.mkdir(parents=True, exist_ok=True)
-        p = subprocess.Popen([sys.executable, str(HERE / "design.py"), "commit", str(kit), "--design", did, "--set", token, "--rev", str(rev)],
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **own)
     except OSError as e:
         arrange.log(f"the design commit could not be started: {e}")
         return _answer_for(_result("problem", why="drive", words=NOT_FINISHED))
@@ -1618,7 +1865,13 @@ def _post_commit(body):
             break
     if not isinstance(res, dict) or res.get("state") not in ("done", "already", "problem"):
         arrange.log(f"design commit for {kit.name} gave no result (exit {p.returncode}): {(out or b'')[-300:]!r}")
-        res = _result("problem", why="drive", words=NOT_FINISHED)
+        # The command stopped without saying how it went. The record on the drive is what is true: if it says
+        # this very set is in, it is in, and saying "couldn't finish" would not be true.
+        mine = _journal(kit, did, token)
+        if mine and mine["state"] == "done":
+            res = _result("done", mine, words=_saved_words(mine))
+        else:
+            res = _result("problem", why="drive", words=NOT_FINISHED)
     return _answer_for(res)
 
 
@@ -1629,7 +1882,8 @@ def handle_post(handler, path, query):
             return _post_slide(handler, query)
         if path not in POST_PATHS:
             return handler.send_error(404)
-        body = _json_body(handler, path, POST_CAP if path in ("/design", "/design-new", "/design-template") else SMALL_CAP)
+        body = _json_body(handler, path, POST_CAP if path in ("/design", "/design-new", "/design-template")
+                          else COMMIT_CAP if path == "/design-commit" else SMALL_CAP)
         if body is None:
             return None
         if path == "/design":
@@ -1646,6 +1900,17 @@ def handle_post(handler, path, query):
             code, out = _post_commit(body)
         arrange._send_json(handler, out, code)
     except (Exception, SystemExit) as e:  # noqa: BLE001
+        if isinstance(e, OSError) and e.errno in DRIVE_TROUBLE and not isinstance(e, (ConnectionError, socket.timeout)):
+            # The Assistant was reached; it is the drive that would not take the change (full, locked, unplugged).
+            # Said as what it is, with "why": "drive", so the page shows these words and not "trying again".
+            arrange.log(f"POST {path} could not write: {e.__class__.__name__}: {str(e)[:200]}")
+            why = kit_mod._plain_os(e)
+            words = (DRIVE if path in ("/design-slide", "/design-commit") else CANT_SAVE if path == "/design" else CANT_KEEP).format(why=why)
+            try:
+                arrange._send_json(handler, {"ok": False, "why": "drive", "words": words}, 500)
+            except (Exception, SystemExit):  # noqa: BLE001
+                pass
+            return
         arrange.log(f"POST {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
         try:
             arrange._send_json(handler, {"ok": False, "words": TRY_AGAIN if isinstance(e, arrange.Busy) else CANT_REACH}, 500)
@@ -1719,10 +1984,50 @@ def cmd_show(kit):
     cs = rec.get("carousel_set")
     if isinstance(cs, dict) and cs.get("kind") == "laid-out":
         say(f"  The newest laid-out set is \"{cs.get('base')}\" ({len(cs.get('files') or [])} slides), in the Carousel folder.")
+    held = waiting_sets(kit)
+    if held:
+        say(f"  {len(held)} unfinished save{'s' if len(held) != 1 else ''} left slides waiting (hidden, never put in the Carousel folder). "
+            f"They clear themselves a day later; design.py tidy clears the ones left alone for an hour now.")
     for w in arrange.waiting():
         if w["kit"] == kit.name and w["piece"] == "design":
             say("  Waiting for Claude: " + arrange.waiting_line(w))
     return 0
+
+
+def cmd_tidy(kit):
+    """Clear the waiting slides of saves that were never finished and have been left alone for an hour. None
+    of them was ever in the Carousel folder; a set that is on its way in is never touched."""
+    before = len(waiting_sets(kit))
+    got = tidy(kit, STAGING_PRESSED, wait=kit_mod.SLIDES_WAIT)
+    if got is None:
+        say("STOP: this shoot's slides are being changed by something else right now. Nothing was cleared. Try again in a moment.")
+        return 2
+    left = len(waiting_sets(kit))
+    say(f"Cleared the waiting slides of {got} unfinished save{'s' if got != 1 else ''} (none had reached the Carousel folder; nothing in it was changed)."
+        if got else "Nothing to clear." if not before else "Nothing was old enough to clear.")
+    if left:
+        say(f"{left} still waiting: started within the last hour, or on the way in. Save slides works again once fewer than {STAGING_MOST} are waiting.")
+    return 0
+
+
+def took_by_name(words):
+    """Clear the line for Claude by the kit name on the line itself, even when no folder has that name any
+    more (the shoot's folder was renamed after its slides were saved). Returns how many were cleared."""
+    return arrange.took(words, "design")
+
+
+def took_for(kit):
+    """Clear this kit's line, and any design line left under a name no folder has any more whose shoot is
+    this one (the folder was renamed after the save)."""
+    n = arrange.took(kit.name, "design")
+    try:
+        shoot = kit_mod.load_rec(kit).get("name") or kit.name
+    except (OSError, ValueError):
+        shoot = kit.name
+    for w in arrange.waiting():
+        if w["piece"] == "design" and w["kit"] != kit.name and w.get("name") == shoot and arrange.kit_by_name(w["kit"]) is None:
+            n += arrange.took(w["kit"], "design")
+    return n
 
 
 def main():
@@ -1732,26 +2037,43 @@ def main():
     sub.add_parser("show").add_argument("words")
     c = sub.add_parser("commit"); c.add_argument("words"); c.add_argument("--design", required=True); c.add_argument("--set", required=True)
     c.add_argument("--rev", type=int, help="the design's counter when the slides were drawn; a design changed since is refused")
+    c.add_argument("--drawn", help="what the page drew the slides from, as it sent it (the page server passes this on)")
     sub.add_parser("took").add_argument("words")
+    sub.add_parser("tidy").add_argument("words")
     a = ap.parse_args()
+    utf8_output()
     import fresh
     fresh.announce()                       # this folder is where the Assistant's code is now (see fresh.py)
 
+    if a.cmd == "took" and took_by_name(a.words):       # the name on the line, whether or not a folder still has it
+        say("Cleared.")
+        return 0
     kit = kit_mod.find_kit(a.words)
     try:
         if a.cmd == "open":
             return cmd_open(kit, a.design)
         if a.cmd == "show":
             return cmd_show(kit)
+        if a.cmd == "tidy":
+            return cmd_tidy(kit)
         if a.cmd == "took":
-            n = arrange.took(kit.name, "design")
+            n = took_for(kit)
             say("Cleared." if n else "Nothing was waiting for that one.")
             return 0
         if a.cmd == "commit":
             if not ID.fullmatch(a.design) or not TOKEN.fullmatch(a.set):
                 say("STOP: --design and --set are the ids the page uses (design.py show lists the designs).")
                 return 2
-            res = commit(kit, a.design, a.set, a.rev)
+            drawn = None
+            if a.drawn is not None:
+                try:
+                    drawn = drawn_ok(json.loads(a.drawn))
+                except ValueError:
+                    drawn = None
+                if drawn is None:
+                    say("STOP: --drawn is not what a page sends.")
+                    return 2
+            res = commit(kit, a.design, a.set, a.rev, drawn)
             if res["state"] == "done":
                 say(f"Slides: {res['count']} slides are in the Carousel folder, named \"{res['base']}\". Nothing was replaced.")
             elif res["state"] == "already":

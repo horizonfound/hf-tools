@@ -14,7 +14,10 @@ DESIGN_SAVE_JS (put on the page last, by design_page.py) works the bar at the bo
 SAVE SLIDES, IN ORDER (every line it says is beside the button):
     1. every font is waited for, the design itself is saved, and the Assistant says what is already saved
     2. a save that was cut off part way is finished first, under the name it had
-    3. nothing changed since the last set: "Already saved as ...", and nothing is drawn
+    3. nothing changed since the last set: "Already saved as ...", and nothing is drawn. "Nothing changed"
+       is the Assistant's word (the same layout, name and edit of every photo, every file still there) plus
+       the page's own: the same fonts are missing now as then. A photo exported again since this page opened
+       stops the save before anything is drawn, with Reload at the top of the page.
     4. an empty frame or a bare slide is asked about IN THE PAGE (Save anyway / Go back); so is a font that
        could not be loaded (those words would be saved in Georgia)
     5. each slide: one canvas, the background, everything on that slide in list order (Designer.paint), JPEG
@@ -59,6 +62,7 @@ DESIGN_SAVE_JS = r"""
     late: 'Couldn’t reach the Assistant to finish saving. Nothing was lost. Press Save slides again and it will finish.',
     // the Assistant's own words for these two, for when the page knows before it has to ask
     changed: 'The design changed while its slides were being made. Nothing was added to your Carousel folder. Press Save slides again.',
+    photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload at the top of this page, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
     // the preview
     previewLabel: 'Preview', count: function(i, n){ return i + ' of ' + n; },
@@ -71,6 +75,22 @@ DESIGN_SAVE_JS = r"""
   var saveBtn = $('save-slides'), prevBtn = $('preview-btn'), line = $('save-line'), yes = $('save-yes'), no = $('save-no');
   var openBtn = $('open-carousel'), openWrap = $('open-wrap'), openLine = $('open-line'), grid = $('gridcrop');
   var busy = false, asking = null, changed = false;
+  var marks = null;       // each photo in use -> its mark on the drive now, from the Assistant's answer to the last save of the design
+  D.on('saved', function(j){ marks = (j && j.marks) || null; });
+  D.on('design', function(){ marks = null; });
+  // What a set of slides is drawn from: the mark this page has for each photo in use (the picture it shows
+  // and draws), and the fonts that could not be loaded. The Assistant writes it down with the set.
+  function drawnFrom(st, fell){
+    var photos = {};
+    st.blocks.forEach(function(b){ if (M.typeOf(b) === 'photo' && b.n != null) photos[String(b.n)] = (D.by[b.n] && D.by[b.n].v) || ''; });
+    return {photos: photos, fell: (fell || []).slice().sort()};
+  }
+  function sameList(a, b){ a = (a || []).slice().sort(); b = (b || []).slice().sort(); return a.length === b.length && a.every(function(x, i){ return x === b[i]; }); }
+  function stale(drawn){
+    if (!marks) return false;
+    for (var k in drawn.photos) { if (Object.prototype.hasOwnProperty.call(marks, k) && marks[k] !== drawn.photos[k]) return true; }
+    return false;
+  }
   var stats = {held: 0, peak: 0, slides: 0, ms: 0, runs: 0};      // what the last save held and took (for the checks)
 
   function say(text){ if (line.textContent !== (text || '')) line.textContent = text || ''; }
@@ -121,8 +141,10 @@ DESIGN_SAVE_JS = r"""
   }
   // The whole set into the Carousel folder. Asked again under the SAME name while the Assistant is still at
   // it, or does not answer, so one press ends as one set under one name.
-  async function commit(id, token, rev, count){
-    var body = JSON.stringify({kit: D.KIT, design: id, set: token, rev: rev, count: count});
+  async function commit(id, token, rev, count, drawn){
+    var o = {kit: D.KIT, design: id, set: token, rev: rev, count: count};
+    if (drawn) o.drawn = drawn;
+    var body = JSON.stringify(o);
     var until = Date.now() + COMMIT_WAIT, again = 0;
     for (;;) {
       var j = null;
@@ -139,12 +161,12 @@ DESIGN_SAVE_JS = r"""
       await wait(named ? 300 : WAIT);
     }
   }
-  function finished(res){
+  function finished(res, fell){
     say(res.words || SW.already(res.base));
     showOpen(true);
     if (D.design) {
       D.design.unfinished = false;
-      D.design.set = {base: res.base, count: res.count, same: true, words: SW.already(res.base)};
+      D.design.set = {base: res.base, count: res.count, same: true, fell: (fell || []).slice(), words: SW.already(res.base)};
       (D.S.designs || []).forEach(function(d){ if (d.id === D.design.id) d.set = res.base; });
     }
   }
@@ -161,14 +183,17 @@ DESIGN_SAVE_JS = r"""
     var ok = await late(D.save.flush(), FLUSH_WAIT);
     if (ok !== true || !D.design || D.design.id !== id || D.blocked) { say(ok === 'late' ? SW.cantReach : SW.notSaved); return; }
     var st = M.copy(D.st), rev = D.save.rev(), n = st.slides, token = D.newToken('s');
+    var drawn = drawnFrom(st, fonts.fellBack);
     changed = false;
+    // a photo exported again since this page opened: what this page shows, and would draw, is the old edit
+    if (stale(drawn)) { say(SW.photoNewer); D.photosChanged(); return; }
     // 2. a save that was cut off part way is finished first, under the name it had
     if (D.design.unfinished) {
       say(SW.placing);
       var first = await commit(id, token, rev, n);
-      if (first.ok) { finished(first); return; }
+      if (first.ok) { finished(first, D.design.set && D.design.set.fell); return; }
       if (first.why !== 'missing') { say(first.words); return; }
-    } else if (D.design.set && D.design.set.same) {
+    } else if (D.design.set && D.design.set.same && sameList(D.design.set.fell, drawn.fell)) {
       // 3. nothing has changed since the last set: nothing is drawn or sent, and the line is said at once.
       // The Assistant is still told (and not waited for), so that this set is the one the kit page shows
       // again if other slides had taken its place since (a new order of the plain slides, a Canva carousel).
@@ -211,9 +236,9 @@ DESIGN_SAVE_JS = r"""
     if (changed) { say(SW.changed); return; }
     // 6. the whole set into the Carousel folder
     say(SW.placing);
-    var res = await commit(id, token, rev, n);
-    if (res.ok) { finished(res); stats.slides = n; stats.ms = Date.now() - t0; }
-    else say(res.words);
+    var res = await commit(id, token, rev, n, drawn);
+    if (res.ok) { finished(res, drawn.fell); stats.slides = n; stats.ms = Date.now() - t0; }
+    else { say(res.words); if (res.why === 'photos') D.photosChanged(); }
   }
   saveBtn.addEventListener('click', function(){
     if (busy || !D.st || !D.design || D.blocked) return;
@@ -221,7 +246,7 @@ DESIGN_SAVE_JS = r"""
     saveBtn.disabled = true;
     showOpen(false);
     stats.held = 0; stats.peak = 0; stats.slides = 0; stats.ms = 0;
-    var end = function(){ busy = false; saveBtn.disabled = false; stats.runs += 1; };
+    var end = function(){ busy = false; saveBtn.disabled = !!D.blocked; stats.runs += 1; };
     run().then(end, function(){ say(SW.stopped(1)); end(); });
   });
   // "Open the Carousel folder": the kit's own folder, through the Assistant; its answer shows right here

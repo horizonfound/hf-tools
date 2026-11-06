@@ -31,7 +31,14 @@ the Assistant. The kit page and the posting queue showing the newest laid-out se
 after a new order from the picker, a Canva carousel fetched after a save, the line home.py pending prints and
 design.py took clears, and the two "Lay out the slides" links pressed in the hidden Chrome.
 
-Exit 0 when every case passes, 1 otherwise.
+A fifth part, tests/design_fix_check.py (--only fixes runs just it, on --port + 11 to + 14): what the
+reviewers of the designer found, each with a case that failed before its fix. Slides that have been in the
+Carousel folder are never moved out or cleared; "Already saved" only when the very same slides would be made
+(a photo exported again, a font, a new name); unfinished saves never lock Save slides; a drive that will not
+take a change is said as that; the line for Claude after a folder is renamed; names in any alphabet.
+
+Exit 0 when every case passes, 1 otherwise. When there is no Chrome the parts that drive the real page are
+skipped, and the last line says so: a run like that has not looked at the page.
 """
 import argparse
 import copy
@@ -935,7 +942,10 @@ def check_all(work, port):
         code, out = post(P, "/design", body(name=odd))
         REV[0] = out["rev"]
         code, out = commit("settoken0a", count=3)
-        case("a new name alone, with the layout as it was saved, makes no new set", code == 200 and out.get("already") is True and out.get("base") == BASE7, (code, out))
+        # (until the reviewers' pass this was answered "already saved" under the old name; a new name is a change now:
+        # see tests/design_fix_check.py part 3 for the set it then makes)
+        case("a new name alone is a change: nothing is 'already saved' under the old name (and with no new slides sent, nothing is made)",
+             code == 400 and out.get("why") == "missing" and tree_print(car) == now, (code, out))
         STATE, REV[0] = change()
         for i in (1, 2, 3):
             slide("settoken11", i, 3, S[i])
@@ -1137,7 +1147,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
                          "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks); "
@@ -1159,7 +1169,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if (work / "fake").exists() or (work / "browser").exists() or (work / "text").exists() or (work / "designs").exists() or (work / "designs-photos").exists() or (work / "wire").exists() or (work / "wire-browser").exists():
+    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1176,10 +1186,18 @@ def main():
     code_only = "\n".join(ln.split("#")[0] for ln in re.sub(r'"""(?:.|\n)*?"""', '""', src).splitlines())
     case("design.py runs no Mac-only program and uses no Mac-only call of its own", not re.search(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only), re.findall(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only)[:5])
     case("design.py names the encoding of every text file it reads or writes", not re.search(r"\.(read_text|write_text)\((?![^)]*encoding=)", src) and not re.search(r"open\([^)]*\"[rwa]\"\s*\)", src))
+    import chrome_drive
+    import design_fix_check
     import design_page_check
     import design_save_check
     import design_text_check
     import design_wire_check
+    have_chrome = bool(chrome_drive.find_chrome())
+    skipped = []            # the parts that drive the real page, when there is no Chrome to drive
+
+    def real_page(part):
+        if not have_chrome:
+            skipped.append(part)
     if a.only in (None, "page"):
         design_page_check.check_page(case, work)
         design_text_check.check_type_page(case, work)
@@ -1194,7 +1212,22 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the checks of the kit page, the posting queue and the line for Claude ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
+    if a.only in (None, "server", "fixes"):
+        # what the reviewers found, each with a case that failed before its fix: its own pretend shoots and servers
+        try:
+            design_fix_check.check_fixes(case, work, a.port + 11, make_kit, Server, post, get_json, ask, run, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the checks of the reviewers' findings ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
+    if a.only in (None, "browser", "fixes"):
+        real_page("the reviewers' findings on the page")
+        try:
+            design_fix_check.check_fixes_browser(case, work, a.port + 14, make_kit, Server, post, get_json, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of the reviewers' findings ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
     if a.only in (None, "browser", "wire"):
+        real_page("the 'Lay out the slides' links")
         try:
             design_wire_check.check_wire_browser(case, work, a.port + 4, make_kit, Server, run, ask, post, get_json)
         except Exception as e:  # noqa: BLE001
@@ -1202,12 +1235,14 @@ def main():
             case("the real-browser checks of the 'Lay out the slides' links ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
     if a.only in (None, "browser"):
         # its own pretend kit and its own page server, a little above the server check's ports
+        real_page("the strip, the frames and the tray")
         try:
             design_page_check.check_browser(case, work, a.port + 5, make_kit, Server, post, get_json)
         except Exception as e:  # noqa: BLE001
             case("the real-browser checks ran to the end", False, f"{type(e).__name__}: {e}")
     if a.only in (None, "browser", "text"):
         # text, fonts and brand colors: another pretend kit and page server, on the port after those
+        real_page("text, fonts and brand colors")
         try:
             design_text_check.check_type_browser(case, work, a.port + 8, make_kit, Server, post, get_json)
         except Exception as e:  # noqa: BLE001
@@ -1215,6 +1250,7 @@ def main():
     if a.only in (None, "browser", "designs"):
         # designs, templates, the preview and Save slides: two more pretend shoots (one from photos drawn
         # here, so every saved pixel is known) and a page server on the port after those
+        real_page("designs, templates, the preview and Save slides")
         try:
             design_save_check.check_designs_browser(case, work, a.port + 9, make_kit, Server, post, get_json)
         except Exception as e:  # noqa: BLE001
@@ -1222,7 +1258,8 @@ def main():
             case("the real-browser checks of designs, templates and Save slides ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
     bad = [n for n, ok in results if not ok]
     print()
-    print(f"{len(results)} cases, {len(results) - len(bad)} passed, {len(bad)} failed." + (f"  Work folder: {work}" if bad or a.work else f"  Work folder (safe to throw away): {work}"))
+    missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")
+    print(f"{len(results)} cases, {len(results) - len(bad)} passed, {len(bad)} failed." + missed + (f"  Work folder: {work}" if bad or a.work else f"  Work folder (safe to throw away): {work}"))
     for n in bad:
         print("  FAILED:", n)
     return 1 if bad else 0

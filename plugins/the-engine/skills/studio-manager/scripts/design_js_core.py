@@ -191,7 +191,12 @@ DESIGN_CORE_JS = r"""
     status(WORDS.saving);
     fetch('/design', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body())})
       .then(function(r){
-        if (r.status >= 500) throw new Error('no answer');      // treated like no answer at all: try again
+        // 500 and up is treated like no answer at all (try again), unless the Assistant says the drive would
+        // not take the change: then its words say why, and that is what is shown
+        if (r.status >= 500) return r.json().then(null, function(){ return null; }).then(function(j){
+          if (j && j.why === 'drive' && j.words) return {code: r.status, j: j};
+          throw new Error('no answer');
+        });
         return r.json().then(function(j){ return {code: r.status, j: j}; });
       })
       .then(function(res){
@@ -212,6 +217,15 @@ DESIGN_CORE_JS = r"""
           status(WORDS.saved);
           note(j.words || WORDS.newer, false);
           settle();
+          return;
+        }
+        if (res.code >= 500 && j.why === 'drive') {
+          // the drive is full, locked or unplugged: say which, keep trying (the change lands by itself once
+          // that is put right), and tell anything waiting on this save that it has not happened
+          dirty = true;
+          status(j.words, true);
+          retryT = setTimeout(send, 2000);
+          settle(false);
           return;
         }
         if (res.code === 404 && j.why !== 'design') {
@@ -244,6 +258,7 @@ DESIGN_CORE_JS = r"""
     settle(false);
     D.render();
   }
+  D.photosChanged = photosChanged;
   D.save = {
     fields: [],
     queue: queue,

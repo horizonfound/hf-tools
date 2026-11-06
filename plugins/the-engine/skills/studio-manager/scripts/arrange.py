@@ -923,6 +923,8 @@ def _one(q, key):
 
 
 def _get_photo(handler, q):
+    if (handler.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+        return handler.send_error(403)      # a picture asked for by another website through the browser: not theirs to show
     kit = kit_by_name(_one(q, "kit"))
     n_txt, size = _one(q, "n"), SIZES.get(_one(q, "size"))
     if kit is None or size is None or not re.fullmatch(r"[0-9]{1,6}", n_txt):
@@ -946,6 +948,7 @@ def _get_photo(handler, q):
     handler.send_header("Content-Type", "image/jpeg")
     handler.send_header("Content-Length", str(len(data)))
     handler.send_header("Cache-Control", "private, max-age=604800")
+    handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
     handler.end_headers()
     handler.wfile.write(data)
 
