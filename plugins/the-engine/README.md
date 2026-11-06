@@ -20,7 +20,7 @@ The setup guide is the one place for this: `docs/The Assistant - Setup Guide.pdf
 In short: Claude desktop app, Settings, Customize, Plugins, + Add, Upload plugin, and the file
 The-Assistant.zip. Use it from the Code tab with your Assistant folder selected.
 
-Updates do not arrive on their own yet. We send a new file, or tell you when to press Check for updates.
+Updates do not arrive on their own yet. We send a new file.
 
 ## How it's built
 

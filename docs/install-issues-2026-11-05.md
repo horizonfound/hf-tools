@@ -169,6 +169,32 @@ she doesn't need to log in.
 - **Where the file comes from.** That night it was passed over Slack, and Dustin had to ask how to get it out
   of Claude. Students need one place to download it. **Dustin and Nicole's call** (the course, or a link).
 
+## What the guide still says that nobody has seen (from the four-reader review, Nov 5)
+
+Four independent readers went through the rebuilt guide: one cold, as a photographer; one against Nicole's
+real screenshots; one against this log; one checking every claim. Their corrections are in the guide now.
+What is left cannot be fixed by rewording. Each needs someone to look at a real screen:
+
+- **Step 1, installing Claude itself.** Both Macs already had it.
+- **Step 2's clicks:** what the folder choice says before a folder is picked, the "Open folder…" line, and
+  whether Claude's file window has a New Folder button.
+- **Step 3:** the + Add menu opened (its exact lines), what to click under Plugin file, what the screen does
+  after Upload, and how to remove an old "The Engine."
+- **Step 4:** the list behind the word next to the model name. Nicole's already said Auto.
+- **Step 5:** Apple's developer-tools window (likely the normal case on a photographer's Mac), and whether
+  hi works in a chat that was open before the file was uploaded.
+- **The Mac's question** about reading a memory card or drive.
+- **Safari may unzip the file by itself** when it is downloaded, leaving a folder and no file to upload.
+  Try the real download link in Safari before the guide goes out.
+- **How long it takes.** The guide no longer claims a time.
+
+**The cheapest way to clear most of these:** one walk-through on a Mac, or a new user account on a Mac,
+that has never had Claude, taking a screenshot at every step.
+
+**For Dustin and Nicole to decide (marked in yellow in the guide):** where the file is downloaded from, the
+address for "send us a screenshot," whether to print how to get a Pro plan and its price, and what the
+guide promises about updates.
+
 ## The rule this leaves behind
 
 **A setup step goes in the guide only after it has been seen working on a real screen, and the guide says

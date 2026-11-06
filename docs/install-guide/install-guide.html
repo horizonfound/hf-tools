@@ -46,7 +46,7 @@ ol.do b{font-weight:600}
 .tip b{font-weight:600}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:.24in}
 figure{margin:.14in 0 0}
-figcaption{font-size:8.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
+figcaption{font-size:9.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
 
 /* mock-up: a window */
 .win{background:#fff;border:1px solid #D9D2C4;border-radius:11px;overflow:hidden;font:400 8.5pt/1.35 var(--sans);color:#2B2F38;zoom:1.16}
@@ -133,12 +133,12 @@ figcaption{font-size:8.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
 .brand span{color:var(--coral-2)}
 .need{display:grid;grid-template-columns:1fr 1fr;gap:.16in;margin-top:.22in}
 .need div{background:var(--paper);border-radius:16px;padding:14px 16px;box-shadow:0 1px 0 var(--line)}
-.need b{display:block;font:600 12.5pt/1.2 var(--sans);margin-bottom:4px}
+.need>div>b{display:block;font:600 12.5pt/1.2 var(--sans);margin-bottom:4px}.need p b{font-weight:600;color:var(--ink)}
 .need p{margin:0;font-size:10.8pt;color:var(--ink-2)}
 .need .n{font:italic 400 15pt/1 var(--display);color:var(--coral-2);margin-bottom:6px;display:block}
 .map{margin-top:.24in;background:var(--ink);color:#F4F1EA;border-radius:18px;padding:16px 20px}
 .map h3{font:400 15pt/1 var(--display);margin:0 0 10px;color:#fff}
-.map ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;counter-reset:m}
+.map ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:6px 24px;counter-reset:m}
 .map li{counter-increment:m;font-size:11pt;display:flex;gap:9px;align-items:baseline}
 .map li::before{content:counter(m);color:var(--coral);font-weight:600;flex:none;width:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:.2in;margin-top:.1in}
@@ -151,6 +151,22 @@ table.fix{width:100%;border-collapse:collapse;font-size:10.6pt;margin-top:.06in}
 table.fix td{vertical-align:top;padding:6px 10px;border-top:1px solid var(--line)}
 table.fix td:first-child{width:38%;font-weight:600}
 h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
+.todo{background:#FFE08A;border-radius:4px;padding:0 5px;font-weight:600;color:#5A4300;white-space:nowrap}
+.first{background:var(--sun);border-radius:12px;padding:9px 13px;font-size:11pt;margin:0 0 .13in}.first b{font-weight:600}
+.box{padding-left:26px}.box::before{content:"+";position:absolute;left:10px;top:7px;font:400 12pt/1 var(--sans);color:#6B7280}
+.box .send{background:none;border:1.4px solid #6B7280;width:8px;height:12px;border-radius:5px;right:11px;bottom:10px}.box .send::after{display:none}
+.pw{font:600 7.8pt/1 var(--sans);color:#4B5563;white-space:nowrap;padding:5px 2px;position:relative;display:inline-flex;align-items:center;gap:4px}
+.pw::after{content:"▾";color:#9AA0AA;font-size:7pt}
+.pw.f::before{content:"";width:10px;height:7px;border:1.3px solid #6B7280;border-radius:2px;display:inline-block}
+.pw.hit{padding:5px 6px}
+.bar em.nav{font-style:normal;color:#8B909A;font:600 8pt/1 var(--mono);margin-left:10px;letter-spacing:3px}
+.bar em.sb{width:11px;height:9px;border:1.3px solid #8B909A;border-radius:2px;margin-left:12px}
+.tog2 u:first-child::after{border-radius:5px 5px 5px 1px}
+.bar{overflow:visible}.win{overflow:visible}.win>.bar:first-child{border-radius:10px 10px 0 0}
+.gbar{height:7px;border-radius:4px;background:#E4DFD3;margin:8px 9px}
+ol.do.tight>li{margin-bottom:.085in;font-size:11.8pt}
+table.fix.small{font-size:10pt}table.fix.small td{padding:5px 9px}
+.way{font-size:10.2pt}.way p,.way ol{font-size:10.2pt}.way li{margin-bottom:3px}
 </style>
 </head>
 <body>
@@ -158,20 +174,18 @@ h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
 <!-- ===================== COVER ===================== -->
 <section class="page cover">
   <div class="brand"><b>The Assistant</b><span>by Horizon Found</span></div>
-  <div style="margin-top:.5in">
+  <div style="margin-top:.42in">
     <div class="eyebrow">Setup guide · Mac</div>
     <h1>Setting up<br><em>The Assistant</em></h1>
-    <p class="lede" style="font-size:14pt;max-width:5.9in">Five short steps, about fifteen minutes, and you only do it once. Every step is one thing to click. Go in order and don't skip ahead.</p>
+    <p class="lede" style="font-size:14pt;max-width:5.9in">Five short steps, and you only do it once. Each numbered line is one thing to do. Go in order.</p>
   </div>
-
-  <div class="eyebrow" style="margin-top:.2in">Before you start, you need</div>
+  <div class="eyebrow" style="margin-top:.16in">Before you start, you need</div>
   <div class="need">
     <div><span class="n">one</span><b>A Mac</b><p>Any recent Mac. A Windows guide comes later.</p></div>
     <div><span class="n">two</span><b>A Claude plan, Pro or higher</b><p>The Assistant runs on your own Claude account. The free plan doesn't include the part of Claude it lives in.</p></div>
     <div><span class="n">three</span><b>An external hard drive</b><p>Where your shoots are kept. If your photos live on your computer for now, it still works, and the Assistant will talk to you about it once.</p></div>
-    <div><span class="n">four</span><b>The Assistant file</b><p>One file called <b>The-Assistant.zip</b>, from us. Save it to your Downloads folder. <b>Don't open it</b> or unzip it.</p></div>
+    <div><span class="n">four</span><b>The Assistant file</b><p>One file called <b>The-Assistant.zip</b>. Download it from <span class="todo">[PLACE: to decide]</span>. It lands in your Downloads folder. Leave it as it is: don't double-click it.</p></div>
   </div>
-
   <div class="map">
     <h3>The five steps</h3>
     <ol>
@@ -182,44 +196,39 @@ h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
       <li>Say hi</li>
     </ol>
   </div>
-  <p style="font-size:10pt;color:var(--ink-2);margin-top:.16in">Every step here was walked through on a real Mac on November 5, 2026. The pictures are drawings of those screens, so yours may look a little different. The words to click are the same.</p>
+  <p style="font-size:10.5pt;margin-top:.14in"><b style="font-weight:600">Stuck at any point?</b> Send a screenshot of what you see to <span class="todo">[ADDRESS: to decide]</span>.</p>
+  <p style="font-size:10pt;color:var(--ink-2);margin-top:.06in">Steps 3 and 5 were walked through on a real Mac on November 5, 2026. The pictures are drawings, so your screen will look a little different. If a word on your screen doesn't match, send us a screenshot.</p>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Draft · November 5, 2026</span></div>
 </section>
 
 <!-- ===================== STEP 1 ===================== -->
 <section class="page">
-  <div class="step"><div class="num">1</div><div><div class="of">Step 1 of 5 · about 3 minutes</div><h2>Install Claude on your Mac</h2></div></div>
-  <p class="lede">Claude is the app the Assistant lives inside. If Claude is already on your Mac and you're signed in, skip to number 4.</p>
+  <div class="step"><div class="num">1</div><div><div class="of">Step 1 of 5</div><h2>Install Claude on your Mac</h2></div></div>
+  <p class="lede">Claude is the app the Assistant lives inside. <b>Already have Claude on your Mac and you're signed in? Start at the small 4 on this page.</b></p>
   <ol class="do">
     <li>Open Safari and go to <b>claude.ai/download</b>.</li>
-    <li>Click the download for <b>Mac</b>. When it finishes, open the downloaded file and drag <b>Claude</b> into your <b>Applications</b> folder.</li>
+    <li>Click the download for <b>Mac</b>. When it finishes, open the downloaded file and follow what it shows to put <b>Claude</b> in your <b>Applications</b> folder.</li>
     <li>Open <b>Claude</b> from Applications and <b>sign in</b> with your Claude account.</li>
-    <li>At the top of the left column there are two small pictures side by side. Click the one that looks like <span class="say" style="font-family:var(--mono);font-size:11pt">&lt;/&gt;</span>. That one is <b>Code</b>.</li>
+    <li>Look at the very top left of the window, on the same line as the red, yellow and green dots. At the right end of that line is a small box with two pictures in it: a speech bubble and <span class="say" style="font-family:var(--mono);font-size:11pt">&lt;/&gt;</span>. Click <b>&lt;/&gt;</b>. (Not the two plain arrows just before it.) That part of Claude is called <b>Code</b>. You won't write any code.</li>
   </ol>
-  <figure>
+  <figure style="margin-top:.22in">
     <div class="win">
-      <div class="bar"><i></i><i></i><i></i><em class="tog2"><u></u><u class="on hit" style="position:relative">&lt;/&gt;<span class="tag" style="top:auto;bottom:-13px;right:-13px">4</span></u></em><span>New session</span></div>
-      <div class="app">
-        <div class="side">
-          <p class="on">+ New</p><p>Search</p><p>Projects</p><p>Artifacts</p><p>Customize</p><p>More</p>
-          <div class="me"><span>your name · Pro</span><b>&#9881;</b></div>
-        </div>
-        <div class="main"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="chip">This computer</span><span class="chip">Select folder</span><span class="grow"></span><span class="plain">Model</span><span class="plain">Manual</span></div></div>
-      </div>
+      <div class="bar"><i></i><i></i><i></i><em class="sb"></em><em class="nav">&lt; &gt;</em><em class="tog2" style="margin-left:8px"><u></u><u class="on hit" style="position:relative">&lt;/&gt;<span class="tag" style="top:auto;bottom:-14px;right:-12px">4</span></u></em><span>New session</span></div>
+      <div class="app"><div class="side"><p class="on">+ New</p><p>Search</p><p>Projects</p><p>Artifacts</p><p>Customize</p><p>More</p><div class="me"><span>your name · Pro ▾</span><b>&#9881;</b></div></div><div class="main"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f">Select folder</span><span class="grow"></span><span class="plain">Opus 5.5 High</span><span class="plain">Manual</span></div></div></div>
     </div>
-    <figcaption>Drawing. The <b>&lt;/&gt;</b> picture is at the top of the left column.</figcaption>
+    <figcaption>Drawing. The &lt;/&gt; picture is on the same line as the three colored dots.</figcaption>
   </figure>
-  <div class="ok"><div><b>You'll know it worked when</b> the top of the window says <b>New session</b> and there's a message box at the bottom with a row of small choices under it.</div></div>
-  <div class="tip"><b>If it asks you to upgrade:</b> your Claude plan doesn't include Code yet. You need Pro or higher. <b>If it asks you to sign in online:</b> follow the link, then come back to the app.</div>
+  <div class="ok"><div><b>You'll know it worked when</b> the top of the window says <b>New session</b> and there's a message box at the bottom with a few small choices under it. A small box in the middle about "Choose environment" or "Connect GitHub" can be ignored. You don't need GitHub.</div></div>
+  <div class="tip"><b>If Claude says your plan doesn't include this part,</b> you need Pro or higher. <b>If it asks you to sign in online,</b> follow the link, then come back to the app.</div>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 1 of 5</span></div>
 </section>
 
 <!-- ===================== STEP 2 ===================== -->
 <section class="page">
-  <div class="step"><div class="num">2</div><div><div class="of">Step 2 of 5 · about 1 minute</div><h2>Make a folder for the Assistant</h2></div></div>
-  <p class="lede">The Assistant needs one small folder of its own to keep its notes in. <b>Your photos never go in this folder.</b></p>
+  <div class="step"><div class="num">2</div><div><div class="of">Step 2 of 5</div><h2>Make a folder for the Assistant</h2></div></div>
+  <p class="lede">Claude needs a small folder to start in. This one is only for the Assistant's own use. <b>Your photos never go in this folder.</b></p>
   <ol class="do">
-    <li>Under the message box, click the choice with a small <b>folder</b> picture on it.</li>
+    <li>Under the message box, click the choice with a small <b>folder</b> picture in front of it.</li>
     <li>Click <b>Open folder…</b> A window opens showing your files.</li>
     <li>Press <span class="key">Command</span> + <span class="key">Shift</span> + <span class="key">H</span>. That jumps to your <b>home folder</b>, the one with your name on it.</li>
     <li>Click <b>New Folder</b> at the bottom left. Type <span class="say">Assistant</span> and click <b>Create</b>.</li>
@@ -227,131 +236,128 @@ h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
   </ol>
   <div class="cols">
     <figure>
-      <div class="win"><div class="main" style="min-height:1.25in"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="chip">This computer</span><span class="chip hit">Select folder<span class="tag">1</span></span><span class="grow"></span><span class="plain">Model</span><span class="plain">Manual</span></div></div></div>
-      <figcaption>Drawing. The folder choice, under the message box.</figcaption>
+      <div class="win"><div class="main" style="min-height:1.25in;border-radius:10px"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f hit">Select folder<span class=tag>1</span></span><span class="grow"></span><span class="plain">Opus 5.5 High</span><span class="plain">Manual</span></div></div></div>
+      <figcaption>Drawing. The folder choice. It may say Select folder, or the name of a folder you've used before.</figcaption>
     </figure>
     <figure>
       <div class="win">
-        <div class="bar"><i></i><i></i><i></i><span>your name</span></div>
+        <div class="bar"><i></i><i></i><i></i><span style="margin:0 auto">your name</span></div>
         <div class="finder">
           <div class="fold"><i></i>Desktop</div>
           <div class="fold"><i></i>Pictures</div>
-          <div class="fold new hit" style="padding:4px 0"><i></i><span>Assistant</span><span class="tag">4</span></div>
+          <div class="fold new" style="padding:4px 0;outline:2px solid #2F6FE4;outline-offset:2px;border-radius:6px"><i></i><span>Assistant</span></div>
         </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid #E4DDCF;background:#F6F3EC"><span class="btnm">New Folder</span><span><span class="btnm">Cancel</span> <span class="btnm pri">Open</span></span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;border-top:1px solid #E4DDCF;background:#F6F3EC;border-radius:0 0 10px 10px"><span class="btnm hit" style="position:relative">New Folder<span class="tag">4</span></span><span><span class="btnm">Cancel</span> <span class="btnm pri hit" style="position:relative">Open<span class="tag">5</span></span></span></div>
       </div>
-      <figcaption>Drawing. Make the folder, then click Open.</figcaption>
+      <figcaption>Drawing. Your home folder, with the new folder in it.</figcaption>
     </figure>
   </div>
   <div class="ok"><div><b>You'll know it worked when</b> the folder choice under the message box now says <b>Assistant</b>.</div></div>
-  <div class="tip"><b>Not in Documents, Desktop or Downloads.</b> Your Mac guards those three and can block Claude from them ("Couldn't access Documents"). Your home folder has no such guard. You'll come back to this same folder every time you open the Assistant.</div>
+  <div class="tip"><b>Not in Documents, Desktop or Downloads.</b> Your Mac guards those three and can block Claude from working in them ("Couldn't access Documents"). Your home folder has no such guard. (The file you saved in Downloads is fine where it is.) You'll come back to this same folder every time you open the Assistant.</div>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 2 of 5</span></div>
 </section>
 
 <!-- ===================== STEP 3 ===================== -->
 <section class="page">
-  <div class="step"><div class="num">3</div><div><div class="of">Step 3 of 5 · about 2 minutes</div><h2>Add the Assistant to Claude</h2></div></div>
-  <p class="lede">You add the Assistant from Claude's own <b>Settings</b>, using the file we sent you. <b>Nothing gets typed or pasted.</b></p>
-  <ol class="do">
-    <li>At the bottom left of the Claude window, click the <b>gear</b> next to your name. <b>Settings</b> opens.</li>
-    <li>In the list on the left, click <b>Customize</b>. Then click <b>Plugins</b> at the top.</li>
-    <li>Click <b>+ Add</b> at the top right, then <b>Upload plugin</b>.</li>
-    <li>Choose <b>The-Assistant.zip</b> from your Downloads folder.</li>
-    <li>Look at the <b>Preview</b> box. It should say <b>the-engine</b> and "The Assistant by Horizon Found…" (the-engine is the Assistant's behind-the-scenes name.)</li>
-    <li>Click the black <b>Upload</b> button. Then close Settings with the <b>X</b>.</li>
+  <div class="step"><div class="num">3</div><div><div class="of">Step 3 of 5</div><h2>Add the Assistant to Claude</h2></div></div>
+  <p class="lede" style="margin-bottom:.08in;max-width:none">You add the Assistant from Claude's own <b>Settings</b>, using the file you downloaded. <b>Nothing gets typed.</b></p>
+  <div class="first"><b>Installed "The Engine" from us before?</b> Message us at <span class="todo">[ADDRESS: to decide]</span> before you go on. Never had it? Carry on.</div>
+  <ol class="do tight">
+    <li>At the very bottom left, at the right end of the line with your name, click the small <b>gear</b>. A box called <b>Settings</b> opens.</li>
+    <li>In the Settings box, find <b>Customize</b> in its list on the left, near the bottom. Click it, then click <b>Plugins</b> at the top. (Landed on Connectors? Leave its buttons alone.)</li>
+    <li>Click the dark <b>+ Add</b> button at the far top right, then <b>Upload plugin</b> (not Add marketplace).</li>
+    <li>Under <b>Plugin file</b>, choose <b>The-Assistant.zip</b> from your Downloads folder.</li>
+    <li>Check two things: <b>no line with a red !</b>, and the <b>Preview</b> says <b>the-engine</b>, "The Assistant by Horizon Found…" (the-engine is its behind-the-scenes name.)</li>
+    <li>Click the black <b>Upload</b> button, then close Settings with its <b>X</b>.</li>
   </ol>
-  <div class="cols" style="grid-template-columns:1fr 1.05fr;align-items:start">
-    <figure>
-      <div class="win">
+  <div class="cols" style="grid-template-columns:1.12fr 1fr;align-items:start">
+    <figure style="margin-top:.02in">
+      <div class="win" style="zoom:1">
         <div class="setbar"><b>Settings</b><span>&#10005;</span></div>
-        <div class="set" style="min-height:1.5in;grid-template-columns:1.05in 1fr">
-          <div class="setl"><p>Account</p><p>Billing</p><p>Appearance</p><p class="on hit" style="position:relative">Customize<span class="tag">2</span></p><p>Code</p></div>
-          <div class="setr"><div class="settop" style="flex-wrap:wrap;gap:8px"><span>Skills</span><b class="hit" style="position:relative">Plugins<span class="tag">2</span></b><b class="add hit" style="position:relative;margin-left:auto">+ Add &#9662;<span class="tag">3</span></b></div>
-            <div class="menu" style="zoom:1;width:1.25in;margin-left:auto"><div>Add marketplace</div><div class="on">Upload plugin</div></div></div>
+        <div class="set" style="min-height:1.42in;grid-template-columns:.92in 1fr">
+          <div class="setl"><p>Account</p><p>Usage</p><p style="color:#B5B9C0;padding:0 7px">…</p><p class="on hit" style="position:relative">Customize<span class="tag">2</span></p><p>Code</p></div>
+          <div class="setr" style="padding:9px 9px"><div class="settop" style="gap:6px;font-size:7.4pt;margin-bottom:8px"><span>Connectors</span><span>Skills</span><b class="hit" style="position:relative;padding:3px 6px">Plugins<span class="tag">2</span></b><span style="flex:1"></span><b class="add hit" style="position:relative;padding:3px 6px">+ Add &#9662;<span class="tag">3</span></b></div>
+            <div class="menu" style="zoom:1;width:1.15in;margin-left:auto;font-size:7.6pt"><div class="gbar"></div><div class="on">Upload plugin</div></div></div>
         </div>
       </div>
-      <figcaption>Drawing. Settings, then Customize, Plugins, + Add.</figcaption>
+      <figcaption>Drawing. Your + Add list may have more lines. Click the one about uploading a plugin.</figcaption>
     </figure>
-    <figure>
-      <div class="win">
-        <div class="panel" style="padding:11px 13px">
-          <div style="font:400 12pt/1.1 var(--sans);margin-bottom:8px">Upload a plugin</div>
-          <div class="prow"><div><b>The-Assistant.zip</b> <small style="display:inline">1.7MB</small></div><span style="color:#8B909A">&#10005;</span></div>
-          <div style="font-size:7pt;color:#8B909A;margin:0 0 7px">&#8226; The archive must contain a .claude-plugin/plugin.json manifest…</div>
-          <div class="prow hit" style="position:relative;display:block"><b>the-engine</b><small>The Assistant by Horizon Found. Two ways in…</small><span class="tag">5</span></div>
-          <div style="margin-top:8px"><span class="btnm hit" style="background:#1F2430;border-color:#1F2430;color:#fff;position:relative">Upload<span class="tag">6</span></span> <span class="btnm">Cancel</span></div>
+    <figure style="margin-top:.02in">
+      <div class="win" style="zoom:1">
+        <div class="panel" style="padding:9px 12px">
+          <div style="font:400 11pt/1.1 var(--sans);margin-bottom:5px">Upload a plugin</div>
+          <div style="font-size:6.8pt;color:#6B7280;border:1px solid #E4DDCF;border-radius:6px;padding:4px 7px;margin-bottom:6px">Only upload plugins you trust…</div>
+          <div style="font-size:7pt;color:#4B5563;margin-bottom:3px">Plugin file</div>
+          <div class="prow" style="padding:6px 9px;margin-bottom:4px"><div><b>The-Assistant.zip</b></div><span style="color:#8B909A">&#10005;</span></div>
+          <div style="font-size:7.4pt;color:#6B7280;margin:0 0 5px">&#8226; The archive must contain…</div>
+          <div style="font-size:7pt;color:#4B5563;margin-bottom:3px">Preview</div>
+          <div class="prow hit" style="position:relative;display:block;padding:6px 9px"><b>the-engine</b><small>The Assistant by Horizon Found…</small><span class="tag">5</span></div>
+          <div style="margin-top:7px"><span class="btnm hit" style="background:#1F2430;border-color:#1F2430;color:#fff;position:relative">Upload<span class="tag">6</span></span> <span class="btnm">Cancel</span></div>
         </div>
       </div>
-      <figcaption>Drawing. The grey line under the file is always there. It is not an error.</figcaption>
+      <figcaption>Drawing. The two grey notes are always there. They are not errors.</figcaption>
     </figure>
   </div>
-  <div class="ok"><div><b>You'll know it worked when</b> there is <b>no red box</b>, the Preview shows the Assistant, and Upload goes through.</div></div>
-  <div class="tip"><b>A red box that says "failed validation"?</b> Stop and send us a screenshot. That one is ours to fix. <b>Had "The Engine" before?</b> Remove it first: in Plugins, click <b>Yours</b>, find The Engine, and uninstall it. <b>Don't use "Add marketplace"</b> or add "The Engine" from Discover: that is an old copy.</div>
+  <div class="ok" style="margin-top:.06in;padding:8px 13px"><div><b>The file is good when</b> there is no red ! and Upload is black, not grey. The real proof is Step 5.</div></div>
+  <div class="tip" style="margin-top:.06in;padding:8px 13px;font-size:10.4pt"><b>A red ! that says "Plugin failed validation"?</b> Stop and send a screenshot to <span class="todo">[ADDRESS: to decide]</span>. That one is ours to fix. <b>"This marketplace is already added"?</b> Cancel, then + Add, Upload plugin. <b>"The Engine" with an Add button?</b> Leave it. It's an old copy.</div>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 3 of 5</span></div>
 </section>
 
 <!-- ===================== STEP 4 ===================== -->
 <section class="page">
-  <div class="step"><div class="num">4</div><div><div class="of">Step 4 of 5 · about 30 seconds</div><h2>Let it work while you're away</h2></div></div>
-  <p class="lede">This is the step that makes "walk away" true. Without it, Claude stops every few seconds to ask "may I do this?", and a backup can't finish while you're out of the room.</p>
+  <div class="step"><div class="num">4</div><div><div class="of">Step 4 of 5</div><h2>Let it work while you're away</h2></div></div>
+  <p class="lede">This step lets a backup finish while you're out of the room. Without it, Claude may stop and ask your permission before each thing it does.</p>
   <ol class="do">
-    <li>Look at the row under the message box, on the right. If it already says <b>Auto</b>, you're done with this step.</li>
-    <li>If it says <b>Manual</b>, click that word. In the list that opens, click <b>Auto</b>.</li>
+    <li>Look under the message box, at the right. After the name of the Claude you're using (ours said Opus 5.5), there is one word. If it says <b>Auto</b>, you're done with this step.</li>
+    <li>If it says anything else, click that word. In the list that opens, click <b>Auto</b>.</li>
   </ol>
   <div class="cols" style="grid-template-columns:1.6fr 1fr;align-items:end">
     <figure>
-      <div class="win"><div class="main" style="min-height:1.2in"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="chip">This computer</span><span class="chip">Assistant</span><span class="grow"></span><span class="plain">Model</span><span class="plain hit">Manual<span class="tag">2</span></span></div></div></div>
-      <figcaption>Drawing. The word is on the right, under the message box.</figcaption>
+      <div class="win"><div class="main" style="min-height:1.2in;border-radius:10px"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f">Assistant</span><span class="grow"></span><span class="plain">Opus 5.5 High</span><span class="plain hit">Manual<span class=tag>2</span></span></div></div></div>
+      <figcaption>Drawing. The word is at the right, under the message box.</figcaption>
     </figure>
     <figure>
-      <div class="menu">
-        <div>Manual</div><div>Accept edits</div><div>Plan</div>
-        <div class="on hit" style="position:relative">Auto<span class="tag">2</span></div>
-      </div>
-      <figcaption>Drawing. Then click Auto.</figcaption>
+      <div class="menu"><div class="gbar"></div><div class="gbar" style="width:60%"></div><div class="gbar" style="width:45%"></div>
+        <div class="on hit" style="position:relative">Auto<span class="tag">2</span></div></div>
+      <figcaption>Drawing. Your list may have other words in it. Auto is the one to click.</figcaption>
     </figure>
   </div>
-  <div class="ok"><div><b>You'll know it worked when</b> that word now says <b>Auto</b>. Claude remembers it for your Assistant folder.</div></div>
-  <div class="tip"><b>Is this safe?</b> Auto means Claude does the backup's steps without asking each time, with its own safety checks running. And the Assistant has its own rule that nothing may break, in any mode: <b>nothing on your memory card is ever deleted, moved or changed.</b></div>
-  <div class="tip" style="background:var(--paper);border:1px solid var(--line)"><b>Don't see Auto in the list?</b> In the same row, click the model's name and pick the newest Claude model. Then look again.</div>
+  <div class="ok"><div><b>You'll know it worked when</b> that word says <b>Auto</b>. Glance at it each time you start; if it has changed, set it back.</div></div>
+  <div class="tip"><b>Is this safe?</b> Auto means Claude does the backup's steps without asking each time, with its own safety checks running. And the Assistant has one rule it never breaks, in any mode: <b>nothing on your memory card is ever deleted, moved or changed.</b></div>
+  <div class="tip" style="background:var(--paper);border:1px solid var(--line)"><b>Don't see Auto in the list?</b> Click the name just left of that word (ours said Opus 5.5), pick the newest one in the list, then look again.</div>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 4 of 5</span></div>
 </section>
 
 <!-- ===================== STEP 5 ===================== -->
 <section class="page">
-  <div class="step"><div class="num">5</div><div><div class="of">Step 5 of 5 · you're there</div><h2>Say hi</h2></div></div>
+  <div class="step"><div class="num">5</div><div><div class="of">Step 5 of 5</div><h2>Say hi</h2></div></div>
   <p class="lede">That's the setup. Now meet your Assistant.</p>
-  <ol class="do">
+  <ol class="do tight">
     <li>Click inside the message box, type <span class="say">hi</span> and press <span class="key">Return</span>.</li>
-    <li>Give it about twenty seconds. The Assistant introduces itself, and its home page opens beside the chat.</li>
-    <li>Claude may ask to <b>import cookies</b> from your browser ("Stay signed in to your sites"). Click <b>Not now</b>, or <b>Don't show again</b>. The Assistant doesn't need them.</li>
+    <li>Give it up to a minute the first time. A few grey lines show in the chat ("Ran 2 commands", "Opened browser"): nothing to click. Then it introduces itself, and its home page opens beside the chat.</li>
+    <li>Claude may offer to copy your browser's sign-ins ("Stay signed in to your sites"). Click <b>Not now</b> or <b>Don't show again</b>. Clicked Import cookies by mistake? Click <b>Cancel</b> in the next box.</li>
   </ol>
   <figure>
-    <div class="win">
-      <div class="bar"><i></i><i></i><i></i><em class="tog2"><u></u><u class="on">&lt;/&gt;</u></em><span>New session</span></div>
+    <div class="win" style="zoom:1.05">
+      <div class="bar"><i></i><i></i><i></i><em class="sb"></em><em class="nav">&lt; &gt;</em><em class="tog2" style="margin-left:8px"><u></u><u class="on" style="position:relative">&lt;/&gt;</u></em><span>New session</span></div>
       <div class="split">
-        <div class="main">
-          <div class="msg you">hi</div>
-          <div class="msg">Hi, I'm your Assistant. I handle the busywork around your photos…</div>
-          <div class="box" style="min-height:.4in">Type / for commands<div class="send"></div></div>
-        </div>
-        <div class="home" style="position:relative">
+        <div class="main" style="min-height:1.5in"><div class="msg you">hi</div><div class="msg">Hi, I'm your Assistant. I handle the busywork around your photos…</div><div class="box" style="min-height:.36in">Type / for commands<div class="send"></div></div></div>
+        <div class="home" style="position:relative;min-height:1.5in;border-radius:0 0 10px 0">
           <h5>Welcome to <em>The Assistant.</em></h5><small>Start with whatever you have today.</small>
-          <div class="cards"><div>Back up a card</div><div>Make posts from a shoot</div><div>My editing queue</div><div>My posting queue</div><div>Open my Assistant folder</div></div>
+          <div class="cards"><div>Back up a card</div><div>Make posts from a shoot</div><div>My editing queue</div><div>My posting queue</div></div>
           <div class="pop"><b>Stay signed in to your sites</b><small>Import cookies from your browser…</small><div><u>Don't show again</u><span class="btnm hit" style="position:relative">Not now<span class="tag">3</span></span><span class="btnm" style="background:#1F2430;color:#fff;border-color:#1F2430">Import cookies</span></div></div>
         </div>
       </div>
     </div>
     <figcaption>Drawing. The chat on the left, the Assistant's home page on the right, and the pop-up to dismiss.</figcaption>
   </figure>
-
-  <h3 class="sub">Three things your Mac might ask, once each</h3>
-  <table class="fix">
-    <tr><td>"Claude would like to access files on a removable volume"</td><td>Click <b>Allow</b>. That is your memory card or your photo drive. It comes up the first time the Assistant reads one.</td></tr>
-    <tr><td>A window from Apple about "command line developer tools"</td><td>Click <b>Install</b>, then <b>Agree</b>. Wait five to ten minutes, then type <b>done</b> in Claude. It's one free piece from Apple the Assistant runs on.</td></tr>
-    <tr><td>"Couldn't access Documents"</td><td>Your Assistant folder is inside Documents. Go back to Step 2 and make it in your home folder.</td></tr>
+  <h3 class="sub" style="margin-top:.1in;font-size:15pt">Things you might see</h3>
+  <table class="fix small">
+    <tr><td>A window from Apple about developer tools</td><td>Click <b>Install</b> and follow Apple's steps. It can take a while. When it's finished, come back and say <b>hi</b> again. It's one free piece from Apple the Assistant runs on.</td></tr>
+    <tr><td>You said hi and no page opened beside the chat</td><td>Click <b>+ New</b> (top of the left column), check the folder under the message box says <b>Assistant</b>, say hi again. Still nothing? Screenshot to <span class="todo">[ADDRESS: to decide]</span>.</td></tr>
+    <tr><td>"Couldn't access Documents"</td><td>Don't click Open System Settings. Close the box. Go back to Step 2, make the folder in your home folder, and say hi again.</td></tr>
   </table>
-  <div class="ok"><div><b>You're set up.</b> From now on, opening the Assistant is: open Claude, click the <b>&lt;/&gt;</b> picture, start a new session in your <b>Assistant</b> folder, say <b>hi</b>.</div></div>
+  <div class="ok" style="padding:8px 13px"><div><b>You're set up.</b> Next time: open Claude, click <b>&lt;/&gt;</b>, click <b>+ New</b>, check the folder under the message box says <b>Assistant</b>, type <b>hi</b>.</div></div>
   <div class="foot"><span><b>The Assistant</b> · Setup guide</span><span>Step 5 of 5</span></div>
 </section>
 
@@ -359,18 +365,18 @@ h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
 <section class="page">
   <div class="eyebrow">You're in</div>
   <h1 style="font-size:32pt;margin:.08in 0 .08in">Two good places to <em>start</em></h1>
-  <p class="lede">You don't need a memory card to begin. Start with whatever you have today. You talk to the Assistant in your own words, the way you'd talk to a person.</p>
+  <p class="lede" style="margin-bottom:.1in;max-width:none">You don't need a memory card to begin. Talk to the Assistant in your own words.</p>
   <div class="two">
     <div class="way">
       <h4>Photos you've <em>already finished</em></h4>
       <p>Edited and exported, sitting in a folder.</p>
       <ol>
         <li>On the home page, click <b>Make posts from a shoot</b>.</li>
-        <li>Follow the box that opens. The first time, it has you paste <b>set up my Assistant folder</b>.</li>
+        <li>A box opens with a few words and a <b>Copy</b> button. Click Copy, click in the chat's message box, press Command + V, then Return. (The first time the words are <b>set up my Assistant folder</b>: that makes a second folder, on your photo drive, for your posts.)</li>
         <li>Click <b>Select the folder with your finished photos</b> and pick your exports.</li>
-        <li>Paste <b>make my posts</b> in the chat.</li>
+        <li>Type <b>make my posts</b> in the chat and press Return.</li>
       </ol>
-      <p style="margin-top:8px">You get single posts, a carousel, stories and a reel, with captions written from what you tell it. Your originals aren't moved or changed.</p>
+      <p style="margin-top:6px">You get single posts, a carousel and stories sized for Instagram, and a reel laid out in CapCut for you to finish (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed.</p>
     </div>
     <div class="way">
       <h4>A <em>memory card</em> with new photos</h4>
@@ -378,19 +384,17 @@ h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
       <ol>
         <li>Put the card in and plug in your drive.</li>
         <li>Type <b>backup now</b> in the chat.</li>
-        <li>The first time only, it asks a few quick questions with buttons.</li>
+        <li>The first time, your Mac may ask whether Claude may read your card or drive (click <b>Allow</b>), and the Assistant asks a few setup questions. After that, it's one quick screen each time.</li>
         <li>When it says <b>You can walk away</b>, walk away.</li>
       </ol>
       <p style="margin-top:8px">When you're back, click <b>Show the report</b> in the chat. Every photo is copied and checked, sorted into named shoots, with six sneak peeks picked to edit first.</p>
     </div>
   </div>
-
-  <h3 class="sub">If something isn't right</h3>
-  <table class="fix">
+  <h3 class="sub" style="margin-top:.12in;font-size:15pt">If something isn't right</h3>
+  <table class="fix small">
     <tr><td>The page beside the chat is blank, or shows a play button</td><td>Don't press the play button. Type <b>show the Assistant</b> and the page comes back.</td></tr>
-    <tr><td>Claude keeps asking "may I run this?"</td><td>Step 4 slipped back. In the row under the message box, change <b>Manual</b> to <b>Auto</b>.</td></tr>
-    <tr><td>"Couldn't access Documents"</td><td>Make the Assistant's folder in your home folder, not in Documents. See Step 2.</td></tr>
-    <tr><td>A backup stopped</td><td>The Assistant says why, first thing, in plain words. Fix that (plug the drive in, clear space) and say <b>backup now</b> again. Nothing is copied twice.</td></tr>
+    <tr><td>Claude keeps stopping to ask permission</td><td>Step 4 slipped back. Say yes to the one on screen, then set the word under the message box back to <b>Auto</b>.</td></tr>
+    <tr><td>A backup stopped</td><td>The Assistant says why, first thing. Fix that (plug the drive in, clear space) and say <b>backup now</b> again. Nothing is copied twice.</td></tr>
     <tr><td>We tell you there's an update</td><td>We'll send a new file and the steps with it.</td></tr>
     <tr><td>You're not sure what to do next</td><td>Say <b>hi</b>. It tells you where things stand and what you can say.</td></tr>
   </table>

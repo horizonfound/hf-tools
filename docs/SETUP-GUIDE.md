@@ -1,5 +1,7 @@
 # Setting up The Assistant
 
+> **Replaced on Nov 5, 2026 by the PDF guide (`docs/The Assistant - Setup Guide.pdf`, built from `docs/install-guide/`). Do not write install steps from this file.** Its Steps 3 and 4 describe routes that failed on Nicole's Mac; see `docs/install-issues-2026-11-05.md`. Kept for its notes on the phone taps and the first backup.
+
 **Draft 2, Nov 5, 2026** (first draft Oct 28). For the printable guide and the walkthrough video. Plain words, one thing per step, every step something to click or paste. Lines marked **[check]** come from the official Claude docs but have not been clicked through in the desktop app yet; confirm each on a fresh Mac before this goes out. Screenshots to add where marked **[shot]**.
 
 ---

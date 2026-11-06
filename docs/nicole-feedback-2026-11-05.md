@@ -130,7 +130,29 @@ reel," and pulling the song out still needs a tool most Macs don't have. If Nico
 the Assistant has to be able to do it. A student with no songs anywhere would have landed on "no song for
 now" tonight.
 
-### 1f. The Start Here interview
+### 1f. The reel felt far too slow, and maybe not on the beat
+
+**Her words (9:16pm, 9:17pm):** "ok it fixed it and made both my reels in two seconds soooo fast" ...
+"sooooo cool! the reel was paced SO incredibly slow though so it just doesnt work. i told claude the reel
+was too slow" ... "i feel like it might not have even paced it with the audio."
+
+**What is known:** her Claude said one reel was 10 photos in about 10 seconds and the other 8 photos in 14
+seconds. That is about 1 second and about 1.75 seconds a photo. The song was 16 seconds of sound pulled
+from a screen recording of an Instagram post.
+
+**Two different things could be going on, and they need telling apart:**
+- **The starting pace is too gentle.** "A little of everything" is the default and lands near a second a
+  photo. Dustin said much the same of the first test reel on Oct 25 ("calm rather than thrilling"). Fast
+  (about half a second) exists but she would have to ask for it. **What the starting pace should be is
+  yours to decide.**
+- **The beat was not found.** A short clip recorded off Instagram is the hardest thing for the beat finder
+  to read, and that route was improvised on her Mac, not tested. If it guessed the beat, the cuts would feel
+  disconnected from the music, which is what she describes. **Not known:** asked her for the line the
+  Assistant prints when it makes a reel ("every cut on the beat at about N beats a minute").
+
+**Also from this:** the speed itself delighted her ("made both my reels in two seconds").
+
+### 1g. The Start Here interview
 
 Set aside on Nov 5 with three other October skills so the install has one helper. Whether the 40-minute
 interview comes back is yours to say.
