@@ -67,6 +67,22 @@ Records (<kit> is the shoot's folder in Your Content; <studio> is STUDIO_HOME, ~
   <studio>/design-fonts.json             fonts they loaded by name ("Yours")
   <studio>/arrange-waiting.json          arrange.py's list: a line for Claude after a save (piece "design")
 
+On a PC (the PC pass of Nov 6; every line of it unproven on a real PC until GitHub's Windows machine runs
+tests/pc_design.py). Everything the two computers do differently is asked of this_computer.py, or of the helpers in
+arrange.py and kit.py that ask it; nothing here does a Mac-only thing itself:
+  * text out (this_computer.utf8_output), records saved over a file that may be open (arrange.write_whole ->
+    this_computer.replace), a slide given its name without ever taking one (kit.place -> this_computer.rename_new:
+    a Mac's hard link, a look and a rename where the drive has no links, Windows' own refusing rename), the locks
+    (arrange.locked and kit._held -> this_computer.try_lock), the commit started with no window
+    (this_computer.popen_detached), this computer's own page asked for with no proxy (this_computer.open_local).
+  * names: a saved slide's name is made by this_computer.safe_name (none of the characters Windows refuses, no
+    dot or space at the end, never CON, AUX, NUL...), the same on both computers so a drive can move between them.
+  * how long a path may be: a PC opens nothing past 260 characters. A slide whose full address in the Carousel
+    folder would pass that (this_computer.path_too_long), or a kit too deep in folders for the designer's own
+    hidden files where long paths are off (records_path_too_long), is refused in plain words BEFORE anything is
+    staged or written (name_too_long, too_deep). A Mac has no such limit and measures nothing.
+  * no record holds a path: a save's record names its files by name only, so there is no slash to get wrong.
+
 Python 3.9, standard library only.
 """
 import argparse
@@ -90,6 +106,7 @@ from urllib.parse import parse_qs, quote
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import this_computer  # noqa: E402
 import arrange  # noqa: E402
 import kit as kit_mod  # noqa: E402
 import posts  # noqa: E402
@@ -145,6 +162,10 @@ STAGING_MOST = 60                       # unfinished sets waiting in one kit
 STAGING_PRESSED = 3600.0                # when that many are waiting, ones left alone for an hour are cleared too
 COMMIT_CAP = 16384                      # bytes in a commit (it says which photos and fonts the slides were drawn from)
 COMMIT_WAIT = 60.0                      # seconds the page's Save slides waits for the set to be placed
+# A PC only (too_deep): as long as the names made here and by the page get. An id is a letter, the time and four
+# of chance (13 today, 14 from the year 2059); the page's name for a press is the same length.
+LONGEST_ID = "d" + "0" * 13
+LONGEST_TOKEN = "s" + "0" * 13
 
 ID = re.compile(r"[a-z][a-z0-9]{5,23}")                 # a design or template id, made here
 TOKEN = re.compile(r"[a-z0-9]{8,24}")                   # the name a page gives one press (a save, a new design)
@@ -152,7 +173,6 @@ COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 FONT = re.compile(r"[A-Za-z0-9]+(?: [A-Za-z0-9]+)*")    # a font family's name: letters, digits, single spaces
 FONT_MAX = 50
 STAGED = re.compile(r"slide-(\d\d)\.jpg")
-RESERVED = {"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 10)} | {f"LPT{i}" for i in range(1, 10)}
 
 # The page is allowed to load one thing from the internet: Google's font stylesheets and font files, for
 # the words on the slides. No script from anywhere, ever. The browser is told so, and keeps to it.
@@ -195,6 +215,15 @@ CANT_SAVE = "Your changes can't be saved right now: {why}. They'll be saved by t
 CANT_KEEP = "That couldn't be saved: {why}."
 PHOTO_NEWER = ("A photo on these slides was exported again since this page opened, so no slides were made. "
                "Nothing was added to your Carousel folder. Press Reload, then Save slides again.")
+# A PC only (a Mac has no such limit and never says these). The limit is said in kit.py's own words (LONG_WORDS).
+LONG_NAME = ("Couldn't save the slides: with this design's name, a slide's own name would be too long for this {pc} "
+             "to open ({limit}). Nothing was added to your Carousel folder. Give the design a shorter name, then "
+             "press Save slides again.")
+LONG_FOLDER = ("Couldn't save the slides: this shoot's folder sits too deep in other folders for this {pc} to open "
+               "a slide in it ({limit}). Nothing was added to your Carousel folder. Tell Claude and it'll sort it out.")
+TOO_DEEP = ("This shoot's folder sits too deep in other folders for this {pc} to keep a design of its slides "
+            "({limit}). Moving {where} nearer the top of the drive, or a shorter name for this shoot's folder, puts "
+            "it right. Nothing was changed.")
 WHY_WORDS = {"many": TOO_MANY_BLOCKS, "long": TEXT_TOO_LONG, "font": FONT_BAD, "name": NAME_BAD}
 
 # ---------- the fonts ----------
@@ -236,23 +265,18 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
-    except UnicodeEncodeError:          # an output that can't spell a name (a PC's own code page): spell it out instead
+    except UnicodeEncodeError:          # an output that can't spell a name and could not be set to UTF-8: spell it out instead
         try:
             print(str(msg).encode("ascii", "backslashreplace").decode("ascii"), flush=True)
         except (OSError, ValueError):
             pass
-
-
-def utf8_output():
-    """What this file prints holds the photographer's own names (a design, a shoot), in any alphabet. A PC's
-    piped output is in the PC's own code page unless told otherwise, and a name outside it would stop a
-    command dead in the middle of its report. (The other scripts get this from this_computer.utf8_output()
-    in the PC pass; when design.py is merged with that, this can become the same call.)"""
-    for s in (sys.stdout, sys.stderr):
-        try:
-            s.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError, ValueError):
-            pass
+    except OSError as e:
+        # A PC only (as arrange.py's and kit.py's say): Windows reports a reader that has gone away as "invalid
+        # argument" (EINVAL), not as a broken pipe. It happens here for real: the page server stops waiting for a
+        # commit after a minute (COMMIT_WAIT) and the commit, still at work, then prints into a closed pipe. The
+        # work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def now_iso():
@@ -315,15 +339,11 @@ def safe_base(name):
     so a name that differs from a saved set's only by one of them could never be given a file."""
     s = unicodedata.normalize("NFC", str(name))
     s = re.sub(r"\(canva\)", " ", s, flags=re.I)
-    s = "".join(" " if (c in '/\\:*?"<>|' or ord(c) < 32 or ord(c) == 127) else c for c in s if not _unseen(c))
-    s = re.sub(r"\s+", " ", s).strip(" .")
-    s = s[:NAME_MAX].rstrip(" .")
-    if not s:
-        s = "Carousel"
-    head, dot, rest = s.partition(".")
-    if head.strip().upper() in RESERVED:
-        s = head.rstrip() + "_" + dot + rest        # Windows judges by what stands before the first dot ("aux_.txt", "Con_")
-    return s
+    s = "".join(" " if ord(c) == 127 else c for c in s if not _unseen(c))
+    # The rest is the one rule every script shares (this_computer.safe_name): the characters Windows refuses and
+    # the control characters become a space, no dot or space at either end, at most 80 letters, and a word Windows
+    # keeps for itself gets an underscore before any dot ("aux_.txt", "Con_"). The same on both computers.
+    return this_computer.safe_name(s, limit=NAME_MAX, fallback="Carousel")
 
 
 def kit_bg(rec):
@@ -573,12 +593,79 @@ def design_lock(kit):
     return kit / ".kit" / "design.lock"
 
 
-def _read_json(path):
-    try:
-        d = json.loads(Path(path).read_text(encoding="utf-8"))
-        return d if isinstance(d, dict) else None
-    except (OSError, ValueError, RecursionError):
+# ---------- a PC only: how long a path may be ----------
+
+def _scratch_of(path):
+    """A record's scratch name, as long as arrange.write_whole's gets on a PC (a process's number of up to seven
+    digits, a thread's of up to ten)."""
+    return path.with_name(f".{path.name}.{'0' * 7}.{'0' * 10}.tmp")
+
+
+def too_deep(kit):
+    """A PC with long paths off (Windows' own setting): plain words when this kit sits too deep in folders for the
+    designer's own hidden files, else None. The longest of them are a slide waiting under its scratch name, a
+    save's record and a day's earlier copy of a design while each is being written. Asked before a design is made
+    or changed and before a slide is staged, so nothing is ever left half written. A Mac: None, nothing measured."""
+    if not this_computer.WINDOWS:
         return None
+    waiting = f"{LONGEST_ID}-{LONGEST_TOKEN}"          # unproven on a real PC
+    own = [staging_dir(kit) / waiting / f".part-{'0' * 7}-{'0' * 10}-slide-00.jpg",
+           _scratch_of(sets_dir(kit) / f"{waiting}.json"),
+           _scratch_of(designs_dir(kit) / "earlier" / f"{LONGEST_ID} 0000-00-00.json")]
+    if not any(this_computer.records_path_too_long(f) for f in own):
+        return None
+    try:
+        h = posts.home()
+        where = f"your \"{h.name}\" folder" if h else "the folder your posts are kept in"
+    except (Exception, SystemExit):  # noqa: BLE001
+        where = "the folder your posts are kept in"
+    return TOO_DEEP.format(pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS, where=where)
+
+
+def name_too_long(kit, name, base=None):
+    """A PC only: plain words when a slide saved from a design of this name could not be opened in File Explorer
+    (its full address in the Carousel folder would pass 260 characters, long paths on or not), else None. base is
+    the set's name when it has been chosen already; otherwise it is worked out as a save would (free_base). When
+    even the shortest name would not fit, the words say it is the folder, not the name. A Mac: None."""
+    if not this_computer.WINDOWS:
+        return None
+    car = kit / "Carousel"                              # unproven on a real PC
+    base = base if base is not None else free_base(kit, name)
+    if not this_computer.path_too_long(car / SET_NAME.format(base=base, i=1)):
+        return None
+    shortest = this_computer.path_too_long(car / SET_NAME.format(base="C", i=1))
+    return (LONG_FOLDER if shortest else LONG_NAME).format(pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS)
+
+
+def cant_save(kit, name, base=None):
+    """(why, plain words) when a PC could not take this design's slides at all ("deep": the kit's own hidden
+    files; "long": a slide's name in the Carousel folder), else None. A Mac: always None."""
+    if not this_computer.WINDOWS:
+        return None
+    words = too_deep(kit)
+    if words:
+        return "deep", words
+    words = name_too_long(kit, name, base)
+    return ("long", words) if words else None
+
+
+def _read_json(path):
+    """A record as a dict, or None when it is not there or is not one. A PC only (unproven on a real PC): a record
+    that is being saved over at this very instant (this_computer.replace, in another thread or by the commit) can
+    refuse to be opened for a moment; it is asked for again a few times, a tenth of a second in all, before it
+    counts as not there. A Mac reads once, as before."""
+    tries = 5 if this_computer.WINDOWS else 1
+    for i in range(tries):
+        try:
+            d = json.loads(Path(path).read_text(encoding="utf-8"))
+            return d if isinstance(d, dict) else None
+        except PermissionError:
+            if i == tries - 1:
+                return None
+            time.sleep(0.01 * (i + 1))
+        except (OSError, ValueError, RecursionError):
+            return None
+    return None
 
 
 def load_design(kit, did):
@@ -628,7 +715,10 @@ def _store(kit, d, old=None):
         arrange.write_whole(prev_path(kit, d["id"]), old)
         day = datetime.now().strftime("%Y-%m-%d")
         if str(old.get("updated") or "")[:10] != day:
-            keep = designs_dir(kit) / "earlier" / f"{d['id']} {str(old.get('updated') or 'undated')[:10]}.json"
+            # the day goes into a file's name, and "updated" is read from a file a hand could have changed: only
+            # its digits and dashes are used (a slash there would make folders, a colon stops a PC)
+            was = re.sub(r"[^0-9-]", "", str(old.get("updated") or "")[:10]) or "undated"
+            keep = designs_dir(kit) / "earlier" / f"{d['id']} {was}.json"
             if not keep.exists():
                 arrange.write_whole(keep, old)
     d["v"] = 1
@@ -720,6 +810,9 @@ def new_design(kit, state=None, name=None, token=None, copy=None):
     rows, stamp = arrange.sheet_rows(kit), arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return 404, {"ok": False, "words": NOT_READY}
+    deep = too_deep(kit)                    # a PC only: nothing is written into a kit too deep for it
+    if deep:
+        return 409, {"ok": False, "why": "deep", "words": deep}
     with arrange.locked(design_lock(kit)):
         designs = list_designs(kit)
         if token is not None:
@@ -787,6 +880,9 @@ def save_from_page(body):
     rows, stamp = arrange.sheet_rows(kit), arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return 404, {"ok": False, "words": NOT_READY}
+    deep = too_deep(kit)                    # a PC only
+    if deep:
+        return 409, {"ok": False, "why": "deep", "words": deep}
     with arrange.locked(design_lock(kit)):
         d = load_design(kit, did)
         if d is None:
@@ -1169,6 +1265,9 @@ def stage_slide(kit, did, token, i, of, data):
         return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
     if of != d["state"]["slides"]:
         return 409, {"ok": False, "why": "changed", "words": CHANGED}
+    cant = cant_save(kit, d["name"])        # a PC only: a slide that could never be opened is not taken in at all
+    if cant:
+        return 409, {"ok": False, "why": cant[0], "words": cant[1]}
     root = staging_dir(kit)
     folder = root / f"{did}-{token}"
     if not kit_mod._has(root, folder.name) and len(waiting_sets(kit)) >= STAGING_MOST:
@@ -1517,6 +1616,9 @@ def _commit(kit, did, token, rev, drawn=None):
         return _result("problem", why="missing", words=MISSING)
     stag = staging_dir(kit) / f"{did}-{token}"
     base = free_base(kit, d["name"])
+    cant = cant_save(kit, d["name"], base)      # a PC only, before anything is written down or moved
+    if cant:
+        return _result("problem", why=cant[0], words=cant[1])
     files = []
     for i in range(1, count + 1):
         p = stag / f"slide-{i:02d}.jpg"
@@ -1638,7 +1740,17 @@ def _get_page(handler, q):
     st = arrange.state_for_page(kit, "carousel") if arrange.sheet_rows(kit) else None
     if st is None:
         return _send_page(handler, design_page.plain_page(NOT_READY))
-    if st["previews"]["made"] < st["previews"]["of"] and any(not x["have"] and not x["missing"] for x in st["photos"]):
+    to_make = any(not x["have"] and not x["missing"] for x in st["photos"])
+    if to_make:
+        # a PC without Pillow, or a kit too deep in folders for a PC: said so, as the pickers say it, rather than
+        # "getting your photos ready" for ever. A Mac: never (arrange.cant_make).
+        cant = arrange.cant_make(kit, arrange.sheet_rows(kit))
+        if cant:
+            return _send_page(handler, design_page.plain_page(cant[1] + " Tell Claude and it'll sort it out."))
+    deep = too_deep(kit)                # a PC only: the designer's own files would not fit either
+    if deep:
+        return _send_page(handler, design_page.plain_page(deep + " Tell Claude and it'll sort it out."))
+    if st["previews"]["made"] < st["previews"]["of"] and to_make:
         arrange.start_previews(kit)
     tidy(kit)                           # day-old slides of saves that were never finished (the Assistant's own scratch)
     _send_page(handler, design_page.page_html(kit.name))
@@ -1649,6 +1761,9 @@ def _get_state(handler, q):
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     want = _one(q, "design")
+    deep = too_deep(kit)                # a PC only: the first look would make a design, and it could not be written
+    if deep:
+        return arrange._send_json(handler, {"ok": False, "why": "deep", "words": deep}, 409)
     st = state_for_page(kit, want if ID.fullmatch(want) else None)
     if st is None:
         return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
@@ -1800,9 +1915,11 @@ def _post_slide(handler, query):
     arrange._send_json(handler, out, code)
 
 
-DRIVE_TROUBLE = (errno.ENOSPC, errno.EDQUOT, errno.EACCES, errno.EPERM, errno.EROFS, errno.ENOENT, errno.ENOTDIR, errno.EIO, errno.ENXIO)
+# by name, so a computer whose Python lacks one of these (EDQUOT is not everywhere) still starts
+DRIVE_TROUBLE = tuple(getattr(errno, n) for n in ("ENOSPC", "EDQUOT", "EACCES", "EPERM", "EROFS", "ENOENT", "ENOTDIR", "EIO", "ENXIO")
+                      if hasattr(errno, n))
 _STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500,
-           "photos": 409}
+           "photos": 409, "long": 409, "deep": 409}
 
 
 def _answer_for(res):
@@ -1848,15 +1965,19 @@ def _post_commit(body):
             # this set the one shown again (it writes the kit's record, so it is a process of its own)
         elif not staged_ok(kit, did, token, d["state"]["slides"]):
             return _answer_for(_result("problem", why="missing", words=MISSING))
+        else:
+            cant = cant_save(kit, d["name"])        # a PC only (the commit asks again, with the name it chooses)
+            if cant:
+                return _answer_for(_result("problem", why=cant[0], words=cant[1]))
     cmd = [sys.executable, str(HERE / "design.py"), "commit", str(kit), "--design", did, "--set", token, "--rev", str(rev)]
     if drawn is not None:
         cmd += ["--drawn", json.dumps(drawn)]       # plain ASCII, whatever the names in the design
-    # On a PC the page server has no window of its own, and a command started from it would open a black one
-    # for a moment at every Save slides: it is started with none. (Written from Microsoft's docs; not run on a PC.)
-    own = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}     # CREATE_NO_WINDOW
+    # Started the way arrange.py starts its slide job (this_computer.popen_detached). A Mac: start_new_session,
+    # exactly as before. A PC: no window (the page server has none of its own, and a command started from it would
+    # open a black one for a moment at every Save slides) and a process group of its own; unproven on a real PC.
     try:
         arrange.HOME.mkdir(parents=True, exist_ok=True)
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **own)
+        p = this_computer.popen_detached(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
         arrange.log(f"the design commit could not be started: {e}")
         return _answer_for(_result("problem", why="drive", words=NOT_FINISHED))
@@ -1932,14 +2053,15 @@ def handle_post(handler, path, query):
 def page_address(kit, did=None):
     """The designer's address on the page server, which is started if it isn't running (as arrange.py does)."""
     import home
-    import urllib.request
     u = home.url()
     if not u:
         return None
     base = u.rsplit("/", 1)[0]
+    # Never through a proxy (this_computer.open_local, as arrange.page_address): a proxy can't see this computer's
+    # own pages, so every try would fail. With no proxy set this is exactly what it was.
     for _ in range(40):                 # a server that is starting over is gone for a moment: wait for it
         try:
-            if b"<title>One moment</title>" not in urllib.request.urlopen(base + "/home", timeout=3).read(700):
+            if b"<title>One moment</title>" not in this_computer.open_local(base + "/home", timeout=3).read(700):
                 break
         except Exception:  # noqa: BLE001
             pass
@@ -1957,8 +2079,26 @@ def cmd_open(kit, did=None):
             say("STOP: couldn't number this shoot's photos. Are they where the kit says they are?")
             return 1
     got = arrange.make_previews(kit)
+    # The four below are arrange.cmd_open's own, word for word, and only ever come from a PC (no Pillow yet, a kit
+    # too deep in folders, copies the virus checker kept busy, a full drive). A Mac never gets them.
+    if got.get("cant"):
+        say(f"STOP: {got['cant']} " + ("Run this again once it is added." if got.get("cant_kind") == "addon"
+                                       else "Run this again once that is done."))
+        return 1
+    deep = too_deep(kit)
+    if deep:
+        say(f"STOP: {deep}")
+        return 1
     if got["missing"] or got["failed"]:
         say(f"({got['missing'] + got['failed']} of {got['of']} photos couldn't be read right now; the page will say so.)")
+        if got.get("why"):
+            say(f"({got['why']})")
+    if got.get("later") and got.get("full"):
+        say(f"({got['later']} of {got['of']} photos weren't ready yet: the drive this post kit is on is full. Once "
+            "there's some room on it, opening the page again makes them.)")
+    elif got.get("later"):
+        say(f"({got['later']} of {got['of']} photos weren't ready yet: something on this {this_computer.COMPUTER} kept "
+            "their copies busy, most often the virus checker. The page makes them when it opens.)")
     if did is not None and load_design(kit, did) is None:
         say(f"STOP: this shoot has no design with the id {did}. (design.py show lists them.)")
         return 1
@@ -2054,7 +2194,7 @@ def main():
     sub.add_parser("took").add_argument("words")
     sub.add_parser("tidy").add_argument("words")
     a = ap.parse_args()
-    utf8_output()
+    this_computer.utf8_output()            # a design's or a shoot's name, in any alphabet, never stops a report on a PC
     import fresh
     fresh.announce()                       # this folder is where the Assistant's code is now (see fresh.py)
 

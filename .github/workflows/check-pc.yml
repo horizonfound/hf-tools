@@ -22,6 +22,16 @@ name: Check it on a Windows PC
 #                            up, the lock across four programs, "is a slide job at work?", a child that outlives
 #                            its starter, saving a record while it is open, a kit too deep for 260 characters, a
 #                            copy held by the virus checker ("later"), a full drive, a background run's log lines
+#   tests/pc_design.py       the carousel designer's own machinery (design.py), with real JPEGs written in plain
+#                            Python so nothing has to be installed: a design saved while its file is open; names
+#                            with an accent, an emoji, a word Windows keeps (CON), a dot at the end, 200 letters;
+#                            staging and a save start to finish; the save's own process started with no window,
+#                            its answer read back in an old code page; a save while a slide in the Carousel folder
+#                            is held open by another program; a drive with no hard links; two saves at the same
+#                            moment from two processes; the locks across programs; a slide's address past 260
+#                            characters refused in plain words before anything is staged; nothing the page is
+#                            given holds a path; every refusal of every designer route on the real page server
+#                            leaves every file byte for byte as it was
 #   tests/pc_pictures.py     made-up RAW files from six camera makers, junk and damaged files
 #   tests/backup_safety.py   never write over a file, never mix two cards, carry on a cut-off backup,
 #                            never copy a card onto itself
@@ -30,6 +40,15 @@ name: Check it on a Windows PC
 #   tests/fixtures/check_sound.py   the reel's sound: lengths, the beat, Windows' own Media Foundation
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
+#   tests/pc_design_page.py  a job of its own, "windows-page", which may fail without failing the check (a first
+#                            run in a browser nobody here has seen on Windows must never block a push): the
+#                            designer's REAL page in the Chrome GitHub's Windows machine carries, hidden, driven by
+#                            tests/chrome_drive.py: it loads with no error, draws six photos from copies the PC made,
+#                            names the PC's own key (Alt), finds Georgia, loads the plugin's own font, saves six
+#                            1080 x 1350 slides, and the hidden Chrome and its throwaway profile are gone afterwards.
+#                            The full test of the page (tests/design_check.py) still needs a Mac: it stops without
+#                            sips, draws its pretend shoots with sips under /private/tmp, and runs the page's rule
+#                            scripts under the Mac's own JavaScript engine.
 # Every script must also compile on the oldest Python we promise (3.9: a Mac's own, and a running page server
 # that has loaded the reel's scripts only starts over onto new code that compiles there).
 # Every test runs even when one before it failed (if: !cancelled()), so one red line never hides the rest.
@@ -43,11 +62,11 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/fixtures/**", "tools/check_pc.py",
-            ".github/workflows/check-pc.yml"]
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**",
+            "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/fixtures/**", "tools/check_pc.py",
-            ".github/workflows/check-pc.yml"]
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**",
+            "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -98,6 +117,9 @@ jobs:
       - name: The photo pickers' own machinery (locks, the job check, small copies, saving while open, a held copy)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/pc_arrange.py
+      - name: The carousel designer's own machinery (names, a held slide, no window, two saves at once, 260 characters, every refusal)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/pc_design.py
       - name: The reel's sound (lengths, the beat, Windows' own Media Foundation)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/fixtures/check_sound.py
@@ -113,6 +135,38 @@ jobs:
         with:
           name: pc-smoke-windows-python-${{ matrix.python }}
           path: ${{ runner.temp }}/pc-smoke-kept
+          if-no-files-found: ignore
+          retention-days: 7
+  windows-page:
+    # The designer's real page in a hidden Chrome on Windows. A job of its own that may fail without failing the
+    # check: nobody here has seen this page in a browser on Windows yet, and a flaky first run must never block a
+    # push. When it fails, the picture of the page and the logs are kept ("pc-design-page").
+    runs-on: windows-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - id: py
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Pillow, the one picture add-on a PC needs
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python -m pip install --quiet pillow
+      - name: Which Chrome this machine carries
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/chrome_drive.py --where
+      - name: The carousel designer's real page in a hidden Chrome (loads, draws, saves six slides, Chrome gone afterwards)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        env:
+          ASSISTANT_PAGE_KEEP: ${{ runner.temp }}/pc-design-page-kept
+        run: python tests/pc_design_page.py
+      - name: Keep the picture of the page and the logs of a failed run
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: pc-design-page
+          path: ${{ runner.temp }}/pc-design-page-kept
           if-no-files-found: ignore
           retention-days: 7
   mac:
@@ -156,6 +210,9 @@ jobs:
         env:
           ASSISTANT_NO_SIPS: "1"
         run: /tmp/v/bin/python tests/pc_arrange.py
+      - name: The carousel designer's own machinery, so a PC fix never breaks the Mac
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/pc_design.py
       - name: The reel's sound
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/fixtures/check_sound.py
@@ -167,6 +224,9 @@ jobs:
       - name: The photo pickers' locks and job check on the Mac's own Python 3.9 (the parts that draw photos say SKIP)
         if: ${{ !cancelled() }}
         run: /usr/bin/python3 tests/pc_arrange.py
+      - name: The carousel designer's own machinery on the Mac's own Python 3.9 (nothing installed; it needs nothing)
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 tests/pc_design.py
       - name: Every script compiles on the Mac's own Python 3.9
         if: ${{ !cancelled() }}
         run: /usr/bin/python3 -m compileall -q plugins/the-engine/skills tests tools

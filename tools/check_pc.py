@@ -117,7 +117,10 @@ WHY = {
 MAC_MODULES = {"fcntl", "termios", "tty", "pty", "pwd", "grp", "resource", "posix"}
 RULES = [
     ("statvfs", re.compile(r"os\.statvfs"), "os.statvfs does not exist on Windows: use this_computer.disk() or free_bytes()"),
-    ("new session", re.compile(r"start_new_session\s*="), "start_new_session does nothing on Windows: use this_computer.popen_detached()"),
+    # Nov 6, the designer's join: also the spelling in a dict of options ({"start_new_session": True}), which is how
+    # design.py started its commit before it was brought under these rules, and which this check did not see
+    ("new session", re.compile(r"""start_new_session\s*=|["']start_new_session["']\s*:"""),
+     "start_new_session does nothing on Windows: use this_computer.popen_detached()"),
     ("/Volumes", re.compile(r"""["']/Volumes(?:[/"']|\b)"""),
      "/Volumes is where a Mac puts drives: use this_computer.volumes(), cards() or volume_by_name()"),
     ("Mac open", re.compile(r"""\[\s*["'](?:/usr/bin/)?open["']|["']/usr/bin/open["'\s]"""), WHY["Mac open"]),
@@ -504,6 +507,10 @@ SELF_TESTS = [   # (made-up script, the short names it must give, in any order; 
      'y = urlopen("http://127.0.0.1/")\n', {"urlopen"}),
     ('import this_computer\nthis_computer.open_local("http://127.0.0.1:8790/home", timeout=1).read(1)\n'
      '# urllib.request.urlopen(u) is only mentioned here\n', set()),
+    # Nov 6, the designer's join: a child's own session asked for through a dict of options
+    ('import os, subprocess\nown = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}\n'
+     'subprocess.Popen(["x"], **own)\n', {"new session"}),
+    ('import this_computer\nthis_computer.popen_detached(["x"])  # a Mac: start_new_session, as before\n', set()),
 ]
 
 

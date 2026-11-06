@@ -40,6 +40,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import this_computer  # noqa: E402
 import arrange_page  # noqa: E402
 import brand  # noqa: E402
 from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
@@ -172,8 +173,11 @@ SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("B
 LEDE = "Each box is one Instagram slide. A photo can stretch across slides, so they join up when people swipe."
 TRAY_HINT = ("Drag a photo onto a slide to add it, or onto a frame to put it there. "
              "Click one to put it in the selected frame, or in the next empty spot.")
+# The key that turns snapping off for a moment is Option on a Mac and Alt on a PC. A Mac's line is word for word
+# what it was; a PC's names only its own key (unproven on a real PC: read from the browser's altKey, which is Alt there).
 SNAP_TITLE = ("Photos line up with the slides and with each other as you drag. "
-              "Hold Option (Alt on a PC) while you drag to turn it off for a moment.")
+              + ("Hold Alt while you drag to turn it off for a moment." if this_computer.WINDOWS
+                 else "Hold Option (Alt on a PC) while you drag to turn it off for a moment."))
 # The bar at the bottom of the window: looking at the carousel as Instagram will show it, and saving it.
 PREVIEW = "Preview swipe"
 GRID_CROP = "Profile grid crop"

@@ -105,9 +105,16 @@ GOTCHAS (each one met while building this)
   * Keys with Cmd / Ctrl / Alt held carry no text, as on a real keyboard. On a Mac the usual editing keys
     (Cmd+A, Z, Shift+Z, C, X, V) also carry Chrome's editing command, so a text box behaves as it does by hand.
   * Never give Chrome the person's own profile. This always makes a new one and removes only that.
-  * If the test is killed outright (kill -9), a small watcher ends the hidden Chrome anyway (Mac and Linux;
-    on Windows only a normal exit, an exception or Ctrl+C is covered). The throwaway profile folder is then
-    left in the work folder.
+  * If the test is killed outright (kill -9), a small watcher ends the hidden Chrome anyway (Mac and Linux).
+    On Windows the hidden Chrome and every helper it starts are put in a job of Windows' own (_WinJob) that
+    Windows ends when the test's process ends, however it ends. The throwaway profile folder is then left in
+    the work folder.
+  * On Windows (Nov 6; written from Microsoft's documentation, unproven until GitHub's Windows machine runs
+    tests/pc_design_page.py): Chrome is found in Program Files (then Chromium, then Edge); stopping it ends the
+    whole tree of helpers (the job, then "taskkill /T /F", then the process itself), because a helper that
+    lives a moment longer still has files of the throwaway profile open and Windows will not remove a file
+    that is open; the profile's removal is tried for up to 15 seconds there, and a profile that still cannot
+    be removed is left in the work folder (c.profile_left says so) and never fails a test by itself.
 """
 import argparse
 import atexit
@@ -505,6 +512,74 @@ def wait_until(fn, seconds=10, every=0.03, what=""):
         time.sleep(every)
 
 
+class _WinJob:
+    """Windows only: a job of Windows' own that holds the hidden Chrome and every helper it starts from then on.
+    end() ends them all at once. The job is set to end its processes when its last handle closes, and this test's
+    process holds the only one, so a test that is killed outright takes its Chrome with it. Every step fails
+    quietly (no job: stop() still has taskkill and the process itself). Unproven on a real PC."""
+
+    def __init__(self, proc):
+        self.handle = self._k32 = None
+        if not WINDOWS:
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.CreateJobObjectW.restype = wintypes.HANDLE
+            k32.CreateJobObjectW.argtypes = (wintypes.LPVOID, wintypes.LPCWSTR)
+            k32.SetInformationJobObject.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+            k32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+            k32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+            k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+
+            class Basic(ctypes.Structure):
+                _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                            ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                            ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                            ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+            class Counters(ctypes.Structure):
+                _fields_ = [(n, ctypes.c_uint64) for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                                                           "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+            class Extended(ctypes.Structure):
+                _fields_ = [("BasicLimitInformation", Basic), ("IoInfo", Counters), ("ProcessMemoryLimit", ctypes.c_size_t),
+                            ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                            ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+            h = k32.CreateJobObjectW(None, None)
+            if not h:
+                return
+            info = Extended()
+            info.BasicLimitInformation.LimitFlags = 0x00002000         # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            ok = (k32.SetInformationJobObject(h, 9, ctypes.byref(info), ctypes.sizeof(info))      # 9: the extended limits
+                  and k32.AssignProcessToJobObject(h, wintypes.HANDLE(int(proc._handle))))
+            if not ok:
+                k32.CloseHandle(h)
+                return
+            self.handle, self._k32 = h, k32
+        except Exception:
+            self.handle = None
+
+    def end(self):
+        """End every process in the job (the hidden Chrome and its helpers). True when Windows took the order."""
+        if self.handle:
+            try:
+                return bool(self._k32.TerminateJobObject(self.handle, 1))
+            except Exception:
+                pass
+        return False
+
+    def close(self):
+        if self.handle:
+            try:
+                self._k32.CloseHandle(self.handle)
+            except Exception:
+                pass
+            self.handle = None
+
+
 _LIVE = set()
 _LIVE_LOCK = threading.Lock()
 _HOOKED = False
@@ -551,8 +626,9 @@ class Chrome:
         self.debug_port = int(debug_port)
         self.keep_profile = keep_profile
         self.extra_args = list(extra_args)
-        self.proc = self.ws = self.profile = self._watch = None
+        self.proc = self.ws = self.profile = self._watch = self._job = None
         self._made_profile = False
+        self.profile_left = False           # True when stop() could not remove the throwaway profile (Windows: a file still open)
         self._lock = threading.Lock()
         self._waiting = {}
         self._next = 0
@@ -613,6 +689,7 @@ class Chrome:
             kw["start_new_session"] = True                            # its own group, so the whole of it can be ended
         _hook_exit()
         self.proc = subprocess.Popen(args, **kw)
+        self._job = _WinJob(self.proc) if WINDOWS else None           # Windows: the whole tree in one job, from the start
         with _LIVE_LOCK:
             _LIVE.add(self)
         try:
@@ -716,6 +793,11 @@ class Chrome:
                         pass
             elif not WINDOWS:
                 self._end_group(proc, signal.SIGTERM)                 # helpers that outlived the main process
+            elif self._job is not None:
+                self._job.end()                                       # Windows: the same, through the job
+        job, self._job = self._job, None
+        if job is not None:
+            job.close()
         if self.ws is not None:
             self.ws.close()
             self.ws = None
@@ -730,7 +812,19 @@ class Chrome:
     def _end_group(self, proc, sig):
         try:
             if WINDOWS:
-                proc.kill() if sig != signal.SIGTERM else proc.terminate()
+                # The whole tree, not only the first process: the job when there is one, then Windows' own
+                # "taskkill /T /F" (the first process and every process started from it), then the process itself.
+                # Windows has no polite signal for a hidden program, so both "signals" end it outright.
+                if self._job is not None:
+                    self._job.end()
+                try:
+                    subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                except (OSError, subprocess.SubprocessError):
+                    pass
+                if proc.poll() is None:
+                    proc.kill()
             else:
                 os.killpg(proc.pid, sig)
         except (OSError, ProcessLookupError):
@@ -742,11 +836,14 @@ class Chrome:
         ok = (p.parent == self.work and p.name.startswith("chrome-profile-") and (p / "made-by-chrome_drive.txt").is_file())
         if not ok:
             return
-        for _ in range(40):                                           # helpers may still be letting go of files
+        # helpers may still be letting go of files: two seconds on a Mac, as before; fifteen on Windows, where a
+        # file that anything still has open (a helper on its way out, the virus checker) cannot be removed at all
+        for _ in range(300 if WINDOWS else 40):
             shutil.rmtree(str(p), ignore_errors=True)
             if not p.exists():
                 break
             time.sleep(0.05)
+        self.profile_left = p.exists()                                # left in the work folder; never a failure by itself
         self._made_profile = False
 
     def alive(self):
