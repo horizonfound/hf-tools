@@ -155,3 +155,45 @@ she doesn't need to log in.
 which screen.** Documentation for a different product (Claude Code in a terminal) is not evidence about the
 Claude desktop app. Before writing any install step, read what the project already knows: the October guide
 had the right route, with screenshots, and the README had it in one line.
+
+---
+
+## After the install: what Nicole noticed while using it (same evening)
+
+These are not install roadblocks. They are a first-time user's notes, kept here so nothing she said is lost.
+
+### A. "Yours" was hard to find
+
+**What she said:** "there is no yours," then "yes i know yours is there but it doesnt have the assistant in
+it," then "ohhh ok nevermind i see it now."
+
+**What happened:** Settings, Customize has three tabs (Connectors, Skills, Plugins), and each has its own
+Yours and Discover. She was on Connectors, so Yours listed her connectors, not the Assistant. She also found
+a second way in: the filter button on Plugins has a Source list with **My Uploads** in it.
+
+**For the guide:** say "click Plugins first, then Yours," not just "click Yours."
+
+### B. Should making posts copy her photos? (a decision for Dustin and Nicole)
+
+**What she said:** "it made a folder and is asking where it can locate the photos i want to use for the
+post. theyre already on my hard drive in another location. it wouldnt make sense to duplicate it so would
+you want it to find the folder instead? or you tell it where it is."
+
+**What it does today:** it copies only the finished JPEGs into its own folder (Dustin's call, Oct 30: copies,
+never moves, finished photos only), so a post kit sits in one place and the originals can't be touched.
+
+**Her point:** when the photos are already on the same drive, a second copy looks like waste, and "find
+them where they are" is what she expected. The Assistant already does this for a shoot it backed up itself
+(it points at the export folder instead of copying), so working in place is possible.
+
+**Not decided. Claude told her it is logged for the two of them.**
+
+### C. The same question asked twice
+
+On that screen the Assistant explained the two ways to hand over photos in a paragraph, and then asked the
+same thing again in a box with two buttons. One or the other is enough. Not changed yet.
+
+### D. "1 failed"
+
+The line above its reply said "Ran 3 commands, opened a page, 1 failed." What failed is not known; it
+carried on and the folder was made. Worth a look at her session if it repeats.
