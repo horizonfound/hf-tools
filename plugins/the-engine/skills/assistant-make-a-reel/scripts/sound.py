@@ -901,11 +901,22 @@ _MF_WORDS = {
 # An AAC song starts with about 2,112 samples (48 ms) of the encoder warming up, and an MP3 with the LAME
 # encoder's delay plus the decoder's own 529 samples (about 25 ms). The file says how much, and afconvert and
 # ffmpeg leave it out; a decoder that keeps it hears every beat that much late, and a cut placed on a late
-# beat lands after it (the fault Dustin turned down on Oct 25). Whether Windows' own Media Foundation leaves
-# it out is not known (nothing here has run on a PC), so _drop_warmup checks: when what Windows gave is
-# exactly as long as the whole file with its warm-up and padding (to within half a frame), the warm-up is
-# still there and comes off the front; when it is shorter, Windows already took it off and nothing is
-# dropped. Unproven on a real PC.
+# beat lands after it (the fault Dustin turned down on Oct 25). _drop_warmup checks what Windows' own Media
+# Foundation gave against the lengths a decode could have: when it is a decode that kept the warm-up, the
+# warm-up comes off the front; when Windows already took it off, nothing is dropped; when it is neither,
+# nothing is dropped either (a song a few milliseconds late beats a song cut short).
+#
+# Seen on GitHub's Windows machines (Nov 6, 2026, Windows Server 2025, the test songs in tests/fixtures):
+# for an MP3, Media Foundation takes the decoder's own 529 samples off the front, as the Mac's afconvert does,
+# but keeps LAME's delay (576 samples, 13 ms), so what comes back is 529 samples shorter than a decode that
+# kept everything; for a constant-rate MP3 it also plays the silent Info frame first (26 ms more). Before this
+# was known, MP3 beats came back a step (variable rate) and three steps (constant rate) later than on the Mac,
+# whose own clicks are 13.1 ms late (measured to 0.1 ms with tests/fixtures/decode_report.py). So for that
+# shape only LAME's delay (and the Info frame) comes off. The Mac's afconvert is the Mac's route and is not
+# changed here.
+
+_MP3_DECODER_DELAY = 529     # samples every MP3 decoder adds at the front
+_LAME_DELAY = 576            # LAME's own delay, the usual one; used only when the file doesn't say
 
 def _itunes_note(b):
     """The iTunes gapless note (iTunSMPB) as (encoder delay, padding, samples played), or None."""
@@ -996,10 +1007,34 @@ def _mp4_warmup(path):
     return None
 
 
+def _mp3_frames(path, p, size):
+    """Every sound frame of an MP3 counted, from the first one at byte p: (frames, samples a frame), or None
+    when the count can't be trusted (a frame that changes kind part way, a file over 64 MB)."""
+    if size > 64 * 1024 * 1024:
+        return None
+    with open(path, "rb") as f:
+        b = f.read(size)
+    first = _mpa_frame(b, p)
+    if not first:
+        return None
+    q, n = p, 0
+    while True:
+        fh = _mpa_frame(b, q)
+        if not fh:
+            break
+        if fh[1] != first[1] or fh[2] != first[2]:
+            return None
+        q += fh[0]
+        n += 1
+    return (n, first[1]) if n else None
+
+
 def _mp3_warmup(path):
-    """The same for an MP3 with a LAME (or ffmpeg) note in its first frame, which says the encoder's delay
-    and padding; True at the end: some decoders also play that first frame, a frame of silence. None when the
-    file doesn't say."""
+    """The same for an MP3: from the LAME (or ffmpeg) note in its first frame, which says the encoder's delay;
+    True at the end when that first frame is a header frame, which some decoders play as a frame of silence.
+    A file with no note at all has its frames counted and LAME's usual delay assumed (most MP3s are LAME's;
+    another encoder's few milliseconds more or less are the most it can be off by). None when the file can't
+    be measured (Fraunhofer's VBRI header, a header with no frame count, a frame count that can't be trusted)."""
     size = os.path.getsize(path)
     with open(path, "rb") as f:
         b = f.read(min(size, 1024 * 1024))
@@ -1011,21 +1046,29 @@ def _mp3_warmup(path):
     if p is None:
         return None
     flen, spf, rate, bitrate, mpeg1, mono = h
+    if not rate:
+        return None
     x = p + 4 + ((17 if mono else 32) if mpeg1 else (9 if mono else 17))
-    if b[x:x + 4] not in (b"Xing", b"Info"):
+    if b[x:x + 4] in (b"Xing", b"Info"):
+        flags = struct.unpack_from(">I", b, x + 4)[0]
+        if not flags & 1:
+            return None
+        frames = struct.unpack_from(">I", b, x + 8)[0]
+        if not frames:
+            return None
+        q = x + 8 + 4 + (4 if flags & 2 else 0) + (100 if flags & 4 else 0) + (4 if flags & 8 else 0)
+        if b[q:q + 4] in (b"LAME", b"Lavf", b"Lavc") and q + 24 <= len(b):
+            delay = int.from_bytes(b[q + 21:q + 24], "big") >> 12
+        else:
+            delay = _LAME_DELAY
+        return (delay + _MP3_DECODER_DELAY) / rate, [frames * spf / rate], spf / rate, True
+    if b[p + 36:p + 40] == b"VBRI":
         return None
-    flags = struct.unpack_from(">I", b, x + 4)[0]
-    if not flags & 1:
+    counted = _mp3_frames(path, p, size)
+    if not counted:
         return None
-    frames = struct.unpack_from(">I", b, x + 8)[0]
-    q = x + 8 + 4 + (4 if flags & 2 else 0) + (100 if flags & 4 else 0) + (4 if flags & 8 else 0)
-    if b[q:q + 4] not in (b"LAME", b"Lavf", b"Lavc") or q + 24 > len(b):
-        return None
-    v = int.from_bytes(b[q + 21:q + 24], "big")
-    delay = v >> 12
-    if not frames or not rate:
-        return None
-    return (delay + 529) / rate, [frames * spf / rate], spf / rate, True
+    frames, spf = counted
+    return (_LAME_DELAY + _MP3_DECODER_DELAY) / rate, [frames * spf / rate], spf / rate, False
 
 
 def _drop_warmup(raw, layout, channels, rate, path, first_time):
@@ -1052,6 +1095,8 @@ def _drop_warmup(raw, layout, channels, rate, path, first_time):
                 one = round(frame * rate)
                 kept += [(n + one, f + one) for n, f in base]
                 gone += [n + one - f for n, f in base]       # ... and took the warm-up off after it
+            if kind == ".mp3":                       # Media Foundation: the decoder's 529 off, the encoder's kept
+                kept += [(n - _MP3_DECODER_DELAY, f - _MP3_DECODER_DELAY) for n, f in list(kept)]
             for n, f in kept:
                 if abs(frames - n) <= near and all(abs(frames - g) > near for g in gone):
                     drop = f
