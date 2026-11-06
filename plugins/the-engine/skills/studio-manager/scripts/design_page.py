@@ -16,10 +16,16 @@ files, so nothing Python does can change a character of it:
                                            lines break, a font's name, a new text box
     design_js_text.py    DESIGN_TEXT_JS    text boxes, their style, the fonts and the font list (Designer.type)
     design_js_brand.py   DESIGN_BRAND_JS   the brand colors
+    design_js_plan.py    DESIGN_PLAN_JS    the rules for templates, filling frames and saving, with no page in
+                                           them (window.DesignPlan)
+    design_js_paint.py   DESIGN_PAINT_JS   ONE way to draw a layout on a canvas: a saved slide, the preview and
+                                           the gallery's little pictures (Designer.paint)
+    design_js_designs.py DESIGN_DESIGNS_JS the shoot menu, the design's name, My designs, Duplicate, + New
+                                           design (the gallery), Save as template, Fill empty frames
+    design_js_save.py    DESIGN_SAVE_JS    Preview swipe, the profile grid's crop, and Save slides
 
-SCRIPTS below is the order they go on the page. A later part (text and fonts; designs, templates and Save
-slides) adds its own string to that list, after the ones here: it finds window.Designer ready, and the page
-starts (Designer.start()) only after every part is in place.
+SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
+(Designer.start()) only after every part is in place.
 
 The look is the pickers' (arrange_page.CSS: Nicole's colours, the system's own font, light only) with the
 designer's own pieces in DESIGN_CSS (and the text and brand-color parts' own, beside their scripts). The
@@ -38,8 +44,12 @@ import arrange_page  # noqa: E402
 import brand  # noqa: E402
 from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
 from design_js_core import DESIGN_CORE_JS  # noqa: E402
+from design_js_designs import DESIGN_DESIGNS_CSS, DESIGN_DESIGNS_JS  # noqa: E402
 from design_js_edit import DESIGN_EDIT_JS  # noqa: E402
 from design_js_model import DESIGN_MODEL_JS  # noqa: E402
+from design_js_paint import DESIGN_PAINT_JS  # noqa: E402
+from design_js_plan import DESIGN_PLAN_JS  # noqa: E402
+from design_js_save import DESIGN_SAVE_CSS, DESIGN_SAVE_JS  # noqa: E402
 from design_js_text import DESIGN_TEXT_CSS, DESIGN_TEXT_JS  # noqa: E402
 from design_js_type import DESIGN_TYPE_JS  # noqa: E402
 
@@ -144,11 +154,14 @@ SCRIPTS = [
     ("DESIGN_TYPE_JS", DESIGN_TYPE_JS),
     ("DESIGN_TEXT_JS", DESIGN_TEXT_JS),
     ("DESIGN_BRAND_JS", DESIGN_BRAND_JS),
-    # HOOK (stage D): ("DESIGN_DESIGNS_JS", ...)  designs bar, gallery, templates, shoot menu, preview, Save slides
+    ("DESIGN_PLAN_JS", DESIGN_PLAN_JS),
+    ("DESIGN_PAINT_JS", DESIGN_PAINT_JS),
+    ("DESIGN_DESIGNS_JS", DESIGN_DESIGNS_JS),
+    ("DESIGN_SAVE_JS", DESIGN_SAVE_JS),
 ]
 
 # The styles of the parts added after the strip, in the order their scripts go on the page.
-PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS
+PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS
 
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))
@@ -158,6 +171,13 @@ TRAY_HINT = ("Drag a photo onto a slide to add it, or onto a frame to put it the
              "Click one to put it in the selected frame, or in the next empty spot.")
 SNAP_TITLE = ("Photos line up with the slides and with each other as you drag. "
               "Hold Option (Alt on a PC) while you drag to turn it off for a moment.")
+# The bar at the bottom of the window: looking at the carousel as Instagram will show it, and saving it.
+PREVIEW = "Preview swipe"
+GRID_CROP = "Profile grid crop"
+SAVE_SLIDES = "Save slides"
+SAVE_ANYWAY = "Save anyway"
+GO_BACK = "Go back"
+OPEN_CAROUSEL = "Open the Carousel folder"
 
 
 def plain_page(words):
@@ -186,16 +206,16 @@ def page_html(kit_name):
         "<p class='lede'>" + html.escape(LEDE) + "</p>"
         "<p class='topline' id='l-reach' hidden></p><p class='topline' id='l-missing' hidden></p><p class='topline' id='l-dropped' hidden></p>"
         "</header>"
-        # The top row: the open design. HOOK (stage D): the shoot menu goes before #g-design; the name becomes a
-        # box, and My designs, Duplicate, + New design, Save as template and Fill empty frames are added to this
-        # row with Designer.tools.group(id, label, 'tools-designs').
+        # The top row: the shoot and the open design. The scripts put the shoot menu before #g-design, a box to
+        # type the name in beside #d-name (which is then hidden), and My designs, Duplicate design, + New design,
+        # Save as template and Fill empty frames after it.
         "<div class='d-tools' id='tools-designs'>"
         "<div class='group' id='g-design'><span class='lbl'>Design</span><b class='dname' id='d-name'></b>"
         "<span class='savestate' id='d-status' role='status'></span></div>"
         "</div>"
         # The second row: the whole carousel. The scripts add to it with Designer.tools.group(id, label): the
-        # brand colors (put beside Background) and + Add text are there; HOOK (stage D): Preview swipe and
-        # Save slides.
+        # brand colors (put beside Background) and + Add text are there. Preview swipe and Save slides are
+        # in the bar at the bottom of the window.
         "<div class='d-tools' id='tools-main'>"
         "<div class='group' id='g-slides'><span class='lbl'>Slides</span>"
         "<button class='tb' id='slides-minus' type='button' aria-label='One fewer slide'>&minus;</button><b id='slides-count'></b>"
@@ -221,6 +241,22 @@ def page_html(kit_name):
         "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span></div>"
         "<p class='hint' id='trayhint'>" + html.escape(TRAY_HINT) + "</p>"
         "<div class='thumbs' id='thumbs'></div></section>"
+        # The bar at the bottom of the window. Every line Save slides says, its two questions' buttons, and
+        # "Open the Carousel folder" with the answer it brings, are here, beside the button that was pressed.
+        # The bar is pinned to the bottom and grows upward, so the three buttons that are always there never
+        # move when a line arrives.
+        "<div class='sv-bar' id='savebar'><div class='sv-in'>"
+        "<button class='tb' id='preview-btn' type='button' disabled>" + html.escape(PREVIEW) + "</button>"
+        "<label class='hint'><input type='checkbox' id='gridcrop'> " + html.escape(GRID_CROP) + "</label>"
+        "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_SLIDES) + "</button>"
+        "<span class='gline' id='save-line' role='status'></span>"
+        "<button class='tb main sv-ans' id='save-yes' type='button' hidden>" + html.escape(SAVE_ANYWAY) + "</button>"
+        "<button class='tb sv-ans' id='save-no' type='button' hidden>" + html.escape(GO_BACK) + "</button>"
+        # the folder button and what pressing it brings: the answer is a small note right over the button,
+        # so its coming never moves the button from under the pointer
+        "<span class='sv-open sv-ans' id='open-wrap' hidden><button class='tb' id='open-carousel' type='button'>" + html.escape(OPEN_CAROUSEL) + "</button>"
+        "<span class='sv-bub' id='open-line' role='status'></span></span>"
+        "</div></div>"
         "</div>"
     )
     scripts = "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + "<script>" + DESIGN_START_JS + "</script>"

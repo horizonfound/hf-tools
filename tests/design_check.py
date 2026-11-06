@@ -20,9 +20,11 @@ Three parts (--only server | page | browser runs one): the server side, by reque
 scripts by themselves, under the Mac's own JavaScript engine; and the real page in a hidden Chrome driven by
 tests/chrome_drive.py (SKIP when there is no Chrome). The last two are in tests/design_page_check.py (the
 strip, the frames, the tray) and tests/design_text_check.py (text boxes, fonts, brand colors; --only text
-runs just its browser part). The browser part uses --port + 5 and --port + 7 for a page server of its own,
-and --port + 8 for the text part's. The text part asks Google Fonts for a few fonts when the internet is
-there, and skips those checks when it is not.
+runs just its browser part), and tests/design_save_check.py (designs, templates, the shoot menu, the preview
+and Save slides, with Pillow reading every slide the page saved; --only designs runs just that part and its
+own page checks). The browser part uses --port + 5 and --port + 7 for a page server of its own, --port + 8
+for the text part's and --port + 9 for the designs part's. The text and designs parts ask Google Fonts for
+a few fonts when the internet is there, and skip those checks when it is not.
 
 Exit 0 when every case passes, 1 otherwise.
 """
@@ -1130,9 +1132,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
-                         "(the strip, then text, fonts and brand colors); text: only the text, fonts and brand colors part of that")
+                         "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
+                         "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks)")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1150,7 +1153,7 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if (work / "fake").exists() or (work / "browser").exists() or (work / "text").exists():
+    if (work / "fake").exists() or (work / "browser").exists() or (work / "text").exists() or (work / "designs").exists() or (work / "designs-photos").exists():
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1159,7 +1162,7 @@ def main():
     r = subprocess.run([PY, str(ROOT / "tools" / "check_plugin.py")], capture_output=True, text=True)
     case("tools/check_plugin.py prints CLEAN", r.returncode == 0 and "CLEAN" in r.stdout, r.stdout[-300:])
     for f in ("design.py", "design_page.py", "design_js_model.py", "design_js_core.py", "design_js_edit.py", "design_js_type.py", "design_js_text.py",
-              "design_js_brand.py", "arrange.py", "posting_queue.py"):
+              "design_js_brand.py", "design_js_plan.py", "design_js_paint.py", "design_js_designs.py", "design_js_save.py", "arrange.py", "posting_queue.py"):
         r = subprocess.run([APPLE, "-c", "import sys; compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1], 'exec')", str(SCRIPTS / f)], capture_output=True, text=True)
         case(f"{f} compiles under the Mac's own /usr/bin/python3", r.returncode == 0, r.stderr[-200:])
     src = (SCRIPTS / "design.py").read_text(encoding="utf-8")
@@ -1167,10 +1170,13 @@ def main():
     case("design.py runs no Mac-only program and uses no Mac-only call of its own", not re.search(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only), re.findall(r"\b(sips|osascript|chflags|caffeinate|fcntl)\b|/Volumes|%-d", code_only)[:5])
     case("design.py names the encoding of every text file it reads or writes", not re.search(r"\.(read_text|write_text)\((?![^)]*encoding=)", src) and not re.search(r"open\([^)]*\"[rwa]\"\s*\)", src))
     import design_page_check
+    import design_save_check
     import design_text_check
     if a.only in (None, "page"):
         design_page_check.check_page(case, work)
         design_text_check.check_type_page(case, work)
+    if a.only in (None, "page", "designs"):
+        design_save_check.check_designs_page(case, work)
     if a.only in (None, "server"):
         check_all(work, a.port)
     if a.only in (None, "browser"):
@@ -1185,6 +1191,14 @@ def main():
             design_text_check.check_type_browser(case, work, a.port + 8, make_kit, Server, post, get_json)
         except Exception as e:  # noqa: BLE001
             case("the real-browser checks of text, fonts and brand colors ran to the end", False, f"{type(e).__name__}: {e}")
+    if a.only in (None, "browser", "designs"):
+        # designs, templates, the preview and Save slides: two more pretend shoots (one from photos drawn
+        # here, so every saved pixel is known) and a page server on the port after those
+        try:
+            design_save_check.check_designs_browser(case, work, a.port + 9, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of designs, templates and Save slides ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
     bad = [n for n, ok in results if not ok]
     print()
     print(f"{len(results)} cases, {len(results) - len(bad)} passed, {len(bad)} failed." + (f"  Work folder: {work}" if bad or a.work else f"  Work folder (safe to throw away): {work}"))
