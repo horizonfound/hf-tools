@@ -48,8 +48,11 @@ DESIGN_BRAND_JS = r"""
   addBtn.setAttribute('aria-label', BW.add); addBtn.title = BW.addTitle;
   var picker = el('input', 'bc-pick'); picker.type = 'color'; picker.id = 'brand-pick'; picker.tabIndex = -1;
   picker.setAttribute('aria-hidden', 'true');
+  // the line a press brings (Saved. / Taken off... Put it back / as many as fit) is in the selection bar's first
+  // line, with the other lines a press brings, so it never lies over words or covers a button
   var line = el('span', 'gline'); line.id = 'brand-line'; line.setAttribute('role', 'status');
-  g.appendChild(label); g.appendChild(row); g.appendChild(addBtn); g.appendChild(picker); g.appendChild(line);
+  g.appendChild(label); g.appendChild(row); g.appendChild(addBtn); g.appendChild(picker);
+  D.selbar.cap(line, 'line');
 
   function colors(){ var b = D.S && D.S.brand; return b && Array.isArray(b.colors) ? b.colors.filter(function(c){ return COLOR.test(c); }) : []; }
   function most(){ var b = D.S && D.S.brand; return b && b.max > 0 ? b.max : 16; }
@@ -57,7 +60,9 @@ DESIGN_BRAND_JS = r"""
 
   function say(text, undoColor){
     line.textContent = '';
+    line.removeAttribute('title');
     if (!text) return;
+    line.title = text;
     line.appendChild(el('span', '', text));
     if (undoColor) {
       var b = el('button', 'tb', BW.back); b.type = 'button'; b.id = 'brand-back';
@@ -153,16 +158,22 @@ DESIGN_BRAND_JS = r"""
 
 DESIGN_BRAND_CSS = """
 .bc-row{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+/* in the slides' row (from 768 px up, where it is a row) the swatches take the room their group has and no more:
+   more colors than fit on one line wrap under the first, with the label and + staying beside them */
+@media(min-width:768px){#brand-row{flex:1 1 0;max-width:max-content}}
 .bc{position:relative;display:inline-flex}
 .bc-sw{width:24px;height:24px;border-radius:6px;border:1px solid rgba(0,0,0,.2);padding:0;cursor:pointer}
 .bc-sw:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
-.bc-row.small .bc-sw{width:20px;height:20px}
+.bc-row.small{gap:4px}
+.bc-row.small .bc-sw{width:18px;height:18px}
 .bc-off{position:absolute;top:-7px;right:-7px;width:16px;height:16px;border-radius:50%;border:0;padding:0;background:var(--ink);color:#fff;font:700 11px/16px var(--sans);text-align:center;cursor:pointer;display:none}
 .bc:hover .bc-off,.bc:focus-within .bc-off{display:block}
 @media(hover:none){.bc-off{display:block}}
 @media(hover:none) and (pointer:coarse){.bc-row{gap:14px}.bc-row .bc-sw{width:32px;height:32px}.bc-off{width:22px;height:22px;top:-10px;right:-10px;font:700 14px/22px var(--sans)}}
 .group input.bc-pick{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
 #g-brand{position:relative}
-#g-brand .gline{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
-#g-brand .gline:empty{display:none}
+#brand-line{display:inline-flex;gap:6px;align-items:center}
+#brand-line>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#brand-line .tb{flex:none}
+#brand-line:empty{display:none}
 """

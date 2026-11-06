@@ -414,10 +414,14 @@ DESIGN_CORE_JS = r"""
       return g;
     },
     button: function(group, text, act, title){ var b = el('button', 'tb', text); b.type = 'button'; b.dataset.a = act; if (title) { b.title = title; b.setAttribute('aria-label', text); } group.appendChild(b); return b; },
-    // something that belongs in the bar's first line, after the help line (Fill empty frames and its line)
-    cap: function(node){ $('selcap').appendChild(node); return node; },
-    line: function(text){ $('selline').textContent = text || ''; }
+    // something that belongs in the bar's first line: after the help line (Fill empty frames and its line), or,
+    // with where = 'line', among the lines a press brings, before the help line (+ Add text's, Brand colors')
+    cap: function(node, where){ var c = $('selcap'); if (where === 'line') c.insertBefore(node, $('selline')); else c.appendChild(node); return node; },
+    line: function(text){ D.say($('selline'), text); }
   };
+  // A line of words in the bar's first line: the words, and the same words as its tooltip, for when the line is
+  // cut short at its end (the first line is one line from 768 px up).
+  D.say = function(e, text){ text = text || ''; if (e.textContent !== text) e.textContent = text; if (text) e.title = text; else e.removeAttribute('title'); };
   D.on('render', function(){
     var b = D.selected(), kind = b ? D.typeOf(b) : 'photo';
     $('selbar').classList.toggle('off', !b);

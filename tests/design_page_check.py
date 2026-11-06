@@ -301,9 +301,11 @@ def check_page(case, work):
     bare = re.sub(r"//[^\n]*", "", src["DESIGN_MODEL_JS"])           # the script without its comments
     case("the rules script has no page in it (no document, no window but the one it hangs itself on)",
          "document" not in bare and bare.count("window") == 2, bare.count("window"))
-    # the lines a press brings sit beside the buttons that were pressed
-    case("designer page: the line a Slides press brings is inside the Slides group, beside its buttons",
-         bool(re.search(r"<div class='group' id='g-slides'>(?:(?!</div>).)*id='slides-plus'(?:(?!</div>).)*id='slides-line'(?:(?!</div>).)*</div>", page, re.S)))
+    # the lines a press brings are in the selection bar's first line (a line there never lies over other words
+    # and never covers a button; the lay-f fix, Nov 6)
+    case("designer page: the line a Slides press brings is in the selection bar's first line, before the help line, not inside the Slides group",
+         bool(re.search(r"<div class='selcap' id='selcap'><span class='gline' id='slides-line' role='status'></span>(?:(?!</div>).)*id='selhint'", page, re.S))
+         and not re.search(r"<div class='group' id='g-slides'>(?:(?!</div>).)*id='slides-line'", page, re.S))
     case("designer page: the line a selection button brings, and the help line, are inside the selection's own bar, in its first line",
          bool(re.search(r"<div class='selbar off' id='selbar'><div class='selcap' id='selcap'>(?:(?!</div>).)*id='selline'(?:(?!</div>).)*id='selhint'(?:(?!</div>).)*</div>", page, re.S)))
     case("designer page: the line a tray click brings is on the tray's own heading line",

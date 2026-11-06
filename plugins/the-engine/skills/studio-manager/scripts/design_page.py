@@ -94,29 +94,44 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .savestate{display:inline-block;width:86px;font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .savestate.bad{color:var(--accent-d)}
 #toolline{margin:0 0 5px}
-/* the bar for the selected thing: one line of words (the help line, the line a press brings, and Fill empty frames
-   while there are any), then its buttons; with nothing selected, the help line alone in a quiet box */
+/* the bar for the selected thing: one line of words (the line a press brings, the help line, and Fill empty frames
+   while there are any), then its buttons; with nothing selected, the help line alone in a quiet box. The lines a
+   press on a tool brings (Slides, + Add text, Brand colors) are in this first line too, so a line never lies over
+   other words and never covers a button. The help line has no claim of its own on the line (flex-basis 0): it
+   fills what the lines a press brings and Fill leave, and gives way first when the line is full (its whole words
+   are in its tooltip); a line a press brings is cut only when the lines alone are too long, and carries its words
+   in its tooltip too. (A help line that shrank instead would leave the other line a fraction of a pixel short,
+   and Chrome draws an ellipsis for that.) */
 .selbar{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
 .selcap{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;min-height:24px;font-size:12.5px;color:var(--soft)}
-.selcap #selhint{flex:1 4 auto;min-width:0}
-.selcap #selline,.selcap #designs-line{flex:0 1 auto;min-width:0;max-width:100%}
+.selcap #selhint{flex:1 1 0%;min-width:0}
+.selcap .gline{flex:0 1 auto;min-width:0;max-width:100%}
 .selcap #fill-holes{flex:none;margin-left:auto}
 .selrows{display:flex;flex-wrap:wrap;gap:4px;align-items:stretch}
 .selbar.off .selrows{display:none}
-.selbar.off .selcap{flex:1 1 auto;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:10px;padding:6px 12px}
-.selbar.off .selcap #selhint{flex:0 1 auto}
-.selbar.off .selcap #fill-holes{margin-left:0}
-@media(max-width:1023px){.selcap #fill-holes{margin-left:0}}
+.selbar.off .selcap{flex:1 1 auto;justify-content:center;border:1px solid var(--line);border-radius:10px;padding:6px 12px}
+.selbar.off .selcap #selhint{text-align:center}
+@media(max-width:767px){.selcap #fill-holes{margin-left:0}.selcap #selhint{flex-basis:auto}}
+/* from 768 px up the bar's first line is one line (the help line gives way, cut at its end) and room is held under
+   it for the selected thing's buttons: three rows between 768 and 1023 px, two from 1024 px up, where the rows
+   are wide enough. So clicking a photo never moves the strip from under the pointer. */
+@media(min-width:768px){
+.selbar{min-height:calc(var(--row) * 3 + 36px)}
+/* the Brand colors group takes whatever room is left in the slides' row and no more, so saving a fourth color
+   never pushes Undo onto a row of its own: with more colors than fit, its swatches wrap inside the group (its
+   row's own rule is in the brand colors' styles). The text's Color group does the same in its row. On a narrower
+   window the rows are not rows, and the groups take their own width as before. */
+#g-brand{flex:1 1 0;max-width:max-content}
+.selrows #sel-color{flex:1 1 0;max-width:max-content}
+.selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
+.selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap .gline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
 @media(min-width:1024px){
 .selbar{min-height:calc(var(--row) * 2 + 32px)}
-.selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
-.selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap #selline,.selbar:not(.off) .selcap #designs-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* a line a press on a tool brings sits right under its own group, over the room held for the bar below, so it moves nothing */
-.d-tools .group>.gline{position:absolute;left:0;top:calc(100% + 5px);z-index:12;width:max-content;max-width:calc(100vw - 48px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--accent-l);border-radius:8px;padding:2px 9px;line-height:18px;box-shadow:var(--shadow)}
-.d-tools .group>.gline:empty{display:none}
 }
-/* between 1024 and 1180 the rows are tight: narrower boxes and sliders, a little less padding on a button */
-@media(max-width:1179px){.group{padding:3px 6px}.group .dz-name{width:150px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:72px}.tb{padding:4px 6px}.sw{width:20px;height:20px}}
+/* between 1024 and 1180 the rows are tight: narrower boxes and sliders, a little less padding on a button and a
+   group, the brand swatches the size of the background's, so six saved brand colors still sit on one line */
+@media(max-width:1179px){.d-tools{gap:3px}.group{padding:3px 5px}.group .dz-name{width:180px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:64px}.tb{padding:4px 6px}.sw{width:20px;height:20px}#g-brand .bc-row{gap:4px}#g-brand .bc-sw{width:20px;height:20px}}
 
 .stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(42,38,34,.45)}
 .stripwrap{position:relative;display:inline-block;vertical-align:top}
@@ -262,8 +277,7 @@ def page_html(kit_name):
         "<div class='d-tools' id='tools-main'>"
         "<div class='group' id='g-slides'><span class='lbl'>Slides</span>"
         "<button class='tb' id='slides-minus' type='button' aria-label='One fewer slide'>&minus;</button><b id='slides-count'></b>"
-        "<button class='tb' id='slides-plus' type='button' aria-label='One more slide'>+</button>"
-        "<span class='gline' id='slides-line' role='status'></span></div>"
+        "<button class='tb' id='slides-plus' type='button' aria-label='One more slide'>+</button></div>"
         "<div class='group' id='g-bg'><span class='lbl'>Background</span>" + swatches +
         "<input type='color' id='bgc' value='#ffffff' aria-label='Pick any background color' title='Pick any color'></div>"
         "<div class='group' id='g-view'><span class='lbl'>" + html.escape(VIEW) + "</span>"
@@ -273,12 +287,14 @@ def page_html(kit_name):
         "<div class='group' id='g-undo'><button class='tb' id='undo' type='button' disabled>Undo</button></div>"
         "</div>"
         "<p class='gline' id='toolline' role='status'></p>"
-        # The bar for the selected thing. One line first: the line a press brings (#selline), the help line
+        # The bar for the selected thing. One line first: the lines a press brings (#slides-line here; the + Add
+        # text and Brand colors scripts put theirs beside it, and #selline is a selection button's), the help line
         # (#selhint), and, while the design has an empty frame, "Fill N empty frames" with its own line (both
         # put here by the designs script). Under it, the groups of buttons for the selected thing, added by the
         # scripts (Designer.selbar.group) into #selrows. With nothing selected the groups are hidden and the
         # help line sits alone in the room held for them, so the strip never moves when the selection changes.
-        "<div class='selbar off' id='selbar'><div class='selcap' id='selcap'><span class='gline' id='selline' role='status'></span>"
+        "<div class='selbar off' id='selbar'><div class='selcap' id='selcap'><span class='gline' id='slides-line' role='status'></span>"
+        "<span class='gline' id='selline' role='status'></span>"
         "<span class='hint' id='selhint'></span></div><div class='selrows' id='selrows'></div></div>"
         "<section class='stage' id='stage'><div class='stripwrap' id='stripwrap'><div class='labels' id='labels'></div>"
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"

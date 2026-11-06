@@ -362,7 +362,7 @@ DESIGN_DESIGNS_JS = r"""
   D.selbar.cap(line);
   var fillBtn = button(DW.fill(0), 'fill-holes'); fillBtn.title = DW.fillTitle; fillBtn.disabled = true; fillBtn.hidden = true;
   D.selbar.cap(fillBtn);
-  function say(text){ line.textContent = text || ''; }
+  function say(text){ D.say(line, text); }
   D.on('change', function(){ say(''); });
   fillBtn.addEventListener('click', function(){
     if (!D.st || D.blocked) return;

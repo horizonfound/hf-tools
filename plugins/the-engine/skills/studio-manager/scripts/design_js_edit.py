@@ -233,7 +233,7 @@ DESIGN_EDIT_JS = r"""
   [['Center on slide', 'center'], ['Bring forward', 'front'], ['Send back', 'back'], ['Duplicate', 'dup'], ['Remove', 'del']].forEach(function(x){ D.selbar.button(g3, x[0], x[1]); });
 
   function lines(which, text){
-    $('slides-line').textContent = which === 'slides' ? text : '';
+    D.say($('slides-line'), which === 'slides' ? text : '');
     D.selbar.line(which === 'sel' ? text : '');
     $('trayline').textContent = which === 'tray' ? text : '';
   }

@@ -396,13 +396,14 @@ DESIGN_TEXT_JS = r"""
   // + Add text, in the row of tools for the whole carousel, before the Size slider
   var gAdd = D.tools.group('g-text', '', 'tools-main', 'g-view');
   var addBtn = D.tools.button(gAdd, TW.addText, 'add-text');
+  // the line a press brings is in the selection bar's first line, with the other lines a press brings
   var addLine = el('span', 'gline'); addLine.id = 'text-line'; addLine.setAttribute('role', 'status');
-  gAdd.appendChild(addLine);
+  D.selbar.cap(addLine, 'line');
   addBtn.addEventListener('click', function(){
     if (!D.st || D.blocked) return;
-    addLine.textContent = '';
-    if (D.st.blocks.length >= M.RULES.blocks) { addLine.textContent = D.WORDS.many; return; }
-    if (D.st.blocks.filter(M.isText).length >= T.RULES.texts) { addLine.textContent = TW.manyTexts(T.RULES.texts); return; }
+    D.say(addLine, '');
+    if (D.st.blocks.length >= M.RULES.blocks) { D.say(addLine, D.WORDS.many); return; }
+    if (D.st.blocks.filter(M.isText).length >= T.RULES.texts) { D.say(addLine, TW.manyTexts(T.RULES.texts)); return; }
     // on the slide of whatever is selected (they are working there), else on the first slide in sight
     var cur = D.selected();
     var b = T.newText(M.nextId(D.st), cur ? D.slideOf(cur) : D.firstSlide(), D.st.bg, D.S.text);
@@ -415,7 +416,7 @@ DESIGN_TEXT_JS = r"""
     D.reveal(b.id);
     focusWords();
   });
-  D.on('change', function(){ addLine.textContent = ''; });
+  D.on('change', function(){ D.say(addLine, ''); });
   D.on('render', function(){ addBtn.disabled = !!D.blocked; });
 
   // the bar for a selected text box
@@ -465,12 +466,12 @@ DESIGN_TEXT_JS = r"""
   var italBtn = tbtn('I', 'italic', '', TW.italic); italBtn.classList.add('tx-i');
   var upBtn = tbtn('AA', 'upper', '', TW.upper);
   var alBtns = [tbtn(TW.left, 'al', 'left'), tbtn(TW.center, 'al', 'center'), tbtn(TW.right, 'al', 'right')];
-  g2.appendChild(el('span', 'lbl', TW.spacing));
+  // each label stays beside its slider when the group wraps on a narrow window (a pair never breaks in two)
+  function pair(words, r){ var p = el('span', 'pair'); p.appendChild(el('span', 'lbl', words)); p.appendChild(r); g2.appendChild(p); }
   var lsR = slider('t-ls', TW.spacingLabel, T.RULES.lsSlider[0], T.RULES.lsSlider[1]);
-  g2.appendChild(lsR);
-  g2.appendChild(el('span', 'lbl', TW.lines));
+  pair(TW.spacing, lsR);
   var lhR = slider('t-lh', TW.linesLabel, T.RULES.lhSlider[0], T.RULES.lhSlider[1]);
-  g2.appendChild(lhR);
+  pair(TW.lines, lhR);
 
   function setLimits(){
     ta.maxLength = T.RULES.textMax;
@@ -704,6 +705,7 @@ DESIGN_TEXT_CSS = """
 .tx-words:focus,.tx-num:focus,.fp-search:focus{outline:2px solid var(--sel);outline-offset:-1px}
 .tb.tx-b{font-weight:800}
 .tb.tx-i{font-style:italic}
+.group .pair{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .fp{position:relative;display:inline-flex}
 .fp-btn{min-width:150px;max-width:230px;text-align:left;font-weight:400;font-size:14px;padding-top:3px;padding-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:30000;width:300px;max-width:calc(100vw - 24px);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px}

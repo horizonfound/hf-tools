@@ -12,7 +12,8 @@ What must hold, like Nicole's page:
     most two rows, a text box its controls in at most two rows
   * "Fill N empty frames" is in that bar's first line, only while there is an empty frame, and takes no room otherwise
   * no label in the slides' row changes length with the selection (Brand colors stays Brand colors)
-  * a line a press on a tool brings (Slides, + Add text, Brand colors) sits under its own group and moves nothing
+  * a line a press on a tool brings (Slides, + Add text, Brand colors) is in that bar's first line, before the help line:
+    it moves nothing, lies over no words and covers no button; the help line gives way first (its words in its tooltip)
   * the strip starts with a slide about a third of the window tall (230 to 460 px), however many slides, and the
     Size slider runs from "every slide fits across the window" to large, with the arrow keys stepping by a quarter
   * the strip's top is at most about 300 px down at 1024 x 768, no lower at wider windows, and the photos' heading
@@ -38,6 +39,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 W, H = 1080, 1350
 
 SIZES = ((1024, 768), (1280, 900), (900, 700), (1440, 900))
+# sixteen brand colors, as many as the Assistant keeps
+BRAND = ["#c4683f", "#1b1917", "#5a5048", "#e4ddd3", "#3d7a5a", "#8a6bb0", "#2f7cf6", "#f0a020", "#a03030", "#306070", "#d0b090", "#405030", "#703050", "#909090", "#204060", "#c0c0a0"]
 
 MEASURE = r"""
 (function(){
@@ -72,8 +75,24 @@ def check_layout_page(case, work):
     case("layout: the room held for the selection bar is two rows and its first line, at 1024 px and up",
          re.search(r"@media\(min-width:1024px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 2 \+ \d+px\)\}", css) is not None
          and ".selbar.off .selrows{display:none}" in css)
-    case("layout: a line a press brings in the tool rows sits under its own group (absolute, at 1024 px and up), not in the row",
-         re.search(r"@media\(min-width:1024px\)\{[^@]*\.d-tools \.group>\.gline\{position:absolute;left:0;top:calc\(100% \+ \d+px\)", css) is not None)
+    case("layout: from 768 px up the room held is three rows and its first line, and the first line is one line (the help line cut at its end)",
+         re.search(r"@media\(min-width:768px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 3 \+ \d+px\)\}", css) is not None
+         and re.search(r"@media\(min-width:768px\)\{[^@]*\.selbar:not\(\.off\) \.selcap\{flex-wrap:nowrap;height:24px\}", css) is not None)
+    case("layout: no line a press brings is drawn over the page (nothing in the tool rows is absolute); the lines are in the bar's first line, "
+         "where the help line has no claim of its own (flex-basis 0) and gives way first",
+         ".d-tools .group>.gline" not in css and "position:absolute" not in css.split(".stage{")[0].split("#toolline")[1]
+         and re.search(r"\.selcap #selhint\{flex:1 1 0%;min-width:0\}", css) is not None and re.search(r"\.selcap \.gline\{flex:0 1 auto;min-width:0", css) is not None
+         and "id='slides-line' role='status'></span><span class='gline' id='selline'" in page)
+    case("layout: the Brand colors group and the text's Color group take the room their row leaves and no more (their swatches wrap inside, never the row)",
+         re.search(r"@media\(min-width:768px\)\{[^@]*#g-brand\{flex:1 1 0;max-width:max-content\}", css) is not None
+         and re.search(r"@media\(min-width:768px\)\{[^@]*\.selrows #sel-color\{flex:1 1 0;max-width:max-content\}", css) is not None
+         and "@media(min-width:768px){#brand-row{flex:1 1 0;max-width:max-content}}" in design_page.DESIGN_BRAND_CSS)
+    case("layout: with nothing selected the quiet box has a plain hairline, not a dashed one (dashed is the page's word for 'drop here')",
+         ".selbar.off .selcap{flex:1 1 auto;justify-content:center;border:1px solid var(--line)" in css and "dashed" not in css.split(".selbar")[1].split(".stage{")[0])
+    case("layout: the design's name box is 180 px wide between 1024 and 1179 px (150 cut ordinary names while the row had room)",
+         re.search(r"@media\(max-width:1179px\)\{[^@]*\.group \.dz-name\{width:180px\}", css) is not None)
+    case("layout: a label and its slider in the text's style group are a pair that never breaks in two", ".group .pair{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}" in design_page.DESIGN_TEXT_CSS
+         and "function pair(words, r)" in design_page.DESIGN_TEXT_JS)
     case("layout: the selection's ring is its own element, cut at the strip's edges, and a handle off the strip is not drawn",
          ".selbox .ring{" in css and ".h.out{display:none}" in css and "outline:2px solid var(--sel);pointer-events:none}\n.selbox.on" not in css)
     case("layout: the page behind a sheet is held still by a class on the page's root", "html.d-locked{overflow:hidden}" in css and "scrollbar-gutter:stable" in css)
@@ -219,6 +238,11 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                     case(f"{tag}: every help line fits in the bar's first line beside Fill empty frames", all(fits), fits)
                 else:
                     case(f"{tag}: the strip still starts no lower than it did (its top under 460 px with nothing selected)", m0["strip"]["top"] <= 460, m0["strip"]["top"])
+                    # under 1024 the room is held too (three rows and the first line from 768 px up): clicking a photo moved the strip 123 px here before
+                    case(f"{tag}: selecting a photo, then text, then nothing moves the strip's top by 0 px (room held under 1024 as well)",
+                         m0["strip"]["top"] == m1["strip"]["top"] == m2["strip"]["top"] == m3["strip"]["top"], (m0["strip"]["top"], m1["strip"]["top"], m2["strip"]["top"], m3["strip"]["top"]))
+                    case(f"{tag}: Fill 1 empty frame is in the bar's one-line first line with a photo selected, not on a row of its own",
+                         m1["fill"] and m1["selcap"]["h"] <= 26 and m1["selcap"]["top"] - 2 <= m1["fill"]["top"] and m1["fill"]["bottom"] <= m1["selcap"]["bottom"] + 2, (m1["fill"], m1["selcap"]))
                 # the save status: a slot of fixed width, so no word in it moves a button
                 moved = J(c, "(function(){ var s = document.getElementById('d-status'), b = document.getElementById('designs-btn').getBoundingClientRect().left, n = document.getElementById('new-design').getBoundingClientRect(), out = [];"
                              " ['saved', 'saving', 'notSaved', 'needsReload', 'retry'].forEach(function(k){ s.textContent = Designer.WORDS[k]; var r = document.getElementById('new-design').getBoundingClientRect();"
@@ -251,6 +275,10 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                 c.js("Designer.select(8)")
                 m2 = measure(c)
                 case(f"{tag}: text selected: its controls show and the page has no sideways scroll", m2["shown"] == ["sel-text", "sel-color", "sel-style", "sel-all"] and m2["scrollW"] <= w, (m2["shown"], m2["scrollW"]))
+                pairs = J(c, "(function(){ return ['t-ls', 't-lh'].map(function(id){ var r = document.getElementById(id), l = r.parentNode.querySelector('.lbl'); var a = r.getBoundingClientRect(), b = l.getBoundingClientRect();"
+                             " return [l.textContent, Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) <= 4, b.right <= a.left + 1, r.parentNode.classList.contains('pair')]; }); })()")
+                case(f"{tag}: Spacing and Lines each stay beside their slider when the style group wraps (a label never ends one line with its slider starting the next)",
+                     all(x[1] and x[2] and x[3] for x in pairs) and [x[0] for x in pairs] == ["Spacing", "Lines"], pairs)
                 case(f"{tag}: no error on the page", not c.page_errors(), c.page_errors())
 
         # =====================================================================================================
@@ -325,21 +353,98 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
             tsel = J(c, "(function(){ var s = document.querySelector('#over .selbox'); return Array.prototype.map.call(s.querySelectorAll('.h'), function(h){ return [h.dataset.h, h.classList.contains('out'), getComputedStyle(h).display !== 'none']; }); })()")
             case("clip: a text box on the strip shows its two side handles", [x for x in tsel if x[2]] == [["tl", False, True], ["br", False, True]], tsel)
 
-            # ---- a line a press brings sits under its own group and moves nothing ----
+            # ---- a line a press brings is in the bar's first line: it moves nothing, lies over nothing, covers no button ----
             open_page(c, D)
             before = measure(c)
             c.js("Designer.select(null)")
             c.click("#slides-minus")           # slide 7 has an empty frame on it
             after = measure(c)
-            line = J(c, "(function(){ var l = document.getElementById('slides-line'), g = document.getElementById('g-slides'); var r = l.getBoundingClientRect(), gr = g.getBoundingClientRect();"
-                        " return {text: l.textContent, top: r.top, left: r.left, right: r.right, gBottom: gr.bottom, gLeft: gr.left, abs: getComputedStyle(l).position}; })()")
-            case("a press that brings a line (one fewer slide, with slide 7 in use): the line sits right under the Slides group, inside the window",
-                 line["text"].startswith("Slide 7 still has something on it") and line["abs"] == "absolute" and line["gBottom"] <= line["top"] <= line["gBottom"] + 12
-                 and abs(line["left"] - line["gLeft"]) < 2 and line["right"] <= 1024, line)
+            LINE = r"""(function(id){ var l = document.getElementById(id), h = document.getElementById('selhint'), cap = document.getElementById('selcap'); var r = l.getBoundingClientRect(), hr = h.getBoundingClientRect(), cr = cap.getBoundingClientRect();
+                 var mid = document.elementFromPoint(hr.left + Math.min(40, hr.width / 2), hr.top + hr.height / 2);
+                 return {text: l.textContent, title: l.title, top: r.top, left: r.left, right: r.right, bottom: r.bottom, hintLeft: hr.left, hintTop: hr.top, hintW: hr.width, capTop: cr.top, capBottom: cr.bottom, pos: getComputedStyle(l).position,
+                         whole: l.scrollWidth <= l.clientWidth, overHint: mid ? mid.id : null, inCap: cap.contains(l), beforeHint: !!(l.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING)}; })"""
+            line = J(c, LINE + "('slides-line')")
+            case("a press that brings a line (one fewer slide, with slide 7 in use): the line is in the bar's first line, before the help line, whole, with its words as its tooltip",
+                 line["text"].startswith("Slide 7 still has something on it") and line["inCap"] and line["beforeHint"] and line["pos"] == "static" and line["whole"] and line["title"] == line["text"]
+                 and line["capTop"] <= line["top"] and line["bottom"] <= line["capBottom"] + 1 and line["right"] <= 1024, line)
             case("...and nothing moved: not the strip, not Undo, not the rows", after["stage"] == before["stage"] and after["undo"] == before["undo"] and after["tools2"] == before["tools2"], (before["stage"], after["stage"]))
             c.js("Designer.select(1)")
             after2 = measure(c)
-            case("...and selecting a photo under that line moves nothing either (the line lies over the bar's first line)", after2["stage"] == before["stage"] and after2["selrows"] == 2, after2["stage"])
+            line2 = J(c, LINE + "('slides-line')")
+            case("...and with a photo selected the line and the help line share the first line side by side: the help line starts after the line ends, and what is drawn over the help line's words is the help line (nothing lies over it)",
+                 after2["stage"] == before["stage"] and after2["selrows"] == 2 and line2["whole"] and line2["hintLeft"] >= line2["right"] and abs(line2["hintTop"] - line2["top"]) <= 2 and line2["hintW"] > 100 and line2["overHint"] == "selhint", (after2["stage"], line2))
+            undo_hit = J(c, "(function(){ var u = document.getElementById('undo').getBoundingClientRect(); var e = document.elementFromPoint(u.left + u.width / 2, u.top + u.height / 2); return e ? e.id : null; })()")
+            case("...and the Undo button is not covered by it", undo_hit == "undo", undo_hit)
+            # the help line has no claim of its own, so a long one is cut, with its whole words as its tooltip; the line a press brings is not
+            hint_cut = J(c, "(function(){ var h = document.getElementById('selhint'); return {cut: h.scrollWidth > h.clientWidth, title: h.title === h.textContent && h.title.length > 60}; })()")
+            case("...the long help line (a photo's) gives way, cut at its end, with its whole words in its tooltip", hint_cut["cut"] and hint_cut["title"], hint_cut)
+            # the Brand colors line (Saved.) and + Add text's line go to the same place
+            c.js("(function(){ var p = document.getElementById('brand-pick'); p.value = '#aa3366'; p.dispatchEvent(new Event('change', {bubbles: true})); })()")
+            c.wait_for("document.getElementById('brand-line').textContent.indexOf('Saved') === 0", 5)
+            bl = J(c, LINE + "('brand-line')")
+            case("a Brand colors press that brings a line (Saved. It's here for every shoot.): in the bar's first line too, whole, before the help line, the strip not moved",
+                 bl["inCap"] and bl["beforeHint"] and bl["whole"] and bl["title"].startswith("Saved") and measure(c)["stage"] == before["stage"], bl)
+            code, _ = post(P, "/design-brand", {"remove": "#aa3366"})
+            tl = J(c, "(function(){ var l = document.getElementById('text-line'); return {inCap: document.getElementById('selcap').contains(l), beforeHint: !!(l.compareDocumentPosition(document.getElementById('selhint')) & Node.DOCUMENT_POSITION_FOLLOWING)}; })()")
+            case("+ Add text's line has its place in the bar's first line as well", tl["inCap"] and tl["beforeHint"], tl)
+
+            # ---- a selection button's 'why' line and the Fill result are never cut while the help line has room to give ----
+            D_SMALL = new_design({"slides": 3, "bg": "#ffffff", "blocks": [frame(1, nums[0], 0, w=120, h=150), frame(2, None, 1)]}, "Layout small")
+            open_page(c, D_SMALL)
+            c.js("Designer.select(1)")
+            c.click("#selbar button[data-a='margin']")
+            why = J(c, "(function(){ var l = document.getElementById('selline'); return {text: l.textContent, whole: l.scrollWidth <= l.clientWidth, title: l.title}; })()")
+            case("a selection button's 'why' line (Add border on a small photo) is whole beside the photo's long help line and Fill, with its words as its tooltip",
+                 why["text"] == "This photo is too small for a border." and why["whole"] and why["title"] == why["text"], why)
+            # twenty empty frames and only eighteen unused photos: the Fill result names the two still empty
+            D_SHORT = new_design({"slides": 20, "bg": "#ffffff", "blocks": [frame(i + 1, None, i) for i in range(20)] + [frame(21 + i, nums[i], i, w=300, h=300) for i in range(6)]}, "Layout short")
+            open_page(c, D_SHORT)
+            c.js("Designer.select(21)")
+            c.click("#fill-holes")
+            c.wait_for("document.getElementById('designs-line').textContent.indexOf('enough') > 0", 5)
+            fr = J(c, "(function(){ var l = document.getElementById('designs-line'); return {text: l.textContent, whole: l.scrollWidth <= l.clientWidth, title: l.title}; })()")
+            case("the Fill result (not enough unused photos, 2 frames still empty) is whole beside the help line, with its words as its tooltip",
+                 "2 frames" in fr["text"] and fr["whole"] and fr["title"] == fr["text"], fr)
+
+            # ---- saved brand colors never push Undo onto a row of its own, and never make the strip move on a selection ----
+            open_page(c, D)
+            base = measure(c)
+            for k in (4, 5):
+                for col in BRAND[:k]:
+                    post(P, "/design-brand", {"add": col})
+                open_page(c, D)
+                mk = measure(c)
+                case(f"{k} saved brand colors at 1024 px: the slides' row is still one row, Undo in it, and the strip where it was with none (four made Undo a row of its own, the strip 38 px lower)",
+                     mk["rows2"] == 1 and mk["undo"]["top"] == base["undo"]["top"] and mk["strip"]["top"] == base["strip"]["top"], (mk["rows2"], mk["undo"], mk["strip"]["top"], base["strip"]["top"]))
+                c.js("Designer.select(null)")
+                c.click("#slides-minus")
+                hit = J(c, "(function(){ var u = document.getElementById('undo').getBoundingClientRect(); var e = document.elementFromPoint(u.left + u.width / 2, u.top + u.height / 2); return [e ? e.id : null, document.getElementById('slides-line').textContent.slice(0, 7)]; })()")
+                case(f"{k} saved brand colors: a Slides press's line covers no button (with four, it lay over Undo and Undo could not be pressed)", hit == ["undo", "Slide 7"], hit)
+            for col in BRAND:
+                post(P, "/design-brand", {"add": col})
+            open_page(c, D)
+            m16 = measure(c)
+            c.js("Designer.select(1)")
+            m16p = measure(c)
+            c.js("Designer.select(8)")
+            m16t = measure(c)
+            c.screenshot("layout-1024x768-brand16-text.png")
+            colour = J(c, "(function(){ var g = document.getElementById('sel-color'), s = document.getElementById('t-brand'); return {gH: g.getBoundingClientRect().height, swatches: s.querySelectorAll('.bc-sw').length, inRow: document.getElementById('g-undo').getBoundingClientRect().top === document.getElementById('g-slides').getBoundingClientRect().top}; })()")
+            case("16 saved brand colors (as many as fit) at 1024 px: the slides' row is one row (the swatches wrap inside their group, Undo stays in the row), and selecting a photo, then text, moves the strip 0 px",
+                 m16["rows2"] == 1 and colour["inRow"] and m16["strip"]["top"] == m16p["strip"]["top"] == m16t["strip"]["top"] and m16t["selrows"] == 2, (m16["rows2"], colour, m16["strip"]["top"], m16p["strip"]["top"], m16t["strip"]["top"], m16t["selrows"]))
+            case("...the text's Color group holds all 16 on one line (its height one row), so the text's controls are still two rows",
+                 colour["swatches"] == 16 and colour["gH"] <= 36, colour)
+            c.js("Designer.select(null)")
+            c.click("#slides-minus")
+            undo16 = J(c, "(function(){ var u = document.getElementById('undo').getBoundingClientRect(); var e = document.elementFromPoint(u.left + u.width / 2, u.top + u.height / 2); return e ? e.id : null; })()")
+            case("...and a Slides press's line covers no button (Undo is what is drawn where Undo is)", undo16 == "undo", undo16)
+            for col in BRAND:
+                post(P, "/design-brand", {"remove": col})
+
+            # ---- the design's name box and the Spacing pair ----
+            open_page(c, D)
+            name_w = J(c, "document.querySelector('#g-design .dz-name') ? document.querySelector('#g-design .dz-name').getBoundingClientRect().width : 0")
+            case("the design's name box is 180 px wide at 1024 px, and the design's row is still one row", 178 <= name_w <= 182 and measure(c)["rows1"] == 1, (name_w, measure(c)["rows1"]))
 
             # ---- the sheets never scroll the page behind, and closing puts the keyboard back ----
             open_page(c, D)
