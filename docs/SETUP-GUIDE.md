@@ -29,7 +29,7 @@ If Code asks you to upgrade, your plan does not include it yet. If it asks you t
 
 The first time you open Code, there is a row of choices under the message box: where to work, which folder, how much to ask you, which model.
 
-1. Under **folder**, choose **Open folder…** and pick your Pictures folder, or make a new folder called **Assistant** anywhere you like. This is only where the Assistant keeps its own notes; your photos never go here. **[shot]**
+1. Under the message box, click the folder choice, choose **Open folder…**, press **Command + Shift + H** to jump to your home folder, and make a new folder there called **Assistant**. This is only where the Assistant keeps its own notes; your photos never go here. **Not inside Documents, Desktop or Downloads:** the Mac guards those and blocked Claude on Nicole's first try ("Couldn't access Documents", Nov 5). **[shot]**
 
 ### Step 3: Add The Assistant to Claude
 
