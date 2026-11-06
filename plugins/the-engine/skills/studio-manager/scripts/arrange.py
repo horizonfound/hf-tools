@@ -260,11 +260,21 @@ def log(line):
 
 
 def write_whole(path, obj):
-    """A file written whole or not at all: a temp name no one else is using, then a rename."""
+    """A file written whole or not at all: a temp name no one else is using, then a rename. When it can't be
+    written or put in place (a full drive; on a PC, a reader that keeps the real file open for longer than the
+    wait), the earlier file is exactly as it was and our own scratch copy is dropped, as kit._write_text_whole
+    drops its own: a page that tries again by itself would otherwise leave one more at every try."""
     make_folder(path.parent)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
-    tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
-    this_computer.replace(tmp, path)        # a Mac: os.replace; a PC waits a moment while a reader has it open
+    try:
+        tmp.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
+        this_computer.replace(tmp, path)    # a Mac: os.replace; a PC waits a moment while a reader has it open
+    except BaseException:
+        try:
+            tmp.unlink()                    # our own scratch copy, never the real file
+        except OSError:
+            pass
+        raise
 
 
 # ---------- the kit and its numbered list ----------
@@ -609,7 +619,9 @@ def make_previews(kit, workers=4, retry=False):
         for row in rows:
             src = photo_path(kit, rec, row)
             try:
-                have = src is not None and all(preview_file(kit, row, s, src).is_file() for s in SIZES.values())
+                # the two copies a page shows. The designer's two larger ones are made only when a finished slide
+                # asks for one (big_copy), so a photo without them is still a photo that is there.
+                have = src is not None and all(preview_file(kit, row, s, src).is_file() for s in (SIZES["s"], SIZES["l"]))
             except OSError:
                 have = False
             if src is None:
@@ -725,7 +737,9 @@ _BIG = threading.Lock()                 # one large copy at a time: sips on a 45
 def big_copy(kit, rec, row, size):
     """The designer's two larger copies (2400 and 4320 on the long edge), made the first time one is asked
     for, one at a time. A photo that is no larger than the next size down already has all of itself in that
-    copy, so that copy is the answer and no second one is made. Returns the file to send, or None."""
+    copy, so that copy is the answer and no second one is made. Returns the file to send, or None.
+    A PC only: a copy something kept busy ("later": the photo is fine, the virus checker held its new copy) is
+    tried again after LATER_WAITS, as the pickers' copies are, before the answer is None. A Mac never waits."""
     own = max(row.get("w") or 0, row.get("h") or 0)
     while size > SIZES["l"]:
         below = max(v for v in SIZES.values() if v < size)
@@ -735,7 +749,13 @@ def big_copy(kit, rec, row, size):
     f = copy_to_serve(kit, rec, row, size)
     if f is None:
         with _BIG:
-            if make_one(kit, row, size, rec=rec) is None:
+            got = make_one(kit, row, size, rec=rec)
+            for pause in LATER_WAITS:   # a PC only (a Mac never gets "later", so this never waits there)
+                if got != "later":
+                    break
+                time.sleep(pause)
+                got = make_one(kit, row, size, rec=rec)
+            if got is None:
                 return None
         f = copy_to_serve(kit, rec, row, size)
     return f

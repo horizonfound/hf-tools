@@ -13,10 +13,16 @@ plugin's side needs nothing installed: the photos and the finished 1080 x 1350 s
 in plain Python (one flat grey each), so it runs on a Mac's own Python 3.9 and on a PC with no Pillow.
   1. the slides this test sends are real JPEGs (design.py's own check; and Pillow opens one, where Pillow is);
   2. what the page is given (state_for_page): no path in it, no backslash, nothing of the scratch folder;
-  3. a design saved while another handle has its file open (a PC waits a moment), and no scratch file left;
+  3. a design saved while another handle has its file open (a PC waits a moment), and no scratch file left; then
+     its file held for longer than that wait (a sync program, the virus checker): the page's words are about the
+     Assistant's own files, never "pictures" or a "photo viewer", no scratch copy is left behind however often
+     the page tries again, the stored design is whole, and the change is saved once the file is let go (a PC:
+     another program really holds it; a Mac: Windows' refusal is pretended at this_computer.replace);
   4. names: an accent, an emoji, a word Windows keeps (CON, aux.final), a dot at the end, the characters Windows
      refuses, 80 letters, 200 letters (refused in plain words): each becomes a slide name this computer takes,
-     the slides are saved under it, and the folder lists exactly the names written down;
+     the slides are saved under it, and the folder lists exactly the names written down; a word Windows keeps, a
+     dot and 80 letters in all still gives a name that settles (80 letters, known again afterwards, "Already
+     saved" on a second press); half of an emoji is not a name or a text, and leaves nothing behind;
   5. staging and a save from start to finish: the slides in the Carousel folder are byte for byte the ones sent,
      nothing waits in staging, and no record of the save holds a path or a backslash; a design's "earlier" copy
      takes only digits and dashes from a date a hand could have changed;
@@ -24,6 +30,11 @@ in plain Python (one flat grey each), so it runs on a Mac's own Python 3.9 and o
      (no window on a PC, a session of its own on a Mac), with this process in an old code page and an emoji in the
      design's name, and its answer read back; then the command's own output in that old code page, as bytes;
   7. a save while one slide in the Carousel folder is held open by another program, and while the kit's record is;
+     then the one road a held file really changes on a PC: a slide of the set being saved is itself held open, so
+     Windows refuses to move it. The save says so in parts/on-a-pc.md's words, the slides before it are in, the
+     rest wait, the record says "moving", and the same press finishes it under the same name once the file is
+     let go. On a PC another program really holds the file; on a Mac (which never refuses) Windows' refusal is
+     pretended at this_computer.rename_new, and said so;
   8. a drive with no hard links (os.link refused): a save still goes in, and a name that is taken is never taken
      again (a PC never links, so there this is the same road as every other save);
   9. two saves at the same moment from two processes, of two designs with the same name: both go in, one as
@@ -270,6 +281,78 @@ def held_design_checks(kit):
     left = [n for n in os.listdir(design.designs_dir(kit)) if n.endswith(".tmp")]
     check("and no scratch file is left beside it", not left, left)
     check("the version before the save is kept beside it", design.prev_path(kit, d["id"]).is_file())
+    held_record_checks(kit, d["id"])
+
+
+def held_record_checks(kit, did):
+    """The design's own record held for longer than this_computer.replace waits (about three seconds)."""
+    target = design.design_path(kit, did)
+    stored = design.load_design(kit, did)
+    real_replace = tc.replace
+    child = None
+    if WINDOWS:
+        ready = work / f"holding-{time.time_ns()}.txt"
+        child = subprocess.Popen([sys.executable, "-c", HOLD_FILE, str(target), str(ready), "120"], env=ENV)
+        end = time.time() + 30
+        while not ready.exists() and time.time() < end:
+            time.sleep(0.05)
+        if not check("another program has the design's own record open", ready.exists()):
+            child.kill()
+            child.wait(timeout=30)
+            return
+    else:
+        print("      (a Mac never refuses to save over an open file: Windows' refusal is pretended at this_computer.replace, "
+              "and the words are asked for as a PC gives them)", flush=True)
+
+        def refused(src, dst, tries=25):
+            if Path(dst) == target:
+                e = PermissionError(13, "The process cannot access the file because it is being used by another process")
+                e.winerror = 32
+                raise e
+            return real_replace(src, dst, tries)
+
+        tc.replace = refused
+    errs = []
+    try:
+        for _ in range(2):                          # the page tries again by itself: twice here
+            try:
+                got = save(kit, did)
+                errs.append(None)
+            except OSError as e:
+                errs.append(e)
+        check("a design's record held longer than the wait: the save is refused (twice), never half done",
+              len(errs) == 2 and all(isinstance(e, PermissionError) for e in errs), [repr(e)[:120] for e in errs])
+        e = errs[-1]
+        if isinstance(e, OSError):
+            was_pc, tc.WINDOWS = tc.WINDOWS, True   # the words as a PC gives them (it is one already, on a PC)
+            try:
+                words = design._drive_words("/design", e)
+                kept = design._drive_words("/design-brand", e)
+                slide_words = design._drive_words("/design-commit", e)
+            finally:
+                tc.WINDOWS = was_pc
+            ok, bad = no_path({"w": words, "k": kept})
+            check("the page's words are about the Assistant's own files: no \"pictures\", no \"photo viewer\", no path",
+                  words.startswith(f"Your changes can't be saved right now: something on this {tc.COMPUTER}") and "Assistant's own files" in words
+                  and words.endswith("They'll be saved by themselves once that is put right.") and "picture" not in words
+                  and "photo viewer" not in words and ok, words)
+            check("the same for a brand color, a font or a template (\"That couldn't be saved: ...\")",
+                  kept.startswith(f"That couldn't be saved: something on this {tc.COMPUTER}") and "picture" not in kept, kept)
+            check("a slide that can't be moved still gets the words about pictures (parts/on-a-pc.md's line)",
+                  slide_words.startswith("Couldn't save the slides: another program") and "Nothing was lost" in slide_words, slide_words)
+        left = [n for n in os.listdir(design.designs_dir(kit)) if n.endswith(".tmp")]
+        check("no scratch copy is left beside the design, however often the page tried", not left, left)
+        now = design.load_design(kit, did)
+        check("the stored design is whole and unchanged, and the version before is beside it",
+              now is not None and now["rev"] == stored["rev"] and now["state"] == stored["state"] and design.prev_path(kit, did).is_file(),
+              (now or {}).get("rev"))
+    finally:
+        tc.replace = real_replace
+        if child is not None:
+            child.kill()
+            child.wait(timeout=30)
+    code, out = save(kit, did)
+    check("once the record is let go, the change is saved", code == 200 and design.load_design(kit, did)["rev"] == stored["rev"] + 1, (code, out))
 
 
 # ---------------------------------------------------------------- 4: names
@@ -308,6 +391,39 @@ def name_checks(kit):
           design.safe_base('<>:"/\\|?*'))
     check('a reserved word keeps its underscore before any dot ("aux_.final", "Con_")',
           design.safe_base("aux.final") == "aux_.final" and design.safe_base("Con") == "Con_", (design.safe_base("aux.final"), design.safe_base("Con")))
+    # a word Windows keeps, a dot, and 80 letters in all: the underscore must not push the name past 80 (a name that
+    # did not settle made a save whose own record was not known again: "Not every slide arrived", then a second set)
+    settle = [w + tail for w in ("con", "AUX", "nul", "Prn", "COM1", "lpt1") for tail in ("." + "x" * 80, " ." + "y" * 80)]
+    settle = [n[:80] for n in settle]
+    unsettled = [(n[:8], len(design.safe_base(n))) for n in settle
+                 if len(design.safe_base(n)) > design.NAME_MAX or design.safe_base(design.safe_base(n)) != design.safe_base(n)]
+    check("a word Windows keeps, a dot and 80 letters in all: the slides' name is 80 letters at most and settles", not unsettled, unsettled)
+    name = "con." + "x" * 76
+    code, out = save(kit, d["id"], name=name)
+    d = design.load_design(kit, d["id"])
+    res, slides = save_set(kit, d, "reserved 80")
+    ok, why = in_carousel(kit, res.get("base") or "", slides) if res.get("state") == "done" else (False, res)
+    last = design.last_done(kit, d["id"]) or {}
+    check("such a design's slides are saved, and the save's own record is known again afterwards",
+          code == 200 and ok and len(res["base"]) <= design.NAME_MAX and last.get("base") == res["base"], why or (res, last.get("base")))
+    files_before = sorted(os.listdir(kit / "Carousel"))
+    res2, _ = save_set(kit, d, "reserved 80 again")
+    check("a second press with nothing changed says \"Already saved\" and makes no second set",
+          res2.get("state") == "already" and sorted(os.listdir(kit / "Carousel")) == files_before, res2)
+    # half of a two-part character (only a made-up request can send one): not a name, not a text, nothing written
+    half = json.loads('"Beach \\ud83c"')
+    before = snap(design.designs_dir(kit))
+    try:
+        code, out = save(kit, d["id"], name=half)
+        err = None
+    except Exception as e:  # noqa: BLE001
+        code, out, err = None, None, repr(e)
+    check("a name holding half an emoji is refused like any other unusable name (400), and nothing is written or left behind",
+          err is None and code == 400 and out.get("words") == design.NAME_BAD and snap(design.designs_dir(kit)) == before, (code, out, err))
+    block = {"id": 1, "type": "text", "text": "Hi", "font": "Georgia", "size": 40, "color": "#000000", "x": 100, "y": 100, "w": 300, "h": 60}
+    fine = design.validate_state({"slides": 2, "bg": "#ffffff", "blocks": [block]})
+    bad = design.validate_state({"slides": 2, "bg": "#ffffff", "blocks": [dict(block, text=half)]})
+    check("and words holding half an emoji are refused as text, where the same words whole are taken", fine[0] is not None and bad == (None, "text"), (fine[1], bad))
 
 
 # ---------------------------------------------------------------- 5: staging and a save, start to finish
@@ -485,6 +601,101 @@ def held_slide_checks(kit):
     rec = kit_mod.load_rec(kit)
     check("a save while the kit's record is open in another handle: saved, and the record names it",
           ok and (rec.get("carousel_set") or {}).get("base") == res3.get("base"), why or res3)
+    held_move_checks(kit, d)
+
+
+HELD_WORDS = "Couldn't save the slides: another program has one of these pictures open"     # parts/on-a-pc.md's line
+
+
+def held_move_checks(kit, d):
+    """A slide of the very set being saved is held open by another program while the commit moves it."""
+    save(kit, d["id"], name="Held move")
+    d = design.load_design(kit, d["id"])
+    tok = token()
+    slides = slides_for(d, "held move")
+    n = len(slides)
+    ok, codes = stage(kit, d, tok, slides)
+    if not check("a new set is staged for the held move", ok and n >= 3, (codes, n)):
+        return
+    stag = design.staging_dir(kit) / f"{d['id']}-{tok}"
+    held = stag / "slide-03.jpg"
+    car = kit / "Carousel"
+    before = snap(car)
+    real_rename_new, real_plain = tc.rename_new, kit_mod._plain_os
+    child = None
+    if WINDOWS:
+        ready = work / f"holding-{time.time_ns()}.txt"
+        child = subprocess.Popen([sys.executable, "-c", HOLD_FILE, str(held), str(ready), "120"], env=ENV)
+        end = time.time() + 30
+        while not ready.exists() and time.time() < end:
+            time.sleep(0.05)
+        if not check("another program has slide 03 of the set being saved open (in staging)", ready.exists()):
+            child.kill()
+            child.wait(timeout=30)
+            return
+    else:
+        print("      (a Mac never refuses to move an open file: Windows' refusal is pretended at this_computer.rename_new, "
+              "after its own three seconds of trying again are left out, and the words are asked for as a PC gives them)", flush=True)
+
+        def refused(src, dst, tries=25):
+            if Path(src).name == held.name and Path(src).parent == stag:
+                e = PermissionError(13, "The process cannot access the file because it is being used by another process")
+                e.winerror = 32                     # ERROR_SHARING_VIOLATION, as Windows gives it
+                raise e
+            return real_rename_new(src, dst, tries)
+
+        def plain_as_a_pc(e):
+            was, tc.WINDOWS = tc.WINDOWS, True      # for these words alone
+            try:
+                return real_plain(e)
+            finally:
+                tc.WINDOWS = was
+
+        tc.rename_new, kit_mod._plain_os = refused, plain_as_a_pc
+    try:
+        t0 = time.time()
+        res = design.commit(kit, d["id"], tok, d["rev"])
+        took = time.time() - t0
+        check("a save while a slide of that very set is held open: a problem with the drive, said in the on-a-pc words",
+              res.get("state") == "problem" and res.get("why") == "drive" and str(res.get("words", "")).startswith(HELD_WORDS)
+              and "Nothing was lost" in res.get("words", "") and "Press Save slides again" in res.get("words", ""), f"{res} after {took:.1f} s")
+        ok, bad = no_path(res)
+        check("its words hold no path", ok, bad)
+        code, told = design._answer_for(res)
+        check("the page is told the same (500, why 'drive'), so it shows these words and does not just try again",
+              code == 500 and told.get("why") == "drive" and told.get("words") == res.get("words"), (code, told))
+        if WINDOWS:
+            check("a PC waited a moment for the file to be let go before giving up (about three seconds)", 2.0 <= took <= 30.0, f"{took:.1f} s")
+        now = snap(car)
+        first_two = {design.SET_NAME.format(base="Held move", i=i): sha(slides[i - 1]) for i in (1, 2)}
+        check("slides 01 and 02 are in the Carousel folder, byte for byte; the held one and those after it are not",
+              {k: v for k, v in now.items() if k not in before} == first_two, sorted(k for k in now if k not in before))
+        check("every file that was in the Carousel folder is unchanged", all(now.get(k) == v for k, v in before.items()))
+        left = sorted(os.listdir(stag)) if stag.is_dir() else []
+        check("the held slide and the ones after it still wait in staging, each the bytes that were sent",
+              left == [f"slide-{i:02d}.jpg" for i in range(3, n + 1)] and all(file_sha(stag / x) == sha(slides[int(x[6:8]) - 1]) for x in left), left)
+        j = design._read_json(design._journal_path(kit, d["id"], tok)) or {}
+        check("the save's record says \"moving\", under the name it chose (so the next press finishes this save, not a new one)",
+              j.get("state") == "moving" and j.get("base") == "Held move", (j.get("state"), j.get("base")))
+        rec = kit_mod.load_rec(kit)
+        check("the kit's record does not name the half-saved set as the carousel",
+              (rec.get("carousel_set") or {}).get("token") != tok and not any(isinstance(x, dict) and x.get("token") == tok for x in rec.get("laid_out") or []))
+    finally:
+        tc.rename_new, kit_mod._plain_os = real_rename_new, real_plain
+        if child is not None:
+            child.kill()                            # the other program is closed
+            child.wait(timeout=30)
+    res2 = design.commit(kit, d["id"], tok, d["rev"])
+    ok, why = in_carousel(kit, res2.get("base") or "", slides) if res2.get("state") == "done" else (False, res2)
+    check("once the file is let go, the same press finishes the save under the same name: every slide in, byte for byte",
+          ok and res2.get("base") == "Held move" and res2.get("count") == n, why or res2)
+    now = snap(car)
+    check("no second set was made, and nothing that was there was changed",
+          sorted(k for k in now if k not in before) == sorted(design.SET_NAME.format(base="Held move", i=i) for i in range(1, n + 1))
+          and all(now.get(k) == v for k, v in before.items()), sorted(k for k in now if k not in before))
+    check("nothing is left waiting in staging for it", not stag.exists(), sorted(os.listdir(stag)) if stag.exists() else "")
+    rec = kit_mod.load_rec(kit)
+    check("and the kit's record names it as the carousel now", (rec.get("carousel_set") or {}).get("token") == tok, rec.get("carousel_set"))
 
 
 # ---------------------------------------------------------------- 8: a drive with no hard links

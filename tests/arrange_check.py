@@ -2710,6 +2710,37 @@ def check_carousel_fixes(work, port):
         case("and twenty is saved", code == 200 and j5.get("ok") is True and len(state()["now"]["nums"]) == 20, (code, j5))
         code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1)))
 
+        # ---- the kit's words in a near-miss shape (hashtags as a list) never stop the kit page or the slides ----
+        words_file, captions, page_file = hid / "words.json", hid / "Captions and hooks.txt", hid / "Post kit.html"
+        given = work / "fixes-words.json"
+
+        def text_of(f):
+            try:
+                return f.read_text(encoding="utf-8")
+            except OSError:
+                return ""
+
+        given.write_text(json.dumps({"hooks": ["One", "Two", "Three"], "caption": "A windy morning.", "hashtags": ["#harbor", "#windy"]}), encoding="utf-8")
+        code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
+        kept = json.loads(words_file.read_text(encoding="utf-8")) if words_file.exists() else {}
+        case("words: hashtags handed over as a list are saved as one line, not a crash", code == 0 and kept.get("hashtags") == "#harbor #windy" and "Traceback" not in out, (code, out[-200:]))
+        case("words: the captions file and the kit page both show them", "#harbor #windy" in text_of(captions) and "<p>#harbor #windy</p>" in text_of(page_file))
+        was = words_file.read_bytes() if words_file.exists() else b""
+        given.write_text(json.dumps({"hooks": ["One"], "caption": 7}), encoding="utf-8")
+        code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
+        case("words: a caption that is not text is refused in plain words, with nothing saved", code == 1 and "STOP:" in out and "Nothing was saved" in out and "Traceback" not in out and words_file.read_bytes() == was, (code, out[-200:]))
+        given.write_text("not json", encoding="utf-8")
+        code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
+        case("words: a file that is not JSON is refused the same way", code == 1 and "STOP:" in out and "Traceback" not in out and words_file.read_bytes() == was, (code, out[-200:]))
+        # a words file an earlier version saved with the list in it (this check's own kit): every later page still works
+        words_file.write_text(json.dumps(dict(kept, hashtags=["#older", "#list"], stories="One line"), indent=1), encoding="utf-8")
+        code, out = run(env, "kit.py", "page", kit_name)
+        case("words: a words file already saved with a list in it no longer stops the kit page", code == 0 and "<p>#older #list</p>" in text_of(page_file) and "Traceback" not in out, (code, out[-200:]))
+        code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1[::-1])))
+        code2, out2 = run(env, "kit.py", "build", kit_name)
+        case("words: nor kit.py build after a new order", code == 0 and code2 == 0 and "Traceback" not in out2, (code, code2, out2[-200:]))
+        code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1)))
+
         case("fixes: the Photos folder at the end: not one photo changed, none added", folder_print(photos_dir) == photos_before)
         log_text = (studio / "arrange.log").read_text() if (studio / "arrange.log").exists() else ""
         case("fixes: nothing failed inside a route or a job", " failed: " not in log_text, [x for x in log_text.splitlines() if " failed: " in x][:2])

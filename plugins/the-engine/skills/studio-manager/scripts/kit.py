@@ -1503,7 +1503,48 @@ def facts(kit):
     return out
 
 
+WORD_SHAPES = {"hooks": "lines", "stories": "lines", "caption": "text", "short": "text", "hashtags": "text", "leaned_on": "text"}
+
+
+def kept_words(words, strict=True):
+    """A kit's words in the shapes the captions file and the kit page read: hooks and stories as lists of lines;
+    caption, short, hashtags and leaned_on as text. Words already in those shapes come back exactly as they were.
+    The near misses are put right rather than left to stop every later page: hashtags handed over as a list
+    become one line with a space between them, a caption written as a list of paragraphs is joined with a blank
+    line between, a single hook or story line given as text becomes a list of one, and "nothing" (null) becomes
+    empty. Anything else (a number, a list inside a list) raises ValueError in plain words when strict (saving:
+    nothing is written then), and is read as empty when not (showing a page from a file already saved)."""
+    if not isinstance(words, dict):
+        if strict:
+            raise ValueError("the words file should hold one set of named pieces (hooks, caption, short, stories, hashtags)")
+        return {}
+    out = dict(words)
+    for k, kind in WORD_SHAPES.items():
+        if k not in out:
+            continue
+        v = out[k]
+        if kind == "lines":
+            if v is None:
+                v = []
+            elif isinstance(v, str):
+                v = [v] if v.strip() else []
+            ok = isinstance(v, list) and all(isinstance(x, str) for x in v)
+        else:
+            if v is None:
+                v = ""
+            elif isinstance(v, list) and all(isinstance(x, str) for x in v):
+                v = (" " if k == "hashtags" else "\n\n").join(x.strip() for x in v if x.strip())
+            ok = isinstance(v, str)
+        if not ok:
+            if strict:
+                raise ValueError(f"\"{k}\" in the words file should be " + ("a list of lines" if kind == "lines" else "text"))
+            v = [] if kind == "lines" else ""
+        out[k] = v
+    return out
+
+
 def save_words(kit, words):
+    words = kept_words(words)           # before anything is written: a wrong shape stops here, with nothing saved
     for k in ("hooks", "caption", "short", "stories"):
         words.setdefault(k, [] if k in ("hooks", "stories") else "")
     words["written"] = datetime.now().isoformat(timespec="seconds")
@@ -1614,6 +1655,7 @@ def rel(kit, p):
 def write_page(kit):
     rec = load_rec(kit)
     words = json.loads((kit / ".kit" / "words.json").read_text(encoding="utf-8")) if (kit / ".kit" / "words.json").exists() else {}
+    words = kept_words(words, strict=False)     # a words file saved in a near-miss shape never stops the page
     name = rec.get("name", kit.name)
     when = rec.get("date") or ""
     try:
@@ -1786,7 +1828,18 @@ def main():
     if a.cmd == "facts":
         say(json.dumps(facts(kit), indent=1, ensure_ascii=False)); return 0
     if a.cmd == "words":
-        save_words(kit, json.loads(read_their_file(a.file))); say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
+        try:
+            given = json.loads(read_their_file(a.file))
+        except ValueError as e:
+            say(f"STOP: the words file isn't JSON that can be read ({e}). Nothing was saved. Fix the file and run this again.")
+            return 1
+        try:
+            given = kept_words(given)
+        except ValueError as e:         # a piece in a shape the page can't show: said before anything is written
+            say(f"STOP: {e}. Nothing was saved. Fix the file and run this again.")
+            return 1
+        save_words(kit, given)
+        say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
     if a.cmd == "page":
         say(str(write_page(kit))); return 0
     if a.cmd == "show":

@@ -316,12 +316,22 @@ def _unseen(c):
     return unicodedata.category(c) == "Cf"
 
 
+def _writable(s):
+    """Can this text be written to a file at all? Half of a two-part character (a lone surrogate, which only a
+    made-up request can send: the page's own boxes never cut a letter in half) cannot be written as UTF-8."""
+    try:
+        s.encode("utf-8")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def clean_name(v):
     """A design's or a template's name as it is kept: one line, no control characters, 1 to 80 letters.
     Marks that turn the reading direction are dropped (they come along when a name is pasted, and can make a
     name read differently from what is stored), and so is anything unseen at either end. None when it is not
-    a usable name."""
-    if not isinstance(v, str):
+    a usable name (one that could never be written to a file among them)."""
+    if not isinstance(v, str) or not _writable(v):
         return None
     s = unicodedata.normalize("NFC", v)
     s = "".join(" " if (ord(c) < 32 or ord(c) == 127) else c for c in s if c not in TURNERS)
@@ -343,7 +353,13 @@ def safe_base(name):
     # The rest is the one rule every script shares (this_computer.safe_name): the characters Windows refuses and
     # the control characters become a space, no dot or space at either end, at most 80 letters, and a word Windows
     # keeps for itself gets an underscore before any dot ("aux_.txt", "Con_"). The same on both computers.
-    return this_computer.safe_name(s, limit=NAME_MAX, fallback="Carousel")
+    base = this_computer.safe_name(s, limit=NAME_MAX, fallback="Carousel")
+    if len(base) > NAME_MAX:
+        # That underscore is added after the cut to 80, so "con." and 76 more letters came out 81 long, and the same
+        # rule run over it again gave 80: a name that did not settle, and a save whose own record (_journal_ok) was
+        # then not known as one. Cut one letter shorter, the underscore fits and the name stays what it is.
+        base = this_computer.safe_name(s, limit=NAME_MAX - 1, fallback="Carousel")
+    return base
 
 
 def kit_bg(rec):
@@ -425,7 +441,7 @@ def _text_block(b, slides):
     if not isinstance(text, str):
         return None, "text"
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    if any((ord(c) < 32 and c != "\n") or ord(c) == 127 for c in text):
+    if any((ord(c) < 32 and c != "\n") or ord(c) == 127 for c in text) or not _writable(text):
         return None, "text"
     if len(text) > TEXT_MAX:
         return None, "long"
@@ -1918,6 +1934,28 @@ def _post_slide(handler, query):
 # by name, so a computer whose Python lacks one of these (EDQUOT is not everywhere) still starts
 DRIVE_TROUBLE = tuple(getattr(errno, n) for n in ("ENOSPC", "EDQUOT", "EACCES", "EPERM", "EROFS", "ENOENT", "ENOTDIR", "EIO", "ENXIO")
                       if hasattr(errno, n))
+HELD_OWN = ("something on this {pc} is holding one of the Assistant's own files for a moment (a sync or backup "
+            "program, or the virus checker)")
+HELD_OWN_MAYBE = ("something on this {pc} may be holding one of the Assistant's own files for a moment (a sync or "
+                  "backup program, or the virus checker); if it stays this way, its folder can't be written to")
+
+
+def _drive_words(path, e):
+    """What a page is told when the drive would not take what one of the designer's routes had to write.
+    Slides (/design-slide, /design-commit) are pictures in the photographer's own folders: kit.py's words, as the
+    slide maker says them. Every other route writes only the Assistant's own hidden records (a design, a
+    template, the brand colors, the font list), so on a PC a record another program holds for longer than
+    this_computer.replace waits is said as that: there is no picture, and nothing the photographer could close.
+    A Mac never refuses that way, and gets kit.py's words for everything, as before."""
+    slides = path in ("/design-slide", "/design-commit")
+    winerror = getattr(e, "winerror", None) if this_computer.WINDOWS else None      # a Mac: always None
+    if not slides and (isinstance(e, this_computer.HeldOpen) or winerror in (5, 32, 33)):   # unproven on a real PC
+        why = (HELD_OWN_MAYBE if winerror == 5 else HELD_OWN).format(pc=this_computer.COMPUTER)
+    else:
+        why = kit_mod._plain_os(e)
+    return (DRIVE if slides else CANT_SAVE if path == "/design" else CANT_KEEP).format(why=why)
+
+
 _STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500,
            "photos": 409, "long": 409, "deep": 409}
 
@@ -2034,8 +2072,7 @@ def handle_post(handler, path, query):
             # The Assistant was reached; it is the drive that would not take the change (full, locked, unplugged).
             # Said as what it is, with "why": "drive", so the page shows these words and not "trying again".
             arrange.log(f"POST {path} could not write: {e.__class__.__name__}: {str(e)[:200]}")
-            why = kit_mod._plain_os(e)
-            words = (DRIVE if path in ("/design-slide", "/design-commit") else CANT_SAVE if path == "/design" else CANT_KEEP).format(why=why)
+            words = _drive_words(path, e)
             try:
                 arrange._send_json(handler, {"ok": False, "why": "drive", "words": words}, 500)
             except (Exception, SystemExit):  # noqa: BLE001
@@ -2194,7 +2231,9 @@ def main():
     sub.add_parser("took").add_argument("words")
     sub.add_parser("tidy").add_argument("words")
     a = ap.parse_args()
-    this_computer.utf8_output()            # a design's or a shoot's name, in any alphabet, never stops a report on a PC
+    # A design's or a shoot's name, in any alphabet, never stops a report on a PC. Belt and braces: importing
+    # arrange (and posts, fresh, home) has already done this, so taking this line out changes no output.
+    this_computer.utf8_output()
     import fresh
     fresh.announce()                       # this folder is where the Assistant's code is now (see fresh.py)
 

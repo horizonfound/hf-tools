@@ -33,6 +33,8 @@ nothing else is touched, no port is used, nothing is deleted outside that folder
      handle (made the same way on a Mac), and shown put right by arrange._own_output.
  11. a kit's drive that is full when copies come back "later" (a PC only): said so ("full"), no waiting, no mark.
      Run the same way as 9; the full drive itself is pretended (this_computer.free_bytes).
+ 12. (inside 1 to 3) a computer that can't make pictures right now: photos whose two page copies are there still
+     count as there; and (inside 9) the designer's larger copy held at its last step is tried again (big_copy).
 Parts 1 to 3, 6, 9 and 11 draw photos with Pillow (the PC's one add-on); without it they say SKIP and why, and the
 rest (the lock, the job check, saving a record, a background run's lines) still runs, as on a Mac's own Python 3.9.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
@@ -193,6 +195,20 @@ def copies_checks(kit, specs):
         pictures.make_jpeg = real_make
     check("a second run makes nothing and tries no photo again", again["made"] == 0 and again["there"] == 6 and not calls,
           f"{again} tried {calls}")
+    # A PC that can't make pictures right now (Pillow gone after a Python update): the photos whose two page copies
+    # are already there still count as there. The designer's two larger sizes (2400, 4320) are only made when a
+    # finished slide asks for one, so their absence must never turn a ready kit into "needs an add-on".
+    real_ready = pictures.ready
+    pictures.ready = lambda: (False, "This computer needs one free add-on first.")
+    try:
+        cant = arrange.make_previews(kit)
+    finally:
+        pictures.ready = real_ready
+    big = [s for s in arrange.SIZES.values() if s > 1600]
+    none_big = not any(arrange.preview_file(kit, {"n": i}, s, kit / "Photos" / spec[0]).is_file()
+                       for i, spec in enumerate(specs, 1) for s in big)
+    check("a computer that can't make pictures right now: photos whose two page copies are there still count as there "
+          "(the designer's larger copies are not asked for)", cant["there"] == 6 and cant["made"] == 0 and none_big, f"{cant} big sizes {big}")
 
 
 # ---------------------------------------------------------------- 4: one writer at a time, across processes
@@ -395,6 +411,21 @@ def held_checks():
         this_computer.free_bytes = real_free
         arrange.LATER_WAITS = (0.2, 0.4)
         hold(None, 0)
+        # (e) the designer's larger copy (2400), made when a finished slide asks for it (big_copy): held once at its
+        # last step it is tried again, as the pickers' copies are; held every time it is not there yet, with no mark
+        rows3 = {x["n"]: x for x in arrange.sheet_rows(kit3)}
+        rec3 = arrange.kit_mod.load_rec(kit3)
+        hold(lambda n: n.startswith("0001-2400-"), 1)
+        f = arrange.big_copy(kit3, rec3, rows3[1], 2400)
+        check("the designer's larger copy, held once at its last step: tried again and made (never 'can't be read')",
+              f is not None and f.is_file() and f.name.startswith("0001-2400-"), f)
+        hold(lambda n: n.startswith("0002-2400-"), 99)
+        f = arrange.big_copy(kit3, rec3, rows3[2], 2400)
+        check("the designer's larger copy, held every time: not there yet, no mark, nothing half-made left",
+              f is None and not any(m.startswith("0002-") for m in marks()) and not scratch(), f"{f} {marks()} {scratch()}")
+        hold(None, 0)
+        f = arrange.big_copy(kit3, rec3, rows3[2], 2400)
+        check("and once it is let go, the next ask makes it", f is not None and f.is_file(), f)
         # (d) a Mac never gets "later": a refusal at the last step is raised, as it always was
         if WINDOWS:
             skip("a Mac: a refusal at the last step is raised, as before", "this is a PC; that is the Mac's side, tried on a Mac")
