@@ -188,6 +188,11 @@ them where they are" is what she expected. The Assistant already does this for a
 
 **Not decided. Claude told her it is logged for the two of them.**
 
+**Found afterwards:** the Assistant can already do what she asked. `kit.py start --folder "<their folder>"`
+makes a kit from photos left where they are. On her run the Assistant went down the copy route (the folder
+picker and the drop box) and never offered it. So the decision is which one the Assistant reaches for first,
+not whether to build something.
+
 ### C. The same question asked twice
 
 On that screen the Assistant explained the two ways to hand over photos in a paragraph, and then asked the
@@ -197,3 +202,26 @@ same thing again in a box with two buttons. One or the other is enough. Not chan
 
 The line above its reply said "Ran 3 commands, opened a page, 1 failed." What failed is not known; it
 carried on and the folder was made. Worth a look at her session if it repeats.
+
+### E. Making posts felt like too much at once, and the caption came too early (a decision for Dustin and Nicole)
+
+**What she said (8:47pm):** "i feel like it should be one at a time this feels overwhelming to have it
+create these for you and it makes it feel like its just gonna do it without any input... wether thats true
+or not it feels like it is." And: "like showing it the photos and then it asking for the caption already i
+feel like you should make the reel or carousel or story first and then you would make the caption after you
+see the final piece."
+
+**What was on her screen:** "Next I'll make your post kit: the reel, the carousel, a few single posts,
+stories, and the captions to go with them. The captions come from you, and I just put them on paper. So tell
+me about this shoot and what you want to say about it. Who they are, what the day was like, anything you'd
+put in the caption."
+
+**What Dustin answered her (8:48pm):** "no ... all you need to do is share stories and details about the
+shoot. give a little background about what it was like."
+
+**Two different things in there:**
+- **The wording.** The Assistant said "the captions come from you" and "anything you'd put in the caption,"
+  so she heard "write your caption now." Dustin's meaning is "just tell me about the shoot." The words on
+  screen don't say that clearly. A reworded question is proposed to Dustin; not changed yet.
+- **The order and the amount.** She would rather make one piece at a time and write the caption after seeing
+  it. The kit makes everything in one go, by design (Dustin, Oct 30). **Their call; nothing changed.**
