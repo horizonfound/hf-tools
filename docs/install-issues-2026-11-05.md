@@ -1,7 +1,7 @@
 # What went wrong when Nicole installed the Assistant (Nov 5, 2026)
 
 Nicole was the first person to install the Assistant on a Mac that isn't Dustin's. She hit eight roadblocks
-in about forty minutes. Every one is written down here: what she saw, why, what fixed it, and what now
+in about forty minutes, and a ninth surprise once she was in. Every one is written down here: what she saw, why, what fixed it, and what now
 stops it from happening to the next person. She got through: at 8:31pm she typed hi and the Assistant
 answered with its home page beside the chat.
 
@@ -19,6 +19,7 @@ right route (the October guide and the README). The lesson is at the bottom.
 | 6 | A grey line, "The archive must contain...", looked like an error | Claude's screen; the guide didn't warn | Yes |
 | 7 | "Couldn't access Documents" when she typed hi | The guide | Yes |
 | 8 | A pop-up asking to import her browser's cookies | Claude's own browser; the guide didn't warn | Yes |
+| 9 | Instagram's "Sign up / Log in" box over her grid | Instagram; the Assistant didn't warn | Yes |
 
 ---
 
@@ -123,6 +124,18 @@ She asked: "do i do these things?"
 Mac and need no sign-in.
 
 **Fix:** the guide says Cancel, and Don't show again.
+
+## 9. Instagram's sign-up box (after install, the first thing she tried)
+
+**What she saw:** she said "read my Instagram grid," gave her handle, and the page beside the chat opened
+her profile with a box over it: "See photos, videos and more from nicolelhill_ ... Sign up / Log in." She
+wrote "tried to log me in," then "it did that but now its loaded my grid."
+
+**Why:** Instagram shows that box to anyone who isn't signed in. The grid behind it can still be read, and
+it was. But nothing told her that, so it looked like the Assistant wanted her password.
+
+**Fix:** the Assistant now says, before it opens the page, that Instagram may show a sign-up box and that
+she doesn't need to log in.
 
 ---
 
