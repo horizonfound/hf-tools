@@ -30,6 +30,15 @@ the same day. Changing picks by typing numbers off a contact sheet is the part s
 half, used her plan, and would come out a little different each time. Built in, it would open at once and
 work the same for everyone. The carousel, singles and stories pick the same way and would want it too.
 
+**Her follow-up (9:10pm), what "ours" should do better:** "for our version it would be cool if the whole
+thing was a drag and drop dragging from the bottom to the top right now the top is only a drag and drop so
+ours will be better." In the page her Claude made, only the reel row at the top could be dragged; photos
+below had to be clicked in. She wants to drag a photo from the bottom straight up into place.
+
+**Already half there:** the sneak-peek picker on the backup report (built Nov 5, afternoon) works exactly
+that way: drag a photo from below onto a numbered spot, drag between spots to reorder, click to see it
+big. A reel picker would reuse that.
+
 **Claude's read:** worth building next. It is real work (a day's, not an hour's), so it waits for a yes.
 
 ### 1a. Her photos ended up in three places
