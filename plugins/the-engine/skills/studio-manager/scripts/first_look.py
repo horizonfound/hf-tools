@@ -360,7 +360,7 @@ def shoots_section(studio):
         out.append(f"<div class='pics{' six' if len(pics) == 6 else ''}'>" + "".join(
             f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>{img(p, g)}</div>"
             for j, (p, g) in enumerate(pics))
-            + f"<span class='chip f-sun' style='--rot:-5deg;top:-.6rem;left:-.5rem'>{s['photos']:,} photos</span>"
+            + f"<span class='chip f-sun' style='--rot:-5deg;top:-1.55rem;left:-.7rem'>{s['photos']:,} photos</span>"
             + "</div>")   # no "outfits or breaks" chip: a nice touch, not needed (Dustin, Oct 28)
         if len(pics) == 6:
             out.append(f"<div class='peeks-wrap' data-shoot='{e(s['id'])}'>"

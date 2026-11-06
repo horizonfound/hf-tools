@@ -487,3 +487,12 @@ it... not the most intuitive." He suggested starting with none selected, and to 
 page's script for about two minutes, so no button on the report worked until it was fixed. Every script on
 the rebuilt page was then checked with the Mac's own JavaScript engine. That check should run every time a
 page is built (not done yet).
+
+## 21. The photo-count tag covered a face
+
+**Dustin:** "Slightly less overlap on the part where it says the 230 photos, because you can see where it
+cuts off Nicole's head in that portrait."
+
+**Fixed the same day:** the count tag on each shoot's photos sits higher, mostly above the top-left photo.
+It now overlaps the photo by about half its height instead of most of it. Seen on both shoots in the pane;
+the face is clear.
