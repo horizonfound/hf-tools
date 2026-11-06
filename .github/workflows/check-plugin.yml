@@ -2,10 +2,11 @@ name: Check the plugin
 # Runs the same check Claude's uploader does on every push that touches the plugin,
 # so a header that is too long (what refused Nicole's upload on Nov 5, 2026) is caught within a minute.
 on:
+  workflow_dispatch:
   push:
-    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py"]
+    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py", ".github/workflows/check-plugin.yml"]
   pull_request:
-    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py"]
+    paths: ["plugins/**", ".claude-plugin/**", "tools/check_plugin.py", ".github/workflows/check-plugin.yml"]
 jobs:
   check:
     runs-on: ubuntu-latest
