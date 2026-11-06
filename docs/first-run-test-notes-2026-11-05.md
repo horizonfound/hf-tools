@@ -410,3 +410,13 @@ nudge now waits until they have made at least one piece, and Today no longer lis
 
 **Not done:** the same button on the editing queue's "Your shoots" list, which would give a way back from
 there too.
+
+**Note 13, the long watcher, stopped at 4:13 pm for a fresh run:** it ran 40 minutes and was never away
+for the 30 it needed, so the hours-away case is still unproven. Its log does settle the other open point:
+it saw every switch to Chrome and Finder and every screen lock, and every return, to the second. So the
+app-switch path works; the first test's "nothing happened" was a return in under a minute.
+
+**Fresh run 5 (4:13 pm):** the saved setup is set aside as `~/.studio-fresh-run-5-2026-11-05`. The last
+run's folders on Big Kahuna (The Assistant folder, the two shoot folders, the backup's records) were
+renamed into `The Engine Test/set aside 2026-11-05 first-run 5/`, with a note inside saying where each
+came from. Nothing deleted or copied.
