@@ -73,10 +73,20 @@ class Renames:
                         why = "Something stopped the rename, and nothing was changed."
                     self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell Claude and it'll sort it out."}
             try:  # the report shows the new name and folder
-                import report_page
-                report_page.write_page(self.session)
+                rebuild_report(self.session)
             except Exception as ex:
                 sys.stderr.write(f"report not rebuilt: {ex}\n")
+
+
+def rebuild_report(session):
+    """Write the report again, in a fresh process. This server can run for days, and a page built with the
+    code it loaded at start comes out in yesterday's look after the Assistant has been updated (Dustin, Nov 5:
+    "Use these" on Show me more rebuilt the report and a change made minutes earlier was gone from it). A
+    fresh process always uses the code on disk."""
+    r = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "report_page.py"), str(session)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout).strip()[-300:])
 
 
 def report_url(studio):
@@ -184,8 +194,7 @@ class Picks:
                 self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
                                         else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell Claude and it'll sort it out."})
             try:
-                import report_page
-                report_page.write_page(self.session)
+                rebuild_report(self.session)
             except Exception as ex:
                 sys.stderr.write(f"report not rebuilt: {ex}\n")
 

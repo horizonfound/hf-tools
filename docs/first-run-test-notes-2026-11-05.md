@@ -496,3 +496,24 @@ cuts off Nicole's head in that portrait."
 **Fixed the same day:** the count tag on each shoot's photos sits higher, mostly above the top-left photo.
 It now overlaps the photo by about half its height instead of most of it. Seen on both shoots in the pane;
 the face is clear.
+
+## 22. Choosing new sneak peeks put the report back to its older look
+
+**Dustin:** after pressing Show me more and choosing new photos, "it looks like it reverted back to the old
+way." His screenshot showed the count tag covering the face again (note 21), a change made minutes before.
+
+**Why it happened:** when "Use these" (or Rename) finishes, the report's little server rebuilds the page.
+It rebuilt it with the code it had loaded into memory when it started, not the code on disk. So anything
+changed since that server started was silently undone on the next rebuild: the tag moved back down and the
+picker went back to opening full. The photos he chose were saved correctly; only the page's look was old.
+
+**Fixed the same day:** the server now rebuilds the report in a fresh process every time, which always uses
+the current code. Checked by having the server itself re-save the same six: the rebuilt page kept the new
+tag position and the new picker.
+
+**The same weakness, still there in the other two page servers (home and posting, and the editing queue):**
+they draw their pages from code loaded when they started. After the Assistant updates, they keep showing
+the old pages until they are stopped and started again. That has needed a manual restart several times
+today. A proper fix, not built: each server notes how new its code was when it started, and whoever asks
+for its address (`home.py url` and the like) restarts it if the code on disk is newer. For students this
+matters the day after an update lands while a page server is still running.
