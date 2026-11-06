@@ -128,7 +128,7 @@ def tidy_own_files(kit):
 
 def save_rec(kit, rec):
     d = hidden(kit)
-    tmp = d / "kit.json.tmp"
+    tmp = d / f"kit.json.{os.getpid()}.tmp"     # a name of this process's own, so two commands never share a half-written file
     tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False))
     os.replace(tmp, d / "kit.json")
 
@@ -239,7 +239,11 @@ def sheet(kit):
     m = re.search(r"List: (.+)", r.stdout)
     if m and Path(m.group(1).strip()).exists():
         listing = json.loads(Path(m.group(1).strip()).read_text())
-        shutil.copyfile(m.group(1).strip(), kit / ".kit" / "sheet.json")
+        # whole or not at all: a page that reads the list while it is being re-made must see the old one or
+        # the new one, never half of one (arrange.py takes a list it can't read as "not ready")
+        tmp = kit / ".kit" / f"sheet.json.{os.getpid()}.tmp"
+        shutil.copyfile(m.group(1).strip(), tmp)
+        os.replace(tmp, kit / ".kit" / "sheet.json")
         rec["numbered"] = len(listing["photos"])
         save_rec(kit, rec)
     return 0
@@ -257,6 +261,23 @@ def parse_nums(s):
     return [int(x) for x in re.findall(r"\d+", s or "")]
 
 
+def parse_reel(s):
+    """The reel's picks the way reel.py reads them: a number, then + to linger or - to pass quickly ("19,4,10+,14-").
+    Returns the numbers, and the marks as {"10": "+", "14": "-"}."""
+    nums, marks = [], {}
+    for n, m in re.findall(r"(\d+)([+-]?)", s or ""):
+        nums.append(int(n))
+        if m:
+            marks[str(int(n))] = m
+    return nums, marks
+
+
+def reel_picks_text(rec):
+    """The reel's picks as one line for reel.py make --picks, marks in place: 19,4,10+,14-"""
+    marks = rec.get("reel_marks") or {}
+    return ",".join(f"{n}{marks.get(str(n), '') if marks.get(str(n)) in ('+', '-') else ''}" for n in rec.get("picks", {}).get("reel") or [])
+
+
 def set_picks(kit, singles, stories, carousel, reel, cover=None):
     by_n = numbered(kit)
     rec = load_rec(kit)
@@ -264,14 +285,20 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
     for key, val in (("singles", singles), ("stories", stories), ("carousel", carousel), ("reel", reel), ("cover", cover)):
         if val is None:
             continue
-        ns = parse_nums(val)
+        marks = None
+        if key == "reel":
+            ns, marks = parse_reel(val)
+        else:
+            ns = parse_nums(val)
         if key == "cover":
             ns = ns[:1]
         bad = [n for n in ns if n not in by_n]
         if bad:
             say(f"STOP: no photo numbered {bad[0]} on the sheet.")
             sys.exit(1)
-        picks[key] = ns
+        picks[key] = ns         # plain numbers, always; the reel's marks sit beside the picks, never inside
+        if marks is not None:
+            rec["reel_marks"] = marks       # replaced whole whenever --reel is given
     rec["picks"] = picks
     save_rec(kit, rec)
     return picks
@@ -416,7 +443,7 @@ def build(kit):
     for k, fs in made.items():
         say(f"{k.capitalize()}: {len(fs)} made.")
     if picks.get("reel"):
-        say("Reel: run reel.py make with these picks: " + ",".join(str(n) for n in picks["reel"]) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
+        say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
             + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
     write_page(kit)
     return 0
@@ -425,6 +452,8 @@ def build(kit):
 def note_reel(kit, project_name, picks=None):
     rec = load_rec(kit)
     rec["reel"] = {"project": project_name, "picks": picks or rec.get("picks", {}).get("reel", []), "made": datetime.now().isoformat(timespec="seconds")}
+    if not picks:
+        rec["reel"]["picks_text"] = reel_picks_text(rec)      # the same picks with Longer (+) and Quicker (-) in place
     save_rec(kit, rec)
     own_file(kit, "Reel.txt").write_text(f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
                                   + ("Photos in it, in order: " + ", ".join(str(n) for n in rec["reel"]["picks"]) + "\n" if rec["reel"]["picks"] else ""))

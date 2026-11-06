@@ -24,13 +24,23 @@ The scripts are in `scripts/` next to this file. Nothing has to be installed on 
 
 Usually you arrive here from the Assistant: they said "I'm done with the beach shoot," it found the export folder and they confirmed it. Use that folder. If they came straight here, ask which shoot; the Assistant's `find_exports.py` finds the folder (see its skill), or they tell you where it is. A folder of favorites or selects they made themselves is even better: use that.
 
-Make the sheet:
+**First, find out whether this shoot has a post kit**, because that decides how the photos are numbered, and every number you pick from here on comes from that one numbering. It has a kit when you came here from one, or when `python3 ../studio-manager/scripts/kit.py show "<shoot name>"` finds it (that prints STOP when there is none).
+
+**With a post kit,** number the photos through the kit, so your numbers and the page's (Step 2) are the same:
+
+```
+python3 ../studio-manager/scripts/kit.py sheet "<kit>"
+```
+
+It runs this skill's sheet on the kit's own photos and keeps the list with the kit. From here on, for every command in this skill, `--folder` is the kit's photos (the folder `kit.py show` prints after "Photos:", or the Photos folder inside the kit's own folder when it prints none) and `--shoot` is the kit's name as `kit.py show` prints it. Once a shoot has a kit, do not run `reel.py sheet` on some other folder under the same shoot name: that numbers the photos differently, and numbers you picked would point at other photos on the page.
+
+**No post kit:** make the sheet yourself:
 
 ```
 python3 scripts/reel.py sheet --folder "<edited photos>" --shoot "<shoot name>"
 ```
 
-It writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Assistant's own folder; their photo folder is not changed. Read the sheet image(s).
+Either way it writes one numbered contact sheet (more if there are over 48 photos) and a list with which way each photo is (tall, wide, square), in the Assistant's own folder; their photo folder is not changed. Read the sheet image(s).
 
 ## Step 2: curate the set (your main job)
 
@@ -48,7 +58,26 @@ python3 scripts/reel.py strip --folder "<edited photos>" --shoot "<shoot name>" 
 
 Read the strip left to right. Fix any jolt (swap two neighbors, move a detail in as a breather, drop the one that fights) and draw it again if you changed anything.
 
-Show the pick in one short message: the numbers in order and a few words on how it flows ("Opens wide on the beach, moves in to the two of them, then hands and the ring, ends on the walk away"), plus one line for any trade-off ("Left out 14, lovely but a twin of 9"). Then one question: "Go with these?" [Make it (recommended)] [Change the picks]. If they change it ("swap 3 for 5", "start with the couple"), do it their way; mention once if it now puts near-twins or three close-ups together.
+**Show the pick.** How depends on whether this shoot has a post kit (you found that out in Step 1).
+
+**With a post kit: on the page beside the chat.** The photographer sees your pick as a row of photos they can move, instead of a paragraph of numbers. Your numbers are the kit's own, since Step 1 numbered the photos through the kit. Save your pick, marks and all, and open the page:
+
+```
+python3 ../studio-manager/scripts/kit.py picks "<kit>" --reel 7,2,11+,4,9-,1-,5,12+
+python3 ../studio-manager/scripts/arrange.py open "<kit>" --piece reel
+```
+
+The second prints the page's address on its last line. Load it in the Claude app's browser pane and bring the pane forward; never Chrome. Then say it short: "My pick for the reel is on the page beside us: 12 photos, in the order they'll play. Opens wide on the beach, moves in to the two of them, ends on the walk away. Move anything you like, or leave it as it is. Next I'll ask which song to cut it to." (add one line for any trade-off), and ask the same question: "Go with these?" [Make it (recommended)] [Change the picks]. On Change the picks: "It's on the page beside us. Drag the photos where you want them, then press \"I'm happy with this order\"." and wait; the page tells them to come back and say "done". If they would rather say the change ("swap 3 for 5", "start with the couple"), do it their way with `kit.py picks` again; the page beside the chat shows the new pick by itself within a few seconds (if it hasn't, load its address in the pane again); mention once if it now puts near-twins or three close-ups together.
+
+**Whichever way they said yes** (the button, "done", "looks good"), run this before the song step and use the picks it prints for everything after:
+
+```
+python3 ../studio-manager/scripts/arrange.py apply "<kit>" --piece reel        prints: Reel picks: 7,2,11+,4,9-,1-,5,12+
+```
+
+It is their order if they moved anything and yours if they didn't, with Longer as `+` and Quicker as `-`. More on the page, and on a line starting ARRANGED, is in the Assistant's `parts/arrange.md` (`../studio-manager/parts/arrange.md`). When a whole post kit is being made, its steps carry on without stopping, so the pick is not shown first there; they can change it afterwards.
+
+**No post kit: in the chat.** Show the pick in one short message: the numbers in order and a few words on how it flows ("Opens wide on the beach, moves in to the two of them, then hands and the ring, ends on the walk away"), plus one line for any trade-off ("Left out 14, lovely but a twin of 9"). Then one question: "Go with these?" [Make it (recommended)] [Change the picks]. If they change it ("swap 3 for 5", "start with the couple"), do it their way; mention once if it now puts near-twins or three close-ups together.
 
 ## Step 3: the song
 
@@ -74,6 +103,8 @@ Ask with buttons: "How should it move?"
 - **Calm:** about two seconds a photo; room to look. Best with 6 to 9 photos.
 - **Fast:** about half a second a photo; quick and punchy. Best with 12 to 20 photos.
 - **Build:** starts calm, quickens toward the end, then lands on the last photo.
+
+**If they set Longer or Quicker on the page and then choose anything but A little of everything,** say once: "One thing: the Longer and Quicker you set only count with \"A little of everything\". With this one they aren't used." The other ways of moving do not read the marks.
 
 **Always ask this question; never skip it and never pick for them.** Say what each means in seconds for THIS song, because the same word is a different speed on a different song (the script's plan line gives the numbers; `--dry-run` shows them without making anything). On a slower song, "a little of everything" and "calm" can sit near two seconds a photo, which reads as slow on Instagram.
 

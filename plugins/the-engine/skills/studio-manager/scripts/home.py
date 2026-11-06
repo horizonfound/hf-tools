@@ -525,6 +525,14 @@ def main():
         say(u)
     elif a.cmd == "pending":
         say(json.dumps(pending(), indent=1))
+        # an order they arranged on a picker page and pressed the final button on: one line each, after the
+        # list ("ARRANGED: <kit folder> | reel | 12 photos"). parts/arrange.md says what to do with one.
+        try:
+            import arrange
+            for w in arrange.waiting():
+                say(arrange.waiting_line(w))
+        except Exception:  # noqa: BLE001  (no such file, or anything else: pending must still answer)
+            pass
     elif a.cmd == "seen":
         mark_seen(); say("ok")
     elif a.cmd == "did":

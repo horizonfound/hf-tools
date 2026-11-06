@@ -80,6 +80,8 @@ FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram kee
 FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
 FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 KINDS = ("reel", "carousel", "single")
+KIT_OWN_FILES = ("Post kit.html", "Captions and hooks.txt", "Reel.txt")   # what /content serves from a kit, and
+KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
 
@@ -711,7 +713,25 @@ def open_capcut(rec):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def ours(self):
+        """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)?
+        Every page here is opened that way. A web page on another site that has been pointed at this Mac by
+        a trick of names still carries its own name in Host, and is refused before any route is looked at."""
+        port = self.server.server_address[1]
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return True
+        say(f"refused: a request for {urlsplit(self.path).path[:60]!r} named another host ({host[:80]!r})")
+        self.send_error(HTTPStatus.FORBIDDEN)
+        return False
+
+    def do_HEAD(self):
+        if self.ours():
+            super().do_HEAD()
+
     def do_GET(self):
+        if not self.ours():
+            return
         path = urlsplit(self.path).path
         if fresh.page_path(path) and fresh.stale() and fresh.restart(self):
             return
@@ -747,6 +767,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path in ("/arrange.html", "/design.html", "/arrange-state", "/kit-photo"):
+            # the pages for arranging a kit's photos: every one of their requests is arrange.py's to answer
+            import arrange
+            return arrange.handle_get(self, path, urlsplit(self.path).query)
         if (path.startswith("/posting-thumbs/") or path.startswith("/feed/") or path.startswith("/queue-thumbs/") or path.startswith("/home-thumbs/")) and ".." not in path:
             return super().do_GET()
         if path.startswith("/content/") and ".." not in path:
@@ -913,8 +937,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(out)
 
     def serve_content(self, rel):
-        """A post kit's page and files, read-only, from The Studio/Content (kit.py), so the kit page opens
-        in the app's browser pane like the report does."""
+        """A post kit's page and its pieces, read-only, from Your Content (kit.py), so the kit page opens in
+        the app's browser pane like the report does. Only what the kit page shows is served:
+            <kit>/Post kit.html, Captions and hooks.txt, Reel.txt     (kept in the kit's hidden folder)
+            <kit>/Singles|Carousel|Stories|Covers/<a picture>          (the pieces the Assistant made)
+        Never the kit's records (they hold folder paths), never the photos themselves, never anything whose
+        name starts with a dot, and never anything outside Your Content (the address is decoded first, then
+        checked part by part; the file's real place is checked against Your Content's real place)."""
         import mimetypes
         from urllib.parse import unquote
         try:
@@ -922,15 +951,29 @@ class Handler(SimpleHTTPRequestHandler):
             h = posts.home()
         except Exception:
             h = None
-        if not h:
+        parts = unquote(rel).split("/")
+        ok = bool(h) and len(parts) in (2, 3) and all(x and not x.startswith(".") and "\\" not in x and "\x00" not in x for x in parts)
+        if ok and len(parts) == 2:
+            ok = parts[1] in KIT_OWN_FILES
+        elif ok:
+            ok = parts[1] in KIT_PIECE_FOLDERS and Path(parts[2]).suffix.lower() in (".jpg", ".jpeg", ".png")
+        if not ok:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        f = (h / posts.CONTENT_NAME / unquote(rel)).resolve()
-        if not f.is_file() and f.name in ("Post kit.html", "Captions and hooks.txt", "Reel.txt"):
-            # The Studio's own files live in the kit's hidden folder (Oct 30); the page's address stays
+        content = h / posts.CONTENT_NAME
+        kit = content / parts[0]
+        f = kit.joinpath(*parts[1:])
+        if len(parts) == 2 and not f.is_file():
+            # The Assistant's own files live in the kit's hidden folder (Oct 30); the page's address stays
             # /content/<kit>/Post kit.html so its pictures (Carousel/..., Singles/...) still resolve beside it.
-            f = f.with_name(".kit") / f.name
-        if not str(f).startswith(str((h / posts.CONTENT_NAME).resolve())) or not f.is_file():
+            f = kit / ".kit" / parts[1]
+        try:
+            inside = not kit.is_symlink() and f.is_file()
+            if inside:
+                f.resolve().relative_to(content.resolve())
+        except (OSError, ValueError):
+            inside = False
+        if not inside:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
@@ -950,6 +993,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Vary", "Origin")
 
     def do_OPTIONS(self):
+        if not self.ours():
+            return
         if urlsplit(self.path).path == "/feed":
             self.send_response(HTTPStatus.NO_CONTENT)
             self.cors()
@@ -961,6 +1006,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path in ("/arrange", "/design", "/design-slide", "/design-commit"):
+            # the pages for arranging a kit's photos. arrange.py checks the Host itself (and the type and the
+            # size), reads a refused body away, and answers in the page's own words.
+            import arrange
+            return arrange.handle_post(self, path, urlsplit(self.path).query)
+        if not self.ours():
+            return
         if path == "/feed":
             return self.post_feed()
         if path == "/clicked":
