@@ -979,6 +979,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the pages for arranging a kit's photos: every one of their requests is arrange.py's to answer
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job"):
+            # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
+            import reel_page
+            return reel_page.handle_get(self, path, urlsplit(self.path).query)
         if path.startswith(("/posting-thumbs/", "/feed/", "/queue-thumbs/", "/home-thumbs/")):
             if thumb_wanted(path):                     # one small picture a page shows, nothing else (see thumb_wanted)
                 return super().do_GET()
@@ -1252,6 +1256,10 @@ class Handler(SimpleHTTPRequestHandler):
             # size), reads a refused body away, and answers in the page's own words.
             import arrange
             return arrange.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut"):
+            # the reel page: reel_page.py checks each of these the way arrange.py does (above)
+            import reel_page
+            return reel_page.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":

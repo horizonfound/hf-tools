@@ -934,14 +934,9 @@ def sync(kit, piece):
         return data, p
 
 
-def state_for_page(kit, piece):
-    """Everything the page draws from. No path and no file name is in it. None when the numbered list can't
-    be read right now."""
-    data, p = sync(kit, piece)
-    if p is None:
-        return None
-    rec = kit_mod.load_rec(kit)
-    rows = sheet_rows(kit)
+def page_photos(kit, rec, rows):
+    """The photos a page draws from, in the list's order: {n, way, w, h, v, missing, have} for each, and how many
+    have their small copy made. No path and no file name is in it. (The pickers' state, and the reel page's.)"""
     try:
         names = set(os.listdir(previews_dir(kit)))
     except OSError:
@@ -969,6 +964,18 @@ def state_for_page(kit, piece):
         # now, or it is there and can't be read
         photos.append({"n": row["n"], "way": row.get("way") or "", "w": row.get("w") or 0, "h": row.get("h") or 0,
                        "v": v, "missing": src is None or unreadable, "have": have})
+    return photos, made
+
+
+def state_for_page(kit, piece):
+    """Everything the page draws from. No path and no file name is in it. None when the numbered list can't
+    be read right now."""
+    data, p = sync(kit, piece)
+    if p is None:
+        return None
+    rec = kit_mod.load_rec(kit)
+    rows = sheet_rows(kit)
+    photos, made = page_photos(kit, rec, rows)
     # "happy" is for the line under the final button, and goes to the page only while that order is still
     # waiting for Claude. Once it has been taken (apply) or put aside (took), nothing is waiting any more.
     happy = p.get("happy") if any(w["kit"] == kit.name and w["piece"] == piece for w in waiting()) else None
@@ -1465,6 +1472,15 @@ def handle_post(handler, path, query):
 
 def page_address(kit, piece):
     """The picker's address on the page server, which is started if it isn't running (as home.py does)."""
+    base = server_base()
+    if not base:
+        return None
+    return f"{base}/arrange.html?kit={quote(kit.name)}&piece={piece}"
+
+
+def server_base():
+    """The page server's address (http://127.0.0.1:<port>), started if it isn't running, once its home page
+    answers. None if it couldn't be started. (The pickers' address, and the reel page's.)"""
     import home
     u = home.url()
     if not u:
@@ -1481,7 +1497,7 @@ def page_address(kit, piece):
         except Exception:  # noqa: BLE001
             pass
         time.sleep(0.25)
-    return f"{base}/arrange.html?kit={quote(kit.name)}&piece={piece}"
+    return base
 
 
 def cmd_open(kit, piece):
