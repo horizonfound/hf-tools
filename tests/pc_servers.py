@@ -83,6 +83,21 @@ def main():
         if pid_on(p):
             sys.exit(f"port {p} is in use here; not touching it")
 
+    # 0. a page server never waits on a name lookup (GitHub's Mac, Nov 7: Python's own server asks the network
+    #    for this computer's name when it starts, which hung about 30 s there; every page then came up too late)
+    import http.server
+    import socket as _socket
+    real_getfqdn = _socket.getfqdn
+    _socket.getfqdn = lambda *a, **k: (time.sleep(5), real_getfqdn(*a, **k))[1]
+    try:
+        t0 = time.time()
+        srv = fresh.Server(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+        took = time.time() - t0
+        srv.server_close()
+    finally:
+        _socket.getfqdn = real_getfqdn
+    check("a page server starts at once even when the network's name lookup hangs", took < 1.0, f"took {took:.1f} s")
+
     # 1. up, with its log in STUDIO_HOME/logs (started the way the Assistant starts it)
     log, before = fresh.start_server([sys.executable, str(code / "edit_queue.py"), "serve", "--port", str(BASE)], "queue")
     check("the log lives in STUDIO_HOME/logs", log == home / "logs" / "queue.log", str(log))

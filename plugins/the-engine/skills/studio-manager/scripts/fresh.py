@@ -40,6 +40,7 @@ import sys
 import threading
 import time
 from http.server import ThreadingHTTPServer
+import socketserver
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
@@ -165,7 +166,22 @@ def code_ok(folder=None):
 
 # ---------------------------------------------------------------- the listening socket
 
-class _PCServer(ThreadingHTTPServer):
+class _QuickServer(ThreadingHTTPServer):
+    """Python's own page server, minus one step: it never looks up this computer's own name when it starts.
+
+    Python's server_bind asks socket.getfqdn("127.0.0.1"), a reverse name lookup, only to fill a name that
+    nothing here reads (only Python's CGI handler uses it). On a Mac whose network is slow or misconfigured
+    (GitHub's Mac machines, Nov 7; a VPN, a hotel network) that lookup can hang about 30 seconds, so a page
+    took half a minute to come up, or a starter gave up on it. Binding is otherwise exactly Python's own."""
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host
+        self.server_port = port
+
+
+class _PCServer(_QuickServer):
     """The page server's socket on a PC (unproven on a real PC).
 
     Python's web server asks for SO_REUSEADDR, which on a Mac only lets a server come back quickly after a
@@ -199,8 +215,8 @@ class _PCServer(ThreadingHTTPServer):
             self.socket = socket.socket(self.address_family, self.socket_type)
 
 
-# Every page server makes its socket with this. On a Mac it is Python's own server, exactly as before.
-Server = _PCServer if this_computer.WINDOWS else ThreadingHTTPServer
+# Every page server makes its socket with this. On a Mac it is Python's own server, without the name lookup.
+Server = _PCServer if this_computer.WINDOWS else _QuickServer
 
 
 # ---------------------------------------------------------------- the servers' logs
