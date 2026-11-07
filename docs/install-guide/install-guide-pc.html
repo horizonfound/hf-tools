@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Setting up The Assistant on a PC</title>
+<style>
+@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Regular.ttf");font-weight:400;font-style:normal}
+@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Italic.ttf");font-weight:400;font-style:italic}
+@font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-Regular.ttf");font-weight:400}
+@font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-SemiBold.ttf");font-weight:600}
+@page{size:8.5in 11in;margin:0}
+:root{--cream:#F7F3EC;--paper:#FFFDF8;--ink:#1F2430;--ink-2:#6B7280;--line:#E6DFD2;--coral:#EE7B5B;--coral-2:#D55D3C;--coral-l:#FCE6DC;--ocean:#4F9A95;--ocean-l:#DCEEEC;--sun:#F8EBC6;
+  --display:"Fraunces",Georgia,serif;--sans:"DM Sans",-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);font:400 12.5pt/1.5 var(--sans)}
+.page{position:relative;width:8.5in;height:11in;padding:.62in .72in .7in;overflow:hidden;break-after:page;background:var(--cream)}
+.page:last-child{break-after:auto}
+.foot{position:absolute;left:.72in;right:.72in;bottom:.34in;display:flex;justify-content:space-between;font-size:8.5pt;color:var(--ink-2);border-top:1px solid var(--line);padding-top:7px}
+.foot b{font-weight:600;color:var(--ink)}
+
+/* headings */
+.eyebrow{font:600 9pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
+h1{font:400 44pt/1.02 var(--display);letter-spacing:-.02em;margin:.18in 0 .12in}
+h1 em{font-style:italic;color:var(--coral-2)}
+.step{display:flex;align-items:center;gap:.2in;margin-bottom:.14in}
+.num{flex:none;width:.62in;height:.62in;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:400 24pt/1 var(--display)}
+.step h2{font:400 25pt/1.08 var(--display);letter-spacing:-.015em;margin:0}
+.step .of{font:600 8.5pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2);margin-bottom:5px}
+.lede{font-size:12.5pt;color:var(--ink-2);margin:0 0 .16in;max-width:6.4in}
+.lede b{color:var(--ink);font-weight:600}
+
+/* the steps */
+ol.do{list-style:none;margin:0;padding:0;counter-reset:d}
+ol.do>li{counter-increment:d;position:relative;padding:0 0 0 .44in;margin:0 0 .13in;font-size:12.5pt}
+ol.do>li::before{content:counter(d);position:absolute;left:0;top:1px;width:.29in;height:.29in;border-radius:50%;background:var(--coral);color:#fff;font:600 10.5pt/.29in var(--sans);text-align:center}
+ol.do b{font-weight:600}
+.key{display:inline-block;font:600 9.5pt/1 var(--sans);background:var(--paper);border:1.2px solid #CFC7B8;border-bottom-width:2.5px;border-radius:6px;padding:4px 7px;margin:0 1px;vertical-align:1px}
+.paste{margin:.07in 0 .03in;background:var(--ink);color:#fff;border-radius:11px;padding:11px 14px;font:500 10.4pt/1.35 var(--mono);white-space:nowrap;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.plabel{font:600 7.8pt/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--coral-2);margin:.1in 0 -.02in}
+.paste span{font:600 7.5pt/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:#F4B9A5;flex:none}
+.say{display:inline-block;background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:3px 10px;font:600 12.5pt/1.3 var(--sans)}
+.ok{display:flex;gap:10px;align-items:flex-start;background:var(--ocean-l);border-radius:12px;padding:10px 13px;font-size:11pt;margin-top:.12in}
+.ok::before{content:"";flex:none;width:17px;height:17px;border-radius:50%;margin-top:2px;background:var(--ocean) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/13px no-repeat}
+.ok b{font-weight:600}
+.tip{background:var(--sun);border-radius:12px;padding:10px 13px;font-size:11pt;margin-top:.12in}
+.tip b{font-weight:600}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:.24in}
+figure{margin:.14in 0 0}
+figcaption{font-size:9.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
+
+/* mock-up: a window */
+.win{background:#fff;border:1px solid #D9D2C4;border-radius:11px;overflow:hidden;font:400 8.5pt/1.35 var(--sans);color:#2B2F38;zoom:1.16}
+.bar{height:24px;background:#EFEBE3;border-bottom:1px solid #DDD6C8;display:flex;align-items:center;gap:6px;padding:0 10px;font:600 8pt/1 var(--sans);color:#6B7280}
+.bar i{width:9px;height:9px;border-radius:50%;background:#E1675B;display:block}.bar i+i{background:#E9B341}.bar i+i+i{background:#58B55B}
+.bar span{margin:0 auto;transform:translateX(-22px)}
+.app{display:grid;grid-template-columns:1.8in 1fr}
+.side{background:#F6F3EC;border-right:1px solid #E4DDCF;padding:10px 9px;min-height:2.1in}
+.tabs{display:flex;gap:3px;background:#E9E4D9;border-radius:8px;padding:3px;margin-bottom:10px}
+.tabs b{flex:1;text-align:center;font:600 8pt/1 var(--sans);padding:6px 0;border-radius:6px;color:#6B7280}
+.tabs b.on{background:#fff;color:var(--ink)}
+.side p{margin:0 0 5px;padding:5px 7px;border-radius:6px;color:#6B7280}
+.side p.on{background:#E9E4D9;color:var(--ink);font-weight:600}
+.main{padding:14px 16px 12px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;min-height:2.1in;background:#fff}
+.box{border:1.3px solid #D9D2C4;border-radius:12px;padding:10px 12px;min-height:.52in;color:#9AA0AA;background:#fff;position:relative}
+.box.typed{color:var(--ink);font:500 7.6pt/1.3 var(--mono);white-space:nowrap}
+.box .send{position:absolute;right:8px;bottom:8px;width:20px;height:20px;border-radius:50%;background:var(--coral)}
+.box .send::after{content:"";position:absolute;left:6px;top:5px;border:5px solid transparent;border-bottom-color:#fff;border-top:0;transform:translateY(1px)}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.2px solid #D9D2C4;border-radius:999px;padding:4px 9px;font:600 7.8pt/1 var(--sans);color:#4B5563;background:#fff;white-space:nowrap}
+.chip::after{content:" ▾";color:#9AA0AA;font-size:7pt}
+.msg{align-self:flex-start;max-width:86%;background:#F3EFE7;border-radius:10px;padding:7px 10px}
+.msg.you{align-self:flex-end;background:var(--ink);color:#fff}
+.hit{outline:2.6px solid var(--coral);outline-offset:3px;border-radius:9px;position:relative}
+.chip.hit{border-radius:999px}
+.tag{position:absolute;top:-11px;right:-11px;width:19px;height:19px;border-radius:50%;background:var(--coral);color:#fff;font:600 8.5pt/19px var(--sans);text-align:center;border:0}
+.menu{border:1px solid #D9D2C4;border-radius:10px;background:#fff;padding:4px;width:1.75in;zoom:1.16;font:500 8.5pt/1 var(--sans)}
+.menu div{padding:7px 9px;border-radius:6px;color:#4B5563}
+.menu div.on{background:var(--coral-l);color:var(--ink);font-weight:600}
+.panel{padding:12px 14px;background:#fff}
+.ptabs{display:flex;gap:14px;border-bottom:1px solid #E4DDCF;margin-bottom:10px;font:600 8.5pt/1 var(--sans);color:#9AA0AA}
+.ptabs b{padding:0 0 7px}.ptabs b.on{color:var(--ink);border-bottom:2px solid var(--ink)}
+.prow{display:flex;justify-content:space-between;align-items:center;border:1px solid #E4DDCF;border-radius:9px;padding:8px 10px;margin-bottom:6px}
+.prow small{display:block;color:#9AA0AA;font-size:7.5pt;margin-top:2px}
+.tog{width:30px;height:17px;border-radius:999px;background:var(--ocean);position:relative;flex:none}
+.tog::after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+.btnm{display:inline-block;border-radius:7px;padding:6px 12px;font:600 8.5pt/1 var(--sans);background:#fff;border:1px solid #CFC7B8;color:#4B5563}
+.btnm.pri{background:#2F6FE4;border-color:#2F6FE4;color:#fff}
+.dialog{width:3.1in;margin:0 auto;background:#F4F2EE;border:1px solid #D0CABD;border-radius:13px;padding:16px 16px 13px;zoom:1.1;text-align:center;font:400 8.6pt/1.4 var(--sans)}
+.dialog .ico{width:34px;height:34px;border-radius:9px;margin:0 auto 8px;background:linear-gradient(#8F97A6,#5F6676)}
+.dialog b{display:block;font-weight:600;font-size:9pt;margin-bottom:4px}
+.dialog .acts{display:flex;gap:8px;justify-content:center;margin-top:11px}
+.finder{padding:14px;display:flex;gap:18px;background:#fff;min-height:1.05in;align-items:flex-start}
+.fold{text-align:center;font-size:8pt;color:#4B5563;width:.8in}
+.fold i{display:block;width:.56in;height:.42in;margin:0 auto 5px;border-radius:5px;background:#7CB7E8;position:relative}
+.fold i::before{content:"";position:absolute;left:0;top:-5px;width:.24in;height:7px;border-radius:4px 4px 0 0;background:#7CB7E8}
+.fold.new span{background:#2F6FE4;color:#fff;border-radius:4px;padding:1px 5px}
+.side{position:relative;padding-bottom:30px}
+.side .me{position:absolute;left:9px;right:9px;bottom:8px;display:flex;justify-content:space-between;align-items:center;color:#6B7280;font-size:7.6pt}
+.side .me b{font-size:11pt;line-height:1;color:#4B5563;padding:1px 3px}
+.tog2{display:inline-flex;gap:2px;background:#E2DCCF;border-radius:6px;padding:2px;margin-left:16px;font-style:normal}
+.tog2 u{text-decoration:none;display:block;min-width:20px;height:15px;border-radius:4px;font:600 7pt/15px var(--mono);text-align:center;color:#6B7280}
+.tog2 u:first-child::after{content:"";display:inline-block;width:8px;height:7px;border:1.3px solid #8B909A;border-radius:3px;vertical-align:-1px}
+.tog2 u.on{background:#fff;color:var(--ink)}
+.bar span{transform:none;margin:0 auto 0 14px}
+.row .grow{flex:1}.row .plain{font:600 7.8pt/1 var(--sans);color:#4B5563;padding:5px 4px;white-space:nowrap;position:relative}
+.setbar{display:flex;justify-content:space-between;padding:9px 13px;border-bottom:1px solid #E4DDCF;font-size:9.5pt}.setbar span{color:#6B7280}
+.set{display:grid;grid-template-columns:1.35in 1fr;min-height:1.75in}
+.setl{border-right:1px solid #E4DDCF;padding:9px 8px}.setl p{margin:0 0 3px;padding:4px 7px;border-radius:6px;color:#4B5563}.setl p.on{background:#ECE7DC;color:var(--ink);font-weight:600}
+.setr{padding:11px 13px}
+.settop{display:flex;align-items:center;gap:11px;font-size:8.3pt;color:#4B5563;margin-bottom:12px}
+.settop b{font-weight:600;color:var(--ink);background:#ECE7DC;border-radius:6px;padding:4px 8px}
+.settop em{font-style:normal;display:inline-flex;border:1px solid #D9D2C4;border-radius:7px;overflow:visible}.settop em u{text-decoration:none;padding:4px 8px}.settop em u.on{font-weight:600;color:var(--ink)}
+.settop i{font-style:normal;flex:1;border:1px solid #D9D2C4;border-radius:7px;padding:4px 8px;color:#9AA0AA;min-width:.5in}
+.settop b.add{background:#5B5F68;color:#fff;white-space:nowrap}
+.pcard{display:flex;justify-content:space-between;align-items:center;background:#F7F5F0;border-radius:10px;padding:10px 12px;max-width:2.9in}
+.pcard small{display:block;color:#8B909A;font-size:7.5pt;margin-top:2px}
+.pcard .plus{width:20px;height:20px;border-radius:6px;background:#E7E2D7;text-align:center;font:600 11pt/19px var(--sans);color:#4B5563}
+.pop{position:absolute;left:3%;right:3%;bottom:7px;background:#fff;border:1px solid #D9D2C4;border-radius:9px;padding:8px 10px;text-align:center}
+.pop b{display:block;font-size:8.5pt}.pop small{display:block;margin:2px 0 6px}.pop div{display:flex;gap:6px;justify-content:flex-end;align-items:center}.pop u{margin-right:auto;font-size:7pt;color:#6B7280}
+.pop .btnm{padding:4px 7px;font-size:7pt;white-space:nowrap}.pop u{white-space:nowrap}
+/* the home page, small */
+.home{background:var(--cream);padding:11px 12px;min-height:2.1in}
+.home h5{font:400 13pt/1.1 var(--display);margin:0 0 3px}.home h5 em{font-style:italic;color:var(--coral-2)}
+.home small{color:var(--ink-2);font-size:7.3pt}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+.cards div{background:var(--paper);border-radius:8px;padding:7px 8px;font:600 7.6pt/1.2 var(--sans);box-shadow:0 1px 0 var(--line)}
+.split{display:grid;grid-template-columns:1fr 1.1fr}
+.split .main{border-right:1px solid #E4DDCF;min-height:2.1in}
+
+/* cover */
+.cover{display:flex;flex-direction:column}
+.brand{display:flex;justify-content:space-between;align-items:baseline;font:600 9pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
+.brand span{color:var(--coral-2)}
+.need{display:grid;grid-template-columns:1fr 1fr;gap:.16in;margin-top:.22in}
+.need div{background:var(--paper);border-radius:16px;padding:14px 16px;box-shadow:0 1px 0 var(--line)}
+.need>div>b{display:block;font:600 12.5pt/1.2 var(--sans);margin-bottom:4px}.need p b{font-weight:600;color:var(--ink)}
+.need p{margin:0;font-size:10.8pt;color:var(--ink-2)}
+.need .n{font:italic 400 15pt/1 var(--display);color:var(--coral-2);margin-bottom:6px;display:block}
+.map{margin-top:.24in;background:var(--ink);color:#F4F1EA;border-radius:18px;padding:16px 20px}
+.map h3{font:400 15pt/1 var(--display);margin:0 0 10px;color:#fff}
+.map ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:6px 24px;counter-reset:m}
+.map li{counter-increment:m;font-size:11pt;display:flex;gap:9px;align-items:baseline}
+.map li::before{content:counter(m);color:var(--coral);font-weight:600;flex:none;width:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:.2in;margin-top:.1in}
+.way{background:var(--paper);border-radius:16px;padding:13px 17px;box-shadow:0 1px 0 var(--line)}
+.way h4{font:400 15.5pt/1.15 var(--display);margin:0 0 6px}
+.way h4 em{font-style:italic;color:var(--coral-2)}
+.way p{margin:0 0 7px;font-size:10.8pt;color:var(--ink-2)}
+.way ol{margin:0;padding-left:18px;font-size:10.8pt}.way li{margin-bottom:4px}
+table.fix{width:100%;border-collapse:collapse;font-size:10.6pt;margin-top:.06in}
+table.fix td{vertical-align:top;padding:6px 10px;border-top:1px solid var(--line)}
+table.fix td:first-child{width:38%;font-weight:600}
+h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
+.todo{background:#FFE08A;border-radius:4px;padding:0 5px;font-weight:600;color:#5A4300;white-space:nowrap}
+.first{background:var(--sun);border-radius:12px;padding:9px 13px;font-size:11pt;margin:0 0 .13in}.first b{font-weight:600}
+.box{padding-left:26px}.box::before{content:"+";position:absolute;left:10px;top:7px;font:400 12pt/1 var(--sans);color:#6B7280}
+.box .send{background:none;border:1.4px solid #6B7280;width:8px;height:12px;border-radius:5px;right:11px;bottom:10px}.box .send::after{display:none}
+.pw{font:600 7.8pt/1 var(--sans);color:#4B5563;white-space:nowrap;padding:5px 2px;position:relative;display:inline-flex;align-items:center;gap:4px}
+.pw::after{content:"▾";color:#9AA0AA;font-size:7pt}
+.pw.f::before{content:"";width:10px;height:7px;border:1.3px solid #6B7280;border-radius:2px;display:inline-block}
+.pw.hit{padding:5px 6px}
+.bar em.nav{font-style:normal;color:#8B909A;font:600 8pt/1 var(--mono);margin-left:10px;letter-spacing:3px}
+.bar em.sb{width:11px;height:9px;border:1.3px solid #8B909A;border-radius:2px;margin-left:12px}
+.tog2 u:first-child::after{border-radius:5px 5px 5px 1px}
+.bar{overflow:visible}.win{overflow:visible}.win>.bar:first-child{border-radius:10px 10px 0 0}
+.gbar{height:7px;border-radius:4px;background:#E4DFD3;margin:8px 9px}
+ol.do.tight>li{margin-bottom:.085in;font-size:11.8pt}
+table.fix.small{font-size:10pt}table.fix.small td{padding:5px 9px}
+.way{font-size:10.2pt}.way p,.way ol{font-size:10.2pt}.way li{margin-bottom:3px}
+
+/* ---- Windows drawings (PC edition only) ---- */
+.wbar{height:26px;background:#EFEBE3;border-bottom:1px solid #DDD6C8;display:flex;align-items:center;gap:9px;padding:0 0 0 11px;font:600 8pt/1 var(--sans);color:#6B7280;border-radius:10px 10px 0 0;position:relative}
+.wbar .ham{flex:none;width:11px;height:9px;border-top:1.4px solid #8B909A;border-bottom:1.4px solid #8B909A;position:relative}
+.wbar .ham::after{content:"";position:absolute;left:0;right:0;top:2.4px;border-top:1.4px solid #8B909A}
+.wbar .ttl{margin-left:6px}
+.wctl{margin-left:auto;display:flex;align-self:stretch}
+.wctl u{text-decoration:none;width:31px;display:flex;align-items:center;justify-content:center;color:#6B7280;font:400 8.5pt/1 var(--sans)}
+.wctl u.mn::before{content:"";width:9px;border-top:1.2px solid #6B7280}
+.wctl u.mx::before{content:"";width:7px;height:7px;border:1.2px solid #6B7280;border-radius:1.5px}
+.wctl u.cl::before{content:"\2715"}
+.wctl.hit{outline-offset:1px}
+.wtog{display:inline-flex;gap:2px;background:#E2DCCF;border-radius:6px;padding:2px;font-style:normal}
+.wtog u{text-decoration:none;display:block;min-width:20px;height:15px;border-radius:4px;font:600 7pt/15px var(--mono);text-align:center;color:#6B7280}
+.wtog u:first-child::after{content:"";display:inline-block;width:8px;height:7px;border:1.3px solid #8B909A;border-radius:5px 5px 5px 1px;vertical-align:-1px}
+.wtog u.on{background:#fff;color:var(--ink)}
+/* Start menu and taskbar */
+.taskbar{height:30px;background:#E9E6E0;border-top:1px solid #D6D0C4;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:0 0 10px 10px}
+.wlogo{width:15px;height:15px;display:grid;grid-template-columns:1fr 1fr;gap:1.5px;position:relative}
+.wlogo i{display:block;background:#2F7BD8;border-radius:1px}
+.tbi{width:15px;height:13px;border-radius:3px;background:#C9C2B4}
+.startm{background:#F4F2EE;border:1px solid #D9D2C4;border-radius:10px;margin:10px auto 9px;width:84%;padding:9px 10px;font-size:8pt}
+.wsearch{border:1.2px solid #CFC7B8;border-radius:999px;background:#fff;padding:5px 10px;font:500 8pt/1 var(--sans);color:var(--ink);display:flex;align-items:center;gap:6px}
+.wsearch::before{content:"";width:7px;height:7px;border:1.3px solid #6B7280;border-radius:50%;flex:none}
+.sres{display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 7px;border-radius:7px;background:#fff}
+.sres i{width:18px;height:18px;border-radius:4px;flex:none;background:linear-gradient(135deg,#2F7BD8 0 50%,#58B55B 50% 100%)}
+.sres small{display:block;color:#8B909A;font-size:7pt}
+/* the Store */
+.store{padding:11px 12px;background:#fff;border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:7px}
+.scard{display:flex;align-items:center;gap:9px;border:1px solid #E4DDCF;border-radius:9px;padding:8px 10px}
+.scard .pyi{width:24px;height:24px;border-radius:6px;flex:none;background:linear-gradient(135deg,#3B77B5 0 50%,#F2C94C 50% 100%)}
+.scard div{flex:1}.scard small{display:block;color:#8B909A;font-size:7pt;margin-top:2px}
+.scard.dim{opacity:.5}
+.getb{border-radius:6px;padding:5px 13px;font:600 8pt/1 var(--sans);background:#2F6FE4;color:#fff;position:relative}
+.getb.grey{background:#E4E1DA;color:#4B5563}
+/* the folder window */
+.fdlg{background:#fff;border-radius:0 0 10px 10px}
+.faddr{display:flex;gap:6px;align-items:center;padding:7px 9px;border-bottom:1px solid #E4DDCF}
+.faddr .arw{font:600 8pt/1 var(--mono);color:#8B909A;letter-spacing:2px}
+.faddr .ab{flex:1;border:1.2px solid #CFC7B8;border-radius:5px;padding:4px 7px;font:500 7.8pt/1 var(--mono);color:var(--ink);position:relative}
+.ftool{display:flex;gap:12px;padding:5px 10px;border-bottom:1px solid #E4DDCF;font:600 7.6pt/1 var(--sans);color:#4B5563;align-items:center}
+.fbody{display:grid;grid-template-columns:.95in 1fr;min-height:.95in}
+.fnav{border-right:1px solid #E4DDCF;padding:7px 6px;font-size:7.6pt;color:#4B5563}
+.fnav p{margin:0 0 3px;padding:3px 5px;border-radius:5px}
+.fnav p.on{background:#E6EEF9;color:var(--ink);font-weight:600}
+.flist{padding:8px 10px;font-size:7.8pt;color:#4B5563}
+.flist p{margin:0 0 3px;padding:3px 6px;border-radius:5px;display:flex;align-items:center;gap:7px}
+.flist p::before{content:"";width:13px;height:10px;border-radius:2px;background:#F2C45A;flex:none}
+.flist p.sel{background:#CFE0F8;color:var(--ink);font-weight:600}
+.flist p.cloud::before{background:#7CB7E8}
+.fbot{display:flex;align-items:center;gap:7px;padding:7px 9px;border-top:1px solid #E4DDCF;background:#F6F3EC;border-radius:0 0 10px 10px;font-size:7.6pt;color:#4B5563}
+.fbot .fname{flex:1;border:1.2px solid #CFC7B8;border-radius:5px;padding:4px 7px;background:#fff;color:var(--ink)}
+.fbot .btnm{padding:5px 10px;font-size:7.6pt}
+/* This PC, drives with letters */
+.drives{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:11px 12px;background:#fff;border-radius:0 0 10px 10px}
+.drv{border:1px solid #E4DDCF;border-radius:8px;padding:7px 7px;font-size:7.3pt;color:#4B5563;white-space:nowrap}
+.drv b{display:block;font-weight:600;color:var(--ink);margin-bottom:5px}
+.drv i{display:block;height:5px;border-radius:3px;background:#E4DFD3;position:relative;overflow:hidden}
+.drv i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--f,40%);background:#2F7BD8}
+.drv small{display:block;margin-top:4px;color:#8B909A;font-size:7pt}
+.drv.card{border-color:var(--coral);background:var(--coral-l)}
+/* the firewall box */
+.fw{background:#F4F2EE;border:1px solid #D0CABD;border-radius:10px;padding:10px 12px;font:400 7.8pt/1.35 var(--sans)}
+.fw b{display:block;font-weight:600;font-size:8.3pt;margin-bottom:4px}
+.fw .ck{display:flex;gap:6px;align-items:center;margin:3px 0}
+.fw .ck::before{content:"";width:9px;height:9px;border:1.2px solid #6B7280;border-radius:2px;flex:none}
+.fw .ck.on::before{background:#2F6FE4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/9px no-repeat;border-color:#2F6FE4}
+.fw .acts{display:flex;gap:6px;justify-content:flex-end;margin-top:7px}
+.fw .btnm{padding:4px 9px;font-size:7.4pt}
+.pclist{margin:.04in 0 0;padding:0;list-style:none}
+.pclist li{position:relative;padding:0 0 0 .2in;margin:0 0 .07in;font-size:10.6pt}
+.pclist li::before{content:"";position:absolute;left:3px;top:.55em;width:7px;height:7px;border-radius:50%;background:var(--coral)}
+.pclist b{font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<section class="page cover">
+  <div class="brand"><b>The Assistant</b><span>by Horizon Found</span></div>
+  <div style="margin-top:.3in">
+    <div class="eyebrow">Setup guide · Windows PC</div>
+    <h1>Setting up<br><em>The Assistant</em></h1>
+    <p class="lede" style="font-size:14pt;max-width:5.9in">Six short steps, and you only do it once. Each numbered line is one thing to do. Go in order.</p>
+  </div>
+  <div class="eyebrow" style="margin-top:.16in">Before you start, you need</div>
+  <div class="need">
+    <div><span class="n">one</span><b>A Windows PC</b><p>Windows 10 or 11, with its updates done, and the internet on while you set up.</p></div>
+    <div><span class="n">two</span><b>A Claude plan, Pro or higher</b><p>The Assistant runs on your own Claude account. The free plan doesn't include the part of Claude it lives in.</p></div>
+    <div><span class="n">three</span><b>An external hard drive</b><p>Where your shoots are kept. If your photos live on your computer for now, it still works, and the Assistant will talk to you about it once.</p></div>
+    <div><span class="n">four</span><b>The Assistant file</b><p>One file called <b>The-Assistant.zip</b>, from <span class="todo">[PLACE: to decide]</span>. It lands in Downloads, maybe shown as <b>The-Assistant</b> with a zipper on its picture. Leave it as it is: don't open it or choose Extract All.</p></div>
+  </div>
+  <div class="map" style="margin-top:.18in">
+    <h3>The six steps</h3>
+    <ol>
+      <li>Add Python from the Microsoft Store</li>
+      <li>Install Claude on your PC</li>
+      <li>Make a folder for the Assistant</li>
+      <li>Add the Assistant to Claude</li>
+      <li>Let it work while you're away</li>
+      <li>Say hi</li>
+    </ol>
+  </div>
+  <p style="font-size:10.5pt;margin-top:.12in;margin-bottom:0"><b style="font-weight:600">Stuck at any point?</b> Send a screenshot of what you see to <span class="todo">[ADDRESS: to decide]</span>. (Windows key + Shift + S takes one.)</p>
+  <p style="font-size:9.6pt;color:var(--ink-2);margin-top:.05in">This is the first Windows edition, and you're among the first to use the Assistant on a PC. The pictures are drawings, so your screen will look a little different. If a word doesn't match, send us a screenshot.</p>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Draft · November 7, 2026</span></div>
+</section>
+
+<!-- ===================== STEP 1: PYTHON ===================== -->
+<section class="page">
+  <div class="step"><div class="num">1</div><div><div class="of">Step 1 of 6</div><h2>Add Python from the Store</h2></div></div>
+  <p class="lede">The Assistant runs on a small free piece of software called Python. A PC doesn't come with it, so you add it once. <b>Do this before you open Claude, so Claude finds it right away.</b></p>
+  <ol class="do tight">
+    <li>Click <b>Start</b>, the Windows logo at the bottom of your screen, and type <span class="say">Store</span>. Click <b>Microsoft Store</b>.</li>
+    <li>In the search box at the top of the Store, type <span class="say">Python Install Manager</span> and press <span class="key">Enter</span>.</li>
+    <li>Click the one called <b>Python Install Manager</b>, from the Python Software Foundation. Not the ones called Python 3.12 or Python 3.13.</li>
+    <li>Click <b>Get</b> (it may say Install). Wait until it's finished. <b>Then you're done: don't click Open.</b> There's nothing to open.</li>
+  </ol>
+  <div class="cols" style="grid-template-columns:1fr 1.25fr;align-items:end">
+    <figure>
+      <div class="win">
+        <div class="startm"><div class="wsearch">Store</div><div class="sres hit" style="position:relative"><i></i><div><b>Microsoft Store</b><small>App</small></div><span class="tag">1</span></div></div>
+        <div class="taskbar"><span class="wlogo hit" style="border-radius:2px"><i></i><i></i><i></i><i></i></span><span class="tbi"></span><span class="tbi"></span><span class="tbi"></span></div>
+      </div>
+      <figcaption>Drawing. Start is the Windows logo on the bar along the bottom of your screen.</figcaption>
+    </figure>
+    <figure>
+      <div class="win">
+        <div class="wbar"><span class="ttl" style="margin-left:0;white-space:nowrap">Store</span><span class="wsearch" style="margin-left:4px;padding:3px 9px;font-size:7.4pt;white-space:nowrap">Python Install Manager</span><span class="wctl"><u class="mn"></u><u class="mx"></u><u class="cl"></u></span></div>
+        <div class="store">
+          <div class="scard hit" style="position:relative"><span class="pyi"></span><div><b>Python Install Manager</b><small>Python Software Foundation</small></div><span class="getb">Get<span class="tag">4</span></span><span class="tag" style="left:-11px;right:auto">3</span></div>
+          <div class="scard dim"><span class="pyi"></span><div><b>Python 3.13</b><small>Python Software Foundation</small></div><span class="getb grey">Get</span></div>
+          <div class="scard dim"><span class="pyi"></span><div><b>Python 3.12</b><small>Python Software Foundation</small></div><span class="getb grey">Get</span></div>
+        </div>
+      </div>
+      <figcaption>Drawing. Pick Python Install Manager, the first one here, and leave the others.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> the button where Get was says <b>Open</b>. Leave it, and close the Store. What you added is Python's installer: Python finishes setting itself up the first time the Assistant uses it.</div></div>
+  <div class="tip"><b>Clicked Open anyway?</b> A black window asks a few questions. Press <span class="key">Enter</span> at each one. When it stops asking, close it with the <b>✕</b> at its top right. <b>Claude already open on this PC?</b> Close it now with its ✕. Step 2 says when to open it again.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 1 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 2: CLAUDE ===================== -->
+<section class="page">
+  <div class="step"><div class="num">2</div><div><div class="of">Step 2 of 6</div><h2>Install Claude on your PC</h2></div></div>
+  <p class="lede">Claude is the app the Assistant lives inside. <b>Already have Claude on this PC and you're signed in? Open it from the Start menu and start at the small 4 on this page.</b></p>
+  <ol class="do">
+    <li>Open your web browser (Edge is fine) and go to <b>claude.ai/download</b>.</li>
+    <li>Click the download for <b>Windows</b>. When it has downloaded, open the file. If Windows asks whether to let this app make changes to your device, click <b>Yes</b>.</li>
+    <li>Open <b>Claude</b> from the Start menu and <b>sign in</b> with your Claude account.</li>
+    <li>Look at the top left of the Claude window. There's a small box with two pictures in it: a speech bubble and <span class="say" style="font-family:var(--mono);font-size:11pt">&lt;/&gt;</span>. Click <b>&lt;/&gt;</b>. (If you see the words Chat and Code instead, click Code.) That part of Claude is called <b>Code</b>. You won't write any code.</li>
+  </ol>
+  <figure style="margin-top:.2in">
+    <div class="win">
+      <div class="wbar"><span class="ham"></span><em class="sb" style="width:11px;height:9px;border:1.3px solid #8B909A;border-radius:2px;display:block"></em><em style="font:600 8pt/1 var(--mono);color:#8B909A;letter-spacing:3px;font-style:normal">&lt; &gt;</em><em class="wtog"><u></u><u class="on hit" style="position:relative">&lt;/&gt;<span class="tag" style="top:auto;bottom:-14px;right:-12px">4</span></u></em><span class="ttl">New session</span><span class="wctl"><u class="mn"></u><u class="mx"></u><u class="cl"></u></span></div>
+      <div class="app"><div class="side"><p class="on">+ New</p><p>Search</p><p>Projects</p><p>Artifacts</p><p>Customize</p><p>More</p><div class="me"><span>your name · Pro ▾</span><b>&#9881;</b></div></div><div class="main"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f">Select folder</span><span class="grow"></span><span class="plain">Opus 5.5 High</span><span class="plain">Manual</span></div></div></div>
+    </div>
+    <figcaption>Drawing. The &lt;/&gt; picture is at the top left. The three buttons at the top right (–, □, ✕) are Windows' own.</figcaption>
+  </figure>
+  <div class="ok"><div><b>You'll know it worked when</b> the top of the window says <b>New session</b> and there's a message box at the bottom with a few small choices under it. A small box in the middle about "Choose environment" or "Connect GitHub" can be ignored. You don't need GitHub.</div></div>
+  <div class="tip"><b>If Claude says your plan doesn't include this part,</b> you need Pro or higher. <b>If it asks you to sign in online,</b> follow the link, then come back to the app. <b>If the download page offers two Windows versions,</b> take the plain one, unless your PC has an ARM chip (such as a Snapdragon): then take ARM64. Not sure? Click Start, type <b>About</b>, open <b>About your PC</b>, and look at <b>System type</b>.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 2 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 3: FOLDER ===================== -->
+<section class="page">
+  <div class="step"><div class="num">3</div><div><div class="of">Step 3 of 6</div><h2>Make a folder for the Assistant</h2></div></div>
+  <p class="lede">Claude needs a small folder to start in. This one is only for the Assistant's own use. <b>Your photos never go in this folder.</b></p>
+  <ol class="do tight">
+    <li>Under the message box, click the choice with a small <b>folder</b> picture in front of it.</li>
+    <li>Click <b>Open folder…</b> A window opens showing your files.</li>
+    <li>Click in the long box at the very top of that window (the address bar). Type <span class="say">%USERPROFILE%</span> and press <span class="key">Enter</span>. That jumps to your <b>home folder</b>, the one with your name on it.</li>
+    <li>Click <b>New folder</b> near the top. Type <span class="say">Assistant</span> and press <span class="key">Enter</span>.</li>
+    <li>With the new <b>Assistant</b> folder selected, click <b>Select Folder</b>.</li>
+  </ol>
+  <div class="cols" style="grid-template-columns:1.05fr 1.3fr;align-items:end;gap:.2in">
+    <figure>
+      <div class="win"><div class="main" style="min-height:1.25in;border-radius:10px"><div class="box">Describe a task…<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f hit">Select folder<span class=tag>1</span></span></div></div></div>
+      <figcaption>Drawing. The folder choice. It may say Select folder, or the name of a folder you've used before.</figcaption>
+    </figure>
+    <figure>
+      <div class="win">
+        <div class="wbar"><span class="ttl" style="margin-left:0">Select Folder</span><span class="wctl"><u class="cl"></u></span></div>
+        <div class="fdlg">
+          <div class="faddr"><span class="arw">&larr; &rarr;</span><span class="ab hit">%USERPROFILE%<span class="tag">3</span></span></div>
+          <div class="ftool"><span>Organize ▾</span><span class="hit" style="position:relative;padding:2px 4px">New folder<span class="tag">4</span></span></div>
+          <div class="fbody">
+            <div class="fnav"><p class="on">your name</p><p>Desktop</p><p>Documents</p><p>This PC</p></div>
+            <div class="flist"><p>Downloads</p><p class="cloud">OneDrive</p><p class="sel">Assistant</p></div>
+          </div>
+          <div class="fbot"><span>Folder:</span><span class="fname">Assistant</span><span class="btnm pri hit" style="position:relative">Select Folder<span class="tag">5</span></span><span class="btnm">Cancel</span></div>
+        </div>
+      </div>
+      <figcaption>Drawing. Your home folder, with the new folder in it.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> the folder choice under the message box now says <b>Assistant</b>.</div></div>
+  <div class="tip"><b>Not in Documents, Desktop, Pictures or OneDrive.</b> On many PCs Windows keeps the first three inside OneDrive, which copies everything to the cloud and can hold a file busy while it does. Your home folder isn't. (The file in Downloads is fine where it is.)</div>
+  <div class="tip" style="background:var(--paper);border:1px solid var(--line);padding:8px 13px"><b>The address bar won't take it?</b> Click <b>This PC</b> on the left, then <b>Local Disk (C:)</b>, <b>Users</b>, and the folder with your name. Carry on from the small 4.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 3 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 4: ADD ===================== -->
+<section class="page">
+  <div class="step"><div class="num">4</div><div><div class="of">Step 4 of 6</div><h2>Add the Assistant to Claude</h2></div></div>
+  <p class="lede" style="margin-bottom:.08in;max-width:none">You add the Assistant from Claude's own <b>Settings</b>, using the file you downloaded. <b>Nothing gets typed.</b></p>
+  <div class="first"><b>Installed "The Engine" from us before?</b> Message us at <span class="todo">[ADDRESS: to decide]</span> before you go on. Never had it? Carry on.</div>
+  <ol class="do tight">
+    <li>At the very bottom left, at the right end of the line with your name, click the small <b>gear</b>. A box called <b>Settings</b> opens.</li>
+    <li>In the Settings box, find <b>Customize</b> in its list on the left, near the bottom (newer copies of Claude may call it <b>Plugins</b>). Click it, then click <b>Plugins</b> at the top if it's there. (Landed on Connectors? Leave its buttons alone.)</li>
+    <li>Click the dark <b>+ Add</b> button at the far top right, then <b>Upload plugin</b> (not Add marketplace).</li>
+    <li>Under <b>Plugin file</b>, click to choose a file. In the window that opens, click <b>Downloads</b> on the left, click <b>The-Assistant</b> (the one with a zipper on its picture), then <b>Open</b>.</li>
+    <li>Check two things: <b>no line with a red !</b>, and the <b>Preview</b> says <b>the-engine</b>, "The Assistant by Horizon Found…" (the-engine is its behind-the-scenes name.)</li>
+    <li>Click the black <b>Upload</b> button, then close Settings with its <b>X</b>.</li>
+  </ol>
+  <div class="cols" style="grid-template-columns:1.12fr 1fr;align-items:start">
+    <figure style="margin-top:.02in">
+      <div class="win" style="zoom:1">
+        <div class="setbar"><b>Settings</b><span>&#10005;</span></div>
+        <div class="set" style="min-height:1.42in;grid-template-columns:.92in 1fr">
+          <div class="setl"><p>Account</p><p>Usage</p><p style="color:#B5B9C0;padding:0 7px">…</p><p class="on hit" style="position:relative">Customize<span class="tag">2</span></p><p>Code</p></div>
+          <div class="setr" style="padding:9px 9px"><div class="settop" style="gap:6px;font-size:7.4pt;margin-bottom:8px"><span>Connectors</span><span>Skills</span><b class="hit" style="position:relative;padding:3px 6px">Plugins<span class="tag">2</span></b><span style="flex:1"></span><b class="add hit" style="position:relative;padding:3px 6px">+ Add &#9662;<span class="tag">3</span></b></div>
+            <div class="menu" style="zoom:1;width:1.15in;margin-left:auto;font-size:7.6pt"><div class="gbar"></div><div class="on">Upload plugin</div></div></div>
+        </div>
+      </div>
+      <figcaption>Drawing. Your + Add list may have more lines. Click the one about uploading a plugin.</figcaption>
+    </figure>
+    <figure style="margin-top:.02in">
+      <div class="win" style="zoom:1">
+        <div class="panel" style="padding:9px 12px">
+          <div style="font:400 11pt/1.1 var(--sans);margin-bottom:5px">Upload a plugin</div>
+          <div style="font-size:6.8pt;color:#6B7280;border:1px solid #E4DDCF;border-radius:6px;padding:4px 7px;margin-bottom:6px">Only upload plugins you trust…</div>
+          <div style="font-size:7pt;color:#4B5563;margin-bottom:3px">Plugin file</div>
+          <div class="prow" style="padding:6px 9px;margin-bottom:4px"><div><b>The-Assistant.zip</b></div><span style="color:#8B909A">&#10005;</span></div>
+          <div style="font-size:7.4pt;color:#6B7280;margin:0 0 5px">&#8226; The archive must contain…</div>
+          <div style="font-size:7pt;color:#4B5563;margin-bottom:3px">Preview</div>
+          <div class="prow hit" style="position:relative;display:block;padding:6px 9px"><b>the-engine</b><small>The Assistant by Horizon Found…</small><span class="tag">5</span></div>
+          <div style="margin-top:7px"><span class="btnm hit" style="background:#1F2430;border-color:#1F2430;color:#fff;position:relative">Upload<span class="tag">6</span></span> <span class="btnm">Cancel</span></div>
+        </div>
+      </div>
+      <figcaption>Drawing. The two grey notes are always there. They are not errors.</figcaption>
+    </figure>
+  </div>
+  <div class="ok" style="margin-top:.06in;padding:8px 13px"><div><b>The file is good when</b> there is no red ! and Upload is black, not grey. The real proof is Step 6.</div></div>
+  <div class="tip" style="margin-top:.06in;padding:8px 13px;font-size:10.4pt"><b>A red ! that says "Plugin failed validation"?</b> Stop and send a screenshot to <span class="todo">[ADDRESS: to decide]</span>. That one is ours to fix. <b>"This marketplace is already added"?</b> Cancel, then + Add, Upload plugin. <b>"The Engine" with an Add button?</b> Leave it. It's an old copy.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 4 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 5: AUTO ===================== -->
+<section class="page">
+  <div class="step"><div class="num">5</div><div><div class="of">Step 5 of 6</div><h2>Let it work while you're away</h2></div></div>
+  <p class="lede">This step lets a backup finish while you're out of the room. Without it, Claude may stop and ask your permission before each thing it does.</p>
+  <ol class="do">
+    <li>Look under the message box, at the right. After the name of the Claude you're using (ours said Opus 5.5), there is one word. If it says <b>Auto</b>, you're done with this step.</li>
+    <li>If it says anything else, click that word. In the list that opens, click <b>Auto</b>.</li>
+  </ol>
+  <div class="cols" style="grid-template-columns:1.6fr 1fr;align-items:end">
+    <figure>
+      <div class="win"><div class="main" style="min-height:1.2in;border-radius:10px"><div class="box">Describe a task or ask a question<div class="send"></div></div><div class="row"><span class="pw">This computer</span><span class="pw f">Assistant</span><span class="grow"></span><span class="plain">Opus 5.5 High</span><span class="plain hit">Manual<span class=tag>2</span></span></div></div></div>
+      <figcaption>Drawing. The word is at the right, under the message box.</figcaption>
+    </figure>
+    <figure>
+      <div class="menu"><div class="gbar"></div><div class="gbar" style="width:60%"></div><div class="gbar" style="width:45%"></div>
+        <div class="on hit" style="position:relative">Auto<span class="tag">2</span></div></div>
+      <figcaption>Drawing. Your list may have other words in it. Auto is the one to click.</figcaption>
+    </figure>
+  </div>
+  <div class="ok"><div><b>You'll know it worked when</b> that word says <b>Auto</b>. Glance at it each time you start; if it has changed, set it back.</div></div>
+  <div class="tip"><b>Is this safe?</b> Auto means Claude does the backup's steps without asking each time, with its own safety checks running. And the Assistant has one rule it never breaks, in any mode: <b>nothing on your memory card is ever deleted, moved or changed.</b></div>
+  <div class="tip" style="background:var(--paper);border:1px solid var(--line)"><b>Don't see Auto in the list?</b> Click the name just left of that word (ours said Opus 5.5), pick the newest one in the list, then look again. Still not there? Your Claude may need its update: open Claude's <b>Help</b> menu at the top left, click <b>Check for Updates</b>, let it restart, then look again.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 5 of 6</span></div>
+</section>
+
+<!-- ===================== STEP 6: HI ===================== -->
+<section class="page">
+  <div class="step"><div class="num">6</div><div><div class="of">Step 6 of 6</div><h2>Say hi</h2></div></div>
+  <p class="lede">That's the setup. Now meet your Assistant.</p>
+  <ol class="do tight">
+    <li>Click inside the message box, type <span class="say">hi</span> and press <span class="key">Enter</span>.</li>
+    <li>Give it a few minutes the first time: Python finishes setting itself up now. A few grey lines show in the chat ("Ran 2 commands", "Opened browser"): nothing to click. Then it introduces itself, and its home page opens beside the chat.</li>
+    <li>Claude may offer to copy your browser's sign-ins ("Stay signed in to your sites"). Click <b>Not now</b> or <b>Don't show again</b>. Clicked Import cookies by mistake? Click <b>Cancel</b> in the next box.</li>
+  </ol>
+  <figure>
+    <div class="win" style="zoom:1.05">
+      <div class="wbar"><span class="ham"></span><em class="wtog" style="margin-left:4px"><u></u><u class="on">&lt;/&gt;</u></em><span class="ttl">New session</span><span class="wctl"><u class="mn"></u><u class="mx"></u><u class="cl"></u></span></div>
+      <div class="split">
+        <div class="main" style="min-height:1.45in"><div class="msg you">hi</div><div class="msg">Hi, I'm your Assistant. I handle the busywork around your photos…</div><div class="box" style="min-height:.36in">Type / for commands<div class="send"></div></div></div>
+        <div class="home" style="position:relative;min-height:1.45in;border-radius:0 0 10px 0">
+          <h5>Welcome to <em>The Assistant.</em></h5><small>Start with whatever you have today.</small>
+          <div class="cards"><div>Back up a card</div><div>Make posts from a shoot</div><div>My editing queue</div><div>My posting queue</div></div>
+          <div class="pop"><b>Stay signed in to your sites</b><small>Import cookies from your browser…</small><div><u>Don't show again</u><span class="btnm hit" style="position:relative">Not now<span class="tag">3</span></span><span class="btnm" style="background:#1F2430;color:#fff;border-color:#1F2430">Import cookies</span></div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption>Drawing. The chat on the left, the Assistant's home page on the right, and the pop-up to dismiss.</figcaption>
+  </figure>
+  <h3 class="sub" style="margin-top:.1in;font-size:15pt">Things you might see</h3>
+  <table class="fix small">
+    <tr><td>"Your PC needs one free piece from Microsoft"</td><td>Python isn't on yet. Do Step 1, close Claude with its ✕, open it again from the Start menu, and say <b>hi</b> again.</td></tr>
+    <tr><td>"It's called Pillow, and I can add it now"</td><td>The first time you make posts or back up a card, the Assistant asks to add one more free piece, for showing your photos. Click <b>Yes, add it</b>. It takes about a minute, once.</td></tr>
+    <tr><td>A Windows Security box about Python and networks</td><td>Leave <b>Private networks</b> ticked and click <b>Allow access</b>. It's for the Assistant's own pages, which run on this PC only.</td></tr>
+    <tr><td>You said hi and no page opened beside the chat</td><td>Click <b>+ New</b> (top of the left column), check the folder under the message box says <b>Assistant</b>, say hi again. Still nothing? Screenshot to <span class="todo">[ADDRESS: to decide]</span>.</td></tr>
+  </table>
+  <div class="ok" style="padding:8px 13px"><div><b>You're set up.</b> Next time: open Claude from the Start menu, click <b>&lt;/&gt;</b>, click <b>+ New</b>, check the folder under the message box says <b>Assistant</b>, type <b>hi</b>.</div></div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Step 6 of 6</span></div>
+</section>
+
+<!-- ===================== OPTIONAL: PHONE ===================== -->
+<section class="page">
+  <div class="step"><div class="num" style="font-size:20pt">+</div><div><div class="of">Optional · any time</div><h2>A tap on your phone</h2></div></div>
+  <p class="lede">The Assistant can tap you on your phone when a backup is done, or when it's waiting on an answer from you. Skip this page if you don't want that. You can come back to it later.</p>
+  <ol class="do">
+    <li><b>Put Claude on your phone.</b> Get the Claude app from the App Store or Google Play and sign in with the <b>same</b> Claude account. When the phone asks whether Claude may send notifications, say <b>Allow</b>.</li>
+    <li><b>Link your PC to your phone.</b> On your PC, open Claude's <b>Settings</b> (the gear, as in Step 4), click <b>Code</b> in its list (it may say Claude Code), and turn on <b>Connect new sessions to Remote Control</b>. Close Settings, then click <b>+ New</b>.</li>
+    <li><b>Turn on the taps.</b> Click in the message box, type the first line below exactly as it is and press <span class="key">Enter</span>. Then the second line, the same way. Each one answers with a line saying it's set to true.
+      <div class="plabel">First line</div>
+      <div class="paste">/config agentPushNotifEnabled=true<span>type it, then Enter</span></div>
+      <div class="plabel">Second line</div>
+      <div class="paste">/config inputNeededNotifEnabled=true<span>type it, then Enter</span></div>
+    </li>
+  </ol>
+  <div class="ok"><div><b>What each one does:</b> the first lets the Assistant tap you when a backup finishes. The second taps you when it's waiting on an answer from you.</div></div>
+  <div class="tip"><b>Good to know.</b> Your PC has to be on and awake, with Claude open. The Assistant asks the PC to stay awake during a backup, but closing a laptop's lid still puts it to sleep: leave it open, with the charger in. And if you're sitting at the PC, the tap is skipped, since you can already see it on screen.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>Optional</span></div>
+</section>
+
+<!-- ===================== WHAT NOW ===================== -->
+<section class="page">
+  <div class="eyebrow">You're in</div>
+  <h1 style="font-size:32pt;margin:.08in 0 .08in">Two good places to <em>start</em></h1>
+  <p class="lede" style="margin-bottom:.1in;max-width:none">You don't need a memory card to begin. Talk to the Assistant in your own words.</p>
+  <div class="two">
+    <div class="way">
+      <h4>Photos you've <em>already finished</em></h4>
+      <p>Edited and exported, sitting in a folder.</p>
+      <ol>
+        <li>On the home page, click <b>Make posts from a shoot</b>.</li>
+        <li>A box opens with a few words and a <b>Copy</b> button. Click Copy, click in the chat's message box, press Ctrl + V, then Enter. (The first time the words are <b>set up my Assistant folder</b>: that makes a second folder, on your photo drive, for your posts.)</li>
+        <li>Click <b>Select the folder with your finished photos</b>. A small window with a list of folders opens: click the little arrows to open <b>This PC</b> and your drive, click the folder with your exports, then <b>OK</b>.</li>
+        <li>Type <b>make my posts</b> in the chat and press Enter.</li>
+      </ol>
+      <p style="margin-top:6px">You get a carousel (or a single post) and stories sized for Instagram, and a reel page where you pick the song and the pace, then finish the reel in CapCut (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed.</p>
+    </div>
+    <div class="way">
+      <h4>A <em>memory card</em> with new photos</h4>
+      <p>Straight out of the camera.</p>
+      <ol>
+        <li>Put the card in and plug in your drive. If Windows pops up a note asking what to do with the card, ignore it, or pick <b>Take no action</b>.</li>
+        <li>Type <b>backup now</b> in the chat and press Enter.</li>
+        <li>The first time, the Assistant asks a few setup questions, one at a time, with buttons. Your drives show with their letters, like <b>Big Kahuna (E:)</b>. After that, it's one quick screen each time.</li>
+        <li>When it says <b>You can walk away</b>, walk away. On a laptop, leave the lid open and the charger in.</li>
+      </ol>
+      <p style="margin-top:8px">When you're back, click <b>Show the report</b> in the chat. Every photo is copied and checked, sorted into named shoots, with six sneak peeks picked to edit first.</p>
+    </div>
+  </div>
+  <div class="tip" style="margin-top:.16in"><b>Why not drag the folder in?</b> On a PC, dragging a folder into another folder on the same drive <b>moves</b> it rather than copying it, so the folder you dragged from ends up empty. Use the Select the folder button instead. Dragged one by mistake? Press <b>Ctrl + Z</b> in that File Explorer window right away and it comes back.</div>
+  <div class="tip" style="background:var(--paper);border:1px solid var(--line)"><b>Rather say it than type it?</b> Click in the message box, press the <b>Windows key + H</b>, and talk. That's Windows' own voice typing, and it needs the internet.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>After setup</span></div>
+</section>
+
+<!-- ===================== ON A PC ===================== -->
+<section class="page">
+  <div class="eyebrow">Good to know</div>
+  <h1 style="font-size:30pt;margin:.08in 0 .06in">How a PC is <em>different</em></h1>
+  <h3 class="sub" style="margin-top:.14in;font-size:15pt">Drive letters</h3>
+  <div class="cols" style="grid-template-columns:1fr 1.15fr;gap:.22in;align-items:start">
+    <p style="margin:.02in 0 0;font-size:10.8pt">Windows gives each drive and memory card a letter when it's plugged in, and a drive doesn't always get the same letter. Some days the card even gets the letter your photo drive had. So before every backup the Assistant checks that your photo drive is where it should be, and that the card isn't. <b>If the letters have moved, it tells you and asks before it copies anything.</b> It never guesses.</p>
+    <figure style="margin-top:0">
+      <div class="win" style="zoom:1.05">
+        <div class="wbar"><span class="ttl" style="margin-left:0">This PC</span><span class="wctl"><u class="mn"></u><u class="mx"></u><u class="cl"></u></span></div>
+        <div class="drives">
+          <div class="drv"><b>Local Disk (C:)</b><i style="--f:62%"></i><small>this computer</small></div>
+          <div class="drv"><b>Big Kahuna (E:)</b><i style="--f:48%"></i><small>your photo drive</small></div>
+          <div class="drv card"><b>EOS_DIGITAL (F:)</b><i style="--f:80%"></i><small>the memory card</small></div>
+        </div>
+      </div>
+      <figcaption>Drawing. File Explorer's This PC. Your names and letters will differ.</figcaption>
+    </figure>
+  </div>
+  <h3 class="sub" style="margin-top:.12in;font-size:15pt">Not on a PC yet</h3>
+  <ul class="pclist">
+    <li><b>Looking through your videos for moments.</b> On a PC the reel page lists your videos and plays the usual kind (from most cameras, and from an iPhone set to Most Compatible), and you can pick a moment yourself with <b>Use this moment</b>. The Assistant can't look through them and pick moments for you yet.</li>
+    <li><b>iPhone videos in High Efficiency.</b> They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).</li>
+    <li><b>iPhone photos (HEIC).</b> Export them as JPEGs first, and the Assistant can use those.</li>
+  </ul>
+  <h3 class="sub" style="margin-top:.1in;font-size:15pt">If something isn't right</h3>
+  <table class="fix small">
+    <tr><td>The page beside the chat is blank, or shows a play button</td><td>Don't press the play button. Type <b>show the Assistant</b> and the page comes back.</td></tr>
+    <tr><td>A folder button seemed to do nothing</td><td>The File Explorer window may be behind Claude. Click <b>File Explorer</b> on the taskbar at the bottom of your screen.</td></tr>
+    <tr><td>"Windows wouldn't let me move the folder"</td><td>Another program has a photo in it open. Close Lightroom and any File Explorer window showing that shoot, then say <b>go</b>. Nothing is lost.</td></tr>
+    <tr><td>Claude keeps stopping to ask permission</td><td>Step 5 slipped back. Say yes to the one on screen, then set the word under the message box back to <b>Auto</b>.</td></tr>
+    <tr><td>A backup stopped</td><td>The Assistant says why, first thing. Fix that (plug the drive in, clear space) and say <b>backup now</b> again. Nothing is copied twice.</td></tr>
+    <tr><td>You're not sure what to do next</td><td>Say <b>hi</b>. It tells you where things stand and what you can say. We'll tell you when there's an update, and send the steps with it.</td></tr>
+  </table>
+  <div class="tip" style="margin-top:.1in"><b>Three promises:</b> nothing on your memory card is ever changed. Nothing is ever deleted. Nothing is ever posted or sent for you.</div>
+  <div class="foot"><span><b>The Assistant</b> · Setup guide for PC</span><span>On a PC</span></div>
+</section>
+
+</body>
+</html>

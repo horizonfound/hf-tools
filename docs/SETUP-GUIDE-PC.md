@@ -1,121 +1,156 @@
 # Setting up The Assistant on a Windows PC
 
-**Draft 1, Nov 6, 2026. Nothing in this guide has been tried on a PC.** It is the PC edition of the Mac guide (the PDF built from `docs/install-guide/`, walked through on Nicole's Mac on Nov 5), with the two things a PC needs that a Mac doesn't. Lines marked **[check on a PC]** are written from the Mac's screens or from the documentation and have not been seen on a PC. Lines marked **[Dustin and Nicole to decide]** are yours, with the most likely answer written in for now.
+**Draft 2, Nov 7, 2026. Still nothing in this guide has been tried on a PC.** Draft 1 (Nov 6) was a script for the first PC walk-through. Draft 2 is the same script, now with a PDF beside it: **`docs/The Assistant - Setup Guide for PC.pdf`**, built by `docs/install-guide/build-pc.sh` from `docs/install-guide/install-guide-pc.html`, in the same look as the Mac PDF. Part 1 and Part 2 below are the PDF's words, line for line, with the marks the PDF leaves out. Steps the official sources confirm (Anthropic's Claude Code and Claude help pages, python.org, Microsoft's help, read Nov 7) no longer carry a mark; each is listed with its link in "What the official sources say" at the bottom.
 
-The rule from the Mac's first install (`docs/install-issues-2026-11-05.md`) holds here too: a step goes in the guide a student gets only after someone has seen it on a real screen. So this is the script for the first PC walk-through, not a guide to send yet.
+Two kinds of marks, in this file only (the PDF has none, apart from the placeholders):
+
+- **[check on a PC]**: written from the Mac's screens, from documentation, or from the scripts' Windows code, and not yet seen on a PC.
+- **[Dustin and Nicole to decide]**: yours, with the most likely answer written in for now.
+
+The rule from the Mac's first install (`docs/install-issues-2026-11-05.md`) holds: a step goes in the guide a student gets only after someone has seen it on a real screen. **So the PC PDF is for the first PC walk-through, not to send yet.** Its cover says it is the first Windows edition; its drawings are marked as drawings.
 
 > **For Dustin, before anyone uses this**
 >
-> - **The route is Upload plugin, the same as the Mac PDF.** The brief for this draft said Add marketplace, Add from a repository. The PDF moved off that route on Nov 5, because the marketplace copy on Claude's servers froze on Oct 16 and never refreshed (install-issues, item 4). Upload plugin is the one seen working.
-> - **What a PC student installs [Dustin and Nicole to decide].** A Mac needs nothing (or Apple's one window). A PC needs at least two things: Python, from the Microsoft Store (the "Python Install Manager"; `winget install 9NQ7512CXL7T` is the same thing for someone at ease with a command line), and **Pillow**, the free add-on that makes the previews. This draft has the Assistant offer Pillow and add it itself on a yes, the first time it needs it. Songs may need a third: the reel is being taught to use Windows' own sound reader (`sound.py`, never run on a PC); if that fails, the fallback is ffmpeg, for example inside the `imageio-ffmpeg` add-on. "Nothing to install" is not true on a PC; "one free install from the Microsoft Store, and the Assistant adds one more piece itself" is the honest line if the Pillow route holds.
-> - **Git for Windows: not asked for here [Dustin and Nicole to decide].** Anthropic's docs call it optional and recommend it, so Claude can use its Mac-like command line; without it Claude uses PowerShell. The instructions were written to work in either. The docs do not say which one the desktop app uses.
-> - **iPhone photos (HEIC) [Dustin and Nicole to decide].** A PC needs a second add-on to read them. This draft says to export them as JPEGs.
-> - **Drive letters.** Windows can hand the photo drive's letter to the memory card another day. Since late Nov 6 the Studio File keeps the drive's name and its own number beside the letter, and the backup stops before writing anything when that letter holds a different drive (written, never run on a PC). Older records (the backups, the queue, the report) still keep folders by letter only.
-> - **One thing to know:** Claude Code has an extra safety wall it can run commands inside (the sandbox). Anthropic's docs say it runs on Mac, Linux and WSL2, and that on plain Windows commands run without it. The Assistant's own rules (never touch the card, never overwrite, never delete) are in its scripts and hold either way.
-> - **What Anthropic's docs say about the Claude app on Windows** (checked Nov 6, `docs/pc-readiness-2026-11-06.md`, section K): the Code part of the app is on Windows, for ordinary PCs and the newer ARM ones; Auto mode is on Windows from a certain app version on; the browser pane exists there; the plugin screens and Remote Control have no Windows note at all. Everything else in this guide about the Windows app is a guess from the Mac's screens.
+> - **The PDF is ready to look at:** `docs/The Assistant - Setup Guide for PC.pdf`, 10 pages: a cover, six steps, an optional phone page, "Two good places to start", and "How a PC is different" (drive letters, what a PC can't do yet, if something isn't right). Rebuild it after any change with `sh docs/install-guide/build-pc.sh`. The Mac PDF and its page are untouched.
+> - **Python is now Step 1, before Claude.** Draft 1 had Claude first. Python first means the Claude that opens in Step 2 is a fresh one and should find Python without a restart. Whether an already-open Claude needs a restart is not documented anywhere. Someone who already has Claude is told to close it during Step 1 and open it again in Step 2. [check on a PC]
+> - **The route is Upload plugin, the same as the Mac PDF** (the marketplace copy on Claude's servers froze on Oct 16; install-issues, item 4).
+> - **What a PC student installs [Dustin and Nicole to decide].** Python, from the Microsoft Store ("Python Install Manager", free, from the Python Software Foundation; it puts in only Python's installer, and Python comes down by itself the first time it runs). And **Pillow**, the free add-on that makes the previews on a PC: the Assistant asks and adds it on a yes, the first time it needs to show photos (`parts/on-a-pc.md`). Songs need nothing more since Nov 6: the reel reads MP3 and M4A with Windows' own sound reader (passed on GitHub's Windows machines, never on a photographer's PC). The honest line for a sales page: "one free install from the Microsoft Store, and the Assistant adds one more piece itself".
+> - **Git for Windows: not asked for [Dustin and Nicole to decide].** Anthropic's docs call it optional. Without it, Claude runs its commands in PowerShell, and the Assistant's instructions are written for either.
+> - **iPhone photos (HEIC) [Dustin and Nicole to decide].** A PC needs a second add-on (pillow-heif) to read them. The PDF says: export them as JPEGs.
+> - **The firewall box.** The Assistant's page servers listen on 127.0.0.1 only (`fresh.Server`), never on the network. Whether that still brings up Windows' "allow access" box is not documented by Microsoft or Anthropic. The PDF has one conditional row for it in Step 6 ("Leave Private networks ticked and click Allow access. It's for the Assistant's own pages, which run on this PC only."). If the walk-through never shows the box, take the row out. [check on a PC, with an ordinary (non-admin) account too: Microsoft says a non-admin's answer makes block rules]
+> - **"Customize" is becoming "Plugins".** Claude's help says the sidebar's Customize becomes Plugins (rolling out from Oct 29, for everyone on Nov 9). Step 4 says "Customize ... (newer copies of Claude may call it Plugins)". Once Nicole's or the tester's screen shows the new name, both PDFs should be updated to it.
+> - **Footage on a PC (v19, Nov 7).** A PC lists videos on the reel page, plays the usual kind (H.264: most cameras, an iPhone set to Most Compatible) and makes clip reels from moments picked with Use this moment. It takes no stills, so "Look through my footage" and the strip of stills don't work there. The PDF says so in plain words under "Not on a PC yet".
+> - **A note for whoever owns `parts/on-a-pc.md`** (from the Python research, Nov 7; not changed here): python.org says Python's automatic first-run install "should not generally be relied on" and suggests an explicit `py install default`; the source code shows the automatic install asks no questions (the PATH question comes only from the setup helper you get by clicking Open), and that it works offline from a bundled copy. And on a PC that already has an older Python, `python3 --version` installs nothing. Pillow 13 needs Python 3.11 or later, so an older Python gets an older Pillow.
 
 ---
 
 ## Before you start
 
-You need five things:
+You need four things:
 
-- **A Windows PC.** The Claude app runs on ordinary PCs and on the newer ARM ones. **[check on a PC: the oldest Windows the app supports]**
+- **A Windows PC.** Windows 10 or 11, with its updates done, and the internet on while you set up.
 - **A Claude plan, Pro or higher.** The Assistant runs on your own Claude account. The free plan doesn't include the part of Claude it lives in.
-- **An external hard drive for your shoots.** If your photos live on your computer for now, it still works, and the Assistant will talk to you about it once.
-- **The Assistant file.** One file called **The-Assistant.zip**. Download it from **[PLACE: to decide]**. It lands in your Downloads folder. Leave it as it is: don't open it and don't choose Extract All.
-- **About half an hour, once.** A little longer than on a Mac, because a PC needs one free piece from Microsoft first. **[check on a PC: how long it really takes]**
+- **An external hard drive.** Where your shoots are kept. If your photos live on your computer for now, it still works, and the Assistant will talk to you about it once.
+- **The Assistant file.** One file called **The-Assistant.zip**, from **[PLACE: to decide]**. It lands in Downloads, maybe shown as **The-Assistant** with a zipper on its picture. Leave it as it is: don't open it or choose Extract All.
+
+**Stuck at any point?** Send a screenshot of what you see to **[ADDRESS: to decide]**. (Windows key + Shift + S takes one.)
+
+This is the first Windows edition, and you're among the first to use the Assistant on a PC. The pictures are drawings, so your screen will look a little different. If a word doesn't match, send us a screenshot.
+
+**[check on a PC: how long the whole setup takes]**
 
 ---
 
 ## Part 1: The one-time setup
 
-### Step 1: Install Claude on your PC
+### Step 1: Add Python from the Store
 
-1. Open your web browser and go to **claude.ai/download**.
-2. Click the download for **Windows**. **[check on a PC: whether the page picks the right one for an ARM PC by itself]** Open the file when it has downloaded and follow what it shows. If Windows asks whether to let it make changes, click **Yes**. **[check on a PC]**
+The Assistant runs on a small free piece of software called Python. A PC doesn't come with it, so you add it once. **Do this before you open Claude, so Claude finds it right away.**
+
+1. Click **Start**, the Windows logo at the bottom of your screen, and type **Store**. Click **Microsoft Store**.
+2. In the search box at the top of the Store, type **Python Install Manager** and press **Enter**.
+3. Click the one called **Python Install Manager**, from the Python Software Foundation. Not the ones called Python 3.12 or Python 3.13.
+4. Click **Get** (it may say Install). Wait until it's finished. **Then you're done: don't click Open.** There's nothing to open. **[check on a PC: Get or Install for someone who never had it; the Store page's own code holds "Get", python.org says "Install"]**
+
+*Drawings: Start with the Store found; the Store with Python Install Manager first and Python 3.13 and 3.12 faded below it.*
+
+You'll know it worked when the button where Get was says **Open**. Leave it, and close the Store. What you added is Python's installer: Python finishes setting itself up the first time the Assistant uses it. **[check on a PC: that the button says Open afterwards]**
+
+**Clicked Open anyway?** A black window asks a few questions. Press **Enter** at each one. When it stops asking, close it with the **✕** at its top right. (Python's source code: Enter takes the default each time, No to everything but installing Python; a yes to the long-paths question would ask for admin rights and a restart, which is why we say Enter.) **[check on a PC: whether the window closes by itself]** **Claude already open on this PC?** Close it now with its ✕. Step 2 says when to open it again. **[check on a PC: whether the ✕ really quits Claude on Windows or leaves it running near the clock]**
+
+### Step 2: Install Claude on your PC
+
+Claude is the app the Assistant lives inside. **Already have Claude on this PC and you're signed in? Open it from the Start menu and start at the small 4 on this page.**
+
+1. Open your web browser (Edge is fine) and go to **claude.ai/download**.
+2. Click the download for **Windows**. When it has downloaded, open the file. If Windows asks whether to let this app make changes to your device, click **Yes**. **[check on a PC: whether this box comes up for an ordinary install, and whether SmartScreen warns first; the docs mention the box only for the MSIX package]**
 3. Open **Claude** from the Start menu and **sign in** with your Claude account.
-4. Find the **Code** part of Claude. On a Mac it is a small **&lt;/&gt;** picture at the top left of the window. **[check on a PC: where it sits on a PC, and what it looks like]** You won't write any code.
+4. Look at the top left of the Claude window. There's a small box with two pictures in it: a speech bubble and **&lt;/&gt;**. Click **&lt;/&gt;**. (If you see the words Chat and Code instead, click Code.) That part of Claude is called **Code**. You won't write any code. **[check on a PC: where it sits and what it looks like on Windows; the docs say only "the Code tab at the top of the sidebar", with names showing on hover]**
 
-You'll know it worked when there's a message box at the bottom with a few small choices under it.
+*Drawing: the Windows window, with the </> picture at the top left and Windows' own –, □, ✕ at the top right.*
 
-If Claude says your plan doesn't include this part, you need Pro or higher.
+You'll know it worked when the top of the window says **New session** and there's a message box at the bottom with a few small choices under it. A small box in the middle about "Choose environment" or "Connect GitHub" can be ignored. You don't need GitHub. **[check on a PC: a "WSL" choice may also be offered under the message box; the Assistant needs the plain Local one, since plugins don't load in WSL]**
 
-### Step 2: Python, the one free piece from Microsoft
-
-The Assistant runs on a small free piece of software called Python. A Mac comes with it (or offers it with one click). A PC doesn't, so you add it once.
-
-1. Open the **Microsoft Store** (click Start and type **Store**).
-2. Search for **Python Install Manager**. **[check on a PC: that this is its exact name in the Store, and that it comes from the Python Software Foundation]**
-3. Click **Get** (or **Install**). When it says it's done, you're done with this step. There's nothing to open.
-
-What you just added is Python's installer. Python itself finishes setting itself up the first time the Assistant uses it: a minute or two, and it needs the internet. The Assistant says "Getting Python ready" while it happens. **[check on a PC: how long it takes, and whether Python asks a question that first time]**
-
-Use the Microsoft Store rather than a website: it's the simplest way, and it's the one this guide was written for.
-
-If you skip this step, the Assistant notices the first time you say hi and tells you the same thing.
-
-**[check on a PC: whether Claude has to be closed and opened again before it can see Python]**
+If Claude says your plan doesn't include this part, you need Pro or higher. If it asks you to sign in online, follow the link, then come back to the app. If the download page offers two Windows versions, take the plain one, unless your PC has an ARM chip (such as a Snapdragon): then take ARM64. Not sure? Click Start, type **About**, open **About your PC**, and look at **System type**. **[check on a PC: whether the download page picks the ARM one by itself]**
 
 ### Step 3: Make a folder for the Assistant
 
 Claude needs a small folder to start in. This one is only for the Assistant's own use. **Your photos never go in this folder.**
 
-1. Under the message box, click the choice for the folder, then **Open folder…** A window opens showing your files. **[check on a PC: the exact words]**
-2. Click in the address bar at the top of that window, type **%USERPROFILE%** and press **Enter**. That jumps to your home folder, the one with your name on it.
-3. Click **New folder**, type **Assistant**, and press **Enter**.
-4. With the new **Assistant** folder selected, click **Select Folder**. **[check on a PC]**
+1. Under the message box, click the choice with a small **folder** picture in front of it.
+2. Click **Open folder…** A window opens showing your files.
+3. Click in the long box at the very top of that window (the address bar). Type **%USERPROFILE%** and press **Enter**. That jumps to your **home folder**, the one with your name on it. **[check on a PC: that the folder window takes it]**
+4. Click **New folder** near the top. Type **Assistant** and press **Enter**.
+5. With the new **Assistant** folder selected, click **Select Folder**. **[check on a PC: the window's words, New folder and Select Folder, are Windows' usual folder window; not seen inside Claude]**
 
-You'll know it worked when the folder choice under the message box says **Assistant**.
+*Drawings: the folder choice under the message box; the Select Folder window at the home folder, with Downloads, OneDrive and the new Assistant folder.*
 
-**Not in Documents, Desktop or Pictures.** On many PCs Windows keeps those three in OneDrive, which copies them to the cloud and can hold a file open while it does. Your home folder isn't synced. You'll come back to this same folder every time you open the Assistant. **[check on a PC: whether the window shows OneDrive this way]**
+You'll know it worked when the folder choice under the message box now says **Assistant**.
+
+**Not in Documents, Desktop, Pictures or OneDrive.** On many PCs Windows keeps the first three inside OneDrive, which copies everything to the cloud and can hold a file busy while it does. Your home folder isn't. (The file in Downloads is fine where it is.)
+
+**The address bar won't take it?** Click **This PC** on the left, then **Local Disk (C:)**, **Users**, and the folder with your name. Carry on from the small 4.
 
 ### Step 4: Add the Assistant to Claude
 
-You add the Assistant from Claude's own **Settings**, using the file you downloaded. Nothing gets typed. **[check on a PC, all of this step: Anthropic's docs don't describe these screens for Windows; the words below are the ones seen on Nicole's Mac]**
+You add the Assistant from Claude's own **Settings**, using the file you downloaded. **Nothing gets typed.** **[check on a PC, all of this step: the words are the ones seen on Nicole's Mac; Claude's help describes the Plugins page's + Add, Add marketplace and upload with no Windows note]**
 
 **Installed "The Engine" from us before?** Message us at **[ADDRESS: to decide]** before you go on. Never had it? Carry on.
 
-1. Open **Settings**. On a Mac it is the small gear at the bottom left, at the right end of the line with your name. **[check on a PC: where it is on a PC]**
-2. In the Settings box, find **Customize** in its list on the left. Click it, then click **Plugins** at the top. (Landed on Connectors? Leave its buttons alone.)
-3. Click the dark **+ Add** button at the top right, then **Upload plugin** (not Add marketplace).
-4. Under **Plugin file**, choose **The-Assistant.zip** from your Downloads folder.
-5. Check two things: **no line with a red !**, and the **Preview** says **the-engine**, "The Assistant by Horizon Found…" (the-engine is its behind-the-scenes name). The two grey notes on that screen are always there. They are not errors.
-6. Click the black **Upload** button, then close Settings.
+1. At the very bottom left, at the right end of the line with your name, click the small **gear**. A box called **Settings** opens. **[check on a PC]**
+2. In the Settings box, find **Customize** in its list on the left, near the bottom (newer copies of Claude may call it **Plugins**). Click it, then click **Plugins** at the top if it's there. (Landed on Connectors? Leave its buttons alone.)
+3. Click the dark **+ Add** button at the far top right, then **Upload plugin** (not Add marketplace).
+4. Under **Plugin file**, click to choose a file. In the window that opens, click **Downloads** on the left, click **The-Assistant** (the one with a zipper on its picture), then **Open**. **[check on a PC: Windows hides ".zip" unless file extensions are switched on]**
+5. Check two things: **no line with a red !**, and the **Preview** says **the-engine**, "The Assistant by Horizon Found…" (the-engine is its behind-the-scenes name.)
+6. Click the black **Upload** button, then close Settings with its **X**.
 
-**A red ! that says "Plugin failed validation"?** Stop and send a screenshot to **[ADDRESS: to decide]**. That one is ours to fix.
+*Drawings: Settings with Customize, Plugins and + Add marked; the Upload a plugin box with the file, the Preview and Upload marked. The same drawings as the Mac PDF.*
+
+The file is good when there is no red ! and Upload is black, not grey. The real proof is Step 6.
+
+**A red ! that says "Plugin failed validation"?** Stop and send a screenshot to **[ADDRESS: to decide]**. That one is ours to fix. **"This marketplace is already added"?** Cancel, then + Add, Upload plugin. **"The Engine" with an Add button?** Leave it. It's an old copy.
 
 ### Step 5: Let it work while you're away
 
 This step lets a backup finish while you're out of the room. Without it, Claude may stop and ask your permission before each thing it does.
 
-1. Look under the message box, at the right. After the name of the Claude you're using, there is one word. If it says **Auto**, you're done with this step.
+1. Look under the message box, at the right. After the name of the Claude you're using (ours said Opus 5.5), there is one word. If it says **Auto**, you're done with this step.
 2. If it says anything else, click that word. In the list that opens, click **Auto**.
 
 You'll know it worked when that word says **Auto**. Glance at it each time you start; if it has changed, set it back.
 
-**Don't see Auto in the list?** Auto came to Windows in a newer version of the Claude app. Update the app **[check on a PC: where its update button is]**, then click the name just left of that word, pick the newest one in the list, and look again.
+**Is this safe?** Auto means Claude does the backup's steps without asking each time, with its own safety checks running. And the Assistant has one rule it never breaks, in any mode: **nothing on your memory card is ever deleted, moved or changed.**
 
-**Is this safe?** Auto means Claude does the backup's steps without asking each time. And the Assistant has one rule it never breaks, in any mode: **nothing on your memory card is ever deleted, moved or changed.**
+**Don't see Auto in the list?** Click the name just left of that word (ours said Opus 5.5), pick the newest one in the list, then look again. Still not there? Your Claude may need its update: open Claude's **Help** menu at the top left, click **Check for Updates**, let it restart, then look again. **[check on a PC: where the Help menu is in the Windows window; the docs give the menu path, Help > Check for Updates…, but not where the menu sits]**
 
 ### Step 6: Say hi
 
+That's the setup. Now meet your Assistant.
+
 1. Click inside the message box, type **hi** and press **Enter**.
-2. Give it up to a minute the first time. A few grey lines show in the chat: nothing to click. Then it introduces itself, and its home page opens beside the chat. **[check on a PC: that the page beside the chat opens on a PC]**
-3. If you skipped Step 2, it tells you your PC needs Python first. Do Step 2, then tell it "done."
-4. Claude may offer to copy your browser's sign-ins ("Stay signed in to your sites"). Click **Not now** or **Don't show again**. **[check on a PC]**
+2. Give it a few minutes the first time: Python finishes setting itself up now. A few grey lines show in the chat ("Ran 2 commands", "Opened browser"): nothing to click. Then it introduces itself, and its home page opens beside the chat. **[check on a PC: how long Python's first run takes (a download of about 37 MB); that the page beside the chat opens on a PC]**
+3. Claude may offer to copy your browser's sign-ins ("Stay signed in to your sites"). Click **Not now** or **Don't show again**. Clicked Import cookies by mistake? Click **Cancel** in the next box. **[check on a PC]**
 
-**The first time it needs to show you photos,** the Assistant says your PC needs one more free piece, called **Pillow**, and asks whether to add it. Click **Yes, add it**. It takes about a minute, and you never see it again. **[Dustin and Nicole to decide]** **[check on a PC]**
+*Drawing: the chat on the left, the home page on the right, the pop-up to dismiss, in a Windows window.*
 
-You're set up. Next time: open Claude, go to Code, start a new chat, check the folder under the message box says **Assistant**, type **hi**.
+**Things you might see:**
 
-### Step 7 (optional): Claude on your phone
+| What you see | What to do |
+|---|---|
+| "Your PC needs one free piece from Microsoft" | Python isn't on yet. Do Step 1, close Claude with its ✕, open it again from the Start menu, and say **hi** again. |
+| "It's called Pillow, and I can add it now" | The first time you make posts or back up a card, the Assistant asks to add one more free piece, for showing your photos. Click **Yes, add it**. It takes about a minute, once. **[check on a PC: how long, and whether Auto lets the install run without asking] [Dustin and Nicole to decide: the Assistant adds it, or the guide has them do it]** |
+| A Windows Security box about Python and networks | Leave **Private networks** ticked and click **Allow access**. It's for the Assistant's own pages, which run on this PC only. **[check on a PC: whether the box comes up at all]** |
+| You said hi and no page opened beside the chat | Click **+ New** (top of the left column), check the folder under the message box says **Assistant**, say hi again. Still nothing? Screenshot to **[ADDRESS: to decide]**. |
 
-The Assistant can tap you on the phone when a backup is done, or when it's time to swap cards. **[check on a PC, all of this step: it was tested on Dustin's Mac on Oct 28; Anthropic's docs say nothing different for Windows, except that the computer has to stay on]**
+**You're set up.** Next time: open Claude from the Start menu, click **&lt;/&gt;**, click **+ New**, check the folder under the message box says **Assistant**, type **hi**.
 
-1. **Install the Claude app on your phone** from the App Store or Google Play. Sign in with the **same** Claude account. When the phone asks whether Claude may send notifications, say **Allow**.
-2. **Link your PC to your phone.** In Code, open the panel on the right side of the chat and flip **Remote Control** on. (Typing `/remote-control` in the message box does the same thing.) **[check on a PC: where the panel and the switch are]**
-3. **Turn on the taps.** In the message box, paste each of these lines and press Enter after each:
+### Optional, any time: a tap on your phone
+
+The Assistant can tap you on your phone when a backup is done, or when it's waiting on an answer from you. Skip this page if you don't want that. You can come back to it later. **[check on a PC, all of this part: it was tested on Dustin's Mac on Oct 28; Anthropic's docs describe it with no Windows difference]**
+
+1. **Put Claude on your phone.** Get the Claude app from the App Store or Google Play and sign in with the **same** Claude account. When the phone asks whether Claude may send notifications, say **Allow**.
+2. **Link your PC to your phone.** On your PC, open Claude's **Settings** (the gear, as in Step 4), click **Code** in its list (it may say Claude Code), and turn on **Connect new sessions to Remote Control**. Close Settings, then click **+ New**.
+3. **Turn on the taps.** Click in the message box, type the first line below exactly as it is and press **Enter**. Then the second line, the same way. Each one answers with a line saying it's set to true. **[check on a PC: that /config typed in the Code message box works there, as it did on the Mac]**
 
 ```
 /config agentPushNotifEnabled=true
@@ -125,88 +160,136 @@ The Assistant can tap you on the phone when a backup is done, or when it's time 
 /config inputNeededNotifEnabled=true
 ```
 
-Each answers with "Set … to true". The first lets the Assistant tap you when a backup finishes; the second taps you when it's waiting on an answer.
+What each one does: the first lets the Assistant tap you when a backup finishes. The second taps you when it's waiting on an answer from you.
 
-**Good to know:** the PC has to be on and awake with Claude open. The Assistant asks the PC to stay awake during a backup, but closing a laptop's lid still puts it to sleep: leave it open, with the charger in. If you're sitting at the PC, the tap is skipped, since you can already see it on screen.
+**Good to know.** Your PC has to be on and awake, with Claude open. The Assistant asks the PC to stay awake during a backup, but closing a laptop's lid still puts it to sleep: leave it open, with the charger in. And if you're sitting at the PC, the tap is skipped, since you can already see it on screen.
+
+(Draft 1 said to flip a Remote Control switch in a panel beside the chat. The PDF uses the Settings switch instead, which the docs name, and which covers every new chat, not one.)
 
 ---
 
-## Part 2: Your first posts, and your first backup
+## Part 2: Two good places to start
 
 You don't need a memory card to begin. Talk to the Assistant in your own words.
 
 ### Photos you've already finished
 
+Edited and exported, sitting in a folder.
+
 1. On the home page, click **Make posts from a shoot**.
-2. A box opens with a few words and a **Copy** button. Click Copy, click in the chat's message box, press **Ctrl + V**, then **Enter**. (The first time the words are **set up my Assistant folder**: that makes a second folder, on your photo drive, for your posts.)
-3. Click **Select the folder with your finished photos**: Windows' own folder window opens. Click the folder with your exports, then **OK**. If no window opens, **don't drag the folder in.** Copy the folder's address instead: in File Explorer, click the address bar at the top of the folder's window and press **Ctrl + C**. Then in the chat type **make posts from**, press **Ctrl + V** to paste the address after it, and press **Enter**. **[check on a PC: that the folder window opens in front of Claude, and the name of its button]**
-4. Type **make my posts** in the chat and press **Enter**. (Skip this if you pasted the folder's address in step 3.)
+2. A box opens with a few words and a **Copy** button. Click Copy, click in the chat's message box, press Ctrl + V, then Enter. (The first time the words are **set up my Assistant folder**: that makes a second folder, on your photo drive, for your posts.)
+3. Click **Select the folder with your finished photos**. A small window with a list of folders opens: click the little arrows to open **This PC** and your drive, click the folder with your exports, then **OK**. **[check on a PC: that the window opens in front of Claude; it is Windows' classic "Browse For Folder" window, from `this_computer.pick_folder`]**
+4. Type **make my posts** in the chat and press Enter.
 
-You get single posts, a carousel and stories sized for Instagram, and captions written from what you tell it. The Assistant works from its own copies; your originals aren't moved or changed.
+You get a carousel (or a single post) and stories sized for Instagram, and a reel page where you pick the song and the pace, then finish the reel in CapCut (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed.
 
-**Why not drag?** In File Explorer, dragging a folder to another folder on the same drive moves it instead of copying it, so the folder you dragged from ends up empty. If that happens, press **Ctrl + Z** in that window right away and it comes back.
+What's behind that line since Nicole's v19 (Nov 7), for the walk-through: the post kit is three cards (Reel, Carousel, Stories); a carousel of one slide is a single post; the reel page has footage, photos ("Let my assistant choose" or drag), the song (a Music folder inside the shoot, or a screen recording's sound), the style and the vibe, then **Make my reel**, which writes a CapCut project; the stories designer saves 9:16 stories into the kit's Stories folder. **[check on a PC: all of it; CapCut for Windows has never opened a project the Assistant wrote]**
+
+**Why not drag the folder in?** On a PC, dragging a folder into another folder on the same drive **moves** it rather than copying it, so the folder you dragged from ends up empty. Use the Select the folder button instead. Dragged one by mistake? Press **Ctrl + Z** in that File Explorer window right away and it comes back.
 
 ### A memory card with new photos
 
-1. Put the card in and plug in your drive. Windows may show a box asking what to do with the card. Close it, or pick **Take no action**: the Assistant does the copying, and never from that box. **[check on a PC: the box's exact words]**
-2. Type **backup now** in the chat and press **Enter**. (You can also press the **Windows key and H** and say it. Windows' voice typing needs the internet. **[check on a PC: that it types into Claude's message box]**)
-3. The first time, the Assistant asks a few setup questions, one at a time, with buttons: which drive your shoots go on (each drive shows with its letter, like "Big Kahuna (E:)"), whether to put them right on it or inside a folder, whether you copy shoots to a second drive too, how you like a shoot folder named, how you write to clients, and how often you like to post. After that, it's one quick screen each time, and it names your drive with its letter ("Onto Big Kahuna (E:) like usual?").
-4. When it says **You can walk away**, walk away. Leave the laptop open and plugged in.
+Straight out of the camera.
 
-**About drive letters.** Windows gives each drive and card a letter when it's plugged in, and a drive doesn't always get the same one. Before every backup the Assistant checks that your photo drive is still on its letter and that the card isn't. If the letters have moved, it tells you and asks before it copies anything. It never guesses.
+1. Put the card in and plug in your drive. If Windows pops up a note asking what to do with the card, ignore it, or pick **Take no action**. **[check on a PC: the note's words]**
+2. Type **backup now** in the chat and press Enter.
+3. The first time, the Assistant asks a few setup questions, one at a time, with buttons. Your drives show with their letters, like **Big Kahuna (E:)**. After that, it's one quick screen each time.
+4. When it says **You can walk away**, walk away. On a laptop, leave the lid open and the charger in.
 
 When you're back, click **Show the report** in the chat. Every photo is copied and checked, sorted into named shoots, with six sneak peeks picked to edit first.
 
-**In Lightroom,** the sneak peeks are one filter away: the keyword **sneak peek**. This works the same on a PC as on a Mac. Photos you had already brought into Lightroom Classic before the backup: select them, then **Metadata > Read Metadata from Files**.
+**Rather say it than type it?** Click in the message box, press the **Windows key + H**, and talk. That's Windows' own voice typing, and it needs the internet. **[check on a PC: that it types into Claude's message box and its question boxes]**
+
+(Not in the PDF, true on a PC as on a Mac: in Lightroom the sneak peeks are the keyword **sneak peek**; photos already in Lightroom Classic need Metadata > Read Metadata from Files.)
 
 ---
 
-## What doesn't work on a PC yet
+## How a PC is different
 
-> **Be straight with the PC tester about this box.**
+### Drive letters
+
+Windows gives each drive and memory card a letter when it's plugged in, and a drive doesn't always get the same letter. Some days the card even gets the letter your photo drive had. So before every backup the Assistant checks that your photo drive is where it should be, and that the card isn't. **If the letters have moved, it tells you and asks before it copies anything.** It never guesses. **[check on a PC: the letters on a second day, with the card put in before the drive]**
+
+*Drawing: File Explorer's This PC with Local Disk (C:), Big Kahuna (E:) and EOS_DIGITAL (F:), the card.*
+
+### Not on a PC yet
+
+- **Looking through your videos for moments.** On a PC the reel page lists your videos and plays the usual kind (from most cameras, and from an iPhone set to Most Compatible), and you can pick a moment yourself with **Use this moment**. The Assistant can't look through them and pick moments for you yet.
+- **iPhone videos in High Efficiency.** They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).
+- **iPhone photos (HEIC).** Export them as JPEGs first, and the Assistant can use those. **[Dustin and Nicole to decide]**
+
+> **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >
 > - **Nothing in this guide has been tried on a PC.** The first PC walk-through is the test of every step.
-> - **Songs for a reel.** A song saved as a WAV file works on any computer. MP3 and M4A songs on a PC are being taught to use Windows' own sound reader, which has never been tried on a real PC. If the Assistant says it can't read your song, make the reel with no song and add the song in CapCut.
-> - **The song from a screen recording.** May not work on a PC yet.
-> - **CapCut.** Nobody has seen CapCut for Windows open a project the Assistant made. Some versions of CapCut may lock their project files. The first reel on a PC is a test. The kit page's **Open in CapCut** button looks for CapCut where it installs itself, never tried on a PC; if it can't find it, it says so: open CapCut from the Start menu.
-> - **The home page's folder button** (Select the folder with your finished photos) opens Windows' own folder window, never tried on a PC. If no window opens, paste the folder's address in the chat instead (Part 2).
-> - **The pages where you move the reel's or the carousel's photos** make their pictures with Pillow, the same free piece as everything else, never tried on a PC. If the pictures don't show, say the change in the chat instead ("start with the couple").
-> - **iPhone photos (HEIC).** Export them as JPEGs first. **[Dustin and Nicole to decide]**
-> - **RAW files from Nikon, Sony, Fuji, Olympus, Panasonic and Pentax.** The previews are written for them but have never been tried on a real file. Canon (CR2 and CR3) and a DJI drone's DNG have been, on a Mac set up to work the way a PC does.
-> - **Drive letters that change.** The Assistant remembers your photo drive by its letter, like E:. If Windows gives it a different letter another day, the Assistant checks before a backup and asks you first, but older shoots' **Open photo folder** buttons may not find their folders until the drive is back on its old letter. Unplugging the card and other drives, then plugging the photo drive back in, usually gives it its old letter. **[check on a PC]**
-> - **Renaming a shoot while Lightroom has it open.** Windows can refuse to rename a folder while another program has one of its photos open. The Assistant says so; close Lightroom (and any File Explorer window showing that folder) and say **go**. Nothing is lost.
-> - **Untried on a PC:** the phone taps, voice typing into Claude, the pages beside the chat staying up while you're away, and keeping the PC awake through a long backup.
+> - **CapCut for Windows.** Nobody has seen it open a project the Assistant made; some versions may lock their project files. A reel made while CapCut is open waits, and is added when CapCut is closed and **Open CapCut** is pressed on the reel page.
+> - **Songs.** MP3 and M4A are read with Windows' own sound reader: right to 0.1 ms on GitHub's Windows machines, never on a photographer's PC. A WAV works anywhere. The sound from a screen recording may not work on a PC yet.
+> - **RAW from Nikon, Sony, Fuji, Olympus, Panasonic and Pentax.** The previews are written for them but never tried on a real file (Canon CR2 and CR3 and a DJI DNG have been, on a Mac set up to work the way a PC does).
+> - **Older shoots after a drive's letter changes.** Their Open photo folder buttons may not find their folders until the drive is back on its old letter.
+> - **Untried on a PC:** the phone taps, voice typing into Claude, the pages beside the chat staying up while you're away, keeping the PC awake through a long backup, the folder window coming up in front of Claude, the designer and the stories designer, reading the Instagram grid and Canva (both use Windows' own curl).
 
----
+### If something isn't right
 
-## If something isn't right
-
-- **The Assistant says your PC needs Python.** Do Step 2, then say **done**. If it still can't find it, close Claude, open it again, and say **hi**.
-- **It asks to add Pillow.** That's the one more free piece it needs for your photos. Say yes.
 - **The page beside the chat is blank, or shows a play button.** Don't press the play button. Type **show the Assistant** and the page comes back.
-- **A button on the page says the Assistant isn't running.** Type **show the Assistant** in the chat.
+- **A folder button seemed to do nothing.** The File Explorer window may be behind Claude. Click **File Explorer** on the taskbar at the bottom of your screen.
+- **"Windows wouldn't let me move the folder."** Another program has a photo in it open. Close Lightroom and any File Explorer window showing that shoot, then say **go**. Nothing is lost.
 - **Claude keeps stopping to ask permission.** Step 5 slipped back. Say yes to the one on screen, then set the word under the message box back to **Auto**.
 - **A backup stopped.** The Assistant says why, first thing. Fix that (plug the drive in, clear space) and say **backup now** again. Nothing is copied twice.
-- **"Windows wouldn't let me move the folder."** Another program has a photo in it open. Close Lightroom and any File Explorer window showing that shoot, then say **go**.
-- **We tell you there's an update.** We'll send a new file and the steps with it.
-- **You're not sure what to do next.** Say **hi**. It tells you where things stand and what you can say.
+- **You're not sure what to do next.** Say **hi**. It tells you where things stand and what you can say. We'll tell you when there's an update, and send the steps with it.
 
 **Three promises:** nothing on your memory card is ever changed. Nothing is ever deleted. Nothing is ever posted or sent for you.
 
 ---
 
+## What the official sources say (read Nov 7, 2026)
+
+The research behind Draft 2. Anthropic's pages were saved as read (scratch, not in the repo); re-read a page before quoting it anywhere. "Stated" means the page says it; "inferred" means it follows but isn't written.
+
+**The Claude app on Windows**
+
+- Windows 10 or later. Stated: [Install Claude Desktop](https://support.claude.com/en/articles/10065433-install-claude-desktop) ("Windows: Windows 10 or higher"). Claude Code itself lists Windows 10 1809 or later, 4 GB of memory, x64 or ARM64 ([setup](https://code.claude.com/docs/en/setup)).
+- Install: download, open the file, launch Claude from the Start menu, sign in. Stated: [Install Claude Desktop](https://support.claude.com/en/articles/10065433-install-claude-desktop). A separate ARM64 installer exists ([desktop quickstart](https://code.claude.com/docs/en/desktop-quickstart)).
+- A Windows permission box (UAC) while installing, and no admin needed except for Cowork. Stated for the packaged (MSIX) install: [Deploy Claude Desktop for Windows](https://support.claude.com/en/articles/12622703-deploy-claude-desktop-for-windows). Whether the ordinary download shows it: not stated.
+- The Code tab includes Claude Code; nothing else to install; it needs Pro, Max, Ultra, Team or Enterprise. Stated: [desktop quickstart](https://code.claude.com/docs/en/desktop-quickstart). The Code tab is "at the top of the sidebar"; names show on hover. Where it sits on Windows: not stated.
+- Folder: the environment control (pick the Local one), then the folder control, Open folder…. Stated: [desktop quickstart](https://code.claude.com/docs/en/desktop-quickstart). Plugins don't load in WSL sessions ([desktop](https://code.claude.com/docs/en/desktop)).
+- Git for Windows is optional; without it Claude Code uses PowerShell, and PowerShell profiles are not loaded. Stated for Claude Code ([setup](https://code.claude.com/docs/en/setup), [tools reference](https://code.claude.com/docs/en/tools-reference)); that the desktop app's own copy does the same is inferred. The safety sandbox does not run on plain Windows.
+- The desktop app doesn't read PowerShell profiles; a changed PATH needs Claude quit and reopened. Stated: [desktop](https://code.claude.com/docs/en/desktop). That a Python installed while Claude is open needs the same is inferred; hence Python first.
+- Auto in the mode selector "appears when auto mode is available", needs a current model, and on native Windows Claude Code v2.1.233 or later. Stated: [desktop](https://code.claude.com/docs/en/desktop), [permission modes](https://code.claude.com/docs/en/permission-modes). A mode is remembered per folder.
+- Ctrl for Cmd; Ctrl+/ shows shortcuts; Ctrl+Shift+B opens the browser pane; "Show in Explorer". Stated: [desktop](https://code.claude.com/docs/en/desktop).
+- Updates: Help > Check for Updates… on Windows; the app updates itself on launch and about every four hours. Stated: [desktop](https://code.claude.com/docs/en/desktop), [Deploy Claude Desktop for Windows](https://support.claude.com/en/articles/12622703-deploy-claude-desktop-for-windows).
+- Remote Control: `/remote-control` in the message box, or Settings > Code (or Claude Code) > Connect new sessions to Remote Control. The push switches `agentPushNotifEnabled` and `inputNeededNotifEnabled` are off by default and work only while Remote Control is connected; pushes are skipped while you're at the session. Stated: [remote control](https://code.claude.com/docs/en/remote-control), [settings reference](https://code.claude.com/docs/en/settings-reference). No Windows difference stated.
+- Plugins: the sidebar's Customize becomes Plugins (from Oct 29, for everyone Nov 9); Add > Add marketplace > Add from a repository is described; uploading a plugin file is one sentence with no steps. Stated: [one Plugins page](https://support.claude.com/en/articles/17740565-manage-plugins-skills-and-connectors-from-one-plugins-page), [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude). The 200 MB, valid .zip limit is stated for organization uploads only ([Manage plugins for your organization](https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization)).
+- Voice: Claude's own `/voice` is for the terminal, not the desktop Code tab ([voice dictation](https://code.claude.com/docs/en/voice-dictation)). Windows' voice typing is Windows key + H, in a text box, and needs the internet ([Microsoft Support](https://support.microsoft.com/en-us/windows/use-voice-typing-to-talk-instead-of-type-on-your-pc-fec94565-c4bd-329d-e59a-af033fa5689f)).
+- Firewall: Windows asks to allow or block the first time a program with no rule listens; a non-admin's answer makes block rules ([Microsoft Learn, firewall rules](https://learn.microsoft.com/windows/security/operating-system-security/network-security/windows-firewall/rules)). Nothing official says whether a program listening on 127.0.0.1 only gets the box.
+- Troubleshooting from Anthropic: "another installation in progress" means run the installer as Administrator; sign-in or 403 errors, sign out and in; crash logs in Event Viewer ([desktop](https://code.claude.com/docs/en/desktop)).
+
+**Python on Windows**
+
+- The Python Install Manager is the official route, from the Microsoft Store, "recommended for most users"; Store ID 9NQ7512CXL7T; the old full installer is deprecated. Stated: [python.org, Using Python on Windows](https://docs.python.org/3/using/windows.html), [Python install manager 26.4](https://www.python.org/downloads/release/pymanager-264/).
+- The Store listing is "Python Install Manager", Python Software Foundation, free, needs Windows 10 version 19044 or later. A Store search for "python" also lists Python 3.12 and Python 3.13 from the same publisher. Stated: [Microsoft Store listing](https://apps.microsoft.com/detail/9NQ7512CXL7T), [Store search](https://apps.microsoft.com/search?query=python).
+- The Store app puts in the manager only; with no Python yet, the first `python`, `py` or `python3` installs the newest one by itself (about 37 MB), for that user only, no admin. Stated: [python.org](https://docs.python.org/3/using/windows.html). That this automatic install asks no questions is read from the source code ([install_command.py](https://github.com/python/pymanager/blob/main/src/manage/install_command.py)); the PATH and four other questions come only from the setup helper you get by clicking Open ([firstrun.py](https://github.com/python/pymanager/blob/main/src/manage/firstrun.py)). With no internet it installs a bundled Python 3.15.0.
+- A work PC can have automatic installs switched off by policy (from the manager's settings file).
+- pip comes with it; `python -m pip install pillow` needs no admin. Pillow 13 (Oct 16, 2026) has ready-made Windows files for Python 3.15 on x64 and ARM64, so no compiler is needed. Stated: [Pillow installation](https://pillow.readthedocs.io/en/stable/installation/basic-installation.html), [Pillow on PyPI](https://pypi.org/project/pillow/).
+
+**Still unknown, for the walk-through:** where the regular installer puts Claude and whether SmartScreen warns; where the Code tab, the gear and the Help menu sit on Windows; whether Settings says Customize or Plugins on the tester's copy; Upload plugin on Windows; how long Python's first run takes and whether an already-open Claude sees it; whether the Store button says Get or Install; whether the firewall box comes up for a server on 127.0.0.1; whether Auto lets the Pillow install run without asking; whether /config works in the message box on Windows; whether the ✕ quits Claude or leaves it running near the clock.
+
+---
+
 ## For the first PC walk-through (Dustin)
 
-Do it on a PC that has never had Claude or Python on it, ideally the PC student's own, with a screenshot at every step. Parallels on a Mac with an Apple chip runs the ARM kind of Windows, which most PCs aren't; it's fine for most of this list but weaker for CapCut and the add-ons (`docs/pc-readiness-2026-11-06.md`, "What needs a real PC").
+Do it on a PC that has never had Claude or Python on it, ideally the PC student's own, with the PDF open beside it and a screenshot at every step. Parallels on a Mac with an Apple chip runs the ARM kind of Windows, which most PCs aren't; it's fine for most of this list but weaker for CapCut and the add-ons (`docs/pc-readiness-2026-11-06.md`, "What needs a real PC"). Try one run on an ordinary (non-admin) Windows account if you can.
 
 What to look at, in order:
 
-1. Step 1: where the Code part is in the Windows app, and what the window looks like.
-2. Step 2: the Store's listing for Python Install Manager, how long Python's first run takes (it downloads Python itself), whether it asks anything then and whether it waits for an answer when Claude runs it, and whether Claude needs a restart to see it.
-3. Step 3: the folder window's words, whether %USERPROFILE% works in it, and how OneDrive shows up.
-4. Step 4: every click (the gear, Customize, Plugins, + Add, Upload plugin) and the Preview.
-5. Step 5: Auto in the list; the app's version.
-6. Step 6: hi, the home page beside the chat, the Pillow question, and whether the install runs in Auto without asking.
-7. Step 7: the Remote Control switch, the two /config lines, a real tap with the tester away from the PC.
-8. Part 2: a real card (the drive letter, the letters on a second day with the card put in before the drive, Windows' box when a card goes in, the setup questions, a full backup, the report, Show the report after an hour away); a real export folder for posts (the folder window from the home page, a post kit built, the pages where the reel's and the carousel's photos are moved, with real photos); a Canva carousel brought into a kit and reading the Instagram grid (both use Windows' own curl); one reel opened in CapCut for Windows (and, if it doesn't open, one CapCut project folder zipped and sent to us, so we can see the format).
-9. How long each step took.
+1. **Step 1:** the Store's listing (Get or Install, the button saying Open afterwards); what happens on Open, if you try it on a second PC; whether Claude's ✕ quits it.
+2. **Step 2:** the Windows box while installing (and SmartScreen); where the Code part is and what the window looks like (this replaces the drawing); whether a WSL choice shows under the message box.
+3. **Step 3:** the folder window's words, whether %USERPROFILE% works in its address bar, and how OneDrive shows up.
+4. **Step 4:** every click (the gear, Customize or Plugins, + Add, Upload plugin, the file window with .zip hidden) and the Preview.
+5. **Step 5:** Auto in the list; the app's version (Help > About Claude); where the Help menu is.
+6. **Step 6:** hi; how long Python's first run takes; the home page beside the chat; the cookie pop-up; whether a firewall box comes up; the Pillow question, how long it takes and whether it runs in Auto without asking.
+7. **The phone:** the Settings switch, the two /config lines, a real tap with the tester away from the PC.
+8. **Part 2, posts:** a real export folder (the folder window from the home page and whether it comes up in front, a post kit built, the reel page with a song from the Music folder and Make my reel, the carousel and stories designers with real photos, one reel opened in CapCut for Windows (if it doesn't open, one CapCut project folder zipped and sent to us), a Canva carousel brought into a kit, reading the Instagram grid).
+9. **Part 2, a card:** a real card (the drive letter, the letters on a second day with the card put in before the drive, Windows' note when a card goes in, the setup questions, a full backup, the report, Show the report after an hour away).
+10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Use this moment, a clip reel.
+11. How long each step took, and the whole setup.
+
+After the walk-through: replace the drawings that turned out wrong (or swap them for the tester's screenshots), take the marks out of this file, update both PDFs if Settings now says Plugins, and only then send the PDF to a student.
