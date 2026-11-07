@@ -829,6 +829,9 @@ def add_to_list(store, entries):
 
 
 OPENED = "Opened CapCut. The newest project is at the top of its list."   # open_capcut's words when it worked
+# What the photographer reads after pressing Open CapCut on the reel page (decision 24 of the v19 plan: Nicole's
+# words, word for word from her server.py). The kit page still says its own line until it is rebuilt as her cards.
+OPEN_WORDS = "CapCut is opening. Your newest reel is at the top of your projects."
 
 
 def open_capcut(store=None, closed=False):

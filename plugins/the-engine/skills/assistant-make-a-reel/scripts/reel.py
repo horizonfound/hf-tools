@@ -22,6 +22,8 @@ on the beat. Claude does the choosing; this does the counting.
         [--clips clips.json]   video clips from their footage, placed in --picks as c1, c2...: c1,7,2,c2,11-,4
         [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo"]
         [--pace beat|mixed|calm|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
+        [--kit "<post kit folder>"]   the reel's working files go in that kit's hidden .kit/reels (REEL_WORK_IN_KIT)
+        [--status <file>]   a small JSON of what happened, for the reel page (ok, dry, short_song, project, plan)
         Finds the beat, starts the song where it picks up, lays the photos (and clips) in that
         order, every cut on a beat, and writes the CapCut project (capcut.py).
         --dry-run prints the plan, ending with "Beats per piece: clip 6, 1, 1, 2, ..." and writes nothing.
@@ -68,6 +70,15 @@ HOME = Path(os.environ.get("STUDIO_HOME") or Path.home() / ".studio")
 PER_SHEET = 48
 EVEN_BPM = 100.0
 
+# ---------- two defaults Dustin and Nicole may change (v19 plan, section 2), each in this one place ----------
+# Decision 1: what belongs to one shoot lives with the shoot. With a --kit, the reel's working files (photos.json,
+# the plan in reel.json, the sheets) go in <kit>/.kit/reels instead of ~/.studio/reels/<shoot>. False: as before.
+REEL_WORK_IN_KIT = True
+# Decision 6: what a reel made for a post kit is called (kit_reel_name). "folder": Dustin's, from Oct 25, the kit's
+# folder name and "reel" ("2022-06-24 Black-sand beach reel"; CapCut's list adds " 2" to a second one). "short":
+# Nicole's, the shoot's short name ("Black-sand beach reel", then "Black-sand beach reel 2").
+REEL_NAME = "folder"
+
 
 def say(msg):
     try:
@@ -98,7 +109,28 @@ def edited_photos(folder):
     return out
 
 
-def workdir(shoot, folder):
+def kit_reel_name(folder_name, short):
+    """The name of a reel made for a post kit (decision 6, REEL_NAME): the kit's folder name and "reel", or the
+    shoot's short name and "reel". CapCut's list makes a second one "... reel 2" (capcut.folder_name)."""
+    return f"{short if REEL_NAME == 'short' else folder_name} reel"
+
+
+def kit_workdir(kit):
+    """<kit>/.kit/reels, when REEL_WORK_IN_KIT and kit is a post kit folder (it has its hidden .kit); else None."""
+    if not REEL_WORK_IN_KIT or not kit:
+        return None
+    k = Path(kit).expanduser()
+    if not (k / ".kit").is_dir():
+        return None
+    d = k / ".kit" / "reels"
+    d.mkdir(exist_ok=True)              # only inside a .kit that is there: never a look-alike kit
+    return d
+
+
+def workdir(shoot, folder, kit=None):
+    d = kit_workdir(kit)
+    if d is not None:
+        return d
     name = slug(shoot or Path(folder).name)
     if this_computer.WINDOWS:
         name = this_computer.unreserved(name)      # a shoot called "Con" or "Aux" is a name Windows keeps for itself
@@ -153,7 +185,7 @@ def make_sheets(photos, out_dir, cell=200, per_row=6, labels=None, name="sheet")
 
 def cmd_sheet(a):
     photos = edited_photos(a.folder)
-    wd = workdir(a.shoot, a.folder)
+    wd = workdir(a.shoot, a.folder, a.kit)
     listing = []
     for i, p in enumerate(photos, 1):
         w, h = capcut.photo_size(p)
@@ -179,7 +211,7 @@ def read_picks(a, n_clips=0):
     """The listing from the sheet, the picked photo numbers in order, Claude's marks ("7+" lingers on photo 7,
     "11-" passes it quickly), and the play order: ("photo", k) for the k-th pick, ("clip", k) for c1, c2...
     (the k-th clip in --clips; only when there are clips)."""
-    listing_file = workdir(a.shoot, a.folder) / "photos.json"
+    listing_file = workdir(a.shoot, a.folder, getattr(a, "kit", None)) / "photos.json"
     same = os.path.normcase      # on a PC, E:\Photos and e:\photos are the same folder; on a Mac this changes nothing
     if listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
         listing = json.loads(listing_file.read_text(encoding="utf-8"))["photos"]
@@ -226,7 +258,7 @@ def read_picks(a, n_clips=0):
 def cmd_strip(a):
     """The picks in play order, one or two rows, numbered as on the sheet: read the flow in one look."""
     by_n, picks, _, _ = read_picks(a)
-    wd = workdir(a.shoot, a.folder)
+    wd = workdir(a.shoot, a.folder, a.kit)
     per_row = len(picks) if len(picks) <= 8 else (len(picks) + 1) // 2
     out = make_sheets([by_n[n]["file"] for n in picks], wd, cell=260, per_row=per_row, labels=picks, name="strip")
     say(f"Strip: {out[0]}  (left to right, top row then bottom, the order the reel plays)")
@@ -341,7 +373,7 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
         grid = timing.even_grid(EVEN_BPM)
     got = timing.plan(items, grid, vibe, song_start, variation, song_length or 0.0)
     if not got["ok"]:
-        return None, {"problem": got["stop"]}
+        return None, {"problem": got["stop"], "short_song": bool(got.get("short"))}
     holds, i0 = got["holds"], got["j0"]
     beats = grid.T
     idx = [i0]
@@ -474,6 +506,24 @@ def read_clips(path):
     return out
 
 
+def write_status(a, **what):
+    """--status: a small JSON of what happened, for the reel page, so it never reads the words to tell (her page
+    told a short song by matching "only N seconds", which missed "15.4 seconds"). Written whole, or not at all."""
+    if not getattr(a, "status", None):
+        return
+    f = Path(a.status).expanduser()
+    tmp = f.with_name(f".{f.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(json.dumps(dict({"ok": False, "dry": bool(a.dry_run), "short_song": False, "project": None,
+                                        "plan": None}, **what), indent=1), encoding="utf-8")
+        this_computer.replace(tmp, f)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
 def cmd_make(a):
     clips = read_clips(a.clips) if a.clips else []
     by_n, picks, hints, order = read_picks(a, len(clips))
@@ -516,6 +566,7 @@ def cmd_make(a):
     pieces, facts = plan_reel(pieces_in, song, a.pace, a.song_start, a.fit, piece_hints, a.variation, beat_file,
                               song_length=(picked["seconds"] if picked else None))
     if pieces is None:
+        write_status(a, short_song=bool(facts.get("short_song")))
         say(facts["problem"])
         sys.exit(2)
     name = reel_name(a, photos)
@@ -526,8 +577,10 @@ def cmd_make(a):
                       "capcut_material": picked["material"] if picked else None,
                       "capcut_beats": picked["beats"] if picked else None} if song else None),
             "hook": {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]} if a.hook else None}
-    wd = workdir(a.shoot, a.folder)
+    wd = workdir(a.shoot, a.folder, a.kit)
     (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1), encoding="utf-8")
+    plan_facts = {"clips": len(facts["clips"]), "photos": facts["photo_count"], "length": facts["length"],
+                  "tempo": facts["tempo"], "song": bool(song), "song_from": facts["song_from"]}
     when = ""
     if song:
         f = facts["song_from"]
@@ -569,6 +622,7 @@ def cmd_make(a):
             say(facts["hits_line"])
         say(facts["beats_line"])
         say(f"Dry run: nothing written. The plan is in {wd / 'reel.json'}")
+        write_status(a, ok=True, plan=plan_facts)
         return
     store = Path(a.store).expanduser() if a.store else capcut.default_store()
     dest, draft = capcut.write(plan, store, a.ignore_open)
@@ -583,6 +637,7 @@ def cmd_make(a):
         say(capcut.write.note)
     if capcut.write.waiting:
         say(capcut.WAITING_HINT)
+    write_status(a, ok=True, project=dest.name, plan=plan_facts)
     rec = json.loads((wd / "reel.json").read_text(encoding="utf-8"))
     rec["capcut_project"] = str(dest)
     (wd / "reel.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
@@ -652,7 +707,7 @@ def main():
     m.add_argument("--name")
     m.add_argument("--hook")
     m.add_argument("--clips", help="a JSON file of video clips (path, src, seconds, w, h, length), placed in --picks as c1, c2...")
-    m.add_argument("--pace", "--vibe", dest="pace", choices=list(timing.VIBES) + list(timing.OLD_NAMES), default="beat",
+    m.add_argument("--pace", "--vibe", dest="pace", choices=list(timing.VIBES) + list(timing.OLD_NAMES), default=timing.DEFAULT_PACE,
                    help="beat (On every beat), mixed (A little of everything), calm, build; "
                         "the old names still work: fast is beat, steady is calm")
     m.add_argument("--variation", type=int, default=0, help="another mix of the same picks and vibe (the page counts the reels already made)")
@@ -661,6 +716,10 @@ def main():
     m.add_argument("--dry-run", action="store_true")
     m.add_argument("--store")
     m.add_argument("--ignore-open", action="store_true")
+    m.add_argument("--kit", help="the post kit this reel is for: its working files go in the kit's hidden .kit/reels")
+    m.add_argument("--status", help="write what happened here as a small JSON, for the reel page")
+    s.add_argument("--kit", help="the post kit these photos are for: the sheet and photos.json go in its .kit/reels")
+    t.add_argument("--kit")
     a = ap.parse_args()
     {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,
      "capcut-ok": cmd_capcut_ok, "sound": cmd_sound}[a.cmd](a)

@@ -792,12 +792,13 @@ def write_page(p):
     return PAGE
 
 
-def open_capcut(rec):
+def open_capcut(rec, ok_words=None):
     """The kit page's "Open in CapCut" button. Starts CapCut through capcut.py (on a Mac its own `open -a`, as
     before; on a PC the CapCut program found where it installs itself), and says which project to click:
     CapCut can't be told to open a project from outside, so the words do that part. capcut.py also adds a reel
     that is still waiting for CapCut's list (one made while CapCut was open on a PC, or while the list couldn't
-    be saved) when CapCut is surely closed, and its note about that is passed on."""
+    be saved) when CapCut is surely closed, and its note about that is passed on. ok_words: the line to say when
+    it opened, in place of the kit page's own (the reel page passes Nicole's, capcut.OPEN_WORDS)."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
         return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
@@ -831,7 +832,7 @@ def open_capcut(rec):
         where = "the Start menu" if this_computer.WINDOWS else "your Applications folder"
         return False, (f"I couldn't open CapCut on this {this_computer.COMPUTER}. Open it from {where}, then click "
                        f"“{project}” in its project list (near the top, newest first). CapCut is free from capcut.com.")
-    words = f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
+    words = ok_words or f"CapCut is open. Click “{project}” in its project list (near the top, newest first), style it, and export it from there."
     base = capcut.OPENED                         # capcut.py's own words when it opened; anything after them is its note
     extra = why[len(base):].strip() if why.startswith(base) else ""
     if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
@@ -979,7 +980,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the pages for arranging a kit's photos: every one of their requests is arrange.py's to answer
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
-        if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job"):
+        if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs"):
             # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
             import reel_page
             return reel_page.handle_get(self, path, urlsplit(self.path).query)

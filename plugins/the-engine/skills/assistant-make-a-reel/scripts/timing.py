@@ -40,6 +40,9 @@ import zlib
 import beats_lite
 
 VIBES = ("beat", "mixed", "calm", "build")
+# The vibe a reel gets when nobody picked one, and the one the reel page marks Recommended (decision 7 of the v19
+# plan: Nicole's On every beat, in place of "a little of everything"; Dustin to confirm). Change it here only.
+DEFAULT_PACE = "beat"
 # The old pace names still work (reel.py --pace): "fast" was about half a second a photo, and Nicole's answer to
 # "too slow" was one photo on every beat ("that's it", Nov 5), so fast is On every beat; "steady" was about a
 # second a photo, even, which is what Calm's two beats come to at an everyday tempo.
@@ -275,7 +278,8 @@ def _what(n_cl, n_ph):
 def plan(items, grid, vibe, song_start=None, variation=0, song_length=0.0):
     """items: in play order, each {"kind": "photo", "path", "mark": "+" | "-" | ""} or {"kind": "clip", "path",
     "seconds"}. Returns {"ok": True, "holds": [half beats per piece], "j0": the grid point it starts on,
-    "squeezed": bool} or {"ok": False, "stop": the STOP line, word for word}."""
+    "squeezed": bool} or {"ok": False, "stop": the STOP line, word for word, "short": True when it was the song
+    that was too short (the reel page shows her "Your song is a little short for this" from this, never from the words)}."""
     seed = seed_for(items, vibe, variation)
     song = grid.song
     j_end = len(grid.T) - 2
@@ -302,7 +306,7 @@ def plan(items, grid, vibe, song_start=None, variation=0, song_length=0.0):
             return {"ok": False, "stop": f"STOP: {what} need at least {quickest:.1f} seconds, even with every photo "
                                          f"at one beat, which is longer than a reel can run. Take a few photos out."}
         room = grid.T[j_end] - grid.T[j0]
-        return {"ok": False, "stop": f"STOP: Your song is only {song_length or room:.1f} seconds, and {what} need at "
+        return {"ok": False, "short": True, "stop": f"STOP: Your song is only {song_length or room:.1f} seconds, and {what} need at "
                                      f"least {quickest:.1f} seconds, even with every photo at one beat. "
                 + ("Select fewer clips, take a few photos out, or use a longer song." if n_cl > 1
                    else "Take a few photos out, or use a longer song.")}

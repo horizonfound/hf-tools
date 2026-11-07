@@ -19,6 +19,16 @@ this_computer.utf8_output()
 # this exact folder, that one is brought forward instead of a twin. Then bring it out of the Dock if it was
 # minimized, put it in front of Finder's other windows, and bring Finder in front of every app (asked two
 # ways, since one can be refused when another app is full screen or has the keyboard).
+# Said after a folder's own line when the folder opened but the computer kept another window in front (decision
+# 25 of the v19 plan: added to Nicole's "is open in Finder" lines). {app} is Finder (File Explorer on a PC) and
+# {bar} the Dock (the taskbar). Every page fills it the same way: behind_words().
+BEHIND_WORDS = ", behind this window. Click {app} in {bar} to see it."
+
+
+def behind_words():
+    return BEHIND_WORDS.format(app=this_computer.FILES_APP, bar=this_computer.APP_BAR)
+
+
 _ACTIVATE = [
     "on run argv",
     "set f to POSIX file (item 1 of argv) as alias",

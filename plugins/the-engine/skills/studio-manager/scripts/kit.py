@@ -1417,10 +1417,16 @@ def build(kit):
     return 0
 
 
-def note_reel(kit, project_name, picks=None):
+def note_reel(kit, project_name, picks=None, picks_text=None):
+    """The kit's record of its reel. picks_text: the order the reel was made in, as reel.py read it ("19,4,10+"),
+    when it isn't Claude's pick (the reel page passes the order on the page)."""
     rec = load_rec(kit)
+    if picks_text:
+        picks = parse_reel(picks_text)[0]
     rec["reel"] = {"project": project_name, "picks": picks or rec.get("picks", {}).get("reel", []), "made": datetime.now().isoformat(timespec="seconds")}
-    if not picks:
+    if picks_text:
+        rec["reel"]["picks_text"] = picks_text
+    elif not picks:
         rec["reel"]["picks_text"] = reel_picks_text(rec)      # the same picks with Longer (+) and Quicker (-) in place
     save_rec(kit, rec)
     _write_text_whole(own_file(kit, "Reel.txt"), f"The reel for this shoot is the CapCut project \"{project_name}\".\nOpen CapCut, style it the way you like, and export it from there.\n"
@@ -1771,6 +1777,7 @@ def main():
         pk.add_argument(f"--{k}")
     sub.add_parser("build").add_argument("words")
     rl = sub.add_parser("reel-made"); rl.add_argument("words"); rl.add_argument("--project", required=True)
+    rl.add_argument("--picks", help="the order it was made in, as reel.py read it (19,4,10+,14-), when not Claude's pick")
     sub.add_parser("facts").add_argument("words")
     w = sub.add_parser("words"); w.add_argument("words"); w.add_argument("--file", required=True)
     sub.add_parser("page").add_argument("words")
@@ -1824,7 +1831,9 @@ def main():
     if a.cmd == "build":
         return build(kit)
     if a.cmd == "reel-made":
-        note_reel(kit, a.project); say("Noted. The reel is on the kit page."); return 0
+        if a.picks and not re.fullmatch(r"\d+[+-]?(,\d+[+-]?)*", a.picks.replace(" ", "")):
+            say("STOP: --picks is the photo numbers in order, like 19,4,10+,14-. Nothing was noted."); return 2
+        note_reel(kit, a.project, picks_text=(a.picks or "").replace(" ", "") or None); say("Noted. The reel is on the kit page."); return 0
     if a.cmd == "facts":
         say(json.dumps(facts(kit), indent=1, ensure_ascii=False)); return 0
     if a.cmd == "words":

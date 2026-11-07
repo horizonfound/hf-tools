@@ -3,6 +3,7 @@
 
     python3 reel_page.py open "beach"      get the page ready (the numbered list, the small copies) and print its address
     python3 reel_page.py show "beach"      what the page has saved: whose order, the order, the record's counter
+    python3 reel_page.py job "<kit>" --id <id>   (the page server's own) make the reel a page asked for
 
 The photographer sees her page: her words (WORDS below, word for word from her reel-maker.html and server.py),
 her steps in her order, her buttons and what they do. Underneath it is built the Assistant's way:
@@ -21,8 +22,11 @@ Routes, all on the posting server (posting_queue.py hands them here):
                                  order, what was saved, the record's counter
   POST /reel-save                {kit, stamp, base, page, saved: {...}}: the page's choices, checked field by field
   GET  /reel-font?f=<name>       one of the plugin's own font files (FACES)
-  POST /reel-open, /reel-make, /reel-capcut and GET /reel-job: kept for the later stages (the song's folder,
-                                 Make my reel and its job, Open CapCut); for now they answer "not yet", in plain words
+  GET  /reel-songs?kit=<folder>  step 3: the songs in the shoot's Music and Photos folders, {id, name, where, kind}
+  POST /reel-open                {kit, what: "music"}: makes <kit>/Music if it isn't there and opens it (finder.py)
+  POST /reel-make                {kit, stamp, picks, song, vibe, test}: Make my reel; answers with a job to ask after
+  GET  /reel-job?kit=&id=        how that job is going: queued, running, done (her lines) or problem (her words)
+  POST /reel-capcut              {kit}: Open CapCut (capcut.py's own open), in her words (capcut.OPEN_WORDS)
 Small copies of the photos are arrange.py's (/kit-photo, .kit/previews), the same the pickers use.
 
 Records:
@@ -35,9 +39,22 @@ Records:
                                   is read from kit.json picks.reel every time.
   <kit>/.kit/reel-page.prev.json  the version before, kept whole
   <kit>/.kit/reel-page.lock       held by every writer (this_computer.try_lock, through arrange.locked), never removed
+  <kit>/.kit/reel-job.json        Make my reel's newest job: {id, state, ask: {picks, song id, vibe, dry, stamp}, pid,
+                                  words, project, problem, short_song}; reel-job.lock is held by its process while it
+                                  lives; reel-job-status.json is what reel.py make --status said; .kit/reels holds the
+                                  reel's working files (reel.REEL_WORK_IN_KIT)
+  "made" in the record            one entry per reel made: {project, picks, vibe, footage, song (its file name),
+                                  song_id, when}; the next reel of the same choices is the next mix (her variation)
 
 The defaults Dustin and Nicole may change sit in one place each (PLAN section 2): MAX_PICKS and its line (23),
-DRAG_OUT (22), REV_CHECK (21), the WORDS table (9, and every word on the page), STYLE (16).
+DRAG_OUT (22), REV_CHECK (21), the WORDS table (9, and every word on the page), STYLE (16), SHORT_SONG_FROM_TOP (8),
+SOUND_BESIDE_OUTSIDE (4), PLAN_WORDS (5). Elsewhere: reel.REEL_NAME (6), reel.REEL_WORK_IN_KIT (1),
+timing.DEFAULT_PACE (7), capcut.OPEN_WORDS (24), finder.BEHIND_WORDS (25).
+
+Songs and the sound of a screen recording (hers: server.py list_songs, sound_of): a song is named to the page by
+an id made from where it is and its file name. A recording's sound is made once with sound.py (afconvert on a Mac,
+Media Foundation on a PC) as "<name> sound.m4a" (".wav" on a PC) beside it, or in <kit>/Music when the recording
+sits in an export folder outside Your Content; a sound already there is used as it is, never written over.
 
 The page is built so the steps still to come slot in where hers has them: SECTIONS keeps her order (1 footage,
 2 the order, 3 the song, 4 the style, 5 the vibe), and an empty slot is simply left out; her renumbering counts
@@ -53,6 +70,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -75,10 +93,33 @@ REV_CHECK = True        # decision 21: two windows on one reel page: a save from
 UNDO_STEPS = 60         # hers
 SAVE_AFTER_MS = 500     # hers: a change is saved half a second after the last one
 FOLLOW_MS = 4000        # how often an open page asks for a fresh pick from Claude (hers looks every 4 s)
+SHORT_SONG_FROM_TOP = 40  # decision 8: a song shorter than this (seconds) starts at the top (her code), not where it picks up
+SOUND_BESIDE_OUTSIDE = False   # decision 4: a screen recording in a Photos folder outside Your Content (an export folder
+                        # the kit only points to) has its sound made in <kit>/Music, never in their folder. True: beside it
+PLAN_WORDS = "nicole"   # decision 5: the Plan line in the result box is hers ("Plan: 14 photos, 15.2 seconds, every cut on
+                        # the beat at about 85 beats a minute, starting the song at the top."); "reel": reel.py's longer line
+MAKE_LIMIT = 600        # hers: a reel may take ten minutes to make, then it is stopped and the page says so
+SONG_EVERY_MS = 3000    # hers: the song list is looked at again every 3 seconds
+JOB_EVERY_MS = 700      # how often the page asks how Make my reel is going (ours: hers waited on one long request)
+JOB_BOOT = 20.0         # seconds a job may take to start before "queued" means it never did
 
 RECORD = "reel-page.json"
 PREV = "reel-page.prev.json"
 LOCK = "reel-page.lock"
+JOB = "reel-job.json"                 # Make my reel's job: its state, its words, what it was asked (ids and numbers only)
+JOB_LOCK = "reel-job.lock"            # held by the job's own process for as long as it lives
+JOB_STATUS = "reel-job-status.json"   # what reel.py make says happened (reel.py --status)
+MAKE_LOCK = arrange.HOME / "reel-make.lock"   # one reel made at a time on this computer (her MAKE_LOCK)
+SONG_EXTS = (".m4a", ".mp3", ".wav", ".aif", ".aiff", ".aac")   # hers
+VIDEO_EXTS = (".mov", ".mp4", ".m4v")                           # hers: a screen recording, whose sound is used
+SOUND = " sound"                      # hers: the sound of "<name>.mov" is kept as "<name> sound.m4a" (".wav" on a PC)
+SONG_ID = re.compile(r"[0-9a-f]{12}")
+JOB_ID = re.compile(r"[0-9a-f]{12}")
+HER_KINDS = ("Plan:", "Made", "Wide", "Dry run", "Beats per piece", "Your song is only", "I left out")   # her server.py
+SHOWN_MADE = ("Plan", "Wide", "Your song is only", "I left out")     # her page, after a reel is made
+LEFT_OUT = ("Your song is only", "I left out")                       # her page shows these in their own box
+TEST_OPEN = "ASSISTANT_TEST_OPEN"     # tests only: "front", "behind" or "fail"; no folder is opened, the answer is as if
+TEST_CAPCUT = "ASSISTANT_TEST_CAPCUT"  # tests only: set, CapCut is never started and the answer is as if it opened
 POST_CAP = 65536
 VIBES = ("beat", "mixed", "calm", "build")           # hers
 STYLES = ("first", "reveal", "backforth", "bookends")  # hers
@@ -96,7 +137,7 @@ FACES = [
 ]
 FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answers to
 
-GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job")
+GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs")
 POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut")
 
 # ---------- the words: hers, word for word (reel-maker.html and server.py, handoff v19) ----------
@@ -217,6 +258,27 @@ WORDS = {
     "open_capcut": "Open CapCut",
     "no_server": "I couldn't reach the page server. Ask your assistant to make the reel instead.",
     "capcut_opening": "CapCut is opening. Your newest reel is at the top of your projects.",
+
+    # her server.py, when Make my reel can't go ahead
+    "pick_photos": "Pick a few photos for the reel first.",
+    "pick_vibe": "Pick a vibe first.",
+    "song_gone": "That song isn't there anymore. Press Add my music and drag it in again.",
+    "no_sound": "I couldn't take the sound out of that recording. Try saving the song as an audio file.",
+    "went_wrong_make": "Something went wrong making the reel. Ask your assistant to make it instead.",
+    "too_long": "That took too long. Ask your assistant to make the reel instead.",
+
+    # her Plan line (bts_reel.py), decision 5: "Plan: 1 clip and 14 photos, 15.2 seconds, every cut on the beat at
+    # about 85 beats a minute, starting the song at the top."
+    "plan_start": "Plan: ",
+    "plan_clip": "{n} clip",
+    "plan_clips": "{n} clips",
+    "plan_and": " and ",
+    "plan_body": ", {secs} seconds, every cut on the beat",
+    "plan_tempo": " at about {bpm} beats a minute",
+    "plan_top": ", starting the song at the top",
+    "plan_in": ", starting the song {s} seconds in",
+    "plan_no_song": ", no song",
+    "plan_own_sound": " (the footage keeps its own sound).",
 }
 
 # Lines that are ours, not hers, each with why (they go on the "Tell Nicole" list):
@@ -236,7 +298,28 @@ OUR_WORDS = {
     # our small copies are made in the background the first time, where hers were made before the page showed
     "getting_ready": "Getting this photo ready...",
     "cant_read": "Can't read this photo right now",
+    # decision 25: her "is open in Finder" line, when the folder opened behind the Claude app (finder.BEHIND_WORDS)
+    "behind": "",                                  # filled in below, from finder.behind_words()
+    # Make my reel runs on its own now, so the page can be told about a second press or a job that was stopped
+    "already_making": "Your reel is already being made. One moment.",
+    "interrupted": "Making your reel stopped before it finished. Nothing was made. Press Make my reel again.",
 }
+
+def _behind():
+    try:
+        import finder
+        return finder.behind_words()
+    except Exception:  # noqa: BLE001  (the words only)
+        return f", behind this window. Click {this_computer.FILES_APP} in {this_computer.APP_BAR} to see it."
+
+
+OUR_WORDS["behind"] = _behind()
+
+
+def pc_words(s):
+    """Her words name Finder; a PC says File Explorer (decision 26). A Mac: exactly hers."""
+    return s.replace("Finder", this_computer.FILES_APP) if this_computer.WINDOWS else s
+
 
 CANT_FIND = WORDS["reach"]
 NOT_READY = arrange.NOT_READY
@@ -395,6 +478,9 @@ def state(kit):
         "claude": claude_order(kit, rec_kit, on_sheet),
         "saved": _for_page(saved, on_sheet),
         "max": MAX_PICKS,
+        "songs": songs_for_page(kit, rec_kit),
+        "music": music_dir(kit).is_dir(),
+        "job": job_for_page(kit),
     }
 
 
@@ -456,17 +542,154 @@ def _text(v, cap):
 
 
 def _song(v, kit):
-    """None (not picked yet), "" (No song), or the id of a song in this shoot (stage a3 fills the list)."""
+    """None (not picked yet), "" (No song), or the id of a song in this shoot right now."""
     if v is None or v == "":
         return v
-    if isinstance(v, str) and v in song_ids(kit):
+    if isinstance(v, str) and SONG_ID.fullmatch(v) and v in song_ids(kit):
         return v
     raise Refused("song")
 
 
+# ---------- step 3: the songs (hers: server.py list_songs and sound_of) ----------
+
+def _reel_module(name):
+    """One of the reel scripts (beside these, in assistant-make-a-reel/scripts), loaded without letting them stay at
+    the front of Python's search list (posting_queue._capcut's way)."""
+    d = str(kit_mod.REEL_PY.parent)
+    if d not in sys.path:
+        sys.path.append(d)
+    saved = list(sys.path)
+    try:
+        return __import__(name)
+    finally:
+        sys.path[:] = saved + [x for x in sys.path if x not in saved]
+
+
+def default_vibe():
+    try:
+        v = _reel_module("timing").DEFAULT_PACE
+        return v if v in VIBES else "beat"
+    except Exception:  # noqa: BLE001
+        return "beat"
+
+
+def music_dir(kit):
+    return kit / "Music"
+
+
+def _inside_content(path):
+    """Is this file or folder inside Your Content? (Then a sound may be kept beside it, decision 4.)"""
+    try:
+        import posts
+        h = posts.home()
+        if not h:
+            return False
+        content = Path(os.path.realpath(h / posts.CONTENT_NAME))
+        return content in Path(os.path.realpath(path)).parents
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def song_id(where, name):
+    """A song's id: from where it is (Music or Photos) and its file name, never a path, the same on every look."""
+    return hashlib.sha1(("%s\0%s" % (where, arrange._nfc(name))).encode("utf-8")).hexdigest()[:12]
+
+
+def _listing(folder):
+    try:
+        return [e for e in os.listdir(folder)]
+    except OSError:
+        return []
+
+
+def list_songs(kit, rec=None):
+    """The songs they put in the shoot's Music folder or its Photos folder, Music first, each folder newest first
+    (hers): audio files, and screen recordings whose sound is used. The sound made from a recording is not listed
+    on its own (the recording is shown once): beside it, or, for a recording in a Photos folder outside Your
+    Content, in the Music folder (decision 4). Links are left out. Each: {id, name, where, kind, path}; the path
+    never leaves this computer's own side."""
+    rec = rec if rec is not None else kit_mod.load_rec(kit)
+    folders = [("Music", music_dir(kit)), ("Photos", kit_mod.photos_dir(kit, rec))]
+    videos = {}
+    for where, d in folders:
+        videos[where] = {Path(f).stem.casefold() for f in _listing(d) if f.lower().endswith(VIDEO_EXTS) and not f.startswith(".")}
+    outside = not _inside_content(folders[1][1])
+    out = []
+    for where, d in folders:
+        made_here = set(videos[where])
+        if where == "Music" and outside and not SOUND_BESIDE_OUTSIDE:
+            made_here |= videos["Photos"]
+        found = []
+        for f in _listing(d):
+            low = f.lower()
+            if f.startswith(".") or not low.endswith(SONG_EXTS + VIDEO_EXTS):
+                continue
+            stem = Path(f).stem
+            if low.endswith((SOUND + ".m4a", SOUND + ".wav")) and stem[:-len(SOUND)].casefold() in made_here:
+                continue                       # the sound taken from a recording: the recording is shown once
+            p = d / f
+            try:
+                if p.is_symlink() or not p.is_file():
+                    continue
+                when = p.stat().st_mtime
+            except OSError:
+                continue
+            found.append((-when, f, {"id": song_id(where, f), "name": stem, "where": where,
+                                     "kind": "video" if low.endswith(VIDEO_EXTS) else "audio", "path": p}))
+        out += [x[2] for x in sorted(found, key=lambda x: (x[0], x[1]))]
+    return out
+
+
+def songs_for_page(kit, rec=None):
+    return [{k: s[k] for k in ("id", "name", "where", "kind")} for s in list_songs(kit, rec)]
+
+
 def song_ids(kit):
-    """The ids of the songs found for this kit. Stage a3 (the song) fills this in; until then there are none."""
-    return set()
+    return {s["id"] for s in list_songs(kit)}
+
+
+def song_by_id(kit, sid, rec=None):
+    return next((s for s in list_songs(kit, rec) if s["id"] == sid), None)
+
+
+def _named(folder, name):
+    """The file in folder whose name is this one (capitals aside, as the drive sees it), or None."""
+    want = arrange._nfc(name).casefold()
+    hit = [e for e in _listing(folder) if arrange._nfc(e).casefold() == want]
+    return folder / hit[0] if hit else None
+
+
+def sound_for(kit, s):
+    """The sound of a screen recording (hers: sound_of), made ONCE and never written over: "<name> sound.m4a"
+    beside the recording (a PC with no ffmpeg makes "<name> sound.wav"), or, when the recording sits in a Photos
+    folder outside Your Content (an export folder the kit only points to), in the kit's own Music folder
+    (decision 4), since their folder is never written to. A sound already there is used as it is.
+    Returns (path, None) or (None, her plain words)."""
+    video = s["path"]
+    if s["where"] == "Photos" and not SOUND_BESIDE_OUTSIDE and not _inside_content(video):
+        folder = music_dir(kit)
+        try:
+            folder.mkdir(exist_ok=True)
+        except OSError:
+            return None, WORDS["no_sound"]
+    else:
+        folder = video.parent
+    for ext in (".m4a", ".wav"):
+        have = _named(folder, video.stem + SOUND + ext)
+        if have is not None and have.is_file() and not have.is_symlink():
+            return have, None
+    out = folder / (video.stem + SOUND + ".m4a")
+    if this_computer.WINDOWS and this_computer.path_too_long(out):      # unproven on a real PC
+        return None, WORDS["no_sound"]
+    try:
+        got, how = _reel_module("sound").extract_audio(video, out)
+    except Exception as e:  # noqa: BLE001
+        arrange.log(f"reel page: the sound of a recording couldn't be taken: {e.__class__.__name__}: {str(e)[:200]}")
+        return None, WORDS["no_sound"]
+    if not got:
+        arrange.log(f"reel page: the sound of a recording couldn't be taken: {str(how)[:200]}")
+        return None, WORDS["no_sound"]
+    return Path(got), None
 
 
 def _sel(v):
@@ -544,7 +767,12 @@ def save_from_page(body):
         on_sheet = {x["n"] for x in rows}
         stored = rec.get("saved") if isinstance(rec.get("saved"), dict) else {}
         try:
-            clean = {k: SAVE_FIELDS[k](v, kit, on_sheet) for k, v in sent.items()}
+            clean = {}
+            for k, v in sent.items():
+                if k == "song" and isinstance(v, str) and v and v == stored.get("song"):
+                    clean[k] = v           # the song saved before stays as it is, even if its file went a moment ago
+                else:
+                    clean[k] = SAVE_FIELDS[k](v, kit, on_sheet)
         except Refused:
             return _bad()
         # More than a reel holds is refused, with one way through: an order that is ALREADY that long (an
@@ -571,6 +799,395 @@ def save_from_page(body):
             return 200, {"ok": True, "rev": rev + 1}
     st = state(kit)
     return _bad(OUR_WORDS["newer"], 409, why="newer", state=st)
+
+
+# ---------- Make my reel: a job of its own (hers: one long request to bts_reel.py) ----------
+# The page asks for a reel (POST /reel-make) and is given a job; a process of its own makes it (reel_page.py job),
+# writing how it is going to <kit>/.kit/reel-job.json, which the page reads (GET /reel-job) until it is done. One
+# job per shoot at a time; one reel made at a time on this computer (the job waits its turn for MAKE_LOCK, as hers
+# waited for her MAKE_LOCK); at most MAKE_LIMIT seconds. Only her kinds of lines reach the page, never a path.
+
+_JOB_ROUTE = threading.Lock()
+
+
+def job_path(kit):
+    return kit / ".kit" / JOB
+
+
+def job_lock_path(kit):
+    return kit / ".kit" / JOB_LOCK
+
+
+def read_job(kit):
+    try:
+        j = json.loads(job_path(kit).read_text(encoding="utf-8"))
+        return j if isinstance(j, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def write_job(kit, j):
+    arrange.write_whole(job_path(kit), j)
+
+
+def job_running(kit):
+    """Is a job's process at work on this shoot right now? It holds .kit/reel-job.lock for as long as it lives;
+    asking tries to share that lock for an instant (arrange.job_running's way). Where a drive has no locks, the
+    job's own process number is asked after instead, for at most MAKE_LIMIT and a minute."""
+    try:
+        arrange.make_folder(job_lock_path(kit).parent)
+        with open(job_lock_path(kit), "a", encoding="utf-8") as f:       # never written to: only looked at
+            got = this_computer.try_lock(f, shared=True)
+            if got is False:
+                return True
+            if got:
+                this_computer.unlock(f)
+                return False
+    except OSError:
+        pass
+    j = read_job(kit) or {}
+    if j.get("state") not in ("queued", "running"):
+        return False
+    return time.time() - float(j.get("t0") or j.get("t") or 0) < MAKE_LIMIT + 60 and arrange._pid_alive(j.get("pid"))
+
+
+def job_for_page(kit):
+    """The newest job as the page sees it: {id, state (queued, running, done, problem), dry, project, words,
+    problem, short_song}. A job that says it is at work but is not (stopped, or the computer was turned off) is a
+    problem, in plain words. No path, no file name, no process number."""
+    j = read_job(kit)
+    if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
+        return None
+    state, problem = j["state"], j.get("problem")
+    if state in ("queued", "running") and not job_running(kit):
+        if state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT:
+            state, problem = "problem", OUR_WORDS["interrupted"]
+    words = [w for w in (j.get("words") or []) if isinstance(w, str)]
+    return {"id": j["id"], "state": state, "dry": bool(j.get("dry")), "project": j.get("project") if state == "done" else None,
+            "words": words if state == "done" else [], "problem": problem if state == "problem" else None,
+            "short_song": bool(j.get("short_song")) and state == "problem"}
+
+
+def _picks_text(lst):
+    return ",".join(f"{x['n']}{x['h']}" for x in lst)
+
+
+def start_make(body):
+    """POST /reel-make: {kit, stamp, picks: [{n, h}], song: an id, "" for No song, vibe, test}. Checked the way a
+    save is; then the job is written down and its process started. (status, answer)."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    if set(body) - {"kit", "stamp", "picks", "song", "vibe", "test"}:
+        return _bad()
+    rows = arrange.sheet_rows(kit)
+    if not rows:
+        return _bad(NOT_READY, 404)
+    if body.get("stamp") != arrange.sheet_stamp(kit):
+        return _bad(OUR_WORDS["photos_changed"], 409, why="photos")
+    on_sheet = {x["n"] for x in rows}
+    try:
+        picks = _picks(body.get("picks"), on_sheet)
+    except Refused:
+        return _bad()
+    if not picks:
+        return _bad(WORDS["pick_photos"])
+    if len(picks) > MAX_PICKS:
+        return _bad(OUR_WORDS["too_many"], 400, why="many")
+    vibe = body.get("vibe")
+    if vibe not in VIBES:
+        return _bad(WORDS["pick_vibe"])
+    song = body.get("song")
+    if song is None:
+        return _bad(re.sub(r"<[^>]+>", "", WORDS["need_song_html"]), 400, why="song")
+    if not isinstance(song, str) or (song and not SONG_ID.fullmatch(song)):
+        return _bad()
+    if song and song not in song_ids(kit):
+        return _bad(WORDS["song_gone"], 400, why="song")
+    test = body.get("test", False)
+    if type(test) is not bool:
+        return _bad()
+    with _JOB_ROUTE:
+        j = read_job(kit) or {}
+        if job_running(kit) or (j.get("state") == "queued" and not j.get("pid") and time.time() - float(j.get("t") or 0) < JOB_BOOT):
+            return 409, {"ok": False, "words": OUR_WORDS["already_making"], "why": "making", "job": job_for_page(kit)}
+        jid = os.urandom(6).hex()
+        write_job(kit, {"id": jid, "state": "queued", "t": time.time(), "dry": test,
+                        "ask": {"picks": _picks_text(picks), "song": song, "vibe": vibe, "dry": test,
+                                "stamp": body.get("stamp")}})
+        try:
+            arrange.HOME.mkdir(parents=True, exist_ok=True)
+            with open(arrange.LOG, "a", encoding="utf-8") as out:
+                # a Mac: start_new_session; a PC: no window, a process group of its own (as the slide job)
+                this_computer.popen_detached([sys.executable, str(HERE / "reel_page.py"), "job", str(kit), "--id", jid],
+                                             stdout=out, stderr=subprocess.STDOUT, **arrange._child_env())
+        except OSError as e:
+            arrange.log(f"reel page: the reel's job could not be started: {e}")
+            write_job(kit, {"id": jid, "state": "problem", "t": time.time(), "dry": test, "problem": WORDS["went_wrong_make"]})
+        return 200, {"ok": True, "job": job_for_page(kit)}
+
+
+def her_plan_line(p):
+    """Her Plan line (bts_reel.py), from the plan's own numbers (decision 5)."""
+    w = WORDS
+    fill = lambda text, **kw: re.sub(r"\{(\w+)\}", lambda m: str(kw.get(m.group(1), m.group(0))), text)   # noqa: E731
+    clips, photos = int(p.get("clips") or 0), int(p.get("photos") or 0)
+    what = (fill(w["plan_clip" if clips == 1 else "plan_clips"], n=clips) + w["plan_and"] if clips else "")
+    what += fill(w["one_photo" if photos == 1 else "photos"], n=photos)
+    line = w["plan_start"] + what + fill(w["plan_body"], secs=f"{float(p.get('length') or 0):.1f}")
+    if p.get("song"):
+        f = float(p.get("song_from") or 0)
+        line += fill(w["plan_tempo"], bpm=round(float(p.get("tempo") or 0)))
+        line += (w["plan_top"] if f < 1 else fill(w["plan_in"], s=f"{f:.0f}")) + "."
+    else:
+        line += w["plan_no_song"] + (w["plan_own_sound"] if clips else ".")
+    return line
+
+
+_PATHISH = re.compile(r"(/[^\s/]+){2,}|~/|[A-Za-z]:[\\/]|\\\\")    # two parts of a path, a home, a drive, a network share
+
+
+def _no_path(line, known):
+    """A line as the page may see it: any path we know of taken back to its last name; a path left after that, and
+    the line is not for the page (None)."""
+    for k in sorted({str(x) for x in known if x}, key=len, reverse=True):
+        if k and k in line:
+            line = line.replace(k, Path(k).name)
+    line = re.sub(r"\s*\([^()]*[/\\][^()]*\)", "", line)        # "(<a folder>)" said in passing
+    return None if _PATHISH.search(line) else line
+
+
+def _her_lines(out, dry, plan, known):
+    """The lines her page shows, from reel.py's words: her server's kinds, then her page's filter."""
+    lines = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+    keep = [w for w in lines if w.startswith(HER_KINDS) or " clip from " in w]
+    if dry:
+        keep = [w for w in keep if not w.startswith(("Dry run", "Made"))]
+    else:
+        keep = [w for w in keep if w.startswith(SHOWN_MADE)]
+    if PLAN_WORDS == "nicole" and plan:
+        keep = [her_plan_line(plan) if w.startswith("Plan:") else w for w in keep]
+    return [x for x in (_no_path(w, known) for w in keep) if x]
+
+
+def _problem(out, known):
+    """What stopped reel.py, in its own plain words (hers: the STOP line, or the last plain line)."""
+    lines = [w.strip() for w in (out or "").splitlines() if w.strip()]
+    stop = next((w for w in lines if w.startswith("STOP")), None) or (lines[-1] if lines else "")
+    stop = re.sub(r"^STOP:\s*", "", stop)
+    return (_no_path(stop, known) if stop else None) or WORDS["went_wrong_make"]
+
+
+def _hold_make_lock(deadline):
+    """MAKE_LOCK, waited for until deadline: the open file holding it, "none" where locks can't be had (the work
+    goes on), or None when the wait ran out."""
+    try:
+        arrange.HOME.mkdir(parents=True, exist_ok=True)
+        f = open(MAKE_LOCK, "a", encoding="utf-8")
+    except OSError:
+        return "none"
+    while True:
+        got = this_computer.try_lock(f)
+        if got:
+            return f
+        if got is None:
+            f.close()
+            return "none"
+        if time.time() > deadline:
+            f.close()
+            return None
+        time.sleep(0.25)
+
+
+def _make(kit, ask, jid, t0):
+    """The work of one job. Returns what goes in the job record: {state, words, project, problem, short_song}."""
+    rec_kit = kit_mod.load_rec(kit)
+    photos = kit_mod.photos_dir(kit, rec_kit)
+    short = short_name(kit.name)
+    known = [kit, photos]          # paths whose last name means something to them; anything else is never shown
+    song, song_name = None, ""
+    if ask.get("song"):
+        s = song_by_id(kit, ask["song"], rec_kit)
+        if s is None:
+            return {"state": "problem", "problem": WORDS["song_gone"]}
+        song_name = s["path"].name
+        if s["kind"] == "video":
+            got, why = sound_for(kit, s)
+            if not got:
+                return {"state": "problem", "problem": why}
+            song = got
+        else:
+            song = s["path"]
+        known += [song]
+    reel = _reel_module("reel")
+    capcut = _reel_module("capcut")
+    picks = ask["picks"]
+    with arrange.locked(lock_path(kit)):
+        made = load(kit).get("made") or []
+    variation = sum(1 for m in made if isinstance(m, dict) and m.get("picks") == picks and m.get("vibe") == ask["vibe"]
+                    and m.get("footage") is None)
+    # The numbers on the page are the kit's numbered list (.kit/sheet.json); reel.py is handed that same list in
+    # its working folder, so a photo exported since can never shift a number to another photo.
+    rows = arrange.sheet_rows(kit)
+    if not rows or arrange.sheet_stamp(kit) != ask.get("stamp"):
+        return {"state": "problem", "problem": OUR_WORDS["photos_changed"]}
+    listing = [{"n": x["n"], "file": str(photos / arrange.photo_name(x)), "w": x.get("w") or 0, "h": x.get("h") or 0,
+                "way": x.get("way") or ""} for x in rows]
+    work = reel.kit_workdir(kit) or reel.workdir(rec_kit.get("name") or short, str(photos))
+    arrange.write_whole(work / "photos.json", {"folder": str(photos), "photos": listing})
+    status = kit / ".kit" / JOB_STATUS
+    arrange.write_whole(status, {"for": jid, "pending": True})
+    cmd = [sys.executable, str(kit_mod.REEL_PY), "make", "--folder", str(photos), "--shoot", rec_kit.get("name") or short,
+           "--kit", str(kit), "--picks", picks, "--vibe", ask["vibe"], "--song", str(song) if song else "none",
+           "--variation", str(variation), "--name", reel.kit_reel_name(kit.name, short), "--status", str(status)]
+    if song:
+        secs = capcut.song_length(str(song)) or 99
+        if secs < SHORT_SONG_FROM_TOP:
+            cmd += ["--song-start", "0"]            # decision 8: her code starts a short song at the top
+    if ask.get("dry"):
+        cmd.append("--dry-run")
+    left = max(30.0, MAKE_LIMIT - (time.time() - t0))
+    try:
+        r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=left,
+                           cwd=str(kit_mod.REEL_PY.parent))
+    except subprocess.TimeoutExpired:
+        return {"state": "problem", "problem": WORDS["too_long"]}
+    try:
+        st = json.loads(status.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    if st.get("pending") or not isinstance(st, dict):
+        st = {}
+    out = (r.stdout or "") + "\n" + (r.stderr or "")
+    if r.returncode != 0 or not st.get("ok"):
+        arrange.log(f"reel page: reel.py stopped ({r.returncode}): {out.strip()[-400:]}")
+        return {"state": "problem", "problem": _problem(r.stdout or out, known), "short_song": bool(st.get("short_song"))}
+    dry = bool(ask.get("dry"))
+    words = _her_lines(r.stdout, dry, st.get("plan"), known)
+    project = st.get("project")
+    if not dry and project:
+        with arrange.locked(lock_path(kit)):
+            rec = load(kit)
+            rec.setdefault("made", []).append({"project": project, "picks": picks, "vibe": ask["vibe"], "footage": None,
+                                               "song": song_name, "song_id": ask.get("song") or "", "when": time.time()})
+            save(kit, rec)
+        try:                     # the kit's own record of its reel, through its command (kit.json is only theirs to write)
+            k = subprocess.run([sys.executable, str(HERE / "kit.py"), "reel-made", str(kit), "--project", project, "--picks", picks],
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=60)
+            if k.returncode != 0:
+                arrange.log(f"reel page: kit.py reel-made said: {(k.stdout + k.stderr).strip()[-300:]}")
+        except (OSError, subprocess.SubprocessError) as e:
+            arrange.log(f"reel page: kit.py reel-made could not run: {e}")
+    return {"state": "done", "words": words, "project": project}
+
+
+def cmd_job(kit, jid):
+    """The job's own process (started by the page server). Holds the job's lock for as long as it lives."""
+    t0 = time.time()
+    arrange._own_output()
+    try:
+        arrange.make_folder(job_lock_path(kit).parent)
+        f = open(job_lock_path(kit), "a", encoding="utf-8")
+    except OSError:
+        f = None
+    got = None
+    if f is not None:
+        end = time.time() + 3.0                     # a page asking "is it running?" holds it for an instant: wait that out
+        while True:
+            got = this_computer.try_lock(f)
+            if got is not False or time.time() > end:
+                break
+            time.sleep(0.05)
+    if got is False:
+        f.close()
+        return 0                                    # another job's process has it
+    try:
+        j = read_job(kit) or {}
+        if j.get("id") != jid or j.get("state") != "queued":
+            return 0
+        ask = j.get("ask") or {}
+        j.update(pid=os.getpid(), t0=t0, t=time.time())
+        write_job(kit, j)
+        g = _hold_make_lock(t0 + MAKE_LIMIT)
+        if g is None:
+            j.update(state="problem", problem=WORDS["too_long"], t=time.time())
+            write_job(kit, j)
+            return 1
+        try:
+            j.update(state="running", t=time.time())
+            write_job(kit, j)
+            try:
+                res = _make(kit, ask, jid, t0)
+            except Exception as e:  # noqa: BLE001  (whatever happens, the page is told in plain words)
+                arrange.log(f"reel page: the reel's job failed: {e.__class__.__name__}: {str(e)[:300]}")
+                res = {"state": "problem", "problem": WORDS["went_wrong_make"]}
+            j.update(res, t=time.time())
+            write_job(kit, j)
+        finally:
+            if g != "none":
+                this_computer.unlock(g)
+                g.close()
+        return 0 if j.get("state") == "done" else 1
+    finally:
+        if f is not None:
+            if got:
+                this_computer.unlock(f)
+            f.close()
+
+
+# ---------- the folder buttons and Open CapCut ----------
+
+def _open_folder(path):
+    """finder.open_folder, or, in a test (TEST_OPEN), nothing opened and the answer as if it had been."""
+    t = os.environ.get(TEST_OPEN)
+    if t:
+        arrange.log(f"reel page (test): would open {Path(path).name}")
+        return (t != "fail"), ("behind" if t == "behind" else "" if t != "fail" else "test")
+    import finder
+    return finder.open_folder(path)
+
+
+def open_music(body):
+    """POST /reel-open {kit, what: "music"}: makes <kit>/Music if it isn't there, and opens it (hers)."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    if set(body) - {"kit", "what"} or body.get("what") != "music":
+        return _bad()
+    d = music_dir(kit)
+    try:
+        d.mkdir(exist_ok=True)               # the kit's own folder is there (kit_by_name): only Music is ever made
+    except OSError:
+        return 200, {"ok": False, "words": WORDS["cant_open"]}
+    ok, note = _open_folder(d)
+    if not ok:
+        arrange.log(f"reel page: the Music folder couldn't be opened: {str(note)[:200]}")
+        return 200, {"ok": False, "words": WORDS["cant_open"]}
+    w = pc_words(WORDS["music_open"])
+    if note == "behind":
+        first, rest = w.split(". ", 1)
+        w = first + OUR_WORDS["behind"] + " " + rest
+    return 200, {"ok": True, "words": w}
+
+
+def open_capcut_for_page(body):
+    """POST /reel-capcut {kit}: starts CapCut (posting_queue.open_capcut, through capcut.py's own open) and says
+    her words (decision 24, capcut.OPEN_WORDS)."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    if set(body) - {"kit"}:
+        return _bad()
+    with arrange.locked(lock_path(kit)):
+        made = [m for m in (load(kit).get("made") or []) if isinstance(m, dict) and m.get("project")]
+    project = made[-1]["project"] if made else (kit_mod.load_rec(kit).get("reel") or {}).get("project")
+    words = _reel_module("capcut").OPEN_WORDS
+    if os.environ.get(TEST_CAPCUT):
+        arrange.log("reel page (test): would open CapCut")
+        return 200, {"ok": True, "words": words}
+    import posting_queue
+    ok, said = posting_queue.open_capcut({"reel": {"project": project}} if project else {}, ok_words=words)
+    return 200, {"ok": bool(ok), "words": said}
 
 
 # ---------- the routes ----------
@@ -612,6 +1229,24 @@ def _get_state(handler, q):
     arrange._send_json(handler, st)
 
 
+def _get_job_or_songs(handler, path, q):
+    """GET /reel-songs?kit=: the shoot's songs (ids and names only); GET /reel-job?kit=&id=: how Make my reel is going."""
+    if (handler.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+        return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
+    kit = arrange.kit_by_name(_one(q, "kit"))
+    if kit is None:
+        return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
+    if path == "/reel-songs":
+        return arrange._send_json(handler, {"ok": True, "music": music_dir(kit).is_dir(), "songs": songs_for_page(kit)})
+    jid = _one(q, "id")
+    if jid and not JOB_ID.fullmatch(jid):
+        return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 400)
+    job = job_for_page(kit)
+    if job is None or (jid and job["id"] != jid):
+        return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD, "job": job}, 404)
+    arrange._send_json(handler, {"ok": True, "job": job})
+
+
 def _get_font(handler, q):
     key = _one(q, "f")
     if key not in FACE_FILES:
@@ -640,8 +1275,8 @@ def handle_get(handler, path, query):
             return _get_state(handler, q)
         if path == "/reel-font":
             return _get_font(handler, q)
-        if path == "/reel-job":                     # stage a4: Make my reel's job
-            return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
+        if path in ("/reel-job", "/reel-songs"):
+            return _get_job_or_songs(handler, path, q)
         return handler.send_error(404)
     except (Exception, SystemExit) as e:  # noqa: BLE001
         arrange.log(f"GET {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
@@ -686,11 +1321,12 @@ def handle_post(handler, path, query):
         body = _json_body(handler, path)
         if body is None:
             return
-        if path == "/reel-save":
-            code, out = save_from_page(body)
-            return arrange._send_json(handler, out, code)
-        # /reel-open (the song's and the footage's folders), /reel-make, /reel-capcut: the later stages
-        return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
+        route = {"/reel-save": save_from_page, "/reel-make": start_make, "/reel-open": open_music,
+                 "/reel-capcut": open_capcut_for_page}.get(path)
+        if route is None:
+            return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
+        code, out = route(body)
+        return arrange._send_json(handler, out, code)
     except (Exception, SystemExit) as e:  # noqa: BLE001
         arrange.log(f"POST {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
         try:
@@ -938,12 +1574,41 @@ def _order_section(w, num):
         "</section>")
 
 
+def _song_section(w, num):
+    e = html.escape
+    return (
+        "<section class='step' id='step3'>"
+        "<h2><span class='num'>" + str(num) + "</span>" + e(w["song_h2"]) + "</h2>"
+        "<p class='say'>" + e(w["song_say1"]) + "</p>"
+        "<p class='say'>" + w["song_say2_html"] + "</p>"
+        "<button class='btn main' id='addMusic' type='button'>" + e(w["add_music"]) + "</button>"
+        "<p class='waiting' id='waiting'></p>"
+        "<div class='songs' id='songs'></div>"
+        "<p class='note'>" + w["licence_html"] + "</p>"
+        "</section>")
+
+
+def _vibe_section(w, num):
+    e = html.escape
+    rec = default_vibe()
+    cards = "".join(
+        "<button class='opt' type='button' data-vibe='" + v + "'><b>" + e(w["vibe_%s_b" % v])
+        + ("<span class='rec'>" + e(w["vibe_rec"]) + "</span>" if v == rec else "") + "</b>"
+        "<span>" + e(w["vibe_%s_s" % v]) + "</span></button>" for v in VIBES)
+    return (
+        "<section class='step' id='step4'>"
+        "<h2><span class='num'>" + str(num) + "</span>" + e(w["vibe_h2"]) + "</h2>"
+        "<p class='say'>" + e(w["vibe_say"]) + "</p>"
+        "<div class='vibes' id='vibes'>" + cards + "</div>"
+        "</section>")
+
+
 SECTIONS = [
     ("step0", None),            # 1. Behind-the-scenes footage? (stage b)
     ("step1", _order_section),  # 2. Put your photos in order
-    ("step3", None),            # 3. Add your song (stage a3)
+    ("step3", _song_section),   # 3. Add your song
     ("stepStyle", None),        # 4. What style of behind the scenes is this? (stage b2)
-    ("step4", None),            # 5. Pick the vibe (stage a4)
+    ("step4", _vibe_section),   # 5. Pick the vibe
 ]
 
 
@@ -954,10 +1619,11 @@ def _json_for_script(obj):
 
 def page_html(kit_name, short, kit_page=False):
     e = html.escape
-    w = WORDS
+    w = {k: pc_words(v) for k, v in WORDS.items()}
     title = w["reel_of"].replace("{short}", short)
-    data = {"words": dict(WORDS, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
-            "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS}
+    data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
+            "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
+            "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS}
     steps = "".join(fn(w, i) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
     back_href = ("/content/" + quote(kit_name) + "/Post%20kit.html") if kit_page else "/home"
     back_words = w["back_kit"] if kit_page else OUR_WORDS["back_home"]
@@ -975,10 +1641,13 @@ def page_html(kit_name, short, kit_page=False):
         + steps +
         "<div class='result' id='result'></div>"
         "</div>"
+        "<div class='make'><div class='in'><div class='sum' id='sum'></div>"
+        "<button class='btn main' id='makeBtn' type='button'>" + e(w["make"]) + "</button></div></div>"
         "<div class='lb' id='lb'><img id='lbimg' alt=''></div>"
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + CORE_JS + "</script>"
-        "<script>" + ORDER_JS + "</script><script>" + START_JS + "</script>"
+        "<script>" + ORDER_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
+        "<script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
 
@@ -1055,6 +1724,7 @@ CORE_JS = r"""
   function fields(){ var out = {}; parts.forEach(function(p){ if (p.fields) { var f = p.fields(); for (var k in f) out[k] = f[k]; } }); return out; }
   function adopt(st, first){ S = st; rev = st.rev; stamp = st.stamp; parts.forEach(function(p){ if (p.adopt) p.adopt(st, first); }); }
   function save(){
+    var out = $('result'); if (out && out.classList.contains('bad')) out.className = 'result';   // hers: they changed something, the old problem no longer applies
     if (blocked || !S) return;
     dirty = true;
     clearTimeout(timer);
@@ -1122,6 +1792,11 @@ CORE_JS = r"""
   }
   var R = window.Reel = {data: DATA, words: W, kit: KIT, q: Q, $: $, esc: esc, fill: fill, part: function(p){ parts.push(p); },
     save: save, notice: notice, start: start, state: function(){ return S; }, busy: null, followNow: follow,
+    // a POST of the page's own (arrange.guard checks it): {code, j}; a server that gave no answer throws
+    post: function(url, obj){
+      return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(obj)})
+        .then(function(r){ if (r.status >= 500) throw new Error('no answer'); return r.json().then(function(j){ return {code: r.status, j: j}; }); });
+    },
     photoUrl: function(p, size){ return '/kit-photo?' + Q + '&n=' + p.n + '&size=' + size + '&v=' + encodeURIComponent(p.v || ''); },
     // her renumbering: only the steps that show are counted
     renumber: function(){ var k = 0; document.querySelectorAll('section.step').forEach(function(s){ if (!s.hidden) s.querySelector('.num').textContent = ++k; }); }};
@@ -1189,6 +1864,7 @@ ORDER_JS = r"""
       (quicks ? R.fill(W.n_quicker, {k: quicks}) : '') + (n && n < 6 ? W.few : n > 20 ? W.lots : '');
     c.className = 'count' + ((n && n < 6) || n > 20 ? ' warn' : '');
     $('step1').classList.toggle('done', n >= 1);
+    if (R.changed) R.changed();                 // the bar at the bottom (hers: summary())
   }
   function buildAll(){
     allEl.innerHTML = '';
@@ -1239,6 +1915,7 @@ ORDER_JS = r"""
     R.renumber(); followClaude();
   }
   R.setFootage = setFootage;
+  R.order = function(){ return M.copy(reel); };
   $('useClaude').onclick = function(){
     var c = claudeOrder();
     if (!c.length) { notPicked(); return; }
@@ -1407,6 +2084,184 @@ ORDER_JS = r"""
 })();
 """
 
+# Step 3, her "Add your song": the songs in the shoot's Music and Photos folders, by id; No song; a new file is
+# picked by itself.
+SONG_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc;
+  var songs = [], seen = null, song = null;          // song: null (not picked yet), '' (No song), or a song's id
+  R.song = function(){ return song; };
+  R.songName = function(){ var s = songs.filter(function(x){ return x.id === song; })[0]; return s ? s.name : ''; };
+  function renderSongs(){
+    var box = $('songs');
+    var list = songs.map(function(s){
+      var on = song === s.id;
+      var what = s.kind === 'video' ? W.song_recording : W.song_song;
+      var where = s.where === 'Music' ? W.song_in_music : W.song_in_photos;
+      return '<button class="song ' + (on ? 'on' : '') + '" type="button" data-id="' + esc(s.id) + '"><span class="ic">' +
+        (s.kind === 'video' ? '&#9654;' : '&#9835;') + '</span><span><b>' + esc(s.name) + '</b><small>' + esc(what) + ', ' + esc(where) + '</small></span></button>';
+    }).join('');
+    box.innerHTML = list + '<button class="song none ' + (song === '' ? 'on' : '') + '" type="button" data-id=""><span class="ic">&ndash;</span><span><b>' +
+      esc(W.no_song_b) + '</b><small>' + esc(W.no_song_s) + '</small></span></button>';
+    box.querySelectorAll('.song').forEach(function(b){ b.onclick = function(){ song = b.dataset.id; renderSongs(); R.save(); if (R.changed) R.changed(); }; });
+    $('step3').classList.toggle('done', song !== null);
+  }
+  // hers (loadSongs): a file that wasn't there on the last look is picked by itself
+  function take(list){
+    var fresh = seen ? list.filter(function(s){ return !seen[s.id]; }) : [];
+    songs = list; seen = {}; list.forEach(function(s){ seen[s.id] = true; });
+    if (fresh.length) { song = fresh[0].id; R.save(); $('waiting').textContent = R.fill(W.got_it, {name: fresh[0].name}); }
+    if (song && !songs.some(function(s){ return s.id === song; })) song = null;
+    renderSongs(); if (R.changed) R.changed();
+  }
+  function loadSongs(){
+    return fetch('/reel-songs?' + R.q, {cache: 'no-store'}).then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.ok && Array.isArray(j.songs)) take(j.songs); }).catch(function(){});
+  }
+  $('addMusic').onclick = function(){
+    $('waiting').textContent = W.opening_music;
+    R.post('/reel-open', {kit: R.kit, what: 'music'}).then(function(res){
+      $('waiting').textContent = (res.j && res.j.words) || W.cant_open;
+      loadSongs();
+    }).catch(function(){ $('waiting').textContent = W.cant_open; });
+  };
+  setInterval(function(){ if (!document.hidden && R.state()) loadSongs(); }, R.data.songEvery);
+  R.part({
+    fields: function(){ return {song: song}; },
+    adopt: function(st, first){
+      var sv = st.saved || {};
+      song = (sv.song === undefined || sv.song === null) ? null : sv.song;
+      if (first) seen = null;
+      take(st.songs || []);
+    }
+  });
+})();
+"""
+
+# Step 5, her "Pick the vibe".
+VIBE_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, $ = R.$, vibe = R.data.defaultVibe;
+  var cards = document.querySelectorAll('#vibes .opt');
+  R.vibe = function(){ return vibe; };
+  function renderVibes(){
+    cards.forEach(function(b){ b.classList.toggle('on', b.dataset.vibe === vibe); });
+    $('step4').classList.add('done');
+  }
+  cards.forEach(function(b){ b.onclick = function(){ vibe = b.dataset.vibe; renderVibes(); R.save(); if (R.changed) R.changed(); }; });
+  R.part({
+    fields: function(){ return {vibe: vibe}; },
+    adopt: function(st){ var sv = st.saved || {}; vibe = sv.vibe || R.data.defaultVibe; renderVibes(); }
+  });
+  renderVibes();
+})();
+"""
+
+# The bar at the bottom and Make my reel: hers, with the reel made by a job of its own that the page asks after.
+# A later step adds to it through R.sumExtra() (words after the photo count, hers: " + 1 clip · Moment first"),
+# R.beforeMake() (a reason not to make yet: {h3, html}) and R.makeExtra() (more for the request).
+MAKE_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc;
+  var TEST = new URLSearchParams(location.search).get('test') === '1';      // hers: plans the reel, makes nothing in CapCut
+  var VIBE_WORDS = {beat: W.vibe_word_beat, mixed: W.vibe_word_mixed, calm: W.vibe_word_calm, build: W.vibe_word_build};
+  var making = false, jobId = null, pollT = null, fails = 0;
+  var btn = $('makeBtn'), out = $('result');
+  if (TEST) btn.textContent = W.make_test;
+  function summary(){
+    if (!R.order || !R.song || !R.vibe) return;
+    var n = R.order().length, s = R.song(), name = R.songName();
+    var songW = s === null ? W.sum_no_song_yet : s === '' ? W.sum_no_song : (name ? esc(name) : W.sum_no_song_yet);
+    var ft = R.sumExtra ? R.sumExtra() : '';
+    $('sum').innerHTML = '<b>' + esc(R.fill(n === 1 ? W.one_photo : W.photos, {n: n})) + ft + '</b> · ' + songW + ' · ' + esc(VIBE_WORDS[R.vibe()] || '');
+    if (!making) btn.disabled = !n;
+  }
+  R.changed = summary;
+  function busy(on){
+    making = on;
+    if (on) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + esc(W.making); }
+    else { btn.textContent = TEST ? W.make_test : W.make; btn.disabled = !(R.order && R.order().length); }
+  }
+  function into_view(){ out.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+  function bad(h3, html){ out.className = 'result on bad'; out.innerHTML = '<h3>' + esc(h3) + '</h3><p>' + html + '</p>'; into_view(); }
+  function lines(words){
+    return (words || []).map(function(w){ return '<p' + (/^(Your song is only|I left out)/.test(w) ? ' class="leftout"' : '') + '>' + esc(w) + '</p>'; }).join('');
+  }
+  function show(job){
+    clearTimeout(pollT); pollT = null; jobId = null; busy(false);
+    if (job.state === 'problem') {
+      var p = job.problem || W.went_wrong;
+      out.className = 'result on bad';
+      out.innerHTML = job.short_song
+        ? '<h3>' + esc(W.short_h3) + '</h3><p>' + esc(p) + '</p>' + (/longer song/.test(p) ? '' : '<p>' + W.short_more_html + '</p>')
+        : '<h3>' + esc(W.didnt_work_h3) + '</h3><p>' + esc(p) + '</p>';
+    } else if (job.dry) {
+      out.className = 'result on';
+      out.innerHTML = '<h3>' + esc(W.test_h3) + '</h3>' + lines(job.words);
+    } else {
+      var back = $('back');
+      out.className = 'result on';
+      out.innerHTML = '<h3>' + esc(R.fill(W.in_capcut_h3, {project: job.project || W.new_reel})) + '</h3>' + lines(job.words) +
+        '<p>' + esc(W.open_capcut_say) + '</p><div class="acts"><button class="btn main" id="capcut" type="button">' + esc(W.open_capcut) +
+        '</button><a class="btn" id="resultBack" href="' + esc(back.getAttribute('href')) + '">' + esc($('backWords').textContent) + '</a></div><p class="went" id="went"></p>';
+      $('capcut').onclick = function(){
+        R.post('/reel-capcut', {kit: R.kit}).then(function(res){ $('went').textContent = (res.j && res.j.words) || ''; }).catch(function(){});
+      };
+    }
+    into_view();
+  }
+  function poll(){
+    pollT = null;
+    if (!jobId) return;
+    fetch('/reel-job?' + R.q + '&id=' + encodeURIComponent(jobId), {cache: 'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        fails = 0;
+        var job = j && j.job;
+        if (!job || job.id !== jobId) { show({state: 'problem', problem: W.interrupted}); return; }
+        if (job.state === 'done' || job.state === 'problem') { show(job); return; }
+        pollT = setTimeout(poll, R.data.jobEvery);
+      })
+      .catch(function(){
+        if (++fails > 40) { show({state: 'problem', problem: W.no_server}); return; }
+        pollT = setTimeout(poll, R.data.jobEvery * 2);
+      });
+  }
+  function follow(job){
+    if (job.state === 'done' || job.state === 'problem') { show(job); return; }
+    jobId = job.id; busy(true);
+    out.className = 'result on'; out.innerHTML = '<p>' + esc(W.finding_beat) + '</p>';
+    clearTimeout(pollT); pollT = setTimeout(poll, R.data.jobEvery);
+  }
+  btn.onclick = function(){
+    if (making) return;
+    if (R.song() === null) { bad(W.need_song_h3, W.need_song_html); return; }
+    var stop = R.beforeMake ? R.beforeMake() : null;
+    if (stop) { bad(stop.h3, stop.html); return; }
+    busy(true);
+    out.className = 'result on'; out.innerHTML = '<p>' + esc(W.finding_beat) + '</p>';
+    var st = R.state() || {}, extra = R.makeExtra ? R.makeExtra() : {};
+    var body = {kit: R.kit, stamp: st.stamp, picks: R.order(), song: R.song(), vibe: R.vibe(), test: TEST};
+    for (var k in extra) body[k] = extra[k];
+    R.post('/reel-make', body).then(function(res){
+      var j = res.j || {};
+      if (j.job) { follow(j.job); return; }             // started, or already being made: that one is followed
+      busy(false); bad(W.didnt_work_h3, esc(j.words || W.went_wrong));
+    }).catch(function(){ busy(false); bad(W.didnt_work_h3, esc(W.no_server)); });
+  };
+  R.part({
+    adopt: function(st, first){
+      var job = st.job;
+      if (first && job && (job.state === 'queued' || job.state === 'running') && !making) follow(job);   // reloaded while one is at work
+      summary();
+    }
+  });
+})();
+"""
+
 START_JS = r"""window.Reel.start();"""
 
 
@@ -1464,7 +2319,15 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("open").add_argument("words")
     sub.add_parser("show").add_argument("words")
+    j = sub.add_parser("job", help="(the page server's own) make the reel a page asked for")
+    j.add_argument("kit")
+    j.add_argument("--id", required=True)
     a = ap.parse_args()
+    if a.cmd == "job":
+        kit = Path(a.kit)
+        if not (kit / ".kit" / "kit.json").is_file() or not JOB_ID.fullmatch(a.id):
+            return 2
+        return cmd_job(kit, a.id)
     import fresh
     fresh.announce()
     kit = kit_mod.find_kit(a.words)
