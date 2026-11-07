@@ -797,6 +797,54 @@ def check_test_make(c, s):
     case("no HTML5 drag on the page, and no path in it", "draggable=" not in page and "dragstart" not in page and not re.search(r"/private/|/Users/", page))
 
 
+def check_pc_page(c, s, clips):
+    """The PC's way on the real page (v19 review, Nov 7: on a PC no video could be played, so no moment could ever be
+    made, while the page said the moments still worked). The page server runs with ASSISTANT_NO_AVFOUNDATION=1, the
+    PC's route on a Mac: a video that plays as it is plays, with no strip; Use this moment adds a card (no still on
+    it); the line to copy for a footage look and Good to know are left out, the PC's own lines in their place;
+    a video still being copied in is listed by name with our line."""
+    import this_computer
+    import html as _html
+    shutil.copy(clips["clip.mov"], s.kit / "Footage" / "PC plays.mov")
+    whole = clips["clip.mov"].read_bytes()
+    (s.kit / "Footage" / "Still copying.mov").write_bytes(whole[: len(whole) // 2])
+    c.open(s.page_url())
+    c.wait_for("!!document.querySelector('.viewer[data-ready] h4')", 20)
+    c.wait_for("Array.from(document.querySelectorAll('.viewer[data-ready] h4')).some(function(h){ return h.textContent === 'PC plays.mov'; })", 20)
+    v = "Array.from(document.querySelectorAll('.viewer[data-ready]')).filter(function(e){ return e.querySelector('h4').textContent === 'PC plays.mov'; })[0]"
+    ok = wait(c, v + ".querySelector('video').readyState >= 1", 15)
+    got = c.js("(function(){ var e = " + v + "; return {strip: e.querySelectorAll('.strip button').length, use: !!e.querySelector('.use'), "
+               "w: e.querySelector('video').videoWidth, d: Math.round(e.querySelector('video').duration)}; })()")
+    case("on a PC a video that plays as it is plays on the page, with no strip of stills, and Use this moment beside it",
+         ok and got == {"strip": 0, "use": True, "w": 640, "d": 6}, got)
+    t = c.js("""({paste: document.getElementById('pasteSay').textContent, line: document.querySelector('#pasteBox .line').hidden,
+                 insight: document.querySelector('.insight').hidden, watch: document.querySelectorAll('#btsBox > p.say')[2].innerHTML,
+                 vlist: document.getElementById('vlist').innerText,
+                 coming: Array.from(document.querySelectorAll('.viewer:not([data-ready]) p')).map(function(p){ return p.textContent.trim(); })})""")
+    case("its lines on a PC: no copy line and no Good to know (Claude can't look there), the PC's own words in their place",
+         t["paste"] == this_computer.NO_LOOK_PC and t["line"] and t["insight"] and t["watch"] == this_computer.WATCH_PC_HTML, t)
+    case("a video still being copied in: listed by name as still copying in, and our line where its player will be",
+         "Still copying.mov" in t["vlist"] and "still copying in" in t["vlist"]
+         and R().OUR_WORDS["coming"].replace("{name}", "Still copying.mov") in t["coming"], t)
+    before = len(cards(c))
+    c.js(v + ".querySelector('video').currentTime = 1.0;")
+    wait(c, "Math.abs(" + v + ".querySelector('video').currentTime - 1) < 0.2", 5)
+    c.js(v + ".querySelector('.use').click();")
+    ok = wait(c, "document.querySelectorAll('#moments .mom').length === %d" % (before + 1), 8)
+    now = cards(c)
+    new = next((x for x in now if x["small"].startswith("PC plays.mov")), {})
+    case("Use this moment on a PC adds a card of theirs, 4 seconds, with no still on it (none on a PC yet)",
+         ok and new.get("yours") and new.get("len") == "4.0 s" and new.get("img") is False
+         and on_disk(s, lambda r: any(m.get("id") == new.get("id") and m.get("video") == "PC plays.mov" for m in r.get("moments") or [])), now)
+    (s.kit / "Footage" / "Still copying.mov").write_bytes(whole)
+    case("once the copy is done it comes in by itself (the page looks every 4 s)",
+         wait(c, "Array.from(document.querySelectorAll('.viewer[data-ready] h4')).some(function(h){ return h.textContent === 'Still copying.mov'; })", 12))
+
+
+def R():
+    return rp()
+
+
 def check_untouched(s, before):
     now = {p.name: sha(p) for p in (s.kit / "Footage").iterdir() if p.is_file()}
     case("every video in their Footage folder is byte for byte as it was dropped in (only ever read)", all(now.get(k) == v for k, v in before.items()), now)
@@ -833,7 +881,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", required=True, help="a folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=9322)
-    ap.add_argument("--only", choices=("server", "order", "make", "page"))
+    ap.add_argument("--only", choices=("server", "order", "make", "page", "pc"))
     a = ap.parse_args()
     work = Path(a.work).resolve()
     if Path("/private/tmp") not in work.parents:
@@ -888,12 +936,25 @@ def main():
             print("SKIP  the page in a browser: no Chrome on this computer", flush=True)
         else:
             # one hidden Chrome after another, each new, so the memory a long run builds up never adds up
-            with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
-                group("steps 1 and 4 on the page", check_page, c, s, clips)
-            with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
-                group("the player, the moment cards and the styles", check_player, c, s)
-            with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
-                group("a test make with footage on the page", check_test_make, c, s)
+            if a.only != "pc":
+                with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
+                    group("steps 1 and 4 on the page", check_page, c, s, clips)
+                with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
+                    group("the player, the moment cards and the styles", check_player, c, s)
+                with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
+                    group("a test make with footage on the page", check_test_make, c, s)
+            if a.only in (None, "pc"):
+                s.stop()
+                s.start(ASSISTANT_NO_AVFOUNDATION="1")
+                with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
+                    group("the PC's way on the page (ASSISTANT_NO_AVFOUNDATION=1)", check_pc_page, c, s, clips)
+                (run / "set aside").mkdir(exist_ok=True)
+                for n in ("PC plays.mov", "Still copying.mov"):
+                    shutil.move(str(s.kit / "Footage" / n), str(run / "set aside" / n))
+                s.stop()
+                s.start()
+                if a.only == "pc":
+                    return rpc.summary()
         case("(the video the page test took back out is byte for byte what was dropped in)", sha(run / "set aside" / "Dropped in.mov") == sha(clips["clip.mov"]))
         group("nothing of theirs changed", check_untouched, s, before)
         s.stop()

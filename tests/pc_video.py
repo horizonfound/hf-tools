@@ -311,9 +311,14 @@ def main():
         check("stills of a non-video: plain words", r.get("state") == "failed" and "/" not in r.get("words", ""), r)
     finally:
         os.environ.pop(video.NO_AV, None)
-    for name, words in (("NO_PREVIEW", this_computer.NO_PREVIEW), ("HEVC_HELP", this_computer.HEVC_HELP)):
+    for name in ("NO_PREVIEW", "HEVC_HELP", "NO_LOOK_PC", "WATCH_PC_HTML", "NOT_LOOKED_PC_HTML", "MOMENTS_PC", "NO_LOOK_CHAT"):
+        words = getattr(this_computer, name, "")
         check(f"this_computer.{name} names nothing Mac-only (no Mac, Finder, QuickTime)",
               words and not any(w in words for w in ("Mac", "Finder", "QuickTime")), words)
+        # v19 review: the first drafts said "The moments and your reel still work" where a PC can make no moment,
+        # promised the HEVC extensions would help (no PC route plays anything yet but H.264), and kept "tap a still"
+        check(f"this_computer.{name} promises nothing a PC can't do yet", not any(w in words for w in (
+              "still work", "Video Extensions", "tap a still", "I find", "look through it")), words)
     check("mac_javascript answers None on a PC, and runs on a Mac",
           (this_computer.mac_javascript("function run(a){return 'hi'}") is None) == (not this_computer.MAC))
     check("PC_ADDON stays None (decision 11: nothing asked for up front)", video.PC_ADDON is None)
@@ -348,6 +353,58 @@ def main():
     check("her loud moments: the room is the middle level; one moment, at 4 s, 34.6 dB above the room",
           [(x["at"], x["above_room"]) for x in lm] == [(4.0, 34.6)], lm)
     check("no levels: no loud moments", video.loud_moments([]) == [])
+
+    # ---- the sound of a long video on a PC (v19 review, Nov 7): read where it is (never copied into the temp folder,
+    # where a phone's video would be gigabytes), and brought down to 8,000 a second, one channel, as it is read
+    import array
+    import sound
+    rng = random.Random(3)
+    raw = array.array("h", (rng.randint(-20000, 20000) for _ in range(2 * 48000 * 3)))       # 3 s, two channels, 48 kHz
+    whole = sound._resample(sound._to_mono16(raw.tobytes(), "s16le", 2), 48000, 8000)
+    sq = sound._Squash(8000)
+    b = raw.tobytes()
+    at = 0
+    for n in (4096, 1000, 77777, 4, 32768, len(b)):                                         # pieces of every size
+        n -= n % 4
+        sq.add(b[at:at + n], "s16le", 2, 48000)
+        at += n
+    check("the sound brought down piece by piece is the same as brought down whole (%d samples)" % len(whole),
+          abs(len(sq.out) - len(whole)) <= 1 and list(sq.out[:len(whole) - 1]) == list(whole[:len(sq.out) - 1]),
+          (len(sq.out), len(whole)))
+    vid = write(work, "phone video.MOV", FTYP, box(b"mdat", DATA), std)
+    seen = {}
+    real = (sound.WINDOWS, sound._afconvert_ok, sound._ffmpegs, sound._mf_read_pcm, shutil.copyfile)
+
+    def fake_mf(path, longest, on_chunk=None):
+        seen.update(path=path, longest=longest, streamed=on_chunk is not None)
+        piece = array.array("h", [12000, -12000] * 4800).tobytes()                            # 0.1 s, two channels
+        if on_chunk is None:
+            return piece * 30, "s16le", 2, 48000
+        for _ in range(30):
+            on_chunk(piece, "s16le", 2, 48000)
+        return None, "s16le", 2, 48000
+
+    def spy_copy(a, b_, **k):
+        seen.setdefault("copied", []).append(str(a))
+        return real[4](a, b_, **k)
+    sound.WINDOWS, sound._afconvert_ok, sound._ffmpegs, sound._mf_read_pcm = True, (lambda: False), (lambda: []), fake_mf
+    shutil.copyfile = spy_copy
+    try:
+        a, how = sound.decode(vid, rate=8000, video=True)
+    finally:
+        sound.WINDOWS, sound._afconvert_ok, sound._ffmpegs, sound._mf_read_pcm, shutil.copyfile = real
+    check("a phone's .MOV on a PC: opened where it is, never copied, read up to an hour, brought down as it is read",
+          seen.get("path") == str(vid) and not seen.get("copied") and seen.get("longest") == sound.LONGEST_VIDEO
+          and seen.get("streamed") and how == "windows" and a is not None and abs(len(a) - 24000) <= 1, (seen, how, a and len(a)))
+    fx = ROOT / "tests" / "fixtures" / "loud-tone-3s.mp4"
+    seen.clear()
+    shutil.copyfile = spy_copy
+    try:
+        db, how = video.loudness(fx)
+    finally:
+        shutil.copyfile = real[4]
+    check(f"a real 3-second clip ({fx.name}, ours): its sound read ({how}), quiet for 1.5 s and then loud, and never copied",
+          db is not None and len(db) == 6 and db[3] - db[2] > 20 and not seen.get("copied"), (db, how, seen))
 
     ok = all(results)
     print(f"\n{sum(results)} of {len(results)} passed.")

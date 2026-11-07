@@ -361,7 +361,10 @@ def cmd_scan(kit, every=None):
     vm = reel_page._video()
     if not reel_page.footage_ok(kit):
         return stop("this shoot's Footage folder is a link or not a folder, so I don't look in it.")
-    vids = reel_page.list_videos(kit)
+    coming = []
+    vids = reel_page.list_videos(kit, coming)
+    if not vids and coming:
+        return stop("the only footage is still being copied in. Run the scan again once it's done.")
     if not vids:
         return stop(f"there's no footage yet. Videos go in the Footage folder inside {reel_page.short_name(kit.name)}: "
                     "on the reel page, Add my footage opens it.")
@@ -397,11 +400,16 @@ def cmd_scan(kit, every=None):
     times_of = photo_times(kit)
     report = {"kit": kit.name, "when": arrange.now_iso(), "notes": ask, "feel": feel, "videos": []}
     say(f"\nThis look: {look}  (a new folder; earlier looks are kept as they were)")
+    if coming:
+        say("Still being copied into the Footage folder, so left out of this look: " + ", ".join(c["name"] for c in coming)
+            + ". Run the scan again once the copy is done.")
     t_all = time.time()
     n_sheets = 0
     for i, v in enumerate(vids, 1):
         t0 = time.time()
         f = v["facts"]
+        say(f"(Looking at video {i} of {len(vids)}: {v['name']}"
+            + (f", {mmss(float(f.get('length') or 0))} long" if not f.get("refused") else "") + "...)")
         if f.get("refused"):
             say(f"\n{i}. {v['name']}: {f['refused']} (left out)")
             report["videos"].append({"key": v["key"], "name": v["name"], "refused": f["refused"]})
@@ -411,15 +419,17 @@ def cmd_scan(kit, every=None):
         cols, cw, ch, per = layout(f.get("w") or 0, f.get("h") or 0)
         n = max(1, int(math.ceil(length / ev - 1e-6)))
         times = [round(k * ev, 3) for k in range(n)]
-        cells, sheets, gap = [], [], None
+        cells, sheets, gap, late = [], [], None, []
         if can and ok_pics:
             cells, r = take_stills(vm, v, times, look, v["key"], (cols, cw, ch))
             if cells is None:
                 gap = r.get("words") or "I couldn't take stills from it."
+                cells = []                 # (a video with no still at all is a line of its own, never a crash)
             elif cells:
                 sheets = write_sheets(cells, look, i, v, (cols, cw, ch), per)
+            late = [float(x["asked"]) for x in (r.get("stills") or []) if x.get("error") == "out of time"]
         elif not can:
-            gap = this_computer.NO_PREVIEW if f.get("codec") not in vm.HEVC else this_computer.HEVC_HELP
+            gap = this_computer.NO_LOOK_CHAT
         else:
             gap = why_pics
         try:
@@ -446,6 +456,10 @@ def cmd_scan(kit, every=None):
                if sheets else "No sheets: " + str(gap)))
         for s in sheets:
             say(f"  sheet, {s['cells'][0]['label']} to {s['cells'][-1]['label']}: {s['path']}")
+        if late:
+            say(f"  NOTE: I ran out of time on this video from {mmss(min(late))}: the {len(late)} stills after that weren't "
+                f"taken, so this look stops there. Take the rest with close looks from {mmss(min(late))}, or run the scan again.")
+            item["out_of_time_from"] = round(min(late), 2)
         if loud:
             say("  Loudest moments (laughs, squeals, talking up): " + ", ".join(f"{mmss(x['at'])} (+{x['above_room']} dB)" for x in loud))
         elif not f.get("has_audio"):
@@ -517,8 +531,7 @@ def cmd_close(kit, given, a, b, every=CLOSE_EVERY, photo=None):
             return stop(f"photo {photo} can't be read right now. Is the drive plugged in?")
         first = {"label": f"PHOTO {photo}", "file": str(p), "photo": photo}
     if not vm.avfoundation_here():
-        say("NOTE: " + (this_computer.HEVC_HELP if f.get("codec") in vm.HEVC else this_computer.NO_PREVIEW)
-            + " Stills can't be taken from a video on a PC yet, so there is no close look here.")
+        say("NOTE: " + this_computer.NO_LOOK_CHAT + " So there is no close look here.")
         return EXIT_NO_SHEETS
     cols, cw, ch, per = layout(f.get("w") or 0, f.get("h") or 0)
     look = vm.fresh_folder(looks_dir(kit), "close")
@@ -754,11 +767,20 @@ def main():
     if a.cmd == "scan" and a.every is not None and (not math.isfinite(a.every) or a.every < 0.5):
         return stop("--every is how many seconds between stills: 0.5 or more.")
     try:
-        if a.cmd == "scan":
-            return cmd_scan(kit, a.every)
-        if a.cmd == "close":
-            return cmd_close(kit, a.video, a.start, a.end, a.every, a.photo)
-        return cmd_moments(kit, a.file)
+        # one video program at a time on this computer (video.turn, v19 review): the whole look takes its turn,
+        # after any preview the reel page is making, and the page waits for it in turn
+        vm = reel_page._video()
+        with vm.turn(vm.TURN_WAIT, waiting=lambda: say(
+                "(Another video is being got ready on this computer right now, most likely a preview on the reel page. "
+                "Waiting for it to finish; this can take a few minutes for a long video.)")) as ok:
+            if not ok:
+                return stop("another video was still being got ready on this computer after " + str(vm.TURN_WAIT // 60)
+                            + " minutes, so I didn't look. Nothing was changed. Run the same command again.", 2)
+            if a.cmd == "scan":
+                return cmd_scan(kit, a.every)
+            if a.cmd == "close":
+                return cmd_close(kit, a.video, a.start, a.end, a.every, a.photo)
+            return cmd_moments(kit, a.file)
     except arrange.Busy:
         return stop("this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.", 2)
 

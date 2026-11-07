@@ -42,6 +42,8 @@ from pathlib import Path
 WINDOWS = os.name == "nt"
 LONGEST_SONG = 15 * 60          # a decode stops reading after this many seconds; a beat needs far less
 LONGEST_VIDEO = 60 * 60         # the most sound pulled out of one video on a PC with nothing installed
+AFCONVERT_TIMEOUT = 600         # seconds afconvert may take (the ffmpeg route's limit too); a damaged file can hang it
+VIDEO_ENDINGS = (".mov", ".mp4", ".m4v")   # opened by Windows by their own ending, as they are (never copied)
 
 
 # ---------------------------------------------------------------- what kind of file it really is
@@ -725,9 +727,13 @@ def _last_line(text):
     return lines[-1][:160] if lines else ""
 
 
-def decode(path, rate=11025):
+def decode(path, rate=11025, video=False):
     """(samples, how) or (None, reason in plain words). Samples: an array of mono 16-bit numbers, `rate` a
-    second. how: afconvert, ffmpeg, imageio-ffmpeg, wav, aiff or windows."""
+    second. how: afconvert, ffmpeg, imageio-ffmpeg, wav, aiff or windows.
+    video=True (the footage look's loudness, video.loudness): the sound of a video, which may be long. On a PC
+    the video is opened where it is (never copied: a phone's video can be gigabytes), up to LONGEST_VIDEO, and
+    its sound is brought down to `rate`, one channel, as it is read, so memory stays flat (v19 review, Nov 7).
+    A song (video=False) goes exactly as before."""
     path = str(path)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
@@ -741,8 +747,11 @@ def decode(path, rate=11025):
                 alias_dir = tempfile.mkdtemp()
                 src = os.path.join(alias_dir, "song" + kind)
                 os.symlink(os.path.abspath(path), src)  # pc-ok: only where afconvert is, a Mac; a PC copies instead
-            r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{rate}", "-c", "1", src, tmp.name],  # pc-ok: Mac only
-                               capture_output=True, encoding="utf-8", errors="replace")
+            try:
+                r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{rate}", "-c", "1", src, tmp.name],  # pc-ok: Mac only
+                                   capture_output=True, encoding="utf-8", errors="replace", timeout=AFCONVERT_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                return None, "it took too long to read the sound (the file may be damaged, or still copying)"
             if r.returncode == 0 and os.path.getsize(tmp.name) > 44:
                 a, got = _read_wav(tmp.name)
                 return _resample(a, got, rate), "afconvert"  # pc-ok: the name of the route, in the Mac branch
@@ -761,7 +770,7 @@ def decode(path, rate=11025):
                 return _resample(_to_mono16(raw, layout, ch), src_rate, rate), kind[1:]
             damaged = _looks_damaged(path, kind)
         if WINDOWS:
-            a, why = _decode_windows(path, rate)    # run on GitHub's Windows machines
+            a, why = _decode_windows(path, rate, video=video)    # run on GitHub's Windows machines
             if a is not None:
                 return a, "windows"
             return None, (_DAMAGED_WORDS if damaged else why)
@@ -1198,10 +1207,11 @@ def _drop_warmup(raw, layout, channels, rate, path, first_time):
     return raw
 
 
-def _mf_read_pcm(path, longest):
+def _mf_read_pcm(path, longest, on_chunk=None):
     """(raw bytes, layout like "s16le", channels, rate) of the first sound track of a song or video, decoded by
     Windows' own Media Foundation. Raises _WindowsSoundError in plain words. Run on GitHub's Windows
-    machines, not yet on a photographer's PC."""
+    machines, not yet on a photographer's PC. on_chunk(raw, layout, channels, rate): each piece handed over as
+    it is read and not kept (a long video's sound), and then (None, layout, channels, rate) comes back."""
     import ctypes
     import uuid
     from ctypes import POINTER, byref, c_int, c_long, c_longlong, c_uint32, c_ulong, c_void_p, c_wchar_p
@@ -1307,7 +1317,11 @@ def _mf_read_pcm(path, longest):
                             buf, byref(ptr), byref(most), byref(now)), "locking the buffer")
                         try:
                             if now.value and ptr.value:
-                                chunks.append(ctypes.string_at(ptr.value, now.value))
+                                piece = ctypes.string_at(ptr.value, now.value)
+                                if on_chunk is None:
+                                    chunks.append(piece)
+                                else:
+                                    on_chunk(piece, layout, channels, rate)
                                 total += now.value
                         finally:
                             com(buf, 4)(buf)                         # Unlock
@@ -1329,6 +1343,8 @@ def _mf_read_pcm(path, longest):
             ole32.CoUninitialize()
     if not total:
         raise _WindowsSoundError(_NO_SOUND)
+    if on_chunk is not None:
+        return None, layout, channels, rate
     raw = b"".join(chunks)
     if total < cap:                                  # (a decode cut off at `cap` can't be measured against the file)
         raw = _drop_warmup(raw, layout, channels, rate, path, first_time)
@@ -1350,9 +1366,51 @@ def _named_right(path, kind, work):
     return dst
 
 
-def _decode_windows(path, rate):
+class _Squash:
+    """A long sound brought down to `want` a second, one channel, piece by piece as it is read (the same blocks
+    _resample averages over the whole sound), so only the small result is ever kept."""
+
+    def __init__(self, want):
+        self.want = want
+        self.out = array.array("h")
+        self._left = array.array("h")
+        self._at = 0.0
+
+    def add(self, raw, layout, channels, rate):
+        a = _to_mono16(raw, layout, channels)
+        if rate == self.want:
+            self.out.extend(a)
+            return
+        buf = self._left + a
+        step = rate / self.want
+        i, n = self._at, len(buf)
+        while i + step <= n:
+            lo, hi = int(i), int(i + step)
+            seg = buf[lo:hi] or buf[lo:lo + 1]
+            self.out.append(sum(seg) // len(seg))
+            i += step
+        cut = int(i)
+        self._left = buf[cut:]
+        self._at = i - cut
+
+
+def _is_video(path):
+    return str(path).lower().endswith(VIDEO_ENDINGS) and real_kind(path) == ".m4a"
+
+
+def _decode_windows(path, rate, video=False):
     """(samples, "windows") or (None, reason). Run on GitHub's Windows machines, not yet on a photographer's
-    PC."""
+    PC. A video (video=True, a .mov, .mp4 or .m4v that is one inside): Windows opens it by its own ending, so it
+    is read where it is, never copied, and its sound brought down to `rate` as it is read (_Squash)."""
+    if video and _is_video(path):
+        try:
+            sq = _Squash(rate)
+            _mf_read_pcm(path, LONGEST_VIDEO, on_chunk=sq.add)
+            return sq.out, "windows"
+        except _WindowsSoundError as e:
+            return None, f"this PC couldn't read the sound of that video ({e})"
+        except Exception as e:  # noqa: BLE001
+            return None, f"this PC couldn't read the sound of that video ({type(e).__name__}: {e})"
     work = tempfile.mkdtemp()
     try:
         src = _named_right(path, real_kind(path), work)

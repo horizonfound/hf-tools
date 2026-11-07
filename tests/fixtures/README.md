@@ -62,3 +62,7 @@ Information only: with both ffmpegs switched off, what this computer's own decod
     python3 tests/fixtures/make_fixtures.py
 
 This needs a Mac (for `afconvert`) and ffmpeg with libmp3lame. The output differs slightly between encoder versions, so remake them only when a new kind of file is needed, then re-check the table above.
+
+## A test clip
+
+`loud-tone-3s.mp4` (about 20 KB, added Nov 7) is a 3-second, 320 x 180 H.264 video with AAC sound, made on a Mac with AVFoundation by the same maker `tests/video_check.py` uses: three solid colours, one a second, and a synthetic tone that is quiet for 1.5 seconds and then loud. No camera, no person, nothing recorded. `tests/pc_video.py` reads its sound through `video.loudness` (Media Foundation on a PC, `afconvert` on a Mac) and checks that the loud half is found and that the video is never copied to read it.

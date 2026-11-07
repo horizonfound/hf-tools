@@ -64,7 +64,7 @@ LIGHT = ("--single-process", "--disable-component-extensions-with-background-pag
          "IsolateOrigins,site-per-process,WebUIOmniboxPopup,OmniboxWebUIPopup,WebUIOmniboxFullPopup,AimServerEligibility")
 ASK = "Find me lining up the shot, then the laugh at the end."
 FEEL = "fun"
-NOT_PREVIEW = "I can't show a preview of this one on this PC. The moments and your reel still work."
+NOT_PREVIEW = "I can't take stills from a video on this PC yet, so I can't look through footage here."   # this_computer.NO_LOOK_CHAT
 
 # the blocker: no Pillow (or anything like it) may be imported, and every program started is written down
 BLOCKER = r'''
@@ -233,6 +233,28 @@ def moments_file(run, name, d):
 
 # ---------- 1. scan ----------
 
+def check_out_of_time(s, run, ftool, clips):
+    """Run last (it makes a look of its own): a scan whose stills run out of time."""
+    n_vids = len(clips)
+    # a look that runs out of time says so plainly, from where (v19 review: a cut-off look read as a whole one)
+    wrap = run / "out of time.py"
+    wrap.write_text(
+        "import runpy, sys, time\n"
+        "sys.path.insert(0, %r)\nsys.path.insert(0, %r)\n"
+        "import video\n"
+        "real = video._stills_now\n"
+        "video._stills_now = lambda path, want, into, name, edge, quality, f, deadline, t0: real(path, want, into, name, edge, quality, f, time.time() + 0.5, t0)\n"
+        "sys.argv = [%r] + sys.argv[1:]\n"
+        "runpy.run_path(sys.argv[0], run_name='__main__')\n" % (str(REEL), str(SCRIPTS), str(SCRIPTS / "footage.py")), encoding="utf-8")
+    e = dict(s.env, PATH="/usr/bin:/bin:/usr/sbin:/sbin", PYTHONPATH=str(ftool.block), FOOT_TOOLS_LOG=str(ftool.log), PYTHONDONTWRITEBYTECODE="1")
+    r = subprocess.run(["/usr/bin/python3", str(wrap), "scan", KIT], capture_output=True, text=True, env=e, timeout=300)
+    o2 = r.stdout + r.stderr
+    late = json.loads(sorted((s.kit / ".kit" / "footage" / "looks").glob("*/scan.json"), key=lambda p: p.stat().st_mtime)[-1].read_text())
+    case("a look that ran out of time says so for each video, from where, and how to get the rest; no sheets, exit 3",
+         r.returncode == 3 and o2.count("NOTE: I ran out of time on this video from 0:00") == n_vids and "close looks from 0:00" in o2
+         and all(v.get("out_of_time_from") == 0.0 for v in late["videos"]), (r.returncode, o2[-800:]))
+
+
 def check_scan(s, run, ftool, clips, keys, during_want):
     F = footage_mod()
     V = vc()
@@ -248,6 +270,9 @@ def check_scan(s, run, ftool, clips, keys, during_want):
          0 <= i_notes < i_feel < i_rules < i_vid and lines[i_notes].endswith(": " + ASK) and lines[i_feel].startswith("They want it to feel fun."),
          lines[:6])
     case("the reel's photo pick is printed, the same with footage or without", "The reel's photo pick (the same with footage or without):" in out, out[:900])
+    n_vids = len(clips)
+    case("a line as it starts each video (v19 review: a long look said nothing until each video was done)",
+         all(("(Looking at video %d of %d: " % (k, n_vids)) in out for k in range(1, n_vids + 1)), out[:1500])
     tools = ftool.tools()
     ran = sorted({x[4:] for x in tools if x.startswith("RUN ")})
     case("nothing installed: no Pillow (or anything like it) was imported", not any(x.startswith("IMPORT") for x in tools), [x for x in tools if x.startswith("IMPORT")])
@@ -587,6 +612,7 @@ def main():
             return rpc.summary()
         if first_look:
             group("a second look, and the PC route", check_again, s, ftool, first_look, first_tree)
+        group("a look that runs out of time", check_out_of_time, s, run, ftool, clips)
         group("nothing of theirs changed", check_untouched, s, before)
     finally:
         s.stop()

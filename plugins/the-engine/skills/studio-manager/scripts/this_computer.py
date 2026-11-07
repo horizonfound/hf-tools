@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -798,29 +799,82 @@ def run_curl(cmd, **kw):
 
 # ---------------------------------------------------------------- video: the Mac's own AVFoundation
 
-# Words a photographer sees on a PC where a still or a player would be (decision 11 of the v19 plan; drafts, for
-# Nicole). The reel's video helper (assistant-make-a-reel/scripts/video.py) has no stills and no small copy on a
+# Words a photographer sees on a PC about behind-the-scenes footage (decisions 11 and 26 of the v19 plan; drafts,
+# for Nicole). The reel's video helper (assistant-make-a-reel/scripts/video.py) has no stills and no small copy on a
 # PC yet: Media Foundation's source reader and sink writer are the Windows way, not built until they can be proven
-# on GitHub's Windows machines. A video the PC can play as it is (H.264) still plays; everything else still works.
-NO_PREVIEW = "I can't show a preview of this one on this PC. The moments and your reel still work."
-# An iPhone records in its High Efficiency format (HEVC) unless set to Most Compatible; Windows can't read HEVC
-# without Microsoft's HEVC Video Extensions. Nothing is asked for up front and nothing is installed by us.
-HEVC_HELP = ("This video was recorded in the iPhone's High Efficiency format (HEVC), which this PC can't show "
-             "without Microsoft's HEVC Video Extensions from the Microsoft Store. The moments and your reel still "
-             "work. For your next shoot, setting the iPhone to Most Compatible (Settings, Camera, Formats) records "
-             "videos any PC can show.")
+# on GitHub's Windows machines. So on a PC a video the page can play as it is (H.264, the iPhone's Most Compatible)
+# plays with no strip of stills under it, and Use this moment works on it; anything else can't be played, so it
+# can't give a moment there. Claude's footage look needs stills, so it can't run on a PC at all yet. Every line
+# below says only what is true on a PC today (v19 review, Nov 7: the first drafts promised moments that a PC can't
+# make). Nothing is asked for up front and nothing is installed by us.
+NO_PREVIEW = ("I can't play this video on this PC yet, so it can't give you a clip here. Videos an iPhone records in "
+              "Most Compatible (H.264) play here.")
+# An iPhone records in its High Efficiency format (HEVC) unless set to Most Compatible.
+HEVC_HELP = ("This video is in the iPhone's High Efficiency format (HEVC), which I can't play on this PC yet, so it "
+             "can't give you a clip here. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, "
+             "Formats) and its videos will play here.")
+# In place of the reel page's "copy this into the chat so I can look through it" line and its Copy button.
+NO_LOOK_PC = ("On this PC I can't look through your videos for you yet. Play each one below and press Use this "
+              "moment on the parts you love.")
+# In place of her "Play it here, or tap a still to jump there." (there is no strip of stills on a PC yet)
+WATCH_PC_HTML = ("Play it here. When you see a part you love, press <b>Use this moment</b>. It shows up first in "
+                 "your clips, 4 seconds long and selected. Use <b>−</b> and <b>+</b> on its card to make it "
+                 "shorter or longer.")
+# In place of her "I haven't looked through your footage yet" box when Make my reel is pressed with no moments
+NOT_LOOKED_PC_HTML = ("Play your videos in step 1 and press <b>Use this moment</b> on the parts you love. Or choose "
+                      "<b>Just photos</b>.")
+# In place of her "The moments I find will show up here." (nobody finds moments for them on a PC yet)
+MOMENTS_PC = "The moments you pick yourself below show up here."
+# What the chat's footage look says on a PC, where it can't take stills
+NO_LOOK_CHAT = "I can't take stills from a video on this PC yet, so I can't look through footage here."
+
+_SCRIPTS = set()                 # the JavaScript programs running now (so a server that starts over stops them)
+_SCRIPTS_LOCK = threading.Lock()
 
 
-def mac_javascript(script, args=(), timeout=120):
+def mac_javascript(script, args=(), timeout=120, pass_fds=()):
     """Run a JavaScript for Automation script (the Mac's own scripting, which reaches AVFoundation, the Mac's video
     parts) with these arguments: the script's run(argv) gets them as text. (exit code, what it printed, its error
     lines), or None on a computer that has no such thing (a PC: video.py names that gap in plain words). A run past
-    `timeout` seconds is stopped and raises subprocess.TimeoutExpired."""
+    `timeout` seconds is stopped and raises subprocess.TimeoutExpired. pass_fds: open files the program keeps
+    while it runs (video.py hands it the computer-wide video lock, so the lock is held for as long as the program
+    lives, even past the end of the Python that started it). Every program running is known to stop_scripts()."""
     if not MAC:
         return None
-    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script, *[str(a) for a in args]],  # pc-ok: the Mac branch
-                       capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
-    return r.returncode, r.stdout, r.stderr
+    p = subprocess.Popen(["osascript", "-l", "JavaScript", "-e", script, *[str(a) for a in args]],  # pc-ok: the Mac branch
+                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         encoding="utf-8", errors="replace", pass_fds=tuple(pass_fds))
+    with _SCRIPTS_LOCK:
+        _SCRIPTS.add(p)
+    try:
+        try:
+            out, err = p.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.communicate()
+            raise
+        except BaseException:
+            p.kill()
+            p.wait()
+            raise
+        return p.returncode, out, err
+    finally:
+        with _SCRIPTS_LOCK:
+            _SCRIPTS.discard(p)
+
+
+def stop_scripts():
+    """Stop every JavaScript program this process started that is still running (a page server calls this before it
+    starts over with newer code: exec keeps this process's number, so a program left running would carry on with
+    nobody to take its answer). Never raises."""
+    with _SCRIPTS_LOCK:
+        running = list(_SCRIPTS)
+    for p in running:
+        try:
+            p.kill()
+            p.wait(timeout=5)
+        except Exception:  # noqa: BLE001  (best effort, on the way out)
+            pass
 
 
 # ---------------------------------------------------------------- this computer's own pages

@@ -19,15 +19,18 @@ numbered list (sheet.json) written by hand, and the test beat WAV. In a scratch 
   6. a recording's sound made once beside it ("<name> sound.wav" on a PC with no ffmpeg, ".m4a" on a Mac), used
      again, never written over; one beside a recording that can't be read is left as it is, and a new one made
      beside it ("<name> sound 2..."). SKIP when this computer can't take the sound out of a video;
-  7. step 1, the footage: header-only videos listed by key, the PC's plain words where a preview would be
-     (this_computer.NO_PREVIEW, HEVC_HELP for an iPhone's HEVC), a moment added, changed, removed and put back,
-     and a test make with a clip (Bookends, one clip in twice). On a Mac the PC's route is asked for.
+  7. step 1, the footage: header-only videos listed by key; one that plays as it is (H.264) ready to play with no
+     strip, the PC's plain words where anything else would play (this_computer.NO_PREVIEW, HEVC_HELP for an
+     iPhone's HEVC); two still being copied in, listed by name with nothing read or made; the page's PC lines;
+     a moment added, changed, removed and put back, and a test make with a clip (Bookends, one clip in twice). On
+     a Mac the PC's route is asked for.
   8. the chat's footage look (footage.py) on a PC: scan and close make no sheets and stop with exit 3 in plain
      words (still printing each video's key and facts); moments refused when wrong, written when right, their own
      moment kept first.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
 printed), and cleared away when everything passed.
 """
+import html
 import json
 import os
 import shutil
@@ -297,7 +300,14 @@ def footage(kit):
         check("Add my footage makes the shoot's Footage folder (no folder opened in a test)", code == 200 and j["ok"] and fd.is_dir(), j)
         pv.write(fd, "Phone é.MOV", pv.FTYP, pv.box(b"mdat", pv.DATA), pv.moov(pv.vtrak(rot=90), pv.atrak()))
         pv.write(fd, "iPhone HEVC.mov", pv.FTYP, pv.box(b"mdat", pv.DATA), pv.moov(pv.vtrak(codec=b"hvc1", conf=pv.hvcc(1)), pv.atrak()))
+        pv.write(fd, "Ten bit.mov", pv.FTYP, pv.box(b"mdat", pv.DATA), pv.moov(pv.vtrak(conf=pv.avcc(110, bits=10)), pv.atrak()))
         (fd / "notes.txt").write_text("not a video", encoding="utf-8")
+        # v19 review: a video still being copied in (here its picture data runs past the end of the file, as it
+        # does part way through a copy) is listed by name, with nothing read or made for it, until it is whole
+        whole = pv.FTYP + pv.moov(pv.vtrak(), pv.atrak()) + pv.box(b"mdat", pv.DATA)
+        (fd / "Copying in.mp4").write_bytes(whole[:-2000])
+        phone_part = pv.FTYP + pv.box(b"mdat", pv.DATA) + pv.moov(pv.vtrak(), pv.atrak())
+        (fd / "Copying phone.MOV").write_bytes(phone_part[:len(phone_part) - 300])
         end = time.time() + 30
         while True:
             f = reel_page.footage_for_page(kit)
@@ -305,14 +315,33 @@ def footage(kit):
                 break
             time.sleep(0.2)
         vids = {v["name"]: v for v in f["videos"]}
+        coming = {n: v for n, v in vids.items() if v["preview"] == "coming"}
+        vids = {n: v for n, v in vids.items() if v["preview"] != "coming"}
         check("the videos listed by name and key, read from their headers (the sideways one shown 360 x 640)",
-              sorted(vids) == ["Phone é.MOV", "iPhone HEVC.mov"] and (vids["Phone é.MOV"]["w"], vids["Phone é.MOV"]["h"]) == (360, 640)
+              sorted(vids) == ["Phone é.MOV", "Ten bit.mov", "iPhone HEVC.mov"] and (vids["Phone é.MOV"]["w"], vids["Phone é.MOV"]["h"]) == (360, 640)
               and all(len(v["key"]) == 12 for v in vids.values()) and no_path(f), f)
+        check("two videos still being copied in: listed by name with our line, no key, nothing read or made for them",
+              sorted(coming) == ["Copying in.mp4", "Copying phone.MOV"]
+              and all(v["key"] == "" and v["words"] == reel_page.OUR_WORDS["coming"].replace("{name}", n) for n, v in coming.items())
+              and sorted(json.loads((kit / ".kit" / "footage" / "facts.json").read_text(encoding="utf-8"))) == sorted(v["key"] for v in vids.values())
+              and sorted(x.name for x in (kit / ".kit" / "footage").iterdir() if x.is_dir()) == sorted(v["key"] for v in vids.values()), coming)
         hevc = "hevc_pc" if this_computer.WINDOWS else "pc"
-        check("no preview on a PC yet: the plain words in its place (NO_PREVIEW; HEVC_HELP for an iPhone's HEVC on a PC)",
-              vids["Phone é.MOV"]["preview"] == "pc" and vids["Phone é.MOV"]["words"] == this_computer.NO_PREVIEW
+        check("on a PC a video that plays as it is (H.264 8-bit 4:2:0) is ready to play, with no strip of stills "
+              "(v19 review: before, no video could be played or give a moment on a PC)",
+              vids["Phone é.MOV"]["preview"] == "ready" and vids["Phone é.MOV"]["strip"] == [] and vids["Phone é.MOV"]["words"] is None, vids)
+        check("anything else can't be played on a PC yet: the plain words in its place (NO_PREVIEW; HEVC_HELP for an "
+              "iPhone's HEVC on a PC)", vids["Ten bit.mov"]["preview"] == "pc" and vids["Ten bit.mov"]["words"] == this_computer.NO_PREVIEW
               and vids["iPhone HEVC.mov"]["preview"] == hevc
               and vids["iPhone HEVC.mov"]["words"] == (this_computer.HEVC_HELP if this_computer.WINDOWS else this_computer.NO_PREVIEW), vids)
+        page = reel_page.page_html(KIT, "Test")
+        check("the page on a PC says only what a PC can do: no line to copy for a footage look, no Good to know about "
+              "it, no 'tap a still', no 'moments I find'; the PC's own lines in their place",
+              html.escape(this_computer.NO_LOOK_PC) in page and this_computer.WATCH_PC_HTML in page and "class='line' hidden" in page
+              and "class='insight' hidden" in page and "tap a still" not in page.split("reelData")[0]
+              and html.escape(reel_page.WORDS["paste_say"]) not in page.split("reelData")[0]
+              and '"moments_none": ' + json.dumps(this_computer.MOMENTS_PC) in page
+              and '"not_looked_html": ' + json.dumps(this_computer.NOT_LOOKED_PC_HTML).replace("<", "\\u003c").replace(">", "\\u003e") in page,
+              page[:200])
         key = vids["Phone é.MOV"]["key"]
         code, j = reel_page.change_moments({"kit": KIT, "do": "add", "video": key, "start": 1.0, "seconds": 4})
         check("Use this moment still works (a moment of theirs, saved), with no still on its card", code == 200 and j["moments"][0]["end"] == 5.0
@@ -355,13 +384,13 @@ def footage_look(kit):
     looks = kit / ".kit" / "footage" / "looks"
     code, out = run("scan", KIT)
     pngs = [p.name for p in looks.rglob("*.png")] if looks.is_dir() else []
-    check("scan on a PC: no sheets, exit 3, the PC's plain words, nothing drawn", code == 3 and this_computer.NO_PREVIEW in out
+    check("scan on a PC: no sheets, exit 3, the PC's plain words, nothing drawn", code == 3 and this_computer.NO_LOOK_CHAT in out
           and "no sheets were made" in out and pngs == [], (code, pngs, out[-500:]))
     check("scan on a PC still prints each video by its key, its length and shape (the sideways one 360x640 tall)",
           f"(key {key}): 0:06 long, 360x640 tall" in out and "Their notes for this reel" in out.split("\n")[0], out[:1500])
     check("scan on a PC writes its look in a new folder (look), with scan.json", (looks / "look" / "scan.json").is_file())
     code, out = run("close", KIT, key, "1", "3")
-    check("close on a PC: exit 3, in plain words", code == 3 and this_computer.NO_PREVIEW in out, out[-300:])
+    check("close on a PC: exit 3, in plain words", code == 3 and this_computer.NO_LOOK_CHAT in out, out[-300:])
     rec = kit / ".kit" / "reel-page.json"
     before = rec.read_bytes()
     bad = work / "too many.json"

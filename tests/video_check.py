@@ -462,14 +462,34 @@ def main():
     sf = video.facts(so) if so.is_file() else {}
     rs = video.stills(so, [0.5], looks, name="sideways copy")
     tr, _ = colour_at(Path(rs["folder"]) / rs["stills"][0]["file"], 0.95, 0.05, work)
-    check("a sideways video's copy plays upright (shown 360x640, still turned 90)",
-          r.get("made") and (sf.get("w"), sf.get("h"), sf.get("rotation")) == (360, 640, 90) and near(tr, (255, 255, 255)),
-          (r, sf, tr))
+    check("a sideways video's copy plays upright (shown 360x640: the turn drawn into its pictures, the white block "
+          "top right as the video shows it)",
+          r.get("made") and (sf.get("w"), sf.get("h")) == (360, 640) and near(tr, (255, 255, 255)), (r, sf, tr))
     sqo = work / "previews" / "square" / "preview.mp4"
     r = video.preview_copy(square, sqo)
     qf = video.facts(sqo) if sqo.is_file() else {}
     check("a video bigger than 540 on its short side is copied at 540 (720x720 becomes 540x540)",
           r.get("made") and (qf.get("w"), qf.get("h")) == (540, 540), (r, qf))
+    # the copy's memory stays flat however long the video (v19 review, Nov 7: the old reader-to-writer loop held
+    # every frame and every second of sound until it ended: 44.5 MB for 2 s against 51.0 MB for 10 s at 60 a second)
+    peaks = {}
+    for secs in (2, 10):
+        mp = work / f"mem-{secs}-picture.mov"
+        js("picture", str(mp), "720", "404", str(secs), "60", cols, timeout=300)
+        mw = work / f"mem-{secs}.wav"
+        tone_wav(mw, secs=secs, loud_at=secs / 2)
+        ma = work / f"mem-{secs}.m4a"
+        subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", str(mw), str(ma)], capture_output=True, check=True)
+        mc = work / f"mem-{secs}.mov"
+        js("compose", str(mp), str(ma), str(mc), "0", "-", timeout=300)
+        mo = work / "previews" / f"mem-{secs}.mp4"
+        r = subprocess.run(["/usr/bin/time", "-l", "osascript", "-l", "JavaScript", "-e", video.VIDEO_JS, "copy", str(mc),
+                            str(mo), "540", video.COPY_PRESET], capture_output=True, encoding="utf-8", errors="replace")
+        m = [ln.split()[0] for ln in r.stderr.splitlines() if "maximum resident set size" in ln]
+        peaks[secs] = int(m[0]) / 1e6 if m and mo.is_file() else None
+    check("the copy's memory stays flat with length: a 10 s 60-a-second video with sound uses under 3 MB more than "
+          "a 2 s one (%s MB, %s MB)" % (peaks.get(2), peaks.get(10)),
+          peaks.get(2) and peaks.get(10) and peaks[10] - peaks[2] < 3.0, peaks)
     taken = work / "previews" / "taken" / "preview.mp4"
     taken.parent.mkdir(parents=True)
     taken.write_bytes(b"something of theirs")

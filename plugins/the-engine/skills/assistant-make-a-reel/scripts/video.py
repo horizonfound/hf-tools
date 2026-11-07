@@ -22,8 +22,9 @@ nothing, so:
     JavaScript for Automation script (VIDEO_JS), run by this_computer.mac_javascript. Stills are taken at the
     exact time asked (no nearest-keyframe guess) and each is labelled with the time AVFoundation really
     returned; they come out upright (a phone's turn applied), no longer than the long edge asked for, as JPEG.
-    The copy is hers in size and rate: 540 on its short side (never enlarged), H.264 at about 1.3 Mbit/s with
-    AAC sound at 96 kbit/s, decoded and encoded again by AVFoundation's reader and writer.
+    The copy is hers in size: 540 on its short side (never enlarged), H.264 8-bit 4:2:0 with AAC sound, made by
+    AVFoundation's own export session (its 960x540 preset's rate, not her 1.3 Mbit/s: an export session can't be
+    given a rate, and the reader-to-writer loop that could held every frame in memory: v19 review, Nov 7).
   * Loudness (loudness): her measure (footage.py's loudness, an RMS level in dB every half second of the sound
     at 8,000 a second), on the sound sound.decode hears (afconvert on a Mac, Media Foundation on a PC), or, on
     a Mac when that can't, AVFoundation's reader. Her loud_moments picks the stretches that jump out of the
@@ -33,9 +34,10 @@ nothing, so:
 On a PC (decision 11 of the v19 plan, and a named gap): the facts, plays_as_is, loudness and everything built on
 them work. Stills and the small copy are NOT built for a PC yet (Media Foundation's source reader and sink
 writer through ctypes, written and proven on GitHub's Windows machines first): there stills() and
-preview_copy() answer with state "pc" and this_computer.NO_PREVIEW ("I can't show a preview of this one on this
-PC. The moments and your reel still work."), and an HEVC video (an iPhone's High Efficiency) with "hevc_pc" and
-this_computer.HEVC_HELP. Nothing is asked for up front and nothing is installed (PC_ADDON stays None).
+preview_copy() answer with state "pc" and this_computer.NO_PREVIEW, and an HEVC video (an iPhone's High
+Efficiency) with "hevc_pc" and this_computer.HEVC_HELP. The reel page plays a video that plays as it is (H.264)
+on a PC with no strip of stills; anything else can't give a clip there. Nothing is asked for up front and nothing
+is installed (PC_ADDON stays None).
 ASSISTANT_NO_AVFOUNDATION=1 makes a Mac answer the way a PC does, to try that route.
 
 The rules it keeps (CLAUDE.md, and the plan's section 4):
@@ -46,11 +48,15 @@ The rules it keeps (CLAUDE.md, and the plan's section 4):
   * The copy is refused unless the drive keeps 5 GB free after it (SPACE_MARGIN, hers): state "lowspace".
   * Memory: JavaScript for Automation keeps every still it wrote until its program ends (measured Nov 7: about
     one still's pixels each, 160 MB for 400 stills at 360 px), so stills are taken in batches, each its own short
-    program held under STILL_BATCH_BYTES. The copy's frames are let go as it goes (40 MB for 300 frames).
+    program held under STILL_BATCH_BYTES. The copy is AVFoundation's export session, which does its own reading
+    and writing, so its memory stays flat however long the video (measured Nov 7: 38.9 MB for 2 s and 39.4 MB for
+    10 s at 60 a second, where the old loop grew from 44.5 to 51.0 MB; tests/video_check.py checks it).
+  * One video program at a time on this computer (turn(), a lock file in STUDIO_HOME held by the running program
+    itself), and every program stops by itself when the Python that started it is gone.
   * plays_as_is: H.264 with 8-bit 4:2:0 colour plays in the Claude app's browser pane as it is (her rule: h264
     with yuv420p); anything else is played from the small copy.
-  * The copy keeps its header at the end (the plan's b1; AVFoundation then writes it in one pass). The page
-    server answers range requests, so the player still finds it.
+  * The copy keeps its header at the end (the plan's b1). The page server answers range requests, so the player
+    still finds it. The phone's turn is drawn into the copy's pictures (it is stored upright, turn 0).
 
 What is proven (Nov 7, 2026, on Dustin's Mac, macOS 27.2, Apple's own Python 3.9), only on clips tests/video_check.py
 makes itself (6 s, 640 x 360 and 720 x 720, H.264, one stored sideways, one MP4 with an accent and a space in its
@@ -63,6 +69,7 @@ a fragmented file from a real camera, any of it on a real PC.
 Python 3.9, standard library only.
 """
 import array
+import contextlib
 import hashlib
 import json
 import math
@@ -71,6 +78,7 @@ import re
 import struct
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -83,9 +91,10 @@ import sound  # noqa: E402
 
 VIDEO_EXTS = (".mov", ".mp4", ".m4v")      # hers
 PREVIEW_SHORT = 540                        # hers: the copy is 540 on its short side (never enlarged)
-COPY_VIDEO_BITS = 1_300_000                # hers: 1300k
-COPY_AUDIO_BITS = 96_000                   # hers: AAC 96k
-COPY_RATE = COPY_VIDEO_BITS + COPY_AUDIO_BITS
+COPY_PRESET = "AVAssetExportPreset960x540"  # AVFoundation's own 540p rate (hers asked ffmpeg for 1300k + AAC 96k;
+                                           # an export session can't be given a rate: on the Tell Nicole list)
+COPY_RATE = 5_000_000                      # bits a second the copy is allowed for, to check the room first (more
+                                           # than the preset uses, so the check errs on the side of room)
 SPACE_MARGIN = 5e9                         # hers: always leave at least 5 GB free on the drive
 STILL_EDGE = 360                           # hers: stills 360 px (footage.py's scale=360)
 STILL_QUALITY = 0.82                       # hers: her sheets were saved at quality 82
@@ -97,6 +106,9 @@ NEAR_FULL = 0.9                            # ours: a last half second this full 
 MOOV_MOST = 256 * 1024 * 1024              # a movie header bigger than this is not a video anyone shot
 PC_ADDON = None                            # decision 11: no add-on is asked for on a PC (nothing is installed)
 NO_AV = "ASSISTANT_NO_AVFOUNDATION"        # tests: a Mac answers the way a PC does
+TURN_WAIT = 900                            # seconds a video program waits for its turn before saying it's busy
+BUSY = "another video is being got ready on this computer right now"
+_RUN = os.urandom(3).hex()                 # this process's own mark on its half-made copies (exec keeps the pid)
 
 CHROMA = {0: "4:0:0", 1: "4:2:0", 2: "4:2:2", 3: "4:4:4"}
 H264_PROFILES = {66: "Baseline", 77: "Main", 88: "Extended", 100: "High", 110: "High 10", 122: "High 4:2:2",
@@ -164,6 +176,26 @@ def _child(b, s, e, kind):
 
 _TOP_KINDS = {b"ftyp", b"moov", b"mdat", b"free", b"skip", b"wide", b"pnot", b"uuid", b"junk", b"meta", b"pdin",
               b"moof", b"mfra", b"styp", b"sidx", b"prfl", b"PICT"}
+
+
+def still_coming(path):
+    """True when the file looks like a video still being copied in: a box at its top level (the picture data, or
+    a header written at the end) runs past the end of the file. A whole video, and a file that isn't boxes at
+    all, say False (the facts then say what it is). Only a few bytes are read."""
+    try:
+        size = os.path.getsize(path)
+        f = open(path, "rb")
+    except OSError:
+        return False
+    with f:
+        first = True
+        for kind, s, e in _file_boxes(f, 0, size):
+            if first and kind not in _TOP_KINDS:
+                return False
+            first = False
+            if s is None:
+                return kind in _TOP_KINDS
+    return False
 
 
 def read_moov(path):
@@ -539,7 +571,7 @@ def fresh_folder(parent, name):
 
 VIDEO_JS = r"""
 ObjC.import('AVFoundation'); ObjC.import('CoreMedia'); ObjC.import('CoreGraphics'); ObjC.import('ImageIO');
-ObjC.import('Foundation');
+ObjC.import('Foundation'); ObjC.import('unistd');
 // The Assistant's video helper (video.py). Every command only READS the video, and never writes over a file.
 function C(n) { return $.NSClassFromString(n); }
 function spin(flag, ms) { var t0 = Date.now(); while (!flag() && Date.now() - t0 < ms) $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.02)); }
@@ -548,6 +580,10 @@ function track(a, kind) { var ts = a.tracksWithMediaType(kind); return Number(ts
 function there(p) { return $.NSFileManager.defaultManager.fileExistsAtPath($(p)); }
 function secs(t) { return $.CMTimeGetSeconds(t); }
 function why(e) { return e && e[0] && !e[0].isNil() ? e[0].localizedDescription.js : ''; }
+// The program that started this one (video.py's Python). When it is gone (a page server stopped or crashed), this
+// one stops too: nobody is left to take its answer, and it would hold the video lock (v19 review, Nov 7).
+var PARENT = 0;
+function orphaned() { return PARENT > 1 && Number($.getppid()) !== PARENT; }
 
 // stills <video> <folder> <long edge> <quality> <first number> <t1,t2,...>: JPEGs NNNNNN.jpg, exact times
 function stills(p, dir, edge, q, first, spec) {
@@ -559,6 +595,7 @@ function stills(p, dir, edge, q, first, spec) {
   g.requestedTimeToleranceBefore = $.kCMTimeZero; g.requestedTimeToleranceAfter = $.kCMTimeZero;
   var times = spec.split(',').map(parseFloat), got = [];
   for (var i = 0; i < times.length; i++) {
+    if (orphaned()) return {error: 'stopped: the program that asked for it is gone', stills: got};
     var f = dir + '/' + ('00000' + (first + i)).slice(-6) + '.jpg';
     if (there(f)) { got.push({asked: times[i], error: 'already there'}); continue; }
     var act = Ref(), err = Ref();
@@ -573,62 +610,45 @@ function stills(p, dir, edge, q, first, spec) {
   return {stills: got};
 }
 
-// copy <video> <out> <short side> <video bits> <audio bits>: H.264 + AAC, upright when played, never enlarged
-function copy(p, out, shortSide, vbits, abits) {
+// copy <video> <out> <short side> <preset>: H.264 + AAC, upright, never enlarged. AVFoundation's own export
+// session decodes and encodes by itself (the reader-to-writer loop it replaced held every frame and every second of
+// sound in this program's memory until it ended: v19 review, Nov 7). The picture is drawn through a video
+// composition at exactly the size wanted, the phone's turn applied, so every copy is made fresh as H.264 8-bit
+// 4:2:0 (a composition never passes the original's pictures through as they were).
+function copy(p, out, shortSide, preset) {
   if (there(out)) return {error: 'already there'};
-  var a = asset(p), v = track(a, 'vide'), s = track(a, 'soun'), t0 = Date.now(), err = Ref();
+  var a = asset(p), v = track(a, 'vide'), t0 = Date.now();
   if (!v) return {error: 'no picture in it'};
-  var n = v.naturalSize, k = Math.min(1, shortSide / Math.min(n.width, n.height));
-  var W = Math.max(2, Math.round(n.width * k / 2) * 2), H = Math.max(2, Math.round(n.height * k / 2) * 2);
-  var r = C('AVAssetReader').assetReaderWithAssetError(a, err);
-  if (!r || r.isNil()) return {error: 'could not read it: ' + why(err)};
-  var vo = C('AVAssetReaderTrackOutput').assetReaderTrackOutputWithTrackOutputSettings(v, $.NSDictionary.dictionaryWithDictionary({PixelFormatType: 0x34323076}));
-  vo.alwaysCopiesSampleData = false; r.addOutput(vo);
-  var ao = null;
-  if (s) {
-    ao = C('AVAssetReaderTrackOutput').assetReaderTrackOutputWithTrackOutputSettings(s, $.NSDictionary.dictionaryWithDictionary({
-      AVFormatIDKey: 0x6C70636D, AVSampleRateKey: 44100, AVNumberOfChannelsKey: 2, AVLinearPCMBitDepthKey: 16,
-      AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false}));
-    ao.alwaysCopiesSampleData = false; r.addOutput(ao);
-  }
-  var w = C('AVAssetWriter').assetWriterWithURLFileTypeError($.NSURL.fileURLWithPath(out), 'public.mpeg-4', err);
-  if (!w || w.isNil()) return {error: 'could not write the copy: ' + why(err)};
-  w.shouldOptimizeForNetworkUse = false;               // the header at the end; the page server answers ranges
+  var n = v.naturalSize, T = v.preferredTransform;
+  var box = $.CGRectApplyAffineTransform($.CGRectMake(0, 0, n.width, n.height), T);
+  var sw = Math.abs(box.size.width), sh = Math.abs(box.size.height);
+  if (!(sw > 0 && sh > 0)) return {error: 'no picture size'};
+  var k = Math.min(1, shortSide / Math.min(sw, sh));
+  var W = Math.max(2, Math.round(sw * k / 2) * 2), H = Math.max(2, Math.round(sh * k / 2) * 2);
+  var M = $.CGAffineTransformConcat($.CGAffineTransformConcat(T, $.CGAffineTransformMakeTranslation(-box.origin.x, -box.origin.y)),
+                                    $.CGAffineTransformMakeScale(W / sw, H / sh));
+  var li = C('AVMutableVideoCompositionLayerInstruction').videoCompositionLayerInstructionWithAssetTrack(v);
+  li.setTransformAtTime(M, $.kCMTimeZero);
+  var ins = C('AVMutableVideoCompositionInstruction').videoCompositionInstruction;
+  ins.timeRange = $.CMTimeRangeMake($.kCMTimeZero, a.duration);
+  ins.layerInstructions = $.NSArray.arrayWithObject(li);
+  var comp = C('AVMutableVideoComposition').videoComposition;
+  comp.renderSize = $.CGSizeMake(W, H);
   var fps = Number(v.nominalFrameRate) || 30;
-  var vi = C('AVAssetWriterInput').assetWriterInputWithMediaTypeOutputSettings('vide', $.NSDictionary.dictionaryWithDictionary({
-    AVVideoCodecKey: 'avc1', AVVideoWidthKey: W, AVVideoHeightKey: H, AVVideoScalingModeKey: 'AVVideoScalingModeResizeAspectFill',
-    AVVideoCompressionPropertiesKey: {AverageBitRate: vbits, ProfileLevel: 'H264_High_AutoLevel', ExpectedFrameRate: fps,
-                                      MaxKeyFrameIntervalDuration: 2}}));
-  vi.transform = v.preferredTransform; vi.expectsMediaDataInRealTime = false; w.addInput(vi);
-  var ai = null;
-  if (s) {
-    ai = C('AVAssetWriterInput').assetWriterInputWithMediaTypeOutputSettings('soun', $.NSDictionary.dictionaryWithDictionary({
-      AVFormatIDKey: 0x61616320, AVSampleRateKey: 44100, AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: abits}));
-    ai.expectsMediaDataInRealTime = false; w.addInput(ai);
+  comp.frameDuration = $.CMTimeMake(100, Math.max(100, Math.round(fps * 100)));
+  comp.instructions = $.NSArray.arrayWithObject(ins);
+  var ex = C('AVAssetExportSession').alloc.initWithAssetPresetName(a, preset);
+  if (!ex || ex.isNil()) return {error: 'this Mac has no ' + preset};
+  ex.outputURL = $.NSURL.fileURLWithPath(out); ex.outputFileType = 'public.mpeg-4';
+  ex.videoComposition = comp;
+  ex.shouldOptimizeForNetworkUse = false;               // the header at the end; the page server answers ranges
+  var done = false; ex.exportAsynchronouslyWithCompletionHandler(function () { done = true; });
+  while (!done) {
+    if (orphaned()) { ex.cancelExport; spin(function () { return done; }, 10000); return {error: 'stopped: the program that asked for it is gone'}; }
+    $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.05));
   }
-  if (!r.startReading) return {error: 'could not read it: ' + (r.error.isNil() ? '' : r.error.localizedDescription.js)};
-  if (!w.startWriting) return {error: 'could not write the copy: ' + (w.error.isNil() ? '' : w.error.localizedDescription.js)};
-  w.startSessionAtSourceTime($.kCMTimeZero);
-  var pairs = [[vo, vi]]; if (s) pairs.push([ao, ai]);
-  var open = pairs.map(function () { return true; }), frames = 0;
-  while (open.some(function (x) { return x; })) {
-    var moved = false;
-    for (var i = 0; i < pairs.length; i++) {
-      if (!open[i]) continue;
-      while (pairs[i][1].readyForMoreMediaData) {
-        var sb = pairs[i][0].copyNextSampleBuffer;
-        if (Number(r.status) !== 1 || !$.CMSampleBufferIsValid(sb)) { pairs[i][1].markAsFinished; open[i] = false; break; }
-        if (!pairs[i][1].appendSampleBuffer(sb)) { r.cancelReading; w.cancelWriting; return {error: 'the copy stopped part way: ' + (w.error.isNil() ? '' : w.error.localizedDescription.js)}; }
-        if (i === 0) frames++;
-        moved = true;
-      }
-    }
-    if (!moved) $.NSThread.sleepForTimeInterval(0.002);
-  }
-  if (Number(r.status) !== 2) { w.cancelWriting; return {error: 'the video could not be read to the end' + (r.error.isNil() ? '' : ': ' + r.error.localizedDescription.js)}; }
-  var done = false; w.finishWritingWithCompletionHandler(function () { done = true; }); spin(function () { return done; }, 600000);
-  if (Number(w.status) !== 2) return {error: 'the copy could not be finished' + (w.error.isNil() ? '' : ': ' + w.error.localizedDescription.js)};
-  return {w: W, h: H, frames: frames, took: (Date.now() - t0) / 1000};
+  if (Number(ex.status) !== 3) return {error: 'the copy could not be made' + (ex.error.isNil() ? '' : ': ' + ex.error.localizedDescription.js)};
+  return {w: W, h: H, took: (Date.now() - t0) / 1000};
 }
 
 // pcm <video> <out> <rate>: the sound as plain 16-bit samples, one channel, little-endian (for loudness)
@@ -643,6 +663,7 @@ function pcm(p, out, rate) {
   r.addOutput(o); r.startReading;
   var all = $.NSMutableData.data;
   while (true) {
+    if (orphaned()) { r.cancelReading; return {error: 'stopped: the program that asked for it is gone'}; }
     var sb = o.copyNextSampleBuffer;
     if (Number(r.status) !== 1 || !$.CMSampleBufferIsValid(sb)) break;
     var bb = $.CMSampleBufferGetDataBuffer(sb), len = $.CMBlockBufferGetDataLength(bb);
@@ -658,8 +679,9 @@ function pcm(p, out, rate) {
 function run(argv) {
   try {
     var c = argv[0], r;
+    PARENT = Number($.getppid());
     if (c === 'stills') r = stills(argv[1], argv[2], parseInt(argv[3]), parseFloat(argv[4]), parseInt(argv[5]), argv[6]);
-    else if (c === 'copy') r = copy(argv[1], argv[2], parseInt(argv[3]), parseInt(argv[4]), parseInt(argv[5]));
+    else if (c === 'copy') r = copy(argv[1], argv[2], parseInt(argv[3]), argv[4]);
     else if (c === 'pcm') r = pcm(argv[1], argv[2], parseInt(argv[3]));
     else r = {error: 'no such command'};
     return JSON.stringify(r);
@@ -673,10 +695,82 @@ def avfoundation_here():
     return this_computer.MAC and not os.environ.get(NO_AV)
 
 
-def _av(args, timeout):
-    """Run one VIDEO_JS command. Its answer as a dict (always one; {"error": ...} when it failed)."""
+# ---- one video program at a time on this computer (v19 review, Nov 7)
+# Two page servers, a server and itself after a restart, the footage look, and every Use this moment each started
+# their own AVFoundation program, and two copies of one video were made at once. Now every AVFoundation run takes
+# its turn under one lock file for the whole computer (<STUDIO_HOME>/video.lock), and the running program is handed
+# the lock itself (this_computer.mac_javascript's pass_fds): the lock is held for as long as that program lives,
+# even when the Python that started it is gone, so nothing can start a second one beside it. The program also
+# stops by itself when its Python is gone (VIDEO_JS's orphaned()).
+
+_HELD = threading.local()
+
+
+def lock_path():
+    return Path(os.environ.get("STUDIO_HOME") or (Path.home() / ".studio")) / "video.lock"
+
+
+@contextlib.contextmanager
+def turn(wait=TURN_WAIT, waiting=None):
+    """Wait (up to `wait` seconds) for this computer's one video turn and hold it inside the with-block: yields
+    True when held (or when this computer has no such locks: carry on, as before), False when the turn didn't come
+    in time. Inside a turn this thread may run any number of video programs; another thread or program waits.
+    waiting(): called once if it has to wait (to say so)."""
+    if getattr(_HELD, "depth", 0):
+        _HELD.depth += 1
+        try:
+            yield True
+        finally:
+            _HELD.depth -= 1
+        return
+    f = None
     try:
-        got = this_computer.mac_javascript(VIDEO_JS, args, timeout=timeout)
+        p = lock_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        f = open(p, "a", encoding="utf-8")
+    except OSError:
+        f = None
+    got = this_computer.try_lock(f) if f is not None else None
+    if got is False:
+        if waiting:
+            waiting()
+        end = time.time() + max(0.0, float(wait))
+        while got is False and time.time() < end:
+            time.sleep(0.2)
+            got = this_computer.try_lock(f)
+    if got is False:
+        f.close()
+        yield False
+        return
+    _HELD.depth, _HELD.f, _HELD.real = 1, (f if got else None), bool(got)
+    try:
+        yield True
+    finally:
+        _HELD.depth, _HELD.f, _HELD.real = 0, None, False
+        if f is not None:
+            if got:
+                this_computer.unlock(f)
+            f.close()
+
+
+def holding_turn():
+    """True inside a turn that holds the real lock (not one carried on without)."""
+    return bool(getattr(_HELD, "depth", 0) and getattr(_HELD, "real", False))
+
+
+def _av(args, timeout, wait=TURN_WAIT):
+    """Run one VIDEO_JS command, in its turn. Its answer as a dict (always one; {"error": ...} when it failed,
+    {"error": BUSY, "busy": True} when its turn didn't come within `wait` seconds)."""
+    with turn(wait) as ok:
+        if not ok:
+            return {"error": BUSY, "busy": True}
+        fds = (_HELD.f.fileno(),) if getattr(_HELD, "f", None) is not None else ()
+        return _av_now(args, timeout, fds)
+
+
+def _av_now(args, timeout, fds):
+    try:
+        got = this_computer.mac_javascript(VIDEO_JS, args, timeout=timeout, pass_fds=fds)
     except subprocess.TimeoutExpired:
         return {"error": "it took too long"}
     except (OSError, subprocess.SubprocessError) as e:
@@ -707,13 +801,15 @@ def _batch_size(f, edge):
     return max(1, min(STILL_BATCH_MOST, int(STILL_BATCH_BYTES // one)))
 
 
-def stills(path, times, into, name="look", edge=STILL_EDGE, quality=STILL_QUALITY, f=None, deadline=None):
+def stills(path, times, into, name="look", edge=STILL_EDGE, quality=STILL_QUALITY, f=None, deadline=None,
+           wait=TURN_WAIT):
     """Stills of the video at the given times (seconds), in a NEW folder made inside `into` (fresh_folder(into,
     name)). Exact times; each still is labelled with the time it really is ("at") beside the time asked; upright;
     no longer than `edge` on its long side; JPEG. Answer:
       {"ok": True, "folder": <the new folder>, "stills": [{"asked", "at", "w", "h", "file"}, or {"asked", "error"}],
-       "took"} or {"ok": False, "state": "pc" | "hevc_pc" | "failed", "words": plain words}.
-    The video is only read. A time past the end is taken at the last picture."""
+       "took"} or {"ok": False, "state": "pc" | "hevc_pc" | "failed" | "busy", "words": plain words}.
+    The video is only read. A time past the end is taken at the last picture. Every batch waits its turn (turn())
+    for up to `wait` seconds; "busy" when not one did, and then no folder is made."""
     t0 = time.time()
     try:
         f = f or facts(path)
@@ -730,6 +826,13 @@ def stills(path, times, into, name="look", edge=STILL_EDGE, quality=STILL_QUALIT
             continue
         if math.isfinite(t):
             want.append(round(min(max(0.0, t), last), 4))
+    with turn(wait) as ok:
+        if not ok:
+            return {"ok": False, "state": "busy", "words": BUSY}
+        return _stills_now(path, want, into, name, edge, quality, f, deadline, t0)
+
+
+def _stills_now(path, want, into, name, edge, quality, f, deadline, t0):
     folder = fresh_folder(into, name)
     got = []
     per = _batch_size(f, int(edge))
@@ -754,8 +857,21 @@ def stills(path, times, into, name="look", edge=STILL_EDGE, quality=STILL_QUALIT
 
 
 def copy_name(out):
+    """The hidden name a copy is made under: this process's number and its own mark (a server that starts over
+    keeps its number, never its mark), so no run ever takes another's half-copy for its own."""
     out = Path(out)
-    return out.with_name(f".{out.stem}.part-{os.getpid()}{out.suffix}")
+    return out.with_name(f".{out.stem}.part-{os.getpid()}-{_RUN}{out.suffix}")
+
+
+def _left_parts(out):
+    """Half-copies beside `out` left by runs that were stopped (ours by their hidden name only)."""
+    out = Path(out)
+    pre, suf = f".{out.stem}.part-", out.suffix
+    try:
+        names = os.listdir(out.parent)
+    except OSError:
+        return []
+    return [out.parent / n for n in names if n.startswith(pre) and n.endswith(suf)]
 
 
 def space_ok(folder, need):
@@ -764,13 +880,15 @@ def space_ok(folder, need):
     return free is not None and free > need + SPACE_MARGIN
 
 
-def preview_copy(path, out, short=PREVIEW_SHORT, f=None, timeout=None):
+def preview_copy(path, out, short=PREVIEW_SHORT, f=None, timeout=None, wait=TURN_WAIT):
     """The small copy to play on the page (hers: _make_preview), made once at `out` (an .mp4): 540 on its short
     side or smaller (never enlarged), H.264 about 1.3 Mbit/s, AAC 96 kbit/s, upright when played.
     Answer: {"ok": True, "made": True|False (False: it was already there, used as it is), "w", "h"} or
     {"ok": False, "state": "lowspace" | "failed" | "pc" | "hevc_pc", "words": plain words}.
     Refused unless the drive keeps 5 GB free after it. Written under a hidden ".<name>.part-<number>.mp4" first
-    and only then given its real name, never over a file that is there; the video is only read."""
+    and only then given its real name, never over a file that is there; the video is only read. Made in its turn
+    (turn()): a half-copy found beside it then can only be from a run that was stopped (every run that makes one
+    holds the turn while it does), so it is taken away first; it is ours by its hidden name."""
     out = Path(out)
     if out.exists():
         return {"ok": True, "made": False}
@@ -780,16 +898,27 @@ def preview_copy(path, out, short=PREVIEW_SHORT, f=None, timeout=None):
         return {"ok": False, "state": "failed", "words": str(e)}
     if not avfoundation_here():
         return _pc_gap(f)
+    with turn(wait) as ok:
+        if not ok:
+            return {"ok": False, "state": "busy", "words": BUSY}
+        return _copy_now(path, out, short, f, timeout)
+
+
+def _copy_now(path, out, short, f, timeout):
+    if out.exists():
+        return {"ok": True, "made": False}
     out.parent.mkdir(parents=True, exist_ok=True)
+    if holding_turn():
+        for p in _left_parts(out):
+            _remove_ours(p)                # a stopped run's half-copy: nobody else can be writing it now
     if not space_ok(out.parent, f["length"] * COPY_RATE / 8 * 1.2):
         return {"ok": False, "state": "lowspace",
                 "words": "Your photo drive is nearly full, so I didn't make a preview of this one. The moments and "
                          "your reel still work; you just can't watch it here."}
     part = copy_name(out)
-    _remove_ours(part)                     # a half-copy an earlier run by this same number left (ours only)
     if timeout is None:
         timeout = max(120.0, f["length"] * 3)
-    r = _av(["copy", str(path), str(part), str(int(short)), str(COPY_VIDEO_BITS), str(COPY_AUDIO_BITS)], timeout)
+    r = _av(["copy", str(path), str(part), str(int(short)), COPY_PRESET], timeout)
     if "error" in r or not part.is_file() or part.stat().st_size < 1000:
         _remove_ours(part)
         return {"ok": False, "state": "failed", "detail": r.get("error", ""),
@@ -843,7 +972,7 @@ def loudness(path, step=LOUD_STEP, f=None):
         return None, str(e)
     if not f.get("has_audio"):
         return [], "no sound"
-    a, how = sound.decode(path, rate=LOUD_RATE)
+    a, how = sound.decode(path, rate=LOUD_RATE, video=True)
     if a is None and avfoundation_here():
         a, how2 = _pcm_mac(path)
         how = how2 if a is not None else how

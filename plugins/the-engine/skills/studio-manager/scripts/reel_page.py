@@ -149,6 +149,11 @@ FOOT_WORK = "footage"                  # ours: <kit>/.kit/footage holds the stil
 FOOT_EVERY_MS = 4000                   # hers: the page looks at the Footage folder every 4 seconds
 STRIP_EVERY = 2.0                      # hers: a still every 2 seconds under the player
 USE_SECONDS = 4.0                      # hers: Use this moment adds a 4-second moment
+PREVIEW_WAIT = 3600                    # ours: seconds the preview worker waits for this computer's one video turn
+MOMENT_WAIT = 2                        # ours: a Use this moment press waits this long for it, then leaves the
+                                       # card's still to the preview worker (the press never waits on a long copy)
+COMING_RECENT = 120                    # ours: a video cut off at its end and changed this recently is still being
+                                       # copied into Footage: left alone until it is whole (v19 review, Nov 7)
 MOMENT_STEP = 0.5                      # hers: − and + change the end by half a second
 MOMENT_MIN, MOMENT_MAX = 1.0, 15.0     # hers: a moment's length is kept 1 to 15 seconds and inside its video
 ADD_MIN, ADD_MAX = 1.0, 8.0            # hers: Use this moment's length, 1 to 8 seconds
@@ -436,7 +441,13 @@ OUR_WORDS = {
     # decision 26: her trim tip names QuickTime Player, which a PC hasn't got (a draft, for Nicole)
     "trim_pc": "On a PC, open it in the Photos app and choose Trim.",
     # (a PC can't show stills or play a video that needs the small copy yet, video.py's named gap, decision 11:
-    # this_computer.NO_PREVIEW and HEVC_HELP come with the video from the server, in place of her "Getting ready")
+    # this_computer.NO_PREVIEW and HEVC_HELP come with the video from the server, in place of her "Getting ready";
+    # a video that plays as it is plays there, with no strip of stills. The PC's own lines for step 1 are
+    # this_computer's NO_LOOK_PC, WATCH_PC_HTML, NOT_LOOKED_PC_HTML and MOMENTS_PC: decision 26, drafts for Nicole)
+    # v19 review: a video still being copied into the Footage folder is listed, and waited for, until it is whole
+    # (hers read it part way and said it couldn't make a preview)
+    "coming_small": "still copying in",
+    "coming": "{name} is still being copied into your Footage folder. It shows up here when it's done.",
 }
 
 def _behind():
@@ -980,6 +991,8 @@ def _facts(kit, p, key):
             got = {"refused": str(e)}
         except OSError:
             return {"refused": WORDS["video_not_here"]}
+        if got.get("refused") and _just_changed(p):
+            return got                     # maybe still coming in: asked again on the next look, never kept
         try:
             with arrange.locked(foot_work(kit) / "facts.lock"):
                 kept = _read(f) or {}
@@ -992,13 +1005,25 @@ def _facts(kit, p, key):
     return got
 
 
-def list_videos(kit):
+def _just_changed(p):
+    try:
+        return time.time() - Path(p).stat().st_mtime < COMING_RECENT
+    except OSError:
+        return False
+
+
+def list_videos(kit, coming=None):
     """The videos in <kit>/Footage, in name order (hers): [{key, name, path, size, facts}]. Hidden files, links
-    and anything not a .mov, .mp4 or .m4v are left out. The path never leaves this computer's own side."""
+    and anything not a .mov, .mp4 or .m4v are left out. The path never leaves this computer's own side.
+    A video still being copied in (its boxes run past the end of the file, and it changed in the last
+    COMING_RECENT seconds) is left out too, its facts never read and nothing made for it: it goes in `coming`
+    (a list, when given) as {name, size}, and comes in whole on a later look (v19 review, Nov 7: a copy in
+    progress left a record for every size it passed through)."""
     d = footage_dir(kit)
     if not footage_ok(kit) or not d.is_dir():
         return []
     out = []
+    vm = _video()
     for f in sorted(_listing(d)):
         if f.startswith(".") or not f.lower().endswith(VIDEO_EXTS):
             continue
@@ -1007,10 +1032,19 @@ def list_videos(kit):
             if p.is_symlink() or not p.is_file():
                 continue
             size = p.stat().st_size
-            key = _video().key(p)
+            if vm.still_coming(p) and _just_changed(p):
+                if coming is not None:
+                    coming.append({"name": f, "size": size})
+                continue
+            key = vm.key(p)
         except OSError:
             continue
-        out.append({"key": key, "name": f, "path": p, "size": size, "facts": _facts(kit, p, key)})
+        fx = _facts(kit, p, key)
+        if fx.get("refused") and _just_changed(p):
+            if coming is not None:            # its header isn't in yet (a phone writes it last): still coming in
+                coming.append({"name": f, "size": size})
+            continue
+        out.append({"key": key, "name": f, "path": p, "size": size, "facts": fx})
     return out
 
 
@@ -1051,6 +1085,8 @@ def _prev_ready(kit, key, rec, f):
     """Is the preview as preview.json says, on disk: the strip's stills there, and the copy when one is needed?"""
     if rec.get("state") != "ready":
         return False
+    if rec.get("no_strip"):            # a PC: it plays as it is, with no strip of stills (video.py's named gap)
+        return not _video().avfoundation_here() and bool((f or {}).get("plays_as_is"))
     strip = _prev_dir(kit, key) / str(rec.get("strip") or "")
     if not rec.get("strip") or not strip.is_dir() or not rec.get("stills"):
         return False
@@ -1061,7 +1097,19 @@ def _prev_ready(kit, key, rec, f):
 
 def _make_preview(kit, v):
     """Hers (_make_preview): reads the video and writes a strip of stills, and, only for a video that doesn't play
-    as it is, the small copy; never touches the video. The state goes in preview.json as it goes."""
+    as it is, the small copy; never touches the video. The state goes in preview.json as it goes. All of it in
+    this computer's one video turn (video.turn), so no other page server, no footage look and no Use this moment
+    can make the same thing beside it (v19 review, Nov 7); the record is read again once the turn is held."""
+    vm = _video()
+    with vm.turn(PREVIEW_WAIT) as ok:
+        if not ok:                     # its turn didn't come: asked for again on the next look
+            with _PREV_LOCK:
+                _PREV_TRIED.discard((str(kit), v["key"]))
+            return
+        _make_preview_now(kit, v)
+
+
+def _make_preview_now(kit, v):
     vm = _video()
     key, f = v["key"], v["facts"]
     d = _prev_dir(kit, key)
@@ -1069,6 +1117,14 @@ def _make_preview(kit, v):
     if f.get("refused"):
         _prev_write(kit, key, {"state": "failed", "words": WORDS["vid_failed"]})
         return
+    if _prev_ready(kit, key, rec, f):
+        return                         # made meanwhile, by another server in its turn
+    if not vm.avfoundation_here() and f.get("plays_as_is"):
+        # a PC: no stills yet (video.py's named gap, decision 11), but the page plays the original as it is, so it
+        # is ready with no strip under the player, and Use this moment works on it (v19 review, Nov 7)
+        _prev_write(kit, key, {"state": "ready", "strip": "", "stills": [], "no_strip": True, "t": time.time()})
+        return
+    rec.pop("no_strip", None)
     rec.update(state="making", t=time.time())
     _prev_write(kit, key, rec)
     if not (rec.get("strip") and (d / rec["strip"]).is_dir() and rec.get("stills")):
@@ -1097,9 +1153,27 @@ def _make_preview(kit, v):
     _prev_write(kit, key, rec)
 
 
+def _queue(job):
+    """Hand a job to this server's one preview worker (started the first time)."""
+    global _PREV_Q
+    with _PREV_LOCK:
+        if _PREV_Q is None:
+            import queue
+            _PREV_Q = queue.Queue()
+            threading.Thread(target=_preview_worker, name="reel previews", daemon=True).start()
+        _PREV_Q.put(job)
+
+
 def _preview_worker():
     while True:
-        kit, v = _PREV_Q.get()
+        job = _PREV_Q.get()
+        if job[0] == "still":              # a moment's card still, left here by a press that couldn't wait
+            try:
+                _moment_still(*job[1:], wait=PREVIEW_WAIT)
+            except Exception as e:  # noqa: BLE001
+                arrange.log(f"reel page: a moment's still couldn't be made: {e.__class__.__name__}: {str(e)[:200]}")
+            continue
+        kit, v = job[1], job[2]
         try:
             _make_preview(kit, v)
         except Exception as e:  # noqa: BLE001  (a preview is a nice-to-have; the reel never depends on it, hers)
@@ -1113,7 +1187,6 @@ def _preview_worker():
 def preview_state(kit, v):
     """(state, words) of a video's preview. A preview not made yet (or left part way by a server that stopped)
     is handed to this server's one worker, once."""
-    global _PREV_Q
     key = v["key"]
     rec = _prev_rec(kit, key)
     if _prev_ready(kit, key, rec, v["facts"]):
@@ -1126,11 +1199,7 @@ def preview_state(kit, v):
                 return st, rec.get("words")
             return ("making" if st == "making" else "waiting"), None
         _PREV_TRIED.add(tag)
-        if _PREV_Q is None:
-            import queue
-            _PREV_Q = queue.Queue()
-            threading.Thread(target=_preview_worker, name="reel previews", daemon=True).start()
-        _PREV_Q.put((kit, v))
+    _queue(("preview", kit, v))
     return "waiting", None
 
 
@@ -1139,15 +1208,23 @@ def strip_for_page(kit, key):
     return [{"n": s["n"], "t": s["t"]} for s in rec.get("stills") or [] if isinstance(s, dict) and "n" in s and "t" in s]
 
 
-def videos_for_page(kit, vids=None):
-    """Hers (footage_list): each video as the page draws it. No path."""
+def videos_for_page(kit, vids=None, coming=None):
+    """Hers (footage_list): each video as the page draws it. No path. Ours: a video still being copied in is
+    listed by its name with preview "coming" and nothing else (no key, nothing made for it yet)."""
     out = []
-    for v in (vids if vids is not None else list_videos(kit)):
+    if vids is None:
+        coming = []
+        vids = list_videos(kit, coming)
+    for c in coming or []:
+        out.append({"key": "", "name": c["name"], "length": 0, "w": 0, "h": 0, "mb": int(round(c["size"] / 1e6)),
+                    "preview": "coming", "words": OUR_WORDS["coming"].replace("{name}", c["name"]), "strip": []})
+    for v in vids:
         f = v["facts"]
         st, words = preview_state(kit, v)
         out.append({"key": v["key"], "name": v["name"], "length": round(float(f.get("length") or 0), 1),
                     "w": int(f.get("w") or 0), "h": int(f.get("h") or 0), "mb": int(round(v["size"] / 1e6)),
                     "preview": st, "words": words, "strip": strip_for_page(kit, v["key"]) if st == "ready" else []})
+    out.sort(key=lambda x: x["name"])
     return out
 
 
@@ -1202,14 +1279,22 @@ def mmss(t):
     return "%d:%04.1f" % (m, s) if round(s, 6) % 1 else "%d:%02d" % (m, round(s))
 
 
-def _moment_still(kit, mid, v, at):
+def _moment_still(kit, mid, v, at, wait=MOMENT_WAIT):
     """The still on a moment's card (hers: one frame from its middle, 360 px), in a folder of its own. A PC has
-    none yet (the card shows the strip's still nearest it, or none)."""
+    none yet (the card shows the strip's still nearest it, or none). It waits up to `wait` seconds for this
+    computer's one video turn; when that isn't long enough (a long copy is being made), the still is left to the
+    preview worker, which makes it in its turn, and the card shows the strip's nearest still meanwhile."""
     try:
         vm = _video()
         if not vm.avfoundation_here():
             return
-        vm.stills(v["path"], [at], foot_work(kit) / "moments", name=mid, f=v["facts"], deadline=time.time() + 30)
+        d = foot_work(kit) / "moments" / mid
+        if d.is_dir() and any(x.lower().endswith(".jpg") for x in _listing(d)):
+            return                         # made already
+        r = vm.stills(v["path"], [at], foot_work(kit) / "moments", name=mid, f=v["facts"],
+                      deadline=time.time() + 30 + wait, wait=wait)
+        if r.get("state") == "busy" and wait < PREVIEW_WAIT:
+            _queue(("still", kit, mid, v, at))
     except Exception as e:  # noqa: BLE001  (a card without its still still works)
         arrange.log(f"reel page: a moment's still couldn't be made: {e.__class__.__name__}: {str(e)[:200]}")
 
@@ -1351,11 +1436,12 @@ def open_footage(kit):
 def footage_for_page(kit):
     """GET /reel-footage: hers (/footage with /reel's moments): the videos, the moments and Claude's footage order.
     Asking starts any preview not made yet, one at a time."""
-    vids = list_videos(kit)
+    coming = []
+    vids = list_videos(kit, coming)
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
     on_sheet = {x["n"] for x in rows}
-    return {"ok": True, "folder": footage_dir(kit).is_dir() and footage_ok(kit), "videos": videos_for_page(kit, vids),
+    return {"ok": True, "folder": footage_dir(kit).is_dir() and footage_ok(kit), "videos": videos_for_page(kit, vids, coming),
             "moments": moments_for_page(kit, rec, on_sheet, vids), "claude_bts": _bts_of(rec, on_sheet)}
 
 
@@ -2553,11 +2639,22 @@ body.arr-dragging,body.arr-dragging *{cursor:grabbing!important;user-select:none
 
 # Her steps, in her order (BUILD.md section 5: "This order is final"). Each is (her section's id, the
 # function that writes it, or None while that step is not built yet). A step left out is simply not on the page.
+def pc_footage():
+    """True where the footage look and the stills can't run (a PC: video.py's named gap)."""
+    try:
+        return not _video().avfoundation_here()
+    except Exception:  # noqa: BLE001
+        return this_computer.WINDOWS
+
+
 def _footage_section(w, num):
     """Her step 1, "Behind-the-scenes footage?" (reel-maker.html #step0), with everything under it: Add my
     footage, the videos, Good to know, the line to copy, Want to direct the reel?, How should it feel?, the moment
-    cards, and the player with its strip."""
+    cards, and the player with its strip. On a PC (pc_footage()), where Claude can't look through footage and
+    there are no stills: Good to know (about how long the look takes) and the line to copy are left out, with
+    this_computer.NO_LOOK_PC in place of the line (decision 26; v19 review, Nov 7). A Mac: exactly hers."""
     e = html.escape
+    pc = pc_footage()
     feels = "".join("<button type='button' data-f='" + f + "'>" + e(w["feel_" + f]) + "</button>" for f in FEELS)
     return (
         "<section class='step' id='step0'>"
@@ -2572,10 +2669,10 @@ def _footage_section(w, num):
         "<button class='btn main' id='addFootage' type='button'>" + e(w["add_footage"]) + "</button>"
         "<p class='waiting' id='footWaiting'></p>"
         "<div class='vlist' id='vlist'></div>"
-        "<div class='insight'><b>" + e(w["insight_b"]) + "</b><p id='insightWords'>" + e(w["insight_words"]) + "</p>"
+        "<div class='insight'" + (" hidden" if pc else "") + "><b>" + e(w["insight_b"]) + "</b><p id='insightWords'>" + e(w["insight_words"]) + "</p>"
         "<p>" + w["quick_fix_html"] + "</p></div>"
-        "<div class='paste' id='pasteBox'><p>" + e(w["paste_say"]) + "</p>"
-        "<div class='line'><span id='pasteWords'>" + e(w["paste_plain"]) + "</span>"
+        "<div class='paste' id='pasteBox'><p id='pasteSay'>" + e(this_computer.NO_LOOK_PC if pc else w["paste_say"]) + "</p>"
+        "<div class='line'" + (" hidden" if pc else "") + "><span id='pasteWords'>" + e(w["paste_plain"]) + "</span>"
         "<button class='btn' id='copyLine' type='button'>" + e(w["copy"]) + "</button></div>"
         "<div class='ask'><label for='askIn'>" + w["ask_label_html"]
         + "<span class='ex'>" + e(w["ask_ex1"]) + "</span><span class='ex'>" + e(w["ask_ex2"]) + "</span></label>"
@@ -2589,7 +2686,7 @@ def _footage_section(w, num):
         "<div class='moments' id='moments'></div>"
         "<div id='undoNote'></div>"
         "<h3 class='mh'>" + e(w["watch_h3"]) + "</h3>"
-        "<p class='say'>" + w["watch_say_html"] + "</p>"
+        "<p class='say'>" + (this_computer.WATCH_PC_HTML if pc else w["watch_say_html"]) + "</p>"
         "<div id='viewers'></div>"
         "</div></section>")
 
@@ -2680,6 +2777,10 @@ def page_html(kit_name, short, kit_page=False):
     if this_computer.WINDOWS:          # decision 26: her trim tip's Mac sentence, a PC's way
         w["quick_fix_html"] = w["quick_fix_html"].replace(
             "On a Mac, open it in QuickTime Player and choose Edit › Trim.", OUR_WORDS["trim_pc"])
+    if pc_footage():                   # decision 26 (v19 review, Nov 7): no footage look on a PC, so no "I find"
+        w["moments_first"] = w["moments_none"] = this_computer.MOMENTS_PC
+        w["not_looked_h3"] = w["clips_need_h3"]
+        w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
     title = w["reel_of"].replace("{short}", short)
     data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
@@ -3311,7 +3412,8 @@ FOOTAGE_JS = r"""
   // ---- the videos and Good to know (hers: renderVideos) ----
   function renderVideos(){
     $('vlist').innerHTML = vids.map(function(v){
-      return '<div class="vid"><span class="ic">&#9654;</span><span>' + esc(v.name) + '</span><small>' + esc(mmss(v.length)) + ' · ' + esc(fill(W.mb, {n: v.mb})) + '</small></div>';
+      var small = v.preview === 'coming' ? W.coming_small + ' · ' + fill(W.mb, {n: v.mb}) : mmss(v.length) + ' · ' + fill(W.mb, {n: v.mb});
+      return '<div class="vid"><span class="ic">&#9654;</span><span>' + esc(v.name) + '</span><small>' + esc(small) + '</small></div>';
     }).join('');
     renderViewers();
     var total = vids.reduce(function(a, v){ return a + v.length; }, 0);
@@ -3332,7 +3434,7 @@ FOOTAGE_JS = r"""
         var pc = v.preview === 'pc' || v.preview === 'hevc_pc';
         var stuck = v.preview === 'failed' || v.preview === 'lowspace' || pc;
         var msg = v.preview === 'lowspace' ? W.vid_lowspace : v.preview === 'failed' ? W.vid_failed
-          : pc ? (v.words || W.vid_failed) : fill(W.vid_getting, {name: v.name});
+          : (pc || v.preview === 'coming') ? (v.words || W.vid_failed) : fill(W.vid_getting, {name: v.name});
         return '<div class="viewer" data-key="' + esc(v.key) + '"><p class="waiting" style="margin:0">' + (stuck ? '' : '<span class="spin"></span> ') + esc(msg) + '</p></div>';
       }
       return '<div class="viewer" data-key="' + esc(v.key) + '" data-ready="1">' +

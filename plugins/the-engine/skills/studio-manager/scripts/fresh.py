@@ -357,6 +357,10 @@ def restart(handler):
             sys.stdout.flush()
         except OSError:
             pass
+        # A video program this server started (a preview copy, a still) stops here: exec keeps this process's
+        # number, so it would carry on with nobody to take its answer, holding the video lock (v19 review, Nov 7).
+        # The new server starts it again from the beginning.
+        this_computer.stop_scripts()
         if spawn:
             if not there:
                 argv[0] = os.path.abspath(argv[0])
