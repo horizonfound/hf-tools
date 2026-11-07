@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The reel page (reel_page.py), step 2 "Put your photos in order", checked on the real page in a HIDDEN Chrome.
+"""The reel page (reel_page.py), step 2 "Put your photos in order", steps 3 and 5 and Make my reel, checked on the
+real page in a HIDDEN Chrome. (Step 1, the footage, and step 4, the style: tests/reel_footage_check.py.)
 
     /usr/bin/python3 tests/reel_page_check.py --work /private/tmp/somewhere [--port 9105]
 
@@ -221,7 +222,8 @@ def check_words():
     case("no address outside this computer in the page (no fonts, no library from the internet)",
          not re.search(r"https?://|//fonts|cdnjs|googleapis", page), re.findall(r"https?://\S{0,40}", page)[:3])
     case("no HTML5 drag in the page (our pointer drag only)", "draggable" not in page and "dragstart" not in page)
-    case("the step that is built shows as 1 when it is the only one (her renumbering)", "<span class='num'>1</span>Put your photos in order" in page)
+    case("her steps as written: the footage 1, the order 2 (the page renumbers the ones that show)",
+         "<span class='num'>1</span>Behind-the-scenes footage?" in page and "<span class='num'>2</span>Put your photos in order" in page)
     m = re.search(r"<style>(.*?)</style>", page, re.S)
     her = None
     f = her_folder()
@@ -395,7 +397,7 @@ def check_page(c, s):
     case("her words: not picked yet, with the line to say in the chat", t["claude_html"] == HERS["not_picked"], t["claude_html"])
     case("her words: the empty reel", t["empty"] == '"%s"' % HERS["empty"], t["empty"])
     case("no pick yet: their own order is on, All your photos is open, the count says 0", t["mine_on"] and not t["claude_on"] and t["all_open"] and t["count"] == "0 photos", t)
-    case("the step is numbered 1 (her renumbering: only the steps that show)", t["num"] == "1")
+    case("the step is numbered 2, after the footage (her renumbering: only the steps that show)", t["num"] == "2")
     case("the recommended tag is not shown without footage (BUILD.md: with footage only)", t["claude_rec_hidden"] is True)
     c.click("#useClaude")
     t = texts(c)
@@ -835,7 +837,7 @@ def check_songs(s):
     case("no Music folder yet: no songs, and it says so", code == 200 and j["songs"] == [] and j["music"] is False, j)
     case("refused: the song list for a kit named by a path", s.http("GET", "/reel-songs?kit=" + str(s.kit).replace(" ", "%20"))[0] == 404)
     case("refused: the song list asked for by another website", s.http("GET", "/reel-songs?" + q, headers={"Sec-Fetch-Site": "cross-site"})[0] == 403)
-    for name, b in (("another folder", {"kit": KIT, "what": "footage"}), ("a path", {"kit": KIT, "what": "/tmp"})):
+    for name, b in (("another folder", {"kit": KIT, "what": "photos"}), ("a path", {"kit": KIT, "what": "/tmp"})):
         case("refused: Add my music for %s" % name, s.http("POST", "/reel-open", b)[0] == 400)
     code, j, _ = s.http("POST", "/reel-open", {"kit": KIT, "what": "music"})
     music = s.kit / "Music"
@@ -1155,11 +1157,12 @@ def wait_result(c, seconds=60):
 
 def check_page_steps(c, s):
     # the record starts clean for the page: their own order of 8 photos, no song yet
-    code, j, _ = s.http("POST", "/reel-save", save_body(s.state(), {"picks": picks([3, 6, 9, 12, 15, 18, 21, 24]), "mine": True, "song": None, "vibe": "beat"}))
-    case("(set up: 8 photos of their own, no song yet)", code in (200, 409), (code, j))
+    # (Just photos: her step 1 is answered, so Make my reel goes ahead; the footage is tests/reel_footage_check.py's)
+    code, j, _ = s.http("POST", "/reel-save", save_body(s.state(), {"picks": picks([3, 6, 9, 12, 15, 18, 21, 24]), "mine": True, "song": None, "vibe": "beat", "footage": False}))
+    case("(set up: 8 photos of their own, no song yet, Just photos)", code in (200, 409), (code, j))
     st = s.state()
-    if st["saved"].get("song") is not None or st["saved"]["picks"] != picks([3, 6, 9, 12, 15, 18, 21, 24]):
-        s.http("POST", "/reel-save", save_body(st, {"picks": picks([3, 6, 9, 12, 15, 18, 21, 24]), "mine": True, "song": None, "vibe": "beat"}, page="setup2"))
+    if st["saved"].get("song") is not None or st["saved"]["picks"] != picks([3, 6, 9, 12, 15, 18, 21, 24]) or st["saved"].get("footage") is not False:
+        s.http("POST", "/reel-save", save_body(st, {"picks": picks([3, 6, 9, 12, 15, 18, 21, 24]), "mine": True, "song": None, "vibe": "beat", "footage": False}, page="setup2"))
     c.open(s.page_url())
     c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songs .song').length > 1", 20)
     t = page_texts3(c)
@@ -1168,7 +1171,8 @@ def check_page_steps(c, s):
     case("her words, step 5: the heading and the line", t["h2v"] == HERS5["h2"] and t["sayv"] == HERS5["say"], (t["h2v"], t["sayv"]))
     case("her words, step 5: the four vibes, in her order", t["cards"] == HERS5["cards"], t["cards"])
     case("Recommended on On every beat only (decision 7)", t["rec"] == ["beat:Recommended"], t["rec"])
-    case("her renumbering: the order 1, the song 2, the vibe 3 (footage and style come later)", t["nums"] == ["step1=1", "step3=2", "step4=3"], t["nums"])
+    case("her renumbering with Just photos: the footage 1, the order 2, the song 3, the vibe 4 (the style hidden)",
+         t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
     case("her song list: each with her words for what it is and where",
          [x[:2] for x in t["songs"]][:3] == [["Short beat", "Song, in your Music folder"], ["New rec", "Screen recording · I'll use its sound, in your Music folder"],
                                               ["Beat one", "Song, in your Music folder"]] and ["Photo song", "Song, in your Photos folder"] in [x[:2] for x in t["songs"]], t["songs"])

@@ -18,7 +18,10 @@ numbered list (sheet.json) written by hand, and the test beat WAV. In a scratch 
   5. stop_tree stops a program and the program it started;
   6. a recording's sound made once beside it ("<name> sound.wav" on a PC with no ffmpeg, ".m4a" on a Mac), used
      again, never written over; one beside a recording that can't be read is left as it is, and a new one made
-     beside it ("<name> sound 2..."). SKIP when this computer can't take the sound out of a video.
+     beside it ("<name> sound 2..."). SKIP when this computer can't take the sound out of a video;
+  7. step 1, the footage: header-only videos listed by key, the PC's plain words where a preview would be
+     (this_computer.NO_PREVIEW, HEVC_HELP for an iPhone's HEVC), a moment added, changed, removed and put back,
+     and a test make with a clip (Bookends, one clip in twice). On a Mac the PC's route is asked for.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
 printed), and cleared away when everything passed.
 """
@@ -277,6 +280,59 @@ def sounds(kit):
           (job, sorted(os.listdir(music))))
 
 
+def footage(kit):
+    """Step 1 on a PC: the videos are header-only (tests/pc_video.py builds them byte by byte), so nothing here ever
+    decodes a picture. On a Mac the PC's route is asked for (ASSISTANT_NO_AVFOUNDATION=1)."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import pc_video as pv
+    import video
+    if not this_computer.WINDOWS:
+        os.environ[video.NO_AV] = "1"
+    try:
+        fd = kit / "Footage"
+        code, j = reel_page.open_music({"kit": KIT, "what": "footage"})
+        check("Add my footage makes the shoot's Footage folder (no folder opened in a test)", code == 200 and j["ok"] and fd.is_dir(), j)
+        pv.write(fd, "Phone é.MOV", pv.FTYP, pv.box(b"mdat", pv.DATA), pv.moov(pv.vtrak(rot=90), pv.atrak()))
+        pv.write(fd, "iPhone HEVC.mov", pv.FTYP, pv.box(b"mdat", pv.DATA), pv.moov(pv.vtrak(codec=b"hvc1", conf=pv.hvcc(1)), pv.atrak()))
+        (fd / "notes.txt").write_text("not a video", encoding="utf-8")
+        end = time.time() + 30
+        while True:
+            f = reel_page.footage_for_page(kit)
+            if all(v["preview"] not in ("waiting", "making") for v in f["videos"]) or time.time() > end:
+                break
+            time.sleep(0.2)
+        vids = {v["name"]: v for v in f["videos"]}
+        check("the videos listed by name and key, read from their headers (the sideways one shown 360 x 640)",
+              sorted(vids) == ["Phone é.MOV", "iPhone HEVC.mov"] and (vids["Phone é.MOV"]["w"], vids["Phone é.MOV"]["h"]) == (360, 640)
+              and all(len(v["key"]) == 12 for v in vids.values()) and no_path(f), f)
+        hevc = "hevc_pc" if this_computer.WINDOWS else "pc"
+        check("no preview on a PC yet: the plain words in its place (NO_PREVIEW; HEVC_HELP for an iPhone's HEVC on a PC)",
+              vids["Phone é.MOV"]["preview"] == "pc" and vids["Phone é.MOV"]["words"] == this_computer.NO_PREVIEW
+              and vids["iPhone HEVC.mov"]["preview"] == hevc
+              and vids["iPhone HEVC.mov"]["words"] == (this_computer.HEVC_HELP if this_computer.WINDOWS else this_computer.NO_PREVIEW), vids)
+        key = vids["Phone é.MOV"]["key"]
+        code, j = reel_page.change_moments({"kit": KIT, "do": "add", "video": key, "start": 1.0, "seconds": 4})
+        check("Use this moment still works (a moment of theirs, saved), with no still on its card", code == 200 and j["moments"][0]["end"] == 5.0
+              and reel_page.moment_still_file(kit, j["moments"][0]["id"]) is None, j)
+        mid = j["moments"][0]["id"]
+        code, j = reel_page.change_moments({"kit": KIT, "do": "update", "id": mid, "end": 5.5})
+        check("− and + work", code == 200 and j["moments"][0]["end"] == 5.5, j)
+        code, j = reel_page.change_moments({"kit": KIT, "do": "remove", "id": mid})
+        code2, j2 = reel_page.change_moments({"kit": KIT, "do": "restore", "id": mid, "at": 0})
+        check("Remove and Undo", code == 200 and j["moments"] == [] and code2 == 200 and [m["id"] for m in j2["moments"]] == [mid], (j, j2))
+        code, j = reel_page.start_make(body(kit, footage=True, style="bookends", clips=[mid]))
+        job = wait_job(kit)
+        beats = next((w for w in (job or {}).get("words", []) if w.startswith("Beats per piece")), None)
+        check("a test make with the clip (Bookends, one clip in twice): her Plan line with 2 clips, the beats, no path",
+              code == 200 and job and job["state"] == "done" and job["words"][0].startswith("Plan: 2 clips and 6 photos")
+              and beats and beats.startswith("Beats per piece: clip ") and no_path(job), job)
+        clips = json.loads((kit / ".kit" / "reels" / "clips.json").read_text(encoding="utf-8"))["clips"]
+        check("clips.json holds the clip twice, from its own video", [c["moment"] for c in clips] == [mid, mid]
+              and all(Path(c["path"]).name == "Phone é.MOV" for c in clips), clips)
+    finally:
+        os.environ.pop(video.NO_AV, None)
+
+
 def part(name, fn, *args):
     print(f"\n-- {name}", flush=True)
     try:
@@ -293,6 +349,7 @@ part("3: a second press, the lock probe, a job stopped outright", second_press_a
 part("4: the job's one limit", limit, kit)
 part("5: stop_tree", tree)
 part("6: a recording's sound", sounds, kit)
+part("7: step 1, the footage, on a PC (header-only videos)", footage, kit)
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))
