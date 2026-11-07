@@ -25,6 +25,9 @@ file when it can be found, else no font path (the template's is the Mac app's).
 The plan (reel.py writes it):
     {"name": "Black-sand beach reel",
      "photos": [{"path": "/…/x.jpg", "start": 0.0, "dur": 2.4}, …],      seconds on the reel
+                a video clip from their footage is a piece too, with "clip": true, "src" (where in the video it
+                starts) and "length" (the whole video's): it goes in as a real video, muted under a song and
+                with its own sound when there is no song
      "song": {"path": "/…/song.m4a", "from": 41.3, "dur": 13.2, "fade_out": 0.6} or null,
      "hook": {"text": "…", "dur": 2.4} or null}
 
@@ -434,12 +437,15 @@ def build(plan, parts, platform):
     end_us = 0
     fps = float(d.get("fps") or 30.0)
     for ph in plan["photos"]:
+        is_clip = bool(ph.get("clip"))
         w, h = ph.get("w") or 0, ph.get("h") or 0
-        if not (w and h):
+        if not (w and h) and not is_clip:          # (a video's size comes with the clip; sips can't read one)
             w, h = photo_size(ph["path"])
         mat = copy.deepcopy(P["photo_material"])
         mat.update({"id": uid(), "path": native(ph["path"]), "material_name": Path(ph["path"]).stem,
                     "width": w, "height": h, "duration": PHOTO_LENGTH, "type": "photo"})
+        if is_clip:                                # a video clip: the whole video is the material, the clip a part of it
+            mat.update({"type": "video", "duration": int(round(float(ph["length"]) * US)), "has_audio": True})
         mats["videos"].append(mat)
         refs = []
         for ex in P["photo_extras"]:
@@ -452,13 +458,17 @@ def build(plan, parts, platform):
         target = tr_f(ph["start_f"], ph["dur_f"], fps) if "start_f" in ph else tr(ph["start"], ph["dur"])
         seg.update({"id": uid(), "material_id": mat["id"], "extra_material_refs": refs,
                     "target_timerange": target, "source_timerange": {"start": 0, "duration": target["duration"]}})
+        if is_clip:                                # from where the clip starts; muted under a song, its own sound with none
+            seg["source_timerange"] = {"start": int(round(float(ph["src"]) * US)), "duration": target["duration"]}
+            seg["volume"] = 0.0 if plan.get("song") else 1.0
         seg["clip"]["scale"] = {"x": s, "y": s}
         seg["uniform_scale"] = {"on": True, "value": 1.0}
         vtrack["segments"].append(seg)
         end = max(end, ph["start"] + ph["dur"])
         end_us = max(end_us, target["start"] + target["duration"])
-        meta_items.append({"duration": 5 * US, "extra_info": Path(ph["path"]).name, "file_Path": native(ph["path"]),
-                           "height": h, "width": w, "metetype": "photo", "t": t0})
+        meta_items.append({"duration": int(round(float(ph["length"]) * US)) if is_clip else 5 * US,
+                           "extra_info": Path(ph["path"]).name, "file_Path": native(ph["path"]),
+                           "height": h, "width": w, "metetype": "video" if is_clip else "photo", "t": t0})
     d["tracks"].append(vtrack)
 
     # the hook, as plain CapCut text they restyle with CapCut's own text styles
@@ -688,7 +698,7 @@ def write(plan, store, ignore_open=False):
         f"[General]\ndraft_create_time={t // US}\ndraft_last_edit_time={t // US}\nreal_edit_keys=0\nreal_edit_seconds=0\n",
         encoding="utf-8")
     cover = dest / "draft_cover.jpg"
-    first = plan["photos"][0]["path"] if plan["photos"] else None
+    first = next((p["path"] for p in plan["photos"] if not p.get("clip")), None)   # the cover is a photo, never a video
     if first and pictures.use_sips():
         subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(cover)], capture_output=True)  # pc-ok: Mac branch
     elif first and pictures.make_jpeg(first, cover, 720):
@@ -907,8 +917,10 @@ def main():
     plan = json.loads(Path(a.plan).read_text(encoding="utf-8"))
     dest, draft = write(plan, store, a.ignore_open)
     secs = draft["duration"] / US
-    n = len(plan["photos"])
-    say(f"Made \"{dest.name}\" in CapCut: {n} photos, {secs:.1f} seconds"
+    n_cl = sum(1 for p in plan["photos"] if p.get("clip"))
+    n = len(plan["photos"]) - n_cl
+    what = (f"{n_cl} clip{'s' if n_cl != 1 else ''} and {n} photo{'s' if n != 1 else ''}" if n_cl else f"{n} photos")
+    say(f"Made \"{dest.name}\" in CapCut: {what}, {secs:.1f} seconds"
         + (f", on the beat of {plan['song'].get('name') or Path(plan['song']['path']).name}" if plan.get("song") else "")
         + (". Open CapCut and it's at the top of your projects." if write.listed else "."))
     if write.left_to_capcut:

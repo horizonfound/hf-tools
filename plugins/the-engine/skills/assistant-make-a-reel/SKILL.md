@@ -48,7 +48,7 @@ Read `../../shared/curating.md` first, every time. The photos are already edited
 
 Pick 8 to 14 and order them by those rules: open on the scroll-stopper; move between wides, mediums, close-ups and details, never three of one distance in a row; change one thing at a time from photo to photo (light, color, distance, direction), so every cut feels like the natural next one; let color and light travel somewhere instead of bouncing; no near-twins side by side; close on a quiet, final frame. A great photo that fights the flow stays out. For a reel, add one more: **tall photos first**, since the screen is tall and a wide photo loses its sides (one or two wide ones are fine if the subject sits near the middle).
 
-While you order them, mark how long each one deserves: a `+` after a number to linger on it (the emotional peak, a wide with a lot to take in, the closer), a `-` to pass quickly (a run of details, two or three frames of one laugh in a burst). Most photos get no mark. With the "a little of everything" pace these marks decide where the long and quick moments fall, so the rhythm follows the photos instead of a formula.
+While you order them, mark how long each one deserves: a `+` after a number to linger on it (the emotional peak, a wide with a lot to take in, the closer), a `-` to pass quickly (a run of details, two or three frames of one laugh in a burst). Most photos get no mark. The marks count in every vibe, in the page's words: "Longer stays on screen about twice as long", "Quicker gets the shortest time, one beat".
 
 Then check your order as it will play:
 
@@ -96,21 +96,21 @@ Ask with buttons: "Which song?" [A song from CapCut's music] [A song file on thi
 
 The script starts the song where it picks up (the loudest stretch that fits, on a beat, nudged toward where the energy jumps) and says where. If they want a different moment, `--song-start 58` is seconds into the song, `--song-start 0` the very top.
 
-## Step 4: how it moves
+## Step 4: the vibe
 
-Ask with buttons: "How should it move?"
-- **A little of everything (recommended):** some quick, some long, never a formula. The changes fall where the music turns over, more cuts where the song is busy and fewer where it's quiet, and your `+` and `-` marks decide which photos linger and which fly by.
-- **Calm:** about two seconds a photo; room to look. Best with 6 to 9 photos.
-- **Fast:** about half a second a photo; quick and punchy. Best with 12 to 20 photos.
-- **Build:** starts calm, quickens toward the end, then lands on the last photo.
+Ask with buttons, in Nicole's words from her reel page: "How should it move? Every cut lands on the beat, whichever you pick. None of these is a fixed template: the timing is worked out for your song, your photos and your clips, so every reel comes out its own way."
+- **On every beat (recommended):** Quick and punchy, a new photo on the beat, with a longer hold where the song hits. (`--pace beat`)
+- **A little of everything:** Some quick, some long, changing where the music turns over. (`--pace mixed`)
+- **Calm:** Longer looks, room to breathe. Best with fewer photos or a longer song. (`--pace calm`)
+- **Build:** Starts calm, speeds up toward the end, then lands on the last photo. (`--pace build`)
 
-**If they set Longer or Quicker on the page and then choose anything but A little of everything,** say once: "One thing: the Longer and Quicker you set only count with \"A little of everything\". With this one they aren't used." The other ways of moving do not read the marks.
+**Always ask this question; never skip it and never pick for them.** The Longer and Quicker marks count with every one of the four. If they want to see the same choices move differently, make it again with `--variation 2` (3, 4...): every reel comes out its own way.
 
-**Always ask this question; never skip it and never pick for them.** Say what each means in seconds for THIS song, because the same word is a different speed on a different song (the script's plan line gives the numbers; `--dry-run` shows them without making anything). On a slower song, "a little of everything" and "calm" can sit near two seconds a photo, which reads as slow on Instagram.
+**Every cut on a whole beat, every photo at least one beat (Nicole, Nov 6).** No half-beat cuts, ever: Quicker is the shortest, one beat; no photo is on screen for less than about half a second (on a very fast song the shortest becomes two beats); the last photo always gets at least two beats. Quick half-beat pairs are gone: on one of her test reels they were 0.3 s a photo, "so fast it like disappears before you even see anything... they don't even hit the beat." **Never write your own script to cut faster or on half beats.** Every cut the Assistant makes comes from `reel.py make`.
 
-**"Too slow", "faster", "more energy" (Nicole's first reel, Nov 5).** Make it again with `--pace beat`: one photo on every beat from the first to the last, the last held one beat longer. That is the one she said "Yes, that's it" to. `--pace fast` is NOT the answer to "too slow": it holds the first photo and the last two much longer, and she called a Fast reel "way way too slow." If one photo a beat is still too slow, the song is slow: say so and offer a quicker song, or more photos. **Never cut on half beats, and never write your own script to do it:** most songs have no hit there, the cuts land on nothing, and it stops feeling like the music (her third reel: "thats not following the beat"). Every cut the Assistant makes comes from `reel.py make`.
+**"Too slow", "faster", "more energy" (Nicole's first reel, Nov 5).** Make it again with On every beat (`--pace beat`): that is the one she said "Yes, that's it" to. If it is still too slow, the song is slow: say so and offer a quicker song, or more photos. (The old names still work: `--pace fast` is On every beat, `--pace steady` is Calm.)
 
-Every cut lands on the beat whichever they pick. If they pick Fast and you chose fewer than 12 photos, offer a few more from the sheet; if Calm and more than 9, offer to trim.
+**Nothing is left out to fit a vibe** ("you shouldn't be removing" photos or footage). When the song is short, the vibe bends: the script keeps every photo, makes the vibe quicker and says so in a line like "Your song is only 15 seconds, so I kept all 14 photos and made Calm quicker to fit. A longer song, or fewer photos, gives it more room." Pass that line on as it is. When even one beat a photo can't fit, nothing is made and it says exactly why ("Your song is only 15 seconds, and 14 photos need at least 15 seconds, even with every photo at one beat. Take a few photos out, or use a longer song."): tell them in those words, as "Your song is a little short for this", never as an error, and ask which they'd like.
 
 ## Step 5: words on the first photo (optional)
 
@@ -121,19 +121,19 @@ Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me opt
 ```
 python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
   --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"   (or --capcut-song "<name>", or --song none)
-  --pace mixed|calm|fast|build   [--night "<backup>" --shoot-id s1]
+  --pace beat|mixed|calm|build   [--night "<backup>" --shoot-id s1]
   [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
 ```
 
 - **The reel is named after its shoot.** When you came from the Assistant, pass the backup and shoot id it gave you (`--night`, `--shoot-id`): the CapCut project is then called exactly like the shoot's folder plus "reel" ("2022-06-24 Black-sand beach reel"), and so is the video CapCut exports. Without those, the shoot name goes through their own folder pattern, dated by the first photo. A second reel of the same shoot gets "reel 2". Only use `--name` if they ask for a different name.
-- `--pace` is their answer from Step 4 (`mixed` is "a little of everything"). The first photo always holds long enough to read, and the last one lands.
-- `--variation 2` (3, 4...) gives another mix of the same picks with the same pace, if they want to see it move differently.
+- `--pace` is their answer from Step 4 (`beat` is On every beat, `mixed` is A little of everything). The last photo always lands, at least two beats.
+- `--variation 2` (3, 4...) gives another mix of the same picks with the same vibe, if they want to see it move differently.
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
 - `--dry-run` prints the plan and writes nothing.
 
 If the script says CapCut was open, tell them it will appear in their CapCut projects in a moment, and only if it doesn't: "Quit CapCut and open it again." Exit 2 is a stop: say what it printed.
 
-How the timing works, if they ask: the reel starts on the first beat of a bar, long holds land on the 1 of a bar (songs in 3, like a waltz, are counted in 3), and every cut sits on the video frame at or just before its beat, never after, so it never feels late. With a song from CapCut's music, the cuts follow CapCut's own beat marks.
+How the timing works, if they ask: the whole reel is worked out at once for its own song and photos, so every cut lands on a whole beat, on the song's stronger hits where there's room; long holds land on the 1 of a bar; every photo stays at least one beat; nothing is left out to fit. The reel starts on the first beat of a bar, and every cut sits on the video frame at or just before its beat, never after, so it never feels late. With a song from CapCut's music, the cuts follow CapCut's own beat marks.
 
 ## Step 7: hand it over
 

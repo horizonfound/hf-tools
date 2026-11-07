@@ -46,6 +46,9 @@ name: Check it on a Windows PC
 #   tests/pc_servers.py      the page servers: a space in the path, never two on one port, the restart
 #                            after an update (about 45 seconds)
 #   tests/fixtures/check_sound.py   the reel's sound: lengths, the beat, Windows' own Media Foundation
+#   tests/reel_timing_check.py      the reel's timing against Nicole's own (her acceptance cases on the synthetic
+#                                   60-second test beat; the cases on a client's songs say SKIP here), clips in
+#                                   reel.py make, and a clip written into a pretend CapCut project as a video
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
 #   tests/pc_design_page.py  a job of its own, "windows-page", which may fail without failing the check (a first
@@ -70,10 +73,10 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
             "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
             "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -131,6 +134,9 @@ jobs:
       - name: The reel's sound (lengths, the beat, Windows' own Media Foundation)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/fixtures/check_sound.py
+      - name: The reel's timing, against Nicole's own (her cases on the test beat; clips; a clip as a video in CapCut's project)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/reel_timing_check.py
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -224,6 +230,9 @@ jobs:
       - name: The reel's sound
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/fixtures/check_sound.py
+      - name: The reel's timing, against Nicole's own
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/reel_timing_check.py
       - name: On the Mac's own Python 3.9 with nothing installed (what a photographer's Mac runs; the PC-way checks say SKIP)
         if: ${{ !cancelled() }}
         env:

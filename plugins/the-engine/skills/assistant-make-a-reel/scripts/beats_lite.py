@@ -298,9 +298,11 @@ def capcut_beats(beat_file):
         return None
 
 
-def analyze(path, beat_file=None):
+def analyze(path, beat_file=None, keep_onset=False):
     """The song's beats, where each bar starts, and how loud each beat is. With CapCut's own beat list
-    (beat_file), its beats and bars are used, so the cuts match the beat marks CapCut shows."""
+    (beat_file), its beats and bars are used, so the cuts match the beat marks CapCut shows.
+    keep_onset: also hand back "onset", how much the sound jumps at every moment (FPS a second), worked out
+    here anyway; timing.py reads how hard the song hits at each cut from it."""
     a, how = decode(path)
     if a is None:
         return {"ok": False, "reason": how, "duration": 0, "tempo": 0, "period": 0, "beats": [], "energy": []}
@@ -320,9 +322,12 @@ def analyze(path, beat_file=None):
         hops = [t * FPS for t in times]
         gaps = sorted(times[i + 1] - times[i] for i in range(len(times) - 1))
         per_s = gaps[len(gaps) // 2]
-        return {"ok": True, "duration": round(dur, 3), "tempo": round(60 / per_s, 1), "period": round(per_s, 4),
-                "beats": [round(t, 3) for t in times], "bar_pos": pos, "meter": max(pos),
-                "energy": energy_per_beat(full, hops), "how": how, "beats_from": "capcut"}
+        out = {"ok": True, "duration": round(dur, 3), "tempo": round(60 / per_s, 1), "period": round(per_s, 4),
+               "beats": [round(t, 3) for t in times], "bar_pos": pos, "meter": max(pos),
+               "energy": energy_per_beat(full, hops), "how": how, "beats_from": "capcut"}
+        if keep_onset:
+            out["onset"] = o
+        return out
     tracked = track(smooth(o, period), period)
     if len(tracked) < 4:
         return {"ok": False, "reason": "no steady beat (the song may be too quiet or too free-form)",
@@ -334,9 +339,12 @@ def analyze(path, beat_file=None):
     o_low = onset_strength(bands[:2])
     m, one = meter_and_one(accents(o_low, o, hops))
     pos = [((i - one) % m) + 1 for i in range(len(beats))]
-    return {"ok": True, "duration": round(dur, 3), "tempo": round(60 * FPS / per, 1),
-            "period": round(per / FPS, 4), "beats": beats, "bar_pos": pos, "meter": m,
-            "energy": energy_per_beat(full, hops), "how": how, "beats_from": "ours"}
+    out = {"ok": True, "duration": round(dur, 3), "tempo": round(60 * FPS / per, 1),
+           "period": round(per / FPS, 4), "beats": beats, "bar_pos": pos, "meter": m,
+           "energy": energy_per_beat(full, hops), "how": how, "beats_from": "ours"}
+    if keep_onset:
+        out["onset"] = o
+    return out
 
 
 if __name__ == "__main__":

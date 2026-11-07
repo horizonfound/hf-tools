@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""The Studio by Horizon Found. How long each photo stays up, counted in beats, so
+"""REPLACED (Nov 7, 2026): nothing imports this any more. Every reel is timed by timing.py, Nicole's engine
+(handoff v19): the vibes beat, mixed, calm and build, one search over the whole reel, every photo at least one
+beat, nothing left out to fit. The old names still work in reel.py (fast is beat, steady is calm). This file
+is kept as the history of the October and early November timing; build nothing new on it.
+
+The Studio by Horizon Found. How long each photo stays up, counted in beats, so
 every cut lands on the beat. Four feels the photographer picks from:
 
   calm    every photo about two seconds; room to look

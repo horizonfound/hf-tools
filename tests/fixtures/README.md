@@ -52,6 +52,11 @@ Standard library only. On a Mac it tries the Mac's own route (`afconvert`) and t
 
 Information only: with both ffmpegs switched off, what this computer's own decoder (Windows' Media Foundation on a PC, `afconvert` on a Mac) makes of the seven MP3 and M4A songs: which way heard each, how many seconds came back against the true length, how loud, how long it took, how early or late its clicks are against the WAV's (to 0.1 ms), and on Windows what Media Foundation gave before `sound.py` took the encoder's warm-up off; or the plain words for why not. GitHub runs it on Windows as a step that may fail without failing the check. `tests/pc_smoke.py` also reads every song's length here and hears the WAV, AIFF, MP3 and M4A songs when the computer has a way to.
 
+## For the reel's timing (added Nov 7)
+
+- `test-beat-60s.wav`: Nicole's 60-second test beat from her handoff v19 (there "test-beat (60 s, made for testing).wav"): a drum pattern her Claude generated at 96 beats a minute, busier from 0:24 to 0:44, with real hits on some half beats. **Synthetic, made for testing**, not recorded or downloaded; WAV, mono, 22,050 a second, 2.6 MB. It is the song for 9 of her 22 timing cases in `tests/reel_timing_check.py`, the ones that can always run (the other 13 use a client's songs, which are never in this repository).
+- `reel-photo-sizes.json`: the width and height of the 52 photos those cases use, numbers only. The test makes pretend photos of those sizes; no photo, name or file name of the shoot is here.
+
 ## Remaking them
 
     python3 tests/fixtures/make_fixtures.py
