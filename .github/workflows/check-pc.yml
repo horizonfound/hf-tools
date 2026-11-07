@@ -43,7 +43,9 @@ name: Check it on a Windows PC
 #   tests/pc_reel_page.py    the reel page's own machinery (reel_page.py), nothing installed: Make my reel's
 #                            refusals, a test make through its own process, a second press, the lock probe, a job
 #                            stopped outright (this_computer.stop_tree), its one time limit, a recording's sound
-#                            made once beside it and a new one beside a sound that can't be read
+#                            made once beside it and a new one beside a sound that can't be read; step 1's footage
+#                            on header-only videos; the chat's footage look (footage.py): no sheets on a PC (exit 3,
+#                            in plain words), moments checked and written, their own kept first
 #   tests/pc_video.py        the reel's video helper (video.py), nothing installed: the facts read from video headers
 #                            built byte by byte (the turn, H.264's profile and colour layout, HEVC, the recording
 #                            time, the header at the end or the front, 64-bit boxes), what plays as it is, plain

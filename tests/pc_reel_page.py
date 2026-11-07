@@ -22,6 +22,9 @@ numbered list (sheet.json) written by hand, and the test beat WAV. In a scratch 
   7. step 1, the footage: header-only videos listed by key, the PC's plain words where a preview would be
      (this_computer.NO_PREVIEW, HEVC_HELP for an iPhone's HEVC), a moment added, changed, removed and put back,
      and a test make with a clip (Bookends, one clip in twice). On a Mac the PC's route is asked for.
+  8. the chat's footage look (footage.py) on a PC: scan and close make no sheets and stop with exit 3 in plain
+     words (still printing each video's key and facts); moments refused when wrong, written when right, their own
+     moment kept first.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
 printed), and cleared away when everything passed.
 """
@@ -333,6 +336,52 @@ def footage(kit):
         os.environ.pop(video.NO_AV, None)
 
 
+def footage_look(kit):
+    """The chat's footage look (footage.py) on a PC: no stills can be taken from a video there yet (video.py's named
+    gap), so scan and close make no sheets and stop with exit 3 in plain words, while the facts are still printed;
+    moments works as on a Mac (checked, written under the record's lock, their own moments kept first). On a Mac
+    the PC's route is asked for. The videos are part 7's header-only ones."""
+    import video
+    env = dict(os.environ)
+    if not this_computer.WINDOWS:
+        env[video.NO_AV] = "1"
+
+    def run(*args):
+        r = subprocess.run([sys.executable, str(SCRIPTS / "footage.py"), *args], capture_output=True, encoding="utf-8",
+                           errors="replace", env=env, timeout=240)
+        return r.returncode, (r.stdout + r.stderr)
+    vids = {v["name"]: v for v in reel_page.list_videos(kit)}
+    key = vids["Phone é.MOV"]["key"]
+    looks = kit / ".kit" / "footage" / "looks"
+    code, out = run("scan", KIT)
+    pngs = [p.name for p in looks.rglob("*.png")] if looks.is_dir() else []
+    check("scan on a PC: no sheets, exit 3, the PC's plain words, nothing drawn", code == 3 and this_computer.NO_PREVIEW in out
+          and "no sheets were made" in out and pngs == [], (code, pngs, out[-500:]))
+    check("scan on a PC still prints each video by its key, its length and shape (the sideways one 360x640 tall)",
+          f"(key {key}): 0:06 long, 360x640 tall" in out and "Their notes for this reel" in out.split("\n")[0], out[:1500])
+    check("scan on a PC writes its look in a new folder (look), with scan.json", (looks / "look" / "scan.json").is_file())
+    code, out = run("close", KIT, key, "1", "3")
+    check("close on a PC: exit 3, in plain words", code == 3 and this_computer.NO_PREVIEW in out, out[-300:])
+    rec = kit / ".kit" / "reel-page.json"
+    before = rec.read_bytes()
+    bad = work / "too many.json"
+    bad.write_text(json.dumps({"moments": [{"video": key, "start": k * 0.1, "end": k * 0.1 + 3.5} for k in range(13)]}), encoding="utf-8")
+    code, out = run("moments", KIT, "--file", str(bad))
+    check("moments on a PC: more than 12 refused, nothing written", code == 1 and "the most I pick is 12" in out and rec.read_bytes() == before, out)
+    good = work / "moments.json"
+    good.write_text(json.dumps({"moments": [{"video": key, "start": "0:00.5", "end": 4.0, "label": "Zoë laughing"},
+                                             {"video": "iPhone HEVC.mov", "start": 2, "end": 5.5, "label": "A look back"}]},
+                               ensure_ascii=False), encoding="utf-8")
+    code, out = run("moments", KIT, "--file", str(good))
+    ms = json.loads(rec.read_text(encoding="utf-8"))["moments"]
+    check("moments on a PC: saved through the command, their own moment (part 7) kept first",
+          code == 0 and [m.get("by") for m in ms] == ["you", None, None] and [m["label"] for m in ms[1:]] == ["Zoë laughing", "A look back"]
+          and (ms[1]["start"], ms[1]["end"]) == (0.5, 4.0), (code, out, ms))
+    page = reel_page.footage_for_page(kit)
+    check("the page's answer has them, each by its video's key, no path", [m["key"] for m in page["moments"]][1:] == [key, vids["iPhone HEVC.mov"]["key"]]
+          and no_path(page), page["moments"])
+
+
 def part(name, fn, *args):
     print(f"\n-- {name}", flush=True)
     try:
@@ -350,6 +399,7 @@ part("4: the job's one limit", limit, kit)
 part("5: stop_tree", tree)
 part("6: a recording's sound", sounds, kit)
 part("7: step 1, the footage, on a PC (header-only videos)", footage, kit)
+part("8: the chat's footage look, on a PC (footage.py)", footage_look, kit)
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))

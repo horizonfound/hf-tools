@@ -40,7 +40,8 @@ Records:
                                   against, "names": {number: file name} for every number it mentions (so a re-made
                                   list finds the same photos again), "saved": {picks, mine, mine_picks, song, vibe,
                                   footage, style, sel, ask, feel, updated}, and, from the later stages, "moments",
-                                  "claude_bts" and "made"}. Her record (BUILD.md section 8), minus her "claude", which
+                                  "claude_bts" and "made"; Claude's moments are written only by footage.py moments,
+                                  which keeps those of an earlier look in "earlier_looks"}. Her record (BUILD.md section 8), minus her "claude", which
                                   is read from kit.json picks.reel every time.
   <kit>/.kit/reel-page.prev.json  the version before, kept whole
   <kit>/.kit/reel-page.lock       held by every writer (this_computer.try_lock, through arrange.locked), never removed
@@ -3737,6 +3738,11 @@ def cmd_show(kit):
         say(f"  In the Footage folder: {len(vids)} video{'s' if len(vids) != 1 else ''}"
             + (f" ({', '.join(v['name'] for v in vids)})" if vids else "") + f"; moments: {len(ms)}"
             + (f", {sum(1 for m in ms if m.get('by') == 'you')} of them theirs" if ms else ""))
+    looks = foot_work(kit) / "looks"
+    n_looks = sum(1 for x in _listing(looks) if re.fullmatch(r"look(?: \d+)?", x)) if looks.is_dir() else 0
+    if n_looks:
+        mine = sum(1 for m in ms if m.get("by") != "you")
+        say(f"  Footage looks (footage.py scan): {n_looks}; Claude's moments on the page: {mine}")
     if saved.get("ask") or saved.get("feel"):
         say(f"  Their notes for the footage look: {saved.get('ask') or '(none)'}; the feel: {saved.get('feel') or '(none)'}")
     made = [m for m in (rec.get("made") or []) if isinstance(m, dict)]
