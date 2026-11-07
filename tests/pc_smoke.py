@@ -9,6 +9,7 @@ CapCut, no Claude app, but real Windows.
     python3 tests/pc_smoke.py        Pillow is the only add-on it uses, and only for the checks that need it
     python3 tests/pc_smoke.py --only posts      just the posts part (below), in a few seconds
     python3 tests/pc_smoke.py --only followup   just the PC follow-up's part (below), in a few seconds
+    python3 tests/pc_smoke.py --only backup     just the whole backups (below)
 
 The pretend photos are drawn here in plain Python, so it runs on the Mac's own Python 3.9 with nothing
 installed (the Mac way: sips). A check that needs Pillow and does not have it says SKIP and why; so does any
@@ -29,8 +30,10 @@ What it tries:
   - the helper that knows both computers: dates in words, safe names, names Windows keeps for itself, long
     paths, room on a drive, the list of drives;
   - a whole copy-and-check of a pretend card with an accent and a colon in its name; the records and the
-    report page written as UTF-8; a name with an emoji in the Studio File and the editing queue; the walk-away
-    check; hiding the records folder; and, with Pillow hidden, the walk-away check stopping in plain words;
+    report page written as UTF-8; the same card again with nobody reading what backup.py says (a closed pipe:
+    on Windows "invalid argument", for real), every file still copied and checked; a name with an emoji in the
+    Studio File and the editing queue; the walk-away check; hiding the records folder; and, with Pillow hidden,
+    the walk-away check stopping in plain words;
   - a page server started in the background outliving the command that started it once that command is swept
     away (on a Mac its process group killed; on Windows its process group sent Ctrl+Break), against a stand-in
     started the plain way that must not survive; saving over a file another program has open;
@@ -72,12 +75,25 @@ What it tries:
     `capcut.py open --closed` adding a waiting reel without asking whether CapCut is open: on a Mac with a
     stand-in for `open`, on a PC with no CapCut installed); the PC folder window's answer read back (a mark in
     front, UTF-16, a line broken in two, a warning after it; on Windows a real Windows PowerShell writing a
-    folder named "Café “shoot” 🌊"); and the PC quoting of a command's values (kit._pc_arg);
+    folder named "Café “shoot” 🌊"); the PC quoting of a command's values (kit._pc_arg); the report's own page
+    server (serve_report.py) started and stopped by its own number: the page for 127.0.0.1 and localhost, a 403
+    for any other host, another port, no port or no Host (nothing handed out, no name saved, no rename asked),
+    and report_url() and queue_url() finding running servers with a dead proxy set in the environment; its Open
+    photo folder refusing //127.0.0.1/c$ and \\\\127.0.0.1\\c$ as text, never asking Windows about them (real
+    on Windows; on a Mac only simulated, this_computer.WINDOWS set in a program of its own), while a report whose
+    photos are on a network drive of its own still opens that folder (a pretend share whose lookups are stood
+    in) and a look-alike of it is refused; and every say()
+    changed on Nov 6 (backup, sort and so rename_shoot, settle, sneak_peeks, posts, return_watch, reel, night)
+    carrying on when nobody reads what it prints (on a Mac a broken pipe; on Windows "invalid argument",
+    EINVAL, for real);
   - a whole backup start to finish (copy and check, index, groups and contact sheet, the look, the sort, the
     sneak-peek pages, the pick, the sneak peeks, the settle), every photo checked against the card, the card
     unchanged, the records hidden, then a rename to an accented name and two renames of capital letters only.
-    On a Mac it runs twice: the Mac's own way, and the PC way (the JPEG inside each photo, and Pillow). On
-    Windows the settle and a rename also run while another program holds a photo open.
+    Then the same backup twice more, each stopping once settled: once read to the end, once with night.py's
+    output read for one line and then closed every time it runs (`| head -1`; the first time with its errors
+    down the same pipe), which must finish with the same exit codes and the same records, file for file.
+    On a Mac the first backup runs twice: the Mac's own way, and the PC way (the JPEG inside each photo, and
+    Pillow). On Windows the settle and a rename also run while another program holds a photo open.
 
 What it does NOT try: the beat of each song (tests/fixtures/check_sound.py), made-up RAW files from six makers
 (tests/pc_pictures.py), the page servers (tests/pc_servers.py), the backup's own promises in depth
@@ -92,6 +108,7 @@ import html
 import importlib.util
 import json
 import os
+import re
 import shutil
 import stat
 import struct
@@ -703,11 +720,47 @@ def no_pillow_check(card, drive, env):
 
 # ---------------------------------------------------------------- a whole backup
 
-def whole_backup(work, how_pictures):
+def run_nobody_reading(args, env, errors_to=None):
+    """(exit code, what could be seen) of a script started the way Claude starts it, whose output is read for one line
+    and then closed, the way `| head -1` leaves it once it has its line: everything the script says after that has
+    nobody to read it (on a Mac a broken pipe; on Windows "invalid argument"). errors_to: a file its error output
+    goes to, read back afterwards; None sends its errors down the same pipe (`2>&1 | head -1`), lost with the rest."""
+    err = open(errors_to, "wb") if errors_to else None
+    try:
+        p = subprocess.Popen([sys.executable, *map(str, args)], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=err if err else subprocess.STDOUT, env=child_env(env))
+    finally:
+        if err:
+            err.close()
+    first = [b""]
+    reader = threading.Thread(target=lambda: first.__setitem__(0, p.stdout.readline()))
+    reader.daemon = True
+    reader.start()
+    reader.join(STEP_TIMEOUT)
+    if reader.is_alive():                # it said nothing within the time a step may take: stopped, a FAIL
+        p.kill()
+        reader.join(30)
+    p.stdout.close()                     # the reader has gone away
+    try:
+        code = p.wait(STEP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        p.wait()
+        code = 124
+    said = first[0].decode("utf-8", "replace")
+    if errors_to:
+        said += Path(errors_to).read_bytes().decode("utf-8", "replace")
+    return code, said + (f"\nTIMED OUT after {STEP_TIMEOUT} s" if code == 124 else f"\n(exit {code})")
+
+
+def whole_backup(work, how_pictures, nobody_reading=None):
     """A whole backup, start to finish, the way night.py runs it for a photographer, with Claude's two looks
     answered here (each group its own shoot; the first moments as sneak peeks). Then a rename, and renames that
     change only capital letters. On Windows, the settle and a rename while a photo is held open.
-    how_pictures: {} for this computer's own way, or {"ASSISTANT_NO_SIPS": "1"} for the PC way on a Mac."""
+    how_pictures: {} for this computer's own way, or {"ASSISTANT_NO_SIPS": "1"} for the PC way on a Mac.
+    nobody_reading: None for all of that. True or False for one of two twins that stop once the backup has finished
+    (no renames, nothing held open), to be compared (nobody_reading_checks): True with night.py's output read for one
+    line and then closed every time it runs; False read to the end. Returns True when the backup finished."""
     home = work / "studio-home"
     home.mkdir(parents=True)
     env = dict(how_pictures, STUDIO_HOME=str(home))
@@ -724,7 +777,19 @@ def whole_backup(work, how_pictures):
     drive.mkdir()
     run("studio_file.py", "set", "--drive", drive, "--offered", "1", "--file-names", "shoot", env=env)
     night = ["night.py", "--source", card, "--name", "Côte card", "--date", "2026-11-06"]
-    code, out = run(*night, env=env)
+    unseen = []                          # what night.py said where nobody was reading, but it could still be seen
+
+    def run_night():
+        """night.py, run the way this backup runs it."""
+        if not nobody_reading:
+            return run(*night, env=env)
+        n = len(unseen)
+        # the first time as `2>&1 | head -1` (its errors gone with the rest); after that `| head -1`, its errors in a file
+        code, said = run_nobody_reading([SCRIPTS / night[0], *night[1:]], env,
+                                        errors_to=None if n == 0 else work / f"night {n + 1} errors.txt")
+        unseen.append(said)
+        return code, said
+    code, out = run_night()
     session = drive / "2026-11-06 Côte card"
     st = session / "_studio"
     check("the backup copies, checks, makes previews and the contact sheet, then asks for the look (exit 4)",
@@ -736,7 +801,7 @@ def whole_backup(work, how_pictures):
     shoots = [{"id": f"s{i}", "suggested": f"Shoot {i}", "groups": [g["id"]], "photos": g.get("count", 0),
                "recap": "Test frames.", "why": "test"} for i, g in enumerate(groups, 1)]
     (st / "shoots.json").write_text(json.dumps({"decided_by": "test", "shoots": shoots}), encoding="utf-8")
-    code, out = run(*night, env=env)
+    code, out = run_night()
     check("it sorts the photos into shoot folders and lays out the sneak-peek pages (exit 7)",
           code == 7 and (st / "peek-sheets.json").is_file() and any((st / "peek-sheets").glob("*.png")), out[-600:])
     if code != 7:
@@ -751,7 +816,7 @@ def whole_backup(work, how_pictures):
 
     index = json.loads((st / "index.json").read_text(encoding="utf-8"))
     first = session / next(p["file"] for p in index["photos"] if p.get("original"))
-    if tc.WINDOWS:
+    if tc.WINDOWS and nobody_reading is None:
         fh = open(first, "rb")   # no FILE_SHARE_DELETE: Windows will not move this file or its folder now
         try:
             code, out = run(*night, env=env)
@@ -759,7 +824,7 @@ def whole_backup(work, how_pictures):
             fh.close()
         held_open_outcome("the settle with a photo held open", code, out, lambda: first.is_file(),
                           lambda: (drive / ".studio" / session.name / "settled.json").is_file())
-    code, out = run(*night, env=env)
+    code, out = run_night()
     records = drive / ".studio" / session.name
     check("the backup finishes: the shoots are moved into place and the day folder is gone (exit 0)",
           code == 0 and (records / "settled.json").is_file() and not session.exists(), out[-600:])
@@ -776,6 +841,12 @@ def whole_backup(work, how_pictures):
         skip(f"the records are out of sight in {tc.FILES_APP}", "this computer has no hidden mark to check")
     else:
         check(f"the records are out of sight in {tc.FILES_APP} (the .studio folder and the backup's records folder)", all(h), str(h))
+    if nobody_reading is not None:
+        if nobody_reading:
+            gone = [s for s in unseen if "Traceback" in s]
+            check("and nothing went wrong out of sight (no Traceback on the error output it still had)", not gone,
+                  (gone[0] if gone else "")[-500:])
+        return True
 
     # ---- a rename (on Windows, first with a photo held open), then renames of capital letters only
     def folder_of(sid):
@@ -819,6 +890,117 @@ def whole_backup(work, how_pictures):
           code == 0 and folder_of("s2") == "2026-06-04 shoot 2" and "2026-06-04 shoot 2" in os.listdir(drive)
           and old2 not in os.listdir(drive) and not bad and n == len(photos), f"{code} {folder_of('s2')!r} {bad[:3]} {out[-300:]}")
     check("after all of it, the card still holds exactly what it held", card_snapshot(card) == before)
+
+
+_CLOCK = re.compile(r"\d{4}-\d\d-\d\d[T ]\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:[+-]\d\d:?\d\d|Z)?")
+_FILE_NUMBERS = {"ino", "inode", "dev", "device", "mtime", "mtime_ns", "ctime", "ctime_ns", "atime", "atime_ns",
+                 "birthtime", "identity", "ident", "file_id", "volume_uuid", "uuid"}
+_HOW_LONG = re.compile(r"second|took|elapsed|duration")          # keys of a number that says how long something took
+_TEXTS = (".json", ".html", ".htm", ".md", ".txt", ".xmp", ".csv", ".log")
+_WORDS_CLOCK = [   # the clock in a page's words: "Friday, November 6 · 5:00 pm", "3 sec", "2 min"
+    (re.compile(r"\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day, (?:January|February|March|April|May|June|July|August|"
+                r"September|October|November|December) \d{1,2}\b"), "<DAY>"),
+    (re.compile(r"\b\d{1,2}:\d\d ?(?:am|pm|AM|PM)\b"), "<TIME>"),
+    (re.compile(r"\b\d+(?:\.\d+)? (?:seconds?|sec|minutes?|min|hours?|hrs)\b"), "<TOOK>")]
+
+
+def _clock(m):
+    """A time written by the clock of this run (today, give or take a day) is taken out; any other time is kept (when
+    each photo was taken is part of the records, and has to be the same in both)."""
+    try:
+        d = date.fromisoformat(m.group(0)[:10])
+    except ValueError:
+        return m.group(0)
+    return "<CLOCK>" if abs((d - date.today()).days) <= 1 else m.group(0)
+
+
+def run_view(root):
+    """What a backup left on its drive, put so two runs can be compared: {place: what is there}. Photos and pictures
+    by their bytes; records and pages as text, with what differs between any two runs taken out: the run's own
+    folder, this run's clock (never when a photo was taken), how long a step took, and the drive's file numbers."""
+    root = Path(root)
+    forms = set()
+    for p in (root, root.resolve()):
+        for f in (str(p), p.as_posix(), p.as_uri()):     # as_uri: a page's link to a folder (file:///...%20...)
+            forms.update((f, json.dumps(f)[1:-1], html.escape(f), html.escape(json.dumps(f)[1:-1])))
+    forms = sorted(forms, key=len, reverse=True)
+    flags = re.IGNORECASE if tc.WINDOWS else 0          # a PC's paths ignore upper and lower case
+
+    def text(t):
+        for f in forms:
+            t = re.sub(re.escape(f), "<RUN>", t, flags=flags)
+        return _CLOCK.sub(_clock, t)
+
+    def value(x, key=None):
+        if key in _FILE_NUMBERS:
+            return "<N>"
+        if isinstance(x, dict):
+            return {text(k): value(v, k) for k, v in x.items()}
+        if isinstance(x, list):
+            return [value(v, key) for v in x]
+        if isinstance(x, str):
+            return text(x)
+        if isinstance(x, (int, float)) and not isinstance(x, bool):
+            if x > 1_000_000_000 or (key and _HOW_LONG.search(key)):
+                return "<N>"                             # a time in seconds since 1970, a file number, how long it took
+        return x
+    import unicodedata
+    out = {}
+    drive = root / "drive night"
+    for p in sorted(drive.rglob("*")):
+        if not p.is_file():
+            continue
+        place = unicodedata.normalize("NFC", p.relative_to(drive).as_posix())
+        data = p.read_bytes()
+        if p.suffix.lower() not in _TEXTS:
+            out[place] = hashlib.sha256(data).hexdigest()
+            continue
+        t = data.decode("utf-8", "replace")
+        try:
+            t = json.dumps(value(json.loads(t)), sort_keys=True, ensure_ascii=False) if p.suffix.lower() == ".json" else None
+        except ValueError:
+            t = None
+        if t is None:                                    # a page, or a record that isn't JSON
+            t = text(data.decode("utf-8", "replace"))
+            for rx, said in _WORDS_CLOCK:
+                t = rx.sub(said, t)
+        out[place] = t
+    return out
+
+
+def records_differ(a, b):
+    """Plain words for every difference between what two backups left on their drives; empty when there is none."""
+    va, vb = run_view(a), run_view(b)
+    said = [f"only in the {'first' if k in va else 'second'}: {k}" for k in sorted(set(va) ^ set(vb))]
+    for k in sorted(set(va) & set(vb)):
+        if va[k] != vb[k]:
+            if len(va[k]) == 64 and len(vb[k]) == 64 and "<" not in va[k]:
+                said.append(f"{k}: not the same bytes")
+                continue
+            at = next((i for i, (x, y) in enumerate(zip(va[k], vb[k])) if x != y), min(len(va[k]), len(vb[k])))
+            said.append(f"{k}: {va[k][max(0, at - 60):at + 60]!r} vs {vb[k][max(0, at - 60):at + 60]!r}")
+    return said
+
+
+def nobody_reading_checks(work):
+    """The same backup twice more, each stopping once it has finished: once read to the end, once with night.py's
+    output read for one line and then closed every time it runs (`| head -1`). Nov 6, closing the last gaps: before,
+    on a Mac too, the copy stopped at its first line (exit 120) with the card not copied."""
+    print("\n-- the same backup twice more: once read to the end, once with nobody reading what it says after its first "
+          "line (`| head -1`)")
+    done = {}
+    for nobody, name in ((False, "twin, read"), (True, "twin, nobody reading")):
+        _tag[0] = "(nobody reading) " if nobody else "(read to the end) "
+        try:
+            done[nobody] = whole_backup(work / name, {}, nobody_reading=nobody)
+        finally:
+            _tag[0] = ""
+    if not (done.get(False) and done.get(True)):
+        return                           # the line that says why has FAILED above
+    diffs = records_differ(work / "twin, read", work / "twin, nobody reading")
+    check("with nobody reading, the backup finishes with the same records as the one read to the end: the same files in the "
+          "same places, photos and pictures byte for byte, every record and page the same (the run's own folder, the clock "
+          "and file numbers aside)", not diffs, f"{len(diffs)} differences: " + "; ".join(diffs[:5]))
 
 
 # ---------------------------------------------------------------- posts: a post kit, the pickers, the posting queue, Canva
@@ -975,15 +1157,17 @@ class _StandIn:
         self.srv.server_close()
 
 
-def ask(port, method, path, host=None, body=None):
+def ask(port, method, path, host=None, body=None, no_host=False):
     """(status, body) of one request to a page server of the Assistant's on 127.0.0.1, sent exactly as given: the
     address is not tidied (so "%2e%2e" arrives as written), and Host is this one when given (a page on another site
-    that has been pointed at this computer still carries its own name there). (None, why) when nothing answered."""
+    that has been pointed at this computer still carries its own name there); no_host: no Host line at all.
+    (None, why) when nothing answered."""
     import http.client
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
     try:
         c.putrequest(method, path, skip_host=True, skip_accept_encoding=True)
-        c.putheader("Host", host or f"127.0.0.1:{port}")
+        if not no_host:
+            c.putheader("Host", host or f"127.0.0.1:{port}")
         if body is not None:
             b = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
             c.putheader("Content-Type", "application/json")
@@ -1502,13 +1686,14 @@ def followup_checks(work):
     """The PC follow-up of Nov 6, where a machine with no screen can see it. Each part's fault FAILs that part
     only; the parts after it still run."""
     print("\n-- the PC follow-up: curl, the grid's list from a PC file, saving from six threads, never through a proxy, "
-          "the queue's page server, CapCut's waiting list, the folder window's answer, quoting for a PC")
+          "the queue's page server, CapCut's waiting list, the folder window's answer, quoting for a PC, the report's "
+          "page server, its folder button and a network path, every say() with nobody reading")
     home = work / "follow-up studio-home"
     home.mkdir()
     env = {"STUDIO_HOME": str(home)}
     ports = smoke_ports(5)
     for part in (curl_checks, feed_checks, saving_checks, proxy_checks, queue_server_checks, capcut_checks,
-                 picker_answer_checks, quoting_checks):
+                 picker_answer_checks, quoting_checks, report_server_checks, report_open_checks, say_checks):
         try:
             part(work, home, env, ports)
         except Exception:  # noqa: BLE001  (a fault in one part FAILs here; the next part still runs)
@@ -1946,6 +2131,320 @@ def quoting_checks(work, home, env, ports):
           "(a comma list in double quotes; a $ in single ones; an apostrophe beside a $ doubled)", got == want, f"{got} {out[-300:]}")
 
 
+def dead_port(port):
+    """A port where nothing listens, for a proxy that is set but dead: (a socket holding it, or None; whether it is
+    dead). Held bound, never listening, when it can be, so nothing else starts listening there meanwhile; when it
+    can't be (a moment after another server let go of it), only checked."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        return s, True
+    except OSError:
+        s.close()
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=3):
+            return None, False          # something answers there: not a dead proxy
+    except OSError:
+        return None, True
+
+
+_REPORT_PROXY_CHILD = """import json, sys, urllib.request
+sys.path.insert(0, {scripts!r})
+import fresh
+started = []
+def no_server(cmd, *a, **k):
+    started.append([str(x) for x in cmd][1:3])
+    raise OSError("this test starts no page server")
+fresh.start_server = no_server
+import serve_report
+try:   # a fresh opener, as a program just started has: does this Python's own fetch really take the proxy?
+    urllib.request.build_opener().open({which!r}, timeout=5).read(1)
+    plain = "answered"
+except Exception as e:
+    plain = type(e).__name__
+r = serve_report.report_url({studio!r})
+q = serve_report.queue_url()
+print("ANSWER " + json.dumps({{"report": r, "queue": q, "started": started, "plain": plain}}))
+"""
+
+
+def report_server_checks(work, home, env, ports):
+    """The report's own page server (serve_report.py), started the way the Assistant starts it and stopped by its own
+    number: it answers to its own name only (127.0.0.1 or localhost, and its port), and refuses any other Host before
+    anything is looked at or changed; and report_url() and queue_url() find a running server with a dead proxy set in
+    the environment, starting no other (Nov 6, closing the last gaps: before, another host got every page and could
+    press Rename, and a proxy made both look for, and start, servers that were already up)."""
+    rs = work / "report server"
+    session = rs / "2026-11-06 Côte card"
+    studio = session / "_studio"
+    studio.mkdir(parents=True)
+    (studio / "manifest.json").write_text(json.dumps({"source": str(work / "report server card"), "dest": str(rs),
+                                                      "files": {}}), encoding="utf-8")
+    page = "<!doctype html><meta charset='utf-8'><title>Côte card</title><p>The report for Côte card</p>".encode("utf-8")
+    (studio / "report.html").write_bytes(page)
+    qhome = work / "report server studio-home"
+    qhome.mkdir()
+    queue_page = _StandIn(ports[1])                   # a queue page already up, for queue_url() to find
+    queue_page.files["/queue.html"] = b"<title>Editing queue</title>"
+    queue_at = f"http://127.0.0.1:{queue_page.port}/queue.html"
+    (qhome / "queue-url.txt").write_text(queue_at + "\n", encoding="utf-8")
+    log = open(work / "report server.log", "wb")
+    srv = subprocess.Popen([sys.executable, str(SCRIPTS / "serve_report.py"), str(session), "--port", str(ports[0])],
+                           stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                           env=child_env({"STUDIO_HOME": str(qhome)}))
+    port, said = None, ""
+    try:
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < 30 and srv.poll() is None:
+            try:
+                said = (studio / "report-url.txt").read_text(encoding="utf-8").strip()
+            except OSError:
+                said = ""
+            if said:
+                from urllib.parse import urlsplit
+                port = urlsplit(said).port
+                if ask(port, "GET", "/which")[0] is not None:
+                    break
+            time.sleep(0.2)
+        check("the report's page server starts and says its address", port is not None and srv.poll() is None,
+              (work / "report server.log").read_bytes().decode("utf-8", "replace")[-300:])
+        if port is None:
+            return
+        mine = {h: ask(port, "GET", "/report.html", host=h) for h in (f"127.0.0.1:{port}", f"localhost:{port}")}
+        check("it answers to its own name: the report page, byte for byte, for 127.0.0.1 and for localhost (with its port)",
+              all(st == 200 and b == page for st, b in mine.values()), str({h: (st, b[:60]) for h, (st, b) in mine.items()}))
+        refused = {}
+        for host in (f"evil.example:{port}", "127.0.0.1:1", "127.0.0.1", None):
+            for method, path, body in (("GET", "/report.html", None), ("GET", "/which", None), ("GET", "/manifest.json", None),
+                                       ("GET", "/rename-status", None), ("HEAD", "/report.html", None),
+                                       ("POST", "/names", {"s1": "hacked"}), ("POST", "/rename", {"shoot": "s1", "name": "hacked"})):
+                st, b = ask(port, method, path, host=host, body=body, no_host=host is None)
+                refused[f"{host or 'no Host'} {method} {path}"] = (st, "Côte" in b.decode("utf-8", "replace") or b"files" in b)
+        st, b = ask(port, "GET", "/rename-status")
+        check("a request naming another host (another name, another port, no port, or no Host at all) is refused (403), "
+              "nothing handed out and nothing changed (no names saved, no rename asked)",
+              all(s == 403 and not leaked for s, leaked in refused.values()) and not (studio / "names.json").exists()
+              and st == 200 and json.loads(b.decode("utf-8") or "{}") == {},
+              str({k: v for k, v in refused.items() if v[0] != 403 or v[1]}) + f" names.json: {(studio / 'names.json').exists()} "
+              f"rename-status: {st} {b[:80]!r}")
+        st, b = ask(port, "POST", "/names", body={"s1": "Beach day"})
+        try:
+            kept = json.loads((studio / "names.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            kept = None
+        check("and the page's own button still saves when it is asked by the server's own name", st == 200 and kept == {"s1": "Beach day"},
+              f"{st} {kept}")
+        # report_url() and queue_url(), in a program of their own with a proxy set that nothing answers
+        holder, dead = dead_port(ports[4])
+        try:
+            if not dead:
+                skip("report_url() and queue_url() with a dead proxy set", f"something answers on port {ports[4]}, so it is no dead proxy")
+            else:
+                proxy_at = f"http://127.0.0.1:{ports[4]}"
+                penv = {"STUDIO_HOME": str(qhome), "no_proxy": "", "NO_PROXY": ""}
+                penv.update({k: proxy_at for k in ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY")})
+                code, out = run_python(["-c", _REPORT_PROXY_CHILD.format(scripts=str(SCRIPTS), studio=str(studio),
+                                                                         which=f"http://127.0.0.1:{port}/which")], env=penv)
+                line = next((ln for ln in out.splitlines() if ln.startswith("ANSWER ")), "")
+                try:
+                    got = json.loads(line[len("ANSWER "):])
+                except ValueError:
+                    got = {}
+                if got.get("plain") == "answered":
+                    skip("report_url() and queue_url() with a dead proxy set",
+                         "this Python's own fetch didn't use the proxy set in the environment, so there is nothing to show")
+                else:
+                    check("report_url() and queue_url() find this computer's own running servers with a dead proxy set in "
+                          "the environment, and start no other",
+                          code == 0 and got.get("report") == said and got.get("queue") == queue_at and got.get("started") == [],
+                          f"{code} {got} wanted {said} and {queue_at} {out[-300:]}")
+        finally:
+            if holder is not None:
+                holder.close()
+    finally:
+        srv.terminate()
+        try:
+            srv.wait(15)
+        except subprocess.TimeoutExpired:
+            srv.kill()
+            srv.wait(15)
+        log.close()
+        queue_page.stop()
+    if port is not None:
+        import socket
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                answered = True
+        except OSError:
+            answered = False
+        check("and once stopped by its own number, nothing answers on its port", not answered, f"port {port}")
+
+
+_REPORT_OPEN_CHILD = """import http.client, json, os, pathlib, sys, threading, time, urllib.parse
+from functools import partial
+from http.server import ThreadingHTTPServer
+sys.path.insert(0, {scripts!r})
+import this_computer
+if {simulate!r}:
+    this_computer.WINDOWS = True     # simulated: a Mac pretending, its paths still the Mac's
+import ntpath, serve_report
+asked, stood = [], []
+OWN = ntpath.normcase(ntpath.normpath({own!r}))   # the report's own network share: its lookups are stood in, never asked
+def watch(cls, name):
+    real = getattr(cls, name)
+    def looked(self, *a, **k):
+        s = str(self)
+        if "127.0.0.1" in s:
+            if ntpath.splitdrive(ntpath.normcase(ntpath.normpath(s)))[0] == OWN:
+                stood.append(name + " " + s)
+                if name == "resolve":   # as this computer would (Windows never climbs above a share with "..")
+                    return type(self)(os.path.normpath(s))
+                if name == "absolute":
+                    return self
+                if name in ("is_dir", "exists"):
+                    return True
+                raise OSError("stood in: nothing is asked of another computer here")
+            asked.append(name + " " + s)
+        return real(self, *a, **k)
+    setattr(cls, name, looked)
+own = type(pathlib.Path("."))
+for name in ("resolve", "is_dir", "exists", "stat", "absolute"):
+    if hasattr(pathlib.Path, name):
+        watch(pathlib.Path, name)
+    if own is not pathlib.Path and name in own.__dict__:
+        watch(own, name)
+opened = []
+serve_report.show_in_finder = lambda p: (opened.append(str(p)), (True, ""))[1]   # never Finder or File Explorer
+serve_report.Handler.allowed = ({allowed!r}, {own_folder!r})
+serve_report.Handler.studio = {studio!r}
+srv = None
+for port in {ports!r}:
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", port), partial(serve_report.Handler, directory={studio!r}))
+        break
+    except OSError:
+        continue
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+out = {{}}
+for want in json.loads(sys.argv[1]):
+    before, stood_before, t0 = len(asked), len(stood), time.monotonic()
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=60)
+    c.request("GET", "/open?path=" + urllib.parse.quote(want, safe=""))
+    r = c.getresponse()
+    said = json.loads(r.read().decode("utf-8"))
+    c.close()
+    out[want] = {{"status": r.status, "ok": said.get("ok"), "words": said.get("words"), "looked up": asked[before:],
+                 "stood in": stood[stood_before:], "took": round(time.monotonic() - t0, 2)}}
+srv.shutdown()
+print("ANSWER " + json.dumps({{"answers": out, "opened": opened}}))
+"""
+
+
+def report_open_checks(work, home, env, ports):
+    """The report's "Open photo folder" (/open) on a PC refuses a network path (//computer/share, \\\\computer\\share)
+    as text, before Windows is asked about it: asking reaches out to that computer first. Every lookup of a path naming
+    127.0.0.1 is recorded, and File Explorer and Finder are stood in. Real on Windows; on a Mac only simulated
+    (this_computer.WINDOWS set in a program of its own, whose paths are still the Mac's).
+    And a report whose photos are on a network drive of its own (a NAS, given a letter or not: once the backup has
+    settled, Windows writes it as \\\\computer\\share\\...) still opens that folder: the share is a pretend one on
+    127.0.0.1 whose every lookup is stood in, so not even this computer is asked anything by its address, while a
+    look-alike next to it ("...X", a ".." out of the folder) is refused with nothing looked up."""
+    allowed = work / "report open" / "2026-06-04 Shoot 1"
+    allowed.mkdir(parents=True)
+    studio = work / "report open" / "_studio"
+    studio.mkdir()
+    simulate = not tc.WINDOWS
+    how = "(a PC)" if tc.WINDOWS else "(simulated on this Mac: this_computer.WINDOWS set in a program of its own)"
+    # the report's own network folder, written the way the records hold it on a PC; with forward slashes on a Mac,
+    # whose paths can only be taken apart at those
+    sep = "\\" if tc.WINDOWS else "/"
+    share = sep * 2 + "127.0.0.1" + sep + "photos"
+    own_folder = share + sep + "The Assistant"
+    own_want = own_folder + sep + "2026-06-04 Shoot 1"
+    look_alikes = [share + sep + "The AssistantX", own_folder + sep + ".." + sep + ".." + sep + "c$"]
+    wants = ["//127.0.0.1/c$", "\\\\127.0.0.1\\c$", "\\??\\UNC\\127.0.0.1\\c$", str(allowed), own_want] + look_alikes
+    code, out = run_python(["-c", _REPORT_OPEN_CHILD.format(scripts=str(SCRIPTS), simulate=simulate, allowed=str(allowed.parent),
+                                                            own=share, own_folder=own_folder, studio=str(studio),
+                                                            ports=[ports[2], ports[3]]), json.dumps(wants)],
+                           env=env)
+    line = next((ln for ln in out.splitlines() if ln.startswith("ANSWER ")), "")
+    try:
+        got = json.loads(line[len("ANSWER "):])
+    except ValueError:
+        got = {}
+    answers = got.get("answers") or {}
+
+    def refused(a):   # at once, in plain words, nothing looked up and nothing even stood in
+        return (a and a["status"] == 200 and a["ok"] is False and a["words"] == "That isn't a folder this report names."
+                and a["looked up"] == [] and a["stood in"] == [] and a["took"] < 5)
+    net = {w: answers.get(w) for w in wants[:3]}
+    check(f"{how} the report's Open photo folder refuses //127.0.0.1/c$, \\\\127.0.0.1\\c$ and \\??\\UNC\\127.0.0.1\\c$ at once, in plain words, "
+          "without asking Windows about them",
+          code == 0 and all(refused(a) for a in net.values()), f"{code} {net} {out[-300:]}")
+    mine = answers.get(wants[3]) or {}
+    opened = got.get("opened") or []
+    check(f"{how} and a folder the report names still opens (Finder and File Explorer stood in)",
+          mine.get("ok") is True and str(mine.get("words", "")).startswith("Opened ") and opened[:1] == [str(allowed)],
+          f"{mine} {opened}")
+    theirs = answers.get(own_want) or {}
+    stood = theirs.get("stood in") or []
+    check(f"{how} and a report whose photos are on a network drive of its own opens that folder ({own_want}), its "
+          "lookups stood in, nothing asked of any computer",
+          theirs.get("ok") is True and str(theirs.get("words", "")).startswith("Opened ") and theirs.get("looked up") == []
+          and any(s.startswith("resolve ") for s in stood) and any(s.startswith("is_dir ") for s in stood)
+          and opened.count(own_want) == 1, f"{theirs} {opened}")
+    odd = {w: answers.get(w) for w in look_alikes}
+    check(f"{how} while a look-alike of that folder (another name starting the same, a '..' out of it) is refused at once, "
+          "nothing looked up", code == 0 and all(refused(a) for a in odd.values()), f"{odd}")
+
+
+_SAY_CHILD = """import errno, json, os, sys
+r, w = os.pipe()
+os.close(r)                 # nobody will ever read this pipe: a `| head` that has read enough
+os.dup2(w, 1)
+os.close(w)
+try:                        # what this computer says when nobody reads: a Mac a broken pipe; Windows "invalid argument"
+    os.write(1, b"probe\\n")
+    probe = "written"
+except OSError as e:
+    probe = errno.errorcode.get(e.errno, str(e.errno))
+os.write(2, ("PROBE " + probe + "\\n").encode("utf-8"))
+sys.path[:0] = [{scripts!r}, {reel!r}]
+import {module} as m
+for i in range(3):
+    m.say("line %d, with nobody reading" % i{extra})
+os.write(2, b"CARRIED ON\\n")
+os._exit(0)
+"""
+SAY_MODULES = ("backup", "sort", "settle", "sneak_peeks", "posts", "return_watch", "reel", "night")
+
+
+def say_checks(work, home, env, ports):
+    """Every say() changed on Nov 6 carries on when nobody reads what it prints (sort.py's is rename_shoot.py's too):
+    a pipe whose reading end is closed, the way `| head -1` leaves it once it has its line. On a Mac that is a broken
+    pipe; on Windows it is "invalid argument" (EINVAL), for real, which is the PC branch of each say()."""
+    log = work / "return_watch said.log"
+    for module in SAY_MODULES:
+        extra = f", log={str(log)!r}" if module == "return_watch" else ""
+        code, out = run_python(["-c", _SAY_CHILD.format(scripts=str(SCRIPTS), reel=str(REEL), module=module, extra=extra)], env=env)
+        lines = out.splitlines()
+        line = "CARRIED ON" in lines
+        probe = next((ln[len("PROBE "):] for ln in lines if ln.startswith("PROBE ")), None)
+        said = {"EPIPE": "a broken pipe", "EINVAL": "Windows' \"invalid argument\" (EINVAL), for real"}.get(probe, probe or "?")
+        extra_ok = True
+        if module == "return_watch":
+            try:
+                extra_ok = len(log.read_text(encoding="utf-8").splitlines()) == 3
+            except OSError:
+                extra_ok = False
+        check(f"{module}.py's say() carries on when nobody reads what it prints ({said})"
+              + (", its log keeping every line" if module == "return_watch" else ""),
+              code == 0 and line and "Traceback" not in out and extra_ok, out[-400:])
+        if tc.WINDOWS and probe not in ("EINVAL", None):
+            info(f"what this PC said to {module}.py when nobody read", f"{probe}, not EINVAL: the PC branch was not the one tried")
+
+
 # ---------------------------------------------------------------- a page server outliving its starter
 
 _STARTER = """import subprocess, sys, time
@@ -2066,6 +2565,9 @@ def main():
     if ONLY == "followup":
         followup_checks(work)
         return finish(work)
+    if ONLY == "backup":
+        whole_backups(work)
+        return finish(work)
 
     # ---- the helper
     d = datetime(2026, 10, 4, 9, 5)
@@ -2161,6 +2663,36 @@ def main():
     if tc.WINDOWS:
         check("the records folder is hidden in File Explorer", hidden(studio), str(hidden(studio)))
 
+    # ---- the same card, with nobody reading what the backup says (a `| head` that has read enough), backup.py run on
+    # its own, not through night.py. On a Mac each line fails as a broken pipe; on Windows as "invalid argument" (EINVAL,
+    # CPython bpo-35754). Either way every file is copied and checked, the records and the report are written, and the
+    # exit code is the backup's own. Its own drive folder, so the checks after it are unchanged.
+    quiet_drive = work / "drive, nobody reading"
+    quiet_drive.mkdir()
+    gone_r, gone_w = os.pipe()
+    os.close(gone_r)
+    try:
+        r = subprocess.run([sys.executable, str(SCRIPTS / "backup.py"), "--source", str(card), "--dest", str(quiet_drive),
+                            "--name", "nobody reading", "--date", "2026-11-06"], stdout=gone_w,
+                           stderr=subprocess.PIPE, env=child_env(env), timeout=STEP_TIMEOUT)
+        code3, said = r.returncode, r.stderr.decode("utf-8", "replace")
+    except subprocess.TimeoutExpired:
+        code3, said = 124, "TIMED OUT"
+    finally:
+        os.close(gone_w)
+    quiet = quiet_drive / "2026-11-06 nobody reading"
+    try:
+        m = json.loads((quiet / "_studio" / "manifest.json").read_text(encoding="utf-8"))
+        first = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
+        whole = (bool(m.get("finished")) and not m.get("problems") and len(m["files"]) == len(first["files"])
+                 and all(e.get("dest", {}).get("ok") for e in m["files"].values())
+                 and (quiet / "_studio" / "morning-report.md").is_file()
+                 and all(sha(p) == sha(quiet / p.relative_to(card)) for p in photos))
+    except (OSError, ValueError, KeyError):
+        whole = False
+    check("a backup with nobody reading what it says still copies and checks every file and writes the report (exit 0)",
+          code3 == 0 and whole, f"exit {code3} {said[-300:]}")
+
     # ---- the Studio File, the walk-away check, the queue
     helper = "Shérman 📷"
     code, out = run("studio_file.py", "set", "--drive", drive, "--offered", "2", "--file-names", "shoot", "--name", helper, env=env)
@@ -2241,10 +2773,20 @@ def main():
         import traceback
         check("the posts checks ran to the end", False, traceback.format_exc()[-1500:])
     followup_checks(work)
+    whole_backups(work)
+    return finish(work)
 
-    # ---- whole backups: this computer's own way; on a Mac also the PC way
+
+def whole_backups(work):
+    """Whole backups: this computer's own way; then the same twice more, read to the end and with nobody reading;
+    on a Mac also the PC way."""
     print("\n-- a whole backup, start to finish" + (" (the Mac's own way: sips)" if pictures.use_sips() else ""))
     whole_backup(work / "whole", {})
+    try:
+        nobody_reading_checks(work)
+    except Exception:  # noqa: BLE001  (a fault here FAILs; the PC way's backup still runs)
+        import traceback
+        check("the backup with nobody reading ran to the end", False, traceback.format_exc()[-1500:])
     if pictures.use_sips():
         print("\n-- a whole backup again, the PC way on this Mac (sips switched off: the JPEG inside each photo, and Pillow)")
         _tag[0] = "(the PC way) "
@@ -2255,7 +2797,6 @@ def main():
                 skip("a whole backup", "Pillow is not installed for this Python; the PC way needs it (python -m pip install pillow)")
         finally:
             _tag[0] = ""
-    return finish(work)
 
 
 def finish(work):
@@ -2279,9 +2820,10 @@ def finish(work):
 
 # python3 tests/pc_smoke.py --only posts: just the post kit, the pickers, the posting queue, Canva and the posting
 # server (a minute, not ten), for trying a change to those. --only followup: just the PC follow-up's part.
+# --only backup: just the whole backups (this computer's own way, the two twins, and on a Mac the PC way).
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv[1:-1] else None
 
 if __name__ == "__main__":
-    if ONLY not in (None, "posts", "followup"):
-        sys.exit("--only takes: posts, followup")
+    if ONLY not in (None, "posts", "followup", "backup"):
+        sys.exit("--only takes: posts, followup, backup")
     sys.exit(main())

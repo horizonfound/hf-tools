@@ -2,13 +2,16 @@ name: Check it on a Windows PC
 # The Assistant has to work on a PC too (Dustin, Nov 6, 2026), and nobody here owns one. GitHub does:
 # on every push that touches the scripts, this runs the parts that should already work on a real
 # Windows machine, and stops any new Mac-only line (tools/check_pc.py):
-#   tests/pc_smoke.py        the helper; a copy-and-check; the walk-away check, also with Pillow hidden;
+#   tests/pc_smoke.py        the helper; a copy-and-check, and the same with nobody reading what it says;
+#                            the walk-away check, also with Pillow hidden;
 #                            a page server outliving the command that started it; moving a folder while a
 #                            photo in it is held open; small pictures the PC way (made-up TIFF-style and
 #                            CR3-style RAWs, a turned JPEG, a see-through PNG, a fake iPhone photo); the reel's
 #                            song lengths and hearing them; then a whole backup start to finish (pictures, sort,
 #                            sneak peeks, settle, every photo checked against the card, the records hidden),
-#                            renames, and on Windows a settle and a rename while a photo is held open; posts: a
+#                            renames, and on Windows a settle and a rename while a photo is held open; the same
+#                            backup with nobody reading what night.py says after its first line (| head -1),
+#                            finishing with the same records as a twin read to the end; posts: a
 #                            post kit built the PC way (sizes, a sideways photo upright), its words and day, the
 #                            pickers' small copies, the posting queue with an emoji, a lock across two programs,
 #                            Canva's downloads from a stand-in on 127.0.0.1, the posting server started and stopped
@@ -17,7 +20,12 @@ name: Check it on a Windows PC
 #                            try only when Windows can't ask about a withdrawn certificate), the Instagram grid's
 #                            list saved the PowerShell way (UTF-16), saving from six threads at once, never through
 #                            a proxy, the editing queue's page server, CapCut's waiting list, the folder window's
-#                            answer read back from a real Windows PowerShell, quoting for PowerShell
+#                            answer read back from a real Windows PowerShell, quoting for PowerShell; the report's
+#                            page server (nothing for another host, report_url and queue_url through a dead proxy,
+#                            Open photo folder refusing \\127.0.0.1\c$ without asking Windows about it, and
+#                            still opening a report's own folder on a network drive); every
+#                            say() changed on Nov 6 carrying on with nobody reading (on Windows "invalid argument",
+#                            EINVAL, for real: the branch of each say() a Mac never takes)
 #   tests/pc_arrange.py      the photo pickers' own machinery (arrange.py): small copies upright and never blown
 #                            up, the lock across four programs, "is a slide job at work?", a child that outlives
 #                            its starter, saving a record while it is open, a kit too deep for 260 characters, a

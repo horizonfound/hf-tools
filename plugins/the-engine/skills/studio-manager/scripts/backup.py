@@ -9,7 +9,7 @@ Writes <dest>/<date> <name>/ with the files in their original folders, plus _stu
 _studio/morning-report.md. A second copy goes to <second>/<date> <name>/ with its own check.
 Safe to run again: files already copied and verified are skipped, nothing is overwritten.
 """
-import argparse, hashlib, json, os, shutil, subprocess, sys, time
+import argparse, errno, hashlib, json, os, shutil, subprocess, sys, time
 from datetime import datetime
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -28,7 +28,20 @@ def hide(folder):
 
 
 def say(msg):
-    print(msg, flush=True)
+    """Print, but never let a closed pipe (someone ran us through `head`) stop the copy, the check of every file,
+    the manifest or the report (the Oct 24 rule). Before Nov 6 a closed pipe stopped the backup part way, on a Mac
+    too. What would have been printed goes nowhere from then on, as in sort.py, so the exit code (0 safe,
+    1 problems, 2 stop, 3 paused, which night.py reads) is the backup's own and never Python's 120."""
+    try:
+        print(msg, flush=True)
+    except BrokenPipeError:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe. A Mac raises anything else, as before. unproven on a real PC
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):
+            raise
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
 
 
 def sha256_of(path):

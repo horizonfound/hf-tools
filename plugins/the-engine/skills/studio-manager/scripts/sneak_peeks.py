@@ -34,6 +34,7 @@ Every run is logged to records/picks-log.json before anything is written.
 Exit codes: 0 done, 1 a problem (nothing written), 2 nothing to do.
 """
 import argparse
+import errno
 import json
 import os
 import sys
@@ -110,6 +111,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def existing_sidecar(photo):

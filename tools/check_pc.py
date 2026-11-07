@@ -20,7 +20,8 @@ check then lets it be (the marker is the promise that a PC never runs it).
 NOT_YET holds the scripts that have not been through the PC pass. Take a script off that list when it
 has been done; the check then holds it to the rules for good. KNOWN holds the few lines in scripts that HAVE
 been through the pass but that this check only learned to see later (Nov 6, second review): each is counted,
-so one more of the same kind in that script still stops, and each says what to do.
+so one more of the same kind in that script still stops, and each says what to do. Empty since Nov 6 (the last
+two, urlopen in night.py and serve_report.py, were fixed), so every script is held to every rule.
 
 How the check reads a script (Nov 6, second review): with Python's own tokenizer and syntax tree, never by
 guessing from how lines start. The first version took the closing \"\"\" of any long text block (page styles,
@@ -159,12 +160,10 @@ ENCODING_WORDS = {
 # Lines in scripts already through the PC pass that this check only learned to see on Nov 6 (second review).
 # (script, short name): (how many there are today, what to do). One more of the same kind in that script stops
 # the check; fewer gives a NOTE to lower the number.
-KNOWN = {   # night.py's open_report line got its pc-ok marker on Nov 6; these two came with the urlopen rule (Nov 6 follow-up)
-    ("night.py", "urlopen"): (1, "open_report's \"is the report server up?\": this_computer.open_local(old, timeout=1) "
-                                 "(the change is written out in the follow-up's needs_from_others)"),
-    ("serve_report.py", "urlopen"): (3, "report_url() and queue_url(): this_computer.open_local in place of each "
-                                        "urllib.request.urlopen (the change is written out in the follow-up's needs_from_others)"),
-}
+# Empty since Nov 6 (closing the last gaps): the two urlopen entries, night.py's open_report (1) and serve_report.py's
+# report_url() and queue_url() (3), now ask through this_computer.open_local, so both files are held to every rule,
+# and a urlopen in any script stops the check.
+KNOWN = {}
 
 
 # ---------------------------------------------------------------- reading a script
@@ -507,6 +506,10 @@ SELF_TESTS = [   # (made-up script, the short names it must give, in any order; 
      'y = urlopen("http://127.0.0.1/")\n', {"urlopen"}),
     ('import this_computer\nthis_computer.open_local("http://127.0.0.1:8790/home", timeout=1).read(1)\n'
      '# urllib.request.urlopen(u) is only mentioned here\n', set()),
+    # (Nov 6, closing the last gaps) the spellings night.py and serve_report.py used to have, and one more
+    ('def f(old):\n    try:\n        import urllib.request\n        urllib.request.urlopen(old, timeout=1).read(1)\n'
+     '    except Exception:\n        pass\n', {"urlopen"}),
+    ('import json, urllib.request as u\nd = json.loads(u.urlopen("http://127.0.0.1:8765/which", timeout=1).read())\n', {"urlopen"}),
     # Nov 6, the designer's join: a child's own session asked for through a dict of options
     ('import os, subprocess\nown = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}\n'
      'subprocess.Popen(["x"], **own)\n', {"new session"}),

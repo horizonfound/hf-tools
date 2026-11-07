@@ -19,6 +19,7 @@ _studio/shoots.json (date-based) when they left one blank. A photo's sidecar
 (.xmp) travels with it. Files with no capture time stay where they are.
 """
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -39,6 +40,12 @@ def say(msg):
     try:
         print(msg, flush=True)
     except BrokenPipeError:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe. A Mac raises anything else, as before. unproven on a real PC
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):
+            raise
         sys.stdout = open(os.devnull, "w", encoding="utf-8")
 
 

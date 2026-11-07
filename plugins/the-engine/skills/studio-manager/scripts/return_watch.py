@@ -22,6 +22,7 @@ Exit 0: they went away and came back (prints how long). Exit 3: gave up after --
 Exit 4: cannot tell on this computer.
 """
 import argparse
+import errno
 import os
 import plistlib
 import re
@@ -41,6 +42,11 @@ def say(msg, log=None):
         print(line, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
     if log:
         try:
             with open(log, "a", encoding="utf-8") as f:

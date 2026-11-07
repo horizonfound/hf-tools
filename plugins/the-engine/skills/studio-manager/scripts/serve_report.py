@@ -121,14 +121,14 @@ def report_url(studio):
     """The live report's address for one backup, starting its little server if none answers for it. Used by the
     home page's "See the report" (Dustin, Nov 5: once he pressed Back to home there was no way back to the
     report). A port can be taken over by another backup's server later, so "alive" is not enough: the server
-    has to say it serves this backup (/which)."""
-    import urllib.request
+    has to say it serves this backup (/which). Asked never through a proxy (this_computer.open_local): a proxy
+    can't see this computer's own pages, so the server would always look gone and another one be started."""
     studio = Path(studio)
     f = studio / "report-url.txt"
 
     def serving(url):
         try:
-            d = json.loads(urllib.request.urlopen(url.rsplit("/", 1)[0] + "/which", timeout=1).read())
+            d = json.loads(this_computer.open_local(url.rsplit("/", 1)[0] + "/which", timeout=1).read())
             return Path(d.get("studio", "")).resolve() == studio.resolve()
         except Exception:  # noqa: BLE001
             return False
@@ -153,15 +153,15 @@ def report_url(studio):
 
 
 def queue_url():
-    """The live queue page's address. If no queue server answers, start one (edit_queue.py serve) and wait for its line."""
-    import urllib.request
+    """The live queue page's address. If no queue server answers, start one (edit_queue.py serve) and wait for its line.
+    "Is it up?" is asked never through a proxy (this_computer.open_local), as in report_url."""
     try:
         import edit_queue
         f = edit_queue.HOME / "queue-url.txt"
         if f.exists():
             old = f.read_text(encoding="utf-8").strip()
             try:
-                urllib.request.urlopen(old, timeout=1).read(1)
+                this_computer.open_local(old, timeout=1).read(1)
                 return old
             except Exception:  # noqa: BLE001
                 pass
@@ -171,7 +171,7 @@ def queue_url():
             if f.exists():
                 url = f.read_text(encoding="utf-8").strip()
                 try:
-                    urllib.request.urlopen(url, timeout=1).read(1)
+                    this_computer.open_local(url, timeout=1).read(1)
                     return url
                 except Exception:  # noqa: BLE001
                     continue
@@ -225,12 +225,60 @@ class Picks:
                 sys.stderr.write(f"report not rebuilt: {ex}\n")
 
 
+def named_as_text(want, folders):
+    """A PC: is `want`, read the way Windows reads a name (either slash, any capitals, "." and ".." worked out), one
+    of `folders` or inside one? Text only: nothing is looked up, so no other computer is asked anything. Windows can't
+    climb above \\\\computer\\share with "..", so a match also pins the computer and the share to one of the report's
+    own (unproven on a real PC). A folder whose name has no drive letter, or no computer and share, never matches."""
+    import ntpath   # how Windows reads a name, on any computer (only ever asked on a PC)
+
+    def whole(drive):   # "E:", or "\\computer\share" with both named (not "\\", "\\?\...", "\\.\...")
+        if len(drive) == 2 and drive[1] == ":" and drive[0].isalpha():
+            return True
+        bits = drive[2:].split("\\") if drive.startswith("\\\\") else []
+        return len(bits) == 2 and all(bits) and bits[0] not in ("?", ".")
+
+    try:   # Windows' own normpath (Python 3.12 and later) refuses a name with a stray NUL in it: not a folder of ours
+        w = ntpath.normcase(ntpath.normpath(want)).rstrip("\\")
+        for a in folders:
+            f = ntpath.normcase(ntpath.normpath(str(a))).rstrip("\\")
+            if not whole(ntpath.splitdrive(f)[0]):
+                continue
+            if w == f or w.startswith(f + "\\"):
+                return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
 class Handler(SimpleHTTPRequestHandler):
     studio = ""
     allowed = ()
     renames = None
     picks = None
     last_open = {}  # path -> time, so one click never opens two Finder windows
+
+    def ours(self):
+        """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)? The report
+        is always opened that way. A web page on another site pointed at this computer by a trick of names still
+        carries its own name in Host, and is refused before anything is looked at (it would otherwise read the
+        backup's records: what they said for the client notes, the notes, the index). As the posting server and
+        the editing queue's."""
+        port = self.server.server_address[1]
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return True
+        self.send_error(HTTPStatus.FORBIDDEN)
+        try:
+            sys.stderr.write(f"refused: a request for {urlsplit(self.path).path[:60]!r} named another host ({host[:80]!r})\n")
+        except Exception:  # noqa: BLE001  (the log is only for reading a miss later; the answer has gone out)
+            pass
+        return False
+
+    def do_HEAD(self):
+        # the report's own "has it been rebuilt?" check asks for report.html this way, every 4 seconds
+        if self.ours():
+            super().do_HEAD()
 
     def list_directory(self, path):
         # Never a bare list of the backup's records (Dustin, Nov 5: the pane's play button opened the server's
@@ -239,6 +287,8 @@ class Handler(SimpleHTTPRequestHandler):
         return None
 
     def do_GET(self):
+        if not self.ours():
+            return
         parts = urlsplit(self.path)
         if fresh.page_path(parts.path) and fresh.stale() and fresh.restart(self):
             return
@@ -303,17 +353,33 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
         want = parse_qs(parts.query).get("path", [""])[0]
         target = Path(want).expanduser()
+        # A PC only: a network path ("//computer/share", "\\computer\share", or Windows' own "\??\UNC\computer\share")
+        # is refused as text, before resolve() or
+        # is_dir() could look it up: asking Windows about one reaches out to that computer first (and offers it the
+        # sign-in of whoever is using this one), and any web page can ask this server for one, even if it can't
+        # read the answer. Unless, as text, it is one of the report's own folders or inside one: a photo drive on the
+        # network, given a letter (Z:) or not, is written as \\computer\share\... in the records once the backup has
+        # settled (Windows' own resolve() turns the letter into the computer's address), and its Open photo folder
+        # opens as before. A drive letter is looked at as before. A Mac: as before.
+        spelled = want.replace("\\", "/")
+        network = (this_computer.WINDOWS and (spelled.startswith("//") or spelled.startswith("/??/"))
+                   and not named_as_text(want, self.allowed))   # unproven on a real PC
         try:   # a name Windows cannot even look up (a stray ? or *) is simply not a folder this report names
-            allowed = any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
+            allowed = not network and any(target.resolve().is_relative_to(Path(a).resolve()) for a in self.allowed)
         except (OSError, ValueError):
             allowed = False
-        if not target.is_dir():
+        if network:
+            ok, words = False, "That isn't a folder this report names."
+        elif not target.is_dir():
             ok, words = False, f"That folder isn't there right now. Is {this_computer.drive_words(target) or 'the drive'} plugged in?"
         elif not allowed:
             ok, words = False, "That isn't a folder this report names."
         else:
             now = time.monotonic()
-            if now - self.last_open.get(str(target), 0) > 1.0:
+            # Never opened yet, or more than a second ago. (Apple's own Python counts this clock from the server's
+            # start, so a click in its first second was taken for a second click and nothing opened.)
+            last = self.last_open.get(str(target))
+            if last is None or now - last > 1.0:
                 ok, why = show_in_finder(target)  # opens it and brings Finder to the front when macOS allows
                 name = target.name or str(target)
                 APP = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
@@ -333,6 +399,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         """The page sends one name to rename right away: {"shoot": id, "name": name} to /rename (queued, run one at a
         time). The older /names takes {shoot id: name} and only keeps them in _studio/names.json for Claude."""
+        if not self.ours():
+            return
         path = urlsplit(self.path).path
         if path == "/rename":
             try:

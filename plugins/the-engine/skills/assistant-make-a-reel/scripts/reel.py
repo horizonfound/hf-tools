@@ -35,6 +35,7 @@ added in CapCut or Instagram.
 Exit codes: 0 done · 2 stop (folder, photo or song missing).
 """
 import argparse
+import errno
 import json
 import subprocess
 import os
@@ -67,6 +68,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def slug(s):

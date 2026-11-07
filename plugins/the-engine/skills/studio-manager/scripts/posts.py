@@ -80,6 +80,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 # ---------- the home ----------
@@ -964,7 +969,7 @@ def main():
         left = ", ".join(plural(n, k) for k, n in sorted(skipped.items()))
         say(f"Copied {copied} finished photo{'s' if copied != 1 else ''} from \"{Path(a.folder).name}\" into the drop box, every one checked. Your originals weren't moved."
             + (f" Left behind, not copied: {left}." if left else ""))
-        print(json.dumps({"copied": copied, "skipped": skipped, "dest": str(dest)}))
+        say(json.dumps({"copied": copied, "skipped": skipped, "dest": str(dest)}))   # through say() like every line: a closed output can't end a finished copy in an error
         return 0 if copied else 3
     if a.cmd == "places":
         for p in places():

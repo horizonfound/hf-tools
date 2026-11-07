@@ -24,9 +24,12 @@ after the first run the command is just:  night.py --source /Volumes/CARD
 A card the ledger (cards.py) already knows is not copied again.
 """
 import argparse
+import errno
 import json
 import os
+import stat
 import subprocess
+import threading
 import time
 import sys
 from datetime import datetime
@@ -41,16 +44,143 @@ import this_computer  # noqa: E402  (the Mac way and the PC way of everything, i
 this_computer.utf8_output()
 
 
+# A closed output never stops the backup part way (the Oct 24 rule: "say() never lets a closed pipe stop the work").
+# Before Nov 6 it did, on a Mac too: run through `| head -1`, the copy stopped at its first line (exit 120), the card
+# not copied; and night.py stopped at its own next line. Our outputs whose reader has gone away ("out", "err").
+_GONE = set()
+
+
+def _reader_gone(e):
+    """Is this error the reader of our output having gone away (a `| head` that has read enough, a closed window)?
+    A broken pipe on both computers; on a PC also "invalid argument" (EINVAL), which is how Windows reports it
+    (as kit.py's say; unproven on a real PC). Anything else is not, and a Mac raises it as before."""
+    return isinstance(e, BrokenPipeError) or (this_computer.WINDOWS and isinstance(e, OSError) and e.errno == errno.EINVAL)
+
+
+def _let_go(which):
+    """From now on this output ("out" or "err") goes nowhere: neither a later line nor Python's own last flush at the
+    end trips over the closed pipe, which would turn night.py's exit code (0, 4, 7..., read by the skill) into 120."""
+    _GONE.add(which)
+    stream = sys.stdout if which == "out" else sys.stderr
+    try:
+        fd = os.open(os.devnull, os.O_WRONLY)
+        try:
+            os.dup2(fd, stream.fileno())
+        finally:
+            os.close(fd)
+    except (OSError, ValueError, AttributeError):
+        null = open(os.devnull, "w", encoding="utf-8")
+        if which == "out":
+            sys.stdout = null
+        else:
+            sys.stderr = null
+
+
 def say(msg):
-    print(msg, flush=True)
+    """Print one line. If whatever reads our output has gone away, the line goes nowhere and the backup carries on."""
+    try:
+        print(msg, flush=True)
+    except OSError as e:
+        if not _reader_gone(e):
+            raise
+        _let_go("out")
+
+
+def _can_close(stream):
+    """Can the reader of this output go away while we still write to it? A pipe or a socket can (`| head`); a
+    terminal or a file can't, and with those the steps write straight to it, exactly as before."""
+    try:
+        mode = os.fstat(stream.fileno()).st_mode
+    except (OSError, ValueError, AttributeError):
+        return False
+    return stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode)
+
+
+def _same_pipe(a, b):
+    """Are our two outputs one and the same pipe (`2>&1 | ...`)? Then a step's two outputs share one pipe here too,
+    so its lines and its errors keep their order. Never on a PC: Windows gives every pipe the number 0, so there a
+    step's errors travel apart from its lines and may land a few lines away from where they were printed (nothing
+    stops, no file changes; this_computer has no way yet to ask Windows whether two outputs are one pipe)."""
+    try:
+        x, y = os.fstat(a.fileno()), os.fstat(b.fileno())
+    except (OSError, ValueError, AttributeError):
+        return False
+    return x.st_ino != 0 and (x.st_dev, x.st_ino) == (y.st_dev, y.st_ino)
+
+
+def _relay(src, which):
+    """Pass one step's output on, byte for byte, as it comes. Once our own output has gone, the step's output is
+    still read and dropped, so the step never meets the closed pipe and never waits on a full one."""
+    try:
+        while True:
+            try:
+                chunk = os.read(src.fileno(), 65536)
+            except OSError:
+                return
+            if not chunk:
+                return
+            if which in _GONE:
+                continue
+            stream = sys.stdout if which == "out" else sys.stderr
+            try:
+                stream.buffer.write(chunk)
+                stream.buffer.flush()
+            except Exception as e:  # noqa: BLE001  (never let this die: the step would wait on a full pipe)
+                if isinstance(e, OSError) and _reader_gone(e):
+                    _let_go(which)
+                else:
+                    _GONE.add(which)
+    finally:
+        try:
+            src.close()
+        except OSError:
+            pass
 
 
 def run(script, *args):
     """Run one of the scripts beside this one, streaming its output; return its exit code.
     The computer is asked not to doze off in the middle of a long copy (the Mac's caffeinate; on a PC,
-    Windows' own request, made in this_computer.py)."""
+    Windows' own request, made in this_computer.py).
+    Written to a terminal or a file, the step writes straight to it, as always. Written to a pipe, the step's output
+    comes through here (_relay), so a reader that goes away part way never stops the step: a step meeting the
+    closed pipe itself stops there, or ends with Python's 120 (`| head -30` on a pretend card stopped the backup
+    at finding the shoots, exit 1, even with every say() of night.py and backup.py made safe).
+    A step must never hand a process that outlives it this output (a page server, say): give it a log of its own, as
+    fresh.start_server does. Otherwise, written to a pipe, each such step waits 10 more seconds here, and that
+    process meets the closed pipe once night.py has gone. No step does today."""
     cmd = this_computer.awake_command([sys.executable, str(HERE / script), *map(str, args)])
-    return subprocess.run(cmd).returncode
+    outputs = (("out", sys.stdout), ("err", sys.stderr))
+    if not any(which in _GONE or _can_close(stream) for which, stream in outputs):
+        return subprocess.run(cmd).returncode   # a terminal or a file: exactly as before
+    for which, stream in outputs:
+        if which in _GONE:
+            continue
+        try:   # our own lines first, so the step's come after them
+            stream.flush()
+        except OSError as e:
+            if not _reader_gone(e):
+                raise
+            _let_go(which)
+    # a gone output: the step's goes nowhere too; a pipe: through here; a terminal or a file: straight to it
+    route = {which: subprocess.DEVNULL if which in _GONE else (subprocess.PIPE if _can_close(stream) else None)
+             for which, stream in outputs}
+    if route["out"] == subprocess.PIPE and route["err"] == subprocess.PIPE and _same_pipe(sys.stdout, sys.stderr):
+        route["err"] = subprocess.STDOUT
+    p = subprocess.Popen(cmd, stdout=route["out"], stderr=route["err"])
+    relays = [threading.Thread(target=_relay, args=(src, which), daemon=True)
+              for src, which in ((p.stdout, "out"), (p.stderr, "err")) if src is not None]
+    for t in relays:
+        t.start()
+    try:
+        code = p.wait()
+    except BaseException:
+        p.kill()   # as subprocess.run does (Ctrl+C, say)
+        p.wait()
+        raise
+    finally:
+        for t in relays:
+            t.join(timeout=10)   # the rest of its output, a moment after it ends
+    return code
 
 
 def fresh(a, b):
@@ -455,9 +585,8 @@ def open_report(session, studio):
     url = None
     if url_file.exists():
         old = url_file.read_text(encoding="utf-8").strip()
-        try:  # is that server still alive?
-            import urllib.request
-            urllib.request.urlopen(old, timeout=1).read(1)
+        try:  # is that server still alive? (asked never through a proxy, which can't see this computer's own pages)
+            this_computer.open_local(old, timeout=1).read(1)
             url = old
         except Exception:
             url = None

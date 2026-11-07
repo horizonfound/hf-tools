@@ -28,6 +28,7 @@ Exit codes: 0 settled (or already) · 1 problems · 6 left together on purpose
 (a name clash, something unexpected in the folder, or the night not finished).
 """
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -48,6 +49,11 @@ def say(msg):
         print(msg, flush=True)
     except BrokenPipeError:
         pass
+    except OSError as e:
+        # A PC only (as kit.py's say): Windows reports a reader that has gone away as "invalid argument" (EINVAL),
+        # not as a broken pipe, and the work goes on, as it does on a Mac. A Mac raises anything else, as before.
+        if not (this_computer.WINDOWS and e.errno == errno.EINVAL):   # unproven on a real PC
+            raise
 
 
 def leave(why):
