@@ -92,6 +92,7 @@ import this_computer  # noqa: E402
 import arrange  # noqa: E402
 import kit as kit_mod  # noqa: E402
 import brand  # noqa: E402
+import look  # noqa: E402
 
 this_computer.utf8_output()
 
@@ -2488,9 +2489,7 @@ def handle_post(handler, path, query):
 # "Recommended for behind-the-scenes reels" shows on a photos-only reel too; BUILD.md says it is for footage
 # only (for the "Tell Nicole" list).
 STYLE = r"""
-:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;--sand-l:#ECEAF6;--line:rgba(31,36,48,.12);
---long:#2f7d57;--long-l:#dcefe5;--quick:#7a5bb0;--quick-l:#ebe3f7;
---display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue',Arial,sans-serif;--ease:cubic-bezier(.2,.7,.2,1)}
+:root{--display:'Fraunces',Georgia,serif}
 *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 9rem}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
@@ -2851,7 +2850,7 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + FONT_CSS + STYLE + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + FONT_CSS + STYLE + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
