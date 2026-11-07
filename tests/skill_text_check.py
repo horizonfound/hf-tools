@@ -214,7 +214,7 @@ def check_reel_skill():
     t = read(REEL / "SKILL.md")
     step2 = t.split("## Step 2", 1)[-1].split("\n## ", 1)[0]
     case("Step 2 reads curating.md and chooses by Nicole's rule: the best photos on their own merit",
-         "../../shared/curating.md" in step2 and "What goes in is Nicole's rule (Nov 6): the best photos, on their own merit" in step2)
+         "<shared>/curating.md" in step2 and "What goes in is Nicole's rule (Nov 6): the best photos, on their own merit" in step2)
     case("... stories in the shoot, a shortlist each, close calls side by side with the strip, a handful of larger looks at most",
          all(x in step2 for x in ("Find the stories in the shoot", "shortlist the strongest frames for each", "settle the close calls side by side",
                                   "`--picks 7,8,9`, draws them in a row", "a handful at most")))

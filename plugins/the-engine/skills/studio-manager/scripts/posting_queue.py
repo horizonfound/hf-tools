@@ -1249,7 +1249,9 @@ class Handler(SimpleHTTPRequestHandler):
         cards), so it always shows what is made now. The kit is found only by its exact name in Your Content's own
         listing (arrange.kit_by_name: a real folder, not a link, holding a kit record). When it can't be reached
         (the drive unplugged, or no such kit) her page says so, with her one line, and the answer is "not found".
-        Should the page fail to build, the copy kit.py last saved is sent instead."""
+        Should the page fail to build, the copy kit.py last saved is sent instead, but only one of today's page
+        (kit.PAGE_MARK); a copy from before her three cards is never passed off as current, and the page says in one
+        line that something couldn't be read and to tell Claude."""
         import arrange
         import kit as kit_mod
         kit = arrange.kit_by_name(name)
@@ -1262,11 +1264,16 @@ class Handler(SimpleHTTPRequestHandler):
                 if need:
                     arrange.start_previews(kit)        # a reel photo on the card has no small copy yet: made in the background
             except Exception as e:  # noqa: BLE001
-                say(f"kit page: couldn't build {name!r} ({e.__class__.__name__}: {str(e)[:160]}); sending the saved copy")
                 try:
                     body = kit_mod.page_path(kit).read_text(encoding="utf-8")
                 except (OSError, UnicodeDecodeError):
-                    body, code = kit_mod.unreachable_html(), HTTPStatus.NOT_FOUND
+                    body = None
+                if body is None or kit_mod.PAGE_MARK not in body:
+                    # no saved copy, or one from before her three cards: an old page would look current and isn't
+                    say(f"kit page: couldn't build {name!r} ({e.__class__.__name__}: {str(e)[:160]}); no saved copy of today's page, so saying so")
+                    body, code = kit_mod.unreachable_html(kit_mod.OUR_KIT_WORDS["cant_build"]), HTTPStatus.INTERNAL_SERVER_ERROR
+                else:
+                    say(f"kit page: couldn't build {name!r} ({e.__class__.__name__}: {str(e)[:160]}); sending the saved copy")
         data = body.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/html; charset=utf-8")

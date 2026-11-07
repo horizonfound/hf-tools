@@ -791,13 +791,15 @@ def pick_text(nums, marks=None):
 
 def kit_pick(rec, piece):
     """The kit's own pick for a piece: the numbers, and for a reel the mark beside each."""
-    nums = [n for n in ((rec.get("picks") or {}).get(piece) or []) if type(n) is int]
+    picks = rec.get("picks") if isinstance(rec.get("picks"), dict) else {}      # a record changed by hand: read what makes sense
+    got = picks.get(piece)
+    nums = [n for n in (got if isinstance(got, list) else []) if type(n) is int]
     seen, clean = set(), []
     for n in nums:
         if n not in seen:
             seen.add(n)
             clean.append(n)
-    rm = rec.get("reel_marks") or {}
+    rm = rec.get("reel_marks") if isinstance(rec.get("reel_marks"), dict) else {}
     marks = [(rm.get(str(n)) if rm.get(str(n)) in ("+", "-") else "") if piece == "reel" else "" for n in clean]
     return clean, marks
 

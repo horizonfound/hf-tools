@@ -308,14 +308,20 @@ def draw_photos(folder):
         d.ellipse([w // 8, h // 8, w // 8 + w // 6, h // 8 + w // 6], fill=(255, 244, 200))
         return im
 
-    made = [("a-checker-wide.jpg", checker(3000, 2000)), ("b-stripes-wide.jpg", stripes(3600, 2400)), ("c-checker-tall.jpg", checker(2000, 3000))]
+    # each photo is drawn, saved and let go before the next (all of them held at once took about 300 MB, more than a
+    # run under the memory guard can spare beside a hidden Chrome)
+    made = [("a-checker-wide.jpg", lambda: checker(3000, 2000)), ("b-stripes-wide.jpg", lambda: stripes(3600, 2400)),
+            ("c-checker-tall.jpg", lambda: checker(2000, 3000))]
     shapes = [("tall", 1200, 1800), ("wide", 1800, 1200), ("tall", 1200, 1800), ("wide", 1800, 1200), ("square", 1400, 1400), ("tall", 1200, 1800), ("wide", 1800, 1200)]
     for i in range(21):
         way, w, h = shapes[i % len(shapes)]
-        made.append((f"p{i + 1:02d}-{way}.jpg", plain(w, h, i)))
-    for name, im in made:
+        made.append((f"p{i + 1:02d}-{way}.jpg", (lambda w=w, h=h, i=i: plain(w, h, i))))
+    for name, draw in made:
+        im = draw()
         im.save(folder / name, "JPEG", quality=93, subsampling=0)
         out[name] = im.size
+        im.close()
+        del im
     return out
 
 
@@ -440,6 +446,8 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
     base = f"http://127.0.0.1:{P}"
     tokens = [0]
     times = {}
+    again = []          # a Chrome started part way (CHROME_DRIVE_LEAN=1), ended at the end like the first
+    early_outside = []  # what the first Chrome asked for, when it was ended part way
     try:
         with cd.Chrome(work=work / "chrome-designs", size=(1280, 900)) as c:
             c.init_script(NO_FINDER_JS)
@@ -1040,6 +1048,13 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             if reach:
                 blocks.append(text(3, "A Google face,\nwrapped onto more than one line here", 2160 + 120, 200, 840, font="Lora", size=96, weight=700, al="right"))
             words_id = new_design("words", {"slides": 3, "bg": "#ffffff", "blocks": blocks}, name="Words test")
+            # A second hidden Chrome at twice the size. Under CHROME_DRIVE_LEAN=1 (a computer short of memory, every
+            # test under a memory guard: two Chromes at once take about 2 GB) the first one is ended before the second
+            # starts, and a fresh one takes its place after: the second window is still a window of its own.
+            lean = os.environ.get("CHROME_DRIVE_LEAN") == "1"
+            if lean:
+                early_outside.extend(c.outside_requests())      # kept for the whole-run check at the end
+                c.stop()
             with cd.Chrome(work=work / "chrome-designs-2x", size=(1500, 900), scale=2) as c2:
                 c2.init_script(NO_FINDER_JS)
                 c2.open(f"{base}/design.html?kit={KQ}&design={words_id}")
@@ -1071,6 +1086,11 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                 c2.wait_for("!Designer.saver.busy()", 60)
                 line = c2.text("#save-line")
                 errs2 = c2.page_errors()
+            if lean:
+                # the helpers above all use "c", so the fresh Chrome is given that name
+                c = cd.Chrome(work=work / "chrome-designs-again", size=(1280, 900)).start()
+                again.append(c)
+                c.init_script(NO_FINDER_JS)
             if case("words: saved (from a second window, drawn at twice the size so the screen can be measured)", line.startswith("Saved 3 slides") and errs2 == [], (line, errs2)):
                 label = {0: "a font the Assistant carries (Inter)", 1: "a carried font in italics, set left, with letter spacing (Cormorant Garamond)", 2: "a Google font in bold, set right (Lora)"}
                 for k in range(len(blocks)):
@@ -1292,9 +1312,11 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
 
             # ================= the whole run =================
             case("the page threw no error and logged none, in the whole run (but for the photo made unreadable on purpose)", c.page_errors() == [], c.page_errors()[:4])
-            outside = [u for u in c.outside_requests() if "fonts.googleapis.com" not in u and "fonts.gstatic.com" not in u]
+            outside = [u for u in early_outside + c.outside_requests() if "fonts.googleapis.com" not in u and "fonts.gstatic.com" not in u]
             case("the page asked nothing of any address but the Assistant's and Google Fonts, in the whole run", outside == [], outside[:4])
     finally:
+        for x in again:
+            x.stop()
         srv.stop()
     for k, v in times.items():
         print(f"TIME  Save slides, {k} (pretend photos of 2 to 9 megapixels): {v:.1f} s from the press to the line", flush=True)

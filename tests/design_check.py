@@ -16,7 +16,7 @@ Run it with a Python that has Pillow (python3, 3.12 on this Mac): the finished s
 1080x1350 JPEGs drawn here, and fake_kit.py needs Pillow too. Pillow is used by this test only, never by the
 plugin.
 
-Three parts (--only server | page | browser runs one): the server side, by requests (below); the page's own
+Three parts (--only server | page | browser runs one; --only strip runs the browser part's strip, frames and tray alone): the server side, by requests (below); the page's own
 scripts by themselves, under the Mac's own JavaScript engine; and the real page in a hidden Chrome driven by
 tests/chrome_drive.py (SKIP when there is no Chrome). The last two are in tests/design_page_check.py (the
 strip, the frames, the tray) and tests/design_text_check.py (text boxes, fonts, brand colors; --only text
@@ -331,8 +331,9 @@ def check_all(work, port):
         case("state: every own face names a font file the plugin has", st["fonts"]["faces"] and all((FONTS / (x["file"] + ".ttf")).is_file() for x in st["fonts"]["faces"]), st["fonts"]["faces"])
         case("state: the fallback font and the rule for a font's name are given", st["fonts"]["fallback"] == "Georgia" and re.fullmatch(st["fonts"]["pattern"], "Old Standard TT") and not re.fullmatch(st["fonts"]["pattern"], "x'; }"), st["fonts"])
         shoots = {s["kit"]: s for s in st["shoots"]}
-        case("state: the shoot menu lists every shoot with its photo count and design count, this one marked open",
-             set(shoots) == {kit_name, kit2_name, kit3_name} and shoots[kit_name]["photos"] == 14 and shoots[kit_name]["designs"] == 1
+        # the design the first visit made counts once it is changed or saved from (v19 fix-c: hers writes nothing until then)
+        case("state: the shoot menu lists every shoot with its photo count and design count (not the one the visit made), this one marked open",
+             set(shoots) == {kit_name, kit2_name, kit3_name} and shoots[kit_name]["photos"] == 14 and shoots[kit_name]["designs"] == 0
              and shoots[kit_name]["open"] is True and shoots[kit2_name]["designs"] == 0 and shoots[kit2_name]["open"] is False, st["shoots"])
         case("state: the look-alike folder beside Your Content is not a shoot", not any("Sneaky" in s["kit"] or "old" in s["kit"] for s in st["shoots"]), st["shoots"])
         case("state: no brand colors, no templates, no fonts of their own yet", st["brand"] == {"colors": [], "max": 16} and st["templates"] == [] and st["fonts"]["yours"] == [], (st["brand"], st["templates"]))
@@ -1190,9 +1191,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen", "layout", "stories"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
-                         "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
+                         "(every part below that drives it, one after another); strip: only the strip, the frames and the tray, in a hidden "
+                         "Chrome (with --only text, designs, wire, fixes, screen, layout and stories it makes up browser, a part at a "
+                         "time, for a computer that can't hold them all in one run); text: only the text, fonts and "
                          "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks); "
                          "wire: only the kit page, the posting queue, the links and the line for Claude; fixes: what the first reviewers found (safety); "
                          "screen: what the second reviewers found (matching Nicole's, and what is on the screen); "
@@ -1285,7 +1288,7 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of the 'Lay out the slides' links ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
-    if a.only in (None, "browser"):
+    if a.only in (None, "browser", "strip"):
         # its own pretend kit and its own page server, a little above the server check's ports
         real_page("the strip, the frames and the tray")
         try:

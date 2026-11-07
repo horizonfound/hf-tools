@@ -93,12 +93,26 @@ DESIGN_CORE_JS = r"""
     return String(s).replace(/\+ New design/g, '+ Add stories').replace(/Carousel folder/g, 'Stories folder')
       .replace(/\bslides\b/g, 'stories').replace(/\bSlides\b/g, 'Stories').replace(/\bslide\b/g, 'story').replace(/\bSlide\b/g, 'Story');
   }
+  // A words function in a story's words: only the line's own words change, never what is put into it. Each
+  // non-empty text it is given (a shoot's or a set's name, a font, the words on a story) goes in as a stand-in,
+  // the line is turned into a story's words, and the real text is put back, so "Slide Rock park" keeps its name.
+  function storyFn(fn){
+    return function(){
+      var real = [], args = Array.prototype.map.call(arguments, function(a){
+        function hold(x){ if (typeof x !== 'string' || x === '') return x; real.push(x); return '\uE000' + (real.length - 1) + '\uE001'; }
+        return Array.isArray(a) ? a.map(hold) : hold(a);
+      });
+      var r = fn.apply(null, args);
+      if (typeof r !== 'string') return r;
+      return storyText(r).replace(/\uE000(\d+)\uE001/g, function(m, i){ return real[+i]; });
+    };
+  }
   function storyWords(table, own){
     Object.keys(table).forEach(function(k){
       if (own && Object.prototype.hasOwnProperty.call(own, k)) { table[k] = own[k]; return; }
       var v = table[k];
       if (typeof v === 'string') table[k] = storyText(v);
-      else if (typeof v === 'function') table[k] = (function(fn){ return function(){ var r = fn.apply(null, arguments); return typeof r === 'string' ? storyText(r) : r; }; })(v);
+      else if (typeof v === 'function') table[k] = storyFn(v);
     });
     if (own) Object.keys(own).forEach(function(k){ if (!Object.prototype.hasOwnProperty.call(table, k)) table[k] = own[k]; });     // a story's own lines
     return table;
@@ -373,7 +387,7 @@ DESIGN_CORE_JS = r"""
       if (!j || !j.ok) { reach((j && j.words) || WORDS.cantReach); return; }
       reach('');
       adopt(j);
-      status(WORDS.saved);
+      status(STORY && j.design && j.design.untouched ? '' : WORDS.saved);     // stories, hers: nothing is "Saved" until the first change
     }).catch(function(){
       reach(WORDS.cantReach);
       setTimeout(start, 2000);
@@ -387,7 +401,7 @@ DESIGN_CORE_JS = r"""
         if (!j || !j.ok) { note((j && j.words) || WORDS.cantReach, true); return false; }
         note('');
         adopt(j);
-        status(WORDS.saved);
+        status(STORY && j.design && j.design.untouched ? '' : WORDS.saved);
         return true;
       });
     });

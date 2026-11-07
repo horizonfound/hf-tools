@@ -375,8 +375,8 @@ def cmd_scan(kit, every=None):
     else:
         say("Their notes for this reel: none (they wrote nothing in \"Want to direct the reel?\").")
     if feel:
-        say(f"They want it to feel {feel}. Choose the photos and the moments that bring that out, and order them to build it; "
-            "the photos are still the best ones, with variety and a story.")
+        say(f"They want it to feel {feel}. Choose the moments that bring that out, and order them to build it; "
+            "the photos stay the reel's photo pick below (the reel skill's footage rules 1 and 5), not chosen again for this.")
     else:
         say("How it should feel: not picked.")
     say("")

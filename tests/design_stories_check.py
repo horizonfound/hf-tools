@@ -328,7 +328,10 @@ def check_stories_server(case, work, port, make_kit, Server, post, get_json, ask
              st["text"] == {"font": "Figtree", "size": 72, "weight": 700, "color": "#111111", "look": "box", "boxColor": "#ffffff", "lh": 1.3, "text": "Your words here"}, st["text"])
         case("state: the preview's name is \"yourname\" while their handle isn't known (decision 18), never hers", st["handle"] == "yourname" and "nicolelhill" not in json.dumps(st))
         case("state: the blank story and the photos to fill from: white, in number order (no carousel order)", st["blank"] == {"slides": 1, "bg": "#ffffff", "blocks": []} and st["carousel"] == [] and st["slide_bg"] == "#ffffff")
-        case("state: the shoot menu counts story designs apart from carousel designs", next(x for x in st["shoots"] if x["kit"] == kit_name)["story_designs"] == 1)
+        # the empty white story the visit made is not a design of theirs until it is changed (hers saves nothing until then)
+        case("state: the shoot menu counts story designs apart from carousel designs, and not the empty one a visit made",
+             next(x for x in st["shoots"] if x["kit"] == kit_name)["story_designs"] == 0 and next(x for x in st["shoots"] if x["kit"] == kit_name)["designs"] == 0,
+             next(x for x in st["shoots"] if x["kit"] == kit_name))
         code, st2 = J(get_json(P, f"/design-state?kit={KQ}&kind=stories"))
         case("state: asked again, the same one design (never a second)", code == 200 and st2["design"]["id"] == DID and len(list(sdesigns.glob("*.json"))) == 1)
         code, st3 = J(get_json(P, f"/design-state?kit={KQ}&kind=stories&design=dnosuchdesign1"))

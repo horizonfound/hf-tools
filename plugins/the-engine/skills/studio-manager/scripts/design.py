@@ -277,13 +277,19 @@ OWN_FACES = [
     ("Inter", 700, "normal", "Inter-Bold"),
     ("Montserrat", 400, "normal", "Montserrat-Regular"),
     ("Montserrat", 700, "normal", "Montserrat-SemiBold"),
+    # decision 19: Figtree, the stories' Classic font that every new story text starts in. Listed now, used only
+    # once its two files are in shared/fonts (a face whose file is missing is never offered or served): until
+    # then it comes from Google Fonts like the other story fonts.
+    ("Figtree", 400, "normal", "Figtree-Regular"),
+    ("Figtree", 700, "normal", "Figtree-Bold"),
 ]
 OWN_FILES = tuple(f[3] for f in OWN_FACES)      # the only names /design-font-file answers to
 # The stories designer's own fonts, first in its list: Google Fonts that feel like Instagram's story fonts (Nicole's
 # list, v19), each with its Instagram style as a nickname ("Classic · Figtree"). Decision 19 was to carry Figtree in
 # the plugin; no Figtree file was on this Mac or in the handoff when stories were built, so it comes from Google like
-# the rest, and with no internet its words show in Georgia with the page's usual line. Adding its .ttf files to
-# shared/fonts and two lines to OWN_FACES is all it takes.
+# the rest, and with no internet its words show in Georgia with the page's usual line. Its two lines are in
+# OWN_FACES already: putting Figtree-Regular.ttf and Figtree-Bold.ttf (OFL, Google Fonts' static files) in
+# shared/fonts is all it takes.
 STORY_FONTS = [("Figtree", "400;700", "Classic"), ("Archivo Narrow", "400;700", "Modern"), ("Yellowtail", "", "Neon"),
                ("Courier Prime", "400;700", "Typewriter"), ("Anton", "", "Strong"), ("DM Serif Display", "", "Editor"),
                ("Bebas Neue", "", "Poster"), ("Playfair Display", "400;700", "Elegant"), ("Fredoka", "400;700", "Bubble"),
@@ -618,9 +624,12 @@ def story_words(s):
     return s
 
 
-def KW(kind, s):
-    """A line a photographer sees, in the words of the kind they are working on."""
-    return story_words(s) if kind == STORIES else s
+def KW(kind, s, **fill):
+    """A line a photographer sees, in the words of the kind they are working on. The line is turned into a story's
+    words first and only then filled in, so what goes into it (a shoot's or a set's name, a folder, a drive's own
+    words) is never changed: a shoot called "Slide Rock park" keeps its name in a story's line."""
+    t = story_words(s) if kind == STORIES else s
+    return t.format(**fill) if fill else t
 
 
 def _starters():
@@ -758,7 +767,7 @@ def too_deep(kit, kind=CAROUSEL):
         where = f"your \"{h.name}\" folder" if h else "the folder your posts are kept in"
     except (Exception, SystemExit):  # noqa: BLE001
         where = "the folder your posts are kept in"
-    return KW(kind, TOO_DEEP.format(pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS, where=where))
+    return KW(kind, TOO_DEEP, pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS, where=where)
 
 
 def name_too_long(kit, name, base=None, kind=CAROUSEL):
@@ -774,7 +783,7 @@ def name_too_long(kit, name, base=None, kind=CAROUSEL):
     if not this_computer.path_too_long(car / k["set_name"].format(base=base, i=1)):
         return None
     shortest = this_computer.path_too_long(car / k["set_name"].format(base="C", i=1))
-    return KW(kind, (LONG_FOLDER if shortest else LONG_NAME).format(pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS))
+    return KW(kind, LONG_FOLDER if shortest else LONG_NAME, pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS)
 
 
 def cant_save(kit, name, base=None, kind=CAROUSEL):
@@ -838,6 +847,30 @@ def list_designs(kit, kind=CAROUSEL):
 
 def count_designs(kit, kind=CAROUSEL):
     return sum(1 for f in kit_mod._listing(designs_dir(kit, kind)) if f.endswith(".json") and ID.fullmatch(f[:-5]))
+
+
+def untouched(kit, d, kind=CAROUSEL, saved=None):
+    """A design the Assistant made by itself on a first visit (or design.py open) that nobody has changed or saved
+    slides from since: one photo per slide from the carousel's order, or one empty white story. It is kept on disk
+    (the page needs a record to save into), but to the photographer it is not "a saved design" yet: her page saves
+    nothing until the first change, so the kit's cards and the shoot menu leave it out, and the stories page shows
+    no "Saved" for it. saved: the designs that have a set saved from them, when the caller has them already."""
+    if not (isinstance(d, dict) and d.get("made_by") == "assistant" and d.get("rev") == 0 and not d.get("from")):
+        return False
+    if saved is None:
+        saved = _designs_with_sets(kit, kind)
+    return d.get("id") not in saved
+
+
+def _designs_with_sets(kit, kind=CAROUSEL):
+    return {j["design"] for j in _journals(kit, kind) if j.get("state") in ("done", "moving")}
+
+
+def count_worked_on(kit, kind=CAROUSEL):
+    """The designs a photographer would call theirs: every design file (as count_designs counts them, so one that
+    can't be read still counts) but one the Assistant made that nobody has changed or saved slides from."""
+    saved = _designs_with_sets(kit, kind)
+    return count_designs(kit, kind) - sum(1 for d in list_designs(kit, kind) if untouched(kit, d, kind, saved))
 
 
 def _names_for(state, rows):
@@ -1119,7 +1152,7 @@ def save_template(name, state, from_name="", token=None, kind=CAROUSEL):
         if token is not None:
             for t in ts:
                 if t.get("made_by") == token:
-                    return 200, {"ok": True, "words": KW(kind, TEMPLATE_SAVED.format(name=t["name"])), "template": _templates_for_page([t])[0],
+                    return 200, {"ok": True, "words": KW(kind, TEMPLATE_SAVED, name=t["name"]), "template": _templates_for_page([t])[0],
                                  "templates": _templates_for_page(ts)}
         if len(ts) >= TEMPLATES_MAX:
             return 409, {"ok": False, "why": "full", "words": TOO_MANY_TEMPLATES}
@@ -1130,7 +1163,7 @@ def save_template(name, state, from_name="", token=None, kind=CAROUSEL):
              "made_by": token or "assistant", "template": to_template(clean)}
         arrange.write_whole(folder / f"{tid}.json", t)
         ts = list_templates(kind)
-        return 200, {"ok": True, "words": KW(kind, TEMPLATE_SAVED.format(name=name)), "template": _templates_for_page([_load_template(tid, kind)])[0],
+        return 200, {"ok": True, "words": KW(kind, TEMPLATE_SAVED, name=name), "template": _templates_for_page([_load_template(tid, kind)])[0],
                      "templates": _templates_for_page(ts)}
 
 
@@ -1196,7 +1229,8 @@ def add_font(name):
 
 
 def fonts_for_page(kind=CAROUSEL):
-    own = {f[0] for f in OWN_FACES if (FONT_DIR / f"{f[3]}.ttf").is_file()}
+    have = {f[3] for f in OWN_FACES if (FONT_DIR / f"{f[3]}.ttf").is_file()}      # only faces whose file is here
+    own = {f[0] for f in OWN_FACES if f[3] in have}
     groups = [{"name": g, "fonts": [{"name": n, "weights": w, "own": n in own} for n, w in fs]} for g, fs in FONT_GROUPS]
     if kind == STORIES:
         # her story fonts first, each with its Instagram style beside it ("Classic · Figtree"); then the rest
@@ -1205,7 +1239,7 @@ def fonts_for_page(kind=CAROUSEL):
     return {
         "groups": groups,
         "yours": load_yours(),
-        "faces": [{"family": fam, "weight": wt, "style": st, "file": key} for fam, wt, st, key in OWN_FACES if fam in own],
+        "faces": [{"family": fam, "weight": wt, "style": st, "file": key} for fam, wt, st, key in OWN_FACES if key in have],
         "default": STORY_TEXT["font"] if kind == STORIES else DEFAULT_FONT, "fallback": FALLBACK_FONT, "google": GOOGLE_CSS,
         "pattern": "^" + FONT.pattern + "$", "max": FONT_MAX,
         "nicks": {n: nick for n, _, nick in STORY_FONTS} if kind == STORIES else {},
@@ -1381,7 +1415,7 @@ def set_info(kit, d, kind=CAROUSEL):
         return None
     same = _same_as(kit, d, j, kind=kind)
     return {"base": j["base"], "count": len(j["files"]), "at": j.get("finished") or j.get("at"), "same": same,
-            "fell": _fell(j), "words": KW(kind, ALREADY.format(base=j["base"])) if same else ""}
+            "fell": _fell(j), "words": KW(kind, ALREADY, base=j["base"]) if same else ""}
 
 
 def _unfinished(kit, did, kind=CAROUSEL):
@@ -1580,7 +1614,7 @@ def _saved_words(j, kind=CAROUSEL):
     """"Saved N slides ...": N is how many of the set are in the folder under their names (a slide the
     photographer has since renamed, moved or changed is theirs, and is not counted)."""
     n = len(j["files"]) - len(j.get("theirs") or [])
-    return KW(kind, (SAVED_ONE if n == 1 else SAVED_SET).format(n=n, base=j["base"]))
+    return KW(kind, SAVED_ONE if n == 1 else SAVED_SET, n=n, base=j["base"])
 
 
 def _result(state, j=None, why="", words="", **more):
@@ -1746,7 +1780,7 @@ def commit(kit, did, token, rev=None, drawn=None, kind=CAROUSEL):
     try:
         lock_file = kit_mod.hidden(kit) / K(kind)["slides_lock"]
     except OSError as e:
-        return _result("problem", why="drive", words=KW(kind, DRIVE.format(why=kit_mod._plain_os(e))))
+        return _result("problem", why="drive", words=KW(kind, DRIVE, why=kit_mod._plain_os(e)))
     with kit_mod._held(lock_file, kit_mod.SLIDES_WAIT) as mine:
         if not mine:
             return _result("problem", why="busy", words=KW(kind, BUSY))
@@ -1756,7 +1790,7 @@ def commit(kit, did, token, rev=None, drawn=None, kind=CAROUSEL):
             return _result("problem", why="busy", words=KW(kind, BUSY))
         except OSError as e:
             arrange.log(f"design commit for {kit.name} stopped: {e.__class__.__name__}: {str(e)[:160]}")
-            return _result("problem", why="drive", words=KW(kind, DRIVE.format(why=kit_mod._plain_os(e))))
+            return _result("problem", why="drive", words=KW(kind, DRIVE, why=kit_mod._plain_os(e)))
 
 
 def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
@@ -1789,7 +1823,7 @@ def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
         if (last["design"], last["token"]) in finished_now:
             return _result("done", last, words=_saved_words(last, kind))
         _show_again(kit, last, kind)
-        return _result("already", last, words=KW(kind, ALREADY.format(base=last["base"])))
+        return _result("already", last, words=KW(kind, ALREADY, base=last["base"]))
     count = d["state"]["slides"]
     if not staged_ok(kit, did, token, count, kind):
         return _result("problem", why="missing", words=KW(kind, MISSING))
@@ -1819,7 +1853,7 @@ def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
 def _design_for_page(kit, d, kind=CAROUSEL):
     return {"id": d["id"], "name": d["name"], "rev": d["rev"], "updated": d.get("updated"), "t": d.get("t"),
             "state": d["state"], "dropped": int(d.get("dropped") or 0), "set": set_info(kit, d, kind),
-            "unfinished": _unfinished(kit, d["id"], kind)}
+            "unfinished": _unfinished(kit, d["id"], kind), "untouched": untouched(kit, d, kind)}
 
 
 def _design_list(kit, designs, open_id=None, kind=CAROUSEL):
@@ -1849,7 +1883,7 @@ def shoots_for_page(open_kit=None):
         except (OSError, ValueError):
             continue
         out.append({"kit": k.name, "name": rec.get("name") or k.name, "photos": len(arrange.sheet_rows(k)),
-                    "designs": count_designs(k), "story_designs": count_designs(k, STORIES),
+                    "designs": count_worked_on(k), "story_designs": count_worked_on(k, STORIES),
                     "open": open_kit is not None and k.name == open_kit.name})
     out.sort(key=lambda s: s["kit"], reverse=True)          # folders start with the date: newest first
     return out
@@ -2164,7 +2198,7 @@ def _drive_words(path, e, kind=CAROUSEL):
         why = (HELD_OWN_MAYBE if winerror == 5 else HELD_OWN).format(pc=this_computer.COMPUTER)
     else:
         why = kit_mod._plain_os(e)
-    return KW(kind, (DRIVE if slides else CANT_SAVE if path == "/design" else CANT_KEEP).format(why=why))
+    return KW(kind, DRIVE if slides else CANT_SAVE if path == "/design" else CANT_KEEP, why=why)
 
 
 _STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500,
@@ -2213,7 +2247,7 @@ def _post_commit(body):
         last = last_done(kit, did, kind)
         if last and _same_as(kit, d, last, drawn, kind):
             if _is_shown(kit, last, kind=kind):
-                return _answer_for(_result("already", last, words=KW(kind, ALREADY.format(base=last["base"]))), kind)
+                return _answer_for(_result("already", last, words=KW(kind, ALREADY, base=last["base"])), kind)
             # already saved, but the kit is showing other slides as its carousel: the commit below makes
             # this set the one shown again (it writes the kit's record, so it is a process of its own)
         elif not staged_ok(kit, did, token, d["state"]["slides"], kind):
@@ -2408,7 +2442,7 @@ def cmd_show(kit, kind=CAROUSEL):
         say(f"  {KW(kind, 'Slides')}: \"{j['base']}\", {len(j['files'])} {KW(kind, 'slides')}, from design {j['design']}, {j.get('finished') or j.get('at')}: {what}")
     cs = rec.get(kk["rec_set"])
     if isinstance(cs, dict) and cs.get("kind") == "laid-out":
-        say(KW(kind, f"  The newest laid-out set is \"{cs.get('base')}\" ({len(cs.get('files') or [])} slides), in the Carousel folder."))
+        say(KW(kind, "  The newest laid-out set is \"{base}\" ({n} slides), in the Carousel folder.", base=cs.get('base'), n=len(cs.get('files') or [])))
     held = waiting_sets(kit, kind)
     if held:
         say(KW(kind, f"  {len(held)} unfinished save{'s' if len(held) != 1 else ''} left slides waiting (hidden, never put in the Carousel folder). "
@@ -2505,11 +2539,11 @@ def main():
                     return 2
             res = commit(kit, a.design, a.set, a.rev, drawn, a.kind)
             if res["state"] == "done":
-                say(KW(a.kind, f"Slides: {res['count']} slides are in the Carousel folder, named \"{res['base']}\". Nothing was replaced."))
+                say(KW(a.kind, "Slides: {n} slides are in the Carousel folder, named \"{base}\". Nothing was replaced.", n=res['count'], base=res['base']))
             elif res["state"] == "already":
-                say(KW(a.kind, f"Slides: already saved as \"{res['base']}\". Nothing was changed."))
+                say(KW(a.kind, "Slides: already saved as \"{base}\". Nothing was changed.", base=res['base']))
             else:
-                say(KW(a.kind, f"STOP: the slides were not saved ({res.get('why')}). ") + str(res.get('words')))
+                say(KW(a.kind, "STOP: the slides were not saved ({why}). ", why=res.get('why')) + str(res.get('words')))
             say("RESULT: " + json.dumps(res))
             return 0 if res["state"] != "problem" else 1
     except arrange.Busy:

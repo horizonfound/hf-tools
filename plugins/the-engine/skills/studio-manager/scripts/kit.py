@@ -1676,7 +1676,13 @@ OUR_KIT_WORDS = {
     "opening": "Opening...",
     "unreached": "Could not reach the Assistant. Tell Claude instead.",
     "saved_copy": "This is a saved copy. Say “show the {name} kit” to Claude and the buttons work.",
+    # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
+    # copy is from before her three cards, so neither can be shown as it is
+    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell Claude, and it'll sort it out.",
 }
+# Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
+# three cards) and never sends one from before them in its place.
+PAGE_MARK = "<meta name='assistant-page' content='post-kit-cards'>"
 STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
 STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
 
@@ -1875,7 +1881,7 @@ def _font_css():
 
 def _head(title):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
+            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
 
 
 def _bar(when_words):
@@ -1883,12 +1889,13 @@ def _bar(when_words):
             f"<span class='short'>Home</span></a>{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
-def unreachable_html():
-    """Her page when the shoot can't be reached (the drive unplugged): her header and her one line."""
+def unreachable_html(line=None):
+    """Her page when the shoot can't be reached (the drive unplugged): her header and her one line (or ours, when
+    the kit is there but its records can't be made into the page)."""
     return (_head("Post kit") + "<body><div class='wrap'>" + _bar("")
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>Post kit<em>.</em></h1>"
             f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p></header>"
-            f"<div id='pieces'><div class='problem'>{html.escape(KIT_WORDS['reach'])}</div></div></div></body></html>")
+            f"<div id='pieces'><div class='problem'>{html.escape(line or KIT_WORDS['reach'])}</div></div></div></body></html>")
 
 
 def _jpgs(folder):
@@ -1937,9 +1944,9 @@ def card_facts(kit, rec=None):
         "reel_photos": photos,                                  # {n, v, have, missing} for the ones the strip shows
         "reel": reel_page.newest_project(kit, rec),
         "slides": [p.name for p in car["files"]],
-        "designs": design.count_designs(kit, design.CAROUSEL),
+        "designs": design.count_worked_on(kit, design.CAROUSEL),
         "stories": [p.name for p in sto["files"]],
-        "story_designs": design.count_designs(kit, design.STORIES),
+        "story_designs": design.count_worked_on(kit, design.STORIES),
     }
 
 
@@ -1950,10 +1957,11 @@ def build_page(kit):
     words = json.loads((kit / ".kit" / "words.json").read_text(encoding="utf-8")) if (kit / ".kit" / "words.json").exists() else {}
     words = kept_words(words, strict=False)     # a words file saved in a near-miss shape never stops the page
     name = rec.get("name") or short_name(kit.name)
-    when = rec.get("date") or (kit.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", kit.name) else "")
+    when = rec.get("date") if isinstance(rec.get("date"), str) and rec.get("date") else ""   # a date changed by hand into a number is left out
+    when = when or (kit.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", kit.name) else "")
     try:
         when_words = this_computer.strftime(date.fromisoformat(when), "%B %-d, %Y")
-    except ValueError:
+    except (ValueError, TypeError):
         when_words = when
     f = card_facts(kit, rec)
     kq = quote(kit.name)
@@ -2052,7 +2060,11 @@ def write_page(kit):
 def show(kit):
     rec = load_rec(kit)
     say(f"{rec.get('name', kit.name)}  ({kit})")
-    say(f"  Photos: {len(photo_files(photos_dir(kit, rec)))}" + (f" at {rec['photos_dir']}" if rec.get("photos_dir") else ""))
+    # the count the sheet, the pages and posts.py list give (every photo numbered on the sheet, a TIFF too); before
+    # there is a sheet, the finished photos in the folder. The folder is always named, so --folder can be read from it.
+    import arrange
+    rows = arrange.sheet_rows(kit)
+    say(f"  Photos: {len(rows) if rows else len(photo_files(photos_dir(kit, rec)))} in {photos_dir(kit, rec)}")
     p = rec.get("picks", {})
     if p:
         say("  Picks: " + ", ".join(f"{k} {len(v)}" for k, v in p.items() if v))

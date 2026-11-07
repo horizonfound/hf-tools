@@ -683,9 +683,11 @@ class Chrome:
         if os.environ.get("CHROME_DRIVE_LEAN") == "1":
             # a smaller hidden Chrome, for a computer short of memory (v19: the Mac ran out of memory under this
             # work, and every test runs under a memory guard): one renderer for every page, the GPU work done in
-            # Chrome's own process, no spare renderer kept warm. Off unless asked for, so a run is as before.
+            # Chrome's own process, no spare renderer kept warm, and none of Chrome's own built-in extensions (two
+            # renderers of about 120 MB each that no test uses). Off unless asked for, so a run is as before.
             args = [a + ",SpareRendererForSitePerProcess,IsolateOrigins,site-per-process" if a.startswith("--disable-features=") else a for a in args]
-            args += ["--renderer-process-limit=1", "--disable-site-isolation-trials", "--in-process-gpu"]
+            args += ["--renderer-process-limit=1", "--disable-site-isolation-trials", "--in-process-gpu",
+                     "--disable-component-extensions-with-background-pages"]
         args += self.extra_args + ["about:blank"]
         self._logfile = open(self.work / (self.profile.name + ".log"), "wb")
         kw = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": self._logfile}
