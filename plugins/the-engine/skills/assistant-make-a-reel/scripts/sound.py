@@ -801,44 +801,120 @@ def _remove_ours(path):
         pass
 
 
-def extract_audio(video, out):
+def _scratch(out):
+    """The hidden name a sound is written under while it is being made: "<dot><name>.part-<number><ext>", in the
+    same folder, so a make cut off part way (power, a crash, a stopped job) never leaves a broken file under the
+    real name for the next make to trust. (It keeps its ending, which ffmpeg reads to choose the kind of file.)"""
+    out = Path(out)
+    return out.with_name(f".{out.stem}.part-{os.getpid()}{out.suffix}")
+
+
+def _place(src, dst, tries=25):
+    """src (a finished file this run made under its hidden name) under its real name dst, never over a file that
+    is there. True when placed; False when dst was taken (src is left for the caller). A Mac: a hard link, which
+    never takes a name that is there, then the hidden name goes; on a drive with no links, checked, then renamed.
+    A PC: os.rename, which Windows refuses onto a name that is there (a virus checker still reading the new
+    file gets a few short waits). (this_computer.rename_new's way; this file stands on its own.)"""
+    if WINDOWS:
+        for i in range(tries):
+            try:
+                os.rename(src, dst)
+                return True
+            except FileExistsError:
+                return False
+            except PermissionError:
+                if i == tries - 1:
+                    raise
+                import time
+                time.sleep(0.01 * (i + 1))
+    try:
+        os.link(src, dst)
+    except FileExistsError:
+        return False
+    except OSError:
+        if os.path.lexists(dst):
+            return False
+        os.rename(src, dst)
+        return True
+    os.unlink(src)
+    return True
+
+
+def _finish(part, out):
+    """The finished sound, from its hidden name to out, or "<name> 2<ext>" and so on if out was taken meanwhile
+    (nothing already there is ever written over or removed). The path it now has, or None."""
+    for _ in range(100):
+        cand = _free(out)
+        try:
+            if _place(part, cand):
+                return cand
+        except OSError:
+            break
+    _remove_ours(part)
+    return None
+
+
+def extract_audio(video, out, timeout=600):
     """The sound of a video or screen recording as a song file. (path written, how) or (None, reason in plain
     words). The video is only ever read. `out` is the .m4a to make, and must not exist yet; nothing that is
     already there is written over. On a PC with no ffmpeg, Windows' own media parts write it as a .wav beside
-    it instead (run on GitHub's Windows machines, not yet on a photographer's PC)."""
+    it instead (run on GitHub's Windows machines, not yet on a photographer's PC).
+    It is written under a hidden name first and given its real name only once it is whole, so a run cut off
+    part way leaves nothing under the real name. timeout: seconds each program may take (a job's time left)."""
     video, out = str(video), Path(out)
     if out.exists():
         return None, f"there is already a file called {out.name} there"
+    part = _scratch(out)
+    _remove_ours(part)                               # a hidden half-file of an earlier run by this same number
     detail = ""
+    timeout = max(1.0, float(timeout))
     if _afconvert_ok():
-        r = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", video, str(out)],  # pc-ok: Mac only
-                           capture_output=True, encoding="utf-8", errors="replace")
-        if r.returncode == 0 and out.is_file() and out.stat().st_size >= 2000:
-            return out, "afconvert"  # pc-ok: the name of the route, in the Mac branch
-        _remove_ours(out)
+        try:
+            r = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", video, str(part)],  # pc-ok: Mac only
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _remove_ours(part)
+            return None, "taking the sound out of that video took too long"
+        if r.returncode == 0 and part.is_file() and part.stat().st_size >= 2000:
+            done = _finish(part, out)
+            if done:
+                return done, "afconvert"  # pc-ok: the name of the route, in the Mac branch
+            return None, f"there is already a file called {out.name} there"
+        _remove_ours(part)
         detail = _last_line(r.stderr)
     for exe, how in _ffmpegs():
         # the song exactly as it is in the video (no re-encoding); if that kind can't go in an .m4a, make AAC.
         # -n: ffmpeg never writes over a file that is there.
         for codec in (["-c:a", "copy"], ["-c:a", "aac", "-b:a", "192k"]):
-            if out.exists():                         # only ever clear away a file this run made itself
+            if out.exists():
                 return None, f"there is already a file called {out.name} there"
+            _remove_ours(part)
             try:
-                r = _run([exe, "-v", "error", "-n", "-i", video, "-vn", "-map", "0:a:0", *codec, str(out)])
+                r = _run([exe, "-v", "error", "-n", "-i", video, "-vn", "-map", "0:a:0", *codec, str(part)], timeout=timeout)
+            except subprocess.TimeoutExpired:
+                _remove_ours(part)
+                return None, "taking the sound out of that video took too long"
             except (OSError, subprocess.SubprocessError) as e:
                 detail = str(e)
-                _remove_ours(out)
+                _remove_ours(part)
                 break                                # this ffmpeg can't run: try the next one
-            if r.returncode == 0 and out.is_file() and out.stat().st_size >= 2000:
-                return out, how
-            _remove_ours(out)
+            if r.returncode == 0 and part.is_file() and part.stat().st_size >= 2000:
+                done = _finish(part, out)
+                if done:
+                    return done, how
+                return None, f"there is already a file called {out.name} there"
+            _remove_ours(part)
             detail = _last_line(r.stderr)
             if "matches no streams" in (r.stderr or ""):
                 return None, "There's no sound in that video."
     if WINDOWS:
-        wav, why, saving = _extract_windows(video, out.with_suffix(".wav"))     # run on GitHub's Windows
+        wav_out = out.with_suffix(".wav")
+        wav, why, saving = _extract_windows(video, _scratch(wav_out))     # run on GitHub's Windows
         if wav:
-            return wav, "windows"
+            done = _finish(Path(wav), wav_out)
+            if done:
+                return done, "windows"
+            return None, f"there is already a file called {wav_out.name} there"
         if why == _NO_SOUND:                         # the add-on wouldn't help: there's nothing to pull out
             return None, "There's no sound in that video."
         if saving:                                   # nor here: Windows heard it, the file couldn't be saved

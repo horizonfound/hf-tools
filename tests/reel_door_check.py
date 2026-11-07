@@ -104,8 +104,13 @@ def check_links(s):
     case("kit.py page writes the kit page", code == 0, out[-300:])
     code, _, raw = s.http("GET", "/content/%s/Post%%20kit.html" % KQ)
     page = raw.decode("utf-8", "replace")
-    links = re.findall(r"<a class='arr' href='([^']+)'>Change the photos</a>", page)
-    case("the kit page has 'Change the photos' in the Reel section and in the Carousel section", code == 200 and len(links) == 2, (code, links))
+    found = re.findall(r"<a class='arr' href='([^']+)'>(Change the photos|Create my reel →|Make a new version →)</a>", page)
+    links = [h for h, _ in found]
+    case("the kit page has the reel's link in the Reel section and 'Change the photos' in the Carousel section", code == 200 and len(links) == 2, (code, found))
+    case("the reel's link says her words: 'Create my reel →' before a reel is made (v19 review: not 'Change the photos')",
+         [w for _, w in found][:1] == ["Create my reel →"] and [w for _, w in found][1:] == ["Change the photos"], found)
+    case("...and the line beside it points at that link, not at the chat",
+         "Not made yet. Press Create my reel to pick your song and make it." in page and "Say “make the reel” to Claude" not in page)
     case("the Reel section's link goes to the reel page", links[:1] == ["/reel.html?kit=" + KQ], links)
     case("the Carousel section's link still goes to the carousel's picker", links[1:] == ["/arrange.html?kit=%s&amp;piece=carousel" % KQ], links)
     code, _, raw = s.http("GET", html.unescape(links[0])) if links else (0, None, b"")
@@ -124,7 +129,7 @@ def check_browser(c, s):
     c.open(s.url("/content/%s/Post%%20kit.html" % KQ))
     c.wait_for("document.body.classList.contains('live')", 10)
     sel = "a.arr[href^='/reel.html']"
-    case("in a browser: the Reel section's 'Change the photos' is showing", c.count(sel) == 1 and c.text(sel) == "Change the photos"
+    case("in a browser: the Reel section's 'Create my reel' is showing", c.count(sel) == 1 and c.text(sel) == "Create my reel →"
          and c.js("(function(){var a=document.querySelector(\"%s\"); return a.closest('section').querySelector('h2').textContent.indexOf('Reel')===0 && a.getBoundingClientRect().width>40})()" % sel) is True)
     c.click(sel)
     try:

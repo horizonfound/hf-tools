@@ -104,6 +104,7 @@ SOUND_BESIDE_OUTSIDE = False   # decision 4: a screen recording in a Photos fold
 PLAN_WORDS = "nicole"   # decision 5: the Plan line in the result box is hers ("Plan: 14 photos, 15.2 seconds, every cut on
                         # the beat at about 85 beats a minute, starting the song at the top."); "reel": reel.py's longer line
 MAKE_LIMIT = 600        # hers: a reel may take ten minutes to make, then it is stopped and the page says so
+JOB_GRACE = 30          # seconds past MAKE_LIMIT before a job is told as too long even while its lock is held
 SONG_EVERY_MS = 3000    # hers: the song list is looked at again every 3 seconds
 JOB_EVERY_MS = 700      # how often the page asks how Make my reel is going (ours: hers waited on one long request)
 JOB_BOOT = 20.0         # seconds a job may take to start before "queued" means it never did
@@ -118,13 +119,24 @@ MAKE_LOCK = arrange.HOME / "reel-make.lock"   # one reel made at a time on this 
 SONG_EXTS = (".m4a", ".mp3", ".wav", ".aif", ".aiff", ".aac")   # hers
 VIDEO_EXTS = (".mov", ".mp4", ".m4v")                           # hers: a screen recording, whose sound is used
 SOUND = " sound"                      # hers: the sound of "<name>.mov" is kept as "<name> sound.m4a" (".wav" on a PC)
+SOUND_NAME = re.compile(r"(.+) sound(?: ([2-9]))?")    # "<name> sound", or "<name> sound 2" beside a damaged one (ours)
+SOUND_SPARES = 8        # "<name> sound 2" to "<name> sound 9": the most made beside sounds that couldn't be read
 SONG_ID = re.compile(r"[0-9a-f]{12}")
 JOB_ID = re.compile(r"[0-9a-f]{12}")
 HER_KINDS = ("Plan:", "Made", "Wide", "Dry run", "Beats per piece", "Your song is only", "I left out")   # her server.py
-SHOWN_MADE = ("Plan", "Wide", "Your song is only", "I left out")     # her page, after a reel is made
+SHOWN_MADE = ("Plan", "Your song is only", "I left out")     # her page, after a reel is made (hers lists "Wide" too, but
+                                                              # her engine never prints one: see NOT_SHOWN)
+NOT_SHOWN = ("Wide",)   # reel.py's "Wide photos zoomed to fill..." line counts by photo NUMBER, which the page never shows
+                        # (it shows places in the reel), and her bts_reel.py prints no such line: hers never shows it
 LEFT_OUT = ("Your song is only", "I left out")                       # her page shows these in their own box
 TEST_OPEN = "ASSISTANT_TEST_OPEN"     # tests only: "front", "behind" or "fail"; no folder is opened, the answer is as if
 TEST_CAPCUT = "ASSISTANT_TEST_CAPCUT"  # tests only: set, CapCut is never started and the answer is as if it opened
+TEST_LIMIT = "ASSISTANT_TEST_MAKE_LIMIT"   # tests only: a few seconds in place of MAKE_LIMIT (and 2 s of JOB_GRACE)
+try:
+    if float(os.environ.get(TEST_LIMIT) or 0) > 0:
+        MAKE_LIMIT, JOB_GRACE = float(os.environ[TEST_LIMIT]), 2
+except ValueError:
+    pass
 POST_CAP = 65536
 VIBES = ("beat", "mixed", "calm", "build")           # hers
 STYLES = ("first", "reveal", "backforth", "bookends")  # hers
@@ -308,6 +320,13 @@ OUR_WORDS = {
     # Make my reel runs on its own now, so the page can be told about a second press or a job that was stopped
     "already_making": "Your reel is already being made. One moment.",
     "interrupted": "Making your reel stopped before it finished. Nothing was made. Press Make my reel again.",
+    # a job stopped after CapCut had the project but before this page noted it (v19 review): never "nothing was made"
+    "interrupted_made": "Making your reel stopped right at the end. It's in CapCut as {project}, but I didn't get to note it here. Open CapCut to see it.",
+    # her "at the top of your projects" line is only true when the reel is in CapCut's list (v19 review): on a PC with
+    # CapCut open, or when CapCut's list couldn't be saved, it waits until CapCut is closed (capcut.write.waiting)
+    "waiting": "CapCut was open, so your reel is waiting to go into its list. {Quit} CapCut, then press Open CapCut and it will be added at the top of your projects.",
+    # CapCut's list couldn't be read or saved, and nothing is waiting: what to do if it isn't there
+    "not_listed": "Open CapCut. If your reel isn't at the top of your projects, {quit} CapCut and open it again.",
 }
 
 def _behind():
@@ -319,6 +338,16 @@ def _behind():
 
 
 OUR_WORDS["behind"] = _behind()
+
+
+def _capcut_words(key):
+    """OUR_WORDS["waiting"] or ["not_listed"] with what you do to make CapCut stop on this computer (quit on a Mac,
+    close on a PC: capcut.QUIT)."""
+    try:
+        quit_ = _reel_module("capcut").QUIT
+    except Exception:  # noqa: BLE001  (the words only)
+        quit_ = "close" if this_computer.WINDOWS else "quit"
+    return OUR_WORDS[key].replace("{Quit}", quit_.capitalize()).replace("{quit}", quit_)
 
 
 def pc_words(s):
@@ -484,7 +513,7 @@ def state(kit):
         "saved": _for_page(saved, on_sheet),
         "max": MAX_PICKS,
         "songs": songs_for_page(kit, rec_kit),
-        "music": music_dir(kit).is_dir(),
+        "music": music_dir(kit).is_dir() and music_ok(kit),
         "job": job_for_page(kit),
     }
 
@@ -582,6 +611,21 @@ def music_dir(kit):
     return kit / "Music"
 
 
+def music_ok(kit):
+    """Is the shoot's Music folder (if it is there at all) a real folder of the kit's own? A Music folder that is a
+    link (or that leads anywhere but inside the kit) is never listed, written into or opened (v19 review: songs
+    were listed from wherever it pointed, and a recording's sound was written there, outside Your Content)."""
+    d = music_dir(kit)
+    try:
+        if not os.path.lexists(d):
+            return True
+        if d.is_symlink() or not d.is_dir():
+            return False
+        return Path(os.path.realpath(d)).parent == Path(os.path.realpath(kit))
+    except OSError:
+        return False
+
+
 def _inside_content(path):
     """Is this file or folder inside Your Content? (Then a sound may be kept beside it, decision 4.)"""
     try:
@@ -614,23 +658,26 @@ def list_songs(kit, rec=None):
     Content, in the Music folder (decision 4). Links are left out. Each: {id, name, where, kind, path}; the path
     never leaves this computer's own side."""
     rec = rec if rec is not None else kit_mod.load_rec(kit)
-    folders = [("Music", music_dir(kit)), ("Photos", kit_mod.photos_dir(kit, rec))]
+    folders = [("Music", music_dir(kit) if music_ok(kit) else None), ("Photos", kit_mod.photos_dir(kit, rec))]
+    folders = [(w, d) for w, d in folders if d is not None]
     videos = {}
     for where, d in folders:
         videos[where] = {Path(f).stem.casefold() for f in _listing(d) if f.lower().endswith(VIDEO_EXTS) and not f.startswith(".")}
-    outside = not _inside_content(folders[1][1])
+    outside = not _inside_content(folders[-1][1])
+    videos.setdefault("Music", set())
     out = []
     for where, d in folders:
         made_here = set(videos[where])
         if where == "Music" and outside and not SOUND_BESIDE_OUTSIDE:
-            made_here |= videos["Photos"]
+            made_here |= videos.get("Photos", set())
         found = []
         for f in _listing(d):
             low = f.lower()
             if f.startswith(".") or not low.endswith(SONG_EXTS + VIDEO_EXTS):
                 continue
             stem = Path(f).stem
-            if low.endswith((SOUND + ".m4a", SOUND + ".wav")) and stem[:-len(SOUND)].casefold() in made_here:
+            m = SOUND_NAME.fullmatch(stem)
+            if low.endswith((".m4a", ".wav")) and m and m.group(1).casefold() in made_here:
                 continue                       # the sound taken from a recording: the recording is shown once
             p = d / f
             try:
@@ -664,14 +711,30 @@ def _named(folder, name):
     return folder / hit[0] if hit else None
 
 
-def sound_for(kit, s):
+def _sound_ok(p):
+    """A sound beside a recording that can be used: a real file, not tiny, whose length can be read and is at least
+    half a second (sound.duration reads the file itself). A sound cut off while it was made (by a make from before
+    sounds were written under a hidden name first) fails this, and is never used (v19 review)."""
+    try:
+        if p.is_symlink() or not p.is_file() or p.stat().st_size < 2000:
+            return False
+        d = _reel_module("sound").duration(p)
+        return bool(d) and d >= 0.5
+    except Exception:  # noqa: BLE001  (a sound nobody can read is a sound not to use)
+        return False
+
+
+def sound_for(kit, s, deadline=None):
     """The sound of a screen recording (hers: sound_of), made ONCE and never written over: "<name> sound.m4a"
     beside the recording (a PC with no ffmpeg makes "<name> sound.wav"), or, when the recording sits in a Photos
     folder outside Your Content (an export folder the kit only points to), in the kit's own Music folder
-    (decision 4), since their folder is never written to. A sound already there is used as it is.
-    Returns (path, None) or (None, her plain words)."""
+    (decision 4), since their folder is never written to. A sound already there is used when it can be read; one
+    that can't (cut off part way) is left exactly as it is and a new one is made beside it, "<name> sound 2.m4a".
+    deadline: the job's own (time.time() it must be done by). Returns (path, None) or (None, her plain words)."""
     video = s["path"]
     if s["where"] == "Photos" and not SOUND_BESIDE_OUTSIDE and not _inside_content(video):
+        if not music_ok(kit):
+            return None, WORDS["no_sound"]
         folder = music_dir(kit)
         try:
             folder.mkdir(exist_ok=True)
@@ -679,21 +742,35 @@ def sound_for(kit, s):
             return None, WORDS["no_sound"]
     else:
         folder = video.parent
-    for ext in (".m4a", ".wav"):
-        have = _named(folder, video.stem + SOUND + ext)
-        if have is not None and have.is_file() and not have.is_symlink():
-            return have, None
-    out = folder / (video.stem + SOUND + ".m4a")
+        if s["where"] == "Music" and not music_ok(kit):
+            return None, WORDS["no_sound"]
+    out = None
+    for extra in [""] + [f" {n}" for n in range(2, SOUND_SPARES + 2)]:
+        names = [video.stem + SOUND + extra + ext for ext in (".m4a", ".wav")]
+        have = [h for h in (_named(folder, n) for n in names) if h is not None]
+        good = next((h for h in have if _sound_ok(h)), None)
+        if good is not None:
+            return good, None
+        if have:
+            arrange.log(f"reel page: a sound beside a recording couldn't be read, so it is left as it is: {have[0].name}")
+            continue
+        out = folder / names[0]                    # the first name with nothing under it
+        break
+    if out is None:
+        return None, WORDS["no_sound"]
     if this_computer.WINDOWS and this_computer.path_too_long(out):      # unproven on a real PC
         return None, WORDS["no_sound"]
+    left = (deadline - time.time()) if deadline else MAKE_LIMIT
+    if left <= 1:
+        return None, WORDS["too_long"]
     try:
-        got, how = _reel_module("sound").extract_audio(video, out)
+        got, how = _reel_module("sound").extract_audio(video, out, timeout=left)
     except Exception as e:  # noqa: BLE001
         arrange.log(f"reel page: the sound of a recording couldn't be taken: {e.__class__.__name__}: {str(e)[:200]}")
         return None, WORDS["no_sound"]
     if not got:
         arrange.log(f"reel page: the sound of a recording couldn't be taken: {str(how)[:200]}")
-        return None, WORDS["no_sound"]
+        return None, WORDS["too_long"] if "took too long" in str(how) else WORDS["no_sound"]
     return Path(got), None
 
 
@@ -864,13 +941,44 @@ def job_for_page(kit):
     if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
         return None
     state, problem = j["state"], j.get("problem")
-    if state in ("queued", "running") and not job_running(kit):
-        if state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT:
+    if state in ("queued", "running"):
+        began = float(j.get("t0") or 0)
+        if began and time.time() - began > MAKE_LIMIT + JOB_GRACE:
+            # past its time, whatever its lock says (v19 review: a hung job held its lock, and the page spun forever)
+            state, problem = "problem", WORDS["too_long"]
+        elif not job_running(kit) and (state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT):
             state, problem = "problem", OUR_WORDS["interrupted"]
+        if state == "problem":
+            made = _made_by(kit, j["id"])
+            if made:              # CapCut has it: never say nothing was made (rule 7)
+                problem = OUR_WORDS["interrupted_made"].replace("{project}", made)
     words = [w for w in (j.get("words") or []) if isinstance(w, str)]
-    return {"id": j["id"], "state": state, "dry": bool(j.get("dry")), "project": j.get("project") if state == "done" else None,
-            "words": words if state == "done" else [], "problem": problem if state == "problem" else None,
-            "short_song": bool(j.get("short_song")) and state == "problem"}
+    out = {"id": j["id"], "state": state, "dry": bool(j.get("dry")), "project": j.get("project") if state == "done" else None,
+           "words": words if state == "done" else [], "problem": problem if state == "problem" else None,
+           "short_song": bool(j.get("short_song")) and state == "problem"}
+    if state == "done" and not j.get("dry") and j.get("capcut_say"):
+        out["capcut_say"] = j["capcut_say"]
+    return out
+
+
+def _made_by(kit, jid):
+    """The CapCut project a job made, when reel.py had finished it (its --status says so for this job) though the
+    job was stopped before writing it down; else None. A name only, never a path."""
+    try:
+        st = json.loads((kit / ".kit" / JOB_STATUS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if isinstance(st, dict) and st.get("for") == jid and st.get("ok") and not st.get("dry") and isinstance(st.get("project"), str):
+        return st["project"]
+    return None
+
+
+def capcut_say(st):
+    """The line under "It's in CapCut": hers when the reel is in CapCut's list (or a Mac's open CapCut adds it by
+    itself); else ours, saying what to do (v19 review)."""
+    if st.get("listed") or st.get("left_to_capcut") or ("listed" not in st and "waiting" not in st):
+        return WORDS["open_capcut_say"]
+    return _capcut_words("waiting" if st.get("waiting") else "not_listed")
 
 
 def _picks_text(lst):
@@ -965,7 +1073,7 @@ def _no_path(line, known):
 def _her_lines(out, dry, plan, known):
     """The lines her page shows, from reel.py's words: her server's kinds, then her page's filter."""
     lines = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-    keep = [w for w in lines if w.startswith(HER_KINDS) or " clip from " in w]
+    keep = [w for w in lines if (w.startswith(HER_KINDS) or " clip from " in w) and not w.startswith(NOT_SHOWN)]
     if dry:
         keep = [w for w in keep if not w.startswith(("Dry run", "Made"))]
     else:
@@ -1004,8 +1112,34 @@ def _hold_make_lock(deadline):
         time.sleep(0.25)
 
 
+_CHILD = []          # the reel.py at work for this job's process right now (the watchdog stops it with the job)
+
+
+def _run_bounded(cmd, timeout, **kw):
+    """subprocess.run with a hard limit on the program AND everything it starts: it runs as its own group
+    (this_computer.popen_detached), and past its time the whole group is stopped (this_computer.stop_tree), not
+    only reel.py (v19 review). (returncode, stdout, stderr); raises subprocess.TimeoutExpired."""
+    p = this_computer.popen_detached(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace", **kw)
+    _CHILD.append(p)
+    try:
+        out, err = p.communicate(timeout=max(1.0, timeout))
+    except subprocess.TimeoutExpired:
+        this_computer.stop_tree(p.pid)
+        try:
+            p.communicate(timeout=10)
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            pass
+        raise
+    finally:
+        if p in _CHILD:
+            _CHILD.remove(p)
+    return p.returncode, out, err
+
+
 def _make(kit, ask, jid, t0):
-    """The work of one job. Returns what goes in the job record: {state, words, project, problem, short_song}."""
+    """The work of one job. Returns what goes in the job record: {state, words, project, problem, short_song}.
+    Everything, from the recording's sound to reel.py, is held to one deadline: t0 + MAKE_LIMIT."""
+    deadline = t0 + MAKE_LIMIT
     rec_kit = kit_mod.load_rec(kit)
     photos = kit_mod.photos_dir(kit, rec_kit)
     short = short_name(kit.name)
@@ -1019,7 +1153,7 @@ def _make(kit, ask, jid, t0):
             return {"state": "problem", "problem": WORDS["song_gone"]}
         song_name = s["path"].name
         if s["kind"] == "video":
-            got, why = sound_for(kit, s)
+            got, why = sound_for(kit, s, deadline)
             if not got:
                 return {"state": "problem", "problem": why}
             song = got
@@ -1043,7 +1177,7 @@ def _make(kit, ask, jid, t0):
     work = reel.kit_workdir(kit) or reel.workdir(rec_kit.get("name") or short, str(photos))
     arrange.write_whole(work / "photos.json", {"folder": str(photos), "photos": listing})
     status = kit / ".kit" / JOB_STATUS
-    arrange.write_whole(status, {"for": jid, "pending": True})
+    arrange.write_whole(status, {"for": jid, "pending": True})     # reel.py keeps "for" when it writes what happened
     cmd = [sys.executable, str(kit_mod.REEL_PY), "make", "--folder", str(photos), "--shoot", rec_kit.get("name") or short,
            "--kit", str(kit), "--picks", picks, "--vibe", ask["vibe"],
            *(["--capcut-song", ask["capcut_song"]] if ask.get("capcut_song") else ["--song", str(song) if song else "none"]),
@@ -1056,10 +1190,11 @@ def _make(kit, ask, jid, t0):
             cmd += ["--song-start", "0"]            # decision 8: her code starts a short song at the top
     if ask.get("dry"):
         cmd.append("--dry-run")
-    left = max(30.0, MAKE_LIMIT - (time.time() - t0))
+    left = deadline - time.time()
+    if left <= 1:
+        return {"state": "problem", "problem": WORDS["too_long"]}
     try:
-        r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=left,
-                           cwd=str(kit_mod.REEL_PY.parent))
+        rc, r_out, r_err = _run_bounded(cmd, left, cwd=str(kit_mod.REEL_PY.parent))
     except subprocess.TimeoutExpired:
         return {"state": "problem", "problem": WORDS["too_long"]}
     try:
@@ -1068,12 +1203,12 @@ def _make(kit, ask, jid, t0):
         st = {}
     if st.get("pending") or not isinstance(st, dict):
         st = {}
-    out = (r.stdout or "") + "\n" + (r.stderr or "")
-    if r.returncode != 0 or not st.get("ok"):
-        arrange.log(f"reel page: reel.py stopped ({r.returncode}): {out.strip()[-400:]}")
-        return {"state": "problem", "problem": _problem(r.stdout or out, known), "short_song": bool(st.get("short_song"))}
+    out = (r_out or "") + "\n" + (r_err or "")
+    if rc != 0 or not st.get("ok"):
+        arrange.log(f"reel page: reel.py stopped ({rc}): {out.strip()[-400:]}")
+        return {"state": "problem", "problem": _problem(r_out or out, known), "short_song": bool(st.get("short_song"))}
     dry = bool(ask.get("dry"))
-    words = _her_lines(r.stdout, dry, st.get("plan"), known)
+    words = _her_lines(r_out, dry, st.get("plan"), known)
     project = st.get("project")
     if not dry and project:
         with arrange.locked(lock_path(kit)):
@@ -1088,7 +1223,37 @@ def _make(kit, ask, jid, t0):
                 arrange.log(f"reel page: kit.py reel-made said: {(k.stdout + k.stderr).strip()[-300:]}")
         except (OSError, subprocess.SubprocessError) as e:
             arrange.log(f"reel page: kit.py reel-made could not run: {e}")
-    return {"state": "done", "words": words, "project": project}
+    return {"state": "done", "words": words, "project": project, "capcut_say": None if dry else capcut_say(st)}
+
+
+_JOB_WRITE = threading.Lock()
+
+
+def _watchdog(kit, jid, deadline, finished):
+    """The job's hard limit (v19 review): at deadline and JOB_GRACE, if the job is still at work (a song file that
+    won't read, a step that hangs), it is written down as too long, and this process, the reel.py it started and
+    everything they started are stopped. The page then says so, and the next Make my reel can go ahead."""
+    left = deadline + JOB_GRACE - time.time()
+    if finished.wait(max(0.0, left)):
+        return
+    with _JOB_WRITE:
+        if finished.is_set():
+            return
+        j = read_job(kit) or {}
+        if j.get("id") == jid and j.get("state") in ("queued", "running"):
+            j.update(state="problem", problem=WORDS["too_long"], t=time.time())
+            made = _made_by(kit, jid)
+            if made:
+                j["problem"] = OUR_WORDS["interrupted_made"].replace("{project}", made)
+            try:
+                write_job(kit, j)
+            except OSError:
+                pass
+        arrange.log(f"reel page: a reel's job ran past {MAKE_LIMIT + JOB_GRACE} s and was stopped")
+        for p in list(_CHILD):
+            this_computer.stop_tree(p.pid)
+        this_computer.stop_tree(os.getpid())     # a Mac: its whole group when it leads one (popen_detached); a PC: its tree
+        os._exit(1)
 
 
 def cmd_job(kit, jid):
@@ -1118,6 +1283,8 @@ def cmd_job(kit, jid):
         ask = j.get("ask") or {}
         j.update(pid=os.getpid(), t0=t0, t=time.time())
         write_job(kit, j)
+        finished = threading.Event()
+        threading.Thread(target=_watchdog, args=(kit, jid, t0 + MAKE_LIMIT, finished), daemon=True).start()
         g = _hold_make_lock(t0 + MAKE_LIMIT)
         if g is None:
             j.update(state="problem", problem=WORDS["too_long"], t=time.time())
@@ -1131,8 +1298,10 @@ def cmd_job(kit, jid):
             except Exception as e:  # noqa: BLE001  (whatever happens, the page is told in plain words)
                 arrange.log(f"reel page: the reel's job failed: {e.__class__.__name__}: {str(e)[:300]}")
                 res = {"state": "problem", "problem": WORDS["went_wrong_make"]}
-            j.update(res, t=time.time())
-            write_job(kit, j)
+            with _JOB_WRITE:
+                finished.set()
+                j.update(res, t=time.time())
+                write_job(kit, j)
         finally:
             if g != "none":
                 this_computer.unlock(g)
@@ -1165,6 +1334,9 @@ def open_music(body):
     if set(body) - {"kit", "what"} or body.get("what") != "music":
         return _bad()
     d = music_dir(kit)
+    if not music_ok(kit):                    # a link, or not a folder: never opened, never written into (v19 review)
+        arrange.log("reel page: the shoot's Music folder is a link or not a folder, so it isn't opened")
+        return 200, {"ok": False, "words": WORDS["cant_open"]}
     try:
         d.mkdir(exist_ok=True)               # the kit's own folder is there (kit_by_name): only Music is ever made
     except OSError:
@@ -1196,7 +1368,8 @@ def open_capcut_for_page(body):
         arrange.log("reel page (test): would open CapCut")
         return 200, {"ok": True, "words": words}
     import posting_queue
-    ok, said = posting_queue.open_capcut({"reel": {"project": project}} if project else {}, ok_words=words)
+    ok, said = posting_queue.open_capcut({"reel": {"project": project}} if project else {}, ok_words=words,
+                                         button=WORDS["open_capcut"])
     return 200, {"ok": bool(ok), "words": said}
 
 
@@ -1209,6 +1382,10 @@ def _one(q, key):
 
 def _get_page(handler, q):
     import arrange_page
+    if (handler.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+        # a link from another website: the plain "can't find" page, and nothing is looked at or written (v19 review:
+        # the page's look starts small copies and can re-write the reel page's record)
+        return arrange._send_page(handler, arrange_page.plain_page(CANT_FIND))
     kit = arrange.kit_by_name(_one(q, "kit"))
     if kit is None:
         return arrange._send_page(handler, arrange_page.plain_page(CANT_FIND))
@@ -1247,7 +1424,7 @@ def _get_job_or_songs(handler, path, q):
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     if path == "/reel-songs":
-        return arrange._send_json(handler, {"ok": True, "music": music_dir(kit).is_dir(), "songs": songs_for_page(kit)})
+        return arrange._send_json(handler, {"ok": True, "music": music_dir(kit).is_dir() and music_ok(kit), "songs": songs_for_page(kit)})
     jid = _one(q, "id")
     if jid and not JOB_ID.fullmatch(jid):
         return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 400)
@@ -1884,6 +2061,9 @@ ORDER_JS = r"""
       b.innerHTML = '<button class="zoom" type="button" title="' + esc(W.zoom) + '" aria-label="' + esc(W.zoom) + '">&#10530;</button><span class="badge"></span>';
       picture(b, p, 's');
       b.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(p.n); } };
+      // a click that came with no press of a pointer before it (detail 0: VoiceOver's VO-Space, Switch Control, a
+      // script) adds or takes out the photo as hers does; a real press is the drag code's (its click callback)
+      b.onclick = function(e){ if (e.detail === 0 && !(e.target.closest && e.target.closest('.zoom'))) toggle(p.n); };
       b.querySelector('.zoom').onclick = function(e){ e.stopPropagation(); openBig(p.n); };
       allEl.appendChild(b);
     });
@@ -2215,7 +2395,7 @@ MAKE_JS = r"""
       var back = $('back');
       out.className = 'result on';
       out.innerHTML = '<h3>' + esc(R.fill(W.in_capcut_h3, {project: job.project || W.new_reel})) + '</h3>' + lines(job.words) +
-        '<p>' + esc(W.open_capcut_say) + '</p><div class="acts"><button class="btn main" id="capcut" type="button">' + esc(W.open_capcut) +
+        '<p>' + esc(job.capcut_say || W.open_capcut_say) + '</p><div class="acts"><button class="btn main" id="capcut" type="button">' + esc(W.open_capcut) +
         '</button><a class="btn" id="resultBack" href="' + esc(back.getAttribute('href')) + '">' + esc($('backWords').textContent) + '</a></div><p class="went" id="went"></p>';
       $('capcut').onclick = function(){
         R.post('/reel-capcut', {kit: R.kit}).then(function(res){ $('went').textContent = (res.j && res.j.words) || ''; }).catch(function(){});
@@ -2390,6 +2570,8 @@ def cmd_make(kit, a):
         say(w)
     if not a.dry_run and res.get("project"):
         say(f"Made: {res['project']}")
+        if res.get("capcut_say") and res["capcut_say"] != WORDS["open_capcut_say"]:
+            say(res["capcut_say"])          # not in CapCut's list yet: what to tell them
     return 0
 
 

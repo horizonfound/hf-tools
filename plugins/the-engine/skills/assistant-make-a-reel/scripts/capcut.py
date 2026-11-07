@@ -365,16 +365,19 @@ def song_length(path):
     if d:
         return float(f"{d:f}")      # to the microsecond, written the way afinfo writes it, so records match a Mac's
     if shutil.which("afinfo"):  # pc-ok: only a Mac has afinfo; anything sound.py could not read
-        r = subprocess.run(["afinfo", p], capture_output=True, encoding="utf-8", errors="replace")  # pc-ok: only a Mac has afinfo
-        m = re.search(r"estimated duration:\s*([\d.]+)", r.stdout)
+        try:
+            r = subprocess.run(["afinfo", p], capture_output=True, encoding="utf-8", errors="replace", timeout=60)  # pc-ok: only a Mac has afinfo
+        except subprocess.TimeoutExpired:
+            r = None                # a length nobody can read in a minute is "unknown", never a wait without end
+        m = re.search(r"estimated duration:\s*([\d.]+)", r.stdout) if r else None
         if m:
             return float(m.group(1))
     if shutil.which("ffprobe"):
-        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
-                            "default=nw=1:nk=1", p], capture_output=True, encoding="utf-8", errors="replace")
         try:
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                "default=nw=1:nk=1", p], capture_output=True, encoding="utf-8", errors="replace", timeout=60)
             return float(r.stdout.strip())
-        except ValueError:
+        except (ValueError, subprocess.TimeoutExpired):
             pass
     if p.lower().endswith(".wav"):
         import wave
@@ -659,8 +662,13 @@ def write(plan, store, ignore_open=False):
     write.waiting = write.listed = False
     fold = folder_name(store, plan["name"])
     dest = store / fold
+    # Made under a hidden name in CapCut's projects folder and given its real name only once every file is in it
+    # (v19 review): a make stopped part way (a job past its time, the power) leaves no half-made project under a
+    # name CapCut would list. Everything written inside names the real folder, since that is where it ends up.
+    # (That CapCut leaves a folder whose name starts with a dot alone is not proven; it would have no project file.)
+    part = store / f".{fold}.making-{os.getpid()}-{uid()[:8]}"
     try:
-        dest.mkdir()
+        part.mkdir()
     except OSError as e:
         say(f"STOP: I couldn't make the project's folder in CapCut's projects folder ({e}). Nothing was written.")
         sys.exit(2)
@@ -671,7 +679,7 @@ def write(plan, store, ignore_open=False):
     song = plan.get("song")
     if song and not song.get("capcut_material"):
         src = Path(song["path"])
-        kept = dest / src.name
+        kept = part / src.name
         try:
             shutil.copyfile(src, kept)
             same = kept.stat().st_size == src.stat().st_size and file_hash(kept) == file_hash(src)
@@ -680,31 +688,41 @@ def write(plan, store, ignore_open=False):
             say(f"STOP: I couldn't put the song into the CapCut project ({e}).")
         if not same:
             try:
-                kept.unlink(missing_ok=True)       # our own half-made copy, in the folder we just made
-                dest.rmdir()
+                kept.unlink(missing_ok=True)       # our own half-made copy, in the hidden folder we just made
+                part.rmdir()
             except OSError:
                 pass
             say("STOP: the song's copy inside the CapCut project didn't match the original, so I made nothing. Try again.")
             sys.exit(2)
-        plan = dict(plan, song=dict(song, path=native(kept), name=song.get("name") or src.name, original=str(src)))
+        plan = dict(plan, song=dict(song, path=native(dest / src.name), name=song.get("name") or src.name, original=str(src)))
     draft, meta = build(plan, load_parts(), their_platform(store))
     draft["name"] = meta["draft_name"] = fold
     t = now_us()
     meta.update({"draft_fold_path": native(dest), "draft_root_path": native(store),
                  "tm_draft_create": t, "tm_draft_modified": t})
-    write_json(dest / draft_file_name(), draft)
-    write_json(dest / "draft_meta_info.json", meta)
-    (dest / "draft_settings").write_text(
+    write_json(part / draft_file_name(), draft)
+    write_json(part / "draft_meta_info.json", meta)
+    (part / "draft_settings").write_text(
         f"[General]\ndraft_create_time={t // US}\ndraft_last_edit_time={t // US}\nreal_edit_keys=0\nreal_edit_seconds=0\n",
         encoding="utf-8")
-    cover = dest / "draft_cover.jpg"
+    cover = dest / "draft_cover.jpg"           # where it will be; it is made in the hidden folder
+    made_cover = part / "draft_cover.jpg"
     first = next((p["path"] for p in plan["photos"] if not p.get("clip")), None)   # the cover is a photo, never a video
     if first and pictures.use_sips():
-        subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(cover)], capture_output=True)  # pc-ok: Mac branch
-    elif first and pictures.make_jpeg(first, cover, 720):
+        subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(made_cover)], capture_output=True)  # pc-ok: Mac branch
+    elif first and pictures.make_jpeg(first, made_cover, 720):
         pass                                 # a PC: the same small cover, made with Pillow
     elif first and str(first).lower().endswith((".jpg", ".jpeg")) and os.path.getsize(first) < 4_000_000:
-        shutil.copyfile(first, cover)
+        shutil.copyfile(first, made_cover)
+    # Every file is in: the folder takes its real name, never over a folder that is there (a rename onto an empty
+    # folder would replace it on a Mac, so the name is looked at first; Windows refuses a name that is there).
+    try:
+        if os.path.lexists(dest):
+            raise FileExistsError(str(dest))
+        os.rename(part, dest)
+    except OSError as e:
+        say(f"STOP: I couldn't give the CapCut project its name ({e}). Nothing was added to CapCut. Try again.")
+        sys.exit(2)
 
     entry = dict(ROOT_ENTRY_KEYS)
     entry.update({"draft_cover": native(cover), "draft_fold_path": native(dest), "draft_id": draft["id"],

@@ -1315,7 +1315,9 @@ def main():
     s.make()
     s.start()
     try:
-        case("the page server is on a port of this test's own (%d)" % s.port, 9100 <= s.port <= 9139 or s.port == a.port)
+        # the server takes the next free port when the one asked for is held for a moment (v19 review): any of the
+        # few just above --port is still this test's own
+        case("the page server is on a port of this test's own (%d)" % s.port, 9100 <= s.port <= 9139 or a.port <= s.port < a.port + 10)
         if a.only in ("songs", "make", "acceptance", "page"):
             return only(a, s, run)
         group("the server", check_server, s)

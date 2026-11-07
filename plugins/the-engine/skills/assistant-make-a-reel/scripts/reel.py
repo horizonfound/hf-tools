@@ -207,13 +207,35 @@ def cmd_sheet(a):
     say(f"List: {wd / 'photos.json'}")
 
 
+def kit_numbers(kit, folder):
+    """The numbered list of a post kit (<kit>/.kit/sheet.json, written by `kit.py sheet`), each photo named in
+    `folder`, or None when there is no kit, no list, or the list is of another folder. With --kit this is what
+    the numbers mean, always (v19 review: a list the page had left in .kit/reels went stale after a new export and
+    `kit.py sheet`, and a chat reel then put every photo one off)."""
+    if not kit:
+        return None
+    f = Path(kit).expanduser() / ".kit" / "sheet.json"
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        rows = [x for x in d.get("photos", []) if isinstance(x, dict) and type(x.get("n")) is int and isinstance(x.get("file"), str)]
+    except (OSError, ValueError, AttributeError, TypeError):
+        return None
+    same = os.path.normcase
+    if not rows or same(str(d.get("folder") or "")) != same(str(Path(folder))):
+        return None
+    return [dict(x, file=str(Path(folder) / Path(x["file"]).name)) for x in rows]
+
+
 def read_picks(a, n_clips=0):
     """The listing from the sheet, the picked photo numbers in order, Claude's marks ("7+" lingers on photo 7,
     "11-" passes it quickly), and the play order: ("photo", k) for the k-th pick, ("clip", k) for c1, c2...
     (the k-th clip in --clips; only when there are clips)."""
-    listing_file = workdir(a.shoot, a.folder, getattr(a, "kit", None)) / "photos.json"
     same = os.path.normcase      # on a PC, E:\Photos and e:\photos are the same folder; on a Mac this changes nothing
-    if listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
+    kit_list = kit_numbers(getattr(a, "kit", None), a.folder)
+    listing_file = workdir(a.shoot, a.folder, getattr(a, "kit", None)) / "photos.json"
+    if kit_list is not None:
+        listing = kit_list       # a kit's one numbered list: the numbers Claude, the page and the kit page all mean
+    elif listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
         listing = json.loads(listing_file.read_text(encoding="utf-8"))["photos"]
     else:
         listing = [{"n": i, "file": str(p), "w": 0, "h": 0} for i, p in enumerate(edited_photos(a.folder), 1)]
@@ -514,8 +536,13 @@ def write_status(a, **what):
     f = Path(a.status).expanduser()
     tmp = f.with_name(f".{f.name}.{os.getpid()}.tmp")
     try:
+        old = json.loads(f.read_text(encoding="utf-8"))
+        mine = {"for": old["for"]} if isinstance(old, dict) and isinstance(old.get("for"), str) else {}
+    except (OSError, ValueError):
+        mine = {}                    # the reel page's job writes {"for": <its id>} first; that is kept, so the page
+    try:                             # can tell which job this says made what
         tmp.write_text(json.dumps(dict({"ok": False, "dry": bool(a.dry_run), "short_song": False, "project": None,
-                                        "plan": None}, **what), indent=1), encoding="utf-8")
+                                        "plan": None}, **mine, **what), indent=1), encoding="utf-8")
         this_computer.replace(tmp, f)
     except OSError:
         try:
@@ -637,7 +664,8 @@ def cmd_make(a):
         say(capcut.write.note)
     if capcut.write.waiting:
         say(capcut.WAITING_HINT)
-    write_status(a, ok=True, project=dest.name, plan=plan_facts)
+    write_status(a, ok=True, project=dest.name, plan=plan_facts, listed=bool(capcut.write.listed),
+                 left_to_capcut=bool(capcut.write.left_to_capcut), waiting=bool(capcut.write.waiting))
     rec = json.loads((wd / "reel.json").read_text(encoding="utf-8"))
     rec["capcut_project"] = str(dest)
     (wd / "reel.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")

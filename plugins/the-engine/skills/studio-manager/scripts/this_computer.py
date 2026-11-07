@@ -386,6 +386,33 @@ def still_running(pid):
         return None
 
 
+def stop_tree(pid):
+    """Stop a program and every program it started, at once (a reel's job that ran past its time). The program
+    must be one started by popen_detached (or one that is its own group). A Mac: when pid leads its own process
+    group (popen_detached starts a new session), the whole group is sent SIGKILL; otherwise only pid. A PC:
+    Windows' own taskkill /T /F, which follows the programs a program started (unproven on a real PC; written from
+    Microsoft's documentation). Never raises; True when asked, False when it couldn't be."""
+    if type(pid) is not int or pid <= 0:
+        return False
+    if WINDOWS:
+        try:
+            exe = os.path.join(os.environ.get("SystemRoot") or r"C:\Windows", "System32", "taskkill.exe")
+            subprocess.run([exe if os.path.isfile(exe) else "taskkill", "/T", "/F", "/PID", str(pid)],
+                           capture_output=True, timeout=30, creationflags=0x08000000)   # CREATE_NO_WINDOW
+            return True
+        except (OSError, subprocess.SubprocessError):
+            return False
+    import signal
+    try:
+        if os.getpgid(pid) == pid:
+            os.killpg(pid, signal.SIGKILL)  # pc-ok: the Mac branch; a PC took taskkill above
+        else:
+            os.kill(pid, signal.SIGKILL)  # pc-ok: the Mac branch
+        return True
+    except OSError:
+        return False
+
+
 _PC_HOUSEKEEPING ={"thumbs.db", "ehthumbs.db", "ehthumbs_vista.db", "desktop.ini"}
 
 

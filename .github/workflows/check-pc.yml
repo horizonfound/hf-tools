@@ -40,7 +40,11 @@ name: Check it on a Windows PC
 #                            characters refused in plain words before anything is staged; nothing the page is
 #                            given holds a path; every refusal of every designer route on the real page server
 #                            leaves every file byte for byte as it was
-#   tests/pc_pictures.py     made-up RAW files from six camera makers, junk and damaged files
+#   tests/pc_reel_page.py    the reel page's own machinery (reel_page.py), nothing installed: Make my reel's
+#                            refusals, a test make through its own process, a second press, the lock probe, a job
+#                            stopped outright (this_computer.stop_tree), its one time limit, a recording's sound
+#                            made once beside it and a new one beside a sound that can't be read
+#   tests/pc_pictures.py    made-up RAW files from six camera makers, junk and damaged files
 #   tests/backup_safety.py   never write over a file, never mix two cards, carry on a cut-off backup,
 #                            never copy a card onto itself
 #   tests/pc_servers.py      the page servers: a space in the path, never two on one port, the restart
@@ -131,6 +135,9 @@ jobs:
       - name: The carousel designer's own machinery (names, a held slide, no window, two saves at once, 260 characters, every refusal)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/pc_design.py
+      - name: The reel page's own machinery (Make my reel's refusals, the job and its lock, its one limit, stopping a job, a recording's sound made once)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/pc_reel_page.py
       - name: The reel's sound (lengths, the beat, Windows' own Media Foundation)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/fixtures/check_sound.py
@@ -227,6 +234,9 @@ jobs:
       - name: The carousel designer's own machinery, so a PC fix never breaks the Mac
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_design.py
+      - name: The reel page's own machinery, so a PC fix never breaks the Mac
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/pc_reel_page.py
       - name: The reel's sound
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/fixtures/check_sound.py

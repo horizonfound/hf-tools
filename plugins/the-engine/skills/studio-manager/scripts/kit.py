@@ -1641,9 +1641,24 @@ REEL_DOOR = "reel-page"
 
 
 def reel_door(kit_name):
-    """The address the kit page's reel "Change the photos" opens (REEL_DOOR)."""
+    """The address the kit page's reel link opens (REEL_DOOR)."""
     q = quote(kit_name)
     return f"/reel.html?kit={q}" if REEL_DOOR == "reel-page" else f"/arrange.html?kit={q}&piece=reel"
+
+
+# The reel link's words while REEL_DOOR is "reel-page": Nicole's, from her post-kit card (pages/post-kit.html), until
+# stage d builds her cards. The reel is made on that page now, so "Change the photos" and "say make the reel to
+# Claude" pointed people elsewhere (v19 review).
+REEL_CREATE = "Create my reel"
+REEL_AGAIN = "Make a new version"
+REEL_NOT_MADE = f"Not made yet. Press {REEL_CREATE} to pick your song and make it."      # ours (her card has no such line)
+
+
+def reel_link_words(made):
+    """The words on the kit page's reel link: hers on the reel page's door, the older words on the picker's."""
+    if REEL_DOOR != "reel-page":
+        return "Change the photos"
+    return (REEL_AGAIN if made else REEL_CREATE) + " \u2192"
 LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
 
 
@@ -1701,7 +1716,9 @@ def write_page(kit):
     story_lines = "".join(wbox(f"Story {i}", s) for i, s in enumerate(words.get("stories", []), 1))
     reel = rec.get("reel")
     reel_html = (f"<p>Your reel is in CapCut, called <b>{html.escape(reel['project'])}</b>. Press Open in CapCut, click that project, style it the way you like, and export it from there.</p>"
-                 + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>"
+                 + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else (
+        f"<p class='empty'>{html.escape(REEL_NOT_MADE)}</p>" if REEL_DOOR == "reel-page" and (kit / ".kit" / "sheet.json").is_file()
+        else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>")
     lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
 
     canva = rec.get("canva", {})
@@ -1715,12 +1732,15 @@ def write_page(kit):
             # The page where they lay the slides out themselves (design.py): a plain link of class 'arr' too,
             # never 'go'. It is put in first, so it sits after "Change the photos" and before the folder's button.
             btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}' title='{html.escape(LAY_OUT_TITLE, quote=True)}'>{html.escape(LAY_OUT)}</a> " + btn)
-        if arrange and can_arrange and (rec.get("picks") or {}).get(arrange):
+        reel_page_door = arrange == "reel" and REEL_DOOR == "reel-page"
+        if arrange and can_arrange and ((rec.get("picks") or {}).get(arrange) or reel_page_door):
             # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
             # every 'go' button asks the Assistant to open a folder in Finder (File Explorer on a PC). Shown only when the page is
-            # served live (a saved copy has nowhere to go).
+            # served live (a saved copy has nowhere to go). The reel page's door shows before Claude has picked too:
+            # that page says how to ask for a pick.
             href = reel_door(kit.name) if arrange == "reel" else f"/arrange.html?kit={quote(kit.name)}&piece={arrange}"
-            btn = (f"<a class='arr' href='{html.escape(href)}'>Change the photos</a> " + btn)
+            label = reel_link_words(bool(reel)) if arrange == "reel" else "Change the photos"
+            btn = (f"<a class='arr' href='{html.escape(href)}'>{html.escape(label)}</a> " + btn)
         cv = canva.get(piece) if piece else None
         if cv and cv.get("edit_url"):
             btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn
@@ -1739,7 +1759,9 @@ def write_page(kit):
             f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"
             f"<p class='folder'>In your {html.escape(brand.short())} folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
             f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
-            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover") else "Cut on the beat, in CapCut. The cover is in the Covers folder."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
+            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover")
+                           else "Cut on the beat, in CapCut. The cover is in the Covers folder." if (kit / "Covers").is_dir()
+                           else "Cut on the beat, in CapCut."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
             + sec("Carousel", carousel_line(shown, bool(canva.get("carousel"))), "4:5", strip("Carousel", fs=shown["files"]), caption + tags, "Carousel", "carousel", arrange="carousel")
             + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
             + sec("Stories", ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva.get("stories") else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle."), "9:16",

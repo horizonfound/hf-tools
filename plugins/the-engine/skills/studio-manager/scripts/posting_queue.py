@@ -803,13 +803,15 @@ def write_page(p):
     return PAGE
 
 
-def open_capcut(rec, ok_words=None):
+def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     """The kit page's "Open in CapCut" button. Starts CapCut through capcut.py (on a Mac its own `open -a`, as
     before; on a PC the CapCut program found where it installs itself), and says which project to click:
     CapCut can't be told to open a project from outside, so the words do that part. capcut.py also adds a reel
     that is still waiting for CapCut's list (one made while CapCut was open on a PC, or while the list couldn't
     be saved) when CapCut is surely closed, and its note about that is passed on. ok_words: the line to say when
-    it opened, in place of the kit page's own (the reel page passes Nicole's, capcut.OPEN_WORDS)."""
+    it opened, in place of the kit page's own (the reel page passes Nicole's, capcut.OPEN_WORDS). button: what the
+    button pressed is called on that page, so a line that says to press it again names the button that is there
+    (the reel page's is "Open CapCut")."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
         return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
@@ -860,7 +862,7 @@ def open_capcut(rec, ok_words=None):
             # `capcut.py open --closed` once they say CapCut is closed (parts/on-a-pc.md)
             words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell Claude “add my waiting reel”."
         else:
-            words += f" If it isn't in the list, {capcut.QUIT} CapCut and press Open in CapCut again, and I'll add it."
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and press {button} again, and I'll add it."
     return True, words
 
 
