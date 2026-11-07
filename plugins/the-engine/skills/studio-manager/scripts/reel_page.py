@@ -15,7 +15,7 @@ her steps in her order, her buttons and what they do. Underneath it is built the
 
   * The page names a kit only by its folder name and a photo only by its number on the kit's numbered list
     (.kit/sheet.json, reel.py's own numbering). No route takes a path or a file name, and no answer has one.
-  * Nothing is loaded from the internet: the fonts are the plugin's own (shared/fonts, through /reel-font), the
+  * Nothing is loaded from the internet: the fonts are the plugin's own (shared/fonts, through /look-font, look.py), the
     drag is our own pointer drag (arrange_page.DRAG_JS; no SortableJS, no browser drag-and-drop).
   * Nothing is kept in the browser: every choice is saved to the kit by POST /reel-save, retried until it lands.
   * kit.json is only ever read here (Claude's order is picks.reel there, with reel_marks); commands write it.
@@ -2483,13 +2483,15 @@ def handle_post(handler, path, query):
 
 
 # ---------- the page ----------
-# Her stylesheet (reel-maker.html, v19), as she wrote it. Only the Google Fonts link is gone: the same two
-# families are served by the Assistant itself (FONT_CSS). OUR_CSS adds what our own drag draws, and one rule
+# Her stylesheet (reel-maker.html, v19), as she wrote it, with three changes. The Google Fonts link is gone: DM Sans
+# is served by the Assistant itself. Her colour names and the rules every page shares now live in look.py (Dustin,
+# Nov 7: every page takes this page's look), so they are not repeated here. And no serif (Dustin, Nov 7: "get rid of
+# that serif font"): her three Fraunces italic touches (the coral full stop after the title, the empty-reel line, the
+# paste line) are DM Sans now, the full stop still coral. OUR_CSS adds what our own drag draws, and one rule
 # hers lacks: anything marked hidden stays hidden. In hers ".opt .rec{display:inline-block}" wins over hidden, so
 # "Recommended for behind-the-scenes reels" shows on a photos-only reel too; BUILD.md says it is for footage
 # only (for the "Tell Nicole" list).
 STYLE = r"""
-:root{--display:'Fraunces',Georgia,serif}
 *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 9rem}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
@@ -2498,7 +2500,6 @@ STYLE = r"""
 .head{padding:clamp(1.8rem,4vw,3rem) 0 .6rem;display:grid;gap:.5rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(30px,4.4vw,50px)/1.03 var(--sans);letter-spacing:-.035em}
-h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing:0}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(15.5px,1.3vw,17.5px);max-width:42em}
 
 .step{background:var(--paper);border-radius:22px;padding:1.3rem;margin-top:1.1rem;box-shadow:0 1px 0 var(--line)}
@@ -2541,7 +2542,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .opt .rec{display:inline-block;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--coral-2);background:var(--coral-l);border-radius:999px;padding:.3em .55em;margin-left:.35rem;vertical-align:2px}
 
 #reel{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;min-height:120px}
-#reel:empty::before{content:"Your reel is empty. Tap photos below to add them.";color:var(--ink-2);grid-column:1/-1;align-self:center;text-align:center;font:italic 400 16px/1.3 var(--display)}
+#reel:empty::before{content:"Your reel is empty. Tap photos below to add them.";color:var(--ink-2);grid-column:1/-1;align-self:center;text-align:center;font:400 16px/1.3 var(--sans)}
 .tile{position:relative;border-radius:12px;overflow:hidden;background:var(--sand-l);cursor:grab;user-select:none;-webkit-user-select:none;box-shadow:0 0 0 1px var(--line)}
 .tile .ph{aspect-ratio:9/16;position:relative}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
@@ -2633,7 +2634,7 @@ details.all summary{cursor:pointer;font-weight:600;font-size:15px}
 .insight b{font-weight:600}.insight p{margin:.35rem 0 0}
 .paste{margin:1rem 0 0;font-size:14.5px}.paste p{margin:0 0 .45rem}
 .paste .line{display:flex;align-items:center;gap:.7rem;justify-content:space-between;border:1.5px dashed var(--coral);border-radius:14px;padding:.6rem .7rem .6rem 1rem;max-width:520px;background:var(--paper)}
-.paste .line span{font:italic 400 18px/1.3 var(--display)}
+.paste .line span{font:500 17px/1.35 var(--sans)}
 .mh{font:600 16px/1.2 var(--sans);margin:1.3rem 0 .2rem}
 .moments{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,190px));gap:.8rem}
 .mom{position:relative;border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper);cursor:default;text-align:left;padding:0;font:inherit;color:inherit}
@@ -2671,6 +2672,12 @@ details.all summary{cursor:pointer;font-weight:600;font-size:15px}
 FONT_CSS = "".join(
     "@font-face{font-family:'%s';src:url('/reel-font?f=%s') format('truetype');font-weight:%d;font-style:%s;font-display:swap}"
     % (fam, key, wt, st) for fam, wt, st, key in FACES)
+# The page itself takes its font from look.py (/look-font). Its DM Sans faces from /reel-font stay behind that as a
+# fallback, so the page keeps its letters on a posting server that does not answer /look-font yet. FONT_CSS (with
+# Fraunces) is kept for the kit pages that still ask for it, and /reel-font answers exactly as before.
+SANS_FALLBACK_CSS = "".join(
+    "@font-face{font-family:'%s';src:url('/reel-font?f=%s') format('truetype');font-weight:%d;font-style:%s;font-display:swap}"
+    % (fam, key, wt, st) for fam, wt, st, key in FACES if fam == "DM Sans")
 
 OUR_CSS = r"""
 [hidden]{display:none!important}
@@ -2850,7 +2857,7 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + FONT_CSS + STYLE + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + SANS_FALLBACK_CSS + STYLE + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "

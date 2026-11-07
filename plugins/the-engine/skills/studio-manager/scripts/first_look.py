@@ -27,7 +27,7 @@ CSS = """
 .talk .mic svg{width:24px;height:24px}
 .talk h3{font:600 18px/1.25 var(--sans);letter-spacing:-.015em;margin-bottom:.25rem}
 .talk p{color:var(--ink-2);font-size:15px}
-.talk .eg{font:italic 400 17px/1.4 var(--display);color:var(--ink);margin-top:.35rem}
+.talk .eg{font:400 17px/1.4 var(--sans);color:var(--ink);margin-top:.35rem}
 .shoots-head{display:grid;gap:.5rem;padding-top:clamp(2rem,4vw,3rem)}
 .shoots-head .h2{font:600 clamp(28px,3.6vw,44px)/1.05 var(--sans);letter-spacing:-.03em;text-wrap:balance}
 .shoots{display:grid;gap:1.5rem;padding:1.6rem 0 1rem}
@@ -56,7 +56,7 @@ CSS = """
 .pics img{width:100%;height:100%;object-fit:cover}
 .pics .chip{z-index:2}
 .copy{display:grid;gap:.9rem}
-.copy .n{font:300 44px/1 var(--display);color:var(--coral-2)}
+.copy .n{font:600 40px/1 var(--sans);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--coral-2)}
 .copy .meta{display:flex;flex-wrap:wrap;gap:.45rem}
 .tag{font:500 12px/1 var(--sans);padding:.5rem .8rem;border-radius:999px;background:var(--cream)}
 .tag.sun{background:var(--sun-l)}.tag.ocean{background:var(--ocean-l)}

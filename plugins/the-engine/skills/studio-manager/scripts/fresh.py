@@ -257,9 +257,9 @@ def log_since(log, before):
 
 WAIT_PAGE = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
              "<meta http-equiv='refresh' content='2'><title>One moment</title>"
-             "<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#FAF9F6;color:#1F2430;"
+             "<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#FAFAF6;color:#1F2430;"
              "font:500 17px/1.5 -apple-system,'Helvetica Neue','Segoe UI',system-ui,Arial,sans-serif}p{max-width:26rem;text-align:center;padding:0 1.5rem}"
-             "small{display:block;margin-top:.5rem;color:#6B7280;font-weight:400;font-size:14px}</style></head>"
+             "small{display:block;margin-top:.5rem;color:#646B78;font-weight:400;font-size:14px}</style></head>"
              "<body><p>One moment.<small>The Assistant just got an update. This page comes back by itself in a couple of seconds.</small></p>"
              "<script>setTimeout(function(){location.reload()},1800)</script></body></html>").encode()
 

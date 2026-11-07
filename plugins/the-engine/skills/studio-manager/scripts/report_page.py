@@ -4,10 +4,11 @@ _studio/report.html. One file, no account; opens in the Claude desktop app or
 any browser. Problems first, then the good news, then a few teasers from the
 shoot itself (from _studio/previews/, picked in _studio/teasers.json).
 
-The look follows the Studio sales-page mock-up ("Fresh": cream desk, coral
-accent, Fraunces + DM Sans, rounded cards, a few things tilted). Fonts load
-from Google when there is internet and fall back to Georgia / the system font
-when there is not; the page works either way.
+The look follows the reel page (Dustin, Nov 7): cream desk, coral accent, rounded
+cards, a few things tilted, and DM Sans for every word, no serif. The colours, the
+font and the shared rules come from look.py; the font is the plugin's own, served by
+the report's server (/look-font), so nothing loads from the internet. Opened as a
+plain file with no server, the page falls back to the system's sans font.
 
 Run on its own:  python3 report_page.py "<session folder>"
 backup.py calls write_page() at the end of every run.
@@ -23,15 +24,8 @@ from pathlib import Path
 MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff",
          ".mov", ".mp4", ".mxf", ".avi"}
 
-FONTS = ("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600"
-         "&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&display=swap")
-
 CSS = """
-:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--ink-deep:#2F6F6B;
---coral:#F07F5A;--coral-2:#D4643F;--ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;
---line:rgba(31,36,48,.12);--shadow:0 30px 60px -30px rgba(31,36,48,.35);
---display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--r:30px;--ease:cubic-bezier(.2,.7,.2,1);
-color-scheme:light}
+:root{color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
 img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
@@ -49,7 +43,6 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .h1{font:600 clamp(36px,5.4vw,64px)/1.02 var(--sans);letter-spacing:-.035em;text-wrap:balance;max-width:14em}
 .h1.bad{max-width:16em}
-.swap{font:italic 400 1.14em/1 var(--display);color:var(--coral-2);letter-spacing:0}   /* the italic word in coral; the wavy underline read as a spelling error (Dustin, Oct 28) */
 .lede{font-size:clamp(16px,1.4vw,19px);color:var(--ink-2);max-width:36em;text-wrap:pretty}
 .hero{display:grid;gap:1.2rem;padding:clamp(2.2rem,5vw,4rem) 0 clamp(1.6rem,3vw,2.4rem)}
 .pill{display:inline-flex;align-items:center;gap:.7rem;padding:.4rem 1.2rem .4rem .45rem;border-radius:999px;font:500 14px/1 var(--sans);background:var(--paper);border:1.5px solid var(--ink);white-space:nowrap;width:max-content}
@@ -83,7 +76,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .big.on{display:flex}.big .card{position:relative;background:var(--paper);border-radius:22px;padding:14px;box-shadow:0 40px 100px -24px rgba(31,36,48,.45),0 0 0 1px var(--line);cursor:default}
 .big img{max-width:86vw;max-height:84vh;object-fit:contain;border-radius:12px;display:block}
 .big .x{position:absolute;top:-14px;right:-14px;width:36px;height:36px;font:600 16px/1 var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:50%;box-shadow:var(--shadow);cursor:pointer}
-.big .nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;font:300 30px/1 var(--display);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:50%;box-shadow:var(--shadow);cursor:pointer;opacity:.9}.big .nav:hover{opacity:1}.big .prev{left:-22px}.big .next{right:-22px}
+.big .nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;font:400 26px/1 var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:50%;box-shadow:var(--shadow);cursor:pointer;opacity:.9}.big .nav:hover{opacity:1}.big .prev{left:-22px}.big .next{right:-22px}
 .big small{position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);color:var(--ink-2);font:500 12px var(--sans)}
 .notes{padding:clamp(1.2rem,2.6vw,2rem) 0 .6rem}
 .notes .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1rem;margin-top:1rem}
@@ -114,10 +107,10 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 .row{display:grid;gap:.15rem;padding:.7rem 0;border-top:1px solid var(--line)}.row:first-of-type{border-top:0;padding-top:0}
 .row b{font-size:13px;font-weight:600}.row span{color:var(--ink-2);font-size:14px;word-break:break-all}
 .card.f-lime p,.card.f-sun p{color:var(--ink)}
-.big-ok{font:400 clamp(26px,2.6vw,34px)/1.1 var(--display);text-wrap:balance}
+.big-ok{font:600 clamp(24px,2.4vw,30px)/1.15 var(--sans);letter-spacing:-.02em;text-wrap:balance}
 .foot{background:var(--ink);color:var(--cream);overflow:hidden;margin-top:1rem}
 .foot .wrap{padding-top:2rem;font-size:14px;text-align:center;opacity:.9}
-.wordmark{font:400 clamp(44px,11vw,160px)/.78 var(--display);letter-spacing:-.03em;white-space:nowrap;text-transform:uppercase;text-align:center;margin:1.2rem 0 -.22em;color:var(--coral)}
+.wordmark{font:600 clamp(34px,8.6vw,124px)/.78 var(--sans);letter-spacing:-.04em;white-space:nowrap;text-transform:uppercase;text-align:center;margin:1.2rem 0 -.22em;color:var(--coral)}
 @media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}
 .teasers{grid-template-columns:repeat(3,1fr)}.cards{grid-template-columns:1fr}}
 @media(max-width:600px){.teasers{grid-template-columns:repeat(2,1fr)}.bar .when{display:none}}
@@ -126,6 +119,7 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
 import brand  # noqa: E402
+import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
 
@@ -365,7 +359,7 @@ def build(manifest, studio):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(brand.title(name))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}{SHOOTS_CSS}</style></head><body>",
+           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}</style></head><body>",
            f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}",
            f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
            + "</div></div>"]

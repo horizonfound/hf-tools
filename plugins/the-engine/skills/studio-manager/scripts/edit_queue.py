@@ -58,6 +58,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 from where import place_key, same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
 this_computer.utf8_output()
@@ -442,15 +443,8 @@ def options(q):
 
 # ---------- the page ----------
 
-FONTS = ("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600"
-         "&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&display=swap")
-
 CSS = r"""
-:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;
---ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;--line:rgba(31,36,48,.12);
---shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;
---r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
-*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
@@ -460,10 +454,9 @@ body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--
 .head{padding:clamp(2rem,5vw,3.6rem) 0 1.2rem;display:grid;gap:.7rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
-h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(--coral);text-decoration-thickness:.06em;text-underline-offset:.12em;letter-spacing:0}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(16px,1.4vw,18px);max-width:38em}
 .talk{margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.3rem .7rem;align-items:baseline;background:var(--sun-l);border-radius:22px;padding:.65rem 1.1rem;font-size:14px;color:var(--ink-2);width:fit-content;max-width:100%}
-.talk i{font:italic 400 16px/1.3 var(--display);color:var(--ink)}
+.talk i{font:400 16px/1.3 var(--sans);color:var(--ink)}
 .list{display:grid;gap:1rem;padding:1rem 0 2rem;margin:0;list-style:none}
 .card{position:relative;display:grid;grid-template-columns:auto 168px 1fr auto;gap:clamp(.8rem,2vw,1.4rem);align-items:center;background:var(--paper);border-radius:var(--r);padding:1rem 1.2rem 1rem .6rem;box-shadow:0 1px 0 var(--line);transition:transform .45s var(--ease),box-shadow .45s var(--ease),opacity .6s var(--ease),filter .6s var(--ease);user-select:none}
 .card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
@@ -478,13 +471,13 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .pics span:nth-child(3){left:86px;transform:rotate(6deg);z-index:1}
 .card:hover .pics span:nth-child(1){transform:rotate(-8deg) translateX(-6px)}.card:hover .pics span:nth-child(3){transform:rotate(9deg) translateX(6px)}
 .pics img{width:100%;height:100%;object-fit:cover;display:block}
-.pics .none{display:grid;place-items:center;font:italic 400 15px/1.2 var(--display);color:var(--ink-2);background:var(--sand-l);border-radius:14px;height:96px;width:150px}
+.pics .none{display:grid;place-items:center;font:400 15px/1.2 var(--sans);color:var(--ink-2);background:var(--sand-l);border-radius:14px;height:96px;width:150px}
 .info{display:grid;gap:.35rem;min-width:0}
 .name{font:600 clamp(19px,2vw,23px)/1.15 var(--sans);letter-spacing:-.02em;overflow-wrap:anywhere}
 .meta{display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:center;font-size:13.5px;color:var(--ink-2)}
 .tag{display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .7rem;border-radius:999px;font:600 12.5px/1 var(--sans);background:var(--sand-l);color:var(--ink)}
 .tag.soon{background:var(--sun-l)}.tag.near{background:var(--coral-l);color:var(--coral-2)}.tag.today{background:var(--coral);color:#fff}.tag.late{background:#C8442A;color:#fff}
-.n{font:italic 400 30px/1 var(--display);color:#C9CCD3;min-width:1.6em;text-align:right}
+.n{font:600 30px/1 var(--sans);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#C9CCD3;min-width:1.6em;text-align:right}
 .check{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--paper);cursor:pointer;transition:background .3s var(--ease),border-color .3s var(--ease),transform .3s var(--ease)}
 .check:hover{border-color:var(--ocean);transform:scale(1.06)}
 .check svg{width:22px;height:22px;stroke:#fff;stroke-width:3;fill:none;opacity:0;transition:opacity .2s}
@@ -510,7 +503,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .ask .go:disabled{opacity:.4;cursor:default;background:var(--coral);color:#fff}
 @keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .empty{background:var(--paper);border-radius:var(--r);padding:2.4rem;text-align:center;display:grid;gap:.4rem}
-.empty b{font:italic 400 30px/1.1 var(--display)}.empty span{color:var(--ink-2)}
+.empty b{font:600 30px/1.1 var(--sans);letter-spacing:-.02em}.empty span{color:var(--ink-2)}
 .line{display:flex;align-items:center;gap:1rem;margin:1.6rem 0 0;color:var(--ink-2)}
 .line::before,.line::after{content:"";flex:1;height:1px;background:var(--line)}
 .line span{font:600 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
@@ -520,7 +513,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);text-decoration:underline wavy var(
 .search:focus-within{border-color:var(--coral)}
 .search input{border:0;outline:0;background:transparent;font:500 14px var(--sans);color:var(--ink);width:100%}
 .search svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2;flex:none}
-.month{font:italic 400 17px/1 var(--display);color:var(--ink-2);margin:1.4rem 0 .5rem;padding-left:.2rem}
+.month{font:400 17px/1 var(--sans);color:var(--ink-2);margin:1.4rem 0 .5rem;padding-left:.2rem}
 .alist{display:block;margin:0;padding:0 0 3rem;list-style:none}
 .acard{display:grid;grid-template-columns:78px 1fr auto;gap:1rem;align-items:center;background:var(--paper);padding:.6rem 1rem .6rem .8rem;border-bottom:1px solid var(--line);transition:background .25s}
 .acard:hover{background:#FFFDF8}
@@ -736,7 +729,7 @@ def page_html(q):
     data = json.dumps(state(q)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(brand.title('Your shoots'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<title>{html.escape(brand.title('Your shoots'))}</title><style>{look.head_css()}{CSS}</style></head><body>"
             f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
@@ -805,6 +798,8 @@ class Handler(SimpleHTTPRequestHandler):
         p = urlsplit(self.path).path
         if fresh.page_path(p) and fresh.stale() and fresh.restart(self):
             return
+        if p == look.FONT_ROUTE:                # the page's font: the plugin's own DM Sans (look.py)
+            return look.serve_font(self, urlsplit(self.path).query)
         if p in ("/", "/queue.html"):
             body = page_html(load()).encode()
             self.send_response(HTTPStatus.OK)

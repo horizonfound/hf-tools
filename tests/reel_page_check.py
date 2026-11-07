@@ -233,7 +233,21 @@ def check_words():
     if her is None:
         print("SKIP  her stylesheet word for word: her handoff isn't on this computer", flush=True)
     else:
-        case("her stylesheet is in the page exactly as she wrote it", m and her in m.group(1))
+        # Dustin, Nov 7: every page takes this page's look and no page keeps a serif. So her colour names come from
+        # look.py now (each of hers there, at her value), and her three Fraunces italic touches are DM Sans; every
+        # other line of hers is in the page as she wrote it.
+        import look
+        root = re.search(r":root\{.*?\}\n", her, re.S).group(0)
+        tokens = dict(re.findall(r"--([a-z0-9-]+):([^;}]+)", root))
+        case("her colour names are all in the shared look, at her values",
+             all("--%s:%s;" % (k, v) in look.ROOT for k, v in tokens.items() if k not in ("display", "sans", "ease"))
+             and "--ease:" + tokens.get("ease", "") in look.ROOT, tokens)
+        ours = her.replace(root, "")
+        ours = re.sub(r"h1 em\{font:italic 400 1\.1em/1 var\(--display\);color:var\(--coral-2\);letter-spacing:0\}\n", "", ours)
+        ours = ours.replace("text-align:center;font:italic 400 16px/1.3 var(--display)}", "text-align:center;font:400 16px/1.3 var(--sans)}")
+        ours = ours.replace(".paste .line span{font:italic 400 18px/1.3 var(--display)}", ".paste .line span{font:500 17px/1.35 var(--sans)}")
+        case("her stylesheet is in the page as she wrote it, but for the shared colours and no serif",
+             m and ours in m.group(1) and "--display" not in m.group(1) and "Fraunces" not in m.group(1))
 
 
 # ---------- 2. the server, without a browser ----------

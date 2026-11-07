@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from finder import open_folder as show_in_finder
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
+import look  # noqa: E402  (the pages' own font: GET /look-font)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
 
@@ -292,6 +293,9 @@ class Handler(SimpleHTTPRequestHandler):
         parts = urlsplit(self.path)
         if fresh.page_path(parts.path) and fresh.stale() and fresh.restart(self):
             return
+        if parts.path == look.FONT_ROUTE:
+            # the report's font: the plugin's own DM Sans (look.py), never a file from the backup's folder
+            return look.serve_font(self, parts.query)
         if parts.path in ("", "/"):
             # the bare address is the report
             self.send_response(HTTPStatus.FOUND)
