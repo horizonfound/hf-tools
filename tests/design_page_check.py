@@ -149,6 +149,9 @@ var a = M.act(five, 1, 'full');
 t('Fill slide: the slide its middle is on (slide 3), whole', eq(box(a.st, 1), {x: 2160, y: 0, w: 1080, h: 1350}) && !('sel' in a) && five.blocks[0].x === 2300, box(a.st, 1));
 t('Across 2 slides: that slide and the next', eq(box(M.act(five, 1, 'span2').st, 1), {x: 2160, y: 0, w: 2160, h: 1350}));
 t('Across 2 slides, on the last slide: the one before it and the last', eq(box(M.act(five, 3, 'span2').st, 3), {x: 3240, y: 0, w: 2160, h: 1350}));
+var single = ST(1, [F(1, 2, 0, 0, W, H)]), grown = M.act(single, 1, 'span2').st;
+t('Across 2 slides on a single post (one slide): the second slide is added, in the same one change, and the photo runs across both', grown.slides === 2 && eq(box(grown, 1), {x: 0, y: 0, w: 2160, h: 1350}) && single.slides === 1 && single.blocks[0].w === W, [grown.slides, box(grown, 1)]);
+t('Across 2 slides on two slides changes the number of slides not at all', M.act(ST(2, [F(1, 2, 0, 0, W, H)]), 1, 'span2').st.slides === 2);
 t('Top half', eq(box(M.act(five, 1, 'top').st, 1), {x: 2160, y: 0, w: 1080, h: 675}));
 t('Bottom half', eq(box(M.act(five, 1, 'bottom').st, 1), {x: 2160, y: 675, w: 1080, h: 675}));
 t('Left half', eq(box(M.act(five, 1, 'left').st, 1), {x: 2160, y: 0, w: 540, h: 1350}));
@@ -192,7 +195,8 @@ t('Slides minus: a photo that ends exactly where the last slide starts is not on
 t('Slides minus: a photo reaching 1 px into the last slide is on it', M.fewerSlides(ST(3, [F(1, 2, 0, 0, 2161, H)])).why === 'last');
 t('Slides minus: something hanging off the end of the strip counts as on the last slide', M.fewerSlides(ST(3, [F(1, 2, 3200, 0, 300, 300)])).why === 'last');
 t('Slides minus: a text box on the last slide stops it too', M.fewerSlides(ST(3, [TX(1, 2300, 300, 800, 110)])).why === 'last');
-t('Slides minus at 2 slides: refused', M.fewerSlides(ST(2, [])).why === 'min');
+t('Slides minus at 1 slide: refused (one slide on its own is a single post, the fewest there is)', M.fewerSlides(ST(1, [])).why === 'min' && M.fewerSlides(ST(1, [])).st.slides === 1);
+t('Slides minus at 2 slides with the second empty: one slide, a single post', M.fewerSlides(ST(2, [F(1, 2, 0, 0, W, H)])).st.slides === 1);
 t('Slides minus: something wider than the slides that would be left stops it', M.fewerSlides(ST(3, [F(1, 2, -200, 0, 2260, H)])).why === 'wide');
 t('Slides plus: one more, up to 20', M.moreSlides(seven).st.slides === 4 && M.moreSlides(ST(20, [])).why === 'max' && M.moreSlides(ST(20, [])).st.slides === 20);
 t('Background: a color is taken in small letters; the same color, or something that is not a color, changes nothing', M.setBg(seven, '#F4EFE6').bg === '#f4efe6' && M.setBg(seven, '#ffffff') === seven && M.setBg(seven, 'red') === seven && M.setBg(seven, '#fff') === seven && M.setBg(seven, 'url(x)') === seven);
@@ -255,8 +259,8 @@ t('a layout from the Assistant is given its crop where none is written, and text
 t('patch: no difference gives the very same layout back', M.patch(one, 1, {x: 0, y: 0}) === one && M.patch(one, 1, {x: 1}) !== one && M.patch(one, 5, {x: 1}) === one);
 t('next number: one above the highest in the layout', M.nextId(ST(3, [F(4, 1, 0, 0, 9, 9), F(17, 1, 0, 0, 9, 9)])) === 18 && M.nextId(ST(3, [])) === 1 && M.nextId(ST(3, [F(1000000, 1, 0, 0, 9, 9)])) === 1);
 t('kind: a text box is text, anything else a photo frame; an empty frame is a frame with no photo', M.typeOf(TX(1, 0, 0, 9, 9)) === 'text' && M.typeOf(full) === 'photo' && M.isHole(F(1, null, 0, 0, 9, 9)) && !M.isHole(full) && !M.isHole(TX(1, 0, 0, 9, 9)));
-M.useLimits({slides: [2, 20], frame_min: 60, on_strip: 40, zoom: [1, 3], blocks: 80});
-t('the Assistant\'s own limits are the ones the rules start with', M.RULES.frameMin === 60 && M.RULES.onStrip === 40 && M.RULES.blocks === 80 && eq(M.RULES.slides, [2, 20]) && eq(M.RULES.zoom, [1, 3]));
+M.useLimits({slides: [1, 20], frame_min: 60, on_strip: 40, zoom: [1, 3], blocks: 80});
+t('the Assistant\'s own limits are the ones the rules start with', M.RULES.frameMin === 60 && M.RULES.onStrip === 40 && M.RULES.blocks === 80 && eq(M.RULES.slides, [1, 20]) && eq(M.RULES.zoom, [1, 3]));
 JSON.stringify(out);
 """
 
@@ -1081,6 +1085,32 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                 c.wait_for("Designer.save.idle()", 8)
             finally:
                 c.desktop()
+
+            # ================= a single post: one slide (decision 12) =================
+            tokens[0] += 1
+            one_state = {"slides": 1, "bg": "#ffffff", "blocks": [{"id": 1, "n": carousel[0], "x": 0, "y": 0, "w": W, "h": H, "ox": 0.5, "oy": 0.5, "zoom": 1}]}
+            code, out = post(srv.port, "/design-new", {"kit": kit_name, "state": one_state, "name": "Single post", "token": f"browsercheck{tokens[0]:03d}"})
+            if case("a single post: a design of one slide is made", code == 200 and out and out["design"]["state"]["slides"] == 1, (code, out)):
+                D8 = out["design"]["id"]
+                c.open(f"http://127.0.0.1:{srv.port}/design.html?kit={KQ}&design={D8}")
+                ready()
+                c.wait_for("document.querySelectorAll('#strip .blk img').length === 1", 15)
+                case("a single post: the line at the top says it, in her words", c.text(".lede").endswith("One slide on its own is a single post."), c.text(".lede"))
+                case("a single post: one slide on the strip, Slides minus is off and says nothing (no 'at least 2' line)",
+                     c.text("#slides-count") == "1" and c.js("document.getElementById('slides-minus').disabled") is True
+                     and c.js("document.getElementById('slides-minus').title") == "" and c.count("#labels span") == 1)
+                c.click("#slides-minus", check=False)
+                case("a single post: pressing Slides minus anyway changes nothing and says nothing", st()["slides"] == 1 and c.text("#slides-line") == "")
+                c.click(centre(1))
+                press("span2")
+                now = st()
+                case("a single post: Across 2 slides adds the second slide and lays the photo across both",
+                     now["slides"] == 2 and {k: blk(now, 1)[k] for k in "xywh"} == {"x": 0, "y": 0, "w": 2160, "h": 1350} and c.text("#slides-count") == "2" and c.count("#labels span") == 2
+                     and settled() and disk(D8)["state"]["slides"] == 2, now)
+                c.click("#undo")
+                now = st()
+                case("a single post: one Undo takes both back (one slide, the photo on it as it was)",
+                     now["slides"] == 1 and {k: blk(now, 1)[k] for k in "xywh"} == {"x": 0, "y": 0, "w": W, "h": H} and settled() and disk(D8)["state"]["slides"] == 1, now)
 
             # ================= the whole run =================
             case("the page threw no error and logged none, in the whole run", c.page_errors() == [], c.page_errors()[:4])

@@ -119,7 +119,7 @@ FONT_DIR = HERE.parent.parent.parent / "shared" / "fonts"      # the font files 
 
 # ---------- the decisions, each in one place ----------
 W, H = 1080, 1350                       # one slide, the shape Instagram shows in the feed (4:5)
-SLIDES_MIN, SLIDES_MAX = 2, 20
+SLIDES_MIN, SLIDES_MAX = 1, 20         # decision 12 (Nicole, Nov 6): one slide on its own is a single post
 MAX_BLOCKS = 80                         # photos and text boxes together, in one design
 MAX_TEXTS = 40
 TEXT_MAX = 2000                         # letters in one text box
@@ -202,6 +202,7 @@ YOURS_FULL = "Your font list is full. The font still works in this design."
 SLIDE_AGAIN = "Something went wrong while the slides were being sent. Nothing was added to your Carousel folder. Press Save slides again."
 SLIDES_WAITING = "Too many unfinished saves are waiting. Tell Claude and it'll sort it out."
 SAVED_SET = "Saved {n} slides in your Carousel folder, named \"{base}\". Nothing was replaced."
+SAVED_ONE = "Saved 1 slide in your Carousel folder, named \"{base}\". Nothing was replaced."
 ALREADY = "Already saved as \"{base}\". Change something to save a new set."
 MISSING = "Not every slide arrived. Nothing was added to your Carousel folder. Press Save slides to try again."
 CHANGED = "The design changed while its slides were being made. Nothing was added to your Carousel folder. Press Save slides again."
@@ -1423,7 +1424,8 @@ def tidy(kit, keep=STAGING_KEEP, wait=0.0):
 def _saved_words(j):
     """"Saved N slides ...": N is how many of the set are in the folder under their names (a slide the
     photographer has since renamed, moved or changed is theirs, and is not counted)."""
-    return SAVED_SET.format(n=len(j["files"]) - len(j.get("theirs") or []), base=j["base"])
+    n = len(j["files"]) - len(j.get("theirs") or [])
+    return (SAVED_ONE if n == 1 else SAVED_SET).format(n=n, base=j["base"])
 
 
 def _result(state, j=None, why="", words="", **more):

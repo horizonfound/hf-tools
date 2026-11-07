@@ -340,7 +340,7 @@ DESIGN_EDIT_JS = r"""
     $('slides-count').textContent = st.slides;
     $('slides-minus').disabled = off || st.slides <= M.RULES.slides[0];
     $('slides-plus').disabled = off || st.slides >= M.RULES.slides[1];
-    $('slides-minus').title = st.slides <= M.RULES.slides[0] ? WORDS.min : '';
+    $('slides-minus').title = '';     // at one slide the button is simply off (hers): one slide is a single post
     $('slides-plus').title = st.slides >= M.RULES.slides[1] ? WORDS.max : '';
     Array.prototype.forEach.call(document.querySelectorAll('#g-bg .sw'), function(x){ x.classList.toggle('on', x.dataset.c === st.bg); });
     if (document.activeElement !== bgc) bgc.value = st.bg;

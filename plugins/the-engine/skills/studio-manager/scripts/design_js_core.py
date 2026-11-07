@@ -75,7 +75,6 @@ DESIGN_CORE_JS = r"""
     // why a press did nothing
     last: function(k){ return 'Slide ' + k + ' still has something on it. Move it or remove it first.'; },
     wide: 'Something is wider than the slides that would be left. Make it smaller first.',
-    min: 'A carousel needs at least 2 slides.',
     max: 'Instagram allows up to 20 slides.',
     small: 'This photo is too small for a border.',
     many: 'A design holds up to 80 photos and text boxes. Remove one first.',

@@ -2,58 +2,44 @@
 
 Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. The quoted lines below are the default wording; Dustin and Nicole may change any of them.
 
-Choosing and ordering the photos is your job and stays so. This page is how the photographer moves things after you have picked: your pick is in a row at the top, in order, with every photo of the shoot below it. They drag to reorder, drag one up to add it, drag one down (or press its X) to take it out, and click any photo to see it big. Every change is saved to the kit as they make it, so nothing is lost if the page is closed.
+Choosing and ordering the photos is your job and stays so. These pages are how the photographer moves things after you have picked, and every change is saved to the kit as they make it, so nothing is lost if a page is closed. A shoot with no post kit has no page: make the kit first (`parts/post-kit.md`, or the reel skill's Step 1 for a reel on its own).
 
-**The reel and the carousel each have this page** (`--piece reel`, `--piece carousel`). It is the same page with two differences. The reel's row is the order the photos play, and each photo has a Normal / Longer / Quicker bar; the carousel's row is the order people swipe, with no bar, and it stops at 20 photos. And the button at the end, "I'm happy with this order", does different things: for the reel it hands the order back to you for the song step; for the carousel the page makes the slides itself, there and then (see "The carousel's page" below). Singles and stories have no page; they are changed by saying it, and you run `kit.py picks` again.
+**Each piece has its own page.**
+- **The reel: the reel page** (Nicole's reel maker, `reel_page.py`). Your pick in a row at the top, in the order it plays, with Longer and Quicker on each photo and all the shoot's photos below; then the song, the vibe, and **Make my reel**, which makes the CapCut project there and then. See "The reel's page" below.
+- **The carousel: the carousel's picker** (`arrange.py --piece carousel`). Your pick in a row, in the order people swipe, every photo of the shoot below it; "I'm happy with this order" makes the slides. See "The carousel's page" below.
+- **The carousel's designer**, where they lay the slides out by hand and add their own words ("lay out my carousel", "design my carousel", "add text to my slides"): "Laying out the slides: the designer", below.
 
-**The carousel has a second page as well, the designer,** where they lay the slides out by hand and add their own words ("lay out my carousel", "design my carousel", "add text to my slides"). It has its own command and its own section: "Laying out the slides: the designer", below.
+Singles and stories have no page; they are changed by saying it, and you run `kit.py picks` again. (The older reel picker, `arrange.py --piece reel`, still works if you run it by name, but nothing links to it and you don't open it: the reel page took its place, decision 3, `kit.REEL_DOOR`.)
 
-## When to open it
+They can also get to each page without you: the kit page has a "Change the photos" button in its Reel section (the reel page) and in its Carousel section (the carousel's picker), and "Lay out the slides" beside the second. Not in the middle of a whole post kit being made: those steps carry on without stopping, and they can change the reel or the carousel afterwards.
 
-- Whenever you show your reel pick for a shoot that has a post kit (the reel skill's Step 2 says how).
-- Whenever they say "change the picks", "reorder the reel", "let me move those around", or anything that means the same.
-- For the carousel, whenever they want to change which photos are in it or their order and would rather do it themselves: "change the carousel", "reorder the slides", "let me pick the carousel photos".
-- Not in the middle of a whole post kit being made: those steps carry on without stopping. They can change the reel or the carousel afterwards.
-
-They can also get there without you: the kit page has a "Change the photos" button in its Reel section and in its Carousel section, which opens the same page.
-
-A shoot with no post kit has no page; its picks are changed in the chat, by number, as before.
-
-## The two commands
+## The reel's page
 
 ```
-python3 <scripts>/arrange.py open "<kit>" --piece reel
-python3 <scripts>/arrange.py apply "<kit>" --piece reel
+python3 <scripts>/reel_page.py open "<kit>"
+python3 <scripts>/reel_page.py show "<kit>"
+python3 <scripts>/reel_page.py make "<kit>" [--capcut-song "<name>"] [--hook "<line>"] [--name "<name>"] [--no-song] [--dry-run]
 ```
 
-**open** gets the page ready (it numbers the photos if that hasn't been done, makes the small copies the page shows, and starts the page server if it isn't running) and prints the page's address on its last line. Load that address in the Claude app's browser pane and bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`). Never Chrome. The page shows whatever the kit's reel pick is, so save your pick first with `kit.py picks "<kit>" --reel ...`.
+**When to open it:** whenever you have picked a reel for a shoot (the reel skill's Step 2), and whenever they say "make a reel", "change the reel", "reorder the reel", "let me move those around" about a reel, or anything that means the same. **open** gets the page ready (it numbers the photos if that hasn't been done, makes the small copies the page shows, and starts the page server if it isn't running) and prints the page's address on its last line. Load that address in the Claude app's browser pane and bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`). Never Chrome. The page shows the kit's reel pick, so save your pick first with `kit.py picks "<kit>" --reel ...` (numbered through the kit: `kit.py sheet "<kit>"`, so your numbers are the page's).
 
-Then say, in place of a paragraph of numbers: "My pick for the reel is on the page beside us: 12 photos, in the order they'll play. Opens wide on the beach, moves in to the two of them, ends on the walk away. Move anything you like, or leave it as it is. Next I'll ask which song to cut it to." and ask "Go with these?" [Make it (recommended)] [Change the picks]. If they choose Change the picks: "It's on the page beside us. Drag the photos where you want them, then press \"I'm happy with this order\"." Then wait. The page tells them to come back to the chat and say "done".
+Then say one or two lines, in place of a paragraph of numbers: "My pick for the reel is on the page beside us: 12 photos, in the order they'll play. Opens wide on the beach, moves in to the two of them, ends on the walk away. Move anything you like, add your song, pick the vibe, and press Make my reel." No question, nothing to wait for: **the page asks the song and the vibe, never you.**
 
-**apply** takes the order from the page into the kit and prints it the way the reel script reads it: `Reel picks: 19,4,10+,14-`. Run it before the song question every time, whichever way they said yes (the button, "done", "looks good"), and use the picks it prints for everything after. If they moved nothing, it prints your pick. Running it twice changes nothing.
+**What the page does by itself, in Nicole's words and in her order:**
+- **Put your photos in order.** "Let my assistant choose" (your pick) or "I'll drag them in myself" (their own order); both are kept, so they can switch back and forth. Drag to move, tap a photo below to add it, × to take one out, Longer and Quicker on each photo, Undo.
+- **Add your song.** "Add my music" makes a Music folder for this shoot and opens it; they drag a song in, or a screen recording of a song playing (the page takes its sound once and keeps it beside the recording, or in the Music folder when the recording sits in a folder of theirs outside Your Content). A new file is picked by itself ("Got it: <name>."). "No song" is there too.
+- **Pick the vibe.** On every beat (recommended), A little of everything, Calm, Build.
+- **Make my reel.** The CapCut project is made there and then; the page says "It's in CapCut: <project>" with an Open CapCut button. Pressed again it makes another version beside the first ("... reel 2"); a reel already in CapCut is never changed.
 
-If they would rather say a change than drag it ("start with the couple"), do it their way: `kit.py picks "<kit>" --reel ...` again. A fresh pick from you replaces what is on the page, and an open page shows it by itself within a few seconds (if it hasn't, load its address in the pane again). The order it replaced is kept (`arrange.py earlier "<kit>" --piece reel` prints it), so nothing they arranged is ever thrown away. Number the photos through the kit before you pick (`kit.py sheet "<kit>"`, the reel skill's Step 1), so your numbers are the page's.
+**"Pick my reel photos for <shoot>"** is the line the page tells them to say when you haven't picked yet. Pick by the reel skill's Step 2, save it with `kit.py picks "<kit>" --reel ...`, and say in one line how it flows ("12 photos: opens wide on the beach, moves in to the two of them, ends on the walk away."). An open page shows your new pick by itself within a few seconds while "Let my assistant choose" is on; if it hasn't, load its address in the pane again. If they are on "I'll drag them in myself", their order stays on the screen and yours waits under "Let my assistant choose": say so in a few words. If they would rather say a change than drag it ("start with the couple"), do it their way with `kit.py picks` again; the page follows the same way.
 
-## A line that starts ARRANGED
+**show** prints what is on the page: whose order, the order Make my reel uses (`19,4,10+,14-`), the song and the vibe they picked there, and how many reels the page has made. Use it whenever you need to know where they are ("did it work?", "which song did I pick?").
 
-`home.py pending` prints one after its list when they pressed "I'm happy with this order" on a page:
+**make** is Make my reel from the chat, for three things only: a song from CapCut's own music (the page doesn't offer them; the reel skill's Step 3 has the licence note to say first), words on the first photo or a trial reel when they ask (Step 5 there), and when the page says "Ask your assistant to make the reel instead" or can't reach its server. It uses exactly what the page would (their order or yours, the song and the vibe they picked there) and makes the reel the same way. If no song is picked on the page yet, it stops: say "Add your song on the page beside us, or pick No song, then tell me." Its last line is "Made: <the CapCut project>".
 
-```
-ARRANGED: 2026-06-24 Beach | reel | 12 photos
-```
+**Longer and Quicker.** On each photo in the row are Longer and Quicker. Those are the reel's `+` and `-` marks, and they count with every vibe (On every beat, A little of everything, Calm, Build). In Nicole's words, which the page uses too: "Longer stays on screen about twice as long", "Quicker gets the shortest time, one beat". On a short song a Longer photo may get a little less than twice, since nothing is left out to fit.
 
-The first part is the kit's folder name; use it as the kit in the commands. The second part is the piece. What follows is for a reel; for a line that says `carousel`, see "The carousel's page" below; for a line that says `design` (they pressed Save slides in the designer), see "Laying out the slides: the designer" below.
-
-- **You were waiting on that reel** (you had asked "Go with these?", or they just said "done"): run `arrange.py apply "<kit folder>" --piece reel`, take the picks it prints, and carry on with the reel skill from its song step. apply clears the line, and the page's own line under the button ("Saved. Go back to the chat...") goes with it.
-- **It came out of the blue** (they opened the page themselves and rearranged a reel): one line and one question. "You put the beach reel in a new order: 12 photos. Want me to make it?" [Make it (recommended)] [Not now]. On yes, apply and make the reel from the song step. On "Not now", `arrange.py took "<kit folder>" --piece reel`; their order stays saved in the kit for whenever they want it.
-
-They said "done" and there is no ARRANGED line: they didn't press the button, and that is fine. The page saves every change as it is made, so run apply and carry on.
-
-## Two things to be straight about
-
-**Longer and Quicker.** Under each photo in the row is a bar that reads Normal, Longer or Quicker. Those are the reel's `+` and `-` marks, and they count with every vibe (On every beat, A little of everything, Calm, Build). In Nicole's words, which the page uses too: "Longer stays on screen about twice as long", "Quicker gets the shortest time, one beat". On a short song a Longer photo may get a little less than twice, since nothing is left out to fit.
-
-**A reel that is already in CapCut is never changed.** A new order makes a new CapCut project beside the first ("... reel 2"); the one they may already have styled stays exactly as it is. Say that in a few words when they rearrange a reel that was already made.
+**A line `ARRANGED: <kit folder> | reel | 12 photos`** from `home.py pending` comes only from the older reel picker, opened by name. Run `arrange.py apply "<kit folder>" --piece reel` (it puts their order into the kit as the reel's pick and clears the line), then `reel_page.py open "<kit folder>"`, load it in the pane, and say: "Your order is on the reel page beside us. Add your song, pick the vibe, and press Make my reel."
 
 ## The carousel's page
 
@@ -62,7 +48,7 @@ python3 <scripts>/arrange.py open "<kit>" --piece carousel
 python3 <scripts>/arrange.py apply "<kit>" --piece carousel
 ```
 
-**open** works as it does for the reel. Load the address it prints in the pane, bring the pane forward, and say: "My pick for the carousel is on the page beside us: 7 photos, in the order people will swipe. Move anything you like, then press \"I'm happy with this order\"." There is nothing to wait for and no question to ask: the page does the rest.
+**When to open it:** whenever they want to change which photos are in the carousel or their order and would rather do it themselves: "change the carousel", "reorder the slides", "let me pick the carousel photos". **open** gets the page ready (it numbers the photos if that hasn't been done, makes the small copies the page shows, and starts the page server if it isn't running) and prints the page's address on its last line; the page shows the kit's carousel pick, so save yours first with `kit.py picks "<kit>" --carousel ...`. Load the address in the Claude app's browser pane, bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`; never Chrome), and say: "My pick for the carousel is on the page beside us: 7 photos, in the order people will swipe. Move anything you like, then press \"I'm happy with this order\"." There is nothing to wait for and no question to ask: the page does the rest.
 
 **What the button does.** The page says "Making your slides..." and, a few seconds later, "Done. 7 slides are in your Carousel folder." with an "Open the Carousel folder" button beside it. The plain slides in the kit's Carousel folder are then in their order: the new ones made from the photos, and the earlier plain slides moved into the kit's hidden folder (never deleted). Canva's slides, and any file in that folder that isn't named like one of this shoot's slides, are left where they are. A plain slide they have edited and saved under its own name counts as a slide: if its place in the order changes it is moved into the hidden folder with the others, kept exactly as they saved it, and you can fetch it back for them. The kit page and the posting queue's picture follow by themselves. If a photo can't be read (the drive is unplugged), the page says which one and that the Carousel folder was left as it was; nothing is half done.
 
@@ -113,4 +99,4 @@ python3 <scripts>/design.py tidy "<kit>"
 
 ## If the page can't show a shoot
 
-The page says "I can't find that shoot's posts. Is the drive plugged in?" when the kit's folder isn't there, and "This shoot isn't ready for this yet" when its photos have never been numbered. `arrange.py open` fixes the second by itself (`design.py open` does the same for the designer, which says the same two lines). A photo that can't be read right now (the photos are on a drive that is unplugged) still shows if its small copy was made earlier; if not, its tile says "Can't read this photo right now". Either way one line at the top of the page says why.
+The page says "I can't find that shoot's posts. Is the drive plugged in?" when the kit's folder isn't there, and "This shoot isn't ready for this yet" when its photos have never been numbered. `arrange.py open` fixes the second by itself (`design.py open` does the same for the designer, which says the same two lines). The reel page says it in Nicole's words: "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload."; `reel_page.py open` numbers the photos the same way. A photo that can't be read right now (the photos are on a drive that is unplugged) still shows if its small copy was made earlier; if not, its tile says "Can't read this photo right now". Either way one line at the top of the page says why.

@@ -1633,6 +1633,17 @@ const big=document.getElementById('big');document.querySelectorAll('.strip img')
 
 
 LAY_OUT = "Lay out the slides"
+# Decision 3 (v19): where the reel's "Change the photos" goes. "reel-page" is Nicole's reel maker (reel_page.py,
+# /reel.html: the order, the song, the vibe and Make my reel on one page); "picker" is the older reel picker
+# (arrange.py --piece reel, /arrange.html), which still works when asked for by name. The carousel's picker is not
+# changed by this.
+REEL_DOOR = "reel-page"
+
+
+def reel_door(kit_name):
+    """The address the kit page's reel "Change the photos" opens (REEL_DOOR)."""
+    q = quote(kit_name)
+    return f"/reel.html?kit={q}" if REEL_DOOR == "reel-page" else f"/arrange.html?kit={q}&piece=reel"
 LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
 
 
@@ -1708,7 +1719,8 @@ def write_page(kit):
             # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
             # every 'go' button asks the Assistant to open a folder in Finder (File Explorer on a PC). Shown only when the page is
             # served live (a saved copy has nowhere to go).
-            btn = (f"<a class='arr' href='/arrange.html?kit={html.escape(quote(kit.name))}&amp;piece={arrange}'>Change the photos</a> " + btn)
+            href = reel_door(kit.name) if arrange == "reel" else f"/arrange.html?kit={quote(kit.name)}&piece={arrange}"
+            btn = (f"<a class='arr' href='{html.escape(href)}'>Change the photos</a> " + btn)
         cv = canva.get(piece) if piece else None
         if cv and cv.get("edit_url"):
             btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn

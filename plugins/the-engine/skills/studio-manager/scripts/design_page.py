@@ -217,7 +217,8 @@ PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))
 
-LEDE = "Each box is one Instagram slide. A photo can stretch across slides, so they join up when people swipe."
+LEDE = ("Each box is one Instagram slide. A photo can stretch across slides, so they join up when people swipe. "
+        "One slide on its own is a single post.")     # her last sentence (v19, pages/carousel-designer.html)
 TRAY_HINT = ("Drag a photo onto a slide to add it, or onto a frame to put it there. "
              "Click one to put it in the selected frame, or in the next empty spot.")
 # The key that turns snapping off for a moment is Option on a Mac and Alt on a PC. A Mac's line is word for word

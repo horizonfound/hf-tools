@@ -281,6 +281,13 @@ def add_for_shoot(p, shoot, kinds):
     return made
 
 
+def carousel_kind(shown):
+    """The kind of a kit's carousel piece (decision 12, Nicole, Nov 6: "One slide on its own is a single post"):
+    "single" when the slides the kit shows as its carousel are a set laid out in the designer that is one slide,
+    "carousel" otherwise. The piece keeps its place (its id) in the queue either way. shown is kit.carousel_shown's."""
+    return "single" if shown.get("kind") == "laid-out" and len(shown.get("files") or []) == 1 else "carousel"
+
+
 def add_for_kit(p, kit_dir):
     """The pieces of a post kit (kit.py): the reel and the carousel (in progress once made, waiting if not),
     and one piece per single post, each with its own thumbnail. Stories don't go on the grid, so they stay
@@ -308,6 +315,7 @@ def add_for_kit(p, kit_dir):
             if n is not None:
                 x["n"] = n
             p["pieces"].append(x)
+        x["kind"] = kind            # a carousel saved as one slide is a single post, and back (carousel_kind)
         x["thumb"] = thumb_of(thumb_src, pid) or x.get("thumb")
         if x["status"] in ("red", "yellow") and status != x["status"]:
             set_status(p, x, status, by="kit", where=where)
@@ -322,8 +330,9 @@ def add_for_kit(p, kit_dir):
         by_n = {x["n"]: x["file"] for x in json.loads(sheet_p.read_text(encoding="utf-8"))["photos"]}
     out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", by_n.get(reel_pick) or (photos[0] if photos else None),
                       where=reel["project"] if reel else None))
-    slides = kit_mod.carousel_files(kit_dir, rec)     # the slides the kit page shows as the carousel (kit.py's one rule)
-    out.append(upsert(f"{sid}-carousel", "carousel", "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
+    shown = kit_mod.carousel_shown(kit_dir, rec)     # the slides the kit page shows as the carousel (kit.py's one rule)
+    slides = shown["files"]
+    out.append(upsert(f"{sid}-carousel", carousel_kind(shown), "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
                       where="the Carousel folder" if slides else None))
     singles = sorted(f for f in (kit_dir / "Singles").glob("*.jpg") if not f.name.startswith(".")) if (kit_dir / "Singles").is_dir() else []
     for i, f in enumerate(singles, 1):
@@ -341,7 +350,8 @@ def refresh_kit_carousel(kit_dir):
     pid = f"kit:{slug(kit_dir.name)}-carousel"
     if not any(x.get("id") == pid for x in load().get("pieces", [])):
         return False
-    slides = kit_mod.carousel_files(kit_dir)          # the slides the kit page shows as the carousel (kit.py's one rule)
+    shown = kit_mod.carousel_shown(kit_dir)          # the slides the kit page shows as the carousel (kit.py's one rule)
+    slides = shown["files"]
     thumb = None
     if slides:
         THUMBS.mkdir(parents=True, exist_ok=True)
@@ -353,6 +363,7 @@ def refresh_kit_carousel(kit_dir):
     if x is None:
         return False
     x["thumb"] = thumb or x.get("thumb")
+    x["kind"] = carousel_kind(shown)                  # one laid-out slide is a single post (decision 12)
     status = "yellow" if slides else "red"
     if x["status"] in ("red", "yellow") and status != x["status"]:
         set_status(p, x, status, by="kit", where="the Carousel folder" if slides else None)

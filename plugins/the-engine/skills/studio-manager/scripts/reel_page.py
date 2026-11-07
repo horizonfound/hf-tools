@@ -2,7 +2,12 @@
 """The reel page: Nicole's reel maker (handoff v19, pages/reel-maker.html), as the Assistant's own page.
 
     python3 reel_page.py open "beach"      get the page ready (the numbered list, the small copies) and print its address
-    python3 reel_page.py show "beach"      what the page has saved: whose order, the order, the record's counter
+    python3 reel_page.py show "beach"      what the page has saved: whose order, the order, the song and vibe picked
+    python3 reel_page.py make "beach" [--capcut-song "<name>"] [--hook "..."] [--name "..."] [--no-song] [--dry-run]
+                                           Claude's own Make my reel, for what the page doesn't do (a song from
+                                           CapCut's music, words on the first photo, a second take under another
+                                           name) or when the page said "Ask your assistant to make the reel instead":
+                                           the page's order, song and vibe, made exactly as the page makes it
     python3 reel_page.py job "<kit>" --id <id>   (the page server's own) make the reel a page asked for
 
 The photographer sees her page: her words (WORDS below, word for word from her reel-maker.html and server.py),
@@ -1006,7 +1011,9 @@ def _make(kit, ask, jid, t0):
     short = short_name(kit.name)
     known = [kit, photos]          # paths whose last name means something to them; anything else is never shown
     song, song_name = None, ""
-    if ask.get("song"):
+    if ask.get("capcut_song"):
+        song_name = ask["capcut_song"]          # Claude's make only (decision 2): CapCut's own music is never on the page
+    elif ask.get("song"):
         s = song_by_id(kit, ask["song"], rec_kit)
         if s is None:
             return {"state": "problem", "problem": WORDS["song_gone"]}
@@ -1038,8 +1045,11 @@ def _make(kit, ask, jid, t0):
     status = kit / ".kit" / JOB_STATUS
     arrange.write_whole(status, {"for": jid, "pending": True})
     cmd = [sys.executable, str(kit_mod.REEL_PY), "make", "--folder", str(photos), "--shoot", rec_kit.get("name") or short,
-           "--kit", str(kit), "--picks", picks, "--vibe", ask["vibe"], "--song", str(song) if song else "none",
-           "--variation", str(variation), "--name", reel.kit_reel_name(kit.name, short), "--status", str(status)]
+           "--kit", str(kit), "--picks", picks, "--vibe", ask["vibe"],
+           *(["--capcut-song", ask["capcut_song"]] if ask.get("capcut_song") else ["--song", str(song) if song else "none"]),
+           "--variation", str(variation), "--name", ask.get("name") or reel.kit_reel_name(kit.name, short), "--status", str(status)]
+    if ask.get("hook"):
+        cmd += ["--hook", ask["hook"]]          # Claude's make only (decision 15): words on the first photo, when they ask
     if song:
         secs = capcut.song_length(str(song)) or 99
         if secs < SHORT_SONG_FROM_TOP:
@@ -2310,7 +2320,76 @@ def cmd_show(kit):
     else:
         say("  On the page: nothing saved yet")
     say(f"  The order Make my reel uses: {current_picks(kit) or '(none yet)'}")
+    sid = saved.get("song")
+    if sid is None:
+        say("  Song: not picked on the page yet")
+    elif sid == "":
+        say("  Song: No song (they'll add music in Instagram)")
+    else:
+        s = song_by_id(kit, sid)
+        say(f"  Song: {s['path'].name} ({'a screen recording, its sound' if s['kind'] == 'video' else 'a song'}, in the {s['where']} folder)"
+            if s else "  Song: the one they picked is not there anymore")
+    vibe = saved.get("vibe")
+    say(f"  Vibe: {WORDS['vibe_' + vibe + '_b'] if vibe in VIBES else 'not picked on the page yet'}"
+        + ("" if vibe in VIBES else f" (Make my reel would use {WORDS['vibe_' + default_vibe() + '_b']})"))
+    made = [m for m in (load(kit).get("made") or []) if isinstance(m, dict)]
+    if made:
+        say(f"  Reels made from the page: {len(made)}, the newest \"{made[-1].get('project')}\"")
     say(f"  Saved {st['rev']} time{'s' if st['rev'] != 1 else ''}")
+    return 0
+
+
+def cmd_make(kit, a):
+    """Claude's own Make my reel (see the top of this file): what the page would hand reel.py, made the same way,
+    one reel at a time on this computer. A song comes from the page, unless they asked for CapCut's own music."""
+    st = state(kit)
+    if st is None:
+        say("STOP: couldn't read this shoot's numbered list. Nothing was made.")
+        return 1
+    saved = st["saved"] or {}
+    picks = current_picks(kit)
+    if not picks:
+        say("STOP: there's no order for this reel yet: pick the photos first (kit.py picks --reel), or they put them in order on the page.")
+        return 1
+    if len([x for x in picks.split(",") if x]) > MAX_PICKS:
+        say("STOP: " + OUR_WORDS["too_many"])
+        return 1
+    vibe = saved.get("vibe") if saved.get("vibe") in VIBES else default_vibe()
+    ask = {"picks": picks, "vibe": vibe, "dry": bool(a.dry_run), "stamp": st["stamp"]}
+    if a.capcut_song:
+        ask["capcut_song"] = a.capcut_song
+    elif a.no_song or saved.get("song") == "":
+        ask["song"] = ""
+    elif saved.get("song"):
+        if song_by_id(kit, saved["song"]) is None:
+            say("STOP: " + WORDS["song_gone"])
+            return 1
+        ask["song"] = saved["song"]
+    else:
+        say("STOP: no song is picked on the page yet. The song is theirs to pick there (Add my music, or No song); pass --no-song only when they have said no song.")
+        return 1
+    if a.hook:
+        ask["hook"] = a.hook
+    if a.name:
+        ask["name"] = a.name
+    t0 = time.time()
+    g = _hold_make_lock(t0 + MAKE_LIMIT)
+    if g is None:
+        say("STOP: another reel is still being made on this computer. Try again in a moment.")
+        return 2
+    try:
+        res = _make(kit, ask, "chat" + os.urandom(4).hex(), t0)
+    finally:
+        if g != "none":
+            this_computer.unlock(g)
+            g.close()
+    if res.get("state") != "done":
+        say("STOP: " + str(res.get("problem") or WORDS["went_wrong_make"]))
+        return 1
+    for w in res.get("words") or []:
+        say(w)
+    if not a.dry_run and res.get("project"):
+        say(f"Made: {res['project']}")
     return 0
 
 
@@ -2319,6 +2398,13 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("open").add_argument("words")
     sub.add_parser("show").add_argument("words")
+    m = sub.add_parser("make", help="Claude's own Make my reel: the page's order, song and vibe")
+    m.add_argument("words")
+    m.add_argument("--capcut-song", help="a song from CapCut's music (only when they asked for it, after the licence note)")
+    m.add_argument("--hook", help="words on the first photo, when they asked for them")
+    m.add_argument("--name", help="another name for the CapCut project (a second take)")
+    m.add_argument("--no-song", action="store_true", help="no song, whatever the page has")
+    m.add_argument("--dry-run", action="store_true")
     j = sub.add_parser("job", help="(the page server's own) make the reel a page asked for")
     j.add_argument("kit")
     j.add_argument("--id", required=True)
@@ -2334,6 +2420,8 @@ def main():
     try:
         if a.cmd == "open":
             return cmd_open(kit)
+        if a.cmd == "make":
+            return cmd_make(kit, a)
         return cmd_show(kit)
     except arrange.Busy:
         say("STOP: this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.")

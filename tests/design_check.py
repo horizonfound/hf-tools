@@ -333,7 +333,7 @@ def check_all(work, port):
              and shoots[kit_name]["open"] is True and shoots[kit2_name]["designs"] == 0 and shoots[kit2_name]["open"] is False, st["shoots"])
         case("state: the look-alike folder beside Your Content is not a shoot", not any("Sneaky" in s["kit"] or "old" in s["kit"] for s in st["shoots"]), st["shoots"])
         case("state: no brand colors, no templates, no fonts of their own yet", st["brand"] == {"colors": [], "max": 16} and st["templates"] == [] and st["fonts"]["yours"] == [], (st["brand"], st["templates"]))
-        case("state: the limits are given (2 to 20 slides, 80 blocks, 2,000 letters)", st["limits"]["slides"] == [2, 20] and st["limits"]["blocks"] == 80 and st["limits"]["text"] == 2000, st["limits"])
+        case("state: the limits are given (1 to 20 slides: one slide on its own is a single post; 80 blocks, 2,000 letters)", st["limits"]["slides"] == [1, 20] and st["limits"]["blocks"] == 80 and st["limits"]["text"] == 2000, st["limits"])
         code, st3 = get_json(P, f"/design-state?kit={KQ}&design=dnosuchdesign1")
         case("state: asking for a design that isn't there gives the newest, and says so", code == 200 and st3["design"]["id"] == DID and st3["fell_back"] is True, (code, st3 and st3.get("fell_back")))
         code, st3 = get_json(P, f"/design-state?kit={KQ}&design=..%2Fx")
@@ -450,7 +450,7 @@ def check_all(work, port):
             return body(s)
 
         ti = len(STATE["blocks"]) - 2       # the text box
-        refused("1 slide", with_state(slides=1), why="slides")
+        refused("0 slides", with_state(slides=0), why="slides")
         refused("21 slides", with_state(slides=21), why="slides")
         refused("slides as a word", with_state(slides="3"), why="slides")
         refused("slides as true", with_state(slides=True), why="slides")
@@ -587,7 +587,7 @@ def check_all(work, port):
             code, out = post(P, "/design-new", b, headers=headers)
             case(f"new design refused, nothing made: {name}", code == code_want and isinstance(out, dict) and out.get("ok") is False and out.get("words") and tree_print(designs) == was, (code, out))
 
-        new_refused("a layout with 1 slide", {"kit": kit_name, "state": {"slides": 1, "bg": "#ffffff", "blocks": []}, "token": "newtoken10"})
+        new_refused("a layout with 0 slides", {"kit": kit_name, "state": {"slides": 0, "bg": "#ffffff", "blocks": []}, "token": "newtoken10"})
         new_refused("a photo that is not on the list", {"kit": kit_name, "state": {"slides": 2, "bg": "#ffffff", "blocks": [{"id": 1, "n": 9999, "x": 0, "y": 0, "w": 100, "h": 100}]}, "token": "newtoken11"})
         new_refused("a token that is not a token", {"kit": kit_name, "state": blank, "token": "../x"})
         new_refused("a copy of a design that is not there", {"kit": kit_name, "copy": "dnosuchdesign1", "token": "newtoken12"}, 404)
@@ -742,7 +742,8 @@ def check_all(work, port):
         slide_refused("a set name that is a path", "..%2F..%2Fx", 1, 3, S[0])
         slide_refused("slide 0", "settoken01", 0, 3, S[0])
         slide_refused("slide 4 of 3", "settoken01", 4, 3, S[0])
-        slide_refused("slide 1 of 1", "settoken01", 1, 1, S[0])
+        slide_refused("slide 1 of 0", "settoken01", 1, 0, S[0])
+        slide_refused("slide 1 of 1 for a design of 3 slides", "settoken01", 1, 1, S[0], 409)
         slide_refused("slide 1 of 21", "settoken01", 1, 21, S[0])
         slide_refused("a slide number that is a word", "settoken01", "one", 3, S[0])
         slide_refused("a slide number below zero", "settoken01", -1, 3, S[0])
@@ -1118,6 +1119,40 @@ def check_all(work, port):
         case("photos numbered again: a page still open from before is told the photos changed, and nothing is written", code == 409 and out.get("why") == "photos", (code, out))
         code, out = post(P, "/design", {"kit": kit_name, "design": D3, "stamp": st["stamp"], "base": d3b["rev"], "page": "checkpage1", "state": d3b["state"]})
         case("photos numbered again: the page that has the new list saves as usual", code == 200, (code, out))
+
+        # ---------- a single post: a design of one slide (decision 12: one slide on its own is a single post) ----------
+        code, st1 = get_json(P, f"/design-state?kit={KQ}")
+        one = {"slides": 1, "bg": "#ffffff", "blocks": [{"id": 1, "n": sheet_b[0]["n"], "x": 0, "y": 0, "w": 1080, "h": 1350}]}
+        code, out = post(P, "/design-new", {"kit": kit_name, "stamp": st1["stamp"], "state": one, "name": "Single post", "token": "onetoken001"})
+        D1 = out["design"]["id"] if code == 200 and out and out.get("ok") else "dnosuchdesign1"
+        case("a single post: a new design of one slide is taken", code == 200 and out["design"]["state"]["slides"] == 1, (code, out))
+        slide_refused("a single post: slide 1 of 2 for a design of one slide", "onetoken002", 1, 2, S[9], 409, did=D1)
+        code, out = slide("onetoken002", 1, 1, S[9], did=D1)
+        case("a single post: its one slide is taken (slide 1 of 1)", code == 200 and out == {"ok": True, "i": 1, "of": 1, "have": 1}, (code, out))
+        car_b = tree_print(car)
+        code, out = commit("onetoken002", did=D1, rev=0, count=1)
+        case("a single post: saved as one slide, and the words say '1 slide'", code == 200 and out.get("count") == 1 and out.get("base") == "Single post"
+             and out.get("words") == "Saved 1 slide in your Carousel folder, named \"Single post\". Nothing was replaced.", (code, out))
+        case("a single post: exactly one file is new in the Carousel folder, byte for byte the slide sent, and nothing that was there changed",
+             new_in_car(before=car_b) == ["Single post - slide 01.jpg"] and tree_print(car).get("Single post - slide 01.jpg") == sha(S[9])
+             and all(tree_print(car).get(k) == v for k, v in car_b.items()), new_in_car(before=car_b))
+        code, o = run(env, "home.py", "pending")
+        case("a single post: Claude is told one slide (not '1 slides')", f"ARRANGED: {kit_name} | design | 1 slide | Single post" in o, o[-300:])
+        run(env, "design.py", "took", kit_name)
+        code, o = run(env, "posting_queue.py", "add", "--kit", kit_name)
+        pieces = json.loads((studio / "posting.json").read_text(encoding="utf-8"))["pieces"] if (studio / "posting.json").is_file() else []
+        mine = [x for x in pieces if x.get("kit") and Path(x["kit"]).name == kit_name and x["id"].endswith("-carousel")]
+        case("a single post: in the posting queue the one-slide set counts as a single post", code == 0 and len(mine) == 1 and mine[0]["kind"] == "single", (code, o[-200:], mine))
+        two = {"slides": 2, "bg": "#ffffff", "blocks": [{"id": 1, "n": sheet_b[0]["n"], "x": 0, "y": 0, "w": 2160, "h": 1350}]}
+        code, out = post(P, "/design", {"kit": kit_name, "design": D1, "stamp": st1["stamp"], "base": 0, "page": "checkpage1", "state": two})
+        for i in (1, 2):
+            slide("onetoken003", i, 2, S[9 + i], did=D1)
+        code, out = commit("onetoken003", did=D1, rev=1, count=2)
+        pieces = json.loads((studio / "posting.json").read_text(encoding="utf-8"))["pieces"]
+        mine = [x for x in pieces if x["id"] == (mine[0]["id"] if mine else "")]
+        case("a single post grown to two slides and saved: the queue's piece is a carousel again (same piece, same place)",
+             code == 200 and out.get("count") == 2 and len(mine) == 1 and mine[0]["kind"] == "carousel", (code, out, mine))
+        run(env, "design.py", "took", kit_name)
 
         # ---------- nothing is in the server's memory: stop it, start it on another port ----------
         code, before_stop = get_json(P, f"/design-state?kit={KQ}&design={DID}")

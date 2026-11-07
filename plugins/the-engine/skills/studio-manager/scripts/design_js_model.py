@@ -19,7 +19,7 @@ DESIGN_MODEL_JS = r"""
   // Every number the designer goes by, in one place. The Assistant sends its own limits with the state
   // (useLimits); these are the same numbers, here so the rules can run with no page.
   var RULES = {
-    slides: [2, 20],        // fewest and most slides
+    slides: [1, 20],        // fewest and most slides (one slide on its own is a single post)
     frameMin: 60,           // a frame is never smaller than this, either way
     onStrip: 40,            // at least this much of anything stays on the strip
     zoom: [1, 3],           // a photo inside its frame
@@ -208,7 +208,11 @@ DESIGN_MODEL_JS = r"""
     if (FRAME_ONLY[a] && !isFrame(b)) return {st: st};
     var si = slideOf(b, st.slides), x0 = si * W, m = RULES.inset, blocks, c;
     if (a === 'full') return {st: patch(st, id, {x: x0, y: 0, w: W, h: H})};
-    if (a === 'span2') { var s0 = si + 1 < st.slides ? si : si - 1; return {st: patch(st, id, {x: s0 * W, y: 0, w: 2 * W, h: H})}; }
+    if (a === 'span2') {
+      // on a single post (one slide) the second slide is added in the same step, so one Undo takes both back (hers)
+      var two = st.slides < 2 ? merge(st, {slides: 2}) : st, s0 = si + 1 < two.slides ? si : si - 1;
+      return {st: patch(two, id, {x: s0 * W, y: 0, w: 2 * W, h: H})};
+    }
     if (a === 'top') return {st: patch(st, id, {x: x0, y: 0, w: W, h: H / 2})};
     if (a === 'bottom') return {st: patch(st, id, {x: x0, y: H / 2, w: W, h: H / 2})};
     if (a === 'left') return {st: patch(st, id, {x: x0, y: 0, w: W / 2, h: H})};
