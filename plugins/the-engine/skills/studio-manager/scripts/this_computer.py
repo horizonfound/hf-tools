@@ -796,6 +796,33 @@ def run_curl(cmd, **kw):
     return r
 
 
+# ---------------------------------------------------------------- video: the Mac's own AVFoundation
+
+# Words a photographer sees on a PC where a still or a player would be (decision 11 of the v19 plan; drafts, for
+# Nicole). The reel's video helper (assistant-make-a-reel/scripts/video.py) has no stills and no small copy on a
+# PC yet: Media Foundation's source reader and sink writer are the Windows way, not built until they can be proven
+# on GitHub's Windows machines. A video the PC can play as it is (H.264) still plays; everything else still works.
+NO_PREVIEW = "I can't show a preview of this one on this PC. The moments and your reel still work."
+# An iPhone records in its High Efficiency format (HEVC) unless set to Most Compatible; Windows can't read HEVC
+# without Microsoft's HEVC Video Extensions. Nothing is asked for up front and nothing is installed by us.
+HEVC_HELP = ("This video was recorded in the iPhone's High Efficiency format (HEVC), which this PC can't show "
+             "without Microsoft's HEVC Video Extensions from the Microsoft Store. The moments and your reel still "
+             "work. For your next shoot, setting the iPhone to Most Compatible (Settings, Camera, Formats) records "
+             "videos any PC can show.")
+
+
+def mac_javascript(script, args=(), timeout=120):
+    """Run a JavaScript for Automation script (the Mac's own scripting, which reaches AVFoundation, the Mac's video
+    parts) with these arguments: the script's run(argv) gets them as text. (exit code, what it printed, its error
+    lines), or None on a computer that has no such thing (a PC: video.py names that gap in plain words). A run past
+    `timeout` seconds is stopped and raises subprocess.TimeoutExpired."""
+    if not MAC:
+        return None
+    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script, *[str(a) for a in args]],  # pc-ok: the Mac branch
+                       capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
+    return r.returncode, r.stdout, r.stderr
+
+
 # ---------------------------------------------------------------- this computer's own pages
 
 def open_local(url, timeout=1):

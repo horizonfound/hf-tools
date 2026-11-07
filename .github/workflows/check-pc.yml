@@ -44,6 +44,11 @@ name: Check it on a Windows PC
 #                            refusals, a test make through its own process, a second press, the lock probe, a job
 #                            stopped outright (this_computer.stop_tree), its one time limit, a recording's sound
 #                            made once beside it and a new one beside a sound that can't be read
+#   tests/pc_video.py        the reel's video helper (video.py), nothing installed: the facts read from video headers
+#                            built byte by byte (the turn, H.264's profile and colour layout, HEVC, the recording
+#                            time, the header at the end or the front, 64-bit boxes), what plays as it is, plain
+#                            refusals of what isn't a video, and the named gap: no stills and no small copy on a
+#                            PC yet, said in this_computer.NO_PREVIEW (HEVC_HELP for an iPhone's HEVC), nothing made
 #   tests/pc_pictures.py    made-up RAW files from six camera makers, junk and damaged files
 #   tests/backup_safety.py   never write over a file, never mix two cards, carry on a cut-off backup,
 #                            never copy a card onto itself
@@ -78,10 +83,10 @@ on:
   workflow_dispatch:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
-            "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/video_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
-            "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/video_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -138,6 +143,9 @@ jobs:
       - name: The reel page's own machinery (Make my reel's refusals, the job and its lock, its one limit, stopping a job, a recording's sound made once)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/pc_reel_page.py
+      - name: The reel's video helper (facts from the header, what plays as it is, the named gap for stills and the copy)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/pc_video.py
       - name: The reel's sound (lengths, the beat, Windows' own Media Foundation)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/fixtures/check_sound.py
@@ -237,6 +245,12 @@ jobs:
       - name: The reel page's own machinery, so a PC fix never breaks the Mac
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_reel_page.py
+      - name: The reel's video helper, the PC's way (headers built byte by byte; the named gap, tried on a Mac)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/pc_video.py
+      - name: The reel's video helper on real clips the Mac's AVFoundation makes (facts, stills by colour, loudness, the copy)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/video_check.py
       - name: The reel's sound
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/fixtures/check_sound.py
@@ -251,6 +265,9 @@ jobs:
       - name: The photo pickers' locks and job check on the Mac's own Python 3.9 (the parts that draw photos say SKIP)
         if: ${{ !cancelled() }}
         run: /usr/bin/python3 tests/pc_arrange.py
+      - name: The reel's video helper on the Mac's own Python 3.9 (nothing installed; it needs nothing)
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 tests/video_check.py
       - name: The carousel designer's own machinery on the Mac's own Python 3.9 (nothing installed; it needs nothing)
         if: ${{ !cancelled() }}
         run: /usr/bin/python3 tests/pc_design.py
