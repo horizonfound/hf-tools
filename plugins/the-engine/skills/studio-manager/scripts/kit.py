@@ -86,7 +86,6 @@ PAD_WHITE = "FFFFFF"
 TOP_BIAS = 0.4               # when a tall photo is trimmed to 4:5, take 40% of the cut from the top, 60% from the bottom (faces sit high)
 CAROUSEL_MOST = 20           # Instagram's own limit for one carousel (arrange.py's LIMITS says the same to the page)
 KINDS = ("reel", "carousel", "singles", "stories")
-FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 
 
 def say(msg):
@@ -1604,7 +1603,139 @@ def save_words(kit, words):
     write_page(kit)
 
 
-# ---------- the page ----------
+# ---------- the page: Nicole's post kit (handoff v19, pages/post-kit.html), three cards ----------
+#
+# Her page asks her server for the kit (/s/<shoot>/kit) and draws three cards you click into: Reel, Carousel and
+# Stories, each with its words column. Ours is the same page built here, on every request of
+# /content/<kit>/Post kit.html (posting_queue.py serve_content), from kit.json, the reel page's record, the design
+# records and the folders; `kit.py page` writes the same page as the saved copy in the kit's hidden folder. The
+# page names no path: a kit by its folder name, a reel photo by its number (/kit-photo), a slide by its file name.
+# Nothing on it comes from the internet (the fonts are the plugin's own, through /reel-font). Her words are in
+# KIT_WORDS, word for word; the few lines that are ours are in OUR_KIT_WORDS, each with its reason.
+
+KIT_WORDS = {
+    "eyebrow": "Post kit",
+    "lede": "Everything you need to post this shoot, in one place. Click the reel, the carousel or your stories to make "
+            "them your way. Nothing gets posted for you.",
+    "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
+    "reel": "Reel",
+    "reel_sub": "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut.",
+    "reel_none": "Your assistant hasn't picked the reel photos yet. Click to pick them yourself.",
+    "in_capcut": "In CapCut:",
+    "open_capcut": "Open in CapCut",
+    "opening_capcut": "Opening CapCut...",
+    "capcut_unreached": "Could not reach the page server. Ask your assistant to open CapCut.",
+    "not_made": "Not made yet",
+    "carousel": "Carousel",
+    "carousel_sub": "Lay out your slides in the carousel designer: photos across slides, type, your brand colors. One slide "
+                    "on its own makes a single post.",
+    "carousel_open": "Open my carousel",
+    "carousel_make": "Design my carousel",
+    "carousel_none": "No slides yet.",
+    "stories": "Stories",
+    "stories_sub": "Sneak peeks and behind the scenes for your stories, made here instead of on your phone: story fonts, "
+                   "your brand colors, kept clear of Instagram's buttons.",
+    "stories_open": "Open my stories",
+    "stories_make": "Make my stories",
+    "stories_none": "No stories yet.",
+    "hooks": "Hooks",
+    "caption": "Caption",
+    "hashtags": "Hashtags",
+    "story_lines": "Story lines",
+    "not_written": "Not written yet.",
+}
+# Ours, with the reason for each: her mock-up's words boxes are always empty, ours hold the kit's words, so each one
+# has a Copy button and a name of its own; the short caption has no box of hers (a single post's caption: it sits
+# under the carousel's, since one slide is a single post); the quiet line under the cards is decision 12 (the
+# Singles and Covers the kit still makes, and the kit folder); Canva's links had a place on the old page; "Written
+# from" says what the words leaned on (rule 11); a saved copy is a file, whose buttons can't reach the Assistant.
+OUR_KIT_WORDS = {
+    "copy": "Copy",
+    "copied": "Copied",
+    "hook_n": "Hook {i}",
+    "story_n": "Story line {i}",
+    "short": "Short caption",
+    "singles": "{n} single photos sized for Instagram",
+    "single": "1 single photo sized for Instagram",
+    "cover": "The reel cover",
+    "open_folder": "Open the {sub} folder",
+    "open_kit": "Open the kit folder",
+    "in_canva": "In Canva:",
+    "canva_carousel": "the carousel",
+    "canva_cover": "the reel cover",
+    "canva_story": "story {n}",
+    "written_from": "Written from: {what}",
+    "opening": "Opening...",
+    "unreached": "Could not reach the Assistant. Tell Claude instead.",
+    "saved_copy": "This is a saved copy. Say “show the {name} kit” to Claude and the buttons work.",
+}
+STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
+STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
+
+# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow
+REEL_CREATE = "Create my reel"
+REEL_AGAIN = "Make a new version"
+STORIES_MAKE = KIT_WORDS["stories_make"] + " →"
+STORIES_OPEN = KIT_WORDS["stories_open"] + " →"
+
+# Decision 3 (v19): where the Reel card goes. "reel-page" is Nicole's reel maker (reel_page.py, /reel.html: the
+# order, the song, the vibe and Make my reel on one page); "picker" is the older reel picker (arrange.py --piece
+# reel, /arrange.html), which still works when asked for by name.
+REEL_DOOR = "reel-page"
+
+
+def reel_door(kit_name):
+    """The address the kit page's Reel card opens (REEL_DOOR)."""
+    q = quote(kit_name)
+    return f"/reel.html?kit={q}" if REEL_DOOR == "reel-page" else f"/arrange.html?kit={q}&piece=reel"
+
+
+def reel_link_words(made):
+    """The Reel card's CTA, hers: "Create my reel →", or "Make a new version →" once a reel is made."""
+    return (REEL_AGAIN if made else REEL_CREATE) + " →"
+
+
+def design_door(kit_name, stories=False):
+    """The Carousel card's and the Stories card's address: the designer, in its carousel or its stories shape."""
+    return f"/design.html?kit={quote(kit_name)}" + ("&kind=stories" if stories else "")
+
+
+def short_name(name):
+    """Hers (server.py short_name): the folder name without a leading date."""
+    return re.sub(r"^\d{4}-\d{2}-\d{2}\s+", "", name) or name
+
+
+def _plural(n, one, many):
+    return one if n == 1 else many
+
+
+def _designs_words(d):
+    return f"{d} saved design{_plural(d, '', 's')}"
+
+
+def carousel_status(n, designs):
+    """Her Carousel card's status line, with "1 slide" where hers said "1 slides" (one slide is a single post)."""
+    if n:
+        return f"{n} {_plural(n, 'slide', 'slides')} saved in the Carousel folder" + (f" · {_designs_words(designs)}" if designs else "")
+    return f"{_designs_words(designs)}, no slides saved yet" if designs else KIT_WORDS["not_made"]
+
+
+def stories_status(n, designs):
+    """Her Stories card's status line."""
+    if n:
+        return f"{n} {_plural(n, 'story', 'stories')} saved in the Stories folder" + (f" · {_designs_words(designs)}" if designs else "")
+    return f"{_designs_words(designs)}, no stories saved yet" if designs else KIT_WORDS["not_made"]
+
+
+def _src(name):
+    """A file's name as it goes into a picture's address on the kit page. Only the three characters that
+    would cut an address short are changed, so every address written before reads the same."""
+    return name.replace("%", "%25").replace("#", "%23").replace("?", "%3F")
+
+
+def rel(kit, p):
+    return html.escape(Path(p).relative_to(kit).as_posix()) if str(p).startswith(str(kit)) else html.escape(str(p))
+
 
 CSS = """
 :root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;--sand-l:#ECEAF6;--line:rgba(31,36,48,.12);
@@ -1614,215 +1745,297 @@ CSS = """
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
-.bar .homelink{display:inline-flex;align-items:center;gap:.45em;margin-right:.25rem;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.bar .homelink:hover{background:var(--coral-2)}.bar .homelink .short{display:none}@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
+.homelink{display:inline-flex;align-items:center;gap:.45em;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.homelink:hover{background:var(--coral-2)}
+.homelink .short{display:none}@media(max-width:560px){.homelink .long{display:none}.homelink .short{display:inline}}
 body:not(.live) .homelink{display:none}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
-h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
+h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em}
 h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing:0}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(16px,1.4vw,18px);max-width:40em}
-.piece{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.4rem;align-items:start;background:var(--paper);border-radius:22px;padding:1.3rem;margin-top:1.2rem;box-shadow:0 1px 0 var(--line)}
-.piece h2{margin:0 0 .2rem;font:600 24px/1.1 var(--sans);letter-spacing:-.02em}
+.piece{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.4rem;align-items:start;background:var(--paper);border-radius:22px;padding:1.3rem;margin-top:1.2rem;box-shadow:0 1px 0 var(--line);transition:box-shadow .25s var(--ease),transform .25s var(--ease)}
+a.piece{color:inherit;text-decoration:none;cursor:pointer}
+a.piece:hover{box-shadow:0 0 0 2px var(--coral),0 10px 30px rgba(31,36,48,.08);transform:translateY(-2px)}
+.piece h2{margin:0;font:600 24px/1.1 var(--sans);letter-spacing:-.02em}
 .piece .sub{color:var(--ink-2);font-size:14px;margin:0 0 .8rem}
-.strip{display:flex;gap:6px;flex-wrap:wrap}.strip img{height:150px;width:auto;border-radius:10px;object-fit:cover;background:var(--sand-l);box-shadow:0 0 0 1px var(--line);cursor:zoom-in;transition:transform .3s var(--ease)}.strip img:hover{transform:translateY(-2px)}
-.strip.tall img{height:210px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
+.ratio{font:600 10px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:.3em .6em;margin-left:.5rem;vertical-align:middle}
+.strip{display:flex;gap:6px;flex-wrap:wrap}
+.strip{flex-wrap:nowrap;overflow:hidden}
+.strip img{height:120px;width:96px;flex:none;border-radius:10px;object-fit:cover;background:var(--sand-l);box-shadow:0 0 0 1px var(--line)}
+.strip.tall img{height:112px;width:63px}
+.strip .more{align-self:center;color:var(--ink-2);font-size:13px;padding:0 .4rem}
+.cta{display:inline-flex;align-items:center;gap:.45rem;border-radius:999px;padding:.62rem 1.1rem;font:600 14px/1 var(--sans);background:var(--ink);color:#fff;border:0;white-space:nowrap;transition:background .2s}
+a.piece:hover .cta{background:var(--coral-2)}
+.go{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:all .2s var(--ease)}
+.go:hover{border-color:var(--coral);color:var(--coral-2)}
+.status{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.9rem 0 0;font-size:14.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#3d9a6a;flex:none}
+.dot.no{background:var(--line)}
+.went{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:.4rem 0 0}
 .words{display:grid;gap:.8rem}
-.w{border:1px solid var(--line);border-radius:14px;padding:.8rem .95rem;position:relative}
+.w{border:1px dashed var(--line);border-radius:14px;padding:.8rem .95rem}
 .w .k{font:600 10px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--coral-2);margin-bottom:.4rem}
-.w p{margin:0;white-space:pre-wrap;font-size:15px}
-.w.hook p{font:italic 400 19px/1.3 var(--display)}
+.empty{font:italic 400 16px/1.3 var(--display);color:var(--ink-2);margin:0}
+.problem{background:var(--coral-l);border-radius:14px;padding:1rem 1.2rem;margin-top:1.2rem}
+@media(max-width:760px){.piece{grid-template-columns:1fr}}
+.w{position:relative}
+.w .t{margin:0;padding-right:4.6rem;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;cursor:text}
+.w.hook .t{font:italic 400 19px/1.3 var(--display)}
 .copy{position:absolute;top:.6rem;right:.6rem;border:0;border-radius:999px;padding:.4rem .8rem;font:600 12px/1 var(--sans);background:var(--ink);color:#fff;cursor:pointer;transition:transform .2s var(--ease)}
 .copy:hover{transform:scale(1.04)}.copy.done{background:var(--coral)}
-.empty{font:italic 400 16px/1.3 var(--display);color:var(--ink-2)}
-.lean{font-size:13px;color:var(--ink-2);margin-top:1rem}
-.folder{font-size:13px;color:var(--ink-2)}
-.go{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:all .2s var(--ease)}
-.go:hover{border-color:var(--coral);color:var(--coral-2);transform:translateY(-1px)}
+.also{margin-top:1.6rem;font-size:13.5px;color:var(--ink-2)}
+.also p{margin:0}
+.also .line{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.1rem}
+.also .bit{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.go.small{padding:.35rem .7rem;font-size:12.5px}
 a.go{text-decoration:none}
-.go.small{padding:.35rem .7rem;font-size:12.5px}.canva-links{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0 0}
-.go.main{background:var(--ink);color:#fff;border-color:var(--ink)}.go.main:hover{background:var(--coral-2);border-color:var(--coral-2);color:#fff}
-.went{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:.4rem 0 0}
-.piece .top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
-.piece .top h2{margin:0}
-.ratio{font:600 10px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:.3em .6em;margin-left:.5rem;vertical-align:middle}
-.arr{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);text-decoration:none;cursor:pointer;transition:all .2s var(--ease)}
-.arr:hover{border-color:var(--coral);color:var(--coral-2);transform:translateY(-1px)}
-body:not(.live) .arr{display:none}
-.big{position:fixed;inset:0;background:rgba(20,22,30,.92);display:none;place-items:center;z-index:50;cursor:zoom-out}.big.on{display:grid}.big img{max-width:92vw;max-height:92vh;border-radius:12px}
-@media(max-width:760px){.piece{grid-template-columns:1fr}}
+.lean{margin-top:.6rem}
 """
 
-SCRIPT = """
-document.querySelectorAll('.copy').forEach(b=>b.onclick=async()=>{const t=b.parentElement.querySelector('p').textContent;
- try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(b.parentElement.querySelector('p'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}
- b.textContent='Copied';b.classList.add('done');setTimeout(()=>{b.textContent='Copy';b.classList.remove('done')},1600)});
-const live=location.protocol.startsWith('http');if(live)document.body.classList.add('live');const KIT=document.body.dataset.kit;
-document.querySelectorAll('.go').forEach(b=>b.onclick=async()=>{const line=b.closest('.piece,header').querySelector('.went');
- if(!live){line.textContent='This is a saved copy. Say “show the '+document.body.dataset.name+' kit” to Claude and the buttons work.';return}
- line.textContent='Opening...';
- try{const r=await fetch('/open?kit='+encodeURIComponent(KIT)+'&sub='+encodeURIComponent(b.dataset.sub||''));const j=await r.json();line.textContent=j.words}
- catch(e){line.textContent='Could not reach the Assistant. Tell Claude instead.'}});
-const big=document.getElementById('big');document.querySelectorAll('.strip img').forEach(i=>i.onclick=()=>{big.querySelector('img').src=i.src;big.classList.add('on')});big.onclick=()=>big.classList.remove('on');
+SCRIPT = r"""
+(function(){
+const live = location.protocol.indexOf('http') === 0;
+if (live) document.body.classList.add('live');
+const KIT = document.body.dataset.kit, W = JSON.parse(document.getElementById('kit-words').textContent);
+function stop(e){ e.preventDefault(); e.stopPropagation(); }
+// the words: the older copy call first (the Claude app's pane refuses the newer one), then the newer
+function copyText(t){
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  if (!ok && navigator.clipboard) return navigator.clipboard.writeText(t).then(function(){ return true; }, function(){ return false; });
+  return Promise.resolve(ok);
+}
+document.querySelectorAll('.copy').forEach(function(b){
+  b.addEventListener('click', function(e){
+    stop(e);                                  // inside a card: the Copy never opens the card's page
+    copyText(b.parentElement.querySelector('.t').textContent).then(function(){
+      b.textContent = W.copied; b.classList.add('done');
+      setTimeout(function(){ b.textContent = W.copy; b.classList.remove('done'); }, 1600);
+    });
+  });
+});
+// clicking the words to select them never opens the card's page either
+document.querySelectorAll('.w .t').forEach(function(p){ p.addEventListener('click', function(e){ e.preventDefault(); }); });
+// her Open in CapCut: stops the card's link, says what happened on the line under it
+const cc = document.getElementById('capcut');
+if (cc) cc.addEventListener('click', async function(e){
+  stop(e);
+  const line = cc.closest('.piece').querySelector('.went');
+  if (!live) { line.textContent = W.saved_copy; return; }
+  line.textContent = W.opening_capcut;
+  try {
+    const r = await fetch('/reel-capcut', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({kit: KIT, from: 'kit'})});
+    const j = await r.json(); line.textContent = j.words;
+  } catch (err) { line.textContent = W.capcut_unreached; }
+});
+// the quiet line's folder buttons (the Assistant opens the folder; the result shows on the line under them)
+document.querySelectorAll('button.go[data-sub]').forEach(function(b){
+  b.addEventListener('click', async function(e){
+    stop(e);
+    const line = b.closest('.also').querySelector('.went');
+    if (!live) { line.textContent = W.saved_copy; return; }
+    line.textContent = W.opening;
+    try {
+      const r = await fetch('/open?kit=' + encodeURIComponent(KIT) + '&sub=' + encodeURIComponent(b.dataset.sub || ''));
+      const j = await r.json(); line.textContent = j.words;
+    } catch (err) { line.textContent = W.unreached; }
+  });
+});
+// a reel photo whose small copy is still being made: asked for again a little later
+document.querySelectorAll('img[data-again]').forEach(function(i){
+  let n = 0;
+  function again(){ if (++n <= 20) setTimeout(function(){ i.src = i.dataset.again + '&try=' + n; }, 1500); }
+  i.addEventListener('error', again);
+  if (i.complete && !i.naturalWidth) again();
+});
+// back to this page from the reel page or a designer: drawn again, so it shows what was just made
+window.addEventListener('pageshow', function(e){ if (e.persisted) location.reload(); });
+})();
 """
 
 
-LAY_OUT = "Lay out the slides"
-# Decision 3 (v19): where the reel's "Change the photos" goes. "reel-page" is Nicole's reel maker (reel_page.py,
-# /reel.html: the order, the song, the vibe and Make my reel on one page); "picker" is the older reel picker
-# (arrange.py --piece reel, /arrange.html), which still works when asked for by name. The carousel's picker is not
-# changed by this.
-REEL_DOOR = "reel-page"
+def _font_css():
+    """The plugin's own fonts (decision 16), from the reel page's route: nothing from the internet."""
+    import reel_page
+    return reel_page.FONT_CSS
 
 
-def reel_door(kit_name):
-    """The address the kit page's reel link opens (REEL_DOOR)."""
-    q = quote(kit_name)
-    return f"/reel.html?kit={q}" if REEL_DOOR == "reel-page" else f"/arrange.html?kit={q}&piece=reel"
+def _head(title):
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
 
 
-# The reel link's words while REEL_DOOR is "reel-page": Nicole's, from her post-kit card (pages/post-kit.html), until
-# stage d builds her cards. The reel is made on that page now, so "Change the photos" and "say make the reel to
-# Claude" pointed people elsewhere (v19 review).
-REEL_CREATE = "Create my reel"
-REEL_AGAIN = "Make a new version"
-REEL_NOT_MADE = f"Not made yet. Press {REEL_CREATE} to pick your song and make it."      # ours (her card has no such line)
+def _bar(when_words):
+    return (f"<div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
+            f"<span class='short'>Home</span></a>{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
-def reel_link_words(made):
-    """The words on the kit page's reel link: hers on the reel page's door, the older words on the picker's."""
-    if REEL_DOOR != "reel-page":
-        return "Change the photos"
-    return (REEL_AGAIN if made else REEL_CREATE) + " \u2192"
-LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
-# The Stories section's link to the stories designer: Nicole's words from her post kit's Stories card (v19).
-STORIES_MAKE = "Make my stories \u2192"
-STORIES_OPEN = "Open my stories \u2192"
+def unreachable_html():
+    """Her page when the shoot can't be reached (the drive unplugged): her header and her one line."""
+    return (_head("Post kit") + "<body><div class='wrap'>" + _bar("")
+            + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>Post kit<em>.</em></h1>"
+            f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p></header>"
+            f"<div id='pieces'><div class='problem'>{html.escape(KIT_WORDS['reach'])}</div></div></div></body></html>")
 
 
-def stories_line(shown, canva):
-    """The line under the Stories heading on the kit page: which stories it is showing, said truly."""
-    if shown["kind"] == "laid-out":
-        return (f"The stories you made in the stories designer, saved as \u201c{shown['base']}\u201d. They are in the Stories folder"
-                + (", and the other stories in that folder are all still there." if shown["others"] else "."))
-    line = ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva
-            else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.")
-    if shown["laid_out"]:
-        line += " The stories you made in the stories designer are in that folder too."
-    return line
+def _jpgs(folder):
+    """A folder's pictures by its own listing (never a hidden one), in name order."""
+    have = _names(folder)
+    return sorted(have[k] for k in have if k.lower().endswith(".jpg") and not k.startswith("."))
 
 
-def _src(name):
-    """A file's name as it goes into a picture's address on the kit page. Only the three characters that
-    would cut an address short are changed, so every address written before reads the same."""
-    return name.replace("%", "%25").replace("#", "%23").replace("?", "%3F")
+def _wbox(label, text, cls=""):
+    return (f"<div class='w{(' ' + cls) if cls else ''}'><div class='k'>{html.escape(label)}</div><p class='t'>{html.escape(text)}</p>"
+            f"<button class='copy' type='button'>{html.escape(OUR_KIT_WORDS['copy'])}</button></div>")
 
 
-def carousel_line(shown, canva):
-    """The line under the Carousel heading on the kit page: which slides the page is showing, said truly."""
-    if shown["kind"] == "laid-out":
-        return (f"The slides you laid out, saved as \u201c{shown['base']}\u201d. They are in the Carousel folder"
-                + (", and the other slides in that folder are all still there." if shown["others"] else "."))
-    line = ("Made in Canva from your template; the plain slides are there too." if canva
-            else "The slides, in order, all the same size. They are in the Carousel folder.")
-    if shown["laid_out"]:
-        line += " The slides you laid out are in that folder too."
-    return line
+def _wempty(label):
+    return f"<div class='w'><div class='k'>{html.escape(label)}</div><p class='empty'>{html.escape(KIT_WORDS['not_written'])}</p></div>"
 
 
-def rel(kit, p):
-    return html.escape(Path(p).relative_to(kit).as_posix()) if str(p).startswith(str(kit)) else html.escape(str(p))
+def _strip(srcs, most, tall=False, again=False):
+    imgs = []
+    for s in srcs[:most]:
+        a = html.escape(s)
+        imgs.append(f"<img src='{a}' alt=''" + (f" data-again='{a}'" if again else "") + ">")
+    more = f"<span class='more'>+{len(srcs) - most}</span>" if len(srcs) > most else ""
+    return f"<div class='strip{' tall' if tall else ''}'>" + "".join(imgs) + more + "</div>"
 
 
-def write_page(kit):
+def _status(text, on, extra=""):
+    return f"<div class='status'><span class='dot{'' if on else ' no'}'></span>{text}{extra}</div>"
+
+
+def card_facts(kit, rec=None):
+    """What the three cards show, read from the kit's records and folders. Reads only. Every name in it is a
+    photo's number or a file's name, never a path."""
+    import arrange
+    import design
+    import reel_page
+    rec = rec if rec is not None else load_rec(kit)
+    rows = arrange.sheet_rows(kit)
+    order = reel_page.order_for_kit_page(kit, rows, rec)
+    by_n = {x["n"]: x for x in rows}
+    shown_rows = [by_n[x["n"]] for x in order if x["n"] in by_n]
+    photos, _ = arrange.page_photos(kit, rec, shown_rows[:STRIP_REEL]) if shown_rows else ([], 0)
+    car, sto = carousel_shown(kit, rec), stories_shown(kit, rec)
+    return {
+        "reel_order": [x["n"] for x in order],
+        "reel_photos": photos,                                  # {n, v, have, missing} for the ones the strip shows
+        "reel": reel_page.newest_project(kit, rec),
+        "slides": [p.name for p in car["files"]],
+        "designs": design.count_designs(kit, design.CAROUSEL),
+        "stories": [p.name for p in sto["files"]],
+        "story_designs": design.count_designs(kit, design.STORIES),
+    }
+
+
+def build_page(kit):
+    """The kit page, as her post kit's three cards. Returns (the page, whether a reel photo's small copy is still
+    to be made: the server then starts making them)."""
     rec = load_rec(kit)
     words = json.loads((kit / ".kit" / "words.json").read_text(encoding="utf-8")) if (kit / ".kit" / "words.json").exists() else {}
     words = kept_words(words, strict=False)     # a words file saved in a near-miss shape never stops the page
-    name = rec.get("name", kit.name)
-    when = rec.get("date") or ""
+    name = rec.get("name") or short_name(kit.name)
+    when = rec.get("date") or (kit.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", kit.name) else "")
     try:
         when_words = this_computer.strftime(date.fromisoformat(when), "%B %-d, %Y")
     except ValueError:
         when_words = when
-    made = rec.get("made_pieces", {})
+    f = card_facts(kit, rec)
+    kq = quote(kit.name)
 
-    def strip(folder_name, tall=False, fs=None):
-        d = kit / folder_name
-        if not d.is_dir():
-            return "<p class='empty'>Not made yet.</p>"
-        if fs is None:
-            fs = sorted((p for p in d.iterdir() if p.suffix.lower() == ".jpg" and not p.name.startswith(".")), key=lambda p: ("(Canva)" not in p.name, p.name))
-        if not fs:
-            return "<p class='empty'>Not made yet.</p>"
-        return f"<div class='strip{' tall' if tall else ''}'>" + "".join(f"<img src='{html.escape(folder_name)}/{html.escape(_src(f.name))}' alt=''>" for f in fs) + "</div>"
+    # the Reel card
+    pics = [p for p in f["reel_photos"]]
+    need_previews = any(not p["have"] and not p["missing"] for p in pics)
+    srcs = [f"/kit-photo?kit={kq}&n={p['n']}&size=s&v={quote(p['v'] or '')}" for p in pics]
+    srcs += [""] * max(0, len(f["reel_order"]) - len(srcs))         # for her "+N": only the first 7 are drawn
+    reel_strip = (_strip(srcs, STRIP_REEL, tall=True, again=True) if f["reel_order"]
+                  else f"<p class='empty'>{html.escape(KIT_WORDS['reel_none'])}</p>")
+    reel_status = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True,
+                           f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>")
+                   if f["reel"] else _status(html.escape(KIT_WORDS["not_made"]), False))
+    hooks = "".join(_wbox(OUR_KIT_WORDS["hook_n"].format(i=i), h, "hook") for i, h in enumerate(words.get("hooks") or [], 1)) or _wempty(KIT_WORDS["hooks"])
 
-    def wbox(k, text, cls=""):
-        return f"<div class='w {cls}'><div class='k'>{html.escape(k)}</div><p>{html.escape(text)}</p><button class='copy'>Copy</button></div>"
+    # the Carousel card
+    slides = f["slides"]
+    car_strip = (_strip([f"Carousel/{_src(n)}" for n in slides], STRIP_SLIDES) if slides
+                 else f"<p class='empty'>{html.escape(KIT_WORDS['carousel_none'])}</p>")
+    car_cta = KIT_WORDS["carousel_open"] if slides or f["designs"] else KIT_WORDS["carousel_make"]
+    car_words = ((_wbox(KIT_WORDS["caption"], words["caption"]) if words.get("caption") else _wempty(KIT_WORDS["caption"]))
+                 + (_wbox(OUR_KIT_WORDS["short"], words["short"]) if words.get("short") else "")
+                 + (_wbox(KIT_WORDS["hashtags"], words["hashtags"]) if words.get("hashtags") else _wempty(KIT_WORDS["hashtags"])))
 
-    hooks = "".join(wbox(f"Hook {i}", h, "hook") for i, h in enumerate(words.get("hooks", []), 1)) or "<p class='empty'>Not written yet.</p>"
-    caption = wbox("Caption", words["caption"]) if words.get("caption") else ""
-    short = wbox("Short caption", words["short"]) if words.get("short") else ""
-    tags = wbox("Hashtags", words["hashtags"]) if words.get("hashtags") else ""
-    story_lines = "".join(wbox(f"Story {i}", s) for i, s in enumerate(words.get("stories", []), 1))
-    reel = rec.get("reel")
-    reel_html = (f"<p>Your reel is in CapCut, called <b>{html.escape(reel['project'])}</b>. Press Open in CapCut, click that project, style it the way you like, and export it from there.</p>"
-                 + (f"<p class='sub'>Photos in it, in order: {', '.join(str(n) for n in reel.get('picks', []))}</p>" if reel.get("picks") else "")) if reel else (
-        f"<p class='empty'>{html.escape(REEL_NOT_MADE)}</p>" if REEL_DOOR == "reel-page" and (kit / ".kit" / "sheet.json").is_file()
-        else "<p class='empty'>Not made yet. Say “make the reel” to Claude.</p>")
-    lean = f"<p class='lean'>Written from: {html.escape(words['leaned_on'])}</p>" if words.get("leaned_on") else ""
+    # the Stories card
+    stories = f["stories"]
+    sto_strip = (_strip([f"Stories/{_src(n)}" for n in stories], STRIP_SLIDES, tall=True) if stories
+                 else f"<p class='empty'>{html.escape(KIT_WORDS['stories_none'])}</p>")
+    sto_cta = KIT_WORDS["stories_open"] if stories or f["story_designs"] else KIT_WORDS["stories_make"]
+    sto_words = "".join(_wbox(OUR_KIT_WORDS["story_n"].format(i=i), s) for i, s in enumerate(words.get("stories") or [], 1)) or _wempty(KIT_WORDS["story_lines"])
 
-    canva = rec.get("canva", {})
-    can_arrange = (kit / ".kit" / "sheet.json").is_file()      # the page that moves photos needs the numbered list
-    shown = carousel_shown(kit, rec)                            # which slides are the carousel today
-    stories = stories_shown(kit, rec)                           # which stories the page shows
+    def card(piece, href, title, ratio, cta, sub, strip, status, wrds, went=False):
+        return (f"<a class='piece' data-piece='{piece}' href='{html.escape(href)}'><div>"
+                f"<div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span class='cta'>{html.escape(cta)} &rarr;</span></div>"
+                f"<p class='sub'>{html.escape(sub)}</p>{strip}{status}" + ("<p class='went'></p>" if went else "")
+                + f"</div><div class='words'>{wrds}</div></a>")
 
-    def sec(title, sub, ratio, body, wrds, folder, piece=None, arrange=None):
-        has = (kit / folder).is_dir()
-        btn = f"<button class='go' data-sub='{html.escape(folder)}'>Open the {html.escape(folder)} folder</button>" if has else ""
-        if arrange == "carousel" and can_arrange:
-            # The page where they lay the slides out themselves (design.py): a plain link of class 'arr' too,
-            # never 'go'. It is put in first, so it sits after "Change the photos" and before the folder's button.
-            btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}' title='{html.escape(LAY_OUT_TITLE, quote=True)}'>{html.escape(LAY_OUT)}</a> " + btn)
-        if arrange == "stories" and can_arrange:
-            # The stories designer (design.py, kind "stories"): the same kind of plain link, before the folder's button.
-            made_some = bool(rec.get("stories_set") or rec.get("stories_laid_out"))
-            btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}&amp;kind=stories'>{html.escape(STORIES_OPEN if made_some else STORIES_MAKE)}</a> " + btn)
-        reel_page_door = arrange == "reel" and REEL_DOOR == "reel-page"
-        if arrange in ("reel", "carousel") and can_arrange and ((rec.get("picks") or {}).get(arrange) or reel_page_door):
-            # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
-            # every 'go' button asks the Assistant to open a folder in Finder (File Explorer on a PC). Shown only when the page is
-            # served live (a saved copy has nowhere to go). The reel page's door shows before Claude has picked too:
-            # that page says how to ask for a pick.
-            href = reel_door(kit.name) if arrange == "reel" else f"/arrange.html?kit={quote(kit.name)}&piece={arrange}"
-            label = reel_link_words(bool(reel)) if arrange == "reel" else "Change the photos"
-            btn = (f"<a class='arr' href='{html.escape(href)}'>{html.escape(label)}</a> " + btn)
-        cv = canva.get(piece) if piece else None
-        if cv and cv.get("edit_url"):
-            btn = f"<a class='go' href='{html.escape(cv['edit_url'])}' target='_blank' rel='noopener'>Open in Canva</a> " + btn
-        if piece == "cover" and reel:
-            # The reel lives in CapCut, so the button opens CapCut (Dustin, Oct 30). CapCut can't be told which
-            # project to open from outside, so the line beside the button names it; it's at the top of the list.
-            btn = "<button class='go main' data-sub='CapCut'>Open in CapCut</button> " + btn
-        return (f"<section class='piece'><div><div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span>{btn}</span></div>"
-                f"<p class='went'></p><p class='sub'>{html.escape(sub)}</p>{body}</div><div class='words'>{wrds}</div></section>")
+    cards = (card("reel", reel_door(kit.name), KIT_WORDS["reel"], "9:16", REEL_AGAIN if f["reel"] else REEL_CREATE,
+                  KIT_WORDS["reel_sub"], reel_strip, reel_status, hooks, went=True)
+             + card("carousel", design_door(kit.name), KIT_WORDS["carousel"], "4:5", car_cta, KIT_WORDS["carousel_sub"],
+                    car_strip, _status(html.escape(carousel_status(len(slides), f["designs"])), bool(slides)), car_words)
+             + card("stories", design_door(kit.name, stories=True), KIT_WORDS["stories"], "9:16", sto_cta, KIT_WORDS["stories_sub"],
+                    sto_strip, _status(html.escape(stories_status(len(stories), f["story_designs"])), bool(stories)), sto_words))
 
-    page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(brand.title(name + ' · Post kit'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'>"
-            f"<div class='wrap'><div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>{brand.bar()}"
-            f"<span class='when'>{html.escape(when_words)}</span></div>"
-            f"<header class='head'><span class='eyebrow'>Post kit</span><h1>{html.escape(name)}<em>.</em></h1>"
-            f"<p class='lede'>Everything you need to post this shoot, in one place. Copy the captions, grab the photos from the folders, and post when you're ready. Nothing gets posted for you.</p>"
-            f"<p class='folder'>In your {html.escape(brand.short())} folder: {html.escape(posts.CONTENT_NAME)} › {html.escape(kit.name)}</p>"
-            f"<p><button class='go main' data-sub=''>Open the kit folder</button> <button class='go' data-sub='Photos'>Open the Photos folder</button></p><p class='went'></p></header>"
-            + sec("Reel", ("Cut on the beat, in CapCut. The cover was made in Canva from your template." if canva.get("cover")
-                           else "Cut on the beat, in CapCut. The cover is in the Covers folder." if (kit / "Covers").is_dir()
-                           else "Cut on the beat, in CapCut."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
-            + sec("Carousel", carousel_line(shown, bool(canva.get("carousel"))), "4:5", strip("Carousel", fs=shown["files"]), caption + tags, "Carousel", "carousel", arrange="carousel")
-            + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
-            + sec("Stories", stories_line(stories, bool(canva.get("stories"))), "9:16",
-                  strip("Stories", tall=True, fs=stories["files"]) + ("<p class='canva-links'>" + " ".join(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>Story {int(n)} in Canva</a>" for n, d in sorted((canva.get("stories") or {}).items(), key=lambda x: int(x[0])) if d.get("edit_url")) + "</p>" if canva.get("stories") else ""),
-                  story_lines or "<p class=empty>Not written yet.</p>", "Stories", arrange="stories")
-            + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
+    # the quiet line under the cards (decision 12): what else the kit folder holds, each with its folder's button
+    bits = []
+    singles = _jpgs(kit / "Singles")
+    if singles:
+        bits.append(f"<span class='bit'>{html.escape(OUR_KIT_WORDS['single'] if len(singles) == 1 else OUR_KIT_WORDS['singles'].format(n=len(singles)))} "
+                    f"<button class='go small' type='button' data-sub='Singles'>{html.escape(OUR_KIT_WORDS['open_folder'].format(sub='Singles'))}</button></span>")
+    if _jpgs(kit / "Covers"):
+        bits.append(f"<span class='bit'>{html.escape(OUR_KIT_WORDS['cover'])} "
+                    f"<button class='go small' type='button' data-sub='Covers'>{html.escape(OUR_KIT_WORDS['open_folder'].format(sub='Covers'))}</button></span>")
+    canva = rec.get("canva") if isinstance(rec.get("canva"), dict) else {}
+    links = []
+    for key, label in (("carousel", OUR_KIT_WORDS["canva_carousel"]), ("cover", OUR_KIT_WORDS["canva_cover"])):
+        c = canva.get(key)
+        if isinstance(c, dict) and isinstance(c.get("edit_url"), str) and c["edit_url"].startswith("https://"):
+            links.append(f"<a class='go small' href='{html.escape(c['edit_url'])}' target='_blank' rel='noopener'>{html.escape(label)}</a>")
+    st = canva.get("stories") if isinstance(canva.get("stories"), dict) else {}
+    for n_, d in sorted(((k, v) for k, v in st.items() if str(k).isdigit()), key=lambda x: int(x[0])):
+        if isinstance(d, dict) and isinstance(d.get("edit_url"), str) and d["edit_url"].startswith("https://"):
+            links.append(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>{html.escape(OUR_KIT_WORDS['canva_story'].format(n=int(n_)))}</a>")
+    if links:
+        bits.append(f"<span class='bit'>{html.escape(OUR_KIT_WORDS['in_canva'])} " + " ".join(links) + "</span>")
+    bits.append(f"<span class='bit'><button class='go small' type='button' data-sub=''>{html.escape(OUR_KIT_WORDS['open_kit'])}</button></span>")
+    lean = (f"<p class='lean'>{html.escape(OUR_KIT_WORDS['written_from'].format(what=words['leaned_on']))}</p>" if words.get("leaned_on") else "")
+    also = f"<div class='also'><p class='line'>{''.join(bits)}</p><p class='went'></p>{lean}</div>"
+
+    page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached")}
+    page_words.update({k: OUR_KIT_WORDS[k] for k in ("copy", "copied", "opening", "unreached")})
+    page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
+    page = (_head(name + " · Post kit")
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'><div class='wrap'>" + _bar(when_words)
+            + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
+            f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p></header>"
+            f"<div id='pieces'>{cards}</div>{also}</div>"
+            f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script>{SCRIPT}</script></body></html>")
+    return page, need_previews
+
+
+def page_html(kit):
+    return build_page(kit)[0]
+
+
+def write_page(kit):
+    """The saved copy of the kit page (the same page the server builds on every request), in the hidden folder."""
+    page = page_html(kit)
     tidy_own_files(kit)
     _write_text_whole(page_path(kit), page)     # whole or not at all, UTF-8 (the page says charset utf-8)
     return page_path(kit)

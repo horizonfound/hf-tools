@@ -3,15 +3,16 @@
 
 Run through tests/design_check.py (python3 tests/design_check.py --only wire --port P; it uses P + 4):
 
-  check_wire          by requests and commands, no browser. After Save slides the kit page shows only the
-                      newest laid-out set, with a true line and the folder's button beside it; a new order from
+  check_wire          by requests and commands, no browser. After Save slides the kit page's Carousel card (her
+                      post kit) shows only the newest laid-out set, with her count of it; a new order from
                       the picker puts the plain slides back and leaves every laid-out file where it is; pressing
                       Save slides again on a design that is already saved shows its set again; a Canva carousel
                       fetched after a save is what shows; a set with a slide missing is not shown in pieces; the
                       posting queue's picture follows the first slide shown; home.py pending prints one line that
                       names the kit, the set and the slides, and design.py took clears it.
-  check_wire_browser  the two "Lay out the slides" links pressed by a real pointer in a hidden Chrome (SKIP when
-                      there is no Chrome): each opens the designer, and neither asks for a folder to be opened.
+  check_wire_browser  the kit page's Carousel card and the picker's "Lay out the slides" pressed by a real pointer in
+                      a hidden Chrome (SKIP when there is no Chrome): each opens the designer, and neither asks for
+                      a folder to be opened.
 
 Nothing here opens Finder: the one request that would (GET /open) is answered inside the page in the browser
 part and is never sent in the other. Needs Pillow (the slides it sends are drawn here). The plugin's own code
@@ -34,9 +35,24 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
 
 LAY_OUT = "Lay out the slides"
-PLAIN_LINE = "The slides, in order, all the same size. They are in the Carousel folder."
-CANVA_LINE = "Made in Canva from your template; the plain slides are there too."
-ALSO_LINE = " The slides you laid out are in that folder too."
+SHOWN_MOST = 6              # her Carousel card draws the first 6 slides, then "+N"
+
+
+def status_line(n, designs=0):
+    """Her Carousel card's status line (kit.carousel_status), as the card shows it."""
+    if not n:
+        return "Not made yet"
+    return f"{n} {'slide' if n == 1 else 'slides'} saved in the Carousel folder" + (f" \u00b7 {designs} saved design{'' if designs == 1 else 's'}" if designs else "")
+
+
+def listing(names):
+    """A Carousel folder's slides in the order the card shows a plain listing: Canva's first, then by name."""
+    return sorted(names, key=lambda n: ("(Canva)" not in n, n))
+
+
+def is_set(got, sub, want, designs=0):
+    """Does her Carousel card show exactly this set: its first six, "+N" for the rest, and the count?"""
+    return got == list(want)[:SHOWN_MOST] and sub == status_line(len(want), designs)
 
 # Run in every page before its own scripts: a request to open a folder never leaves the page. It is written
 # down where a later page of the same tab can still read it (a link that also asked for a folder would do so
@@ -57,14 +73,15 @@ NO_FINDER_KEPT_JS = r"""
 
 
 def _carousel_section(page):
-    """The Carousel section of a kit page: (its html, the picture addresses in it, the line under its heading)."""
-    m = re.search(r"<section class='piece'><div><div class='top'><h2>Carousel<span.*?</section>", page, re.S)
+    """The Carousel card of a kit page (her post kit, v19 stage d): (its html, the picture addresses in it, its
+    status line, as text)."""
+    m = re.search(r"<a class='piece' data-piece='carousel'.*?</a>", page, re.S)
     if not m:
         return "", [], ""
     sec = m.group(0)
     srcs = [unescape(x) for x in re.findall(r"<img src='([^']+)'", sec)]
-    sub = re.search(r"<p class='sub'>(.*?)</p>", sec, re.S)
-    return sec, srcs, unescape(sub.group(1)) if sub else ""
+    st = re.search(r"<div class='status'>(.*?)</div>", sec, re.S)
+    return sec, srcs, unescape(re.sub(r"<[^>]+>", "", st.group(1))).strip() if st else ""
 
 
 def _mean(data, box=None):
@@ -144,7 +161,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
             return code, data.decode("utf-8", "replace")
 
         def shown(q=KQ):
-            """(the picture names the kit page's Carousel section shows, the line under its heading, the section)"""
+            """(the picture names the kit page's Carousel card shows, its status line, the card)"""
             code, page = kit_page(q)
             sec, srcs, sub = _carousel_section(page)
             return [unquote(s.split("/", 1)[1]) for s in srcs if s.startswith("Carousel/")], sub, sec
@@ -184,15 +201,11 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         # ---------- before any design: the kit page as it was, plus the link ----------
         names0 = plain_names()
         got, sub, sec = shown()
-        case("before any laid-out set: the kit page shows the plain slides and the photographer's own picture", sorted(got) == sorted(names0 + ["my own picture.jpg"]), got)
-        case("before any laid-out set: the line is the one it always was", sub == PLAIN_LINE, sub)
-        links = re.findall(r"<a class='arr' href='([^']+)'[^>]*>" + LAY_OUT + "</a>", sec)
-        code, page = kit_page()
-        case("the kit page has 'Lay out the slides' once, in the Carousel section", len(links) == 1 and page.count(">" + LAY_OUT + "</a>") == 1 and links[0] == f"/design.html?kit={KQ}", links)
-        order = [m.group(1) for m in re.finditer(r">(Change the photos|Lay out the slides|Open the Carousel folder)<", sec)]
-        case("...beside 'Change the photos', before the folder's button", order == ["Change the photos", "Lay out the slides", "Open the Carousel folder"], order)
-        tag = (re.findall(r"<a [^>]*>" + LAY_OUT + "</a>", page) or [""])[0]
-        case("...a plain link of class 'arr', never 'go', with nothing that asks for a folder", "class='arr'" in tag and "class='go" not in tag and "data-sub" not in tag and "body:not(.live) .arr{display:none}" in page, tag)
+        case("before any laid-out set: the kit page shows the plain slides and the photographer's own picture (her first six, and the count)",
+             is_set(got, sub, listing(names0 + ["my own picture.jpg"])), (got, sub))
+        links = re.findall(r"<a class='piece' data-piece='carousel' href='([^']+)'>", sec)
+        case("the kit page's Carousel card is a link to the designer for this shoot (her post kit)", links == [f"/design.html?kit={KQ}"], links)
+        case("...a plain link, never a 'go' button, with nothing in it that asks for a folder", "data-sub" not in sec and "class='go" not in sec, sec[:200])
         code, h, data = ask(P, "GET", unescape(links[0])) if links else (0, {}, b"")
         case("...and its address is the designer for this shoot", code == 200 and b"class='designer'" in data and f"data-kit='{kit_name}'".encode() in data, code)
         code, h, data = ask(P, "GET", "/posting.html")
@@ -200,7 +213,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         ok, why = thumb_is((car / names0[0]).read_bytes())
         case("before any laid-out set: the posting queue's picture is the first plain slide", ok, why)
         got2, sub2, sec2 = shown(K2)
-        case("a kit that never gets a laid-out set has the link too", sec2.count(">" + LAY_OUT + "</a>") == 1 and f"/design.html?kit={K2}" in sec2 and sub2 == PLAIN_LINE, sub2)
+        case("a kit that never gets a laid-out set has the link too", f"href='/design.html?kit={K2}'" in sec2 and is_set(got2, sub2, listing(plain_names(kit2))), sub2)
 
         # ---------- a save from the designer ----------
         code, st = get_json(P, f"/design-state?kit={KQ}")
@@ -237,11 +250,9 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         set1 = [f"{BASE1} - slide {i:02d}.jpg" for i in range(1, N + 1)]
         case("Save slides: the first set is saved under the design's name", code == 200 and out.get("ok") and out.get("base") == BASE1 and out.get("count") == N, (code, out))
         got, sub, sec = shown()
-        case("after a save the kit page's Carousel section shows only the laid-out set, in order", got == set1, got)
-        case("...with a true line naming the set shown", sub == f"The slides you laid out, saved as “{BASE1}”. They are in the Carousel folder, and the other slides in that folder are all still there.", sub)
-        case("...and the folder's button is in that same section, beside the line about the folder", "data-sub='Carousel'>Open the Carousel folder</button>" in sec and "<p class='went'></p>" in sec)
+        case("after a save the kit page's Carousel card shows only the laid-out set, in order, with her count", is_set(got, sub, set1, 1), (got, sub))
         loaded = pictures_load()
-        case("...and every picture the page shows loads, and is byte for byte the slide that was saved", [loaded.get(n) for n in set1] == S1, [n for n in set1 if loaded.get(n) != S1[set1.index(n)]])
+        case("...and every picture the card shows loads, and is byte for byte the slide that was saved", [loaded.get(n) for n in set1[:SHOWN_MOST]] == S1[:SHOWN_MOST], [n for n in set1[:SHOWN_MOST] if loaded.get(n) != S1[set1.index(n)]])
         case("...while the plain slides and the photographer's own picture are all still in the folder, unchanged", nothing_changed() == [] and all((car / n).is_file() for n in names0 + ["my own picture.jpg"]), nothing_changed())
         ok, why = thumb_is(S1[0])
         case("after a save the posting queue's picture of the carousel is the set's first slide", ok, why)
@@ -262,9 +273,9 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         set2 = [f"{NAME2} - slide {i:02d}.jpg" for i in range(1, N + 1)]
         case("a second save, after a change and a new name, makes a new set beside the first", code == 200 and out.get("base") == NAME2 and all((car / n).is_file() for n in set1 + set2), (code, out))
         got, sub, sec = shown()
-        case("the kit page now shows only the newest set (a name with &, ', # and % in it)", got == set2 and f"saved as “{NAME2}”" in sub, (got, sub))
+        case("the kit page now shows only the newest set (a name with &, ', # and % in it)", is_set(got, sub, set2, 1), (got, sub))
         loaded = pictures_load()
-        case("...and its pictures load from the page's own addresses, byte for byte", [loaded.get(n) for n in set2] == S2, [n for n in set2 if loaded.get(n) is None])
+        case("...and its pictures load from the page's own addresses, byte for byte", [loaded.get(n) for n in set2[:SHOWN_MOST]] == S2[:SHOWN_MOST], [n for n in set2[:SHOWN_MOST] if loaded.get(n) is None])
         ok, why = thumb_is(S2[0])
         case("...and the posting queue's picture follows the newest set's first slide", ok, why)
         code, out = run(env, "home.py", "pending")
@@ -294,8 +305,8 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         names1 = plain_names()
         case("...and the job ends done, with new plain slides", bool(job) and job.get("state") == "done" and names1 != names0 and len(names1) == len(new_order), job)
         got, sub, sec = shown()
-        case("after the new order the kit page shows the plain slides again (and their own picture), and no laid-out slide", sorted(got) == sorted(names1 + ["my own picture.jpg"]) and not [n for n in got if n in set1 + set2], got)
-        case("...and its line says, truly, that the laid-out slides are still in the folder", sub == PLAIN_LINE + ALSO_LINE, sub)
+        case("after the new order the kit page shows the plain slides again (and their own picture), and no laid-out slide",
+             is_set(got, sub, listing(names1 + ["my own picture.jpg"]), 1) and not [n for n in got if n in set1 + set2], (got, sub))
         now = tree_print(car)
         case("...and every laid-out file is still in the Carousel folder, byte for byte", [now.get(n) for n in set1 + set2] == [sha(x) for x in S1 + S2], [n for n in set1 + set2 if n not in now])
         aside = [n for n in names0 if n not in names1]
@@ -319,7 +330,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         case("Save slides with nothing changed, while the plain slides are shown: 'Already saved as ...', and no new file", code == 200 and out.get("already") is True and out.get("base") == NAME2
              and out.get("words") == f"Already saved as \"{NAME2}\". Change something to save a new set." and sorted(os.listdir(car)) == files_before, (code, out))
         got, sub, sec = shown()
-        case("...and the kit page shows that set again, with its line", got == set2 and f"saved as “{NAME2}”" in sub, (got, sub))
+        case("...and the kit page shows that set again, with its count", is_set(got, sub, set2, 1), (got, sub))
         ok, why = thumb_is(S2[0])
         case("...and the posting queue's picture is that set's first slide again", ok, why)
         rec_now = rec_file.read_bytes()
@@ -347,8 +358,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         case("wire: a Canva carousel was put in as canva_kit.py fetch records one", r.returncode == 0 and "ok" in r.stdout, (r.stdout + r.stderr)[-300:])
         got, sub, sec = shown()
         case("a Canva carousel fetched after a laid-out save: the kit page shows the Canva slides first, then the plain ones, and no laid-out slide",
-             got[:2] == canva_names and sorted(got[2:]) == sorted(names1 + ["my own picture.jpg"]), got)
-        case("...and its line says so, and that the laid-out slides are in the folder too", sub == CANVA_LINE + ALSO_LINE, sub)
+             is_set(got, sub, listing(canva_names + names1 + ["my own picture.jpg"]), 1) and got[:2] == canva_names, (got, sub))
         ok, why = thumb_is(canva_pics[0])
         case("...and the posting queue's picture is the first Canva slide", ok, why)
         case("...and every laid-out file is still there, unchanged", nothing_changed() == [], nothing_changed())
@@ -357,7 +367,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         BASE3 = f"{NAME2} (2)"
         set3 = [f"{BASE3} - slide {i:02d}.jpg" for i in range(1, N + 1)]
         got, sub, sec = shown()
-        case("a laid-out set saved after that Canva carousel is the one shown", code == 200 and out.get("base") == BASE3 and got == set3 and f"saved as “{BASE3}”" in sub, (code, out, got))
+        case("a laid-out set saved after that Canva carousel is the one shown", code == 200 and out.get("base") == BASE3 and is_set(got, sub, set3, 1), (code, out, got, sub))
         ok, why = thumb_is(S3[0])
         case("...in the posting queue too", ok, why)
 
@@ -368,11 +378,11 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         code, out = run(env, "kit.py", "page", kit_name)
         got, sub, sec = shown()
         case("a laid-out set with a slide gone from the folder is not shown, and none of its other slides shows as a loose slide",
-             got[:2] == canva_names and not [n for n in got if " - slide " in n] and sub == CANVA_LINE + ALSO_LINE, (got, sub))
+             got[:2] == canva_names and not [n for n in got if " - slide " in n] and is_set(got, sub, listing(canva_names + names1 + ["my own picture.jpg"]), 1), (got, sub))
         shutil.move(str(out_of_the_way / set3[1]), str(car / set3[1]))      # and puts it back
         code, out = run(env, "kit.py", "page", kit_name)
         got, sub, sec = shown()
-        case("put back, the set is shown whole again", got == set3, got)
+        case("put back, the set is shown whole again", is_set(got, sub, set3, 1), (got, sub))
         case("at the end nothing that was ever in the Carousel folder has changed or gone", nothing_changed() == [], nothing_changed())
         run(env, "design.py", "took", kit_name)
 
@@ -413,7 +423,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
         r2 = json.loads(rec2_file.read_text(encoding="utf-8"))
         got2, sub2, sec2 = shown(K2)
         case("a kit with no laid-out set: a new order writes no carousel_set into its record, and its page reads as before",
-             code == 0 and "carousel_set" not in r2 and "laid_out" not in r2 and sub2 == PLAIN_LINE and sorted(got2) == sorted(plain_names(kit2)), (sorted(r2), sub2))
+             code == 0 and "carousel_set" not in r2 and "laid_out" not in r2 and is_set(got2, sub2, listing(plain_names(kit2))), (sorted(r2), sub2))
     finally:
         srv.stop()
 
@@ -427,7 +437,7 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
          'design.py open "<kit>"' in part and 'design.py took "<kit folder>"' in part and "| design |" in part)
     case("parts/arrange.md says the words on a slide are the photographer's and nothing made earlier is replaced",
          "never invent" in part.lower() and "nothing made earlier is replaced" in part.lower())
-    for name, needle in (("where-things-live.md", "design-templates"), ("canva.md", "laid out"), ("post-kit.md", LAY_OUT)):
+    for name, needle in (("where-things-live.md", "design-templates"), ("canva.md", "laid out"), ("post-kit.md", "Design my carousel")):
         text = (SCRIPTS.parent / "parts" / name).read_text(encoding="utf-8")
         case(f"parts/{name} mentions the designer's side of things ({needle!r})", needle in text)
 
@@ -476,23 +486,23 @@ def check_wire_browser(case, work, port, make_kit, Server, run, ask, post, get_j
             # ---- the kit page ----
             c.open(f"{base}/content/{KQ}/Post%20kit.html")
             c.wait_for("document.body.classList.contains('live')", 10)
-            car_imgs = ("Array.from(document.querySelectorAll('section.piece')).filter(function(s){return s.querySelector('h2').textContent.indexOf('Carousel')===0})[0]"
-                        ".querySelectorAll('.strip img')")
+            car_imgs = "document.querySelectorAll(\"a.piece[data-piece='carousel'] .strip img\")"
             try:
                 c.wait_for(f"Array.from({car_imgs}).every(function(i){{return i.complete}})", 15)
             except cd.Timeout:
                 pass
             sizes = json.loads(c.js(f"JSON.stringify(Array.from({car_imgs}).map(function(i){{return [i.naturalWidth, i.naturalHeight]}}))"))
-            case("kit page, in a browser: the Carousel section shows the saved set and every one of its pictures really loads (1080 by 1350)",
-                 len(sizes) == N and all(x == [1080, 1350] for x in sizes), sizes)
-            sub = c.js("Array.from(document.querySelectorAll('section.piece')).filter(function(s){return s.querySelector('h2').textContent.indexOf('Carousel')===0})[0].querySelector('.sub').textContent")
-            case("kit page, in a browser: the line names the set exactly as it was saved", f"saved as \u201c{NAME}\u201d" in sub, sub)
-            # the Stories section has a link of its own to the stories designer (v19 stage c2); this one is the carousel's
-            sel = "a.arr[href^='/design.html']:not([href*='kind=stories'])"
-            case("kit page, in a browser: the Stories section links to the stories designer (her \"Make my stories →\")",
-                 c.js("(function(){var a=document.querySelector(\"a.arr[href*='kind=stories']\"); return !!a && a.closest('section').querySelector('h2').textContent.indexOf('Stories')===0 && a.textContent})()") == "Make my stories \u2192")
-            case("kit page, in a browser: 'Lay out the slides' is showing in the Carousel section, beside 'Change the photos'",
-                 c.count(sel) == 1 and c.text(sel) == LAY_OUT and c.js(f"(function(){{var a=document.querySelector(\"{sel}\"), s=a.closest('section'); return s.querySelector('h2').textContent.indexOf('Carousel')===0 && !!a.previousElementSibling && a.previousElementSibling.textContent==='Change the photos' && a.getBoundingClientRect().width>40}})()") is True)
+            case("kit page, in a browser: the Carousel card shows the saved set (her first six) and every one of its pictures really loads (1080 by 1350)",
+                 len(sizes) == min(N, SHOWN_MOST) and all(x == [1080, 1350] for x in sizes), sizes)
+            sub = c.js("document.querySelector(\"a.piece[data-piece='carousel'] .status\").textContent")
+            case("kit page, in a browser: the card counts the set as it was saved", sub == status_line(N, 1), sub)
+            # the Stories card is a link of its own to the stories designer (v19 stage c2); this one is the carousel's
+            sel = "a.piece[data-piece='carousel']"
+            case("kit page, in a browser: the Stories card links to the stories designer (her \"Make my stories →\")",
+                 c.js("(function(){var a=document.querySelector(\"a.piece[data-piece='stories']\"); return !!a && a.getAttribute('href').indexOf('kind=stories')>0 && a.querySelector('.cta').textContent})()") == "Make my stories \u2192")
+            case("kit page, in a browser: the Carousel card says her 'Open my carousel →' and links to the designer",
+                 c.count(sel) == 1 and c.text(sel + " .cta") == "Open my carousel \u2192" and c.js(f"document.querySelector(\"{sel}\").getAttribute('href')") == f"/design.html?kit={KQ}")
+            sel = sel + " h2"
             c.click(sel)
             c.wait_for("location.pathname === '/design.html' && window.Designer && Designer.st && Designer.S", 20, tell="location.href")
             case("kit page: pressing it opens the designer for that shoot", c.js("location.pathname + location.search").startswith(f"/design.html?kit={KQ}") and c.js("Designer.KIT") == kit_name, c.js("location.href"))
@@ -501,10 +511,10 @@ def check_wire_browser(case, work, port, make_kit, Server, run, ask, post, get_j
             # the same press does trip this check when a folder IS asked for: the folder's own button, on the kit page
             c.open(f"{base}/content/{KQ}/Post%20kit.html")
             c.wait_for("document.body.classList.contains('live')", 10)
-            c.click("button.go[data-sub='Carousel']")
+            c.click("button.go[data-sub='']")
             c.wait_for("JSON.parse(sessionStorage.getItem('__opens') || '[]').length === 1", 5)
-            case("(the check does see a request to open a folder: the folder's own button makes exactly one, and it never leaves the page)",
-                 opens() == [f"/open?kit={KQ}&sub=Carousel"] and asked_open() == [], (opens(), asked_open()))
+            case("(the check does see a request to open a folder: the kit folder's own button makes exactly one, and it never leaves the page)",
+                 opens() == [f"/open?kit={KQ}&sub="] and asked_open() == [], (opens(), asked_open()))
             c.js("sessionStorage.removeItem('__opens')")
 
             # ---- the carousel picker's Done line ----
@@ -551,7 +561,7 @@ def check_wire_browser(case, work, port, make_kit, Server, run, ask, post, get_j
                  (cs.get("kind"), cs.get("base"), sent("/design-commit") - commits_before))
             code, h, data = ask(P, "GET", f"/content/{KQ}/Post%20kit.html")
             sec, srcs, sub = _carousel_section(data.decode("utf-8", "replace"))
-            case("designer page: ...and the kit page shows that set again and says so", len(srcs) == N and f"saved as \u201c{NAME}\u201d" in sub, sub)
+            case("designer page: ...and the kit page shows that set again and counts it", len(srcs) == min(N, SHOWN_MOST) and sub == status_line(N, 1), sub)
             case("designer page: nothing on the page threw an error", not c.page_errors(), c.page_errors())
             # at a phone's width the Done line still fits
             c.phone(390, 844)

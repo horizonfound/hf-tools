@@ -474,10 +474,11 @@ def check_stories_server(case, work, port, make_kit, Server, post, get_json, ask
         code, outp = run(env, "kit.py", "page", kit_name) if False else (0, "")
         kit_mod.write_page(kit)
         kpage = (kit / ".kit" / "Post kit.html").read_text(encoding="utf-8")
-        sect = kpage[kpage.index("<h2>Stories"):]
-        case("the kit page's Stories section shows the saved set, names it, and has her \"Open my stories →\" link to the stories designer",
-             "Fake beach stories - 01.jpg" in sect and "Story 01 (" not in sect.split("</div>")[2] and "saved as \u201cFake beach stories\u201d" in sect
-             and f"href='/design.html?kit={quote(kit_name)}&amp;kind=stories'>Open my stories \u2192</a>" in sect, sect[:700])
+        m = re.search(r"<a class='piece' data-piece='stories' href='([^']*)'>(.*?)</a>", kpage, re.S)
+        href, sect = (m.group(1), m.group(2)) if m else ("", "")
+        case("the kit page's Stories card (her post kit) shows the saved set, counts it, and is her \"Open my stories →\" link to the stories designer",
+             all(f"Stories/{n}" in sect for n in names) and "Story 01 (" not in sect and "3 stories saved in the Stories folder \u00b7 1 saved design" in sect
+             and href == f"/design.html?kit={quote(kit_name)}&amp;kind=stories" and "<span class='cta'>Open my stories &rarr;</span>" in sect, sect[:700])
         code, outw = run(env, "home.py", "pending")
         case("the line for Claude: ARRANGED: <kit> | stories | 3 stories | Fake beach stories", "ARRANGED: 2026-11-01 Fake beach | stories | 3 stories | Fake beach stories" in outw, outw[-300:])
         code, outt = run(env, "design.py", "took", kit_name)

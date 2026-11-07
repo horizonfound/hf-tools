@@ -712,7 +712,7 @@ function render(S){
  pinned.forEach(x=>g.appendChild(real(x)));   // Instagram keeps pinned posts at the top; new posts land after them
  const nextId=S.greens[0]&&S.greens[0].id;   // first in line: the next post
  greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine'+(x.id===nextId?' next':'');t.dataset.id=x.id;
-  t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind==='reel'?'&#9654;&#xFE0E; Reel':'&#10697; Carousel'}</span><span class="d">${x.id===nextId?'Next up · ':''}${nice(x.date)}</span>`;g.appendChild(t)});
+  t.innerHTML=(x.thumb?`<img src="${x.thumb}" alt="">`:'')+`<span class="k">${x.kind==='reel'?'&#9654;&#xFE0E; Reel':x.kind==='single'?'&#9634;&#xFE0E; Single post':'&#10697; Carousel'}</span><span class="d">${x.id===nextId?'Next up · ':''}${nice(x.date)}</span>`;g.appendChild(t)});
  if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
@@ -1158,7 +1158,8 @@ class Handler(SimpleHTTPRequestHandler):
         # computers); a path compare also ignores upper and lower case and the kind of slash on a PC
         if kd and content in kd.parents and kd.is_dir():
             if sub == "CapCut":
-                ok, words = open_capcut(kit_mod.load_rec(kd))
+                # her words on both pages (decision 24); the kit page's own button now goes through /reel-capcut
+                ok, words = open_capcut(kit_mod.load_rec(kd), ok_words=_capcut().OPEN_WORDS)
                 target = None
             elif sub == "":
                 target = kd
@@ -1216,6 +1217,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not ok:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
+        if parts[1] == "Post kit.html":
+            return self.serve_kit_page(parts[0])
         content = h / posts.CONTENT_NAME
         kit = content / parts[0]
         f = kit.joinpath(*parts[1:])
@@ -1236,6 +1239,37 @@ class Handler(SimpleHTTPRequestHandler):
         data = f.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def serve_kit_page(self, name):
+        """The kit page, built from the kit's records and folders on every request (kit.build_page: Nicole's three
+        cards), so it always shows what is made now. The kit is found only by its exact name in Your Content's own
+        listing (arrange.kit_by_name: a real folder, not a link, holding a kit record). When it can't be reached
+        (the drive unplugged, or no such kit) her page says so, with her one line, and the answer is "not found".
+        Should the page fail to build, the copy kit.py last saved is sent instead."""
+        import arrange
+        import kit as kit_mod
+        kit = arrange.kit_by_name(name)
+        body, code = None, HTTPStatus.OK
+        if kit is None:
+            body, code = kit_mod.unreachable_html(), HTTPStatus.NOT_FOUND
+        else:
+            try:
+                body, need = kit_mod.build_page(kit)
+                if need:
+                    arrange.start_previews(kit)        # a reel photo on the card has no small copy yet: made in the background
+            except Exception as e:  # noqa: BLE001
+                say(f"kit page: couldn't build {name!r} ({e.__class__.__name__}: {str(e)[:160]}); sending the saved copy")
+                try:
+                    body = kit_mod.page_path(kit).read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    body, code = kit_mod.unreachable_html(), HTTPStatus.NOT_FOUND
+        data = body.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()

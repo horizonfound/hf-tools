@@ -147,12 +147,13 @@ def check_wide_kit(s):
     # 2. the kit page
     code, out = s.cmd("kit.py", "page", str(k))
     page = (k / ".kit" / "Post kit.html").read_text(encoding="utf-8") if (k / ".kit" / "Post kit.html").is_file() else ""
-    case("2. the kit page's reel link shows before Claude has picked, in her words", code == 0
-         and "<a class='arr' href='/reel.html?kit=%s'>Create my reel →</a>" % WIDE_KIT.replace(" ", "%20") in page, out[-200:])
-    case("2. the line beside it points at that link, not at the chat",
-         "Not made yet. Press Create my reel to pick your song and make it." in page and "Say “make the reel” to Claude" not in page)
-    case("2. no 'The cover is in the Covers folder' on a kit with no Covers folder",
-         "The cover is in the Covers folder" not in page and not (k / "Covers").exists())
+    case("2. the kit page's Reel card (her post kit) links to the reel page before Claude has picked, in her words", code == 0
+         and "<a class='piece' data-piece='reel' href='/reel.html?kit=%s'>" % WIDE_KIT.replace(" ", "%20") in page
+         and "<span class='cta'>Create my reel &rarr;</span>" in page, out[-200:])
+    case("2. with her line for a shoot not picked yet, and nothing pointing at the chat",
+         "Your assistant hasn&#x27;t picked the reel photos yet. Click to pick them yourself." in page and "Say “make the reel” to Claude" not in page)
+    case("2. no Covers folder named on a kit with no Covers folder",
+         "data-sub='Covers'" not in page and "The reel cover" not in page and not (k / "Covers").exists())
     # 4. a chat reel after the numbers were re-made under the list the page left in .kit/reels
     left = k / ".kit" / "reels" / "photos.json"
     case("(the page's make left its list in .kit/reels)", left.is_file())

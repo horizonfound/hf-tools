@@ -988,7 +988,8 @@ def state_for_page(kit, piece):
         "dropped": list(p.get("dropped_nums") or []) or [0] * len(p.get("dropped") or []),
         "limits": LIMITS[piece], "previews": {"made": made, "of": len(rows)}, "job": job_for_page(kit, piece),
         "reel_made": bool(rec.get("reel")), "canva": kit_mod.canva_behind(rec),
-        "kit_page": kit_mod.rec_path(kit).with_name("Post kit.html").is_file(),
+        # the kit page is built on every request from the kit's record (v19 stage d), so every kit has one
+        "kit_page": kit_mod.rec_path(kit).is_file(),
     }
 
 

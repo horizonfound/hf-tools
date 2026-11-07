@@ -8,9 +8,9 @@ What it checks, on a pretend kit it makes itself (tests/fake_kit.py; nothing of 
     the vibe in the chat; the reel picker is no longer what they open; post-kit.md no longer makes the reel in
     the same breath as the kit (decision 14); the core table sends "pick my reel photos" to parts/arrange.md;
     nothing anywhere still says Longer and Quicker count with one vibe only;
-  * the kit page: its reel "Change the photos" goes to the reel page (kit.REEL_DOOR, decision 3), the carousel's
-    still to the carousel's picker, and the old reel picker still answers when asked for by name;
-  * in a HIDDEN Chrome: pressing the reel's "Change the photos" on the kit page opens the reel page, and a fresh
+  * the kit page (her three cards since stage d): the Reel card goes to the reel page (kit.REEL_DOOR, decision 3), the
+    Carousel card to the designer, and the old reel picker and the carousel's picker still answer when asked by name;
+  * in a HIDDEN Chrome: pressing the Reel card on the kit page opens the reel page, and a fresh
     pick from the chat (kit.py picks --reel) shows on that open page by itself;
   * reel_page.py show (the order, the song, the vibe) and reel_page.py make (Claude's own Make my reel): it stops
     when no song is picked on the page, a dry run makes nothing, a real one makes one CapCut project in a pretend
@@ -104,15 +104,20 @@ def check_links(s):
     case("kit.py page writes the kit page", code == 0, out[-300:])
     code, _, raw = s.http("GET", "/content/%s/Post%%20kit.html" % KQ)
     page = raw.decode("utf-8", "replace")
-    found = re.findall(r"<a class='arr' href='([^']+)'>(Change the photos|Create my reel →|Make a new version →)</a>", page)
-    links = [h for h, _ in found]
-    case("the kit page has the reel's link in the Reel section and 'Change the photos' in the Carousel section", code == 200 and len(links) == 2, (code, found))
-    case("the reel's link says her words: 'Create my reel →' before a reel is made (v19 review: not 'Change the photos')",
-         [w for _, w in found][:1] == ["Create my reel →"] and [w for _, w in found][1:] == ["Change the photos"], found)
-    case("...and the line beside it points at that link, not at the chat",
-         "Not made yet. Press Create my reel to pick your song and make it." in page and "Say “make the reel” to Claude" not in page)
-    case("the Reel section's link goes to the reel page", links[:1] == ["/reel.html?kit=" + KQ], links)
-    case("the Carousel section's link still goes to the carousel's picker", links[1:] == ["/arrange.html?kit=%s&amp;piece=carousel" % KQ], links)
+    # her post kit (v19 stage d): three cards, each a link to its page
+    found = re.findall(r"<a class='piece' data-piece='(\w+)' href='([^']+)'>", page)
+    links = [h for p_, h in found if p_ == "reel"]
+    case("the kit page has her three cards, Reel, Carousel and Stories, each a link", code == 200 and [p_ for p_, _ in found] == ["reel", "carousel", "stories"], (code, found))
+    reel_card = page[page.index("data-piece='reel'"):page.index("data-piece='carousel'")] if len(found) == 3 else ""
+    case("the Reel card says her words: 'Create my reel →' before a reel is made (v19 review: not 'Change the photos')",
+         "<span class='cta'>Create my reel &rarr;</span>" in reel_card and "Change the photos" not in page, reel_card[:300])
+    case("...with her 'Not made yet' under it, and nothing pointing at the chat",
+         "<span class='dot no'></span>Not made yet</div>" in reel_card and "Say “make the reel” to Claude" not in page)
+    case("the Reel card goes to the reel page", links[:1] == ["/reel.html?kit=" + KQ], links)
+    case("the Carousel card goes to the designer (her post kit), not to the carousel's picker",
+         [h for p_, h in found if p_ == "carousel"] == ["/design.html?kit=" + KQ], found)
+    code_c, _, raw_c = s.http("GET", "/arrange.html?kit=%s&piece=carousel" % KQ)
+    case("the carousel's picker still answers when asked for by name", code_c == 200 and b"data-piece='carousel'" in raw_c, code_c)
     code, _, raw = s.http("GET", html.unescape(links[0])) if links else (0, None, b"")
     case("the reel page answers at that address with her step 2", code == 200 and "Put your photos in order" in raw.decode("utf-8", "replace"), code)
     code, _, raw = s.http("GET", "/arrange.html?kit=%s&piece=reel" % KQ)
@@ -128,10 +133,10 @@ def check_links(s):
 def check_browser(c, s):
     c.open(s.url("/content/%s/Post%%20kit.html" % KQ))
     c.wait_for("document.body.classList.contains('live')", 10)
-    sel = "a.arr[href^='/reel.html']"
-    case("in a browser: the Reel section's 'Create my reel' is showing", c.count(sel) == 1 and c.text(sel) == "Create my reel →"
-         and c.js("(function(){var a=document.querySelector(\"%s\"); return a.closest('section').querySelector('h2').textContent.indexOf('Reel')===0 && a.getBoundingClientRect().width>40})()" % sel) is True)
-    c.click(sel)
+    sel = "a.piece[data-piece='reel']"
+    case("in a browser: the Reel card with her 'Create my reel →' is showing", c.count(sel) == 1 and c.text(sel + " .cta") == "Create my reel →"
+         and c.js("(function(){var a=document.querySelector(\"%s\"); return a.querySelector('h2').textContent.indexOf('Reel')===0 && a.getAttribute('href').indexOf('/reel.html')===0 && a.getBoundingClientRect().width>40})()" % sel) is True)
+    c.click(sel + " .cta")
     try:
         c.wait_for("location.pathname === '/reel.html' && document.querySelector('h1') && document.querySelectorAll('#reel .tile').length > 0", 20)
         went = True

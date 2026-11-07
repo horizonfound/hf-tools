@@ -2059,15 +2059,19 @@ def check_carousel(work, port):
         case("home.py pending prints the ARRANGED line for the carousel", code == 0 and out.strip().splitlines()[-1] == want_line, out[-200:])
         code, h, data = ask(P, "GET", f"/content/{KQ}/Post%20kit.html")
         kit_page = data.decode()
-        case("the kit page was written again: it shows the new slides and none of the earlier ones", code == 200 and all(n in kit_page for n in wanted) and not any(n in kit_page for n in aside), [n for n in aside if n in kit_page])
-        links = re.findall(r"<a class='arr' href='([^']+)'>(?:Change the photos|Create my reel →|Make a new version →)</a>", kit_page)
-        case("the kit page has the reel's link in the Reel section (the reel page, decision 3; her 'Create my reel') and 'Change the photos' in the Carousel section", links == [f"/reel.html?kit={KQ}", f"/arrange.html?kit={KQ}&amp;piece=carousel"], links)
-        tags = re.findall(r"<a [^>]*>(?:Change the photos|Create my reel →|Make a new version →)</a>", kit_page)
-        case("those are plain links of class 'arr', never 'go' (every 'go' button asks for a folder to be opened)", len(tags) == 2 and all("class='arr'" in t and "go" not in t.split("href")[0] and "data-sub" not in t for t in tags) and "body:not(.live) .arr{display:none}" in kit_page, tags)
-        code, h, data = ask(P, "GET", html.unescape(links[1])) if len(links) == 2 else (0, {}, b"")
-        case("the Carousel section's link opens the carousel's picker", code == 200 and b"data-piece='carousel'" in data, code)
+        shown_all = sorted(wanted + EXTRA, key=lambda n: ("(Canva)" not in n, n))     # her card: Canva's first, then by name
+        case("the kit page shows the new slides (her first six of the folder's, then '+N') and none of the earlier ones",
+             code == 200 and all(n in kit_page for n in shown_all[:6]) and (len(shown_all) <= 6 or f"<span class='more'>+{len(shown_all) - 6}</span>" in kit_page)
+             and f"{len(shown_all)} slides saved in the Carousel folder" in kit_page and not any(n in kit_page for n in aside), [n for n in aside if n in kit_page])
+        # her post kit (v19 stage d): three cards you click into; the carousel's picker has no door on it any more
+        links = re.findall(r"<a class='piece' data-piece='(?:reel|carousel)' href='([^']+)'>", kit_page)
+        case("the kit page's Reel card goes to the reel page (decision 3) and its Carousel card to the designer (her post kit)", links == [f"/reel.html?kit={KQ}", f"/design.html?kit={KQ}"], links)
+        case("the cards are plain links, never a 'go' button (every 'go' button asks for a folder to be opened)",
+             len(links) == 2 and not re.search(r"<a class='piece'[^>]*data-sub", kit_page))
+        code, h, data = ask(P, "GET", f"/arrange.html?kit={KQ}&piece=carousel")
+        case("the carousel's picker still opens when asked for by name", code == 200 and b"data-piece='carousel'" in data, code)
         code, h, data = ask(P, "GET", html.unescape(links[0])) if len(links) == 2 else (0, {}, b"")
-        case("the Reel section's link opens the reel page (her reel maker)", code == 200 and "Put your photos in order".encode() in data, code)
+        case("the Reel card opens the reel page (her reel maker)", code == 200 and "Put your photos in order".encode() in data, code)
         opened = tree_print(kit)
         case("opening the reel page added only its own lock to the kit (an empty file every writer of its record holds)",
              sorted(set(opened) - set(after)) == [".kit/reel-page.lock"] and all(opened[k] == v for k, v in after.items()), sorted(set(opened) ^ set(after)))
@@ -2728,7 +2732,7 @@ def check_carousel_fixes(work, port):
         code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
         kept = json.loads(words_file.read_text(encoding="utf-8")) if words_file.exists() else {}
         case("words: hashtags handed over as a list are saved as one line, not a crash", code == 0 and kept.get("hashtags") == "#harbor #windy" and "Traceback" not in out, (code, out[-200:]))
-        case("words: the captions file and the kit page both show them", "#harbor #windy" in text_of(captions) and "<p>#harbor #windy</p>" in text_of(page_file))
+        case("words: the captions file and the kit page both show them", "#harbor #windy" in text_of(captions) and "<p class='t'>#harbor #windy</p>" in text_of(page_file))
         was = words_file.read_bytes() if words_file.exists() else b""
         given.write_text(json.dumps({"hooks": ["One"], "caption": 7}), encoding="utf-8")
         code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
@@ -2739,7 +2743,7 @@ def check_carousel_fixes(work, port):
         # a words file an earlier version saved with the list in it (this check's own kit): every later page still works
         words_file.write_text(json.dumps(dict(kept, hashtags=["#older", "#list"], stories="One line"), indent=1), encoding="utf-8")
         code, out = run(env, "kit.py", "page", kit_name)
-        case("words: a words file already saved with a list in it no longer stops the kit page", code == 0 and "<p>#older #list</p>" in text_of(page_file) and "Traceback" not in out, (code, out[-200:]))
+        case("words: a words file already saved with a list in it no longer stops the kit page", code == 0 and "<p class='t'>#older #list</p>" in text_of(page_file) and "Traceback" not in out, (code, out[-200:]))
         code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1[::-1])))
         code2, out2 = run(env, "kit.py", "build", kit_name)
         case("words: nor kit.py build after a new order", code == 0 and code2 == 0 and "Traceback" not in out2, (code, code2, out2[-200:]))

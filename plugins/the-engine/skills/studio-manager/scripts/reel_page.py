@@ -31,7 +31,8 @@ Routes, all on the posting server (posting_queue.py hands them here):
   POST /reel-open                {kit, what: "music"}: makes <kit>/Music if it isn't there and opens it (finder.py)
   POST /reel-make                {kit, stamp, picks, song, vibe, test}: Make my reel; answers with a job to ask after
   GET  /reel-job?kit=&id=        how that job is going: queued, running, done (her lines) or problem (her words)
-  POST /reel-capcut              {kit}: Open CapCut (capcut.py's own open), in her words (capcut.OPEN_WORDS)
+  POST /reel-capcut              {kit, from?}: Open CapCut (capcut.py's own open), in her words (capcut.OPEN_WORDS);
+                                 "from": "kit" is the post kit's Reel card (her "Open in CapCut" button)
 Small copies of the photos are arrange.py's (/kit-photo, .kit/previews), the same the pickers use.
 
 Records:
@@ -81,6 +82,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, quote
 
@@ -94,6 +96,7 @@ import brand  # noqa: E402
 this_computer.utf8_output()
 
 # ---------- the defaults, each in one place (PLAN section 2) ----------
+KIT_OPEN_CAPCUT = "Open in CapCut"   # her post kit's button (pages/post-kit.html); the reel page's is WORDS["open_capcut"]
 MAX_PICKS = 40          # decision 23: her server keeps 40 (and quietly drops the rest); ours says so
 DRAG_OUT = False        # decision 22: hers. Only the x or a tap below takes a photo out, never a drag down
 REV_CHECK = True        # decision 21: two windows on one reel page: a save from a page that hadn't seen the newest is refused
@@ -647,7 +650,8 @@ def state(kit):
     return {
         "ok": True,
         "short": short_name(kit.name),
-        "kit_page": kit_mod.rec_path(kit).with_name("Post kit.html").is_file(),
+        # the kit page is built on every request from the kit's record (v19 stage d), so every kit has one
+        "kit_page": kit_mod.rec_path(kit).is_file(),
         "stamp": stamp, "rev": int(rec.get("rev") or 0), "total": len(rows),
         "photos": photos, "previews": {"made": made, "of": len(rows)},
         "claude": claude_order(kit, rec_kit, on_sheet),
@@ -674,6 +678,17 @@ def _for_page(saved, on_sheet):
     return out
 
 
+def _order_used(saved, claude):
+    """The order Make my reel uses, as [{n, h}]: their own when they chose "I'll drag them in myself", otherwise
+    Claude's newest, with the Longer / Quicker they set on the same photos (her followClaude)."""
+    saved = saved or {}
+    if saved.get("mine") or (not claude and saved.get("picks")):
+        return list(saved.get("picks") or [])
+    if isinstance(saved.get("picks"), list) and [x["n"] for x in saved["picks"]] == [x["n"] for x in claude]:
+        return list(saved["picks"])
+    return list(claude)
+
+
 def current_picks(kit):
     """The order Make my reel uses when it is not handed one by the page, as reel.py reads it ("19,4,10+,14-"):
     their own when they chose "I'll drag them in myself", otherwise Claude's newest, with the Longer / Quicker
@@ -681,15 +696,56 @@ def current_picks(kit):
     st = state(kit)
     if st is None:
         return ""
-    saved = st["saved"] or {}
-    claude = st["claude"]
-    if saved.get("mine") or (not claude and saved.get("picks")):
-        lst = saved.get("picks") or []
-    elif isinstance(saved.get("picks"), list) and [x["n"] for x in saved["picks"]] == [x["n"] for x in claude]:
-        lst = saved["picks"]
-    else:
-        lst = claude
-    return ",".join(f"{x['n']}{x.get('h') or ''}" for x in lst)
+    return ",".join(f"{x['n']}{x.get('h') or ''}" for x in _order_used(st["saved"], st["claude"]))
+
+
+def order_for_kit_page(kit, rows=None, rec_kit=None):
+    """The reel's photos in the order Make my reel would use (_order_used), for the post kit's Reel card (her
+    kit_summary's reel_order). Reads only: nothing is saved and no lock is taken, so showing the kit page never
+    changes the record. A record saved against an earlier numbered list is read the way sync() would bring it in
+    line (each photo found again by its file name), in memory only. [] when the numbered list can't be read."""
+    rows = arrange.sheet_rows(kit) if rows is None else rows
+    if not rows:
+        return []
+    rec = load(kit)
+    saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
+    stamp = arrange.sheet_stamp(kit)
+    if saved and rec.get("stamp") and stamp and rec.get("stamp") != stamp:
+        n_of = {}
+        for x in rows:
+            n_of.setdefault(arrange.photo_name(x), x["n"])
+        saved = dict(saved)
+        for key in ("picks", "mine_picks"):
+            if isinstance(saved.get(key), list):
+                saved[key] = _refind(saved[key], rec.get("names") or {}, n_of)
+    on_sheet = {x["n"] for x in rows}
+    return _order_used(_for_page(saved, on_sheet), claude_order(kit, rec_kit, on_sheet))
+
+
+def _when_of(iso):
+    try:
+        return datetime.fromisoformat(str(iso)).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def newest_project(kit, rec_kit=None):
+    """The CapCut project of the newest reel of this kit, or None: the newest made from the reel page (its record's
+    "made") or from the chat (kit.json "reel", which the page's own makes write too), whichever was made later.
+    Hers (server.py kit_summary) takes the page's first; the chat's is newer only when it was made after it."""
+    rec_kit = rec_kit if rec_kit is not None else kit_mod.load_rec(kit)
+    made = [m for m in (load(kit).get("made") or []) if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]]
+    page = made[-1] if made else None
+    chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
+    if not (isinstance(chat.get("project"), str) and chat["project"]):
+        return page["project"] if page else None
+    if not page:
+        return chat["project"]
+    try:
+        page_when = float(page.get("when") or 0)
+    except (TypeError, ValueError):
+        page_when = 0.0
+    return chat["project"] if _when_of(chat.get("made")) > page_when + 1 else page["project"]
 
 
 # ---------- checking what a page sends ----------
@@ -2149,23 +2205,24 @@ def open_music(body):
 
 
 def open_capcut_for_page(body):
-    """POST /reel-capcut {kit}: starts CapCut (posting_queue.open_capcut, through capcut.py's own open) and says
+    """POST /reel-capcut {kit, from?}: starts CapCut (posting_queue.open_capcut, through capcut.py's own open) and says
     her words (decision 24, capcut.OPEN_WORDS)."""
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
-    if set(body) - {"kit"}:
+    if set(body) - {"kit", "from"} or body.get("from", "reel") not in ("reel", "kit"):
         return _bad()
+    # "from": "kit" is the post kit's Reel card, whose button is her "Open in CapCut" (the reel page's is "Open CapCut")
+    button = KIT_OPEN_CAPCUT if body.get("from") == "kit" else WORDS["open_capcut"]
     with arrange.locked(lock_path(kit)):
-        made = [m for m in (load(kit).get("made") or []) if isinstance(m, dict) and m.get("project")]
-    project = made[-1]["project"] if made else (kit_mod.load_rec(kit).get("reel") or {}).get("project")
+        project = newest_project(kit)
     words = _reel_module("capcut").OPEN_WORDS
     if os.environ.get(TEST_CAPCUT):
         arrange.log("reel page (test): would open CapCut")
         return 200, {"ok": True, "words": words}
     import posting_queue
     ok, said = posting_queue.open_capcut({"reel": {"project": project}} if project else {}, ok_words=words,
-                                         button=WORDS["open_capcut"])
+                                         button=button)
     return 200, {"ok": bool(ok), "words": said}
 
 
