@@ -1437,17 +1437,25 @@ def build(kit):
                 vals += [Path(rec["night"]).as_posix(), rec["shoot_id"]]
             # --shoot only with a name: Windows PowerShell 5.1 drops an empty "" when it starts a program, which
             # would leave --shoot with nothing after it (reel.py treats no --shoot and an empty one the same)
-            say("Reel: run reel.py make with these picks: " + _pc_arg(reel_picks_text(rec))
+            say(REEL_LINE + _pc_arg(reel_picks_text(rec))
                 + f" --folder {_pc_arg(vals[0])}" + (f" --shoot {_pc_arg(vals[1])}" if vals[1] else "")
                 + (f" --night {_pc_arg(vals[2])} --shoot-id {_pc_arg(vals[3])}" if rec.get("night") else "")
                 + (" (one of these has an apostrophe and also a $, a backtick, a backslash or a quote mark in it, so "
                    "it is written here the PowerShell way; in Git Bash, quote it as on a Mac: parts/on-a-pc.md)"
                    if any(_pc_both_ways(v) for v in vals) else ""))
         else:
-            say("Reel: run reel.py make with these picks: " + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
+            say(REEL_LINE + reel_picks_text(rec) + f" --folder \"{photos_dir(kit, rec)}\" --shoot \"{rec.get('name')}\""
                 + (f" --night \"{rec['night']}\" --shoot-id {rec['shoot_id']}" if rec.get("night") else ""))
     write_page(kit)
     return 0
+
+
+# The line kit.py build hands Claude about the reel (decision 14, Nicole's post kit: one piece at a time). The reel is
+# made on the reel page, where the photographer picks the song and the vibe and presses Make my reel; the command
+# after it is only for when the page can't be used (parts/arrange.md, "The reel's page"). Until v19 the line began
+# "Reel: run reel.py make with these picks: ", which read as "make it now".
+REEL_LINE = ("Reel: the pick is saved; the reel is made on the reel page (parts/arrange.md, \"The reel's page\"), not "
+             "here. Only when the page can't be used: reel.py make with these picks: ")
 
 
 def note_reel(kit, project_name, picks=None, picks_text=None):

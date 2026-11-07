@@ -297,7 +297,7 @@ if (SCENARIO === 'preparing') {
   check('photos that left the shoot are named in a line', text('l-dropped') === '2 photos are no longer in this shoot, so they were taken out.' && !byId('l-dropped').hidden, text('l-dropped'));
   check('a tile with no copy yet has no picture', !poolTile(5).querySelector('img') && !rowTile(1).querySelector('img') && !rowTile(1).classList.contains('cantread'));
   check('no link to a kit page that is not there', byId('kitlink').hidden);
-  check('a reel that was already made, its new order still waiting for Claude: the other saved line', text('doneline').indexOf('I\u2019ll make a new reel in this order. The one already in CapCut stays as it is.') > 0, text('doneline'));
+  check('a reel that was already made, its new order still waiting for Claude: the other saved line', text('doneline').indexOf('I\u2019ll put this order on the reel page, where you can make a new reel. The one already in CapCut stays as it is.') > 0, text('doneline'));
   layout(10); cc = centre(poolTile(5)); press(poolTile(5), cc[0], cc[1]); release(cc[0], cc[1]);
   var bp = byId('big').querySelector('.pic');
   check('the big view of a photo whose copy is not made yet says it is being got ready, not that it can\u2019t be read', byId('big').classList.contains('on') && bp.classList.contains('notyet') && !bp.classList.contains('cantread') && !bp.querySelector('img').getAttribute('src'));
@@ -815,7 +815,7 @@ check('before the button is pressed there is no line under it', text('doneline')
 clickButton(byId('happy'));
 check('the final button sends the unsaved change and done together', lastPost().done === true && eq(lastPost().nums, [1, 6, 11, 21]), JSON.stringify(lastPost()));
 settle();
-check('only then does the line under the button appear', text('doneline').indexOf('Go back to the chat and say') > 0 && text('doneline').indexOf('which song') > 0 && text('status') === 'Saved', text('doneline'));
+check('only then does the line under the button appear', text('doneline').indexOf('Go back to the chat and say') > 0 && text('doneline').indexOf('on the reel page, where you add your song') > 0 && text('status') === 'Saved', text('doneline'));
 check('the Assistant recorded it', SERVER.st.happy && SERVER.st.happy.rev === SERVER.st.rev);
 check('the reel\u2019s line has no folder button and no Canva line beside it (those are the carousel\u2019s)', byId('openfolder').hidden && byId('canvaline').hidden && SERVER.opens.length === 0);
 check('the reel\u2019s line has no Lay out the slides link (that is the carousel\u2019s)', byId('layout').hidden);
@@ -1492,7 +1492,7 @@ def check_server(work, port, photos):
 
         # the cover is made once; so the record must stay true of it when the opener changes
         code, out = run(env, "kit.py", "build", kit_name)
-        case("kit.py build makes the pieces, and its reel line carries the picks", code == 0 and (kit / "Covers" / "Reel cover.jpg").is_file() and "Reel: run reel.py make with these picks: " + ",".join(map(str, pick)) + " --folder" in out, out[-300:])
+        case("kit.py build makes the pieces, and its reel line carries the picks", code == 0 and (kit / "Covers" / "Reel cover.jpg").is_file() and "Reel: the pick is saved; the reel is made on the reel page" in out and "reel.py make with these picks: " + ",".join(map(str, pick)) + " --folder" in out, out[-300:])
         # ---- the kit page's own address serves the kit page and its pieces, and nothing else ----
         code, h, data = ask(P, "GET", f"/content/{KQ}/Post%20kit.html")
         case("the kit page still opens", code == 200 and b"Post kit" in data and h.get("content-type", "").startswith("text/html"), code)

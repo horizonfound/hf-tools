@@ -392,8 +392,10 @@ PICKER_JS = r"""
       help: 'Your reel, in the order it plays. Drag a photo to move it. Drag one up from below to add it. Click any photo to see it big.',
       legend: 'Under each photo: how long it stays on screen. Normal, Longer or Quicker. Longer stays on screen about twice as long. Quicker gets the shortest time, one beat.',
       few: 'A reel needs at least 2 photos.', full: 'A reel holds up to 60 photos. Take one out first.',
-      done: 'Saved. Go back to the chat and say “done”, and I’ll ask which song to cut it to.',
-      doneAgain: 'Saved. Go back to the chat and say “done”, and I’ll make a new reel in this order. The one already in CapCut stays as it is.'
+      // v19: the reel page took this picker's place (decision 3); after "done" the order goes onto the reel page,
+      // where the song and the vibe are picked (parts/arrange.md). Until v19: "I’ll ask which song to cut it to."
+      done: 'Saved. Go back to the chat and say “done”, and I’ll put this order on the reel page, where you add your song and make the reel.',
+      doneAgain: 'Saved. Go back to the chat and say “done”, and I’ll put this order on the reel page, where you can make a new reel. The one already in CapCut stays as it is.'
     },
     carousel: {
       label: 'Carousel', thing: 'carousel', rowname: 'Your carousel',

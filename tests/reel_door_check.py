@@ -82,7 +82,7 @@ def check_words():
     case("parts/arrange.md: no reel step waits on 'Go with these?' before a song question", "Next I'll ask which song" not in arr and "Go with these?" not in arr)
     case("parts/post-kit.md: the reel is not made as part of the kit (decision 14)",
          "Then the reel through the reel skill" not in kit_part and "reel.py make" not in kit_part and "**The reel is not made here**" in kit_part)
-    row = next((ln for ln in core.splitlines() if "`parts/arrange.md`" in ln and ln.startswith("|")), "")
+    row = next((ln for ln in core.splitlines() if "`parts/arrange.md`" in ln and ln.startswith("|") and '"pick my reel photos for <shoot>"' in ln), "")
     case("the core table sends 'pick my reel photos for <shoot>' to parts/arrange.md", '"pick my reel photos for <shoot>"' in row, row[:200])
     stale = []
     for p in PLUGIN.rglob("*"):

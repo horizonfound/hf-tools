@@ -11,7 +11,8 @@ It never posts anything and never changes an original.
 | **hi** | It says where things stand and opens its home page beside the chat. |
 | **backup now** | Copies a memory card to your drive, checks every file, sorts and names the shoots, picks six sneak peeks, and leaves a report. |
 | **make my posts** | Turns a folder of finished photos into a post kit: single posts, a carousel, stories, a reel cover, and captions written from what you tell it. |
-| **make a reel** | Lays your picks on the beat of your song as a CapCut project for you to style and export. |
+| **make a reel** | Picks the photos and opens the reel page beside the chat: add your song, pick the vibe, press Make my reel, and the photos land on the beat as a CapCut project for you to style and export. |
+| **make my stories** | Opens the stories designer: your photos in layouts, your own words, saved as Instagram stories. |
 | **what's in my queue** | The shoots you still have to edit, and when each is due. |
 | **show my posting queue** | What's ready to post and how your grid will look. |
 

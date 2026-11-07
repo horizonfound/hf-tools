@@ -430,7 +430,8 @@ def check_wire(case, work, port, make_kit, Server, post, get_json, ask, run, tre
     # ---------- the instructions lead a fresh reader to the right command ----------
     skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
     part = (SCRIPTS.parent / "parts" / "arrange.md").read_text(encoding="utf-8")
-    row = next((ln for ln in skill.splitlines() if ln.startswith("|") and "parts/arrange.md" in ln), "")
+    # the row that has the phrase (v19 split the one long row by piece: the reel's row is the first to name parts/arrange.md)
+    row = next((ln for ln in skill.splitlines() if ln.startswith("|") and "parts/arrange.md" in ln and '"lay out my carousel"' in ln), "")
     case("SKILL.md's table sends 'lay out my carousel', 'design my carousel' and 'add text to my slides' to parts/arrange.md",
          all(p in row for p in ('"lay out my carousel"', '"design my carousel"', '"add text to my slides"')), row[:200])
     case("parts/arrange.md gives the command that opens the designer, and the one that clears its line",
