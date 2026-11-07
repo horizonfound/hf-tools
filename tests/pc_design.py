@@ -49,6 +49,11 @@ in plain Python (one flat grey each), so it runs on a Mac's own Python 3.9 and o
  12. the real page server (posting_queue.py serve) on a scratch port: every refusal of every designer route
      leaves every file byte for byte as it was and gives no path away; the plugin's own font is served as a font;
      then one save through the server, whose commit the server starts itself.
+ 13. the stories designer (kind "stories"), its machinery as a PC runs it: what the page is given (no path, a
+     story's size, the handle), one stories design a shoot, a story's looks kept, a carousel's slide refused as a
+     story, a set of 1080 x 1920 stories saved into the Stories folder under names this computer takes (an accent, an
+     emoji, a word Windows keeps), byte for byte, the kit's record and kit.stories_shown, "(2)" for a second set,
+     and on a PC the 260-character limit said in a story's words.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
 printed), and cleared away when everything passed.
 """
@@ -1118,6 +1123,60 @@ def server_checks(kit):
     check("the page server is stopped", srv.poll() is not None)
 
 
+def stories_checks(kit):
+    st = design.state_for_page(kit, kind="stories")
+    check("stories: the page is given the shoot's one stories design, empty, white, 1080 x 1920", bool(st) and st["design"]["state"] == {"slides": 1, "bg": "#ffffff", "blocks": []}
+          and st["limits"]["h"] == 1920 and st["kind"] == "stories", st and st.get("design"))
+    ok, bad = no_path(st)
+    check("stories: no path, no backslash and nothing of the scratch folder in what the page is given", ok, bad)
+    check("stories: the preview's name is \"yourname\" (no handle known)", st["handle"] == "yourname")
+    code, out = design.new_design(kit, kind="stories")
+    check("stories: a second stories design is refused", code == 409 and out.get("why") == "one", (code, out))
+    did = st["design"]["id"]
+    d = design.load_design(kit, did, "stories")
+    state = {"slides": 3, "bg": "#ffffff", "blocks": [
+        {"id": 1, "n": 1, "x": 0, "y": 0, "w": 1080, "h": 1920, "ox": 0.5, "oy": 0.5, "zoom": 1},
+        {"id": 2, "type": "text", "text": "Zoë’s day 🌊", "font": "Figtree", "size": 72, "weight": 700, "italic": False, "upper": False, "al": "center",
+         "ls": 0, "lh": 1.3, "color": "#111111", "x": 130, "y": 806.4, "w": 820, "h": 93.6, "look": "box", "boxColor": "#ffffff"}]}
+    body = {"kit": kit.name, "kind": "stories", "design": did, "page": PAGE, "base": d["rev"], "stamp": arrange.sheet_stamp(kit), "state": state, "name": "CON"}
+    code, out = design.save_from_page(body)
+    check("stories: a story's layout and a name Windows keeps for itself are saved; its text keeps its look", code == 200
+          and design.load_design(kit, did, "stories")["state"]["blocks"][1]["look"] == "box", (code, out))
+    d = design.load_design(kit, did, "stories")
+    tok = token()
+    code, out = design.stage_slide(kit, did, tok, 1, 3, jpeg(1080, 1350, level=3, note="a carousel slide"), "stories")
+    check("stories: a carousel's 1080 x 1350 slide is refused as a story", code == 400, (code, out))
+    sent = [jpeg(1080, 1920, level=i * 4, note=f"story {i}") for i in (1, 2, 3)]
+    codes = [design.stage_slide(kit, did, tok, i, 3, data, "stories")[0] for i, data in enumerate(sent, 1)]
+    res = design.commit(kit, did, tok, d["rev"], kind="stories")
+    base = res.get("base") or ""
+    folder = kit / "Stories"
+    listed = {unicodedata.normalize("NFC", n) for n in os.listdir(folder)} if folder.is_dir() else set()
+    names = [design.STORY_SET_NAME.format(base=base, i=i) for i in (1, 2, 3)]
+    check("stories: the set goes into the Stories folder under a name this computer takes (\"CON\" made safe), byte for byte",
+          codes == [200] * 3 and res["state"] == "done" and base == tc.safe_name("CON", limit=80) and all(unicodedata.normalize("NFC", n) in listed for n in names)
+          and all(file_sha(folder / n) == sha(x) for n, x in zip(names, sent)), (codes, res, sorted(listed)[:6]))
+    rec = kit_mod.load_rec(kit)
+    shown = kit_mod.stories_shown(kit)
+    check("stories: the kit's record names the set, and kit.stories_shown shows it", rec.get("stories_set", {}).get("base") == base and [p.name for p in shown["files"]] == names
+          and "carousel_set" not in rec, (rec.get("stories_set"), shown))
+    jfiles = list(design.sets_dir(kit, "stories").glob("*.json"))
+    check("stories: the save's record holds no path and no backslash", jfiles and all("\\" not in f.read_text(encoding="utf-8") and str(work) not in f.read_text(encoding="utf-8") for f in jfiles))
+    code, out = design.save_from_page(dict(body, base=design.load_design(kit, did, "stories")["rev"], state=dict(state, bg="#111111")))
+    d = design.load_design(kit, did, "stories")
+    tok = token()
+    for i, data in enumerate(sent, 1):
+        design.stage_slide(kit, did, tok, i, 3, data, "stories")
+    res2 = design.commit(kit, did, tok, d["rev"], kind="stories")
+    check("stories: a second set after a change is \"<name> (2)\", and the first is untouched", res2.get("base") == base + " (2)"
+          and all(file_sha(folder / n) == sha(x) for n, x in zip(names, sent)), res2)
+    if not WINDOWS:
+        check("stories: a Mac has no length limit for a story either", design.cant_save(kit, "L" * 80, kind="stories") is None)
+    else:
+        cant = design.cant_save(kit, "L" * 80, kind="stories")
+        check("stories: on a PC a long name is measured in the Stories folder, said in a story's words (or fits)", cant is None or ("stor" in cant[1] and "slide" not in cant[1]), cant)
+
+
 def part(name, fn, *args):
     """One part; a fault in it FAILs here and never stops the parts after it."""
     print(f"\n-- {name}", flush=True)
@@ -1141,6 +1200,7 @@ part("9: two saves at the same moment, from two processes", race_checks, make_ki
 part("10: the locks across programs", lock_checks, make_kit("2026-11-07 Locks"))
 part("11: how long a path may be on a PC", long_checks, KIT)
 part("12: the real page server: refusals change nothing, a save goes through", server_checks, make_kit("2026-11-08 Server"))
+part("13: the stories designer", stories_checks, make_kit("2026-11-09 Zoë’s stories 🌊"))
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))

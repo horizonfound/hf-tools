@@ -1005,6 +1005,8 @@ def waiting():
 
 def waiting_line(w):
     n = w.get("count") or 0
+    if w["piece"] == "stories":         # stories saved from the stories designer (design.py, kind "stories")
+        return f"ARRANGED: {w['kit']} | stories | {n} {'story' if n == 1 else 'stories'}" + (f" | {w['base']}" if w.get("base") else "")
     return (f"ARRANGED: {w['kit']} | {w['piece']} | {n} {'slide' if w['piece'] == 'design' else 'photo'}{'s' if n != 1 else ''}"
             + (f" | {w['base']}" if w.get("base") else ""))      # a set of laid-out slides is named, last
 

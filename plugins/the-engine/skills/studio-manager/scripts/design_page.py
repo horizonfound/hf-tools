@@ -35,6 +35,7 @@ Assistant sends with the state (design.GOOGLE_CSS): no address on the internet i
 Nothing that matters is kept in the browser: every change is saved to the kit by POST /design.
 """
 import html
+import json
 import sys
 from pathlib import Path
 
@@ -190,6 +191,21 @@ body.d-dragging,body.d-dragging *{user-select:none!important;-webkit-user-select
 .d-lift .pic img{display:block;width:100%;height:100%;object-fit:cover}
 .d-lift .say{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;white-space:nowrap;background:var(--ink);color:#fff;font:600 12.5px/1 var(--sans);padding:6px 10px;border-radius:8px;display:none}
 .d-lift .say.on{display:block}
+/* the Carousel / Stories switch beside the page's name, and the way back to the post kit (hers, v19) */
+.kindnav{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}
+.kindnav a{font:600 12.5px/1.2 var(--sans);text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:3px 11px;letter-spacing:0;text-transform:none}
+.kindnav a.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.bar .kitlink .arr{margin-right:.35em}
+/* stories (the same designer in 9:16): a solid line between two stories, and the bands where Instagram's own
+   buttons sit, drawn over the strip only (never in a saved story) */
+.seam.story{border-left:3px solid var(--panel)}
+.safe{position:absolute;left:0;background:rgba(220,60,60,.10);border-color:rgba(220,60,60,.55);border-style:dashed;border-width:0;pointer-events:none;z-index:9001;display:flex;align-items:center;justify-content:center;color:rgba(160,40,40,.85);font-weight:600;overflow:hidden;white-space:nowrap}
+.blk.words .bx2{position:absolute;pointer-events:none}
+.st-only-line{font-size:12.5px;color:var(--soft)}
+/* a story's text has two more groups (Look, Remove this story): one more row is held for them, so selecting text
+   never moves the strip there either */
+@media(min-width:768px){body[data-kind=stories] .selbar{min-height:calc(var(--row) * 4 + 40px)}}
+@media(min-width:1024px){body[data-kind=stories] .selbar{min-height:calc(var(--row) * 3 + 36px)}}
 """
 
 # The page starts only when every part is on it.
@@ -239,6 +255,25 @@ GO_BACK = "Go back"
 OPEN_CAROUSEL = "Open the Carousel folder"
 
 
+# The stories designer's own words (Nicole's v19 page, ?kind=stories). Its "slide" words become "story" ones
+# (decision 20), so the screen never names a button or a slide that is not there.
+STORY_TITLE = "Stories designer"
+STORY_TAB = "Stories Designer"
+STORY_LEDE = ("Each box is one Instagram story (9:16). Behind the scenes, a sneak peek, a few favorites: make them here "
+              "instead of on your phone. The red bands show where Instagram's own buttons sit, so keep your words out of them.")
+STORY_PREVIEW = "Preview"
+STORY_BANDS = "Show Instagram's buttons"
+SAVE_STORIES = "Save stories"
+OPEN_STORIES = "Open the Stories folder"
+KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
+KIND_NAV = (("carousel", "Carousel"), ("stories", "Stories"))
+
+
+def _story(s):
+    import design
+    return design.story_words(s)
+
+
 def plain_page(words):
     """A small page for when there is nothing to design: the words, and the way back home."""
     return arrange_page.plain_page(words)
@@ -253,16 +288,25 @@ def _shell(title, body_attrs, inner, scripts=""):
             + inner + scripts + "</body></html>")
 
 
-def page_html(kit_name):
-    """The designer for one shoot. Everything else arrives by /design-state."""
-    attrs = " data-kit='" + html.escape(kit_name, quote=True) + "'"
+def page_html(kit_name, kind="carousel"):
+    """The designer for one shoot (kind "stories": the stories designer). Everything else arrives by /design-state."""
+    import design
+    from urllib.parse import quote
+    story = kind == design.STORIES
+    attrs = " data-kit='" + html.escape(kit_name, quote=True) + "'" + (" data-kind='stories'" if story else "")
+    U = _story if story else (lambda x: x)
+    title = STORY_TITLE if story else "Carousel designer"
+    lede = STORY_LEDE if story else LEDE
+    nav = "".join("<a href='/design.html?kit=" + html.escape(quote(kit_name), quote=True) + ("&amp;kind=stories" if k == "stories" else "")
+                  + "'" + (" class='on' aria-current='page'" if (k == "stories") == story else "") + ">" + html.escape(w) + "</a>"
+                  for k, w in KIND_NAV)
     swatches = "".join(
         "<button class='sw' type='button' data-c='" + c + "' style='background:" + c + "' aria-label='" + name + "' title='" + name + "'></button>"
         for name, c in SWATCHES)
     inner = (
-        "<a class='kitlink' id='kitlink' hidden>Back to the post kit</a></div>"
-        "<header class='head'><span class='eyebrow'>Carousel designer</span><h1 id='title'></h1>"
-        "<p class='lede'>" + html.escape(LEDE) + "</p>"
+        "<a class='kitlink' id='kitlink' hidden><span class='arr' aria-hidden='true'>&larr;</span>" + html.escape(KIT_BACK) + "</a></div>"
+        "<header class='head'><span class='eyebrow'>" + html.escape(title) + "<span class='kindnav' id='kindnav'>" + nav + "</span></span><h1 id='title'></h1>"
+        "<p class='lede'>" + html.escape(lede) + "</p>"
         "<p class='topline' id='l-reach' hidden></p><p class='topline' id='l-missing' hidden></p><p class='topline' id='l-dropped' hidden></p>"
         "</header>"
         # The top row: the shoot and the open design. The scripts put the shoot menu before #g-design, a box to
@@ -276,14 +320,14 @@ def page_html(kit_name):
         # brand colors (put beside Background) and + Add text (before Size) are there. Preview swipe and Save
         # slides are in the bar at the bottom of the window.
         "<div class='d-tools' id='tools-main'>"
-        "<div class='group' id='g-slides'><span class='lbl'>Slides</span>"
-        "<button class='tb' id='slides-minus' type='button' aria-label='One fewer slide'>&minus;</button><b id='slides-count'></b>"
-        "<button class='tb' id='slides-plus' type='button' aria-label='One more slide'>+</button></div>"
+        "<div class='group' id='g-slides'><span class='lbl'>" + U("Slides") + "</span>"
+        "<button class='tb' id='slides-minus' type='button' aria-label='" + U("One fewer slide") + "'>&minus;</button><b id='slides-count'></b>"
+        "<button class='tb' id='slides-plus' type='button' aria-label='" + U("One more slide") + "'>+</button></div>"
         "<div class='group' id='g-bg'><span class='lbl'>Background</span>" + swatches +
         "<input type='color' id='bgc' value='#ffffff' aria-label='Pick any background color' title='Pick any color'></div>"
         "<div class='group' id='g-view'><span class='lbl'>" + html.escape(VIEW) + "</span>"
-        "<input type='range' id='view-size' min='40' max='480' value='230' aria-label='" + html.escape(VIEW_LABEL, quote=True) + "' title='" + html.escape(VIEW_LABEL, quote=True) + "'></div>"
-        "<div class='group' id='g-snap'><label class='hint' title='" + html.escape(SNAP_TITLE, quote=True) + "'>"
+        "<input type='range' id='view-size' min='40' max='480' value='230' aria-label='" + html.escape(U(VIEW_LABEL), quote=True) + "' title='" + html.escape(U(VIEW_LABEL), quote=True) + "'></div>"
+        "<div class='group' id='g-snap'><label class='hint' title='" + html.escape(U(SNAP_TITLE), quote=True) + "'>"
         "<input type='checkbox' id='snap' checked aria-label='Snap into line'> Snap into line</label></div>"
         "<div class='group' id='g-undo'><button class='tb' id='undo' type='button' disabled>Undo</button></div>"
         "</div>"
@@ -301,7 +345,7 @@ def page_html(kit_name):
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
         "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span></div>"
-        "<p class='hint' id='trayhint'>" + html.escape(TRAY_HINT) + "</p>"
+        "<p class='hint' id='trayhint'>" + html.escape(U(TRAY_HINT)) + "</p>"
         "<div class='thumbs' id='thumbs'></div></section>"
         # The bar at the bottom of the window. Every line Save slides says, its two questions' buttons, and
         # "Open the Carousel folder" with the answer it brings, are here, beside the button that was pressed.
@@ -316,21 +360,29 @@ def page_html(kit_name):
         "<p class='d-note' id='d-trouble' role='status' hidden></p>"
         "<p class='d-note quiet' id='grid-line' hidden></p>"
         "</div><div class='sv-in'>"
-        "<button class='tb' id='preview-btn' type='button' disabled>" + html.escape(PREVIEW) + "</button>"
-        "<label class='hint'><input type='checkbox' id='gridcrop' aria-label='" + html.escape(GRID_CROP, quote=True) + "'> " + html.escape(GRID_CROP) + "</label>"
-        "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_SLIDES) + "</button>"
+        "<button class='tb' id='preview-btn' type='button' disabled>" + html.escape(STORY_PREVIEW if story else PREVIEW) + "</button>"
+        # stories: the same tick shows Instagram's buttons over every story instead, and is on to start with (hers)
+        + ("<label class='hint'><input type='checkbox' id='gridcrop' checked aria-label='" + html.escape(STORY_BANDS, quote=True) + "'> " + html.escape(STORY_BANDS) + "</label>"
+           if story else
+           "<label class='hint'><input type='checkbox' id='gridcrop' aria-label='" + html.escape(GRID_CROP, quote=True) + "'> " + html.escape(GRID_CROP) + "</label>")
+        + "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_STORIES if story else SAVE_SLIDES) + "</button>"
         "<span class='gline' id='save-line' role='status'></span>"
         "<button class='tb main sv-ans' id='save-yes' type='button' hidden>" + html.escape(SAVE_ANYWAY) + "</button>"
         "<button class='tb sv-ans' id='save-no' type='button' hidden>" + html.escape(GO_BACK) + "</button>"
         # the folder button and what pressing it brings: the answer is a small note right over the button,
         # so its coming never moves the button from under the pointer
-        "<span class='sv-open sv-ans' id='open-wrap' hidden><button class='tb' id='open-carousel' type='button'>" + html.escape(OPEN_CAROUSEL) + "</button>"
+        "<span class='sv-open sv-ans' id='open-wrap' hidden><button class='tb' id='open-carousel' type='button'>" + html.escape(OPEN_STORIES if story else OPEN_CAROUSEL) + "</button>"
         "<span class='sv-bub' id='open-line' role='status'></span></span>"
         "</div></div>"
         "</div>"
     )
-    scripts = "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + "<script>" + DESIGN_START_JS + "</script>"
-    return _shell(brand.title("Carousel designer"), attrs, inner, scripts)
+    # The numbers the scripts go by, before any of them runs: the size of one slide (a story: 1080 by 1920), how many
+    # there may be, and for a story where Instagram's own buttons sit. Plain numbers and words from design.py, never
+    # anything a page sent; "<" is written so that it can't end the script early.
+    limits = json.dumps(design.limits_for(kind), separators=(",", ":")).replace("<", "\\u003c")
+    scripts = ("<script>window.DESIGN_LIMITS=" + limits + ";</script>"
+               + "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + "<script>" + DESIGN_START_JS + "</script>")
+    return _shell(brand.title(STORY_TAB if story else "Carousel designer"), attrs, inner, scripts)
 
 
 if __name__ == "__main__":

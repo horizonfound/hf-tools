@@ -42,6 +42,9 @@ after the hand test of Nov 6, measured at four window sizes and two narrow ones:
 the selected thing that never moves the strip, the strip's starting size and the Size slider, the clip at the
 strip's edges, the sheets that never scroll the page behind, and the names a screen reader hears.
 
+A seventh part, tests/design_stories_check.py (--only stories runs just it: its page checks, its server checks on
+--port + 22 and its real page on --port + 24): the stories designer, the same page in a second shape (?kind=stories).
+
 Exit 0 when every case passes, 1 otherwise. When there is no Chrome the parts that drive the real page are
 skipped, and the last line says so: a run like that has not looked at the page.
 """
@@ -1187,13 +1190,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen", "layout"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "text", "designs", "wire", "fixes", "screen", "layout", "stories"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(the strip; text, fonts and brand colors; designs, templates and Save slides); text: only the text, fonts and "
                          "brand colors part of that; designs: only the designs, templates, preview and Save slides part (with its own page checks); "
                          "wire: only the kit page, the posting queue, the links and the line for Claude; fixes: what the first reviewers found (safety); "
                          "screen: what the second reviewers found (matching Nicole's, and what is on the screen); "
-                         "layout: the arrangement (the rows, the selection bar, the strip's size, the sheets, the names), measured at six window sizes")
+                         "layout: the arrangement (the rows, the selection bar, the strip's size, the sheets, the names), measured at six window sizes; "
+                         "stories: the stories designer (its words against Nicole's, its rules, its routes and saves, and its real page)")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1211,7 +1215,8 @@ def main():
         work.mkdir(parents=True, exist_ok=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
-    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout")):
+    if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout",
+                                         "stories", "stories-browser")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1234,6 +1239,7 @@ def main():
     import design_page_check
     import design_save_check
     import design_screen_check
+    import design_stories_check
     import design_text_check
     import design_wire_check
     have_chrome = bool(chrome_drive.find_chrome())
@@ -1247,6 +1253,8 @@ def main():
         design_text_check.check_type_page(case, work)
     if a.only in (None, "page", "designs"):
         design_save_check.check_designs_page(case, work)
+    if a.only in (None, "page", "stories"):
+        design_stories_check.check_stories_page(case, work)
     if a.only in (None, "server"):
         check_all(work, a.port)
     if a.only in (None, "server", "wire"):
@@ -1320,6 +1328,19 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of designs, templates and Save slides ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-600:]}")
+    if a.only in (None, "server", "stories"):
+        try:
+            design_stories_check.check_stories_server(case, work, a.port + 22, make_kit, Server, post, get_json, ask, run, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the checks of the stories designer's routes and saves ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "stories"):
+        real_page("the stories designer")
+        try:
+            design_stories_check.check_stories_browser(case, work, a.port + 24, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of the stories designer ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     bad = [n for n, ok in results if not ok]
     print()
     missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")

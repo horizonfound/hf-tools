@@ -28,6 +28,9 @@ Undo, and the places later parts add themselves:
     D.selbar.group(id, label, when) a new group in the bar for the selected thing; when(kind, block) -> shown?
     D.quiet.push(fn)                fn() true while a pop-up is open: the strip's keys are then left alone
     D.load(id)                      open another of this shoot's designs (saves the open one first)
+    D.STORY, D.KQ, D.storyWords     the stories designer (?kind=stories): true, '&kind=stories' for every route of
+                                    the designer, and the one way a part's words are said in a story's words
+                                    ("story" for "slide", the Stories folder: decision 20)
 
 Nothing that matters is kept in the browser: the layout is saved by POST /design about 0.7 s after a change
 (and at once when the page is hidden or left), one save at a time, with the counter the Assistant gave.
@@ -38,6 +41,9 @@ DESIGN_CORE_JS = r"""
   'use strict';
   var M = window.DesignModel;
   var KIT = document.body.dataset.kit, Q = 'kit=' + encodeURIComponent(KIT);
+  // The stories designer is this same page in a second shape (Nicole, v19). Its kind is in the limits the page was
+  // written with (DesignModel.KIND); every route of the designer is told it, so stories are kept apart.
+  var STORY = M.KIND === 'stories', KQ = STORY ? '&kind=stories' : '';
   var $ = function(id){ return document.getElementById(id); };
   var el = function(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -80,12 +86,34 @@ DESIGN_CORE_JS = r"""
     many: 'A design holds up to 80 photos and text boxes. Remove one first.',
     full: 'Every slide has a photo, and 20 slides is as many as Instagram allows. Drag this photo onto a frame to put it there instead.'
   };
+  // A part's words in a story's words: "slide" becomes "story", "slides" "stories", the Carousel folder the Stories
+  // folder, "+ New design" "+ Add stories". Strings are changed in place; a function's answer is changed as it is
+  // given. Only ever run in the stories designer, so a carousel's words are exactly as they were.
+  function storyText(s){
+    return String(s).replace(/\+ New design/g, '+ Add stories').replace(/Carousel folder/g, 'Stories folder')
+      .replace(/\bslides\b/g, 'stories').replace(/\bSlides\b/g, 'Stories').replace(/\bslide\b/g, 'story').replace(/\bSlide\b/g, 'Story');
+  }
+  function storyWords(table, own){
+    Object.keys(table).forEach(function(k){
+      if (own && Object.prototype.hasOwnProperty.call(own, k)) { table[k] = own[k]; return; }
+      var v = table[k];
+      if (typeof v === 'string') table[k] = storyText(v);
+      else if (typeof v === 'function') table[k] = (function(fn){ return function(){ var r = fn.apply(null, arguments); return typeof r === 'string' ? storyText(r) : r; }; })(v);
+    });
+    if (own) Object.keys(own).forEach(function(k){ if (!Object.prototype.hasOwnProperty.call(table, k)) table[k] = own[k]; });     // a story's own lines
+    return table;
+  }
+  if (STORY) storyWords(WORDS, {
+    max: 'A set holds up to 40 stories.',
+    full: 'Every story has a photo, and 40 stories is as many as a set holds. Drag this photo onto a frame to put it there instead.',
+    one: 'It\u2019s your only story, so it stays.'
+  });
   // a name this page gives itself, new on every load and kept nowhere: it lets the Assistant tell this
   // page's own save (whose answer never arrived) from a change made in another window
   var PAGE = (Math.random().toString(36).slice(2, 12) + Date.now().toString(36)).replace(/[^a-z0-9]/g, '');
 
   var D = window.Designer = {
-    M: M, KIT: KIT, Q: Q, WORDS: WORDS, $: $, el: el,
+    M: M, KIT: KIT, Q: Q, KQ: KQ, STORY: STORY, WORDS: WORDS, $: $, el: el, storyWords: function(t, own){ return STORY ? storyWords(t, own) : t; },
     S: null,              // the last whole answer from /design-state
     by: {},               // photo number -> its record
     design: null,         // the open design: {id, name, set, unfinished, dropped}
@@ -199,6 +227,7 @@ DESIGN_CORE_JS = r"""
   function settle(ok){ if (ok === false || (!saving && !dirty)) { var w = waiters; waiters = []; w.forEach(function(f){ f(ok !== false); }); } }
   function body(){
     var b = {kit: KIT, design: D.design.id, stamp: D.S.stamp, base: rev, page: PAGE, state: D.st};
+    if (STORY) b.kind = 'stories';
     D.save.fields.forEach(function(fn){ fn(b); });
     return b;
   }
@@ -317,7 +346,7 @@ DESIGN_CORE_JS = r"""
     D.sel = null; D.adjust = false; dirty = false;
     clearTimeout(timer); clearTimeout(retryT);
     // which design is open lives in the address, so a reload opens the same one
-    try { window.history.replaceState(null, '', '/design.html?' + Q + '&design=' + encodeURIComponent(d.id)); } catch (e) {}
+    try { window.history.replaceState(null, '', '/design.html?' + Q + (STORY ? KQ : '&design=' + encodeURIComponent(d.id))); } catch (e) {}
     $('d-name').textContent = d.name;
     D.emit('design', d);
     D.render();
@@ -337,7 +366,7 @@ DESIGN_CORE_JS = r"""
   }
   function wanted(){ var m = /[?&]design=([a-z0-9]{1,40})(?:&|$)/.exec(location.search); return m ? m[1] : ''; }
   function getState(id){
-    return fetch('/design-state?' + Q + (id ? '&design=' + encodeURIComponent(id) : ''), {cache: 'no-store'}).then(function(r){ return r.json(); });
+    return fetch('/design-state?' + Q + KQ + (id ? '&design=' + encodeURIComponent(id) : ''), {cache: 'no-store'}).then(function(r){ return r.json(); });
   }
   function start(){
     getState(wanted()).then(function(j){

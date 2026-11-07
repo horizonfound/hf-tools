@@ -105,6 +105,8 @@ What a PC can't read yet, and what to say:
 
 `parts/arrange.md` has the designer itself; this is what a PC changes. None of it has been seen on a real PC. [check on a PC]
 
+The stories designer (`--kind stories`) is the same page, and everything below applies to it in a story's words: "Open the Stories folder", "Couldn't save the stories: ...", and a story's name in the Stories folder held to the same 260 characters. Its Box and Neon looks are drawn by the browser itself, the same on a PC as on a Mac.
+
 - **The words.** "Open the Carousel folder" opens File Explorer, and its answer on the page says so ("Opened Carousel in File Explorer."). The key that turns "Snap into line" off for a moment is Alt (the page's own line says Alt on a PC). Undo is Ctrl+Z.
 - **The photos on the page** are small copies made with Pillow, the same add-on as everywhere else. If `design.py open` stops saying this PC needs an add-on first, answer it as "Pictures: one more free add-on" says above, then run it again.
 - **Fonts: nothing changes.** The five families the Assistant carries are served by the Assistant itself, the rest come from Google Fonts when the PC is online, and the plain serif that words fall back to (Georgia) is on every PC.

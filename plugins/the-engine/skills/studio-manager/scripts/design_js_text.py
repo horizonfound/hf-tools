@@ -35,12 +35,20 @@ For the next part (Save slides, templates):
                                          when nothing changes); boxes whose font is still loading are left
     Designer.type.fonts.ready(st, {retry}) -> promise of {ready: true, fellBack: ['Lobster', ...]}
     Designer.type.edit(patch, o)         change the selected text box (used by the brand colors)
+
+STORIES (the stories designer, Designer.STORY; hers, v19). A text box has a look: Plain, Box (a rounded box behind
+each line, its color the box color, the words black or white on it, padding 0.3 x the size, corners 0.22 x the size)
+or Neon (the words' color lightened 65% toward white, with a glow in that color at blurs of 0.06, 0.18 and 0.36 x the
+size). The Look group in the bar for a selected text box sets it; "Box color" shows while the look is Box. The screen
+and a saved story draw a look the same way (drawText). The font list starts with her story fonts, each shown as
+"<Instagram style> · <font>" ("Classic · Figtree"), and the font button says it the same way. A carousel's text has no
+look, and is drawn exactly as it was.
 """
 
 DESIGN_TEXT_JS = r"""
 (function(){
   'use strict';
-  var D = window.Designer, M = D.M, T = window.DesignType, $ = D.$, el = D.el;
+  var D = window.Designer, M = D.M, T = window.DesignType, $ = D.$, el = D.el, STORY = D.STORY;
 
   // Every line of words this part of the page says.
   var TW = D.WORDS.type = {
@@ -66,8 +74,11 @@ DESIGN_TEXT_JS = r"""
     // the line on the page when words are not in their own font
     offline: function(names){ return 'No internet right now, so ' + list(names) + (names.length === 1 ? ' is' : ' are') + ' showing as Georgia. ' + (names.length === 1 ? 'It' : 'They') + ' will come back when you’re online.'; },
     cantLoad: function(names){ return 'Couldn’t load ' + list(names) + ' from Google Fonts, so ' + (names.length === 1 ? 'it is' : 'they are') + ' showing as Georgia. Pick another font for that text.'; },
-    fallbackNow: function(names){ return 'Couldn’t load ' + list(names) + ' just now, so ' + (names.length === 1 ? 'it is' : 'they are') + ' showing as Georgia.'; }
+    fallbackNow: function(names){ return 'Couldn’t load ' + list(names) + ' just now, so ' + (names.length === 1 ? 'it is' : 'they are') + ' showing as Georgia.'; },
+    // a story's text (hers)
+    look: 'Look', plain: 'Plain', box: 'Box', neon: 'Neon', boxColor: 'Box color'
   };
+  D.storyWords(TW);
   function list(names){
     var q = names.map(function(n){ return '“' + n + '”'; });
     return q.length <= 1 ? q.join('') : q.slice(0, -1).join(', ') + ' and ' + q[q.length - 1];
@@ -89,6 +100,8 @@ DESIGN_TEXT_JS = r"""
   var MC = document.createElement('canvas').getContext('2d');
 
   function fontsOf(){ return (D.S && D.S.fonts) || {groups: [], yours: [], faces: []}; }
+  // a story font's Instagram style ("Classic" for Figtree), or ''
+  function nickOf(name){ var n = fontsOf().nicks || {}; return Object.prototype.hasOwnProperty.call(n, name) && typeof n[name] === 'string' ? n[name] : ''; }
   function learn(){
     info = {};
     (fontsOf().groups || []).forEach(function(g){ (g.fonts || []).forEach(function(f){ if (T.fontOk(f.name)) info[f.name] = {own: f.own === true, weights: typeof f.weights === 'string' ? f.weights : ''}; }); });
@@ -277,19 +290,44 @@ DESIGN_TEXT_JS = r"""
     return L;
   }
   function colorOf(b){ return /^#[0-9a-fA-F]{6}$/.test(b.color || '') ? b.color : T.RULES.fresh.dark; }
+  function boxOf(b){ return /^#[0-9a-fA-F]{6}$/.test(b.boxColor || '') ? b.boxColor : '#ffffff'; }
+  function lookOf(b){ return STORY && (b.look === 'box' || b.look === 'neon') ? b.look : 'plain'; }
   // Draw a text box on a canvas: the same lines, at the same places, as the screen shows. The canvas's left
-  // edge is strip x = offsetX (a slide's own left edge) and its top is strip y = offsetY (0).
+  // edge is strip x = offsetX (a slide's own left edge) and its top is strip y = offsetY (0). A story's Box look
+  // draws a rounded box behind each line first; its Neon look draws the words three times, once with each glow.
   function drawText(ctx, b, offsetX, offsetY){
-    var L = layoutOf(b), x0 = b.x - (offsetX || 0), y0 = b.y - (offsetY || 0);
+    var L = layoutOf(b), x0 = b.x - (offsetX || 0), y0 = b.y - (offsetY || 0), look = lookOf(b);
     ctx.save();
     likePage(ctx, b);
-    ctx.fillStyle = colorOf(b);
+    if (look === 'box') {
+      var pad = T.boxPad(b), r = Math.min(T.boxRad(b), L.lh / 2);
+      ctx.fillStyle = boxOf(b);
+      L.lines.forEach(function(ln, i){
+        if (!ln.t) return;
+        var x = x0 + ln.x - pad, y = y0 + i * L.lh, w = ln.w + 2 * pad, h = L.lh;
+        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.fill();
+      });
+    }
     ctx.textAlign = 'left';
     ctx.direction = 'ltr';
     ctx.textBaseline = L.base === null ? 'middle' : 'alphabetic';
-    L.lines.forEach(function(ln, i){
-      if (ln.t) ctx.fillText(ln.t, x0 + ln.x, y0 + i * L.lh + (L.base === null ? L.lh / 2 : L.base));
-    });
+    var words = function(){
+      L.lines.forEach(function(ln, i){
+        if (ln.t) ctx.fillText(ln.t, x0 + ln.x, y0 + i * L.lh + (L.base === null ? L.lh / 2 : L.base));
+      });
+    };
+    if (look === 'neon') {
+      // a canvas's glow is not made smaller with the drawing, so it is told how large one slide pixel is drawn
+      var sc = 1;
+      try { var m = ctx.getTransform(); sc = Math.sqrt(m.a * m.a + m.b * m.b) || 1; } catch (e) {}
+      ctx.fillStyle = T.lighten(colorOf(b), T.NEON.core); ctx.shadowColor = colorOf(b); ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+      T.NEON.blurs.slice().reverse().forEach(function(k){ ctx.shadowBlur = k * b.size * sc; words(); });
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = colorOf(b);
+      words();
+    }
     ctx.restore();
     return L;
   }
@@ -339,10 +377,21 @@ DESIGN_TEXT_JS = r"""
         if (!drawn.has(node)) inner.style.visibility = 'hidden';
         return;
       }
-      var L = layoutOf(b), key = T.sig(b) + '\u0001' + colorOf(b) + '\u0001' + epoch;
+      var look = lookOf(b);
+      var L = layoutOf(b), key = T.sig(b) + '\u0001' + colorOf(b) + '\u0001' + epoch + '\u0001' + look + '\u0001' + (look === 'box' ? boxOf(b) : '');
       if (drawn.get(node) !== key) {
         inner.textContent = '';
-        var font = T.fontString(b, b.size), color = colorOf(b);
+        var font = T.fontString(b, b.size), color = look === 'neon' ? T.lighten(colorOf(b), T.NEON.core) : colorOf(b);
+        // a story's Box look: a rounded box behind each line, drawn first so the words sit on it
+        if (look === 'box') L.lines.forEach(function(ln, i){
+          if (!ln.t) return;
+          var bx = el('div', 'bx2'), pad = T.boxPad(b);
+          bx.style.left = (ln.x - pad) + 'px'; bx.style.top = i * L.lh + 'px';
+          bx.style.width = (ln.w + 2 * pad) + 'px'; bx.style.height = L.lh + 'px';
+          bx.style.background = boxOf(b); bx.style.borderRadius = Math.min(T.boxRad(b), L.lh / 2) + 'px';
+          inner.appendChild(bx);
+        });
+        var glow = look === 'neon' ? T.NEON.blurs.map(function(k){ return '0 0 ' + (k * b.size) + 'px ' + colorOf(b); }).join(', ') : '';
         L.lines.forEach(function(ln, i){
           var e = el('div', 'tx-ln', ln.t);         // textContent: the words are never read as markup
           e.style.font = font;
@@ -350,6 +399,7 @@ DESIGN_TEXT_JS = r"""
           e.style.lineHeight = L.lh + 'px';
           e.style.letterSpacing = (b.ls || 0) + 'px';
           e.style.color = color;
+          if (glow) e.style.textShadow = glow;
           e.style.left = ln.x + 'px'; e.style.top = i * L.lh + 'px'; e.style.height = L.lh + 'px';
           inner.appendChild(e);
         });
@@ -473,6 +523,30 @@ DESIGN_TEXT_JS = r"""
   var lhR = slider('t-lh', TW.linesLabel, T.RULES.lhSlider[0], T.RULES.lhSlider[1]);
   pair(TW.lines, lhR);
 
+  // a story's text: Plain, Box, Neon, and the box's color while it is Box (hers)
+  var lookBtns = [], boxIn = null, boxLbl = null;
+  if (STORY) {
+    var g4 = D.selbar.group('sel-look', TW.look, isText);
+    [['plain', TW.plain], ['box', TW.box], ['neon', TW.neon]].forEach(function(x){
+      var b = el('button', 'tb', x[1]); b.type = 'button'; b.dataset.look = x[0]; g4.appendChild(b); lookBtns.push(b);
+    });
+    boxLbl = el('span', 'lbl', TW.boxColor); boxLbl.id = 'box-lbl'; g4.appendChild(boxLbl);
+    boxIn = el('input'); boxIn.type = 'color'; boxIn.id = 't-box'; boxIn.setAttribute('aria-label', TW.boxColor); boxIn.title = TW.boxColor;
+    g4.appendChild(boxIn);
+    // the order of the bar is hers: the text's groups, Look, then Remove this story, then the buttons for anything
+    var rows = $('selrows'), story = $('sel-story'), all = $('sel-all');
+    if (story && all && story.parentNode === rows) rows.insertBefore(story, all);
+    g4.addEventListener('click', function(e){
+      var bt = e.target.closest ? e.target.closest('button[data-look]') : null;
+      if (!bt || !selText()) return;
+      change('look', bt.dataset.look);
+    });
+    boxIn.addEventListener('pointerdown', function(){ arm('box'); });
+    boxIn.addEventListener('focus', function(){ arm('box'); });
+    boxIn.addEventListener('input', function(){ change('boxColor', boxIn.value, 'box'); });
+    boxIn.addEventListener('change', function(){ if (!change('boxColor', boxIn.value, 'box')) D.render(); });
+  }
+
   function setLimits(){
     ta.maxLength = T.RULES.textMax;
     sizeN.min = String(T.RULES.size[0]); sizeN.max = String(T.RULES.size[1]);
@@ -535,7 +609,14 @@ DESIGN_TEXT_JS = r"""
     setVal(lsR, M.clamp(Math.round(b.ls || 0), T.RULES.lsSlider[0], T.RULES.lsSlider[1]));
     setVal(lhR, M.clamp(Math.round(b.lh * 100), T.RULES.lhSlider[0], T.RULES.lhSlider[1]));
     setVal(colorIn, colorOf(b));
-    fontBtn.textContent = b.font + ' ▾';
+    var nick = STORY ? nickOf(b.font) : '';
+    fontBtn.textContent = (nick ? nick + ' · ' : '') + b.font + ' ▾';
+    if (STORY) {
+      var lk = lookOf(b);
+      lookBtns.forEach(function(x){ x.classList.toggle('on', x.dataset.look === lk); });
+      boxIn.hidden = boxLbl.hidden = lk !== 'box';
+      setVal(boxIn, boxOf(b));
+    }
     fontBtn.setAttribute('aria-label', TW.fontButton + ': ' + b.font);        // its words, and what the press does
     fontBtn.style.fontFamily = stateOf(b.font) === 'ok' ? T.familyString(b.font) : '';
     var bold = b.weight >= 700, can = hasBold(b.font) || bold;
@@ -587,13 +668,13 @@ DESIGN_TEXT_JS = r"""
     fontList.textContent = '';
     var groups = [{name: TW.yours, fonts: (F.yours || []).map(function(n){ return {name: n, own: false}; })}].concat(F.groups || []);
     groups.forEach(function(g){
-      var hits = (g.fonts || []).filter(function(f){ return T.fontOk(f.name) && (!q || f.name.toLowerCase().indexOf(q) >= 0); });
+      var hits = (g.fonts || []).filter(function(f){ return T.fontOk(f.name) && (!q || (f.name + ' ' + (f.nick || '')).toLowerCase().indexOf(q) >= 0); });
       if (!hits.length) return;
       fontList.appendChild(el('div', 'fp-grp', g.name));
       hits.forEach(function(f){
         if (f.name.toLowerCase() === q) exact = true;
         var bt = el('button', 'fp-it'); bt.type = 'button'; bt.dataset.font = f.name; bt.setAttribute('role', 'option');
-        bt.appendChild(el('span', 'fp-name', f.name));
+        bt.appendChild(el('span', 'fp-name', typeof f.nick === 'string' && f.nick ? f.nick + ' · ' + f.name : f.name));
         if (f.own === true) bt.appendChild(el('span', 'fp-tag', TW.ownTag));
         if (b && b.font === f.name) { bt.classList.add('cur'); bt.setAttribute('aria-selected', 'true'); }
         fontList.appendChild(bt);
@@ -683,7 +764,7 @@ DESIGN_TEXT_JS = r"""
     T: T, WORDS: TW,
     fontString: T.fontString, measure: measurer, layout: layoutOf, drawText: drawText, fit: fit, status: status,
     lines: function(b){ return layoutOf(b).lines.map(function(ln){ return ln.t; }); },
-    edit: edit, change: change, selected: selText, focusWords: focusWords,
+    edit: edit, change: change, selected: selText, focusWords: focusWords, look: lookOf,
     fonts: {want: want, state: stateOf, settled: settled, hasBold: hasBold, retry: function(){ if (retry()) bump(); }, ready: ready, fellBack: fellBack,
             reach: reach, net: function(){ return net; }, own: function(name){ return !!(info[name] && info[name].own); }}
   };

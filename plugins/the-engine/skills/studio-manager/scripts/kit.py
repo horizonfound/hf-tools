@@ -875,6 +875,40 @@ def carousel_files(kit, rec=None):
     return carousel_shown(kit, rec)["files"]
 
 
+# Decision 13: kit.py build keeps making the plain stories (one photo each, sized for a story) beside the ones they
+# lay out in the stories designer. False stops making them; nothing already made is touched either way.
+MAKE_PLAIN_STORIES = True
+
+
+def stories_shown(kit, rec=None):
+    """Which stories the kit page shows: the one rule, as carousel_shown is for the carousel. Reads only.
+    The Stories folder can hold the plain stories, Canva's and any number of sets saved from the stories designer
+    (design.py, kind "stories"), side by side; nothing in it is ever taken away to choose.
+      * the newest set saved from the designer (rec["stories_set"]), when every one of its files is in the
+        folder's own listing and no Canva story was fetched after it was saved: those files, in order;
+      * otherwise today's listing (every .jpg, Canva's first) without any file of any designer's set.
+    {"kind": "laid-out" | "listing", "files": [paths], "base": the set's name or "", "others": how many other
+     pictures are in the folder, "laid_out": how many designer stories are in the folder and not shown}"""
+    rec = rec if rec is not None else load_rec(kit)
+    folder = kit / "Stories"
+    have = _names(folder)
+    sets = [x for x in (rec.get("stories_laid_out") or []) if isinstance(x, dict)]
+    cs = rec.get("stories_set")
+    if isinstance(cs, dict) and cs.get("kind") == "laid-out":
+        sets = sets + [cs]
+    in_sets = {_nf(str(n)) for x in sets for n in (x.get("files") or [])}
+    listed = sorted((have[k] for k in have if k.lower().endswith(".jpg") and not k.startswith(".")),
+                    key=lambda n: ("(Canva)" not in n, n))
+    if isinstance(cs, dict) and cs.get("kind") == "laid-out" and cs.get("files"):
+        mine = [_nf(str(n)) for n in cs["files"]]
+        fetched = str(((rec.get("canva") or {}).get("fetched") or {}).get("Stories") or "")
+        if all(n in have for n in mine) and not (fetched and fetched > str(cs.get("shown") or cs.get("saved") or "")):
+            return {"kind": "laid-out", "files": [folder / have[n] for n in mine], "base": str(cs.get("base") or ""),
+                    "others": len([n for n in listed if _nf(n) not in set(mine)]), "laid_out": 0}
+    plain = [n for n in listed if _nf(n) not in in_sets]
+    return {"kind": "listing", "files": [folder / n for n in plain], "base": "", "others": 0, "laid_out": len(listed) - len(plain)}
+
+
 def canva_behind(rec):
     """Do this kit's Canva carousel slides show an earlier choice of photos than the plain slides do now?
     True only when a Canva carousel is on record AND the carousel has changed since it was made:
@@ -1348,7 +1382,7 @@ def build(kit):
               "stories": (lambda a, b: shape(a, b, STORY, "pad", PAD_DARK), "Story")}
     for key, (maker, prefix) in makers.items():
         ns = picks.get(key) or []
-        if not ns:
+        if not ns or (key == "stories" and not MAKE_PLAIN_STORIES):
             continue
         out = kit / key.capitalize()
         out.mkdir(exist_ok=True)
@@ -1660,6 +1694,21 @@ def reel_link_words(made):
         return "Change the photos"
     return (REEL_AGAIN if made else REEL_CREATE) + " \u2192"
 LAY_OUT_TITLE = "Put photos side by side, add your own words and colors, and save the finished slides."
+# The Stories section's link to the stories designer: Nicole's words from her post kit's Stories card (v19).
+STORIES_MAKE = "Make my stories \u2192"
+STORIES_OPEN = "Open my stories \u2192"
+
+
+def stories_line(shown, canva):
+    """The line under the Stories heading on the kit page: which stories it is showing, said truly."""
+    if shown["kind"] == "laid-out":
+        return (f"The stories you made in the stories designer, saved as \u201c{shown['base']}\u201d. They are in the Stories folder"
+                + (", and the other stories in that folder are all still there." if shown["others"] else "."))
+    line = ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva
+            else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle.")
+    if shown["laid_out"]:
+        line += " The stories you made in the stories designer are in that folder too."
+    return line
 
 
 def _src(name):
@@ -1724,6 +1773,7 @@ def write_page(kit):
     canva = rec.get("canva", {})
     can_arrange = (kit / ".kit" / "sheet.json").is_file()      # the page that moves photos needs the numbered list
     shown = carousel_shown(kit, rec)                            # which slides are the carousel today
+    stories = stories_shown(kit, rec)                           # which stories the page shows
 
     def sec(title, sub, ratio, body, wrds, folder, piece=None, arrange=None):
         has = (kit / folder).is_dir()
@@ -1732,8 +1782,12 @@ def write_page(kit):
             # The page where they lay the slides out themselves (design.py): a plain link of class 'arr' too,
             # never 'go'. It is put in first, so it sits after "Change the photos" and before the folder's button.
             btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}' title='{html.escape(LAY_OUT_TITLE, quote=True)}'>{html.escape(LAY_OUT)}</a> " + btn)
+        if arrange == "stories" and can_arrange:
+            # The stories designer (design.py, kind "stories"): the same kind of plain link, before the folder's button.
+            made_some = bool(rec.get("stories_set") or rec.get("stories_laid_out"))
+            btn = (f"<a class='arr' href='/design.html?kit={html.escape(quote(kit.name))}&amp;kind=stories'>{html.escape(STORIES_OPEN if made_some else STORIES_MAKE)}</a> " + btn)
         reel_page_door = arrange == "reel" and REEL_DOOR == "reel-page"
-        if arrange and can_arrange and ((rec.get("picks") or {}).get(arrange) or reel_page_door):
+        if arrange in ("reel", "carousel") and can_arrange and ((rec.get("picks") or {}).get(arrange) or reel_page_door):
             # A plain link to the page where they move the photos themselves. Its class is 'arr', never 'go':
             # every 'go' button asks the Assistant to open a folder in Finder (File Explorer on a PC). Shown only when the page is
             # served live (a saved copy has nowhere to go). The reel page's door shows before Claude has picked too:
@@ -1764,9 +1818,9 @@ def write_page(kit):
                            else "Cut on the beat, in CapCut."), "9:16", reel_html + strip("Covers", tall=True), hooks, "Covers", "cover", arrange="reel")
             + sec("Carousel", carousel_line(shown, bool(canva.get("carousel"))), "4:5", strip("Carousel", fs=shown["files"]), caption + tags, "Carousel", "carousel", arrange="carousel")
             + sec("Single posts", "Single photos sized for Instagram, in the Singles folder. On your profile grid Instagram shows only the middle of each one, so keep faces near the middle.", "4:5", strip("Singles"), short or caption or "", "Singles")
-            + sec("Stories", ("Made in Canva from your template, with your words on them; the plain ones are there too." if canva.get("stories") else "Photos sized for stories, in the Stories folder. Instagram puts its own buttons over the top and bottom, so the photo sits in the middle."), "9:16",
-                  strip("Stories", tall=True) + ("<p class='canva-links'>" + " ".join(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>Story {int(n)} in Canva</a>" for n, d in sorted((canva.get("stories") or {}).items(), key=lambda x: int(x[0])) if d.get("edit_url")) + "</p>" if canva.get("stories") else ""),
-                  story_lines or "<p class=empty>Not written yet.</p>", "Stories")
+            + sec("Stories", stories_line(stories, bool(canva.get("stories"))), "9:16",
+                  strip("Stories", tall=True, fs=stories["files"]) + ("<p class='canva-links'>" + " ".join(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>Story {int(n)} in Canva</a>" for n, d in sorted((canva.get("stories") or {}).items(), key=lambda x: int(x[0])) if d.get("edit_url")) + "</p>" if canva.get("stories") else ""),
+                  story_lines or "<p class=empty>Not written yet.</p>", "Stories", arrange="stories")
             + f"{lean}</div><div class='big' id='big'><img alt=''></div>"
             f"<script>{SCRIPT}</script></body></html>")
     tidy_own_files(kit)

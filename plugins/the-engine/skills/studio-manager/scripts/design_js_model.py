@@ -7,7 +7,9 @@ undo list, which made copy of a photo to draw from. Every function takes a layou
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
 
-A layout is {slides, bg, blocks}. Strip pixels: slide k spans x = k*1080 to (k+1)*1080, height 1350.
+A layout is {slides, bg, blocks}. Strip pixels: slide k spans x = k*1080 to (k+1)*1080, height 1350 (a story,
+in the stories designer: 1080 by 1920). The size comes from window.DESIGN_LIMITS, which design_page.py writes into
+the page from design.limits_for before any script runs; with none (the tests' own engine) it is a carousel's.
 A frame is {id, n | null, x, y, w, h, ox, oy, zoom}; a text box has type "text". STACKING IS LIST ORDER:
 the last block is on top. There is no z.
 """
@@ -15,7 +17,9 @@ the last block is on top. There is no z.
 DESIGN_MODEL_JS = r"""
 (function(root){
   'use strict';
-  var W = 1080, H = 1350;
+  var L0 = root && root.DESIGN_LIMITS ? root.DESIGN_LIMITS : null;
+  var W = L0 && L0.w > 0 ? L0.w : 1080, H = L0 && L0.h > 0 ? L0.h : 1350;
+  var KIND = L0 && L0.kind === 'stories' ? 'stories' : 'carousel';
   // Every number the designer goes by, in one place. The Assistant sends its own limits with the state
   // (useLimits); these are the same numbers, here so the rules can run with no page.
   var RULES = {
@@ -37,6 +41,7 @@ DESIGN_MODEL_JS = r"""
     // start[1] pixels tall
     view: {min: 40, max: 480, step: 1.25, few: 140, start: [230, 460]}
   };
+  if (L0 && L0.slides && L0.slides.length === 2) RULES.slides = [L0.slides[0], L0.slides[1]];
   function useLimits(l){
     if (!l) return;
     if (l.slides && l.slides.length === 2) RULES.slides = [l.slides[0], l.slides[1]];
@@ -262,6 +267,16 @@ DESIGN_MODEL_JS = r"""
     if (st.slides >= RULES.slides[1]) return {st: st, why: 'max'};
     return {st: merge(st, {slides: st.slides + 1})};
   }
+  // Stories: take out story k (from 0) and everything whose middle is on it; the stories after it move up (hers).
+  // At one story nothing changes: {st, why: 'one'}.
+  function removeStory(st, k){
+    if (st.slides <= 1) return {st: st, why: 'one'};
+    k = clamp(Math.floor(Number(k) || 0), 0, st.slides - 1);
+    var lo = k * W, hi = lo + W;
+    var blocks = st.blocks.filter(function(b){ return !(b.x + b.w / 2 >= lo && b.x + b.w / 2 < hi); })
+      .map(function(b){ return b.x >= hi ? merge(b, {x: r2(b.x - W)}) : b; });
+    return {st: withBlocks(st, blocks, {slides: st.slides - 1}), sel: null};
+  }
   function setBg(st, color){
     color = String(color || '').toLowerCase();
     if (!/^#[0-9a-f]{6}$/.test(color) || color === st.bg) return st;
@@ -384,7 +399,7 @@ DESIGN_MODEL_JS = r"""
   }
 
   root.DesignModel = {
-    W: W, H: H, RULES: RULES, useLimits: useLimits,
+    W: W, H: H, KIND: KIND, RULES: RULES, useLimits: useLimits, removeStory: removeStory,
     clamp: clamp, r2: r2, isText: isText, isFrame: isFrame, isHole: isHole, typeOf: typeOf, same: same, copy: copy,
     indexOf: indexOf, find: find, merge: merge, tidy: tidy, patch: patch, nextId: nextId,
     layoutImg: layoutImg, pan: pan, zoomTo: zoomTo, zoomBy: zoomBy,

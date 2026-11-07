@@ -30,7 +30,8 @@ which calls it, so the words break in the same places in both.
 DESIGN_TYPE_JS = r"""
 (function(root){
   'use strict';
-  var W = 1080, H = 1350;
+  var L0 = root && root.DESIGN_LIMITS ? root.DESIGN_LIMITS : null;      // the page's size (a story's: 1080 by 1920)
+  var W = L0 && L0.w > 0 ? L0.w : 1080, H = L0 && L0.h > 0 ? L0.h : 1350;
   var FONT = /^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
   var COLOR = /^#[0-9a-f]{6}$/;
   // Every number the words go by, in one place. The Assistant sends its own limits with the state (useLimits).
@@ -150,12 +151,20 @@ DESIGN_TYPE_JS = r"""
     if (!m) return false;
     return 0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16) < 128;
   }
-  // In the middle of a slide, a little above half way down; white words on a dark background.
+  // In the middle of a slide, a little above half way down; white words on a dark background. A story's new text
+  // (defaults from the Assistant: size, weight, line height, color, look, box color) starts the way hers does:
+  // Classic, bold, size 72, line height 1.3, black on a white box.
   function newText(id, slide, bg, defaults){
     var f = RULES.fresh, d = defaults || {};
-    return {id: id, type: 'text', text: typeof d.text === 'string' ? cleanText(d.text) : '', font: fontOk(d.font) ? d.font : RULES.fallback,
-            size: f.size, weight: 400, italic: false, upper: false, al: 'center', ls: 0, lh: f.lh, color: isDark(bg) ? f.light : f.dark,
-            x: slide * W + (W - f.w) / 2, y: r2(H * f.y), w: f.w, h: r2(f.size * f.lh)};
+    var size = Number(d.size) > 0 ? clamp(Number(d.size), RULES.size[0], RULES.size[1]) : f.size;
+    var lh = Number(d.lh) > 0 ? clamp(Number(d.lh), RULES.lh[0], RULES.lh[1]) : f.lh;
+    var b = {id: id, type: 'text', text: typeof d.text === 'string' ? cleanText(d.text) : '', font: fontOk(d.font) ? d.font : RULES.fallback,
+             size: size, weight: d.weight >= 700 ? 700 : 400, italic: false, upper: false, al: 'center', ls: 0, lh: lh,
+             color: COLOR.test(String(d.color || '').toLowerCase()) ? String(d.color).toLowerCase() : isDark(bg) ? f.light : f.dark,
+             x: slide * W + (W - f.w) / 2, y: r2(H * f.y), w: f.w, h: r2(size * lh)};
+    if (d.look === 'plain' || d.look === 'box' || d.look === 'neon') b.look = d.look;
+    if (COLOR.test(String(d.boxColor || '').toLowerCase())) b.boxColor = String(d.boxColor).toLowerCase();
+    return b;
   }
   // Where a new text box goes so that it is never exactly on top of one that is already there: under the box
   // in its way (and under the next one, if that spot is taken too), or above them when the slide has no room
@@ -186,7 +195,38 @@ DESIGN_TYPE_JS = r"""
     else if (key === 'upper') p.upper = value === true;
     else if (key === 'al') { if (value !== 'left' && value !== 'center' && value !== 'right') return null; p.al = value; }
     else if (key === 'color') { v = String(value || '').toLowerCase(); if (!COLOR.test(v)) return null; p.color = v; }
+    else if (key === 'boxColor') { v = String(value || '').toLowerCase(); if (!COLOR.test(v)) return null; p.boxColor = v; p.color = contrast(v); }
+    else if (key === 'look') return lookChange(b, value);
     else return null;
+    return p;
+  }
+
+  // ---- a story's text looks (hers, v19): Plain, Box (a rounded box behind each line), Neon (a glow) ----
+  // Words that sit on a box of this color: black on a light box, white on a dark one.
+  function contrast(c){
+    var m = /^#?([0-9a-f]{6})$/i.exec(c || '');
+    if (!m) return '#111111';
+    var v = parseInt(m[1], 16), y = 0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255);
+    return y > 150 ? '#111111' : '#ffffff';
+  }
+  // A color mixed toward white by k (the bright core of neon words).
+  function lighten(c, k){
+    var m = /^#?([0-9a-f]{6})$/i.exec(c || '');
+    if (!m) return '#ffffff';
+    var v = parseInt(m[1], 16), ch = [v >> 16, (v >> 8) & 255, v & 255].map(function(x){ return Math.round(x + (255 - x) * k); });
+    return '#' + ch.map(function(x){ var h = x.toString(16); return h.length < 2 ? '0' + h : h; }).join('');
+  }
+  function boxPad(b){ return 0.3 * b.size; }
+  function boxRad(b){ return 0.22 * b.size; }
+  // The three blurs of the neon glow, as parts of the size, and how far toward white its core is.
+  var NEON = {blurs: [0.06, 0.18, 0.36], core: 0.65};
+  // The change one press of Plain, Box or Neon makes. Like Instagram: turning Box on makes the text's color the
+  // box's (white when it was neon) and the words black or white on it; turning it off gives the words the box's color.
+  function lookChange(b, look){
+    if (look !== 'plain' && look !== 'box' && look !== 'neon') return null;
+    var p = {look: look}, was = b.look || 'plain';
+    if (look === 'box' && was !== 'box') { p.boxColor = b.color && was !== 'neon' ? String(b.color).toLowerCase() : '#ffffff'; p.color = contrast(p.boxColor); }
+    else if (look !== 'box' && was === 'box') p.color = String(b.boxColor || b.color || '#111111').toLowerCase();
     return p;
   }
 
@@ -194,7 +234,8 @@ DESIGN_TYPE_JS = r"""
     W: W, H: H, RULES: RULES, useLimits: useLimits,
     fontOk: fontOk, fontString: fontString, familyString: familyString, googleHref: googleHref, tidyName: tidyName,
     cleanText: cleanText, shown: shown, letters: letters, wrapLines: wrapLines, heightOf: heightOf, layout: layout,
-    baseline: baseline, sig: sig, isDark: isDark, newText: newText, freeSpot: freeSpot, style: style
+    baseline: baseline, sig: sig, isDark: isDark, newText: newText, freeSpot: freeSpot, style: style,
+    contrast: contrast, lighten: lighten, boxPad: boxPad, boxRad: boxRad, NEON: NEON, lookChange: lookChange
   };
 })(typeof window !== 'undefined' ? window : this);
 """

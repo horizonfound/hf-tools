@@ -8,8 +8,9 @@ Choosing and ordering the photos is your job and stays so. These pages are how t
 - **The reel: the reel page** (Nicole's reel maker, `reel_page.py`). Your pick in a row at the top, in the order it plays, with Longer and Quicker on each photo and all the shoot's photos below; then the song, the vibe, and **Make my reel**, which makes the CapCut project there and then. See "The reel's page" below.
 - **The carousel: the carousel's picker** (`arrange.py --piece carousel`). Your pick in a row, in the order people swipe, every photo of the shoot below it; "I'm happy with this order" makes the slides. See "The carousel's page" below.
 - **The carousel's designer**, where they lay the slides out by hand and add their own words ("lay out my carousel", "design my carousel", "add text to my slides"): "Laying out the slides: the designer", below.
+- **The stories designer**, the same page made for Instagram stories ("make my stories", "lay out my stories", "design my stories", "add text to my stories"): "Making stories: the stories designer", below.
 
-Singles and stories have no page; they are changed by saying it, and you run `kit.py picks` again. (The older reel picker, `arrange.py --piece reel`, still works if you run it by name, but nothing links to it and you don't open it: the reel page took its place, decision 3, `kit.REEL_DOOR`.)
+Singles have no page; they are changed by saying it, and you run `kit.py picks` again. The plain stories `kit.py build` makes (one photo each) are changed the same way; the stories they make themselves are in the stories designer. (The older reel picker, `arrange.py --piece reel`, still works if you run it by name, but nothing links to it and you don't open it: the reel page took its place, decision 3, `kit.REEL_DOOR`.)
 
 They can also get to each page without you: the kit page has a "Change the photos" button in its Reel section (the reel page) and in its Carousel section (the carousel's picker), and "Lay out the slides" beside the second. Not in the middle of a whole post kit being made: those steps carry on without stopping, and they can change the reel or the carousel afterwards.
 
@@ -98,6 +99,27 @@ python3 <scripts>/design.py tidy "<kit>"
 **If the page says "Too many unfinished saves are waiting"** (it takes sixty presses of Save slides that were each stopped part way, with none finished in between), run `design.py tidy "<kit>"`. It clears the waiting slides of saves that were left alone for an hour or more; none of those ever reached the Carousel folder, and nothing in that folder is changed. Then say "That's cleared. Press Save slides again." The page also clears them by itself: after an hour when it is that full, and day-old ones each time the designer is opened or slides are saved.
 
 **Fonts.** The font list comes from Google Fonts when the computer is online; five families work with no internet. A font that can't be loaded is shown in a plain serif and the page says so in one line, and Save slides asks before saving words that way.
+
+## Making stories: the stories designer
+
+The designer has a second shape for Instagram stories (Nicole's): each box is one 9:16 story, and they make the stories themselves, behind the scenes, a sneak peek, a few favorites, on the computer instead of on their phone. It is theirs to drive, like the carousel's designer: you open it and step back. A shoot has **one** stories design; there is no list of designs and no name to type.
+
+**When to open it.** "Make my stories", "lay out my stories", "design my stories", "add text to my stories", "put words on my stories", or anything else that means they want to make the stories themselves. They can get there without you: the kit page's Stories section has "Make my stories →" ("Open my stories →" once they have saved some), and the designer itself has a Carousel / Stories switch at the top. A shoot with no post kit has no designer; make the kit first (`parts/post-kit.md`).
+
+```
+python3 <scripts>/design.py open "<kit>" --kind stories
+python3 <scripts>/design.py show "<kit>" --kind stories
+python3 <scripts>/design.py took "<kit folder>" --kind stories
+python3 <scripts>/design.py tidy "<kit>" --kind stories
+```
+
+**open** gets the page ready as for the carousel and prints the page's address on its last line. Load it in the Claude app's browser pane and bring the pane forward (never Chrome). If the line above the address starts `NEW:`, the shoot had no stories yet, and the page opens on its "Add stories" window; say: "Your stories are on the page beside us. Pick how the first one starts: a blank story, one photo per story, or one of the layouts. Press \"+ Add stories\" any time to add more after the last one." If it starts `THEIRS:`, say: "Your stories are on the page beside us, just as you left them." There is nothing to wait for and no question to ask.
+
+**What the page does by itself.** "+ Add stories" puts what they pick after their last story and never replaces anything: a blank white story, one story each for the next five photos not used yet, or a layout (one photo, two up, three strips, four, six, nine or twelve, edge to edge), with the tick "Put this shoot's photos in the frames for me" filling the new frames with photos the stories don't use yet. "Remove this story" takes out the story the selected thing is on (Undo brings it back; at one story it is off). "Show Instagram's buttons" (on to start with) shades the top and bottom of every story, where Instagram puts its name, buttons and reply bar, so their words stay clear; the shading is never in a saved story. Text starts bold, black on a white box, in Classic (Figtree), and the Look buttons make it Plain, Box or Neon. "Preview" plays the stories the way Instagram shows them, with their Instagram handle at the top (from the grid they had read; "yourname" before that). "Save stories" makes each story 1080 by 1920 and puts the whole set in the kit's Stories folder, named after the shoot ("Beach stories - 01.jpg", "... - 02.jpg"), with "Open the Stories folder" on the same line. **Nothing made earlier is replaced:** the plain stories, Canva's stories, anything they put in that folder and every set saved before stay where they are, and a set saved again after a change is a new set beside the first ("Beach stories (2) - 01.jpg"). The kit page then shows the newest saved set as the stories, and says so. Everything else (saving as they work, "Already saved as ...", a photo exported again, a save cut off part way, "Too many unfinished saves", fonts and brand colors, Save as template, which keeps a story's templates apart from a carousel's) works as it does in the carousel's designer, above, with `--kind stories` on each command.
+
+**The words on a story are theirs.** The same rule as on a slide: you never put words on a story, never write a line for one, and never suggest a name, a date or a moment they did not give you. "Behind the scenes" or "sneak peek" is theirs to type. If they ask what a story should say, ask what they want to say, or point to their story lines on the kit page.
+
+**A line `ARRANGED: <kit folder> | stories | 6 stories | Beach stories`** from `home.py pending` means they pressed Save stories. There is nothing for you to make. Say one line, "Your 6 stories are saved in the Stories folder as \"Beach stories\". Nothing was replaced.", and run `design.py took "<kit folder>" --kind stories`, which clears the line. Give it the kit's folder name exactly as the line has it.
 
 **Canva is a separate finish.** Filling their Canva template (`parts/canva.md`) still starts from the kit's plain photos, never from laid-out slides. They can use either, or both; each leaves the other's slides alone.
 

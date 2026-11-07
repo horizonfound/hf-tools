@@ -16,6 +16,9 @@ the page in a hidden Chrome driven by tests/chrome_drive.py:
   * Georgia, the font words fall back to, is on this computer; a font the plugin carries loads from the Assistant;
   * Save slides: six finished 1080 x 1350 JPEGs arrive in the Carousel folder, the line says so, the folder's
     button shows (it is NOT pressed: no window is ever opened), and, where Pillow is, slide 1 is the photo's grey;
+  * the stories designer (?kind=stories): it opens on Add stories, One photo per story makes five stories, the bands
+    of Instagram's buttons show, a text box takes the Neon look, and Save stories puts five finished 1080 x 1920 JPEGs
+    in the Stories folder (where Pillow is: story 1 is the first photo's grey, and no band is in it);
   * the hidden Chrome is gone afterwards, every helper with it, and its throwaway profile removed.
 Nothing is touched outside a scratch folder it makes itself. SKIP and exit 0 when there is no Chrome, or no way of
 making pictures yet (a PC without Pillow). Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED.
@@ -219,11 +222,75 @@ def main():
             check("slide 1 is the first photo's own grey, not a blank slide", all(abs(v - grey) <= 6 for v in px), px)
         else:
             skip("slide 1 is the first photo's own grey", "Pillow is not installed for this Python" if files else "no slide to read")
-        check("no error of the page's own at the end", not c.page_errors(), c.page_errors()[:3])
+        check("no error of the page's own on the carousel", not c.page_errors(), c.page_errors()[:3])
+        # the stories designer, on the same shoot, in a Chrome of its own (one Chrome at a time, to go easy on the
+        # computer's memory: the carousel's is stopped first, and its own checks at the end still look at it)
+        c.stop()
+        stories_chrome(base, kit)
+
     except Exception as e:  # noqa: BLE001
         import traceback
         check("the page ran to the end of the test", False, f"{e.__class__.__name__}: {e} | {traceback.format_exc()[-700:]}")
     finally:
+        _finish(c, seen, srv, log, log_path)
+
+
+def stories_chrome(base, kit):
+    c = chrome_drive.Chrome(work=work / "chrome-stories", size=(1280, 900))
+    c.start()
+    try:
+        c.open(base + "/design.html?kit=" + quote(kit.name) + "&kind=stories", seconds=60)
+        try:
+            c.wait_for(READY + " && !document.getElementById('gallery').hidden", 60, tell="document.body.innerText.slice(0, 300)")
+            sready = True
+        except chrome_drive.Timeout as e:
+            sready = str(e)
+        if check("stories: the stories designer opens on its Add stories window", sready is True, sready):
+            c.click("#gallery-fresh .dz-card:nth-child(2) .dz-use")
+            NS = min(PHOTOS, 5)          # One photo per story: the next five photos not in a story yet (hers)
+            c.wait_for("document.getElementById('gallery').hidden && Designer.st.slides === %d" % NS, 10)
+            check(f"stories: One photo per story makes {NS} stories with Instagram's bands on each", c.count("#strip .safe") == 2 * NS, c.count("#strip .safe"))
+            c.click("#strip .blk[data-id='1']")
+            c.click("#add-text")
+            c.type_text("A day")
+            c.click("#sel-look [data-look='neon']")
+            check("stories: a text box takes the Neon look", c.js("Designer.selected().look") == "neon")
+            c.key("Escape")
+            c.click("#save-slides")
+            try:
+                c.wait_for("!Designer.saver.busy() || Designer.saver.asking()", 180, tell="document.getElementById('save-line').textContent")
+            except chrome_drive.Timeout:
+                pass
+            if c.js("Designer.saver.asking()"):
+                c.click("#save-yes")
+                try:
+                    c.wait_for("!Designer.saver.busy()", 180, tell="document.getElementById('save-line').textContent")
+                except chrome_drive.Timeout:
+                    pass
+            sline = c.text("#save-line")
+            check(f"stories: Save stories says the {NS} stories are in the Stories folder", sline.startswith(f"Saved {NS} stories in your Stories folder, named \""), sline)
+            sto = kit / "Stories"
+            sfiles = sorted(n for n in os.listdir(sto)) if sto.is_dir() else []
+            swhole = [n for n in sfiles if design.slide_ok((sto / n).read_bytes(), "stories")]
+            check(f"stories: {NS} finished 1080 x 1920 JPEGs are in the Stories folder", len(sfiles) == NS and swhole == sfiles, sfiles)
+            if HAVE_PIL and sfiles:
+                with Image.open(sto / sfiles[0]) as im:
+                    rgb = im.convert("RGB")
+                    mid, top = rgb.getpixel((540, 1400)), rgb.getpixel((540, 120))
+                grey = 128 + 2 * 5
+                check("stories: story 1 is the first photo's own grey, and no band of Instagram's buttons is in it",
+                      all(abs(v - grey) <= 6 for v in mid) and all(abs(v - grey) <= 6 for v in top), (mid, top))
+            else:
+                skip("stories: story 1 is the first photo's grey", "Pillow is not installed for this Python" if sfiles else "no story to read")
+        check("no error of the stories page's own at the end", not c.page_errors(), c.page_errors()[:3])
+    finally:
+        pid = c.proc.pid if c.proc else None
+        c.stop()
+        check("the stories' hidden Chrome is gone", not pid or tc.still_running(pid) is not True)
+
+
+def _finish(c, seen, srv, log, log_path):
+    if True:
         if results.count(False):
             keep(c, log_path)
         if c is not None:

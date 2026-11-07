@@ -487,7 +487,10 @@ def check_wire_browser(case, work, port, make_kit, Server, run, ask, post, get_j
                  len(sizes) == N and all(x == [1080, 1350] for x in sizes), sizes)
             sub = c.js("Array.from(document.querySelectorAll('section.piece')).filter(function(s){return s.querySelector('h2').textContent.indexOf('Carousel')===0})[0].querySelector('.sub').textContent")
             case("kit page, in a browser: the line names the set exactly as it was saved", f"saved as \u201c{NAME}\u201d" in sub, sub)
-            sel = "a.arr[href^='/design.html']"
+            # the Stories section has a link of its own to the stories designer (v19 stage c2); this one is the carousel's
+            sel = "a.arr[href^='/design.html']:not([href*='kind=stories'])"
+            case("kit page, in a browser: the Stories section links to the stories designer (her \"Make my stories →\")",
+                 c.js("(function(){var a=document.querySelector(\"a.arr[href*='kind=stories']\"); return !!a && a.closest('section').querySelector('h2').textContent.indexOf('Stories')===0 && a.textContent})()") == "Make my stories \u2192")
             case("kit page, in a browser: 'Lay out the slides' is showing in the Carousel section, beside 'Change the photos'",
                  c.count(sel) == 1 and c.text(sel) == LAY_OUT and c.js(f"(function(){{var a=document.querySelector(\"{sel}\"), s=a.closest('section'); return s.querySelector('h2').textContent.indexOf('Carousel')===0 && !!a.previousElementSibling && a.previousElementSibling.textContent==='Change the photos' && a.getBoundingClientRect().width>40}})()") is True)
             c.click(sel)

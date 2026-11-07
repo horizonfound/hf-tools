@@ -21,6 +21,13 @@ kit folder's name; a press that makes something carries a name of its own (a tok
 was lost and is sent again never makes two. Names and words only ever go on the page as text.
 
 For the saving part: Designer.post(path, body, tries), Designer.newToken(prefix), Designer.modals.
+
+STORIES (Designer.STORY; hers, v19): one stories design a shoot, so the name, My designs and Duplicate are not
+shown (only the save word is). "+ New design" is "+ Add stories": its window ("Add stories": Start with, Your
+templates, Layouts, each card's button Add) ADDS what is picked after the last story and never replaces anything
+(DesignPlan.addStories), in one Undo step, with no trip to the Assistant beyond the usual save. "Start with" is
+Blank story and One photo per story; the layouts are her seven grids. A shoot whose stories are still empty opens
+on that window. The shoot menu goes to each shoot's stories and counts its story designs.
 """
 
 DESIGN_DESIGNS_JS = r"""
@@ -65,6 +72,19 @@ DESIGN_DESIGNS_JS = r"""
     fillSome: function(k){ return 'There weren’t enough unused photos, so ' + k + (k === 1 ? ' frame is' : ' frames are') + ' still empty.'; },
     fellBack: 'That design isn’t here, so this is your newest one.'
   };
+  var STORY = D.STORY;
+  function stories(k){ return k === 1 ? '1 story' : k + ' stories'; }
+  D.storyWords(DW, {
+    newTitle: 'Add stories after your last one. Nothing you made is replaced.',
+    galleryTitle: 'Add stories',
+    // hers: what the window says depends on whether anything is on the stories yet
+    gallerySub: function(){ return D.st && D.st.blocks.length ? 'Pick what to add. It goes after your last story, and nothing you made is replaced.' : 'Pick how your first story starts. You can add more any time.'; },
+    secFresh: 'Start with', secStarters: 'Layouts', use: 'Add',
+    blank: 'Blank story', blankSub: function(){ return 'An empty white story'; },
+    onePer: 'One photo per story', slidesSub: stories,
+    // hers: "1 story · 3 photos", "1 story · 3 photos · from Beach"
+    tplSub: function(slides, frames, from){ return stories(slides) + ' · ' + frames + (frames === 1 ? ' photo' : ' photos') + (from ? ' · from ' + from : ''); }
+  });
   var NAME_MAX = 80;
 
   // ---------- small things other parts use too ----------
@@ -181,7 +201,7 @@ DESIGN_DESIGNS_JS = r"""
   function refresh(){
     if (!D.S || !D.design) return Promise.resolve(false);
     var id = D.design.id, stamp = D.S.stamp, was = lists();
-    return fetch('/design-state?' + D.Q + '&design=' + encodeURIComponent(id), {cache: 'no-store'})
+    return fetch('/design-state?' + D.Q + D.KQ + '&design=' + encodeURIComponent(id), {cache: 'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(j){
         if (!j || !j.ok || !D.design || D.design.id !== id || !D.S || D.S.stamp !== stamp || j.stamp !== stamp) return false;
@@ -221,11 +241,11 @@ DESIGN_DESIGNS_JS = r"""
     (D.S.shoots || []).forEach(function(s){
       if (typeof s.kit !== 'string' || !s.kit) return;
       var open = s.kit === D.KIT, a = el('a', 'dz-item' + (open ? ' cur' : ''));
-      // a shoot is its kit folder's name; each shoot is a page of its own
-      a.href = '/design.html?kit=' + encodeURIComponent(s.kit);
+      // a shoot is its kit folder's name; each shoot is a page of its own (its stories, in the stories designer)
+      a.href = '/design.html?kit=' + encodeURIComponent(s.kit) + D.KQ;
       a.dataset.open = open ? '1' : '';
       a.appendChild(el('b', '', s.name || s.kit));
-      a.appendChild(el('small', '', DW.shootSub(s.photos || 0, s.designs || 0, open)));
+      a.appendChild(el('small', '', DW.shootSub(s.photos || 0, (STORY ? s.story_designs : s.designs) || 0, open)));
       if (open) a.setAttribute('aria-current', 'page');
       list.appendChild(a);
     });
@@ -253,6 +273,7 @@ DESIGN_DESIGNS_JS = r"""
   nameBox.disabled = true;            // until a design is open
   nameShow.hidden = true;
   nameShow.parentNode.insertBefore(nameBox, nameShow.nextSibling);
+  if (STORY) nameBox.hidden = true;   // one stories design a shoot: only the save word shows (hers)
   var nameAtFocus = null;
   // the name goes with every save of the design
   D.save.fields.push(function(body){ if (D.design && typeof D.design.name === 'string' && D.design.name) body.name = D.design.name; });
@@ -283,6 +304,7 @@ DESIGN_DESIGNS_JS = r"""
   var designsBtn = button(DW.myDesigns + ' ▾', 'designs-btn'); designsBtn.setAttribute('aria-label', DW.myDesigns);
   var dupBtn = button(DW.dup, 'dup-design'); dupBtn.title = DW.dupTitle; D.label(dupBtn, DW.dup);
   gDesign.appendChild(designsBtn); gDesign.appendChild(dupBtn);
+  if (STORY) { designsBtn.hidden = true; dupBtn.hidden = true; }
   function when(t){
     if (!(t > 0)) return '';
     var a = P.ago(t, Date.now() / 1000);
@@ -407,7 +429,9 @@ DESIGN_DESIGNS_JS = r"""
   // One card: a little picture of the layout, its name, what it holds, and Use.
   function card(box, name, sub, layout, start){
     var c = el('div', 'dz-card'), pic = el('div', 'dz-pic'), cv = document.createElement('canvas');
-    var dpr = Math.min(2, window.devicePixelRatio || 1), s = P.cardScale(layout.slides, 256, 96);
+    // a story's little picture is taller (hers: 170 px), so a tall 9:16 grid can be seen
+    var dpr = Math.min(2, window.devicePixelRatio || 1), s = P.cardScale(layout.slides, 256, STORY ? 170 : 96);
+    if (STORY) pic.style.height = '170px';
     var w = Math.max(1, Math.round(layout.slides * M.W * s)), h = Math.max(1, Math.round(M.H * s));
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     cv.style.width = w + 'px'; cv.style.height = h + 'px';
@@ -427,6 +451,11 @@ DESIGN_DESIGNS_JS = r"""
     };
     if (layout.blocks.some(M.isText)) draw(false).then(function(){ draw(true); }); else draw(true);
   }
+  // the shoot's photos that are not in a story yet (what "Put this shoot's photos in the frames for me" fills from)
+  function unused(){
+    var u = M.used(D.st);
+    return (D.S.photos || []).filter(function(p){ return !u[p.n]; });
+  }
   function buildGallery(){
     var S = D.S, fill = tick.checked;
     gSub.textContent = DW.gallerySub(S.name || '');
@@ -435,13 +464,24 @@ DESIGN_DESIGNS_JS = r"""
     cardShelf = D.paint.shelf();
     Object.keys(secs).forEach(function(k){ secs[k].textContent = ''; });
     var blank = M.tidy(S.blank || {slides: 5, bg: '#ffffff', blocks: []});
-    card(secs.fresh, DW.blank, DW.blankSub(blank.slides), blank, function(){ return {stamp: S.stamp, state: blank}; });
-    var one = P.onePerSlide(S.photos, S.carousel, S.slide_bg);
-    card(secs.fresh, DW.onePer, DW.slidesSub(one.slides), one, function(){ return {}; });      // the Assistant makes this one itself
+    if (STORY) {
+      // stories: each card says what would be ADDED; pressing Add puts it after the last story ({add, fill})
+      card(secs.fresh, DW.blank, DW.blankSub(blank.slides), blank, function(){ return {add: M.copy(blank), fill: false}; });
+      var ops = P.onePerStory(D.st, S.photos);
+      card(secs.fresh, DW.onePer, DW.slidesSub(ops.slides), ops, function(){ return {add: P.onePerStory(D.st, S.photos), fill: false}; });
+    } else {
+      card(secs.fresh, DW.blank, DW.blankSub(blank.slides), blank, function(){ return {stamp: S.stamp, state: blank}; });
+      var one = P.onePerSlide(S.photos, S.carousel, S.slide_bg);
+      card(secs.fresh, DW.onePer, DW.slidesSub(one.slides), one, function(){ return {}; });      // the Assistant makes this one itself
+    }
     var tpl = function(box, t, from){
       if (!t || !t.template || !Array.isArray(t.template.blocks)) return;
-      var shown = P.fromTemplate(t.template, fill, S.photos, S.carousel);
-      card(box, t.name || '', DW.tplSub(shown.slides, P.frames(shown), from), shown, function(){
+      // a story's little picture shows the layout with the photos the stories don't use yet, as Add would put them in
+      var shown = STORY ? (fill ? P.fill(P.fromTemplate(t.template, false), unused(), S.carousel) : P.fromTemplate(t.template, false))
+                        : P.fromTemplate(t.template, fill, S.photos, S.carousel);
+      card(box, t.name || '', DW.tplSub(shown.slides, P.frames(shown), from), shown, STORY ? function(){
+        return {add: P.fromTemplate(t.template, false), fill: tick.checked};
+      } : function(){
         return {stamp: S.stamp, state: P.fromTemplate(t.template, tick.checked, S.photos, S.carousel)};
       });
     };
@@ -473,6 +513,16 @@ DESIGN_DESIGNS_JS = r"""
     if (!bt || busy || bt.disabled) return;
     var start = cards[Number(bt.dataset.card)];
     if (!start) return;
+    if (STORY) {
+      // stories: what was picked goes after the last story, in one Undo step; the design saves itself as always
+      if (!D.st || D.blocked) return;
+      var pick = start(), r = P.addStories(D.st, M.tidy(pick.add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
+      if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
+      D.setState(r.st, {sel: null, adjust: false});
+      closeGallery();
+      D.revealSlide(r.first);
+      return;
+    }
     setBusy(true);
     sheet.classList.add('dz-busy');
     gLine.textContent = DW.making;
@@ -516,7 +566,9 @@ DESIGN_DESIGNS_JS = r"""
     if (!name) { tLine.textContent = DW.nameBad; return; }
     tBusy = true; tSave.disabled = true; tLine.textContent = '';
     // the layout as it is on the page now; the Assistant takes the photos out and numbers the frames
-    post('/design-template', {kit: D.KIT, token: newToken('t'), name: name, state: D.st}, 3).then(function(res){
+    var tb = {kit: D.KIT, token: newToken('t'), name: name, state: D.st};
+    if (STORY) tb.kind = 'stories';
+    post('/design-template', tb, 3).then(function(res){
       var j = res.j;
       tBusy = false;
       if (j && j.ok) {
@@ -533,6 +585,14 @@ DESIGN_DESIGNS_JS = r"""
   }
   tSave.addEventListener('click', saveTemplate);
   tName.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); saveTemplate(); } });
+
+  // Stories: a shoot whose stories have nothing on them yet opens on the Add stories window (hers), once a page
+  var asked = false;
+  D.on('design', function(){
+    if (!STORY || asked || !D.st || D.st.blocks.length || D.st.slides > 1) return;
+    asked = true;
+    Promise.resolve().then(function(){ if (!D.modals.any() && !D.blocked) newBtn.click(); });
+  });
 
   D.designs = {refresh: refresh, cleanName: cleanName, closePops: closePops};
 })();

@@ -25,12 +25,20 @@ Where later parts attach:
                                + New design, Save as template, Fill empty frames, Preview swipe, Save slides
     Designer.viewSlide()       the slide in the middle of what is showing (where + Add text puts a text box)
     Designer.reveal(id)        scroll the strip so a block shows
+
+In the stories designer (Designer.STORY) the same strip is a row of 9:16 stories: a solid line between two stories,
+no "Across 2 slides", "Remove this story" for whatever is selected (off at one story, with a line saying why), and
+the bands where Instagram's own buttons sit, drawn over every story while "Show Instagram's buttons" is ticked.
+Those bands are part of the page only: a saved story is drawn by Designer.paint, which never draws them.
 """
 
 DESIGN_EDIT_JS = r"""
 (function(){
   'use strict';
-  var D = window.Designer, M = D.M, W = M.W, H = M.H, $ = D.$, el = D.el, WORDS = D.WORDS;
+  var D = window.Designer, M = D.M, W = M.W, H = M.H, $ = D.$, el = D.el, WORDS = D.WORDS, STORY = D.STORY;
+  // where Instagram's own buttons cover a story: its name and buttons at the top, the reply bar at the bottom (hers)
+  var SAFE = STORY && window.DESIGN_LIMITS && window.DESIGN_LIMITS.safe ? window.DESIGN_LIMITS.safe : [250, 340];
+  var BANDS = {top: 'Instagram\'s name and buttons', bottom: 'Instagram\'s reply bar'};
   var stage = $('stage'), wrap = $('stripwrap'), strip = $('strip'), over = $('over'), labels = $('labels'), thumbs = $('thumbs');
   // A photo added by a CLICK in the tray becomes the selected one (as in Nicole's page), so the next click
   // swaps it rather than filling the next empty spot. One place to change that.
@@ -39,7 +47,7 @@ DESIGN_EDIT_JS = r"""
   var EDGE = 40, STEP = 14, DWELL = 250;    // the strip scrolls sideways while a drag rests this near its ends
 
   var nodes = {};       // block id -> its element on the strip (kept between draws, so no picture is fetched twice)
-  var seams = [], guides = [], tiles = {};
+  var seams = [], guides = [], tiles = {}, bands = [];
   // The selection box: a ring (the outline) and four handles. The ring is cut off at the strip's edges, so a
   // frame pulled past the top or bottom is not drawn over the slide labels or the page; a handle whose corner
   // is off the strip is not drawn either, while one on the strip's very edge shows whole.
@@ -201,11 +209,12 @@ DESIGN_EDIT_JS = r"""
     });
     Object.keys(nodes).forEach(function(id){ if (!seen[id]) { nodes[id].remove(); delete nodes[id]; } });
     while (seams.length > st.slides - 1) seams.pop().remove();
-    while (seams.length < st.slides - 1) { var sm = el('div', 'seam'); strip.appendChild(sm); seams.push(sm); }
+    while (seams.length < st.slides - 1) { var sm = el('div', STORY ? 'seam story' : 'seam'); strip.appendChild(sm); seams.push(sm); }
     seams.forEach(function(sm, i){ sm.style.left = (i + 1) * W * s + 'px'; });
     while (labels.children.length > st.slides) labels.lastChild.remove();
     while (labels.children.length < st.slides) labels.appendChild(el('span', '', WORDS.slide(labels.children.length + 1)));
     for (var k = 0; k < st.slides; k++) labels.children[k].style.left = (k + 0.5) * W * s + 'px';
+    drawBands(st, s);
     var b = D.selected();
     if (b) {
       placeSel(b, s);
@@ -215,11 +224,28 @@ DESIGN_EDIT_JS = r"""
     else if (G.redo) G.redo();          // a drag is going on: what it shows is drawn again over the fresh strip
   }
   D.on('render', draw);
+  // Stories: Instagram's buttons cover these parts of every story, shaded while the tick at the bottom is on. On the
+  // strip only; nothing here is ever in a saved story.
+  function drawBands(st, s){
+    var on = STORY && !!$('gridcrop') && $('gridcrop').checked, want = on ? st.slides * 2 : 0;
+    while (bands.length > want) bands.pop().remove();
+    while (bands.length < want) { var z = el('div', 'safe'); z.setAttribute('aria-hidden', 'true'); strip.appendChild(z); bands.push(z); }
+    for (var i = 0; i < want; i++) {
+      var top = i % 2 === 0, k = Math.floor(i / 2), z = bands[i], h = top ? SAFE[0] : SAFE[1];
+      z.style.left = k * W * s + 'px'; z.style.width = W * s + 'px';
+      z.style.top = (top ? 0 : (H - h) * s) + 'px'; z.style.height = h * s + 'px';
+      z.style.fontSize = Math.max(9, 30 * s) + 'px';
+      z.style.borderBottomWidth = top ? '1.5px' : '0'; z.style.borderTopWidth = top ? '0' : '1.5px';
+      var words = s > 0.12 ? (top ? BANDS.top : BANDS.bottom) : '';
+      if (z.textContent !== words) z.textContent = words;
+    }
+  }
 
   // ---------- the bars of buttons ----------
   var g1 = D.selbar.group('sel-photo', 'Selected photo', function(kind){ return kind === 'photo'; });
-  [['Fill slide', 'full'], ['Across 2 slides', 'span2'], ['Top half', 'top'], ['Bottom half', 'bottom'], ['Left half', 'left'],
-   ['Right half', 'right'], ['Add border', 'margin']].forEach(function(x){ D.selbar.button(g1, x[0], x[1]); });
+  // stories stand on their own: no "Across 2 slides" there (hers), and "Fill slide" is "Fill story"
+  [[STORY ? 'Fill story' : 'Fill slide', 'full'], ['Across 2 slides', 'span2'], ['Top half', 'top'], ['Bottom half', 'bottom'], ['Left half', 'left'],
+   ['Right half', 'right'], ['Add border', 'margin']].forEach(function(x){ if (!(STORY && x[1] === 'span2')) D.selbar.button(g1, x[0], x[1]); });
   var g2 = D.selbar.group('sel-crop', 'Crop', function(kind){ return kind === 'photo'; });
   var adjBtn = D.selbar.button(g2, WORDS.inside, 'adjust');
   adjBtn.id = 'adjust';
@@ -230,7 +256,16 @@ DESIGN_EDIT_JS = r"""
   D.selbar.button(g2, 'Take the photo out', 'empty', 'Takes the photo out and leaves an empty frame');
   // HOOK (stage C): the text controls are groups added here, before this last one, with Designer.selbar.group(...)
   var g3 = D.selbar.group('sel-all', '', function(){ return true; });
-  [['Center on slide', 'center'], ['Bring forward', 'front'], ['Send back', 'back'], ['Duplicate', 'dup'], ['Remove', 'del']].forEach(function(x){ D.selbar.button(g3, x[0], x[1]); });
+  [[STORY ? 'Center on story' : 'Center on slide', 'center'], ['Bring forward', 'front'], ['Send back', 'back'], ['Duplicate', 'dup'], ['Remove', 'del']].forEach(function(x){ D.selbar.button(g3, x[0], x[1]); });
+  // Stories: "Remove this story" takes out the story the selected thing is on, and everything on it; the stories
+  // after it move up, and Undo brings it back (hers). At one story it is off, and a line beside it says why.
+  var delStory = null, oneLine = null;
+  if (STORY) {
+    var g4 = D.selbar.group('sel-story', '', function(){ return true; });
+    delStory = D.selbar.button(g4, 'Remove this story', 'delstory', 'Take out the story this is on, and everything on it');
+    oneLine = el('span', 'st-only-line', WORDS.one); oneLine.id = 'only-story'; oneLine.hidden = true;
+    g4.appendChild(oneLine);
+  }
 
   function lines(which, text){
     D.say($('slides-line'), which === 'slides' ? text : '');
@@ -248,7 +283,7 @@ DESIGN_EDIT_JS = r"""
       if (D.typeOf(b) === 'photo' && !M.isHole(b)) D.select(b.id, {adjust: !D.adjust});
       return;
     }
-    var r = M.act(D.st, b.id, a);
+    var r = a === 'delstory' ? M.removeStory(D.st, slideOf(b) - 1) : M.act(D.st, b.id, a);
     if (r.why) { lines('sel', why(r)); return; }
     var o = {};
     if ('sel' in r) o.sel = r.sel;
@@ -345,6 +380,7 @@ DESIGN_EDIT_JS = r"""
     Array.prototype.forEach.call(document.querySelectorAll('#g-bg .sw'), function(x){ x.classList.toggle('on', x.dataset.c === st.bg); });
     if (document.activeElement !== bgc) bgc.value = st.bg;
     $('undo').disabled = off || !D.canUndo();
+    if (delStory) { delStory.disabled = off || st.slides <= 1; oneLine.hidden = st.slides > 1; }
     syncSize();
     D.label(adjBtn, D.adjust ? WORDS.insideDone : WORDS.inside);
     adjBtn.classList.toggle('on', D.adjust);
@@ -367,6 +403,11 @@ DESIGN_EDIT_JS = r"""
     else if (right > stage.scrollLeft + stage.clientWidth - 24) stage.scrollLeft = right - stage.clientWidth + 24;
   }
   D.reveal = reveal;
+  // Scroll the strip so slide (story) k, from 0, starts at its left (stories: the ones just added).
+  D.revealSlide = function(k){
+    if (!D.st || !(k >= 0)) return;
+    stage.scrollLeft = Math.max(0, wrap.offsetLeft + k * W * D.scale - 24);
+  };
   // The first slide that is wholly in sight (the one in the middle of what shows when none is): where a new
   // text box goes when nothing is selected.
   D.firstSlide = function(){

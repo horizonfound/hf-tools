@@ -113,7 +113,10 @@ t('template: with the tick the frames are filled by shape from this shoot\'s pho
 t('template: using one does not change the template itself', JSON.stringify(tpl) === keep);
 a = P.fromTemplate({slides: 3, bg: '#ffffff', blocks: [F(1, 44, 0, 0, W, H, {ox: 0.2, zoom: 2})]}, false, photos, []);
 t('template: a photo number that somehow came with a template is never used (templates hold no photo)', a.blocks[0].n === null && a.blocks[0].ox === 0.5 && a.blocks[0].zoom === 1);
-t('template: a silly slide count is brought to 2..20', P.fromTemplate({slides: 99, bg: '#ffffff', blocks: []}, false).slides === 20 && P.fromTemplate({slides: 0, bg: '#ffffff', blocks: []}, false).slides === 2);
+// one slide on its own is a single post (decision 12): the rules go down to one slide, as the Assistant's do (before v19 stage c2 they
+// brought a template to 2, so a one-slide template came out as two slides)
+t('template: a silly slide count is brought to 1..20', P.fromTemplate({slides: 99, bg: '#ffffff', blocks: []}, false).slides === 20 && P.fromTemplate({slides: 0, bg: '#ffffff', blocks: []}, false).slides === 1);
+t('template: a one-slide template stays one slide', P.fromTemplate({slides: 1, bg: '#ffffff', blocks: []}, false).slides === 1);
 
 // ---- one photo per slide ----
 var one = P.onePerSlide(photos, [6, 3, 1], '#111111');
@@ -121,7 +124,7 @@ t('one per slide: the carousel\'s order, each photo filling its own slide, on th
   one.slides === 3 && one.bg === '#111111' && eq(ns(one), [6, 3, 1]) && one.blocks.every(function(b, i){ return b.x === i * W && b.y === 0 && b.w === W && b.h === H && b.id === i + 1 && b.slot === i + 1; }), one);
 one = P.onePerSlide(photos, [], '#ffffff');
 t('one per slide: with no carousel order it is the first eight photos', one.slides === 8 && eq(ns(one), [1, 2, 3, 4, 5, 6, 7, 8]), ns(one));
-t('one per slide: never fewer than 2 slides', P.onePerSlide(photos, [4], '#ffffff').slides === 2 && P.onePerSlide(photos, [4], '#ffffff').blocks.length === 1);
+t('one per slide: one photo makes one slide (a single post)', P.onePerSlide(photos, [4], '#ffffff').slides === 1 && P.onePerSlide(photos, [4], '#ffffff').blocks.length === 1);
 var lots = []; for (i = 1; i <= 30; i++) lots.push({n: i, way: 'tall', w: 1200, h: 1800});
 t('one per slide: never more than 20', P.onePerSlide(lots, lots.map(function(p){ return p.n; }), '#ffffff').slides === 20);
 
@@ -217,7 +220,7 @@ def check_designs_page(case, work):
          "cv.width = W; cv.height = H;" in sv and "QUALITY = 0.93" in sv and "'image/jpeg', QUALITY" in sv and "D.paint.letGo(sh, i < n ? D.paint.keys(st, i, 1) : null)" in sv)
     case("saving: the commit is asked again under the same name for the press (the token is made once, before the first slide)",
          sv.count("D.newToken('s')") == 1 and sv.index("D.newToken('s')") < sv.index("for (i = 1; i <= n; i++)") and "set: token" in sv)
-    case("a shoot's link is its kit folder's name and nothing else", "a.href = '/design.html?kit=' + encodeURIComponent(s.kit);" in d and d.count(".href") == 1 and ".href" not in sv)
+    case("a shoot's link is its kit folder's name and nothing else (and, in the stories designer, the kind)", "a.href = '/design.html?kit=' + encodeURIComponent(s.kit) + D.KQ;" in d and d.count(".href") == 1 and ".href" not in sv)
     asked = sorted(set(re.findall(r"'(/[a-z][a-z.-]*)[?']", d + sv)))
     case("every address the later parts name is one of the Assistant's own routes (and the designer's own page, for another shoot)",
          asked == ["/design-commit", "/design-new", "/design-slide", "/design-state", "/design-template", "/design.html", "/open"]
@@ -229,7 +232,8 @@ def check_designs_page(case, work):
                         r"(?:(?!</div>).)*id='save-yes'(?:(?!</div>).)*id='save-no'(?:(?!</div>).)*id='open-carousel'(?:(?!</div>).)*id='open-line'(?:(?!</div>).)*</div></div>", page, re.S)))
     case("designer page: one main (terracotta) button shows at a time in that bar: Save slides, or Save anyway while a question is up",
          page.count("class='tb main") == 2 and "id='save-yes' type='button' hidden" in page)
-    case("designer page: no Instagram name, logo or handle on the preview", not re.search(r"@[a-z0-9_]{3,}|instagram\.com|ig-logo", d + sv, re.I) and "Instagram" not in sv)
+    case("designer page: no Instagram name, logo or handle written into the preview (the stories preview's name is their own handle, sent with the state)",
+         not re.search(r"@[a-z0-9_]{3,}|instagram\.com|ig-logo|nicolelhill", d + sv, re.I) and "Instagram" not in sv)
     for css_name, css in (("designs styles", design_js_designs.DESIGN_DESIGNS_CSS), ("saving styles", design_js_save.DESIGN_SAVE_CSS)):
         case(f"{css_name}: no backslash, fetch nothing (no url(...), no @font-face, no @import), name no font, light only",
              "\\" not in css and "url(" not in css and "@font-face" not in css and "@import" not in css and "prefers-color-scheme" not in css

@@ -31,12 +31,18 @@ The button is off while this runs. A change to the design while it runs stops it
 
 The timers here are waits between tries (a slide or a commit the Assistant did not answer), never something
 the page's state depends on.
+
+STORIES (Designer.STORY; hers, v19): "Save stories" makes each story 1080 by 1920 the same way and the Assistant puts
+the set in the Stories folder; the tick is "Show Instagram's buttons" (the bands are the strip's own, never in a saved
+story); "Preview" plays like Instagram stories: a black phone, a bar for each story across the top, their name
+(their Instagram handle, or "yourname") with "2h" and a close mark, the reply bar at the bottom, and a tap on the
+left third goes back, anywhere else goes on.
 """
 
 DESIGN_SAVE_JS = r"""
 (function(){
   'use strict';
-  var D = window.Designer, M = D.M, P = window.DesignPlan, $ = D.$, el = D.el, W = M.W, H = M.H;
+  var D = window.Designer, M = D.M, P = window.DesignPlan, $ = D.$, el = D.el, W = M.W, H = M.H, STORY = D.STORY;
 
   // Every line of words this part of the page says. (What the Assistant answers with is shown as it comes.)
   var SW = D.WORDS.save = {
@@ -77,8 +83,11 @@ DESIGN_SAVE_JS = r"""
     previewLabel: 'Preview', count: function(i, n){ return i + ' of ' + n; },
     prev: 'Previous slide', next: 'Next slide', close: 'Close',
     previewHint: 'Swipe, use the arrows, or the arrow keys.',
-    gridTitle: 'Your profile grid shows the first slide a little narrower. The striped edges on slide 1 are what it leaves out.'
+    gridTitle: 'Your profile grid shows the first slide a little narrower. The striped edges on slide 1 are what it leaves out.',
+    // the stories preview (hers): the name bar and the reply bar a story is shown with
+    ago: '2h', reply: 'Send message'
   };
+  D.storyWords(SW, {previewLabel: 'Preview'});
   var TRIES = 3, WAIT = 2000, FLUSH_WAIT = 20000, COMMIT_WAIT = 75000, QUALITY = 0.93;
 
   var saveBtn = $('save-slides'), prevBtn = $('preview-btn'), line = $('save-line'), yes = $('save-yes'), no = $('save-no');
@@ -145,7 +154,7 @@ DESIGN_SAVE_JS = r"""
   // One finished slide to the Assistant's waiting place. Sent again when no answer comes (the same picture
   // twice is fine there). -> {ok} or {ok: false, words}
   async function sendSlide(id, token, i, of, blob){
-    var url = '/design-slide?' + D.Q + '&design=' + encodeURIComponent(id) + '&set=' + encodeURIComponent(token) + '&i=' + i + '&of=' + of;
+    var url = '/design-slide?' + D.Q + D.KQ + '&design=' + encodeURIComponent(id) + '&set=' + encodeURIComponent(token) + '&i=' + i + '&of=' + of;
     for (var t = 0; t < TRIES; t++) {
       try {
         var r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'image/jpeg'}, body: blob});
@@ -163,6 +172,7 @@ DESIGN_SAVE_JS = r"""
   // it, or does not answer, so one press ends as one set under one name.
   async function commit(id, token, rev, count, drawn){
     var o = {kit: D.KIT, design: id, set: token, rev: rev, count: count};
+    if (STORY) o.kind = 'stories';
     if (drawn) o.drawn = drawn;
     var body = JSON.stringify(o);
     var until = Date.now() + COMMIT_WAIT, again = 0;
@@ -274,7 +284,7 @@ DESIGN_SAVE_JS = r"""
   // "Open the Carousel folder": the kit's own folder, through the Assistant; its answer shows right here
   openBtn.addEventListener('click', function(){
     openLine.textContent = '';
-    fetch('/open?' + D.Q + '&sub=Carousel', {cache: 'no-store'})
+    fetch('/open?' + D.Q + '&sub=' + (STORY ? 'Stories' : 'Carousel'), {cache: 'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(j){
         var words = (j && j.words) || D.WORDS.cantReach;
@@ -295,10 +305,10 @@ DESIGN_SAVE_JS = r"""
   // what the tick shows is said in words in the bar for as long as it is on (a title alone is never seen by
   // a finger or a keyboard)
   var gridLine = $('grid-line');
-  grid.parentNode.title = SW.gridTitle;
+  if (!STORY) grid.parentNode.title = SW.gridTitle;
   grid.addEventListener('change', function(){ D.render(); });
   D.on('render', function(){
-    var on = grid.checked && !!D.st, s = D.scale, trim = P.gridTrim();
+    var on = !STORY && grid.checked && !!D.st, s = D.scale, trim = P.gridTrim();     // a story's tick shows the bands instead
     cropL.classList.toggle('on', on); cropR.classList.toggle('on', on);
     if (gridLine.hidden !== !on) { gridLine.textContent = on ? SW.gridTitle : ''; gridLine.hidden = !on; }
     if (!on) return;
@@ -318,6 +328,20 @@ DESIGN_SAVE_JS = r"""
   var dots = el('div', 'pv-dots'); dots.id = 'pv-dots';
   var foot = el('div', 'pv-foot'), bClose = el('button', 'tb', SW.close); bClose.type = 'button'; bClose.id = 'pv-close';
   foot.appendChild(el('span', '', SW.previewHint)); foot.appendChild(bClose);
+  // stories: the bars a story is shown with, over it, so they can see what those cover (hers); never in a saved story
+  var bars = null, handleEl = null;
+  if (STORY) {
+    phone.classList.add('pv-story');
+    bars = el('div', 'pv-bars'); bars.id = 'pv-bars';
+    var igtop = el('div', 'pv-igtop'); igtop.id = 'pv-igtop';
+    igtop.appendChild(el('i'));
+    var who = el('span'); handleEl = el('span', 'pv-who'); who.appendChild(handleEl); who.appendChild(document.createTextNode(' ')); who.appendChild(el('small', '', SW.ago));
+    igtop.appendChild(who); igtop.appendChild(el('span', 'pv-x', '×'));
+    var igbot = el('div', 'pv-igbot'); igbot.id = 'pv-igbot';
+    igbot.appendChild(el('span', '', SW.reply)); igbot.appendChild(el('b', '', '♡')); igbot.appendChild(el('b', '', '➤'));
+    [bars, igtop, igbot].forEach(function(x){ x.setAttribute('aria-hidden', 'true'); view.appendChild(x); });
+    count.hidden = true; dots.hidden = true;
+  }
   phone.appendChild(view); phone.appendChild(dots); phone.appendChild(foot);
   modal.appendChild(phone);
   var pv = {open: false, i: 0, w: 360, st: null, shelf: null, cvs: [], drawn: {}, drag: null};
@@ -334,6 +358,7 @@ DESIGN_SAVE_JS = r"""
     pv.i = M.clamp(i, 0, pv.st.slides - 1);
     place(0);
     Array.prototype.forEach.call(dots.children, function(d, k){ d.classList.toggle('on', k === pv.i); });
+    if (bars) Array.prototype.forEach.call(bars.children, function(d, k){ d.classList.toggle('on', k === pv.i); d.classList.toggle('pv-done', k < pv.i); });
     count.textContent = SW.count(pv.i + 1, pv.st.slides);
     bPrev.style.visibility = pv.i > 0 ? 'visible' : 'hidden';
     bNext.style.visibility = pv.i < pv.st.slides - 1 ? 'visible' : 'hidden';
@@ -348,6 +373,7 @@ DESIGN_SAVE_JS = r"""
     var h = Math.round(pv.w * H / W);
     view.style.width = pv.w + 'px'; view.style.height = h + 'px';
     track.textContent = ''; dots.textContent = '';
+    if (bars) { bars.textContent = ''; handleEl.textContent = (D.S && D.S.handle) || 'yourname'; }
     track.classList.add('pv-held');           // it is put in place, not slid there
     for (var k = 0; k < st.slides; k++) {
       var cv = document.createElement('canvas');
@@ -358,6 +384,7 @@ DESIGN_SAVE_JS = r"""
       ctx.fillRect(0, 0, cv.width, cv.height);
       track.appendChild(cv); pv.cvs.push(cv);
       dots.appendChild(el('b'));
+      if (bars) bars.appendChild(el('b'));
     }
     pv.open = true;
     D.modals.open(modal, function(){
@@ -392,7 +419,13 @@ DESIGN_SAVE_JS = r"""
     var dx = pv.drag.dx;
     pv.drag = null;
     track.classList.remove('pv-held');
-    if (pv.open) go(cancel ? pv.i : P.swipe(pv.i, dx, pv.st.slides));
+    if (!pv.open) return;
+    if (STORY && !cancel && e && Math.abs(dx) < 6) {       // a tap, like stories: the left third goes back, the rest goes on
+      var r = view.getBoundingClientRect();
+      go(e.clientX < r.left + r.width / 3 ? pv.i - 1 : pv.i + 1);
+      return;
+    }
+    go(cancel ? pv.i : P.swipe(pv.i, dx, pv.st.slides));
   }
   view.addEventListener('pointerup', function(e){ endDrag(e, false); });
   view.addEventListener('pointercancel', function(e){ endDrag(e, true); });
@@ -439,4 +472,20 @@ DESIGN_SAVE_CSS = """
 .pv-nav.pv-r{right:8px}
 .pv-count{position:absolute;top:10px;right:10px;z-index:5;background:rgba(0,0,0,.6);color:#fff;font-size:12px;border-radius:999px;padding:2px 8px;pointer-events:none}
 .pv-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 12px 12px;font-size:12.5px;color:#555}
+/* the stories preview, with Instagram's own bars on top (hers) */
+.pv-phone.pv-story{background:#000;color:#fff}
+.pv-phone.pv-story .pv-foot{color:#bbb;padding-top:10px}
+.pv-phone.pv-story .pv-foot .tb{background:#fff;color:#111;border-color:#fff}
+.pv-count[hidden],.pv-dots[hidden]{display:none!important}
+.pv-bars{position:absolute;left:8px;right:8px;top:8px;display:flex;gap:4px;z-index:6;pointer-events:none}
+.pv-bars b{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.45)}
+.pv-bars b.on,.pv-bars b.pv-done{background:#fff}
+.pv-igtop{position:absolute;left:12px;right:12px;top:20px;display:flex;align-items:center;gap:8px;z-index:6;color:#fff;font:600 13px var(--sans);text-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none}
+.pv-igtop i{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#e0855a,#c4683f);box-shadow:0 0 0 2px #fff;display:block;flex:none}
+.pv-igtop small{font-weight:400;opacity:.8}
+.pv-igtop .pv-x{margin-left:auto;font-size:20px;font-weight:300}
+.pv-igbot{position:absolute;left:10px;right:10px;bottom:12px;display:flex;align-items:center;gap:12px;z-index:6;pointer-events:none}
+.pv-igbot span{flex:1;border:1.5px solid rgba(255,255,255,.85);border-radius:999px;color:#fff;font:14px var(--sans);padding:9px 14px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pv-igbot b{color:#fff;font-size:22px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pv-story .pv-nav{z-index:7}
 """

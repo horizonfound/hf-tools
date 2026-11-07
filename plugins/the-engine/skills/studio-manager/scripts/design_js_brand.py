@@ -89,7 +89,10 @@ DESIGN_BRAND_JS = r"""
   function use(c){
     if (!D.st || D.blocked || !COLOR.test(c)) return;
     say('');
-    if (selText()) D.type.edit({color: c});
+    var t = selText();
+    // a story's text on a box: a brand color colors the box, and the words go black or white on it (hers)
+    if (t && D.STORY && D.type.look(t) === 'box') D.type.change('boxColor', c);
+    else if (t) D.type.edit({color: c});
     else D.setState(function(st){ return M.setBg(st, c); });
   }
 
