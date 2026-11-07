@@ -122,7 +122,7 @@ Ask: "Want words on the first photo?" [No words (recommended)] [Yes, give me opt
 python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
   --picks 7,2,11+,4,9-,1-,5,12+ --song "<song file>"   (or --capcut-song "<name>", or --song none)
   --pace beat|mixed|calm|build   [--night "<backup>" --shoot-id s1]
-  [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2]
+  [--hook "the line they picked"] [--song-start 58] [--fit] [--variation 2] [--clips clips.json]
 ```
 
 - **The reel is named after its shoot.** When you came from the Assistant, pass the backup and shoot id it gave you (`--night`, `--shoot-id`): the CapCut project is then called exactly like the shoot's folder plus "reel" ("2022-06-24 Black-sand beach reel"), and so is the video CapCut exports. Without those, the shoot name goes through their own folder pattern, dated by the first photo. A second reel of the same shoot gets "reel 2". Only use `--name` if they ask for a different name.
@@ -130,6 +130,7 @@ python3 scripts/reel.py make --folder "<edited photos>" --shoot "<shoot name>" \
 - `--variation 2` (3, 4...) gives another mix of the same picks with the same vibe, if they want to see it move differently.
 - Wide photos fill the screen by default; `--fit` shows them whole with bars instead.
 - `--dry-run` prints the plan and writes nothing.
+- **Video clips, when the reel has footage:** `--clips clips.json`, a list of the moments, each `{"path": the video, "src": seconds into the video where the moment starts, "seconds": how long its card is, "w": the video's width, "h": its height, "length": the whole video's length in seconds}`. Put them in `--picks` where they play, as `c1`, `c2`... by their place in the list: `c1,7,2,c2,11-,4`. Each clip plays once, so the same moment twice (a Bookends reel that opens and closes on it) is two entries, `c1` and `c2`. A clip runs whole beats, never longer than its card or past the end of its video; with a song the clips are muted, with no song they keep their own sound. If anything in the file is missing or can't be right, the script stops and says what in plain words: never guess a size or a length.
 
 If the script says CapCut was open, tell them it will appear in their CapCut projects in a moment, and only if it doesn't: "Quit CapCut and open it again." Exit 2 is a stop: say what it printed.
 
@@ -137,7 +138,7 @@ How the timing works, if they ask: the whole reel is worked out at once for its 
 
 ## Step 7: hand it over
 
-Two lines, their words: "It's in CapCut: 2022-06-24 Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off."
+Two lines, their words: "It's in CapCut: 2022-06-24 Black-sand beach reel, 10 photos, 12.4 seconds, cut on the beat of Golden Hour. Open it, add your look, and export." If the script named wide photos, add: "Photo 4 is wide, so it's zoomed to fill the screen; slide it in CapCut if anything important is cut off." With clips in the reel the script counts by place in the reel, clips included, so say it that way ("The 5th one in the reel is wide..."), and pass on its line about a wide clip the same way.
 
 Then one next step, as a question with buttons: a carousel from the same picks, or trial reels. **Trial reels** are the same cut with a different opening line: run `make` again with another `--hook` and `--name "<shoot> reel, take 2"`, one project each, in seconds. Remind them once that trial reels go out as trial reels, never to the feed.
 

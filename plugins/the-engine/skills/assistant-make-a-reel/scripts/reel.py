@@ -358,6 +358,11 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
         if x["kind"] == "clip":
             length = float(x["length"])
             src = float(x["src"])
+            if piece["dur"] > length + 1e-6:               # the whole video is shorter than one beat of the reel
+                which = x.get("label") or "a clip"
+                return None, {"problem": f"STOP: {which} ({Path(x['path']).name}) is only {length:.2f} seconds of "
+                                         f"video, and nothing in a reel stays on screen for less than one beat "
+                                         f"({piece['dur']:.2f} s here). Pick a longer moment for it, or take it out."}
             if src + piece["dur"] > length:                # near the end of the video: start a little earlier
                 src = max(0.0, length - piece["dur"] - 0.05)
             piece.update(clip=True, src=round(src, 3), length=length)
@@ -367,16 +372,21 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
     early = [round((beats[i] - song_from) - f / FPS, 3) for i, f in zip(idx, cut_f)]
     clips = [k + 1 for k, x in enumerate(items) if x["kind"] == "clip"]
     photo_no = 0
-    wide = []
-    for x in items:
+    wide, wide_at, wide_clips = [], [], []                # photo numbers; places in the reel; clips (places)
+    for at, x in enumerate(items, 1):
+        is_wide = x.get("w", 0) > x.get("h", 0) * 1.05
         if x["kind"] == "photo":
             photo_no += 1
-            if x.get("w", 0) > x.get("h", 0) * 1.05:
+            if is_wide:
                 wide.append(photo_no)
+                wide_at.append(at)
+        elif is_wide:
+            wide_clips.append(at)
     facts = {"tempo": grid.tempo, "meter": grid.meter, "feel": vibe, "vibe": vibe, "feel_words": words,
              "shortest": shortest, "longest": longest, "beats": steps, "length": round(cut_f[-1] / FPS, 2),
              "song_from": round(song_from, 3) if song else None, "song_from_f": from_f if song else None,
-             "cut_early_by": early, "beats_from": grid.beats_from, "wide": wide, "clips": clips,
+             "cut_early_by": early, "beats_from": grid.beats_from, "wide": wide, "wide_at": wide_at,
+             "wide_clips": wide_clips, "clips": clips,
              "photo_count": photo_no,
              "beats_line": timing.beats_line(items, holds), "hits_line": timing.hits_line(grid, i0, holds),
              "kind_note": timing.kind_note(items, vibe, song, song_length) if got["squeezed"] else None}
@@ -451,12 +461,16 @@ def read_clips(path):
             say(f"STOP: clip c{k} needs its video (path), where it starts (src), how long it is (seconds) and "
                 f"how long the whole video is (length).")
             sys.exit(2)
-        if src < 0 or secs <= 0 or length <= 0 or src >= length:
-            say(f"STOP: clip c{k} starts at {src:g} s and runs {secs:g} s, but its video is {length:g} s long.")
+        if src < 0 or secs <= 0 or length <= 0 or src + secs > length + 0.05:
+            say(f"STOP: clip c{k} starts at {src:g} s and runs {secs:g} s, but its video is {length:g} s long, "
+                f"so it would run past the end of its video.")
             sys.exit(2)
-        w, h = num("w") or 0, num("h") or 0
+        w, h = num("w", "width"), num("h", "height")
+        if not w or not h or w <= 0 or h <= 0:
+            say(f"STOP: clip c{k} needs its video's size (w and h, in pixels), so it can fill the tall screen.")
+            sys.exit(2)
         out.append({"kind": "clip", "path": str(Path(p).expanduser()), "src": src, "seconds": secs,
-                    "w": int(w), "h": int(h), "length": length})
+                    "w": int(w), "h": int(h), "length": length, "label": f"c{k}"})
     return out
 
 
@@ -526,8 +540,7 @@ def cmd_make(a):
     span = (f"{facts['shortest']:.1f} to {facts['longest']:.1f} seconds a photo"
             if facts["shortest"] != facts["longest"] else f"{facts['shortest']:.1f} seconds a photo")
     n_cl, n_ph = len(facts["clips"]), facts["photo_count"]
-    what = (f"{n_cl} clip{'s' if n_cl != 1 else ''} and {n_ph} photo{'s' if n_ph != 1 else ''}" if n_cl
-            else f"{n_ph} photos")
+    what = (f"{n_cl} clip{'s' if n_cl != 1 else ''} and " if n_cl else "") + f"{n_ph} photo{'s' if n_ph != 1 else ''}"
     if song:
         say(f"Plan: {what}, {facts['length']:.1f} seconds, {facts['feel_words']} ({span}), every cut "
             f"on the beat at about {facts['tempo']:.0f} beats a minute{when}.")
@@ -542,8 +555,15 @@ def cmd_make(a):
     for k, p in enumerate(pieces, 1):
         if p.get("clip"):
             say(f"  {k}. clip from {Path(p['path']).name} at {p['src']:.1f} s, {p['dur']:.1f} s long")
-    if facts["wide"]:
-        say(f"Wide photos zoomed to fill the screen: {', '.join(map(str, facts['wide']))} (slide them in CapCut if a face is cut off).")
+    if facts["wide"] and not a.fit:
+        if n_cl:                                     # count by place in the reel, as the clip lines above do
+            say(f"Wide photos zoomed to fill the screen, by their place in the reel: "
+                f"{', '.join(map(str, facts['wide_at']))} (slide them in CapCut if a face is cut off).")
+        else:
+            say(f"Wide photos zoomed to fill the screen: {', '.join(map(str, facts['wide']))} (slide them in CapCut if a face is cut off).")
+    for k in ([] if a.fit else facts["wide_clips"]):
+        say(f"The clip at {k} in the reel ({Path(pieces[k - 1]['path']).name}) is wide, so it's zoomed to fill the tall screen and loses its sides "
+            f"(slide it in CapCut if anything important is cut off).")
     if a.dry_run:
         if facts["hits_line"]:
             say(facts["hits_line"])

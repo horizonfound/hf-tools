@@ -390,7 +390,7 @@ PICKER_JS = r"""
     reel: {
       label: 'Reel', thing: 'reel', rowname: 'Your reel',
       help: 'Your reel, in the order it plays. Drag a photo to move it. Drag one up from below to add it. Click any photo to see it big.',
-      legend: 'Under each photo: how long it stays on screen. Normal, Longer or Quicker. Longer and Quicker count when the reel moves as “A little of everything”.',
+      legend: 'Under each photo: how long it stays on screen. Normal, Longer or Quicker. Longer stays on screen about twice as long. Quicker gets the shortest time, one beat.',
       few: 'A reel needs at least 2 photos.', full: 'A reel holds up to 60 photos. Take one out first.',
       done: 'Saved. Go back to the chat and say “done”, and I’ll ask which song to cut it to.',
       doneAgain: 'Saved. Go back to the chat and say “done”, and I’ll make a new reel in this order. The one already in CapCut stays as it is.'

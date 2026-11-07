@@ -51,7 +51,7 @@ They said "done" and there is no ARRANGED line: they didn't press the button, an
 
 ## Two things to be straight about
 
-**Longer and Quicker.** Under each photo in the row is a bar that reads Normal, Longer or Quicker. Those are the reel's `+` and `-` marks. They decide which photos linger and which pass quickly only when the reel moves as "A little of everything". The other ways of moving (calm, fast, build, one photo a beat) do not use them. The page says so; you say so too if they set some and then pick another way of moving: "One thing: the Longer and Quicker you set only count with \"A little of everything\". With this one they aren't used."
+**Longer and Quicker.** Under each photo in the row is a bar that reads Normal, Longer or Quicker. Those are the reel's `+` and `-` marks, and they count with every vibe (On every beat, A little of everything, Calm, Build). In Nicole's words, which the page uses too: "Longer stays on screen about twice as long", "Quicker gets the shortest time, one beat". On a short song a Longer photo may get a little less than twice, since nothing is left out to fit.
 
 **A reel that is already in CapCut is never changed.** A new order makes a new CapCut project beside the first ("... reel 2"); the one they may already have styled stays exactly as it is. Say that in a few words when they rearrange a reel that was already made.
 

@@ -292,17 +292,17 @@ def _main(work, songs):
     wd.mkdir(parents=True)
     (wd / "photos.json").write_text(json.dumps({"folder": str(photos), "photos": listing}), encoding="utf-8")
 
-    def clips_file(clips, tag):
+    def clips_file(clips, tag, size=(2160, 3840)):
         f = work / f"clips-{tag}.json"
-        f.write_text(json.dumps([{"path": str(work / VIDEO_NAME), "src": s, "seconds": round(e - s, 2), "w": 2160,
-                                  "h": 3840, "length": 420.7767} for s, e in clips]), encoding="utf-8")
+        f.write_text(json.dumps([{"path": str(work / VIDEO_NAME), "src": s, "seconds": round(e - s, 2), "w": size[0],
+                                  "h": size[1], "length": 420.7767} for s, e in clips]), encoding="utf-8")
         return f
 
-    def make(song, vibe, picks, clips=(), variation=0, start=None, flag="--pace", tag="x", extra=()):
+    def make(song, vibe, picks, clips=(), variation=0, start=None, flag="--pace", tag="x", extra=(), size=(2160, 3840)):
         args = ["make", "--dry-run", "--folder", photos, "--shoot", "Pretend", "--picks", picks, flag, vibe,
                 "--song", song if song else "none", "--variation", variation]
         if clips:
-            args += ["--clips", clips_file(clips, tag)]
+            args += ["--clips", clips_file(clips, tag, size)]
         if start is not None:
             args += ["--song-start", start]
         return run_reel(env, *(args + list(extra)))
@@ -349,15 +349,57 @@ def _main(work, songs):
     check("reel.py, photos only and no --clips: the plan line arrange_check reads, and her beats line",
           code == 0 and out.startswith("Plan: 10 photos") and beats_of(out).startswith("Beats per piece: "), out[-400:])
 
+    print("\n-- what the plan says (the timing reviewers' findings, Nov 7)")
+    code, out = make(BEAT60, "mixed", "1,2,3,4,5,6,7,8,9", tag="roomy")
+    check("reel.py, 9 photos, A little of everything, on the 60-second test beat (a reel of about 8 seconds): "
+          "no \"Your song is only...\" note, since the song had room (her engine said it here)",
+          code == 0 and "Your song is only" not in out and beats_of(out).startswith("Beats per piece: "),
+          f"exit {code}: {out[-600:]}")
+    code, out = make(BEAT60, "beat", "7", tag="one")
+    check("reel.py, a one-photo reel: \"Plan: 1 photo,\" (not \"1 photos\")", code == 0 and out.startswith("Plan: 1 photo,"),
+          f"exit {code}: {out[:300]}")
+    code, out = make(BEAT60, "beat", "21,1,2", tag="widephoto")
+    check("reel.py, photos only: the wide photo named by its photo number, as before",
+          code == 0 and "Wide photos zoomed to fill the screen: 1 (" in out, f"exit {code}: {out[-500:]}")
+    code, out = make(BEAT60, "beat", "c1,1,2,21,3", [(2.5, 6.5)], tag="wideclip", size=(1920, 1080))
+    check("reel.py, with a clip first: the wide photo named by its place in the reel (4), and the wide clip named too",
+          code == 0 and "Wide photos zoomed to fill the screen, by their place in the reel: 4 (" in out
+          and f"The clip at 1 in the reel ({VIDEO_NAME}) is wide" in out, f"exit {code}: {out[-700:]}")
+    code, out = make(BEAT60, "beat", "c1,1,2,21,3", [(2.5, 6.5)], tag="wideclipfit", size=(1920, 1080), extra=("--fit",))
+    check("reel.py --fit: nothing is zoomed, so no line says it is", code == 0 and "zoomed" not in out,
+          f"exit {code}: {out[-500:]}")
+
+    short = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 0.0, "seconds": 4.0, "w": 2160, "h": 3840,
+              "length": 1.0}] + [photo(x, photos) for x in ("1", "2", "3")]
+    pieces, facts = reel.plan_reel(short, str(BEAT60), "beat")
+    fits = pieces is not None and pieces[0]["src"] + pieces[0]["dur"] <= 1.0 + 1e-6
+    check("plan_reel, a 4-second card on a 1-second video: the clip runs no longer than its video",
+          fits, json.dumps(facts if pieces is None else pieces[0]))
+    tiny = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 0.0, "seconds": 0.2, "w": 2160, "h": 3840,
+             "length": 0.2}] + [photo(x, photos) for x in ("1", "2")]
+    pieces, facts = reel.plan_reel(tiny, str(BEAT60), "beat")
+    check("plan_reel, a video shorter than one beat: STOP in plain words, nothing planned past its end",
+          pieces is None and facts["problem"].startswith("STOP:")
+          and "only 0.20 seconds of video" in facts["problem"], json.dumps(facts if pieces is None else pieces[0]))
+
+    page = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts" / "arrange_page.py").read_text(encoding="utf-8")
+    part = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "parts" / "arrange.md").read_text(encoding="utf-8")
+    check("the reel picker's legend and parts/arrange.md: Longer and Quicker count in every vibe, in Nicole's words",
+          "Longer stays on screen about twice as long" in page and "Quicker gets the shortest time, one beat" in page
+          and "count when the reel moves" not in page and "only count with" not in part
+          and "count with every vibe" in part)
+
     print("\n-- --clips refuses what can't be right")
     bad = work / "clips-bad.json"
     for label, content, picks, words in (
             ("a clip with no length", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0}], "c1,1,2", "how long the whole video is"),
             ("a clip that starts past its video's end", [{"path": str(work / VIDEO_NAME), "src": 50.0, "seconds": 4.0, "length": 20.0}], "c1,1,2", "its video is 20 s long"),
-            ("a clip that isn't in --picks", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0}], "1,2,3", "isn't in --picks"),
-            ("c2 when there is one clip", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0}], "c1,1,c2", "no clip c2"),
-            ("one clip played twice", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0}], "c1,1,c1", "more than once"),
-            ("a file with no clips", [], "1,2", "has no clips")):
+            ("a clip that isn't in --picks", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0, "w": 2160, "h": 3840}], "1,2,3", "isn't in --picks"),
+            ("c2 when there is one clip", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0, "w": 2160, "h": 3840}], "c1,1,c2", "no clip c2"),
+            ("one clip played twice", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0, "w": 2160, "h": 3840}], "c1,1,c1", "more than once"),
+            ("a file with no clips", [], "1,2", "has no clips"),
+            ("a clip that runs past the end of its video", [{"path": str(work / VIDEO_NAME), "src": 0.0, "seconds": 4.0, "length": 1.0, "w": 2160, "h": 3840}], "c1,1,2", "run past the end of its video"),
+            ("a clip with no size (w and h)", [{"path": str(work / VIDEO_NAME), "src": 1.0, "seconds": 4.0, "length": 20.0}], "c1,1,2", "needs its video's size")):
         bad.write_text(json.dumps(content), encoding="utf-8")
         code, out = run_reel(env, "make", "--dry-run", "--folder", photos, "--shoot", "Pretend", "--picks", picks,
                              "--song", "none", "--clips", bad)

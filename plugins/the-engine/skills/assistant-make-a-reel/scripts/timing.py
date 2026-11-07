@@ -18,7 +18,7 @@ Her rules, in her words where she gave them:
   - Nothing is ever left out to fit: "you shouldn't be removing" photos or footage. When the song is short the
     longer holds shrink (and they are told kindly, kind_note); when even one beat each can't fit, nothing is
     made and they are told exactly why (the STOP line).
-  - A clip runs whole beats, never longer than its card. An opening clip is 3 to 4 seconds and never under 3;
+  - A clip runs whole beats, never longer than its card or what is left of its video. An opening clip is 3 to 4 seconds and never under 3;
     later clips may shrink to 2 seconds on a short song; a card they made longer than 4.2 s keeps its length,
     give or take a beat.
   - "A little of everything" is mixed differently for every reel: seeded by the file names, the vibe and how
@@ -183,6 +183,8 @@ def candidates(items, grid, vibe, seed, j0=None):
     for idx, x in enumerate(items):
         if x["kind"] == "clip":
             card = float(x["seconds"])
+            if x.get("length") is not None:                    # never past the end of its video
+                card = max(0.0, min(card, float(x["length"]) - float(x.get("src") or 0.0)))
             kmax = max(1, int((card + 0.02) / period))        # whole beats, never longer than the card
             if card <= 4.2:                                    # the Assistant's length (or shorter): 3 to 4 seconds
                 floor_s = 2.95 if idx == 0 else 1.95           # the opening clip never under 3 s; later ones 2 s at the least
@@ -304,7 +306,12 @@ def plan(items, grid, vibe, song_start=None, variation=0, song_length=0.0):
                                      f"least {quickest:.1f} seconds, even with every photo at one beat. "
                 + ("Select fewer clips, take a few photos out, or use a longer song." if n_cl > 1
                    else "Take a few photos out, or use a longer song.")}
-    return {"ok": True, "holds": holds, "j0": j0, "squeezed": sum(holds) < 0.85 * natural}
+    # The kind note is for a song that really was too short: the vibe's own lengths, from where the reel starts,
+    # run past the song's end. Her engine also said it when the search simply chose quicker holds on a song with
+    # room to spare (a mixed reel using a third of a 50-second song), which isn't true; the holds are the same.
+    here = sum(c[0][0] for c in candidates(items, grid, vibe, seed, j0))
+    squeezed = j0 + here > j_end and sum(holds) < 0.85 * natural
+    return {"ok": True, "holds": holds, "j0": j0, "squeezed": squeezed}
 
 
 # ---------------------------------------------------------------- her words
