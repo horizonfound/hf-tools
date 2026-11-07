@@ -302,6 +302,28 @@ interview comes back is yours to say.
 
 ---
 
+### 1h. Her handoff v5 (Nov 6, 11:59am): a post kit you click into, and a reel page in three steps
+
+Read Nov 6, afternoon (the zip is in `reference-private/nicole-handoff-v5-2026-11-06/`, never pushed; read only, never run). Nothing of it is built. Dustin said "Yes, read v5"; building any of it is the two of you to decide.
+
+**What she pictured, in her words:** on the post kit page "there's nothing for you to click into"; "you basically click reel and then it would open another window, which would be the reel picker", where "they could pick the order, or you could choose the order"; a button that "says like, add music to my reel", which "should open a folder that you create in their content folder for music", so they "can drag their screen recording, the song that they like, into that folder"; then "what type of vibe you want", and "make my reel".
+
+**Her post kit page:** the same look as ours, with the Reel and the Carousel as cards you click. Reel: the photos in order as small thumbnails, "In CapCut: <name>" with Open in CapCut, "Make a new version". Carousel: the saved slides, "N slides saved · N saved designs", "Open my carousel" into the designer with "Back to the post kit". Single posts and Stories marked "Coming next" (ours already makes them). No folder buttons.
+
+**Her reel page, three steps:** (1) "Put your photos in order": "Let Claude choose (Recommended)" or "I'll drag them in myself", Longer / Quicker under each photo (ours has these on the reel picker); (2) "Add your song": "Add my music" makes a Music folder inside the shoot and opens it in Finder; whatever lands in it shows on the page within a few seconds and is picked; a screen recording's sound is saved beside it; "No song (I'll add music in Instagram when I post)" with one licensing line; (3) "Pick the vibe": "On every beat (Recommended)", "A little of everything", "Calm", "Build". Then "Make my reel" writes a new CapCut project from the page.
+
+**What ours already does the same or close:** the reel picker (order, add, take out, Longer / Quicker, Claude's pick first); Open in CapCut; the designer from the kit page; singles and stories; the song from a file, from a screen recording (`reel.py sound`), or none; the four paces with "A little of everything" recommended. **What ours does in the chat instead of on a page:** the song question, the pace question, the words on the first photo, and the making itself.
+
+**Where v5 goes against something already decided (yours to settle):**
+1. **Half beats.** Her "On every beat" cuts Quicker photos on half beats (her reel 4, which she approved). Ours: "never cut on half beats" (Nov 5, reel skill); `pace.py` has an every-beat pace on whole beats. Also she recommends "On every beat" where ours recommends "A little of everything".
+2. **CapCut's own songs.** She decided "no CapCut song list" ("they're not going to know what the songs are or the beat"). Dustin, Oct 25: "offer it and let them decide."
+3. **The Music folder inside each shoot**, and the recording's sound saved beside it in their Photos folder. Ours keeps their folder untouched and writes the sound to `~/.studio/reels/<shoot>/`; a saved-songs shelf (`~/.studio/songs/`) was the plan.
+4. **Licensing default.** Her page says the safe way is No song and add music in Instagram. Oct 25 (Nicole): the default is the song in the video, the silent version on request.
+5. **Starting from nothing.** Her page lets them drag an order with no pick from Claude. Rule 11: choosing and ordering is the Assistant's job; the page is for moving things afterwards.
+6. **Her page uses ffmpeg first** (ours: nothing installed), loads a drag library from the internet (ours: nothing from the internet), opens Finder plainly (ours: a window of its own, brought forward), and starts the song at 0 for a short song (ours: where it picks up).
+
+**Size, if you say build:** the post kit as cards, a day at most. The reel page, several days: the song and vibe steps folded into the reel picker, a Music place with a Finder button, the sound pulled out in the background, "Make my reel" as a background job the page watches, every Mac call given its PC way, and tests.
+
 ## 2. Small fixes Claude can make when you say go
 
 ### 2a. Reword the question before a post kit
