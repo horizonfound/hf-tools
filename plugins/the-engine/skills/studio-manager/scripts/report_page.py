@@ -89,7 +89,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .note .copy.sub{background:transparent;color:var(--ink,#1e1e22);border:1px solid var(--line,#d8d1c6)}
 .note .did{font-size:13px;color:var(--ink-2);opacity:0;transition:opacity .3s}
 .note .did.on{opacity:1}
-.note .empty{font-size:14px;color:var(--ink-2);font-style:italic}
+.note .empty{font-size:14px;color:var(--ink-2)}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:1rem 0 clamp(2.5rem,5vw,4rem)}
 .where-card{justify-content:center}
 .where-card .path{font:400 14px/1.45 var(--sans);color:var(--ink-2);word-break:break-all;background:var(--paper);border-radius:14px;padding:.75rem .9rem}
@@ -110,7 +110,7 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 .big-ok{font:600 clamp(24px,2.4vw,30px)/1.15 var(--sans);letter-spacing:-.02em;text-wrap:balance}
 .foot{background:var(--ink);color:var(--cream);overflow:hidden;margin-top:1rem}
 .foot .wrap{padding-top:2rem;font-size:14px;text-align:center;opacity:.9}
-.wordmark{font:600 clamp(34px,8.6vw,124px)/.78 var(--sans);letter-spacing:-.04em;white-space:nowrap;text-transform:uppercase;text-align:center;margin:1.2rem 0 -.22em;color:var(--coral)}
+.wordmark{font:600 clamp(40px,11.2vw,144px)/.78 var(--sans);letter-spacing:-.04em;white-space:nowrap;text-transform:uppercase;text-align:center;margin:1.2rem 0 -.22em;color:var(--coral)}
 @media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}
 .teasers{grid-template-columns:repeat(3,1fr)}.cards{grid-template-columns:1fr}}
 @media(max-width:600px){.teasers{grid-template-columns:repeat(2,1fr)}.bar .when{display:none}}

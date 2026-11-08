@@ -151,7 +151,19 @@ def main():
          all("--%s:%s;" % kv in arrange_page.CSS for kv in (("bg", look.COLOR["cream"]), ("panel", look.COLOR["paper"]), ("ink", look.COLOR["ink"]),
                                                           ("soft", look.COLOR["ink-2"]), ("line", look.COLOR["line"]), ("accent", look.COLOR["coral-2"])))
          and "--sans:" + look.SANS + ";" in arrange_page.CSS
-         and not re.search(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0|-apple-system", chrome, re.I), re.findall(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0", chrome, re.I)[:3])
+         and not re.search(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0|-apple-system", chrome.replace(look.SANS, ""), re.I),
+         re.findall(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0|-apple-system", chrome.replace(look.SANS, ""), re.I)[:3])
+    # the reviewers' fixes (Nov 7)
+    case("the font list sends the few symbols DM Sans lacks to the Mac's own font, not Lucida Grande or PingFang",
+         look.SANS.startswith("'Assistant Sans',-apple-system,BlinkMacSystemFont,") and "'Segoe UI'" in look.SANS)
+    case("no slanted DM Sans left on the report or the queue ('Not written yet', 'Next up: <name>')",
+         "font-style:italic" not in report_page.CSS + edit_queue.CSS and "#next em{font-style:normal" in edit_queue.CSS)
+    case("the report's footer wordmark fills its band again (11.2vw, up to 144px)",
+         ".wordmark{font:600 clamp(40px,11.2vw,144px)/.78 var(--sans)" in report_page.CSS)
+    case("the pickers' top bar: the coral BY HORIZON FOUND and pill buttons of every other page, the old by-line on a phone so nothing wraps",
+         "text-transform:uppercase;color:var(--accent)}" in arrange_page.CSS and "border-radius:10px" not in
+         re.search(r"\.bar \.homelink\{[^}]*\}", arrange_page.CSS).group(0) + re.search(r"\.bar \.kitlink\{[^}]*\}", arrange_page.CSS).group(0)
+         and ".brand small{margin-top:2px;font:400 11.5px/1.1 var(--sans);letter-spacing:0;text-transform:none;color:var(--soft-s)}}" in arrange_page.CSS)
     pick, plain = arrange_page.page_html("A kit", "reel"), arrange_page.plain_page("Nothing here.")
     des = design_page.page_html("A kit"); story = design_page.page_html("A kit", "stories")
     case("the pickers, their plain page and both designers start their styles with the page server's own fonts",

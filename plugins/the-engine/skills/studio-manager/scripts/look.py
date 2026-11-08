@@ -41,7 +41,11 @@ FONT_ROUTE = "/look-font"
 # triangles) falls through to the next name in the list, and in the designer 'DM Sans' is the photographer's slide
 # font, so the page itself was loading the photographer's DM Sans Bold for an arrow. With the name left out the
 # page never asks for a slide font. Same letters either way when the route is up.
-SANS = "'Assistant Sans','Helvetica Neue','Segoe UI',Arial,sans-serif"
+# -apple-system and BlinkMacSystemFont come right after it (Nov 7, review): the few symbols DM Sans lacks (the
+# little triangle on "My designs", the ticks, the pens, the arrow on Open photo folder, the drag grips) are drawn
+# in the Mac's own font, as the pickers drew them before, instead of whatever Chrome finds (Lucida Grande,
+# PingFang, Apple Symbols). Neither name means anything on a PC, which goes on to Segoe UI.
+SANS = "'Assistant Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue','Segoe UI',Arial,sans-serif"
 
 # Every colour name the pages use. The first block is the reel page's own; the second is the backup report's
 # extra palette (the first look, the stats bar, the legend), kept at the values it has always had.

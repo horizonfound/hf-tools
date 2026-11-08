@@ -455,6 +455,7 @@ body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--
 .eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(16px,1.4vw,18px);max-width:38em}
+#next em{font-style:normal;font-weight:600;color:var(--ink)}
 .talk{margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.3rem .7rem;align-items:baseline;background:var(--sun-l);border-radius:22px;padding:.65rem 1.1rem;font-size:14px;color:var(--ink-2);width:fit-content;max-width:100%}
 .talk i{font:400 16px/1.3 var(--sans);color:var(--ink)}
 .list{display:grid;gap:1rem;padding:1rem 0 2rem;margin:0;list-style:none}

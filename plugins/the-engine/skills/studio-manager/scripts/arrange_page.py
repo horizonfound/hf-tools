@@ -61,11 +61,12 @@ button{font-family:inherit}
 .wrap{display:flex;flex-direction:column;min-height:100vh;padding:0 16px}
 .bar,.head,.panel,.poolsec,.plain{flex:none;width:100%;max-width:1068px;margin-left:auto;margin-right:auto}
 .bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;min-height:52px;padding:8px 0;border-bottom:1px solid var(--line)}
-.brand b{font:600 14px/1.1 var(--sans)}.brand small{display:block;margin-top:2px;font:400 11.5px/1.1 var(--sans);color:var(--soft-s)}
-.bar .homelink{display:inline-flex;align-items:center;gap:.45em;font:600 13.5px/1.2 var(--sans);color:var(--panel);background:var(--ink);text-decoration:none;padding:8px 14px 8px 11px;border-radius:10px;white-space:nowrap;transition:background .15s}
+.brand b{font:600 14px/1.1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.bar .homelink{display:inline-flex;align-items:center;gap:.45em;font:600 13.5px/1.2 var(--sans);color:var(--panel);background:var(--ink);text-decoration:none;padding:8px 14px 8px 11px;border-radius:999px;white-space:nowrap;transition:background .15s}
 .bar .homelink:hover{background:var(--accent)}.bar .homelink .short{display:none}
-@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
-.bar .kitlink{margin-left:auto;font:600 13.5px/1.2 var(--sans);color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;transition:background .15s}
+@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}
+.brand small{margin-top:2px;font:400 11.5px/1.1 var(--sans);letter-spacing:0;text-transform:none;color:var(--soft-s)}}
+.bar .kitlink{margin-left:auto;font:600 13.5px/1.2 var(--sans);color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 12px;transition:background .15s}
 .bar .kitlink:hover{background:var(--chip)}
 .head{padding:18px 0;display:grid;gap:2px}
 .eyebrow{font:600 11.5px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
