@@ -126,6 +126,17 @@ def main():
         case(label + ": no italic left on a heading or a quiet line (DM Sans has no italic of its own)",
              not re.search(r"font:\s*italic", css), re.findall(r"[^}]*font:\s*italic[^}]*", css)[:2])
     case("report_page and edit_queue no longer name Google Fonts", not hasattr(report_page, "FONTS") and not hasattr(edit_queue, "FONTS"))
+    # the posts side (group B): the posting page, the home page, the post kit
+    import posting_queue
+    import home
+    import kit
+    for label, css in (("posting_queue.CSS", posting_queue.CSS), ("home.CSS_EXTRA", home.CSS_EXTRA), ("kit.CSS", kit.CSS)):
+        case(label + ": no serif, no --display, nothing from the internet", not SERIF.search(sans_only(css)), SERIF.findall(sans_only(css)))
+        case(label + ": no italic left on a heading or a quiet line (DM Sans has no italic of its own)",
+             not re.search(r"font:\s*italic", css), re.findall(r"[^}]*font:\s*italic[^}]*", css)[:2])
+    case("posting_queue no longer names Google Fonts, and the reel page has no /reel-font fallback in its page",
+         not hasattr(posting_queue, "FONTS") and not hasattr(reel_page, "SANS_FALLBACK_CSS"))
+    case("the kit page's head is the shared look (no /reel-font, no Fraunces)", kit._font_css() == look.head_css())
 
     # a small backup's report, written for real
     session = work / "2026-11-07 look test"
@@ -164,8 +175,11 @@ def main():
             return str(fallback)
         rport = port_in(st / "report-url.txt", BASE)
         qport = port_in(studio_home / "queue-url.txt", BASE + 5)
-        case("both servers came up", wait(f"http://127.0.0.1:{rport}/report.html") and wait(f"http://127.0.0.1:{qport}/queue.html"))
-        for label, port in (("report server", rport), ("editing queue server", qport)):
+        start(SCRIPTS / "posting_queue.py", "serve", "--port", str(BASE + 10))
+        pport = port_in(studio_home / "posting-url.txt", BASE + 10)
+        case("all three servers came up", wait(f"http://127.0.0.1:{rport}/report.html") and wait(f"http://127.0.0.1:{qport}/queue.html")
+             and wait(f"http://127.0.0.1:{pport}/home"))
+        for label, port in (("report server", rport), ("editing queue server", qport), ("posting server", pport)):
             code, body, hd = get(f"http://127.0.0.1:{port}/look-font?f=DMSans-SemiBold")
             case(label + ": /look-font gives DMSans-SemiBold byte for byte", code == 200 and body == semi and hd.get("Content-Type") == "font/ttf", code)
             for bad in ("../DMSans-SemiBold", "Fraunces-Italic", ""):
@@ -177,6 +191,11 @@ def main():
         case("report server: the report it serves asks for no outside address", code == 200 and b"googleapis" not in body and b"/look-font?f=" in body)
         code, body, _ = get(f"http://127.0.0.1:{qport}/queue.html")
         case("editing queue server: its page asks for no outside address", code == 200 and b"googleapis" not in body and b"/look-font?f=" in body)
+        for path in ("/home", "/posting.html"):
+            code, body, _ = get(f"http://127.0.0.1:{pport}{path}")
+            case("posting server: %s asks for no outside address, takes the shared look, no serif" % path,
+                 code == 200 and b"googleapis" not in body and b"<link" not in body and ("<style>" + look.head_css()).encode() in body
+                 and not SERIF.search(sans_only(body.decode("utf-8"))), (code, SERIF.findall(sans_only(body.decode("utf-8", "replace")))[:3]))
     finally:
         for p in procs:
             try:

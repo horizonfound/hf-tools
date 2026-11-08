@@ -201,8 +201,12 @@ def check_page_fresh(s):
     k = s.kit
     code, text = page(s)
     case("the page is answered (200), as HTML, UTF-8", code == 200 and text.startswith("<!doctype html>"), code)
-    case("nothing from the internet in the page: no Google Fonts link, no http(s) address, the plugin's own fonts", "googleapis" not in text and not re.search(r"https?://", text)
-         and "url('/reel-font?f=DMSans-Regular')" in text and "url('/reel-font?f=Fraunces-Italic')" in text)
+    # Nov 7 (Dustin: every page in the reel page's look, no serif): the page's font is the plugin's own DM Sans from
+    # /look-font (look.py); it asked for /reel-font and Fraunces italic before.
+    case("nothing from the internet in the page: no Google Fonts link, no http(s) address, the plugin's own DM Sans and no serif",
+         "googleapis" not in text and not re.search(r"https?://", text)
+         and "url('/look-font?f=DMSans-Regular')" in text and "url('/look-font?f=DMSans-SemiBold')" in text
+         and "Fraunces" not in text and "--display" not in text and "/reel-font" not in text)
     case("no path in the page", not re.search(r"/private/|/Users/|\.kit/|kit\.json", text), re.findall(r".{20}(?:/private/|/Users/|\.kit/).{20}", text)[:2])
     case("her bar: Back to home, the product's name, the date in words", "Back to home" in text and "<span class='when'>November 1, 2026</span>" in text)
     case("her heading: the eyebrow 'Post kit', the shoot's name with her coral full stop, her lede",
@@ -400,7 +404,11 @@ def check_browser(c, s):
     case("in a browser: the reel photos load (their small copies made in the background when missing)", loaded and c.count("[data-piece=reel] .strip img") == 7,
          c.js("Array.from(document.querySelectorAll('[data-piece=reel] .strip img')).map(function(i){return i.naturalWidth})"))
     case("in a browser: the carousel and stories pictures load", c.js("Array.from(document.querySelectorAll('[data-piece=carousel] .strip img, [data-piece=stories] .strip img')).every(function(i){return i.complete && i.naturalWidth > 0})") is True)
-    case("in a browser: the page's fonts are the plugin's own and they loaded", c.js("document.fonts.check(\"600 16px 'DM Sans'\") && document.fonts.check(\"italic 400 16px 'Fraunces'\")") is True)
+    case("in a browser: the page's font is the plugin's own DM Sans and it loaded (no Fraunces declared)",
+         c.js("(function(){var f=Array.from(document.fonts);return f.some(function(x){return x.family.replace(/[\"']/g,'')=='Assistant Sans'&&x.weight=='400'&&x.status=='loaded'})"
+              "&&f.some(function(x){return x.family.replace(/[\"']/g,'')=='Assistant Sans'&&x.weight=='600'&&x.status=='loaded'})"
+              "&&!f.some(function(x){return /Fraunces/.test(x.family)})})()") is True,
+         c.js("Array.from(document.fonts).map(function(x){return x.family+' '+x.weight+' '+x.status}).join(', ')"))
 
     # Copy inside a card: copies, and does not follow the card's link
     c.click("[data-piece=reel] .w .copy")

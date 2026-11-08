@@ -2672,12 +2672,8 @@ details.all summary{cursor:pointer;font-weight:600;font-size:15px}
 FONT_CSS = "".join(
     "@font-face{font-family:'%s';src:url('/reel-font?f=%s') format('truetype');font-weight:%d;font-style:%s;font-display:swap}"
     % (fam, key, wt, st) for fam, wt, st, key in FACES)
-# The page itself takes its font from look.py (/look-font). Its DM Sans faces from /reel-font stay behind that as a
-# fallback, so the page keeps its letters on a posting server that does not answer /look-font yet. FONT_CSS (with
-# Fraunces) is kept for the kit pages that still ask for it, and /reel-font answers exactly as before.
-SANS_FALLBACK_CSS = "".join(
-    "@font-face{font-family:'%s';src:url('/reel-font?f=%s') format('truetype');font-weight:%d;font-style:%s;font-display:swap}"
-    % (fam, key, wt, st) for fam, wt, st, key in FACES if fam == "DM Sans")
+# The page itself takes its font from look.py (/look-font, answered by the posting server). FONT_CSS (with Fraunces)
+# is kept for kit pages saved before Nov 7 that still ask for it, and /reel-font answers exactly as before.
 
 OUR_CSS = r"""
 [hidden]{display:none!important}
@@ -2857,7 +2853,7 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + SANS_FALLBACK_CSS + STYLE + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "

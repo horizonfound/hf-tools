@@ -68,6 +68,7 @@ from urllib.parse import unquote, urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
@@ -83,7 +84,6 @@ FEED_MAX = 15            # tiles read from their profile: five rows of three
 FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
 FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram keeps the pictures themselves
 FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
-FONTS = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=DM+Sans:wght@400;500;600&display=swap"
 KINDS = ("reel", "carousel", "single")
 KIT_OWN_FILES = ("Post kit.html", "Captions and hooks.txt", "Reel.txt")   # what /content serves from a kit, and
 KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
@@ -643,20 +643,14 @@ def feed_words(f):
 # ---------- the page ----------
 
 CSS = r"""
-:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;
---ocean:#5EB5A9;--ocean-l:#DCEFEA;--sun:#F2CF72;--sun-l:#FBF2D6;--sand-l:#ECEAF6;--lime:#CDE9D6;--line:rgba(31,36,48,.12);
---red:#E0635A;--yellow:#E8B84A;--green:#4FB286;
---shadow:0 30px 60px -30px rgba(31,36,48,.35);--display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--r:26px;--ease:cubic-bezier(.2,.7,.2,1)}
-*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+:root{--red:#E0635A;--yellow:#E8B84A;--green:#4FB286}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
-.bar .homelink{display:inline-flex;align-items:center;gap:.45em;margin-right:.25rem;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.bar .homelink:hover{background:var(--coral-2)}.bar .homelink .short{display:none}@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
+.bar .homelink{margin-right:.25rem}.bar .homelink .short{display:none}@media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
-.eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em;text-wrap:balance}
-h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing:0}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(16px,1.4vw,18px);max-width:38em}
 .tankbar{height:14px;border-radius:999px;background:var(--sand-l);overflow:hidden;max-width:520px;margin-top:.4rem}
 .tankbar i{display:block;height:100%;border-radius:999px;background:var(--green);transition:width .8s var(--ease)}
@@ -672,7 +666,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .tile .k{position:absolute;top:8px;left:8px;font:600 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);padding:5px 8px;border-radius:999px}
 .tile .d{position:absolute;bottom:8px;left:8px;max-width:calc(100% - 16px);font:600 11px/1 var(--sans);letter-spacing:.02em;color:#fff;background:rgba(0,0,0,.78);padding:6px 9px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile.next .d{background:var(--coral);color:#fff}.tile.mine::after{content:'';position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(to top,rgba(0,0,0,.38),rgba(0,0,0,0));pointer-events:none}.tile.mine .k,.tile.mine .d{z-index:1}.tile.mine:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 3px var(--coral),0 16px 28px -12px rgba(31,36,48,.5)}
 .tile.ghost{cursor:default;background:repeating-linear-gradient(45deg,#ECEAF6,#ECEAF6 6px,#E3E0F0 6px,#E3E0F0 12px)}
-.tile.ghost small{position:absolute;inset:0;display:grid;place-items:center;font:italic 400 12px/1.2 var(--display);color:var(--ink-2);text-align:center;padding:8px}
+.tile.ghost small{position:absolute;inset:0;display:grid;place-items:center;font:400 12px/1.2 var(--sans);color:var(--ink-2);text-align:center;padding:8px}
 .tile.real{cursor:default}.tile.real img{filter:saturate(.85)}
 .tile.real .k{background:rgba(255,255,255,.8);color:var(--ink)}
 .tile.mine{box-shadow:inset 0 0 0 3px var(--coral)}.tile.mine .k{background:rgba(0,0,0,.78);color:#fff;text-transform:none;letter-spacing:.02em;font-size:11px}
@@ -687,7 +681,7 @@ h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing
 .btn{border:0;border-radius:999px;padding:.5rem .95rem;font:600 13.5px/1 var(--sans);cursor:pointer;background:var(--ink);color:#fff}
 .btn.o{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn.g{background:var(--green);color:#fff}
-.empty{font:italic 400 15px/1.3 var(--display);color:var(--ink-2);padding:.4rem 0 1rem}
+.empty{font:400 15px/1.3 var(--sans);color:var(--ink-2);padding:.4rem 0 1rem}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.7rem 1.1rem;border-radius:999px;font-size:14px;opacity:0;transition:all .4s var(--ease);pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%)}
 .offline{font-size:13px;color:var(--coral-2)}
@@ -783,7 +777,7 @@ def page_html(p):
     data = json.dumps(state(p)).replace("</", "<\\/")
     when = today().strftime("%A, %B ") + str(today().day)
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{html.escape(brand.title('Posting queue'))}</title><link rel='stylesheet' href='{FONTS}'><style>{CSS}</style></head><body>"
+            f"<title>{html.escape(brand.title('Posting queue'))}</title><style>{look.head_css()}{CSS}</style></head><body>"
             f"<div class='wrap'><div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>{brand.bar()}"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
@@ -953,6 +947,8 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if fresh.page_path(path) and fresh.stale() and fresh.restart(self):
             return
+        if path == look.FONT_ROUTE:                     # the pages' font: the plugin's own DM Sans (look.py)
+            return look.serve_font(self, urlsplit(self.path).query)
         if path in ("", "/"):
             # the bare address is the front door, the home page (it used to be the posting page)
             self.send_response(HTTPStatus.FOUND)

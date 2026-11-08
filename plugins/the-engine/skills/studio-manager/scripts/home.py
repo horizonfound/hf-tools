@@ -36,6 +36,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
 this_computer.utf8_output()
@@ -312,7 +313,7 @@ CSS_EXTRA = r"""
 .menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;padding:1rem 0 .4rem}
 .item{position:relative;display:grid;gap:.5rem;align-content:start;text-align:left;padding:22px 22px 20px;border:0;border-radius:var(--r);background:var(--paper);box-shadow:0 1px 0 var(--line);cursor:pointer;font:inherit;color:inherit;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .item:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
-.item .n{font:600 20px/1.15 var(--sans);letter-spacing:-.02em}.item .n em{font:italic 400 1.05em/1 var(--display);color:var(--coral-2)}
+.item .n{font:600 20px/1.15 var(--sans);letter-spacing:-.02em}.item .n em{font:inherit;font-style:normal;color:var(--coral-2)}
 .item p{margin:0;color:var(--ink-2);font-size:14.5px}
 .item.open{box-shadow:inset 0 0 0 2px var(--ink),var(--shadow)}.item.open .n em{color:var(--coral-2)}
 .howto{grid-column:1/-1;display:none;gap:.5rem;padding:22px 26px;border-radius:18px;background:var(--ink);color:#F4F1EA;box-shadow:var(--shadow)}
@@ -506,7 +507,7 @@ def page_html():
     lede = "Here's where things stand. Click anything below to see what it does." if known else \
         "Click anything below to see what it does. Start with whatever you have today: photos you've already finished, or a memory card from a shoot."
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{e(brand.title())}</title><link rel='stylesheet' href='{posting_queue.FONTS}'><style>{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
+            f"<title>{e(brand.title())}</title><style>{look.head_css()}{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when'>{e(g['today'])}</span></div>"
             f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"

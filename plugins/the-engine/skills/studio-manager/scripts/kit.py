@@ -64,6 +64,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import exif_read  # noqa: E402
 import brand  # noqa: E402
+import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import pictures  # noqa: E402
 import posts  # noqa: E402
 import studio_file  # noqa: E402
@@ -1618,7 +1619,7 @@ def save_words(kit, words):
 # /content/<kit>/Post kit.html (posting_queue.py serve_content), from kit.json, the reel page's record, the design
 # records and the folders; `kit.py page` writes the same page as the saved copy in the kit's hidden folder. The
 # page names no path: a kit by its folder name, a reel photo by its number (/kit-photo), a slide by its file name.
-# Nothing on it comes from the internet (the fonts are the plugin's own, through /reel-font). Her words are in
+# Nothing on it comes from the internet (the fonts are the plugin's own, through /look-font: look.py). Her words are in
 # KIT_WORDS, word for word; the few lines that are ours are in OUR_KIT_WORDS, each with its reason.
 
 KIT_WORDS = {
@@ -1752,20 +1753,14 @@ def rel(kit, p):
 
 
 CSS = """
-:root{--cream:#FAFAF6;--paper:#FFFFFF;--ink:#1F2430;--ink-2:#646B78;--coral:#F07F5A;--coral-2:#D4643F;--coral-l:#FCE6DD;--sand-l:#ECEAF6;--line:rgba(31,36,48,.12);
---display:'Fraunces',Georgia,serif;--sans:'DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif;--ease:cubic-bezier(.2,.7,.2,1)}
-*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:400 16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 4rem}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 .bar .when{margin-left:auto;font:500 13px/1 var(--sans);color:var(--ink-2)}
-.homelink{display:inline-flex;align-items:center;gap:.45em;font:600 13.5px/1 var(--sans);color:#fff;background:var(--ink);text-decoration:none;padding:10px 16px 10px 13px;border-radius:999px;white-space:nowrap;transition:background .2s}.homelink:hover{background:var(--coral-2)}
 .homelink .short{display:none}@media(max-width:560px){.homelink .long{display:none}.homelink .short{display:inline}}
 body:not(.live) .homelink{display:none}
 .head{padding:clamp(2rem,5vw,3.4rem) 0 1rem;display:grid;gap:.6rem}
-.eyebrow{font:600 11px/1.3 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
 h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.035em}
-h1 em{font:italic 400 1.1em/1 var(--display);color:var(--coral-2);letter-spacing:0}
 .lede{margin:0;color:var(--ink-2);font-size:clamp(16px,1.4vw,18px);max-width:40em}
 .piece{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.4rem;align-items:start;background:var(--paper);border-radius:22px;padding:1.3rem;margin-top:1.2rem;box-shadow:0 1px 0 var(--line);transition:box-shadow .25s var(--ease),transform .25s var(--ease)}
 a.piece{color:inherit;text-decoration:none;cursor:pointer}
@@ -1790,12 +1785,12 @@ a.piece:hover .cta{background:var(--coral-2)}
 .words{display:grid;gap:.8rem}
 .w{border:1px dashed var(--line);border-radius:14px;padding:.8rem .95rem}
 .w .k{font:600 10px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--coral-2);margin-bottom:.4rem}
-.empty{font:italic 400 16px/1.3 var(--display);color:var(--ink-2);margin:0}
+.empty{font:400 16px/1.3 var(--sans);color:var(--ink-2);margin:0}
 .problem{background:var(--coral-l);border-radius:14px;padding:1rem 1.2rem;margin-top:1.2rem}
 @media(max-width:760px){.piece{grid-template-columns:1fr}}
 .w{position:relative}
 .w .t{margin:0;padding-right:4.6rem;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;cursor:text}
-.w.hook .t{font:italic 400 19px/1.3 var(--display)}
+.w.hook .t{font:500 18px/1.35 var(--sans)}
 .copy{position:absolute;top:.6rem;right:.6rem;border:0;border-radius:999px;padding:.4rem .8rem;font:600 12px/1 var(--sans);background:var(--ink);color:#fff;cursor:pointer;transition:transform .2s var(--ease)}
 .copy:hover{transform:scale(1.04)}.copy.done{background:var(--coral)}
 .also{margin-top:1.6rem;font-size:13.5px;color:var(--ink-2)}
@@ -1874,9 +1869,9 @@ window.addEventListener('pageshow', function(e){ if (e.persisted) location.reloa
 
 
 def _font_css():
-    """The plugin's own fonts (decision 16), from the reel page's route: nothing from the internet."""
-    import reel_page
-    return reel_page.FONT_CSS
+    """The fonts, the colour names and the rules every page shares (look.py): the plugin's own DM Sans, from the
+    posting server's /look-font, nothing from the internet (decision 16)."""
+    return look.head_css()
 
 
 def _head(title):
