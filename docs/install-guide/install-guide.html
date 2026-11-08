@@ -4,13 +4,11 @@
 <meta charset="utf-8">
 <title>Setting up The Assistant</title>
 <style>
-@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Regular.ttf");font-weight:400;font-style:normal}
-@font-face{font-family:"Fraunces";src:url("../../plugins/the-engine/shared/fonts/Fraunces-Italic.ttf");font-weight:400;font-style:italic}
 @font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-Regular.ttf");font-weight:400}
 @font-face{font-family:"DM Sans";src:url("../../plugins/the-engine/shared/fonts/DMSans-SemiBold.ttf");font-weight:600}
 @page{size:8.5in 11in;margin:0}
 :root{--cream:#F7F3EC;--paper:#FFFDF8;--ink:#1F2430;--ink-2:#6B7280;--line:#E6DFD2;--coral:#EE7B5B;--coral-2:#D55D3C;--coral-l:#FCE6DC;--ocean:#4F9A95;--ocean-l:#DCEEEC;--sun:#F8EBC6;
-  --display:"Fraunces",Georgia,serif;--sans:"DM Sans",-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
+  --sans:"DM Sans",-apple-system,"Helvetica Neue",Arial,sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);font:400 12.5pt/1.5 var(--sans)}
 .page{position:relative;width:8.5in;height:11in;padding:.62in .72in .7in;overflow:hidden;break-after:page;background:var(--cream)}
@@ -20,11 +18,11 @@ html,body{margin:0;padding:0;background:var(--cream);color:var(--ink);font:400 1
 
 /* headings */
 .eyebrow{font:600 9pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
-h1{font:400 44pt/1.02 var(--display);letter-spacing:-.02em;margin:.18in 0 .12in}
-h1 em{font-style:italic;color:var(--coral-2)}
+h1{font:600 42pt/1.03 var(--sans);letter-spacing:-.035em;margin:.18in 0 .12in}
+h1 em{font-style:normal;color:var(--coral-2)}
 .step{display:flex;align-items:center;gap:.2in;margin-bottom:.14in}
-.num{flex:none;width:.62in;height:.62in;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:400 24pt/1 var(--display)}
-.step h2{font:400 25pt/1.08 var(--display);letter-spacing:-.015em;margin:0}
+.num{flex:none;width:.62in;height:.62in;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:600 22pt/1 var(--sans);font-variant-numeric:tabular-nums}
+.step h2{font:600 23pt/1.1 var(--sans);letter-spacing:-.02em;margin:0}
 .step .of{font:600 8.5pt/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2);margin-bottom:5px}
 .lede{font-size:12.5pt;color:var(--ink-2);margin:0 0 .16in;max-width:6.4in}
 .lede b{color:var(--ink);font-weight:600}
@@ -120,7 +118,7 @@ figcaption{font-size:9.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
 .pop .btnm{padding:4px 7px;font-size:7pt;white-space:nowrap}.pop u{white-space:nowrap}
 /* the home page, small */
 .home{background:var(--cream);padding:11px 12px;min-height:2.1in}
-.home h5{font:400 13pt/1.1 var(--display);margin:0 0 3px}.home h5 em{font-style:italic;color:var(--coral-2)}
+.home h5{font:600 12pt/1.15 var(--sans);letter-spacing:-.01em;margin:0 0 3px}.home h5 em{font-style:normal;color:var(--coral-2)}
 .home small{color:var(--ink-2);font-size:7.3pt}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
 .cards div{background:var(--paper);border-radius:8px;padding:7px 8px;font:600 7.6pt/1.2 var(--sans);box-shadow:0 1px 0 var(--line)}
@@ -135,22 +133,22 @@ figcaption{font-size:9.5pt;color:var(--ink-2);margin-top:6px;font-style:italic}
 .need div{background:var(--paper);border-radius:16px;padding:14px 16px;box-shadow:0 1px 0 var(--line)}
 .need>div>b{display:block;font:600 12.5pt/1.2 var(--sans);margin-bottom:4px}.need p b{font-weight:600;color:var(--ink)}
 .need p{margin:0;font-size:10.8pt;color:var(--ink-2)}
-.need .n{font:italic 400 15pt/1 var(--display);color:var(--coral-2);margin-bottom:6px;display:block}
+.need .n{font:600 13.5pt/1 var(--sans);letter-spacing:-.01em;color:var(--coral-2);margin-bottom:6px;display:block}
 .map{margin-top:.24in;background:var(--ink);color:#F4F1EA;border-radius:18px;padding:16px 20px}
-.map h3{font:400 15pt/1 var(--display);margin:0 0 10px;color:#fff}
+.map h3{font:600 14.5pt/1 var(--sans);letter-spacing:-.015em;margin:0 0 10px;color:#fff}
 .map ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:6px 24px;counter-reset:m}
 .map li{counter-increment:m;font-size:11pt;display:flex;gap:9px;align-items:baseline}
 .map li::before{content:counter(m);color:var(--coral);font-weight:600;flex:none;width:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:.2in;margin-top:.1in}
 .way{background:var(--paper);border-radius:16px;padding:13px 17px;box-shadow:0 1px 0 var(--line)}
-.way h4{font:400 15.5pt/1.15 var(--display);margin:0 0 6px}
-.way h4 em{font-style:italic;color:var(--coral-2)}
+.way h4{font:600 15pt/1.15 var(--sans);letter-spacing:-.015em;margin:0 0 6px}
+.way h4 em{font-style:normal;color:var(--coral-2)}
 .way p{margin:0 0 7px;font-size:10.8pt;color:var(--ink-2)}
 .way ol{margin:0;padding-left:18px;font-size:10.8pt}.way li{margin-bottom:4px}
 table.fix{width:100%;border-collapse:collapse;font-size:10.6pt;margin-top:.06in}
 table.fix td{vertical-align:top;padding:6px 10px;border-top:1px solid var(--line)}
 table.fix td:first-child{width:38%;font-weight:600}
-h3.sub{font:400 17pt/1.1 var(--display);margin:.2in 0 .04in}
+h3.sub{font:600 16.5pt/1.12 var(--sans);letter-spacing:-.02em;margin:.2in 0 .04in}
 .todo{background:#FFE08A;border-radius:4px;padding:0 5px;font-weight:600;color:#5A4300;white-space:nowrap}
 .first{background:var(--sun);border-radius:12px;padding:9px 13px;font-size:11pt;margin:0 0 .13in}.first b{font-weight:600}
 .box{padding-left:26px}.box::before{content:"+";position:absolute;left:10px;top:7px;font:400 12pt/1 var(--sans);color:#6B7280}
