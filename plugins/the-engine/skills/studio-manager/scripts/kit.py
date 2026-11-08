@@ -1752,7 +1752,8 @@ def rel(kit, p):
     return html.escape(Path(p).relative_to(kit).as_posix()) if str(p).startswith(str(kit)) else html.escape(str(p))
 
 
-CSS = """
+CSS = """img.wait{content:linear-gradient(#ECEAF6,#ECEAF6)}
+
 .wrap{max-width:1040px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 4rem}
 .bar{display:flex;align-items:center;gap:1rem;min-height:64px;border-bottom:1px solid var(--line)}
 .brand b{font:600 16px/1 var(--sans)}.brand small{display:block;margin-top:4px;font:600 10px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--coral-2)}
@@ -1858,9 +1859,11 @@ document.querySelectorAll('button.go[data-sub]').forEach(function(b){
 // a reel photo whose small copy is still being made: asked for again a little later
 document.querySelectorAll('img[data-again]').forEach(function(i){
   let n = 0;
-  function again(){ if (++n <= 20) setTimeout(function(){ i.src = i.dataset.again + '&try=' + n; }, 1500); }
+  // while it waits, an empty tile, never the browser's broken-picture icon (Dustin's first kit, Nov 7)
+  function again(){ i.classList.add('wait'); if (++n <= 40) setTimeout(function(){ i.src = i.dataset.again + '&try=' + n; }, 1500); }
   i.addEventListener('error', again);
-  if (i.complete && !i.naturalWidth) again();
+  i.addEventListener('load', function(){ if (i.naturalWidth) i.classList.remove('wait'); });
+  if (i.complete) { if (i.naturalWidth) i.classList.remove('wait'); else again(); }
 });
 // back to this page from the reel page or a designer: drawn again, so it shows what was just made
 window.addEventListener('pageshow', function(e){ if (e.persisted) location.reload(); });
@@ -1912,7 +1915,7 @@ def _strip(srcs, most, tall=False, again=False):
     imgs = []
     for s in srcs[:most]:
         a = html.escape(s)
-        imgs.append(f"<img src='{a}' alt=''" + (f" data-again='{a}'" if again else "") + ">")
+        imgs.append(f"<img src='{a}' alt=''" + (f" class='wait' data-again='{a}'" if again else "") + ">")
     more = f"<span class='more'>+{len(srcs) - most}</span>" if len(srcs) > most else ""
     return f"<div class='strip{' tall' if tall else ''}'>" + "".join(imgs) + more + "</div>"
 

@@ -967,8 +967,13 @@ def main():
             return 1
         copied, skipped, dest = got
         left = ", ".join(plural(n, k) for k, n in sorted(skipped.items()))
-        say(f"Copied {copied} finished photo{'s' if copied != 1 else ''} from \"{Path(a.folder).name}\" into the drop box, every one checked. Your originals weren't moved."
-            + (f" Left behind, not copied: {left}." if left else ""))
+        label = Path(a.folder).name or str(a.folder)
+        if not copied:                          # never "copied 0 ... every one checked" (Dustin's first try, Nov 7)
+            say(f"No finished photos (JPEGs) in \"{label}\", so nothing was copied."
+                + (f" It only has {left}." if left else " The folder is empty."))
+        else:
+            say(f"Copied {copied} finished photo{'s' if copied != 1 else ''} from \"{label}\" into the drop box, every one checked. Your originals weren't moved."
+                + (f" Left behind, not copied: {left}." if left else ""))
         say(json.dumps({"copied": copied, "skipped": skipped, "dest": str(dest)}))   # through say() like every line: a closed output can't end a finished copy in an error
         return 0 if copied else 3
     if a.cmd == "places":
