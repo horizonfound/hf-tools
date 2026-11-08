@@ -105,8 +105,8 @@ DESIGN_PAINT_JS = r"""
       if (b.n == null) {
         if (!o.holes) return;           // an empty frame leaves the background showing
         ctx.save();
-        ctx.fillStyle = 'rgba(120,110,100,.22)'; ctx.fillRect(x, b.y, b.w, b.h);
-        ctx.lineWidth = Math.max(6, 1.5 / o.out); ctx.strokeStyle = 'rgba(120,110,100,.6)';
+        ctx.fillStyle = 'rgba(100,107,120,.22)'; ctx.fillRect(x, b.y, b.w, b.h);
+        ctx.lineWidth = Math.max(6, 1.5 / o.out); ctx.strokeStyle = 'rgba(100,107,120,.6)';
         ctx.strokeRect(x + ctx.lineWidth / 2, b.y + ctx.lineWidth / 2, b.w - ctx.lineWidth, b.h - ctx.lineWidth);
         ctx.restore();
         return;

@@ -947,6 +947,7 @@ def osascript(js_file):
 def check_scripts(work):
     sys.path.insert(0, str(SCRIPTS))
     import arrange_page as ap
+    import look
     page = ap.page_html("A kit", "reel")
     car_page = ap.page_html("A kit", "carousel")
     plain = ap.plain_page("I can't find that shoot's posts. Is the drive plugged in?")
@@ -972,10 +973,15 @@ def check_scripts(work):
     case("a kit name is html-escaped on its way into the page", "data-kit='&lt;b&gt; &amp; &#x27;x&#x27;'" in ap.page_html("<b> & 'x'", "reel"))
     case("the plain page has the Back to home button and the words", "href='/home'" in plain and "Back to home" in plain and "I can&#x27;t find that shoot&#x27;s posts." in plain)
     case("the styles carry no backslash", "\\" not in ap.CSS)
-    # the look (Nov 6): the system's own font, a PC's as well as a Mac's; no web font; light only
-    case("the styles name the system font for a Mac and for a PC, and no web font",
-         '-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif' in ap.CSS
+    # the look (Nov 7): every page's font list from look.py (the plugin's own DM Sans as 'Assistant Sans', with
+    # Segoe UI for a PC), no serif, nothing from the internet; the fonts themselves are added by the page, from
+    # the page server's own /look-font; light only
+    case("the styles use every page's font list (look.SANS), with no serif and no web font",
+         "--sans:" + look.SANS + ";" in ap.CSS and "'Segoe UI'" in look.SANS
          and not re.search(r"Fraunces|DM Sans|Iowan|Palatino|Georgia|serif|googleapis|gstatic", ap.CSS.replace("sans-serif", "")))
+    case("the picker page and the plain page take their fonts from the page server's own font route, before the styles",
+         all(pg.count(look.font_css()) == 1 and pg.index(look.font_css()) < pg.index(ap.CSS) and "googleapis" not in pg
+             and "gstatic" not in pg for pg in (page, car_page, plain)))
     case("the styles are light only (no dark version switches itself on)", "prefers-color-scheme" not in ap.CSS and "data-theme" not in ap.CSS and "color-scheme" not in ap.CSS)
     # one whole line of the row always fits the row's own box, so the Normal / Longer / Quicker bar on the
     # first line is never cut off: a row photo is never taller than --rh, the box never shorter than that

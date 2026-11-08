@@ -27,8 +27,8 @@ files, so nothing Python does can change a character of it:
 SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
 (Designer.start()) only after every part is in place.
 
-The look is the pickers' (arrange_page.CSS: Nicole's colours, the system's own font, light only) with the
-designer's own pieces in DESIGN_CSS (and the text and brand-color parts' own, beside their scripts). The
+The look is the pickers' (arrange_page.CSS: its colours and font from look.py, light only; the fonts
+themselves from the page server's own /look-font) with the designer's own pieces in DESIGN_CSS (and the text and brand-color parts' own, beside their scripts). The
 page's own chrome loads nothing from the internet. The ONE thing the page may load from the internet is a
 Google Fonts stylesheet and its font files, for the words on the slides, and only through the address the
 Assistant sends with the state (design.GOOGLE_CSS): no address on the internet is written in this page.
@@ -44,6 +44,7 @@ sys.path.insert(0, str(HERE))
 import this_computer  # noqa: E402
 import arrange_page  # noqa: E402
 import brand  # noqa: E402
+import look  # noqa: E402
 from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
 from design_js_core import DESIGN_CORE_JS  # noqa: E402
 from design_js_designs import DESIGN_DESIGNS_CSS, DESIGN_DESIGNS_JS  # noqa: E402
@@ -72,7 +73,7 @@ body.designer .topline{margin-top:6px}
 .d-tools{display:flex;flex-wrap:wrap;gap:4px;align-items:stretch;margin-bottom:4px}
 .group{position:relative;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:var(--row);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px 7px}
 .group .lbl{color:var(--soft);font-size:12.5px;margin-right:1px;white-space:nowrap}
-.group b{font-weight:650}
+.group b{font-weight:600}
 #slides-count{display:inline-block;min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
 .tb{font:600 13px/1.2 var(--sans);border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:8px;padding:4px 8px;cursor:pointer;white-space:nowrap}
 .tb:hover{border-color:var(--soft)}
@@ -91,7 +92,7 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .gline{font-size:13px;color:var(--accent-d)}
 .gline:empty{display:none}
 .gline .tb{padding:2px 8px;font-size:12.5px}
-.dname{font:650 14.5px/1.3 var(--sans);overflow-wrap:anywhere}
+.dname{font:600 14.5px/1.3 var(--sans);overflow-wrap:anywhere}
 .savestate{display:inline-block;width:86px;font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .savestate.bad{color:var(--accent-d)}
 #toolline{margin:0 0 5px}
@@ -121,9 +122,13 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 /* the Brand colors group takes whatever room is left in the slides' row and no more, so saving a fourth color
    never pushes Undo onto a row of its own: with more colors than fit, its swatches wrap inside the group (its
    row's own rule is in the brand colors' styles). The text's Color group does the same in its row. On a narrower
-   window the rows are not rows, and the groups take their own width as before. */
+   window the rows are not rows, and the groups take their own width as before. The text's Color label and its
+   picker never part (only its brand swatches wrap): in the page's own font (Nov 7) the style buttons came 5 px
+   narrower, and the Color group was squeezed to fit them beside it, the label over the picker, a taller row, and
+   the strip moved 22 px at 1280. */
 #g-brand{flex:1 1 0;max-width:max-content}
 .selrows #sel-color{flex:1 1 0;max-width:max-content}
+.selrows #sel-color{flex-wrap:nowrap}
 .selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
 .selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap .gline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
@@ -134,7 +139,7 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
    group, the brand swatches the size of the background's, so six saved brand colors still sit on one line */
 @media(max-width:1179px){.d-tools{gap:3px}.group{padding:3px 5px}.group .dz-name{width:180px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:64px}.tb{padding:4px 6px}.sw{width:20px;height:20px}#g-brand .bc-row{gap:4px}#g-brand .bc-sw{width:20px;height:20px}}
 
-.stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(42,38,34,.45)}
+.stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(31,36,48,.45)}
 .stripwrap{position:relative;display:inline-block;vertical-align:top}
 .labels{position:absolute;left:0;top:-22px;height:20px;width:100%;pointer-events:none}
 .labels span{position:absolute;top:0;font-size:12px;color:var(--soft);transform:translateX(-50%);white-space:nowrap}
@@ -143,13 +148,13 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .seam{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(47,124,246,.75);pointer-events:none;z-index:9000}
 .blk{position:absolute;overflow:hidden;cursor:move;background:var(--line)}
 .blk img{position:absolute;max-width:none;pointer-events:none;-webkit-user-drag:none;user-select:none}
-.blk.hole{background:repeating-linear-gradient(45deg,rgba(120,110,100,.16) 0 10px,rgba(120,110,100,.26) 10px 20px);box-shadow:inset 0 0 0 1.5px rgba(120,110,100,.55);display:flex;align-items:center;justify-content:center;text-align:center;color:#5c534a;font-weight:600}
+.blk.hole{background:repeating-linear-gradient(45deg,rgba(100,107,120,.16) 0 10px,rgba(100,107,120,.26) 10px 20px);box-shadow:inset 0 0 0 1.5px rgba(100,107,120,.55);display:flex;align-items:center;justify-content:center;text-align:center;color:#4B5160;font-weight:600}
 .blk .drop{background:rgba(255,253,249,.85);border-radius:6px;padding:2px 6px;pointer-events:none}
 .blk .cant{position:absolute;top:0;right:0;bottom:0;left:0;display:grid;place-items:center;padding:6px;text-align:center;font-size:11.5px;line-height:1.3;color:var(--ink);pointer-events:none}
 .blk .bd{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none}
 .blk.adj{cursor:grab}
 .blk.droptarget{outline:3px solid var(--accent);outline-offset:-3px}
-.blk.other{background:transparent;outline:1.5px dashed rgba(120,110,100,.7);outline-offset:-1px;color:var(--ink);white-space:pre-wrap;text-align:center;line-height:1.15}
+.blk.other{background:transparent;outline:1.5px dashed rgba(100,107,120,.7);outline-offset:-1px;color:var(--ink);white-space:pre-wrap;text-align:center;line-height:1.15}
 .selbox{position:absolute;display:none;pointer-events:none}
 .selbox.on{display:block}
 .selbox .ring{position:absolute;top:0;right:0;bottom:0;left:0;outline:2px solid var(--sel);pointer-events:none}
@@ -161,14 +166,14 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .h.tr{right:-7px;top:-7px;cursor:nesw-resize}.h.bl{left:-7px;bottom:-7px;cursor:nesw-resize}
 .selbox.adj .h,.selbox.fixed .h{display:none}
 .guide{position:absolute;background:#f0508c;pointer-events:none}
-.slidemark{position:absolute;top:0;bottom:0;display:none;outline:3px solid var(--accent);outline-offset:-3px;background:rgba(196,104,63,.14);pointer-events:none}
+.slidemark{position:absolute;top:0;bottom:0;display:none;outline:3px solid var(--accent);outline-offset:-3px;background:rgba(212,100,63,.14);pointer-events:none}
 .d-note{margin:0 0 8px;font-size:13.5px;color:var(--accent-d);display:flex;flex-wrap:wrap;gap:8px;align-items:center;overflow-wrap:anywhere}
 .d-note.quiet{color:var(--soft)}
 .blk:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 
 .tray{flex:1 0 auto;margin-top:14px;padding-bottom:28px}
 .trayhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 2px}
-.tray h2{margin:0;font:650 16px/1.3 var(--sans)}
+.tray h2{margin:0;font:600 16px/1.3 var(--sans)}
 .tray .prep{font-size:13.5px;color:var(--soft)}
 .tray .hint{margin:0 0 10px}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;align-items:start}
@@ -176,8 +181,8 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .th{position:relative;aspect-ratio:2/3;border-radius:8px;overflow:hidden;cursor:grab;background:var(--line);touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:0}
 .th.wide{aspect-ratio:3/2;grid-column:span 2}
 .th img{position:absolute;top:0;left:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none;-webkit-user-drag:none;user-select:none;transition:opacity .15s}
-.th .num{position:absolute;top:4px;left:4px;padding:0 5px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font:400 11.5px/1.5 var(--sans);pointer-events:none}
-.th .tick{position:absolute;right:5px;bottom:5px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font:700 12px/20px var(--sans);text-align:center;pointer-events:none;display:none}
+.th .num{position:absolute;top:4px;left:4px;padding:0 5px;border-radius:5px;background:rgba(20,22,30,.72);color:#fff;font:400 11.5px/1.5 var(--sans);pointer-events:none}
+.th .tick{position:absolute;right:5px;bottom:5px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font:600 12px/20px var(--sans);text-align:center;pointer-events:none;display:none}
 .th.used .tick{display:block}
 .th.used img{opacity:.6}
 .th .cant{position:absolute;top:0;right:0;bottom:0;left:0;display:none;place-items:center;padding:22px 5px 5px;text-align:center;font-size:11px;line-height:1.3;color:var(--ink);pointer-events:none}
@@ -282,7 +287,7 @@ def plain_page(words):
 def _shell(title, body_attrs, inner, scripts=""):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>" + html.escape(title) + "</title><style>" + arrange_page.CSS + DESIGN_CSS + PART_CSS + "</style></head>"
+            "<title>" + html.escape(title) + "</title><style>" + look.font_css() + arrange_page.CSS + DESIGN_CSS + PART_CSS + "</style></head>"
             "<body class='designer'" + body_attrs + ">"
             "<div class='wrap'><div class='bar'>" + arrange_page.BACK_HOME + brand.bar()
             + inner + scripts + "</body></html>")

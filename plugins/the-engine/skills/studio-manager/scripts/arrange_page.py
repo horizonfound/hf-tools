@@ -9,9 +9,10 @@ as data- attributes); the script asks /arrange-state for everything else. All Ja
 nothing Python does can change a character of it. Nothing is loaded from the internet: no font link, no
 library. Nothing is kept in the browser's storage: every change is saved to the kit by POST /arrange.
 
-The look (Nov 6) follows the picker pages Nicole's own Claude made: the system's own font (a Mac's, a PC's),
-warm paper colours, one terracotta accent, same-size tall tiles with the picture cut to fill them, and the two
-main buttons in a bar held at the bottom of the window. Light only: no other page of the Assistant goes dark,
+The layout (Nov 6) follows the picker pages Nicole's own Claude made: same-size tall tiles with the picture cut
+to fill them, and the two main buttons in a bar held at the bottom of the window. The colours and the font
+(Nov 7) are every page's, from look.py: the plugin's own DM Sans, served by the page's own server at
+/look-font (nothing from the internet), the cream background, the dark ink, one coral accent. Light only: no other page of the Assistant goes dark,
 so this one does not either. The drag measures real boxes: the row's own box (#rowwrap), each row tile and
 its picture (.rt and its .ph, which are the same box now that the Normal / Longer / Quicker bar lies on the
 photo), the panel, the photos below (#poolsec), and the bar of buttons (#dock, where a drop does nothing).
@@ -23,8 +24,8 @@ bar take a press a few pixels outside what is drawn, so a near miss does not ope
 A Mac and a PC (read through for the PC pass, Nov 6): nothing in the page is Mac-only. No Finder, Dock or
 Option words and no key names on the page (Tab, Enter, space, Escape and the arrows, which it answers to, are on
 both); every address
-is the page server's own, with forward slashes, never a file:// path; the font list names Windows' own (Segoe UI)
-beside the Mac's. Not yet seen on a PC: how the Claude app's pane there draws it and passes on the pointer.
+is the page server's own, with forward slashes, never a file:// path; the font list (look.SANS) names Windows'
+own (Segoe UI) for a moment when the font route is down. Not yet seen on a PC: how the Claude app's pane there draws it and passes on the pointer.
 
 Three scripts, in this order on the page:
   MODEL_JS    the row as a list, and where a drop lands. No page in it, so it can be tested by itself.
@@ -39,11 +40,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
+import look  # noqa: E402
 
-CSS = """
-:root{--bg:#f6f3ee;--panel:#fffdf9;--ink:#2a2622;--soft:#7a7067;--soft-s:#746a61;--line:#e4ddd3;--chip:#efe9e0;--accent:#c4683f;--accent-d:#a4532f;--accent-l:#f7e8de;--long:#3d7a5a;--quick:#8a6bb0;--shadow:0 1px 3px rgba(0,0,0,.08);
---sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
---rw:96px;--rh:156px;--pw:110px;--gap:10px;--gut:10px}
+# The colour names are the pickers' own (the designer's styles use the same ones); their values and the font come
+# from look.py, the one place for the look of every page (Nov 7: the reel page's style everywhere). --chip is the
+# one colour the reel page has no name for: a quiet warm grey behind the designer's tool buttons. The fonts
+# themselves (@font-face) are added by _shell, never here: these styles fetch nothing.
+_C = look.COLOR
+CSS = (":root{--bg:" + _C["cream"] + ";--panel:" + _C["paper"] + ";--ink:" + _C["ink"] + ";--soft:" + _C["ink-2"]
+       + ";--soft-s:" + _C["ink-2"] + ";--line:" + _C["line"] + ";--chip:#F2F1EC;--accent:" + _C["coral-2"]
+       + ";--accent-d:#B9542F;--accent-l:" + _C["coral-l"] + ";--long:" + _C["long"] + ";--quick:" + _C["quick"]
+       + ";--shadow:0 1px 0 var(--line),0 1px 3px rgba(31,36,48,.06);\n--sans:" + look.SANS + ";\n"
+       + "--rw:96px;--rh:156px;--pw:110px;--gap:10px;--gut:10px}") + """
 @media(max-width:520px){:root{--pw:84px;--gap:8px;--gut:8px}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;scroll-padding-bottom:120px}
@@ -53,24 +61,24 @@ button{font-family:inherit}
 .wrap{display:flex;flex-direction:column;min-height:100vh;padding:0 16px}
 .bar,.head,.panel,.poolsec,.plain{flex:none;width:100%;max-width:1068px;margin-left:auto;margin-right:auto}
 .bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;min-height:52px;padding:8px 0;border-bottom:1px solid var(--line)}
-.brand b{font:650 14px/1.1 var(--sans)}.brand small{display:block;margin-top:2px;font:400 11.5px/1.1 var(--sans);color:var(--soft-s)}
+.brand b{font:600 14px/1.1 var(--sans)}.brand small{display:block;margin-top:2px;font:400 11.5px/1.1 var(--sans);color:var(--soft-s)}
 .bar .homelink{display:inline-flex;align-items:center;gap:.45em;font:600 13.5px/1.2 var(--sans);color:var(--panel);background:var(--ink);text-decoration:none;padding:8px 14px 8px 11px;border-radius:10px;white-space:nowrap;transition:background .15s}
-.bar .homelink:hover{background:#4a433c}.bar .homelink .short{display:none}
+.bar .homelink:hover{background:var(--accent)}.bar .homelink .short{display:none}
 @media(max-width:560px){.bar .homelink .long{display:none}.bar .homelink .short{display:inline}}
 .bar .kitlink{margin-left:auto;font:600 13.5px/1.2 var(--sans);color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;transition:background .15s}
 .bar .kitlink:hover{background:var(--chip)}
 .head{padding:18px 0;display:grid;gap:2px}
-.eyebrow{font:600 11.5px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--soft-s)}
-h1{margin:0;font:650 22px/1.25 var(--sans);overflow-wrap:anywhere}
+.eyebrow{font:600 11.5px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0;font:600 22px/1.25 var(--sans);overflow-wrap:anywhere}
 .lede{margin:0;color:var(--soft)}
 .topline{justify-self:start;margin:8px 0 0;font-size:14px;color:var(--accent-d);background:var(--accent-l);border-radius:10px;padding:7px 12px}
 .plain{margin-top:22px;padding:16px 18px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 .plain p{margin:0;font-size:16px;max-width:36em}
 
-.panel{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 -14px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(42,38,34,.45);padding:14px}
+.panel{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 -14px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(31,36,48,.45);padding:14px}
 @media(max-width:520px){.panel{padding:10px;border-radius:12px}}
 .phead{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 10px}
-.phead h2,.poolhead h2{margin:0;font:650 16px/1.3 var(--sans)}
+.phead h2,.poolhead h2{margin:0;font:600 16px/1.3 var(--sans)}
 .phead .prep{order:1;font-size:13.5px;color:var(--soft)}
 .phead .count{order:2;margin-left:auto;font-size:14px;color:var(--soft)}
 .phead .advice{order:3;font-size:14px;color:var(--accent-d)}
@@ -78,7 +86,7 @@ h1{margin:0;font:650 22px/1.25 var(--sans);overflow-wrap:anywhere}
 .rowwrap{min-height:calc(var(--rh) + 12px);max-height:max(calc(var(--rh) + 12px),calc(40vh - 104px));margin:0 calc(0px - var(--gut));overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
 .row{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--rw),1fr));align-content:start;gap:var(--gap);padding:4px var(--gut) 8px;min-height:calc(var(--rh) + 12px)}
 .rowempty{grid-column:1/-1;display:grid;place-items:center;min-height:136px;margin:0;padding:12px;color:var(--soft);text-align:center}
-.ins{position:absolute;width:3px;border-radius:3px;background:var(--accent);pointer-events:none;display:none;box-shadow:0 0 0 2px rgba(196,104,63,.22)}
+.ins{position:absolute;width:3px;border-radius:3px;background:var(--accent);pointer-events:none;display:none;box-shadow:0 0 0 2px rgba(212,100,63,.22)}
 .ins.on{display:block}
 .rowline{margin:8px 0 0;font-size:13.5px;color:var(--accent-d)}
 .rowline:empty{display:none}
@@ -88,7 +96,7 @@ h1{margin:0;font:650 22px/1.25 var(--sans);overflow-wrap:anywhere}
 .btn:hover{background:var(--chip)}
 a.btn{text-decoration:none}
 .btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.main:hover{background:#b35c36;border-color:#b35c36}
+.btn.main:hover{background:var(--accent-d);border-color:var(--accent-d)}
 .btn:disabled{opacity:.45;cursor:default}
 .btn:disabled:hover{background:var(--panel)}
 .btn.main:disabled:hover{background:var(--accent);border-color:var(--accent)}
@@ -126,11 +134,11 @@ a.btn{text-decoration:none}
 .tile:focus-visible .ph,.pt:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .rt{touch-action:none}
 .rt .ph{position:relative;width:100%;aspect-ratio:2/3;max-height:var(--rh);border-radius:10px;overflow:hidden;background:var(--line)}
-.rt .pos{position:absolute;top:5px;left:5px;padding:1px 6px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font:650 11.5px/1.45 var(--sans);white-space:nowrap;pointer-events:none}
-.rt .x{position:absolute;top:4px;right:4px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font:400 15px/22px var(--sans);text-align:center;cursor:pointer;padding:0}
+.rt .pos{position:absolute;top:5px;left:5px;padding:1px 6px;border-radius:6px;background:rgba(20,22,30,.72);color:#fff;font:600 11.5px/1.45 var(--sans);white-space:nowrap;pointer-events:none}
+.rt .x{position:absolute;top:4px;right:4px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(20,22,30,.65);color:#fff;font:400 15px/22px var(--sans);text-align:center;cursor:pointer;padding:0}
 .rt .x:hover{background:var(--accent)}
 .rt .x::after{content:'';position:absolute;top:-6px;right:-6px;bottom:-6px;left:-6px}
-.rt .mk{position:absolute;left:5px;right:5px;bottom:5px;border:0;border-radius:6px;padding:4px 0;background:rgba(255,255,255,.88);color:#2a2622;font:600 11.5px/1.2 var(--sans);white-space:nowrap;cursor:pointer}
+.rt .mk{position:absolute;left:5px;right:5px;bottom:5px;border:0;border-radius:6px;padding:4px 0;background:rgba(255,255,255,.88);color:var(--ink);font:600 11.5px/1.2 var(--sans);white-space:nowrap;cursor:pointer}
 .rt .mk:hover{background:#fff}
 .rt .mk.long{background:var(--long);color:#fff}
 .rt .mk.quick{background:var(--quick);color:#fff}
@@ -142,8 +150,8 @@ a.btn{text-decoration:none}
 .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--pw),1fr));gap:var(--gap)}
 .pt{aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:var(--line);touch-action:pan-y}
 .pt img{transition:opacity .15s}
-.pt .num{position:absolute;top:5px;left:5px;padding:1px 6px;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;font:400 12px/1.45 var(--sans);pointer-events:none}
-.pt .pos{position:absolute;right:6px;bottom:6px;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--accent);color:#fff;font:700 12px/24px var(--sans);text-align:center;pointer-events:none;display:none}
+.pt .num{position:absolute;top:5px;left:5px;padding:1px 6px;border-radius:6px;background:rgba(20,22,30,.72);color:#fff;font:400 12px/1.45 var(--sans);pointer-events:none}
+.pt .pos{position:absolute;right:6px;bottom:6px;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--accent);color:#fff;font:600 12px/24px var(--sans);text-align:center;pointer-events:none;display:none}
 .pt.in img{opacity:.45}
 .pt.in .pos{display:block}
 .pt .cant,.rt .cant{position:absolute;top:0;right:0;bottom:0;left:0;display:none;place-items:center;padding:26px 6px 6px;text-align:center;font-size:11.5px;line-height:1.3;color:var(--ink);pointer-events:none}
@@ -156,26 +164,26 @@ body.arr-dragging,body.arr-dragging *{cursor:grabbing!important;user-select:none
 .arr-lift .say{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;white-space:nowrap;background:var(--ink);color:#fff;font:600 12.5px/1 var(--sans);padding:6px 10px;border-radius:8px;display:none}
 .arr-lift .say.on{display:block}
 
-.big{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9000;background:rgba(0,0,0,.85);display:none;place-items:center;padding:16px;overflow:auto}
+.big{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9000;background:rgba(20,22,30,.92);display:none;place-items:center;padding:16px;overflow:auto}
 .big.on{display:grid}
 .big .box{position:relative;display:grid;gap:10px;justify-items:center;max-width:100%}
 .big .pic{position:relative;display:grid;place-items:center;min-width:120px;min-height:120px}
-.big .pic img{display:block;max-width:min(88vw,1000px);max-height:62vh;border-radius:8px;background:#2a2622}
+.big .pic img{display:block;max-width:min(88vw,1000px);max-height:62vh;border-radius:8px;background:var(--ink)}
 .big .pic .cant,.big .pic .wait{color:#fff;font-size:15px;padding:2rem;display:none}
 .big .pic.cantread img,.big .pic.notyet img{display:none}.big .pic.cantread .cant,.big .pic.notyet .wait{display:block}
 .big .where{margin:0;color:#fff;font:500 14px/1.3 var(--sans);text-align:center}
 .big .bacts{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center}
-.big .btn{background:#fffdf9;border-color:#fffdf9;color:#2a2622;padding:8px 14px;font-size:14px}
-.big .btn:hover{background:#efe9e0;border-color:#efe9e0}
+.big .btn{background:var(--panel);border-color:var(--panel);color:var(--ink);padding:8px 14px;font-size:14px}
+.big .btn:hover{background:var(--chip);border-color:var(--chip)}
 .big .btn.cur{background:var(--accent);border-color:var(--accent);color:#fff}
 .big .btn.cur[data-act='mark+']{background:var(--long);border-color:var(--long)}
 .big .btn.cur[data-act='mark-']{background:var(--quick);border-color:var(--quick)}
 .big .btn.ghost{background:transparent;border-color:rgba(255,255,255,.55);color:#fff}
 .big .btn.ghost:hover{background:rgba(255,255,255,.14)}
 .big .btn:disabled{opacity:.4}
-.big .btn:disabled:hover{background:#fffdf9;border-color:#fffdf9}
+.big .btn:disabled:hover{background:var(--panel);border-color:var(--panel)}
 .big .gap{width:8px}
-.big .bx,.big .nav{position:absolute;border:0;background:rgba(255,253,249,.94);color:#2a2622;width:36px;height:36px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer;z-index:2}
+.big .bx,.big .nav{position:absolute;border:0;background:rgba(255,255,255,.94);color:var(--ink);width:36px;height:36px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer;z-index:2}
 .big .bx{top:-6px;right:-6px}
 .big .nav{top:calc(31vh - 18px)}.big .prev{left:-8px}.big .next{right:-8px}
 @media(min-width:900px){.big .prev{left:-48px}.big .next{right:-48px}.big .bx{top:-12px;right:-48px}}
@@ -970,7 +978,7 @@ BACK_HOME = ("<a class='homelink' href='/home'><span aria-hidden='true'>&larr;</
 def _shell(title, body_attrs, inner, scripts=""):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>" + html.escape(title) + "</title><style>" + CSS + "</style></head><body" + body_attrs + ">"
+            "<title>" + html.escape(title) + "</title><style>" + look.font_css() + CSS + "</style></head><body" + body_attrs + ">"
             "<div class='wrap'><div class='bar'>" + BACK_HOME + brand.bar()
             + inner + scripts + "</body></html>")
 

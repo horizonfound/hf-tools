@@ -775,7 +775,7 @@ DESIGN_TEXT_JS = r"""
 # are set by the script, each from a checked name.
 DESIGN_TEXT_CSS = """
 .blk.words{overflow:visible;background:transparent}
-.blk.words.blank{outline:1.5px dashed rgba(120,110,100,.7);outline-offset:-1px}
+.blk.words.blank{outline:1.5px dashed rgba(100,107,120,.7);outline-offset:-1px}
 .tx-in{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none}
 .selbox.tx-sides .h.tr,.selbox.tx-sides .h.bl{display:none}
 .selbox.tx-sides .h.tl{top:calc(50% - 7px);cursor:ew-resize}

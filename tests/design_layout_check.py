@@ -87,6 +87,8 @@ def check_layout_page(case, work):
          re.search(r"@media\(min-width:768px\)\{[^@]*#g-brand\{flex:1 1 0;max-width:max-content\}", css) is not None
          and re.search(r"@media\(min-width:768px\)\{[^@]*\.selrows #sel-color\{flex:1 1 0;max-width:max-content\}", css) is not None
          and "@media(min-width:768px){#brand-row{flex:1 1 0;max-width:max-content}}" in design_page.DESIGN_BRAND_CSS)
+    case("layout: the text's Color label and its picker never part, so the Color group is never squeezed to make room beside it (the strip moved 22 px at 1280 in the page's own font, Nov 7)",
+         re.search(r"@media\(min-width:768px\)\{[^@]*\.selrows #sel-color\{flex-wrap:nowrap\}", css) is not None)
     case("layout: with nothing selected the quiet box has a plain hairline, not a dashed one (dashed is the page's word for 'drop here')",
          ".selbar.off .selcap{flex:1 1 auto;justify-content:center;border:1px solid var(--line)" in css and "dashed" not in css.split(".selbar")[1].split(".stage{")[0])
     case("layout: the design's name box is 180 px wide between 1024 and 1179 px (150 cut ordinary names while the row had room)",

@@ -37,7 +37,11 @@ FACE_FILES = tuple(f for f, _ in FACES)          # the only names /look-font ans
 FONT_ROUTE = "/look-font"
 
 # Segoe UI stays in the list for a PC whose page server is restarting (the font route down for a moment).
-SANS = "'Assistant Sans','DM Sans','Helvetica Neue','Segoe UI',Arial,sans-serif"
+# 'DM Sans' is left out on purpose (Nov 7, the designer): a letter DM Sans does not have (the arrows, the little
+# triangles) falls through to the next name in the list, and in the designer 'DM Sans' is the photographer's slide
+# font, so the page itself was loading the photographer's DM Sans Bold for an arrow. With the name left out the
+# page never asks for a slide font. Same letters either way when the route is up.
+SANS = "'Assistant Sans','Helvetica Neue','Segoe UI',Arial,sans-serif"
 
 # Every colour name the pages use. The first block is the reel page's own; the second is the backup report's
 # extra palette (the first look, the stats bar, the legend), kept at the values it has always had.

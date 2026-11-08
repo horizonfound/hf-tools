@@ -169,10 +169,10 @@ DESIGN_BRAND_CSS = """
 .bc-sw:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
 .bc-row.small{gap:4px}
 .bc-row.small .bc-sw{width:18px;height:18px}
-.bc-off{position:absolute;top:-7px;right:-7px;width:16px;height:16px;border-radius:50%;border:0;padding:0;background:var(--ink);color:#fff;font:700 11px/16px var(--sans);text-align:center;cursor:pointer;display:none}
+.bc-off{position:absolute;top:-7px;right:-7px;width:16px;height:16px;border-radius:50%;border:0;padding:0;background:var(--ink);color:#fff;font:600 11px/16px var(--sans);text-align:center;cursor:pointer;display:none}
 .bc:hover .bc-off,.bc:focus-within .bc-off{display:block}
 @media(hover:none){.bc-off{display:block}}
-@media(hover:none) and (pointer:coarse){.bc-row{gap:14px}.bc-row .bc-sw{width:32px;height:32px}.bc-off{width:22px;height:22px;top:-10px;right:-10px;font:700 14px/22px var(--sans)}}
+@media(hover:none) and (pointer:coarse){.bc-row{gap:14px}.bc-row .bc-sw{width:32px;height:32px}.bc-off{width:22px;height:22px;top:-10px;right:-10px;font:600 14px/22px var(--sans)}}
 .group input.bc-pick{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
 #g-brand{position:relative}
 #brand-line{display:inline-flex;gap:6px;align-items:center}

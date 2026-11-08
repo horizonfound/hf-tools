@@ -1118,7 +1118,8 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             outside = [u for u in c.outside_requests() if not u.startswith(("https://fonts.googleapis.com/css2?family=", "https://fonts.gstatic.com/"))]
             case("the page made no request to any address but its own and Google Fonts (for a text box's font), in the whole run", outside == [], outside[:4])
             asked = sorted(set(re.sub(r"\?.*", "", re.sub(r"^https?://[^/]+", "", r["url"])) for r in c.requests if "127.0.0.1" in r["url"]))
-            case("every request it made was for the page, its state, a made copy of a photo, or a save", set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/design-font-file", "/favicon.ico"}, asked)
+            # (/look-font: the page's own DM Sans, every page's font since Nov 7, from the posting server itself)
+            case("every request it made was for the page, its state, a made copy of a photo, its own font, or a save", set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/design-font-file", "/look-font", "/favicon.ico"}, asked)
             case("the Finder was never asked for (/open was not requested)", not any("/open" in r["url"] for r in c.requests))
     finally:
         srv.stop()

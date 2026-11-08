@@ -110,7 +110,8 @@ def main():
     case("head_css: the only addresses are the pages' own font route",
          re.findall(r"url\('([^']*)'\)", head) == ["/look-font?f=" + k for k, _ in look.FACES])
     case("head_css: the font is the plugin's DM Sans under the pages' own name, first in the font list",
-         "font-family:'Assistant Sans'" in head and look.SANS.startswith("'Assistant Sans','DM Sans'") and "--sans:" + look.SANS in head)
+         "font-family:'Assistant Sans'" in head and look.SANS.startswith("'Assistant Sans',") and "DM Sans" not in look.SANS
+         and "--sans:" + look.SANS in head)
     case("head_css: no backslash (it goes into raw strings and pages as it is)", "\\" not in head)
     for name, val in (("cream", "#FAFAF6"), ("ink", "#1F2430"), ("coral-2", "#D4643F"), ("line", "rgba(31,36,48,.12)")):
         case("ROOT has --%s %s (the reel page's)" % (name, val), "--%s:%s;" % (name, val) in look.ROOT)
@@ -137,6 +138,24 @@ def main():
     case("posting_queue no longer names Google Fonts, and the reel page has no /reel-font fallback in its page",
          not hasattr(posting_queue, "FONTS") and not hasattr(reel_page, "SANS_FALLBACK_CSS"))
     case("the kit page's head is the shared look (no /reel-font, no Fraunces)", kit._font_css() == look.head_css())
+    # the pickers and the designer (group C): their own colour names, valued from look.py; the page's fonts added
+    # by the page (never in the styles); the designer's slide fonts are the photographer's and not checked here
+    import arrange_page
+    import design_page
+    chrome = arrange_page.CSS + design_page.DESIGN_CSS + design_page.PART_CSS
+    # (the preview's stand-in profile picture, a small warm circle, is a picture of Instagram, not the page's look)
+    chrome = re.sub(r"\.pv-igtop i\{[^}]*\}", "", chrome)
+    case("the pickers' and the designer's own styles: no serif, nothing from the internet, no @font-face",
+         not SERIF.search(sans_only(chrome)) and "@font-face" not in chrome and "url(" not in chrome, SERIF.findall(sans_only(chrome)))
+    case("the pickers' colours and font list are look.py's (cream, paper, ink, coral, the shared font list)",
+         all("--%s:%s;" % kv in arrange_page.CSS for kv in (("bg", look.COLOR["cream"]), ("panel", look.COLOR["paper"]), ("ink", look.COLOR["ink"]),
+                                                          ("soft", look.COLOR["ink-2"]), ("line", look.COLOR["line"]), ("accent", look.COLOR["coral-2"])))
+         and "--sans:" + look.SANS + ";" in arrange_page.CSS
+         and not re.search(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0|-apple-system", chrome, re.I), re.findall(r"#f6f3ee|#fffdf9|#2a2622|#c4683f|#efe9e0", chrome, re.I)[:3])
+    pick, plain = arrange_page.page_html("A kit", "reel"), arrange_page.plain_page("Nothing here.")
+    des = design_page.page_html("A kit"); story = design_page.page_html("A kit", "stories")
+    case("the pickers, their plain page and both designers start their styles with the page server's own fonts",
+         all(pg.count("<style>" + look.font_css()) == 1 and "googleapis" not in pg.split("<script")[0] for pg in (pick, plain, des, story)))
 
     # a small backup's report, written for real
     session = work / "2026-11-07 look test"

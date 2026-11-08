@@ -444,7 +444,7 @@ DESIGN_SAVE_JS = r"""
 
 # The styles of the bar at the bottom of the window, the profile grid's crop and the preview.
 DESIGN_SAVE_CSS = """
-.sv-bar{flex:none;position:sticky;bottom:0;z-index:25;margin:0 -16px;padding:10px 16px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -6px 16px -12px rgba(42,38,34,.4)}
+.sv-bar{flex:none;position:sticky;bottom:0;z-index:25;margin:0 -16px;padding:10px 16px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -6px 16px -12px rgba(31,36,48,.4)}
 .sv-notes{max-width:var(--wide);margin:0 auto}
 .sv-in{max-width:var(--wide);margin:0 auto;display:flex;flex-wrap:nowrap;gap:8px;align-items:flex-end;min-height:34px}
 .sv-in>*{flex:none}

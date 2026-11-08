@@ -600,9 +600,9 @@ DESIGN_DESIGNS_JS = r"""
 
 # The styles of the designs part: the name box, the pop-up lists, the sheets over the page, the gallery's cards.
 DESIGN_DESIGNS_CSS = """
-.dz-name{font:650 14px/1.2 var(--sans);width:200px;max-width:100%;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;color:var(--ink)}
+.dz-name{font:600 14px/1.2 var(--sans);width:200px;max-width:100%;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;color:var(--ink)}
 .dz-name:focus,.dz-in:focus{outline:2px solid var(--sel);outline-offset:-1px}
-.tb.dz-strong{font-weight:650;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb.dz-strong{font-weight:600;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dz-popwrap{position:relative;display:inline-flex;max-width:100%}
 .dz-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:30000;width:330px;max-width:calc(100vw - 24px);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px}
 .dz-pop[hidden]{display:none}
@@ -612,26 +612,26 @@ DESIGN_DESIGNS_CSS = """
 .dz-item:hover{background:var(--chip)}
 .dz-item:focus-visible{outline:2px solid var(--sel);outline-offset:-2px}
 .dz-item.cur{background:var(--chip);box-shadow:inset 3px 0 0 var(--sel)}
-.dz-item b{display:block;font-weight:650;overflow-wrap:anywhere}
+.dz-item b{display:block;font-weight:600;overflow-wrap:anywhere}
 .dz-item small{color:var(--soft);font-size:12.5px}
-.dz-modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;background:rgba(42,38,34,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+.dz-modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;background:rgba(20,22,30,.72);display:flex;align-items:center;justify-content:center;padding:16px}
 .dz-modal[hidden]{display:none}
 .dz-sheet{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:1040px;max-width:100%;max-height:92vh;overflow:auto;overscroll-behavior:contain;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 .dz-sheet.dz-small{width:500px}
-.dz-sheet h2{margin:0 0 4px;font:650 19px/1.3 var(--sans)}
+.dz-sheet h2{margin:0 0 4px;font:600 19px/1.3 var(--sans)}
 .dz-sheet .hint{font-size:13.5px}
 .dz-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px 14px;flex-wrap:wrap}
 .dz-top>div:first-child{flex:1 1 300px;min-width:0}
 .dz-acts{display:flex;flex:0 1 auto;gap:10px;align-items:center;flex-wrap:wrap}
 .dz-say{min-height:20px;margin:6px 0 2px;font-size:13.5px;line-height:20px;color:var(--accent-d)}
-.dz-sec{font:650 12px/1.3 var(--sans);color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-top:10px}
+.dz-sec{font:600 12px/1.3 var(--sans);color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-top:10px}
 .dz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:6px 0 12px}
 @media(max-width:520px){.dz-grid{grid-template-columns:1fr}.dz-sheet{padding:14px}}
 .dz-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);display:flex;flex-direction:column;gap:8px;min-width:0}
 .dz-pic{height:96px;display:flex;align-items:center;overflow:hidden;border-radius:6px;background:var(--line)}
 .dz-pic canvas{display:block;flex:none}
 .dz-cap{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.dz-cap b{display:block;font-weight:650;overflow-wrap:anywhere}
+.dz-cap b{display:block;font-weight:600;overflow-wrap:anywhere}
 .dz-cap small{color:var(--soft);font-size:12.5px}
 .dz-busy .dz-use{opacity:.4;pointer-events:none}
 .dz-in{font:400 14px/1.3 var(--sans);border:1px solid var(--line);border-radius:8px;padding:8px 9px;background:#fff;color:var(--ink);width:240px;max-width:100%}

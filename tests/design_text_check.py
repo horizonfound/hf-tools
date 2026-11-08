@@ -375,8 +375,10 @@ def check_type_browser(case, work, port, make_kit, Server, post, get_json):
                 print("SKIP  Google Fonts cannot be reached from this computer: the checks that load a font from Google are skipped", flush=True)
             case("start: a design with no words asks nothing of any address but the Assistant's (the question above aside)",
                  all("&text=" in u and "fonts.googleapis.com" in u for u in c.outside_requests()), c.outside_requests()[:3])
-            case("start: the plugin's own fonts are declared from the Assistant's own files, and none has been fetched yet (nothing uses one)",
-                 c.js("(function(){ var n = 0, loaded = 0; document.fonts.forEach(function(f){ n++; if (f.status === 'loaded') loaded++; }); return n >= 12 && loaded === 0; })()")
+            # (the page's own letters, 'Assistant Sans' from /look-font since Nov 7, are not a slide font: they are
+            # left out of the count, and must never pull in a slide font by falling back to one)
+            case("start: the plugin's own fonts are declared from the Assistant's own files, and none has been fetched yet (nothing uses one; the page's own font aside)",
+                 c.js("(function(){ var n = 0, loaded = 0; document.fonts.forEach(function(f){ if (f.family.replace(/[\"']/g, '') === 'Assistant Sans') return; n++; if (f.status === 'loaded') loaded++; }); return n >= 12 && loaded === 0; })()")
                  and not any("/design-font-file" in r["url"] for r in c.requests))
             case("start: + Add text and the Brand colors group are in the row of tools, Brand colors beside Background",
                  c.count("#tools-main #add-text") == 1 and c.js("document.getElementById('g-bg').nextElementSibling.id") == "g-brand" and c.text("#brand-label") == "Brand colors")
@@ -918,8 +920,8 @@ def check_type_browser(case, work, port, make_kit, Server, post, get_json):
             case("everything asked of Google was a stylesheet or a font file, by GET", all(re.match(r"https://fonts\.googleapis\.com/css2\?family=[A-Za-z0-9+]+(:wght@[0-9;]+)?&display=swap(&text=[a-z0-9]+)?$", u) or u.startswith("https://fonts.gstatic.com/") for u in c.outside_requests()),
                  [u for u in c.outside_requests() if "gstatic" not in u][:3])
             asked = sorted(set(re.sub(r"\?.*", "", re.sub(r"^https?://[^/]+", "", r["url"])) for r in c.requests if "127.0.0.1" in r["url"]))
-            case("every request to the Assistant was for the page, its state, a made copy of a photo, a font file, a save, a brand color or a kept font",
-                 set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/design-font-file", "/design-brand", "/design-font", "/favicon.ico"}, asked)
+            case("every request to the Assistant was for the page, its state, a made copy of a photo, a font file, the page's own font, a save, a brand color or a kept font",
+                 set(asked) <= {"/design.html", "/design-state", "/kit-photo", "/design", "/design-font-file", "/look-font", "/design-brand", "/design-font", "/favicon.ico"}, asked)
             case("the Finder was never asked for (/open was not requested)", not any("/open" in r["url"] for r in c.requests))
             case("nothing is kept in the browser's own storage", c.js("localStorage.length + sessionStorage.length") == 0 and c.js("document.cookie") == "")
     finally:
