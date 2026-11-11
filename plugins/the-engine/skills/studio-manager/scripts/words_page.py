@@ -193,8 +193,6 @@ OUR_WORDS = {
     "nothing_to_carry": "Tell me about it above first",
     "cant_reach": arrange.CANT_REACH,
     "queue_cant": "The posting queue couldn't be saved just now. Tell your assistant.",
-    # two shoots whose folder names come out the same once shortened: the other one is already in the queue
-    "queue_twin": "A shoot with nearly the same name is already in your posting queue, and I can't tell the two apart. Tell your assistant.",
 }
 ON_DRIVE = " on your photo drive"        # her words; left out when Your Content is on the computer's own disk
 
@@ -309,21 +307,21 @@ def strip_for_page(kit, piece, rec, slides):
     return ["/kit-photo?kit=%s&n=%d&size=s&v=%s" % (kq, p["n"], quote(p["v"] or "", safe="")) for p in photos if not p["missing"] or p["have"]], need
 
 
-def piece_id(pq, kit, piece):
-    """The posting queue's own name for a kit's reel or carousel (posting_queue.add_for_kit)."""
-    return "kit:%s-%s" % (pq.slug(kit.name), piece)
+def piece_id(pq, kit, piece, p=None):
+    """The posting queue's own name for this kit's reel or carousel: the one its piece in the queue carries
+    (posting_queue.kit_piece: found by the folder the piece was made from, never by the folder's name made
+    short, which two shoots can share), or, when it isn't in the queue yet, the name it would be given."""
+    if p is None:
+        p = _queue_file(pq) or {"pieces": []}
+    x = pq.kit_piece(p, kit, piece)
+    return x["id"] if x is not None else "%s-%s" % (pq.kit_sid(p, kit), piece)
 
 
 def _same_kit(x, kit):
-    """Is this posting-queue piece this kit's own? The queue's name for a piece is the kit's folder name made
-    short (lower case, punctuation as dashes, 40 characters), so two shoots can come out with the same one
-    ("Fake beach" and "Fake-beach", or two long names alike at the start). Every piece keeps the folder it was
-    made from; a piece made from another folder is the other shoot's, never shown or changed as this one's.
-    (A piece with no folder kept, from before that was written down, counts as this kit's.)"""
-    was = x.get("kit")
-    if not isinstance(was, str) or not was:
-        return True
-    return _nfc(re.split(r"[\\/]", was.rstrip("\\/"))[-1]) == _nfc(kit.name)
+    """Is this posting-queue piece this kit's own? The queue's one rule (posting_queue.same_kit): by the folder
+    the piece was made from, so two shoots whose names shorten alike ("Fake beach" and "Fake-beach") are never
+    shown or changed as one another."""
+    return _pq().same_kit(x, kit)
 
 
 def _queue_file(pq):
@@ -347,9 +345,8 @@ def queue_state(kit, piece, slides):
     if p is None:
         return out
     out["interval"] = bool(p.get("interval"))
-    pid = piece_id(pq, kit, piece)
-    x = next((y for y in p["pieces"] if isinstance(y, dict) and y.get("id") == pid), None)
-    if x is None or not _same_kit(x, kit):
+    x = pq.kit_piece(p, kit, piece)          # this kit's own piece, by the folder it was made from
+    if x is None:
         return out
     out["status"] = x.get("status") if isinstance(x.get("status"), str) else ""
     out["date"] = x.get("date") if isinstance(x.get("date"), str) else ""
@@ -506,12 +503,10 @@ def add_to_queue(body):
     try:
         with pq._POSTING_LOCK:
             p = pq.load()
-            sid = "kit:" + pq.slug(kit.name)
-            if any(isinstance(y, dict) and y.get("shoot_id") == sid and not _same_kit(y, kit) for y in p["pieces"]):
-                return 409, {"ok": False, "words": OUR_WORDS["queue_twin"]}      # another shoot's pieces: never changed as this one's
+            # another shoot whose name shortens to the same one keeps its own pieces: this kit's get a name of
+            # their own (posting_queue.kit_sid), and each is found by the folder it was made from
             pq.add_for_kit(p, kit)
-            pid = piece_id(pq, kit, piece)
-            x = next((y for y in p["pieces"] if y.get("id") == pid), None)
+            x = pq.kit_piece(p, kit, piece)
             if x is None:
                 return _bad(WORDS["cant_add"], 500)
             if x.get("status") not in ("green", "posted"):

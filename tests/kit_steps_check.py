@@ -466,8 +466,14 @@ def check_states(s, k):
         case("a second shoot whose folder name shortens to the same one ('%s'): its page never shows the first shoot's 'Added to my queue' or its date" % twin[:12],
              lines == {"reel": (READY, "Add to my queue"), "carousel": (READY, "Add to my queue")}, (code_t, lines))
         code_a, j_a, _ = s.http("POST", "/words-queue", {"kit": twin, "piece": "reel"})
-        case("...and adding it is refused in plain words, with the first shoot's pieces left exactly as they were",
-             code_a == 409 and "nearly the same name" in (j_a or {}).get("words", "") and json.dumps(s.posting(), sort_keys=True) == before, (code_a, j_a))
+        first = json.loads(before).get("pieces", [])
+        now_p = s.posting().get("pieces", [])
+        mine = [x for x in now_p if re.split(r"[\\/]", str(x.get("kit") or ""))[-1] == twin]
+        case("...and adding it works (stage 3: a name of its own in the queue), with the first shoot's pieces left exactly as they were",
+             code_a == 200 and (j_a or {}).get("ok") and json.dumps(now_p[:len(first)], sort_keys=True) == json.dumps(first, sort_keys=True)
+             and len(mine) == 2 and not {x["id"] for x in mine} & {x["id"] for x in first}
+             and any(x["id"].endswith("-reel") and x["status"] == "green" for x in mine), (code_a, j_a, [x["id"] for x in now_p]))
+        s.write_posting(json.loads(before))       # as it was, for what follows
     finally:
         shutil.rmtree(str(s.kit.parent / twin), ignore_errors=True)
 

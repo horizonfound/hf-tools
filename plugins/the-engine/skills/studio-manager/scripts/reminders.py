@@ -121,6 +121,13 @@ class CalendarProblem(Exception):
     """The calendar could not be reached or said no. The message is in plain words, for the photographer."""
 
 
+# What a page or the photographer is told when something on this computer (a file that can't be saved, a
+# program fault) stopped the reminders: never Python's own wording, never a file's path. The real words go in
+# result["detail"] for the log and the chat's "(reminders not updated: ...)" line, which Claude reads.
+STOPPED_HERE = "Something on this computer got in the way. Tell Claude and it'll sort it out."
+PASSES = 3                         # run(): how many times one round looks again after it changed the calendar
+
+
 def say(msg):
     try:
         print(msg, flush=True)
@@ -549,7 +556,8 @@ def _osascript(script, args=(), timeout=TIMEOUT):
     except subprocess.TimeoutExpired:
         raise CalendarProblem("Calendar took too long to answer.")
     except OSError as e:
-        raise CalendarProblem(f"Calendar couldn't be asked ({e}).")
+        sys.stderr.write(f"reminders: Calendar couldn't be asked ({type(e).__name__}: {e})\n")   # the path stays in the log
+        raise CalendarProblem("Calendar couldn't be asked.")
     if r.returncode != 0:
         raise CalendarProblem(_problem_words(r.stderr))
     return r.stdout.strip()
@@ -729,7 +737,8 @@ class CalendarFiles:
         out = []
         for uid, e in sorted(self._state().items(), key=lambda kv: (kv[1].get("date") or "", kv[0])):
             if isinstance(e, dict) and e.get("opened") != e.get("seq") and (self._dir() / str(e.get("file"))).is_file():
-                out.append({"id": e.get("id"), "uid": uid, "file": str(self._dir() / e["file"]), "title": e.get("title"), "cancel": bool(e.get("cancelled"))})
+                out.append({"id": e.get("id"), "uid": uid, "file": str(self._dir() / e["file"]), "title": e.get("title"), "cancel": bool(e.get("cancelled")),
+                            "again": bool(e.get("ever_opened"))})   # again: an earlier file of this post was opened in their calendar app
         return out
 
     def handed(self):
@@ -744,8 +753,9 @@ class CalendarFiles:
         for w in self.waiting():
             try:
                 self.opener(w["file"])
-            except Exception as e:  # noqa: BLE001  (whatever the opener says, in words; nothing is lost)
-                return {"opened": opened, "problem": str(e)[:200] or "That calendar file couldn't be opened."}
+            except Exception as e:  # noqa: BLE001  (nothing is lost; a CalendarProblem's words are plain, anything else may name a path)
+                plain = str(e)[:200] if isinstance(e, CalendarProblem) and str(e).strip() else "That calendar file couldn't be opened."
+                return {"opened": opened, "problem": plain, "detail": f"{type(e).__name__}: {e}"[:300]}
             st = self._state()
             if isinstance(st.get(w["uid"]), dict):
                 st[w["uid"]]["opened"] = st[w["uid"]].get("seq")
@@ -755,15 +765,117 @@ class CalendarFiles:
         return {"opened": opened, "problem": None}
 
 
+# ---------------------------------------------------------------- a pretend calendar, for tests only
+
+PRETEND = "pretend.json"           # <STUDIO_HOME>/reminders/pretend.json: what the pretend calendar should do
+PRETEND_ONLY = "The pretend calendar is for tests only: it needs a practice STUDIO_HOME with reminders/pretend.json in it."
+
+
+def pretend_config():
+    """The pretend calendar's settings, or None when pretending is not allowed here. Allowed only when
+    STUDIO_HOME is set, is not the real ~/.studio, and holds reminders/pretend.json (a test writes it; a
+    photographer's own folder never has one). Read fresh every time, so a test can change it while a page
+    server runs: {"calendars": [...], "sleep": seconds for every set / remove, "fail": words (every set / remove
+    says no), "list_sleep", "list_fail", "opener": "log" | "fail" (the PC way's file opener)}."""
+    env = os.environ.get("STUDIO_HOME")
+    if not env:
+        return None
+    try:
+        if Path(env).resolve() == (Path.home() / ".studio").resolve():
+            return None
+        cfg = json.loads((Path(env) / "reminders" / PRETEND).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return cfg if isinstance(cfg, dict) else None
+
+
+def pretend_log(*what):
+    """One line per call, in <STUDIO_HOME>/reminders/pretend-calls.log (a test reads it)."""
+    try:
+        with open(notes_dir() / "pretend-calls.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(list(what), ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+class PretendCalendar:
+    """A calendar that is only a file (reminders/pretend-calendar.json), shaped like the Mac's: a list of
+    calendars to choose from, events made, changed and removed by uid. FOR TESTS ONLY (pretend_config says
+    when); it can be told to be slow or to say no."""
+    name = "pretend"
+    needs_calendar = True
+    opens_files = False
+
+    def _cfg(self):
+        cfg = pretend_config()
+        if cfg is None:
+            raise CalendarProblem(PRETEND_ONLY)
+        return cfg
+
+    def _book(self):
+        return _read_json(notes_dir() / "pretend-calendar.json", {})
+
+    def _slow(self, cfg, slow="sleep", fail="fail"):
+        if cfg.get(slow):
+            time.sleep(float(cfg[slow]))
+        if cfg.get(fail):
+            raise CalendarProblem(str(cfg[fail]))
+
+    def calendars(self):
+        cfg = self._cfg()
+        pretend_log("list")
+        self._slow(cfg, "list_sleep", "list_fail")
+        return [str(n) for n in cfg.get("calendars") or []]
+
+    def set(self, piece_id, cal, uid, day, t, ttl, nts, keep_notes=False):
+        cfg = self._cfg()
+        pretend_log("set", piece_id, cal, uid or "", day, t)
+        self._slow(cfg)
+        book = self._book()
+        if keep_notes:
+            if not uid or uid not in book:
+                return None
+            nts = book[uid].get("notes")
+        if not uid or uid not in book:
+            uid = "pretend-%d-%s" % (len(book) + 1, hashlib.sha1(f"{piece_id}{time.time()}".encode("utf-8")).hexdigest()[:8])
+        book[uid] = {"id": piece_id, "cal": cal, "date": day, "time": t, "title": ttl, "notes": nts}
+        _write_whole(notes_dir() / "pretend-calendar.json", json.dumps(book, indent=1, ensure_ascii=False))
+        return uid
+
+    def remove(self, piece_id, cal, uid):
+        cfg = self._cfg()
+        pretend_log("remove", piece_id, cal, uid or "")
+        self._slow(cfg)
+        book = self._book()
+        if uid in book:
+            del book[uid]
+            _write_whole(notes_dir() / "pretend-calendar.json", json.dumps(book, indent=1, ensure_ascii=False))
+
+
+def _pretend_opener(path):
+    cfg = pretend_config() or {}
+    pretend_log("open", Path(path).name)
+    if cfg.get("opener") == "fail":
+        raise CalendarProblem("That calendar file couldn't be opened.")
+
+
 # ---------------------------------------------------------------- which one
 
 def default_backend():
     """A Mac: the Calendar app. A PC (and anything else): calendar files. REMINDERS_BACKEND=file | mac | none
-    says otherwise (a test's programs say file, so a Mac's real calendar is never asked)."""
+    says otherwise (a test's programs say file, so a Mac's real calendar is never asked). "pretend" is the
+    pretend calendar, for tests only: CalendarProblem anywhere pretend_config() does not allow it. With "file"
+    and a pretend.json that has "opener", the files are "opened" by a pretend opener (tests only, same rule)."""
     which = os.environ.get("REMINDERS_BACKEND", "").strip().lower()
     if which == "none":
         return None
+    if which == "pretend":
+        if pretend_config() is None:
+            raise CalendarProblem(PRETEND_ONLY)
+        return PretendCalendar()
     if which == "file" or (which != "mac" and not this_computer.MAC):
+        if (pretend_config() or {}).get("opener"):
+            return CalendarFiles(opener=_pretend_opener)
         return CalendarFiles()
     return MacCalendar()
 
@@ -779,7 +891,8 @@ def calendars(backend=None):
     except CalendarProblem:
         raise
     except Exception as e:  # noqa: BLE001
-        raise CalendarProblem(str(e)[:200] or "Calendar couldn't be asked.")
+        sys.stderr.write(f"reminders: the calendar list couldn't be read ({type(e).__name__}: {e})\n")
+        raise CalendarProblem("Calendar couldn't be asked.")
 
 
 def set_calendar(p, name, backend=None):
@@ -928,11 +1041,19 @@ def _did_words(do, a, files, backend=None):
 
 
 def _stopped(res, e):
-    words = str(e).strip() if isinstance(e, CalendarProblem) else (f"{type(e).__name__}: {e}" if str(e).strip() else type(e).__name__)
+    """Note what stopped a sync. res["problem"]: plain words fit for a page (a CalendarProblem's own, or
+    STOPPED_HERE for anything else: Python's wording and a file's path never reach a page). res["detail"]: the
+    real words, for the log; res["note"]: the chat's line, which carries the real words for Claude."""
     if isinstance(e, subprocess.TimeoutExpired):
-        words = "Calendar took too long to answer."
-    res["problem"] = words[:200]
-    res["note"] = f"(reminders not updated: {res['problem']})"
+        plain = detail = "Calendar took too long to answer."
+    elif isinstance(e, CalendarProblem) and str(e).strip():
+        plain = detail = str(e).strip()
+    else:
+        plain = STOPPED_HERE
+        detail = f"{type(e).__name__}: {e}" if str(e).strip() else type(e).__name__
+    res["problem"] = plain[:200]
+    res["detail"] = detail[:300]
+    res["note"] = f"(reminders not updated: {res['detail'][:200]})"
     res["changed"] = bool(res["changes"])
     return res
 
@@ -1007,30 +1128,70 @@ def run(load, save, lock=None, backend=None, force=False, words=None):
     talk to the calendar, then load the queue again under the lock, merge the few fields and save only if
     something changed. load() and save(p) are the queue's own (posting_queue.load, posting_queue.save); lock is
     the queue's lock (anything usable with `with`), or None. Never raises. Returns sync's result, with
-    "busy": True (and nothing done) when another sync is already at work."""
+    "busy": True (and nothing done) when another sync is already at work.
+
+    The queue may be changed by ANOTHER program while the calendar is being talked to (a command in the chat
+    taking a post out of line: its own look at the calendar finds nothing to do, since the event is not made
+    yet). So after a pass that changed the calendar, the freshly loaded queue is looked at once more, still
+    inside the one-at-a-time lock, and if the calendar is no longer what that queue asks for, another pass
+    follows (PASSES at most; never after a calendar problem, which would only be asked again). What every
+    pass did is handed back as one result."""
     lock = lock or contextlib.nullcontext()
     with _one_at_a_time() as mine:
         if not mine:
             return {"changed": False, "changes": {}, "did": [], "problem": None, "note": None, "to_open": [], "busy": True}
-        try:
-            with lock:
-                snap = snapshot(load())
-        except (Exception, SystemExit) as e:  # noqa: BLE001  (posting_queue.load stops the program on a file it can't read)
-            return _stopped({"changed": False, "changes": {}, "did": [], "problem": None, "note": None, "to_open": []}, e)
-        res = sync(snap, backend, force=force, words=words)
-        if res["changes"]:
-            strays = []
+        total = None
+        for n in range(PASSES):
             try:
                 with lock:
-                    fresh = load()
-                    changed, strays = merge(fresh, res["changes"])
-                    if changed:
-                        save(fresh)
-            except (Exception, SystemExit) as e:  # noqa: BLE001
-                _stopped(res, e)          # the events are in made.json, so the next run picks them up, not twice
-            if strays:
-                forget(strays, backend if backend is not None else default_backend())
-        return res
+                    snap = snapshot(load())
+            except (Exception, SystemExit) as e:  # noqa: BLE001  (posting_queue.load stops the program on a file it can't read)
+                res = _stopped({"changed": False, "changes": {}, "did": [], "problem": None, "note": None, "to_open": []}, e)
+                return res if total is None else _add_pass(total, res)
+            if n:
+                # a later pass: only when the queue as it is NOW asks for something the calendar doesn't have
+                try:
+                    b = backend if backend is not None else default_backend()
+                    todo = b is not None and any(a.get("do") != "leave" for a in plan(
+                        snap, need_calendar=getattr(b, "needs_calendar", True), words=words, made=_made()))
+                except Exception:  # noqa: BLE001  (the next round finds it)
+                    todo = False
+                if not todo:
+                    break
+            res = sync(snap, backend, force=force and not n, words=words)
+            if res["changes"]:
+                strays = []
+                try:
+                    with lock:
+                        fresh = load()
+                        changed, strays = merge(fresh, res["changes"])
+                        if changed:
+                            save(fresh)
+                except (Exception, SystemExit) as e:  # noqa: BLE001
+                    _stopped(res, e)          # the events are in made.json, so the next run picks them up, not twice
+                if strays:
+                    forget(strays, backend if backend is not None else default_backend())
+            total = res if total is None else _add_pass(total, res)
+            if not res["changes"] or res.get("problem"):
+                break
+        return total
+
+
+def _add_pass(total, res):
+    """One result out of two passes of a round: every line said, the newest fields for each post (with the uid
+    the round first saw), and the last pass's word on trouble and on the files waiting."""
+    for pid, c in (res.get("changes") or {}).items():
+        was = total["changes"][pid]["was"] if pid in total["changes"] else c.get("was")
+        total["changes"][pid] = dict(c, was=was)
+    total["did"] = list(total.get("did") or []) + list(res.get("did") or [])
+    total["changed"] = bool(total["changes"])
+    for k in ("problem", "note", "to_open"):
+        total[k] = res.get(k)
+    if res.get("detail"):
+        total["detail"] = res["detail"]
+    else:
+        total.pop("detail", None)
+    return total
 
 
 def open_waiting(backend=None):

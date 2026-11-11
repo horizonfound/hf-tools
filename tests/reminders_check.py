@@ -6,8 +6,8 @@ the last check says it was never reached.
 
     python3 tests/reminders_check.py
 
-Every line must say PASS. Lines that say WIRING are Nicole's checks on the queue page's own words, which do not
-exist until stage 4 wires the page: they are listed with the exact text so they are not lost.
+Every line must say PASS. Nicole's checks 17 to 19 are on the queue page's own words (wired in stage 4): they read
+posting_queue.py's page, and tests/posting_reminders_page_check.py checks the same on the real page in a browser.
 Python 3.9, standard library only, a Mac or a PC.
 """
 import copy
@@ -45,10 +45,10 @@ fails = 0
 count = 0
 
 
-def check(name, cond):
+def check(name, cond, seen=None):
     global fails, count
     count += 1
-    print(("PASS  " if cond else "FAIL  ") + name, flush=True)
+    print(("PASS  " if cond else "FAIL  ") + name + ("" if cond or seen is None else "\n      saw: " + repr(seen)[:600]), flush=True)
     fails += 0 if cond else 1
 
 
@@ -236,10 +236,13 @@ try:
     check("18 (our side) each post its own time: one post's time never turns another's reminder on", "remind_on" not in q3["pieces"][1] and "remind_time" not in q3["pieces"][1])
     R.set_reminder(q3, q3["pieces"][0]["id"], None)
     check("19 (our side) no reminder is a real answer: off keeps nothing on the calendar side", q3["pieces"][0]["remind_on"] is False and not R.plan(R.snapshot(q3), words=words))
-    for line in ("17 the page offers 9 am, Noon, 6 pm, 8 pm and their own:  ['09:00','9 am']  ['12:00','Noon']  ['18:00','6 pm']  ['20:00','8 pm']  type=\"time\"",
-                 "18 Remind me always opens the times:  r.querySelector('[data-m=\"yes\"]').onclick=()=>pickRemind(el,x,'time')",
-                 "19 I'll post it myself closes it:  I'll post it myself"):
-        print("WIRING  for stage 4, on the queue page: " + line)
+    # her checks 17 to 19 are on the queue page's own source (stage 4 wired the page). Hers looked for type="time"
+    # in a line of HTML; ours builds the time box as an element (inp.type='time'), so nothing of theirs is ever HTML.
+    # The same three are checked on the real page in a browser by tests/posting_reminders_page_check.py.
+    page = (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8")
+    check("17 the page offers 9 am, Noon, 6 pm, 8 pm and their own", all(k in page for k in ("['09:00','9 am']", "['12:00','Noon']", "['18:00','6 pm']", "['20:00','8 pm']", "inp.type='time'")))
+    check("18 Remind me always opens the times", "r.querySelector('[data-m=\"yes\"]').onclick=()=>pickRemind(el,x,'time')" in page)
+    check("19 I'll post it myself closes it", "I'll post it myself" in page)
 
     # ------------------------------------------------------------ ours
     print("\nOurs")
@@ -553,14 +556,103 @@ try:
     th.start()
     th.join(30)
     q = store["q"]
-    check("run: the queue's lock is never held while the calendar is asked", held == [False] and not th.is_alive())
+    check("run: the queue's lock is never held while the calendar is asked", held and not any(held) and not th.is_alive(), held)
     check("run: a queue changed during the calendar call is not written over", q["interval"] == 2 and q["pieces"][1]["status"] == "red" and q["pieces"][0]["remind_time"] == "20:00"
-          and q["pieces"][0].get("event_uid") in cal.events and store["saves"] == 1)
+          and q["pieces"][0].get("event_uid") in cal.events)
+    # (the fix round, Nov 11) the round looks at the queue again after it changed the calendar: a change made
+    # meanwhile by ANOTHER program (a command in the chat) has nobody else to start a round for it
+    check("run: a time changed during the calendar call is caught up by the same round (it looks again), one event",
+          out and out[0]["changed"] and len(cal.events) == 1 and cal.events[q["pieces"][0]["event_uid"]]["when"].endswith("20:00") and len(held) == 2, (held, cal.events))
     cal.during = None
-    res = R.run(load, save, lock, mac, words=words)            # the time changed meanwhile: caught up now
     saves = store["saves"]
     res2 = R.run(load, save, lock, mac, words=words)
-    check("run: the next round catches up, and a round with nothing to do saves nothing", res["changed"] and cal.events[store["q"]["pieces"][0]["event_uid"]]["when"].endswith("20:00") and not res2["changed"] and store["saves"] == saves)
+    check("run: a round with nothing to do saves nothing and asks the calendar nothing", not res2["changed"] and store["saves"] == saves and len(held) == 2)
+
+    # a post taken out of line by a command while its reminder is still being made: no event may be left
+    fresh_home()
+    cal = Pretend()
+    mac = R.MacCalendar(run=cal.run)
+    store = {"q": queue(), "saves": 0, "loads": 0}
+    store["q"]["remind"] = {"calendar": "Home"}
+    R.set_reminder(store["q"], store["q"]["pieces"][0]["id"], "09:00")
+    seen = []
+
+    def unready_meanwhile():
+        if not seen:                                         # "posting_queue.py unready reel", mid-call
+            x = store["q"]["pieces"][0]
+            x["status"] = "yellow"
+            x.pop("date", None)
+            seen.append(R.plan(R.snapshot(store["q"]), made=R._made(), words=words))   # what that command's own look finds
+        else:
+            seen.append("again")
+
+    cal.during = unready_meanwhile
+    res = R.run(load, save, lock, mac, words=words)
+    x = store["q"]["pieces"][0]
+    check("run: a post taken out of line while its reminder was being made (the command itself saw nothing to do) is left with NO event",
+          seen[:1] == [[]] and cal.events == {} and "event_uid" not in x and "event_sig" not in x and x["status"] == "yellow" and res["problem"] is None
+          and R._made() == {} and R.plan(R.snapshot(store["q"]), made=R._made(), words=words) == [], (seen, cal.events, x))
+    check("...and the round says both things it did (set, then removed)", [d.split(":")[0] for d in res["did"]] == ["Reminder set", "Reminder removed"], res["did"])
+
+    # it can't go round for ever: a queue that changes during EVERY call stops after PASSES passes
+    fresh_home()
+    cal = Pretend()
+    mac = R.MacCalendar(run=cal.run)
+    store = {"q": queue(), "saves": 0, "loads": 0}
+    store["q"]["remind"] = {"calendar": "Home"}
+    R.set_reminder(store["q"], store["q"]["pieces"][0]["id"], "09:00")
+    turns = []
+
+    def always():
+        turns.append(1)
+        store["q"]["pieces"][0]["remind_time"] = "%02d:00" % (10 + len(turns))
+
+    cal.during = always
+    res = R.run(load, save, lock, mac, words=words)
+    check("run: a queue that changes during every call ends the round after %d passes, one event, no trouble" % R.PASSES,
+          len(turns) == R.PASSES and len(cal.events) == 1 and res["problem"] is None and not lock.locked(), (len(turns), cal.events))
+    cal.during = None
+
+    # a calendar that says no is asked once, never again by the same round
+    fresh_home()
+    cal = Pretend()
+    mac = R.MacCalendar(run=cal.run)
+    store = {"q": queue(), "saves": 0, "loads": 0}
+    store["q"]["remind"] = {"calendar": "Home"}
+    for i in (0, 1):
+        R.set_reminder(store["q"], store["q"]["pieces"][i]["id"], "09:00")
+    cal.fail = R.CalendarProblem("Calendar took too long to answer.")
+    res = R.run(load, save, lock, mac, words=words)
+    check("run: a calendar that says no is asked once by a round, never again", cal.calls == [("fail",)] and res["problem"] == "Calendar took too long to answer." and store["saves"] == 0, cal.calls)
+    cal.fail = None
+    fresh_home()                                             # back to one reminded post with its event, for what follows
+    cal = Pretend()
+    mac = R.MacCalendar(run=cal.run)
+    store = {"q": queue(), "saves": 0, "loads": 0}
+    store["q"]["remind"] = {"calendar": "Home"}
+    R.set_reminder(store["q"], store["q"]["pieces"][0]["id"], "09:00")
+    R.run(load, save, lock, mac, words=words)
+
+    # ---- words fit for a page (the fix round): Python's wording and a file's path never reach one
+    res = R._stopped({"changes": {}}, IsADirectoryError(21, "Is a directory", "/Users/someone/.studio/reminders/state.json"))
+    check("a fault that is not the calendar's is a plain line for the page; the real words are kept apart for the log",
+          res["problem"] == R.STOPPED_HERE and "/" not in res["problem"] and "Error" not in res["problem"]
+          and "IsADirectoryError" in res["detail"] and "state.json" in res["detail"] and res["note"].startswith("(reminders not updated: IsADirectoryError"), res)
+    res = R._stopped({"changes": {}}, R.CalendarProblem("That calendar isn't in Calendar any more."))
+    check("...a calendar's own plain words still go through as they are", res["problem"] == "That calendar isn't in Calendar any more." == res["detail"], res)
+
+    class Broken:
+        needs_calendar = True
+
+        def calendars(self):
+            raise PermissionError(13, "Permission denied", "C:\\Users\\someone\\.studio\\reminders\\x.ics")
+
+    try:
+        R.calendars(Broken())
+        said = None
+    except R.CalendarProblem as e:
+        said = str(e)
+    check("calendars(): a fault that is not the calendar's never hands a path to the page", said == "Calendar couldn't be asked.", said)
 
     def bad_load():
         sys.exit("STOP: posting.json could not be read. Nothing changed.")

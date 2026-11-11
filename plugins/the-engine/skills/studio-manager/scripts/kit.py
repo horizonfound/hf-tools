@@ -1787,6 +1787,7 @@ body:not(.live) #queueLink{display:none}
 .w.q .qb{margin-top:.6rem}
 .w.q.locked{opacity:.75}
 .w.q .went{margin:.4rem 0 0}.w.q .went:empty{display:none}
+.w.q .qpic{display:block;width:56px;aspect-ratio:4/5;object-fit:cover;border-radius:8px;box-shadow:0 0 0 1px var(--line);margin:.45rem 0 .1rem}
 .qbtn{display:inline-flex;align-items:center;gap:.4rem;border:0;background:var(--ink);color:#fff;border-radius:999px;padding:.55rem 1rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:background .2s}
 .qbtn:hover{background:var(--coral-2)}
 .qbtn[disabled]{background:var(--line);color:var(--ink-2);cursor:default;pointer-events:none}
@@ -2023,7 +2024,12 @@ def queue_box(piece, made, has_caption, q):
     if status == "green":
         day = nice_day(q.get("date"))
         said = K["down_for"].format(day=day) if day else K["in_queue"]
-        return open_.format(cls="") + head + f"<p class='ws'>{html.escape(said)}</p>" + button(K["added"]) + feed + "</div>"
+        # decision 8: the photo they picked for the grid in the posting queue shows here too (the queue's own
+        # small tile, by its address on this server; a picture only, no words of ours)
+        pic = ""
+        if q.get("cover") and isinstance(q.get("thumb"), str) and q["thumb"].startswith("/posting-thumbs/"):
+            pic = f"<img class='qpic' src='{html.escape(q['thumb'])}' alt=''>"
+        return open_.format(cls="") + head + pic + f"<p class='ws'>{html.escape(said)}</p>" + button(K["added"]) + feed + "</div>"
     if not made or not has_caption:
         need = (K["need_both"] if not made and not has_caption else K["need_made"] if not made else K["need_caption"]).format(piece=piece)
         return (open_.format(cls=" locked") + head + f"<p class='ws'>{html.escape(need + K['locked'])}</p>"
