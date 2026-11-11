@@ -37,6 +37,7 @@ AirDrop or an Apple ID have a PC's line beside them (PC_WORDS).
 import html
 import json
 import os
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -192,6 +193,8 @@ OUR_WORDS = {
     "nothing_to_carry": "Tell me about it above first",
     "cant_reach": arrange.CANT_REACH,
     "queue_cant": "The posting queue couldn't be saved just now. Tell your assistant.",
+    # two shoots whose folder names come out the same once shortened: the other one is already in the queue
+    "queue_twin": "A shoot with nearly the same name is already in your posting queue, and I can't tell the two apart. Tell your assistant.",
 }
 ON_DRIVE = " on your photo drive"        # her words; left out when Your Content is on the computer's own disk
 
@@ -311,6 +314,18 @@ def piece_id(pq, kit, piece):
     return "kit:%s-%s" % (pq.slug(kit.name), piece)
 
 
+def _same_kit(x, kit):
+    """Is this posting-queue piece this kit's own? The queue's name for a piece is the kit's folder name made
+    short (lower case, punctuation as dashes, 40 characters), so two shoots can come out with the same one
+    ("Fake beach" and "Fake-beach", or two long names alike at the start). Every piece keeps the folder it was
+    made from; a piece made from another folder is the other shoot's, never shown or changed as this one's.
+    (A piece with no folder kept, from before that was written down, counts as this kit's.)"""
+    was = x.get("kit")
+    if not isinstance(was, str) or not was:
+        return True
+    return _nfc(re.split(r"[\\/]", was.rstrip("\\/"))[-1]) == _nfc(kit.name)
+
+
 def _queue_file(pq):
     """The posting queue as it is saved, for reading. An unreadable file reads as empty here (the queue's own
     load stops the program; a page server must answer)."""
@@ -334,7 +349,7 @@ def queue_state(kit, piece, slides):
     out["interval"] = bool(p.get("interval"))
     pid = piece_id(pq, kit, piece)
     x = next((y for y in p["pieces"] if isinstance(y, dict) and y.get("id") == pid), None)
-    if x is None:
+    if x is None or not _same_kit(x, kit):
         return out
     out["status"] = x.get("status") if isinstance(x.get("status"), str) else ""
     out["date"] = x.get("date") if isinstance(x.get("date"), str) else ""
@@ -484,13 +499,16 @@ def add_to_queue(body):
     facts = kit_facts(kit)
     _, project, slides = facts
     made = bool(project) if piece == "reel" else bool(slides)
-    w = piece_for_page(words_mod.piece_of(words_mod.load(kit), piece))
-    if not made or not w["caption"]:
+    # the one rule both pages unlock on (words.status): a drafted caption, or one they typed themselves
+    if not made or not words_mod.status(kit)[piece]["caption"]:
         return 409, {"ok": False, "words": WORDS["q_locked"].replace("{piece}", piece)}
     pq = _pq()
     try:
         with pq._POSTING_LOCK:
             p = pq.load()
+            sid = "kit:" + pq.slug(kit.name)
+            if any(isinstance(y, dict) and y.get("shoot_id") == sid and not _same_kit(y, kit) for y in p["pieces"]):
+                return 409, {"ok": False, "words": OUR_WORDS["queue_twin"]}      # another shoot's pieces: never changed as this one's
             pq.add_for_kit(p, kit)
             pid = piece_id(pq, kit, piece)
             x = next((y for y in p["pieces"] if y.get("id") == pid), None)

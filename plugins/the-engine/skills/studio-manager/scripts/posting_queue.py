@@ -85,7 +85,8 @@ FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
 FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram keeps the pictures themselves
 FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
 KINDS = ("reel", "carousel", "single")
-KIT_OWN_FILES = ("Post kit.html", "Captions and hooks.txt", "Reel.txt")   # what /content serves from a kit, and
+KIT_OWN_FILES = ("Post kit.html", "Reel.txt")   # what /content serves from a kit (not an older kit's captions file:
+                                            # no page shows it since Nov 10, and it may hold hashtags), and
 KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
@@ -994,6 +995,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
             import reel_page
             return reel_page.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/words.html", "/words-state"):
+            # the words page (Nicole's v20: captions and hooks): every one of its requests is words_page.py's to answer
+            import words_page
+            return words_page.handle_get(self, path, urlsplit(self.path).query)
         if path.startswith(("/posting-thumbs/", "/feed/", "/queue-thumbs/", "/home-thumbs/")):
             if thumb_wanted(path):                     # one small picture a page shows, nothing else (see thumb_wanted)
                 return super().do_GET()
@@ -1188,7 +1193,7 @@ class Handler(SimpleHTTPRequestHandler):
     def serve_content(self, rel):
         """A post kit's page and its pieces, read-only, from Your Content (kit.py), so the kit page opens in
         the app's browser pane like the report does. Only what the kit page shows is served:
-            <kit>/Post kit.html, Captions and hooks.txt, Reel.txt     (kept in the kit's hidden folder)
+            <kit>/Post kit.html, Reel.txt                            (kept in the kit's hidden folder)
             <kit>/Singles|Carousel|Stories|Covers/<a picture>          (the pieces the Assistant made)
         Never the kit's records (they hold folder paths), never the photos themselves, never anything whose
         name starts with a dot, and never anything outside Your Content (the address is decoded first, then
@@ -1312,6 +1317,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the reel page: reel_page.py checks each of these the way arrange.py does (above)
             import reel_page
             return reel_page.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/words-save", "/words-carry", "/words-rhythm", "/words-queue", "/words-open"):
+            # the words page: words_page.py checks each of these the way arrange.py does (above)
+            import words_page
+            return words_page.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":

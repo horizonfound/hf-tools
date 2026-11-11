@@ -203,6 +203,15 @@ def check_curating():
     case("... their own order is always kept on the page; yours never replaces it", "yours never replaces it" in t)
     case("... nothing of a client's: no name from her example shoot, no numbers from her example picks",
          not re.search(r"Hannah|\b(41|42|45|46|49|51)\b", t))
+    case("... step 7, for a reel: mark its rhythm fully (Nicole, Nov 10): a third Longer, a quarter Quicker, the rest plain, "
+         "never three of a kind in a row, a Longer after a few quick ones; the photographer's own marks win",
+         all(x in steps for x in ("mark its rhythm: every reel, fully (Nicole, Nov 10)", "about a third of the photos", "about a quarter",
+                                  "**The rest plain.**", "never three Longers or three Quickers in a row",
+                                  "a Longer comes after a few quick ones", "and theirs win", "A carousel has no marks"))
+         and "Aurora" not in t)
+    case("... step 7: On every beat's lengths are aims; the song's hits still decide (review, Nov 11)",
+         "a Longer photo aims for about three beats" in steps and "those are aims, and the song's hits still decide" in steps
+         and "a Longer photo holds about three beats" not in t)
     them = [ln for ln in t.splitlines() if "Nicole" not in ln]           # Nicole is "she"; the photographer never is
     case("... the photographer is never 'she' or 'he'", not any(re.search(r"\b(she|he|his|hers?)\b", ln) for ln in them),
          [ln[:120] for ln in them if re.search(r"\b(she|he|his|hers?)\b", ln)][:3])
@@ -221,7 +230,27 @@ def check_reel_skill():
     case("... the order is the Assistant's flow rules, the emotion builds and comes back down, tall photos first",
          "The order is the Assistant's flow rules" in step2 and "let the emotion build, then come back down" in step2 and "tall photos first" in step2)
     case("... about 8 to 14 is a guide, not a rule", "About 8 to 14 photos is a guide, not a rule" in step2 and "Pick 8 to 14" not in t)
-    case("... the '-' mark is for a detail in a run, not frames of one laugh", "a detail in a run" in step2 and "frames of one laugh" not in t)
+    case("... every reel is marked fully (Nicole, Nov 10): about a third Longer, about a quarter Quicker, the rest plain",
+         "Mark every reel's rhythm, fully (Nicole, Nov 10)" in step2 and "on about a third of the photos" in step2
+         and "on about a quarter" in step2 and "**The rest plain.**" in step2 and "Most photos get no mark" not in t)
+    case("... what gets Longer and what gets Quicker, in her words; never three of a kind in a row; not frames of one laugh",
+         all(x in step2 for x in ("the scroll-stopper you open on", "the emotional peaks", "a wide frame with a lot to take in", "and the closer",
+                                  "details (shoes, hands)", "quick fun bursts", "the middle of a fast run",
+                                  "never three Longers or three Quickers in a row", "a Longer comes after a few quick ones"))
+         and "frames of one laugh" not in t)
+    step4 = t.split("## Step 4", 1)[-1].split("\n## ", 1)[0]
+    case("Step 4: On every beat has rhythm (her v22): Longer about three beats, Quicker one, plain one or two, never one beat each",
+         "On every beat has rhythm (Nicole, Nov 10)" in step4 and "about three beats" in step4 and "never one beat each" in step4
+         and "planned so that three one-beat plain photos don't come in a row" in step4)
+    # The made reel does not always keep the plan (same in her engine: the song's hits and the bar can pull a plain
+    # opener or a Longer photo to one beat), so the words say "aims" and never promise it (review, Nov 11).
+    case("... and those lengths are aims, not promises: a Longer or the opener can land on one beat, one-beat photos can fall together",
+         "**Those are aims, not promises.**" in step4 and "a Longer photo or a plain opener lands on one beat" in step4
+         and "three or four one-beat photos fall together" in step4 and "never tell them it can't happen" in step4
+         and "never three one-beat plain photos in a row" not in t and "(two to four, wherever the song hits)" not in t)
+    case("... a reel pick is fully marked wherever it is saved, the post kit's kit.py picks --reel included",
+         "**This holds wherever a reel pick is saved**, the post kit's `kit.py picks --reel` included" in step2
+         and "`--reel 7+,2,11-,4,9+`" in step2)
     case("... their own order is kept on the page", "Their own order is always kept on the page; yours never replaces it." in step2)
     foot = t.split("## Behind-the-scenes footage", 1)[-1].split("\n## ", 1)[0]
     case("her footage rules 4 to 6: never a photo because of a clip, never limited to the footage's setting, the same picks with or without",
@@ -237,6 +266,13 @@ def check_doors():
     hello = read(SM / "parts" / "hello.md")
     case("the hello's Make posts explanation names the reel page and the two designers",
          "the reel is made on its own page beside the chat" in hello and "the carousel and the stories each have a designer" in hello)
+    arr = read(SM / "parts" / "arrange.md")
+    case("arrange.md: a reel pick goes to the page fully marked (Nicole, Nov 10), and the page keeps the marks that are on it",
+         "about a third Longer, about a quarter Quicker, the rest plain, never three Longers or three Quickers in a row" in arr
+         and "**Your marks and theirs.**" in arr and "the page keeps what is on it, marks and all" in arr)
+    case("arrange.md: On every beat's lengths are aims, not promises (the song's hits still decide)",
+         "a Longer photo aims for about three beats" in arr and "Those are aims, not promises" in arr
+         and "never that it can't happen" in arr and "a Longer photo holds about three beats" not in arr)
     kitp = read(SM / "parts" / "post-kit.md")
     case("post-kit.md: plain stories are the kit's, the stories designer is theirs from the Stories card",
          "plain stories (one photo each)" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)

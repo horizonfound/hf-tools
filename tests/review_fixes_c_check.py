@@ -169,25 +169,33 @@ def check_server(work, port):
         finally:
             rec_file.write_text(good, encoding="utf-8")
 
-        # the page can't be built at all (a words file that is not JSON): a saved copy from before her cards is never sent
-        words_file.write_text("{not json", encoding="utf-8")
+        # the page can't be built at all (the shoot's name saved as a number; before Nov 10 this was a words file that
+        # was not JSON, which the page no longer reads): a saved copy from before her cards is never sent
+        bad = json.dumps(dict(json.loads(good), name=7), ensure_ascii=False)
+        rec_file.write_text(bad, encoding="utf-8")
         try:
             saved_page.write_text("<!doctype html><html><head><link href='https://fonts.googleapis.com/css2?family=Fraunces'></head>"
                                   "<body>OLD PAGE: Change the photos</body></html>", encoding="utf-8")
             code, page = kit_page()
             case("can't build, old saved copy: the old page is not sent; one line says something couldn't be read and to tell Claude",
                  code == 500 and "OLD PAGE" not in page and "couldn't be read" in page and "Tell Claude" in page and "googleapis" not in page, (code, page[-300:]))
-            words_file.unlink()
+            rec_file.write_text(good, encoding="utf-8")
             c2, out2 = dc.run(env, "kit.py", "page", kit_name)
-            words_file.write_text("{not json", encoding="utf-8")
+            rec_file.write_text(bad, encoding="utf-8")
             code, page = kit_page()
             case("can't build, saved copy of today's page: that copy is sent (it carries the page's mark)",
                  c2 == 0 and code == 200 and "data-piece='stories'" in page and "assistant-page" in page, (c2, out2[-200:], code))
         finally:
-            if words_file.exists():
-                words_file.unlink()
+            rec_file.write_text(good, encoding="utf-8")
         code, page = kit_page()
         case("records put right: the page is built again", code == 200 and "data-piece='stories'" in page)
+        words_file.write_text("{not json", encoding="utf-8")
+        try:
+            code, page = kit_page()
+            case("an older kit's words.json that can't be read never stops the page (the page no longer reads it), and is left as it is",
+                 code == 200 and "data-piece='stories'" in page and words_file.read_text(encoding="utf-8") == "{not json", code)
+        finally:
+            words_file.unlink()
     finally:
         srv.stop()
 

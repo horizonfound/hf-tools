@@ -87,10 +87,10 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -160,6 +160,12 @@ jobs:
       - name: The words for a post (the record, Nicole's rules for writing and asking)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/words_check.py
+      - name: The words page (every route and refusal, the queue step; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/words_page_check.py --no-chrome
+      - name: The post kit's three steps (every state of Your words and Add to my queue, no link inside a link; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/kit_steps_check.py --no-chrome
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true

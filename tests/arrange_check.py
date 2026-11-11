@@ -2724,7 +2724,8 @@ def check_carousel_fixes(work, port):
         case("and twenty is saved", code == 200 and j5.get("ok") is True and len(state()["now"]["nums"]) == 20, (code, j5))
         code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1)))
 
-        # ---- the kit's words in a near-miss shape (hashtags as a list) never stop the kit page or the slides ----
+        # ---- the old way to write a kit's words is closed (Nov 10: one way, the words page and words.py), and what it
+        # left in an older kit (hashtags as a list, a story line as text) is left on the disk and never stops a page ----
         words_file, captions, page_file = hid / "words.json", hid / "Captions and hooks.txt", hid / "Post kit.html"
         given = work / "fixes-words.json"
 
@@ -2734,22 +2735,19 @@ def check_carousel_fixes(work, port):
             except OSError:
                 return ""
 
+        older = json.dumps({"hooks": ["One", "Two", "Three"], "caption": "A windy morning.", "hashtags": ["#older", "#list"], "stories": "One line"}, indent=1)
+        words_file.write_text(older, encoding="utf-8")
         given.write_text(json.dumps({"hooks": ["One", "Two", "Three"], "caption": "A windy morning.", "hashtags": ["#harbor", "#windy"]}), encoding="utf-8")
         code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
-        kept = json.loads(words_file.read_text(encoding="utf-8")) if words_file.exists() else {}
-        case("words: hashtags handed over as a list are saved as one line, not a crash", code == 0 and kept.get("hashtags") == "#harbor #windy" and "Traceback" not in out, (code, out[-200:]))
-        case("words: the captions file and the kit page both show them", "#harbor #windy" in text_of(captions) and "<p class='t'>#harbor #windy</p>" in text_of(page_file))
-        was = words_file.read_bytes() if words_file.exists() else b""
-        given.write_text(json.dumps({"hooks": ["One"], "caption": 7}), encoding="utf-8")
-        code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
-        case("words: a caption that is not text is refused in plain words, with nothing saved", code == 1 and "STOP:" in out and "Nothing was saved" in out and "Traceback" not in out and words_file.read_bytes() == was, (code, out[-200:]))
+        case("words: kit.py words is refused in plain words that point to words.py, with nothing saved",
+             code == 2 and "STOP:" in out and "words.py" in out and "Nothing was saved" in out and "Traceback" not in out
+             and text_of(words_file) == older and not captions.exists(), (code, out[-200:]))
         given.write_text("not json", encoding="utf-8")
         code, out = run(env, "kit.py", "words", kit_name, "--file", str(given))
-        case("words: a file that is not JSON is refused the same way", code == 1 and "STOP:" in out and "Traceback" not in out and words_file.read_bytes() == was, (code, out[-200:]))
-        # a words file an earlier version saved with the list in it (this check's own kit): every later page still works
-        words_file.write_text(json.dumps(dict(kept, hashtags=["#older", "#list"], stories="One line"), indent=1), encoding="utf-8")
+        case("words: a file that is not JSON is refused the same way", code == 2 and "STOP:" in out and "Traceback" not in out and text_of(words_file) == older, (code, out[-200:]))
         code, out = run(env, "kit.py", "page", kit_name)
-        case("words: a words file already saved with a list in it no longer stops the kit page", code == 0 and "<p class='t'>#older #list</p>" in text_of(page_file) and "Traceback" not in out, (code, out[-200:]))
+        case("words: an older kit's words file with a list in it never stops the kit page, never shows on it, and is left as it was",
+             code == 0 and "#older" not in text_of(page_file) and "data-piece='reel'" in text_of(page_file) and "Traceback" not in out and text_of(words_file) == older, (code, out[-200:]))
         code, out = run(env, "kit.py", "picks", kit_name, "--carousel", ",".join(map(str, N1[::-1])))
         code2, out2 = run(env, "kit.py", "build", kit_name)
         case("words: nor kit.py build after a new order", code == 0 and code2 == 0 and "Traceback" not in out2, (code, code2, out2[-200:]))

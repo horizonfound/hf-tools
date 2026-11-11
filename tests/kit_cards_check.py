@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """The post kit as Nicole's three cards (v19 stage d): the kit page built on every request, checked on pretend kits.
+(The three steps on the Reel and Carousel cards, v20, have their own check: tests/kit_steps_check.py.)
 
     /usr/bin/python3 tests/kit_cards_check.py --work /private/tmp/somewhere [--port 9550]
 
 What it checks, on pretend kits it makes itself (tests/fake_kit.py; nothing of a client's):
-  * her words, word for word: every word in kit.KIT_WORDS against her own pages/post-kit.html (handoff v19), when
+  * her words, word for word: every word in kit.KIT_WORDS against her own pages/post-kit.html (handoff v20), when
     her handoff is on this computer (it is never in the repository; without it that one part says SKIP);
   * the page as the server builds it on each request (/content/<kit>/Post kit.html) and as kit.py page saves it:
     her bar, date, lede and three cards, each a link to its page (the reel page, the designer, the stories
     designer); her "+N" after 7 reel photos and after 6 slides or stories; "1 slide saved" (not "1 slides"); the
-    design counts; her dashed word boxes, filled from the kit's words with a Copy button each, and "Not written
-    yet." only where a piece has no words; the quiet line under the cards (Singles, Covers, the kit folder);
+    design counts; the Reel and Carousel cards' steps there and the Stories card without them; her folder buttons
+    at the top; the quiet line under the cards (Singles, Covers, Canva's links);
   * the kit at each stage: nothing made yet, a reel made (from the chat, then a newer one from the reel page), a
     laid-out carousel, a one-slide set (a single post, also on the posting page's grid), saved stories, a Canva
     carousel fetched after the laid-out set, and an unplugged drive (her "I can't reach this shoot right now..."
     line, answered as not found);
-  * in a HIDDEN Chrome: each card's words and where its link goes, a press on a card opening its page, Copy inside
-    a card copying its words and NOT following the card's link, Open in CapCut saying her words and not following
-    the link either, the folder buttons asking the Assistant (and never leaving the page), the reel photos loading,
+  * in a HIDDEN Chrome: each card's words and where its link goes, a press on a card opening its page, Open in
+    CapCut saying her words and not following the card's link, the folder buttons asking the Assistant (and never leaving the page), the reel photos loading,
     nothing asked of the internet, no sideways scroll at a phone's width, no error on the page.
 
 Nothing outside --work is touched. No folder is ever opened (the page's folder requests are answered inside the
@@ -49,8 +49,8 @@ KQ = quote(KIT)
 EMPTY_NAME = "Quiet morning"
 OPEN_WORDS = rpc.OPEN_WORDS
 REACH = "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload."
-LEDE = ("Everything you need to post this shoot, in one place. Click the reel, the carousel or your stories to make them "
-        "your way. Nothing gets posted for you.")
+LEDE = ("Everything you need to post this shoot, in one place. Make your reel or carousel, write its words, then add it "
+        "to your posting queue. Nothing gets posted for you.")
 
 # every request a page makes to open a folder is answered inside the page (no folder is ever opened), and every copy
 # the page makes is noted, so a test can say what was copied
@@ -75,10 +75,13 @@ PAGE_HOOKS = r"""
 
 
 def her_text():
-    f = rpc.her_folder()
-    if not f or not (f / "pages" / "post-kit.html").is_file():
-        return None
-    return html.unescape((f / "pages" / "post-kit.html").read_text(encoding="utf-8")).replace("\\'", "'")
+    """Her post kit page as of v20 (the three steps), when her handoff is on this computer."""
+    for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*")):
+            f = h / "Carousel designer and reel picker" / "pages" / "post-kit.html"
+            if f.is_file() and "Add to my queue" in f.read_text(encoding="utf-8"):
+                return html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
+    return None
 
 
 def kit_module(s):
@@ -97,9 +100,9 @@ def check_words(s):
     case("kit page words: the line under the heading is hers", k.KIT_WORDS["lede"] == LEDE)
     case("kit page words: her unreachable line is the same as the reel page's", k.KIT_WORDS["reach"] == REACH)
     if t is None:
-        print("SKIP  her words against her own page: her handoff v19 is not on this computer", flush=True)
+        print("SKIP  her words against her own page: her handoff v20 is not on this computer", flush=True)
         return
-    missing = [key for key, v in k.KIT_WORDS.items() if v not in t]
+    missing = [key for key, v in k.KIT_WORDS.items() if any(frag.strip() and frag not in t for frag in re.split(r"\{\w+\}", v))]
     case("every word in kit.KIT_WORDS is in her pages/post-kit.html, word for word", not missing, missing)
     for frag in ("slides saved in the Carousel folder", "saved design", "no slides saved yet", "saved in the Stories folder", "'story' : 'stories'",
                  "no stories saved yet", "Make a new version", "Create my reel", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
@@ -137,12 +140,9 @@ def status_of(fragment):
     return re.sub(r"\s+", " ", plain(m.group(1))).strip() if m else ""
 
 
-def boxes(fragment):
-    """(label, text, has Copy) for every word box in a card."""
-    out = []
-    for m in re.finditer(r"<div class='w(?: hook)?'><div class='k'>(.*?)</div><p class='(t|empty)'>(.*?)</p>(<button class='copy'[^>]*>Copy</button>)?</div>", fragment, re.S):
-        out.append((html.unescape(m.group(1)), html.unescape(m.group(3)), bool(m.group(4))))
-    return out
+def steps(fragment):
+    """The numbered steps in a card: ["1 Make it", "2 Your words: caption & hooks", "3 Add to my queue"]."""
+    return [re.sub(r"\s+", " ", plain(m)).strip() for m in re.findall(r"<div class='stepk'>(.*?)</div>", fragment, re.S)]
 
 
 def write_rec(kit, change):
@@ -186,13 +186,19 @@ def check_empty_kit(s):
          "Create my reel →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
     case("nothing made: 'No slides yet.' and 'No stories yet.', each 'Not made yet'",
          "No slides yet." in plain(c) and "No stories yet." in plain(t) and status_of(c) == "Not made yet" and status_of(t) == "Not made yet")
-    case("nothing made: every word box says 'Not written yet.' (Hooks; Caption and Hashtags; Story lines) and has no Copy",
-         boxes(r) == [("Hooks", "Not written yet.", False)] and boxes(c) == [("Caption", "Not written yet.", False), ("Hashtags", "Not written yet.", False)]
-         and boxes(t) == [("Story lines", "Not written yet.", False)], (boxes(r), boxes(c), boxes(t)))
+    case("nothing made: the Reel and Carousel cards have her three steps (Make it, Your words, Add to my queue); the Stories card has none",
+         steps(r) == ["1 Make it", "2 Your words: caption & hooks", "3 Add to my queue"] and steps(c) == ["1 Make it", "2 Your words: caption", "3 Add to my queue"]
+         and steps(t) == [] and "class='w" not in t, (steps(r), steps(c), steps(t)))
+    case("nothing made: 'Not written yet. Tell me about it ...' in both words boxes, and both queue steps locked",
+         "Not written yet. Tell me about it and I'll help with your caption and hooks." in plain(r) and "Not written yet. Tell me about it and I'll help with your caption." in plain(c)
+         and "Make your reel and write its caption first." in plain(r) and "Make your carousel and write its caption first." in plain(c))
     case("nothing made: no Open in CapCut on a kit with no reel", "id='capcut'" not in text)
     also = text[text.index("<div class='also'>"):]
-    case("nothing made: the quiet line has only 'Open the kit folder' (no Singles, no Covers folder yet)",
-         re.findall(r"data-sub='([^']*)'", also) == [""] and "Open the kit folder" in also, re.findall(r"data-sub='([^']*)'", also))
+    head = text[text.index("<header class='head'>"):text.index("</header>")]
+    case("nothing made: her buttons at the top, Open the kit folder, Open the Photos folder and My posting queue →, and an empty quiet line (no Singles, no Covers folder yet)",
+         re.findall(r"data-sub='([^']*)'", head) == ["", "Photos"] and "Open the kit folder" in head and "Open the Photos folder" in head
+         and "<a class='go' id='queueLink' href='/posting.html'>My posting queue &rarr;</a>" in head
+         and re.findall(r"data-sub='([^']*)'", also) == [], (re.findall(r"data-sub='([^']*)'", head), re.findall(r"data-sub='([^']*)'", also)))
     return k
 
 
@@ -252,22 +258,11 @@ def check_page_fresh(s):
     rec_file.write_text(json.dumps(rp), encoding="utf-8")
     case("showing the kit page wrote nothing to the reel page's record", json.loads(rec_file.read_text(encoding="utf-8")) == rp)
 
-    # the words
-    words = s.work / "words.json"
-    words.write_text(json.dumps({"hooks": ["Wind in every frame", "Three of us & a kite"], "caption": "A windy morning at the beach.\n\nMore soon.",
-                                 "short": "Windy.", "stories": ["Sneak peek →"], "leaned_on": "what you said when the kit was made"}), encoding="utf-8")
-    code, out = s.cmd("kit.py", "words", KIT, "--file", str(words))
+    # the saved copy (kit.py page) is the page the server builds
+    code, out = s.cmd("kit.py", "page", KIT)
     code2, text = page(s)
-    _, r = card(text, "reel")
-    _, c = card(text, "carousel")
-    _, t = card(text, "stories")
-    case("words written: the Reel card's hooks, one dashed box each, with Copy", boxes(r) == [("Hook 1", "Wind in every frame", True), ("Hook 2", "Three of us & a kite", True)], boxes(r))
-    case("words written: the Carousel card's caption and short caption with Copy, and 'Not written yet.' only for the missing hashtags",
-         boxes(c) == [("Caption", "A windy morning at the beach.\n\nMore soon.", True), ("Short caption", "Windy.", True), ("Hashtags", "Not written yet.", False)], boxes(c))
-    case("words written: the Stories card's story line with Copy", boxes(t) == [("Story line 1", "Sneak peek →", True)], boxes(t))
-    case("words written: 'Written from' under the cards", "Written from: what you said when the kit was made" in plain(text[text.index("<div class='also'>"):]))
-    case("the saved copy kit.py wrote (kit.py words writes it) is the same page as the one served",
-         (k / ".kit" / "Post kit.html").read_text(encoding="utf-8") == text, code)
+    case("the saved copy kit.py page writes is the same page as the one served",
+         code == 0 and (k / ".kit" / "Post kit.html").read_text(encoding="utf-8") == text, (code, out[-200:]))
 
     # a laid-out carousel (this check's own record, as a Save slides in the designer leaves it)
     car = k / "Carousel"
@@ -356,9 +351,9 @@ def check_page_fresh(s):
     shutil.copyfile(ph[42], k / "Covers" / "Reel cover.jpg")
     code, text = page(s)
     also = text[text.index("<div class='also'>"):]
-    case("the quiet line under the cards: '2 single photos sized for Instagram' with Open the Singles folder, 'The reel cover' with Open the Covers folder, and Open the kit folder",
-         re.findall(r"data-sub='([^']*)'", also) == ["Singles", "Covers", ""] and "2 single photos sized for Instagram" in plain(also)
-         and "The reel cover" in plain(also) and "Open the kit folder" in plain(also), re.findall(r"data-sub='([^']*)'", also))
+    case("the quiet line under the cards: '2 single photos sized for Instagram' with Open the Singles folder, 'The reel cover' with Open the Covers folder",
+         re.findall(r"data-sub='([^']*)'", also) == ["Singles", "Covers"] and "2 single photos sized for Instagram" in plain(also)
+         and "The reel cover" in plain(also), re.findall(r"data-sub='([^']*)'", also))
     case("no Singles or Covers card of their own (decision 12)", "<h2>Single posts" not in text and text.count("class='piece'") == 3)
 
 
@@ -409,20 +404,6 @@ def check_browser(c, s):
               "&&f.some(function(x){return x.family.replace(/[\"']/g,'')=='Assistant Sans'&&x.weight=='600'&&x.status=='loaded'})"
               "&&!f.some(function(x){return /Fraunces/.test(x.family)})})()") is True,
          c.js("Array.from(document.fonts).map(function(x){return x.family+' '+x.weight+' '+x.status}).join(', ')"))
-
-    # Copy inside a card: copies, and does not follow the card's link
-    c.click("[data-piece=reel] .w .copy")
-    time.sleep(0.4)
-    case("Copy inside the Reel card copies the hook", json.loads(c.js("sessionStorage.getItem('__copied') || '[]'")) == ["Wind in every frame"], c.js("sessionStorage.getItem('__copied')"))
-    case("...says 'Copied' on the button", c.text("[data-piece=reel] .w .copy") == "Copied")
-    case("...and the card's link was NOT followed (still on the kit page)", c.js("location.pathname") == "/content/%s/Post%%20kit.html" % KQ, c.js("location.href"))
-    c.click("[data-piece=carousel] .w .copy")
-    time.sleep(0.4)
-    case("Copy inside the Carousel card copies the caption, and stays on the page",
-         json.loads(c.js("sessionStorage.getItem('__copied') || '[]'"))[-1:] == ["A windy morning at the beach.\n\nMore soon."] and c.js("location.pathname").startswith("/content/"))
-    c.click("[data-piece=stories] .w .t")
-    time.sleep(0.3)
-    case("a click on the words themselves (to select them) doesn't open the card's page either", c.js("location.pathname").startswith("/content/"))
 
     # Open in CapCut: her words on the line under it, and the link not followed
     c.click("#capcut")
@@ -476,7 +457,14 @@ def check_browser(c, s):
     c.phone(390, 844)
     c.open(url)
     c.wait_for("document.querySelectorAll('a.piece').length === 3", 10)
-    case("at a phone's width: one column, no sideways scroll", c.js("document.documentElement.scrollWidth <= window.innerWidth") is True
+    wide = c.js("(function(){var d=document.documentElement,out=[];document.querySelectorAll('.piece').forEach(function(card){"
+                "var e=card.getBoundingClientRect().right+0.5;card.querySelectorAll('.strip,.cta,.w').forEach(function(n){"
+                "if(n.getBoundingClientRect().right>e)out.push(n.className)})});return {page:d.clientWidth,scroll:d.scrollWidth,out:out,"
+                "imgs:Math.max.apply(null,Array.from(document.querySelectorAll('.strip')).map(function(s){return s.querySelectorAll('img').length}))}})()")
+    # (against the page's own width: window.innerWidth grows with a page that overflows, so it could never fail)
+    case("at a phone's width: one column, no sideways scroll, nothing hanging out of a card (a row of 6 or more pictures)",
+         wide["scroll"] <= wide["page"] == 390 and not wide["out"] and wide["imgs"] >= 6, wide)
+    case("at a phone's width: the steps sit under the photos", True
          and c.rect("[data-piece=reel] .words")["y"] > c.rect("[data-piece=reel] .status")["y"])
     c.desktop()
 

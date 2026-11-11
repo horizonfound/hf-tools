@@ -9,8 +9,9 @@
       Stories/                 story frames, 1080 x 1920
       Covers/                  the reel cover
       .kit/                    hidden: the Studio's own files, so the photographer sees only photo
-                               folders (Dustin, Oct 30). The kit page (Post kit.html, every piece with
-                               a Copy button), Captions and hooks.txt, Reel.txt, and the kit's records.
+                               folders (Dustin, Oct 30). The kit page (Post kit.html), Reel.txt, and the
+                               kit's records. (An older kit may also hold words.json and Captions and
+                               hooks.txt from before Nov 10: left where they are, never read, never shown.)
                                The page is shown through the posting server, never opened as a file.
                                Also here: slides-older/<time>/ (plain carousel slides a new order
                                replaced: moved here, never deleted, with moved.json saying what moved)
@@ -28,12 +29,15 @@ Claude does the choosing and the writing; this does the files. Nothing posts.
     python3 kit.py sheet "beach"                       numbered contact sheets of the photos (reel.py's)
     python3 kit.py picks "beach" --singles 3,17,22 --stories 5,9,30,41 --carousel 1,4,8,12,15,19,23 --reel 2,6,... [--cover 2]
     python3 kit.py build "beach"                       Singles, Carousel, Stories from the picks (reel via reel.py)
-    python3 kit.py facts "beach"                       what Claude writes the words from (JSON)
-    python3 kit.py words "beach" --file words.json     save the hooks, caption, short caption, story lines
+    python3 kit.py facts "beach"                       the shoot's facts (the day, the picks, what they said), as JSON
     python3 kit.py page "beach"                        rebuild Post kit.html
-    python3 kit.py voice --sample-file posted.txt --never-file never.txt --audience both --hashtags "#..."
+    python3 kit.py voice --sample-file posted.txt --never-file never.txt --audience both
                                                        how they write for Instagram (asked once; in the Studio File)
     python3 kit.py show "beach"
+
+The words for a post (Nicole's v20, Nov 10) are not written here: each piece's caption (and a reel's hooks) are
+written on its words page (words_page.py) and through words.py (show, ask, answer, draft), and kept in
+.kit/post-words.json. `kit.py words` only says so. There are no hashtags and no short caption (Dustin, Nov 10).
 
 Exit: 0 done, 1 problem, 2 nothing there, 7 the export folder could not be found (ask).
 
@@ -1479,10 +1483,13 @@ def note_reel(kit, project_name, picks=None, picks_text=None):
 # ---------- the words ----------
 
 def voice():
-    return studio_file.load().get("voice", {})
+    """How they write (asked once): captions they've posted, ones they'd never write, who the feed is for. Hashtags
+    an earlier version kept in the Studio File stay there, unread (Dustin, Nov 10: no hashtags)."""
+    v = studio_file.load().get("voice", {})
+    return {k: x for k, x in v.items() if k != "hashtags"} if isinstance(v, dict) else {}
 
 
-def set_voice(sample=None, never=None, audience=None, hashtags=None):
+def set_voice(sample=None, never=None, audience=None):
     sf = studio_file.load()
     v = sf.setdefault("voice", {})
     if sample is not None:
@@ -1491,8 +1498,6 @@ def set_voice(sample=None, never=None, audience=None, hashtags=None):
         v["never"] = [s.strip() for s in re.split(r"\n\s*\n", never.strip()) if s.strip()]
     if audience:
         v["audience"] = audience
-    if hashtags is not None:
-        v["hashtags"] = hashtags.strip()
     sf["voice"] = v
     studio_file.save(sf)
     return v
@@ -1539,7 +1544,7 @@ def facts(kit):
         "they_said": told_text(kit),
         "picks": rec.get("picks", {}), "numbered_list": str(kit / ".kit" / "sheet.json"),
         "voice": voice(), "client_note_voice": studio_file.load().get("note", {}),
-        "existing_words": bool((kit / ".kit" / "words.json").exists()),
+        "words": words_status(kit),             # the words page's record (words.py), per piece
     }
     if rec.get("night") and rec.get("shoot_id"):
         try:
@@ -1551,81 +1556,47 @@ def facts(kit):
     return out
 
 
-WORD_SHAPES = {"hooks": "lines", "stories": "lines", "caption": "text", "short": "text", "hashtags": "text", "leaned_on": "text"}
+WORDS_MOVED = ("STOP: a post's words aren't saved this way any more. Each piece has its own words page (step 2 on the kit "
+               "page's Reel and Carousel cards), and from the chat it is words.py: `words.py show \"<kit>\" reel` (their "
+               "answers and the rules), `words.py ask`, `words.py answer --file`, `words.py draft --file` (the caption, and "
+               "a reel's hooks). No hashtags and no short caption. Nothing was saved.")
 
 
-def kept_words(words, strict=True):
-    """A kit's words in the shapes the captions file and the kit page read: hooks and stories as lists of lines;
-    caption, short, hashtags and leaned_on as text. Words already in those shapes come back exactly as they were.
-    The near misses are put right rather than left to stop every later page: hashtags handed over as a list
-    become one line with a space between them, a caption written as a list of paragraphs is joined with a blank
-    line between, a single hook or story line given as text becomes a list of one, and "nothing" (null) becomes
-    empty. Anything else (a number, a list inside a list) raises ValueError in plain words when strict (saving:
-    nothing is written then), and is read as empty when not (showing a page from a file already saved)."""
-    if not isinstance(words, dict):
-        if strict:
-            raise ValueError("the words file should hold one set of named pieces (hooks, caption, short, stories, hashtags)")
-        return {}
-    out = dict(words)
-    for k, kind in WORD_SHAPES.items():
-        if k not in out:
-            continue
-        v = out[k]
-        if kind == "lines":
-            if v is None:
-                v = []
-            elif isinstance(v, str):
-                v = [v] if v.strip() else []
-            ok = isinstance(v, list) and all(isinstance(x, str) for x in v)
-        else:
-            if v is None:
-                v = ""
-            elif isinstance(v, list) and all(isinstance(x, str) for x in v):
-                v = (" " if k == "hashtags" else "\n\n").join(x.strip() for x in v if x.strip())
-            ok = isinstance(v, str)
-        if not ok:
-            if strict:
-                raise ValueError(f"\"{k}\" in the words file should be " + ("a list of lines" if kind == "lines" else "text"))
-            v = [] if kind == "lines" else ""
-        out[k] = v
-    return out
+def words_status(kit):
+    """Each piece's words, from the words page's record (words.py status): {reel: {answered, caption, hooks,
+    picked}, carousel: {...}}. The kit's older flat words.json is never read."""
+    import words as words_mod
+    return words_mod.status(kit)
 
 
-def save_words(kit, words):
-    words = kept_words(words)           # before anything is written: a wrong shape stops here, with nothing saved
-    for k in ("hooks", "caption", "short", "stories"):
-        words.setdefault(k, [] if k in ("hooks", "stories") else "")
-    words["written"] = datetime.now().isoformat(timespec="seconds")
-    _write_whole(kit / ".kit" / "words.json", words)       # whole or not at all, UTF-8
-    lines = ["HOOKS (pick one, or write your own)", ""]
-    lines += [f"{i}. {h}" for i, h in enumerate(words["hooks"], 1)]
-    lines += ["", "CAPTION", "", words["caption"].strip(), ""]
-    if words.get("short"):
-        lines += ["SHORT CAPTION", "", words["short"].strip(), ""]
-    if words.get("stories"):
-        lines += ["STORY LINES", ""] + [f"- {s}" for s in words["stories"]] + [""]
-    if words.get("hashtags"):
-        lines += ["HASHTAGS", "", words["hashtags"].strip(), ""]
-    if words.get("leaned_on"):
-        lines += ["", f"Written from: {words['leaned_on']}"]
-    _write_text_whole(own_file(kit, "Captions and hooks.txt"), "\n".join(lines) + "\n")
-    write_page(kit)
-
-
-# ---------- the page: Nicole's post kit (handoff v19, pages/post-kit.html), three cards ----------
+# ---------- the page: Nicole's post kit (handoff v19, pages/post-kit.html; its three steps, v20), three cards ----------
 #
 # Her page asks her server for the kit (/s/<shoot>/kit) and draws three cards you click into: Reel, Carousel and
-# Stories, each with its words column. Ours is the same page built here, on every request of
-# /content/<kit>/Post kit.html (posting_queue.py serve_content), from kit.json, the reel page's record, the design
-# records and the folders; `kit.py page` writes the same page as the saved copy in the kit's hidden folder. The
-# page names no path: a kit by its folder name, a reel photo by its number (/kit-photo), a slide by its file name.
-# Nothing on it comes from the internet (the fonts are the plugin's own, through /look-font: look.py). Her words are in
-# KIT_WORDS, word for word; the few lines that are ours are in OUR_KIT_WORDS, each with its reason.
+# Stories. Since v20 (Nov 10) the Reel and Carousel cards are each three numbered steps: 1 Make it (the card as it
+# was), 2 Your words (a dashed box that opens the words page for that piece: words_page.py), 3 Add to my queue (the
+# posting queue, unlocked once the piece is made and has its caption). Ours is the same page built here, on every
+# request of /content/<kit>/Post kit.html (posting_queue.py serve_content), from kit.json, the reel page's record,
+# the design records, the words page's record (words.py status), the posting queue and the folders; `kit.py page`
+# writes the same page as the saved copy in the kit's hidden folder. The page names no path: a kit by its folder
+# name, a reel photo by its number (/kit-photo), a slide by its file name. Nothing on it comes from the internet
+# (the fonts are the plugin's own, through /look-font: look.py). Her words are in KIT_WORDS, word for word; the few
+# lines that are ours are in OUR_KIT_WORDS, each with its reason.
+#
+# The words a kit shows are the words page's only (Dustin, Nov 10: one way to write a caption; no hashtags, no
+# short caption, no words for stories). The page shows whether they are written, never the words themselves: those
+# are one press away, on the words page. A kit's older words.json is not read.
+#
+# No link inside a link (the bug Nicole caught, v20 screenshot 9): each card is an <a>, so nothing inside a card is
+# an <a>. The words box and "See it in my feed" are spans and divs with role=link and data-href, opened by one
+# click handler in the capture phase, which also keeps every press in the queue box from opening the card's page.
 
 KIT_WORDS = {
     "eyebrow": "Post kit",
-    "lede": "Everything you need to post this shoot, in one place. Click the reel, the carousel or your stories to make "
-            "them your way. Nothing gets posted for you.",
+    "lede": "Everything you need to post this shoot, in one place. Make your reel or carousel, write its words, then add "
+            "it to your posting queue. Nothing gets posted for you.",
+    "open_kit": "Open the kit folder",
+    "open_photos": "Open the Photos folder",
+    "my_queue": "My posting queue",
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
     "reel": "Reel",
     "reel_sub": "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut.",
@@ -1647,33 +1618,48 @@ KIT_WORDS = {
     "stories_open": "Open my stories",
     "stories_make": "Make my stories",
     "stories_none": "No stories yet.",
-    "hooks": "Hooks",
-    "caption": "Caption",
-    "hashtags": "Hashtags",
-    "story_lines": "Story lines",
-    "not_written": "Not written yet.",
+    # v20: the three steps
+    "step_make": "Make it",
+    "step_words": "Your words: ",                  # + "caption & hooks" (a reel) or "caption" (a carousel)
+    "caption": "caption",
+    "hooks": "hooks",
+    "caption_ready": "Caption ready",
+    "picked": "picked",
+    "told": "You've told me about it. Copy the line on the page into the chat and I'll write your {what}.",
+    "not_written": "Not written yet. Tell me about it and I'll help with your {what}.",
+    "open_words": "Open my words",
+    "write_words": "Write my words",
+    "step_queue": "Add to my queue",
+    "need_both": "Make your {piece} and write its caption",
+    "need_made": "Make your {piece}",
+    "need_caption": "Write its caption",
+    "locked": " first. Then add it to your posting queue to see it in your feed and give it a date.",
+    "ready": "It's ready! Add it to your posting queue so you can see it in your feed and give it a date.",
+    "how_often": "How often do you want to post?",
+    "how_often_b": " I'll give each post a date.",
+    "down_for": "Down for {day}.",
+    "in_queue": "In your posting queue.",
+    "added": "✓ Added to my queue",
+    "feed": "See it in my feed",
+    "posted": "Posted ✓",
+    "posted_btn": "✓ Posted",
+    "adding": "Adding it…",
+    "cant_add": "I couldn't add it. Try again in a moment.",
+    "not_saved": "Not saved.",
 }
-# Ours, with the reason for each: her mock-up's words boxes are always empty, ours hold the kit's words, so each one
-# has a Copy button and a name of its own; the short caption has no box of hers (a single post's caption: it sits
-# under the carousel's, since one slide is a single post); the quiet line under the cards is decision 12 (the
-# Singles and Covers the kit still makes, and the kit folder); Canva's links had a place on the old page; "Written
-# from" says what the words leaned on (rule 11); a saved copy is a file, whose buttons can't reach the Assistant.
+# Ours, with the reason for each: the quiet line under the cards is decision 12 of v19 (the Singles and Covers the
+# kit still makes); Canva's links had a place on the old page; a saved copy is a file, whose buttons can't reach
+# the Assistant; the folder buttons say what the Assistant's own folder opener answers (it knows when the window
+# opened behind this one), where hers says "The Photos folder is open in Finder."
 OUR_KIT_WORDS = {
-    "copy": "Copy",
-    "copied": "Copied",
-    "hook_n": "Hook {i}",
-    "story_n": "Story line {i}",
-    "short": "Short caption",
     "singles": "{n} single photos sized for Instagram",
     "single": "1 single photo sized for Instagram",
     "cover": "The reel cover",
     "open_folder": "Open the {sub} folder",
-    "open_kit": "Open the kit folder",
     "in_canva": "In Canva:",
     "canva_carousel": "the carousel",
     "canva_cover": "the reel cover",
     "canva_story": "story {n}",
-    "written_from": "Written from: {what}",
     "opening": "Opening...",
     "unreached": "Could not reach the Assistant. Tell Claude instead.",
     "saved_copy": "This is a saved copy. Say “show the {name} kit” to Claude and the buttons work.",
@@ -1682,8 +1668,8 @@ OUR_KIT_WORDS = {
     "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell Claude, and it'll sort it out.",
 }
 # Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
-# three cards) and never sends one from before them in its place.
-PAGE_MARK = "<meta name='assistant-page' content='post-kit-cards'>"
+# three cards with their three steps, v20) and never sends one from before them in its place.
+PAGE_MARK = "<meta name='assistant-page' content='post-kit-steps'>"
 STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
 STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
 
@@ -1785,22 +1771,38 @@ a.piece:hover .cta{background:var(--coral-2)}
 .went{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:.4rem 0 0}
 .words{display:grid;gap:.8rem}
 .w{border:1px dashed var(--line);border-radius:14px;padding:.8rem .95rem}
-.w .k{font:600 10px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--coral-2);margin-bottom:.4rem}
 .empty{font:400 16px/1.3 var(--sans);color:var(--ink-2);margin:0}
 .problem{background:var(--coral-l);border-radius:14px;padding:1rem 1.2rem;margin-top:1.2rem}
-@media(max-width:760px){.piece{grid-template-columns:1fr}}
-.w{position:relative}
-.w .t{margin:0;padding-right:4.6rem;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;cursor:text}
-.w.hook .t{font:500 18px/1.35 var(--sans)}
-.copy{position:absolute;top:.6rem;right:.6rem;border:0;border-radius:999px;padding:.4rem .8rem;font:600 12px/1 var(--sans);background:var(--ink);color:#fff;cursor:pointer;transition:transform .2s var(--ease)}
-.copy:hover{transform:scale(1.04)}.copy.done{background:var(--coral)}
+@media(max-width:760px){.piece{grid-template-columns:minmax(0,1fr)}}
+.piece>*{min-width:0}
+.folders{display:flex;gap:.5rem;flex-wrap:wrap;margin:.4rem 0 0}
+body:not(.live) #queueLink{display:none}
+.stepno{display:inline-grid;place-items:center;width:1.45rem;height:1.45rem;border-radius:50%;background:#FFF6F2;border:1.5px solid var(--coral-l);font:600 11.5px/1 var(--sans);color:var(--coral-2);margin-right:.35rem;vertical-align:1px}
+.stepk{font:600 10px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--coral-2);margin:0 0 .5rem;display:flex;align-items:center}
+.w.go-words{cursor:pointer;transition:border-color .2s,background .2s}
+.w.go-words:hover,.w.go-words:focus-visible{border-color:var(--coral);border-style:solid;background:#FFF6F2}
+.w .wl{display:inline-flex;margin-top:.6rem;font:600 13.5px/1 var(--sans);color:var(--coral-2)}
+.w .ws{font-size:14px;color:var(--ink);margin:0}
+.w.q{cursor:default}
+.w.q .qb{margin-top:.6rem}
+.w.q.locked{opacity:.75}
+.w.q .went{margin:.4rem 0 0}.w.q .went:empty{display:none}
+.qbtn{display:inline-flex;align-items:center;gap:.4rem;border:0;background:var(--ink);color:#fff;border-radius:999px;padding:.55rem 1rem;font:600 13.5px/1 var(--sans);cursor:pointer;transition:background .2s}
+.qbtn:hover{background:var(--coral-2)}
+.qbtn[disabled]{background:var(--line);color:var(--ink-2);cursor:default;pointer-events:none}
+.qbtn.done[disabled]{background:#E6F2EC;color:#2f7d56}
+.qlink{display:block;width:max-content;max-width:100%;margin-top:.7rem;font:600 13.5px/1 var(--sans);color:var(--coral-2);cursor:pointer}
+.qlink:hover{text-decoration:underline}
+.qchips{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
+.qchips button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:.45rem .8rem;font:600 13px/1 var(--sans);cursor:pointer}
+.qchips button:hover{border-color:var(--coral);color:var(--coral-2)}
+.qchips button[disabled]{opacity:.6;cursor:default}
 .also{margin-top:1.6rem;font-size:13.5px;color:var(--ink-2)}
 .also p{margin:0}
 .also .line{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.1rem}
 .also .bit{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .go.small{padding:.35rem .7rem;font-size:12.5px}
 a.go{text-decoration:none}
-.lean{margin-top:.6rem}
 """
 
 SCRIPT = r"""
@@ -1808,29 +1810,95 @@ SCRIPT = r"""
 const live = location.protocol.indexOf('http') === 0;
 if (live) document.body.classList.add('live');
 const KIT = document.body.dataset.kit, W = JSON.parse(document.getElementById('kit-words').textContent);
+const top = document.getElementById('folderWent');
 function stop(e){ e.preventDefault(); e.stopPropagation(); }
-// the words: the older copy call first (the Claude app's pane refuses the newer one), then the newer
-function copyText(t){
-  const ta = document.createElement('textarea');
-  ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
-  document.body.appendChild(ta); ta.select();
-  let ok = false;
-  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-  ta.remove();
-  if (!ok && navigator.clipboard) return navigator.clipboard.writeText(t).then(function(){ return true; }, function(){ return false; });
-  return Promise.resolve(ok);
+function post(path, body){
+  return fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+    .then(function(r){ return r.json(); });
 }
-document.querySelectorAll('.copy').forEach(function(b){
-  b.addEventListener('click', function(e){
-    stop(e);                                  // inside a card: the Copy never opens the card's page
-    copyText(b.parentElement.querySelector('.t').textContent).then(function(){
-      b.textContent = W.copied; b.classList.add('done');
-      setTimeout(function(){ b.textContent = W.copy; b.classList.remove('done'); }, 1600);
+function go(href){
+  if (!live) { if (top) top.textContent = W.saved_copy; return; }
+  if (href && href.charAt(0) === '/' && href.charAt(1) !== '/') location.href = href;     // only ever a page of the Assistant's own
+}
+// Steps 2 and 3 drawn again from the page as the Assistant builds it now, each box changed in place: the card
+// keeps its shape and nothing else on the page moves (Nicole, Nov 10: "the layout never jumps or breaks apart")
+function redraw(){
+  return fetch(location.href, {cache: 'no-store'}).then(function(r){ return r.text(); }).then(function(t){
+    const d = new DOMParser().parseFromString(t, 'text/html');
+    if (d.body.dataset.kit !== KIT) return;
+    document.body.dataset.rhythm = d.body.dataset.rhythm || '';
+    d.querySelectorAll('[data-box]').forEach(function(n){
+      const old = document.querySelector('[data-box="' + n.dataset.box + '"]');
+      if (old && old.outerHTML !== n.outerHTML) old.replaceWith(document.importNode(n, true));
     });
   });
-});
-// clicking the words to select them never opens the card's page either
-document.querySelectorAll('.w .t').forEach(function(p){ p.addEventListener('click', function(e){ e.preventDefault(); }); });
+}
+function box(piece){ return document.querySelector('[data-box="queue-' + piece + '"]'); }
+function say(piece, t){ const b = box(piece), w = b && b.querySelector('.went'); if (w) w.textContent = t; }
+let busy = false;
+function add(piece){
+  if (busy) return;
+  if (!live) { say(piece, W.saved_copy); return; }
+  if (!document.body.dataset.rhythm) { askRhythm(piece); return; }      // asked once: how often they post, so each post gets a date
+  busy = true;
+  // "Adding it…" shows in the button itself, so the press moves nothing (her rule: buttons change in place, the
+  // layout never jumps); only something going wrong brings in a line under it. After the rhythm chips there is
+  // no button any more, so there the line says it.
+  const btn = box(piece).querySelector('[data-add]');
+  const was = btn ? btn.textContent : '';
+  say(piece, '');
+  if (btn) { btn.textContent = W.adding; btn.disabled = true; } else say(piece, W.adding);
+  const failed = function(t){ busy = false; if (btn) { btn.textContent = was; btn.disabled = false; } say(piece, t); };
+  post('/words-queue', {kit: KIT, piece: piece}).then(function(r){
+    if (!r || !r.ok) { failed((r && r.words) || W.cant_add); return; }
+    return redraw().then(function(){ busy = false; }, function(){ busy = false; location.reload(); });
+  }, function(){ failed(W.cant_add); });
+}
+function askRhythm(piece){
+  const qb = box(piece).querySelector('.qb');
+  qb.textContent = '';
+  const p = document.createElement('p'); p.className = 'ws'; p.style.margin = '.2rem 0 0';
+  const b = document.createElement('b'); b.textContent = W.how_often;
+  p.appendChild(b); p.appendChild(document.createTextNode(W.how_often_b));
+  const chips = document.createElement('div'); chips.className = 'qchips';
+  W.rhythms.forEach(function(t){
+    const c = document.createElement('button'); c.type = 'button'; c.dataset.iv = t; c.dataset.piece = piece; c.textContent = t;
+    chips.appendChild(c);
+  });
+  qb.appendChild(p); qb.appendChild(chips);
+}
+function rhythm(chip){
+  if (busy) return;
+  const piece = chip.dataset.piece;
+  busy = true;
+  post('/words-rhythm', {text: chip.dataset.iv}).then(function(r){
+    busy = false;
+    if (!r || !r.ok) { say(piece, (r && r.words) || W.not_saved); return; }
+    document.body.dataset.rhythm = '1';
+    add(piece);
+  }, function(){ busy = false; say(piece, W.not_saved); });
+}
+// One handler, in the capture phase, for everything inside a card that is not the card's own link. Nothing in a
+// card is an <a> (a link inside a link breaks the card apart), so "See it in my feed" and the words box are
+// opened from their data-href here; and no press in the queue box ever opens the card's page.
+document.addEventListener('click', function(e){
+  const t = e.target.closest ? e.target : e.target.parentElement;
+  if (!t) return;
+  const a = t.closest('[data-add]');
+  if (a) { stop(e); add(a.dataset.add); return; }
+  const c = t.closest('[data-iv]');
+  if (c) { stop(e); rhythm(c); return; }
+  const l = t.closest('.qlink');
+  if (l) { stop(e); go(l.dataset.href); return; }
+  if (t.closest('.w.q')) { stop(e); return; }
+  const g = t.closest('.go-words');
+  if (g) { stop(e); go(g.dataset.href); return; }
+}, true);
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Enter' || !e.target.closest) return;
+  const g = e.target.closest('.qlink, .go-words');
+  if (g && g === e.target) { stop(e); go(g.dataset.href); }
+}, true);
 // her Open in CapCut: stops the card's link, says what happened on the line under it
 const cc = document.getElementById('capcut');
 if (cc) cc.addEventListener('click', async function(e){
@@ -1843,11 +1911,12 @@ if (cc) cc.addEventListener('click', async function(e){
     const j = await r.json(); line.textContent = j.words;
   } catch (err) { line.textContent = W.capcut_unreached; }
 });
-// the quiet line's folder buttons (the Assistant opens the folder; the result shows on the line under them)
+// the folder buttons, at the top and on the quiet line (the Assistant opens the folder; the result shows on the
+// line under them)
 document.querySelectorAll('button.go[data-sub]').forEach(function(b){
   b.addEventListener('click', async function(e){
     stop(e);
-    const line = b.closest('.also').querySelector('.went');
+    const line = b.closest('.folders') ? top : b.closest('.also').querySelector('.went');
     if (!live) { line.textContent = W.saved_copy; return; }
     line.textContent = W.opening;
     try {
@@ -1865,7 +1934,7 @@ document.querySelectorAll('img[data-again]').forEach(function(i){
   i.addEventListener('load', function(){ if (i.naturalWidth) i.classList.remove('wait'); });
   if (i.complete) { if (i.naturalWidth) i.classList.remove('wait'); else again(); }
 });
-// back to this page from the reel page or a designer: drawn again, so it shows what was just made
+// back to this page from the words page, the reel page or a designer: drawn again, so it shows what was just made
 window.addEventListener('pageshow', function(e){ if (e.persisted) location.reload(); });
 })();
 """
@@ -1902,13 +1971,66 @@ def _jpgs(folder):
     return sorted(have[k] for k in have if k.lower().endswith(".jpg") and not k.startswith("."))
 
 
-def _wbox(label, text, cls=""):
-    return (f"<div class='w{(' ' + cls) if cls else ''}'><div class='k'>{html.escape(label)}</div><p class='t'>{html.escape(text)}</p>"
-            f"<button class='copy' type='button'>{html.escape(OUR_KIT_WORDS['copy'])}</button></div>")
+def _step(n, label):
+    return f"<div class='stepk'><span class='stepno'>{n}</span>{html.escape(label)}</div>"
 
 
-def _wempty(label):
-    return f"<div class='w'><div class='k'>{html.escape(label)}</div><p class='empty'>{html.escape(KIT_WORDS['not_written'])}</p></div>"
+def words_box(kit_name, piece, w):
+    """Step 2, hers: the dashed box that opens the words page for this piece. w is words.py's status for it
+    ({answered, caption, hooks, picked}). A reel has hooks; a carousel a caption only (Nicole, Nov 10)."""
+    K = KIT_WORDS
+    has_hooks = piece == "reel"
+    hooks = int(w.get("hooks") or 0) if has_hooks else 0
+    picked = int(w.get("picked") or 0)
+    what = f"{K['caption']} and {K['hooks']}" if has_hooks else K["caption"]
+    if w.get("caption") or hooks:
+        bits = [K["caption_ready"]] if w.get("caption") else []
+        if hooks:
+            bits.append(f"{hooks} {K['hooks']}" + (f", {picked} {K['picked']}" if picked else ""))
+        state = f"<p class='ws'>{html.escape(' · '.join(bits))}</p>"
+    elif w.get("answered"):
+        state = f"<p class='ws'>{html.escape(K['told'].format(what=what))}</p>"
+    else:
+        state = f"<p class='empty'>{html.escape(K['not_written'].format(what=what))}</p>"
+    link = K["open_words"] if w.get("caption") or hooks else K["write_words"]
+    label = K["step_words"] + (f"{K['caption']} & {K['hooks']}" if has_hooks else K["caption"])
+    href = f"/words.html?kit={quote(kit_name, safe='')}&piece={piece}"
+    return (f"<div class='w go-words' data-box='words-{piece}' role='link' tabindex='0' data-href='{html.escape(href)}'>"
+            f"{_step(2, label)}{state}<span class='wl'>{html.escape(link)} &rarr;</span></div>")
+
+
+def nice_day(iso):
+    """Hers: "Wed, Nov 11"."""
+    try:
+        return this_computer.strftime(date.fromisoformat(iso), "%a, %b %-d")
+    except (ValueError, TypeError):
+        return ""
+
+
+def queue_box(piece, made, has_caption, q):
+    """Step 3, hers: Add to my queue. Locked until the piece is made and has its caption (decision 7). q is
+    words_page.queue_state's for this piece ({status, date, ...}). Nothing in it is an <a>."""
+    K = KIT_WORDS
+    head = _step(3, K["step_queue"])
+    open_ = f"<div class='w q{{cls}}' data-box='queue-{piece}'>"
+    feed = f"<span class='qlink' role='link' tabindex='0' data-href='/posting.html'>{html.escape(K['feed'])} &rarr;</span>"
+
+    def button(text, done=True):
+        return f"<div class='qb'><button class='qbtn{' done' if done else ''}' type='button' disabled>{html.escape(text)}</button></div>"
+    status = q.get("status") if isinstance(q, dict) else ""
+    if status == "posted":
+        return open_.format(cls="") + head + f"<p class='ws'>{html.escape(K['posted'])}</p>" + button(K["posted_btn"]) + feed + "</div>"
+    if status == "green":
+        day = nice_day(q.get("date"))
+        said = K["down_for"].format(day=day) if day else K["in_queue"]
+        return open_.format(cls="") + head + f"<p class='ws'>{html.escape(said)}</p>" + button(K["added"]) + feed + "</div>"
+    if not made or not has_caption:
+        need = (K["need_both"] if not made and not has_caption else K["need_made"] if not made else K["need_caption"]).format(piece=piece)
+        return (open_.format(cls=" locked") + head + f"<p class='ws'>{html.escape(need + K['locked'])}</p>"
+                + button(K["step_queue"], done=False) + "</div>")
+    return (open_.format(cls="") + head + f"<p class='ws'>{html.escape(K['ready'])}</p>"
+            f"<div class='qb'><button class='qbtn' type='button' data-add='{piece}'>{html.escape(K['step_queue'])}</button></div>"
+            "<p class='went'></p></div>")
 
 
 def _strip(srcs, most, tall=False, again=False):
@@ -1948,12 +2070,38 @@ def card_facts(kit, rec=None):
     }
 
 
+def steps_facts(kit, f):
+    """Steps 2 and 3 for the reel and the carousel: each piece's words (words.py status: the words page's record,
+    nothing else) and its place in the posting queue (words_page.queue_state, the same one the words page shows),
+    and whether a posting rhythm is set. Reads only. A words record or a queue that can't be read just now reads
+    as nothing written and nothing queued; the kit page still opens."""
+    out = {"words": {}, "queue": {}, "rhythm": False}
+    try:
+        st = words_status(kit)
+    except (Exception, SystemExit):  # noqa: BLE001
+        st = {}
+    try:
+        import words_page
+    except (Exception, SystemExit):  # noqa: BLE001
+        words_page = None
+    for piece in ("reel", "carousel"):
+        w = st.get(piece) if isinstance(st, dict) else None
+        out["words"][piece] = w if isinstance(w, dict) else {}
+        q = {}
+        if words_page is not None:
+            try:
+                q = words_page.queue_state(kit, piece, f["slides"])
+            except (Exception, SystemExit):  # noqa: BLE001
+                q = {}
+        out["queue"][piece] = q
+        out["rhythm"] = out["rhythm"] or bool(q.get("interval"))
+    return out
+
+
 def build_page(kit):
     """The kit page, as her post kit's three cards. Returns (the page, whether a reel photo's small copy is still
     to be made: the server then starts making them)."""
     rec = load_rec(kit)
-    words = json.loads((kit / ".kit" / "words.json").read_text(encoding="utf-8")) if (kit / ".kit" / "words.json").exists() else {}
-    words = kept_words(words, strict=False)     # a words file saved in a near-miss shape never stops the page
     name = rec.get("name") or short_name(kit.name)
     when = rec.get("date") if isinstance(rec.get("date"), str) and rec.get("date") else ""   # a date changed by hand into a number is left out
     when = when or (kit.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", kit.name) else "")
@@ -1962,6 +2110,7 @@ def build_page(kit):
     except (ValueError, TypeError):
         when_words = when
     f = card_facts(kit, rec)
+    steps = steps_facts(kit, f)
     kq = quote(kit.name)
 
     # the Reel card
@@ -1974,36 +2123,40 @@ def build_page(kit):
     reel_status = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True,
                            f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>")
                    if f["reel"] else _status(html.escape(KIT_WORDS["not_made"]), False))
-    hooks = "".join(_wbox(OUR_KIT_WORDS["hook_n"].format(i=i), h, "hook") for i, h in enumerate(words.get("hooks") or [], 1)) or _wempty(KIT_WORDS["hooks"])
 
     # the Carousel card
     slides = f["slides"]
     car_strip = (_strip([f"Carousel/{_src(n)}" for n in slides], STRIP_SLIDES) if slides
                  else f"<p class='empty'>{html.escape(KIT_WORDS['carousel_none'])}</p>")
     car_cta = KIT_WORDS["carousel_open"] if slides or f["designs"] else KIT_WORDS["carousel_make"]
-    car_words = ((_wbox(KIT_WORDS["caption"], words["caption"]) if words.get("caption") else _wempty(KIT_WORDS["caption"]))
-                 + (_wbox(OUR_KIT_WORDS["short"], words["short"]) if words.get("short") else "")
-                 + (_wbox(KIT_WORDS["hashtags"], words["hashtags"]) if words.get("hashtags") else _wempty(KIT_WORDS["hashtags"])))
 
     # the Stories card
     stories = f["stories"]
     sto_strip = (_strip([f"Stories/{_src(n)}" for n in stories], STRIP_SLIDES, tall=True) if stories
                  else f"<p class='empty'>{html.escape(KIT_WORDS['stories_none'])}</p>")
     sto_cta = KIT_WORDS["stories_open"] if stories or f["story_designs"] else KIT_WORDS["stories_make"]
-    sto_words = "".join(_wbox(OUR_KIT_WORDS["story_n"].format(i=i), s) for i, s in enumerate(words.get("stories") or [], 1)) or _wempty(KIT_WORDS["story_lines"])
 
-    def card(piece, href, title, ratio, cta, sub, strip, status, wrds, went=False):
+    def steps_col(piece, made):
+        """Steps 2 and 3, hers: the words box, then the queue box (locked until made and captioned)."""
+        w = steps["words"][piece]
+        return words_box(kit.name, piece, w) + queue_box(piece, made, bool(w.get("caption")), steps["queue"][piece])
+
+    def card(piece, href, title, ratio, cta, sub, strip, status, wrds=None, went=False):
+        # the card is a link, so nothing inside it is an <a> (see the note above KIT_WORDS)
         return (f"<a class='piece' data-piece='{piece}' href='{html.escape(href)}'><div>"
-                f"<div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span class='cta'>{html.escape(cta)} &rarr;</span></div>"
+                + (_step(1, KIT_WORDS["step_make"]) if wrds is not None else "")
+                + f"<div class='top'><h2>{html.escape(title)}<span class='ratio'>{ratio}</span></h2><span class='cta'>{html.escape(cta)} &rarr;</span></div>"
                 f"<p class='sub'>{html.escape(sub)}</p>{strip}{status}" + ("<p class='went'></p>" if went else "")
-                + f"</div><div class='words'>{wrds}</div></a>")
+                + "</div>" + (f"<div class='words'>{wrds}</div>" if wrds is not None else "") + "</a>")
 
+    # the Stories card is as it was: no words box and no queue step (no words for stories; they aren't on the grid)
     cards = (card("reel", reel_door(kit.name), KIT_WORDS["reel"], "9:16", REEL_AGAIN if f["reel"] else REEL_CREATE,
-                  KIT_WORDS["reel_sub"], reel_strip, reel_status, hooks, went=True)
+                  KIT_WORDS["reel_sub"], reel_strip, reel_status, steps_col("reel", bool(f["reel"])), went=True)
              + card("carousel", design_door(kit.name), KIT_WORDS["carousel"], "4:5", car_cta, KIT_WORDS["carousel_sub"],
-                    car_strip, _status(html.escape(carousel_status(len(slides), f["designs"])), bool(slides)), car_words)
+                    car_strip, _status(html.escape(carousel_status(len(slides), f["designs"])), bool(slides)),
+                    steps_col("carousel", bool(slides)))
              + card("stories", design_door(kit.name, stories=True), KIT_WORDS["stories"], "9:16", sto_cta, KIT_WORDS["stories_sub"],
-                    sto_strip, _status(html.escape(stories_status(len(stories), f["story_designs"])), bool(stories)), sto_words))
+                    sto_strip, _status(html.escape(stories_status(len(stories), f["story_designs"])), bool(stories))))
 
     # the quiet line under the cards (decision 12): what else the kit folder holds, each with its folder's button
     bits = []
@@ -2026,17 +2179,23 @@ def build_page(kit):
             links.append(f"<a class='go small' href='{html.escape(d['edit_url'])}' target='_blank' rel='noopener'>{html.escape(OUR_KIT_WORDS['canva_story'].format(n=int(n_)))}</a>")
     if links:
         bits.append(f"<span class='bit'>{html.escape(OUR_KIT_WORDS['in_canva'])} " + " ".join(links) + "</span>")
-    bits.append(f"<span class='bit'><button class='go small' type='button' data-sub=''>{html.escape(OUR_KIT_WORDS['open_kit'])}</button></span>")
-    lean = (f"<p class='lean'>{html.escape(OUR_KIT_WORDS['written_from'].format(what=words['leaned_on']))}</p>" if words.get("leaned_on") else "")
-    also = f"<div class='also'><p class='line'>{''.join(bits)}</p><p class='went'></p>{lean}</div>"
+    also = f"<div class='also'><p class='line'>{''.join(bits)}</p><p class='went'></p></div>"
 
-    page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached")}
-    page_words.update({k: OUR_KIT_WORDS[k] for k in ("copy", "copied", "opening", "unreached")})
+    # her three buttons under the lede, and the line that says what happened; the queue is a page of this same server
+    folders = (f"<p class='folders'><button class='go' type='button' data-sub=''>{html.escape(KIT_WORDS['open_kit'])}</button> "
+               f"<button class='go' type='button' data-sub='Photos'>{html.escape(KIT_WORDS['open_photos'])}</button> "
+               f"<a class='go' id='queueLink' href='/posting.html'>{html.escape(KIT_WORDS['my_queue'])} &rarr;</a></p>"
+               "<p class='went' id='folderWent'></p>")
+
+    import words_page
+    page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached", "how_often", "how_often_b", "adding", "cant_add", "not_saved")}
+    page_words.update({k: OUR_KIT_WORDS[k] for k in ("opening", "unreached")})
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
+    page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
     page = (_head(name + " · Post kit")
-            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}'><div class='wrap'>" + _bar(when_words)
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
-            f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p></header>"
+            f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p>{folders}</header>"
             f"<div id='pieces'>{cards}</div>{also}</div>"
             f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script>{SCRIPT}</script></body></html>")
@@ -2070,7 +2229,12 @@ def show(kit):
         say(f"  {k.capitalize()}: {len(v)} made")
     if rec.get("reel"):
         say(f"  Reel: CapCut project \"{rec['reel']['project']}\"")
-    say("  Words: " + ("written" if (kit / ".kit" / "words.json").exists() else "not yet"))
+    try:
+        st = words_status(kit)
+    except (Exception, SystemExit):  # noqa: BLE001
+        st = {}
+    say("  Words: " + ", ".join(f"{k} " + ("caption written" if (st.get(k) or {}).get("caption") else "told, not written" if (st.get(k) or {}).get("answered") else "not yet")
+                                for k in ("reel", "carousel")))
     say(f"  Page: {page_path(kit)}" if page_path(kit).exists() else "  Page: not yet")
 
 
@@ -2098,19 +2262,22 @@ def main():
     rl = sub.add_parser("reel-made"); rl.add_argument("words"); rl.add_argument("--project", required=True)
     rl.add_argument("--picks", help="the order it was made in, as reel.py read it (19,4,10+,14-), when not Claude's pick")
     sub.add_parser("facts").add_argument("words")
-    w = sub.add_parser("words"); w.add_argument("words"); w.add_argument("--file", required=True)
+    w = sub.add_parser("words"); w.add_argument("words", nargs="?"); w.add_argument("--file")     # the old way: only says where the words are written now
     sub.add_parser("page").add_argument("words")
     sub.add_parser("show").add_argument("words")
-    v = sub.add_parser("voice"); v.add_argument("--sample-file"); v.add_argument("--never-file"); v.add_argument("--audience", choices=["clients", "photographers", "both"]); v.add_argument("--hashtags")
+    v = sub.add_parser("voice"); v.add_argument("--sample-file"); v.add_argument("--never-file"); v.add_argument("--audience", choices=["clients", "photographers", "both"])
     a = ap.parse_args()
 
     if a.cmd == "voice":
         sample = read_their_file(a.sample_file) if a.sample_file else None
         never = read_their_file(a.never_file) if a.never_file else None
-        vv = set_voice(sample, never, a.audience, a.hashtags)
-        say(f"Voice: {len(vv.get('samples', []))} captions of theirs, {len(vv.get('never', []))} they'd never write, for {vv.get('audience', 'both')}"
-            + (f", hashtags kept" if vv.get("hashtags") else "") + ".")
+        vv = set_voice(sample, never, a.audience)
+        say(f"Voice: {len(vv.get('samples', []))} captions of theirs, {len(vv.get('never', []))} they'd never write, for {vv.get('audience', 'both')}.")
         return 0
+    if a.cmd == "words":
+        # before the kit is even looked for: nothing is read, nothing is written, an older words.json stays as it is
+        say(WORDS_MOVED)
+        return 2
     if a.cmd == "start":
         if a.night:
             if not a.shoot:
@@ -2155,19 +2322,6 @@ def main():
         note_reel(kit, a.project, picks_text=(a.picks or "").replace(" ", "") or None); say("Noted. The reel is on the kit page."); return 0
     if a.cmd == "facts":
         say(json.dumps(facts(kit), indent=1, ensure_ascii=False)); return 0
-    if a.cmd == "words":
-        try:
-            given = json.loads(read_their_file(a.file))
-        except ValueError as e:
-            say(f"STOP: the words file isn't JSON that can be read ({e}). Nothing was saved. Fix the file and run this again.")
-            return 1
-        try:
-            given = kept_words(given)
-        except ValueError as e:         # a piece in a shape the page can't show: said before anything is written
-            say(f"STOP: {e}. Nothing was saved. Fix the file and run this again.")
-            return 1
-        save_words(kit, given)
-        say(f"Saved. The captions and the kit page are updated: {page_path(kit)}"); return 0
     if a.cmd == "page":
         say(str(write_page(kit))); return 0
     if a.cmd == "show":
