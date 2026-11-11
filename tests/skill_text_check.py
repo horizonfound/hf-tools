@@ -513,9 +513,9 @@ def check_posting():
     case("reminders are offered, never assumed, each post its own time", "Offered, never assumed." in flat and "each post gets its own" in flat)
     case("never say a reminder is set before status says so", "Don't say a reminder is set until `reminders.py status` says so." in flat)
     case("the Mac's permission question: say yes, and where to turn it back on",
-         "Say yes" in flat and "System Settings, Privacy & Security, Automation" in flat
+         "Press Allow on both" in flat and "System Settings, Privacy & Security, Automation" in flat
          and "System Settings, Privacy & Security, " in re.sub(r'"\s+"', "", rem) and "Automation" in rem)
-    case("the part is honest that the real Calendar is untried", "have not been tried yet, only a pretend calendar" in flat)
+    case("the part says what was proven on the real Calendar and what was not", "What is proven (Dustin's Mac, Nov 11" in flat and "Not tried: saying Don't Allow" in flat)
     case("a calendar that is gone sends them to choosing another, not to a dead end", "they choose another" in flat and "there is no way to choose another yet" not in flat)
     case("the page still never offers the calendar question once one is chosen (else the part's line is wrong)",
          "mode==='cal'||(mode==='time'&&!pc&&!R.calendar)" in page and page.count("'cal')") == 0)
