@@ -275,6 +275,9 @@ def check_doors():
     case("arrange.md: a reel pick goes to the page fully marked (Nicole, Nov 10), and the page keeps the marks that are on it",
          "about a third Longer, about a quarter Quicker, the rest plain, never three Longers or three Quickers in a row" in arr
          and "**Your marks and theirs.**" in arr and "the page keeps what is on it, marks and all" in arr)
+    case("arrange.md: fresh marks show on an order they never changed, and never over marks they set (the whole-build fix round)",
+         "**An order they never changed takes your new marks**" in arr and "**An order they marked themselves keeps theirs**" in arr
+         and "reel_earlier" in read(SCRIPTS / "kit.py") and "claude_earlier" in read(SCRIPTS / "reel_page.py"))
     case("arrange.md: On every beat's lengths are aims, not promises (the song's hits still decide)",
          "a Longer photo aims for about three beats" in arr and "Those are aims, not promises" in arr
          and "never that it can't happen" in arr and "a Longer photo holds about three beats" not in arr)
@@ -459,8 +462,136 @@ def check_words():
     case("the playbook's hooks and captions sections give way to the words part", "they win.**" in read(PLUGIN / "shared" / "playbook.md") and "`parts/words.md`" in read(PLUGIN / "shared" / "playbook.md"))
 
 
+# ---------- 8. the posting queue's part: the panel, the grid photo, posting-day reminders ----------
+
+def check_posting():
+    part_path = SM / "parts" / "posting-queue.md"
+    part = read(part_path)
+    flat = re.sub(r"\s+", " ", part).replace("’", "'")
+    page = read(SCRIPTS / "posting_queue.py").replace("’", "'")
+    rem = read(SCRIPTS / "reminders.py")
+    rows = table_rows(read(SM / "SKILL.md"))
+    for phrase in ('"remind me to post the beach reel"', '"is my reminder set"', '"show my posting queue"', "\"the beach reel's ready\""):
+        hit = [r for r in rows if phrase in r.split(" | ")[0]]
+        case(f"exactly one row answers {phrase}", len(hit) == 1, len(hit))
+        if hit:
+            case("... and it sends Claude to parts/posting-queue.md", "`parts/posting-queue.md`" in hit[0].split(" | ", 1)[1])
+    case("the part no longer says the calendar dates are not built", "Not built yet" not in part and "posting dates on their calendar" not in part)
+    # the page's own words, read from the page, so a change there is caught here
+    said = {
+        "the reel's cover line": r"reel_line:'([^']+)'", "the carousel's first-slide line": r"carousel_line:'([^']+)'",
+        "Copy caption": r"copy_caption:'([^']+)'", "Copy my hook": r"copy_hook:'([^']+)'", "Open my words": r"open_words:'([^']+)'",
+        "Write my words": r"write_words:'([^']+)'", "No caption yet.": r"no_caption:'([^']+)'", "the no-hook line": r"no_hook:'([^']+)'",
+        "the can't-find-the-photos line": r"\bcant:'(I can't find[^']+)'",
+        "Set a reminder to post": r"RW=\{set:'([^']+)'", "Remind me": r"yes:'([^']+)'", "I'll post it myself": r'no:"([^"]+)"',
+        "Which calendar does your phone show?": r"which:'([^']+)'", "What time?": r"what:'([^']+)'",
+        "the Mac's say-yes line": r"slow:' ([^']+)'", "I can't reach your Calendar right now.": r"cant:'(I can't reach[^']+)'",
+        "Try again": r"again:'([^']+)'", "the trouble line": r"trouble:'([^']+)'", "Change time": r"change:'([^']+)'", "Turn off": r"off:'([^']+)'",
+        "Add to my calendar": r"pc_add:'([^']+)'", "Add it again": r"pc_add_again:'([^']+)'", "Take it off my calendar": r"pc_take:'([^']+)'",
+    }
+    for what, pat in said.items():
+        m = re.search(pat, page)
+        case(f"the posting page still says: {what}", bool(m))
+        if m:
+            case(f"... and the part says it the same way: {m.group(1)[:60]}", m.group(1) in flat, m.group(1))
+    # every command the part names is one the scripts have
+    have = {"posting_queue.py": set(re.findall(r'add_parser\("([a-z-]+)"\)', page)) | {"ready", "unready", "posted", "skip"},
+            "reminders.py": set(re.findall(r'add_parser\("([a-z-]+)"\)', rem))}
+    named = re.findall(r"`(?:python3 <scripts>/)?(posting_queue\.py|reminders\.py) ([a-z-]+)", part)
+    bad = [f"{f} {c}" for f, c in named if c not in have[f]]
+    case("every posting_queue.py and reminders.py command the part names exists", named and not bad, bad)
+    for c in ("status", "calendars", "sync", "open", "calendar"):
+        case(f"the part names reminders.py {c}", ("reminders.py", c) in named)
+    # the chat cannot set a reminder: there is no such command, and the part says so (if one is ever added, say it here).
+    # Choosing the calendar again is the one thing the chat can do (reminders.py calendar <name>, Nov 11).
+    setter = [c for c in have["posting_queue.py"] | have["reminders.py"] if c in ("remind", "set", "on", "off", "time")]
+    case("there is still no command that sets a reminder, its time, or turns it off", not setter, setter)
+    case("reminders.py has the command that changes the calendar, and the part tells it: the names, their choice, then the command",
+         "calendar" in have["reminders.py"] and "**Changing the calendar**" in flat and 'reminders.py calendar "<the name, exactly as listed>"' in flat
+         and "never choose for them" in flat and "Changing the calendar afterwards is not built" not in flat and "I can't change which calendar yet" not in flat)
+    case("the part says the chat cannot set one, and where the button is", "The chat cannot set one." in flat and "Click the beach reel in your grid" in flat and "Set a reminder to post" in flat)
+    case("reminders are offered, never assumed, each post its own time", "Offered, never assumed." in flat and "each post gets its own" in flat)
+    case("never say a reminder is set before status says so", "Don't say a reminder is set until `reminders.py status` says so." in flat)
+    case("the Mac's permission question: say yes, and where to turn it back on",
+         "Say yes" in flat and "System Settings, Privacy & Security, Automation" in flat
+         and "System Settings, Privacy & Security, " in re.sub(r'"\s+"', "", rem) and "Automation" in rem)
+    case("the part is honest that the real Calendar is untried", "have not been tried yet, only a pretend calendar" in flat)
+    case("a calendar that is gone sends them to choosing another, not to a dead end", "they choose another" in flat and "there is no way to choose another yet" not in flat)
+    case("the page still never offers the calendar question once one is chosen (else the part's line is wrong)",
+         "mode==='cal'||(mode==='time'&&!pc&&!R.calendar)" in page and page.count("'cal')") == 0)
+    case('"reminders not updated": the queue is right, do not run the command again, then status and sync',
+         "(reminders not updated: ...)" in flat and "Don't run the queue command again" in flat and "reminders.py sync" in flat
+         and "(reminders not updated: " in page and "(reminders not updated: " in rem)
+    case("a PC: a calendar file they add themselves, and never 'your reminder is set'",
+         "a calendar file" in flat and 'Never tell a PC photographer "your reminder is set"' in flat and "None of it has been tried on a real PC yet." in flat)
+    case("a PC: the alert may not come through, said plainly", "The alert may not come through." in flat and "Google Calendar" in flat)
+    case("a PC: the file lines the commands print are in the part as printed",
+         "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in flat
+         and "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in page
+         and "Nothing is waiting to be opened." in flat and "Nothing is waiting to be opened." in rem)
+    case("ready to post normally comes from Add to my queue, which needs its caption; offer the words",
+         "Add to my queue" in flat and "does not check for a caption" in flat and "don't mark it ready silently" in flat and "`parts/words.md`" in flat)
+    case("the panel's words come from the words page; changes go through parts/words.md",
+         "nothing is written or changed in the posting queue" in flat and "that is `parts/words.md`, every time" in flat)
+    case("two shoots with nearly the same name: both can be in the queue, never guess",
+         "Both can be in the posting queue" in flat and "Never guess which of the two" in flat
+         and "could mean more than one" in flat and "could mean more than one" in page and "def kit_sid" in page)
+    case("the old refusal line is nowhere in the scripts (else the part must say what to do about it)",
+         not any("nearly the same name" in read(f) for f in SCRIPTS.glob("*.py")))
+    stray = []
+    for q in instruction_files():
+        if q.name == "posting-queue.md":
+            continue
+        for i, ln in enumerate(read(q).splitlines(), 1):
+            if re.search(r"reminders\.py (?:status|sync|calendars|calendar|open)\b", ln):
+                stray.append(f"{rel(q)}:{i}")
+    case("the calendar reminder commands are told in one place, parts/posting-queue.md", not stray, stray)
+
+
+def check_whole_build():
+    """The whole-build fix round (Nov 11): three promises Nicole ruled out, the PC's honest list, where things live."""
+    import json
+    # Nicole, v20: never say on a page that the words "sound like you". The Assistant shapes what they said like an editor would.
+    banned = re.compile(r"sounds? like you|in your voice|the way you write", re.I)
+    home = read(SCRIPTS / "home.py")
+    card = re.search(r'\("posts", "Make posts from a shoot",\s*"([^"]+)"', home)
+    case("the home page's Make posts card promises no captions that 'sound like you' or are 'written the way you write'",
+         bool(card) and not banned.search(card.group(1)) and "captions" in card.group(1), card.group(1) if card else "card not found")
+    case("... and names the kit's three pieces (no 'single photos': a single post is a one-slide carousel)",
+         bool(card) and "single photos" not in card.group(1) and all(w in card.group(1) for w in ("a reel", "a carousel", "stories")))
+    plug = json.loads(read(PLUGIN / ".claude-plugin" / "plugin.json"))["description"]
+    market = json.loads(read(ROOT / ".claude-plugin" / "marketplace.json"))["plugins"][0]["description"]
+    case("the plugin's one-line description promises no captions 'in your voice'", not banned.search(plug), plug)
+    case("... and the marketplace's description is the same line, word for word", plug == market)
+    kit_part = read(SM / "parts" / "post-kit.md")
+    said = [m for m in re.findall(r'"([^"\n]+)"', kit_part) if banned.search(m)]
+    case("no line the Assistant says in parts/post-kit.md promises words that 'sound like you' (only the rule itself names the phrase)",
+         said == ["sound like you"], said)
+    pages = [f.name for f in sorted(SCRIPTS.glob("*.py")) if re.search(r"captions? (?:that )?sounds? like you|captions in your voice|captions written the way you write", read(f))]
+    case("no page script promises captions that sound like them", not pages, pages)
+    # the PC's "what can't you do" list names reminders, and the PC part points at the reminder section
+    pc = re.sub(r"\s+", " ", read(SM / "parts" / "on-a-pc.md"))
+    lst = pc.split('## "What can\'t you do on a PC?"', 1)[-1].split("## ", 1)[0]
+    case("on a PC, 'what can't you do' names posting-day reminders: a calendar file added by hand, again after any change, check the alert",
+         "Posting-day reminders" in lst and "calendar file" in lst and "again after any change" in lst and "alert" in lst)
+    case("the PC part points at the reminder section and never names a reminders command itself",
+         "On a PC: a calendar file they add themselves" in pc and "`parts/posting-queue.md`" in pc and "`parts/words.md`" in pc)
+    guide = re.sub(r"\s+", " ", read(ROOT / "docs" / "SETUP-GUIDE-PC.md")) if (ROOT / "docs" / "SETUP-GUIDE-PC.md").is_file() else None
+    if guide is not None:        # the guide is not part of the installed plugin; checked where the project is
+        case("the PC setup guide's 'Not on a PC yet' list names reminders too",
+             "Posting-day reminders" in guide.split("### Not on a PC yet", 1)[-1][:2500])
+    # where things live: the new records
+    where = re.sub(r"\s+", " ", read(SM / "parts" / "where-things-live.md"))
+    words_py, rem_py = read(SCRIPTS / "words.py"), read(SCRIPTS / "reminders.py")
+    for name, src in (("post-words.json", words_py), ("post-words.prev.json", words_py), ("brand-homebase.md", words_py),
+                      ("made.json", rem_py), ("state.json", rem_py), ("event_uid", rem_py), ("event_sig", rem_py), ("event_cal", rem_py)):
+        case(f"where-things-live names {name}, and the script still uses that name", f"`{name}`" in where and f'"{name}"' in src)
+    case("where-things-live names the reminders' folder, posting.json's reminder fields and the log",
+         all(w in where for w in ("`reminders/`", "`posting.json`", "`remind_on`", "`remind_time`", "`logs/reminders.log`", "`last.json`")))
+
+
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words):
+    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

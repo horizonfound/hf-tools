@@ -22,6 +22,8 @@ time); stills checked by their colour at known times, upright, labelled with the
 enlarged, every look in a new folder; the loud stretch found within one half second; the copy made once, never
 over a file, never enlarged, upright, and read back by AVFoundation; the PC route (ASSISTANT_NO_AVFOUNDATION=1)
 saying its plain words and making nothing; a non-video refused in plain words.
+STUDIO_HOME is set to the scratch folder, so the computer-wide video lock is the test's own and nothing is ever
+written in the real ~/.studio.
 
 Run it under the memory guard (it touches video). Every line says PASS, FAIL or SKIP. Exit 1 only when something
 FAILED; the scratch folder is kept then.
@@ -287,6 +289,13 @@ def main():
         work.mkdir(parents=True)
     else:
         work = Path(tempfile.mkdtemp(prefix="assistant video "))
+    # The computer-wide video lock is <STUDIO_HOME>/video.lock, or ~/.studio/video.lock when that is not set. This
+    # test must never take (or leave behind) the real one, so it gets a STUDIO_HOME of its own before any video
+    # program is started (found Nov 11: an empty video.lock was left in the real ~/.studio).
+    (work / "studio").mkdir()
+    os.environ["STUDIO_HOME"] = str(work / "studio")
+    check("the video lock is the test's own (in its STUDIO_HOME), never the real ~/.studio's",
+          str(video.lock_path()).startswith(str(work)) and video.lock_path() != Path.home() / ".studio" / "video.lock", video.lock_path())
     clips = work / "clips"
     clips.mkdir()
     cols = ";".join(",".join(map(str, c)) for c in COLOURS)

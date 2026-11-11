@@ -437,6 +437,27 @@ def _pc_both_ways(text):
     return bool(_PC_IN_DOUBLE.intersection(text) and _PC_IN_SINGLE.intersection(text))
 
 
+REEL_EARLIER_KEPT = 12
+
+
+def note_earlier_reel(rec, new_nums, new_marks):
+    """Before a new reel pick replaces the one in the record: keep the one being replaced, as one line
+    ("19,4,10+,14-"), in rec["reel_earlier"] (the newest last, the last 12, none twice). The reel page reads
+    it to tell "the photographer changed nothing" from "they set these marks themselves": an order on the page
+    that is still exactly an earlier pick of the Assistant's, marks and all, takes the newest pick's marks; one
+    they touched keeps theirs (Nicole's v22: a pick made before the fuller marks gets them when it is picked
+    again). Changes rec; the caller saves."""
+    old = reel_picks_text(rec)
+    if not old:
+        return
+    marks = new_marks or {}
+    new = ",".join(f"{n}{marks.get(str(n), '') if marks.get(str(n)) in ('+', '-') else ''}" for n in new_nums)
+    if old == new:
+        return
+    kept = [t for t in (rec.get("reel_earlier") if isinstance(rec.get("reel_earlier"), list) else []) if isinstance(t, str) and t != old]
+    rec["reel_earlier"] = (kept + [old])[-REEL_EARLIER_KEPT:]
+
+
 def set_picks(kit, singles, stories, carousel, reel, cover=None):
     by_n = numbered(kit)
     rec = load_rec(kit)
@@ -458,6 +479,8 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
         if key == "carousel" and len(ns) > CAROUSEL_MOST:
             say(f"STOP: Instagram allows up to {CAROUSEL_MOST} photos in a carousel, and this pick has {len(ns)}. Nothing was changed.")
             sys.exit(1)
+        if key == "reel":
+            note_earlier_reel(rec, ns, marks)
         picks[key] = ns         # plain numbers, always; the reel's marks sit beside the picks, never inside
         if marks is not None:
             rec["reel_marks"] = marks       # replaced whole whenever --reel is given

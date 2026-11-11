@@ -561,6 +561,23 @@ def claude_order(kit, rec_kit=None, on_sheet=None):
     return out
 
 
+def earlier_orders(rec_kit, on_sheet=None):
+    """The Assistant's earlier picks for this reel (kit.json "reel_earlier", written by kit.py picks when a new
+    pick replaces one), each as [{n, h}], only photos on the numbered list. An order the page shows that is
+    still exactly one of these was never touched by the photographer."""
+    out = []
+    got = (rec_kit or {}).get("reel_earlier")
+    for text in got if isinstance(got, list) else []:
+        if not isinstance(text, str):
+            continue
+        one = [{"n": int(n), "h": m} for n, m in re.findall(r"(\d+)([+-]?)", text)]
+        if on_sheet is not None:
+            one = [x for x in one if x["n"] in on_sheet]
+        if one:
+            out.append(one)
+    return out
+
+
 def _numbers_in(saved, rec=None):
     """Every photo number the record mentions: the saved orders, and (from the footage stage) Claude's footage
     order and the photos the moments are matched to."""
@@ -656,6 +673,7 @@ def state(kit):
         "stamp": stamp, "rev": int(rec.get("rev") or 0), "total": len(rows),
         "photos": photos, "previews": {"made": made, "of": len(rows)},
         "claude": claude_order(kit, rec_kit, on_sheet),
+        "claude_earlier": earlier_orders(rec_kit, on_sheet),
         "saved": _for_page(saved, on_sheet),
         "max": MAX_PICKS,
         "songs": songs_for_page(kit, rec_kit),
@@ -679,13 +697,22 @@ def _for_page(saved, on_sheet):
     return out
 
 
-def _order_used(saved, claude):
+def _marked(order):
+    return [(x.get("n"), x.get("h") or "") for x in order or []]
+
+
+def _order_used(saved, claude, earlier=()):
     """The order Make my reel uses, as [{n, h}]: their own when they chose "I'll drag them in myself", otherwise
-    Claude's newest, with the Longer / Quicker they set on the same photos (her followClaude)."""
+    Claude's newest, with the Longer / Quicker they set on the same photos (her followClaude). One case more
+    (Nov 11): when what is saved is still exactly an earlier pick of the Assistant's, marks and all (`earlier`:
+    earlier_orders), the photographer changed nothing, so the newest pick's marks are used. Nicole's own v22 did
+    this by hand for her Aurora shoot; without it a kit picked before the fuller marks could never get them."""
     saved = saved or {}
     if saved.get("mine") or (not claude and saved.get("picks")):
         return list(saved.get("picks") or [])
     if isinstance(saved.get("picks"), list) and [x["n"] for x in saved["picks"]] == [x["n"] for x in claude]:
+        if _marked(saved["picks"]) != _marked(claude) and any(_marked(saved["picks"]) == _marked(e) for e in earlier or ()):
+            return list(claude)
         return list(saved["picks"])
     return list(claude)
 
@@ -697,7 +724,7 @@ def current_picks(kit):
     st = state(kit)
     if st is None:
         return ""
-    return ",".join(f"{x['n']}{x.get('h') or ''}" for x in _order_used(st["saved"], st["claude"]))
+    return ",".join(f"{x['n']}{x.get('h') or ''}" for x in _order_used(st["saved"], st["claude"], st.get("claude_earlier")))
 
 
 def order_for_kit_page(kit, rows=None, rec_kit=None):
@@ -720,7 +747,8 @@ def order_for_kit_page(kit, rows=None, rec_kit=None):
             if isinstance(saved.get(key), list):
                 saved[key] = _refind(saved[key], rec.get("names") or {}, n_of)
     on_sheet = {x["n"] for x in rows}
-    return _order_used(_for_page(saved, on_sheet), claude_order(kit, rec_kit, on_sheet))
+    rec_kit = rec_kit if rec_kit is not None else kit_mod.load_rec(kit)
+    return _order_used(_for_page(saved, on_sheet), claude_order(kit, rec_kit, on_sheet), earlier_orders(rec_kit, on_sheet))
 
 
 def _when_of(iso):
@@ -3034,6 +3062,9 @@ ORDER_JS = r"""
   var photos = [], byN = {}, claude = [], claudeBts = [], reel = [], mine = false, mineOrder = null;
   var footage = null;            // step 1 sets this (R.setFootage); until then, no footage
   var marks = {};                // only the Longer / Quicker they set themselves, carried over to the assistant's next order
+  var earlier = [];              // the assistant's earlier picks (state.claude_earlier): an order still exactly one of these was never touched
+  function marked(list){ return JSON.stringify((list || []).map(function(r){ return [r.n, r.h || '']; })); }
+  function untouched(list){ var m = marked(list); return earlier.some(function(e){ return marked(e) === m; }); }
   var undoStack = [], lastSnap = null, undoT = null, pollT = null, stampSeen = null;
   var short = '';
   var reelEl = $('reel'), allEl = $('all'), wrapEl = $('reelwrap'), insEl = document.createElement('div');
@@ -3129,7 +3160,12 @@ ORDER_JS = r"""
     if (mine) return;
     var c = claudeOrder();
     if (!c.length) return;
-    if (M.sameNums(c, reel)) return;          // same photos: keep their Longer / Quicker marks
+    if (M.sameNums(c, reel)) {                // same photos: keep their Longer / Quicker marks...
+      if (marked(c) !== marked(reel) && untouched(reel)) {      // ...unless they never set any: still an earlier pick of the assistant's, so its newest marks show
+        reel = M.copy(c); renderReel(); renderAll(); track();
+      }
+      return;
+    }
     reel = c.map(function(r){ return {n: r.n, h: marks[r.n] !== undefined ? marks[r.n] : (r.h || '')}; });
     renderReel(); renderAll(); track();
   }
@@ -3280,10 +3316,13 @@ ORDER_JS = r"""
       photos = st.photos; byN = {}; photos.forEach(function(p){ byN[p.n] = p; });
       claude = known(st.claude);
       claudeBts = known(st.claude_bts);
+      earlier = (st.claude_earlier || []).map(known);
       var saved = st.saved;
       if (saved && Array.isArray(saved.picks)) {
         reel = known(saved.picks);
         mine = !!saved.mine;
+        // saved before the assistant picked again, and never touched by them: the newest pick's marks show
+        if (!mine && M.sameNums(claude, reel) && marked(claude) !== marked(reel) && untouched(reel)) reel = M.copy(claude);
         mineOrder = Array.isArray(saved.mine_picks) ? known(saved.mine_picks) : (mine ? M.copy(reel) : null);
         if (saved.footage === true || saved.footage === false) footage = saved.footage;
       } else {
@@ -3306,6 +3345,7 @@ ORDER_JS = r"""
       var c = known(st.claude);
       if (JSON.stringify(c) !== JSON.stringify(claude)) {          // a fresh pick from the assistant
         claude = c;
+        earlier = (st.claude_earlier || []).map(known);
         $('claudeWords').textContent = footage === true ? W.claude_words_bts : W.claude_words;
         if (!claudeOrder().length) notPicked();
         followClaude();

@@ -44,7 +44,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | "make a single post", "a post with just one photo" (one slide on its own is a single post) | `parts/arrange.md`, "A single post" |
 | `home.py pending` prints a line starting ARRANGED | `parts/arrange.md` |
 | "show my post kit", "show me the beach kit", "open the post kit" | `parts/post-kit.md`, "Show my post kit" |
-| "show my posting queue", "the beach reel's ready", "I posted it", "how much content do I have", "read my Instagram grid" | `parts/posting-queue.md` |
+| "show my posting queue", "the beach reel's ready", "I posted it", "how much content do I have", "read my Instagram grid"; "remind me to post the beach reel", "is my reminder set", "I picked the wrong calendar", "pick the photo it shows in my grid", a line that says "reminders not updated" | `parts/posting-queue.md` |
 | you need to know where a file or record is kept | `parts/where-things-live.md` |
 | you are on a Windows PC (once per conversation, before the first command) | `parts/on-a-pc.md` |
 

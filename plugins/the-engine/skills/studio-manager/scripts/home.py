@@ -300,7 +300,7 @@ MENU = [
      "Copies your memory card to your hard drive and double-checks every photo. Then it sorts the photos into shoots, names them, and picks a few to edit first.",
      ["Put your memory card in.", "Then paste this in the chat:"], "Nothing on your memory card is changed."),
     ("posts", "Make posts from a shoot",
-     "Turns a folder of finished photos into Instagram posts: a reel, a carousel, single photos, stories, and captions written the way you write.",
+     "Turns a folder of finished photos into Instagram posts: a reel, a carousel, stories, and help with your captions.",
      ["<button class='btn open-inline pick' data-pick='1'>Select the folder with your finished photos</button> <span class='after'>{NAME} makes its own copies of the JPEGs in that folder. Your originals aren't moved or changed.</span>",
       "Then paste this in the chat, and {the_name} sorts them and makes your posts:"],
      "Nothing is posted. You post it when you're ready."),

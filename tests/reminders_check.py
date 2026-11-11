@@ -1035,6 +1035,62 @@ try:
     check("sync again: nothing sent", r.returncode == 0 and "No reminder has changed since last time." in r.stdout)
     r = cli("calendars")
     check("calendars, on a computer with calendar files: says there is none to choose", r.returncode == 0 and "no calendars to choose from" in r.stdout)
+    # ---- "calendar <name>": the choice can be changed (Nov 11; before, a wrong tap or a deleted calendar was a dead end)
+    print("\nChoosing the calendar again, from the chat")
+    import time as _time
+    fresh_home()
+    (STUDIO / "reminders").mkdir()
+    (STUDIO / "reminders" / "pretend.json").write_text(json.dumps({"calendars": ["Home", "Work", "Family"]}), encoding="utf-8")
+    q = queue()
+    q["pieces"][0]["kit"] = str(kit)
+    R.set_reminder(q, q["pieces"][0]["id"], "09:00")
+    (STUDIO / "posting.json").write_text(json.dumps(q, indent=1, ensure_ascii=False), encoding="utf-8")
+    env = dict(env, REMINDERS_BACKEND="pretend")
+
+    def posting():
+        return json.loads((STUDIO / "posting.json").read_text(encoding="utf-8"))
+
+    def book(want, secs=30):
+        """The pretend calendar's events once `want` is true of them (the round runs in a helper of its own)."""
+        end = _time.time() + secs
+        while True:
+            try:
+                b = json.loads((STUDIO / "reminders" / "pretend-calendar.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                b = {}
+            if want(b) or _time.time() > end:
+                return b
+            _time.sleep(0.2)
+
+    r = cli("calendar", "Holidays")
+    check("calendar <a name that isn't there>: nothing changed, the names listed, exit 1",
+          r.returncode == 1 and 'No calendar called "Holidays" was found. Nothing was changed.' in r.stdout and "Home\nWork\nFamily" in r.stdout
+          and "remind" in posting() and not (posting().get("remind") or {}).get("calendar"), r.stdout + r.stderr)
+    r = cli("calendar", "home")
+    b = book(lambda b: len(b) == 1)
+    check("calendar <name>, the first time (capital letters aside): chosen, said, and the reminder is made there in the background",
+          r.returncode == 0 and "Reminders now go on the Home calendar." in r.stdout and posting()["remind"]["calendar"] == "Home"
+          and [e["cal"] for e in b.values()] == ["Home"], r.stdout + r.stderr + repr(b))
+    end = _time.time() + 30
+    while not posting()["pieces"][0].get("event_uid") and _time.time() < end:
+        _time.sleep(0.2)
+    first_uid = posting()["pieces"][0].get("event_uid")
+    r = cli("calendar", "Work")
+    b = book(lambda b: [e["cal"] for e in b.values()] == ["Work"])
+    end = _time.time() + 30
+    while posting()["pieces"][0].get("event_cal") != "Work" and _time.time() < end:
+        _time.sleep(0.2)
+    check("calendar <another name>: changed, said with the one before, and our one event is moved (never a second left behind)",
+          r.returncode == 0 and "Reminders now go on the Work calendar. They were on Home." in r.stdout and posting()["remind"]["calendar"] == "Work"
+          and [e["cal"] for e in b.values()] == ["Work"] and first_uid and posting()["pieces"][0].get("event_cal") == "Work", r.stdout + r.stderr + repr(b))
+    r = cli("calendar", "Work")
+    check("calendar <the same name>: says so and changes nothing", r.returncode == 0 and "Reminders already go on the Work calendar. Nothing was changed." in r.stdout)
+    r = cli("status")
+    check("status afterwards names the new calendar", r.returncode == 0 and "Reminders go on the Work calendar." in r.stdout and "on the Work calendar." in r.stdout.split("\n", 1)[1], r.stdout)
+    env = dict(env, REMINDERS_BACKEND="file")
+    r = cli("calendar", "Work")
+    check("calendar <name> on a computer with calendar files: says there is none to choose", r.returncode == 0 and "no calendars to choose from" in r.stdout)
+
     check("no stray scratch files are left beside the records", not [f.name for f in (STUDIO / "reminders").iterdir() if f.name.endswith(".tmp")] and not list(STUDIO.glob("*.tmp")))
 
     check("the real Calendar was never reached by any check", not REAL)

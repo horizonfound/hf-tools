@@ -159,16 +159,21 @@ The stories designer (`--kind stories`) is the same page, and everything below a
 
 ## "What can't you do on a PC?"
 
-When they ask what doesn't work on a PC (or "is there anything I'm missing?"), say it plainly, short, in these words or close to them. The first three are the setup guide's own "Not on a PC yet" list:
+When they ask what doesn't work on a PC (or "is there anything I'm missing?"), say it plainly, short, in these words or close to them. The list is the setup guide's own "Not on a PC yet" list:
 
 > A few things don't work on a PC yet:
 > - Looking through your videos for moments. The reel page lists your videos and plays the usual kind (from most cameras, and from an iPhone set to Most Compatible), and you can pick a moment yourself with Use this moment. I just can't look through them and pick moments for you yet.
 > - iPhone videos in High Efficiency. They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).
 > - iPhone photos (HEIC). Export them as JPEGs first, and I can use those.
+> - Posting-day reminders don't reach your calendar by themselves. I make a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert.
 >
 > And you're one of the first to use me on a PC, so the rest is new here too, CapCut for Windows most of all. If anything looks off, tell me.
 
 Say only what they asked about when they asked about one thing ("can you do my footage?": the first line only). Never promise when any of it will come. RAW files from cameras other than Canon and DJI (Nikon, Sony, Fuji and the rest) are written for and never tried on a real file; mention that only if they shoot one of those.
+
+## The words page and posting-day reminders
+
+The words page (`parts/words.md`) and the posting queue's panel for a post work on a PC as on a Mac. Posting-day reminders do not: a PC has no Calendar app the Assistant can talk to, so a reminder is a calendar file they open and accept themselves, and again after every change. Before you say anything about a reminder on a PC, read "On a PC: a calendar file they add themselves" in `parts/posting-queue.md`: the page's words there, the command that opens the waiting files, and the limits to say plainly (the alert may be dropped; the Assistant can't see their calendar, so never say "your reminder is set"). None of it has been tried on a real PC yet.
 
 ## Everything else
 

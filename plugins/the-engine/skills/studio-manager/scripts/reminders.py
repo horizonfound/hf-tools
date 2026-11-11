@@ -1245,6 +1245,53 @@ def status_lines(p, backend=None):
 
 # ---------------------------------------------------------------- the command line
 
+class _Names:
+    """A calendar list already read, standing in for the calendar when a choice is checked (set_calendar asks
+    its backend for the list; asking the Calendar app twice takes a second or more each time)."""
+    def __init__(self, names):
+        self.names = list(names)
+
+    def calendars(self):
+        return self.names
+
+
+def choose_calendar(name, backend, queue):
+    """"calendar <name>": choose the calendar reminders go on, or change it (Nov 11). Before this the choice
+    was made once on the page and could never be changed, so a wrong tap, or a calendar deleted later, left
+    every reminder stuck. The name must be one calendars() gives (capital letters aside); anything else changes
+    nothing and lists the names. The events themselves are moved by the next reminders round, in the background
+    as after any other command (queue.calendar_in_step): only our own events, by their ids, and an event on a
+    calendar that is gone is made afresh on the new one. Exit 0 chosen (or already that one), 1 not changed."""
+    if backend is None or not getattr(backend, "needs_calendar", True):
+        say("There are no calendars to choose from on this computer: a reminder is a calendar file, and your calendar app asks which calendar when it opens.")
+        return 0
+    try:
+        names = calendars(backend)
+    except CalendarProblem as e:
+        say(f"(calendars not read: {e})")
+        return 1
+    want = str(name or "").strip()
+    match = want if want in names else None
+    if match is None:
+        close = [n for n in names if n.strip().lower() == want.lower()]
+        match = close[0] if len(close) == 1 else None
+    if match is None:
+        say(f"No calendar called \"{want}\" was found. Nothing was changed.")
+        say("The calendars a reminder can go on:\n" + "\n".join(names) if names else "No calendar a reminder could go on was found.")
+        return 1
+    with queue._POSTING_LOCK:
+        p = queue.load()
+        was = (p.get("remind") or {}).get("calendar") if isinstance(p.get("remind"), dict) else None
+        if was == match:
+            say(f"Reminders already go on the {match} calendar. Nothing was changed.")
+            return 0
+        set_calendar(p, match, backend=_Names(names))
+        queue.save(p)
+    say(f"Reminders now go on the {match} calendar." + (f" They were on {was}." if was else ""))
+    queue.calendar_in_step()
+    return 0
+
+
 def main(argv=None):
     this_computer.utf8_output()
     ap = argparse.ArgumentParser(description="Posting-day reminders on their calendar.")
@@ -1254,6 +1301,8 @@ def main(argv=None):
     s = sub.add_parser("sync")
     s.add_argument("--all", action="store_true", help="send every reminder again, changed or not")
     sub.add_parser("open")
+    c = sub.add_parser("calendar")     # choose (or change) the calendar reminders go on, by its name
+    c.add_argument("name")
     a = ap.parse_args(argv)
     if not a.cmd:
         ap.print_help()
@@ -1281,6 +1330,8 @@ def main(argv=None):
             say("Nothing is waiting to be opened.")
         return 0
     import posting_queue as queue      # here, not at the top: only the commands that read the queue need it
+    if a.cmd == "calendar":
+        return choose_calendar(a.name, backend, queue)
     if a.cmd == "status":
         for line in status_lines(queue.load(), backend):
             say(line)

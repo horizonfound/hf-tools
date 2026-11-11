@@ -1,5 +1,7 @@
 # Building Nicole's v20 and v21 in: the handoff for the Code session on Dustin's Mac
 
+**Update, Nov 11: stages 1 to 5 and Nicole's v22 are built on branch `v21` (not merged yet); stage 6, the brand interview, waits on Dustin and Nicole's call. What was built and what is unproven: `CLAUDE.md`, "Nicole's v20 and v21", "Nicole's v22" and "The whole-build fix round".**
+
 Written Nov 10, 2026 (late evening) by the cloud session, after going through both handoffs with Dustin.
 Read `CLAUDE.md` first, as always. This file says what to build, what Dustin decided, and what is already done.
 

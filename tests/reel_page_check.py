@@ -556,6 +556,50 @@ def check_page(c, s):
     s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))
     c.wait_for("JSON.stringify(%s) === %s" % (ORDER, json.dumps(json.dumps(CLAUDE, separators=(",", ":")))), 8)
 
+    # fresh MARKS on the same photos in the same order (Nicole's v22: a reel picked before the fuller marks is picked
+    # again). An order they never touched takes the new marks; one they marked themselves keeps theirs.
+    def marks_are(want, seconds=8):
+        try:
+            c.wait_for("JSON.stringify(%s) === %s" % (MARKS, json.dumps(json.dumps(want, separators=(",", ":")))), seconds)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    plain = [""] * len(CLAUDE)
+    if c.js(MARKS)[1] == "-":
+        c.click("#reel .tile:nth-child(2) .qk")         # take their own Quicker off again: the order is the assistant's, as picked
+    case("(the assistant's order with no marks, saved)", c.js(MARKS) == plain and on_disk(s, {"mine": False, "picks": picks(CLAUDE)}), c.js(MARKS))
+    full = ["+", "-", "", "+", "", "-", "", "+", "", "-", "", "+"][:len(CLAUDE)]
+    full_text = ",".join("%d%s" % (n, m) for n, m in zip(CLAUDE, full))
+    s.cmd("kit.py", "picks", str(s.kit), "--reel", full_text)
+    kept = json.loads((s.kit / ".kit" / "kit.json").read_text()).get("reel_earlier") or []
+    case("the pick that was replaced is kept in the kit's record (reel_earlier), as one line", kept and kept[-1] == ",".join(map(str, CLAUDE)), kept)
+    case("fresh marks on an order they never touched show on the open page by themselves", marks_are(full) and c.js(ORDER) == CLAUDE, c.js(MARKS))
+    code, out = s.cmd("reel_page.py", "show", str(s.kit))
+    case("... and Make my reel would use them, though the page saved nothing (what is saved is still the earlier pick)",
+         "The order Make my reel uses: " + full_text in out and ((s.record() or {}).get("saved") or {}).get("picks") == picks(CLAUDE), out[-600:])
+    c.reload()
+    c.wait_for(READY, 15)
+    case("... and after a reload the page shows the fresh marks, not the saved earlier pick", c.js(MARKS) == full and c.js(ORDER) == CLAUDE, c.js(MARKS))
+    c.click("#reel .tile:nth-child(3) .lng")            # now they set one mark of their own
+    theirs = list(full)
+    theirs[2] = "+"
+    case("(their own Longer on the third photo, saved)", c.js(MARKS) == theirs and on_disk(s, {"picks": picks(CLAUDE, theirs)}), c.js(MARKS))
+    other = ["-"] + [""] * (len(CLAUDE) - 1)
+    other_text = ",".join("%d%s" % (n, m) for n, m in zip(CLAUDE, other))
+    s.cmd("kit.py", "picks", str(s.kit), "--reel", other_text)
+    time.sleep(5.5)
+    case("fresh marks on an order they marked themselves change nothing on the page (hers)", c.js(MARKS) == theirs, c.js(MARKS))
+    code, out = s.cmd("reel_page.py", "show", str(s.kit))
+    case("... and Make my reel keeps their marks", "The order Make my reel uses: " + ",".join("%d%s" % (n, m) for n, m in zip(CLAUDE, theirs)) in out, out[-600:])
+    c.click("#reel .tile:nth-child(3) .lng")            # their mark off again: the order is once more exactly an earlier pick
+    case("their mark taken off again: the page is back on an earlier pick of the assistant's, and keeps showing it until the next pick",
+         c.js(MARKS) == full and on_disk(s, {"picks": picks(CLAUDE, full)}), c.js(MARKS))
+    s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))
+    case("the next pick (no marks) is followed, since nothing on the page is theirs", marks_are(plain) and c.js(ORDER) == CLAUDE, c.js(MARKS))
+    kept = json.loads((s.kit / ".kit" / "kit.json").read_text()).get("reel_earlier") or []
+    case("the kept picks hold no line twice", len(kept) == len(set(kept)) and len(kept) <= 12, kept)
+
     # the 40 limit
     c.click("#useMine")
     left = [n for n in range(1, PHOTOS + 1) if n not in mine_order]
