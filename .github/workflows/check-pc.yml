@@ -87,10 +87,10 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -157,6 +157,9 @@ jobs:
       - name: The reel's timing, against Nicole's own (her cases on the test beat; clips; a clip as a video in CapCut's project)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/reel_timing_check.py
+      - name: The words for a post (the record, Nicole's rules for writing and asking)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/words_check.py
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
