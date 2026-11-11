@@ -669,11 +669,12 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 EXPECTED = {   # her acceptance/expected.json, word for word (the same 22 lines tests/reel_timing_check.py holds)
-    "song2 first 14 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
-    "song2 first 20 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2",
-    "beat60 first 14 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
-    "song1 photos 10 beat": "Beats per piece: 1, 1, 1, 1, 1, 1, 2, 1, 1, 2",
-    "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
+    # the five On every beat lines as she re-recorded them in handoff v22 (Nov 10: On every beat has rhythm)
+    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 3",
+    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2",
+    "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
+    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 3, 3, 1, 2, 3",
+    "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
     "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 4, 1, 1, 1, 4",
     "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 4, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3",
     "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
@@ -692,8 +693,6 @@ EXPECTED = {   # her acceptance/expected.json, word for word (the same 22 lines 
     "song1 first 14 beat (too long for the song)": "STOP: Your song is only 15.4 seconds, and 1 clip and 14 photos need at least 14.2 seconds, even with every photo at one beat. Take a few photos out, or use a longer song.",
     "beat60 first 14 mixed variation 2": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 1, 1, 4, 1, 1, 1, 3",
 }
-# beyond her 22, through the page: from her own bts_reel.py (tests/reel_timing_check.py's EXTRA, Nov 7)
-VARIATION3 = "Beats per piece: 1, 1, 1, 1, 1, 1, 2, 1, 1, 2"
 HER_PLAN = re.compile(r"^Plan: (\d+ clips? and )?\d+ photos?, \d+\.\d seconds, every cut on the beat"
                       r"( at about \d+ beats a minute(, starting the song at the top|, starting the song \d+ seconds in)\.|, no song( \(the footage keeps its own sound\))?\.)$")
 OPEN_WORDS = "CapCut is opening. Your newest reel is at the top of your projects."
@@ -1102,8 +1101,14 @@ def check_acceptance(s):
     rec = k / ".kit" / "reel-page.json"
     rec.write_text(json.dumps({"v": 1, "made": [{"project": "x", "picks": PICK10, "vibe": "beat", "footage": None}] * 3}))
     _, job = make_job(s, SIZES_KIT, pk(PICK10), ids["beat60"], "beat")
-    case("three reels already made with these choices: the next is variation 3, her line exactly (photos only, on the test beat)",
-         beats_of(job) == VARIATION3, "expected: %s / got: %s" % (VARIATION3, job))
+    # (the line itself is no longer held here: On every beat changed in her v22 and her new engine is never run,
+    # so the page's line is checked against reel.py --variation 3, the same engine asked directly)
+    r3 = subprocess.run([sys.executable, str(ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "scripts" / "reel.py"),
+                         "make", "--dry-run", "--folder", str(k / "Photos"), "--shoot", "Pretend sizes", "--kit", str(k), "--picks", PICK10,
+                         "--vibe", "beat", "--song", str(BEAT60), "--variation", "3"], capture_output=True, text=True, env=dict(s.env), timeout=120)
+    variation3 = next((ln for ln in r3.stdout.splitlines() if ln.startswith("Beats per piece")), None)
+    case("three reels already made with these choices: the next is variation 3, the line reel.py --variation 3 gives (photos only, on the test beat)",
+         variation3 and beats_of(job) == variation3, "expected: %s / got: %s" % (variation3 or r3.stdout[-300:] + r3.stderr[-300:], job))
 
     # with clips: reel.py directly, with --kit and --clips
     video = s.work / VIDEO_NAME

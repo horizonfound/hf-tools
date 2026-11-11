@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026) run through
+"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026; the five
+On every beat cases as she re-recorded them in handoff v22, Nov 10, when On every beat got its rhythm) run through
 OUR code (timing.py, called by reel.py), and every "Beats per piece" line must match hers word for word.
 
     python3 tests/reel_timing_check.py
@@ -8,7 +9,7 @@ OUR code (timing.py, called by reel.py), and every "Beats per piece" line must m
 Her cases: two songs from a real shoot and a 60-second test beat, in every vibe (On every beat, A little of
 everything, Calm, Build), as Moment first (one clip, then the photos), Back and forth (three clips, two photos
 after each) and photos only; one reel too long for its song (her plain STOP line); one second variation.
-The expected lines are copied from her acceptance/expected.json, unchanged.
+The expected lines are copied from her acceptance/expected.json (v22's), unchanged.
 
   - The 60-second test beat is synthetic (a drum pattern made for testing) and lives in tests/fixtures/
     (test-beat-60s.wav), so its 9 cases always run.
@@ -105,12 +106,12 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 
-EXPECTED = {   # her acceptance/expected.json, word for word
-    "song2 first 14 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
-    "song2 first 20 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2",
-    "beat60 first 14 beat": "Beats per piece: clip 6, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
-    "song1 photos 10 beat": "Beats per piece: 1, 1, 1, 1, 1, 1, 2, 1, 1, 2",
-    "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2",
+EXPECTED = {   # her acceptance/expected.json, word for word (the five "beat" lines are v22's, the other 17 as in v19)
+    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 3",
+    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2",
+    "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
+    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 3, 3, 1, 2, 3",
+    "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
     "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 4, 1, 1, 1, 4",
     "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 4, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3",
     "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
@@ -163,9 +164,6 @@ EXTRA = {
     "photos only, A little of everything, the song started 30 seconds in": (
         "beat60", 30.0, "mixed", PICK10, [], 0,
         ["Beats per piece: 3, 1, 1, 1, 2, 4, 2, 1, 1, 4"]),
-    "photos only, On every beat, variation 3": (
-        "beat60", None, "beat", PICK10, [], 3,
-        ["Beats per piece: 1, 1, 1, 1, 1, 1, 2, 1, 1, 2"]),
 }
 
 
@@ -234,6 +232,132 @@ def rules(name, items, pieces, facts, period):
             if not p.get("clip") or p["src"] + p["dur"] > float(x["length"]) + 1e-9:
                 bad.append(f"clip {k + 1} is not a clip piece inside its video: {p}")
     check(f"{name}: her rules hold", not bad, "; ".join(bad))
+
+
+# ---------------------------------------------------------------- On every beat's rhythm (her v22), by its rules
+
+def beat_rhythm(reel, timing, photos, songs):
+    """Rules that hold on any computer, whatever the song's samples come to: the plan for On every beat never has
+    three one-beat plain photos in a row; a Longer photo aims higher than any plain one and is only shorter than
+    a plain neighbour when the song forces it; another variation gives another mix; the same choices the same reel."""
+    print("\n-- On every beat has rhythm (her handoff v22, Nov 10): the rules, on any computer")
+    import random
+    rnd = random.Random(22)
+    bad_run, bad_aim, bad_len, tried = [], [], [], 0
+    for n in (2, 3, 5, 8, 10, 13, 14, 20, 30, 45):
+        for _ in range(60):
+            marks = [rnd.choice(["", "", "", "+", "-"]) for _ in range(n)]
+            seed = rnd.randrange(2 ** 32)
+            t = timing.beat_plan(marks, seed)
+            tried += 1
+            if len(t) != n or any(v not in (2, 4, 6) for v in t):
+                bad_len.append((marks, t))
+            for k in range(n - 2):                             # three one-beat photos in a row: never three plain,
+                if t[k:k + 3] == [2, 2, 2] and sum(m == "" for m in marks[k:k + 3]) > 1:   # nor two (as hers: one
+                    bad_run.append(("".join(m or "." for m in marks), t))   # plain photo before two Quickers may stay)
+            if any((m == "+") != (v == 6) or (m == "-" and v != 2) for m, v in zip(marks, t)):
+                bad_aim.append(("".join(m or "." for m in marks), t))
+            if marks[0] == "" and t[0] != 4:
+                bad_aim.append(("opener", "".join(m or "." for m in marks), t))
+    check(f"the plan, {tried} made-up reels: every photo aims for one, two or three beats", not bad_len, str(bad_len[:2]))
+    check("the plan: never three one-beat plain photos in a row, nor two plain ones in a one-beat run of three "
+          "(Quickers in a row are the photographer's own marks and stay one beat)", not bad_run, str(bad_run[:2]))
+    check("the plan: Longer aims for three beats and nothing else does, Quicker for one, a plain opener for two",
+          not bad_aim, str(bad_aim[:2]))
+    plain = timing.beat_plan([""] * 40, 12345)
+    check("the plan, 40 plain photos: a mix of one- and two-beat photos, not all the same",
+          set(plain) == {2, 4} and plain.count(2) >= 8 and plain.count(4) >= 8, str(plain))
+    check("the plan: the same choices give the same plan, another seed another one",
+          plain == timing.beat_plan([""] * 40, 12345) and plain != timing.beat_plan([""] * 40, 12346))
+
+    def beats(picks, song, variation=0, start=None):
+        items = [photo(x, photos) for x in picks.split(",")]
+        pieces, facts = reel.plan_reel(items, str(song) if song else None, "beat", start, False, None, variation)
+        return items, (None if pieces is None else facts["beats"]), facts
+
+    aurora = "3+,4-,9,10,16,15+,11-,18,8,34-,37,29+,24+"      # her v22 example's marks (our pretend photos)
+    for label, song in (("the 60-second test beat", BEAT60), ("no song", None)):
+        items, b, facts = beats(aurora, song)
+        ok = b is not None
+        marks = [x["mark"] for x in items]
+        det = ""
+        if ok:
+            longer = [v for v, m in zip(b, marks) if m == "+"]
+            plains = [v for v, m in zip(b[:-1], marks[:-1]) if m == ""]
+            quick = [v for v, m in zip(b, marks) if m == "-"]
+            runs3 = [k for k in range(len(b) - 2) if b[k:k + 3] == [1, 1, 1] and all(m == "" for m in marks[k:k + 3])]
+            ok = (set(quick) == {1} and max(plains) <= 2 and min(longer) >= 2 and b[-1] >= 2 and not runs3
+                  and all(not (m == "+" and v < max([b[j] for j in (k - 1, k + 1) if 0 <= j < len(b) and marks[j] == ""] or [0]))
+                          for k, (v, m) in enumerate(zip(b, marks)))
+                  and len(set(b)) >= 3)
+            det = f"{facts['beats_line']}"
+        check(f"a 13-photo marked reel (her Aurora marks) on {label}, with room to spare: Quicker one beat, plain one "
+              f"or two, every Longer two or more and never shorter than a plain photo beside it, no three one-beat "
+              f"plain photos in a row, at least three different lengths", ok, det or str(facts))
+        _, again, _ = beats(aurora, song)
+        check(f"the same reel on {label}, planned again: the same beats", b == again, f"{b} then {again}")
+        others = [beats(aurora, song, v)[1] for v in (1, 2, 3, 4, 5)]
+        check(f"the same reel on {label}, Make my reel again (variations 1 to 5): a different mix comes out",
+              any(o != b for o in others) and all(o is not None and len(o) == len(b) for o in others), f"{b}; {others}")
+    # The made reel is not the plan (same in her engine): the search still lands cuts on the song's hits and the 1 of
+    # each bar, and gives up an aim for it. So the instructions may only speak of aims. If these stop being true the
+    # words in the reel skill's Step 4 can be firmer; while they are true, the words must not promise (review, Nov 11).
+    broke = {"opener": None, "run": None, "longer": None}
+    for n in range(8, 15):
+        for v in range(6):
+            plain = ",".join(str(k + 1) for k in range(n))
+            _, b, f = beats(plain, None, v)
+            if b and not f.get("squeezed"):
+                if b[0] == 1 and not broke["opener"]:
+                    broke["opener"] = f"{n} plain photos, variation {v}: {b}"
+                if any(b[k:k + 3] == [1, 1, 1] for k in range(n - 3)) and not broke["run"]:
+                    broke["run"] = f"{n} plain photos, variation {v}: {b}"
+            _, b, f = beats("1+," + ",".join(str(k + 2) for k in range(n - 1)), None, v)
+            if b and not f.get("squeezed") and b[0] == 1 and not broke["longer"]:
+                broke["longer"] = f"{n} photos, only the opener Longer, variation {v}: {b}"
+    step4 = (ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "SKILL.md").read_text(encoding="utf-8")
+    step4 = step4.split("## Step 4", 1)[-1].split("\n## ", 1)[0]
+    promises = ("never three one-beat plain photos in a row" in step4 or "**Those are aims, not promises.**" not in step4
+                or "a Longer photo or a plain opener lands on one beat" not in step4)
+    check("the made reel can give up an aim with room to spare (no song: a one-beat plain opener, three one-beat plain "
+          "photos in a row, a one-beat Longer opener; as hers), so the reel skill's Step 4 says aims, not promises",
+          not (any(broke.values()) and promises), f"{broke}")
+    check("... and all three do happen today (if this fails the timing changed: look at Step 4's words again)",
+          all(broke.values()), f"{broke}")
+    _, a, _ = beats(PICK10, BEAT60)
+    _, c, _ = beats("1,2,3,4,5,19+,42+,7,8,51+", BEAT60)
+    check("the same marks on other photos: their own mix (the file names seed it)", a is not None and c is not None,
+          f"{a}; {c}")
+    # A reel that just fits: every Longer may squeeze to one beat, so nothing is left out and nothing new stops.
+    grid, _ = timing.song_grid(str(BEAT60))
+    room = (len(grid.T) - 2) // 2
+    n = None
+    for n in range(room, 10, -1):                              # the most photos that fit the test beat at all
+        tight = ",".join(f"{(k % 52) + 1}" + ("+" if k % 3 == 0 else "") for k in range(n))
+        items, b, facts = beats(tight, BEAT60)
+        if b is not None:
+            break
+    marks = [x["mark"] for x in items]
+    check(f"a reel that just fits ({n} photos, a third marked Longer, on the 60-second test beat): all {n} are in, "
+          f"and Longer photos squeeze down to one beat rather than stop the reel",
+          b is not None and len(b) == n and min(b) >= 1 and any(v == 1 for v, m in zip(b, marks) if m == "+"),
+          str(facts)[:400])
+    items, b, facts = beats(",".join(f"{(k % 52) + 1}+" for k in range(n + 1)), BEAT60)
+    check("one photo more than fits: her STOP line, unchanged (\"even with every photo at one beat\")",
+          b is None and str(facts.get("problem", "")).startswith("STOP: Your song is only 60.0 seconds")
+          and "even with every photo at one beat" in facts["problem"], str(facts)[:300])
+    untouched = True
+    for v in ("mixed", "calm", "build"):                       # the rhythm is On every beat's alone
+        its = [photo(x, photos) for x in PICK10.split(",")]
+        seed = timing.seed_for(its, v)
+        c1 = timing.candidates(its, grid, v, seed)
+        saved, timing.beat_plan = timing.beat_plan, (lambda marks, seed: [2] * len(marks))
+        try:
+            c2 = timing.candidates(its, grid, v, seed)
+        finally:
+            timing.beat_plan = saved
+        untouched = untouched and c1 == c2
+    check("A little of everything, Calm and Build never read On every beat's rhythm", untouched)
 
 
 # ---------------------------------------------------------------- reel.py make, the way Claude runs it
@@ -361,6 +485,8 @@ def _main(work, songs):
     code, out = make(BEAT60, "mixed", PICK10)
     check("reel.py, photos only and no --clips: the plan line arrange_check reads, and her beats line",
           code == 0 and out.startswith("Plan: 10 photos") and beats_of(out).startswith("Beats per piece: "), out[-400:])
+
+    beat_rhythm(reel, timing, photos, songs)
 
     print("\n-- what the plan says (the timing reviewers' findings, Nov 7)")
     code, out = make(BEAT60, "mixed", "1,2,3,4,5,6,7,8,9", tag="roomy")

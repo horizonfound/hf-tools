@@ -27,8 +27,15 @@ Read this every time you choose photos for a reel, a carousel, or any group of e
 4. **Settle the close calls side by side.** Put each group of near-similar frames next to each other and choose the strongest: the peak of the expression, the sharpest frame, the cleanest frame. For a reel, `reel.py strip` with just the group as its picks (`--picks 7,8,9`) draws them in a row; open a photo larger only when the strip can't settle it. This is the one place to look closer: a handful of comparisons, never photo by photo.
 5. **Keep sequences that tell a story; drop twins that don't** (rule 3 above).
 6. **Order them** by the flow rules below.
-7. **Check the order as it will play.** Read your order as a strip, left to right; `reel.py strip` draws it. Fix any jolt.
-8. **Tell them in a few words** how it flows and what was left out and why (below).
+7. **For a reel, mark its rhythm: every reel, fully (Nicole, Nov 10).** The marks are the reel's rhythm. A reel of hers with three of thirteen photos marked played nearly every photo for one beat: "All of the photos are on the same beat... you should also be choosing which photos should be rolling longer and quicker. Base it off of what's going to make the video engaging with the photos... it needs to be engaging, it needs to be beautiful." So, as you order a reel:
+   - **Longer (`+`), about a third of the photos:** the scroll-stopper you open on, the emotional peaks (a kiss, a laugh, a tender moment), a wide frame with a lot to take in, and the closer.
+   - **Quicker (`-`), about a quarter:** details (shoes, hands), quick fun bursts (a peace sign, a spin), and the middle of a fast run.
+   - **The rest plain.** Spread the marks so the reel breathes: never three Longers or three Quickers in a row, and a Longer comes after a few quick ones.
+   - The vibe then shapes it. On every beat: a Longer photo aims for about three beats, a Quicker one a single beat, and plain photos one beat or two in a mix that is the reel's own; those are aims, and the song's hits still decide, so now and then a Longer photo lands shorter. Calm and Build stretch everything. The photographer can change any mark on the reel page, and theirs win.
+
+   A carousel has no marks.
+8. **Check the order as it will play.** Read your order as a strip, left to right; `reel.py strip` draws it. Fix any jolt.
+9. **Tell them in a few words** how it flows and what was left out and why (below).
 
 ## The order: how the set flows (the Assistant's own, Dustin, Oct 25)
 

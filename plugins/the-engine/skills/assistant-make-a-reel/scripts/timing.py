@@ -10,6 +10,9 @@ Her rules, in her words where she gave them:
   - Every photo stays at least one whole beat and about half a second (MIN_SHOW): no half-beat cuts. On one of
     her test reels the half-beat pairs were 0.3 s a photo: "so fast it like disappears before you even see anything".
     Quicker means the shortest: one beat. The last photo always gets at least two beats.
+  - On every beat has rhythm (her handoff v22, Nov 10): plain photos run one beat or two in a mix that is the
+    reel's own, a Longer photo aims for three beats, a plain opener for two, and three one-beat photos never
+    sit in a row in the plan unless they marked them all Quicker.
   - The vibes are not fixed templates: "those are not set in stone templates. Those should change for every
     single thing that's made." One search over the whole reel (dynamic programming) picks every length
     together: each piece has a natural length for the vibe and a few others it may take at a small cost; cuts
@@ -164,6 +167,44 @@ def _mixed_targets(n, seed):
     return out[:n]
 
 
+def _beat_targets(n, seed):
+    """On every beat: plain photos in a rhythm of one and two beats (half beats 2 and 4), mixed differently for
+    every reel, so it never plays as one beat each (Nicole, Nov 10, handoff v22, on a reel that did: "All of the
+    photos are on the same beat... it needs to be engaging, it needs to be beautiful"). No block may follow one
+    that would make three one-beat photos in a row. Longer and Quicker marks, and the song's hits, still lead."""
+    blocks = [[2, 2, 4], [2, 4], [4, 2], [2, 4, 2], [4, 2, 2]]
+    pick = random.Random(seed + 7)                     # its own draw, apart from "a little of everything"
+    out, last = [], None
+    while len(out) < n:
+        ok = [x for x in blocks if x is not last and not (out[-2:] == [2, 2] and x[0] == 2)
+              and not (out[-1:] == [2] and x[:2] == [2, 2])]
+        b = pick.choice(ok or blocks)
+        out += b
+        last = b
+    return out[:n]
+
+
+def beat_plan(marks, seed):
+    """On every beat, planned around the marks (hers, v22): what each photo aims for, in half beats, in play order.
+    Longer 3 beats, Quicker 1, a plain opener 2, the other plain photos from the rhythm; then any run of three or
+    more one-beat photos in a row gets a plain photo in it (never a Quicker one, the middle first) lifted to two."""
+    mix = _beat_targets(len(marks), seed)
+    t = [6 if m == "+" else 2 if m == "-" else (4 if k == 0 else mix[k]) for k, m in enumerate(marks)]
+    run = []
+    for k, v in enumerate(t + [0]):
+        if v == 2:
+            run.append(k)
+            continue
+        while len(run) >= 3:
+            plain = [r for r in run[1:-1] if marks[r] != "-"] or [r for r in run if marks[r] != "-"]
+            if not plain:
+                break
+            t[plain[0]] = 4
+            run = run[run.index(plain[0]) + 1:]
+        run = []
+    return t
+
+
 def _whole_beats(c, period):
     """Every length a whole number of beats, and never under about half a second."""
     hmin = 2 * max(1, math.ceil(MIN_SHOW / period))
@@ -180,6 +221,7 @@ def candidates(items, grid, vibe, seed, j0=None):
     photos = [k for k, x in enumerate(items) if x["kind"] == "photo"]
     n = len(photos)
     mix = _mixed_targets(n, seed)
+    beat_t = beat_plan([x.get("mark") or "" for x in items if x["kind"] == "photo"], seed)
     out = []
     pk = 0
     at = j0                                                    # roughly where each piece falls in the song
@@ -203,8 +245,18 @@ def candidates(items, grid, vibe, seed, j0=None):
         mark = x.get("mark") or ""
         frac = pk / max(1, n)
         if vibe == "beat":
-            t = {"+": 4, "-": 1}.get(mark, 2)
-            c = _costs(t, [1, 2, 4, 6] if mark == "+" else [1, 2, 4], 0.8)
+            # Still a new photo on the beat, but with rhythm (Nicole, Nov 10): a plain photo is one beat or two,
+            # Longer aims for three (one only when the song is too short for more), Quicker stays one, and a plain
+            # opener gets two beats to be seen.
+            if mark == "+":
+                t, c = 6, _costs(6, [2, 4, 6, 8], 0.8)
+            elif mark == "-":
+                t, c = 2, _costs(2, [2], 1.0)
+            elif first:
+                t, c = 4, _costs(4, [2, 4, 6], 0.6)
+            else:
+                t = beat_t[pk]
+                c = _costs(t, [2, 4], 0.9)
         elif vibe == "calm":
             t = {"+": 8, "-": 2}.get(mark, 4)
             c = _costs(t, [2, 4, 6, 8], 1.0)
@@ -222,7 +274,7 @@ def candidates(items, grid, vibe, seed, j0=None):
             t = {"+": max(4, t * 2), "-": 1}.get(mark, t)
             c = _costs(t, [1, 2, 4, 6, 8], 0.9)
         if last:                                               # the last photo lands: never under two beats
-            t = 4 if vibe == "beat" else 8
+            t = (6 if mark == "+" else 4) if vibe == "beat" else 8
             c = _costs(t, [4, 6, 8], 1.0)
         out.append(_whole_beats(c, period))
         pk += 1
