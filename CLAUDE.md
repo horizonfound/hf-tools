@@ -446,3 +446,7 @@ The Claude desktop app's workspace stops any process the moment a step finishes 
 - Commit messages in plain words. Push to main only when main stays shippable.
 - `__pycache__` is ignored. No secrets in the repo, ever. Dustin's Mac password once appeared in a transcript; it is not stored anywhere and he was told to change it.
 - Project docs also live in the claude.ai Project "The Engine" (`engine/...`). When a doc here changes in a way the Project should know, say so; Dustin can paste it over.
+
+## Merged, and the brand interview goes to Nicole first (Dustin, Nov 11, morning)
+
+**v20, v21 and v22 are in main** (Dustin: "Yes, merge it", after the Calendar check passed on his Mac; the version before is tagged `before-v21`), and `dist/The-Assistant.zip` was rebuilt from it. **Stage 6, the brand interview: Dustin wants Nicole to shape it with her own Claude before anything is built.** The handoff for her is the folder `docs/brand-interview-handoff-2026-11-11/` (the brief, the October question list, the October Brand File template). It asks for one file back, `brand-interview-from-nicole.md`: the exact questions, the finished Brand Homebase's template, and her recommendation on how long it is and where it sits. Dustin hands it over himself (rule 10); nothing was sent. Build nothing for stage 6 until that file is back and the two of them have agreed.
