@@ -2,7 +2,7 @@
 """The carousel designer's rules, as one script with no page in it (design_page.py puts it on the page).
 
 DESIGN_MODEL_JS makes window.DesignModel: where a photo sits inside its frame, what a move, a resize or a
-nudge may do, snapping, the one-click layouts, which slide a thing is on, adding and swapping photos, the
+nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts, which slide a thing is on, adding and swapping photos, the
 undo list, which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
@@ -32,6 +32,8 @@ DESIGN_MODEL_JS = r"""
     inset: 70,              // "Add border" pulls each edge in by this much
     dup: 60,                // a duplicate sits this far down and right of its original
     snapPx: 10,             // snapping reaches this many SCREEN pixels
+    centerPx: 14,           // and the middle of a slide, a seam or half way up reaches this many (hers)
+    centerFlash: 1400,      // after an arrow key: how long the centered lines show, in ms (hers)
     nudge: 5, nudgeBig: 50, // an arrow key, and with Shift
     undo: 60,               // steps of Undo kept
     wheel: 1.05,            // one turn of the wheel zooms by this much
@@ -140,23 +142,72 @@ DESIGN_MODEL_JS = r"""
     for (var i = 0; i < ls.length; i++) { var d = ls[i] - v; if (Math.abs(d) <= thr && (best === null || Math.abs(d) < Math.abs(best))) best = d; }
     return best;
   }
-  // o: {snap: true | false, thr: reach in strip pixels}
+  // ---- centered (hers, v22): the middle of a slide, a seam the thing sits across, and half way up ----
+  // The slides a thing at x, w wide, is on: {slide: the first (from 0), span: how many}.
+  function onSlides(x, w, slides){
+    var first = clamp(Math.floor((x + 1) / W), 0, slides - 1), last = Math.max(first, clamp(Math.floor((x + w - 1) / W), 0, slides - 1));
+    return {slide: first, span: last - first + 1};
+  }
+  // What the blue lines and the label are drawn from: x = where the upright line is (null: none), y = where the
+  // level one is (null: none), cx, cy = the thing's middle (where the label sits), seam = the upright line is a
+  // seam, slide and span = the slides the level line runs over.
+  function midOf(x, y, w, h, slides, onX, onY, seam){
+    var on = onSlides(x, w, slides);
+    return {x: onX ? x + w / 2 : null, y: onY ? H / 2 : null, cx: x + w / 2, cy: y + h / 2, seam: !!seam, slide: on.slide, span: on.span};
+  }
+  // The label on the blue pill: her five.
+  function midWords(mid){
+    if (!mid || (mid.x == null && mid.y == null)) return '';
+    if (mid.x != null && mid.y != null) return mid.seam ? 'Centered on the seam, and up and down' : 'Centered';
+    if (mid.x != null) return mid.seam ? 'Centered on the seam' : 'Centered side to side';
+    return 'Centered up and down';
+  }
+  // Is b centered where it sits now (within a pixel)? What the flash after an arrow key shows, or null.
+  function centered(st, b){
+    if (!b) return null;
+    var cx = b.x + b.w / 2, cy = b.y + b.h / 2, r = ((cx - W / 2) % W + W) % W;
+    var onMid = (r < 1 || W - r < 1) && cx > 0 && cx < st.slides * W;
+    var q = (cx % W + W) % W;
+    var onSeam = (q < 1 || W - q < 1) && cx > 1 && cx < st.slides * W - 1 && Math.floor((b.x + 1) / W) !== Math.floor((b.x + b.w - 1) / W);
+    var onY = Math.abs(cy - H / 2) < 1;
+    if (!onMid && !onSeam && !onY) return null;
+    return midOf(b.x, b.y, b.w, b.h, st.slides, onMid || onSeam, onY, onSeam && !onMid);
+  }
+  // o: {snap: true | false, thr: reach in strip pixels, cthr: the reach of the centers, in strip pixels (0 or
+  // none: no centering)}. The middle is tried first; the edges snap only on an axis the middle did not.
   function move(st, b0, dx, dy, o){
     o = o || {};
-    var x = b0.x + dx, y = b0.y + dy, gx = [], gy = [];
+    var x = b0.x + dx, y = b0.y + dy, gx = [], gy = [], mid = null, dcx = null, dcy = null, seam = false;
     if (o.snap) {
+      if (o.cthr > 0) {
+        var mids = [], across = [], k;
+        for (k = 0; k < st.slides; k++) mids.push(k * W + W / 2);
+        // only a seam the thing actually sits across
+        for (k = 1; k < st.slides; k++) { if (x < k * W - 1 && x + b0.w > k * W + 1) across.push(k * W); }
+        var cx0 = x + b0.w / 2, dm = nearest(cx0, mids, o.cthr), ds = across.length ? nearest(cx0, across, o.cthr) : null;
+        dcx = dm === null ? ds : ds === null ? dm : (Math.abs(dm) <= Math.abs(ds) ? dm : ds);
+        dcy = nearest(y + b0.h / 2, [H / 2], o.cthr);
+        seam = dcx !== null && dcx === ds && ds !== dm;
+        if (dcx !== null) x += dcx;
+        if (dcy !== null) y += dcy;
+      }
       var lx = lines(st, 'x', b0.id), ly = lines(st, 'y', b0.id);
-      var a1 = nearest(x, lx, o.thr), a2 = nearest(x + b0.w, lx, o.thr);
-      var ax = a1 === null ? a2 : a2 === null ? a1 : (Math.abs(a1) <= Math.abs(a2) ? a1 : a2);
-      if (ax !== null) { x += ax; gx.push(ax === a1 ? x : x + b0.w); }
-      var b1 = nearest(y, ly, o.thr), b2 = nearest(y + b0.h, ly, o.thr);
-      var ay = b1 === null ? b2 : b2 === null ? b1 : (Math.abs(b1) <= Math.abs(b2) ? b1 : b2);
-      if (ay !== null) { y += ay; gy.push(ay === b1 ? y : y + b0.h); }
+      if (dcx === null) {
+        var a1 = nearest(x, lx, o.thr), a2 = nearest(x + b0.w, lx, o.thr);
+        var ax = a1 === null ? a2 : a2 === null ? a1 : (Math.abs(a1) <= Math.abs(a2) ? a1 : a2);
+        if (ax !== null) { x += ax; gx.push(ax === a1 ? x : x + b0.w); }
+      }
+      if (dcy === null) {
+        var b1 = nearest(y, ly, o.thr), b2 = nearest(y + b0.h, ly, o.thr);
+        var ay = b1 === null ? b2 : b2 === null ? b1 : (Math.abs(b1) <= Math.abs(b2) ? b1 : b2);
+        if (ay !== null) { y += ay; gy.push(ay === b1 ? y : y + b0.h); }
+      }
     }
     var c = clampXY(x, y, b0.w, b0.h, st.slides);
-    if (c.x !== x) gx = [];             // a guide line only shows where the thing really sits
-    if (c.y !== y) gy = [];
-    return {x: r2(c.x), y: r2(c.y), gx: gx, gy: gy};
+    if (c.x !== x) { gx = []; dcx = null; }     // a guide line only shows where the thing really sits
+    if (c.y !== y) { gy = []; dcy = null; }
+    if (dcx !== null || dcy !== null) mid = midOf(c.x, c.y, b0.w, b0.h, st.slides, dcx !== null, dcy !== null, seam);
+    return {x: r2(c.x), y: r2(c.y), gx: gx, gy: gy, mid: mid};
   }
   // Pulling a corner ('tl', 'tr', 'bl', 'br') by dx, dy. o: {snap, thr, shift: keep the shape, minW, minH,
   // maxH, widthOnly: a text box (only its width changes; its height follows its lines)}.
@@ -404,7 +455,7 @@ DESIGN_MODEL_JS = r"""
     indexOf: indexOf, find: find, merge: merge, tidy: tidy, patch: patch, nextId: nextId,
     layoutImg: layoutImg, pan: pan, zoomTo: zoomTo, zoomBy: zoomBy,
     slideOf: slideOf, clampXY: clampXY, onStrip: onStrip,
-    lines: lines, nearest: nearest, move: move, resize: resize, nudge: nudge,
+    lines: lines, nearest: nearest, move: move, centered: centered, midWords: midWords, onSlides: onSlides, resize: resize, nudge: nudge,
     act: act, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,
     used: used, firstEmptySlide: firstEmptySlide, nextHole: nextHole, swapPhoto: swapPhoto, addPhoto: addPhoto,
     clickPhoto: clickPhoto, dropAt: dropAt, pickSize: pickSize, screenCopy: screenCopy,

@@ -14,6 +14,9 @@ the page in a hidden Chrome driven by tests/chrome_drive.py:
   * the page loads with no error of its own, shows one photo on each of six slides, and every photo is drawn;
   * the line about the key that turns snapping off names this computer's key (Alt on a PC);
   * Georgia, the font words fall back to, is on this computer; a font the plugin carries loads from the Assistant;
+  * Nicole's v22: "+ Add slides" opens "Add slides" (eight single slides, eleven starters, Add on the cards), a single
+    slide goes after the last with nothing replaced, the blue "Centered side to side" label shows while it is dragged
+    near its slide's middle, and Undo puts the design back;
   * Save slides: six finished 1080 x 1350 JPEGs arrive in the Carousel folder, the line says so, the folder's
     button shows (it is NOT pressed: no window is ever opened), and, where Pillow is, slide 1 is the photo's grey;
   * the stories designer (?kind=stories): it opens on Add stories, One photo per story makes five stories, the bands
@@ -198,6 +201,33 @@ def main():
             check(f"a font the plugin carries ({own}) loads from the Assistant itself", got == "ok", got)
         else:
             skip("a font the plugin carries loads from the Assistant itself", "this copy of the plugin carries no font files")
+        # Nicole's v22: "+ Add slides" adds after the last slide and replaces nothing; the centered label when a photo
+        # is dragged to the middle of a slide. Undo puts the design back, so the save below is of the design as it was.
+        was = c.js("JSON.stringify(Designer.st)")
+        c.click("#add-slides")
+        c.wait_for("!document.getElementById('gallery').hidden && document.querySelectorAll('#gallery-singles .dz-card').length === 8", 10)
+        heads = c.js("JSON.stringify([document.querySelector('#gallery h2').textContent, document.querySelector('#gallery-singles .dz-use').textContent, document.querySelectorAll('#gallery-starters .dz-card').length])")
+        check("+ Add slides opens \"Add slides\" with eight single slides, eleven starter templates, and Add on the cards", json.loads(heads) == ["Add slides", "Add", 11], heads)
+        if c.js("document.getElementById('gallery-fill').checked"):
+            c.click("#gallery-fill")
+        c.click("#gallery-singles .dz-card .dz-use")
+        c.wait_for("document.getElementById('gallery').hidden", 10)
+        now = json.loads(c.js("JSON.stringify(Designer.st)"))
+        old = json.loads(was)
+        check("Add (One with a border): one more slide after the last, her frame on it, and every slide that was there exactly as it was",
+              now["slides"] == old["slides"] + 1 and now["blocks"][:len(old["blocks"])] == old["blocks"]
+              and [(b["x"] - old["slides"] * 1080, b["y"], b["w"], b["h"]) for b in now["blocks"][len(old["blocks"]):]] == [(90, 110, 900, 1130)], now["slides"])
+        sc = c.js("Designer.scale")
+        r = c.rect(".blk[data-id='%d']" % now["blocks"][-1]["id"])
+        c.drag((r["cx"], r["cy"]), (r["cx"] + 5, r["cy"] + 60 * sc + 4), steps=6, release=False, check=False)
+        tag = c.js("(function(e){ return e ? e.textContent : ''; })(document.querySelector('.midtag'))")
+        c.mouse_release()
+        check("dragging it a little off the middle of its slide: the blue label says it is centered side to side, and it is", tag == "Centered side to side"
+              and c.js("(function(b){ return b.x + b.w / 2; })(Designer.st.blocks[Designer.st.blocks.length - 1])") == old["slides"] * 1080 + 540, tag)
+        c.click("#undo")
+        c.click("#undo")
+        check("two Undos: the design is exactly what it was before", c.js("JSON.stringify(Designer.st)") == was)
+        c.wait_for("Designer.save.idle()", 20)
         check("no error of the page's own so far", not c.page_errors(), c.page_errors()[:3])
         # Save slides
         c.click("#save-slides")

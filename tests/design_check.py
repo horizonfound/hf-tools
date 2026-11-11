@@ -45,6 +45,11 @@ strip's edges, the sheets that never scroll the page behind, and the names a scr
 A seventh part, tests/design_stories_check.py (--only stories runs just it: its page checks, its server checks on
 --port + 22 and its real page on --port + 24): the stories designer, the same page in a second shape (?kind=stories).
 
+An eighth part, tests/design_v22_check.py (--only v22 runs just it: its tables and rules, its routes on --port + 26
+and its real page on --port + 28): Nicole's v22. "+ Add slides" (adding never replaces, 20 slides at most), her eight
+single slides and her five templates frame for frame, the starters she removed, Rename on their own templates, the
+centered lines while dragging and after an arrow key, and Save slides on an untouched design.
+
 Exit 0 when every case passes, 1 otherwise. When there is no Chrome the parts that drive the real page are
 skipped, and the last line says so: a run like that has not looked at the page.
 """
@@ -321,9 +326,10 @@ def check_all(work, port):
         case("state: the eleven starter templates, every frame empty", len(st["starters"]) == 11 and all(
             all(b.get("type") == "text" or b["n"] is None for b in s["template"]["blocks"]) and s["template"]["blocks"] for s in st["starters"]),
             [s["name"] for s in st["starters"]])
-        title = next((s for s in st["starters"] if s["id"] == "st-title"), None)
-        case("state: the Title slide starter carries two text boxes and four frames", title and sum(1 for b in title["template"]["blocks"] if b.get("type") == "text") == 2
-             and sum(1 for b in title["template"]["blocks"] if b.get("type") != "text") == 4, title)
+        # (Title slide, the one starter that carried words, is no longer a starter: Nicole's v22. tests/design_v22_check.py
+        # has the starters frame by frame; tests/design_save_check.py opens a design laid out as Title slide was.)
+        case("state: no starter template carries words (hers, v22: layout only), and Title slide is not among them",
+             not any(b.get("type") == "text" for s in st["starters"] for b in s["template"]["blocks"]) and not any(s["id"] == "st-title" for s in st["starters"]))
         groups = {g["name"]: g["fonts"] for g in st["fonts"]["groups"]}
         own = sorted(x["name"] for fs in groups.values() for x in fs if x["own"])
         case("state: the font list has Serif, Sans and Script groups", list(groups) == ["Serif", "Sans", "Script"] and len(groups["Serif"]) == 12 and len(groups["Sans"]) == 12 and len(groups["Script"]) == 7, {k: len(v) for k, v in groups.items()})
@@ -1191,7 +1197,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(every part below that drives it, one after another); strip: only the strip, the frames and the tray, in a hidden "
                          "Chrome (with --only text, designs, wire, fixes, screen, layout and stories it makes up browser, a part at a "
@@ -1200,7 +1206,9 @@ def main():
                          "wire: only the kit page, the posting queue, the links and the line for Claude; fixes: what the first reviewers found (safety); "
                          "screen: what the second reviewers found (matching Nicole's, and what is on the screen); "
                          "layout: the arrangement (the rows, the selection bar, the strip's size, the sheets, the names), measured at six window sizes; "
-                         "stories: the stories designer (its words against Nicole's, its rules, its routes and saves, and its real page)")
+                         "stories: the stories designer (its words against Nicole's, its rules, its routes and saves, and its real page); "
+                         "v22: Nicole's v22 (+ Add slides, single slides, her templates, Rename, the centered lines): its tables and rules, "
+                         "its routes on --port + 26 and its real page on --port + 28")
     a = ap.parse_args()
     if not Path("/usr/bin/sips").exists():
         print("STOP: this needs a Mac (sips).")
@@ -1219,7 +1227,7 @@ def main():
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
     if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout",
-                                         "stories", "stories-browser")):
+                                         "stories", "stories-browser", "v22", "v22-browser")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1244,6 +1252,7 @@ def main():
     import design_screen_check
     import design_stories_check
     import design_text_check
+    import design_v22_check
     import design_wire_check
     have_chrome = bool(chrome_drive.find_chrome())
     skipped = []            # the parts that drive the real page, when there is no Chrome to drive
@@ -1344,6 +1353,21 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of the stories designer ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "page", "v22"):
+        design_v22_check.check_v22_page(case, work)
+    if a.only in (None, "server", "v22"):
+        try:
+            design_v22_check.check_v22_server(case, work, a.port + 26, make_kit, Server, post, get_json, ask)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the checks of v22's routes ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "v22"):
+        real_page("v22: + Add slides, single slides, Rename, the centered lines")
+        try:
+            design_v22_check.check_v22_browser(case, work, a.port + 28, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of v22 ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     bad = [n for n, ok in results if not ok]
     print()
     missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")

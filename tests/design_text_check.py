@@ -572,7 +572,7 @@ def check_type_browser(case, work, port, make_kit, Server, post, get_json):
             case("arrow keys nudge a text box (5, and 50 with Shift)", sel()["x"] == b["x"] + 5 and sel()["y"] == b["y"] + 50, sel())
             # snapping: drop it a few pixels short of a sixth of a slide
             b = sel()
-            goal = 1260                                 # slide 2's first sixth
+            goal = 1440                                 # a sixth of slide 2 whose box-middle is far from every center (v22: a middle within reach wins over an edge)
             x, y = centre(2)
             c.drag((x, y), (x + (goal - 4 - b["x"]) * s, y), steps=6)
             case("snapping: let go a little short of a sixth of a slide, a text box snaps onto it like a photo", abs(sel()["x"] - goal) < 0.011, sel()["x"])

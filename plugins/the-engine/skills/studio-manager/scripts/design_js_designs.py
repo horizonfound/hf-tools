@@ -14,6 +14,17 @@ DESIGN_DESIGNS_JS (put on the page by design_page.py after the drawing script) a
     Fill N empty frames   every empty frame given the next unused photo whose shape fits; it sits in the first line
                       of the bar for the selected thing, and only while the design has an empty frame
 
+    + Add slides      (hers, v22; a carousel only) the same gallery in adding mode, "Add slides": what is picked goes
+                      AFTER THE LAST SLIDE in one Undo step and nothing is replaced (DesignPlan.addStories, as a story's
+                      "+ Add stories"), up to 20 slides; every card's button reads Add; Start fresh is Blank slide (the
+                      design's own background) and One photo per slide (the photos not used yet, up to five). On a
+                      design with nothing on it, it is "+ New design".
+    Single slides     her eight one-slide layouts, a section of small cards between Start fresh and Your templates
+    Rename            beside the name of each of their own templates in the gallery: the name becomes a box; Return or
+                      a press anywhere else saves (POST /design-template {kit, rename: id, name}; the Assistant keeps
+                      the version before), Escape leaves it as it was
+    A long template's little picture is drawn as wide as its card.
+
 There is no way to delete a design or a template here, on purpose.
 
 Nothing is kept in the browser. A design or a template is known by the id the Assistant made, a shoot by its
@@ -70,7 +81,14 @@ DESIGN_DESIGNS_JS = r"""
     fillTitle: 'Puts photos you haven’t used yet into the empty frames',
     fillNone: 'Every photo in this shoot is already on a slide.',
     fillSome: function(k){ return 'There weren’t enough unused photos, so ' + k + (k === 1 ? ' frame is' : ' frames are') + ' still empty.'; },
-    fellBack: 'That design isn’t here, so this is your newest one.'
+    fellBack: 'That design isn’t here, so this is your newest one.',
+    // "+ Add slides" (hers, v22): the same window, adding after the last slide; nothing is replaced
+    addSlides: '+ Add slides', addTitle: 'Add slides after your last one. Nothing you made is replaced.',
+    addGalleryTitle: 'Add slides',
+    addGallerySub: 'Pick what to add. It goes after your last slide, and nothing you made is replaced: one slide at a time, or a whole template.',
+    add: 'Add', secSingles: 'Single slides',
+    blankSlide: 'Blank slide', blankSlideSub: 'One empty slide',
+    rename: 'Rename', renameLabel: function(name){ return 'A new name for the template ' + name; }
   };
   var STORY = D.STORY;
   function stories(k){ return k === 1 ? '1 story' : k + ' stories'; }
@@ -170,6 +188,7 @@ DESIGN_DESIGNS_JS = r"""
   document.addEventListener('pointerdown', function(e){ pops.forEach(function(p){ if (p.open && !p.wrap.contains(e.target)) closePop(p); }); }, true);
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Escape') return;
+    if (e.target && e.target.classList && e.target.classList.contains('dz-rnin')) return;       // the rename box: Escape only cancels the rename
     var open = pops.filter(function(p){ return p.open; });
     if (open.length) {
       e.preventDefault(); e.stopPropagation();
@@ -303,6 +322,14 @@ DESIGN_DESIGNS_JS = r"""
   // ---------- My designs, Duplicate ----------
   var designsBtn = button(DW.myDesigns + ' ▾', 'designs-btn'); designsBtn.setAttribute('aria-label', DW.myDesigns);
   var dupBtn = button(DW.dup, 'dup-design'); dupBtn.title = DW.dupTitle; D.label(dupBtn, DW.dup);
+  // its second word is in a piece of its own, so a tight row (1024 to 1179 px wide, now that "+ Add slides" is in
+  // it too) can show just "Duplicate" (hers) and stay one row; what a screen reader hears is the whole name
+  (function(){
+    var i = DW.dup.indexOf(' ');
+    if (i < 0) return;
+    dupBtn.textContent = DW.dup.slice(0, i);
+    dupBtn.appendChild(el('span', 'dz-wide', DW.dup.slice(i)));
+  })();
   gDesign.appendChild(designsBtn); gDesign.appendChild(dupBtn);
   if (STORY) { designsBtn.hidden = true; dupBtn.hidden = true; }
   function when(t){
@@ -376,6 +403,9 @@ DESIGN_DESIGNS_JS = r"""
 
   // ---------- + New design, Save as template (the top row); Fill empty frames (the selection bar's first line) ----------
   var gNew = D.tools.group('g-new', '', 'tools-designs');
+  // "+ Add slides" (carousel only; a story's "+ Add stories" is the one button there): before "+ New design", as hers
+  var addBtn = null;
+  if (!STORY) { addBtn = D.tools.button(gNew, DW.addSlides, 'add-slides'); addBtn.title = DW.addTitle; D.label(addBtn, DW.addSlides); }
   var newBtn = D.tools.button(gNew, DW.newDesign, 'new-design'); newBtn.title = DW.newTitle; D.label(newBtn, DW.newDesign);
   var tplBtn = D.tools.button(gNew, DW.saveTpl, 'save-template');
   // Fill empty frames and its line: in the first line of the bar for the selected thing, shown only while there is
@@ -400,14 +430,15 @@ DESIGN_DESIGNS_JS = r"""
     fillBtn.disabled = D.blocked || !k;
     fillBtn.hidden = !k;
     tplBtn.disabled = D.blocked;
-    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; }
+    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; if (addBtn) addBtn.disabled = D.blocked; }
   });
 
   // the gallery
   var gallery = D.modals.make('gallery');
   var sheet = el('div', 'dz-sheet'); sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', DW.galleryTitle);
   var top = el('div', 'dz-top'), head = el('div');
-  head.appendChild(el('h2', '', DW.galleryTitle));
+  var gHead = el('h2', '', DW.galleryTitle);
+  head.appendChild(gHead);
   var gSub = el('p', 'hint'); gSub.id = 'gallery-sub'; head.appendChild(gSub);
   var acts = el('div', 'dz-acts'), tickLabel = el('label', 'hint'), tick = el('input');
   tick.type = 'checkbox'; tick.id = 'gallery-fill'; tick.checked = true; tick.setAttribute('aria-label', DW.fillTick);
@@ -418,31 +449,41 @@ DESIGN_DESIGNS_JS = r"""
   var gLine = el('p', 'dz-say'); gLine.id = 'gallery-line'; gLine.setAttribute('role', 'status');
   sheet.appendChild(top); sheet.appendChild(gLine);
   var secs = {};
-  [['fresh', DW.secFresh], ['mine', DW.secMine], ['starters', DW.secStarters]].forEach(function(x){
+  // hers: Start fresh, Single slides (a carousel's only), Your templates, Starter templates
+  var ADDING = false;       // the window is adding to this carousel (+ Add slides), not starting a new design
+  [['fresh', DW.secFresh], ['singles', DW.secSingles], ['mine', DW.secMine], ['starters', DW.secStarters]].forEach(function(x){
+    if (STORY && x[0] === 'singles') return;
     sheet.appendChild(el('div', 'dz-sec', x[1]));
-    var g = el('div', 'dz-grid'); g.id = 'gallery-' + x[0];
+    var g = el('div', 'dz-grid' + (x[0] === 'singles' ? ' dz-ones' : '')); g.id = 'gallery-' + x[0];
     sheet.appendChild(g);
     secs[x[0]] = g;
   });
   gallery.appendChild(sheet);
   var cards = [], cardShelf = null;
-  // One card: a little picture of the layout, its name, what it holds, and Use.
-  function card(box, name, sub, layout, start){
-    var c = el('div', 'dz-card'), pic = el('div', 'dz-pic'), cv = document.createElement('canvas');
-    // a story's little picture is taller (hers: 170 px), so a tall 9:16 grid can be seen
-    var dpr = Math.min(2, window.devicePixelRatio || 1), s = P.cardScale(layout.slides, 256, STORY ? 170 : 96);
+  // One card: a little picture of the layout, its name, what it holds, and Use (Add when it adds).
+  // o.one: a single slide's small card (hers: the slide, its name, the button underneath).
+  // o.rename(name) -> a promise: one of their own templates, whose name has a Rename link beside it.
+  function card(box, name, sub, layout, start, o){
+    o = o || {};
+    var c = el('div', 'dz-card' + (o.one ? ' dz-one' : '')), pic = el('div', 'dz-pic'), cv = document.createElement('canvas');
+    pic.appendChild(cv); c.appendChild(pic);
+    var cap = el('div', 'dz-cap'), left = el('div'), nm = el('b', '', name);
+    left.appendChild(nm); left.appendChild(el('small', '', sub));
+    var word = STORY || ADDING ? DW.add : DW.use;
+    var use = button(word, '', 'dz-use'); use.dataset.card = String(cards.length);
+    use.setAttribute('aria-label', word + ': ' + name);
+    cap.appendChild(left); cap.appendChild(use); c.appendChild(cap);
+    if (o.rename) renameLink(left, nm, name, o.rename, function(v){ use.setAttribute('aria-label', word + ': ' + v); });
+    box.appendChild(c);
+    cards.push(start);
+    // a story's little picture is taller (hers: 170 px), so a tall 9:16 grid can be seen. A long template's picture
+    // fills its card's width (hers, v22: "it has a gap"): the card is on the page by now, so its width is known.
+    var dpr = Math.min(2, window.devicePixelRatio || 1), room = o.one ? 0 : pic.clientWidth;
+    var s = o.one ? Math.min(120 / M.H, 96 / M.W) : P.cardScale(layout.slides, Math.max(256, room), STORY ? 170 : 96);
     if (STORY) pic.style.height = '170px';
     var w = Math.max(1, Math.round(layout.slides * M.W * s)), h = Math.max(1, Math.round(M.H * s));
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     cv.style.width = w + 'px'; cv.style.height = h + 'px';
-    pic.appendChild(cv); c.appendChild(pic);
-    var cap = el('div', 'dz-cap'), left = el('div');
-    left.appendChild(el('b', '', name)); left.appendChild(el('small', '', sub));
-    var use = button(DW.use, '', 'dz-use'); use.dataset.card = String(cards.length);
-    use.setAttribute('aria-label', DW.use + ': ' + name);
-    cap.appendChild(left); cap.appendChild(use); c.appendChild(cap);
-    box.appendChild(c);
-    cards.push(start);
     // drawn by the same function that draws a saved slide, from the small copies of this shoot's photos.
     // A layout with words is shown without them at once, and with them when their fonts are in.
     var ctx = cv.getContext('2d'), out = cv.width / (layout.slides * M.W), sh = cardShelf;
@@ -451,14 +492,74 @@ DESIGN_DESIGNS_JS = r"""
     };
     if (layout.blocks.some(M.isText)) draw(false).then(function(){ draw(true); }); else draw(true);
   }
+  // "Rename" beside one of their own templates' names (hers, v22): the name becomes a box; Return or a press
+  // anywhere else saves it, Escape leaves the name as it was. The name only ever goes on the page as text.
+  // A saved name is put back into this one card and no other card is drawn again: the press that ended the typing
+  // may be on another card's Add or Rename, and a button made anew between that press and its release would
+  // never get the click; the window also stays where it was scrolled to.
+  function renameLink(left, nm, name, save, renamed){
+    var link = el('button', 'dz-rn', DW.rename); link.type = 'button'; link.title = DW.rename;
+    link.setAttribute('aria-label', DW.rename + ': ' + name);
+    nm.after(link);
+    link.addEventListener('click', function(){
+      if (busy) return;
+      var inp = el('input', 'dz-rnin'); inp.type = 'text'; inp.value = name; inp.maxLength = NAME_MAX; inp.autocomplete = 'off';
+      inp.spellcheck = false; inp.setAttribute('aria-label', DW.renameLabel(name));
+      nm.replaceWith(inp); link.remove();
+      D.focus(inp); try { inp.select(); } catch (e) {}
+      var done = false;
+      var finish = function(ok){
+        if (done) return;
+        done = true;
+        var v = cleanName(inp.value);
+        var back = function(){ if (inp.isConnected) { inp.replaceWith(nm); nm.after(link); } };
+        if (!(ok && v && v !== name)) { back(); return; }       // nothing changed: the name as it was
+        inp.disabled = true;
+        save(v).then(function(now){ return now; }, function(){ return ''; }).then(function(now){
+          if (now) {
+            name = now; nm.textContent = now;
+            link.setAttribute('aria-label', DW.rename + ': ' + now);
+            if (renamed) renamed(now);
+          }
+          // the keyboard goes back to this card's Rename, unless a press has taken it somewhere else meanwhile
+          var a = document.activeElement, mine = inp.isConnected && (!a || a === document.body || a === inp);
+          back();
+          if (mine) D.focus(link);
+        });
+      };
+      inp.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); D.focus(link); }
+      });
+      inp.addEventListener('blur', function(){ finish(true); });
+    });
+  }
+  // The new name is sent with the template's id and nothing else; the Assistant keeps the version before.
+  function renameTemplate(t, v){
+    var body = {kit: D.KIT, rename: t.id, name: v};
+    if (STORY) body.kind = 'stories';
+    return post('/design-template', body, 3).then(function(res){
+      var j = res.j;
+      if (j && Array.isArray(j.templates) && D.S) D.S.templates = j.templates;
+      var ok = !!(j && j.ok);
+      gLine.textContent = ok ? '' : ((j && j.words) || D.WORDS.cantReach);
+      // the name as the Assistant saved it (tidied), for the card that asked; no card is drawn again
+      var now = ok && j.template && typeof j.template.name === 'string' ? j.template.name : '';
+      if (ok) t.name = now || v;
+      return ok ? (now || v) : '';
+    });
+  }
   // the shoot's photos that are not in a story yet (what "Put this shoot's photos in the frames for me" fills from)
   function unused(){
     var u = M.used(D.st);
     return (D.S.photos || []).filter(function(p){ return !u[p.n]; });
   }
   function buildGallery(){
-    var S = D.S, fill = tick.checked;
-    gSub.textContent = DW.gallerySub(S.name || '');
+    var S = D.S, fill = tick.checked, adds = STORY || ADDING;
+    // hers: the window's name and line say whether what is picked is added or starts a new design
+    var title = ADDING ? DW.addGalleryTitle : DW.galleryTitle;
+    gHead.textContent = title; sheet.setAttribute('aria-label', title);
+    gSub.textContent = ADDING ? DW.addGallerySub : DW.gallerySub(S.name || '');
     cards = [];
     if (cardShelf) D.paint.letGo(cardShelf, null);
     cardShelf = D.paint.shelf();
@@ -469,29 +570,43 @@ DESIGN_DESIGNS_JS = r"""
       card(secs.fresh, DW.blank, DW.blankSub(blank.slides), blank, function(){ return {add: M.copy(blank), fill: false}; });
       var ops = P.onePerStory(D.st, S.photos);
       card(secs.fresh, DW.onePer, DW.slidesSub(ops.slides), ops, function(){ return {add: P.onePerStory(D.st, S.photos), fill: false}; });
+    } else if (ADDING) {
+      // adding to a carousel (hers): one empty slide in the design's own background, or a slide each for the
+      // photos not used yet, up to five
+      var one1 = {slides: 1, bg: D.st.bg, blocks: []};
+      card(secs.fresh, DW.blankSlide, DW.blankSlideSub, one1, function(){ return {add: {slides: 1, bg: D.st.bg, blocks: []}, fill: false}; });
+      var per = P.onePerStory(D.st, S.photos); per.bg = D.st.bg;
+      card(secs.fresh, DW.onePer, DW.slidesSub(per.slides), per, function(){ return {add: P.onePerStory(D.st, S.photos), fill: false}; });
     } else {
       card(secs.fresh, DW.blank, DW.blankSub(blank.slides), blank, function(){ return {stamp: S.stamp, state: blank}; });
       var one = P.onePerSlide(S.photos, S.carousel, S.slide_bg);
       card(secs.fresh, DW.onePer, DW.slidesSub(one.slides), one, function(){ return {}; });      // the Assistant makes this one itself
     }
-    var tpl = function(box, t, from){
+    var tpl = function(box, t, from, o){
       if (!t || !t.template || !Array.isArray(t.template.blocks)) return;
-      // a story's little picture shows the layout with the photos the stories don't use yet, as Add would put them in
-      var shown = STORY ? (fill ? P.fill(P.fromTemplate(t.template, false), unused(), S.carousel) : P.fromTemplate(t.template, false))
-                        : P.fromTemplate(t.template, fill, S.photos, S.carousel);
-      card(box, t.name || '', DW.tplSub(shown.slides, P.frames(shown), from), shown, STORY ? function(){
+      // a card that adds shows the layout with the photos not used yet, as Add would put them in
+      var shown = adds ? (fill ? P.fill(P.fromTemplate(t.template, false), unused(), S.carousel) : P.fromTemplate(t.template, false))
+                       : P.fromTemplate(t.template, fill, S.photos, S.carousel);
+      // (hers: a card shows the layout on its own background even when adding, though a design has one background
+      // and what is added sits on the design's)
+      card(box, t.name || '', o && o.one ? '' : DW.tplSub(shown.slides, P.frames(shown), from), shown, adds ? function(){
         return {add: P.fromTemplate(t.template, false), fill: tick.checked};
       } : function(){
         return {stamp: S.stamp, state: P.fromTemplate(t.template, tick.checked, S.photos, S.carousel)};
-      });
+      }, o);
     };
+    if (secs.singles) (S.singles || []).forEach(function(t){ tpl(secs.singles, t, '', {one: true}); });
     if (!(S.templates || []).length) secs.mine.appendChild(el('p', 'hint', DW.noneYet));
-    (S.templates || []).forEach(function(t){ tpl(secs.mine, t, typeof t.from === 'string' ? t.from : ''); });
+    (S.templates || []).forEach(function(t){
+      tpl(secs.mine, t, typeof t.from === 'string' ? t.from : '', {rename: function(v){ return renameTemplate(t, v); }});
+    });
     (S.starters || []).forEach(function(t){ tpl(secs.starters, t, ''); });
   }
   function closeGallery(){ D.modals.close(gallery); }
-  newBtn.addEventListener('click', function(){
+  // adding: true from "+ Add slides". With nothing on the design yet it is "+ New design" (hers).
+  function openGallery(adding, from){
     if (busy || !D.S || !D.design || D.blocked) return;
+    ADDING = !STORY && adding === true && D.st.blocks.length > 0;
     gLine.textContent = '';
     sheet.classList.remove('dz-busy');
     D.modals.open(gallery, function(){
@@ -499,13 +614,18 @@ DESIGN_DESIGNS_JS = r"""
       if (busy) { giveUp(); setBusy(false); sheet.classList.remove('dz-busy'); }
       if (cardShelf) { D.paint.letGo(cardShelf, null); cardShelf = null; }
       Object.keys(secs).forEach(function(k){ secs[k].textContent = ''; });
-      D.focus(newBtn);
+      D.focus(from);
     });
     buildGallery();
     sheet.scrollTop = 0;
     D.focus(gClose);
-    refresh().then(function(changed){ if (changed && D.modals.isOpen(gallery) && !busy) buildGallery(); });
-  });
+    refresh().then(function(changed){
+      // (not while a name is being typed into a card: the card would be drawn again under the typing)
+      if (changed && D.modals.isOpen(gallery) && !busy && !sheet.querySelector('.dz-rnin')) buildGallery();
+    });
+  }
+  newBtn.addEventListener('click', function(){ openGallery(false, newBtn); });
+  if (addBtn) addBtn.addEventListener('click', function(){ openGallery(true, addBtn); });
   gClose.addEventListener('click', closeGallery);
   tick.addEventListener('change', function(){ if (D.modals.isOpen(gallery) && !busy) buildGallery(); });
   sheet.addEventListener('click', function(e){
@@ -513,8 +633,9 @@ DESIGN_DESIGNS_JS = r"""
     if (!bt || busy || bt.disabled) return;
     var start = cards[Number(bt.dataset.card)];
     if (!start) return;
-    if (STORY) {
-      // stories: what was picked goes after the last story, in one Undo step; the design saves itself as always
+    if (STORY || ADDING) {
+      // stories, and "+ Add slides": what was picked goes after the last one, in one Undo step; nothing there is
+      // replaced, and the design saves itself as always
       if (!D.st || D.blocked) return;
       var pick = start(), r = P.addStories(D.st, M.tidy(pick.add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
       if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
@@ -624,6 +745,9 @@ DESIGN_DESIGNS_CSS = """
 .dz-top>div:first-child{flex:1 1 300px;min-width:0}
 .dz-acts{display:flex;flex:0 1 auto;gap:10px;align-items:center;flex-wrap:wrap}
 .dz-say{min-height:20px;margin:6px 0 2px;font-size:13.5px;line-height:20px;color:var(--accent-d)}
+/* the Add slides / New design window's line stays in sight however far the window is scrolled: a press on a card far
+   down (Add at 20 slides, a template that could not be made, a rename refused) must show its answer */
+#gallery-line:not(:empty){position:sticky;top:0;z-index:3;background:var(--panel);box-shadow:0 0 0 6px var(--panel),0 7px 0 0 var(--line)}
 .dz-sec{font:600 12px/1.3 var(--sans);color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-top:10px}
 .dz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:6px 0 12px}
 @media(max-width:520px){.dz-grid{grid-template-columns:1fr}.dz-sheet{padding:14px}}
@@ -634,6 +758,23 @@ DESIGN_DESIGNS_CSS = """
 .dz-cap b{display:block;font-weight:600;overflow-wrap:anywhere}
 .dz-cap small{color:var(--soft);font-size:12.5px}
 .dz-busy .dz-use{opacity:.4;pointer-events:none}
+/* a tight row: "Duplicate design" is "Duplicate" (the word before the name box is left out too, in the page's own styles) */
+@media(min-width:1024px) and (max-width:1179px){.dz-wide{display:none}}
+/* Rename, beside one of their own templates' names (hers, v22) */
+.dz-rn{margin-left:6px;border:0;background:none;padding:0;font:600 11.5px/1.2 var(--sans);color:var(--accent-d);cursor:pointer;text-decoration:underline}
+.dz-rn:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+.dz-cap b{display:inline}
+.dz-cap small{display:block}
+.dz-rnin{font:600 14px/1.2 var(--sans);padding:3px 6px;border:1px solid var(--line);border-radius:6px;width:100%;max-width:220px;background:#fff;color:var(--ink)}
+.dz-rnin:focus{outline:2px solid var(--sel);outline-offset:-1px}
+/* single slides: small cards, the slide, its name and the button underneath (hers, v22) */
+.dz-grid.dz-ones{grid-template-columns:repeat(auto-fill,minmax(112px,1fr))}
+.dz-card.dz-one{padding:8px;gap:6px}
+.dz-card.dz-one .dz-pic{height:auto;justify-content:center;background:transparent}
+.dz-card.dz-one .dz-cap{flex-direction:column;align-items:stretch;text-align:center;gap:5px;flex:1;justify-content:space-between}
+.dz-card.dz-one .dz-cap small{display:none}
+.dz-card.dz-one .dz-cap b{font-size:12.5px;line-height:1.25}
+.dz-card.dz-one .dz-use{width:100%}
 .dz-in{font:400 14px/1.3 var(--sans);border:1px solid var(--line);border-radius:8px;padding:8px 9px;background:#fff;color:var(--ink);width:240px;max-width:100%}
 .dz-fields{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
 """

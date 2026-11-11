@@ -209,8 +209,8 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                 case(f"{tag}: the slides' row runs Slides, Background, Brand colors, + Add text, Size, Snap into line, Undo",
                      order == ["g-slides", "g-bg", "g-brand", "g-text", "g-view", "g-snap", "g-undo"], order)
                 order1 = J(c, "Array.prototype.map.call(document.querySelectorAll('#tools-designs > .group'), function(g){ return g.id; })")
-                case(f"{tag}: the design's row runs Shoot, Design (name, status, My designs, Duplicate design), + New design and Save as template; Fill empty frames is not in it",
-                     order1 == ["g-shoot", "g-design", "g-new"] and J(c, "Array.prototype.map.call(document.querySelectorAll('#g-new > button'), function(b){ return b.id; })") == ["new-design", "save-template"]
+                case(f"{tag}: the design's row runs Shoot, Design (name, status, My designs, Duplicate design), + Add slides, + New design and Save as template; Fill empty frames is not in it",
+                     order1 == ["g-shoot", "g-design", "g-new"] and J(c, "Array.prototype.map.call(document.querySelectorAll('#g-new > button'), function(b){ return b.id; })") == ["add-slides", "new-design", "save-template"]
                      and c.js("document.getElementById('selcap').contains(document.getElementById('fill-holes'))"), order1)
                 # the selection: a photo, then text, then nothing
                 c.js("Designer.select(1)")

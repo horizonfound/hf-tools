@@ -6,7 +6,9 @@ everything a hand does on it:
 
     photos as frames (the picture always covers its frame, laid out from the picture's own size); empty frames
     press to select; drag to move (after 3 px); pull a corner to resize (Shift keeps the shape); both snap to
-    sixths of a slide and to other things' edges with pink guide lines (Alt, or the Snap tick, turns it off)
+    sixths of a slide and to other things' edges with pink guide lines (Alt, or the Snap tick, turns it off);
+    its middle snaps first to the middle of a slide, to a seam it sits across and to half way up, shown with blue
+    lines and a blue label ("Centered", ...; hers, v22), which also show for a moment after an arrow key lands it there
     double-click, or "Move photo inside": drag the picture inside its frame, wheel or slider to zoom
     the one-click buttons, arrow keys, Delete, Cmd/Ctrl+Z, Escape
     the tray: every photo numbered as in the pickers; drag one onto a frame or a slide, or click it
@@ -167,11 +169,32 @@ DESIGN_EDIT_JS = r"""
     });
   }
   function clearGuides(){ guides.forEach(function(g){ g.remove(); }); guides = []; }
-  function showGuides(gx, gy){
+  // mid (hers, v22): the blue lines and the label when the thing sits centered on a slide, on a seam, or half way up.
+  // The level line runs over only the slides the thing is on.
+  function showGuides(gx, gy, mid){
     clearGuides();
-    var s = D.scale;
+    var s = D.scale, e;
     (gx || []).forEach(function(x){ var e = el('div', 'guide'); e.style.left = x * s + 'px'; e.style.top = '0'; e.style.width = '1px'; e.style.height = '100%'; over.appendChild(e); guides.push(e); });
     (gy || []).forEach(function(y){ var e = el('div', 'guide'); e.style.top = y * s + 'px'; e.style.left = '0'; e.style.height = '1px'; e.style.width = '100%'; over.appendChild(e); guides.push(e); });
+    if (!mid || (mid.x == null && mid.y == null)) return;
+    // on a layer of their own above every photo, so the lines and the label show over the photo being moved (hers)
+    if (!midover) { midover = el('div', 'over midover'); over.parentNode.appendChild(midover); }
+    if (mid.x != null) { e = el('div', 'guide mid mid-v'); e.style.left = mid.x * s + 'px'; e.style.top = '0'; e.style.height = '100%'; midover.appendChild(e); guides.push(e); }
+    if (mid.y != null) { e = el('div', 'guide mid mid-h'); e.style.top = mid.y * s + 'px'; e.style.left = mid.slide * W * s + 'px'; e.style.width = mid.span * W * s + 'px'; midover.appendChild(e); guides.push(e); }
+    e = el('div', 'midtag', M.midWords(mid)); e.style.left = mid.cx * s + 'px'; e.style.top = mid.cy * s + 'px';
+    midover.appendChild(e); guides.push(e);
+  }
+  // After an arrow key: the same lines and label for a moment when the thing now sits centered (within a pixel).
+  var flash = null, flashT = null, midover = null;
+  function flashCentered(id){
+    clearTimeout(flashT);
+    flash = {id: id};
+    flashT = setTimeout(function(){ flash = null; if (!G || !G.on) clearGuides(); }, M.RULES.centerFlash);
+    showFlash();
+  }
+  function showFlash(){
+    var b = flash && D.st && D.sel === flash.id ? M.find(D.st, flash.id) : null, mid = b ? M.centered(D.st, b) : null;
+    if (mid) showGuides([], [], mid); else clearGuides();
   }
   function clearDropMarks(){
     slidemark.style.display = 'none';
@@ -220,7 +243,7 @@ DESIGN_EDIT_JS = r"""
       placeSel(b, s);
       selbox.className = 'selbox on' + (D.adjust ? ' adj' : '') + (D.blockTypes[D.typeOf(b)].fixed ? ' fixed' : '');
     } else selbox.className = 'selbox';
-    if (!G || !G.on) { clearGuides(); clearDropMarks(); }
+    if (!G || !G.on) { showFlash(); clearDropMarks(); }
     else if (G.redo) G.redo();          // a drag is going on: what it shows is drawn again over the fresh strip
   }
   D.on('render', draw);
@@ -510,13 +533,13 @@ DESIGN_EDIT_JS = r"""
       place(node, live, D.scale);
       T.draw(node, live, D.scale, true);
       placeSel(live, D.scale);
-      showGuides(res.gx, res.gy);
+      showGuides(res.gx, res.gy, res.mid);
     }
     begin(e, {
       start: MOVE_START, node: node,
       move: function(){
         var p = stripPoint(G.cx, G.cy), dx = p.x - p0.x, dy = p.y - p0.y;
-        var o = {snap: snapOn() && !G.alt, thr: M.RULES.snapPx / D.scale, shift: G.shift, widthOnly: !!T.widthOnly, minW: T.minW, minH: T.minH, maxH: T.maxH};
+        var o = {snap: snapOn() && !G.alt, thr: M.RULES.snapPx / D.scale, cthr: M.RULES.centerPx / D.scale, shift: G.shift, widthOnly: !!T.widthOnly, minW: T.minW, minH: T.minH, maxH: T.maxH};
         if (mode === 'move') res = M.move(D.st, b0, dx, dy, o);
         else if (mode === 'resize') res = M.resize(D.st, b0, corner, dx, dy, o);
         else { var nat = T.natural(node, b0); res = M.pan(b0, dx, dy, nat.w, nat.h); }
@@ -588,6 +611,7 @@ DESIGN_EDIT_JS = r"""
     e.preventDefault();
     // a key held down is one Undo step; each new press is its own
     D.setState(function(st){ return M.nudge(st, b.id, mv[0], mv[1]); }, {undo: 'nudge:' + b.id + ':' + e.key, fresh: !e.repeat});
+    flashCentered(b.id);
   });
   // ---------- the tray ----------
   function tilePic(t, p){

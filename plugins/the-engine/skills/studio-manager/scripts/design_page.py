@@ -137,6 +137,9 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 }
 /* between 1024 and 1180 the rows are tight: narrower boxes and sliders, a little less padding on a button and a
    group, the brand swatches the size of the background's, so six saved brand colors still sit on one line */
+/* (v22: "+ Add slides" is in the design's row too, so from 1024 to 1179 the word "Design" before the name box is left
+   out and "Duplicate design" reads "Duplicate": the row stays one row) */
+@media(min-width:1024px) and (max-width:1179px){#g-design>.lbl{display:none}}
 @media(max-width:1179px){.d-tools{gap:3px}.group{padding:3px 5px}.group .dz-name{width:180px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:64px}.tb{padding:4px 6px}.sw{width:20px;height:20px}#g-brand .bc-row{gap:4px}#g-brand .bc-sw{width:20px;height:20px}}
 
 .stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(31,36,48,.45)}
@@ -166,6 +169,12 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .h.tr{right:-7px;top:-7px;cursor:nesw-resize}.h.bl{left:-7px;bottom:-7px;cursor:nesw-resize}
 .selbox.adj .h,.selbox.fixed .h{display:none}
 .guide{position:absolute;background:#f0508c;pointer-events:none}
+/* centered on the slide, on a seam, or half way up (Nicole, Nov 10): blue 2 px lines and a blue pill with the words */
+.over.midover{z-index:9500}
+.guide.mid{background:#1f8fff}
+.guide.mid-v{width:2px;margin-left:-1px}
+.guide.mid-h{height:2px;margin-top:-1px}
+.midtag{position:absolute;z-index:3;pointer-events:none;background:#1f8fff;color:#fff;font:600 11px/1 var(--sans);padding:4px 7px;border-radius:999px;white-space:nowrap;transform:translate(-50%,-50%)}
 .slidemark{position:absolute;top:0;bottom:0;display:none;outline:3px solid var(--accent);outline-offset:-3px;background:rgba(212,100,63,.14);pointer-events:none}
 .d-note{margin:0 0 8px;font-size:13.5px;color:var(--accent-d);display:flex;flex-wrap:wrap;gap:8px;align-items:center;overflow-wrap:anywhere}
 .d-note.quiet{color:var(--soft)}

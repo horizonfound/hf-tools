@@ -72,6 +72,7 @@ Records (<kit> is the shoot's folder in Your Content; <studio> is STUDIO_HOME, ~
   <kit>/.kit/slides.lock                 kit.py's own: held while files go into the Carousel folder
   <kit>/.kit/kit.json                    "carousel_set" (the newest laid-out set) and "laid_out" (every one)
   <studio>/design-templates/<id>.json    a template: a layout with empty frames, shared by every shoot
+  <studio>/design-templates/<id>.prev.json   that template as it was before its last rename
   <studio>/brand.json                    the brand colors, shared by every shoot
   <studio>/design-fonts.json             fonts they loaded by name ("Yours")
   <studio>/arrange-waiting.json          arrange.py's list: a line for Claude after a save (piece "design"; stories: "stories")
@@ -216,6 +217,7 @@ FONT_BAD = "That doesn't look like a font's name. Use letters, numbers and space
 NAME_BAD = "Give it a name, up to 80 letters."
 TEMPLATE_EMPTY = "Add some photos or text first, then save it as a template."
 TEMPLATE_SAVED = "Saved \"{name}\" to your templates. You'll find it under + New design, in any shoot."
+NO_TEMPLATE = "I can't find that template. Close this window and open it again."
 TOO_MANY_TEMPLATES = "You have 200 templates, which is as many as fit."
 BRAND_FULL = "You've saved 16 brand colors, which is as many as fit. Take one off first."
 YOURS_FULL = "Your font list is full. The font still works in this design."
@@ -632,23 +634,49 @@ def KW(kind, s, **fill):
     return t.format(**fill) if fill else t
 
 
-def _starters():
-    """The eleven starter templates from Nicole's designer, as templates: frames in the order they are
+def _layouts(raw, kind="carousel"):
+    """Layouts written as (id, name, slides, background, frames, texts) as templates: frames in the order they are
     stacked and filled, no photo in any of them."""
-    m, g = 70, 24
+    out = []
+    for sid, name, slides, bg, frames, texts in raw:
+        blocks = []
+        for i, f in enumerate(frames, 1):
+            blocks.append(dict(f, id=len(blocks) + 1, n=None, ox=0.5, oy=0.5, zoom=1, slot=i))
+        for t in texts:
+            blocks.append(dict(t, id=len(blocks) + 1))
+        clean, _ = validate_state({"slides": slides, "bg": bg, "blocks": blocks}, template=True, kind=kind)
+        if clean is not None:
+            out.append({"id": sid, "name": name, "template": clean})
+    return out
 
-    def F(x, y, w, h):
-        return {"x": x, "y": y, "w": w, "h": h}
 
-    def T(x, y, w, **extra):
-        t = {"type": "text", "text": DEFAULT_TEXT, "font": DEFAULT_FONT, "size": 96, "weight": 400, "italic": False,
-             "upper": False, "al": "center", "ls": 0, "lh": 1.15, "color": "#2a2622", "x": x, "y": y, "w": w, "h": 110}
-        t.update(extra)
-        return t
+def _F(x, y, w, h):
+    return {"x": x, "y": y, "w": w, "h": h}
 
-    half_h, half_w = H / 2 - 1.5 * m, W / 2 - g / 2
-    gw, gh = (W - 3 * g) / 2, (H - 3 * g) / 2
+
+def _starters():
+    """The starter templates, in the order of Nicole's designer (her v22, Nov 10): her five from her own template
+    ideas first (layout only, no words), then the six of the first eleven she kept. Film strip, Side by side, Big and
+    small, Title slide and Four-photo grid are no longer offered (hers); a design that was made from one of them is
+    a design like any other and holds its own layout, so it opens and saves as it always did."""
+    m, F = 70, _F
+    half_h = H / 2 - 1.5 * m
     raw = [
+        ("tp-postcard", "Postcard collage", 9, "#f6f1e7",
+         [F(0, 0, 1080, 1350), F(1534, 176, 562, 594), F(1151, 878, 361, 405), F(2160, 0, 1080, 1350), F(3413, 68, 907, 405),
+          F(3316, 878, 551, 472), F(4320, 0, 1080, 1350), F(5400, 351, 432, 418), F(6026, 0, 454, 634), F(5724, 837, 454, 459),
+          F(6480, 0, 1080, 1350), F(7787, 432, 626, 675), F(8640, 0, 1080, 1350)], []),
+        ("tp-layered", "Layered trio", 3, "#ffffff",
+         [F(0, 400, 1560, 950), F(1685, 40, 1385, 970), F(880, 70, 545, 605), F(975, 740, 855, 610)], []),
+        ("tp-overlay-frames", "Overlay, column and frames", 5, "#f4f1ec",
+         [F(0, 0, 1080, 1350), F(283, 353, 499, 644), F(1080, 0, 1594, 1350), F(2751, 141, 412, 403), F(2751, 589, 412, 403),
+          F(3390, 190, 780, 865), F(4470, 190, 780, 865)], []),
+        ("tp-seam-editorial", "Across the seam into a collage", 5, "#f2f0ec",
+         [F(324, 266, 1511, 772), F(2510, 230, 560, 860), F(3240, 0, 487, 721), F(3780, 62, 425, 608), F(3727, 721, 557, 629),
+          F(4454, 190, 786, 954)], []),
+        ("tp-gallery", "Gallery walk", 5, "#ffffff",
+         [F(295, 354, 507, 701), F(1080, 0, 1080, 1350), F(2160, 0, 1080, 1350), F(3443, 228, 549, 953), F(4059, 228, 549, 953),
+          F(4667, 228, 549, 953)], []),
         ("st-story", "Story mix", 7, "#f4efe6",
          [F(0, 0, W, H), F(W, 0, 2 * W, H), F(3 * W + m, m, W - 2 * m, half_h), F(3 * W + m, H / 2 + m / 2, W - 2 * m, half_h),
           F(4 * W + 90, 120, 600, 900), F(4 * W + 750, 560, 660, 660), F(5 * W + 470, 170, 520, 780), F(6 * W, 0, W, H)], []),
@@ -659,36 +687,43 @@ def _starters():
         ("st-peek", "Seam peek", 5, "#e9e1d6",
          [F(0, 0, W, H), F(W + 90, 200, 640, 960), F(2 * W - 300, 520, 600, 600), F(2 * W + 420, 150, 560, 840),
           F(3 * W, 0, W, H), F(4 * W, 0, W, H)], []),
-        ("st-grid", "Four-photo grid", 3, "#ffffff",
-         [F(0, 0, W, H), F(W + g, g, gw, gh), F(W + 2 * g + gw, g, gw, gh), F(W + g, 2 * g + gh, gw, gh),
-          F(W + 2 * g + gw, 2 * g + gh, gw, gh), F(2 * W, 0, W, H)], []),
-        ("st-title", "Title slide", 4, "#f4efe6", [F(140, 760, 800, 470), F(W, 0, W, H), F(2 * W, 0, W, H), F(3 * W, 0, W, H)],
-         [T(90, 260, 900, text="Your title", size=150),
-          T(140, 470, 800, text="a line of your own", font="Montserrat", size=34, upper=True, ls=8)]),
-        ("st-film", "Film strip", 3, "#111111", [F(40, 275, 1000, 800), F(W + 40, 275, 1000, 800), F(2 * W + 40, 275, 1000, 800)], []),
         ("st-border", "Editorial borders", 5, "#ffffff", [F(k * W + 90, 110, 900, 1130) for k in range(5)], []),
-        ("st-pairs", "Side by side", 4, "#ffffff",
-         [F(0, 0, W, H), F(W, 0, half_w, H), F(W + W / 2 + g / 2, 0, half_w, H), F(2 * W, 0, half_w, H),
-          F(2 * W + W / 2 + g / 2, 0, half_w, H), F(3 * W, 0, W, H)], []),
-        ("st-bigsmall", "Big and small", 4, "#e9e1d6",
-         [F(0, 0, W, H), F(W, 0, 640, H), F(W + 700, 420, 320, 440), F(2 * W + 60, 420, 320, 440),
-          F(2 * W + 440, 0, 640, H), F(3 * W, 0, W, H)], []),
         ("st-wide3", "One wide across three", 3, "#ffffff", [F(0, 0, 3 * W, H)], []),
     ]
-    out = []
-    for sid, name, slides, bg, frames, texts in raw:
-        blocks = []
-        for i, f in enumerate(frames, 1):
-            blocks.append(dict(f, id=len(blocks) + 1, n=None, ox=0.5, oy=0.5, zoom=1, slot=i))
-        for t in texts:
-            blocks.append(dict(t, id=len(blocks) + 1))
-        clean, _ = validate_state({"slides": slides, "bg": bg, "blocks": blocks}, template=True)
-        if clean is not None:
-            out.append({"id": sid, "name": name, "template": clean})
-    return out
+    return _layouts(raw)
+
+
+def _singles():
+    """The carousel's single slides (hers, v22): each is one slide, added after the last one by "+ Add slides" (or a
+    one-slide design of its own from "+ New design"). Her eight, with her frames and backgrounds."""
+    m, g, F = 70, 24, _F
+
+    def grid(cols, rows):
+        cw, ch = (W - (cols - 1) * g) / cols, (H - (rows - 1) * g) / rows
+        return [F(c * (cw + g), r * (ch + g), cw, ch) for r in range(rows) for c in range(cols)]
+
+    half_h = H / 2 - 1.5 * m
+    raw = [
+        ("cs-border", "One with a border", 1, "#ffffff", [F(90, 110, 900, 1130)], []),
+        ("cs-2t", "Two stacked", 1, "#ffffff", [F(m, m, W - 2 * m, half_h), F(m, H / 2 + m / 2, W - 2 * m, half_h)], []),
+        ("cs-three", "Three across", 1, "#ebe9e5", [F(0, 460, 308, 336), F(355, 460, 344, 336), F(742, 460, 338, 336)], []),
+        ("cs-4", "Four", 1, "#ffffff", grid(2, 2), []),
+        ("cs-9", "Nine", 1, "#ffffff", grid(3, 3), []),
+        ("cs-mosaic", "Playful mosaic", 1, "#f2efe8",
+         [F(251, 175, 193, 268), F(462, 51, 189, 392), F(668, 88, 172, 172), F(668, 277, 253, 391), F(382, 460, 269, 412),
+          F(668, 685, 253, 194), F(617, 897, 304, 287)], []),
+        ("cs-mood", "Mood board", 1, "#dcdad5",
+         [F(213, 315, 223, 319), F(463, 225, 232, 234), F(453, 472, 287, 310), F(176, 634, 264, 376), F(463, 787, 196, 293),
+          F(697, 672, 168, 302)], []),
+        ("cs-overlap", "Overlapping collage", 1, "#d6d4cc",
+         [F(92, 101, 312, 312), F(433, 101, 309, 312), F(301, 342, 356, 231), F(694, 481, 271, 269), F(226, 575, 674, 450),
+          F(756, 993, 258, 256)], []),
+    ]
+    return _layouts(raw)
 
 
 STARTERS = _starters()
+SINGLES = _singles()
 
 
 def _story_starters():
@@ -713,6 +748,8 @@ def _story_starters():
 STORY_STARTERS = _story_starters()
 KINDS[CAROUSEL]["starters"] = STARTERS
 KINDS[STORIES]["starters"] = STORY_STARTERS
+KINDS[CAROUSEL]["singles"] = SINGLES
+KINDS[STORIES]["singles"] = []          # hers: a story's layouts are its single stories already
 
 
 # ---------- where a kit's designs are ----------
@@ -1164,6 +1201,36 @@ def save_template(name, state, from_name="", token=None, kind=CAROUSEL):
         arrange.write_whole(folder / f"{tid}.json", t)
         ts = list_templates(kind)
         return 200, {"ok": True, "words": KW(kind, TEMPLATE_SAVED, name=name), "template": _templates_for_page([_load_template(tid, kind)])[0],
+                     "templates": _templates_for_page(ts)}
+
+
+def template_prev_path(tid, kind=CAROUSEL):
+    """Where a template as it was before its last rename is kept (never listed as a template: its name is no id)."""
+    return K(kind)["templates"] / f"{tid}.prev.json"
+
+
+def rename_template(tid, name, kind=CAROUSEL):
+    """"Rename" on a card under Your templates (hers, v22): the template's name and nothing else. The file as it was
+    is kept beside it first (<id>.prev.json), the layout is never touched, and a template can only be named by an
+    id this file made. The same name again changes nothing. Returns (status, answer)."""
+    if not isinstance(tid, str) or not ID.fullmatch(tid):
+        return 400, {"ok": False, "why": "template", "words": NOT_UNDERSTOOD}
+    name = clean_name(name)
+    if name is None:
+        return 400, {"ok": False, "why": "name", "words": NAME_BAD}
+    folder = K(kind)["templates"]
+    with arrange.locked(HOME / K(kind)["templates_lock"]):
+        path = folder / f"{tid}.json"
+        if f"{tid}.json" not in kit_mod._listing(folder) or _load_template(tid, kind) is None:
+            return 404, {"ok": False, "why": "template", "words": NO_TEMPLATE}
+        old = _read_json(path)
+        if clean_name(old.get("name")) != name:
+            arrange.write_whole(template_prev_path(tid, kind), old)
+            new = dict(old)
+            new["name"], new["renamed"] = name, now_iso()
+            arrange.write_whole(path, new)
+        ts = list_templates(kind)
+        return 200, {"ok": True, "words": "", "template": _templates_for_page([_load_template(tid, kind)])[0],
                      "templates": _templates_for_page(ts)}
 
 
@@ -1945,7 +2012,7 @@ def state_for_page(kit, want=None, kind=CAROUSEL):
         "carousel": [] if story else [n for n in st["now"]["nums"]], "slide_bg": "#ffffff" if story else kit_bg(rec),
         "design": _design_for_page(kit, d, kind), "fell_back": fell_back,
         "designs": _design_list(kit, designs, d["id"], kind),
-        "templates": _templates_for_page(list_templates(kind)), "starters": K(kind)["starters"],
+        "templates": _templates_for_page(list_templates(kind)), "starters": K(kind)["starters"], "singles": K(kind)["singles"],
         "brand": {"colors": load_brand(), "max": BRAND_MAX},
         "fonts": fonts_for_page(kind), "shoots": shoots_for_page(kit), "limits": limits_for(kind),
         "blank": blank_story() if story else {"slides": DEFAULT_SLIDES, "bg": kit_bg(rec), "blocks": []},
@@ -2133,6 +2200,11 @@ def _post_template(body):
     token = _token(body)
     if token is False:
         return 400, {"ok": False, "why": "token", "words": NOT_UNDERSTOOD}
+    if "rename" in body:
+        # "Rename" on one of their own templates: its id and the new name, nothing else (a layout sent along is refused)
+        if "state" in body or token is not None:
+            return 400, {"ok": False, "why": "shape", "words": NOT_UNDERSTOOD}
+        return rename_template(body.get("rename"), body.get("name"), kind)
     try:
         shoot = kit_mod.load_rec(kit).get("name") or kit.name
     except (OSError, ValueError):

@@ -54,6 +54,10 @@ in plain Python (one flat grey each), so it runs on a Mac's own Python 3.9 and o
      story, a set of 1080 x 1920 stories saved into the Stories folder under names this computer takes (an accent, an
      emoji, a word Windows keeps), byte for byte, the kit's record and kit.stories_shown, "(2)" for a second set,
      and on a PC the 260-character limit said in a story's words.
+ 14. Nicole's v22: what the page is given (her five templates first, her eight single slides, no path), and Rename on
+     one of their own templates: a name with an accent, an emoji and characters a PC refuses in a file's name (it is
+     only ever inside the file), the version before kept beside it, no scratch file left, the refusals, and a rename
+     while another program has the file open.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept (its place is
 printed), and cleared away when everything passed.
 """
@@ -1177,6 +1181,47 @@ def stories_checks(kit):
         check("stories: on a PC a long name is measured in the Stories folder, said in a story's words (or fits)", cant is None or ("stor" in cant[1] and "slide" not in cant[1]), cant)
 
 
+def v22_checks(kit):
+    st = design.state_for_page(kit)
+    check("v22: the page is given the eleven starters (her five first) and her eight single slides, no words in any, no path",
+          [t["id"] for t in st["starters"]][:5] == ["tp-postcard", "tp-layered", "tp-overlay-frames", "tp-seam-editorial", "tp-gallery"] and len(st["starters"]) == 11
+          and [t["id"] for t in st["singles"]] == ["cs-border", "cs-2t", "cs-three", "cs-4", "cs-9", "cs-mosaic", "cs-mood", "cs-overlap"]
+          and not any(b.get("type") == "text" for t in st["starters"] + st["singles"] for b in t["template"]["blocks"]) and no_path(st)[0],
+          [t["id"] for t in st["starters"]])
+    state = {"slides": 2, "bg": "#f4efe6", "blocks": [{"id": 1, "n": 1, "x": 0, "y": 0, "w": 1080, "h": 1350, "ox": 0.5, "oy": 0.5, "zoom": 1},
+                                                      {"id": 2, "n": 2, "x": 1170, "y": 110, "w": 900, "h": 1130, "ox": 0.5, "oy": 0.5, "zoom": 1}]}
+    code, out = design.save_template("Beach", state, "Zoë’s beach 🌊", token("t"))
+    tid = out.get("template", {}).get("id")
+    f = design.TEMPLATES / f"{tid}.json"
+    first = f.read_bytes() if tid else b""
+    check("v22: a template of their own is saved", code == 200 and bool(tid), (code, out))
+    code, out = design.rename_template(tid, "Zoë’s days 🌊: CON / aux?")
+    now = json.loads(f.read_text(encoding="utf-8"))
+    prev = design.template_prev_path(tid)
+    check("v22: Rename with an accent, an emoji and characters a PC refuses in a file's name: the name is only ever inside the file, so it is kept as typed",
+          code == 200 and out["template"]["name"] == "Zoë’s days 🌊: CON / aux?" and now["name"] == "Zoë’s days 🌊: CON / aux?" and now["template"] == json.loads(first)["template"], (code, out))
+    check("v22: Rename: the version before is kept beside it, byte for byte, and is not listed as a template", prev.is_file() and prev.read_bytes() == first
+          and [t["id"] for t in design.list_templates()].count(tid) == 1 and len(design.list_templates()) == 1)
+    check("v22: Rename: no scratch file is left in the templates folder", sorted(os.listdir(design.TEMPLATES)) == sorted([f.name, prev.name]), sorted(os.listdir(design.TEMPLATES)))
+    ok, bad = no_path(out)
+    check("v22: Rename: no path and no backslash in the answer", ok, bad)
+    good = f.read_bytes()
+    for what, args, want in (("half of an emoji", (tid, "\ud83c"), 400), ("an empty name", (tid, "  "), 400), ("81 letters", (tid, "x" * 81), 400),
+                             ("an id with a backslash", ("..\\" + str(tid), "A"), 400), ("an id with a drive letter", ("C:" + str(tid), "A"), 400),
+                             ("a template that is not there", ("t" + "z" * 12, "A"), 404)):
+        code, out = design.rename_template(*args)
+        check(f"v22: Rename refused ({what}), and the template is as it was", code == want and out.get("ok") is False and f.read_bytes() == good, (code, out))
+    # while another program has the template's file open (a PC waits a moment; a Mac never minds)
+    with open(f, "rb"):
+        try:
+            code, out = design.rename_template(tid, "Held open")
+        except OSError as e:
+            code, out = 0, {"err": str(e)[:80]}
+    name_now = json.loads(f.read_text(encoding="utf-8"))["name"]
+    check("v22: Rename while another program reads the template's file: it is renamed, or left whole as it was (never half written)",
+          (code == 200 and name_now == "Held open") or name_now == "Zoë’s days 🌊: CON / aux?", (code, out, name_now))
+
+
 def part(name, fn, *args):
     """One part; a fault in it FAILs here and never stops the parts after it."""
     print(f"\n-- {name}", flush=True)
@@ -1201,6 +1246,7 @@ part("10: the locks across programs", lock_checks, make_kit("2026-11-07 Locks"))
 part("11: how long a path may be on a PC", long_checks, KIT)
 part("12: the real page server: refusals change nothing, a save goes through", server_checks, make_kit("2026-11-08 Server"))
 part("13: the stories designer", stories_checks, make_kit("2026-11-09 Zoë’s stories 🌊"))
+part("14: Nicole's v22: her starters and single slides, and Rename on a template", v22_checks, make_kit("2026-11-10 Rename"))
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))

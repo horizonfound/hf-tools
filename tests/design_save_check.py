@@ -618,9 +618,12 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             })"""
             c.wait_for("[0,1,2,3,4,5,6,7,8,9,10].every(function(i){ return (%s)('#gallery-starters .dz-card canvas', i).colors > 12; })" % PAINTED, 15)
             pics = [c.call(PAINTED, "#gallery-starters .dz-card canvas", i) for i in range(11)]
-            case("gallery: every card's little picture is drawn with this shoot's photos (many colours in each), no taller than 96 and no wider than 256",
-                 all(p["colors"] > 12 and p["cssh"] <= 96.5 and p["cssw"] <= 256.5 for p in pics), pics)
-            case("gallery: the little pictures are canvases the page drew; no picture element points anywhere", c.count("#gallery img") == 0 and c.count("#gallery canvas") == 13)
+            # (v22: a long template's picture fills its card's width, so it may be wider than 256; never wider than its card)
+            rooms = J("Array.from(document.querySelectorAll('#gallery-starters .dz-pic')).map(function(p){ return p.clientWidth; })")
+            case("gallery: every card's little picture is drawn with this shoot's photos (many colours in each), no taller than 96 and no wider than its card",
+                 all(p["colors"] > 12 and p["cssh"] <= 96.5 and p["cssw"] <= max(256, room) + 0.5 for p, room in zip(pics, rooms)), (pics, rooms))
+            # (v22: her eight single slides have a little picture each too)
+            case("gallery: the little pictures are canvases the page drew; no picture element points anywhere", c.count("#gallery img") == 0 and c.count("#gallery canvas") == 13 + 8)
             c.click("#gallery-fill")
             c.wait_for("!document.getElementById('gallery-fill').checked && document.querySelectorAll('#gallery-starters .dz-card').length === 11", 5)
             c.wait_for("[0,1,2,3,4,5,6,7,8,9,10].every(function(i){ return (%s)('#gallery-starters .dz-card canvas', i).colors > 1; })" % PAINTED, 15)
@@ -673,9 +676,22 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                      and c.page_errors() == [], (ns, [way.get(n) for n in ns], c.page_errors()[:2]))
             case("starters: each press made one more design, and none took another's place (3 + 11 files, the first still byte for byte the same)",
                  len(files()) == 14 and len(set(made.values())) == 11 and (designs / f"{first}.json").read_bytes() == first_bytes, len(files()))
-            open_design(made["st-title"])
+            # Title slide is no longer a starter (Nicole's v22). A design laid out as it was (as one made from it before
+            # would be) still opens, and its words still get their heights from their lines.
+            title_state = {"slides": 4, "bg": "#f4efe6", "blocks": [
+                frame(1, None, 140, 760, 800, 470), frame(2, None, W), frame(3, None, 2 * W), frame(4, None, 3 * W),
+                {"id": 5, "type": "text", "text": "Your title", "font": "Playfair Display", "size": 150, "weight": 400, "italic": False, "upper": False, "al": "center", "ls": 0,
+                 "lh": 1.15, "color": "#2a2622", "x": 90, "y": 260, "w": 900, "h": 110},
+                {"id": 6, "type": "text", "text": "a line of your own", "font": "Montserrat", "size": 34, "weight": 400, "italic": False, "upper": True, "al": "center", "ls": 8,
+                 "lh": 1.15, "color": "#2a2622", "x": 140, "y": 470, "w": 800, "h": 110}]}
+            open_design(new_design("the Title slide layout", title_state, "Title slide as it was"))
+            fonts_in()
+            try:
+                c.wait_for("Designer.st.blocks.filter(function(b){ return b.type === 'text'; }).every(function(b){ return b.h !== 110; })", 10)
+            except cd.Timeout:
+                pass
             tb = [b for b in st()["blocks"] if b.get("type") == "text"]
-            case("starter 'Title slide': after its fonts arrive the words' heights follow their lines (no longer the stand-in 110)",
+            case("a design laid out as the 'Title slide' starter was: after its fonts arrive the words' heights follow their lines (no longer the stand-in 110)",
                  len(tb) == 2 and tb[0]["text"] == "Your title" and all(abs(b["h"] - round(b["h"] / (b["size"] * b["lh"])) * b["size"] * b["lh"]) < 0.02 for b in tb) and settled(), tb)
 
             # ---- the tick off: empty frames, and Fill N empty frames ----
