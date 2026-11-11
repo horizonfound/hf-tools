@@ -20,7 +20,12 @@ Reads text only; nothing is run, started or written. What it checks:
   * the reel skill: Nicole's choosing rules in Step 2, her footage rules 4 to 6, "nothing is ever left out to fit";
   * the hello, the home page, the kit and the Canva part: the reel page named where the old flow was, and the
     stories designer offered where only plain or Canva stories were;
-  * nothing of a client's in the text this stage wrote.
+  * nothing of a client's in the text this stage wrote;
+  * the words (Nicole's v20, stage 5 of the v21 build): each of the three lines the words page hands out, and a
+    caption or hooks asked for in their own words, leads through the core's table to parts/words.md; that part
+    has the interview order, answers through a file, the Brand Homebase read in full and never another brand's
+    file, the goal first, a carousel a caption only, no words for stories, no hashtags and no short caption; and
+    no instruction still describes the old way of writing a caption or a hook.
 
 Every line says PASS or FAIL; exit 1 only when something FAILED.
 """
@@ -295,8 +300,167 @@ def check_doors():
          "opens the reel page beside the chat" in readme and "**make my stories** | Opens the stories designer" in readme)
 
 
+# ---------- 7. the words: one way to write a caption and hooks (Nicole's v20) ----------
+
+OLD_WAY = [
+    # (what it is, a pattern that must not be in any instruction)
+    ("captions written as part of making a kit", r"kit\.py words \"<kit>\" --file"),
+    ("a captions file handed to the photographer", r"Captions and hooks\.txt"),
+    ("hooks written five at a time, in the reel skill", r"write five short options"),
+    ("hooks written from what is seen in the photos", r"hook options for the on-screen text, based on what it sees"),
+    ("ten to twenty hooks", r"offers ten to twenty hook"),
+    ("three hooks of different kinds", r"three hooks|hooks \(three"),
+    ("a hashtags question or hashtags in a draft", r"(?i)\b(?:ask|add|write|their) (?:for )?(?:their )?hashtags\b(?! question)"),
+    ("a short caption being written", r"(?i)\b(?:and|write|with) a short caption\b"),
+    ("story lines written by the Assistant", r"(?i)\bwrite (?:the )?story lines\b"),
+    ("the caption written from the photos", r"(?i)captions? (?:written )?from (?:what is in )?the photos"),
+]
+
+
+def check_words():
+    core = read(SM / "SKILL.md")
+    rows = table_rows(core)
+    part_path = SM / "parts" / "words.md"
+    case("parts/words.md exists", part_path.is_file())
+    part = read(part_path) if part_path.is_file() else ""
+    flat = re.sub(r"\s+", " ", part)
+    # the page's own lines, read from the page, so a change there is caught here
+    page = read(SCRIPTS / "words_page.py")
+    lines = {k: re.search(r'"%s": "([^"]+)"' % k, page) for k in ("talk_line", "write_line", "polish_quoted")}
+    case("the words page still hands out its three lines", all(lines.values()), [k for k, v in lines.items() if not v])
+    for k, m in lines.items():
+        if not m:
+            continue
+        line = m.group(1).strip("“”").replace("{short}", "<shoot>")
+        for piece in ("reel", "carousel"):
+            said = line.replace("{piece}", piece)
+            lead = said.rsplit(" ", 1)[0]                     # e.g. 'Ask me about the <shoot>'
+            hit = [r for r in rows if ('"' + said + '"') in r.split(" | ")[0]
+                   or (('"' + lead + ' reel"') in r.split(" | ")[0] and "(or carousel)" in r.split(" | ")[0])]
+            case(f'exactly one row answers "{said}"', len(hit) == 1, len(hit))
+            if hit:
+                named = re.findall(r"`([^`]+\.md)`", hit[0].split(" | ", 1)[1])
+                case("... and it sends Claude to parts/words.md and nowhere else", named == ["parts/words.md"], named)
+        case(f'parts/words.md names the line "{line.replace("{piece}", "reel")}"', ('"' + line.replace("{piece}", "reel") + '"') in part)
+    for phrase in ('"write a caption for the beach reel"', '"I need hooks"', '"redo the captions"'):
+        hit = [r for r in rows if phrase in r.split(" | ")[0]]
+        case(f"exactly one row answers {phrase}, and it is the words part",
+             len(hit) == 1 and re.findall(r"`([^`]+\.md)`", hit[0].split(" | ", 1)[1]) == ["parts/words.md"], len(hit))
+    case("no other row of the core's table still takes captions", not [r for r in rows if re.search(r"\bcaptions?\b", r.split(" | ")[0]) and "parts/words.md" not in r])
+    d = re.search(r"^description: (.*)$", core, re.M).group(1)
+    case("studio-manager's description names write my words", "write my words" in d)
+
+    # the commands, as words.py has them
+    for cmd in ("ask", "answer", "show", "draft", "carry"):
+        case(f"words.md names words.py {cmd}", re.search(r"words\.py %s\b" % cmd, part))
+    wpy = read(SCRIPTS / "words.py")
+    case("... and words.py has each of them", all(('"%s"' % c) in wpy for c in ("ask", "answer", "show", "draft", "carry")))
+    case("words.md: what they said goes through a file, never the command line",
+         "**Anything they said goes through a file, never the command line.**" in part and "--file" in part and "--text " not in part)
+    keys = re.findall(r'^\{"(\w+)":', part, re.M)
+    case("words.md's example files use only the names words.py takes",
+         set(keys) <= {"about", "who", "who_text", "where", "purpose", "purpose_text", "notes", "caption"}
+         and {"about", "who", "who_text", "where", "purpose", "purpose_text", "notes", "caption"} <= set(keys), keys)
+    for name, group in (("who", "WHO"), ("where", "WHERE"), ("purpose", "PURPOSE")):
+        m = re.search(r"^%s = \{(.*)\}" % group, wpy, re.M)
+        buttons = re.findall(r'"(\w+)":', m.group(1)) if m else []
+        case(f"words.md names every button words.py takes for {name} ({', '.join(buttons)})",
+             buttons and all(("`%s`" % b) in part for b in buttons), buttons)
+
+    # the interview
+    order = ["1 the shoot", "1b whether to use the people's names", "2 who they're trying to reach", "2b tell me about them",
+             "2c, reels only, feed or trial reel", "3 what the post is for", "3b the follow-up to that", "4 anything to include or leave out"]
+    at = [flat.find(x) for x in order]
+    case("words.md: the interview order, with 1b, 2b, 2c and 3b", all(a >= 0 for a in at) and at == sorted(at), at)
+    case("... which is the order words.py ask prints", all(x in wpy for x in ("\n  1. Tell me about this shoot", "\n  1b. ", "\n  2. Who are you trying", "\n  2b. ", "\n  2c. ", "\n  3. What is this post", "\n  3b. ", "\n  4. Anything else")))
+    case("words.md: one question at a time, each answer saved at once, their words as said",
+         "Never two at once" in part and "**Save each answer the moment you have it,**" in part and "**Their words, as they said them.**" in part)
+    case("words.md: the follow-ups are always asked; saving notes keeps what was there",
+         "**1b, 2b and 3b are always asked**" in part and "**Saving notes replaces notes.**" in part)
+    case("words.md: ask, don't guess (a slip of the microphone, a missing detail)", "**Ask, don't guess.**" in part and "Never fill a gap" in part)
+    case("words.md: what they said when the kit was made is offered for question 1, saved only on their yes",
+         "[Use that] [Let me add to it]" in part and "Never save it there without asking" in part)
+
+    # the writing
+    case("words.md: read the Brand Homebase in full, every time, before writing", "**Read their Brand Homebase in full,**" in part and "every time, before you write a word" in part)
+    case("words.md: never another brand's file", "**The mistake to avoid: never another brand's file.**" in part and "Never search the computer for one" in part)
+    case("words.md: no Homebase found: say so and ask; the fallback until the brand interview is in setup",
+         'If `show` says "No Brand Homebase found"' in part and "No Brand Homebase found" in wpy
+         and "That is the fallback until the brand interview is part of setup" in part and "It isn't checked against your brand yet." in part)
+    case("words.md: the goal first", "**the goal first**" in part and "Even when they said the offer last, it opens the caption" in part)
+    case("words.md: specifics only from them; an invented feeling is an invented fact", "**Specifics come only from them:**" in part and "is an invented fact" in part)
+    case("words.md: her hook rules as printed, not pasted again", "her hook rules stand as written" in part and "what the command prints wins" in part
+         and "YOU'RE THE EDITOR" not in part and "OPTIMIZE FOR THE GOAL" not in part)
+    case("... and words.py still prints them (hers, word for word)", "YOU'RE THE EDITOR (Nicole, Nov 10)" in wpy and "Never describe the shoot as a hook" in wpy)
+    case("words.md: a second caption is genuinely different", "The second caption is genuinely different" in part)
+    case("words.md: a carousel gets a caption only", "**A carousel:** one caption, and nothing else. No hooks, no cover lines" in part)
+    case("words.md: a one-slide carousel is a single post, and its words are the carousel's", "**A single post** is a one-slide carousel, and its words are the carousel's" in part)
+    case("words.md: no words for stories", "**Stories get no words from you.**" in part)
+    case("words.md: no hashtags, no short caption", "**Never hashtags, and never a second, short caption**" in part)
+    case("words.md: polishing never replaces their caption", "**Never replace it and never add a fact.**" in part and '{"caption": "..."}' in part)
+    case("words.md: each ends with one line that it is on the page", all(x in part for x in (
+        '"That\'s all on the page."', '"Your caption and ten hooks are on the page. Pick the hooks you love there."',
+        '"Your caption is on the page."', '"Your polished caption is on the page, above your own."')))
+    case("words.md: new hooks clear their picks, and it says so", "**Saving any change to the hooks clears their picks on the page,**" in part)
+    case("words.py show marks the hooks they picked (canva.md and the reel skill lean on it)", "<- picked" in wpy
+         and "<- picked" in read(SM / "parts" / "canva.md") and "<- picked" in read(REEL / "SKILL.md"))
+    case("words.md has nothing of a client's in it", not re.search(r"Hannah|Laguna|Nicole Hill|mommy|\$400|December 4", part), re.findall(r"Hannah|Laguna|Nicole Hill|mommy|\$400|December 4", part))
+
+    # the fix round (Nov 11): things a cold read got wrong
+    row2 = [r for r in rows if '"I need hooks"' in r.split(" | ")[0]]
+    case("the words row also takes hashtags, a short caption and what a story should say",
+         row2 and all(x in row2[0].split(" | ")[0] for x in ("hashtags", "a short caption", '"what should my story say"')))
+    case("words.md: hashtags, a short version, story and slide words asked for in their own words", '"Write me some hashtags"' in part and '"what should my story say?"' in part)
+    case("words.md: the Brand Homebase file is named exactly, as words.py names it",
+         "named exactly `brand-homebase.md`" in part and 'HOMEBASE = "brand-homebase.md"' in wpy and "text file called brand-homebase," not in part)
+    case("... and words.py show prints where it would be read from", "no other name or ending" in wpy)
+    case("words.md: a skip saves nothing, and a later pass offers the open follow-up once more",
+         "**A skip saves nothing.**" in part and "**On a later pass**" in part and 'offer it once more, lightly' in part)
+    case("words.md: the other piece's answers are offered before the interview starts again",
+         "**If nothing is answered for this piece but the other one is,**" in part and "[Use what I said for the reel] [Ask me again]" in part
+         and "Nothing is answered for the {piece} yet, but the {other} is" in wpy)
+    case("words.md: a closing thank-you is not a rule for every caption",
+         "**How a caption closes is theirs:**" in part and "when names are in, a thank-you" not in part and "Then thanks to the client by name" not in part)
+    case("words.md: polishing a caption said in the chat doesn't claim their own box", "and no word about their own" in part and "or to say it here." not in part)
+    arr = read(SM / "parts" / "arrange.md")
+    case("arrange.md no longer points to hooks or story lines on the kit page",
+         "story lines on the kit page" not in arr and "hooks and caption for this shoot are on the kit page" not in arr
+         and arr.count("(`parts/words.md`)") >= 2)
+    told = [f"{rel(p)}:{i}" for p in instruction_files() for i, ln in enumerate(read(p).splitlines(), 1)
+            if re.search(r"kit\.py told\b(?!.*--text-file)", ln) or re.search(r'kit\.py told [^`]*--text "', ln)]
+    case("what they said about a shoot always goes through a file (kit.py told --text-file)", not told, told)
+
+    # the neighbours
+    kitp = read(SM / "parts" / "post-kit.md")
+    step4 = kitp.split("4. **The words are not written here.**", 1)[-1].split("\n5. ", 1)[0]
+    case("post-kit.md step 4 is a short pointer to the words part", "read `parts/words.md` in full" in step4 and len(step4) < 1200 and "words.py answer" not in step4, len(step4))
+    case("post-kit.md: the voice question is a stand-in until the brand interview is in setup", "stays only until the brand interview is part of setup" in kitp)
+    case("post-kit.md: what they said at the kit's start is never copied into a words page by itself", "never copied into a words page by itself" in kitp)
+    case("canva.md: the cover's hook is one they picked, never one Claude chose", "a hook they chose, never one you chose" in read(SM / "parts" / "canva.md"))
+    case("the reel skill: a hook comes from the words page, never written in the reel step",
+         "Never write hooks here, from the photos, or five at a time" in read(REEL / "SKILL.md") and "parts/words.md" in read(REEL / "SKILL.md"))
+    case("hello.md and photos-in.md send captions to the words part", "parts/words.md" in read(SM / "parts" / "hello.md") and "parts/words.md" in read(SM / "parts" / "photos-in.md"))
+    for what, pat in OLD_WAY:
+        hits = []
+        for p in instruction_files():
+            for i, ln in enumerate(read(p).splitlines(), 1):
+                if re.search(pat, ln):
+                    hits.append(f"{rel(p)}:{i}")
+        case(f"no instruction still has the old way: {what}", not hits, hits)
+    # whoever tells Claude how to write a caption or hooks points at the words part (or is it)
+    stray = []
+    for p in instruction_files():
+        if p.name in ("words.md", "playbook.md", "guardrails.md", "voice-of-the-assistant.md"):
+            continue
+        for i, ln in enumerate(read(p).splitlines(), 1):
+            if re.search(r"words\.py (?:ask|answer|draft|carry)\b", ln):
+                stray.append(f"{rel(p)}:{i}")
+    case("the words commands that save are told in one place, parts/words.md", not stray, stray)
+    case("the playbook's hooks and captions sections give way to the words part", "they win.**" in read(PLUGIN / "shared" / "playbook.md") and "`parts/words.md`" in read(PLUGIN / "shared" / "playbook.md"))
+
+
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors):
+    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

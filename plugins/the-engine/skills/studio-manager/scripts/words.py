@@ -317,6 +317,16 @@ def homebase():
     return None
 
 
+def homebase_spot():
+    """Where a Brand Homebase would be read from when there is none yet: the Assistant's folder, by its exact
+    name. Printed so nobody has to guess the folder or the name (a .txt or a PDF beside it is not found)."""
+    try:
+        h = posts.home()
+    except Exception:
+        h = None
+    return (Path(h) if h else Path(os.environ.get("STUDIO_HOME") or Path.home() / ".studio")) / HOMEBASE
+
+
 def answered(ans):
     who = ", ".join(WHO.get(x, x) for x in ans.get("who") or [])
     return [("1. The shoot", ans.get("about")),
@@ -339,6 +349,7 @@ def cmd_show(kit, piece):
         say(f"\nTheir Brand Homebase: {hb}  (read it in full before you write)")
     else:
         say("\nNo Brand Homebase found. Ask them where it is, or write from their answers and say it isn't on their brand yet.")
+        say(f"  It is read from exactly this file, and no other name or ending: {homebase_spot()}")
         v = kitmod.voice()
         if v.get("samples") or v.get("never"):
             say("  What they gave when asked how they write (kit.py voice), until there is a Homebase:")
@@ -377,8 +388,14 @@ def cmd_show(kit, piece):
         say("\nAlready written (a new draft replaces it; the version before is kept):")
         if w.get("caption"):
             say("  Caption: " + w["caption"].replace("\n", " / "))
-        for i, h in enumerate(w.get("hooks") or [], 1):
-            say(f"  {i}. {h}")
+        hooks = w.get("hooks") or []
+        picked = {i for i in (w.get("picked") or []) if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(hooks)}
+        for i, h in enumerate(hooks, 1):
+            say(f"  {i}. {h}" + ("   <- picked" if (i - 1) in picked else ""))
+        if hooks:
+            # the picking is theirs, on the words page: never pick one for them (parts/words.md, parts/canva.md)
+            say(f"  They picked {len(picked)} of the {len(hooks)} on the page (marked \"<- picked\")." if picked
+                else "  None picked yet: they pick on the words page (Pick). Never choose one for them.")
     return 0
 
 
@@ -390,6 +407,24 @@ def cmd_ask(kit, piece):
     say(f"{kit.name}, the {piece}: answered so far")
     for k, v in answered(w["answers"]):
         say(f"  {k}: {(v or '').strip() or '(not yet)'}")
+    other = [p for p in PIECES if p != piece][0]
+    st = status(kit)
+    if not st[piece]["answered"] and st[other]["answered"]:
+        # so they never answer twice (Nicole): offered, with their yes; "where" is the reel's own and never carries
+        say(f"\nNothing is answered for the {piece} yet, but the {other} is. Don't start again from question 1: offer"
+            f" to use what they said for the {other} (buttons: Use what I said for the {other} · Ask me again)."
+            f" On yes: words.py carry \"<kit>\" {other} {piece}, then ask only what is still open"
+            + (" (2c: feed or trial reel)." if piece == "reel" else "."))
+        return 0
+    if not (w["answers"].get("about") or "").strip():
+        # what they said when the kit was made is theirs, but it was said about the whole shoot, before this
+        # piece existed: it is offered as question 1's answer, with their yes, never saved there unasked
+        said = kitmod.told_text(kit)
+        if said:
+            say("\nQuestion 1 isn't answered, but they said this when the kit was made (theirs, word for word):")
+            say("    " + said.replace("\n", " / "))
+            say("  Don't ask question 1 cold: read it back in a line and ask whether to use it as it is or add to it"
+                " (buttons: Use that · Let me add to it). Save it as about only once they say so, their words as said.")
     return 0
 
 

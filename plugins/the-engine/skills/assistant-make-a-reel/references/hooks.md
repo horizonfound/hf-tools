@@ -1,5 +1,7 @@
 # Writing the hook (the on-screen line)
 
+**Older notes, kept for the thinking (Oct). Since Nov 10 a reel's hooks are written one way: ten, on its words page, by the rules `words.py` prints (the Assistant's `parts/words.md`). Where these notes differ, those win.**
+
 The hook is measured against the client, not against taste. Nicole's rules, in her words where she gave them.
 
 - **It speaks to the client about what she feels and wants.** "Hooks speak to a mom, about what she feels and wants, not how Nicole works." The voice check's most-off line was "I barely directed this session. This is what happens when you just let them play." Rewritten: "You're always the one taking the picture. This time you're in it."

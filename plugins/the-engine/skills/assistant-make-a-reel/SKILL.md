@@ -34,7 +34,7 @@ python3 <assistant scripts>/kit.py start --folder "<edited photos>" --name "<sho
 python3 <assistant scripts>/kit.py start --night "<backup>" --shoot s1          (a shoot the Assistant backed up)
 ```
 
-If that stops because the Assistant folder isn't set up yet, set it up first (`<assistant>/parts/photos-in.md`, "set up my Assistant folder"), then start the kit. Don't write the kit's captions or make its other pieces here unless they asked for posts; a reel needs only the kit.
+If that stops because the Assistant folder isn't set up yet, set it up first (`<assistant>/parts/photos-in.md`, "set up my Assistant folder"), then start the kit. Don't make the kit's other pieces here unless they asked for posts; a reel needs only the kit. A reel's caption and hooks are never written as part of making it: they have their own page and their own part (`<assistant>/parts/words.md`), when they ask.
 
 Then number the photos through the kit, so your numbers and the page's are the same:
 
@@ -137,9 +137,9 @@ The page asks it too, in Nicole's words: "Pick the vibe", with **On every beat**
 
 ## Step 5: words on the first photo, and trial reels (only if they ask)
 
-The page has neither, and you don't offer them. If they ask for words on the first photo, write five short options in their voice (their Brand File's Voice section if they have one). Rules from Nicole: it speaks to their client about what the client feels and wants, never about how the photographer works; one short line, readable in a second; a real angle only this photographer would say; never invent a name, date, price or offer. They pick one; make it from the chat (Step 6) with `--hook "<the line they picked>"`. It goes in as plain white text over the first photo; they restyle it with one of CapCut's text styles.
+The page has neither, and you don't offer them. The words on the first photo are the reel's hook, and there is one way a hook is written (Dustin and Nicole, Nov 10): the reel's words page, ten of them, from what they said about the post, by Nicole's rules (`<assistant>/parts/words.md`; read it in full before you write one). Never write hooks here, from the photos, or five at a time. If they ask for words on the first photo: `python3 <assistant scripts>/words.py show "<kit>" reel` lists the reel's hooks with the ones they picked on the page marked "<- picked". One picked: that is the line. Several: ask which, with the picked ones as buttons. None picked: ask them to press Pick on the one they want on the words page. None written yet: that part first. Then make it from the chat (Step 6) with `--hook "<the line they picked>"`; on a PC the line goes the way `<assistant>/parts/on-a-pc.md` says anything they wrote goes. It goes in as plain white text over the first photo; they restyle it with one of CapCut's text styles.
 
-**Trial reels**, if they ask, are the same cut with a different opening line: make it from the chat with another `--hook` and `--name "<the kit's folder name> reel, take 2"`, one CapCut project each. Remind them once that trial reels go out as trial reels, never to the feed.
+**Trial reels**, if they ask, are the same cut with a different opening line, another hook they picked on the words page: make it from the chat with another `--hook` and `--name "<the kit's folder name> reel, take 2"`, one CapCut project each. Remind them once that trial reels go out as trial reels, never to the feed.
 
 ## Step 6: make it
 

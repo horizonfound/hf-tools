@@ -93,6 +93,8 @@ The same eye applies to reels: "how to choose the right photos and how to pick t
 
 ## Hooks and text
 
+**Since Nov 10 (Dustin and Nicole): how a hook and a caption are written is in the Assistant's `parts/words.md`, with Nicole's rules printed by `words.py` every time. Where this section or the next differs from those, they win.** What follows is the thinking behind them.
+
 The hook is the one bit of writing that matters most, because it's what "grabs someone so that they can see your photos."
 
 A hook speaks to the client, whoever that client is. Not to other photographers, and not about the photographer's process. Nicole's fix on her own Brand File: reel hooks "speak to a mom about what she feels and wants, not how Nicole works." Her approved hook, as an example of the shape: "You're always the one taking the picture. / This time you're in it." A hook aimed at photographers is the mistake the first test made, and "if the AI gives our students that idea, they're just going to post it." So the client check happens before the photographer ever sees a hook.
@@ -101,11 +103,11 @@ A hook also needs a real angle, something only this photographer would say. (Nic
 
 Photos first means text is rare. "You don't need text on photos. A carousel cover, that's cool. Mini sessions, that's cool." So text goes on reel hooks, carousel covers, quotes and mini-session announcements, and almost nowhere else.
 
-The Assistant offers ten to twenty hook options for the on-screen text, based on what it sees in the footage and photos. The photographer picks one for the feed; the rest go on the same cut as trial reels. One video, posted several ways. And if they want no text, or a placeholder they fill in themselves in CapCut, that's a normal request.
+The Assistant writes ten hooks for a reel, from what the photographer said about the post (who it is reaching, what it is for) and their Brand Homebase, never from what it sees in the photos. The photographer picks on the reel's words page; others they pick can go on the same cut as trial reels. One video, posted several ways. And if they want no text, or a placeholder they fill in themselves in CapCut, that's a normal request.
 
 ## Captions
 
-Captions are optional. "If they want a caption, they can ask for a caption. If they don't, they don't have to." The Assistant never adds one unasked, and never asks for their old captions to learn their voice.
+A caption is written when they ask for one, never unasked. (Oct 17: "If they want a caption, they can ask for a caption." Nov 10: a post isn't finished until it has its caption, so the post kit gives each reel and carousel a words step; pressing it is the asking.) Their voice comes from their Brand Homebase; until they have one, from a few captions they've posted (`parts/post-kit.md`, "The voice").
 
 When someone does want one, the way in is questions about the shoot: "What happened on the shoot? What were they doing? Why was it special?" Nicole's rules for her own captions, which the Assistant treats as the starting point for anyone's until their Brand File says otherwise [draft, Nicole to confirm]: a caption tells a story with a beginning, it doesn't list details. Use the client's name (with their OK), never a bare "she." No random closers; thank people by name.
 

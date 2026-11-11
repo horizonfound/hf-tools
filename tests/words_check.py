@@ -64,9 +64,17 @@ try:
     old_words = {"hooks": ["An older hook"], "caption": "An older caption", "stories": [], "short": "", "hashtags": []}
     (KIT / ".kit" / "words.json").write_text(json.dumps(old_words), encoding="utf-8")
 
+    (KIT / ".kit" / "told.json").write_text(json.dumps({"text": "A windy morning with Zoë."}, ensure_ascii=False), encoding="utf-8")
+    early = run("ask", "hannah", "reel").stdout
+    check("ask: what they said when the kit was made is offered for question 1, with their yes",
+          "they said this when the kit was made" in early and "A windy morning with Zoë." in early and "Use that" in early)
     # no Homebase yet: it says so and asks, never looks further afield
     first = run("show", "hannah", "reel").stdout
     check("no Brand Homebase: says so and says to ask", "No Brand Homebase found. Ask them where it is" in first)
+    check("... and names the exact file it would read", str(HOME / "brand-homebase.md") in first and "no other name or ending" in first)
+    (HOME / "brand-homebase.txt").write_text("not this one", encoding="utf-8")
+    check("... a file with another ending is not taken for it", "No Brand Homebase found" in run("show", "hannah", "reel").stdout)
+    (HOME / "brand-homebase.txt").unlink()
     (HOME / "brand-homebase.md").write_text("# Brand Homebase\nWarm, plain, never salesy. Zoë says so.\n", encoding="utf-8")
 
     # the interview: one answer at a time
@@ -94,7 +102,13 @@ try:
     check("show: 10 hooks for a reel", "Write 10 hooks" in show)
     check("show: trial reel / feed shown", "Where it's going: On their feed" in show)
 
+    cask = run("ask", "hannah", "carousel").stdout
+    check("ask: a carousel with nothing answered offers the reel's answers, and does not offer the kit-start words",
+          "Nothing is answered for the carousel yet, but the reel is" in cask and "words.py carry" in cask
+          and "Use what I said for the reel" in cask and "when the kit was made" not in cask)
     ask = run("ask", "hannah", "reel").stdout
+    check("ask: the reel, answered, is not offered the other piece's answers", "Nothing is answered for the reel yet" not in ask)
+    check("ask: once question 1 is answered, the kit-start words are not offered again", "when the kit was made" not in ask)
     check("ask: names question and the follow-ups", "Do you want their names in it?" in ask and "Always follow up" in ask)
     check("ask: feed or trial reel, reels only", "Reels only: Is this going on your feed, or is it a trial reel?" in ask)
 
@@ -105,6 +119,8 @@ try:
     import words as W
     W.save_from_page(KIT, "reel", {"picked": [5, 5, 99, True], "own": "My own caption"})
     check("the page's picks: only real hooks, each once", rec()["pieces"]["reel"]["picked"] == [5])
+    marked = [ln for ln in run("show", "hannah", "reel").stdout.splitlines() if "<- picked" in ln and ln.strip()[:1].isdigit()]
+    check("show marks the hook they picked on the page, and only that one", len(marked) == 1 and marked[0].strip().startswith("6. Hook 6"))
     run("draft", "hannah", "reel", "--file", jfile({"caption": "MINI SESSIONS first, edited."}))
     r = rec()["pieces"]["reel"]
     check("draft: picks kept when only the caption changes", r["picked"] == [5])
@@ -113,6 +129,8 @@ try:
           and json.loads((KIT / ".kit" / "post-words.prev.json").read_text(encoding="utf-8"))["pieces"]["reel"]["caption"] == "MINI SESSIONS first.")
     run("draft", "hannah", "reel", "--file", jfile({"hooks": hooks[::-1]}))
     check("draft: picks cleared when the hooks change", rec()["pieces"]["reel"]["picked"] == [])
+    check("show: with nothing picked, it says they pick on the page and never to choose for them",
+          "None picked yet" in run("show", "hannah", "reel").stdout and "<- picked" not in run("show", "hannah", "reel").stdout)
     nothing = run("draft", "hannah", "reel", "--file", jfile({"caption": "  ", "hooks": []}), ok=False)
     check("an empty draft is refused", nothing.returncode == 2)
 
