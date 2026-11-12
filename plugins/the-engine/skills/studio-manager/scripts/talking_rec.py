@@ -112,7 +112,8 @@ LOG = fresh.LOGS / "talking.log"          # the real words of anything that went
 # What is kept beside the record, per video, and joined back on when the record is read (her shape for the page).
 WORD_FIELDS = ("words", "sentences", "info", "transcribed", "video_key", "how", "ondevice")
 # Everything that counts in word numbers: it belongs to one video's script and to no other.
-EDIT_FIELDS = ("cut", "claude_cut", "claude_why", "splits", "speeds", "zooms", "shots", "moves", "photos", "claude_shots")
+EDIT_FIELDS = ("cut", "claude_cut", "claude_why", "splits", "speeds", "zooms", "shots", "moves", "photos", "claude_shots",
+               "claude_placed")
 KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds")
 MADE_AGAIN = "made-again"                 # in "earlier": this video's words were made again while the record was on another
 REPLACED_KEPT = 12                        # as kit.py picks --reel keeps reel_earlier
@@ -859,6 +860,12 @@ def settle(kit):
         if j.get("id") == done[0][1] and j.get("state") in ("queued", "running"):
             _job_over(kit, j.get("id"), "done" if done[0][0] == "landed" else "problem")
         log(f"{kit.name}: the job turning its video into words was gone ({done[0][0]}); the record says so now")
+        try:                                      # a job killed outright never tidied up: the sound of their talk
+            cleared = clear_stale_work()          # is not left on the disk until some later talking job
+            if cleared:
+                log(f"cleared the scratch of {len(cleared)} talking job(s) that were stopped part way")
+        except Exception:  # noqa: BLE001  (settle never raises)
+            pass
     return bool(done)
 
 
@@ -1236,6 +1243,8 @@ def _watchdog(kit, jid, name, finished):
             _fail(kit, name, line_for("too_long"))
             _job_over(kit, jid, "problem")
             this_computer.stop_scripts()
+            if JOB_ID.fullmatch(str(jid)):        # ours: this job's own scratch (the sound of their talk is never kept);
+                shutil.rmtree(WORK / jid, ignore_errors=True)   # cmd_job's own tidy-up is never reached from here
             this_computer.stop_tree(os.getpid())  # a Mac: its whole group (popen_detached made it one); a PC: its tree
             os._exit(1)
 
@@ -1520,6 +1529,16 @@ def state_for_page(kit, rev=None, mark=None):
             hit = foot.get(_nfc(x["v"]).casefold())
             key = _key_of(hit[1]) if hit else None
             x["v"] = {"key": key, "name": hit[0]} if key else {"key": gone_key(x["v"]), "name": x["v"], "gone": True}
+            if key:
+                # its shape too, so the preview draws a wide video wide from the first frame (hers loads the
+                # Footage list as the page starts; ours asks for that list only when the picker is opened)
+                try:
+                    fx = reel_page._facts(kit, hit[1], key)
+                    w, h = int(fx.get("w") or 0), int(fx.get("h") or 0)
+                except (OSError, TypeError, ValueError, AttributeError):
+                    w = h = 0
+                if w > 0 and h > 0:
+                    x["v"]["w"], x["v"]["h"] = w, h
         shots.append(x)
     on_sheet = {x["n"] for x in arrange.sheet_rows(kit)}
     photos_gone = sorted({k for x in shots for k in x["ns"] if k not in on_sheet})
@@ -1670,7 +1689,7 @@ def _f_shots(v, ctx):
             _no("shots")
         vkey, name, given = r.get("v"), None, None
         if isinstance(vkey, dict):                          # the state's own {key, name}, sent back as it came
-            if set(vkey) - {"key", "name", "gone"}:
+            if set(vkey) - {"key", "name", "gone", "w", "h"}:      # w and h: the state's own, never kept
                 _no("shots")
             given, vkey = vkey.get("name"), vkey.get("key")
             if given is not None and _engine()._video_name(given) is None:
@@ -1697,7 +1716,18 @@ def _f_shots(v, ctx):
             _no("shots")
         out.append({"a": a, "b": b, "ns": [] if name else ns, "v": name, "from": round(frm, 3) if name else 0.0,
                     "spot": r["spot"], "pos": _f_box(r.get("pos"), "shots"), "me": _f_box(r.get("me"), "shots")})
+    # hers: the page only ever sends stretches in order of their first word, none sharing a word with another
+    # (everything it saves goes through setRange). So they are kept in that order, and a set that overlaps is
+    # refused; unless the stored record already overlaps (one changed by hand): that one must stay saveable.
+    out.sort(key=lambda x: x["a"])
+    if not ctx.get("stored_overlap") and overlapping(out):
+        _no("shots")
     return out
+
+
+def overlapping(shots):
+    """Do any two stretches share a word? (shots in order of their first word)"""
+    return any(y["a"] <= x["b"] for x, y in zip(shots, shots[1:]))
 
 
 def _f_cap_pos(v, ctx):
@@ -1796,7 +1826,7 @@ def save_from_page(kit, body):
         seen = {}
         ctx = {"n": len(eng._words(rec)), "on_sheet": {x["n"] for x in arrange.sheet_rows(kit)}, "footage": footage,
                "stored_ns": {k for x in had for k in x["ns"]}, "stored_v": stored_v, "known": known,
-               "foot_names": foot_names, "seen": seen}
+               "foot_names": foot_names, "seen": seen, "stored_overlap": overlapping(had)}
         clean = {k: SAVE_FIELDS[k](v, ctx) for k, v in sent.items()}
         rev = _rev(rec)
         if all(_same(_stored(rec, k), v) for k, v in clean.items()):
@@ -1921,9 +1951,24 @@ def save_place(kit, given, replace=False):
         if had and not _same(had, shots):
             keep_replaced(rec, "place --replace")
         rec["shots"], rec["photos"], rec["claude_shots"] = shots, {}, True
+        rec["claude_placed"] = shots_mark(shots)           # ours: which set it was, so status can tell if it still is
         out["n"], out["photos"] = len(shots), sum(len(x["ns"]) for x in shots)
     change(kit, fn)
     return out["n"], out["photos"]
+
+
+def shots_mark(shots):
+    """A short mark of one set of photo stretches (her claude_shots is a plain yes; this says which set)."""
+    return hashlib.sha1(json.dumps(shots, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+
+
+def placed_by(rec, shots):
+    """Whose the photo stretches on the record are, for status: "assistant" (still the very set the assistant
+    placed), "changed" (the assistant placed photos and the page has changed them since), or None (never placed
+    by the assistant, or an older record that does not say which set it placed: no claim either way)."""
+    if not shots or not rec.get("claude_shots") or not isinstance(rec.get("claude_placed"), str):
+        return None
+    return "assistant" if rec["claude_placed"] == shots_mark(shots) else "changed"
 
 
 def _stretches(kit, given, rec, n, eng):
@@ -2039,7 +2084,8 @@ def cmd_status(kit):
     say(f"  Script: {len(words)} words, {sum(eng.kept(rec))} kept, {len(cut)} cuts ({cut_by}).")
     say(f"  The reel: {eng.reel_seconds(pcs):.1f} seconds in {len(pcs)} pieces.")
     sh = eng.shots(rec)
-    say(f"  Photo stretches: {len(sh)}" + (" (placed by you)" if sh and rec.get("claude_shots") else "")
+    say(f"  Photo stretches: {len(sh)}" + {"assistant": " (placed by you)",
+                                          "changed": " (changed on the page since you placed them: ask before replacing them)"}.get(placed_by(rec, sh), "")
         + f"; who places them: {rec.get('photo_mode') or 'not chosen'}.")
     kept_for = sorted(k for k in (rec.get("earlier") if isinstance(rec.get("earlier"), dict) else {}) if isinstance(k, str))
     if kept_for:

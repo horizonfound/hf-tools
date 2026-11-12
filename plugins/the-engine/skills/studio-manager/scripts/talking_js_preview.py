@@ -89,8 +89,10 @@ function r4(v){ return Math.round(v * 10000) / 10000; }
 function mediaOf(x, k){
   if (x.v) {
     if (x.v.gone || !x.v.key) return null;
-    var w = 0, h = 0, vs = T.vids ? T.vids() : [];
-    for (var i = 0; i < vs.length; i++) if (vs[i].key === x.v.key) { w = vs[i].w; h = vs[i].h; }
+    // its shape: the state's own first (it rides on the stretch, so a wide video is drawn wide from the first
+    // frame after a reload: the Footage list is only asked for when the picker opens), then the list, then the video
+    var w = +x.v.w || 0, h = +x.v.h || 0, vs = T.vids ? T.vids() : [];
+    if (!(w > 0 && h > 0)) for (var i = 0; i < vs.length; i++) if (vs[i].key === x.v.key) { w = vs[i].w; h = vs[i].h; }
     if (!(w > 0 && h > 0) && bv.dataset.key === x.v.key && bv.videoWidth) { w = bv.videoWidth; h = bv.videoHeight; }
     return {video: true, key: x.v.key, w: w > 0 ? w : 1080, h: h > 0 ? h : 1920};
   }

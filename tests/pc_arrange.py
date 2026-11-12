@@ -322,7 +322,10 @@ def deep_checks(kit):
               and not arrange.previews_dir(deep).exists() and "260 characters" in (g.get("cant") or ""), g)
     else:
         skip("too deep for 260 characters", "long paths are on here" if WINDOWS else "not a PC")
-        check("no such limit here: cant_make says nothing", arrange.cant_make(kit, arrange.sheet_rows(kit)) is None)
+        got = arrange.cant_make(kit, arrange.sheet_rows(kit))
+        # the PC way of making pictures on a Python with no Pillow (ASSISTANT_NO_SIPS=1 on a Mac's own Python):
+        # cant_make rightly names the missing add-on; it is the 260-character limit that must not be named here
+        check("no such limit here: cant_make says nothing about depth", got is None or (not HAVE_PIL and got[0] == "addon"), got)
 
 
 # ---------------------------------------------------------------- 9 and 11: a copy something holds ("later"), a full drive

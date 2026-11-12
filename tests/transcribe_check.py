@@ -1225,10 +1225,13 @@ def part_job(clips):
           (rec_of(kit3).get("problem"), j.get("state"), time.time() - t0))
     check("...and its process is gone, its lock free", wait_for(lambda: not arrange._pid_alive(pid), 10) and not TR.job_running(kit3), pid)
     left = sorted(os.listdir(TALK_HOME / "work"))
-    check("...it could not tidy up after itself: its scratch folder is still there", left == [j.get("id")], left)
+    check("...and the watchdog took the job's scratch with it: the sound of their talk is not left on the disk (stage G)", left == [], left)
     os.environ.pop("ASSISTANT_TEST_TALK_LIMITS")
     old = time.time() - 120
-    os.utime(TALK_HOME / "work" / left[0], (old, old))
+    dead = TALK_HOME / "work" / "eeeeeeeeeeee"          # a job that died with no chance to tidy up (a power cut)
+    dead.mkdir()
+    (dead / "sound.wav").write_bytes(b"RIFF")
+    os.utime(dead, (old, old))
     stranger = TALK_HOME / "work" / "not a job"
     stranger.mkdir()
     os.utime(stranger, (old, old))
@@ -1272,7 +1275,13 @@ def part_job(clips):
     os.kill(pid, signal.SIGKILL)
     wait_for(lambda: not arrange._pid_alive(pid), 10)
     check("(the job was killed while the record still said working)", rec_of(kit3).get("status") == "working")
+    killed = sorted(os.listdir(TALK_HOME / "work"))
+    old = time.time() - 120
+    for n in killed:
+        os.utime(TALK_HOME / "work" / n, (old, old))  # as if killed a while ago (one just made is never cleared)
     st = TR.state_for_page(kit3)
+    check("a job killed part way: the look that tells the page it stopped also clears its scratch, so the sound of their talk does not wait for the next talking job (stage G)",
+          len(killed) == 1 and os.listdir(TALK_HOME / "work") == [], (killed, os.listdir(TALK_HOME / "work")))
     r = rec_of(kit3)
     check("a job killed part way: the page is told it stopped, in plain words, and is not left on \"working\"",
           st["working"] is False and st["rec"]["status"] == "ready" and st["rec"]["problem"] == TR.OUR_JOB_WORDS["interrupted"][0]
@@ -1286,10 +1295,12 @@ def part_job(clips):
     st = wait_done(kit3)
     check("and Edit my video can be pressed again straight away, and finishes", ans == {"ok": True} and st and rec_of(kit3).get("status") == "ready"
           and rec_of(kit3).get("problem") == "", (code, ans))
-    left = sorted(os.listdir(TALK_HOME / "work"))
-    check("(the killed job's scratch folder is still there: it is too new to be anyone's to clear yet)", len(left) == 1, left)
+    dead = TALK_HOME / "work" / "ffffffffffff"
+    dead.mkdir()
+    left = ["ffffffffffff"]
+    check("(a dead job's scratch folder just made is too new to be anyone's to clear yet)", TR.clear_stale_work() == [] and dead.is_dir())
     old = time.time() - 120
-    os.utime(TALK_HOME / "work" / left[0], (old, old))
+    os.utime(dead, (old, old))
     check("clearing by hand names exactly that folder, and a second clearing finds nothing", TR.clear_stale_work() == left and TR.clear_stale_work() == [])
 
     # a job written down that never started

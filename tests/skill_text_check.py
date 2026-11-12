@@ -297,6 +297,14 @@ def check_doors():
          "plain stories (one photo each)" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)
     case("post-kit.md: 'show my post kit' loads the kit page in the pane through home.py url", '## "Show my post kit"' in kitp and "home.py url" in kitp.split('## "Show my post kit"', 1)[1])
     case("post-kit.md: the kit's reel and carousel counts are guides", "about 8 to 14, a guide, not a rule" in kitp and "about 5 to 8, a guide" in kitp)
+    # the design preview on the kit's cards (Nicole's v24, section 7; the stage G fix round): the assistant is told
+    # what the picture is, in the kit page's own two lines
+    kitsrc = read(SCRIPTS / "kit.py")
+    flatk, flata = re.sub(r"\s+", " ", kitp), re.sub(r"\s+", " ", arr)
+    pv = tuple(re.search(r'"%s": "([^"]+)"' % k, kitsrc).group(1).replace("{name}", "<name>") for k in ("preview_of", "preview_stories"))
+    case("post-kit.md says what the small picture on a card is before anything is saved, in the kit page's own two lines, and that Add to my queue stays locked",
+         all(('"' + x + '"') in flatk for x in pv) and "Add to my queue stays locked, until they press Save slides (Save stories)" in flatk, pv)
+    case("arrange.md says the same where it says which slides count as the carousel", all(('"' + x + '"') in flata for x in pv) and "nothing to queue until Save slides" in flata)
     photos = read(SM / "parts" / "photos-in.md")
     case("photos-in.md: 'make the reel for the park shoot' goes to the pick and the reel page", "then the reel page, where they add the song" in photos)
     canva = read(SM / "parts" / "canva.md")
@@ -786,6 +794,21 @@ def check_talking():
         case(f"where-things-live names {n}", ("`" + n + "`") in live)
     case("...and the scripts still keep them there", all(x in src for x in ('"talking.json"', "talking.prev.json", "talking.lock", "talking-words.json", "preview.mp4", "facts.json", "talking.damaged-"))
          and str(talking_rec.LOG).replace("\\", "/").endswith("logs/talking.log") and talking_rec.TALK_HOME.name == "talking" and talking_rec.WORK.name == "work")
+    case("the part says what status says once they have changed the photos the assistant placed, in status's own words (stage G)",
+         "changed on the page since you placed them: ask before replacing them" in flat and "(changed on the page since you placed them: ask before replacing them)" in src)
+    # the stage G fix round: the files the first pass left unnamed, and the honest line about a job cut off
+    more = {"talking-words.prev.json": talking_rec.WORDS_PREV, "made-again": talking_rec.MADE_AGAIN}
+    case("where-things-live names the words as they were before, and the made-again mark, by the script's own names",
+         not [k for k, v in more.items() if k != v or ("`" + k + "`") not in live], more)
+    for n, has in (("talking-words.lock", '"talking-words.lock"'), ("talking/facts.lock", '"facts.lock"'),
+                   ("talking/<video key>/preview.unusable-<date>-<time>.mp4", "preview.unusable-")):
+        case(f"where-things-live names {n}, and the scripts still use that name", ("`" + n + "`") in live and has in src + read(SCRIPTS / "reel_page.py"))
+    case("where-things-live says the unusable small copy is kept and counts toward the room on the drive", "kept, never deleted; it counts toward the same room on the drive" in live)
+    flat_live = re.sub(r"\s+", " ", live)
+    case("where-things-live no longer says a job's sound is always removed when the job ends: a job cut off leaves it until the Assistant next sees the job is gone",
+         "removed when the job ends. Nothing of the photographer's is kept there" not in flat_live
+         and "A job cut off outright (a power cut, a force quit) can't tidy up" in flat_live and "clear_stale_work()" in src.split("def settle(", 1)[1].split("\ndef ", 1)[0]
+         and "shutil.rmtree(WORK / jid" in src.split("def _watchdog(", 1)[1].split("\ndef ", 1)[0])
     case("where-things-live says the small copies are kept, and how big they can get", "kept on purpose" in live and "1.3 GB" in live)
     case("where-things-live says the earlier edits and what a --replace replaced are kept", "`earlier`" in live and "`replaced`" in live and "the last 12" in live)
 

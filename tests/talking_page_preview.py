@@ -729,6 +729,13 @@ def run_page(t, c, s):
         c.js("window.__hold = false")
         case("ours: a Footage video that could not be loaded the first time shows nothing (no empty box to move, no handle) and is not asked for on every frame; once it can be played it shows by itself, with no reload",
              s.video.key(f) == vkey and lost == [False, False, False, False] and k1 >= 1 and k2 == k1 and back == [True, True, True], (lost, k1, k2, back))
+        # stage G: a Footage video's shape rides on its stretch in the state, so a wide video is drawn wide before
+        # its small copy has loaded and without the Footage list (which only the picker asks for); hers loads the list
+        shp = c.js("(function(){ var T = window.Talk, x = T.findShot(6), far = 'aaaaaaaaaaaa';"
+                   " return [x && x.v && x.v.w, x && x.v && x.v.h, T.mediaOf({v: {key: far, name: 'x.mp4', w: 320, h: 180}}), T.mediaOf({v: {key: far, name: 'x.mp4'}}),"
+                   "  T.defPos('center', 320, 180)]; })()")
+        case("a Footage video on a stretch has its own shape from the state: drawn wide before its small copy or the Footage list has loaded (with no shape known, tall, as before)",
+             shp[:2] == [320, 180] and (shp[2]["w"], shp[2]["h"]) == (320, 180) and (shp[3]["w"], shp[3]["h"]) == (1080, 1920), shp)
         save_js({"shots": [{"a": 6, "b": 9, "ns": [], "v": {"key": vkey, "name": FOOT}, "from": 0.5, "spot": "full", "pos": None, "me": None}]})
         at(WORDS[6]["start"] + 0.01)
         c.wait_for("document.getElementById('bvid').readyState >= 2 && !document.getElementById('bvid').seeking && window.__pic().vid", 15,

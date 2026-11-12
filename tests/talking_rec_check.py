@@ -296,12 +296,30 @@ try:
     good("shots: a Footage video by its key is kept by its name, with its start, and no photos",
          {"shots": [shot(0, 3, ns=[2], v=FOOT_KEY, spot="pip", **{"from": 1.23456})]}, "shots", [S(0, 3, [], "pip", v="clip one.mp4", frm=1.235)])
     stv = TR.state_for_page(KIT)["shots"][0]["v"]
-    check("... and the page is given it back as {key, name}", stv == {"key": FOOT_KEY, "name": "clip one.mp4"}, stv)
+    check("... and the page is given it back as {key, name}, with the video's own shape (a wide video is drawn wide from the first frame, as hers: stage G)",
+          stv == {"key": FOOT_KEY, "name": "clip one.mp4", "w": 320, "h": 180}, stv)
+    b4 = REC.read_bytes()
+    code, ans = sv({"shots": [shot(0, 3, ns=[], v=stv, spot="pip", **{"from": 1.235})]})
+    check("... and that very thing sent back as it came is taken (nothing to write), the shape never kept in the record",
+          code == 200 and REC.read_bytes() == b4 and "\"w\"" not in json.dumps(rec()["shots"]), (code, ans))
     good("shots: boxes are held to hers (x, y -0.5 to 1.5; w 0.08 to 2), to 4 places",
          {"shots": [shot(0, 0, spot="center", pos={"x": -9, "y": 9, "w": 0.01}), shot(1, 1, spot="pip", me={"x": 0.123456, "y": 0.5, "w": 5})]},
          "shots", [S(0, 0, [1], "center", pos={"x": -0.5, "y": 1.5, "w": 0.08}), S(1, 1, [1], "pip", me={"x": 0.1235, "y": 0.5, "w": 2.0})])
-    good("shots: stretches that overlap or come out of order are taken as they are (hers)",
-         {"shots": [shot(4, 9, ns=[2]), shot(0, 5, ns=[3])]}, "shots", [S(4, 9, [2], "full"), S(0, 5, [3], "full")])
+    # stage G: her page can never send two stretches that share a word (all it saves goes through setRange,
+    # which trims around the new one and sorts), so such a set is refused, and a set out of order is kept in order
+    good("shots: stretches sent out of order are kept in order of their first word (hers: setRange sorts)",
+         {"shots": [shot(6, 9, ns=[2]), shot(0, 5, ns=[3])]}, "shots", [S(0, 5, [3], "full"), S(6, 9, [2], "full")])
+    refused("two stretches that share a word (her page can never send them)", {"shots": [shot(0, 5, ns=[3]), shot(4, 9, ns=[2])]})
+    refused("... the same, sent the other way round", {"shots": [shot(4, 9, ns=[2]), shot(0, 5, ns=[3])]})
+    refused("... and one stretch inside another", {"shots": [shot(3, 9, ns=[2]), shot(5, 6, ns=[3])]})
+    good("shots: a stretch whose words are all cut still saves (cutting after placing makes one)",
+         {"shots": [shot(0, 2, ns=[3]), shot(8, 8, ns=[2])]}, "shots", [S(0, 2, [3], "full"), S(8, 8, [2], "full")])
+    # a record changed by hand can hold an overlap: it is still read (the later stretch has the shared words),
+    # and the page can still save from it (never locked out of its own record)
+    TR.change(KIT, lambda r: r.update(shots=[S(4, 9, [2], "full"), S(0, 5, [3], "full")]))
+    code, ans = sv({"shots": [shot(0, 5, ns=[3]), shot(4, 9, ns=[2], spot="pip")]})
+    check("a record that already overlaps (changed by hand): a save from the page is still taken", code == 200 and rec()["shots"][1]["spot"] == "pip", (code, ans))
+    TR.change(KIT, lambda r: r.update(shots=[S(4, 9, [2], "full"), S(0, 5, [3], "full")]))
     stp = TR.state_for_page(KIT)
     # cut is [[0, 2], [8, 8]]: word 3 is the first stretch's alone; 4 to 7 are shared, so they are the later one's
     check("... read in order of first word, the later one having the words they share",
@@ -470,6 +488,8 @@ try:
     r = run("place", SHORT, "--file", jfile(PL), "--replace")
     check("place --replace run twice: nothing changes the second time", r.returncode == 0 and REC.read_bytes() == before)
 
+    r = run("status", SHORT)
+    check("status straight after a place: the photo stretches are '(placed by you)'", "Photo stretches: 3 (placed by you);" in r.stdout, r.stdout)
     r = run("place", SHORT, "--file", jfile(PL))
     check("place: the assistant's own set sent again WITHOUT --replace (a run cut off or doubted) saves, changes nothing, asks nothing",
           r.returncode == 0 and r.stdout.strip() == "Saved: 3 photo stretches, 5 photos. The page shows them in a few seconds."
@@ -513,6 +533,13 @@ try:
     TR.change(KIT, lambda r: [TR.keep_replaced(r, f"round {i}") for i in range(20)] and None)
     check("... and only the last 12 are kept", len(rec()["replaced"]) == 12 and rec()["replaced"][-1]["why"] == "round 19")
 
+    r = run("status", SHORT)
+    check("status after the page changed the photos the assistant placed: no longer '(placed by you)'; it says to ask before replacing them (stage G)",
+          rec().get("claude_shots") is True and "(placed by you)" not in r.stdout
+          and "Photo stretches: 1 (changed on the page since you placed them: ask before replacing them);" in r.stdout, r.stdout)
+    TR.change(KIT, lambda r_: r_.pop("claude_placed", None) and None)
+    r = run("status", SHORT)
+    check("... and an older record (the flag, but not which set was placed) makes neither claim", "Photo stretches: 1;" in r.stdout, r.stdout)
     r = run("status", SHORT)
     check("status: where the reel stands, in a few plain lines",
           r.returncode == 0 and "my talk.mp4" in r.stdout and f"{NW} words" in r.stdout and "Photo stretches: 1" in r.stdout and "Talking folder: 2 videos" in r.stdout, r.stdout)

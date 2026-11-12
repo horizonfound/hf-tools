@@ -78,6 +78,25 @@ name: Check it on a Windows PC
 #                                   check flagged (Dustin, Nov 12). Needs Pillow for the pretend backup.
 #   tests/shoot_report_check.py     one report for a shoot on several cards (shoot_report.py, the report's card mode,
 #                                   the server's /card/N/ routes), on two pretend backups. Needs Pillow.
+#   tests/talking_engine_check.py, talking_rec_check.py, talking_capcut_check.py, pc_talking.py,
+#   talking_page_check.py           Nicole's v23 and v24, the talking-to-camera reel (added Nov 12; standard library
+#                                   only, pretend kits, the one tiny clip in tests/fixtures read by its header): the
+#                                   arithmetic against her numbers worked by hand; the record, a save from the page
+#                                   field by field and the chat's commands; the CapCut project written into a pretend
+#                                   projects folder; the PC line (Edit my video answers at once and makes nothing);
+#                                   and the page's routes and refusals (--no-chrome on Windows).
+#   tests/capcut_even.py            Mac job only (a SKIP on a PC): today's photo reels are byte for byte the projects
+#                                   kept from before the talking reel's builder went into capcut.py.
+#   tests/guard_check.py            Mac job only: the memory guard (tests/guard.py) the video and Chrome tests run under.
+#   tests/transcribe_check.py       a job of its own on the Mac, "mac-talking", under the guard: turning a talking
+#                                   video into words with the PRETEND transcriber only (the real app is never built
+#                                   or started, so macOS never asks anything), on 6-second clips the Mac makes itself.
+#   tests/talking_page_check.py (whole), tests/design_preview_check.py
+#                                   a job of its own on the Mac, "mac-page", which may fail without failing the check
+#                                   (as windows-page: nobody has seen these pages in GitHub's Chrome yet): the talking
+#                                   reel's real page and the designer's small preview picture for the post kit, in a
+#                                   hidden Chrome, one at a time under the guard.
+#                                   None of these has run on GitHub yet: the first push is the test.
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
 #   tests/pc_design_page.py  a job of its own, "windows-page", which may fail without failing the check (a first
@@ -103,10 +122,12 @@ on:
   workflow_dispatch:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/design_preview_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/design_preview_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -199,6 +220,21 @@ jobs:
       - name: One report for a shoot on several cards (the link, the card pages, the shoot page, the server's /card/N/ routes)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/shoot_report_check.py --port 8873
+      - name: The talking reel's arithmetic, against Nicole's numbers worked by hand
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_engine_check.py
+      - name: The talking reel's record (a save from the page field by field, the Talking folder, the chat's commands)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_rec_check.py
+      - name: A talking reel made in CapCut (the project, the maker and its job, into a pretend projects folder; CapCut is never started)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_capcut_check.py
+      - name: Talking reels on a PC (the named gap - Edit my video answers with the PC line at once and makes nothing)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/pc_talking.py
+      - name: The talking reel page (every route and refusal; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_page_check.py --no-chrome
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -322,6 +358,27 @@ jobs:
       - name: One report for a shoot on several cards
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/shoot_report_check.py --port 8873
+      - name: The memory guard the video and Chrome tests run under
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard_check.py
+      - name: The talking reel's arithmetic, against Nicole's numbers worked by hand
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/talking_engine_check.py
+      - name: The talking reel's record (a save from the page field by field, the Talking folder, the chat's commands)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/talking_rec_check.py
+      - name: Today's photo reels are still the CapCut projects kept from before the talking reel's builder
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/capcut_even.py
+      - name: A talking reel made in CapCut (a pretend projects folder; CapCut is never started)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/talking_capcut_check.py
+      - name: Talking reels the PC's way, tried on a Mac (the named gap)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/pc_talking.py
+      - name: The talking reel on the Mac's own Python 3.9 (nothing installed; these need nothing)
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 tests/guard_check.py && /usr/bin/python3 tests/talking_engine_check.py && /usr/bin/python3 tests/talking_rec_check.py && /usr/bin/python3 tests/capcut_even.py && /usr/bin/python3 tests/talking_capcut_check.py && /usr/bin/python3 tests/pc_talking.py
       - name: The words for a post and posting-day reminders on the Mac's own Python 3.9 (nothing installed; they need nothing)
         if: ${{ !cancelled() }}
         run: /usr/bin/python3 tests/words_check.py && /usr/bin/python3 tests/reminders_check.py && /usr/bin/python3 tests/peek_check.py
@@ -355,3 +412,39 @@ jobs:
           path: ${{ runner.temp }}/pc-smoke-kept.tgz
           if-no-files-found: ignore
           retention-days: 7
+  mac-talking:
+    # Turning a talking video into words (Nicole's v23), with the PRETEND transcriber only: the real app is never
+    # built or started here, so macOS is never given a reason to ask about Speech Recognition. The clips are 6 seconds
+    # long and made here by the Mac's own AVFoundation. One video test at a time, under the memory guard.
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - name: Turning a talking video into words (the pretend transcriber, the sound, the job, its limits and its tidy-up), on the Mac's own Python 3.9
+        if: ${{ !cancelled() }}
+        run: /usr/bin/python3 tests/guard.py 800 /usr/bin/python3 tests/transcribe_check.py
+      - name: The same on the newest Python this machine carries
+        if: ${{ !cancelled() }}
+        run: python3 tests/guard.py 800 python3 tests/transcribe_check.py
+  mac-page:
+    # The talking reel's real page, and the designer's small preview picture for the post kit, in a hidden Chrome on
+    # GitHub's Mac. A job of its own that may fail without failing the check, as windows-page: nobody has seen these
+    # pages in GitHub's Chrome yet, and a flaky first run must never block a push. One at a time, under the guard
+    # (3000 MB: the guard counts a Chrome's shared memory once per helper, so a hidden Chrome alone reads about 1 GB).
+    runs-on: macos-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - id: venv
+        name: A Python with Pillow
+        run: python3 -m venv /tmp/v && /tmp/v/bin/pip install --quiet pillow
+      - name: Which Chrome this machine carries
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/chrome_drive.py --where
+      - name: The talking reel page, whole (step 1, the script, the preview, the timeline, her words, the door on the reel page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_page_check.py
+      - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci

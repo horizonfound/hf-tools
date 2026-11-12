@@ -51,8 +51,10 @@ def main():
                 srv.shutdown()
                 srv.server_close()
         text = (SCRIPTS.parent / "parts" / "backup.md").read_text(encoding="utf-8")
-        check("the backup instructions look first, switch it on for them, and keep the picture for when they can't",
-              all(x in text for x in ("get_session", "set_remote_control", "phone_setup.py url", "Never for one card")))
+        # Since Nov 11, late: the Assistant cannot flip the switch itself in auto mode, so the instructions go straight
+        # to the page and never try the call (this check still asked for the call, and had failed since then)
+        check("the backup instructions go straight to the picture page, never try to flip the switch themselves, and never for one card",
+              all(x in text for x in ("phone_setup.py url", "Never for one card", "so never try")) and "set_remote_control" not in text)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"\n{'ALL OK' if not FAILED else str(len(FAILED)) + ' FAILED'}")
