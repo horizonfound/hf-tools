@@ -52,6 +52,18 @@ def on_disk(p):
     return any(unicodedata.normalize("NFC", n) == want for n in names)
 
 
+def top(rel):
+    """The shoot's own folder, from a file's place in the records: the first folder on the way. A shoot with
+    photos and clips keeps them in Photos and Videos inside it (Dustin, Nov 11), so a file's own folder is not
+    always the shoot's; a shoot of one kind is flat, and this is then the file's folder, as it always was."""
+    return Path(Path(rel).parts[0])
+
+
+def inside(rel):
+    """A file's place inside its shoot's folder: "Photos/Smith_0001_IMG_1.CR3", or just its name in a flat shoot."""
+    return Path(*Path(rel).parts[1:])
+
+
 def same_text(a, b):
     """Two paths spelled exactly alike, letter for letter. On a PC, Python's own path comparison ignores upper
     and lower case (as the drive does), which would hide a rename that only changes the case; this never does.
@@ -110,10 +122,12 @@ def plan_rename(session, studio, shoot_id, new_name):
     if not shoot.get("folder"):
         sys.exit(f"STOP: {shoot_id} has not been sorted yet; run sort.py first.")
     old_folder = Path(shoot["folder"])
+    if len(old_folder.parts) != 1:
+        sys.exit(f"STOP: {shoot_id}'s folder is recorded as {old_folder}, which is not a shoot folder I made. Nothing renamed.")
     # their naming, from the Studio File: folder pattern, and whether photos keep their frame names
     naming = studio_file.load().get("naming", {})
     keep_names = naming.get("file_names", "shoot") == "original"
-    in_folder = [p for p in index["photos"] if Path(p["file"]).parent == old_folder and p.get("original")]
+    in_folder = [p for p in index["photos"] if old_folder in Path(p["file"]).parents and p.get("original")]
     shoot_date = min((p["taken"] for p in in_folder if p.get("taken")), default=None)
     new_folder = Path(safe_folder(studio_file.render(naming, new_name, shoot_date)) if naming.get("folder_pattern") and shoot_date else safe_folder(new_name))
     prefix = slug(new_name)
@@ -123,22 +137,33 @@ def plan_rename(session, studio, shoot_id, new_name):
         sys.exit(f"STOP: a folder named {new_folder} already exists. Nothing renamed.")
 
     files = manifest["files"]
-    on_disk_names = {n.lower(): n for n in os.listdir(session / old_folder)}
+    listings = {}
+
+    def names_in(folder):
+        """The names in one folder of the shoot, by their lower-case spelling (read once per folder)."""
+        if folder not in listings:
+            try:
+                listings[folder] = {n.lower(): n for n in os.listdir(session / folder)}
+            except OSError:
+                listings[folder] = {}
+        return listings[folder]
+
     moves = []
     for p in in_folder:
         cur = Path(p["file"])
+        into = new_folder / inside(cur).parent   # the same place inside the shoot (Photos, Videos, or the top)
         rec = files.get(p["original"])
         if not rec or not rec.get("sha256"):
             sys.exit(f"STOP: no verified record for {p['original']}. Nothing renamed.")
         if keep_names:
             # photos keep their frame names; only the folder changes
-            new = new_folder / cur.name
+            new = into / cur.name
             sidecar_name = lambda ext: cur.with_suffix(ext).name  # noqa: E731
         else:
             m = NUMBERED.match(cur.name)
             if not m:
                 sys.exit(f"STOP: {cur.name} is not in the sorter's naming; will not guess. Nothing renamed.")
-            new = new_folder / f"{prefix}_{m['n']}_{m['orig']}"
+            new = into / f"{prefix}_{m['n']}_{m['orig']}"
             sidecar_name = lambda ext, m=m: f"{prefix}_{m['n']}_{Path(m['orig']).stem}{ext}"  # noqa: E731
         moves.append({"from": p["file"], "to": new.as_posix(), "original": p["original"], "sha256": rec["sha256"]})
         # the sidecar, if the sorter brought one along: once, by the record the backup verified
@@ -149,18 +174,18 @@ def plan_rename(session, studio, shoot_id, new_name):
             if so in files and (session / sc).exists():
                 if not files[so].get("sha256"):
                     sys.exit(f"STOP: no verified record for {so}. Nothing renamed.")
-                moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(ext)).as_posix(),
+                moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(ext)).as_posix(),
                               "original": so, "sha256": files[so]["sha256"]})
                 break
         else:
             # a sidecar the Studio wrote itself (the sneak-peek keyword) is not in the backup's records;
             # it travels along too, checked against its own hash, so Lightroom keeps pairing it with the photo.
             # Found by name regardless of case, since an older rename could leave its case behind the photo's.
-            found = on_disk_names.get((cur.stem + ".xmp").lower())
+            found = names_in(cur.parent).get((cur.stem + ".xmp").lower())
             if found:
-                sc = old_folder / found
+                sc = cur.parent / found
                 if studio_wrote(session / sc):
-                    moves.append({"from": sc.as_posix(), "to": (new_folder / sidecar_name(Path(found).suffix)).as_posix(),
+                    moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(Path(found).suffix)).as_posix(),
                                   "original": None, "sha256": sha256_of(session / sc), "studio": True})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
@@ -168,11 +193,10 @@ def plan_rename(session, studio, shoot_id, new_name):
     if len(set(dests)) != len(dests):
         sys.exit("STOP: two files would get the same new name. Nothing renamed.")
     # nothing may be in the way before the first move happens, so a rename never stops halfway
-    old_names = {x.name.lower() for x in (session / old_folder).iterdir()}
     for x in moves:
         to_name, from_name = Path(x["to"]).name, Path(x["from"]).name
-        if to_name.lower() != from_name.lower() and to_name.lower() in old_names:
-            sys.exit(f"STOP: {to_name} is already in {old_folder}. Nothing renamed.")
+        if to_name.lower() != from_name.lower() and to_name.lower() in names_in(Path(x["from"]).parent):
+            sys.exit(f"STOP: {to_name} is already in {Path(x['from']).parent}. Nothing renamed.")
     if same_text(new_folder, old_folder) and all(Path(x["to"]).name == Path(x["from"]).name for x in moves):
         return shoot, old_folder, new_folder, []
     # on a PC, a place longer than File Explorer can open would stop the rename part way: found now, before anything
@@ -181,8 +205,8 @@ def plan_rename(session, studio, shoot_id, new_name):
     # folder with a shorter prefix can pass the first two and fail there).
     long = [x["to"] for x in moves if this_computer.path_too_long(session / x["to"])]
     if not same_text(new_folder, old_folder):
-        long += [(new_folder / Path(x["from"]).name).as_posix() for x in moves
-                 if this_computer.path_too_long(session / new_folder / Path(x["from"]).name)]
+        long += [(new_folder / inside(x["from"])).as_posix() for x in moves
+                 if this_computer.path_too_long(session / new_folder / inside(x["from"]))]
     if this_computer.path_too_long(session / new_folder, folder=True):
         long.insert(0, new_folder.as_posix())
     # the report's small copies of the sneak peeks take the photos' new names too (follow_sneak_peeks), inside the
@@ -236,7 +260,7 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             this_computer.rename(session / old_folder, session / new_folder)  # one atomic move of the whole folder
             folder_moved = True
         for m in moves:
-            src = session / new_folder / Path(m["from"]).name
+            src = session / new_folder / inside(m["from"])
             dst = session / m["to"]
             if dst.exists() and not same_text(src, dst) and not case_twin(src, dst):
                 entry["problems"].append(f"{m['to']} already exists; not overwritten")
@@ -312,7 +336,7 @@ def where_they_are(session, new_folder, moves):
         if m.get("moved") or on_disk(session / m["to"]):
             out[m["from"]] = m["to"]
         else:
-            out[m["from"]] = (new_folder / Path(m["from"]).name).as_posix()
+            out[m["from"]] = (new_folder / inside(m["from"])).as_posix()
     return out
 
 
@@ -324,7 +348,7 @@ def write_records(session, studio, shoot_id, new_folder, moves, new_name=None):
     new_path = where_they_are(session, new_folder, moves)
     # a rename that stopped part way recorded some photos in the renamed folder under their old names
     for m in moves:
-        between = (new_folder / Path(m["from"]).name).as_posix()
+        between = (new_folder / inside(m["from"])).as_posix()
         if between != m["from"]:
             new_path.setdefault(between, new_path[m["from"]])
     index = load(studio, "index.json")
@@ -442,8 +466,8 @@ def finish_unfinished(session, studio):
                     f"({entry.get('to_name')}); each real one matched the backup.")
             continue
         say(f"Finishing a rename that was cut off: {entry.get('from_name')} -> {entry.get('to_name')}")
-        new_folder = Path(real[0]["to"]).parent if real else None
-        old_folder = Path(real[0]["from"]).parent if real else None
+        new_folder = top(real[0]["to"]) if real else None
+        old_folder = top(real[0]["from"]) if real else None
         # the old run's own notes about what it had not got to yet, and about phantoms, are not problems
         phantom_names = [m["to"] for m in moves if m.get("phantom")]
         entry["problems"] = [p for p in entry.get("problems", [])
@@ -463,7 +487,7 @@ def finish_unfinished(session, studio):
                 folder_moved = True
             for m in real:
                 dst = session / m["to"]
-                src = session / new_folder / Path(m["from"]).name
+                src = session / new_folder / inside(m["from"])
                 if not m.get("moved") and on_disk(src) and not same_text(src, dst) and (not dst.exists() or case_twin(src, dst)):
                     this_computer.rename(src, dst)
                     m["moved"] = True
@@ -473,7 +497,7 @@ def finish_unfinished(session, studio):
             failed(session, studio, log, log_path, entry, e, new_folder, real, folder_moved)
         for m in real:
             dst = session / m["to"]
-            src = session / new_folder / Path(m["from"]).name
+            src = session / new_folder / inside(m["from"])
             if on_disk(dst) and not (on_disk(src) and not same_text(src, dst)):
                 m["moved"] = True
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:

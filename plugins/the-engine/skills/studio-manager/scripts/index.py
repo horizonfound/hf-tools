@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import exif_read  # noqa: E402
+import clips  # noqa: E402  (which files are video, and how to say a count)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
 
@@ -38,10 +39,19 @@ def build(session_dir):
         rel = p.relative_to(session_dir).as_posix()
         rec = {"file": rel, "size": p.stat().st_size, "sha256": hashes.get(rel)}
         facts = exif_read.read(p)
-        if not facts.get("taken"):
-            unreadable.append(rel)
         rec.update(facts)
+        if clips.is_clip(p):
+            rec["clip"] = True   # by the file's ending, whether or not its date could be read
+            if not rec.get("taken"):
+                # A clip with no date would be set aside with the leftovers, out of sight (Nov 11). Phones and some
+                # cameras write a clip's header at the END of the file, where the quick reader does not look, and
+                # some write no date in it at all. So: the video reader finds the header wherever it is; failing
+                # that, the file's own time, which the camera set when it wrote the clip and the backup kept.
+                when, how = clips.recorded(p)
+                if when:
+                    rec["taken"], rec["taken_from"] = when, how
         records.append(rec)
+    unreadable = [r["file"] for r in records if not r.get("taken")]
     records.sort(key=lambda r: (r.get("taken") or "9999", r["file"]))
 
     taken = [r["taken"] for r in records if r.get("taken")]
@@ -77,7 +87,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         sys.exit("usage: index.py <session folder>")
     ix = build(sys.argv[1])
-    print(f"{ix['count']} photos or clips indexed in {ix['seconds']} s")
+    print(f"{clips.words(ix['count'] - ix['clips'], ix['clips'])} indexed in {ix['seconds']} s")
     print(f"Taken: {nice(ix['first'])} to {nice(ix['last'])}")
     for day, n in ix["days"].items():
         print(f"  {day}: {n}")

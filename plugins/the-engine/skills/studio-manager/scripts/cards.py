@@ -21,6 +21,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -135,9 +136,59 @@ def register(root, session):
     return fp
 
 
+# A card that has stopped answering (Dustin's first real backup, Nov 11: the card went quiet, the check sat in the
+# middle of a read for about 15 minutes and said nothing; taking the card out and putting it back fixed it). A read
+# from such a card cannot be given up from inside the program doing it, so the first touch of the card is made by a
+# small program of its own: if it has not answered in ANSWER_SECONDS, it is left behind and the backup stops with
+# plain words, before anything else reads the card.
+ANSWER_SECONDS = 30
+QUIET_CARD = ("Your memory card has stopped answering. Nothing was copied and nothing on it was changed. "
+              "Take the card out, put it back in, and say go.")
+
+
+def probe(root, files=3, each=64 * 1024):
+    """Touch the card the way a backup first does: list it, and read the front of a few files. Returns how many
+    files it read. Any error is the caller's to hear (the check says it in its own words)."""
+    read = 0
+    for p, _ in files_on(root)[:files]:
+        with open(Path(root) / p, "rb") as fh:
+            fh.read(each)
+        read += 1
+    return read
+
+
+def answers(root, limit=None, cmd=None):
+    """True when the card answers a small read within `limit` seconds (ANSWER_SECONDS). False when it does not:
+    the reading program is told to stop and is not waited for (one stuck on a quiet card cannot be stopped until
+    the card answers or comes out). A card that answers with an error counts as answering: the check that follows
+    says what is wrong. `cmd` is for the tests (a program that never finishes)."""
+    if limit is None:
+        try:   # a shorter wait for the tests only
+            limit = float(os.environ.get("ASSISTANT_CARD_ANSWER_SECONDS") or ANSWER_SECONDS)
+        except ValueError:
+            limit = ANSWER_SECONDS
+    cmd = cmd or [sys.executable, str(Path(__file__).resolve()), "probe", str(root)]
+    try:
+        p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        return True   # could not even start the small program: let the check itself read the card, as before
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        if p.poll() is not None:
+            return True
+        time.sleep(0.1)
+    try:
+        p.kill()
+    except OSError:
+        pass
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
+    pr = sub.add_parser("probe")
+    pr.add_argument("card")
     f = sub.add_parser("fingerprint")
     f.add_argument("card")
     c = sub.add_parser("check")
@@ -146,6 +197,12 @@ def main():
     r.add_argument("card")
     r.add_argument("session")
     a = ap.parse_args()
+    if a.cmd == "probe":
+        try:
+            print(f"read the front of {probe(a.card)} files")
+        except OSError as e:
+            sys.exit(f"could not read the card ({e.__class__.__name__})")
+        return
     if a.cmd == "fingerprint":
         print(json.dumps(fingerprint(a.card), indent=1))
     elif a.cmd == "check":

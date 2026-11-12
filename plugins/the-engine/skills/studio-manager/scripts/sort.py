@@ -17,6 +17,10 @@ inside the new one, in shooting order. Rule 1 in code:
 Names come from _studio/names.json (what they said) or the suggested name in
 _studio/shoots.json (date-based) when they left one blank. A photo's sidecar
 (.xmp) travels with it. Files with no capture time stay where they are.
+
+A shoot with photos and video clips gets two folders inside its own, Photos and
+Videos, each numbered from 0001 in shooting order (Dustin, Nov 11). A shoot of
+only photos, or only clips, stays one flat folder, as before.
 """
 import argparse
 import errno
@@ -31,6 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import studio_file  # noqa: E402
+import clips  # noqa: E402  (which files are video, and the Photos and Videos folders)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
 
@@ -170,15 +175,23 @@ def make_plan(session, studio):
         shoot_date = photos[0].get("taken") or groups[s["groups"][0]]["start"]
         folder = safe_folder(studio_file.render(naming, name, shoot_date)) if naming.get("folder_pattern") else safe_folder(name)
         prefix = slug(name)
-        for n, p in enumerate(photos, 1):
+        # photos and clips together: two folders inside the shoot's, each numbered on its own, so a clip never
+        # sits in among the photos or takes one of their numbers (Dustin, Nov 11). One kind only: one flat folder.
+        stills, videos = [p for p in photos if not clips.is_clip(p)], [p for p in photos if clips.is_clip(p)]
+        if stills and videos:
+            placed = ([(Path(folder) / clips.PHOTOS_FOLDER, n, p) for n, p in enumerate(stills, 1)]
+                      + [(Path(folder) / clips.VIDEOS_FOLDER, n, p) for n, p in enumerate(videos, 1)])
+        else:
+            placed = [(Path(folder), n, p) for n, p in enumerate(photos, 1)]
+        for into, n, p in placed:
             src = Path(p["file"])
             new_name = src.name if keep_names else f"{prefix}_{n:04d}_{src.name}"
-            dest = Path(folder) / new_name
+            dest = into / new_name
             cands = [(src, dest)]
             # the sidecar travels with its photo, same new stem
             for sc in (src.with_suffix(".xmp"), src.with_suffix(".XMP")):
                 if sc.as_posix() in files:
-                    cands.append((sc, Path(folder) / (sc.name if keep_names else f"{prefix}_{n:04d}_{sc.name}")))
+                    cands.append((sc, into / (sc.name if keep_names else f"{prefix}_{n:04d}_{sc.name}")))
             for a, b in cands:
                 if text_key(b) in used_dest:
                     sys.exit(f"STOP: two files would land on {b}. Nothing sorted."
@@ -260,14 +273,15 @@ def main():
     problems = check_plan(session, plan)
     by_shoot = {}
     for m in plan["moves"]:
-        by_shoot.setdefault(m["name"], 0)
-        by_shoot[m["name"]] += 1
+        where = Path(m["to"]).parent.as_posix()
+        by_shoot.setdefault(where, 0)
+        by_shoot[where] += 1
     say(f"Plan for {plan['session']}:")
     if plan["already_sorted"]:
-        say(f"  already sorted on an earlier run, left alone: {plan['already_sorted']} photos")
-    for name, n in by_shoot.items():
-        say(f"  {safe_folder(name)}/   {n} files")
-    say(f"  left where they are: {len(plan['untouched'])} (no capture time, or not a photo)")
+        say(f"  already sorted on an earlier run, left alone: {plan['already_sorted']} files")
+    for where, n in by_shoot.items():
+        say(f"  {where}/   {n} files")
+    say(f"  left where they are: {len(plan['untouched'])} (no capture time, or not a photo or a clip)")
     first = next((m for m in plan["moves"] if not m.get("already")), None)
     if first:
         say(f"  e.g. {first['from']}  ->  {first['to']}")
@@ -435,7 +449,7 @@ def main():
         fs = [m for m in plan["moves"] if m["shoot"] == s["id"]]
         if fs:
             s["name"] = fs[0]["name"]
-            s["folder"] = Path(fs[0]["to"]).parent.as_posix()
+            s["folder"] = Path(fs[0]["to"]).parts[0]   # the shoot's own folder (Photos and Videos sit inside it)
     (studio / "shoots.json").write_text(json.dumps(sh, indent=1), encoding="utf-8")
 
     log["finished"] = datetime.now().isoformat(timespec="seconds")

@@ -13,12 +13,14 @@ in _studio/names.json by serve_report.py and shown filled in next time.
     python3 first_look.py "<session folder>"     writes a one-line page that just opens report.html
 """
 import html
+import re
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+import clips  # noqa: E402  (which files are video, and how to say a count)
 this_computer.utf8_output()
 
 CSS = """
@@ -55,6 +57,15 @@ CSS = """
 .pics .ph:hover{transform:rotate(0) translateY(-6px);box-shadow:var(--shadow);z-index:1}
 .pics img{width:100%;height:100%;object-fit:cover}
 .pics .chip{z-index:2}
+.pics .ph.clip{position:relative}
+.pics .ph.clip::after{content:'';position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(20,22,28,.55);pointer-events:none}
+.pics .ph.clip::before{content:'';position:absolute;left:50%;top:50%;z-index:1;margin:-11px 0 0 -7px;border-style:solid;border-width:11px 0 11px 18px;border-color:transparent transparent transparent #fff;pointer-events:none}
+.pics .ph.clip{cursor:pointer}
+.clips-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem 1rem;padding:0 .3rem;font:500 14.5px/1.4 var(--sans)}
+.clips-row .all-clips{color:var(--coral-2,#b9542f);font-weight:600;background:none;border:0;padding:0;cursor:pointer;font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.clips-row .clips-hint{color:var(--soft,#7a7067)}
+.clips-row .clips-state{flex-basis:100%;color:var(--ink);min-height:1.2em}
+.shoot .novid{display:grid;place-items:center;text-align:center;aspect-ratio:5/4;border-radius:20px;background:var(--sand-l);color:var(--soft,#7a7067);font:500 15px/1.4 var(--sans);padding:1.5rem;position:relative}
 .copy{display:grid;gap:.9rem}
 .copy .n{font:600 40px/1 var(--sans);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--coral-2)}
 .copy .meta{display:flex;flex-wrap:wrap;gap:.45rem}
@@ -354,6 +365,33 @@ def big_preview(studio, g, p):
     return f"groups/big/{p}" if pictures.make_jpeg(src, big, 2000, 82) else None
 
 
+def clip_stills(studio, g, most=3):
+    """For a group of nothing but video clips that has no pictures yet (a backup made before clips got stills, or
+    one whose stills could not be made at the time): a still from up to `most` of its clips, made once into
+    groups/ and found again by name after that. Fills g["previews"] and g["clip_previews"] for this page only;
+    the records are not rewritten. Nothing when the drive is unplugged or on a PC (no stills there yet)."""
+    files = g.get("files", [])
+    if g.get("previews") or not files or not all(clips.is_clip(f) for f in files):
+        return
+    try:
+        from where import locate
+        root, _ = locate(studio)
+    except Exception:  # noqa: BLE001
+        return
+    if len(files) > most:
+        step = (len(files) - 1) / (most - 1)
+        files = [files[round(i * step)] for i in range(most)]
+    made = []
+    for f in files:
+        stem = Path(f).stem
+        m = re.match(r"^.+?_\d{4}_(.+)$", stem)   # the camera's own name, so a rename finds the same still again
+        name = f"{g['id']}_{m.group(1) if m else stem}.jpg"
+        if (studio / "groups" / name).exists() or ((root / f).is_file() and clips.still(root / f, studio / "groups" / name)):
+            made.append(name)
+    clips.borrow_turns(studio / "groups", made)   # a still with nobody in it stands the way its neighbour does
+    g["previews"], g["clip_previews"] = made, list(made)
+
+
 def peeks_by_shoot(studio):
     """{shoot id: [preview file names]} of the sneak peeks that have a preview, in the order they were picked."""
     out = {}
@@ -394,9 +432,46 @@ def note_card(note):
     return "\n".join(out)
 
 
+def tally(gs):
+    """(photos, clips) in these groups. Older records have no count of clips, so the files are counted."""
+    photos = clips_ = 0
+    for g in gs:
+        if "photos" in g and "clips" in g:
+            photos, clips_ = photos + g["photos"], clips_ + g["clips"]
+        else:
+            a, b = clips.count(g.get("files", []))
+            photos, clips_ = photos + a, clips_ + b
+    return photos, clips_
+
+
+# A click on a clip's still plays the clip in the computer's own video player; "See all N video clips" opens their
+# folder. Both ask the report's server (a page cannot open a file itself), and what happened is said right under the
+# pictures. Opened as a plain file, with no server, the line says how to get there instead.
+CLIPS_SCRIPT = """<script>(()=>{
+const say=(row,m)=>{const t=row&&row.querySelector('.clips-state');if(t)t.textContent=m||''};
+const rowOf=id=>document.querySelector(".clips-row[data-shoot='"+id+"']");
+const ask=async(row,url)=>{
+ if(!location.protocol.startsWith('http')){say(row,'Ask Claude to show the report, and this will work.');return}
+ try{const r=await fetch(url,{cache:'no-store'});const j=await r.json();say(row,j.words||(j.ok?'':'Could not open it.'))}
+ catch(e){say(row,'The Assistant is not running right now. Ask Claude to show the report, then try again.')}};
+document.querySelectorAll('.ph.clip[data-play]').forEach(p=>{
+ const go=()=>{const row=rowOf(p.dataset.shoot);say(row,'Opening it...');ask(row,'/play?file='+encodeURIComponent(p.dataset.play))};
+ p.addEventListener('click',go);p.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}})});
+document.querySelectorAll('.clips-row .all-clips').forEach(b=>b.addEventListener('click',()=>{
+ const row=b.closest('.clips-row');say(row,'Opening the folder...');ask(row,'/open-clips?shoot='+encodeURIComponent(row.dataset.shoot))}));
+})();</script>"""
+
+
 def nice_date(iso):
     d = datetime.fromisoformat(iso)
     return d.strftime("%a, %b ") + str(d.day)
+
+
+def both_folders(s, groups):
+    """True when this shoot's photos and clips were filed in Photos and Videos inside its folder."""
+    want = {clips.PHOTOS_FOLDER, clips.VIDEOS_FOLDER}
+    seen = {Path(f).parts[1] for g in s.get("groups", []) if g in groups for f in groups[g].get("files", []) if len(Path(f).parts) > 2}
+    return want <= seen
 
 
 def today_iso():
@@ -413,7 +488,8 @@ def shoots_section(studio):
     shoots = json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"]
     names = json.loads((studio / "names.json").read_text(encoding="utf-8")) if (studio / "names.json").exists() else {}
     e = html.escape
-    total = sum(s["photos"] for s in shoots)
+    counts = {s["id"]: tally([groups[g] for g in s["groups"] if g in groups]) for s in shoots}
+    total = clips.words(sum(a for a, _ in counts.values()), sum(b for _, b in counts.values()))
     days = sorted({groups[g]["start"][:10] for s in shoots for g in s["groups"]})
     named = sum(1 for s in shoots if names.get(s["id"]))
     filed = all(s.get("folder") for s in shoots)
@@ -434,7 +510,7 @@ def shoots_section(studio):
         pass
 
     out = ["<div class='wrap'><div class='shoots-head'><span class='eyebrow'>What's on the card</span>",
-           f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total:,} photos</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
+           f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total}</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
            f"<p class='lede'>{'Each one is already in its own folder, named by date. Give it a better name and everything is renamed to match.' if filed else 'Give each one a name and it is filed, named and ready for you.'}</p>",
            f"<div class='talk'><span class='mic'>{MIC}</span><div><h3>Just tell me who's who.</h3>"
            "<p>Say it the way you'd say it to a person. I'll sort out which is which and fill the names in.</p>"
@@ -443,6 +519,8 @@ def shoots_section(studio):
     for i, s in enumerate(shoots, 1):
         gs = [groups[g] for g in s["groups"]]
         start = gs[0]["start"]
+        for g in gs:
+            clip_stills(studio, g)
         mine = peeks.get(s["id"], [])
         if len(mine) >= 6:   # the six sneak peeks as one mosaic: the hero, two beside it, three under
             pics = [(p, None) for p in mine[:6]]
@@ -452,7 +530,12 @@ def shoots_section(studio):
             rest = mine[3:6]
         else:                # not picked yet: three previews spread across the shoot
             pics = [(p, g) for g in gs for p in g.get("previews", [])]
-            if len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
+            if pics and all(p in g.get("clip_previews", []) for p, g in pics):
+                # stills from clips: the three where the face makes the best picture, the best one biggest
+                # (Dustin, Nov 11: the preview "should at least look semi-decent")
+                score = clips.turns(studio / "groups")
+                pics = sorted(pics, key=lambda pg: -(score.get(pg[0], {}).get("face") or 0))[:3]
+            elif len(pics) > 3:  # the hero from the middle of the shoot, two more spread out
                 pics = [pics[len(pics) // 2], pics[0], pics[-1]]
             rest = []
         lenses = sorted({l for g in gs for l in g.get("lenses", [])})
@@ -460,17 +543,38 @@ def shoots_section(studio):
         # the box always shows the shoot's current name (locked in, or the suggested one it was filed under), so
         # clicking clears it and shows that name underneath in grey (Dustin, Oct 28: a fresh backup showed an empty box)
         val = names.get(s["id"]) or s.get("name") or s.get("suggested", "")
+        n_photos, n_clips = counts[s["id"]]
+        how_many = clips.words(n_photos, n_clips)
+
         def img(p, g):
             if g is None:
                 return f"<img src='sneak-peeks/{e(p)}' alt=''>"
+            if is_still(p, g):   # a still from a video clip: shown as it is (there is no bigger photo behind it)
+                return f"<img src='groups/{e(p)}' alt='A still from a video clip. Click to play the clip.'>"
             big = big_preview(studio, g, p)
             return f"<img src='groups/{e(p)}' alt=''" + (f" data-big='{e(big)}'" if big else "") + ">"
+
+        def is_still(p, g):
+            return g is not None and p in g.get("clip_previews", [])
+
+        def clip_of(p, g):
+            """The clip a still came from, as the records spell it (the still's name ends with the camera's name)."""
+            cam = p[:-4].split("_", 1)[-1]
+            return next((f for f in g.get("files", []) if clips.is_clip(f) and Path(f).stem.endswith(cam)), "")
+
+        def tile(j, p, g):
+            rot = f"style='--rot:{ROTS[j % len(ROTS)]}deg'"
+            if is_still(p, g):   # a still from a clip: a click plays the clip (it has a play mark on it, so it must)
+                return (f"<div class='ph clip' data-play='{e(clip_of(p, g))}' data-shoot='{e(s['id'])}' {rot} role='button' tabindex='0' "
+                        f"title='Play this video clip'>{img(p, g)}</div>")
+            return f"<div class='ph' data-g='{e(s['id'])}' {rot} title='Click to see it bigger'>{img(p, g)}</div>"
         out.append("<article class='shoot'><div class='top'>")
         out.append("<div class='gal'>")   # the gallery, with the sneak-peeks line under it (Dustin, Oct 28)
         out.append(f"<div class='pics{' six' if len(pics) == 6 else ''}'>" + "".join(
-            f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[j % len(ROTS)]}deg' title='Click to see it bigger'>{img(p, g)}</div>"
-            for j, (p, g) in enumerate(pics))
-            + f"<span class='chip f-sun' style='--rot:-5deg;top:-1.55rem;left:-.7rem'>{s['photos']:,} photos</span>"
+            tile(j, p, g) for j, (p, g) in enumerate(pics))
+            + ("" if pics else f"<div class='novid'>Video clips don't show a picture here yet.<br>{'All ' + format(n_clips, ',') + ' are' if n_clips > 1 else 'It is'} in the folder, copied and checked.</div>"
+               if n_clips and not n_photos else "")
+            + f"<span class='chip f-sun' style='--rot:-5deg;top:-1.55rem;left:-.7rem'>{how_many}</span>"
             + "</div>")   # no "outfits or breaks" chip: a nice touch, not needed (Dustin, Oct 28)
         if len(pics) == 6:
             out.append(f"<div class='peeks-wrap' data-shoot='{e(s['id'])}'>"
@@ -480,6 +584,13 @@ def shoots_section(studio):
                        "<button class='pk send' type='button'>Pick again</button><button class='pk cancel' type='button'>Never mind</button></div>"
                        "<div class='peeks-more' hidden></div>"
                        "<p class='peeks-state'></p></div>")
+        if n_clips:
+            # a way to reach every clip, and the line that says what a click did, right under the pictures
+            shown = sum(1 for p, g in pics if is_still(p, g))
+            link = (f"See all {n_clips:,} video clips" if n_clips > 1 else "Open the folder this video clip is in")
+            hint = "Click a picture to play that clip." if shown else ""
+            out.append(f"<div class='clips-row' data-shoot='{e(s['id'])}'><button class='all-clips' type='button'>{link} <span aria-hidden='true'>↗</span></button>"
+                       + (f"<span class='clips-hint'>{hint}</span>" if hint else "") + "<span class='clips-state' aria-live='polite'></span></div>")
         out.append("</div>")   # gal
         out.append("<div class='copy'>")
         out.append(f"<span class='n'>{i:02d}</span>")
@@ -493,7 +604,9 @@ def shoots_section(studio):
                    f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'>"
                    f"<button class='go' type='button' data-shoot='{e(s['id'])}'>Rename</button></div>"
                    f"<span class='state' data-for='{e(s['id'])}'></span>"
-                   + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match.</small></div>"
+                   + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match."
+                      + (f" Inside its folder, your photos are in <b>{clips.PHOTOS_FOLDER}</b> and your video clips in <b>{clips.VIDEOS_FOLDER}</b>." if both_folders(s, groups) else "")
+                      + "</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
         # the editing queue, one button: click, pick a date on the calendar, done (Dustin, Oct 28)
@@ -520,7 +633,7 @@ def shoots_section(studio):
             out.append(card)
         out.append("</article>")
     out.append("</div>")   # no how-to paragraph under the shoots: not needed (Dustin, Oct 28)
-    return "\n".join(out), PICKER + SCRIPT
+    return "\n".join(out), PICKER + SCRIPT + CLIPS_SCRIPT
 
 
 def write_page(session_dir):

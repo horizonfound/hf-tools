@@ -13,6 +13,7 @@ import argparse, errno, hashlib, json, os, shutil, subprocess, sys, time
 from datetime import datetime
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import clips  # noqa: E402  (only for the words: "212 photos and 6 clips", never "photos or clips")
 this_computer.utf8_output()
 
 CHUNK = 8 * 1024 * 1024
@@ -368,7 +369,7 @@ def main():
     files, skipped = inventory(src)
     total_bytes = sum(s for _, s in files if s > 0)
     media = [p for p, s in files if p.suffix.lower() in MEDIA]
-    say(f"Source: {src}\n  {len(files)} files, {human(total_bytes)}, {len(media)} photos or clips")
+    say(f"Source: {src}\n  {len(files)} files, {human(total_bytes)}, {clips.words_for(media)}")
     if not files:
         say("STOP: the card looks empty. Nothing to copy.")
         sys.exit(2)
@@ -469,7 +470,7 @@ def main():
     mac = "Mac " if this_computer.MAC else ""   # "hidden Mac system file" on a Mac, word for word as before; "hidden system file" on a PC
     skipped_note = f" ({skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be)" if skipped else ""
     lines += ["## What's on it", "",
-              f"- {len(media)} photos or clips, " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda t: -t[1])) + skipped_note,
+              f"- {clips.words_for(media)}, " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda t: -t[1])) + skipped_note,
               f"- Taken: {taken[0]} to {taken[-1]}" if len(taken) >= 2 else (f"- Taken: {taken[0]}" if taken else "- Taken: (no dates found yet)")]
     cams = sorted({v["camera"] for v in infos.values() if v.get("camera")})
     if cams:

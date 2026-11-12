@@ -25,7 +25,8 @@ from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from finder import open_folder as show_in_finder
+from finder import open_folder as show_in_finder, open_file as open_in_player
+import clips  # noqa: E402  (which files are video)
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
 import look  # noqa: E402  (the pages' own font: GET /look-font)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -353,6 +354,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if parts.path in ("/play", "/open-clips"):
+            return self.clips(parts)
         if parts.path != "/open":
             return super().do_GET()
         want = parse_qs(parts.query).get("path", [""])[0]
@@ -393,6 +396,61 @@ class Handler(SimpleHTTPRequestHandler):
                 ok, words = True, f"Opened {target.name or str(target)} in {this_computer.FILES_APP}."
             self.last_open[str(target)] = now
         print(f"open asked: {target} -> {'ok' if ok else 'no'}: {words}", flush=True)
+        out = json.dumps({"ok": ok, "words": words}).encode()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(out)
+
+    def clips(self, parts):
+        """GET /play?file=<a clip, as the backup's records spell it>: play it in the computer's own video player.
+        GET /open-clips?shoot=<id>: open the folder that shoot's video clips are in. Neither takes a place on the
+        drive from the page: the clip must be one the records list, and the folder is worked out from the records."""
+        q = parse_qs(parts.query)
+        ok, words = False, ("That isn't a video clip this report names." if parts.path == "/play"
+                            else "I couldn't find that shoot's video clips.")
+        try:
+            from where import locate
+            root, records = locate(self.studio)
+            index = json.loads((records / "index.json").read_text(encoding="utf-8")).get("photos", [])
+            target = None
+            if parts.path == "/play":
+                want = q.get("file", [""])[0]
+                if any(p.get("file") == want and clips.is_clip(p) for p in index):
+                    target = root / want
+            else:
+                sid = q.get("shoot", [""])[0]
+                groups = {g["id"]: g for g in json.loads((records / "groups.json").read_text(encoding="utf-8"))["groups"]}
+                shoot = next((s for s in json.loads((records / "shoots.json").read_text(encoding="utf-8"))["shoots"] if s.get("id") == sid), None)
+                listed = {p.get("file") for p in index}
+                mine = [f for g in (shoot or {}).get("groups", []) if g in groups for f in groups[g].get("files", []) if clips.is_clip(f) and f in listed]
+                folders = {Path(f).parent for f in mine}
+                if folders:   # the Videos folder, or the shoot's own folder when its clips sit right in it
+                    target = root / (folders.pop() if len(folders) == 1 else Path(Path(mine[0]).parts[0]))
+            if target is not None:
+                there = target.is_file() if parts.path == "/play" else target.is_dir()
+                now = time.monotonic()
+                last = self.last_open.get(str(target))
+                if not there:
+                    words = f"That {'video clip' if parts.path == '/play' else 'folder'} isn't there right now. Is {this_computer.drive_words(target) or 'the drive'} plugged in?"
+                elif last is not None and now - last <= 1.0:
+                    ok, words = True, ""   # the second half of a double click: already opening
+                elif parts.path == "/play":
+                    ok, why = open_in_player(target)
+                    words = ("Playing in your video player. If you don't see it, it opened behind this window."
+                             if ok else f"Couldn't open your video player. ({why})")
+                else:
+                    ok, why = show_in_finder(target)
+                    APP = this_computer.FILES_APP
+                    name = target.name or str(target)
+                    words = (f"Opened {name} in {APP}, behind this window. Click {APP} in {this_computer.APP_BAR} to see it." if why == "behind"
+                             else f"Opened {name} in {APP}.") if ok else f"Couldn't open {APP}. ({why})"
+                self.last_open[str(target)] = now
+        except Exception as e:  # noqa: BLE001  (a click must always get an answer in plain words)
+            ok, words = False, "Something went wrong opening that. Tell Claude and it'll sort it out."
+            print(f"clips asked: {parts.path} failed: {e.__class__.__name__}: {e}", flush=True)
+        print(f"open asked: {parts.path} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")

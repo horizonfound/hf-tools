@@ -106,6 +106,29 @@ def open_folder(path):
         return False, str(e)
 
 
+def open_file(path):
+    """(ok, note) after opening one file with whatever the computer opens it with: a video clip in the computer's
+    own player (QuickTime Player on a Mac). The file is only opened, never changed. Not ok: note says why."""
+    path = str(path)
+    if sys.platform == "win32":
+        # unproven on a real PC
+        import os
+        path = os.path.normpath(path)
+        if not os.path.isfile(path):
+            return False, "that file is not there"
+        try:
+            os.startfile(path)
+            return True, ""
+        except OSError as e:
+            return False, str(e)
+    cmd = ["open", path] if sys.platform == "darwin" else ["xdg-open", path]  # pc-ok: the Mac and Linux branch
+    try:
+        r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=15)
+        return r.returncode == 0, (r.stderr or "").strip()
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+
+
 if __name__ == "__main__":
     ok, why = open_folder(sys.argv[1])
     print(("opened, behind the app in front" if why == "behind" else "opened") if ok else f"could not open: {why}")

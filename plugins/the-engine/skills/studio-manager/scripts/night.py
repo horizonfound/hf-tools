@@ -38,6 +38,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import cards  # noqa: E402
+import clips  # noqa: E402  (which files are video, and how to say a count)
 import studio_file  # noqa: E402
 from where import locate  # noqa: E402
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -353,6 +354,13 @@ def main():
             if getattr(a, k):
                 setattr(a, k, str(this_computer.drive_root(getattr(a, k))))
 
+    # Does the card answer at all? Asked first, by a small program of its own with a time limit, so a card that has
+    # gone quiet stops the backup in plain words within half a minute, instead of a silent wait with no end.
+    if a.source and not cards.answers(a.source):
+        say("STOP, before anything is copied:")
+        say(f"  - {cards.QUIET_CARD}")
+        sys.exit(2)
+
     # the ledger: a card already backed up is not copied again
     if a.source and not a.session and not a.again:
         fp, held = cards.check(a.source)
@@ -496,11 +504,22 @@ def main():
     # 4. Claude's one look
     if not (studio / "shoots.json").exists():
         groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
+        # groups of nothing but video clips: three frames from each clip (start, middle, end) on pages of their
+        # own, so the look can tell what happens in them and name them for it (Dustin, Nov 11). A Mac only for now.
+        if not (studio / "clip-sheets.json").exists() and any(g.get("clips") and not g.get("photos") for g in groups):
+            run("clips.py", "sheets", session)
         say("\n4. NEEDS A LOOK. Read this image: " + str(studio / "groups-sheet.png"))
         say("   One row per group, in this order:")
         for i, g in enumerate(groups, 1):
             gap = f"after a {g['gap_before_min']} min gap" if g.get("gap_before_min") is not None else "first of the day"
-            say(f"   {i:02d} {g['id']}  {g['start'][:16].replace('T', ' ')} to {g['end'][11:16]}  {g['count']:>5} photos  {gap}")
+            what = clips.words(g.get("photos", g["count"]), g.get("clips", 0))
+            say(f"   {i:02d} {g['id']}  {g['start'][:16].replace('T', ' ')} to {g['end'][11:16]}  {what:>22}  {gap}")
+        for line in clips.sheet_words(studio):
+            say(line)
+        if any(g.get("clips") for g in groups):
+            say("   Some of these are video clips. On the first image, a row of clips shows one still from each clip (no picture at all on a PC):")
+            say("   clips shot the same day and place as photos belong to that shoot (behind the scenes). In a recap, say")
+            say("   \"video clips\", never \"photos\" and never \"clips\" on its own, for video, and if a row shows no picture say only what the times tell you.")
         say("   Decide which rows are one shoot (same people, same place, same day) and write " + str(studio / "shoots.json") + ".")
         say("   The suggested name is the place or subject only (\"Black-sand beach\"); the date goes on by the folder naming, so never put it in the name:")
         say('   {"decided_by": "Claude, from the contact sheet", "shoots": [{"id": "s1", "suggested": "<place or subject, no date: the folder naming adds the date>",'
@@ -535,8 +554,17 @@ def main():
             say("6b. Thinning each shoot to its moments, for the sneak peeks")
             if run("peek_sheets.py", "make", studio) != 0:
                 say("   (could not make the pages; going on without sneak peeks)")
+        sheets = {}
         if (studio / "peek-sheets.json").exists():
             sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
+            # sneak peeks are photos only: a shoot of nothing but video clips has none, and is never asked about
+            none = [sh["name"] for sh in sheets.values() if not sh.get("moments")]
+            sheets = {sid: sh for sid, sh in sheets.items() if sh.get("moments")}
+            if none and not sheets:
+                say("6b. No photos on this card, only video clips, so there are no sneak peeks to pick.")
+            elif none:
+                say("6b. No sneak peeks for " + ", ".join(none) + ": video clips only.")
+        if sheets:
             say("\n6b. NEEDS THE PICKS. For each shoot, read its page(s) and choose six sneak peeks by number:")
             for sid, sh in sheets.items():
                 say(f"   {sid} {sh['name']}: {sh['moments']} moments on {len(sh['pages'])} page(s)")

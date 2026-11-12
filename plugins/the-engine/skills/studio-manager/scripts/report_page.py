@@ -121,6 +121,7 @@ from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
 import brand  # noqa: E402
 import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import clips  # noqa: E402  (which files are video, and how to say a count)
 this_computer.utf8_output()
 
 PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
@@ -346,6 +347,8 @@ def build(manifest, studio):
     problems = manifest.get("problems") or []
     kinds = Counter(Path(k).suffix.lower().lstrip(".") or "other" for k in files)
     media = sum(n for k, n in kinds.items() if f".{k}" in MEDIA)
+    n_clips = sum(n for k, n in kinds.items() if f".{k}" in clips.VIDEO)
+    media_words = clips.words(media - n_clips, n_clips)   # "212 photos and 6 clips": a clip is never called a photo
     skipped = manifest.get("skipped_system_files", 0)
     session = manifest.get("session", "Session")
     name = session.split(" ", 1)[1] if session[:10].count("-") == 2 and " " in session else session
@@ -377,7 +380,7 @@ def build(manifest, studio):
     elif all_good:
         where = "your drive and your second copy" if second else "your drive"
         out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
-        out.append(f"<p class='lede'>Every photo was copied to {where} and checked against the card, byte for byte. "
+        out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and checked against the card, byte for byte. "
                    "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.</p>")
         out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
     else:
@@ -403,7 +406,7 @@ def build(manifest, studio):
         out.append("<div class='wrap'><div class='teasers'>")
         for i, p in enumerate(pics):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
-        chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", f"{media:,} photos"),
+        chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", media_words),
                  ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
                  ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good else "keep the card")]
         for cls, rot, pos, text in chips:
@@ -418,7 +421,7 @@ def build(manifest, studio):
     # the details
     out.append("<div class='wrap'><div class='cards'>")
     out.append("<div class='card'><span class='eyebrow'>What's on it</span>"
-               f"<h3>{media:,} photos or clips</h3>")
+               f"<h3>{media_words}</h3>")
     if total:
         parts = kinds.most_common()
         out.append("<div class='bar-k'>" + "".join(
@@ -437,7 +440,7 @@ def build(manifest, studio):
         out.append(f"<p>{skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
     aside = sort_aside(studio)
     if aside:
-        out.append(f"<p>{len(aside)} file{'s' if len(aside) != 1 else ''} that aren't photos "
+        out.append(f"<p>{len(aside)} file{'s that are' if len(aside) != 1 else ' that is'} not a photo or a video clip "
                    f"({', '.join(sorted({Path(a).suffix.lower().lstrip('.') for a in aside}))}) set aside, not deleted.</p>")
     out.append("</div>")
 
@@ -463,13 +466,17 @@ def build(manifest, studio):
     # Opens the folder in Finder (File Explorer on a PC): from Safari on its own, or via serve_report.py inside the app.
     where = photos_folder(manifest.get("dest", ""))
     url = Path(where).as_uri() + "/" if where else ""
-    out.append("<div class='card f-sand where-card'><span class='eyebrow'>Where your photos are</span>")
+    only_clips = bool(n_clips) and media == n_clips
+    both = bool(n_clips) and media > n_clips
+    where_title = "Where your video clips are" if only_clips else "Where your photos and video clips are" if both else "Where your photos are"
+    where_button = "Open video folder" if only_clips else "Open photo folder"
+    out.append(f"<div class='card f-sand where-card'><span class='eyebrow'>{where_title}</span>")
     out.append(f"<p class='path'>{e(where)}</p>")
     if url:
         # On a PC the folder also rides along as it is written there (E:\...), because the file:// address of a
         # drive letter does not turn back into a folder by itself (unproven on a real PC). A Mac's page is as before.
         plain = f" data-path='{e(str(where))}'" if this_computer.WINDOWS else ""
-        out.append(f"<a class='go where' href='{e(url)}'{plain} title='Open this folder in {this_computer.FILES_APP}'>Open photo folder"
+        out.append(f"<a class='go where' href='{e(url)}'{plain} title='Open this folder in {this_computer.FILES_APP}'>{where_button}"
                    "<span class='arr'>&#8599;</span></a>")
     if second:
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"

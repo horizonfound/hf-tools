@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
+import clips  # noqa: E402  (which files are video, how to say a count, a still of a clip)
 this_computer.utf8_output()
 
 
@@ -53,6 +54,8 @@ def find_groups(photos, gap_minutes):
             "start": g[0]["taken"], "end": g[-1]["taken"],
             "minutes": round((end - start).total_seconds() / 60),
             "count": len(g),
+            "photos": sum(1 for p in g if not clips.is_clip(p)),
+            "clips": sum(1 for p in g if clips.is_clip(p)),
             "gap_before_min": gap_before,
             "bodies": len(cams),
             "lenses": [l for l, _ in Counter(p.get("lens") for p in g if p.get("lens")).most_common(2)],
@@ -92,14 +95,24 @@ def main():
         folder.mkdir(exist_ok=True)
         for g in groups:
             g["previews"] = []
-            for f in spread(g["files"], a.previews):
+            # the pictures come from the photos; a group of nothing but clips gets a still of each clip instead
+            # (a Mac only for now), listed in clip_previews so the report can put a play mark on them
+            stills = [f for f in g["files"] if not clips.is_clip(f)]
+            for f in spread(stills or g["files"], a.previews):
                 dst = folder / f"{g['id']}_{Path(f).stem}.jpg"
+                if clips.is_clip(f):
+                    if clips.still(session / f, dst):
+                        g["previews"].append(dst.name)
+                        g.setdefault("clip_previews", []).append(dst.name)
+                    continue
                 if dst.exists() or make_preview(session / f, dst):
                     g["previews"].append(dst.name)
                 else:
                     why = pictures.why_not(session / f)
                     if why:
                         print(f"could not show {Path(f).name}: {why}", flush=True)
+            if g.get("clip_previews"):
+                clips.borrow_turns(folder, g["clip_previews"])   # a still with nobody in it stands the way its neighbour does
 
     (studio / "groups.json").write_text(json.dumps({
         "session": index.get("session"), "gap_minutes": a.gap,
@@ -114,7 +127,7 @@ def main():
             print(f"\n{this_computer.strftime(datetime.fromisoformat(g['start']), '%A, %B %-d, %Y')}")
         gap = f"after a {g['gap_before_min']} min gap" if g["gap_before_min"] is not None else "first of the day"
         bodies = f", {g['bodies']} cameras" if g["bodies"] > 1 else ""
-        print(f"  {g['id']}  {clock(g['start'])} to {clock(g['end'])}  {g['count']:>5} photos  {g['minutes']:>4} min   {gap}{bodies}")
+        print(f"  {g['id']}  {clock(g['start'])} to {clock(g['end'])}  {clips.words(g['photos'], g['clips']):>22}  {g['minutes']:>4} min   {gap}{bodies}")
     if undated:
         print(f"\n{len(undated)} files with no date, left out of the groups")
     print(f"\n{len(groups)} groups at a {a.gap:g} minute gap. Written to {studio / 'groups.json'}")

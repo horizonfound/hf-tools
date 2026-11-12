@@ -60,6 +60,7 @@ import brand  # noqa: E402
 import fresh  # noqa: E402  (read at startup: which code this process loaded; see fresh.py)
 import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import clips  # noqa: E402  (which files are video, and how to say a count)
 from where import place_key, same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
 this_computer.utf8_output()
 
@@ -245,6 +246,20 @@ def existing(q, studio, shoot_id):
     return next((x for x in q["shoots"] if same_place(x.get("studio"), studio) and x.get("shoot") == shoot_id), None)
 
 
+def counted(s, groups):
+    """(photos, clips) in a backed-up shoot, from its groups; (None, 0) when its groups are not known."""
+    gs = [groups[g] for g in s.get("groups", []) if g in groups]
+    if not gs:
+        return s.get("photos"), 0
+    return clips.count(f for g in gs for f in g.get("files", []))
+
+
+def count_words(s):
+    """ "212 photos and 6 clips" for a queue record; "" when it has no count. A clip is never called a photo."""
+    n, c = s.get("count") or 0, s.get("clips") or 0
+    return clips.words(n, c) if (n or c) else ""
+
+
 def build_entry(q, root, studio, s, names, groups, status, due=None):
     name = names.get(s["id"]) or s.get("name") or s.get("suggested") or s["id"]
     gs = [groups[g] for g in s.get("groups", []) if g in groups]
@@ -261,7 +276,8 @@ def build_entry(q, root, studio, s, names, groups, status, due=None):
             dst = THUMBS / sid / f"{i}{src.suffix.lower()}"
             shutil.copyfile(src, dst)  # a copy of a small preview, never the photo
             thumbs.append(dst.relative_to(HOME).as_posix())
-    return {"id": sid, "name": name, "shot": shot, "due": due, "count": s.get("photos"),
+    n_photos, n_clips = counted(s, groups)
+    return {"id": sid, "name": name, "shot": shot, "due": due, "count": n_photos, "clips": n_clips,
             "folder": str(root / s["folder"]) if s.get("folder") else None,
             "studio": str(studio), "shoot": s["id"], "thumbs": thumbs, "status": status,
             "added": datetime.now().isoformat(timespec="seconds")}
@@ -300,7 +316,8 @@ def register_night(q, night):
         x = existing(q, studio, s["id"])
         if x:
             x["name"] = names.get(s["id"]) or s.get("name") or x["name"]
-            x["count"] = s.get("photos") or x.get("count")
+            n_photos, n_clips = counted(s, groups)
+            x["count"], x["clips"] = (n_photos if n_photos is not None else x.get("count")), n_clips
             continue
         q["shoots"].append(build_entry(q, root, studio, s, names, groups, "archived"))
         added += 1
@@ -582,7 +599,7 @@ function render(order){
     li.innerHTML = `<span class="grip" title="Drag to reorder">&#8942;&#8942;</span>
       <div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
-        <div class="meta">${dueTag(s.due)}<button class="setdue" type="button">${s.due ? 'Change the date' : 'Set a due date'}</button>${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
+        <div class="meta">${dueTag(s.due)}<button class="setdue" type="button">${s.due ? 'Change the date' : 'Set a due date'}</button>${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
       <div class="right"><span class="n">${String(i + 1).padStart(2, '0')}</span>
         <button class="check" title="Mark finished" aria-label="Mark ${esc(s.name)} finished"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
     li.querySelector('.check').onclick = () => finish(li, s);
@@ -604,7 +621,7 @@ function renderArchive(fresh){
     const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
     html += `<li class="acard${fresh == s.id ? ' fresh' : ''}" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
-        <div class="meta">${s.status == 'finished' ? `<span class="tag edited">Edited${s.finished_at ? ' ' + nice(s.finished_at.slice(0,10)) : ''}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count ? `<span>${s.count.toLocaleString()} photos</span>` : ''}</div></div>
+        <div class="meta">${s.status == 'finished' ? `<span class="tag edited">Edited${s.finished_at ? ' ' + nice(s.finished_at.slice(0,10)) : ''}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
       <div class="acts">${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
         ${s.status == 'finished' ? `<button class="requeue" data-id="${esc(s.id)}">Put back in my editing queue</button>` : `<button class="requeue addq" data-id="${esc(s.id)}">Add to my editing queue</button>`}</div></li>`;
   });
@@ -710,6 +727,7 @@ def state(q):
     def pub(s):
         d = {k: s.get(k) for k in ("id", "name", "shot", "due", "count", "thumbs", "finished_at", "status")}
         d["has_folder"] = bool(s.get("studio") or s.get("folder"))
+        d["count_words"] = count_words(s)
         return d
     return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)], "archive": [pub(s) for s in archive(q)]}
 
@@ -911,7 +929,7 @@ def show(q, all_=False):
     if not w:
         say("Nothing waiting in the editing queue.")
     for i, s in enumerate(w, 1):
-        extra = f", {s['count']:,} photos" if s.get("count") else ""
+        extra = f", {count_words(s)}" if count_words(s) else ""
         say(f"{i}. {s['name']}: {due_words(s.get('due'))}{extra}")
     if all_:
         a = archive(q)
