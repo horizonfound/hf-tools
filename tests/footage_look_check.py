@@ -2,7 +2,7 @@
 """The chat's footage look (studio-manager/scripts/footage.py), on small clips this test makes itself, and the
 reel page showing its moments in a HIDDEN Chrome.
 
-    python3 guard.py 800 /usr/bin/python3 tests/footage_look_check.py --work /private/tmp/somewhere [--port 9340]
+    python3 tests/guard.py 800 /usr/bin/python3 tests/footage_look_check.py --work /private/tmp/somewhere [--port 9340]
         [--only scan|moments|page]
 
 It touches video, so it runs under the 800 MB memory guard and keeps itself small: a 12-photo pretend kit

@@ -2,7 +2,7 @@
 """The reel page's step 1 (behind-the-scenes footage), the moment cards, the player and step 4 (the style),
 checked on the server and on the real page in a HIDDEN Chrome, on small clips this test makes itself.
 
-    python3 guard.py 800 /usr/bin/python3 tests/reel_footage_check.py --work /private/tmp/somewhere [--port 9322]
+    python3 tests/guard.py 800 /usr/bin/python3 tests/reel_footage_check.py --work /private/tmp/somewhere [--port 9322]
         [--only server|order|make|page]
 
 It touches video, so it is run under the 800 MB memory guard; it keeps itself small to fit: a 12-photo pretend
