@@ -398,7 +398,7 @@ def run_page(t, c, s):
     case("Escape closes it", c.js("window.__menu()") is None)
     c.click('#script .seg[data-a="9"]', nth=2, check=False)
     c.wait_for("document.getElementById('pmenu').classList.contains('open')", 5)
-    c.click("h1")
+    c.click((3, 3))                                      # the window's corner: outside the menu wherever it opened
     case("a press anywhere outside it closes it", c.js("window.__menu()") is None)
     c.click('#script .seg[data-a="9"]', nth=2, check=False)
     c.wait_for("document.getElementById('pmenu').classList.contains('open')", 5)

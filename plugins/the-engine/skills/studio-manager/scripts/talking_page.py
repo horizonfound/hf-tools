@@ -18,8 +18,9 @@ C2 is talking_js_script.py (the sentences, a click on a word, the highlight bar,
 words, dragging a bar, a bar's menu) and talking_js_pick.py (the photo picker and the video picker).
 C3 is talking_js_preview.py (playing the cut or the whole, a photo or a video where it will sit, themselves in
 the corner, the zooms, the captions, dragging and sizing on the preview, the phone guides, step 3's chips).
-The timeline is its own file, added to JS_PARTS when it is built; until then the timeline shows its frame and
-nothing moves in it but its round play button.
+C4 is talking_js_timeline.py (the dock across the bottom: the ruler, the clips and the photo blocks, scrubbing, a
+clip's ends and a photo block's ends, Split, Delete, Speed, Zoom, the timeline's own zoom, the keys for Undo, Redo
+and Delete, and Make it in CapCut with its result box).
 
 Routes (GET: our host, never another website's page; POST: the pickers' guard, then one JSON object; the kit by
 its folder name; everything wrapped so the server stays up):
@@ -28,13 +29,16 @@ its folder name; everything wrapped so the server stays up):
                                          counter and the mark the page holds, only {ok, rev, mark, working, step,
                                          make} while neither has moved (a long talk's whole state is about half a
                                          megabyte, and the page asks every 3 seconds)
+    GET  /talking-state?kit=&only=make   only {ok, make}: what the page asks once a second while a make is at work
     GET  /talking-video?kit=             the small copy of their talking video, in pieces when asked (Range)
     POST /talking-open  {kit}            makes <kit>/Talking if it isn't there and opens it
     POST /talking-start {kit, video}     Edit my video: `video` is the key the state gave. A video whose script
                                          was made before comes back with its edit, nothing transcribed again;
                                          otherwise a job of its own turns it into words (talking_rec.start)
     POST /talking-save  {kit, base, page, saved}   talking_rec.save_from_page (up to SAVE_CAP bytes)
-    POST /talking-make  {kit}            Make it in CapCut (talking_rec.start_make)
+    POST /talking-make  {kit[, dry]}     Make it in CapCut, in a job of its own (talking_rec.start_make); the page
+                                         then asks /talking-state how it stands ("make") and shows her result box.
+                                         `dry: true` (hers too; her page never sends it) plans and writes nothing
 The video picker uses the reel page's own routes: /reel-footage?kit=&for=talking (the list only: no "not ready",
 the reel page's record never rewritten; asked ONLY when the picker opens, since asking gets every Footage video
 ready), /reel-video, /reel-strip, /reel-open {what: "footage"}. The photos are the pickers' small copies
@@ -64,6 +68,7 @@ import talking_js_step1  # noqa: E402
 import talking_js_script  # noqa: E402
 import talking_js_pick  # noqa: E402
 import talking_js_preview  # noqa: E402
+import talking_js_timeline  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
 POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make")
@@ -74,7 +79,8 @@ UNDO_STEPS = 60              # hers
 REV = re.compile(r"[0-9]{1,12}")
 MARK = re.compile(r"[0-9a-f]{12}")
 # The page's script, in the order it runs. Each later sub-stage adds its own file here.
-JS_PARTS = (talking_js_core.JS, talking_js_step1.JS, talking_js_script.JS, talking_js_pick.JS, talking_js_preview.JS)
+JS_PARTS = (talking_js_core.JS, talking_js_step1.JS, talking_js_script.JS, talking_js_pick.JS, talking_js_preview.JS,
+            talking_js_timeline.JS)
 FOOTAGE_EVERY_MS = 4000      # hers: while the video picker is open and a video is still being got ready
 COPIES_EVERY_MS = 4000       # ours: while a photo the page shows has no small copy yet, look for it again
 COPIES_TRIES = 90            # ...this many times with nothing new, then no more (a copy that never comes)
@@ -212,6 +218,7 @@ WORDS = {
     "delete_clip": "🗑 Delete clip",
     "delete_photo": "🗑 Delete photo",
     "speed": "Speed",
+    "speed_x": "{v}×",
     "zoom": "Zoom",
     "undo": "↶ Undo",
     "redo": "↷ Redo",
@@ -256,6 +263,11 @@ WORDS = {
     "making": "Making it…",
     "made_h2": "It's in CapCut",
     "made_say": "Open CapCut, give your captions your look, and export.",
+    # the one line her maker prints into the result box (talking_capcut.py; ours is talking_make.MADE_LISTED and
+    # MADE_OPEN, the very same words: the test holds the two together)
+    "made_listed": "Made \"{project}\" in CapCut. Open CapCut and it's at the top of your projects.",
+    "made_open": "Made \"{project}\" in CapCut. CapCut is open, so it will show up in your projects in a moment; if it "
+                 "isn't there, quit and reopen CapCut.",
 }
 WORDS.update({"job_" + k: v for k, v in TR.JOB_WORDS.items()})       # her engine's lines (talking_core.py)
 WORDS.update({"make_" + k: v for k, v in TR.MAKE_WORDS.items()})     # her server's lines (server.py make_talking)
@@ -285,6 +297,14 @@ OUR_WORDS = {
     "undo_title_pc": ("Undo (Ctrl+Z)", "a PC has no ⌘ key"),
     "redo_title_pc": ("Redo (Ctrl+Shift+Z)", "a PC has no ⌘ key"),
 }
+OUR_WORDS["made_only"] = (
+    "Made \"{project}\" in CapCut.",
+    "talking_make.MADE_ONLY: the reel is made but could not be added to CapCut's list of projects, so neither of her "
+    "two lines would be true")
+OUR_WORDS["made_only_note"] = (
+    "Made \"{project}\" in CapCut. {note}",
+    "the same, with capcut.py's own note after it on the same line (what to do so the reel shows up in CapCut), as "
+    "the photo reel's page shows it")
 OUR_WORDS["not_ready"] = (
     "This shoot isn't ready for this yet. Tell your assistant: make posts from this shoot.",
     "the pickers' own line says \"to Claude\", which no line on this page may; the same page, reworded")
@@ -308,6 +328,7 @@ def page_words():
         w.setdefault(k, line)
     if this_computer.WINDOWS:
         w["undo_title"], w["redo_title"] = w["undo_title_pc"], w["redo_title_pc"]
+        w["made_open"] = w["made_open"].replace("quit and reopen", "close and reopen")      # decision 2b.11
     return w
 
 
@@ -406,11 +427,16 @@ def save_from_page(body):
 
 
 def make_from_page(body):
-    """POST /talking-make {kit}: Make it in CapCut, in a job of its own (talking_rec.start_make)."""
-    kit, bad = _kit_only(body)
+    """POST /talking-make {kit[, dry]}: Make it in CapCut, in a job of its own (talking_rec.start_make). The answer
+    is {"ok": True, "job": how it stands} or {"ok": False, "why", "words"} with her line and nothing made. `dry`
+    (true or false, nothing else) plans and writes nothing, as hers; her page never sends it."""
+    kit, bad = _kit_only(body, ("kit", "dry"))
     if bad:
         return bad
-    return TR.start_make(kit)
+    dry = body.get("dry", False)
+    if not isinstance(dry, bool):
+        return _bad()
+    return TR.start_make(kit, dry=dry)
 
 
 def _with_make(kit, st):
@@ -454,6 +480,15 @@ def state(kit, rev=None, mark=None):
     return _with_make(kit, TR.state_for_page(kit, rev, mark))
 
 
+def make_only(kit):
+    """What GET /talking-state?kit=&only=make answers: {"ok": True, "make": how the newest make stands, or None}.
+    Nothing else, and nothing is read but the make's own small files."""
+    try:
+        return {"ok": True, "make": TR.make_for_page(kit)}
+    except (OSError, ValueError):
+        return {"ok": True, "make": None}
+
+
 def _one(q, key):
     v = q.get(key, [""])
     return v[0] if v else ""
@@ -491,6 +526,13 @@ def _get_state(handler, q):
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     if not arrange.sheet_rows(kit):
         return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
+    only = _one(q, "only")
+    if only:
+        # while a make is at work the page asks once a second, and wants nothing but how the make stands: never
+        # the whole state (half a megabyte on a long talk), whatever has moved since the page last looked
+        if only != "make":
+            return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 400)
+        return arrange._send_json(handler, make_only(kit))
     rev, mark = _one(q, "rev"), _one(q, "mark")
     # the counter and the mark the page holds: only when both arrive whole is the short answer ever given
     held = REV.fullmatch(rev) and MARK.fullmatch(mark)
@@ -658,8 +700,8 @@ def _step3(w):
 
 
 def _floating(w):
-    """The highlight bar, the photo picker, the video picker, the photo menu and the toast: all hidden until a
-    later sub-stage's script opens them."""
+    """The highlight bar, the photo picker, the video picker, the photo menu and the toast: all hidden until the
+    page's script opens them."""
     e = html.escape
     head = "<div style='display:flex;justify-content:space-between;align-items:center;gap:1rem'>"
     return (
@@ -686,7 +728,7 @@ def _floating(w):
 
 def _dock(w):
     """The timeline, then the make bar, fixed across the bottom. The timeline is hidden until there is a script;
-    Make it in CapCut stays off until the sub-stage that makes it work."""
+    Make it in CapCut is off until there is something to make (talking_js_timeline.py)."""
     e = html.escape
     q = lambda s: e(s, quote=True)  # noqa: E731
     return (

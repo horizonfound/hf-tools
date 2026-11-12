@@ -529,11 +529,14 @@ def run_page(t, c, s):
     save_js({"shots": [stretch(spot="corner", ns=[2])]})
     at(mid)
     c.js("window.Talk.SELSHOT = null; window.Talk.markShot()")
+    # the press on Put the captions back (step 3) scrolled the page: the whole preview back in sight, above the dock
+    c.js("document.getElementById('screen').scrollIntoView({block: 'center'})")
     was = rev()
     tiny_press("#phFront")
     time.sleep(0.4)
     case("a press on a photo that moves under 3 px is a click: nothing saved, nothing played; it picks the stretch",
-         rev() == was and paused() and shot(1)["pos"] is None and c.js("window.Talk.SELSHOT") == 1 and c.js("document.querySelectorAll('#script .seg.on').length") == 3)
+         rev() == was and paused() and shot(1)["pos"] is None and c.js("window.Talk.SELSHOT") == 1 and c.js("document.querySelectorAll('#script .seg.on').length") == 3,
+         (rev(), was, paused(), shot(1), c.js("window.Talk.SELSHOT"), c.js("document.querySelectorAll('#script .seg.on').length")))
     was = rev()
     bx = drag_by("#phFront", -30, 25)
     moved(was)

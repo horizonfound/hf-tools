@@ -229,6 +229,8 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .pmenu{max-width:calc(100vw - 16px)}
 .screen{user-select:none;-webkit-user-select:none}
 .screen .movable,.screen .knob,.screen .cap{touch-action:none}
+html{scroll-padding-bottom:calc(var(--dock) + 12px)}
+.tl-x{user-select:none;-webkit-user-select:none}
 """
 
 

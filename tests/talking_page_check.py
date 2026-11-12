@@ -2,7 +2,7 @@
 """The talking reel page (talking_page.py: Nicole's handoff v24, pages/talking-reel.html, served by the posting
 server), checked by request and on the real page in a HIDDEN Chrome.
 
-    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|preview|words] [--no-chrome] [--port 9620] [--work <folder>]
+    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|preview|timeline|words] [--no-chrome] [--port 9620] [--work <folder>]
 
 Run it under the memory guard, ONE such test at a time (it drives a hidden Chrome and plays a tiny video). The
 limit is 3000 MB, as for the other tests that drive a Chrome: the guard counts a Chrome's shared memory once per
@@ -28,6 +28,11 @@ Parts (one per sub-stage of the page; the later ones are added as they are built
   preview sub-stage C3 (tests/talking_page_preview.py holds it): playing the cut and the whole, every spot with her
           numbers (the same ones CapCut gets), dragging and sizing a photo, themselves in the corner and the
           caption, the zooms, the captions, a Footage video kept in step, the phone guides, step 3's chips.
+
+  timeline sub-stage C4 (tests/talking_page_timeline.py holds it): the dock across the bottom. The scale and the
+          ruler, picking a clip or a photo block, the round x, Delete, a clip's ends (in cuts, out brings back), a
+          photo block's ends, Split, Speed, Zoom, the timeline's own zoom, Undo and Redo by button and by key, and
+          Make it in CapCut from the press to her result box (into the test's own pretend CapCut folder).
 
 What it never does: touch the real ~/.studio (STUDIO_HOME is the scratch folder; the real one is listed before
 and after), build or start the real transcriber (TALKING_TRANSCRIBER=pretend, TALKING_NO_REAL=1), open a folder
@@ -110,6 +115,10 @@ HERS_NOT_OURS = {
     "Across top": "dead code (the spot she removed, Nov 12)",
     "The Assistant's transcriber isn't on this Mac yet.": "a state ours cannot reach: ours builds it, and says so in its own lines",
     "I can't find the Assistant's reel maker on this Mac.": "a state ours cannot reach",
+    "Dry run: nothing made in CapCut.":
+        "her maker's second dry-run line: it reaches a result box only after a request with `dry` in it, which neither her page nor ours sends (talking_make.DRY_DONE, for the assistant and the tests)",
+    "Behind you: in CapCut, tap the top copy of your talking clip at those spots and choose Remove background, so the photo shows behind you.":
+        "dead code in her maker (the \"behind\" spot she removed)",
     # names her code uses, not wording
     "Content-Type": "a name in her code", "Escape": "a key's name", "Space": "a key's name", "Delete": "a key's name",
     "Backspace": "a key's name",
@@ -117,6 +126,10 @@ HERS_NOT_OURS = {
 # ...and one of hers that is the END of a line her engine builds (the Mac's own error words come first)
 HERS_NOT_OURS_ENDS = {
     "If it asked about Speech Recognition, click Allow, then try again.": "replaced by our permission lines (wrong once refused: macOS never asks twice)",
+}
+# ...and one that is the START of a line her maker builds (the numbers follow)
+HERS_NOT_OURS_STARTS = {
+    "Plan: ": "her maker's first dry-run line: only after a request with `dry` in it, which neither her page nor ours sends (talking_make.DRY_PLAN)",
 }
 # Lines of ours held in one piece where her script builds them from parts: (key, her parts, each found in her page)
 BUILT_FROM_PARTS = {
@@ -128,6 +141,9 @@ BUILT_FROM_PARTS = {
     "secs": ("+ ' s'",),
     "pick_alt": ('alt="Photo ${p.n}"',),
 }
+# Hers, but from her maker (talking_capcut.py), which prints them with the project's name in the middle: compared
+# with that file whole, not piece by piece
+HER_MAKER_LINES = ("made_listed", "made_open")
 REAL = Path.home() / (".stu" + "dio")          # only ever listed, to prove this test leaves it alone
 
 
@@ -326,7 +342,7 @@ def her_lines():
     whole = {x for _, x in wpc.her_strings(raw, everything=True)} | set(attrs)
     shown = [x for _, x in wpc.her_strings(raw)] + [a for a in attrs if "${" not in a]
     py = ""
-    for name in ("talking_core.py", "server.py"):
+    for name in ("talking_core.py", "server.py", "talking_capcut.py"):
         src = (HERS24 / name).read_text(encoding="utf-8")
         py += "\n" + src
         if name == "server.py":                      # only her talking reel's own part of the server
@@ -336,6 +352,11 @@ def her_lines():
             t = " ".join(m.group(1).replace("\\'", "'").replace('\\"', '"').split())
             if re.search(r"[A-Za-z]{2,} [A-Za-z]", t):
                 shown.append(t)
+        if name == "talking_capcut.py":              # every line her maker prints: her result box shows them all
+            for m in re.finditer(r'print\(f?"((?:[^"\\]|\\.)+)"', src):
+                t = " ".join(m.group(1).replace("\\'", "'").replace('\\"', '"').replace("{dest.name}", "{project}").split())
+                if re.search(r"[A-Za-z]{2,} [A-Za-z]", t):
+                    shown.append(t)
     text = " ".join((html.unescape(raw) + py).replace("\\'", "'").split())
     return whole, shown, text
 
@@ -367,12 +388,15 @@ def check_words(s):
     # pulled out whole)
     bad = []
     for k, v in w.items():
-        if k in BUILT_FROM_PARTS:
+        if k in BUILT_FROM_PARTS or k in HER_MAKER_LINES:
             continue
         for frag in fragments(v):
             if worth(frag) and frag not in whole and not (len(frag) >= 12 and frag in text):
                 bad.append((k, frag))
     case("every line in talking_page.WORDS (%d) is in her files, word for word" % len(w), not bad, bad[:6])
+    maker = (HERS24 / "talking_capcut.py").read_text(encoding="utf-8")
+    not_hers = [k for k in HER_MAKER_LINES if ('print(f"' + w[k].replace("{project}", "{dest.name}").replace('"', '\\"') + '")') not in maker]
+    case("the two lines her maker prints into the result box are in talking_page.WORDS exactly as she wrote them", not not_hers and maker.count('print(f"Made ') == len(HER_MAKER_LINES), not_hers)
     raw = (HERS24 / "pages" / "talking-reel.html").read_text(encoding="utf-8")
     case("the lines ours holds in one piece are made of her parts", all(p in raw for parts in BUILT_FROM_PARTS.values() for p in parts),
          [p for parts in BUILT_FROM_PARTS.values() for p in parts if p not in raw])
@@ -383,14 +407,17 @@ def check_words(s):
     built = [" ".join(w[k].split()) for k in BUILT_FROM_PARTS]
 
     def named(x):
-        return x in HERS_NOT_OURS or any(x.endswith(n) for n in HERS_NOT_OURS_ENDS)
+        return x in HERS_NOT_OURS or any(x.endswith(n) for n in HERS_NOT_OURS_ENDS) or any(x.startswith(n) for n in HERS_NOT_OURS_STARTS)
     missing = [x for x in shown if x not in ours and not named(x) and not any(x in b for b in built)
                and not re.fullmatch(r"[.#][\w .#\[\]=\"-]+", x)]          # a selector in her code, not wording
     case("every line her page, her engine and her server can show (%d) is in talking_page.WORDS, whole; the ones left out on purpose are named" % len(shown),
          len(shown) > 150 and not missing, missing[:6])
     case("...and nothing is named as left out that is in fact ours", not [x for x in HERS_NOT_OURS if x in ours and x not in ("Delete",)],
          [x for x in HERS_NOT_OURS if x in ours])
-    gone = [n for n in list(HERS_NOT_OURS) + list(HERS_NOT_OURS_ENDS) if n not in text]
+    gone = [n for n in list(HERS_NOT_OURS) + list(HERS_NOT_OURS_ENDS) + list(HERS_NOT_OURS_STARTS) if n not in text]
+    printed = [x for x in shown if x.startswith(("Made ", "Plan: ", "Dry run", "Behind you"))]
+    case("her maker's printed lines are read too (her result box shows every line it prints): the two \"Made\" lines are ours whole, the two dry-run lines and her dead \"Behind you\" line are named",
+         len(printed) == 5 and len([x for x in printed if x in ours]) == 2 and all(x in ours or named(x) for x in printed), printed)
     case("...and everything named as left out is truly in her files (the list can't hide a line she never wrote)", not gone, gone)
     case("every line of ours is truly ours (none of them is one of hers under another name)",
          not [v for v in ours_lines if " ".join(v.split()) in whole and len(v) > 12], [v for v in ours_lines if " ".join(v.split()) in whole][:3])
@@ -452,9 +479,9 @@ def check_built(s):
     case("every button says it is a button (none can send a form)", not re.findall(r"<button(?![^>]*type='button')[^>]*>", body))
     case("the Back to the post kit link goes to this shoot's kit page", "href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'" in body)
     case("the page's files stay readable: each script file is one string and nothing else",
-         all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"])))
+         all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"], sys.modules["talking_js_timeline"])))
     new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py", "talking_js_script.py", "talking_js_pick.py",
-           "talking_js_preview.py")
+           "talking_js_preview.py", "talking_js_timeline.py")
     lit = [f for f in new if re.search(r"expanduser|['\"]\.studio['\"]", (SCRIPTS / f).read_text(encoding="utf-8"))]
     case("no literal home in the new files (the computer's own folder only through arrange.HOME)", not lit, lit)
 
@@ -904,8 +931,8 @@ def check_edit(c, s, kit, k1, k2):
          c.js("document.getElementById('vid').getAttribute('src')"))
     c.wait_for("document.getElementById('vid').readyState >= 1", 15, tell="document.getElementById('vid').error && document.getElementById('vid').error.message")
     case("...and it loads and plays from this computer (3 seconds long)", abs(c.js("document.getElementById('vid').duration") - 3.0) < 0.3, c.js("document.getElementById('vid').duration"))
-    case("the make bar's line, hers: seconds of talking, photos, zooms, captions",
-         c.text("#sum") == "%s of talking · 0 photos · 0 zooms · captions on" % after and c.text("#sum b") == after and c.js("document.getElementById('makeBtn').disabled"), c.text("#sum"))
+    case("the make bar's line, hers: seconds of talking, photos, zooms, captions; and Make it in CapCut is live once there is something to make",
+         c.text("#sum") == "%s of talking · 0 photos · 0 zooms · captions on" % after and c.text("#sum b") == after and not c.js("document.getElementById('makeBtn').disabled"), c.text("#sum"))
     case("the dock grew with the timeline, and the page's room with it",
          c.js("parseInt(document.body.style.paddingBottom) === document.getElementById('dock').offsetHeight + 24 && document.getElementById('dock').offsetHeight > 100"))
 
@@ -1201,7 +1228,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=PORT)
-    ap.add_argument("--only", choices=("s1", "script", "preview", "words"), help="one part")
+    ap.add_argument("--only", choices=("s1", "script", "preview", "timeline", "words"), help="one part")
     ap.add_argument("--no-chrome", action="store_true", help="the routes only")
     a = ap.parse_args()
     if any(p in chrome_drive.NEVER_PORTS for p in range(a.port, a.port + 10)):
@@ -1253,6 +1280,18 @@ def main():
             else:
                 with chrome_drive.Chrome(work=str(work / "chrome3"), size=(1280, 1100)) as c:
                     group("the preview on the page", tpp.run_page, me, c, s)
+        if a.only in (None, "timeline"):
+            import talking_page_timeline as tpt
+            me = sys.modules[__name__]
+            if s.proc is None:
+                s.start()
+                case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 10)
+            group("the timeline and Make it in CapCut, by request", tpt.run_requests, me, s)
+            if a.no_chrome or not chrome_drive.find_chrome():
+                skip("the timeline on the page: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
+            else:
+                with chrome_drive.Chrome(work=str(work / "chrome4"), size=(1280, 1100)) as c:
+                    group("the timeline and Make it in CapCut on the page", tpt.run_page, me, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()
