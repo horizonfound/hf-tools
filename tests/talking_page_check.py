@@ -2,7 +2,7 @@
 """The talking reel page (talking_page.py: Nicole's handoff v24, pages/talking-reel.html, served by the posting
 server), checked by request and on the real page in a HIDDEN Chrome.
 
-    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|words] [--no-chrome] [--port 9620] [--work <folder>]
+    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|words] [--no-chrome] [--port 9620] [--work <folder>]
 
 Run it under the memory guard, ONE such test at a time (it drives a hidden Chrome and plays a tiny video). The
 limit is 3000 MB, as for the other tests that drive a Chrome: the guard counts a Chrome's shared memory once per
@@ -20,10 +20,17 @@ Parts (one per sub-stage of the page; the later ones are added as they are built
           of the page that fails, answers that cross, a copy into the folder that was cut off), names and words with <b>, quotes and an emoji showing as text, no path anywhere,
           nothing asked of the internet, phone width, no page errors.
 
+  script  sub-stage C2 (tests/talking_page_script.py holds it): the sentences, a click on a word, the highlight
+          bar and each of its buttons, the Move row, the bars above the words, dragging a bar, a bar's menu, the
+          photo picker and the video picker; her pitfalls and the layouts she turned down, each with its check.
+          The video picker has the Mac get two 3-second Footage videos ready (a few stills each).
+
 What it never does: touch the real ~/.studio (STUDIO_HOME is the scratch folder; the real one is listed before
 and after), build or start the real transcriber (TALKING_TRANSCRIBER=pretend, TALKING_NO_REAL=1), open a folder
-(ASSISTANT_TEST_OPEN), or make a video: the one "talking video" is tests/fixtures/loud-tone-3s.mp4 (3 seconds,
-self-made), and its small copy is put in place by the test, so no job here ever asks the Mac to make one.
+(ASSISTANT_TEST_OPEN), or make a talking video's small copy: the one "talking video" is
+tests/fixtures/loud-tone-3s.mp4 (3 seconds, self-made), and its small copy is put in place by the test, so no job
+here ever asks the Mac to make one. (The `script` part does have the Mac read stills from two Footage videos, both
+that same 3-second file.)
 The page server (port 9620 up) and the hidden Chrome are this test's own and are stopped at the end.
 
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only.
@@ -115,6 +122,7 @@ BUILT_FROM_PARTS = {
     "sum_caps_on": (" · captions ${REC.captions === false ? 'off' : 'on'}",),
     "sum_caps_off": (" · captions ${REC.captions === false ? 'off' : 'on'}",),
     "secs": ("+ ' s'",),
+    "pick_alt": ('alt="Photo ${p.n}"',),
 }
 REAL = Path.home() / (".stu" + "dio")          # only ever listed, to prove this test leaves it alone
 
@@ -441,7 +449,7 @@ def check_built(s):
     case("the Back to the post kit link goes to this shoot's kit page", "href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'" in body)
     case("the page's files stay readable: each script file is one string and nothing else",
          all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"])))
-    new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py")
+    new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py", "talking_js_script.py", "talking_js_pick.py")
     lit = [f for f in new if re.search(r"expanduser|['\"]\.studio['\"]", (SCRIPTS / f).read_text(encoding="utf-8"))]
     case("no literal home in the new files (the computer's own folder only through arrange.HOME)", not lit, lit)
 
@@ -1188,7 +1196,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=PORT)
-    ap.add_argument("--only", choices=("s1", "words"), help="one part")
+    ap.add_argument("--only", choices=("s1", "script", "words"), help="one part")
     ap.add_argument("--no-chrome", action="store_true", help="the routes only")
     a = ap.parse_args()
     if any(p in chrome_drive.NEVER_PORTS for p in range(a.port, a.port + 10)):
@@ -1216,6 +1224,18 @@ def main():
                 with chrome_drive.Chrome(work=str(work), size=(1280, 1100)) as c:
                     group("step 1 on the page", check_page, c, s)
                     group("the Assistant out of reach", check_unreached, c, s)
+        if a.only in (None, "script"):
+            import talking_page_script as tps
+            me = sys.modules[__name__]
+            if s.proc is None:
+                s.start()
+                case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 10)
+            group("the script and the pickers, by request", tps.run_requests, me, s)
+            if a.no_chrome or not chrome_drive.find_chrome():
+                skip("the script on the page: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
+            else:
+                with chrome_drive.Chrome(work=str(work / "chrome2"), size=(1280, 1100)) as c:
+                    group("the script and the pickers on the page", tps.run_page, me, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()

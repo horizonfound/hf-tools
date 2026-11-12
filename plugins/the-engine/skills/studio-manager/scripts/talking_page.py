@@ -14,8 +14,10 @@ put on the page as text.
 The page is built in sub-stages (the plan, Stage C). This file, talking_css.py, talking_js_core.py and
 talking_js_step1.py are C1: the whole page's structure, every route, the state and its 3-second refresh, and
 step 1 (Add my video, the videos, Edit my video, the status line, who places the photos, the lines to copy).
-The script, the pickers, the preview and the timeline are their own files (talking_js_script.py and so on), added
-to JS_PARTS as each is built; until then steps 2 and 3 and the timeline show their frame and nothing moves in them.
+C2 is talking_js_script.py (the sentences, a click on a word, the highlight bar, the Move row, the bars above the
+words, dragging a bar, a bar's menu) and talking_js_pick.py (the photo picker and the video picker).
+The preview and the timeline are their own files, added to JS_PARTS as each is built; until then the preview
+shows the talking video and nothing over it, and the timeline shows its frame and nothing moves in it.
 
 Routes (GET: our host, never another website's page; POST: the pickers' guard, then one JSON object; the kit by
 its folder name; everything wrapped so the server stays up):
@@ -31,8 +33,10 @@ its folder name; everything wrapped so the server stays up):
                                          otherwise a job of its own turns it into words (talking_rec.start)
     POST /talking-save  {kit, base, page, saved}   talking_rec.save_from_page (up to SAVE_CAP bytes)
     POST /talking-make  {kit}            Make it in CapCut (talking_rec.start_make)
-The video picker (a later sub-stage) uses the reel page's own routes: /reel-footage?kit=&for=talking (the list
-only: no "not ready", the reel page's record never rewritten), /reel-video, /reel-strip, /reel-open.
+The video picker uses the reel page's own routes: /reel-footage?kit=&for=talking (the list only: no "not ready",
+the reel page's record never rewritten; asked ONLY when the picker opens, since asking gets every Footage video
+ready), /reel-video, /reel-strip, /reel-open {what: "footage"}. The photos are the pickers' small copies
+(/kit-photo, by number); which photos there are rides on every whole state ("photos", see _to_draw).
 
 A Mac and a PC: the page opens on both. On a PC Edit my video answers this_computer.NO_TALKING_PC at once (a named
 gap); "Finder" reads File Explorer and the two Undo tooltips name Ctrl.
@@ -55,6 +59,8 @@ import talking_rec as TR  # noqa: E402
 import talking_css      # noqa: E402
 import talking_js_core  # noqa: E402
 import talking_js_step1  # noqa: E402
+import talking_js_script  # noqa: E402
+import talking_js_pick  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
 POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make")
@@ -65,7 +71,10 @@ UNDO_STEPS = 60              # hers
 REV = re.compile(r"[0-9]{1,12}")
 MARK = re.compile(r"[0-9a-f]{12}")
 # The page's script, in the order it runs. Each later sub-stage adds its own file here.
-JS_PARTS = (talking_js_core.JS, talking_js_step1.JS)
+JS_PARTS = (talking_js_core.JS, talking_js_step1.JS, talking_js_script.JS, talking_js_pick.JS)
+FOOTAGE_EVERY_MS = 4000      # hers: while the video picker is open and a video is still being got ready
+COPIES_EVERY_MS = 4000       # ours: while a photo the page shows has no small copy yet, look for it again
+COPIES_TRIES = 90            # ...this many times with nothing new, then no more (a copy that never comes)
 START_JS = "window.Talk.start();"
 
 # Every line of hers a photographer can see on this page, word for word (pages/talking-reel.html, v24; the lines
@@ -160,7 +169,9 @@ WORDS = {
     "put_back": "Put it back",
     "removed": "Removed. Undo brings it back.",
     "removed_many": "Removed. Undo brings them back.",
+    "pm_words": "“{words}”",
     "pick_head": "Pick photos",
+    "pick_alt": "Photo {n}",
     "pick_for": "Photos for “{words}”",
     "close": "Close",
     "pick_say": "Pick one, or several to flash through those words one after another, in the order you click them.",
@@ -263,6 +274,11 @@ OUR_WORDS = {
     "newer": (TR.NEWER, "hers has no counter: a save from a page that had not seen the assistant's cut wipes it"),
     "busy": (TR.BUSY, "two saves at the same moment; hers has one process and no lock across programs"),
     "trouble": (TR.TROUBLE, "a record that would not be read just now; hers shows an empty edit"),
+    "vp_cant": ("{length} · I couldn't get this one ready to use here",
+                "a Footage video whose small copy could not be made: her picker opens an empty player for it; the "
+                "reel page's own line for it says its moments and the reel still work, which is not so on this page"),
+    "vp_lowspace": ("{length} · your photo drive is almost full, so I couldn't get this one ready",
+                    "the same, when the reason is a nearly full drive (her own page says \"almost full\")"),
     "undo_title_pc": ("Undo (Ctrl+Z)", "a PC has no ⌘ key"),
     "redo_title_pc": ("Redo (Ctrl+Shift+Z)", "a PC has no ⌘ key"),
 }
@@ -395,12 +411,39 @@ def make_from_page(body):
 
 
 def _with_make(kit, st):
-    """The state, with how the newest Make it in CapCut stands beside it (small: it rides on every answer)."""
+    """The state, with how the newest Make it in CapCut stands beside it (small: it rides on every answer). A
+    WHOLE state (one with the record in it) also gets what the script and the pickers draw with (_to_draw)."""
     try:
         st["make"] = TR.make_for_page(kit)
     except (OSError, ValueError):
         st["make"] = None
+    if isinstance(st.get("rec"), dict):
+        _to_draw(kit, st)
     return st
+
+
+def _to_draw(kit, st):
+    """Beside a whole state: "photos", the shoot's photos as the pickers know them ({n, w, h, v, have, missing},
+    numbered as the sheet; the page asks for each small copy by its number, /kit-photo), and "stills", for each
+    Footage video on a stretch the number of its first still when one is made ({key: n}; the page asks for it by
+    /reel-strip). Only read: nothing is made, started or written here, and no path or file name is in it."""
+    photos, stills = [], {}
+    try:
+        got, _made = arrange.page_photos(kit, TR.kitmod.load_rec(kit), arrange.sheet_rows(kit))
+        photos = [{"n": p["n"], "w": p["w"], "h": p["h"], "v": p["v"], "have": bool(p["have"]), "missing": bool(p["missing"])} for p in got]
+    except (Exception, SystemExit) as e:  # noqa: BLE001  (the page still works: the pickers show nothing to pick)
+        arrange.log(f"talking page: the photos couldn't be listed ({e.__class__.__name__})")
+    for x in st.get("shots") or []:
+        v = x.get("v") if isinstance(x, dict) else None
+        if not isinstance(v, dict) or v.get("gone") or not isinstance(v.get("key"), str) or v["key"] in stills:
+            continue
+        try:
+            strip = reel_page.strip_for_page(kit, v["key"])
+        except (Exception, SystemExit):  # noqa: BLE001
+            strip = []
+        if strip:
+            stills[v["key"]] = strip[0]["n"]
+    st["photos"], st["stills"] = photos, stills
 
 
 def state(kit, rev=None, mark=None):
@@ -669,7 +712,9 @@ def page_html(kit_name):
     short = reel_page.short_name(kit_name)
     kq = quote(kit_name, safe="")
     data = {"kit": kit_name, "short": short, "words": w, "lookEvery": LOOK_EVERY_MS, "toastMs": TOAST_MS,
-            "undoSteps": UNDO_STEPS, "pc": bool(this_computer.WINDOWS)}
+            "undoSteps": UNDO_STEPS, "pc": bool(this_computer.WINDOWS), "footageEvery": FOOTAGE_EVERY_MS,
+            "copiesEvery": COPIES_EVERY_MS, "copiesTries": COPIES_TRIES,
+            "previewDone": list(reel_page.DONE_STATES)}
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"

@@ -203,7 +203,9 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .toast.on{opacity:1}
 """
 
-# Ours. A video's chip is a real button (hers: a span), so it needs a button's own font and colour put back; a
+# Ours. A video's chip is a real button (hers: a span), so it needs a button's own font and colour put back (the
+# same for a photo in the picker and a Move chip); a stretch's bar is never text to highlight; a video in the
+# picker that is not ready yet looks it; a
 # long name (a shoot, a video) breaks instead of pushing a phone sideways; the line for a video still copying in;
 # and a ring for the keyboard.
 OUR_CSS = r"""
@@ -216,6 +218,14 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .btn:focus-visible,.vid:focus-visible,.opt:focus-visible,.chip:focus-visible{outline:2px solid var(--coral-2);outline-offset:2px}
 .tl-time{white-space:nowrap}
 @media(max-width:520px){.who-row{grid-template-columns:1fr}.tl-scale{margin-left:0}}
+.pk{display:block;width:100%;border:0;background:none;padding:0;font:inherit;color:inherit}
+.pk:focus-visible,.vcard:focus-visible{outline:2px solid var(--coral-2);outline-offset:2px}
+.vcard:disabled{opacity:.55;cursor:default}.vcard:disabled:hover{border-color:var(--line)}
+.vcard b{overflow-wrap:anywhere}
+.tools .chip{font-family:inherit}
+.seg{user-select:none;-webkit-user-select:none;touch-action:none}
+.sthumbs{user-select:none;-webkit-user-select:none}
+.pmenu{max-width:calc(100vw - 16px)}
 """
 
 
