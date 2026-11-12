@@ -191,3 +191,21 @@ Found while building: **the Assistant can see whether Remote Control is on, and 
 Checked: `tests/phone_setup_check.py` (6 checks, both Pythons), and the page by eye in the pane. On this session Remote Control reads as on. **Not tried:** the switch being flipped by the Assistant in a real backup, and a tap actually arriving on a phone between two cards. **To confirm with Dustin:** step 1 says the button is "near the top of the Claude window" and is "the first one, the one with three lines", from his screenshot.
 
 The pictures are made by `tools/make_phone_pictures.py` from the screenshots in `docs/phone-setup/`. If the app's look changes, save new screenshots there and run it again.
+
+## 16. The card swap: "Eject my card", then "Card 2 is in" (Dustin, Nov 11, late)
+
+Dustin: "you're going to have to build something that pops up and says, hey, it's time to swap your card. So when they come back to the screen, there's something waiting for them. And there should be an eject my card button... then it's like, okay, now go ahead and pop in your new one."
+
+Built, in the chat rather than on a page, because buttons in the chat are the ones that drive the Assistant (the same reason "Show the report" lives there).
+
+- **Card done, more to come:** a tap on the phone, and a box waiting in the chat: "Card 1 is safe: 1,840 photos on Big Kahuna and checked." "Ready to swap cards?" with one button, **Eject my card**.
+- **They press it:** the Assistant ejects the card and says "Your card is out. Pull it from the reader, and put the next one in." Then a second box: "Is card 2 in?" with one button, **Card 2 is in**.
+- **They press that:** the Assistant finds the card and starts it, asking nothing again.
+- **Safety (`eject_card.py`):** it only ejects a real memory card, and only one whose backup is finished and checked. It refuses the photo drive, a folder, and a card that is not backed up. Ejecting changes nothing on the card. Every touch has a time limit.
+- **If the Mac won't let go:** "Something on this Mac is still using the card... Close it and try again." with the same button again.
+- **On a PC:** not built. It says how to eject by hand, then offers "Card 2 is in".
+- "Eject my card" also works any other time they say it, for a single card after the report.
+
+Checked: `tests/eject_check.py`, 9 checks, both Pythons, with the Mac's own eject swapped for a recorder. **Not tried:** a real eject. Dustin's two-card test is the first.
+
+Seen while building: asking the Mac about EOS_DIGITAL hung again for over two minutes. That is the second time today with this card and reader. The backup's own first read is now protected by the 30 second limit, but it points at the reader or its cable.
