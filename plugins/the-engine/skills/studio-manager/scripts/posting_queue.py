@@ -1783,6 +1783,16 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/phone-setup":
+            # the picture of where the Remote Control switch is, for a backup of more than one card (phone_setup.py)
+            import phone_setup
+            body = phone_setup.page_html().encode()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in ("/home", "/home.html"):
             import home
             body = home.page_html().encode()

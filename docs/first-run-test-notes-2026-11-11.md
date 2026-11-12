@@ -176,3 +176,18 @@ Checked: `tests/glance_check.py`, 6 checks on a pretend setup, both Pythons. **N
 Also done in the same go: the two real video shoots are renamed "Garden lighting demo" and "Green chair, direct to camera" (17 clips, every one checked as the same file), and the day's work was committed.
 
 Still open from this test: phone setup when there is more than one card (note 4), a card going quiet mid-copy (note 13), the reel page picking up the Videos folder, and anything on a PC.
+
+## 15. Phone taps when there is more than one card, built (note 4; Dustin sent the two screenshots, Nov 11, late)
+
+Dustin: the Remote Control switch is inside the session rail, and sent the top bar and the switch itself.
+
+Found while building: **the Assistant can see whether Remote Control is on, and can switch it on itself** with their OK. So most photographers never need instructions.
+
+- **Two or more cards, Remote Control already on:** nothing is asked. The starting message adds "I'll tap your phone when it's time for card 2."
+- **Off:** one question, "Want a tap on your phone when it's time for the next card?" with "Yes, turn it on" and "No, I'll stay close". On yes the Assistant flips the switch. The app may ask them to approve.
+- **Only when the Assistant can't do it:** a page beside the chat, "Get a tap on your phone", with three steps and Dustin's two screenshots, the button and the switch circled. `phone_setup.py url`.
+- Never for one card, and never holds the backup up.
+
+Checked: `tests/phone_setup_check.py` (6 checks, both Pythons), and the page by eye in the pane. On this session Remote Control reads as on. **Not tried:** the switch being flipped by the Assistant in a real backup, and a tap actually arriving on a phone between two cards. **To confirm with Dustin:** step 1 says the button is "near the top of the Claude window" and is "the first one, the one with three lines", from his screenshot.
+
+The pictures are made by `tools/make_phone_pictures.py` from the screenshots in `docs/phone-setup/`. If the app's look changes, save new screenshots there and run it again.
