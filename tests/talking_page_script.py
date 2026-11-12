@@ -158,7 +158,7 @@ def run_page(t, c, s):
     # ---- the sentences
     got = c.js("Array.from(document.querySelectorAll('#script .sent')).map(function(e){ return [e.className, Array.from(e.querySelectorAll('.words span[data-i]')).map(function(x){ return x.textContent; })]; })")
     case("the script: one box a sentence, every word in it as text, in order",
-         [g[1] for g in got] == [SAID[a:b + 1] for a, b in (S1, S2, S3)] and all(g[0] == "sent" for g in got), got)
+         [g[1] for g in got] == [SAID[a:b + 1] for a, b in (S1, S2, S3)] and all(g[0].replace(" now", "") == "sent" for g in got), got)   # (the sentence being said is lit: the preview)
     case("a word with a tag in it is text, never HTML", c.js("document.querySelectorAll('#script .words b:not(.sh)').length") == 0 and c.text(word(2)) == "<b>bold</b>")
     tools = c.js("Array.from(document.querySelectorAll('#script .sent')).map(function(e){ var r = e.querySelector('.tools'); return [e.children.length, Array.from(r.children).map(function(x){ return [x.tagName, x.textContent, x.classList.contains('on')]; })]; })")
     want = [["SPAN", "Move", False], ["BUTTON", "None", True], ["BUTTON", "Punch in", False], ["BUTTON", "Slow zoom", False]]

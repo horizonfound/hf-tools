@@ -74,6 +74,8 @@ Turned down by Nicole and never to come back (v24 section 3): one photo panel un
 - Dragging a video block's end on the timeline loses the video (`v`, `from` dropped). Ours carries them.
 - "Remove this one" always removes the first photo of a flashing stretch. Kept as hers (her page never offers another), noted.
 - The spacebar toggles the talking video behind the open video picker. Ours ignores keys while either picker is open.
+- The same spacebar plays the video behind the open photo menu, and takes the key from a button or a tick reached with the Tab key (it plays, and the button is not pressed). Ours: nothing plays behind the open menu, and a button, tick or slider reached with the Tab key is pressed by the spacebar as anywhere else; after a mouse click the spacebar plays and pauses, as hers. (Found in C3's review.)
+- A Footage video shorter than the words it sits on flickers in her preview: once it has ended it is started again from its beginning and thrown back to its end, over and over, until the stretch is done. Ours stays on its last frame. **Stage D: CapCut must do the same with a short video (hold or end the block), and say which.** (Found in C3's review.)
 - A video with no sound shows a Python error. Ours: her line "I couldn't hear any talking in that video." before anything is made.
 - A preview keyed only on the file name plays a stale copy after a re-export. Ours keys on name, size and time (`video.key`).
 - `place` accepts a photo number that does not exist and a stretch with no kept word (it silently vanishes from the reel). Ours refuses both in plain words.

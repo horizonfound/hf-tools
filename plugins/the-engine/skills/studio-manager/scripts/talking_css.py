@@ -207,7 +207,8 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 # same for a photo in the picker and a Move chip); a stretch's bar is never text to highlight; a video in the
 # picker that is not ready yet looks it; a
 # long name (a shoot, a video) breaks instead of pushing a phone sideways; the line for a video still copying in;
-# and a ring for the keyboard.
+# and a ring for the keyboard. On the preview: nothing is text to highlight while a hand drags there, a touch on
+# something that drags is a drag (the rest of the preview still scrolls the page under a finger).
 OUR_CSS = r"""
 .vid{font:inherit;font-size:14px;color:var(--ink);max-width:100%;overflow-wrap:anywhere;text-align:left}
 .vid:disabled{opacity:.5;cursor:default}
@@ -226,6 +227,8 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .seg{user-select:none;-webkit-user-select:none;touch-action:none}
 .sthumbs{user-select:none;-webkit-user-select:none}
 .pmenu{max-width:calc(100vw - 16px)}
+.screen{user-select:none;-webkit-user-select:none}
+.screen .movable,.screen .knob,.screen .cap{touch-action:none}
 """
 
 

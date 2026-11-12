@@ -2,7 +2,7 @@
 """The talking reel page (talking_page.py: Nicole's handoff v24, pages/talking-reel.html, served by the posting
 server), checked by request and on the real page in a HIDDEN Chrome.
 
-    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|words] [--no-chrome] [--port 9620] [--work <folder>]
+    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|preview|words] [--no-chrome] [--port 9620] [--work <folder>]
 
 Run it under the memory guard, ONE such test at a time (it drives a hidden Chrome and plays a tiny video). The
 limit is 3000 MB, as for the other tests that drive a Chrome: the guard counts a Chrome's shared memory once per
@@ -24,6 +24,10 @@ Parts (one per sub-stage of the page; the later ones are added as they are built
           bar and each of its buttons, the Move row, the bars above the words, dragging a bar, a bar's menu, the
           photo picker and the video picker; her pitfalls and the layouts she turned down, each with its check.
           The video picker has the Mac get two 3-second Footage videos ready (a few stills each).
+
+  preview sub-stage C3 (tests/talking_page_preview.py holds it): playing the cut and the whole, every spot with her
+          numbers (the same ones CapCut gets), dragging and sizing a photo, themselves in the corner and the
+          caption, the zooms, the captions, a Footage video kept in step, the phone guides, step 3's chips.
 
 What it never does: touch the real ~/.studio (STUDIO_HOME is the scratch folder; the real one is listed before
 and after), build or start the real transcriber (TALKING_TRANSCRIBER=pretend, TALKING_NO_REAL=1), open a folder
@@ -449,7 +453,8 @@ def check_built(s):
     case("the Back to the post kit link goes to this shoot's kit page", "href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'" in body)
     case("the page's files stay readable: each script file is one string and nothing else",
          all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"])))
-    new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py", "talking_js_script.py", "talking_js_pick.py")
+    new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py", "talking_js_script.py", "talking_js_pick.py",
+           "talking_js_preview.py")
     lit = [f for f in new if re.search(r"expanduser|['\"]\.studio['\"]", (SCRIPTS / f).read_text(encoding="utf-8"))]
     case("no literal home in the new files (the computer's own folder only through arrange.HOME)", not lit, lit)
 
@@ -1196,7 +1201,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=PORT)
-    ap.add_argument("--only", choices=("s1", "script", "words"), help="one part")
+    ap.add_argument("--only", choices=("s1", "script", "preview", "words"), help="one part")
     ap.add_argument("--no-chrome", action="store_true", help="the routes only")
     a = ap.parse_args()
     if any(p in chrome_drive.NEVER_PORTS for p in range(a.port, a.port + 10)):
@@ -1236,6 +1241,18 @@ def main():
             else:
                 with chrome_drive.Chrome(work=str(work / "chrome2"), size=(1280, 1100)) as c:
                     group("the script and the pickers on the page", tps.run_page, me, c, s)
+        if a.only in (None, "preview"):
+            import talking_page_preview as tpp
+            me = sys.modules[__name__]
+            if s.proc is None:
+                s.start()
+                case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 10)
+            group("the preview, by request", tpp.run_requests, me, s)
+            if a.no_chrome or not chrome_drive.find_chrome():
+                skip("the preview on the page: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
+            else:
+                with chrome_drive.Chrome(work=str(work / "chrome3"), size=(1280, 1100)) as c:
+                    group("the preview on the page", tpp.run_page, me, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()

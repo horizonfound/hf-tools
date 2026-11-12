@@ -16,8 +16,10 @@ talking_js_step1.py are C1: the whole page's structure, every route, the state a
 step 1 (Add my video, the videos, Edit my video, the status line, who places the photos, the lines to copy).
 C2 is talking_js_script.py (the sentences, a click on a word, the highlight bar, the Move row, the bars above the
 words, dragging a bar, a bar's menu) and talking_js_pick.py (the photo picker and the video picker).
-The preview and the timeline are their own files, added to JS_PARTS as each is built; until then the preview
-shows the talking video and nothing over it, and the timeline shows its frame and nothing moves in it.
+C3 is talking_js_preview.py (playing the cut or the whole, a photo or a video where it will sit, themselves in
+the corner, the zooms, the captions, dragging and sizing on the preview, the phone guides, step 3's chips).
+The timeline is its own file, added to JS_PARTS when it is built; until then the timeline shows its frame and
+nothing moves in it but its round play button.
 
 Routes (GET: our host, never another website's page; POST: the pickers' guard, then one JSON object; the kit by
 its folder name; everything wrapped so the server stays up):
@@ -61,6 +63,7 @@ import talking_js_core  # noqa: E402
 import talking_js_step1  # noqa: E402
 import talking_js_script  # noqa: E402
 import talking_js_pick  # noqa: E402
+import talking_js_preview  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
 POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make")
@@ -71,7 +74,7 @@ UNDO_STEPS = 60              # hers
 REV = re.compile(r"[0-9]{1,12}")
 MARK = re.compile(r"[0-9a-f]{12}")
 # The page's script, in the order it runs. Each later sub-stage adds its own file here.
-JS_PARTS = (talking_js_core.JS, talking_js_step1.JS, talking_js_script.JS, talking_js_pick.JS)
+JS_PARTS = (talking_js_core.JS, talking_js_step1.JS, talking_js_script.JS, talking_js_pick.JS, talking_js_preview.JS)
 FOOTAGE_EVERY_MS = 4000      # hers: while the video picker is open and a video is still being got ready
 COPIES_EVERY_MS = 4000       # ours: while a photo the page shows has no small copy yet, look for it again
 COPIES_TRIES = 90            # ...this many times with nothing new, then no more (a copy that never comes)
@@ -636,9 +639,11 @@ def _step2(w):
         "<i class='knob' id='meKnob' title='" + q(w["knob_me"]) + "'></i>"
         "<i class='knob' id='capKnob' title='" + q(w["knob_cap"]) + "'></i>"
         "<div class='cap' id='cap'></div>" + guides + "</div>"
-        # nothing but these two checkboxes ever sits under the preview (her v24, section 3)
-        "<div class='controls'><label title='" + q(w["guides_title"]) + "'><input type='checkbox' id='guidesOn'> " + e(w["guides"]) + "</label>"
-        "<label><input type='checkbox' id='cutMode' checked> " + e(w["cut_mode"]) + "</label></div>"
+        # nothing but these two checkboxes ever sits under the preview (her v24, section 3). autocomplete off: a
+        # browser must not put back, on a reload, a tick it remembers ("Play the cut version" is remembered nowhere,
+        # and the guides only under the key the page itself keeps)
+        "<div class='controls'><label title='" + q(w["guides_title"]) + "'><input type='checkbox' id='guidesOn' autocomplete='off'> " + e(w["guides"]) + "</label>"
+        "<label><input type='checkbox' id='cutMode' checked autocomplete='off'> " + e(w["cut_mode"]) + "</label></div>"
         "</div><div class='script' id='script'></div></div></section>")
 
 
