@@ -149,6 +149,7 @@ STYLES = ("first", "reveal", "backforth", "bookends")  # hers
 MOMENT_ID = re.compile(r"[mu][0-9]{1,4}-[0-9a-f]{6}")  # hers: m<k>-<6 hex> (Claude's), u<k>-<6 hex> (theirs)
 # step 1, the footage (stage b2 and b3)
 FOOTAGE = "Footage"                    # hers: <shoot>/Footage, the behind-the-scenes videos they drag in
+NOT_IN_TALKING = "That video isn't in this shoot's Talking folder."    # hers (talking_core.start), v23
 FOOT_WORK = "footage"                  # ours: <kit>/.kit/footage holds the stills, the small copies and their states
 FOOT_EVERY_MS = 4000                   # hers: the page looks at the Footage folder every 4 seconds
 STRIP_EVERY = 2.0                      # hers: a still every 2 seconds under the player
@@ -1059,13 +1060,22 @@ _FACTS = {}                  # key -> facts, read once in this process (and kept
 _FACTS_LOCK = threading.Lock()
 
 
-def _facts(kit, p, key):
+def _folder_work(kit, folder):
+    """Where the Assistant keeps what it made for the videos of one of the kit's folders: Footage's in
+    .kit/footage, as always; any other folder's (v24: Talking) in a hidden folder of its own, .kit/talking."""
+    return foot_work(kit) if folder == FOOTAGE else kit / ".kit" / folder.lower()
+
+
+def _facts(kit, p, key, folder=FOOTAGE):
     """The video's facts (video.facts, from its header): from this process's memory, else the kit's facts.json,
-    else read and kept there. {"refused": plain words} for a file that is not a video it can read."""
+    else read and kept there. {"refused": plain words} for a file that is not a video it can read. Each folder
+    has a facts file of its own (Footage's is .kit/footage/facts.json, as always)."""
+    work = _folder_work(kit, folder)
+    key_mem = key if folder == FOOTAGE else (folder, key)
     with _FACTS_LOCK:
-        if key in _FACTS:
-            return _FACTS[key]
-    f = foot_work(kit) / "facts.json"
+        if key_mem in _FACTS:
+            return _FACTS[key_mem]
+    f = work / "facts.json"
     kept = _read(f) or {}
     got = kept.get(key) if isinstance(kept.get(key), dict) else None
     if got is None:
@@ -1075,18 +1085,18 @@ def _facts(kit, p, key):
         except v.NotAVideo as e:
             got = {"refused": str(e)}
         except OSError:
-            return {"refused": WORDS["video_not_here"]}
+            return {"refused": WORDS["video_not_here"] if folder == FOOTAGE else NOT_IN_TALKING}
         if got.get("refused") and _just_changed(p):
             return got                     # maybe still coming in: asked again on the next look, never kept
         try:
-            with arrange.locked(foot_work(kit) / "facts.lock"):
+            with arrange.locked(work / "facts.lock"):
                 kept = _read(f) or {}
                 kept[key] = got
                 arrange.write_whole(f, kept)
         except (OSError, arrange.Busy):
             pass
     with _FACTS_LOCK:
-        _FACTS[key] = got
+        _FACTS[key_mem] = got
     return got
 
 
@@ -1097,15 +1107,17 @@ def _just_changed(p):
         return False
 
 
-def list_videos(kit, coming=None):
+def list_videos(kit, coming=None, folder=FOOTAGE):
     """The videos in <kit>/Footage, in name order (hers): [{key, name, path, size, facts}]. Hidden files, links
     and anything not a .mov, .mp4 or .m4v are left out. The path never leaves this computer's own side.
     A video still being copied in (its boxes run past the end of the file, and it changed in the last
     COMING_RECENT seconds) is left out too, its facts never read and nothing made for it: it goes in `coming`
     (a list, when given) as {name, size}, and comes in whole on a later look (v19 review, Nov 7: a copy in
-    progress left a record for every size it passed through)."""
-    d = footage_dir(kit)
-    if not footage_ok(kit) or not d.is_dir():
+    progress left a record for every size it passed through).
+    `folder` is another folder of the kit's own to list the same way (v24: "Talking"), with the same "is it the
+    kit's own folder" check and a facts file of its own; Footage, the default, is exactly as before."""
+    d = kit / folder
+    if not _own_folder(kit, folder) or not d.is_dir():
         return []
     out = []
     vm = _video()
@@ -1124,7 +1136,7 @@ def list_videos(kit, coming=None):
             key = vm.key(p)
         except OSError:
             continue
-        fx = _facts(kit, p, key)
+        fx = _facts(kit, p, key, folder)
         if fx.get("refused") and _just_changed(p):
             if coming is not None:            # its header isn't in yet (a phone writes it last): still coming in
                 coming.append({"name": f, "size": size})
