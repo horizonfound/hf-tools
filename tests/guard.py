@@ -289,6 +289,10 @@ def main(argv):
     if not watching:
         say("This computer's memory can't be read here (no ps), so the command runs unguarded.")
 
+    # whatever is run under the guard can never build or start the real transcriber app (transcribe.py's
+    # TALKING_NO_REAL): a video test that forgets to say so itself still cannot raise the Mac's permission box
+    os.environ.setdefault("TALKING_NO_REAL", "1")
+
     # this run's mark: one line of environment that everything the command starts inherits
     mark_name, mark_word = f"GUARD_TREE_{os.getpid()}", os.urandom(8).hex()
     try:

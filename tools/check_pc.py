@@ -70,7 +70,7 @@ MAC_TOOLS = [("sips", "pictures", "pictures.py (make_jpeg, thumb_rows, size_of)"
              ("pbcopy", "the clipboard", "a Mac-only branch (a PC has no such command)"),
              ("pbpaste", "the clipboard", "a Mac-only branch (a PC has no such command)"),
              ("xattr", "a file's extra Mac notes", "a Mac-only branch"),
-             ("xcrun", "Apple's developer tools", "a Mac-only branch"),
+             ("xcrun", "Apple's developer tools", "transcribe.py (MacSpeech), in its Mac-only branch"),
              ("defaults", "the Mac's settings", "a Mac-only branch"),
              ("ditto", "a Mac copy", "a copy the backup's way (hash while copying), on both computers"),
              ("say", "the Mac speaking", "a Mac-only branch"),
@@ -83,7 +83,13 @@ MAC_TOOLS = [("sips", "pictures", "pictures.py (make_jpeg, thumb_rows, size_of)"
              ("pkill", "ending a program by its name", "a Mac-only branch (a PC has no such command)"),
              ("lsof", "which program holds a file open", "this_computer.py, or a Mac-only branch"),
              ("launchctl", "the Mac's background jobs", "a Mac-only branch"),
-             ("pmset", "the Mac's sleep settings", "this_computer.py (keep_awake), or a Mac-only branch")]
+             ("pmset", "the Mac's sleep settings", "this_computer.py (keep_awake), or a Mac-only branch"),
+             # Nov 12, talking reels: the small app that turns talking into words is built with Apple's own tools
+             ("swiftc", "Apple's compiler", "transcribe.py (MacSpeech), by its full path, in its Mac-only branch"),
+             ("codesign", "signing an app", "transcribe.py (MacSpeech), in its Mac-only branch"),
+             ("xcode-select", "where Apple's tools are", "transcribe.py (MacSpeech), in its Mac-only branch"),
+             ("plutil", "reading an app's description", "transcribe.py (MacSpeech), in its Mac-only branch"),
+             ("tccutil", "the Mac's privacy answers", "transcribe.py (MacSpeech), in its Mac-only branch")]
 # Mac-only tools still called directly somewhere, without a home yet: listed so they cannot be forgotten.
 # Empty since Nov 6: pgrep (is CapCut open) became a STOP like the others; capcut.py's one call is in its Mac
 # branch, marked pc-ok.
@@ -514,6 +520,14 @@ SELF_TESTS = [   # (made-up script, the short names it must give, in any order; 
     ('import os, subprocess\nown = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}\n'
      'subprocess.Popen(["x"], **own)\n', {"new session"}),
     ('import this_computer\nthis_computer.popen_detached(["x"])  # a Mac: start_new_session, as before\n', set()),
+    # Nov 12, talking reels: Apple's own tools, by a bare name or a full path, alone or inside a Path
+    ('import subprocess\nsubprocess.run(["swiftc", "-O", "a.swift"])\nsubprocess.run(["/usr/bin/codesign", "--force", "x.app"])\n'
+     'subprocess.run(["/usr/bin/xcode-select", "-p"])\n', {"swiftc", "codesign", "xcode-select"}),
+    ('import subprocess\nsubprocess.run(["xcrun", "--find", "swiftc"])\nsubprocess.run(["plutil", "-lint", "a.plist"])\n'
+     'subprocess.run(["tccutil", "reset", "SpeechRecognition"])\n', {"xcrun", "swiftc", "plutil", "tccutil"}),
+    ('from pathlib import Path\ndev = Path("/x")\nc = dev / "usr" / "bin" / "swiftc"\n', {"swiftc"}),
+    ('from pathlib import Path\ndev = Path("/x")\nc = dev / "usr" / "bin" / "swiftc"  # pc-ok: a full path, on a Mac only\n'
+     's = "Only with their yes, run `xcode-select --install` (it opens Apple\'s own window)."\n', set()),
 ]
 
 

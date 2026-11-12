@@ -23,10 +23,24 @@ for <shoot>": cut first, then this):
 
     python3 talking_rec.py status "<shoot>"                where this shoot's talking reel stands, in a few lines
 
+When they say "set up talking reels" (the page tells them to when a Mac needs it):
+    python3 talking_rec.py setup --check                   where turning talking into words stands on this computer:
+                                                           Apple's tools, the small app that listens, and what the
+                                                           Mac last said about Speech Recognition. Sets nothing up.
+    python3 talking_rec.py setup                           the same, then the first-time setup. If Apple's tools are
+                                                           missing it says so and stops: `xcode-select --install`
+                                                           opens Apple's own install window, so only with their yes.
+
+Edit my video on the page (start(), then `talking_rec.py job`, the Assistant's own command) turns the video into
+words in a job of its own: see "turning a video into words" below. The Mac's own Speech Recognition route is
+WRITTEN, NEVER RUN until Dustin's hand step; every test uses the pretend transcriber.
+
 <shoot> is the name as the page wrote it in the line they pasted, or a few words of it. Write the two files in
 the scratchpad, never in their folders, and hand them over with --file (never on the command line).
 
-Where things are kept, all in the kit's hidden folder (nothing of theirs is in the computer's own Assistant folder):
+Where things are kept, all in the kit's hidden folder (nothing of theirs is in the computer's own Assistant folder;
+only the transcriber's own app, when it has one, and the scratch sound of a job at work, in <that folder>/talking/,
+the sound removed when the job ends):
     .kit/talking.json            the record: which video, their cuts, splits, speeds, zooms, photo stretches,
                                  captions. Her field names. Saved whole or not at all, one writer at a time
                                  (.kit/talking.lock), with a counter ("rev") that moves on with every change.
@@ -35,6 +49,10 @@ Where things are kept, all in the kit's hidden folder (nothing of theirs is in t
                                  each video that was turned into a script. Written once per video, never by a
                                  save from the page, so every save stays small (a 30-minute talk is about 4,500
                                  words).
+    .kit/talking-job.json        the newest job that turned a video into words (its state, which video);
+                                 .kit/talking-job.lock is held by that job's process for as long as it lives
+    .kit/talking/<key>/preview.mp4   the small copy of a talking video the page plays (540 on its short side),
+                                 made once per video and kept; .kit/talking/facts.json the videos' facts
     a record that was read and is not a record (damaged) is set aside as talking.damaged-<date>-<time>.json,
     never written over. A record that is there and would not be READ just now (a drive that hiccuped, another
     program holding it) is left exactly where it is: every command and save says "try again", nothing is moved.
@@ -49,13 +67,19 @@ kept too ("replaced", the last 12).
 
 Exit: 0 done, 1 a problem with the kit, 2 STOP (nothing was saved).
 
-A Mac and a PC: every file is read and written as UTF-8; nothing here needs a Mac.
+A Mac and a PC: every file is read and written as UTF-8. The record and the chat's commands need no Mac. Turning
+a video into words does (a named gap): on a PC, Edit my video answers this_computer.NO_TALKING_PC at once and makes
+nothing.
 """
 import argparse
 import hashlib
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -81,6 +105,7 @@ WORD_FIELDS = ("words", "sentences", "info", "transcribed", "video_key", "how", 
 # Everything that counts in word numbers: it belongs to one video's script and to no other.
 EDIT_FIELDS = ("cut", "claude_cut", "claude_why", "splits", "speeds", "zooms", "shots", "moves", "photos", "claude_shots")
 KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds")
+MADE_AGAIN = "made-again"                 # in "earlier": this video's words were made again while the record was on another
 REPLACED_KEPT = 12                        # as kit.py picks --reel keeps reel_earlier
 
 # hers (server.py /talking/save), each in one place
@@ -103,6 +128,7 @@ FAR = 10 ** 9                             # no number the page sends (a second, 
 # Hers, word for word (talking.py): what the commands say.
 NO_SCRIPT_SHOW = "there's no script for this shoot yet: on the page, add their video and press Edit my video"
 NO_SCRIPT = "no script yet"
+NO_SCRIPT_MAKE = "Turn your video into a script first."       # hers (server.py make_talking)
 THEIR_CUTS = "they've already made their own cuts on the page. Ask before replacing them (then run again with --replace)"
 THEIR_PHOTOS = "they already have photos placed. Ask before replacing them (then run again with --replace)"
 PHOTOS_PLACED = "They already have photos placed: ask before replacing them (then place with --replace)."
@@ -412,7 +438,7 @@ def use_video(kit, name):
     return change(kit, fn)
 
 
-def put_words(kit, name, key, words, info=None, more=None, again=False):
+def put_words(kit, name, key, words, info=None, more=None, again=False, switch=True):
     """A video has just been turned into words: keep them (once, in the words file, the version before beside
     it), and make the record ready on that video. Words made again for a video that already had a script start
     its edit afresh (what was there is kept in "replaced"): the word numbers belong to the old words.
@@ -420,6 +446,9 @@ def put_words(kit, name, key, words, info=None, more=None, again=False):
     `again=True` is Edit my video pressed again on a video that already had its script: the edit starts afresh
     even when the words come back the same (hers always does; the plan's "replaced"). Without it, the same words
     for the same file change nothing, so a job that runs twice is harmless.
+    `switch=False` (the job's own save): when they chose ANOTHER video while this one's words were being made,
+    the words are kept (they are per video) and the record is left on the video they chose; this video's script
+    is there when they come back to it (use_video), its earlier edit started afresh then if it must be.
 
     Safe to cut off: the words file is written first and the record second, and the record carries the mark of
     the script its edit belongs to ("words_of"). If this stops between the two, the record's mark no longer
@@ -456,6 +485,14 @@ def put_words(kit, name, key, words, info=None, more=None, again=False):
 
     def fn(rec):
         if rec.get("video") != name:
+            if not switch:
+                # they are on another video now: leave them there. This video's edit, set aside when they left,
+                # is marked so it starts afresh when they come back, if it belongs to the old words.
+                e = rec.get("earlier", {}).get(name) if isinstance(rec.get("earlier"), dict) else None
+                if isinstance(e, dict) and (again or (e.get("words_of") is None and rewrote)) and e.get("words_of") != MADE_AGAIN:
+                    e["words_of"] = MADE_AGAIN
+                    return None
+                return False
             switch_video(rec, name)
         was = rec.get("words_of")
         if again or (was is not None and was != eid) or (was is None and rewrote):
@@ -545,22 +582,801 @@ def video_state(kit, rec, talks=None):
     return "here"
 
 
+# ---------- turning a video into words: a job of its own (hers: a thread inside her server) ----------
+# Edit my video (start) writes the job down and starts a process of its own (talking_rec.py job), which the page
+# server starting over cannot stop. The job: the video's facts, whatever the transcriber needs set up (the first
+# time only), the small copy to play on the page, the sound, the words, then ONE whole save (put_words). One job
+# per shoot (.kit/talking-job.lock, held for as long as the job lives); one talking job at a time on this
+# computer (<the Assistant's own folder>/talking/turn.lock); the small copy and the sound are made in the
+# computer's one video turn (video.turn(), shared with a backup's clip work, so a talk may wait behind a backup).
+# Every step has its own stated time limit, a watchdog stops a job that runs past them all, and a job that died
+# reads as plain words on the page, never a page stuck on "Getting your video ready…".
+# The two waits (for another shoot's talking job, for the video turn) share one allowance. The computer is kept
+# awake for as long as the job lives (this_computer.awake_while; a closed lid still stops it, and every limit is
+# a clock time, so a Mac that slept part way comes back as "took too long"). A job whose words reached their file
+# but whose record was busy is finished by the next look (settle), never thrown away; a job that starts after
+# the page was told it stopped makes nothing; and the job's save never moves the record off a video they have
+# since chosen.
+#
+# Where things are: the small copy is the kit's (.kit/talking/<the video's key>/preview.mp4, made once and
+# kept); the sound the transcriber listens to is on the computer's own disk (talking/work/<job>/, removed when
+# the job ends, and by the next job if this one was killed); the transcriber's own app, when there is one, is
+# in talking/ too. Nothing of theirs is kept there.
+
+JOB = "talking-job.json"                  # the newest job: {id, state, video, key, again, t, t0, pid, until}
+JOB_ID = re.compile(r"[0-9a-f]{12}")
+JOB_BOOT = 20.0                           # seconds a job may take to start before "queued" means it never did
+TALK_HOME = arrange.HOME / "talking"      # on the computer's own disk: the transcriber's app, and the scratch sound
+WORK = TALK_HOME / "work"
+TALK_TURN = "turn.lock"
+MAX_TALK = 30 * 60                        # ours (hers has no limit): a talk over 30 minutes is refused
+SETUP_LIMIT = 300.0                       # ours: the first-time setup (building the small app) may take this long
+JOB_GRACE = 30.0                          # the plan's 30 s of grace
+SETUP_TURN_WAIT = 20.0                    # `setup` from the chat waits this long for a talking job to finish, then says so
+SAVE_TRIES = 6                            # the finished words' last save is tried this often when the record is busy
+COPY_SMALLEST = 1000                      # a small copy under this many bytes is no video (video._copy_now's own floor)
+WORK_YOUNG = 30.0                         # a work folder this new is never cleared (its job may be about to hold it)
+LANG = "en-US"                            # hers: the only language asked for
+TEST_LIMITS = "ASSISTANT_TEST_TALK_LIMITS"   # tests only: a JSON object of limits in seconds, in place of the real ones
+
+# Hers, word for word (talking_core.py): what the page is told while a video becomes a script, and when it can't.
+JOB_WORDS = {
+    "ready_video": "Getting your video ready…",
+    "to_script": "Turning your words into a script…",
+    "not_in_folder": "That video isn't in this shoot's Talking folder.",
+    "still_working": "I'm still working on the last one. Give it a minute.",
+    "lowspace": "The photo drive is almost full, so I couldn't make the preview.",
+    "unreadable": "I couldn't read that video. Try exporting it again as a regular .mov or .mp4.",
+    "no_talking": "I couldn't hear any talking in that video.",
+}
+# Ours: states hers never reaches, or reaches with words that would be wrong. Every one a DRAFT for Nicole to
+# reword; the permission lines stay drafts until the real box has been seen (the plan's hand step). Each with
+# its reason. (line, why it is ours)
+OUR_JOB_WORDS = {
+    "setup": ("Setting up, just this once…",
+              "hers has the transcriber built by hand beforehand; ours builds it on their Mac the first time"),
+    "asking": ("Your Mac is asking if The Assistant may use Speech Recognition. Say yes in that box and I'll carry on. "
+               "(It may be behind this window.)",
+               "hers waits in silence while macOS asks"),
+    "no_answer": ("Your Mac asked if The Assistant may use Speech Recognition, and nobody answered, so I stopped. "
+                  "Press Edit my video to try again.",
+                  "hers would wait an hour"),
+    "refused": ("Speech Recognition is turned off for The Assistant, so I can't turn your talking into words yet. To turn "
+                "it on: open System Settings, then Privacy & Security, then Speech Recognition, and switch on The "
+                "Assistant. Then press Edit my video again.",
+                "hers says \"click Allow, then try again\", which is wrong once refused: macOS never asks twice"),
+    "restricted": ("This Mac doesn't allow Speech Recognition (Screen Time or a work profile is holding it off), so I "
+                   "can't turn your talking into words on it.",
+                   "hers shows the Mac's own error words"),
+    "dictation_off": ("Your Mac's Dictation looks to be turned off, and I need it to turn your talking into words. To "
+                      "turn it on: open System Settings, then Keyboard, and switch on Dictation. Then press Edit my "
+                      "video again.",
+                      "hers shows the Mac's own error words"),
+    "servers": ("This Mac can only turn talking into words by sending the sound to Apple, and I won't send your video's "
+                "sound anywhere. So I can't make a script on this Mac yet.",
+                "hers sends the sound to Apple without a word (rules 7 and 8)"),
+    "no_tools": ("Talking reels need one more thing from Apple on this Mac before the first one. Tell your assistant: "
+                 "set up talking reels.",
+                 "ours builds the transcriber on their Mac, which needs Apple's Command Line Tools"),
+    "old_tools": ("Apple's tools on this Mac are older than its macOS, so I couldn't finish setting up. Tell your "
+                  "assistant: set up talking reels.",
+                  "after a macOS update the compiler and the SDK can disagree"),
+    "licence": ("Apple's tools on this Mac are waiting for their licence to be accepted, so I couldn't finish setting "
+                "up. Tell your assistant: set up talking reels.",
+                "an Xcode whose licence was never accepted refuses to build"),
+    "setup_failed": ("I couldn't finish setting up talking reels on this Mac. Tell your assistant: set up talking reels.",
+                     "the build can fail in ways hers never meets"),
+    "old_mac": ("Talking reels need macOS 13 or newer, and this Mac is on an older one.",
+                "hers needs macOS 13 too and does not say so"),
+    "changed": ("This video has changed since its script was made. Press Edit my video to make its script again.",
+                "hers keeps the old script on a video exported again under the same name"),
+    "too_long": ("That took too long, so I stopped. Nothing of yours was changed. Press Edit my video to try again.",
+                 "hers has no limit: a hung step leaves the page on \"Getting your video ready…\" for good"),
+    "over_30": ("That video is over 30 minutes, which is more than I can turn into a script. Try a shorter one.",
+                "hers has no limit"),
+    "waited": ("Another video was still being worked on, so I didn't get to yours. Press Edit my video to try again.",
+               "hers does one video at a time inside her server; ours can wait behind a backup's clips or another "
+               "shoot's talk, and her \"still working on the last one\" would not be true of this shoot"),
+    "interrupted": ("I was stopped before the script was finished. Press Edit my video to try again.",
+                    "hers stays on \"Getting your video ready…\" when her server stops part way"),
+    "failed": ("I couldn't turn the talking into words just now. Press Edit my video to try again.",
+               "hers shows the Mac's own error words in brackets; ours keeps those in the log"),
+    "pc": (this_computer.NO_TALKING_PC, "hers has no PC"),
+}
+# What video.preview_copy says, as this page's own lines (its `words` are the footage page's, never passed on).
+COPY_STATES = {"lowspace": "lowspace", "failed": "unreadable", "busy": "waited", "pc": "pc", "hevc_pc": "pc"}
+
+
+def line_for(code):
+    """The page's line for a state: hers where she has one, else ours. An unknown state gets the plain "couldn't"."""
+    if code in JOB_WORDS:
+        return JOB_WORDS[code]
+    return OUR_JOB_WORDS.get(code, OUR_JOB_WORDS["failed"])[0]
+
+
+class JobProblem(Exception):
+    """The job can't go on: `code` names the page's line (line_for); `detail` is for the log only."""
+
+    def __init__(self, code, detail=""):
+        super().__init__(code)
+        self.code, self.detail = code, str(detail or "")[:1500]
+
+
+def _vm():
+    return reel_page._video()
+
+
+def _sound():
+    return reel_page._reel_module("sound")
+
+
+def _transcribe():
+    return reel_page._reel_module("transcribe")
+
+
+def transcriber():
+    """The way this computer turns talking into words (transcribe.pick), its files in the Assistant's own folder."""
+    return _transcribe().pick(TALK_HOME)
+
+
+def limits(length):
+    """The job's stated time limits for a video `length` seconds long, in seconds:
+    turn   waiting for the computer's one video turn AND for another shoot's talking job, ONE allowance shared
+           by the two waits (the plan's 900 s): does not count against the work
+    setup  the first-time setup;  ask  the Mac's own question, waiting for an answer
+    copy   the small copy: the larger of 120 s and 3 times the length
+    sound  the larger of 120 s and the length;  words  the larger of 5 minutes and 4 times the length
+    grace  30 s;  spare  a minute;  ceiling  the whole job: their sum and the spare minute."""
+    n = max(0.0, float(length or 0))
+    d = {"turn": float(_vm().TURN_WAIT), "setup": SETUP_LIMIT, "ask": float(_transcribe().ASK_WAIT),
+         "copy": max(120.0, 3 * n), "sound": max(120.0, n), "words": max(300.0, 4 * n), "grace": JOB_GRACE, "spare": 60.0}
+    t = os.environ.get(TEST_LIMITS)
+    if t:
+        try:
+            d.update({k: float(v) for k, v in json.loads(t).items() if k in d})
+        except (ValueError, TypeError, AttributeError):
+            pass
+    d["ceiling"] = d["setup"] + d["ask"] + d["copy"] + d["sound"] + d["words"] + d["grace"] + d["spare"]
+    return d
+
+
+def job_path(kit):
+    return Path(kit) / ".kit" / JOB
+
+
+def read_job(kit):
+    try:
+        j = json.loads(job_path(kit).read_text(encoding="utf-8"))
+        return j if isinstance(j, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def write_job(kit, j):
+    arrange.write_whole(job_path(kit), j)
+
+
+def _fnum(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def job_running(kit):
     """Is a job turning this shoot's video into words right now? The job holds .kit/talking-job.lock for as long
-    as it lives (reel_page.job_running's way); nothing is made by asking."""
+    as it lives (reel_page.job_running's way); nothing is made by asking. On a drive that has no locks, the
+    job's own process number is asked after instead, for at most the job's ceiling and a minute."""
     p = Path(kit) / ".kit" / JOB_LOCK
     try:
-        if not p.is_file():
+        if p.is_file():
+            with open(p, "a", encoding="utf-8") as f:       # never written to: only looked at
+                got = this_computer.try_lock(f, shared=True)
+                if got is False:
+                    return True
+                if got:
+                    this_computer.unlock(f)
+                    return False
+    except OSError:
+        pass
+    j = read_job(kit) or {}
+    if j.get("state") != "running":
+        return False
+    return time.time() < _fnum(j.get("until")) + 60 and arrange._pid_alive(j.get("pid"))
+
+
+def _starting(j):
+    """Written down a moment ago and not yet picked up by its own process."""
+    return bool(j) and j.get("state") == "queued" and not j.get("pid") and time.time() - _fnum(j.get("t")) < JOB_BOOT
+
+
+def settle(kit):
+    """A record that says "working" when no job is: the job was killed, the computer was turned off, or it ran
+    past every limit. The record is given its plain line (once), so the page never waits on a job that is gone.
+    True when it changed the record. Cheap when there is nothing to do; never raises."""
+    kit = Path(kit)
+    try:
+        if _slim(kit).get("status") != "working":
             return False
-        with open(p, "a", encoding="utf-8") as f:           # never written to: only looked at
-            got = this_computer.try_lock(f, shared=True)
+    except Unreadable:
+        return False
+
+    def gone():
+        j = read_job(kit) or {}
+        until = _fnum(j.get("until"))
+        if j.get("state") == "running" and until and time.time() > until + JOB_GRACE:
+            return "too_long"                     # past its time, whatever its lock says
+        if job_running(kit) or _starting(j):
+            return None
+        return "interrupted"
+
+    if gone() is None:
+        return False
+    done = []
+
+    def fn(rec):
+        code = gone()                             # asked again, now that nothing else can be changing the record
+        if rec.get("status") != "working" or code is None:
+            return False
+        j = read_job(kit) or {}
+        if _landed(rec, j):                       # its words were kept and only the record's save was missed
+            _ready(rec, j)
+            code = "landed"
+        else:
+            _stopped(rec, line_for(code))
+        done.append((code, j.get("id")))
+    try:
+        change(kit, fn)
+    except (Busy, Unreadable, OSError):
+        return False
+    if done:
+        # the job is written down as over too, so a process that starts late (a busy Mac, one just woken) sees
+        # it is no longer wanted and makes nothing, instead of turning the record ready minutes after this
+        j = read_job(kit) or {}
+        if j.get("id") == done[0][1] and j.get("state") in ("queued", "running"):
+            _job_over(kit, j.get("id"), "done" if done[0][0] == "landed" else "problem")
+        log(f"{kit.name}: the job turning its video into words was gone ({done[0][0]}); the record says so now")
+    return bool(done)
+
+
+def _landed(rec, j):
+    """Did this job's words reach the words file, with only the record's own save missed? (The record's lock was
+    busy at the very end, or the job was stopped between its two saves.) rec: the record with its words joined on."""
+    if not isinstance(j, dict) or not isinstance(j.get("video"), str) or rec.get("video") != j["video"]:
+        return False
+    began = _fnum(j.get("t0")) or _fnum(j.get("t"))
+    return bool(rec.get("words")) and bool(began) and isinstance(j.get("key"), str) and rec.get("video_key") == j["key"] \
+        and _fnum(rec.get("transcribed")) >= began
+
+
+def _ready(rec, j):
+    """The record made ready on words that are already kept (what put_words' second half does)."""
+    if j.get("again") and any(k in rec for k in EDIT_FIELDS):
+        fresh_edit(rec, "Edit my video again")
+    rec["words_of"] = words_id(rec.get("video_key"), rec.get("words"))
+    rec["status"], rec["step"], rec["problem"] = "ready", "", ""
+    rec.setdefault("captions", True)
+
+
+def _stopped(rec, line):
+    """The record after a job that didn't finish: its plain line; a script made earlier for this video is still
+    there and still theirs to edit ("ready"), otherwise there is nothing to show but the line ("problem")."""
+    rec["status"] = "ready" if rec.get("words") else "problem"
+    rec["step"], rec["problem"] = "", str(line)[:300]
+
+
+def preview_path(kit, key):
+    """Where the small copy of a talking video is kept (made once per video key, in the kit's hidden folder)."""
+    return Path(kit) / ".kit" / TALKING.lower() / str(key) / "preview.mp4"
+
+
+def preview_for(kit, rec=None):
+    """The small copy to play for the record's video, or None when there is none (for the page's player).
+    The video as it is in the Talking folder now; when it has gone, the copy made from the one its script was
+    made from."""
+    kit = Path(kit)
+    rec = rec if rec is not None else load(kit)
+    name = rec.get("video")
+    if not isinstance(name, str) or not name:
+        return None
+    hit = _plain_videos(kit, TALKING).get(_nfc(name).casefold())
+    for key in ((_key_of(hit[1]) if hit else None), rec.get("video_key")):
+        if isinstance(key, str) and KEY.fullmatch(key) and preview_path(kit, key).is_file():
+            return preview_path(kit, key)
+    return None
+
+
+def can_make(kit, rec=None):
+    """May this shoot's talking reel be made in CapCut right now? (True, "") or (False, the page's line).
+    Refused while its video is being turned into words, and when the video was exported again since its script
+    was made (every word's time belongs to the old file) or is no longer there."""
+    kit = Path(kit)
+    rec = rec if rec is not None else load(kit)
+    if job_running(kit) or rec.get("status") == "working":
+        return False, JOB_WORDS["still_working"]
+    if not rec.get("words"):
+        return False, NO_SCRIPT_MAKE
+    vs = video_state(kit, rec)
+    if vs == "changed":
+        return False, line_for("changed")
+    if vs == "gone":
+        return False, JOB_WORDS["not_in_folder"]
+    return True, ""
+
+
+def facts_problem(f):
+    """Why this video can't be turned into a script, from its facts alone (before anything is made), or None."""
+    if not isinstance(f, dict) or f.get("refused"):
+        return "unreadable"
+    if not f.get("has_audio"):
+        return "no_talking"                       # hers: "I couldn't hear any talking in that video."
+    if _fnum(f.get("length")) > MAX_TALK:
+        return "over_30"
+    if _fnum(f.get("length")) <= 0:
+        return "unreadable"
+    return None
+
+
+_START = threading.Lock()
+
+
+def start(kit, video):
+    """Edit my video: turn `video` (its key as the page sends it, or its file name) into a script, in a job of
+    its own. (status, answer): {"ok": True} when the job was started, else {"ok": False, "why", "words"} with the
+    page's line and NOTHING made or changed.
+    On a PC (and on a Mac older than macOS 13) it answers at once with that computer's line."""
+    kit = Path(kit)
+    tr = transcriber()
+    if tr.name == "none":
+        return 200, {"ok": False, "why": tr.why(), "words": line_for(tr.why())}
+    with _START:
+        talks = list_talks(kit)
+        talk = talk_by_key(kit, video, talks) or talk_by_name(kit, video, talks)
+        if talk is None:
+            return 404, {"ok": False, "why": "gone", "words": JOB_WORDS["not_in_folder"]}
+        if job_running(kit) or _starting(read_job(kit)):
+            return 409, {"ok": False, "why": "working", "words": JOB_WORDS["still_working"]}
+        bad = facts_problem(talk["facts"])
+        if bad:
+            return 200, {"ok": False, "why": bad, "words": line_for(bad)}
+        name, jid = talk["name"], os.urandom(6).hex()
+        try:
+            again = bool(words_for(kit, name))
+            kitmod.hidden(kit)
+            write_job(kit, {"id": jid, "state": "queued", "t": time.time(), "video": name, "key": talk["key"],
+                            "again": again, "length": _fnum(talk["facts"].get("length"))})
+
+            def fn(rec):
+                if rec.get("video") != name:
+                    switch_video(rec, name)
+                rec["status"], rec["step"], rec["problem"] = "working", JOB_WORDS["ready_video"], ""
+                rec.setdefault("captions", True)
+            change(kit, fn)
+        except Busy:
+            _job_over(kit, jid, "problem")
+            return 503, {"ok": False, "why": "busy", "words": BUSY}
+        except (Unreadable, OSError) as e:
+            log(f"{kit.name}: Edit my video could not start ({e.__class__.__name__}: {e})")
+            _job_over(kit, jid, "problem")
+            return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+        try:
+            fresh.LOGS.mkdir(parents=True, exist_ok=True)
+            with open(LOG, "a", encoding="utf-8") as out:
+                # a Mac: a session of its own; a PC: no window, a process group of its own (as the reel's job)
+                this_computer.popen_detached([sys.executable, str(HERE / "talking_rec.py"), "job", str(kit), "--id", jid],
+                                             stdout=out, stderr=subprocess.STDOUT, **arrange._child_env())
+        except OSError as e:
+            log(f"{kit.name}: the job could not be started: {e}")
+            _job_over(kit, jid, "problem")
+            _fail(kit, name, line_for("failed"))
+            return 200, {"ok": False, "why": "failed", "words": line_for("failed")}
+        return 200, {"ok": True}
+
+
+def _job_over(kit, jid, state):
+    try:
+        j = read_job(kit) or {}
+        if j.get("id") == jid:
+            j.update(state=state, t=time.time())
+            write_job(kit, j)
+    except OSError:
+        pass
+
+
+def _fail(kit, name, line, j=None):
+    """The job stopped: the record gets its line (only if it is still on that video and still says working).
+    With the job `j`: when its words did reach the words file and only the record's save was missed, the record
+    is made ready instead (the work is never thrown away over a busy moment)."""
+    def fn(rec):
+        if rec.get("video") != name or rec.get("status") != "working":
+            return False
+        if j is not None and _landed(rec, j):
+            _ready(rec, j)
+        else:
+            _stopped(rec, line)
+    try:
+        change(kit, fn)
+    except (Busy, Unreadable, OSError) as e:
+        log(f"{Path(kit).name}: the record could not be told the job stopped ({e.__class__.__name__}); settle() will")
+
+
+def _step(kit, name, line):
+    """What the page shows under Edit my video while the job is at work."""
+    def fn(rec):
+        if rec.get("video") != name or rec.get("status") != "working" or rec.get("step") == line:
+            return False
+        rec["step"] = line
+    try:
+        change(kit, fn)
+    except (Busy, Unreadable, OSError):
+        pass                                      # a line on the page, nothing more: the work goes on
+
+
+# ---- the job's scratch folders on the computer's own disk
+
+def _work_alive(d):
+    """Is the job this work folder belongs to still alive? It holds the folder's own lock for as long as it lives."""
+    try:
+        with open(d / ".lock", "a", encoding="utf-8") as f:
+            got = this_computer.try_lock(f)
             if got is False:
                 return True
             if got:
                 this_computer.unlock(f)
+                return False
     except OSError:
-        pass
-    return False
+        return True                               # can't tell: leave it be
+    try:                                          # no locks here: by the job's own number, for at most its ceiling
+        o = json.loads((d / "owner.json").read_text(encoding="utf-8"))
+        return time.time() < _fnum(o.get("until")) + 60 and arrange._pid_alive(o.get("pid"))
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def clear_stale_work():
+    """Take away work folders whose job is no longer alive (a job stopped by the watchdog can't tidy up after
+    itself). Ours by name only: a folder directly inside talking/work whose name is a job's id. Returns the
+    names it removed."""
+    out = []
+    try:
+        names = sorted(os.listdir(WORK))
+    except OSError:
+        return out
+    for n in names:
+        d = WORK / n
+        try:
+            if not JOB_ID.fullmatch(n) or d.is_symlink() or not d.is_dir():
+                continue
+            if time.time() - d.stat().st_mtime < WORK_YOUNG or _work_alive(d):
+                continue
+            shutil.rmtree(d)
+            out.append(n)
+        except OSError:
+            continue
+    return out
+
+
+BUILD_DIR = re.compile(r"build-(\d+)-[0-9a-f]{6}")
+
+
+def clear_stale_builds():
+    """Take away a scratch build folder left by a build that was stopped part way (the watchdog, the power).
+    Ours by name only: a folder directly inside the talking folder named build-<process number>-<six letters>,
+    whose process is gone, and older than a build can take. Returns the names it removed."""
+    out = []
+    try:
+        names = sorted(os.listdir(TALK_HOME))
+        old = float(_transcribe().BUILD_LIMIT) + 120
+    except OSError:
+        return out
+    for n in names:
+        m = BUILD_DIR.fullmatch(n)
+        d = TALK_HOME / n
+        try:
+            if not m or d.is_symlink() or not d.is_dir():
+                continue
+            if time.time() - d.stat().st_mtime < old or arrange._pid_alive(int(m.group(1))):
+                continue
+            shutil.rmtree(d)
+            out.append(n)
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _copy_usable(p):
+    """Is the small copy at `p` a video that can be played? (One found already there is otherwise used as it is.)"""
+    try:
+        if Path(p).stat().st_size < COPY_SMALLEST:
+            return False
+        return _fnum(_vm().facts(p).get("length")) > 0
+    except Exception:  # noqa: BLE001  (not a video, or it can't be read)
+        return False
+
+
+def _set_copy_aside(p):
+    """A small copy that is there and is no video (a drive that hiccuped, a copy cut short by something other
+    than us): moved to preview.unusable-<date>-<time>.mp4 beside it, never deleted, so a good one can be made."""
+    p = Path(p)
+    base = f"preview.unusable-{time.strftime('%Y%m%d-%H%M%S')}"
+    for k in range(1, 100):
+        dst = p.with_name(base + ("" if k == 1 else f"-{k}") + ".mp4")
+        if not os.path.lexists(dst):
+            os.rename(p, dst)
+            log(f"{p.parent.parent.parent.parent.name}: the small copy {p.parent.name}/{p.name} was no video; set aside as {dst.name}")
+            return dst
+    raise OSError("no free name to set the unusable small copy aside under")
+
+
+def _save_words(kit, name, key, words, info, more, again):
+    """The job's one whole save. The words file is written first (put_words); when the record itself is busy
+    just then it is tried again a few times (the words are already safe, and the same words written twice
+    change nothing), so many minutes of work are never thrown away over a short clash."""
+    for k in range(SAVE_TRIES):
+        try:
+            return put_words(kit, name, key, words, info=info, more=more, again=again, switch=False)
+        except Busy:
+            if k == SAVE_TRIES - 1 or time.time() > _UNTIL[0] - 2 * LOCK_WAIT:
+                raise
+            time.sleep(1.0)
+
+
+class _Turn:
+    """One talking job at a time on this computer: a lock file in the Assistant's own talking folder, held for as
+    long as the with-block lasts. ok is False when the turn didn't come within `wait` seconds."""
+
+    def __init__(self, wait):
+        self.wait, self.cm, self.ok = wait, None, False
+
+    def __enter__(self):
+        try:
+            TALK_HOME.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        self.cm = kitmod._held(TALK_HOME / TALK_TURN, self.wait)
+        self.ok = self.cm.__enter__() is not False
+        return self.ok
+
+    def __exit__(self, *a):
+        return self.cm.__exit__(*a)
+
+
+_UNTIL = [0.0]            # when the watchdog stops this job's process, whatever it is doing
+_JOB_WRITE = threading.Lock()
+
+
+def _watchdog(kit, jid, name, finished):
+    """The job's hard limit: past _UNTIL (the stated limits, added up) the job is written down as too long, and
+    this process and everything it started are stopped. The transcriber's own app stops by itself a few seconds
+    later (nothing touches its "alive" file any more)."""
+    while not finished.wait(0.25):
+        if time.time() <= _UNTIL[0]:
+            continue
+        with _JOB_WRITE:
+            if finished.is_set():
+                return
+            log(f"{Path(kit).name}: the job turning its video into words ran past its limits and was stopped")
+            _fail(kit, name, line_for("too_long"))
+            _job_over(kit, jid, "problem")
+            this_computer.stop_scripts()
+            this_computer.stop_tree(os.getpid())  # a Mac: its whole group (popen_detached made it one); a PC: its tree
+            os._exit(1)
+
+
+def _work(kit, j, work, lim):
+    """The work of one job. Returns nothing when the record is ready; raises JobProblem (or the transcriber's
+    TalkProblem) with the state the page's line comes from."""
+    vm, name = _vm(), j["video"]
+    talk = talk_by_name(kit, name)
+    if talk is None:
+        raise JobProblem("not_in_folder")
+    key, f = talk["key"], talk["facts"]
+    bad = facts_problem(f)
+    if bad:
+        raise JobProblem(bad, f.get("refused", ""))
+    tr = transcriber()
+    if tr.name == "none":
+        raise JobProblem(tr.why())
+
+    def say(code):
+        _step(kit, name, {"setup": OUR_JOB_WORDS["setup"][0], "asking": OUR_JOB_WORDS["asking"][0]}.get(code, JOB_WORDS["to_script"]))
+
+    asked = time.time()
+    with _Turn(lim["turn"]) as mine:
+        if not mine:
+            raise JobProblem("waited", "another shoot's talking job kept the turn")
+        waited = time.time() - asked              # the two waits share ONE allowance (the plan's 900 s)
+        tr.setup(time.time() + lim["setup"], say)
+        _step(kit, name, JOB_WORDS["ready_video"])
+        with vm.turn(max(0.0, lim["turn"] - waited)) as ok:
+            if not ok:
+                raise JobProblem("waited", "the computer's video turn didn't come")
+            with _JOB_WRITE:                      # the waiting is over: from here the work's own limits count
+                _UNTIL[0] = time.time() + lim["copy"] + lim["sound"] + lim["ask"] + lim["words"] + lim["grace"] + lim["spare"]
+                j["until"] = _UNTIL[0]
+                write_job(kit, j)
+            pv = preview_path(kit, key)
+            if os.path.lexists(pv) and not _copy_usable(pv):
+                _set_copy_aside(pv)               # there, and no video: never played, never deleted; made again
+            r = vm.preview_copy(talk["path"], pv, f=f, timeout=lim["copy"], wait=0)
+            if not r.get("ok"):
+                code = COPY_STATES.get(r.get("state"), "unreadable")
+                if "too long" in str(r.get("detail") or ""):
+                    code = "too_long"
+                raise JobProblem(code, f"the small copy: {r.get('state')} {r.get('detail') or ''}")
+            _step(kit, name, JOB_WORDS["to_script"])
+            wav, how = _sound().speech_wav(talk["path"], work / "sound.wav", timeout=lim["sound"])
+            if wav is None:
+                code = "no_talking" if how == _sound()._NO_SOUND else ("too_long" if "too long" in str(how) else "unreadable")
+                raise JobProblem(code, f"the sound: {how}")
+        got = tr.run(wav, LANG, time.time() + lim["words"], say)
+    words = got.get("words") if isinstance(got, dict) else None
+    if not words:
+        raise JobProblem("no_talking", "the transcriber gave no words")
+    if _key_of(talk["path"]) != key:
+        raise JobProblem("changed", "the video was exported again while its script was being made")
+    j["key"] = key                                # the key the words were made from (for a save finished later)
+    _save_words(kit, name, key, words, {"w": f.get("w"), "h": f.get("h"), "dur": f.get("length")},
+                {"how": got.get("how"), "ondevice": got.get("ondevice")}, bool(j.get("again")))
+
+
+def cmd_job(kit, jid):
+    """The job's own process (started by start()). Holds the job's lock for as long as it lives."""
+    kit = Path(kit)
+    t0 = time.time()
+    arrange._own_output()
+    try:
+        arrange.make_folder(kit / ".kit")
+        f = open(kit / ".kit" / JOB_LOCK, "a", encoding="utf-8")
+    except OSError:
+        f = None
+    got = None
+    if f is not None:
+        end = time.time() + 3.0                   # a page asking "is it running?" holds it for an instant: wait that out
+        while True:
+            got = this_computer.try_lock(f)
+            if got is not False or time.time() > end:
+                break
+            time.sleep(0.05)
+    if got is False:
+        f.close()
+        return 0                                  # another job's process has it
+    work, wf = WORK / jid, None
+    try:
+        j = read_job(kit) or {}
+        if j.get("id") != jid or j.get("state") != "queued" or not isinstance(j.get("video"), str):
+            return 0
+        name = j["video"]
+        try:
+            now = _slim(kit)
+            wanted = now.get("status") == "working" and now.get("video") == name
+        except Unreadable:
+            wanted = True                         # can't tell just now: carry on, as asked
+        if not wanted:
+            # the page was already told this job stopped (it took too long to start), or they moved on: a job
+            # that carried on now would turn the record ready by itself minutes later. It makes nothing.
+            log(f"{kit.name}: a job started late for {name!r}; the record no longer waits for it, so it did nothing")
+            _job_over(kit, jid, "problem")
+            return 0
+        lim = limits(j.get("length"))
+        _UNTIL[0] = t0 + lim["turn"] + lim["ceiling"]
+        j.update(state="running", pid=os.getpid(), t0=t0, t=time.time(), until=_UNTIL[0])
+        write_job(kit, j)
+        this_computer.awake_while()               # the computer stays awake while this job lives (a closed lid still stops it)
+        finished = threading.Event()
+        threading.Thread(target=_watchdog, args=(kit, jid, name, finished), daemon=True).start()
+        line = None
+        try:
+            cleared = clear_stale_work()
+            clear_stale_builds()
+            if cleared:
+                log(f"cleared the scratch of {len(cleared)} talking job(s) that were stopped part way")
+            work.mkdir(parents=True, exist_ok=True)
+            wf = open(work / ".lock", "a", encoding="utf-8")
+            this_computer.try_lock(wf)
+            (work / "owner.json").write_text(json.dumps({"pid": os.getpid(), "until": _UNTIL[0], "kit": kit.name}), encoding="utf-8")
+            _work(kit, j, work, lim)
+        except JobProblem as e:
+            line = line_for(e.code)
+            log(f"{kit.name}: the video could not be turned into words ({e.code}): {e.detail}")
+        except (Busy, Unreadable) as e:
+            line = str(e)
+            log(f"{kit.name}: the video's words could not be saved ({e.__class__.__name__})")
+        except Exception as e:  # noqa: BLE001  (a transcriber's TalkProblem, or anything else: plain words on the page, the real ones in the log)
+            state = getattr(e, "state", None)
+            line = line_for(state if isinstance(state, str) else "failed")
+            log(f"{kit.name}: the video could not be turned into words ({e.__class__.__name__}: {state or ''}): "
+                f"{getattr(e, 'detail', '') or str(e)[:600]}")
+        with _JOB_WRITE:
+            finished.set()
+            if line:
+                _fail(kit, name, line, j)
+            _job_over(kit, jid, "problem" if line else "done")
+        return 1 if line else 0
+    finally:
+        if wf is not None:
+            try:
+                this_computer.unlock(wf)
+            except (OSError, ValueError):
+                pass
+            wf.close()
+        if JOB_ID.fullmatch(jid):
+            shutil.rmtree(work, ignore_errors=True)     # ours: this job's own scratch (the sound is never kept)
+        if f is not None:
+            if got:
+                this_computer.unlock(f)
+            f.close()
+
+
+def cmd_setup(check=False):
+    """`setup [--check]`: where "turning talking into words" stands on this computer, for the assistant (never
+    read out as it is). Without --check it also does the setup (the first time: builds the small app)."""
+    tr = transcriber()
+    rep = tr.report()
+    say(f"Turning talking into words on this {this_computer.COMPUTER}: {rep.get('how')}")
+    if tr.name == "none":
+        say(f"  Not possible here: {line_for(tr.why())}")
+        return 1
+    tools = rep.get("tools")
+    if isinstance(tools, dict):
+        say("  Apple's tools: " + ("found" if tools.get("found") else f"NOT found ({tools.get('why')})"
+            if tools.get("found") is not None else "not looked for"))
+    if "built" in rep:
+        say("  The small app that listens: " + ("built" if rep["built"] else
+            ("there, but from an older version: it will be built again" if rep.get("app_there") else "not built yet")))
+    perm = rep.get("permission") or {}
+    if "permission" in rep:
+        say("  Speech Recognition, as last seen: " + (f"{perm.get('state')} ({perm.get('when')})" if perm.get("state") else
+            "never asked yet (the Mac asks the first time a video is turned into a script)"))
+    if check:
+        return 0
+    if not tr.needs_setup():
+        say("Nothing to set up: it is ready.")
+        return 0
+    # the same turn a talking job holds while it sets up: two builds at once would each set the other's app
+    # aside, and to macOS every rebuilt app is a new app (the permission would be asked again)
+    with _Turn(SETUP_TURN_WAIT) as mine:
+        if not mine:
+            say("STOP: a talking video is being turned into a script right now, and that job does this setup "
+                "itself when it is needed. Nothing was done. Run this again once it has finished.")
+            return 3
+        clear_stale_builds()
+        return _setup_now(tr)
+
+
+def _setup_now(tr):
+    """The setup itself, inside the computer's talking turn."""
+    if not tr.needs_setup():                      # asked again now the turn is held: a job may have just built it
+        say("Nothing to set up: it is ready.")
+        return 0
+    try:
+        tr.setup(time.time() + SETUP_LIMIT, None)
+    except Exception as e:  # noqa: BLE001
+        state = getattr(e, "state", None)
+        log(f"setup: {e.__class__.__name__}: {state or ''}: {getattr(e, 'detail', '') or str(e)[:600]}")
+        if state in ("no_tools", "licence", "old_tools", "pc", "old_mac"):
+            say(f"STOP: {line_for(state)}")
+        else:
+            # never the page's own line here: it ends "Tell your assistant: set up talking reels.", which is
+            # the very thing that was just run
+            say("STOP: the small app that listens could not be built on this Mac"
+                + (" in the time it is given." if state == "too_long" else "."))
+            say(f"  The Mac's own words for why are at the end of the talking log: {LOG}")
+            say("  Read them, and tell them plainly what is in the way. Running this again with nothing changed will "
+                "stop the same way, so don't send them round again; talking reels wait until that is sorted out. "
+                "Their photo reel, carousel and stories are not affected.")
+        if state == "no_tools":
+            say("  Apple's Command Line Tools are not on this Mac. Ask them first; only with their yes, run "
+                "`xcode-select --install` (it opens Apple's own install window), wait for it to finish, then run this again.")
+        elif state == "licence":
+            say("  Apple's licence for its tools has not been accepted on this Mac. Ask them to open Xcode once and "
+                "agree, then run this again.")
+        elif state == "old_tools":
+            say("  Apple's tools are older than this macOS. Ask them to run Software Update (it offers the newer "
+                "Command Line Tools), then run this again.")
+        return 2
+    say("Set up. The first video turned into a script will make the Mac ask once about Speech Recognition.")
+    return 0
 
 
 def folder_mark(kit):
@@ -598,7 +1414,8 @@ def state_for_page(kit, rev=None, mark=None):
     When the record can't be read just now: {ok: False, why: "trouble", words} and nothing else; never an empty
     edit that looks as if theirs had gone."""
     kit = Path(kit)
-    working = job_running(kit)
+    settle(kit)                                            # a job that is gone is told as plain words, once
+    working = job_running(kit) or _starting(read_job(kit))
     try:
         slim = _slim(kit)
         now = _rev(slim)
@@ -1151,8 +1968,19 @@ def main(argv=None):
         if with_file:
             s.add_argument("--file", required=True, help="a UTF-8 JSON file (in the scratchpad)")
             s.add_argument("--replace", action="store_true", help="only after they said yes to replacing theirs")
+    s = sub.add_parser("setup", help="where turning talking into words stands on this computer, and set it up")
+    s.add_argument("--check", action="store_true", help="only say where it stands; set nothing up")
+    s = sub.add_parser("job", help="(the Assistant's own) turn a video into words; started by Edit my video")
+    s.add_argument("kit")
+    s.add_argument("--id", required=True)
     a = ap.parse_args(argv)
+    if a.cmd == "job":
+        if not JOB_ID.fullmatch(a.id) or not (Path(a.kit) / ".kit").is_dir():
+            return 1
+        return cmd_job(Path(a.kit), a.id)
     fresh.announce()
+    if a.cmd == "setup":
+        return cmd_setup(a.check)
     kit = find(a.shoot)
     try:
         if a.cmd == "show":

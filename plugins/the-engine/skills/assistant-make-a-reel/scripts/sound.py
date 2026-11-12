@@ -938,6 +938,172 @@ def extract_audio(video, out, timeout=600):
                   "(mp3, m4a or wav).")
 
 
+# ---------------------------------------------------------------- a video's talking, for turning into words
+#
+# The sound a transcriber listens to (transcribe.py): 16,000 a second, one channel, 16-bit, a plain .wav on the
+# computer's own disk. ONE route on a Mac, file to file: afconvert straight to the file; if afconvert can't read
+# that video's sound, AVFoundation's own reader writing straight to the file. Never ffmpeg, even when this Mac
+# has one (every word's time must be the same on every Mac), never decode(), and never through Python's memory:
+# a 30-minute talk is 58 MB of samples, which decode() would hold two or three times over and loop through
+# slowly. Here nothing is held: memory is the same for ten seconds as for thirty minutes.
+
+SPEECH_RATE = 16000
+SPEECH_PART = 300                 # seconds of sound one run of AVFoundation's reader takes (see _speech_reader)
+
+SPEECH_JS = r"""
+ObjC.import('AVFoundation'); ObjC.import('CoreMedia'); ObjC.import('Foundation'); ObjC.import('unistd');
+// The Assistant's speech-sound reader (sound.py's speech_wav). It only READS the video, and only ever adds to the
+// end of the one file it is handed (which sound.py made a moment ago).
+// run <video> <out> <rate> <from second> <seconds>: that stretch of the sound, added to the end of <out>.
+function C(n) { return $.NSClassFromString(n); }
+function run(argv) {
+  try {
+    var p = argv[0], out = argv[1], rate = parseInt(argv[2]), from = parseInt(argv[3]), secs = parseInt(argv[4]);
+    var parent = Number($.getppid());
+    var a = C('AVURLAsset').URLAssetWithURLOptions($.NSURL.fileURLWithPath(p), $.NSDictionary.dictionaryWithDictionary({AVURLAssetPreferPreciseDurationAndTimingKey: true}));
+    var ts = a.tracksWithMediaType('soun');
+    if (!Number(ts.count)) return JSON.stringify({has_audio: false});
+    var length = $.CMTimeGetSeconds(ts.objectAtIndex(0).timeRange.duration);
+    var err = Ref(), r = C('AVAssetReader').assetReaderWithAssetError(a, err);
+    var o = C('AVAssetReaderTrackOutput').assetReaderTrackOutputWithTrackOutputSettings(ts.objectAtIndex(0), $.NSDictionary.dictionaryWithDictionary({
+      AVFormatIDKey: 0x6C70636D, AVSampleRateKey: rate, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
+      AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false}));
+    r.addOutput(o);
+    r.timeRange = $.CMTimeRangeMake($.CMTimeMake(from, 1), $.CMTimeMake(secs, 1));
+    r.startReading;
+    var fh = $.NSFileHandle.fileHandleForWritingAtPath(out);
+    if (!fh || fh.isNil()) return JSON.stringify({error: 'the sound file could not be opened'});
+    fh.seekToEndOfFile;
+    var buf = $.NSMutableData.dataWithLength(0), total = 0;
+    while (true) {
+      if (parent > 1 && Number($.getppid()) !== parent) { r.cancelReading; fh.closeFile; return JSON.stringify({error: 'stopped: the program that asked for it is gone'}); }
+      var sb = o.copyNextSampleBuffer;
+      if (Number(r.status) !== 1 || !$.CMSampleBufferIsValid(sb)) break;
+      var bb = $.CMSampleBufferGetDataBuffer(sb), len = Number($.CMBlockBufferGetDataLength(bb));
+      buf.setLength(len);
+      $.CMBlockBufferCopyDataBytes(bb, 0, len, buf.mutableBytes);
+      fh.writeData(buf);
+      total += len;
+    }
+    fh.closeFile;
+    if (Number(r.status) !== 2) return JSON.stringify({error: 'the sound could not be read to the end'});
+    return JSON.stringify({has_audio: true, bytes: total, length: length});
+  } catch (e) { return JSON.stringify({error: String((e && e.message) || e)}); }
+}
+"""
+
+
+def _wav_head(data_bytes, rate):
+    """The 44 bytes at the front of a plain 16-bit, one-channel WAV holding data_bytes of samples."""
+    return struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", (36 + data_bytes) & 0xFFFFFFFF, b"WAVE", b"fmt ", 16, 1, 1, rate,
+                       rate * 2, 2, 16, b"data", data_bytes & 0xFFFFFFFF)
+
+
+def _speech_reader(video, part, rate, timeout, piece=None):
+    """AVFoundation's reader, writing straight to `part`. (True, "") or (False, why).
+    The Mac's scripting keeps every piece of sound it was handed until its program ends (measured Nov 12: 32 MB
+    for 20 seconds, 77 MB for 20 minutes, and letting a piece go by hand crashes it). So the sound is read in
+    stretches of SPEECH_PART seconds, each by a short program of its own that adds to the end of the file: what
+    any one of them holds is the same however long the video is."""
+    scripts = str(Path(__file__).resolve().parent.parent.parent / "studio-manager" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import json
+    import time
+    import this_computer
+    piece = int(piece or SPEECH_PART)
+    end = time.time() + timeout
+    with open(part, "wb") as f:
+        f.write(_wav_head(0, rate))                  # the sizes are filled in once the samples are counted
+    start, wrote, length = 0, 0, None
+    while length is None or start < length:
+        left = end - time.time()
+        if left <= 0:
+            return False, "it took too long"
+        try:
+            got = this_computer.mac_javascript(SPEECH_JS, [str(video), str(part), str(int(rate)), str(start), str(piece)],
+                                               timeout=left)
+        except subprocess.TimeoutExpired:
+            return False, "it took too long"
+        except (OSError, subprocess.SubprocessError) as e:
+            return False, str(e)
+        if got is None:
+            return False, "this computer has no AVFoundation"
+        code, out, err = got
+        try:
+            r = json.loads(((out or "").strip().splitlines() or [""])[-1])
+        except ValueError:
+            return False, _last_line(err) or f"it stopped (exit {code})"
+        if not isinstance(r, dict) or r.get("error"):
+            return False, str(r.get("error") if isinstance(r, dict) else "an odd answer")
+        if r.get("has_audio") is False:
+            return False, _NO_SOUND
+        wrote += int(r.get("bytes") or 0)
+        length = float(r.get("length") or 0)
+        start += piece
+        if start < length:
+            # A stretch comes back a few samples short at its end (measured: 32 samples, 2 ms). The next one must
+            # still start exactly where it belongs, or a long talk's words would drift: the file is brought to
+            # that exact length (a moment of silence added, or a sample or two taken off) before going on.
+            want = 44 + start * int(rate) * 2
+            have = os.path.getsize(part)
+            with open(part, "r+b") as f:
+                if have < want:
+                    f.seek(0, 2)
+                    f.write(b"\0" * (want - have))
+                elif have > want:
+                    f.truncate(want)
+    data = os.path.getsize(part) - 44
+    if wrote <= 0 or data <= 0:
+        return False, "the sound came out empty"
+    with open(part, "r+b") as f:
+        f.write(_wav_head(data, rate))
+    return True, ""
+
+
+def speech_wav(video, out, rate=SPEECH_RATE, timeout=600):
+    """The talking in a video as a small sound file a transcriber can listen to: `rate` a second (16,000), one
+    channel, 16-bit, a plain .wav at `out` (which must not be there yet; put it on the computer's own disk).
+    (path written, how) or (None, why in plain words; exactly _NO_SOUND when the video has no sound).
+    how: "afconvert" or "avfoundation". The video is only ever read. Written under a hidden name first and given
+    its real name only when whole. Nothing is held in memory: it goes from file to file.
+    A Mac only (no ffmpeg, on purpose: the word times must be the same on every Mac); on a PC nothing can turn
+    talking into words yet, so this says so and makes nothing."""
+    video, out = str(video), Path(out)
+    if WINDOWS or sys.platform != "darwin":
+        return None, "this computer can't get a video's talking ready yet (only a Mac can)"
+    if out.exists():
+        return None, f"there is already a file called {out.name} there"
+    timeout = max(1.0, float(timeout))
+    part = _scratch(out)
+    _remove_ours(part)
+    detail = ""
+    try:
+        if _afconvert_ok():
+            try:
+                r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{int(rate)}", "-c", "1", video, str(part)],  # pc-ok: Mac only (a PC returned above)
+                                   stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
+            except subprocess.TimeoutExpired:
+                return None, "getting the talking out of that video took too long"
+            if r.returncode == 0 and part.is_file() and part.stat().st_size > 44 and (_wav_duration(str(part)) or 0) > 0:
+                done = part if _place(str(part), str(out)) else None
+                return (out, "afconvert") if done else (None, f"there is already a file called {out.name} there")  # pc-ok: the name of the route, in the Mac branch
+            detail = _last_line(r.stderr)
+            _remove_ours(part)
+        if os.environ.get("ASSISTANT_NO_AVFOUNDATION"):
+            return None, "I couldn't read any sound in that video. " + detail
+        ok, why = _speech_reader(video, part, rate, timeout)
+        if not ok:
+            return None, (why if why == _NO_SOUND else "I couldn't read any sound in that video. " + (why or detail))
+        if not _place(str(part), str(out)):
+            return None, f"there is already a file called {out.name} there"
+        return out, "avfoundation"
+    except OSError as e:
+        return None, f"I couldn't get the talking out of that video ({e})"
+    finally:
+        _remove_ours(part)
+
+
 # ---------------------------------------------------------------- Windows' own Media Foundation
 #
 # Everything below runs only on a PC; it has run on GitHub's Windows machines (Nov 6, 2026), not yet on a

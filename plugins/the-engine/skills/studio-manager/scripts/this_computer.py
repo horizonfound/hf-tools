@@ -163,6 +163,23 @@ def awake_command(cmd):
     return list(cmd)
 
 
+def awake_while(pid=None):
+    """Keep the computer awake for as long as process `pid` lives (this process when none is given): for a long
+    job that is already running and must stay the leader of its own process group, so awake_command (which puts
+    caffeinate in front of it) will not do. A Mac: `caffeinate -i -w <pid>`, which ends by itself when that
+    process does. A PC: keep_awake(). Like both, it cannot stop a closed lid. Returns the helper it started
+    (a Mac) or None. Never raises."""
+    pid = os.getpid() if pid is None else int(pid)
+    if MAC and Path("/usr/bin/caffeinate").exists():
+        try:
+            return subprocess.Popen(["/usr/bin/caffeinate", "-i", "-w", str(pid)], stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            return None
+    keep_awake()
+    return None
+
+
 # ---------------------------------------------------------------- a server that outlives its starter
 
 def popen_detached(cmd, **kw):
@@ -827,6 +844,12 @@ NOT_LOOKED_PC_HTML = ("Play your videos in step 1 and press <b>Use this moment</
 MOMENTS_PC = "The moments you pick yourself below show up here."
 # What the chat's footage look says on a PC, where it can't take stills
 NO_LOOK_CHAT = "I can't take stills from a video on this PC yet, so I can't look through footage here."
+
+# Talking reels (v24). Nothing on a PC can turn talking into words with nothing installed, and a PC makes no small
+# copy of a video, so Edit my video answers with this at once and makes nothing. Ours (hers has no PC): a draft
+# for Nicole to reword.
+NO_TALKING_PC = ("Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. "
+                 "Your photo reel, carousel and stories all work here.")
 
 _SCRIPTS = set()                 # the JavaScript programs running now (so a server that starts over stops them)
 _SCRIPTS_LOCK = threading.Lock()
