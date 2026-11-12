@@ -69,6 +69,8 @@ HERS1 = {
     "say": "Do you want this reel to include behind-the-scenes video from the shoot, or just your photos?",
     "bts_b": "Add behind-the-scenes footage", "bts_s": "Clips from the shoot, mixed with your finished photos.",
     "photos_b": "Just photos", "photos_s": "Your finished photos, cut on the beat.",
+    # the third card: her v23 reel-maker.html (Nov 11) is the source for these two (rpc.V23_WORDS, checked against her page there)
+    "talk_b": "Talking to camera", "talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page.",
     "say2": "Press <b>Add my footage</b> and a Footage folder for this shoot opens in Finder. Drag your behind-the-scenes videos into it.",
     "add": "▶ Add my footage",
     "insight_b": "Good to know: longer footage takes longer",
@@ -502,6 +504,9 @@ def texts1(c):
       return {h2: h('step0'), say: document.querySelector('#step0 > p.say').textContent,
         bts_b: document.querySelector('#modeBts b').textContent, bts_s: document.querySelector('#modeBts span').textContent,
         photos_b: document.querySelector('#modePhotos b').textContent, photos_s: document.querySelector('#modePhotos span').textContent,
+        talk_b: document.querySelector('#modeTalk b').textContent, talk_s: document.querySelector('#modeTalk span').textContent,
+        talk_on: document.getElementById('modeTalk').classList.contains('on'), talk_href: document.getElementById('modeTalk').getAttribute('href'),
+        choices: Array.from(document.querySelectorAll('#step0 .choice > *')).map(function(x){ return x.id; }),
         say2: document.querySelector('#btsBox > p.say').innerHTML, add: document.getElementById('addFootage').textContent,
         insight_b: document.querySelector('.insight > b').textContent, insight: document.getElementById('insightWords').textContent,
         fix: document.querySelectorAll('.insight p')[1].innerHTML, paste_say: document.querySelector('#pasteBox > p').textContent,
@@ -562,13 +567,23 @@ def check_page(c, s, clips):
     t = texts1(c)
     case("footage not chosen yet: both cards off, the box and step 4 hidden, steps 1 to 4 (hers)", not t["bts_on"] and not t["photos_on"]
          and t["box_hidden"] and t["style_hidden"] and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
-    for k in ("h2", "say", "bts_b", "bts_s", "photos_b", "photos_s"):
+    for k in ("h2", "say", "bts_b", "bts_s", "photos_b", "photos_s", "talk_b", "talk_s"):
         case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
+    case("the third card's words are the ones taken from her v23 page", (HERS1["talk_b"], HERS1["talk_s"]) == (rpc.V23_WORDS["foot_talk_b"], rpc.V23_WORDS["foot_talk_s"]))
+    v23 = rpc.her_v23_page()
+    if v23 is None:
+        print("SKIP  the third card against her v23 page: that handoff (reference-private) isn't on this computer", flush=True)
+    else:
+        case("...and they are in her v23 reel-maker.html, on her third card", '<a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>'
+             % (HERS1["talk_b"], HERS1["talk_s"]) in v23)
+    case("step 1 has her three choices in her order, the third a link to this shoot's talking page, with no tick",
+         t["choices"] == ["modeBts", "modePhotos", "modeTalk"] and t["talk_href"] == "/talking.html?kit=" + KIT.replace(" ", "%20") and not t["talk_on"], (t["choices"], t["talk_href"]))
     c.click("#makeBtn")
     case("Make my reel before footage is chosen: her \"One more thing\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["foot_need"]), 5),
          texts1(c)["result"])
     c.click("#modePhotos")
     t = texts1(c)
+    case("Just photos: the third card stays without the tick", not t["talk_on"])
     case("Just photos: marked, step 1 done, the box and step 4 stay hidden", t["photos_on"] and t["done0"] and t["box_hidden"] and t["style_hidden"]
          and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t)
     case("saved: footage false", on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is False))

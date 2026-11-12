@@ -26,6 +26,17 @@ Reads text only; nothing is run, started or written. What it checks:
     has the interview order, answers through a file, the Brand Homebase read in full and never another brand's
     file, the goal first, a carousel a caption only, no words for stories, no hashtags and no short caption; and
     no instruction still describes the old way of writing a caption or a hook.
+;
+  * the talking reel (Nicole's v23 and v24, stage E of the v24 build): each of the three lines the talking reel
+    page hands out, and "set up talking reels", has one row in the core's table, to parts/talking-reel.md; that
+    part exists and holds her two rule blocks word for word, every command it names, --replace only after asking,
+    the place step sent to shared/curating.md, never a zoom, a speed or a caption word, never "ready" before
+    status says so, the setup talk and Apple's window only with their yes, files in the scratchpad, never a click
+    on a system box, and what is not proven; both descriptions stay within 1,024 characters with the new trigger
+    words in the reel skill's only; the reel skill no longer says "no zooms" without saying it is about a photo
+    reel; the reel page's third card is named in parts/arrange.md; the PC gap is in parts/on-a-pc.md and the PC
+    guide in the same words; and parts/where-things-live.md names every file the talking reel keeps, by the
+    scripts' own names. (For this last part the talking scripts are imported, only to read their words.)
 
 Every line says PASS or FAIL; exit 1 only when something FAILED.
 """
@@ -590,8 +601,197 @@ def check_whole_build():
          all(w in where for w in ("`reminders/`", "`posting.json`", "`remind_on`", "`remind_time`", "`logs/reminders.log`", "`last.json`")))
 
 
+# ---------- the talking reel (Nicole's v23 and v24, stage E of the v24 build) ----------
+
+def check_talking():
+    # The scripts are only imported, to read their own words and names (nothing of theirs is run). The Assistant's
+    # own folder is pointed at a scratch folder first, so nothing can land in the real one.
+    import os
+    import tempfile
+    import atexit
+    import shutil
+    scratch = tempfile.mkdtemp(prefix="skill-text-check-")
+    atexit.register(shutil.rmtree, scratch, True)
+    os.environ["STUDIO_HOME"] = scratch
+    os.environ["TALKING_TRANSCRIBER"] = "none"
+    os.environ["TALKING_NO_REAL"] = "1"
+    sys.path.insert(0, str(SCRIPTS))
+    sys.path.insert(0, str(REEL / "scripts"))
+    import talking            # her two rule blocks, word for word (tests/talking_rec_check.py holds them to her file)
+    import talking_page
+    import talking_rec
+    import this_computer
+    import reel_page
+    core = read(SM / "SKILL.md")
+    rows = table_rows(core)
+    part_path = SM / "parts" / "talking-reel.md"
+    case("parts/talking-reel.md exists", part_path.is_file())
+    part = read(part_path) if part_path.is_file() else ""
+    flat = re.sub(r"\s+", " ", part)
+    quoted = re.sub(r"\s+", " ", re.sub(r"(?m)^> ?", "", part))       # with the quote marks of a quoted block taken off
+
+    # the three lines the page hands out, read from the page, so a change there is caught here
+    W = talking_page.WORDS
+    for k in ("cut_line", "place_line", "cut_place_line"):
+        said = W[k].replace("{short}", "<shoot>")
+        hit = [r for r in rows if ('"' + said + '"') in r.split(" | ")[0]]
+        case(f'exactly one row answers the page\'s line "{said}"', len(hit) == 1, len(hit))
+        if hit:
+            named = re.findall(r"`([^`]+\.md)`", hit[0].split(" | ", 1)[1])
+            case("... and it sends Claude to parts/talking-reel.md and nowhere else", named == ["parts/talking-reel.md"], named)
+        case(f'the part names the line "{said}"', ('"' + said + '"') in part)
+    hit = [r for r in rows if '"set up talking reels"' in r.split(" | ")[0]]
+    case('the line the page tells them to say when the Mac needs setting up ("set up talking reels") has its row too',
+         len(hit) == 1 and "parts/talking-reel.md" in hit[0] and "Tell your assistant: set up talking reels." in talking_rec.line_for("no_tools"))
+    case("the three lines lead nowhere else: no other row of the table takes a talking reel",
+         not [r for r in rows if "talking" in r.split(" | ")[0].lower() and "parts/talking-reel.md" not in r])
+
+    # the descriptions: no new trigger words in the core's (it has no room), they are in the reel skill's
+    d_core = re.search(r"^description: (.*)$", core, re.M).group(1)
+    reel = read(REEL / "SKILL.md")
+    d_reel = re.search(r"^description: (.*)$", reel, re.M).group(1)
+    case("the core's description is as it was (no talking words squeezed into its last 8 characters)", "talking" not in d_core.lower() and len(d_core) <= 1024, len(d_core))
+    case("the reel skill's description has the talking reel's trigger words, within 1,024 characters (%d)" % len(d_reel),
+         len(d_reel) <= 1024 and all(x in d_reel for x in ("cut my talking reel", "place the photos in my talking reel", "set up talking reels", "make a talking reel")))
+    case("...and nothing in it a strict reader stops on (a colon followed by a space, an angle bracket)", ": " not in d_reel and "<" not in d_reel and ">" not in d_reel)
+    case("the reel skill points to the part near Steps 1 and 2, before Step 1",
+         "<assistant>/parts/talking-reel.md" in reel and 0 < reel.find("## A talking reel is its own thing") < reel.find("## Step 1:")
+         and all(('"' + W[k].replace("{short}", "<shoot>") + '"') in reel for k in ("cut_line", "place_line", "cut_place_line")))
+
+    # rule 2 of the reel skill (decision 2b.3): "no zooms" only with its scope
+    m = re.search(r"(?m)^2\. \*\*Every frame is theirs\.\*\*.*$", reel)
+    rule2 = m.group(0) if m else ""
+    case("the reel skill's rule 2 says no zooms or motion \"in a photo reel\", and names the talking reel's three moves as the photographer's own",
+         "**In a photo reel**" in rule2 and "no zooms or motion" in rule2.split("**In a photo reel**")[-1].split("**A talking reel**")[0]
+         and all(x in rule2 for x in ("Punch in", "Slow zoom", "a faster speed", "the photographer presses", "You never add one")), rule2[:300])
+    bare = [ln[:140] for f in instruction_files() for ln in read(f).splitlines()
+            if re.search(r"\bno zooms?\b", ln, re.I) and "photo reel" not in ln.lower()]
+    case("nothing Claude reads says \"no zooms\" without saying it is about a photo reel", not bare, bare)
+    case("rule 2 still keeps what nothing changes: every frame theirs, hard cuts, no transitions, no effects, nothing generated",
+         all(x in rule2 for x in ("Every frame is theirs", "Hard cuts", "no transitions", "no effects", "no generated anything")))
+
+    # her two rule blocks are the rules, word for word
+    for name, block in (("cutting", talking.RULES), ("photo", talking.PHOTO_RULES)):
+        want = re.sub(r"\s+", " ", block).strip()
+        case(f"Nicole's {name} rules are in the part word for word, as the engine prints them", want in quoted, want[:80])
+    case("the part says the commands print the rules every time, and to follow what they print",
+         "every time" in flat and "`show` prints Nicole's cutting rules and `photos` prints her photo rules" in flat and talking_rec.cmd_show and talking_rec.cmd_photos)
+
+    # each command the part names is one the script takes
+    src = read(SCRIPTS / "talking_rec.py")
+    cmds = re.findall(r"python3 <scripts>/talking_rec\.py (\w+)", part)
+    case("every talking_rec.py command the part names is a command (show, cut, photos, place, status, setup)",
+         set(cmds) == {"show", "cut", "photos", "place", "status", "setup"} and all(('"%s"' % c) in src for c in set(cmds)), sorted(set(cmds)))
+    case("the part opens the page with talking_page.py open, in the pane, never Chrome",
+         'python3 <scripts>/talking_page.py open' in part and hasattr(talking_page, "cmd_open") and "Never Chrome" in part and "mcp__ccd_view__show_pane" in part)
+    case("the part's Saved lines are the commands' own",
+         "Saved: 4 cuts. The reel is now 28.4 seconds of talking. The page shows it in a few seconds." in flat
+         and 'say(f"Saved: {n} cuts. The reel is now {secs:.1f} seconds of talking. The page shows it in a few seconds.")' in src
+         and "Saved: 12 photo stretches, 21 photos. The page shows them in a few seconds." in flat
+         and 'say(f"Saved: {n} photo stretches, {m} photos. The page shows them in a few seconds.")' in src)
+    case("the part's two STOP lines are the commands' own", ("`STOP: " + talking_rec.THEIR_CUTS.split(". ")[0] + ".`") in part
+         and ("`STOP: " + talking_rec.THEIR_PHOTOS.split(". ")[0] + ".`") in part and talking_rec.PHOTOS_PLACED in flat)
+    spots = re.search(r"The spots, as the page names them: (.*?)Stretches go in order", flat)
+    case("the four spots, in the script's order, each with the page's own name for it",
+         bool(spots) and re.findall(r"`(\w+)` is \"([^\"]+)\"", spots.group(1))
+         == [(s, W["spot_" + s]) for s in talking_rec.PLACE_SPOTS], spots and spots.group(1)[:200])
+
+    # the things the assistant never does
+    for what, words in (
+        ("--replace only after asking, every time", ("`--replace` goes on a command only after they have said yes", "Only on Replace them, run the same command again with `--replace`",
+                                                     "Only on Replace them all, run again with `--replace`", "ask every time")),
+        ("the place step goes to shared/curating.md first", ("Read `curating.md` in the plugin's `shared` folder first, every time", "${CLAUDE_SKILL_DIR}/../../shared/curating.md")),
+        ("never a zoom, a speed or a caption word", ("You never add a zoom, never change a speed, and never touch a caption word", "you have no command for them")),
+        ("never \"the script is ready\" before status says so", ("Never say the script is ready, or that anything is on the page, before a command says so", "answered from `status`")),
+        ("the setup talk: through talking_rec.py setup, Apple's window in the core's own words", ("`talking_rec.py setup --check`", "click Install, then Agree. It takes five to ten minutes. Tell me when it says it's done.")),
+        ("xcode-select --install never without their yes", ("**Never run `xcode-select --install` without their yes:**",)),
+        ("cuts and stretches through a file in the scratchpad", ("go through a file in your scratchpad", "never on the command line and never in their folders")),
+        ("the assistant never clicks a system box", ("You never click it, and you never use computer control on any system box or on System Settings", "The Mac never asks twice".lower())),
+        ("an empty cut is a cut", ('{"cut": [], "why": []}',)),
+        ("cut first, then place", ("Cut first, all the way through to its Saved line, then place", "Do the whole cut first")),
+        ("what is not proven yet", ("## Not proven yet, honestly", "has never run", "Nobody has opened a talking reel project in CapCut yet", "Any language but English")),
+        ("Make it in CapCut is theirs, on the page", ("You have no command to press it for them", "A project already in CapCut is never changed")),
+    ):
+        miss = [w for w in words if w not in flat and w not in flat.lower()]
+        case(f"the part: {what}", not miss, miss)
+    case("(the core's own words for Apple's window are still the ones the part borrows)", "click Install, then Agree. It takes five to ten minutes." in core)
+    case("where the Mac's switch is, the part says as the page does", "Privacy & Security, then Speech Recognition" in flat and "Privacy & Security, then Speech Recognition" in talking_rec.line_for("refused")
+         and "then Keyboard, and switch on Dictation" in flat and "then Keyboard, and switch on Dictation" in talking_rec.line_for("dictation_off"))
+    case("the part reads a stop of the setup from the script's own lines", "Not possible here" in src and "Not possible here" in flat and "Nothing to set up: it is ready." in src
+         and "Nothing to set up: it is ready." in flat and "STOP: a talking video is being turned into a script right now" in flat
+         and "a talking video is being turned into a script right now" in src)
+    case("the part reads status from the script's own lines", all(x in src and x in flat for x in ("No script yet", "No video has been turned into a script yet", "exported again since its script was made")))
+    case("the photographer has no gender in the part, and nothing of a client's", not re.search(r"\b(she|he|her|his|him)\b", re.sub(r"Nicole's|her photo rules|\"Her .*?baby\"|her older kids[^\"]*", "", quoted.replace(re.sub(r"\s+", " ", talking.RULES).strip(), "")), re.I)
+         , re.findall(r".{30}\b(?:she|he|her|his|him)\b.{30}", re.sub(r"Nicole's|her photo rules", "", quoted.replace(re.sub(r"\s+", " ", talking.RULES).strip(), "")), re.I)[:3])
+
+    # stage E's review: each of these was a finding, and each check fails with its fix taken out
+    case("the part never names the button on the Mac's box (nobody has seen it): \"say yes in that box\", as the page's own line",
+         "click allow" not in flat.lower() and flat.count("ay yes in that box") >= 3 and "Say yes in that box" in talking_rec.OUR_JOB_WORDS["asking"][0]
+         and "say yes when the Mac asks" in flat, re.findall(r".{20}[Cc]lick Allow.{20}", flat))
+    case("the replace-my-cuts question never uses \"mine\" for two people: [Keep my cuts], not [Keep mine]", "[Keep my cuts] [Replace them]" in flat and "[Keep mine]" not in flat)
+    case("the part goes by the line, not the exit number, and names setup's and open's own exits as the scripts give them",
+         "Go by the line, not the exit number" in flat and "`setup` answers 3 with its STOP" in flat and "1 with \"Not possible here\" on a PC" in flat
+         and "`open` answers 1 with a STOP" in flat and "Never read those as \"more than one shoot\"" in flat
+         and re.search(r"being turned into a script right now.*?return 3", src, re.S) and re.search(r"Not possible here.*?\n\s+return 1", src)
+         and "Exit 1: the words fit more than one shoot" not in flat)
+    case("a second run of the same file asks them nothing, and the part says so (place too)",
+         "changes nothing and asks nothing" in flat and "sent again, is the one thing that doesn't stop" in flat and "before you ask them anything" in flat)
+    case("a full bring-back is their own work, in the part as in the script", "Bringing back every word you cut is their own work too" in flat)
+    case("show and photos both end with the exported-again note, and both flows in the part stop on it",
+         flat.count("If it ends with a line starting `NOTE: their talking video was exported again`, stop here") == 2
+         and talking_rec.EXPORTED_AGAIN.startswith("NOTE: their talking video was exported again")
+         and src.count("EXPORTED_AGAIN +") == 2)
+    case("the part quotes the who-places-them question as the page has it: a heading, then the question",
+         ('the heading "' + W["who_h"] + '", and under it "' + W["who_say"] + '"') in flat)
+    case("arriving from the reel skill, the part's <scripts> and its core are named on both sides",
+         "where it writes `<scripts>`, that is `<assistant scripts>` here" in reel and "`<assistant>/SKILL.md`, which you read first if you haven't this conversation" in reel
+         and "`<scripts>` is what it calls `<assistant scripts>`" in flat and "read `<assistant>/SKILL.md` first" in flat
+         and "../../shared/curating.md`" not in part.replace("${CLAUDE_SKILL_DIR}/../../shared/curating.md`", ""))
+
+    # the door, in what Claude reads
+    arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
+    case("parts/arrange.md names the reel page's third card in her words, as a link and not a choice",
+         ('"' + reel_page.WORDS["foot_talk_b"] + '"') in arr and ('"' + reel_page.WORDS["foot_talk_s"] + '"') in arr
+         and "it is a link, not a choice" in arr and "never gets the tick" in arr and "`parts/talking-reel.md`" in arr)
+
+    # the PC: a named gap, in the same words everywhere
+    pc = read(SM / "parts" / "on-a-pc.md")
+    pcflat = re.sub(r"\s+", " ", pc)
+    guide = read(ROOT / "docs" / "SETUP-GUIDE-PC.md")
+    case("the PC line is this_computer's own, in the PC part and in the talking part", this_computer.NO_TALKING_PC in pcflat and this_computer.NO_TALKING_PC in flat)
+    cant = pc[pc.index('## "What can\'t you do on a PC?"'):pc.index("## The words page and posting-day reminders")]
+    case("\"What can't you do on a PC?\" lists talking reels, with the page's PC line whole (plan 2b.5)",
+         ("\n> - Talking reels. " + this_computer.NO_TALKING_PC + "\n") in cant + "\n", [ln for ln in cant.splitlines() if "Talking reels" in ln])
+    not_yet = guide[guide.index("### Not on a PC yet"):]
+    not_yet = not_yet[:not_yet.index("\n> ")]
+    case("the PC guide's \"Not on a PC yet\" lists talking reels, marked as wording still theirs", ("- **Talking reels.** " + this_computer.NO_TALKING_PC + " **[") in not_yet
+         and "wording is Dustin and Nicole's" in not_yet.split("**Talking reels.**")[1])
+    said = re.findall(r"(?m)^> - ([^.]+)\.", cant)
+    listed = re.findall(r"(?m)^- \*\*([^*]+?)\.?\*\*", not_yet)
+    case("the two lists name the same gaps, in the same order", [re.sub(r"\W+", " ", x).lower().strip()[:18] for x in said] == [re.sub(r"\W+", " ", x).lower().strip()[:18] for x in listed], (said, listed))
+
+    # where things live: every name there is one the scripts use
+    live = read(SM / "parts" / "where-things-live.md")
+    import talking_make
+    import transcribe
+    names = {"Talking": talking_rec.TALKING, "talking-job.json": talking_rec.JOB, "talking-job.lock": talking_rec.JOB_LOCK,
+             "talking-make-job.json": talking_rec.MAKE_JOB, "talking-make-job.lock": talking_rec.MAKE_JOB_LOCK,
+             "talking-make-status.json": talking_rec.MAKE_STATUS, "talking-make.json": talking_make.PLAN_FILE,
+             "talking-make.lock": talking_make.MAKE_LOCK, "turn.lock": talking_rec.TALK_TURN, "built.json": transcribe.BUILT,
+             "permission.json": transcribe.PERMISSION, "Assistant Transcriber.app": transcribe.APP_NAME}
+    case("where-things-live names every talking file, and each name is the script's own (%d)" % len(names),
+         not [k for k, v in names.items() if k != v or ("`" + k + "`") not in live], [k for k, v in names.items() if k != v or ("`" + k + "`") not in live])
+    for n in ("talking.json", "talking.prev.json", "talking.lock", "talking-words.json", "talking/<video key>/preview.mp4", "talking/facts.json",
+              "talking.damaged-<date>-<time>.json", "~/.studio/talking/", "older/", "work/<job>/", "~/.studio/logs/talking.log"):
+        case(f"where-things-live names {n}", ("`" + n + "`") in live)
+    case("...and the scripts still keep them there", all(x in src for x in ('"talking.json"', "talking.prev.json", "talking.lock", "talking-words.json", "preview.mp4", "facts.json", "talking.damaged-"))
+         and str(talking_rec.LOG).replace("\\", "/").endswith("logs/talking.log") and talking_rec.TALK_HOME.name == "talking" and talking_rec.WORK.name == "work")
+    case("where-things-live says the small copies are kept, and how big they can get", "kept on purpose" in live and "1.3 GB" in live)
+    case("where-things-live says the earlier edits and what a --replace replaced are kept", "`earlier`" in live and "`replaced`" in live and "the last 12" in live)
+
+
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build):
+    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

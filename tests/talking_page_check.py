@@ -2,7 +2,7 @@
 """The talking reel page (talking_page.py: Nicole's handoff v24, pages/talking-reel.html, served by the posting
 server), checked by request and on the real page in a HIDDEN Chrome.
 
-    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|preview|timeline|words] [--no-chrome] [--port 9620] [--work <folder>]
+    python3 tests/guard.py 3000 python3 tests/talking_page_check.py [--only s1|script|preview|timeline|words|door] [--no-chrome] [--port 9620] [--work <folder>]
 
 Run it under the memory guard, ONE such test at a time (it drives a hidden Chrome and plays a tiny video). The
 limit is 3000 MB, as for the other tests that drive a Chrome: the guard counts a Chrome's shared memory once per
@@ -33,6 +33,10 @@ Parts (one per sub-stage of the page; the later ones are added as they are built
           ruler, picking a clip or a photo block, the round x, Delete, a clip's ends (in cuts, out brings back), a
           photo block's ends, Split, Speed, Zoom, the timeline's own zoom, Undo and Redo by button and by key, and
           Make it in CapCut from the press to her result box (into the test's own pretend CapCut folder).
+
+  door    Stage E (tests/talking_page_door.py holds it): the way in. Step 1's third card on the reel page, "Talking
+          to camera": her two lines and her one style rule, a plain link third after the two choices, to the
+          talking page of the same shoot; a press on it leaves the reel page's record exactly as it was.
 
 What it never does: touch the real ~/.studio (STUDIO_HOME is the scratch folder; the real one is listed before
 and after), build or start the real transcriber (TALKING_TRANSCRIBER=pretend, TALKING_NO_REAL=1), open a folder
@@ -1228,7 +1232,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=PORT)
-    ap.add_argument("--only", choices=("s1", "script", "preview", "timeline", "words"), help="one part")
+    ap.add_argument("--only", choices=("s1", "script", "preview", "timeline", "words", "door"), help="one part")
     ap.add_argument("--no-chrome", action="store_true", help="the routes only")
     a = ap.parse_args()
     if any(p in chrome_drive.NEVER_PORTS for p in range(a.port, a.port + 10)):
@@ -1292,6 +1296,18 @@ def main():
             else:
                 with chrome_drive.Chrome(work=str(work / "chrome4"), size=(1280, 1100)) as c:
                     group("the timeline and Make it in CapCut on the page", tpt.run_page, me, c, s)
+        if a.only in (None, "door"):
+            import talking_page_door as tpd
+            me = sys.modules[__name__]
+            if s.proc is None:
+                s.start()
+                case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 10)
+            group("the door: the reel page's third card, by request", tpd.run_requests, me, s)
+            if a.no_chrome or not chrome_drive.find_chrome():
+                skip("the door on the page: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
+            else:
+                with chrome_drive.Chrome(work=str(work / "chrome5"), size=(1280, 1100)) as c:
+                    group("the door on the page", tpd.run_page, me, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()

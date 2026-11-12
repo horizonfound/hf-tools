@@ -1,6 +1,6 @@
 ---
 name: assistant-make-a-reel
-description: The Assistant by Horizon Found, the reel. Turns a photographer's edited, exported photos into a CapCut project cut on the beat of their song, with Claude picking and ordering the photos, ready for them to style and export in CapCut. Use this whenever the person says make a reel, turn these into a reel, reel from the beach shoot, pick my reel photos for a shoot, look through my footage for a shoot, yes to "want a reel?", cut these to a song, or trial reels from this shoot, even if they do not name the Assistant.
+description: The Assistant by Horizon Found, the reel. Turns a photographer's edited, exported photos into a CapCut project cut on the beat of their song, with Claude picking and ordering the photos, ready for them to style and export in CapCut. Use this whenever the person says make a reel, turn these into a reel, reel from the beach shoot, pick my reel photos for a shoot, look through my footage for a shoot, yes to "want a reel?", cut these to a song, or trial reels from this shoot, even if they do not name the Assistant. Also for the talking reel, where they talk to the camera about a shoot (cut my talking reel for a shoot, place the photos in my talking reel, cut my talking reel and place the photos, set up talking reels, make a talking reel).
 ---
 
 # Make a reel
@@ -16,12 +16,16 @@ Paths here, written once so they work from any folder: `<reel scripts>` is the `
 ## The rules
 
 1. **Edited photos only.** A reel is made from the photos they exported after editing, never from the backup's raw files. If all you have is a backup, say "Whenever you're finished with your edits, let me know and I'll turn your favorites into a reel."
-2. **Every frame is theirs.** Hard cuts on the beat. No transitions, no effects, no zooms or motion, no generated anything. Their look comes from CapCut.
+2. **Every frame is theirs.** Hard cuts, no transitions, no effects, no generated anything. Their look comes from CapCut. **In a photo reel** the cuts are on the beat and there are no zooms or motion: a photo stays still. **A talking reel** (below) has three moves of its own, each on their own video and each one the photographer presses on its page: Punch in, Slow zoom, and a faster speed. You never add one, there or anywhere.
 3. **Always a new CapCut project.** Never open, change or overwrite one they made. The script will not.
 4. **CapCut can stay open** (on a Mac). If it is open, the script writes only the new project's folder and CapCut adds it to its projects by itself; if it is closed, the project is added to CapCut's list for next time. Never ask them to quit CapCut unless the new project doesn't show up. **On a PC, a reel made while CapCut is open waits** to be added to CapCut's list. If the output ends with "NOTE: once CapCut is closed, `capcut.py open` adds the waiting reel...", ask them to close CapCut, then run `python3 <reel scripts>/capcut.py open`, which adds the reel to CapCut's list and starts CapCut. (The same line can appear on either computer when CapCut's list couldn't be saved; the answer is the same.) `python3 <reel scripts>/capcut.py open` also just starts CapCut, on either computer, whenever they want it open.
 5. **One look at the sheet, not photo by photo.** The contact sheet is how you see the shoot and the strip is how you check the order. Open a single photo larger only to settle a close call, and never more than a handful.
 6. **Nothing posts, nothing sends.**
 7. **Nothing is ever left out to fit** (Nicole, Nov 6): not a photo, not a clip. A vibe bends to fit the song; the photos and clips don't. When even the quickest timing can't fit, nothing is made and the page says exactly why.
+
+## A talking reel is its own thing
+
+When they paste **"Cut my talking reel for <shoot>"**, **"Place the photos in my talking reel for <shoot>"** or **"Cut my talking reel and place the photos for <shoot>"**, or say "set up talking reels" or "make a talking reel", this skill's steps are not the way: read `<assistant>/parts/talking-reel.md` in full and follow it. That part is one of the Assistant's own: where it writes `<scripts>`, that is `<assistant scripts>` here, and its "core" is `<assistant>/SKILL.md`, which you read first if you haven't this conversation (its first-thing checks and rules apply). A talking reel is them talking to the camera about a shoot, with their photos going with what they say. It has its own page (the third card in step 1 of the reel page, **Talking to camera**, opens it), no song and no beat, and your part is cutting their script like an editor and placing photos when they ask. It still needs the shoot's post kit and its numbered photos, which Step 1 below makes; Step 2's pick is for a photo reel and is not used there.
 
 ## Step 1: the edited photos, in a post kit
 
@@ -167,6 +171,8 @@ The page has already told them it's in CapCut and given them the Open CapCut but
 ## Untested, honestly
 
 Proven on Dustin's Mac with CapCut 9.6: a project written this way opens and exports (Oct 21). The full flow here (sheet, pick, song, beat, project) has run on test photos only. Not yet tried: CapCut versions other than 9.6, Windows (the place CapCut keeps its projects on a PC is written in but has never been tried; nobody has seen CapCut for Windows open a project written this way; reading an MP3 or M4A song on a PC is written, through Windows' own media parts, but has never run on a PC), HEIC photos. The first time on any of these, say "first time on this, tell me if anything looks off" and keep going.
+
+A talking reel has its own list of what nobody has tried yet (turning real talking into words, and its project opened in CapCut): `<assistant>/parts/talking-reel.md`, "Not proven yet, honestly".
 
 ## Parked
 

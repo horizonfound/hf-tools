@@ -95,11 +95,37 @@ def her_folder():
     return None
 
 
+# Step 1's third card (her v23, Nov 11): the two lines and the one style rule her v23 reel-maker.html adds to her
+# v19 page. Her v23 page is the source for them (it differs from v19 by these and one line of script).
+V23_WORDS = {"foot_talk_b": "Talking to camera",
+             "foot_talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page."}
+V23_RULE = "a.opt{text-decoration:none;display:block}\n"
+V23_AFTER = ".opt{position:relative}\n"
+
+
+def her_v23_page():
+    """Her v23 reel-maker.html (the reel page with the third card), or None when that handoff isn't here."""
+    for base in (ROOT, ROOT.parent / "hf-tools"):          # the folder beside this one, never a home path written out
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v23-*")):
+            f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
+            if f.is_file():
+                return f.read_text(encoding="utf-8")
+    return None
+
+
+def her_page():
+    """Her reel page as text: v23's when it is on this computer (the newest she sent), else v19's."""
+    t = her_v23_page()
+    if t is None and her_folder():
+        t = (her_folder() / "pages" / "reel-maker.html").read_text(encoding="utf-8")
+    return t
+
+
 def her_text():
     f = her_folder()
     if not f:
         return None
-    t = "\n".join((f / n).read_text(encoding="utf-8") for n in ("pages/reel-maker.html", "server.py", "bts_reel.py"))
+    t = "\n".join([her_page()] + [(f / n).read_text(encoding="utf-8") for n in ("server.py", "bts_reel.py")])
     return html.unescape(t).replace("\\'", "'")
 
 
@@ -207,7 +233,17 @@ def check_words():
         print("SKIP  her words against her own page: her handoff (reference-private) isn't on this computer", flush=True)
     else:
         bad = []
+        v23 = her_v23_page()
+        if v23 is None:
+            print("SKIP  the third card's two lines against her v23 page: that handoff isn't on this computer", flush=True)
+        else:
+            case("her v23 page is her v19 page with the third card and nothing else (two lines of words, one style rule, one line of script)",
+                 [x for x in v23.splitlines() if x not in (her_folder() / "pages" / "reel-maker.html").read_text(encoding="utf-8").splitlines()]
+                 == [V23_RULE.strip(), '      <a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>' % (V23_WORDS["foot_talk_b"], V23_WORDS["foot_talk_s"]),
+                     "$('modeTalk').href = 'talking-reel.html?shoot=' + encodeURIComponent(SHOOT);   // a talking-to-camera reel (Nicole, Nov 11)"])
         for k, v in rp.WORDS.items():
+            if v23 is None and k in V23_WORDS:
+                continue
             for frag in re.split(r"\{\w+\}", v):
                 if len(frag.strip()) >= 2 and frag not in t:
                     bad.append((k, frag))
@@ -215,6 +251,7 @@ def check_words():
         bad = [(k, v) for k, v in HERS.items() for x in (v if isinstance(v, list) else [v])
                if k not in ("not_picked", "title", "doc_title", "take_out_label") and x not in t]
         case("every word this test expects on step 2 is hers", not bad, bad[:5])
+    case("the third card's two lines are in reel_page.WORDS as she wrote them (v23)", {k: rp.WORDS.get(k) for k in V23_WORDS} == V23_WORDS)
     case("the limit line is the plan's (decision 23)", rp.OUR_WORDS["too_many"] == OURS_TOO_MANY, rp.OUR_WORDS["too_many"])
     case("the defaults sit where the plan says: 40, no drag out, the two-window check on",
          rp.MAX_PICKS == 40 and rp.DRAG_OUT is False and rp.REV_CHECK is True)
@@ -228,8 +265,11 @@ def check_words():
     her = None
     f = her_folder()
     if f:
-        ht = (f / "pages" / "reel-maker.html").read_text(encoding="utf-8")
+        ht = her_page()
         her = ht[ht.index("<style>") + 7:ht.index("</style>")]
+        if V23_RULE not in her:      # only her v19 page is here: her v23 rule goes where her v23 page has it
+            her = her.replace(V23_AFTER, V23_AFTER + V23_RULE, 1)
+        case("her one style rule for the third card (v23) is in her stylesheet once, after the rule it follows", her.count(V23_AFTER + V23_RULE) == 1 and her.count("a.opt{") == 1)
     if her is None:
         print("SKIP  her stylesheet word for word: her handoff isn't on this computer", flush=True)
     else:

@@ -421,6 +421,16 @@ try:
     before = REC.read_bytes()
     r = run("cut", SHORT, "--file", jfile({"cut": [[0, 2]], "why": ["the warm-up"]}), "--replace")
     check("cut --replace run twice: nothing changes the second time", r.returncode == 0 and REC.read_bytes() == before)
+    # every cut of the assistant's brought back on the page: that empty list is THEIR work (stage E's review)
+    sv({"cut": []})
+    before = REC.read_bytes()
+    st_out = run("status", SHORT).stdout
+    r = run("cut", SHORT, "--file", jfile({"cut": [[0, 2]], "why": ["the warm-up"]}))
+    check("cut: after they bring back everything the assistant cut, a fresh cut stops without --replace, as status says",
+          r.returncode == 2 and r.stdout.strip() == "STOP: " + TR.THEIR_CUTS and REC.read_bytes() == before
+          and "their own cuts (ask before replacing them)" in st_out, (r.stdout, st_out))
+    r = run("cut", SHORT, "--file", jfile({"cut": [[0, 2]], "why": ["the warm-up"]}), "--replace")
+    check("... and with --replace it is saved", r.returncode == 0 and rec()["cut"] == [[0, 2]] and rec()["claude_cut"] == [[0, 2]], r.stdout)
     r = run("cut", SHORT, "--file", jfile({"cut": []}))
     check("an empty cut is still a cut: claude_cut is a list, even an empty one (hers)",
           r.returncode == 0 and rec()["claude_cut"] == [] and rec()["cut"] == [] and TR.state_for_page(KIT)["rec"]["claude_cut"] == []
@@ -455,10 +465,20 @@ try:
     now = rec()
     check("... stretches in order, pos and me empty, claude_shots set, v23's photos emptied",
           now["shots"] == [S(3, 6, [4], "full"), S(9, 12, [1, 2, 3], "pip"), S(13, 15, [5], "center")] and now["claude_shots"] is True and now["photos"] == {}, now["shots"])
-    check("... and the stretch of theirs it replaced is kept", len(now["replaced"]) == 3 and now["replaced"][-1]["why"] == "place --replace" and now["replaced"][-1]["shots"][0]["ns"] == [7])
+    check("... and the stretch of theirs it replaced is kept", len(now["replaced"]) == 4 and now["replaced"][-1]["why"] == "place --replace" and now["replaced"][-1]["shots"][0]["ns"] == [7])
     before = REC.read_bytes()
     r = run("place", SHORT, "--file", jfile(PL), "--replace")
     check("place --replace run twice: nothing changes the second time", r.returncode == 0 and REC.read_bytes() == before)
+
+    r = run("place", SHORT, "--file", jfile(PL))
+    check("place: the assistant's own set sent again WITHOUT --replace (a run cut off or doubted) saves, changes nothing, asks nothing",
+          r.returncode == 0 and r.stdout.strip() == "Saved: 3 photo stretches, 5 photos. The page shows them in a few seconds."
+          and REC.read_bytes() == before, r.stdout)
+    r = run("place", SHORT, "--file", jfile({"shots": PL["shots"][:2]}))
+    check("... a different set still stops without --replace", r.returncode == 2 and r.stdout.strip() == "STOP: " + TR.THEIR_PHOTOS and REC.read_bytes() == before, r.stdout)
+    r = run("place", SHORT, "--file", jfile({"shots": [{"a": 3, "b": 6, "ns": [999], "spot": "full"}]}))
+    check("... and a file with a mistake in it, photos already there: 'already placed' is still said first",
+          r.returncode == 2 and r.stdout.strip() == "STOP: " + TR.THEIR_PHOTOS and REC.read_bytes() == before, r.stdout)
 
     def place_stop(name, shots, has):
         b4 = REC.read_bytes()
@@ -549,6 +569,9 @@ try:
           stp["video_state"] == "changed" and stp["videos"][0]["key"] != KEY1 and stp["rec"]["video"] == "my talk.mp4", stp["video_state"])
     check("... show says so to the assistant, status too", "exported again since this script was made" in run("show", SHORT).stdout
           and "exported again since its script was made" in run("status", SHORT).stdout)
+    out = run("photos", SHORT).stdout
+    check("... and photos ends with the same note (the place steps never run show)",
+          out.rstrip().endswith("press Edit my video again on the page before you cut or place.") and "exported again since this script was made" in out, out[-200:])
     TR.put_words(KIT, "my talk.mp4", stp["videos"][0]["key"], WORDS, {"dur": 3.0})
     check("... and once its words are made again it is the one", TR.state_for_page(KIT)["video_state"] == "here")
     aside = TMP / "aside.mp4"

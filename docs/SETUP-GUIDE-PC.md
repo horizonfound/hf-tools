@@ -217,6 +217,7 @@ Windows gives each drive and memory card a letter when it's plugged in, and a dr
 - **iPhone videos in High Efficiency.** They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).
 - **iPhone photos (HEIC).** Export them as JPEGs first, and the Assistant can use those. **[Dustin and Nicole to decide]**
 - **Posting-day reminders don't reach your calendar by themselves.** The Assistant makes a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert. **[New Nov 11: not in the PDF yet; wording is Dustin and Nicole's]**
+- **Talking reels.** Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here. **[New Nov 12: not in the PDF yet; wording is Dustin and Nicole's]**
 
 > **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >

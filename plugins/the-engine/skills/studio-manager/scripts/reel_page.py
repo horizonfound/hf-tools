@@ -20,6 +20,9 @@ her steps in her order, her buttons and what they do. Underneath it is built the
   * Nothing is kept in the browser: every choice is saved to the kit by POST /reel-save, retried until it lands.
   * kit.json is only ever read here (Claude's order is picks.reel there, with reel_marks); commands write it.
   * Nothing is deleted or written over: the record is written whole, with the version before kept beside it.
+  * Step 1's third card, Talking to camera (her v23, Nov 11), is a plain link written on the server to the
+    talking reel's own page for the same shoot (talk_card; talking_page.py). It is not a choice: it saves nothing
+    and never gets the tick, and this page's record does not know it was pressed.
 
 Routes, all on the posting server (posting_queue.py hands them here):
   GET  /reel.html?kit=<folder>   the page
@@ -205,6 +208,9 @@ WORDS = {
     "foot_bts_s": "Clips from the shoot, mixed with your finished photos.",
     "foot_photos_b": "Just photos",
     "foot_photos_s": "Your finished photos, cut on the beat.",
+    # the third card (her v23, Nov 11): a plain link to the talking reel's own page. It chooses nothing here.
+    "foot_talk_b": "Talking to camera",
+    "foot_talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page.",
     "foot_say2_html": "Press <b>Add my footage</b> and a Footage folder for this shoot opens in Finder. Drag your behind-the-scenes videos into it.",
     "add_footage": "▶ Add my footage",
     "opening_footage": "Opening your Footage folder in Finder...",
@@ -2564,6 +2570,7 @@ h1{margin:0;font:600 clamp(30px,4.4vw,50px)/1.03 var(--sans);letter-spacing:-.03
 .opt span{display:block;color:var(--ink-2);font-size:13.5px;line-height:1.35;margin-top:.15rem}
 .opt:hover{border-color:var(--coral)}
 .opt{position:relative}
+a.opt{text-decoration:none;display:block}
 .opt.on{border-color:var(--coral-2);background:#FFF6F2;box-shadow:0 0 0 1px var(--coral-2) inset}
 .opt.on::after{content:"✓";position:absolute;top:.6rem;right:.75rem;width:22px;height:22px;border-radius:50%;background:var(--coral-2);color:#fff;font:700 12px/22px var(--sans);text-align:center}
 .opt.on b{padding-right:1.6rem}
@@ -2771,6 +2778,7 @@ def _footage_section(w, num):
         "<div class='choice'>"
         "<button class='opt' id='modeBts' type='button'><b>" + e(w["foot_bts_b"]) + "</b><span>" + e(w["foot_bts_s"]) + "</span></button>"
         "<button class='opt' id='modePhotos' type='button'><b>" + e(w["foot_photos_b"]) + "</b><span>" + e(w["foot_photos_s"]) + "</span></button>"
+        + TALK_SPOT +
         "</div>"
         "<div id='btsBox' hidden>"
         "<p class='say'>" + w["foot_say2_html"] + "</p>"
@@ -2865,6 +2873,20 @@ def _vibe_section(w, num):
         "</section>")
 
 
+TALK_SPOT = "<!--talk-->"   # where step 1's third card goes; page_html writes it, since it alone knows the shoot
+
+
+def talk_card(w, kit_name):
+    """Step 1's third choice (her v23 reel-maker.html: <a class="opt" id="modeTalk">): a plain link to the talking
+    reel's page for the same shoot, written here on the server so it works before any script runs. It is a link and
+    nothing more: it saves nothing, never gets the tick, and leaves this page's record as it was. The shoot goes in
+    the address by its folder name (never a path), as every page's does. A PC gets the same card: the talking page
+    opens there and says in its own words what a PC can't do yet (this_computer.NO_TALKING_PC)."""
+    e = html.escape
+    return ("<a class='opt' id='modeTalk' href='" + e("/talking.html?kit=" + quote(kit_name), quote=True) + "'><b>"
+            + e(w["foot_talk_b"]) + "</b><span>" + e(w["foot_talk_s"]) + "</span></a>")
+
+
 SECTIONS = [
     ("step0", _footage_section),  # 1. Behind-the-scenes footage?
     ("step1", _order_section),    # 2. Put your photos in order
@@ -2897,6 +2919,7 @@ def page_html(kit_name, short, kit_page=False):
             "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY}
     # her numbers as written (step 1 to 5, step 4 hidden until footage is chosen); the page renumbers them (hers)
     steps = "".join(fn(w, i) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
+    steps = steps.replace(TALK_SPOT, talk_card(w, kit_name))
     back_href = ("/content/" + quote(kit_name) + "/Post%20kit.html") if kit_page else "/home"
     back_words = w["back_kit"] if kit_page else OUR_WORDS["back_home"]
     return (

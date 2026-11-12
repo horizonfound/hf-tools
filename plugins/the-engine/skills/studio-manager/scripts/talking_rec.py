@@ -141,6 +141,8 @@ NO_SCRIPT_MAKE = "Turn your video into a script first."       # hers (server.py 
 THEIR_CUTS = "they've already made their own cuts on the page. Ask before replacing them (then run again with --replace)"
 THEIR_PHOTOS = "they already have photos placed. Ask before replacing them (then run again with --replace)"
 PHOTOS_PLACED = "They already have photos placed: ask before replacing them (then place with --replace)."
+EXPORTED_AGAIN = ("NOTE: their talking video was exported again since this script was made, so these word times belong to "
+                  "the old file. Ask them to press Edit my video again on the page before you cut")     # show and photos end with it
 
 
 def _engine():
@@ -1880,7 +1882,9 @@ def save_cut(kit, given, replace=False):
                 raise Stop(f"{pair[0]}-{pair[1]} isn't a range of word numbers (0 to {n - 1})")
             cuts.append([x, y])
         cuts = merge_ranges(cuts)
-        theirs = bool(rec.get("cut")) and rec.get("claude_cut") != rec.get("cut")
+        # theirs: what is on the record is not the assistant's own last cut. That holds for an EMPTY list too:
+        # after the assistant's cut, bringing every word back on the page is their own work (status says so)
+        theirs = (bool(rec.get("cut")) or isinstance(rec.get("claude_cut"), list)) and rec.get("claude_cut") != _lst(rec, "cut")
         if theirs and not replace:
             raise Stop(THEIR_CUTS)
         why = given.get("why")
@@ -1903,43 +1907,57 @@ def save_place(kit, given, replace=False):
         if not n:
             raise Stop(NO_SCRIPT)
         had = eng.shots(rec)
+        try:
+            shots = _stretches(kit, given, rec, n, eng)
+        except Stop:
+            if had and not replace:
+                raise Stop(THEIR_PHOTOS)                   # as before: photos already there is said first
+            raise
         if had and not replace:
-            raise Stop(THEIR_PHOTOS)
-        if not isinstance(given, dict) or not isinstance(given.get("shots", []), list):
-            raise Stop('the file should be {"shots": [{"a": first word, "b": last word, "ns": [photo numbers], "spot": "pip"}, ...]}')
-        on_sheet = {x["n"] for x in arrange.sheet_rows(Path(kit))}
-        if not on_sheet:
-            raise Stop("this shoot has no numbered photo list yet (kit.py sheet makes it)")
-        keep = eng.kept(rec)
-        rows = []
-        for x in given.get("shots") or []:
-            if not isinstance(x, dict) or _wnum(x.get("a")) is None or _wnum(x.get("b")) is None:
-                raise Stop("each stretch needs a first word (a) and a last word (b), as word numbers")
-            rows.append(x)
-        shots, last = [], -1
-        for x in sorted(rows, key=lambda x: _wnum(x["a"])):
-            s0, e0 = _wnum(x["a"]), _wnum(x["b"])
-            if not (0 <= s0 <= e0 < n) or s0 <= last:
-                raise Stop(f"{s0}-{e0} isn't a range of word numbers that follows the one before it")
-            if x.get("v"):
-                raise Stop(f"{s0}-{e0}: place takes photos only, never a video (a video is theirs to add on the page)")
-            raw = x.get("ns") if isinstance(x.get("ns"), list) else []
-            ns = [_wnum(v) for v in raw]
-            if not ns or None in ns or x.get("spot") not in PLACE_SPOTS:
-                raise Stop(f"{s0}-{e0}: each stretch needs photo numbers and a spot (pip, full, center, corner)")
-            missing = [k for k in ns if k not in on_sheet]
-            if missing:
-                raise Stop(f"{s0}-{e0}: photo {missing[0]} isn't one of this shoot's photos (the sheet's numbers are the page's)")
-            if not any(keep[s0:e0 + 1]):
-                raise Stop(f"{s0}-{e0}: every word there is cut, so the photo would never show. Cover kept words only")
-            shots.append({"a": s0, "b": e0, "ns": ns[:MAX_NS], "v": None, "from": 0.0, "spot": x["spot"], "pos": None, "me": None})
-            last = e0
+            # the very set the assistant placed last, sent again (a run cut off or doubted): it landed, so there
+            # is nothing to save and nothing to ask them. Anything else on the record stops, as ever.
+            if not (rec.get("claude_shots") and _same(had, shots)):
+                raise Stop(THEIR_PHOTOS)
         if had and not _same(had, shots):
             keep_replaced(rec, "place --replace")
         rec["shots"], rec["photos"], rec["claude_shots"] = shots, {}, True
         out["n"], out["photos"] = len(shots), sum(len(x["ns"]) for x in shots)
     change(kit, fn)
     return out["n"], out["photos"]
+
+
+def _stretches(kit, given, rec, n, eng):
+    """The photo stretches in a file the assistant wrote, checked one by one. Stop names the first that is wrong."""
+    if not isinstance(given, dict) or not isinstance(given.get("shots", []), list):
+        raise Stop('the file should be {"shots": [{"a": first word, "b": last word, "ns": [photo numbers], "spot": "pip"}, ...]}')
+    on_sheet = {x["n"] for x in arrange.sheet_rows(Path(kit))}
+    if not on_sheet:
+        raise Stop("this shoot has no numbered photo list yet (kit.py sheet makes it)")
+    keep = eng.kept(rec)
+    rows = []
+    for x in given.get("shots") or []:
+        if not isinstance(x, dict) or _wnum(x.get("a")) is None or _wnum(x.get("b")) is None:
+            raise Stop("each stretch needs a first word (a) and a last word (b), as word numbers")
+        rows.append(x)
+    shots, last = [], -1
+    for x in sorted(rows, key=lambda x: _wnum(x["a"])):
+        s0, e0 = _wnum(x["a"]), _wnum(x["b"])
+        if not (0 <= s0 <= e0 < n) or s0 <= last:
+            raise Stop(f"{s0}-{e0} isn't a range of word numbers that follows the one before it")
+        if x.get("v"):
+            raise Stop(f"{s0}-{e0}: place takes photos only, never a video (a video is theirs to add on the page)")
+        raw = x.get("ns") if isinstance(x.get("ns"), list) else []
+        ns = [_wnum(v) for v in raw]
+        if not ns or None in ns or x.get("spot") not in PLACE_SPOTS:
+            raise Stop(f"{s0}-{e0}: each stretch needs photo numbers and a spot (pip, full, center, corner)")
+        missing = [k for k in ns if k not in on_sheet]
+        if missing:
+            raise Stop(f"{s0}-{e0}: photo {missing[0]} isn't one of this shoot's photos (the sheet's numbers are the page's)")
+        if not any(keep[s0:e0 + 1]):
+            raise Stop(f"{s0}-{e0}: every word there is cut, so the photo would never show. Cover kept words only")
+        shots.append({"a": s0, "b": e0, "ns": ns[:MAX_NS], "v": None, "from": 0.0, "spot": x["spot"], "pos": None, "me": None})
+        last = e0
+    return shots
 
 
 def cmd_show(kit):
@@ -1957,8 +1975,7 @@ def cmd_show(kit):
     if cut:
         say("\nAlready cut (theirs or yours): " + ", ".join(f"{x}-{y}" for x, y in cut))
     if video_state(kit, rec) == "changed":
-        say("\nNOTE: their talking video was exported again since this script was made, so these word times belong to "
-            "the old file. Ask them to press Edit my video again on the page before you cut.")
+        say("\n" + EXPORTED_AGAIN + ".")
     return 0
 
 
@@ -1988,6 +2005,8 @@ def cmd_photos(kit):
     say("  " + sheet_line(kit))
     if eng.shots(rec):
         say("\n" + PHOTOS_PLACED)
+    if video_state(kit, rec) == "changed":
+        say("\n" + EXPORTED_AGAIN + " or place.")
     return 0
 
 
