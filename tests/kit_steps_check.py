@@ -107,8 +107,9 @@ def skip(line):
 
 
 def her_page():
+    """Her post kit page, the newest on this computer (v20 has the three steps; v24 adds the design preview's lines)."""
     for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*"), reverse=True):
             f = h / "Carousel designer and reel picker" / "pages" / "post-kit.html"
             if f.is_file() and "Add to my queue" in f.read_text(encoding="utf-8"):
                 return f
@@ -266,6 +267,8 @@ def check_words(k):
         t = html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
         bad = []
         for key, v in k.KIT_WORDS.items():
+            if key.startswith("preview_") and "design_preview" not in t:
+                continue            # the design preview's two lines are hers from v24 on (tests/kit_cards_check.py has them)
             for frag in re.split(r"\{\w+\}", v):
                 if frag.strip() and frag not in t:
                     bad.append((key, frag))

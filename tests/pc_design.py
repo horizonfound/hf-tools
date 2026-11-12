@@ -1011,6 +1011,24 @@ def server_checks(kit):
             except ValueError:
                 return code, {}
 
+        def head_only(path, length):
+            """A picture POST's first lines only (it says how long it is, and sends nothing): -> (the status, the first line)."""
+            import socket
+            s = socket.create_connection(("127.0.0.1", port), timeout=10)
+            try:
+                s.sendall(f"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: image/jpeg\r\nContent-Length: {length}\r\n\r\n".encode("ascii"))
+                got = b""
+                while b"\r\n" not in got:
+                    more = s.recv(4096)
+                    if not more:
+                        break
+                    got += more
+                line = got.split(b"\r\n")[0].decode("ascii", "replace")
+                parts = line.split(" ")
+                return (int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None), line
+            finally:
+                s.close()
+
         Q = "kit=" + quote(kit.name)
         code, _, data = ask("GET", "/design-state?" + Q)
         try:
@@ -1028,6 +1046,9 @@ def server_checks(kit):
         slide = jpeg(W, H, 11, "a refused slide")
         tok = token()
         sq = f"/design-slide?{Q}&design={did}&set={tok}"
+        pq = f"/design-preview?{Q}&design={did}"
+        pw, ph = design.preview_shape(n)
+        pv1, pv2 = jpeg(pw, ph, 21, "a preview"), jpeg(pw, ph, 22, "another preview")
         (STUDIO / "design-templates").mkdir(exist_ok=True)
         before_kit, before_studio = snap(kit), {k: v for k, v in snap(STUDIO).items() if k.startswith(("design-", "brand"))}
         other_state = dict(state, bg="#123456")
@@ -1061,6 +1082,20 @@ def server_checks(kit):
             ("a commit for a design changed since", lambda: post("/design-commit", {"kit": kit.name, "design": did, "set": token(), "rev": rev + 3, "count": n}), 409),
             ("a commit that is not one", lambda: post("/design-commit", {"kit": kit.name, "design": did, "set": "x", "rev": "1"}), 400),
             ("a designer route that does not exist", lambda: post("/design-nothing", {"kit": kit.name}), 404),
+            # the small picture of a design for the post kit (Nicole's v24)
+            ("a preview that is not a picture", lambda: post(f"{pq}&rev={rev}", raw=b"x" * 5000, kind="image/jpeg"), 400),
+            ("a preview of the wrong shape (a whole slide)", lambda: post(f"{pq}&rev={rev}", raw=slide, kind="image/jpeg"), 400),
+            ("a preview of a story's shape for a carousel", lambda: post(f"{pq}&rev={rev}", raw=jpeg(162, 288, 5, "story"), kind="image/jpeg"), 400),
+            ("a preview drawn from an older layout", lambda: post(f"{pq}&rev={rev + 3}", raw=pv1, kind="image/jpeg"), 409),
+            ("a preview with no counter", lambda: post(pq, raw=pv1, kind="image/jpeg"), 400),
+            ("a preview for a design that is not there", lambda: post(f"/design-preview?{Q}&design=d00000000000&rev=0", raw=pv1, kind="image/jpeg"), 404),
+            ("a preview whose design is a path", lambda: post(f"/design-preview?{Q}&design=..%2F..%2Fx&rev=0", raw=pv1, kind="image/jpeg"), 400),
+            ("a preview whose design is a PC address", lambda: post(f"/design-preview?{Q}&design=C:%5CUsers%5Cx&rev=0", raw=pv1, kind="image/jpeg"), 400),
+            ("a preview for a shoot that is not there", lambda: post(f"/design-preview?kit=No%20such%20shoot&design={did}&rev={rev}", raw=pv1, kind="image/jpeg"), 404),
+            ("a preview for the carousel's design, asked as stories", lambda: post(f"{pq}&rev={rev}&kind=stories", raw=pv1, kind="image/jpeg"), 404),
+            ("a preview sent as JSON", lambda: post(f"{pq}&rev={rev}", raw=pv1), 415),
+            ("a preview from another website (Origin)", lambda: post(f"{pq}&rev={rev}", raw=pv1, kind="image/jpeg", headers={"Origin": "http://evil.example"}), 403),
+            ("a preview that says it is over 1 MB, before a byte of it is sent", lambda: head_only(f"{pq}&rev={rev}", 1024 * 1024 + 1), 413),
         ]
         for what, send, want in refusals:
             try:
@@ -1087,6 +1122,56 @@ def server_checks(kit):
               sorted(set(before_studio) ^ set(after_studio))[:6])
         leaked = [what for what, data in bodies if what.split(" ")[1].startswith("/design") and (str(work).encode("utf-8") in data or work.name.encode("utf-8") in data)]
         check("no answer of a designer route gave away where anything is on this computer", not leaked, leaked[:4])
+        for bad in ("../../../.kit/kit.json", did + ".preview.jpg", "..%5C..%5Ckit", "C:%5CWindows%5Cwin.ini", "", did):
+            code, _, data = ask("GET", f"/design-preview?{Q}&design=" + bad)
+            check(f"refused: a design's preview named {bad!r} before one is kept (404)", code == 404, code)
+        # the small picture of a design, kept through the server (Nicole's v24): one hidden file beside the design
+        check("(a preview written here is one design.py takes: a whole JPEG of the right shape for this design)",
+              design.preview_ok(pv1, n) and design.jpeg_size(pv1) == (pw, ph) and not design.preview_ok(pv1, n, "stories"), (design.jpeg_size(pv1), (pw, ph)))
+        pfile = design.preview_path(kit, did)
+        before_else = {k: v for k, v in snap(kit).items() if not k.endswith(".preview.jpg")}
+        code, out = post(f"{pq}&rev={rev}", raw=pv1, kind="image/jpeg")
+        check("a preview through the server: kept beside the design, byte for byte, with no scratch file left",
+              code == 200 and out == {"ok": True, "same": False} and pfile.read_bytes() == pv1
+              and not [x for x in os.listdir(pfile.parent) if x.startswith(".")], (code, out, sorted(os.listdir(pfile.parent))))
+        check("and nothing else in the kit changed: not the design, not the kit's record, not a folder of theirs",
+              {k: v for k, v in snap(kit).items() if not k.endswith(".preview.jpg")} == before_else)
+        check("it is not a design: the count and the list of designs are as they were",
+              design.count_designs(kit) == len(st["designs"]) and [d["id"] for d in design.list_designs(kit)] == [d["id"] for d in st["designs"]])
+        code, out = post(f"{pq}&rev={rev}", raw=pv1, kind="image/jpeg")
+        check("the same preview again: fine, nothing written", code == 200 and out == {"ok": True, "same": True}, (code, out))
+        code, heads, data = ask("GET", pq + "&v=1")
+        check("GET /design-preview gives it back as a JPEG, byte for byte", code == 200 and heads.get("content-type") == "image/jpeg" and data == pv1, (code, heads.get("content-type"), len(data)))
+        with open(pfile, "rb") as held:                 # a reader has the picture open (a browser, a virus checker)
+            held.read(10)
+            code, out = post(f"{pq}&rev={rev}", raw=pv2, kind="image/jpeg")
+        code2, out2 = post(f"{pq}&rev={rev}", raw=pv2, kind="image/jpeg") if code != 200 else (code, out)
+        check("a new preview takes the old one's place, whole, even sent while another handle has the picture open (a PC waits a moment; else the next one lands)",
+              code2 == 200 and pfile.read_bytes() == pv2 and not [x for x in os.listdir(pfile.parent) if x.startswith(".")], (code, out, code2, out2))
+        pv = design.newest_preview(kit)
+        check("newest_preview: this design, by its id and name, with the picture's own time, and no path in it",
+              bool(pv) and pv["id"] == did and pv["name"] == st["design"]["name"] and type(pv["v"]) is int and no_path(pv)[0], pv)
+        check("newest_preview for stories: none (the picture is the carousel's)", design.newest_preview(kit, "stories") is None)
+        page_now = kit_mod.page_html(kit)
+        check("the post kit's Carousel card shows it, named by the kit's folder name and the design's id only (no path, no backslash)",
+              f"design={did}&amp;v={pv['v'] if pv else ''}" in page_now and "A preview of " in page_now and str(work) not in page_now and "\\" not in page_now.split("<script")[0],
+              page_now.count("dprev"))
+        check("...and the button beside the preview is her 'Open my carousel'", "Open my carousel" in page_now and "Design my carousel" not in page_now)
+        # the design emptied after its picture was kept (this test's own scratch kit; the file is put back as it was)
+        dfile = design.design_path(kit, did)
+        d_raw = dfile.read_bytes()
+        d_now = json.loads(d_raw.decode("utf-8"))
+        d_now["state"] = dict(d_now["state"], blocks=[])
+        dfile.write_bytes(json.dumps(d_now).encode("utf-8"))
+        try:
+            page_empty = kit_mod.page_html(kit)
+            code, _, data = ask("GET", pq + "&v=1")
+            check("a design emptied after its picture was kept: not previewed (newest_preview none, no picture on the card, GET 404), the picture left on disk",
+                  design.newest_preview(kit) is None and "dprev" not in page_empty.split("</style>")[-1] and "A preview of " not in page_empty
+                  and code == 404 and pfile.read_bytes() == pv2, (design.newest_preview(kit), code))
+        finally:
+            dfile.write_bytes(d_raw)
+        check("...and with its photos back it is previewed again", (design.newest_preview(kit) or {}).get("id") == did)
         # the plugin's own font, as a font
         own = next((f for f in design.OWN_FILES if (FONTS / f"{f}.ttf").is_file()), None)
         if own:

@@ -207,15 +207,27 @@ def check_designs_page(case, work):
         case(f"{n}: no script, frame or link is ever added to the page", not re.search(r"createElement\(\s*['\"](script|iframe|object|embed|link)['\"]", s))
         case(f"{n}: no address on the internet is written in it", not re.search(r"https?://|googleapis|gstatic", s))
     case("the rules and the drawing wait on no timer at all", "setTimeout" not in src["DESIGN_PLAN_JS"] and "setTimeout" not in src["DESIGN_PAINT_JS"])
-    case("the only timers are waits between tries and one giving-up limit: three in the designs script (a POST with no answer; leaving for another shoot; giving up on a new design the Assistant never answered), one in the saving script",
-         src["DESIGN_DESIGNS_JS"].count("setTimeout(") == 3 and "setTimeout(ok, MAKE_WAIT)" in src["DESIGN_DESIGNS_JS"] and src["DESIGN_SAVE_JS"].count("setTimeout(") == 1,
+    # (v24: the saving script has a second timer, the wait before the small picture for the post kit is drawn:
+    # 1.5 s after a good save or a design opening, hers; nothing on the page depends on it)
+    case("the only timers are waits between tries, one giving-up limit and the wait before the post kit's small picture: three in the designs script (a POST with no answer; leaving for another shoot; giving up on a new design the Assistant never answered), two in the saving script",
+         src["DESIGN_DESIGNS_JS"].count("setTimeout(") == 3 and "setTimeout(ok, MAKE_WAIT)" in src["DESIGN_DESIGNS_JS"] and src["DESIGN_SAVE_JS"].count("setTimeout(") == 2
+         and "setTimeout(ok, ms)" in src["DESIGN_SAVE_JS"] and "pvT = setTimeout(pushPreview, ms > 0 ? ms : PV.wait)" in src["DESIGN_SAVE_JS"],
          (src["DESIGN_DESIGNS_JS"].count("setTimeout("), src["DESIGN_SAVE_JS"].count("setTimeout(")))
     d, sv, pt = src["DESIGN_DESIGNS_JS"], src["DESIGN_SAVE_JS"], src["DESIGN_PAINT_JS"]
     case("drawing: a photo is laid out by the strip's own rule from the loaded picture's own size, and words by the text part's own drawing",
          "M.layoutImg(b, img.naturalWidth, img.naturalHeight)" in pt and "D.type.drawText(ctx, b, x0, 0)" in pt and pt.count("drawImage(") == 1 and "fillText" not in pt)
-    case("drawing: the preview, the gallery and a saved slide are all drawn by Designer.paint (no other drawImage or fillText on the page's later parts)",
-         "drawImage" not in d and "drawImage" not in sv and "fillText" not in d and "fillText" not in sv
-         and "D.paint.slide(" in sv and sv.count("D.paint.slide(") == 2 and "D.paint.strip(" in d)
+    # (v24: the post kit's small picture is each slide drawn small by Designer.paint, then set side by side: the one
+    # drawImage in the saving script copies a slide the painter has just drawn, canvas to canvas, and nothing else)
+    case("drawing: the preview, the gallery, a saved slide and the post kit's small picture are all drawn by Designer.paint (no fillText, and no drawImage on the page's later parts but the one that sets the small slides side by side)",
+         "drawImage" not in d and sv.count("drawImage(") == 1 and "cx.drawImage(one, i * (w + PV.gap), 0);" in sv and "fillText" not in d and "fillText" not in sv
+         and "D.paint.slide(" in sv and sv.count("D.paint.slide(") == 3 and "await D.paint.slide(ox, st, i, {out: PV.k, shelf: sh, cap: 's'});" in sv and "D.paint.strip(" in d)
+    case("the post kit's small picture: up to 6 slides (4 stories) at 20% (15%), 6 px apart on white, JPEG at 0.85, 1.5 s after a good save or a design opening, never beside Save slides",
+         "PV = {wait: 1500, most: STORY ? 4 : 6, k: STORY ? 0.15 : 0.2, gap: 6, quality: 0.85" in sv and "'image/jpeg', PV.quality" in sv and "cx.fillStyle = '#ffffff'" in sv
+         and "D.on('saved', previewSoon);" in sv and "D.on('design', previewSoon);" in sv and "if (pvBusy || busy) { schedulePreview(); return; }" in sv
+         and "if (!D.st || !D.design || D.blocked || !D.st.blocks.length) return;" in sv)
+    pv_part = sv[sv.index("a small picture of the design, for the post kit"):sv.index("the profile grid's crop, on slide 1")]
+    case("the post kit's small picture never puts a word on the page: its part of the script touches no element, says nothing and opens no box",
+         not re.search(r"\bsay\(|textContent|\.hidden\b|\$\(|\bel\(|alert\(|confirm\(|prompt\(|console\.", pv_part), re.findall(r"\bsay\(|textContent|\$\(|console\.\w+", pv_part)[:3])
     case("saving: one canvas of 1080 by 1350 for every slide, JPEG at 0.93, and the pictures the next slide does not need are let go",
          "cv.width = W; cv.height = H;" in sv and "QUALITY = 0.93" in sv and "'image/jpeg', QUALITY" in sv and "D.paint.letGo(sh, i < n ? D.paint.keys(st, i, 1) : null)" in sv)
     case("saving: the commit is asked again under the same name for the press (the token is made once, before the first slide)",
@@ -223,8 +235,8 @@ def check_designs_page(case, work):
     case("a shoot's link is its kit folder's name and nothing else (and, in the stories designer, the kind)", "a.href = '/design.html?kit=' + encodeURIComponent(s.kit) + D.KQ;" in d and d.count(".href") == 1 and ".href" not in sv)
     asked = sorted(set(re.findall(r"'(/[a-z][a-z.-]*)[?']", d + sv)))
     case("every address the later parts name is one of the Assistant's own routes (and the designer's own page, for another shoot)",
-         asked == ["/design-commit", "/design-new", "/design-slide", "/design-state", "/design-template", "/design.html", "/open"]
-         and len(re.findall(r"\bfetch\(", d + sv)) == 5 and "XMLHttpRequest" not in d + sv and "sendBeacon" not in d + sv and "WebSocket" not in d + sv, asked)
+         asked == ["/design-commit", "/design-new", "/design-preview", "/design-slide", "/design-state", "/design-template", "/design.html", "/open"]
+         and len(re.findall(r"\bfetch\(", d + sv)) == 6 and "XMLHttpRequest" not in d + sv and "sendBeacon" not in d + sv and "WebSocket" not in d + sv, asked)
     case("there is no way to delete a design or a template on the page", not re.search(r"[Dd]elete|[Tt]rash|/design-delete|/design-remove", d + sv))
     # the bar at the bottom: every line Save slides says is beside the button that was pressed
     case("designer page: the Save slides line, its two answers, and Open the Carousel folder with its own line are in one bar with the button, in that order",

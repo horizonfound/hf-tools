@@ -52,6 +52,10 @@ Rules this file keeps:
 Records (<kit> is the shoot's folder in Your Content; <studio> is STUDIO_HOME, ~/.studio unless set):
   <kit>/.kit/designs/<id>.json           one design: {v, id, name, updated, t, rev, stamp, names, state, from, dropped}
   <kit>/.kit/designs/<id>.prev.json      that design as it was before its last save
+  <kit>/.kit/designs/<id>.preview.jpg    a small picture of that design's first slides, for the post kit's card
+                                         while no slides are saved (Nicole's v24). The Assistant's own: drawn by
+                                         the designer's page after a good save and when a design opens, replaced
+                                         each time, never counted or listed as a design, nothing of theirs
   <kit>/.kit/designs/earlier/<id> <YYYY-MM-DD>.json
                                          that design as it stood at the end of that day (kept when the first
                                          change of a later day comes in; one a day at most)
@@ -177,6 +181,11 @@ POST_CAP = 262144                       # bytes in a JSON save
 SMALL_CAP = 4096                        # bytes in the small JSON posts (a color, a font name, a commit)
 SLIDE_CAP = 12 * 1024 * 1024            # bytes in one finished slide
 SLIDE_MIN = 1000
+PREVIEW_CAP = 1024 * 1024               # bytes in a design's small preview picture (this route's own cap, not a slide's)
+PREVIEW_MIN = 200
+PREVIEW_MOST = {"carousel": 6, "stories": 4}        # hers: the first 6 slides, or the first 4 stories
+PREVIEW_SCALE = {"carousel": 0.2, "stories": 0.15}  # hers: a slide at 20% (216 by 270), a story at 15% (162 by 288)
+PREVIEW_GAP = 6                         # white, between one slide and the next
 STAGING_KEEP = 86400.0                  # seconds a set that never finished arriving is kept before it is cleared
 STAGING_MOST = 60                       # unfinished sets waiting in one kit
 STAGING_PRESSED = 3600.0                # when that many are waiting, ones left alone for an hour are cleared too
@@ -766,6 +775,12 @@ def prev_path(kit, did, kind=CAROUSEL):
     return designs_dir(kit, kind) / f"{did}.prev.json"
 
 
+def preview_path(kit, did, kind=CAROUSEL):
+    """A design's small picture for the post kit. Its name ends .jpg, so nothing that lists or counts designs
+    (every one of them reads names ending .json) ever sees it."""
+    return designs_dir(kit, kind) / f"{did}.preview.jpg"
+
+
 def sets_dir(kit, kind=CAROUSEL):
     return designs_dir(kit, kind) / "sets"
 
@@ -1141,6 +1156,113 @@ def save_from_page(body):
         info = set_info(kit, d, kind)
         return 200, {"ok": True, "words": SAVED_WORD, "rev": d["rev"], "updated": d.get("updated"), "t": d.get("t"),
                      "set": info, "unfinished": _unfinished(kit, did, kind), "marks": photo_marks(kit, d["state"], rows)}
+
+
+# ---------- the small picture of a design, for the post kit (Nicole's v24) ----------
+# The designer's page draws the design's first slides small, side by side, and sends the picture here after each
+# good save and when a design opens. The post kit's Carousel (or Stories) card shows it while no slides are saved.
+# It is one hidden file of the Assistant's own beside the design, written whole and replaced each time. Nothing in
+# the Carousel or Stories folder, kit.json, the design or its counter is touched for it.
+
+def preview_shape(slides, kind=CAROUSEL):
+    """(width, height) of a design's preview picture: up to 6 slides at 216 by 270 (stories: up to 4 at 162 by
+    288), 6 px of white between one and the next."""
+    k = K(kind)
+    n = max(1, min(int(slides), PREVIEW_MOST[k["kind"]]))
+    w, h = round(k["w"] * PREVIEW_SCALE[k["kind"]]), round(k["h"] * PREVIEW_SCALE[k["kind"]])
+    return n * w + (n - 1) * PREVIEW_GAP, h
+
+
+def preview_ok(data, slides, kind=CAROUSEL):
+    """Is this the preview of a design of that many slides: a JPEG from its first two bytes to its last two, no
+    bigger than PREVIEW_CAP, whose own header says exactly the right shape? (A header check: the picture is not
+    decoded. It is only ever served as image/jpeg with nosniff, into an <img>.)"""
+    return (isinstance(data, (bytes, bytearray)) and PREVIEW_MIN <= len(data) <= PREVIEW_CAP
+            and data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9" and jpeg_size(data) == preview_shape(slides, kind))
+
+
+def keep_preview(kit, did, rev, data, kind=CAROUSEL):
+    """Keep the small picture the page drew of a design. Returns (status, answer). Taken only when the design is
+    there, the page drew it from the newest layout (rev is the stored counter), the design has something on it
+    (hers: nothing is shown of a blank design; the Assistant's own first design counts once it is opened), and
+    the picture is a whole JPEG of exactly the right shape. Written whole under a scratch name, then put in
+    place; the same picture again writes nothing. The design, its counter and everything else are only read."""
+    if not isinstance(did, str) or not ID.fullmatch(did) or type(rev) is not int or rev < 0:
+        return 400, {"ok": False, "why": "preview", "words": NOT_UNDERSTOOD}
+    if not isinstance(data, (bytes, bytearray)) or not PREVIEW_MIN <= len(data) <= PREVIEW_CAP:
+        return 400, {"ok": False, "why": "picture", "words": NOT_UNDERSTOOD}
+    deep = too_deep(kit, kind)              # a PC only (the preview's own name is shorter than the ones measured)
+    if deep:
+        return 409, {"ok": False, "why": "deep", "words": deep}
+    with arrange.locked(design_lock(kit)):
+        d = load_design(kit, did, kind)
+        if d is None:
+            return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
+        if rev != d["rev"]:
+            return 409, {"ok": False, "why": "changed", "words": NEWER}
+        if not d["state"]["blocks"]:
+            return 409, {"ok": False, "why": "empty", "words": NOT_UNDERSTOOD}
+        if not preview_ok(data, d["state"]["slides"], kind):
+            return 400, {"ok": False, "why": "picture", "words": NOT_UNDERSTOOD}
+        dst = preview_path(kit, did, kind)
+        if kit_mod._has(dst.parent, dst.name):
+            try:
+                if dst.read_bytes() == bytes(data):
+                    return 200, {"ok": True, "same": True}
+            except OSError:
+                pass
+        tmp = dst.with_name(f".{dst.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            with open(tmp, "wb") as f:
+                f.write(data)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass
+            this_computer.replace(tmp, dst)     # a Mac: os.replace; a PC waits a moment while a reader has it open
+        except BaseException:
+            try:
+                tmp.unlink()                    # our own scratch copy, never the picture that is there
+            except OSError:
+                pass
+            raise
+    return 200, {"ok": True, "same": False}
+
+
+def preview_shown(d):
+    """May this design's picture be shown? Only while the design has something on it. The page sends no picture
+    of a blank design, so a design emptied after its picture was kept would otherwise go on showing slides that
+    are no longer in it. The picture file is left where it is; a design filled again gets a new one."""
+    try:
+        return bool(d["state"]["blocks"])
+    except (KeyError, TypeError):
+        return False
+
+
+def newest_preview(kit, kind=CAROUSEL):
+    """The design the post kit previews, as hers: among the designs that have a preview picture, the one whose
+    DESIGN was changed last. {"id", "name", "updated", "v"} or None. "v" is the picture's own time (it goes in the
+    picture's address, so a browser never shows an older one). One thing hers lacks: a design that has since been
+    emptied is passed over (preview_shown), so its old picture is never shown of a design with nothing on it.
+    Reads only; never raises."""
+    try:
+        folder = designs_dir(kit, kind)
+        names = set(kit_mod._listing(folder))
+        for d in list_designs(kit, kind):           # newest first
+            name = f"{d['id']}.preview.jpg"
+            if name not in names or not preview_shown(d):
+                continue
+            try:
+                st = (folder / name).stat()
+            except OSError:
+                continue
+            if not PREVIEW_MIN <= st.st_size <= PREVIEW_CAP:
+                continue
+            return {"id": d["id"], "name": d["name"], "updated": d.get("updated"), "v": int(st.st_mtime * 1000)}
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
+    return None
 
 
 # ---------- templates, brand colors, fonts: shared by every shoot ----------
@@ -2106,8 +2228,34 @@ def _get_font(handler, q):
     handler.wfile.write(data)
 
 
-GET_PATHS = ("/design.html", "/design-state", "/design-font-file")
-POST_PATHS = ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit")
+def _get_preview(handler, q):
+    """A design's small picture, for the post kit's card: by the kit's folder name and the design's id, never a path."""
+    kind = kind_ok(_one(q, "kind"))
+    did = _one(q, "design")
+    kit = arrange.kit_by_name(_one(q, "kit")) if kind is not None and ID.fullmatch(did) else None
+    if kit is None:
+        return handler.send_error(404)
+    dst = preview_path(kit, did, kind)
+    try:
+        if not kit_mod._has(dst.parent, dst.name) or not preview_shown(load_design(kit, did, kind)):
+            return handler.send_error(404)      # no picture, no design, or a design emptied since its picture
+        data = dst.read_bytes()
+    except OSError:
+        return handler.send_error(404)
+    if not PREVIEW_MIN <= len(data) <= PREVIEW_CAP or data[:2] != b"\xff\xd8":
+        return handler.send_error(404)
+    handler.send_response(200)
+    handler.send_header("Content-Type", "image/jpeg")
+    handler.send_header("Content-Length", str(len(data)))
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
+GET_PATHS = ("/design.html", "/design-state", "/design-font-file", "/design-preview")
+POST_PATHS = ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
+              "/design-preview")
 
 
 def handle_get(handler, path, query):
@@ -2126,11 +2274,13 @@ def handle_get(handler, path, query):
             return _get_state(handler, q)
         if path == "/design-font-file":
             return _get_font(handler, q)
+        if path == "/design-preview":
+            return _get_preview(handler, q)
         return handler.send_error(404)
     except (Exception, SystemExit) as e:  # noqa: BLE001
         arrange.log(f"GET {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
         try:
-            if path == "/design-font-file":
+            if path in ("/design-font-file", "/design-preview"):
                 handler.send_error(404)
             elif path.endswith(".html"):
                 import design_page
@@ -2245,6 +2395,33 @@ def _post_slide(handler, query):
     if not lo <= of <= hi or not 1 <= i <= of:
         return arrange._send_json(handler, {"ok": False, "why": "slide", "words": NOT_UNDERSTOOD}, 400)
     code, out = stage_slide(kit, did, token, i, of, data, kind)
+    arrange._send_json(handler, out, code)
+
+
+def _post_preview(handler, query):
+    """The designer's small picture of a design (copied from the slide route's guard, with a cap of its own:
+    a body over PREVIEW_CAP is refused before a byte of it is read)."""
+    try:
+        handler.connection.settimeout(arrange.BODY_WAIT)
+    except (OSError, AttributeError):
+        pass
+    bad = arrange.guard(handler, "image/jpeg", PREVIEW_CAP, "/design-preview")
+    if bad:
+        arrange._drain(handler)
+        return arrange._send_json(handler, {"ok": False, "words": bad[1]}, bad[0])
+    n = int(handler.headers.get("Content-Length").strip())
+    data = handler.rfile.read(n)
+    q = parse_qs(query or "", keep_blank_values=True)
+    kind = kind_ok(_one(q, "kind"))
+    if kind is None:
+        return arrange._send_json(handler, {"ok": False, "why": "kind", "words": NOT_UNDERSTOOD}, 400)
+    kit = arrange.kit_by_name(_one(q, "kit"))
+    if kit is None:
+        return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
+    did, rev_txt = _one(q, "design"), _one(q, "rev")
+    if len(data) != n or not ID.fullmatch(did) or not re.fullmatch(r"[0-9]{1,9}", rev_txt):
+        return arrange._send_json(handler, {"ok": False, "why": "preview", "words": NOT_UNDERSTOOD}, 400)
+    code, out = keep_preview(kit, did, int(rev_txt), data, kind)
     arrange._send_json(handler, out, code)
 
 
@@ -2373,6 +2550,9 @@ def handle_post(handler, path, query):
         if path == "/design-slide":
             kind = kind_ok(_one(parse_qs(query or "", keep_blank_values=True), "kind")) or CAROUSEL
             return _post_slide(handler, query)
+        if path == "/design-preview":
+            kind = kind_ok(_one(parse_qs(query or "", keep_blank_values=True), "kind")) or CAROUSEL
+            return _post_preview(handler, query)
         if path not in POST_PATHS:
             return handler.send_error(404)
         body = _json_body(handler, path, POST_CAP if path in ("/design", "/design-new", "/design-template")

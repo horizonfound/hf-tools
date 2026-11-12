@@ -50,6 +50,10 @@ and its real page on --port + 28): Nicole's v22. "+ Add slides" (adding never re
 single slides and her five templates frame for frame, the starters she removed, Rename on their own templates, the
 centered lines while dragging and after an arrow key, and Save slides on an untouched design.
 
+A ninth part, tests/design_preview_check.py (--only preview runs just it, on --port + 30): Nicole's v24, the small
+picture of a design that the page sends for the post kit, on the real page in the hidden Chrome. Its routes, with
+every refusal, are in the server part here ("the small picture of a design").
+
 Exit 0 when every case passes, 1 otherwise. When there is no Chrome the parts that drive the real page are
 skipped, and the last line says so: a run like that has not looked at the page.
 """
@@ -722,6 +726,112 @@ def check_all(work, port):
         code, h, data = ask(P, "GET", f"/kit-photo?kit={K3}&n={big_row['n']}&size=xxx")
         case("larger copy: a size that is not one of the four is refused", code == 404, code)
 
+        # ---------- the small picture of a design, for the post kit (Nicole's v24) ----------
+        code, now_st = get_json(P, f"/design-state?kit={KQ}&design={DID}")
+        p_rev, p_slides = now_st["design"]["rev"], now_st["design"]["state"]["slides"]
+        p_w = min(p_slides, 6) * 216 + (min(p_slides, 6) - 1) * 6
+        pv_file = designs / f"{DID}.preview.jpg"
+        PJ = {"Content-Type": "image/jpeg"}
+        good1, good2 = jpeg(p_w, 270, 61), jpeg(p_w, 270, 62)
+        list_before = [(x["id"], x["rev"], x["name"]) for x in now_st["designs"]]
+        n_json = len(list(designs.glob("*.json")))
+
+        def preview(data, did=None, rev=None, kitq=None, headers=None, kind=""):
+            code, _, out = ask(P, "POST", f"/design-preview?kit={kitq or KQ}&design={did or DID}&rev={p_rev if rev is None else rev}{kind}", body=data, headers=headers or PJ)
+            try:
+                return code, json.loads(out)
+            except ValueError:
+                return code, None
+
+        def preview_refused(name, data, code_want=400, why=None, **kw):
+            was = tree_print(kit)
+            code, out = preview(data, **kw)
+            case(f"preview refused, nothing written: {name}", code == code_want and isinstance(out, dict) and out.get("ok") is False
+                 and bool(out.get("words")) and (why is None or out.get("why") == why) and tree_print(kit) == was, (code, out))
+
+        case("preview: (the design has something on it, and no picture of it is kept yet)", bool(now_st["design"]["state"]["blocks"]) and not pv_file.exists())
+        code, h, data = ask(P, "GET", f"/design-preview?kit={KQ}&design={DID}")
+        case("preview: asked for before one is kept: not found", code == 404, code)
+        preview_refused("a PNG", png(p_w, 270))
+        preview_refused("a JPEG of one slide's shape for a design of %d" % p_slides, jpeg(216, 270, 5), why="picture")
+        preview_refused("a full slide (1080 by 1350)", jpeg(1080, 1350, 5), why="picture")
+        preview_refused("the right shape for stories, sent for a carousel", jpeg(min(p_slides, 4) * 162 + (min(p_slides, 4) - 1) * 6, 288, 5), why="picture")
+        preview_refused("a JPEG cut off before its end", good1[:-50], why="picture")
+        preview_refused("a JPEG with something after its end", good1 + b"<script>", why="picture")
+        preview_refused("words, sent as a JPEG", b"hello " * 400, why="picture")
+        preview_refused("a body of 100 bytes", good1[:98] + b"\xff\xd9", why="picture")
+        preview_refused("drawn from an older layout (the counter is not the newest)", good1, 409, "changed", rev=p_rev - 1 if p_rev else p_rev + 1)
+        preview_refused("drawn from a layout the Assistant has never had", good1, 409, "changed", rev=p_rev + 5)
+        preview_refused("a counter that is a word", good1, rev="one")
+        preview_refused("a counter below zero", good1, rev="-1")
+        preview_refused("no counter at all", good1, rev="")
+        preview_refused("a design that is not there", good1, 404, "design", did="dnosuchdesign1")
+        preview_refused("a design id that is a path", good1, did="..%2Fx")
+        preview_refused("a shoot that is not there", good1, 404, kitq="Nope")
+        preview_refused("a kind that is not one", good1, kind="&kind=posters")
+        preview_refused("the carousel's design asked for as stories", good1, 404, kind="&kind=stories")
+        preview_refused("sent as JSON", good1, 415, headers={"Content-Type": "application/json"})
+        preview_refused("another site's Origin", good1, 403, headers={"Content-Type": "image/jpeg", "Origin": "http://evil.example"})
+        preview_refused("another site's name as Host", good1, 403, headers={"Content-Type": "image/jpeg", "Host": "evil.example"})
+        code, blank_st = get_json(P, f"/design-state?kit={KQ}&design={D2}")
+        if case("preview: (the blank design made above is still blank)", code == 200 and blank_st["design"]["id"] == D2 and not blank_st["design"]["state"]["blocks"]):
+            preview_refused("a blank design (hers: nothing is shown of a design with nothing on it)", jpeg(5 * 216 + 24, 270, 7), 409, "empty", did=D2, rev=blank_st["design"]["rev"])
+        was = tree_print(kit)
+        line = raw_request(P, f"POST /design-preview?kit={KQ}&design={DID}&rev={p_rev} HTTP/1.1\r\nHost: 127.0.0.1:{P}\r\nContent-Type: image/jpeg\r\nContent-Length: 1048577\r\n\r\n")
+        case("preview refused: a body one byte over 1 MB, before a byte of it is read", " 413 " in line + " " and tree_print(kit) == was, line)
+        case("preview: after every refusal no picture is kept", not pv_file.exists() and not list(designs.glob("*.jpg")) and not list(designs.glob(".*")))
+
+        was_else = tree_print(kit, skip=(f".kit/designs/{DID}.preview.jpg",))
+        code, out = preview(good1)
+        case("preview: a whole JPEG of the right shape, drawn from the newest layout, is kept beside the design", code == 200 and out == {"ok": True, "same": False}
+             and pv_file.read_bytes() == good1, (code, out))
+        case("preview: ...as one hidden file of the Assistant's own: nothing else in the kit was written, and no scratch file is left",
+             tree_print(kit, skip=(f".kit/designs/{DID}.preview.jpg",)) == was_else and not list(designs.glob(".*")) and [x.name for x in designs.glob("*.jpg")] == [pv_file.name])
+        code, after_st = get_json(P, f"/design-state?kit={KQ}&design={DID}")
+        case("preview: the design, its counter, and the list and count of designs are as they were",
+             after_st["design"] == now_st["design"] and [(x["id"], x["rev"], x["name"]) for x in after_st["designs"]] == list_before
+             and len(list(designs.glob("*.json"))) == n_json and after_st["shoots"] == now_st["shoots"])
+        stamp1 = pv_file.stat().st_mtime_ns
+        time.sleep(0.05)
+        code, out = preview(good1)
+        case("preview: the same picture again is fine, and writes nothing", code == 200 and out == {"ok": True, "same": True} and pv_file.stat().st_mtime_ns == stamp1, (code, out))
+        code, out = preview(good2)
+        case("preview: a new picture takes the old one's place, whole", code == 200 and out == {"ok": True, "same": False} and pv_file.read_bytes() == good2
+             and not list(designs.glob(".*")), (code, out))
+        code, h, data = ask(P, "GET", f"/design-preview?kit={KQ}&design={DID}&v=123")
+        case("preview: GET gives the picture back, as a JPEG that is not kept by the browser unasked", code == 200 and data == good2 and h.get("content-type") == "image/jpeg"
+             and h.get("cache-control") == "no-cache" and h.get("x-content-type-options") == "nosniff", (code, h))
+        for name, path, want in (("a design with no picture", f"/design-preview?kit={KQ}&design={D2}", 404),
+                                 ("a design that is not there", f"/design-preview?kit={KQ}&design=dnosuchdesign1", 404),
+                                 ("an id that is a path", f"/design-preview?kit={KQ}&design=..%2F{DID}", 404),
+                                 ("the picture's own file name as the id", f"/design-preview?kit={KQ}&design={DID}.preview.jpg", 404),
+                                 ("a shoot that is not there", f"/design-preview?kit=Nope&design={DID}", 404),
+                                 ("the carousel's picture asked for as stories", f"/design-preview?kit={KQ}&design={DID}&kind=stories", 404),
+                                 ("a kind that is not one", f"/design-preview?kit={KQ}&design={DID}&kind=posters", 404)):
+            code, h, data = ask(P, "GET", path)
+            case(f"preview: GET refused: {name}", code == want and good2 not in data, code)
+        code, h, data = ask(P, "GET", f"/design-preview?kit={KQ}&design={DID}", headers={"Host": "evil.example"})
+        case("preview: GET under another site's name is refused", code == 403 and good2 not in data, code)
+        # a story's picture: 162 by 288 each, up to four
+        code, sst = get_json(P, f"/design-state?kit={KQ}&kind=stories")
+        SID = sst["design"]["id"] if code == 200 else ""
+        sdesigns = kit / ".kit" / "story-designs"
+        preview_refused("the shoot's stories while they are one empty story", jpeg(162, 288, 9), 409, "empty", did=SID, rev=sst["design"]["rev"], kind="&kind=stories")
+        s_state = {"slides": 5, "bg": "#ffffff", "blocks": [{"id": 1, "type": "text", "text": "A sneak peek", "font": "Inter", "size": 72, "weight": 700, "italic": False, "upper": False,
+                                                              "al": "center", "color": "#111111", "ls": 0, "lh": 1.3, "x": 100, "y": 400, "w": 800, "h": 200}]}
+        code, out = post(P, "/design", {"kit": kit_name, "kind": "stories", "design": SID, "stamp": sst["stamp"], "base": sst["design"]["rev"], "page": "checkpage9", "state": s_state})
+        if case("preview: (the stories are given five stories and a text box)", code == 200 and out.get("ok"), (code, out)):
+            s_rev = out["rev"]
+            preview_refused("stories: a carousel-shaped picture", jpeg(4 * 216 + 18, 270, 9), why="picture", did=SID, rev=s_rev, kind="&kind=stories")
+            preview_refused("stories: five stories wide (only the first four are drawn)", jpeg(5 * 162 + 24, 288, 9), why="picture", did=SID, rev=s_rev, kind="&kind=stories")
+            sgood = jpeg(4 * 162 + 18, 288, 63)
+            code, out = preview(sgood, did=SID, rev=s_rev, kind="&kind=stories")
+            case("preview: stories: the first four at 162 by 288 are kept, beside the stories design and nowhere else",
+                 code == 200 and out == {"ok": True, "same": False} and (sdesigns / f"{SID}.preview.jpg").read_bytes() == sgood and pv_file.read_bytes() == good2, (code, out))
+            code, h, data = ask(P, "GET", f"/design-preview?kit={KQ}&design={SID}&kind=stories")
+            case("preview: stories: GET gives it back", code == 200 and data == sgood, code)
+        case("preview: none of this wrote the kit's own record or the Carousel folder", rec_file.read_bytes() == rec_before and tree_print(car) == car_before)
+
         # ---------- finished slides: staging ----------
         staging = kit / ".kit" / "design-staging"
         everything_else = lambda: tree_print(kit, skip=(".kit/design-staging", ".kit/previews"))   # noqa: E731
@@ -1197,7 +1307,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22", "preview"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(every part below that drives it, one after another); strip: only the strip, the frames and the tray, in a hidden "
                          "Chrome (with --only text, designs, wire, fixes, screen, layout and stories it makes up browser, a part at a "
@@ -1248,6 +1358,7 @@ def main():
     import design_fix_check
     import design_layout_check
     import design_page_check
+    import design_preview_check
     import design_save_check
     import design_screen_check
     import design_stories_check
@@ -1368,6 +1479,13 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of v22 ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "preview"):
+        real_page("v24: the small picture of a design for the post kit")
+        try:
+            design_preview_check.check_preview_browser(case, work, a.port + 30, make_kit, Server, post, get_json)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of the design preview ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     bad = [n for n, ok in results if not ok]
     print()
     missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")

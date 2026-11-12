@@ -1802,7 +1802,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path in ("/design.html", "/design-state", "/design-font-file"):
+        if path in ("/design.html", "/design-state", "/design-font-file", "/design-preview"):
             # the carousel designer: every one of its requests is design.py's to answer
             import design
             return design.handle_get(self, path, urlsplit(self.path).query)
@@ -2160,7 +2160,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path in ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit"):
+        if path in ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
+                    "/design-preview"):
             # the carousel designer: design.py checks each of these the way arrange.py does (below)
             import design
             return design.handle_post(self, path, urlsplit(self.path).query)

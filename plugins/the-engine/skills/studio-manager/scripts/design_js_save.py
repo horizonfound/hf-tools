@@ -32,6 +32,15 @@ The button is off while this runs. A change to the design while it runs stops it
 The timers here are waits between tries (a slide or a commit the Assistant did not answer), never something
 the page's state depends on.
 
+A SMALL PICTURE FOR THE POST KIT (hers, v24): 1.5 seconds after each good autosave, and when a design opens, the
+first slides (up to 6; stories: up to 4) are drawn small, side by side, by the same painter that draws a saved slide
+(each at 216 by 270, a story at 162 by 288, 6 px of white between; from the small copies of the photos, so it takes
+a fraction of the memory a full slide does) and sent to the Assistant as one JPEG at 0.85 (POST /design-preview).
+The post kit's card shows it while no slides are saved. Several quick changes make one picture; a blank design
+makes none; it never starts a slide or sends while Save slides runs (a small slide already being drawn is finished first); a photo whose small copy is still being
+made (a first visit) is waited for, a few seconds at a time; and it says nothing on the page, ever, whatever the
+Assistant answers. The timers here are those waits and nothing else depends on them.
+
 STORIES (Designer.STORY; hers, v19): "Save stories" makes each story 1080 by 1920 the same way and the Assistant puts
 the set in the Stories folder; the tick is "Show Instagram's buttons" (the bands are the strip's own, never in a saved
 story); "Preview" plays like Instagram stories: a black phone, a bar for each story across the top, their name
@@ -298,6 +307,60 @@ DESIGN_SAVE_JS = r"""
   document.addEventListener('pointerdown', function(e){ if (openLine.textContent && !(e.target && openWrap.contains(e.target))) openLine.textContent = ''; }, true);
   document.addEventListener('keydown', function(){ if (openLine.textContent) openLine.textContent = ''; }, true);
   D.on('render', function(){ if (!busy) saveBtn.disabled = D.blocked; prevBtn.disabled = !D.st; });
+
+  // ---------- a small picture of the design, for the post kit (hers, v24) ----------
+  // Never a word on the page, whatever happens here: the picture is the Assistant's own, and the next good save
+  // or the next time the design opens draws it again.
+  // (retry, tries: a photo whose small copy is not made yet, on a first visit, is waited for: asked again every
+  // 3 seconds, up to 10 times, then left for the next save or the next time the design opens)
+  var PV = {wait: 1500, most: STORY ? 4 : 6, k: STORY ? 0.15 : 0.2, gap: 6, quality: 0.85, retry: 3000, tries: 10};
+  var pvT = null, pvBusy = false, pvTries = 0, pvStats = {sent: 0, kept: 0, refused: 0, failed: 0, drawn: 0};
+  function schedulePreview(ms){ clearTimeout(pvT); pvT = setTimeout(pushPreview, ms > 0 ? ms : PV.wait); }
+  function previewSoon(){ pvTries = 0; schedulePreview(); }
+  async function pushPreview(){
+    pvT = null;
+    if (!D.st || !D.design || D.blocked || !D.st.blocks.length) return;       // hers: nothing of a blank design
+    if (pvBusy || busy) { schedulePreview(); return; }                         // one at a time, and never beside Save slides
+    if (!D.save.idle()) return;                                                // a save is on its way: its answer asks again
+    pvBusy = true;
+    var id = D.design.id, st = M.copy(D.st), rev = D.save.rev();
+    var n = Math.min(st.slides, PV.most), w = Math.round(W * PV.k), h = Math.round(H * PV.k);
+    var cv = document.createElement('canvas'), one = document.createElement('canvas'), sh = D.paint.shelf(), again = false, later = false;
+    try {
+      cv.width = n * w + (n - 1) * PV.gap; cv.height = h;
+      one.width = w; one.height = h;
+      var cx = cv.getContext('2d'), ox = one.getContext('2d');
+      cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, cv.width, cv.height);
+      for (var i = 0; i < n; i++) {
+        if (busy) { again = true; return; }
+        await D.paint.slide(ox, st, i, {out: PV.k, shelf: sh, cap: 's'});
+        cx.drawImage(one, i * (w + PV.gap), 0);
+        D.paint.letGo(sh, i + 1 < n ? D.paint.keys(st, i + 1, PV.k, 's') : null);
+      }
+      pvStats.drawn += 1;
+      var blob = await new Promise(function(ok, bad){
+        try { cv.toBlob(function(b){ if (b && b.size > 0) ok(b); else bad(new Error('no picture')); }, 'image/jpeg', PV.quality); } catch (e) { bad(e); }
+      });
+      if (busy) { again = true; return; }
+      // drawn from a layout that is no longer the newest: the save that changed it asks for a new picture
+      if (!D.design || D.design.id !== id || D.save.rev() !== rev || !D.save.idle()) return;
+      pvStats.sent += 1;
+      var r = await fetch('/design-preview?' + D.Q + D.KQ + '&design=' + encodeURIComponent(id) + '&rev=' + rev,
+                          {method: 'POST', headers: {'Content-Type': 'image/jpeg'}, body: blob});
+      if (r.ok) pvStats.kept += 1; else pvStats.refused += 1;
+    } catch (e) {
+      pvStats.failed += 1;
+      if (e && e.photo && pvTries < PV.tries) { pvTries += 1; later = true; }
+    } finally {
+      D.paint.letGo(sh, null);
+      cv.width = 1; cv.height = 1; one.width = 1; one.height = 1;
+      pvBusy = false;
+      if (again) schedulePreview(); else if (later) schedulePreview(PV.retry);
+    }
+  }
+  D.on('saved', previewSoon);
+  D.on('design', previewSoon);
+  D.previewer = {stats: pvStats, rules: PV, busy: function(){ return pvBusy; }, waiting: function(){ return pvT != null; }};
 
   // ---------- the profile grid's crop, on slide 1 ----------
   var over = $('over'), cropL = el('div', 'sv-crop sv-l'), cropR = el('div', 'sv-crop sv-r');

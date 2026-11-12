@@ -16,6 +16,11 @@ What it checks, on pretend kits it makes itself (tests/fake_kit.py; nothing of a
     laid-out carousel, a one-slide set (a single post, also on the posting page's grid), saved stories, a Canva
     carousel fetched after the laid-out set, and an unplugged drive (her "I can't reach this shoot right now..."
     line, answered as not found);
+  * the design preview (her v24): her two lines and her style line, the same in her page and ours; the picture of
+    the design they're working on shown on the Carousel card while no slides are saved (the assistant's own first
+    design once the designer has opened it and sent its picture, never a blank design, the design changed last
+    even when an older design has the newer picture, a design's name as text), the same on the Stories card,
+    the piece still not "made" and its queue step locked, saved slides winning, and an unplugged drive;
   * in a HIDDEN Chrome: each card's words and where its link goes, a press on a card opening its page, Open in
     CapCut saying her words and not following the card's link, the folder buttons asking the Assistant (and never leaving the page), the reel photos loading,
     nothing asked of the internet, no sideways scroll at a phone's width, no error on the page.
@@ -75,9 +80,10 @@ PAGE_HOOKS = r"""
 
 
 def her_text():
-    """Her post kit page as of v20 (the three steps), when her handoff is on this computer."""
+    """Her post kit page, the newest on this computer (v20: the three steps; v24: the design preview), when her
+    handoff is here."""
     for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*"), reverse=True):
             f = h / "Carousel designer and reel picker" / "pages" / "post-kit.html"
             if f.is_file() and "Add to my queue" in f.read_text(encoding="utf-8"):
                 return html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
@@ -102,7 +108,9 @@ def check_words(s):
     if t is None:
         print("SKIP  her words against her own page: her handoff v20 is not on this computer", flush=True)
         return
-    missing = [key for key, v in k.KIT_WORDS.items() if any(frag.strip() and frag not in t for frag in re.split(r"\{\w+\}", v))]
+    # (the design preview's two lines are hers from v24 on: checked just below, against her v24 page, when it is here)
+    missing = [key for key, v in k.KIT_WORDS.items() if not (key.startswith("preview_") and "design_preview" not in t)
+               and any(frag.strip() and frag not in t for frag in re.split(r"\{\w+\}", v))]
     case("every word in kit.KIT_WORDS is in her pages/post-kit.html, word for word", not missing, missing)
     for frag in ("slides saved in the Carousel folder", "saved design", "no slides saved yet", "saved in the Stories folder", "'story' : 'stories'",
                  "no stories saved yet", "Make a new version", "Create my reel", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
@@ -111,6 +119,26 @@ def check_words(s):
          and k.stories_status(3, 1) == "3 stories saved in the Stories folder · 1 saved design"
          and k.carousel_status(0, 1) == "1 saved design, no slides saved yet" and k.stories_status(0, 0) == "Not made yet",
          (k.carousel_status(7, 2), k.stories_status(3, 1), k.carousel_status(0, 1)))
+    # v24: the design preview. Her two lines and her style line, found in her page and equal to ours.
+    if "design_preview" not in t:
+        print("SKIP  her design preview's words against her own page: her handoff v24 is not on this computer", flush=True)
+    else:
+        raw = next(f.read_text(encoding="utf-8") for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))
+                   for f in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*/Carousel designer and reel picker/pages/post-kit.html"), reverse=True)
+                   if "design_preview" in f.read_text(encoding="utf-8"))
+        hers_car = re.search(r"kit\.design_preview \? `<div class=\"status\"><span class=\"dot no\"></span>(.*?)</div>`", raw)
+        hers_sto = re.search(r"kit\.story_preview \? `<div class=\"status\"><span class=\"dot no\"></span>(.*?)</div>`", raw)
+        hers_css = re.search(r"^\.strip img\.dprev\{.*\}$", raw, re.M)
+        case("her v24 page has the two preview lines and the one style line", bool(hers_car and hers_sto and hers_css), (bool(hers_car), bool(hers_sto), bool(hers_css)))
+        if hers_car and hers_sto and hers_css:
+            case("the Carousel card's preview line is hers, word for word (the design's name where hers has it)",
+                 hers_car.group(1).replace("\\'", "'").replace("${esc(kit.design_preview.name)}", "{name}") == k.KIT_WORDS["preview_of"], (hers_car.group(1), k.KIT_WORDS["preview_of"]))
+            case("the Stories card's preview line is hers, word for word", hers_sto.group(1).replace("\\'", "'") == k.KIT_WORDS["preview_stories"], (hers_sto.group(1), k.KIT_WORDS["preview_stories"]))
+            case("the preview picture's style line is hers, letter for letter, and is in our page's styles", hers_css.group(0) == k.PREVIEW_STYLE and k.PREVIEW_STYLE in k._head("x"), hers_css.group(0))
+            case("...and hers shows it with a grey dot, in a plain strip (not the tall one) for stories too",
+                 raw.count('<div class="strip"><img class="dprev"') == 2 and "dot no\"></span>A preview of" in raw)
+    case("our two preview lines never say Claude, and say 'your'", "Claude" not in k.KIT_WORDS["preview_of"] + k.KIT_WORDS["preview_stories"]
+         and k.KIT_WORDS["preview_of"] == "A preview of {name}: your slides aren't saved yet" and k.KIT_WORDS["preview_stories"] == "A preview of your stories: they aren't saved yet")
     case("...and '1 slide saved', not her '1 slides'", k.carousel_status(1, 1) == "1 slide saved in the Carousel folder · 1 saved design"
          and k.stories_status(1, 0) == "1 story saved in the Stories folder", k.carousel_status(1, 1))
 
@@ -132,7 +160,7 @@ def plain(fragment):
 
 
 def strip_srcs(fragment):
-    return [html.unescape(x) for x in re.findall(r"<img src='([^']*)'", fragment)]
+    return [html.unescape(x) for x in re.findall(r"<img(?: class='dprev')? src='([^']*)'", fragment)]
 
 
 def status_of(fragment):
@@ -357,6 +385,234 @@ def check_page_fresh(s):
     case("no Singles or Covers card of their own (decision 12)", "<h2>Single posts" not in text and text.count("class='piece'") == 3)
 
 
+# ---------- the design preview (her v24) ----------
+
+def shaped_jpeg(src, w, h, out):
+    """A real JPEG of exactly w by h, made from one of the pretend kit's photos with the Mac's own sips (this test
+    only; the designer's page draws the real ones)."""
+    r = subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", "-z", str(h), str(w), str(src), "--out", str(out)], capture_output=True, text=True, timeout=60)
+    data = Path(out).read_bytes() if r.returncode == 0 and Path(out).is_file() else b""
+    return data
+
+
+def empty_kit(s):
+    hits = [p for p in (s.target / "The Assistant" / "Your Content").iterdir() if p.name.endswith(EMPTY_NAME)]
+    return hits[0] if hits else None
+
+
+def send_preview(s, kit_name, did, rev, data, kind=""):
+    return s.http("POST", "/design-preview?kit=%s&design=%s&rev=%d%s" % (quote(kit_name), did, rev, kind), body=data, headers={"Content-Type": "image/jpeg"})
+
+
+def check_preview(s):
+    """The kit with nothing made, as the designer's page leaves it: this check sends the pictures the page would."""
+    k = empty_kit(s)
+    if not case("(the kit with nothing made is there)", k is not None):
+        return
+    q = quote(k.name)
+    code, out = s.cmd("kit.py", "sheet", str(k))                # its photos numbered, as "make posts" leaves a kit
+    case("(the kit's photos are numbered: kit.py sheet)", code == 0 and (k / ".kit" / "sheet.json").is_file(), out[-300:])
+    ph = photos_of(s.kit)                                       # pictures to shape the test's previews from
+    theirs = s.work / "a folder of finished photos"             # this kit was started from a folder: its photos stay there
+    scratch = s.work / "preview pictures"
+    scratch.mkdir(exist_ok=True)
+    photos_before = sorted((p.name, p.stat().st_size, p.stat().st_mtime_ns) for p in theirs.iterdir())
+    rec_before = (k / ".kit" / "kit.json").read_bytes()
+
+    def cards():
+        code, text = page(s, k.name)
+        return text, card(text, "carousel")[1], card(text, "stories")[1]
+
+    def pic(n, w, h):
+        return shaped_jpeg(ph[n], w, h, scratch / ("p%d-%dx%d.jpg" % (n, w, h)))
+
+    def carousel_shape(slides):
+        n = min(slides, 6)
+        return n * 216 + (n - 1) * 6, 270
+
+    # the first visit to the designer makes the assistant's own first design
+    code, st, _ = s.http("GET", "/design-state?kit=%s" % q)
+    if not case("(the designer's first visit made the assistant's own first design)", code == 200 and st and st["design"]["untouched"] and st["design"]["state"]["blocks"], code):
+        return
+    A, a_rev, a_name, a_slides, stamp = st["design"]["id"], st["design"]["rev"], st["design"]["name"], st["design"]["state"]["slides"], st["stamp"]
+    text, c, t = cards()
+    case("a design is there but the designer has sent no picture yet: 'No slides yet.' and 'Not made yet', as before", "No slides yet." in plain(c) and status_of(c) == "Not made yet" and "class='dprev'" not in text, status_of(c))
+    w, h = carousel_shape(a_slides)
+    a1 = pic(0, w, h)
+    code, out, _ = send_preview(s, k.name, A, a_rev, a1)
+    case("(the designer's page sends the picture of the design it opened)", code == 200 and out == {"ok": True, "same": False}, (code, out))
+    text, c, t = cards()
+    srcs = strip_srcs(c)
+    case("the assistant's own first design, once opened: its picture is the Carousel card's strip, one picture",
+         len(srcs) == 1 and srcs[0].startswith("/design-preview?kit=%s&design=%s&v=" % (q, A)) and "<div class='strip'><img class='dprev' src='" in c and "class='more'" not in c, srcs)
+    case("...with her line 'A preview of <the design's name>: your slides aren't saved yet' and a grey dot",
+         status_of(c) == "A preview of %s: your slides aren't saved yet" % a_name and "<span class='dot no'></span>" in c and "<span class='dot'></span>" not in c, status_of(c))
+    case("...and the card no longer says 'No slides yet.'", "No slides yet." not in plain(c))
+    code, _, raw = s.http("GET", srcs[0]) if srcs else (0, None, b"")
+    case("...the picture loads from that address, and is the one that was sent", code == 200 and raw == a1, code)
+    case("...the button beside a preview is her 'Open my carousel →' (hers never says 'Design my carousel' beside a picture of one), though the assistant's own design is still not counted",
+         "Open my carousel →" in plain(c) and "Design my carousel" not in plain(c) and "saved design" not in plain(c), plain(c)[-200:])
+    case("...the piece is still not made: its queue step is locked",
+         "Make your carousel and write its caption first." in plain(c) and "data-add=" not in c, plain(c)[-200:])
+    case("...the Stories card is as it was ('No stories yet.', 'Not made yet')", "No stories yet." in plain(t) and status_of(t) == "Not made yet" and "class='dprev'" not in t, status_of(t))
+    case("...no path in the page, and nothing from the internet", not re.search(r"/private/|/Users/|\.kit/|kit\.json|https?://", text))
+
+    # a blank design made after it: nothing is shown of a blank design
+    blank = {"slides": 5, "bg": "#ffffff", "blocks": []}
+    code, out, _ = s.http("POST", "/design-new", body={"kit": k.name, "stamp": stamp, "state": blank, "token": "kitcardtok01"})
+    B = out["design"]["id"] if code == 200 and out else ""
+    code2, out2, _ = send_preview(s, k.name, B, 0, pic(1, *carousel_shape(5)))
+    text, c, t = cards()
+    case("a blank design made afterwards (the newest design): its picture is refused, and the card still previews the first design",
+         bool(B) and code2 == 409 and not (k / ".kit" / "designs" / (B + ".preview.jpg")).exists()
+         and status_of(c) == "A preview of %s: your slides aren't saved yet" % a_name and ("design=%s&" % A) in strip_srcs(c)[0], (code2, out2, status_of(c)))
+
+    # a second design with something on it, changed later: the newest design wins
+    time.sleep(0.05)
+    code, out, _ = s.http("POST", "/design-new", body={"kit": k.name, "stamp": stamp, "token": "kitcardtok02"})
+    C = out["design"]["id"] if code == 200 and out else ""
+    c_name, c_slides = (out["design"]["name"], out["design"]["state"]["slides"]) if C else ("", 1)
+    code, out, _ = send_preview(s, k.name, C, 0, pic(2, *carousel_shape(c_slides)))
+    text, c, t = cards()
+    case("a second design with photos on it, made later, with a picture: the card previews it (the design changed last)",
+         code == 200 and status_of(c) == "A preview of %s: your slides aren't saved yet" % c_name and ("design=%s&" % C) in strip_srcs(c)[0], (code, status_of(c)))
+    v_before = re.search(r"&v=(\d+)", strip_srcs(c)[0]).group(1)
+    time.sleep(1.1)
+    a2 = pic(3, w, h)
+    code, out, _ = send_preview(s, k.name, A, a_rev, a2)
+    pa, pc = k / ".kit" / "designs" / (A + ".preview.jpg"), k / ".kit" / "designs" / (C + ".preview.jpg")
+    text, c, t = cards()
+    case("the older design gets a newer picture file: the card still previews the design that was changed last (hers: by the design, not the picture)",
+         code == 200 and pa.read_bytes() == a2 and pa.stat().st_mtime > pc.stat().st_mtime
+         and status_of(c) == "A preview of %s: your slides aren't saved yet" % c_name and ("design=%s&" % C) in strip_srcs(c)[0], status_of(c))
+    case("...and that picture's address is unchanged (its 'v' is its own file's time)", re.search(r"&v=(\d+)", strip_srcs(c)[0]).group(1) == v_before)
+    c2 = pic(4, *carousel_shape(c_slides))
+    time.sleep(0.05)
+    send_preview(s, k.name, C, 0, c2)
+    text, c, t = cards()
+    case("a new picture of the previewed design changes its address, so a browser never shows the old one", re.search(r"&v=(\d+)", strip_srcs(c)[0]).group(1) != v_before, strip_srcs(c))
+
+    # a design's name is text
+    code, cst, _ = s.http("GET", "/design-state?kit=%s&design=%s" % (q, C))
+    tricky = "<b>Tom & \"Jo\"</b>"
+    code, out, _ = s.http("POST", "/design", body={"kit": k.name, "design": C, "stamp": stamp, "base": cst["design"]["rev"], "page": "kitcardpage1", "name": tricky, "state": cst["design"]["state"]})
+    text, c, t = cards()
+    case("a design's name is shown as text, never as markup", code == 200 and status_of(c) == "A preview of %s: your slides aren't saved yet" % tricky
+         and "A preview of &lt;b&gt;Tom &amp; &quot;Jo&quot;&lt;/b&gt;: your slides aren&#x27;t saved yet" in c and "<b>Tom" not in c, (code, c[-400:]))
+
+    # a design emptied after its picture was kept: its old picture is never shown (a fault of hers, fixed)
+    code, out, _ = s.http("POST", "/design", body={"kit": k.name, "design": C, "stamp": stamp, "base": out["rev"] if code == 200 and out else -1, "page": "kitcardpage1",
+                                                   "name": tricky, "state": dict(cst["design"]["state"], blocks=[])})
+    emptied_rev = out["rev"] if code == 200 and out else -1
+    text, c, t = cards()
+    code2, _, raw = s.http("GET", "/design-preview?kit=%s&design=%s" % (q, C))
+    case("the previewed design is emptied (every photo taken off): the card stops showing its old picture and previews the next design that has something on it",
+         code == 200 and pc.is_file() and status_of(c) == "A preview of %s: your slides aren't saved yet" % a_name and ("design=%s&" % A) in strip_srcs(c)[0] and tricky not in html.unescape(c), (code, status_of(c)))
+    case("...the emptied design's picture is still on disk (nothing is removed) but its address answers not found", pc.is_file() and code2 == 404 and raw[:2] != b"\xff\xd8", code2)
+    code3, out3, _ = s.http("POST", "/design", body={"kit": k.name, "design": C, "stamp": stamp, "base": emptied_rev, "page": "kitcardpage1", "name": tricky, "state": cst["design"]["state"]})
+    text, c, t = cards()
+    case("the photos put back: that design is previewed again", code3 == 200 and status_of(c) == "A preview of %s: your slides aren't saved yet" % tricky and ("design=%s&" % C) in strip_srcs(c)[0], (code3, status_of(c)))
+
+    # stories: the same, in her words for stories
+    code, sst, _ = s.http("GET", "/design-state?kit=%s&kind=stories" % q)
+    S = sst["design"]["id"] if code == 200 and sst else ""
+    code, out, _ = send_preview(s, k.name, S, sst["design"]["rev"], pic(5, 162, 288), kind="&kind=stories")
+    text, c, t = cards()
+    case("the shoot's stories while they are one empty story: no picture is kept and the Stories card is as it was", code == 409 and status_of(t) == "Not made yet" and "class='dprev'" not in t, (code, status_of(t)))
+    s_state = {"slides": 6, "bg": "#ffffff", "blocks": [{"id": 1, "type": "text", "text": "A sneak peek", "font": "Inter", "size": 72, "weight": 700, "italic": False,
+                                                          "upper": False, "al": "center", "color": "#111111", "ls": 0, "lh": 1.3, "x": 100, "y": 400, "w": 800, "h": 200}]}
+    code, out, _ = s.http("POST", "/design", body={"kit": k.name, "kind": "stories", "design": S, "stamp": sst["stamp"], "base": sst["design"]["rev"], "page": "kitcardpage2", "state": s_state})
+    s_rev = out["rev"] if code == 200 and out else -1
+    s1 = pic(6, 4 * 162 + 18, 288)
+    code, out, _ = send_preview(s, k.name, S, s_rev, s1, kind="&kind=stories")
+    text, c, t = cards()
+    srcs = strip_srcs(t)
+    case("stories with something on them, and their picture sent (the first four of six): the Stories card's strip is that one picture, in a plain strip",
+         code == 200 and len(srcs) == 1 and srcs[0].startswith("/design-preview?kit=%s&design=%s&kind=stories&v=" % (q, S)) and "<div class='strip'><img class='dprev' src='" in t, (code, srcs))
+    case("...with her line 'A preview of your stories: they aren't saved yet', a grey dot, and no words box or queue step",
+         status_of(t) == "A preview of your stories: they aren't saved yet" and "<span class='dot no'></span>" in t and steps(t) == [], status_of(t))
+    code, _, raw = s.http("GET", srcs[0]) if srcs else (0, None, b"")
+    case("...the stories picture loads from that address", code == 200 and raw == s1, code)
+    case("...and the Stories card's button is her 'Open my stories →'", "Open my stories →" in plain(t) and "Make my stories" not in plain(t), plain(t)[-160:])
+    case("...and the Carousel card still shows its own", "design=%s&" % C in strip_srcs(c)[0] and "kind=stories" not in strip_srcs(c)[0])
+
+    # none of it touched anything of theirs, or the kit's record, or what counts as a design
+    names = sorted(p.name for p in (k / ".kit" / "designs").iterdir() if not p.name.startswith("."))
+    case("the pictures are hidden files beside their designs: '<id>.preview.jpg', one each, and no scratch file left",
+         [n for n in names if n.endswith(".jpg")] == sorted([A + ".preview.jpg", C + ".preview.jpg"])
+         and [p.name for p in (k / ".kit" / "story-designs").iterdir() if p.name.endswith(".jpg")] == [S + ".preview.jpg"]
+         and not [p for p in (k / ".kit" / "designs").iterdir() if p.name.startswith(".")], names)
+    case("the kit's record and its photos are as they were, and no Carousel or Stories folder was made",
+         (k / ".kit" / "kit.json").read_bytes() == rec_before and sorted((p.name, p.stat().st_size, p.stat().st_mtime_ns) for p in theirs.iterdir()) == photos_before
+         and not (k / "Carousel").exists() and not (k / "Stories").exists())
+    code, out = s.cmd("kit.py", "page", k.name)
+    code2, text = page(s, k.name)
+    case("the saved copy kit.py page writes is the same page as the one served, preview and all", code == 0 and "class='dprev'" in text and (k / ".kit" / "Post kit.html").read_text(encoding="utf-8") == text, (code, out[-200:]))
+
+    # saved slides still win (this check's own pictures, as kit.py build or Save slides would leave them)
+    (k / "Carousel").mkdir()
+    shutil.copyfile(ph[0], k / "Carousel" / "Slide 01.jpg")
+    (k / "Stories").mkdir()
+    shutil.copyfile(ph[1], k / "Stories" / "Story 01.jpg")
+    text, c, t = cards()
+    case("saved slides win: the Carousel card shows the slide and '1 slide saved in the Carousel folder · 2 saved designs' (the blank one and the second; not the assistant's own), no preview",
+         strip_srcs(c) == ["Carousel/Slide 01.jpg"] and status_of(c) == "1 slide saved in the Carousel folder · 2 saved designs" and "class='dprev'" not in c and "<span class='dot'></span>" in c, (strip_srcs(c), status_of(c)))
+    case("saved stories win: the Stories card shows the story and '1 story saved in the Stories folder · 1 saved design', no preview",
+         strip_srcs(t) == ["Stories/Story 01.jpg"] and status_of(t) == "1 story saved in the Stories folder · 1 saved design" and "class='dprev'" not in t, (strip_srcs(t), status_of(t)))
+    (k / "Carousel" / "Slide 01.jpg").rename(scratch / "Slide 01.jpg")       # this check's own two pictures, taken out again
+    (k / "Stories" / "Story 01.jpg").rename(scratch / "Story 01.jpg")
+    text, c, t = cards()
+    case("with the slides gone again the previews are back", "class='dprev'" in c and "class='dprev'" in t and status_of(t) == "A preview of your stories: they aren't saved yet")
+
+    # an unplugged drive
+    content = s.target / "The Assistant"
+    away = s.target / "The Assistant (unplugged for the preview check)"
+    src = strip_srcs(c)[0]
+    content.rename(away)                       # this check's own pretend drive, put back below
+    try:
+        code, text = page(s, k.name)
+        code2, _, raw = s.http("GET", src)
+        case("the drive unplugged: her 'I can't reach this shoot right now...' line with no card, and the picture's address answers not found",
+             code == 404 and REACH in html.unescape(text) and "class='piece'" not in text and code2 == 404 and raw[:2] != b"\xff\xd8", (code, code2))
+        km = kit_module(s)
+        import design as design_mod
+        case("...and asking which design to preview on a kit that is not there gives nothing, never an error",
+             design_mod.newest_preview(k) is None and design_mod.newest_preview(k, "stories") is None)
+    finally:
+        away.rename(content)
+    text, c, t = cards()
+    case("plugged in again: both previews are back", "class='dprev'" in c and "class='dprev'" in t and text.count("class='piece'") == 3)
+
+
+def check_preview_browser(c, s):
+    k = empty_kit(s)
+    if k is None:
+        return
+    c.clear_errors()
+    c.open(s.url("/content/%s/Post%%20kit.html" % quote(k.name)))
+    ok = c.wait_for("Array.prototype.every.call(document.querySelectorAll('img.dprev'), function(i){ return i.complete && i.naturalWidth > 0; }) && document.querySelectorAll('img.dprev').length === 2", seconds=10)
+    got = c.js("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('img.dprev'), function(i){ var r = i.getBoundingClientRect(), p = i.closest('.piece').getBoundingClientRect(), cs = getComputedStyle(i);"
+               " return {piece: i.closest('.piece').dataset.piece, nw: i.naturalWidth, nh: i.naturalHeight, w: r.width, h: r.height, inside: r.left >= p.left && r.right <= p.right + 0.5,"
+               " fit: cs.objectFit, shadow: cs.boxShadow, bg: cs.backgroundImage + cs.backgroundColor}; }))")
+    got = json.loads(got) if isinstance(got, str) else []
+    case("in a browser: both preview pictures load, on the Carousel and the Stories cards", ok and [g["piece"] for g in got] == ["carousel", "stories"], got)
+    case("...each is 120 px tall, shown whole at its own shape (her style line), and stays inside its card",
+         bool(got) and all(abs(g["h"] - 120) < 0.6 and g["fit"] == "contain" and g["inside"] and g["w"] <= g["nw"] / g["nh"] * 120 + 1 for g in got), got)
+    case("...with no tile behind it and no outline (hers: background none, box-shadow none)", bool(got) and all(g["shadow"] == "none" and "rgba(0, 0, 0, 0)" in g["bg"] for g in got), got)
+    case("...nothing asked of the internet and no error on the page", not c.outside_requests() and not c.page_errors(), (c.outside_requests(), c.page_errors()))
+    href = c.js("document.querySelector(\"a.piece[data-piece='carousel']\").getAttribute('href')")
+    case("...and the card is still one link to the designer (the picture is not a link of its own)", href == "/design.html?kit=" + quote(k.name) and c.js("document.querySelectorAll('a.piece a').length") == 0, href)
+    c.phone(390, 844)
+    try:
+        c.open(s.url("/content/%s/Post%%20kit.html" % quote(k.name)))
+        c.wait_for("document.querySelectorAll('img.dprev').length === 2 && document.querySelector('img.dprev').complete", seconds=10)
+        wide = c.js("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        fits = c.js("Array.prototype.every.call(document.querySelectorAll('img.dprev'), function(i){ var r = i.getBoundingClientRect(), p = i.parentNode.getBoundingClientRect(); return r.right <= p.right + 0.5; })")
+        case("...at a phone's width the picture is no wider than its card, and the page does not scroll sideways", wide <= 0 and fits, (wide, fits))
+    finally:
+        c.desktop()
+
+
 def check_unplugged(s):
     content = s.target / "The Assistant"
     away = s.target / "The Assistant (unplugged for this check)"
@@ -503,12 +759,14 @@ def main():
         case("the page server is on a port of this test's own (%d)" % s.port, a.port <= s.port < a.port + 10)
         group("a kit with nothing made", check_empty_kit, s)
         group("the kit, step by step", check_page_fresh, s)
+        group("the design preview", check_preview, s)
         group("an unplugged drive", check_unplugged, s)
         if not chrome_drive.find_chrome():
             print("SKIP  the kit page in a browser: no Chrome on this computer", flush=True)
         else:
             with chrome_drive.Chrome(work=str(run), size=(1280, 1400)) as c:
                 group("the kit page in a browser", check_browser, c, s)
+                group("the design preview in a browser", check_preview_browser, c, s)
                 group("an unplugged drive, in a browser", check_unplugged_browser, c, s)
     finally:
         s.stop()

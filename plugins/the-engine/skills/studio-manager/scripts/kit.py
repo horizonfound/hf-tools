@@ -1669,7 +1669,13 @@ KIT_WORDS = {
     "adding": "Adding it…",
     "cant_add": "I couldn't add it. Try again in a moment.",
     "not_saved": "Not saved.",
+    # v24: the design they're working on shows on its card before any slides are saved
+    "preview_of": "A preview of {name}: your slides aren't saved yet",
+    "preview_stories": "A preview of your stories: they aren't saved yet",
 }
+# v24, her style line for that picture, as she wrote it (the whole strip of small slides is ONE picture, shown
+# whole, 120 px tall, with no tile behind it)
+PREVIEW_STYLE = ".strip img.dprev{width:auto;max-width:100%;height:120px;object-fit:contain;object-position:left;background:none;box-shadow:none;border-radius:6px}"
 # Ours, with the reason for each: the quiet line under the cards is decision 12 of v19 (the Singles and Covers the
 # kit still makes); Canva's links had a place on the old page; a saved copy is a file, whose buttons can't reach
 # the Assistant; the folder buttons say what the Assistant's own folder opener answers (it knows when the window
@@ -1783,6 +1789,7 @@ a.piece:hover{box-shadow:0 0 0 2px var(--coral),0 10px 30px rgba(31,36,48,.08);t
 .strip{flex-wrap:nowrap;overflow:hidden}
 .strip img{height:120px;width:96px;flex:none;border-radius:10px;object-fit:cover;background:var(--sand-l);box-shadow:0 0 0 1px var(--line)}
 .strip.tall img{height:112px;width:63px}
+""" + PREVIEW_STYLE + """
 .strip .more{align-self:center;color:var(--ink-2);font-size:13px;padding:0 .4rem}
 .cta{display:inline-flex;align-items:center;gap:.45rem;border-radius:999px;padding:.62rem 1.1rem;font:600 14px/1 var(--sans);background:var(--ink);color:#fff;border:0;white-space:nowrap;transition:background .2s}
 a.piece:hover .cta{background:var(--coral-2)}
@@ -2075,6 +2082,15 @@ def _status(text, on, extra=""):
     return f"<div class='status'><span class='dot{'' if on else ' no'}'></span>{text}{extra}</div>"
 
 
+def _preview_strip(kit_name, pv, stories=False):
+    """Her strip when no slides are saved and the designer has sent a picture of the design (v24): that one
+    picture, named by the kit's folder name and the design's id, with the picture's own time so a browser never
+    shows an older one."""
+    src = (f"/design-preview?kit={quote(kit_name)}&design={quote(str(pv['id']))}" + ("&kind=stories" if stories else "")
+           + f"&v={int(pv['v'])}")
+    return f"<div class='strip'><img class='dprev' src='{html.escape(src)}' alt=''></div>"
+
+
 def card_facts(kit, rec=None):
     """What the three cards show, read from the kit's records and folders. Reads only. Every name in it is a
     photo's number or a file's name, never a path."""
@@ -2096,6 +2112,9 @@ def card_facts(kit, rec=None):
         "designs": design.count_worked_on(kit, design.CAROUSEL),
         "stories": [p.name for p in sto["files"]],
         "story_designs": design.count_worked_on(kit, design.STORIES),
+        # v24: the newest design that has a small picture of itself ({id, name, updated, v}), or None
+        "design_preview": design.newest_preview(kit, design.CAROUSEL),
+        "story_preview": design.newest_preview(kit, design.STORIES),
     }
 
 
@@ -2155,15 +2174,26 @@ def build_page(kit):
 
     # the Carousel card
     slides = f["slides"]
+    # v24: no slides saved, but the designer has sent a picture of the design they're working on: that picture
+    # and her line. Saved slides still win, the piece is not "made" and its queue step stays locked.
+    car_pv = None if slides else f.get("design_preview")
     car_strip = (_strip([f"Carousel/{_src(n)}" for n in slides], STRIP_SLIDES) if slides
+                 else _preview_strip(kit.name, car_pv) if car_pv
                  else f"<p class='empty'>{html.escape(KIT_WORDS['carousel_none'])}</p>")
-    car_cta = KIT_WORDS["carousel_open"] if slides or f["designs"] else KIT_WORDS["carousel_make"]
+    car_status = (KIT_WORDS["preview_of"].format(name=car_pv["name"]) if car_pv
+                  else carousel_status(len(slides), f["designs"]))
+    # (hers says "Open my carousel" beside every preview: in hers a design with a picture is always a counted one.
+    # Ours leaves the assistant's own first design out of the count, so the picture decides the button too.)
+    car_cta = KIT_WORDS["carousel_open"] if slides or f["designs"] or car_pv else KIT_WORDS["carousel_make"]
 
     # the Stories card
     stories = f["stories"]
+    sto_pv = None if stories else f.get("story_preview")
     sto_strip = (_strip([f"Stories/{_src(n)}" for n in stories], STRIP_SLIDES, tall=True) if stories
+                 else _preview_strip(kit.name, sto_pv, stories=True) if sto_pv
                  else f"<p class='empty'>{html.escape(KIT_WORDS['stories_none'])}</p>")
-    sto_cta = KIT_WORDS["stories_open"] if stories or f["story_designs"] else KIT_WORDS["stories_make"]
+    sto_status = KIT_WORDS["preview_stories"] if sto_pv else stories_status(len(stories), f["story_designs"])
+    sto_cta = KIT_WORDS["stories_open"] if stories or f["story_designs"] or sto_pv else KIT_WORDS["stories_make"]
 
     def steps_col(piece, made):
         """Steps 2 and 3, hers: the words box, then the queue box (locked until made and captioned)."""
@@ -2182,10 +2212,10 @@ def build_page(kit):
     cards = (card("reel", reel_door(kit.name), KIT_WORDS["reel"], "9:16", REEL_AGAIN if f["reel"] else REEL_CREATE,
                   KIT_WORDS["reel_sub"], reel_strip, reel_status, steps_col("reel", bool(f["reel"])), went=True)
              + card("carousel", design_door(kit.name), KIT_WORDS["carousel"], "4:5", car_cta, KIT_WORDS["carousel_sub"],
-                    car_strip, _status(html.escape(carousel_status(len(slides), f["designs"])), bool(slides)),
+                    car_strip, _status(html.escape(car_status), bool(slides)),
                     steps_col("carousel", bool(slides)))
              + card("stories", design_door(kit.name, stories=True), KIT_WORDS["stories"], "9:16", sto_cta, KIT_WORDS["stories_sub"],
-                    sto_strip, _status(html.escape(stories_status(len(stories), f["story_designs"])), bool(stories))))
+                    sto_strip, _status(html.escape(sto_status), bool(stories))))
 
     # the quiet line under the cards (decision 12): what else the kit folder holds, each with its folder's button
     bits = []
