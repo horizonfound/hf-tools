@@ -160,3 +160,19 @@ Checked: `tests/clips_check.py` (50 checks, both Pythons; the player and the fol
 - Photos with no date are unchanged: still set aside, as before.
 
 Checked: `tests/clips_check.py`, now 58 checks, both Pythons. A stand-in card reader that never answers is given up on in 2 seconds in the test; a real quiet card has not been seen since. Two made-up clips, one with its header at the end of a big file and one with no date, both get a date.
+
+## 14. The glance screen, built (note 3; Dustin: "just keep going and do it", Nov 11, late)
+
+From the second backup on, the every-backup screen opens with the usual, right there to glance at.
+
+- **In the chat, before the question:** "Here's how I'll do it, same as last time:" and a few short lines. On Dustin's Mac they read: Photos go onto Big Kahuna. No second copy. Folders named like "Smith Family, Oct 18 2026". Photos named after the shoot, with the camera's number kept. Client notes written the way you write, signed "Dustin / Horizon Found". Posts lined up at 3 a week.
+- **The question:** "Same as usual?" with the same settings in one line, so they are in view even when only the question is on screen. Buttons: "Looks good" and "Change something".
+- **Change something:** one question, "What would you like to change?", then just that one setup question again. Never the whole setup. A different drive asks "just this time, or from now on?"
+- It replaces "Onto Big Kahuna like usual?". The other two questions on that screen are unchanged: how many cards, and what's on the card.
+- The lines come from `studio_file.py glance`.
+
+Checked: `tests/glance_check.py`, 6 checks on a pretend setup, both Pythons. **Not tried:** a real second backup with it, which is the real test of how it reads.
+
+Also done in the same go: the two real video shoots are renamed "Garden lighting demo" and "Green chair, direct to camera" (17 clips, every one checked as the same file), and the day's work was committed.
+
+Still open from this test: phone setup when there is more than one card (note 4), a card going quiet mid-copy (note 13), the reel page picking up the Videos folder, and anything on a PC.

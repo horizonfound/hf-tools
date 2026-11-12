@@ -311,10 +311,71 @@ def render(naming, shoot, when):
     return this_computer.unreserved(out)   # "Nul_. Family", not "Nul. Family_" (which Windows still reads as NUL)
 
 
+def place_words(path):
+    """A folder the way a photographer would say it: "Big Kahuna", or "Photo Shoots on Big Kahuna"; a folder on
+    the computer itself by its name ("Pictures on this Mac")."""
+    if not path:
+        return ""
+    path = Path(path)
+    drive = this_computer.drive_words(path)
+    if not drive:
+        return f"{path.name or path} on this {this_computer.COMPUTER}"
+    here = path.name
+    return drive if (not here or here == drive or len(path.parts) <= 3) else f"{here} on {drive}"
+
+
+def glance(sf=None):
+    """The usual, to glance at before a backup (Dustin, Nov 11: from the second backup on, "a quick little list for
+    them to glance at so they can see all of the settings up front", then Looks good or Change something).
+    (lines, one line): each setting as a short plain line, and all of them in one line for the question itself.
+    ([], "") when there is no setup yet."""
+    sf = load() if sf is None else sf
+    drives_ = (sf or {}).get("drives", {})
+    if not drives_.get("session"):
+        return [], ""
+    naming = sf.get("naming", {})
+    lines = [("Photos go onto " + place_words(drives_["session"]), "photos onto " + place_words(drives_["session"]))]
+    second = drives_.get("second")
+    lines.append(("A second copy goes onto " + place_words(second), "a second copy onto " + place_words(second)) if second
+                 else ("No second copy", "no second copy"))
+    label = naming.get("label")
+    if not label and naming.get("folder_pattern"):
+        try:
+            label = render(naming, "Smith Family", "2026-10-18T10:00:00")
+        except Exception:  # noqa: BLE001
+            label = None
+    if label:
+        lines.append((f"Folders named like \u201c{label}\u201d", f"folders like \u201c{label}\u201d"))
+    if naming.get("file_names", "shoot") == "original":
+        lines.append(("Photos keep the camera's own names", "photos keep the camera's names"))
+    else:
+        lines.append(("Photos named after the shoot, with the camera's number kept", "photos named after the shoot"))
+    note = sf.get("note") or {}
+    if note.get("on"):
+        how = "the way you write" if note.get("sample") else {"warm": "warm and personal", "plain": "short and plain",
+                                                             "playful": "playful"}.get(note.get("tone"), "in your voice")
+        sign = " / ".join(x.strip() for x in (note.get("sign_off") or "").splitlines() if x.strip())
+        lines.append((f"Client notes written {how}" + (f", signed \u201c{sign}\u201d" if sign else ""), f"client notes {how}"))
+    try:   # how often they post, from the posting queue's own record
+        import json as _json
+        import os as _os
+        home = Path(_os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
+        per_week = _json.loads((home / "posting.json").read_text(encoding="utf-8")).get("interval")
+        if per_week:
+            import posting_queue
+            words = posting_queue.interval_words(per_week)
+            lines.append((f"Posts lined up at {words}", f"posts at {words}"))
+    except Exception:  # noqa: BLE001  (no posting record yet, or it cannot be read: the line is simply left out)
+        pass
+    one = "; ".join(short for _, short in lines)
+    return [long for long, _ in lines], one[:1].upper() + one[1:] + "."
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("show")
+    sub.add_parser("glance", help="the usual, as short plain lines to glance at before a backup, and as one line for the question")
     sub.add_parser("drives")
     sub.add_parser("cards", help="memory cards in right now: one line each, the path first")
     i = sub.add_parser("internal", help="is this folder on the computer's own disk? prints yes or no")
@@ -340,6 +401,17 @@ def main():
     if a.cmd == "show":
         sf = load()
         print(as_markdown(sf) if sf else "No Studio File yet. The first 'backup now' sets it up.")
+        return
+    if a.cmd == "glance":
+        lines, one = glance()
+        if not lines:
+            print("No setup yet. The first 'backup now' asks the setup questions instead.")
+            return
+        print("THE USUAL (say these to them, one short line each, exactly as written):")
+        for ln in lines:
+            print(ln)
+        print("ONE LINE (put this in the question itself):")
+        print(one)
         return
     if a.cmd == "cards":
         found = this_computer.cards()
