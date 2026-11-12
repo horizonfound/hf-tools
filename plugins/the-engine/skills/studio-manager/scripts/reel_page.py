@@ -1530,11 +1530,17 @@ def open_footage(kit):
     return 200, {"ok": True, "words": w}
 
 
-def footage_for_page(kit):
+def footage_for_page(kit, read_only=False):
     """GET /reel-footage: hers (/footage with /reel's moments): the videos, the moments and Claude's footage order.
-    Asking starts any preview not made yet, one at a time."""
+    Asking starts any preview not made yet, one at a time.
+    `read_only` (GET /reel-footage?kit=&for=talking, the talking reel page's video picker): the videos only. The
+    reel page's own record is neither brought in line with the numbered list nor written, and no moments are
+    read; the previews are still asked for, or a video never opened on the reel page would never be ready."""
     coming = []
     vids = list_videos(kit, coming)
+    if read_only:
+        return {"ok": True, "folder": footage_dir(kit).is_dir() and footage_ok(kit), "videos": videos_for_page(kit, vids, coming),
+                "moments": [], "claude_bts": []}
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
     on_sheet = {x["n"] for x in rows}
@@ -2343,6 +2349,8 @@ def _get_footage(handler, path, q):
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     if path == "/reel-footage":
+        if _one(q, "for") == "talking":          # the talking reel page's video picker: the list, and nothing written
+            return arrange._send_json(handler, footage_for_page(kit, read_only=True))
         if not arrange.sheet_rows(kit):
             return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
         return arrange._send_json(handler, footage_for_page(kit))
@@ -2479,14 +2487,15 @@ def handle_get(handler, path, query):
             pass
 
 
-def _json_body(handler, path):
+def _json_body(handler, path, cap=None):
     """The body of a JSON POST as a dict, after arrange's guard (host, Origin, type, length). None when it was
-    refused (and answered)."""
+    refused (and answered). `cap` is the most bytes the route takes (POST_CAP unless the route says otherwise:
+    the talking reel page's save may be larger)."""
     try:
         handler.connection.settimeout(arrange.BODY_WAIT)
     except (OSError, AttributeError):
         pass
-    bad = arrange.guard(handler, "application/json", POST_CAP, path)
+    bad = arrange.guard(handler, "application/json", POST_CAP if cap is None else cap, path)
     if bad:
         arrange._drain(handler)
         arrange._send_json(handler, {"ok": False, "words": bad[1]}, bad[0])

@@ -1456,15 +1456,19 @@ def _setup_now(tr):
 
 def folder_mark(kit):
     """A short mark that moves whenever something the page shows changes without the record changing: a video
-    added to, taken from or exported again in the Talking or Footage folder (their names, sizes and times, from
-    plain listings: nothing is opened, nothing queued), or the numbered photo list."""
+    added to, taken from or exported again in the Talking or Footage folder (their names, sizes and times, and
+    whether each changed in the last couple of minutes, from plain listings: nothing is opened, nothing queued),
+    or the numbered photo list."""
     kit = Path(kit)
     parts = []
     for folder in (TALKING, reel_page.FOOTAGE):
         for _, (name, p) in sorted(_plain_videos(kit, folder).items()):
             try:
                 st = p.stat()
-                parts.append([folder, name, st.st_size, st.st_mtime_ns])
+                # "changed just now" is part of the mark: a video that is still coming in is held back only
+                # while it is recent, so the mark must move when that window ends, or a copy that was cut off
+                # (or a file whose header can't be read) would be "still being copied" on the page for ever
+                parts.append([folder, name, st.st_size, st.st_mtime_ns, reel_page._just_changed(p)])
             except OSError:
                 parts.append([folder, name, None, None])
     parts.append(arrange.sheet_stamp(kit))

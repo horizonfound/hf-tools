@@ -1819,6 +1819,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the words page (Nicole's v20: captions and hooks): every one of its requests is words_page.py's to answer
             import words_page
             return words_page.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/talking.html", "/talking-state", "/talking-video"):
+            # the talking reel page (Nicole's v24): every one of its requests is talking_page.py's to answer
+            import talking_page
+            return talking_page.handle_get(self, path, urlsplit(self.path).query)
         if path.startswith(("/posting-thumbs/", "/feed/", "/queue-thumbs/", "/home-thumbs/")):
             if thumb_wanted(path):                     # one small picture a page shows, nothing else (see thumb_wanted)
                 return super().do_GET()
@@ -2178,6 +2182,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the words page: words_page.py checks each of these the way arrange.py does (above)
             import words_page
             return words_page.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make"):
+            # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
+            import talking_page
+            return talking_page.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":
