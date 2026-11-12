@@ -235,16 +235,19 @@ Each with what was built, so nothing waited.
 
 ## 9. When Claude Code asks a permission question (outside Auto mode)
 
-- **Never asks:** Edit my video and Make it in CapCut. The build, the sound, the app and the CapCut project all start inside the background job the page server starts.
+- **Should never ask (not yet tried in the Claude app):** Edit my video and Make it in CapCut. The build, the sound, the app and the CapCut project all start inside the background job the page server starts.
 - **May ask:** the assistant's chat commands (`talking_rec.py show`, `cut`, `photos`, `place`, `status`, `setup`, and `talking_page.py open`), and writing the cuts file or the stretches file. Those files go in the assistant's scratch folder, never in their folders and never on the command line.
 - **Not Claude Code's question, the Mac's:** the first Edit my video on a Mac brings up macOS's own Speech Recognition box. That one is theirs to answer; the assistant never clicks it.
 
 ## 10. Not proven yet
 
-- **The small app has never been built or run,** on any Mac. Its source has not been through Apple's compiler since a late change.
+- **The small app has never been built or run,** on any Mac. Apple's compiler was run once on the app's source to check it for mistakes (nothing was built or started); the source was changed after that and has not been checked again. Whether that one check was inside "never build" is Dustin's call.
+- **The one-time setup on a Mac without Apple's tools** has never been walked through (Apple's install window, then picking up again).
+- **Which Macs can do it without Apple's servers** is not known. The stop that says the sound won't be sent anywhere has only been reached with the pretend transcriber.
 - **The Speech Recognition box has never been seen:** its words, its buttons, whether it comes to the front, whether a rebuild asks again. Two of our lines (Dictation off; no talking heard) rest on guesses about what Apple's error says.
 - **No real talking video:** only 3 and 6 second self-made clips. Not a phone video (HEVC, 4K, HDR, held sideways), not a long talk, not another language.
 - **Nobody has opened a talking reel in CapCut.** To look at, one by one: a sped-up piece; a punch in; a slow zoom; a photo in each spot, moved and resized; themselves in the corner, in step; a phone video stored turned; a video stretch, muted, from its start point; captions above a full-screen photo; cuts landing on the words.
-- **Nobody's own hand on the page,** and no look by hand in the Claude app's pane: a hidden Chrome only.
+- **Nobody's own hand on the page,** and no look by hand in the Claude app's pane: a hidden Chrome only. The same goes for the reel page's third card, "Talking to camera".
+- **The design preview** in the pane by anyone's hand, with real large photos, or on a PC's Chrome. The card can show a slightly older picture when the designer is left within about 2 seconds of a change.
 - **A fresh session** given the three pasted lines.
 - **Windows:** nothing has run there, and GitHub's checks have not run on any of this yet.

@@ -692,6 +692,17 @@ def check_talking():
          set(cmds) == {"show", "cut", "photos", "place", "status", "setup"} and all(('"%s"' % c) in src for c in set(cmds)), sorted(set(cmds)))
     case("the part opens the page with talking_page.py open, in the pane, never Chrome",
          'python3 <scripts>/talking_page.py open' in part and hasattr(talking_page, "cmd_open") and "Never Chrome" in part and "mcp__ccd_view__show_pane" in part)
+    # talking_page.py open finds the shoot as every other command does (talking_rec.find -> kit.find_kit), so two
+    # shoots matching is its exit 1 too; the part once said never to read open's 1 that way
+    import inspect
+    import kit as kit_for_find
+    case("the part says talking_page.py open answers 'more than one shoot' as the other commands do, as the code does",
+         "TR.find(a.words)" in inspect.getsource(talking_page.main)
+         and "kitmod.find_kit(words)" in inspect.getsource(talking_rec.find)
+         and "could mean more than one" in inspect.getsource(kit_for_find.find_kit)
+         and "`talking_page.py open` finds the shoot the same way as the others, so it too answers 1 with the line that says the words fit more than one shoot" in flat
+         and "`open` answers 1 with a STOP when the shoot isn't in Your Content or its photos couldn't be numbered. Never read those" not in flat
+         and 'For `open`, an exit 1 means "more than one shoot" only when its line says so.' in flat)
     case("the part's Saved lines are the commands' own",
          "Saved: 4 cuts. The reel is now 28.4 seconds of talking. The page shows it in a few seconds." in flat
          and 'say(f"Saved: {n} cuts. The reel is now {secs:.1f} seconds of talking. The page shows it in a few seconds.")' in src
@@ -738,8 +749,8 @@ def check_talking():
          and "say yes when the Mac asks" in flat, re.findall(r".{20}[Cc]lick Allow.{20}", flat))
     case("the replace-my-cuts question never uses \"mine\" for two people: [Keep my cuts], not [Keep mine]", "[Keep my cuts] [Replace them]" in flat and "[Keep mine]" not in flat)
     case("the part goes by the line, not the exit number, and names setup's and open's own exits as the scripts give them",
-         "Go by the line, not the exit number" in flat and "`setup` answers 3 with its STOP" in flat and "1 with \"Not possible here\" on a PC" in flat
-         and "`open` answers 1 with a STOP" in flat and "Never read those as \"more than one shoot\"" in flat
+         "Go by the line, not the exit number" in flat and "`setup` has exits of its own: 3 with its STOP" in flat and "1 with \"Not possible here\" on a PC" in flat
+         and "it also answers 1 with a STOP when the shoot isn't in Your Content" in flat and "never read that 1 as \"more than one shoot\"" in flat
          and re.search(r"being turned into a script right now.*?return 3", src, re.S) and re.search(r"Not possible here.*?\n\s+return 1", src)
          and "Exit 1: the words fit more than one shoot" not in flat)
     case("a second run of the same file asks them nothing, and the part says so (place too)",
