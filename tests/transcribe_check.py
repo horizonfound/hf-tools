@@ -292,8 +292,11 @@ def part_rules():
         owners.append(fn)
     check("transcribe.py starts a program in two places only: _tool (full paths) and real_starter (the Mac's open)",
           sorted(set(owners)) == ["_tool", "real_starter"], owners)
-    check("talking_rec.py starts no program itself but its own job", len(re.findall(r"subprocess\.(run|Popen|call)\(", rec_src)) == 0
-          and rec_src.count("popen_detached(") == 1)
+    started = re.findall(r"popen_detached\(\[sys\.executable, str\(HERE / \"talking_rec\.py\"\), \"([a-z-]+)\"", rec_src)
+    check("talking_rec.py starts no program itself but its own two jobs (a video into words; stage D's Make it in CapCut, "
+          "whose maker is run through the reel page's own time-limited runner)",
+          len(re.findall(r"subprocess\.(run|Popen|call)\(", rec_src)) == 0 and rec_src.count("popen_detached(") == 2
+          and sorted(started) == ["job", "make-job"] and rec_src.count("_run_bounded(") == 1, started)
     for what, fn in (("the real builder", lambda: T.real_builder(TMP / "nope", {"compiler": "/usr/bin/true", "sdk": "/"})),
                      ("the real starter", lambda: T.real_starter(["/usr/bin/true"])),
                      ("any of Apple's tools", lambda: T._tool(["/usr/bin/true"], 5))):
@@ -1361,7 +1364,7 @@ def part_job(clips):
     check("...and it may be made again", TR.can_make(kit) == (True, ""))
     talk.unlink()                                        # the test's own copy
     ok, why = TR.can_make(kit)
-    check("a video taken out of the Talking folder: the make is refused with her line", ok is False and why == "That video isn't in this shoot's Talking folder.")
+    check("a video taken out of the Talking folder: the make is refused with her line", ok is False and why == "Your talking video isn't in the Talking folder anymore.")
     k5 = make_kit("2026-10-22 Fifth shoot")
     check("no script yet: the make is refused with her line", TR.can_make(k5) == (False, "Turn your video into a script first."))
 

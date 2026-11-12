@@ -31,6 +31,11 @@ The plan (reel.py writes it):
      "song": {"path": "/…/song.m4a", "from": 41.3, "dur": 13.2, "fade_out": 0.6} or null,
      "hook": {"text": "…", "dur": 2.4} or null}
 
+A talking reel (talking_make.py writes its plan; Nicole's v23 and v24) is made by a second builder in this file,
+build_talking, through the same write(): write(plan, store, builder=build_talking). Its plan is described above
+that function. A photo reel's project is exactly what it was before that builder went in
+(tests/capcut_even.py keeps the proof).
+
 How: every CapCut project is a folder of plain files. This builds one from pieces
 CapCut itself wrote (references/capcut/), never edits a project they made, and
 never overwrites a folder. If CapCut is open, it only writes the new project's
@@ -346,14 +351,18 @@ def photo_size(f):
     return (int(got[0]), int(got[1])) if got else (0, 0)
 
 
-def fill_scale(w, h):
-    """CapCut fits a photo inside the frame at scale 1. This is the scale that fills the frame instead."""
+def cover_scale(w, h):
+    """CapCut fits a picture (a photo or a video) inside the frame at scale 1. This is the scale that fills the
+    frame instead. 1 for a size nobody could read."""
     if not w or not h:
         return 1.0
     cw, ch = CANVAS
     fit = min(cw / w, ch / h)
     fill = max(cw / w, ch / h)
     return round(fill / fit, 6)
+
+
+fill_scale = cover_scale        # its name since October (reel.py and the photo reel's build() use it)
 
 
 def song_length(path):
@@ -412,9 +421,10 @@ def tr_f(start_f, dur_f, fps=30.0):
     return {"start": a, "duration": b - a}
 
 
-def build(plan, parts, platform):
-    draft, meta, P = parts
-    d = copy.deepcopy(draft)
+def _start_draft(plan, parts, platform):
+    """A new, empty project from CapCut's own pieces: (the draft, its id). Their CapCut's version is copied in
+    when there is a project of theirs to read it from."""
+    d = copy.deepcopy(parts[0])
     if platform:
         d.update(copy.deepcopy(platform))
     elif os.name == "nt":
@@ -424,11 +434,71 @@ def build(plan, parts, platform):
         for k in ("platform", "last_modified_platform"):
             if isinstance(d.get(k), dict):
                 d[k] = dict(d[k], os="windows", os_version=_platform.version())
-    mats = d["materials"]
     draft_id = uid()
     d["id"] = draft_id
     d["name"] = plan["name"]
     d["canvas_config"] = {"background": None, "height": CANVAS[1], "ratio": "original", "width": CANVAS[0]}
+    return d, draft_id
+
+
+def _segment(P, mats, material_id, target, source, scale=1.0):
+    """One clip on a picture track, with the six companions CapCut gives every clip (its speed item among them):
+    where it sits on the reel (target), which part of its file it shows (source), and how big."""
+    refs = []
+    for ex in P["photo_extras"]:
+        item = copy.deepcopy(ex["item"])
+        item["id"] = uid()
+        mats[ex["list"]].append(item)
+        refs.append(item["id"])
+    seg = copy.deepcopy(P["photo_segment"])
+    seg.update({"id": uid(), "material_id": material_id, "extra_material_refs": refs,
+                "target_timerange": target, "source_timerange": source})
+    seg["clip"]["scale"] = {"x": scale, "y": scale}
+    seg["uniform_scale"] = {"on": True, "value": 1.0}
+    return seg
+
+
+def _text(P, mats, text, target):
+    """Plain CapCut text they restyle with CapCut's own text styles: its material goes in, its clip comes back."""
+    tm = copy.deepcopy(P["text_material"])
+    tm["id"] = uid()
+    if os.name == "nt" and str(tm.get("font_path", "")).startswith("/Applications/"):
+        tm["font_path"] = _windows_default_font()        # unproven on a real PC (row I4)
+    content = json.loads(tm["content"])
+    style = content["styles"][0]
+    style["range"] = [0, len(text)]
+    content["styles"] = [style]
+    content["text"] = text
+    tm["content"] = json.dumps(content, ensure_ascii=False)
+    mats["texts"].append(tm)
+    ts = copy.deepcopy(P["text_segment"])
+    ts.update({"id": uid(), "material_id": tm["id"], "target_timerange": target})
+    return ts
+
+
+def _finish_meta(meta, draft_id, name, duration, meta_items):
+    """The project's own description (draft_meta_info.json), with what was put in it listed the way CapCut lists it."""
+    m = copy.deepcopy(meta)
+    m["draft_id"] = draft_id
+    m["draft_name"] = name
+    m["tm_duration"] = duration
+    first = next((x for x in m["draft_materials"] if x["type"] == 0), None)
+    if first is not None:
+        for it in meta_items:
+            first["value"].append({
+                "ai_group_type": "", "create_time": it["t"], "duration": it["duration"], "enter_from": 0,
+                "extra_info": it["extra_info"], "file_Path": it["file_Path"], "height": it["height"],
+                "id": str(uuid.uuid4()), "import_time": it["t"], "import_time_ms": it["t"] * US,
+                "item_source": 1, "material_color_tag": "", "md5": "", "metetype": it["metetype"],
+                "roughcut_time_range": {"duration": -1, "start": -1},
+                "sub_time_range": {"duration": -1, "start": -1}, "type": 0, "width": it["width"]})
+    return m
+
+
+def build(plan, parts, platform):
+    draft, meta, P = parts
+    d, draft_id = _start_draft(plan, parts, platform)
+    mats = d["materials"]
     meta_items = []
     t0 = int(time.time())
 
@@ -450,22 +520,12 @@ def build(plan, parts, platform):
         if is_clip:                                # a video clip: the whole video is the material, the clip a part of it
             mat.update({"type": "video", "duration": int(round(float(ph["length"]) * US)), "has_audio": True})
         mats["videos"].append(mat)
-        refs = []
-        for ex in P["photo_extras"]:
-            item = copy.deepcopy(ex["item"])
-            item["id"] = uid()
-            mats[ex["list"]].append(item)
-            refs.append(item["id"])
-        seg = copy.deepcopy(P["photo_segment"])
         s = ph.get("scale") or (fill_scale(w, h) if ph.get("fill", True) else 1.0)
         target = tr_f(ph["start_f"], ph["dur_f"], fps) if "start_f" in ph else tr(ph["start"], ph["dur"])
-        seg.update({"id": uid(), "material_id": mat["id"], "extra_material_refs": refs,
-                    "target_timerange": target, "source_timerange": {"start": 0, "duration": target["duration"]}})
+        seg = _segment(P, mats, mat["id"], target, {"start": 0, "duration": target["duration"]}, s)
         if is_clip:                                # from where the clip starts; muted under a song, its own sound with none
             seg["source_timerange"] = {"start": int(round(float(ph["src"]) * US)), "duration": target["duration"]}
             seg["volume"] = 0.0 if plan.get("song") else 1.0
-        seg["clip"]["scale"] = {"x": s, "y": s}
-        seg["uniform_scale"] = {"on": True, "value": 1.0}
         vtrack["segments"].append(seg)
         end = max(end, ph["start"] + ph["dur"])
         end_us = max(end_us, target["start"] + target["duration"])
@@ -477,20 +537,8 @@ def build(plan, parts, platform):
     # the hook, as plain CapCut text they restyle with CapCut's own text styles
     hook = plan.get("hook")
     if hook and hook.get("text"):
-        tm = copy.deepcopy(P["text_material"])
-        tm["id"] = uid()
-        if os.name == "nt" and str(tm.get("font_path", "")).startswith("/Applications/"):
-            tm["font_path"] = _windows_default_font()        # unproven on a real PC (row I4)
-        content = json.loads(tm["content"])
-        style = content["styles"][0]
-        style["range"] = [0, len(hook["text"])]
-        content["styles"] = [style]
-        content["text"] = hook["text"]
-        tm["content"] = json.dumps(content, ensure_ascii=False)
-        mats["texts"].append(tm)
-        ts = copy.deepcopy(P["text_segment"])
         hook_us = us_f(hook["dur_f"], fps) if hook.get("dur_f") else int(round(hook.get("dur", 2.5) * US))
-        ts.update({"id": uid(), "material_id": tm["id"], "target_timerange": {"start": 0, "duration": min(hook_us, end_us)}})
+        ts = _text(P, mats, hook["text"], {"start": 0, "duration": min(hook_us, end_us)})
         tt = copy.deepcopy(P["text_track"])
         tt.update({"id": uid(), "segments": [ts]})
         d["tracks"].append(tt)
@@ -558,23 +606,346 @@ def build(plan, parts, platform):
 
     d["duration"] = end_us
     d["update_time"] = now_us()
+    return d, _finish_meta(meta, draft_id, plan["name"], d["duration"], meta_items)
 
-    m = copy.deepcopy(meta)
-    m["draft_id"] = draft_id
-    m["draft_name"] = plan["name"]
-    m["tm_duration"] = d["duration"]
-    first = next((x for x in m["draft_materials"] if x["type"] == 0), None)
-    if first is not None:
-        for it in meta_items:
-            first["value"].append({
-                "ai_group_type": "", "create_time": it["t"], "duration": it["duration"], "enter_from": 0,
-                "extra_info": it["extra_info"], "file_Path": it["file_Path"], "height": it["height"],
-                "id": str(uuid.uuid4()), "import_time": it["t"], "import_time_ms": it["t"] * US,
-                "item_source": 1, "material_color_tag": "", "md5": "", "metetype": it["metetype"],
-                "roughcut_time_range": {"duration": -1, "start": -1},
-                "sub_time_range": {"duration": -1, "start": -1}, "type": 0, "width": it["width"]})
-    return d, m
 
+# ---------------------------------------------------------------- a talking reel (Nicole's handoffs v23 and v24)
+#
+# Their talking-to-camera video, cut where they cut it, with their photos and videos where they put them, as a new
+# CapCut project. Her numbers, each in one place. NOBODY HAS OPENED ONE OF THESE IN CAPCUT YET (Nicole's own were
+# written into a scratch folder and never opened; docs/handoff-v24-build-2026-11-12.md, section 5): the layer
+# flags and order, the speed item, the keyframes and the moved text all come from her reading of her own
+# projects, not from a project CapCut wrote. Until a person opens one, every line below is "written, not seen".
+#
+# The plan (talking_make.py writes it; every path is real and stays on this side):
+#     {"name": "Hannah talking reel", "photos": [], "song": None, "hook": None,
+#      "files": [every file the project points at], "cover": a photo for the project's cover or None,
+#      "video": {"path", "w", "h" (as it is SHOWN: a phone video held upright is stored turned), "length"},
+#      "pieces": [{"from", "to" (seconds in the video), "speed", "zoom" (a place in "zooms" or None),
+#                  "at", "dur" (seconds on the reel)}, …]                            talking.pieces(), in play order
+#      "zooms": [{"a", "b", "kind": "punch" | "zoom"}],
+#      "shots": [{"at", "dur" (on the reel), "spot": "full" | "pip" | "center" | "corner",
+#                 "pos": {x, y, w} or None, "me": {x, y, w} or None,
+#                 "photos": [{"path", "w", "h"}, …]  or  "video": {"path", "w", "h", "length", "from"}}, …],
+#      "captions": [{"text", "start", "end"}, …] or None (captions off), "cap_pos": {x, y} or None, "cap_size": 1}
+#
+# Layers, bottom to top, hers: the talking video (the main track); the photos and videos (flag 2); the small
+# copies of the talking clip for "you in the corner" (flag 2, muted); the captions (text).
+#
+# The 30 fps grid (a deliberate difference from hers): CapCut moves every time onto whole frames when it opens a
+# project, and in October that put every cut of a photo reel a frame late. So each piece's edges are put on whole
+# frames here, and the photo, corner-copy and caption times are taken from those same edges, so the layers meet
+# exactly. A sped-up piece shows its frame length times its speed of the video (one rule, for the main piece and
+# its corner copy). A piece differs from hers by at most half a frame.
+
+PUNCH = 1.15                # hers: a punch in is the piece at 1.15
+ZOOM_TO = 1.12              # hers: a slow zoom goes from 1.0 to 1.12 across its words
+ME_DEFAULT = {"x": (50 + CANVAS[0] * 0.36 / 2) / CANVAS[0],          # hers: them, small, bottom left
+              "y": (CANVAS[1] - 60 - CANVAS[1] * 0.36 / 2) / CANVAS[1], "w": 0.36}
+CAP_DEFAULT = {"x": 0.5, "y": 0.71}                                   # hers: captions low in the middle
+MIN_VIDEO_STRETCH = 0.1     # hers: a video on a stretch is never shorter than this
+SLACK = 1e-3                # hers: 1 ms of slack when asking whether a piece lies inside a stretch
+# The slow zoom's two keyframes are timed in the VIDEO's own clock (hers: "timed in the clip's own source time").
+# Other accounts of CapCut's files time them from the start of the clip. Nothing here was ever written by CapCut
+# itself, so this is one switch in one function (_zoom_times): "video" (hers) or "clip".
+ZOOM_CLOCK = "video"
+
+
+def fit_scale(w, h):
+    """How many canvas pixels one pixel of a picture takes at CapCut's scale 1 (the picture fitted inside the
+    frame). 0 for a size nobody could read."""
+    if not w or not h:
+        return 0.0
+    return min(CANVAS[0] / w, CANVAS[1] / h)
+
+
+def box_scale(w, h, across):
+    """Hers: the scale that makes a picture `across` canvas pixels wide. 1 for a size nobody could read (the
+    picture is fitted; never a division by nothing)."""
+    f = fit_scale(w, h)
+    if not f or not across:
+        return 1.0
+    return round(across / (w * f), 6)
+
+
+def canvas_xy(cx, cy):
+    """Hers: CapCut's position for something centred at canvas pixel (cx, cy) counted from the top left. CapCut
+    counts from the middle, in half-canvases, up is positive."""
+    cw, ch = CANVAS
+    return {"x": round((cx - cw / 2) / (cw / 2), 6), "y": round((ch / 2 - cy) / (ch / 2), 6)}
+
+
+def default_place(spot, w, h):
+    """Hers (the page uses the same numbers): where a photo sits before they move it, as its centre and its width
+    in parts of the screen. Center: 70% wide, a little above the middle. Small corner: 35% wide, top right."""
+    if spot == "center":
+        return {"x": 0.5, "y": 0.44, "w": 0.704}
+    tall = 0.352 * (CANVAS[0] / CANVAS[1]) * (h / w if w and h else 1.0)       # its height, as a part of the screen
+    return {"x": 1 - 0.046 - 0.176, "y": 0.073 + tall / 2, "w": 0.352}
+
+
+# The page's own limits (talking_rec's save holds every box and size to these). A record changed by hand could hold
+# anything, so the builder holds them too: a number that is no number falls back to where the thing sits by itself.
+BOX_LIMITS = {"x": (-0.5, 1.5), "y": (-0.5, 1.5), "w": (0.08, 2.0)}
+CAP_LIMITS = (0.02, 0.98)
+SIZE_LIMITS = (0.4, 3.0)
+
+
+def _held(v, lo, hi, default):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return default
+    if v != v or v in (float("inf"), float("-inf")):
+        return default
+    return min(hi, max(lo, v))
+
+
+def _held_box(box, default):
+    """A {x, y, w} they dragged something to, held to the page's limits; `default` when there is none."""
+    if not isinstance(box, dict):
+        return dict(default)
+    return {k: _held(box.get(k), BOX_LIMITS[k][0], BOX_LIMITS[k][1], default[k]) for k in ("x", "y", "w")}
+
+
+def _zoom_times(source, target):
+    """When a piece's two zoom keyframes fall, in microseconds: (at its start, at its end). See ZOOM_CLOCK."""
+    if ZOOM_CLOCK == "clip":
+        return 0, target["duration"]
+    return source["start"], source["start"] + source["duration"]
+
+
+def zoom_keyframes(P, t0, t1, v0, v1):
+    """A slow zoom on one clip: CapCut's scale keyframes, v0 at t0 and v1 at t1, in a straight line (hers; the
+    piece is typed from her field list, see parts.json's _about)."""
+    prop = copy.deepcopy(P["scale_keyframe"]["property"])
+    prop["id"] = uid()
+    for t, v in ((t0, v0), (t1, v1)):
+        k = copy.deepcopy(P["scale_keyframe"]["keyframe"])
+        k.update({"id": uid(), "time_offset": int(t), "values": [v]})
+        prop["keyframe_list"].append(k)
+    return [prop]
+
+
+def overlay_track(P, segs, k):
+    """Hers: a layer above the main one, the way CapCut writes them in the photographer's own projects: flag 2,
+    its clips in time order, numbered by layer (the k-th layer up: render_index k + 1, track_render_index k)."""
+    t = copy.deepcopy(P["video_track"])
+    t["id"] = uid()
+    t["flag"] = 2
+    t["segments"] = sorted(segs, key=lambda x: x["target_timerange"]["start"])
+    for sg in t["segments"]:
+        sg["render_index"] = k + 1
+        sg["track_render_index"] = k
+    return t
+
+
+def _set_speed(seg, mats, speed):
+    """Hers: a sped-up clip says so twice, on the clip and on its own speed item."""
+    if speed == 1.0:
+        return
+    seg["speed"] = speed
+    for sp in mats.get("speeds", []):
+        if sp["id"] in seg["extra_material_refs"]:
+            sp["speed"] = speed
+
+
+def _piece_speed(p):
+    try:
+        v = float(p.get("speed") or 1.0)
+    except (TypeError, ValueError):
+        return 1.0
+    return v if v > 0 else 1.0
+
+
+def talking_grid(pieces, fps=30.0, length=0.0):
+    """Each piece's place on the reel in whole frames: [(first frame, the frame after its last)], one after
+    another with no gap. A piece is never under one frame, and never shows more of the video than there is (the
+    last piece's 0.14 s of air after the last word can run past the end of a video that stops on that word)."""
+    out, at = [], 0
+    for p in pieces:
+        b = max(at + 1, int(round((float(p["at"]) + float(p["dur"])) * fps)))
+        if length:
+            room = int((float(length) - float(p["from"])) / _piece_speed(p) * fps + 1e-6)
+            b = min(b, at + max(1, room))
+        out.append((at, b))
+        at = b
+    return out
+
+
+def _on_grid(t, pieces, grid):
+    """A moment on the reel (as talking.py counted it) as a whole frame on the grid: a piece's own edge exactly,
+    a moment inside a piece in proportion."""
+    for p, (a, b) in zip(pieces, grid):
+        s, e = float(p["at"]), float(p["at"]) + float(p["dur"])
+        if t <= s + SLACK:
+            return a
+        if t < e - SLACK:
+            return a + int(round((t - s) / (e - s) * (b - a)))
+    return grid[-1][1] if grid else 0
+
+
+def build_talking(plan, parts, platform):
+    """A talking reel's project (see the plan above). capcut.write(plan, store, builder=build_talking).
+    Afterwards build_talking.no_frame says how many photos could not be shown: a stretch with more photos than
+    frames (30 photos on half a second) has no frame for the rest; every photo gets one whenever there is one."""
+    draft, meta, P = parts
+    d, draft_id = _start_draft(plan, parts, platform)
+    mats = d["materials"]
+    fps = float(d.get("fps") or 30.0)
+    cw, ch = CANVAS
+    t0 = int(time.time())
+    V = plan["video"]
+    vw, vh, length = int(V.get("w") or 0), int(V.get("h") or 0), float(V.get("length") or 0)
+    pieces = list(plan["pieces"])
+    zooms = plan.get("zooms") or []
+    grid = talking_grid(pieces, fps, length)
+    total = grid[-1][1] if grid else 0
+    meta_items, listed = [], set()
+
+    def note(path, w, h, kind, dur_us):               # CapCut's own list of what is in the project, each file once
+        if native(path) not in listed:
+            listed.add(native(path))
+            meta_items.append({"duration": dur_us, "extra_info": Path(path).name, "file_Path": native(path),
+                               "height": h, "width": w, "metetype": kind, "t": t0})
+
+    def material(path, w, h, video_length=None):
+        mat = copy.deepcopy(P["photo_material"])
+        mat.update({"id": uid(), "path": native(path), "material_name": Path(path).stem, "width": w, "height": h,
+                    "duration": PHOTO_LENGTH, "type": "photo"})
+        if video_length is not None:
+            mat.update({"type": "video", "duration": int(round(video_length * US)), "has_audio": True})
+        mats["videos"].append(mat)
+        note(path, w, h, "photo" if video_length is None else "video",
+             5 * US if video_length is None else int(round(video_length * US)))
+        return mat
+
+    # ONE material for their talking video (hers made one per piece): every piece and every corner copy is a part of it
+    vmat = material(V["path"], vw, vh, length)
+    fill = cover_scale(vw, vh)                         # 1 for a 9:16 video; a video that is not 9:16 fills the frame
+
+    def frames(z):                                     # a zoom's whole stretch on the reel, in frames
+        on = [g for p, g in zip(pieces, grid) if p.get("zoom") == z]
+        return min(a for a, _ in on), max(b for _, b in on)
+
+    main = copy.deepcopy(P["video_track"])
+    main["id"] = uid()
+    main["segments"] = []
+    spans = []                                         # each piece's (target, source, speed), for its corner copy
+    for p, (a, b) in zip(pieces, grid):
+        sp = _piece_speed(p)
+        target = tr_f(a, b - a, fps)
+        source = {"start": int(round(float(p["from"]) * US)), "duration": int(round(target["duration"] * sp))}
+        spans.append((target, source, sp))
+        seg = _segment(P, mats, vmat["id"], target, source, fill)
+        seg["volume"] = 1.0
+        _set_speed(seg, mats, sp)
+        zi = p.get("zoom")
+        z = zooms[zi] if type(zi) is int and 0 <= zi < len(zooms) and isinstance(zooms[zi], dict) else None
+        if z and z.get("kind") == "punch":
+            s = round(fill * PUNCH, 6)
+            seg["clip"]["scale"] = {"x": s, "y": s}
+        elif z and z.get("kind") == "zoom":            # 1.0 to 1.12 across the whole zoom, piece by piece
+            za, zb = frames(zi)
+            v0 = round(fill * (1.0 + (ZOOM_TO - 1.0) * (a - za) / max(1, zb - za)), 6)
+            v1 = round(fill * (1.0 + (ZOOM_TO - 1.0) * (b - za) / max(1, zb - za)), 6)
+            seg["clip"]["scale"] = {"x": v0, "y": v0}
+            seg["common_keyframes"] = zoom_keyframes(P, *_zoom_times(source, target), v0, v1)
+        main["segments"].append(seg)
+    d["tracks"].append(main)
+
+    photos, copies = [], []
+    build_talking.no_frame = 0                         # photos left out because their stretch has fewer frames than photos
+    for sh in plan.get("shots") or []:
+        fa, fb = _on_grid(float(sh["at"]), pieces, grid), _on_grid(float(sh["at"]) + float(sh["dur"]), pieces, grid)
+        if fb <= fa:
+            continue
+        spot = sh.get("spot")
+
+        def placed(w, h, sh=sh, spot=spot):            # (scale, position): hers
+            if spot in ("full", "pip"):
+                return cover_scale(w, h), None         # Full screen and "you in the corner" fill the frame
+            box = _held_box(sh.get("pos"), default_place(spot, w, h))
+            return box_scale(w, h, box["w"] * cw), canvas_xy(box["x"] * cw, box["y"] * ch)
+
+        v = sh.get("video")
+        if v:                                          # a video of theirs instead: muted, from where they chose
+            w, h, vlen = int(v.get("w") or 0), int(v.get("h") or 0), float(v.get("length") or 0)
+            start = min(max(0.0, float(v.get("from") or 0)), max(0.0, vlen - MIN_VIDEO_STRETCH))
+            n = min(fb - fa, max(int(round(MIN_VIDEO_STRETCH * fps)), int((vlen - start) * fps + 1e-6)))
+            target = tr_f(fa, n, fps)
+            s, xy = placed(w, h)
+            seg = _segment(P, mats, material(v["path"], w, h, vlen)["id"], target,
+                           {"start": int(round(start * US)), "duration": target["duration"]}, s)
+            seg["volume"] = 0.0
+            if xy:
+                seg["clip"]["transform"] = xy
+            photos.append(seg)
+        else:                                          # photos, one after another, evenly across the stretch
+            ps = [x for x in (sh.get("photos") or []) if isinstance(x, dict) and x.get("path")]
+            for j, ph in enumerate(ps):
+                a = fa + int(round(j * (fb - fa) / len(ps)))
+                b = fa + int(round((j + 1) * (fb - fa) / len(ps)))
+                if b <= a:
+                    build_talking.no_frame += 1        # more photos than frames: this one has no frame to be on
+                    continue
+                w, h = ph.get("w") or 0, ph.get("h") or 0
+                if not (w and h):
+                    w, h = photo_size(ph["path"])
+                target = tr_f(a, b - a, fps)
+                s, xy = placed(w, h)
+                seg = _segment(P, mats, material(ph["path"], w, h)["id"], target, {"start": 0, "duration": target["duration"]}, s)
+                if xy:
+                    seg["clip"]["transform"] = xy
+                photos.append(seg)
+        if spot == "pip":                              # themselves, small, on top: on each piece wholly inside the stretch
+            me = _held_box(sh.get("me"), ME_DEFAULT)
+            lo, hi = float(sh["at"]) - SLACK, float(sh["at"]) + float(sh["dur"]) + SLACK
+            for p, (target, source, sp) in zip(pieces, spans):
+                if float(p["at"]) >= lo and float(p["at"]) + float(p["dur"]) <= hi:
+                    # at scale me.w, as hers (NOT times the fill: CapCut cannot crop, so a sideways video's copy
+                    # "filling" its box would be wider than the whole frame). For a 9:16 video the two are the same.
+                    seg = _segment(P, mats, vmat["id"], dict(target), dict(source), round(me["w"], 6))
+                    seg["clip"]["transform"] = canvas_xy(me["x"] * cw, me["y"] * ch)
+                    seg["volume"] = 0.0                # the sound is the main piece's; no zoom on the copy (hers)
+                    _set_speed(seg, mats, sp)
+                    copies.append(seg)
+    k = 1
+    for segs in (photos, copies):
+        if segs:
+            d["tracks"].append(overlay_track(P, segs, k))
+            k += 1
+
+    # the captions: plain text they restyle in CapCut, where they dragged them and as big as they made them.
+    # None (captions off) writes no caption layer at all.
+    caps = [c for c in (plan.get("captions") or []) if isinstance(c, dict) and str(c.get("text") or "").strip()]
+    if caps:
+        cp = plan.get("cap_pos") if isinstance(plan.get("cap_pos"), dict) else {}
+        cp = {k: _held(cp.get(k), CAP_LIMITS[0], CAP_LIMITS[1], CAP_DEFAULT[k]) for k in ("x", "y")}
+        cs = _held(plan.get("cap_size") or 1, SIZE_LIMITS[0], SIZE_LIMITS[1], 1.0)
+        where = {"x": round((cp["x"] - 0.5) * 2, 6), "y": round((0.5 - cp["y"]) * 2, 6)}
+        starts = []
+        for c in caps:                                 # each on its own frame, in order
+            a = _on_grid(float(c["start"]), pieces, grid)
+            if starts and a <= starts[-1][0]:
+                a = starts[-1][0] + 1
+            if a < total:
+                starts.append((a, c))
+        tt = copy.deepcopy(P["text_track"])
+        tt.update({"id": uid(), "segments": []})
+        for i, (a, c) in enumerate(starts):            # hers: each stays until the next; the last ends where it ends
+            b = starts[i + 1][0] if i + 1 < len(starts) else max(a + 1, min(total, _on_grid(float(c["end"]), pieces, grid)))
+            ts = _text(P, mats, str(c["text"]), tr_f(a, b - a, fps))
+            if ts.get("clip"):
+                ts["clip"]["transform"] = dict(where)
+                ts["clip"]["scale"] = {"x": cs, "y": cs}
+            tt["segments"].append(ts)
+        if tt["segments"]:
+            d["tracks"].append(tt)
+
+    d["duration"] = us_f(total, fps)
+    d["update_time"] = now_us()
+    return d, _finish_meta(meta, draft_id, plan["name"], d["duration"], meta_items)
 
 ROOT_ENTRY_KEYS = {
     "cloud_draft_cover": False, "cloud_draft_sync": False, "draft_cloud_last_action_download": False,
@@ -611,9 +982,11 @@ def folder_name(store, name):
     return cand
 
 
-def write_json(path, obj):
+def write_json(path, obj, strict=False):
+    """`strict`: a number CapCut could not read (Infinity, NaN) raises ValueError before anything is written,
+    rather than going into the file (for a valid project the bytes are the same either way)."""
     tmp = path.with_name(path.name + ".studio-tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+    tmp.write_text(json.dumps(obj, ensure_ascii=False, allow_nan=not strict), encoding="utf-8")
     try:
         this_computer.replace(tmp, path)     # on a PC, waits a moment if another program has the file open
     except OSError:
@@ -638,8 +1011,10 @@ def native(p):
     return str(p).replace("\\", "/") if os.name == "nt" else str(p)
 
 
-def write(plan, store, ignore_open=False):
-    """Returns (project folder, draft). With CapCut open, only the new project's own folder is written and
+def write(plan, store, ignore_open=False, builder=None):
+    """Returns (project folder, draft). `builder` makes the project from the plan (build, a photo reel, when
+    none is given; build_talking for a talking reel). A plan may also name every other file its project points
+    at ("files": all of them must be there, or nothing is written) and the photo for the cover ("cover"). With CapCut open, only the new project's own folder is written and
     CapCut adds it to its list by itself (seen on Dustin's Mac, CapCut 9.6, Oct 25: within two seconds, twice);
     CapCut's list file is left alone, since an open CapCut writes its own copy of it. With CapCut closed, the
     project is added to the list too, after a copy of the list is kept.
@@ -654,6 +1029,7 @@ def write(plan, store, ignore_open=False):
     missing = [p["path"] for p in plan["photos"] if not Path(p["path"]).is_file()]
     if plan.get("song") and not Path(plan["song"]["path"]).is_file():
         missing.append(plan["song"]["path"])
+    missing += [str(f) for f in plan.get("files") or [] if not Path(f).is_file()]
     if missing:
         say("STOP: these files are not where the plan says: " + ", ".join(missing[:5]))
         sys.exit(2)
@@ -695,19 +1071,25 @@ def write(plan, store, ignore_open=False):
             say("STOP: the song's copy inside the CapCut project didn't match the original, so I made nothing. Try again.")
             sys.exit(2)
         plan = dict(plan, song=dict(song, path=native(dest / src.name), name=song.get("name") or src.name, original=str(src)))
-    draft, meta = build(plan, load_parts(), their_platform(store))
-    draft["name"] = meta["draft_name"] = fold
-    t = now_us()
-    meta.update({"draft_fold_path": native(dest), "draft_root_path": native(store),
-                 "tm_draft_create": t, "tm_draft_modified": t})
-    write_json(part / draft_file_name(), draft)
-    write_json(part / "draft_meta_info.json", meta)
+    try:
+        draft, meta = (builder or build)(plan, load_parts(), their_platform(store))
+        draft["name"] = meta["draft_name"] = fold
+        t = now_us()
+        meta.update({"draft_fold_path": native(dest), "draft_root_path": native(store),
+                     "tm_draft_create": t, "tm_draft_modified": t})
+        json.dumps([draft, meta], allow_nan=False)     # a number CapCut could not read (Infinity, NaN) stops it here
+        write_json(part / draft_file_name(), draft)
+        write_json(part / "draft_meta_info.json", meta)
+    except Exception:
+        shutil.rmtree(part, ignore_errors=True)        # our own hidden making folder: only files this run wrote
+        raise
     (part / "draft_settings").write_text(
         f"[General]\ndraft_create_time={t // US}\ndraft_last_edit_time={t // US}\nreal_edit_keys=0\nreal_edit_seconds=0\n",
         encoding="utf-8")
     cover = dest / "draft_cover.jpg"           # where it will be; it is made in the hidden folder
     made_cover = part / "draft_cover.jpg"
-    first = next((p["path"] for p in plan["photos"] if not p.get("clip")), None)   # the cover is a photo, never a video
+    # the cover is a photo, never a video: the one the plan names, else the reel's first photo
+    first = plan.get("cover") or next((p["path"] for p in plan["photos"] if not p.get("clip")), None)
     if first and pictures.use_sips():
         subprocess.run(["sips", "-Z", "720", "-s", "format", "jpeg", first, "--out", str(made_cover)], capture_output=True)  # pc-ok: Mac branch
     elif first and pictures.make_jpeg(first, made_cover, 720):
@@ -720,8 +1102,11 @@ def write(plan, store, ignore_open=False):
         if os.path.lexists(dest):
             raise FileExistsError(str(dest))
         os.rename(part, dest)
-    except OSError as e:
-        say(f"STOP: I couldn't give the CapCut project its name ({e}). Nothing was added to CapCut. Try again.")
+    except OSError:
+        # (another make took the name in the same moment, most likely.) The hidden making folder holds only files
+        # this run wrote: it is cleared, so nothing half-made is left in CapCut's projects folder. No place is named.
+        shutil.rmtree(part, ignore_errors=True)
+        say("STOP: I couldn't give the CapCut project its name. Nothing was added to CapCut. Try again.")
         sys.exit(2)
 
     entry = dict(ROOT_ENTRY_KEYS)

@@ -31,6 +31,10 @@ When they say "set up talking reels" (the page tells them to when a Mac needs it
                                                            missing it says so and stops: `xcode-select --install`
                                                            opens Apple's own install window, so only with their yes.
 
+Make it in CapCut on the page (start_make(), then `talking_rec.py make-job`, the Assistant's own command) runs
+assistant-make-a-reel/scripts/talking_make.py in a job of its own, as Make my reel does: see "Make it in CapCut"
+below. make_for_page() is what the page asks after.
+
 Edit my video on the page (start(), then `talking_rec.py job`, the Assistant's own command) turns the video into
 words in a job of its own: see "turning a video into words" below. The Mac's own Speech Recognition route is
 WRITTEN, NEVER RUN until Dustin's hand step; every test uses the pretend transcriber.
@@ -53,6 +57,11 @@ the sound removed when the job ends):
                                  .kit/talking-job.lock is held by that job's process for as long as it lives
     .kit/talking/<key>/preview.mp4   the small copy of a talking video the page plays (540 on its short side),
                                  made once per video and kept; .kit/talking/facts.json the videos' facts
+    .kit/talking-make-job.json   the newest Make it in CapCut from the page (its state, its one line);
+                                 .kit/talking-make-job.lock is held by that job's process for as long as it
+                                 lives; .kit/talking-make-status.json is what the maker said happened, and
+                                 .kit/talking-make.json the plan it last handed to CapCut's writer (all four
+                                 the Assistant's own working files, each replaced by the next make)
     a record that was read and is not a record (damaged) is set aside as talking.damaged-<date>-<time>.json,
     never written over. A record that is there and would not be READ just now (a drive that hiccuped, another
     program holding it) is left exactly where it is: every command and save says "try again", nothing is moved.
@@ -326,11 +335,19 @@ def _same(a, b):
     return json.dumps(a, sort_keys=True, ensure_ascii=False) == json.dumps(b, sort_keys=True, ensure_ascii=False)
 
 
-def change(kit, fn, src=None, stale_why="its script was made again"):
+QUIET_FIELDS = ("made",)                  # the Assistant's own notes: nothing the page edits or reads (see change)
+
+
+def change(kit, fn, src=None, stale_why="its script was made again", quiet=False):
     """Read the record, change it (fn(record with its words); return False to leave it alone, raise to refuse),
     and save it as one step no other command or page can get in the middle of. The version before is kept
     beside it. Nothing is written when fn changed nothing. An accepted change moves the counter ("rev") on by
     one. The words themselves are never written from here (put_words does that, once per video).
+    `quiet`: a change that touches ONLY the Assistant's own notes (QUIET_FIELDS: which reels were made) is saved
+    without moving the counter, the page's stamp or its mark, and without replacing the version before: the page
+    never edits or reads those, so its next save is not refused as stale and its Undo list is not emptied by a
+    press of Make it in CapCut (hers has no counter, so her note costs nothing either). A quiet change that
+    turns out to touch anything else is an ordinary change.
     Returns the record as it now is, words joined on."""
     kit = Path(kit)
     kitmod.hidden(kit)
@@ -354,6 +371,10 @@ def change(kit, fn, src=None, stale_why="its script was made again"):
         if _same(new, before):
             return full
         new["v"] = 1
+        own = set(QUIET_FIELDS) | {"v"}
+        if quiet and there and all(_same(new.get(k), before.get(k)) for k in (set(new) | set(before)) - own):
+            arrange.write_whole(p, new)                    # rev, updated and from exactly as they were
+            return _join(dict(new), words_for(kit, new.get("video"), wf))
         new["rev"] = _rev(before) + 1
         new["updated"] = time.time()                       # hers: the page tells a change by this
         if src is not None:
@@ -886,22 +907,76 @@ def preview_for(kit, rec=None):
     return None
 
 
-def can_make(kit, rec=None):
-    """May this shoot's talking reel be made in CapCut right now? (True, "") or (False, the page's line).
-    Refused while its video is being turned into words, and when the video was exported again since its script
-    was made (every word's time belongs to the old file) or is no longer there."""
+# ---------- Make it in CapCut: may it be made, and the words for when it may not ----------
+# Hers, word for word (server.py make_talking): why a talking reel can't be made right now.
+MAKE_WORDS = {
+    "no_script": NO_SCRIPT_MAKE,
+    "gone": "Your talking video isn't in the Talking folder anymore.",
+    "all_cut": "Everything is cut. Bring some words back first.",
+    "went_wrong": "Something went wrong making it.",
+}
+# Ours, each a DRAFT for Nicole to reword, each with its reason (decision 2b.13). (line, why it is ours)
+OUR_MAKE_WORDS = {
+    "photo_gone": ("A photo in your talking reel isn't in this shoot anymore. Take it off its words or put it back, "
+                   "then make it again.",
+                   "hers leaves that stretch out of the reel without a word; ours stops before anything is written"),
+    "video_gone": ("A video in your talking reel isn't in the Footage folder anymore. Take it off its words or put it "
+                   "back, then make it again.",
+                   "hers leaves that stretch out of the reel without a word; ours stops before anything is written"),
+    # capcut.py's own STOP lines as the page's result box may show them (any place taken out by reel_page._no_path).
+    # Hers shows her maker's STOP line too; these are our maker's. Any OTHER line capcut.py stops with is told as
+    # her "Something went wrong making it." and kept in the log.
+    "no_capcut": ("I can't find CapCut's projects folder. Is CapCut installed, and has it been opened once?",
+                  "capcut.py's own stop, as the photo reel's page shows it: tells them what to do, where hers says only that something went wrong"),
+    "no_folder": ("I couldn't make the project's folder in CapCut's projects folder. Nothing was written.",
+                  "capcut.py's own stop, as the photo reel's page shows it"),
+    "no_name": ("I couldn't give the CapCut project its name. Nothing was added to CapCut. Try again.",
+                "capcut.py's own stop, as the photo reel's page shows it"),
+}
+CAPCUT_STOPS = ("no_capcut", "no_folder", "no_name")
+
+
+def make_line(code):
+    """The page's line for why a talking reel can't be made: hers where she has one, else ours; a video still
+    being turned into words gets her "still working" line, one exported again our "changed" line (stage B)."""
+    if code in MAKE_WORDS:
+        return MAKE_WORDS[code]
+    if code in OUR_MAKE_WORDS:
+        return OUR_MAKE_WORDS[code][0]
+    if code in ("working", "making"):                  # "making": another make of this shoot's reel is at work
+        return JOB_WORDS["still_working"]
+    if code == "changed":
+        return line_for("changed")
+    if code == "trouble":
+        return TROUBLE
+    return MAKE_WORDS["went_wrong"]
+
+
+def make_problem(kit, rec=None):
+    """Why this shoot's talking reel can't be made in CapCut right now, as a code for make_line, or None when it
+    can. "working" while its video is being turned into words; "no_script"; "changed" when the video was exported
+    again since its script was made (every word's time belongs to the old file); "gone" when it is no longer in
+    the Talking folder; "all_cut" when no word is left."""
     kit = Path(kit)
     rec = rec if rec is not None else load(kit)
     if job_running(kit) or rec.get("status") == "working":
-        return False, JOB_WORDS["still_working"]
+        return "working"
     if not rec.get("words"):
-        return False, NO_SCRIPT_MAKE
+        return "no_script"
     vs = video_state(kit, rec)
     if vs == "changed":
-        return False, line_for("changed")
-    if vs == "gone":
-        return False, JOB_WORDS["not_in_folder"]
-    return True, ""
+        return "changed"
+    if vs != "here":
+        return "gone"
+    if not _engine().pieces(rec):
+        return "all_cut"
+    return None
+
+
+def can_make(kit, rec=None):
+    """May this shoot's talking reel be made in CapCut right now? (True, "") or (False, the page's line)."""
+    code = make_problem(kit, rec)
+    return (True, "") if code is None else (False, make_line(code))
 
 
 def facts_problem(f):
@@ -1949,6 +2024,280 @@ def cmd_status(kit):
     return 0
 
 
+# ---------- Make it in CapCut: a job of its own (hers: a subprocess inside her server's request) ----------
+# The page presses Make it in CapCut (start_make) and is given a job; a process of its own makes the reel
+# (talking_rec.py make-job, which runs talking_make.py), writing how it is going to .kit/talking-make-job.json,
+# which the page asks after (make_for_page) until it is done: Make my reel's way (reel_page.py). One make per
+# shoot at a time (.kit/talking-make-job.lock, held for as long as the job lives); one reel of ANY kind made at a
+# time on this computer (the job waits its turn for the same reel-make.lock the photo reel's job holds); at most
+# reel_page.MAKE_LIMIT seconds, then a watchdog stops it and the page says so. Only the maker's one line, or a
+# plain line of why not, ever reaches the page: never a path, never a Python error (those go to the log).
+# A job that died after the project was written is told as made (its --status file says so): never "nothing
+# was made" about a reel that is in CapCut.
+
+MAKE_JOB = "talking-make-job.json"        # the newest make: {id, state, t, t0, pid, dry, words, project, problem}
+MAKE_JOB_LOCK = "talking-make-job.lock"
+MAKE_STATUS = "talking-make-status.json"  # what talking_make.py said happened, for the job that asked ("for")
+TEST_STORE = "ASSISTANT_TEST_TALKING_STORE"   # tests only: a pretend CapCut projects folder; CapCut is never asked after
+_MAKE_ROUTE = threading.Lock()
+_MAKE_WRITE = threading.Lock()
+
+
+def _maker():
+    return kitmod.REEL_PY.parent / "talking_make.py"
+
+
+def read_make(kit):
+    try:
+        j = json.loads((Path(kit) / ".kit" / MAKE_JOB).read_text(encoding="utf-8"))
+        return j if isinstance(j, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def write_make(kit, j):
+    arrange.write_whole(Path(kit) / ".kit" / MAKE_JOB, j)
+
+
+def make_running(kit):
+    """Is a job making this shoot's talking reel right now? It holds .kit/talking-make-job.lock for as long as it
+    lives (reel_page.job_running's way); nothing is made by asking. On a drive that has no locks, the job's own
+    process number is asked after instead, for at most the limit and a minute."""
+    p = Path(kit) / ".kit" / MAKE_JOB_LOCK
+    try:
+        if p.is_file():
+            with open(p, "a", encoding="utf-8") as f:       # never written to: only looked at
+                got = this_computer.try_lock(f, shared=True)
+                if got is False:
+                    return True
+                if got:
+                    this_computer.unlock(f)
+                    return False
+    except OSError:
+        pass
+    j = read_make(kit) or {}
+    if j.get("state") not in ("queued", "running"):
+        return False
+    return time.time() - (_fnum(j.get("t0")) or _fnum(j.get("t"))) < reel_page.MAKE_LIMIT + 60 and arrange._pid_alive(j.get("pid"))
+
+
+def _made_by(kit, jid):
+    """What a job's maker said it made, when it had finished the project (its --status says so for this job)
+    though the job was stopped before writing that down: {"project", "line"}; else None. Names only, no path."""
+    try:
+        st = json.loads((Path(kit) / ".kit" / MAKE_STATUS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if isinstance(st, dict) and st.get("for") == jid and st.get("ok") and not st.get("dry") and isinstance(st.get("project"), str):
+        line = st.get("line")
+        return {"project": st["project"], "line": line if isinstance(line, str) and line else f"Made \"{st['project']}\" in CapCut."}
+    return None
+
+
+def make_for_page(kit):
+    """The newest make as the page sees it: {id, state (queued, running, done, problem), dry, project, words,
+    problem}, or None when this shoot's reel was never made from the page. `words` are the lines for her result
+    box (the maker's one line). A job that says it is at work but is not (stopped, the computer turned off, past
+    its time) is a problem in plain words; unless its project did reach CapCut, and then it is done. No path, no
+    file name, no process number."""
+    kit = Path(kit)
+    j = read_make(kit)
+    if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
+        return None
+    state, problem = j["state"], j.get("problem")
+    words, project = [w for w in (j.get("words") or []) if isinstance(w, str)], j.get("project")
+    if state in ("queued", "running"):
+        began = _fnum(j.get("t0"))
+        late = bool(began) and time.time() - began > reel_page.MAKE_LIMIT + reel_page.JOB_GRACE
+        gone = not make_running(kit) and (state == "running" or j.get("pid") or time.time() - _fnum(j.get("t")) > JOB_BOOT)
+        if late or gone:
+            made = _made_by(kit, j["id"])
+            if made:
+                state, words, project = "done", [made["line"]], made["project"]
+            else:
+                state, problem = "problem", MAKE_WORDS["went_wrong"]
+    return {"id": j["id"], "state": state, "dry": bool(j.get("dry")), "project": project if state == "done" else None,
+            "words": words if state == "done" else [],
+            "problem": (problem if isinstance(problem, str) and problem else MAKE_WORDS["went_wrong"]) if state == "problem" else None}
+
+
+def note_made(kit, project):
+    """Hers: the record keeps each reel that was made, and when ("made": [{"project", "when"}]). Saved quietly:
+    the record's counter does not move (see change), so the page's next save and its Undo are as they were."""
+    def fn(rec):
+        made = [m for m in _lst(rec, "made") if isinstance(m, dict)]
+        made.append({"project": str(project), "when": time.time()})
+        rec["made"] = made
+    change(kit, fn, quiet=True)
+
+
+def start_make(kit, dry=False):
+    """Make it in CapCut. (status, answer): {"ok": True, "job": make_for_page} when a job was started; else
+    {"ok": False, "why", "words"} with the page's line and NOTHING made or changed. Refused at once, hers: no
+    script yet, the talking video gone from its folder, everything cut; ours: its video still being turned into
+    words, exported again since its script was made, or a make already at work for this shoot."""
+    kit = Path(kit)
+    try:
+        code = make_problem(kit)
+    except Unreadable:
+        return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+    if code:
+        return (409 if code == "working" else 400), {"ok": False, "why": code, "words": make_line(code)}
+    with _MAKE_ROUTE:
+        j = read_make(kit) or {}
+        if make_running(kit) or (j.get("state") == "queued" and not j.get("pid") and time.time() - _fnum(j.get("t")) < JOB_BOOT):
+            return 409, {"ok": False, "why": "making", "words": JOB_WORDS["still_working"], "job": make_for_page(kit)}
+        jid = os.urandom(6).hex()
+        try:
+            kitmod.hidden(kit)
+            write_make(kit, {"id": jid, "state": "queued", "t": time.time(), "dry": bool(dry)})
+        except OSError as e:
+            log(f"{kit.name}: Make it in CapCut could not start ({e.__class__.__name__}: {e})")
+            return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+        try:
+            fresh.LOGS.mkdir(parents=True, exist_ok=True)
+            with open(LOG, "a", encoding="utf-8") as out:
+                # a Mac: a session of its own; a PC: no window, a process group of its own (as the photo reel's job)
+                this_computer.popen_detached([sys.executable, str(HERE / "talking_rec.py"), "make-job", str(kit), "--id", jid],
+                                             stdout=out, stderr=subprocess.STDOUT, **arrange._child_env())
+        except OSError as e:
+            log(f"{kit.name}: the talking reel's job could not be started: {e}")
+            try:
+                write_make(kit, {"id": jid, "state": "problem", "t": time.time(), "dry": bool(dry), "problem": MAKE_WORDS["went_wrong"]})
+            except OSError:
+                return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+        return 200, {"ok": True, "job": make_for_page(kit)}
+
+
+def _make_now(kit, jid, dry, deadline):
+    """The work of one make: talking_make.py, held to the deadline with everything it starts. Returns what goes
+    in the job: {state, words, project} or {state, problem}."""
+    status = kit / ".kit" / MAKE_STATUS
+    arrange.write_whole(status, {"for": jid, "pending": True})      # the maker keeps "for" when it writes what happened
+    cmd = [sys.executable, str(_maker()), "make", "--kit", str(kit), "--status", str(status)]
+    if dry:
+        cmd.append("--dry-run")
+    if os.environ.get(TEST_STORE):
+        cmd += ["--store", os.environ[TEST_STORE], "--ignore-open"]
+    left = deadline - time.time()
+    if left <= 1:
+        return {"state": "problem", "problem": MAKE_WORDS["went_wrong"]}
+    try:
+        rc, r_out, r_err = reel_page._run_bounded(cmd, left, cwd=str(_maker().parent))
+    except subprocess.TimeoutExpired:
+        log(f"{kit.name}: the talking reel's maker ran past its time and was stopped")
+        made = _made_by(kit, jid)
+        return {"state": "done", "words": [made["line"]], "project": made["project"]} if made else \
+            {"state": "problem", "problem": MAKE_WORDS["went_wrong"]}
+    try:
+        st = json.loads(status.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    if not isinstance(st, dict) or st.get("pending") or st.get("for") != jid:
+        st = {}
+    lines = [w.strip() for w in (r_out or "").splitlines() if w.strip()]
+    if rc != 0 or not st.get("ok"):
+        log(f"{kit.name}: talking_make.py stopped ({rc}): {((r_out or '') + ' / ' + (r_err or '')).strip()[-600:]}")
+        if isinstance(st.get("stop"), str):
+            return {"state": "problem", "problem": make_line(st["stop"])}
+        stop = next((w for w in lines if w.startswith("STOP")), "")
+        # capcut.py's own STOP (no CapCut projects folder, say): its plain words with any place taken out, or hers
+        said = reel_page._no_path(re.sub(r"^STOP:\s*", "", stop), [kit]) if stop else None
+        known = {OUR_MAKE_WORDS[k][0] for k in CAPCUT_STOPS}      # only a line that is on our list reaches the page
+        return {"state": "problem", "problem": said if said in known else MAKE_WORDS["went_wrong"]}
+    shown = [x for x in (reel_page._no_path(w, [kit]) for w in lines) if x]       # the maker's one line; never a path
+    return {"state": "done", "words": shown, "project": st.get("project") if not dry else None}
+
+
+def _make_watchdog(kit, jid, deadline, finished):
+    """The make's hard limit: at the deadline and reel_page.JOB_GRACE, a job still at work is written down (as
+    made, when its project did reach CapCut; else as a problem), and this process, the maker it started and
+    everything they started are stopped. The next Make it in CapCut can then go ahead."""
+    if finished.wait(max(0.0, deadline + reel_page.JOB_GRACE - time.time())):
+        return
+    with _MAKE_WRITE:
+        if finished.is_set():
+            return
+        j = read_make(kit) or {}
+        if j.get("id") == jid and j.get("state") in ("queued", "running"):
+            made = _made_by(kit, jid)
+            if made:
+                j.update(state="done", words=[made["line"]], project=made["project"], t=time.time())
+            else:
+                j.update(state="problem", problem=MAKE_WORDS["went_wrong"], t=time.time())
+            try:
+                write_make(kit, j)
+            except OSError:
+                pass
+        log(f"{Path(kit).name}: the talking reel's job ran past its time and was stopped")
+        for p in list(reel_page._CHILD):
+            this_computer.stop_tree(p.pid)
+        this_computer.stop_tree(os.getpid())      # a Mac: its whole group (popen_detached made it one); a PC: its tree
+        os._exit(1)
+
+
+def cmd_make_job(kit, jid):
+    """The make's own process (started by start_make). Holds the make's lock for as long as it lives."""
+    kit = Path(kit)
+    t0 = time.time()
+    arrange._own_output()
+    try:
+        arrange.make_folder(kit / ".kit")
+        f = open(kit / ".kit" / MAKE_JOB_LOCK, "a", encoding="utf-8")
+    except OSError:
+        f = None
+    got = None
+    if f is not None:
+        end = time.time() + 3.0                   # a page asking "is it running?" holds it for an instant: wait that out
+        while True:
+            got = this_computer.try_lock(f)
+            if got is not False or time.time() > end:
+                break
+            time.sleep(0.05)
+    if got is False:
+        f.close()
+        return 0                                  # another make's process has it
+    try:
+        j = read_make(kit) or {}
+        if j.get("id") != jid or j.get("state") != "queued":
+            return 0
+        deadline = t0 + reel_page.MAKE_LIMIT
+        j.update(pid=os.getpid(), t0=t0, t=time.time())
+        write_make(kit, j)
+        finished = threading.Event()
+        threading.Thread(target=_make_watchdog, args=(kit, jid, deadline, finished), daemon=True).start()
+        g = reel_page._hold_make_lock(deadline)   # one reel of any kind made at a time on this computer
+        if g is None:
+            with _MAKE_WRITE:
+                finished.set()
+                j.update(state="problem", problem=MAKE_WORDS["went_wrong"], t=time.time())
+                write_make(kit, j)
+            log(f"{kit.name}: another reel was being made for the whole of this make's time; nothing was made")
+            return 1
+        try:
+            j.update(state="running", t=time.time())
+            write_make(kit, j)
+            try:
+                res = _make_now(kit, jid, bool(j.get("dry")), deadline)
+            except Exception as e:  # noqa: BLE001  (whatever happens, the page is told in plain words)
+                log(f"{kit.name}: the talking reel's job failed: {e.__class__.__name__}: {str(e)[:300]}")
+                res = {"state": "problem", "problem": MAKE_WORDS["went_wrong"]}
+            with _MAKE_WRITE:
+                finished.set()
+                j.update(res, t=time.time())
+                write_make(kit, j)
+        finally:
+            if g != "none":
+                this_computer.unlock(g)
+                g.close()
+        return 0 if j.get("state") == "done" else 1
+    finally:
+        if f is not None:
+            if got:
+                this_computer.unlock(f)
+            f.close()
+
+
 def read_json(path):
     try:
         return json.loads(kitmod.read_their_file(path))
@@ -1973,11 +2322,14 @@ def main(argv=None):
     s = sub.add_parser("job", help="(the Assistant's own) turn a video into words; started by Edit my video")
     s.add_argument("kit")
     s.add_argument("--id", required=True)
+    s = sub.add_parser("make-job", help="(the Assistant's own) make the talking reel in CapCut; started by Make it in CapCut")
+    s.add_argument("kit")
+    s.add_argument("--id", required=True)
     a = ap.parse_args(argv)
-    if a.cmd == "job":
+    if a.cmd in ("job", "make-job"):
         if not JOB_ID.fullmatch(a.id) or not (Path(a.kit) / ".kit").is_dir():
             return 1
-        return cmd_job(Path(a.kit), a.id)
+        return cmd_job(Path(a.kit), a.id) if a.cmd == "job" else cmd_make_job(Path(a.kit), a.id)
     fresh.announce()
     if a.cmd == "setup":
         return cmd_setup(a.check)

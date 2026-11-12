@@ -1,0 +1,13 @@
+{
+ "about": "sha256 of each photo reel's CapCut project with its ids evened out (tests/capcut_even.py), as capcut.py at commit 473f17d built it",
+ "projects": {
+  "grid, song, hook, clip": "9ca7ea8b3045b7152b244e8cad4cc906dfecb8401b98b285759f94764827e10a",
+  "grid, song, hook, clip (their CapCut's version copied)": "188695c0288bb2b070798e8f0944d6346806d99b586aea29e9dbd4aa04605128",
+  "seconds, no song": "5b9f09a1db6390a28409cbfed7be6ab1741eb7c36d4b7b8cc41b5d2b9d2e7ca0",
+  "seconds, no song (their CapCut's version copied)": "d93028f2697bebae620406aa4fb3fc8e3ca3574aecabbd8e9b735daa3528f660",
+  "seconds, hook, short song": "8a969f032a065e62c932df5278dc6ccd910f91561ca062ac21286e693edc62b3",
+  "seconds, hook, short song (their CapCut's version copied)": "bbbf6d078fff32f6fc181b1b7bef0b7bace287f0729f93e23f6424ce5c08048a",
+  "CapCut's own song": "f0dfaba2b2620b0359d69f8030eb880d2bb568c43d9fee80abee02daffbebf81",
+  "CapCut's own song (their CapCut's version copied)": "8ebeed9e81351269d236fd7ce80c54ade304af9fd3f4be3f1c4800028836fa82"
+ }
+}

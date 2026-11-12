@@ -1,5 +1,5 @@
 {
- "_about": "Pieces of CapCut 9.6 (Mac) projects that CapCut itself wrote, with ids, paths and device ids blanked. capcut.py clones these. Photo segment and its six companions from a project made in CapCut; the text pieces as CapCut re-saved them after opening a script-written project.",
+ "_about": "Pieces of CapCut 9.6 (Mac) projects that CapCut itself wrote, with ids, paths and device ids blanked. capcut.py clones these. Photo segment and its six companions from a project made in CapCut; the text pieces as CapCut re-saved them after opening a script-written project. The scale_keyframe piece (a slow zoom on a talking reel) is NOT one of those: it is typed from the field list in Nicole's handoff, not yet seen written by CapCut.",
  "video_track": {
   "attribute": 0,
   "flag": 0,
@@ -592,5 +592,31 @@
   "sub_template_id": -1,
   "translate_original_text": "",
   "adjust_params": []
+ },
+ "scale_keyframe": {
+  "property": {
+   "id": "00000000-0000-0000-0000-000000000000",
+   "material_id": "",
+   "property_type": "KFTypeScaleX",
+   "keyframe_list": []
+  },
+  "keyframe": {
+   "id": "00000000-0000-0000-0000-000000000000",
+   "curveType": "Line",
+   "time_offset": 0,
+   "left_control": {
+    "x": 0.0,
+    "y": 0.0
+   },
+   "right_control": {
+    "x": 0.0,
+    "y": 0.0
+   },
+   "values": [
+    1.0
+   ],
+   "string_value": "",
+   "graphID": ""
+  }
  }
 }
