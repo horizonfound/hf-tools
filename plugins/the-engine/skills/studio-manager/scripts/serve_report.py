@@ -15,6 +15,7 @@ Its log is ~/.studio/logs/report <backup> <tag>.log (log_name), never inside the
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import threading
 import sys
@@ -253,12 +254,35 @@ def named_as_text(want, folders):
     return False
 
 
+CARD_PATH = re.compile(r"^/card/(\d+)(/.*)?$")
+
+
 class Handler(SimpleHTTPRequestHandler):
     studio = ""
     allowed = ()
     renames = None
     picks = None
     last_open = {}  # path -> time, so one click never opens two Finder windows
+    root = None     # the backup this server was started for: {"studio", "session", "directory", "allowed", "renames", "picks"}
+    cards = {}      # a shoot on several cards (shoot_report.py): card number -> the same for that card
+    shoot = False   # ... and then /report.html is the shoot's page, each card at /card/N/
+
+    def context(self):
+        """Which backup this request is for. /card/2/<rest> is card 2 of the shoot (the prefix comes off the path, so
+        every page and route is the same as for a backup on its own); anything else is the backup this server was
+        started for, whose /report.html is the shoot's page when it is one card of a shoot. Sets this request's
+        records, folders and workers, so a rename asked on card 2's section renames card 2's shoot."""
+        ctx = self.root
+        parts = urlsplit(self.path)
+        m = CARD_PATH.match(parts.path)
+        if m and int(m.group(1)) in self.cards:
+            ctx = self.cards[int(m.group(1))]
+            self.path = (m.group(2) or "/") + (("?" + parts.query) if parts.query else "")
+        elif self.shoot and parts.path == "/report.html" and (Path(ctx["studio"]) / "shoot-report.html").exists():
+            self.path = "/shoot-report.html" + (("?" + parts.query) if parts.query else "")
+        if ctx:
+            self.studio, self.directory, self.allowed = ctx["studio"], ctx["directory"], ctx["allowed"]
+            self.renames, self.picks = ctx["renames"], ctx["picks"]
 
     def ours(self):
         """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)? The report
@@ -280,6 +304,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_HEAD(self):
         # the report's own "has it been rebuilt?" check asks for report.html this way, every 4 seconds
         if self.ours():
+            self.context()
             super().do_HEAD()
 
     def list_directory(self, path):
@@ -291,6 +316,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self.ours():
             return
+        self.context()
         parts = urlsplit(self.path)
         if fresh.page_path(parts.path) and fresh.stale() and fresh.restart(self):
             return
@@ -298,9 +324,9 @@ class Handler(SimpleHTTPRequestHandler):
             # the report's font: the plugin's own DM Sans (look.py), never a file from the backup's folder
             return look.serve_font(self, parts.query)
         if parts.path in ("", "/"):
-            # the bare address is the report
+            # the bare address is the report (relative, so /card/2/ goes to card 2's own report, not the shoot's page)
             self.send_response(HTTPStatus.FOUND)
-            self.send_header("Location", "/report.html")
+            self.send_header("Location", "report.html")
             self.end_headers()
             return
         if parts.path == "/which":
@@ -463,6 +489,7 @@ class Handler(SimpleHTTPRequestHandler):
         time). The older /names takes {shoot id: name} and only keeps them in _studio/names.json for Claude."""
         if not self.ours():
             return
+        self.context()
         path = urlsplit(self.path).path
         if path == "/rename":
             try:
@@ -579,11 +606,25 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from where import locate
     _, studio = locate(a.session)
-    manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
-    Handler.allowed = tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p)
-    Handler.renames = Renames(a.session, studio)
-    Handler.picks = Picks(a.session, studio)
+
+    def context_for(session, studio):
+        manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
+        return {"studio": str(studio), "directory": str(studio),
+                "allowed": tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p),
+                "renames": Renames(session, studio), "picks": Picks(session, studio)}
+    Handler.root = context_for(a.session, studio)
+    Handler.allowed, Handler.renames, Handler.picks = Handler.root["allowed"], Handler.root["renames"], Handler.root["picks"]
     Handler.studio = str(studio)
+    # one card of a shoot on several cards (shoot_report.py): every card's records are served too, at /card/N/
+    import shoot_report
+    data = shoot_report.read(studio)
+    if data:
+        for c in data["cards"]:
+            if not c.get("found"):
+                continue
+            rec = Path(c["found"])
+            Handler.cards[int(c["card"])] = Handler.root if rec.resolve() == studio.resolve() else context_for(str(rec), rec)
+        Handler.shoot = len(Handler.cards) >= 2
     # the asked-for port, or the next free one: another session's server may be holding it
     srv = None
     for port in range(a.port, a.port + 20):

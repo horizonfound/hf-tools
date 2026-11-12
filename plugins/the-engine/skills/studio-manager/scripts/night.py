@@ -330,6 +330,8 @@ def main():
     ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
     ap.add_argument("--no-peeks", action="store_true", help="skip the sneak peeks (the backup still finishes and settles)")
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
+    ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card; the card is never marked safe")
+    ap.add_argument("--with", dest="with_", default=None, help="the first card's backup of this shoot: this card is linked to it, so the report shows every card on one page")
     a = ap.parse_args()
 
     # their drive and second copy come from the Studio File unless given here
@@ -412,6 +414,24 @@ def main():
                 return
     elif a.source and a.dest and a.name:
         session = Path(a.dest).expanduser() / this_computer.safe_name(f"{a.date} {a.name.strip()}", limit=120)
+        if not session.exists():
+            # The same command again after the settle (the day folder is gone, its records are in .studio): a
+            # finished backup, never a second copy of the card. If the ledger missed it (a sample that covered the
+            # whole card, or a stop between the copy and the ledger), it is put in now.
+            try:
+                root, st = locate(session)
+            except SystemExit:
+                root, st = None, None
+            if st is not None and (st / "settled.json").exists():
+                from backup import whole_records
+                if whole_records(st):
+                    cards.register(a.source, st)
+                    say(f"This backup is finished and settled: the shoots are in {root}. The card is in the ledger.")
+                else:
+                    say(f"This backup is finished and settled: the shoots are in {root}. It was a sample of the card, so the card is not marked safe.")
+                if a.open:
+                    open_report(st, st)
+                return
     else:
         sys.exit("usage: --source [--dest --name], or --session <folder>")
     studio = session / "_studio"
@@ -460,8 +480,11 @@ def main():
             # taken for finished, so the rest of the card was never copied (found Nov 6). It carries on now.
             from backup import inventory, not_copied
             card_files, _ = inventory(Path(a.source))
-            if not_copied(m, Path(a.source), card_files):
-                done = False
+            if not_copied(m, Path(a.source), card_files, sampling=bool(a.sample)):
+                done = False   # (a sample run again without --sample copies the rest and becomes a whole backup)
+            elif m.get("sample") and not a.sample:
+                from backup import whole_records
+                whole_records(studio)   # the sample covered the whole card: the marker goes, the ledger gets it below
     if not done:
         if not (a.source and a.dest and a.name):
             sys.exit(f"STOP: {session} is not fully backed up, and I need --source, --dest and --name to continue it.")
@@ -471,12 +494,23 @@ def main():
             args += ["--second", a.second]
         if a.budget:
             args += ["--budget", a.budget]
+        if a.sample:
+            args += ["--sample", str(a.sample)]
         code = run("backup.py", *args)
         if code != 0:
             sys.exit(code)  # 1 problems, 2 stop, 3 paused: backup.py already said why
-        cards.register(a.source, session)  # now the ledger knows this card
     else:
         say("1. Already copied and verified")
+    if a.source:
+        if json.loads(manifest.read_text(encoding="utf-8")).get("sample"):
+            say("   (a sample, so the card is NOT marked as backed up)")
+        else:
+            cards.register(a.source, session)  # now the ledger knows this card (it is told only once)
+    if a.with_:
+        # one shoot on several cards (Dustin, Nov 12): link this card to the first one's backup, so one report
+        # shows every card. The pages come at step 6; a link that fails leaves this card's report on its own.
+        if run("shoot_report.py", "link", a.with_, str(session)) not in (0, 2):
+            say("   (could not link this card to the shoot's other cards; its report stands on its own)")
 
     # 2. the index (backup.py makes it; make sure)
     if not (studio / "index.json").exists():
@@ -501,13 +535,22 @@ def main():
         if run("sheet.py", session) != 0:
             sys.exit(1)
 
+    groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
+    # groups of nothing but video clips: three frames from each clip (start, middle, end) on pages of their
+    # own, so the look can tell what happens in them and name them for it (Dustin, Nov 11). A Mac only for now.
+    if not (studio / "clip-sheets.json").exists() and any(g.get("clips") and not g.get("photos") for g in groups):
+        run("clips.py", "sheets", session)
+
+    # 3b. sideways video clips stand up in the backup copy (Dustin, Nov 11). The card is never changed; the copy
+    # has been verified; the log is written first and the change is proved against the card's hash. A Mac only
+    # (it needs Vision to tell which way up a clip is).
+    if any(g.get("clips") for g in groups) and this_computer.MAC and not clips.rotations_done(studio):
+        say("3b. Turning sideways video clips upright in the backup")
+        if run("clips.py", "rotate", session) != 0:
+            sys.exit(1)
+
     # 4. Claude's one look
     if not (studio / "shoots.json").exists():
-        groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
-        # groups of nothing but video clips: three frames from each clip (start, middle, end) on pages of their
-        # own, so the look can tell what happens in them and name them for it (Dustin, Nov 11). A Mac only for now.
-        if not (studio / "clip-sheets.json").exists() and any(g.get("clips") and not g.get("photos") for g in groups):
-            run("clips.py", "sheets", session)
         say("\n4. NEEDS A LOOK. Read this image: " + str(studio / "groups-sheet.png"))
         say("   One row per group, in this order:")
         for i, g in enumerate(groups, 1):
@@ -575,9 +618,12 @@ def main():
             say("   detail, a different look); no two neighbors alike; every one a frame they'd be glad to see.")
             say("   First, the close look: shortlist 10 to 16 per shoot from the pages, then")
             say("      python3 " + str(HERE / "peek_sheets.py") + " closer \"" + str(studio) + "\" s1=61,64,71,18,... s2=...")
-            say("   and read the -close pages it writes (four per page, full size). Drop anything soft, mid-blink, awkward,")
-            say("   or with crew in the frame. Choose the six from what is left.")
-            say(f"   Then: python3 {HERE / 'peek_sheets.py'} pick \"{studio}\" s1=14,3,27,9,41,18 s2=...   and run this command again.")
+            say("   and read the -close pages it writes (four per page, full size). On a Mac each photo carries the face")
+            say("   check's words beside its number (red capitals are a fault: half-closed eyes, an open mouth). Drop those,")
+            say("   and anything soft, awkward, cut off, or with crew in the frame. Choose the six from what is left.")
+            say("   Then pick with one checked line per photo, saying what you saw of the eyes and the mouth (hero first):")
+            say(f"      python3 {HERE / 'peek_sheets.py'} pick \"{studio}\" s1=14,3,27,9,41,18 s2=... --checked \"s1 14: eyes open to camera, mouth closed, sharp, nothing cut off\" ...")
+            say("   A flagged photo is refused (the hero always); the pick says what to fix. Then run this command again.")
             sys.exit(7)
     if (studio / "sneak-peeks.json").exists():
         say("6b. Marking the sneak peeks for Lightroom")

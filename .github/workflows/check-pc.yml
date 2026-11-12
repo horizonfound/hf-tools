@@ -73,6 +73,11 @@ name: Check it on a Windows PC
 #                                   Added Nov 11: it had been left out, so the PC's calendar file was never tried
 #                                   on Windows.
 #   tests/skill_text_check.py       the instructions say what the scripts do (standard library only, reads only)
+#   tests/peek_check.py             the face check before the sneak peeks (pretend faces; on a Mac one real Vision
+#                                   run) and the pick that demands a checked line per photo and refuses what the
+#                                   check flagged (Dustin, Nov 12). Needs Pillow for the pretend backup.
+#   tests/shoot_report_check.py     one report for a shoot on several cards (shoot_report.py, the report's card mode,
+#                                   the server's /card/N/ routes), on two pretend backups. Needs Pillow.
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
 #   tests/pc_design_page.py  a job of its own, "windows-page", which may fail without failing the check (a first
@@ -97,10 +102,10 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -188,6 +193,12 @@ jobs:
       - name: The instructions say what the scripts do (the words, the kit, the posting queue, reminders, the PC part)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/skill_text_check.py
+      - name: The face check and the stricter sneak-peek pick (pretend faces; a PC has no Vision, so the pages say so)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/peek_check.py
+      - name: One report for a shoot on several cards (the link, the card pages, the shoot page, the server's /card/N/ routes)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/shoot_report_check.py --port 8873
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -305,9 +316,15 @@ jobs:
       - name: The instructions say what the scripts do
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/skill_text_check.py
+      - name: The face check and the stricter sneak-peek pick (pretend faces, and one real Vision run on the pretend photos)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/peek_check.py
+      - name: One report for a shoot on several cards
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/shoot_report_check.py --port 8873
       - name: The words for a post and posting-day reminders on the Mac's own Python 3.9 (nothing installed; they need nothing)
         if: ${{ !cancelled() }}
-        run: /usr/bin/python3 tests/words_check.py && /usr/bin/python3 tests/reminders_check.py
+        run: /usr/bin/python3 tests/words_check.py && /usr/bin/python3 tests/reminders_check.py && /usr/bin/python3 tests/peek_check.py
       - name: On the Mac's own Python 3.9 with nothing installed (what a photographer's Mac runs; the PC-way checks say SKIP)
         if: ${{ !cancelled() }}
         env:

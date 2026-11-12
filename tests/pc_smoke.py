@@ -807,12 +807,15 @@ def whole_backup(work, how_pictures, nobody_reading=None):
     if code != 7:
         return
     sheets = json.loads((st / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
-    spec = []
+    spec, checked = [], []
     for sid, s in sheets.items():
         n = s.get("moments") if isinstance(s.get("moments"), int) else len(s.get("list") or [])
         spec.append(f"{sid}=" + ",".join(str(k) for k in range(1, min(6, n) + 1)))
-    code, out = run("peek_sheets.py", "pick", session, *spec, env=env)
-    check("the sneak peeks are picked", code == 0, out[-400:])
+        checked += [f"--checked={sid} {k}: eyes open, mouth closed, sharp (a pretend photo)" for k in range(1, min(6, n) + 1)]
+    code, out = run("peek_sheets.py", "closer", session, *spec, env=env)
+    check("the close look runs (the face check on a Mac; a PC says it has none)", code == 0, out[-400:])
+    code, out = run("peek_sheets.py", "pick", session, *spec, *checked, env=env)
+    check("the sneak peeks are picked, with a checked line per photo", code == 0, out[-400:])
 
     index = json.loads((st / "index.json").read_text(encoding="utf-8"))
     first = session / next(p["file"] for p in index["photos"] if p.get("original"))

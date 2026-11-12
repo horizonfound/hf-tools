@@ -60,7 +60,8 @@ def main(night):
     run = lambda *a: subprocess.run([sys.executable, str(SCRIPTS / a[0]), *a[1:]], capture_output=True, text=True)
     r = run("peek_sheets.py", "make", str(night)); assert r.returncode == 0, r.stdout + r.stderr
     r = run("peek_sheets.py", "closer", str(night), "s1=1,2,3,4,5,6,7,8,9,10,11,12", "s2=1,2,3,4,5,6,7,8,9,10"); assert r.returncode == 0, r.stdout + r.stderr
-    r = run("peek_sheets.py", "pick", str(night), "s1=3,1,5,7,9,11", "s2=2,4,6,8,10,1"); assert r.returncode == 0, r.stdout + r.stderr
+    checked = [f"--checked={sid} {n}: eyes open, mouth closed, sharp (a pretend photo)" for sid, nums in (("s1", (3, 1, 5, 7, 9, 11)), ("s2", (2, 4, 6, 8, 10, 1))) for n in nums]
+    r = run("peek_sheets.py", "pick", str(night), "s1=3,1,5,7,9,11", "s2=2,4,6,8,10,1", *checked); assert r.returncode == 0, r.stdout + r.stderr
     r = run("sneak_peeks.py", "--night", str(night)); assert r.returncode in (0, 2), r.stdout + r.stderr
     r = run("first_look.py", str(night)); assert r.returncode == 0, r.stdout + r.stderr
     r = run("report_page.py", str(night)); assert r.returncode == 0, r.stdout + r.stderr

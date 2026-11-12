@@ -235,6 +235,8 @@ def not_this_card(manifest, src, files, name):
     both are "<weekday> card"). When the first card's backup had not finished, the second card was taken for it:
     nothing of the second card was copied, and the report said the photos were safe, so the second card could have
     been formatted with its photos on it alone."""
+    if manifest.get("sample"):
+        files = list(files)[:manifest["sample"].get("kept", 0)]   # a sample backup only ever holds its sample
     copied = {k: e for k, e in (manifest.get("files") or {}).items()
               if any((e.get(label) or {}).get("ok") for label in ("dest", "second"))}
     if not copied:
@@ -264,10 +266,36 @@ def not_this_card(manifest, src, files, name):
     return None
 
 
-def not_copied(manifest, src, files):
+def whole_records(records):
+    """True when the records in this folder describe a whole backup: every file copied and checked, no problems,
+    and no sample marker left, or one that covered the whole card (asked for more files than the card held),
+    which is dropped here. A sample of part of a card stays a sample: False."""
+    mp = Path(records) / "manifest.json"
+    try:
+        manifest = json.loads(mp.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    files = manifest.get("files") or {}
+    ok = bool(files) and not manifest.get("problems") and all((v.get("dest") or {}).get("ok") for v in files.values())
+    if not ok:
+        return False
+    smp = manifest.get("sample")
+    if smp:
+        if smp.get("kept", 0) < smp.get("of", 0):
+            return False
+        manifest.pop("sample")
+        tmp = mp.with_name(mp.name + ".tmp")
+        tmp.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        this_computer.replace(tmp, mp)
+    return True
+
+
+def not_copied(manifest, src, files, sampling=True):
     """The files on this card that the records do not have as copied and checked: on the drive, and in the second
     copy when there is one. Empty when the backup of this card is whole."""
     have = manifest.get("files") or {}
+    if sampling and manifest.get("sample"):
+        files = list(files)[:manifest["sample"].get("kept", 0)]   # a sample backup is whole once its sample is
     labels = ("dest", "second") if manifest.get("second") else ("dest",)
     return [k for k in (p.relative_to(src).as_posix() for p, _ in files)
             if not all(((have.get(k) or {}).get(label) or {}).get("ok") for label in labels)]
@@ -353,6 +381,8 @@ def main():
     ap.add_argument("--date", default=None, help="YYYY-MM-DD, default today")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--budget", type=float, default=None, help="seconds to work before pausing cleanly (run again to continue)")
+    ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card (in path order). "
+                    "The records say it was a sample, the report says the card is not backed up, and the card is never marked safe.")
     a = ap.parse_args()
 
     # drive_root: on a PC a bare "E:" means the top of drive E (Python alone reads it as wherever it last was on E).
@@ -367,6 +397,17 @@ def main():
     second = this_computer.drive_root(a.second).expanduser() / folder if a.second else None
 
     files, skipped = inventory(src)
+    all_files = files
+    sample = None
+    if a.sample and a.sample < len(files):     # a sample that covers the whole card is simply the whole card
+        # a sample for a test (Dustin, Nov 11: a two-card rehearsal without burning through space). Only the first
+        # N files are copied; everything that follows reads "sample" in the records, and the card is never called safe.
+        if a.sample < 1:
+            say("STOP: --sample needs a number of files, 1 or more.")
+            sys.exit(2)
+        sample = {"kept": min(a.sample, len(files)), "of": len(files)}
+        files = files[:sample["kept"]]
+        say(f"A SAMPLE, for a test: the first {sample['kept']} of the card's {sample['of']} files. The card will NOT be backed up or marked safe.")
     total_bytes = sum(s for _, s in files if s > 0)
     media = [p for p, s in files if p.suffix.lower() in MEDIA]
     say(f"Source: {src}\n  {len(files)} files, {human(total_bytes)}, {clips.words_for(media)}")
@@ -423,6 +464,10 @@ def main():
     manifest["dest"] = str(dest)
     manifest["second"] = str(second) if second else None
     manifest["skipped_system_files"] = skipped
+    if sample:
+        manifest["sample"] = sample
+    elif a.sample:
+        manifest.pop("sample", None)           # asked for more than the card holds: a whole backup
     manifest["started"] = manifest.get("started") or datetime.now().isoformat(timespec="seconds")
 
     t0 = time.time()
@@ -456,6 +501,8 @@ def main():
     elapsed = time.time() - t0
     manifest["finished"] = datetime.now().isoformat(timespec="seconds")
     manifest["problems"] = problems
+    if manifest.get("sample") and not a.sample and not not_copied(manifest, src, all_files, sampling=False):
+        manifest.pop("sample")                 # run again without --sample, it copied the rest: a whole backup now
     manifest["taken"] = (f"{taken[0]} to {taken[-1]}" if len(taken) >= 2 else taken[0]) if taken else None
     manifest["work_seconds"] = manifest.get("work_seconds", 0) + elapsed  # across resumed runs
     mpath.write_text(json.dumps(manifest, indent=1), encoding="utf-8")

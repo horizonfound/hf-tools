@@ -337,7 +337,36 @@ def home_link():
     return ""
 
 
-def build(manifest, studio):
+# One card of a shoot, shown inside the shoot's page (shoot_report.py): the card page sits in a frame sized to its
+# content, so anything it pins to its own window (the enlarged photo, the Show me more grid, the folder button's
+# line) would sit in the middle of the whole card, often off screen. This puts those on the part of the frame that is
+# in view, and keeps them there as the page scrolls. Same page, same address family, so same origin.
+CARD_SCRIPT = """
+<script>
+(function(){
+  if(window===window.parent||!window.frameElement) return;
+  var sel='.big,.pkbig,.open-toast';
+  function place(){
+    var r=window.frameElement.getBoundingClientRect(), top=Math.max(0,-r.top), h=parent.innerHeight;
+    document.querySelectorAll(sel).forEach(function(el){
+      var on=el.classList.contains('open-toast')?el.classList.contains('on'):getComputedStyle(el).display!=='none';
+      if(!on){ el.style.top=''; el.style.height=''; el.style.bottom=''; return; }
+      if(el.classList.contains('open-toast')){ el.style.top=(top+h-70)+'px'; el.style.bottom='auto'; }
+      else { el.style.top=top+'px'; el.style.height=h+'px'; el.style.bottom='auto'; }
+    });
+  }
+  new MutationObserver(place).observe(document.documentElement,{attributes:true,subtree:true,attributeFilter:['style','class']});
+  parent.addEventListener('scroll',place,{passive:true}); parent.addEventListener('resize',place);
+})();
+</script>
+"""
+
+CARD_CSS = ".card-hero{padding-top:1.2rem;padding-bottom:1rem}.card-hero .h1{font-size:clamp(26px,3.6vw,40px)}"
+
+
+def build(manifest, studio, card=None):
+    """The report of one backup. card={"n": 2, "of": 3, "shoot": "Smith wedding"}: the same report as one card of a
+    shoot, for the shoot's page (no top bar, no footer, "Card 2 of 3" on the hero, the fixes a frame needs)."""
     files = manifest.get("files", {})
     total = len(files)
     total_bytes = sum(e.get("size", 0) for e in files.values() if e.get("size", 0) > 0)
@@ -362,14 +391,19 @@ def build(manifest, studio):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}</style></head><body>",
-           f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}",
-           f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
-           + "</div></div>"]
+           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}{CARD_CSS if card else ''}</style></head><body>"]
+    if not card:
+        out.append(f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}"
+                   f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
+                   + "</div></div>")
 
     # hero: the one line they need
-    out.append("<section class='wrap hero'>")
-    out.append(f"<span class='eyebrow'>Backup report · {e(name)}</span>")
+    out.append("<section class='wrap hero card-hero'>" if card else "<section class='wrap hero'>")
+    if card:
+        out.append(f"<span class='eyebrow'>Card {int(card['n'])} of {int(card['of'])} · {e(name)}"
+                   + (f" · {e(nice_time(finished))}" if finished else "") + "</span>")
+    else:
+        out.append(f"<span class='eyebrow'>Backup report · {e(name)}</span>")
     if problems:
         out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
         out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. Nothing on the memory card has been changed; "
@@ -377,6 +411,13 @@ def build(manifest, studio):
         out.append("<span class='pill bad'><span class='dot'>!</span>Not finished</span>")
         out.append("<div class='problems'><span class='eyebrow'>Needs you first</span><h2>What stopped it</h2><ul>"
                    + "".join(f"<li>{e(p)}</li>" for p in problems) + "</ul></div>")
+    elif all_good and manifest.get("sample"):
+        # a sample for a test (Dustin, Nov 11): never a word that could be read as "the card is safe"
+        smp = manifest["sample"]
+        out.append(f"<h1 class='h1'>A sample: {total:,} of the {smp.get('of', 0):,} files on the card, copied and <span class='swap'>verified.</span></h1>")
+        out.append(f"<p class='lede'>This was a test run on part of the card. The other {max(0, smp.get('of', 0) - total):,} files were not copied, "
+                   "so the card is not backed up and is not safe to format. Nothing on the memory card has been changed.</p>")
+        out.append("<span class='pill wait'><span class='dot'>…</span>Keep the card: this was a sample</span>")
     elif all_good:
         where = "your drive and your second copy" if second else "your drive"
         out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
@@ -408,7 +449,7 @@ def build(manifest, studio):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
         chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", media_words),
                  ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
-                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good else "keep the card")]
+                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good and not manifest.get("sample") else "keep the card")]
         for cls, rot, pos, text in chips:
             out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
         out.append("</div>")
@@ -442,6 +483,9 @@ def build(manifest, studio):
     if aside:
         out.append(f"<p>{len(aside)} file{'s that are' if len(aside) != 1 else ' that is'} not a photo or a video clip "
                    f"({', '.join(sorted({Path(a).suffix.lower().lstrip('.') for a in aside}))}) set aside, not deleted.</p>")
+    turned = clips.turned_words(studio)   # sideways clips turned upright in the backup copy (Dustin, Nov 11)
+    if turned:
+        out.append(f"<p>{e(turned)}</p>")
     out.append("</div>")
 
     def photos_folder(root):
@@ -486,8 +530,9 @@ def build(manifest, studio):
     out.append("</div>")
     out.append("</div></div>")
 
-    out.append("<footer class='foot'><div class='wrap'>Your memory card is exactly as it was.</div>"
-               f"<div class='wordmark'>{e(brand.name())}</div></footer>")
+    if not card:
+        out.append("<footer class='foot'><div class='wrap'>Your memory card is exactly as it was.</div>"
+                   f"<div class='wordmark'>{e(brand.name())}</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.
     # The button says what happened, every time: opened, or why not (the drive unplugged, the Studio not running).
@@ -497,19 +542,28 @@ def build(manifest, studio):
                "for(const a of document.querySelectorAll('a.where')){"
                "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=" + ("a.dataset.path||" if this_computer.WINDOWS else "") + "decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
-               "try{const r=await fetch('/open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
+               "try{const r=await fetch('open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
                "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
-    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT + "</body></html>")
+    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT
+               + (CARD_SCRIPT if card else "") + "</body></html>")
     return "\n".join(out)
 
 
 def write_page(session_dir):
+    """The report, report.html in the records. A backup that is one card of a shoot (shoot_report.py: shoot.json in
+    the records) also gets report-card.html, the same report as a card, and the shoot's own page is rebuilt for
+    every card of the shoot, so a rename or a new pick on one card shows on the shoot's page at once."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from where import locate
     _, studio = locate(session_dir)
     manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
     page = studio / "report.html"
     page.write_text(build(manifest, studio), encoding="utf-8")
+    import shoot_report
+    card = shoot_report.card_of(studio)
+    if card:
+        (studio / "report-card.html").write_text(build(manifest, studio, card=card), encoding="utf-8")
+        shoot_report.write_pages(studio)
     return page
 
 

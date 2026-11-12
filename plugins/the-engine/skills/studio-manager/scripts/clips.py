@@ -8,12 +8,17 @@ photos, and some cards hold nothing but video. One place for what the backup nee
   - one still picture of a clip, for the report and the contact sheet (a Mac only for now: the reel's video
     helper has no stills on a PC, so there a clip simply shows no picture)
 
-Nothing here changes a clip; a still is a new small JPEG in the backup's own records.
+A still is a new small JPEG in the backup's own records. The one thing here that changes a clip is the turn
+(rotate, further down): a sideways clip's orientation note is set in the BACKUP COPY only, after it is
+verified, with the log written first and the change proved against the card's hash. The card is never changed.
 """
 import json
+import os
 import shutil
+import struct
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -460,6 +465,379 @@ def sheet_words(records):
     return out
 
 
+
+# ---------------------------------------------------------------- sideways clips stand up in the backup copy
+# (Dustin, Nov 11: "there's no instance where anybody would ever want them to be left sideways"). A camera held on
+# its side to film a vertical clip often does not write the turn into the file, so the clip plays lying down in
+# every player. Once the copy on the photographer's drive is verified, the Assistant sets the clip's own
+# orientation note: the 36-byte matrix in the video track's header (the same note a phone writes), which every
+# player, CapCut, Premiere and Instagram honour. Not one frame is touched or re-encoded, so the picture is exactly
+# the camera's. THE CARD IS NEVER CHANGED: only the copy on the drive, and only after it has been verified.
+#
+# Our way: the log (clip-rotations.json) is written before the first byte changes; the 36 bytes are read back;
+# then the whole file is read ONCE and two hashes are made from that one read: the file as it is now (recorded as
+# its new sha256), and the file as it would be with the old 36 bytes put back (which must equal the hash the
+# backup took from the card, proving nothing else in the file changed). The card's hash is kept beside the new one
+# in the manifest and the index as card_sha256. A turn is undone the same way (--undo), byte for byte. Safe to
+# run twice; a run cut off part way is finished by the next.
+IDENTITY = struct.pack(">9i", 65536, 0, 0, 0, 65536, 0, 0, 0, 1 << 30)
+ROTATIONS = "clip-rotations.json"
+
+
+def matrix_for(turn, w, h):
+    """The track matrix that shows a stored w x h picture turned `turn` degrees clockwise. The form a phone
+    writes: (a, b, u, c, d, v, x, y, w), 16.16 fixed except the last column."""
+    one, F = 65536, 1 << 30
+    if turn == 90:
+        a, b, c, d, x, y = 0, one, -one, 0, h * one, 0
+    elif turn == 180:
+        a, b, c, d, x, y = -one, 0, 0, -one, w * one, h * one
+    elif turn == 270:
+        a, b, c, d, x, y = 0, -one, one, 0, 0, w * one
+    else:
+        return IDENTITY
+    return struct.pack(">9i", a, b, 0, c, d, 0, x, y, F)
+
+
+def track_matrix(path):
+    """Where a clip keeps its orientation note: {"at": the file offset of the video track's 36-byte matrix,
+    "matrix": those bytes, "w", "h": the stored picture size} for the first enabled video track, or None when the
+    file is not a video this can read. Only the header is read."""
+    video = _video()
+    path = Path(path)
+    try:
+        size = path.stat().st_size
+        f = open(path, "rb")
+    except OSError:
+        return None
+    with f:
+        moov = None
+        first = True
+        for kind, s, e in video._file_boxes(f, 0, size):
+            if first and kind not in video._TOP_KINDS:
+                return None
+            first = False
+            if s is None:
+                return None
+            if kind == b"moov":
+                moov = (s, e)
+                break
+        if not moov or moov[1] - moov[0] > video.MOOV_MOST:
+            return None
+        f.seek(moov[0])
+        b = f.read(moov[1] - moov[0])
+    if len(b) < moov[1] - moov[0]:
+        return None
+    fallback = None
+    for kind, s, e in video._boxes(b, 0, len(b)):
+        if kind != b"trak":
+            continue
+        da, dz = video._child(b, s, e, b"mdia")
+        ha, hz = video._child(b, da, dz, b"hdlr")
+        if ha is None or b[ha + 8:ha + 12] != b"vide":
+            continue
+        ta, tz = video._child(b, s, e, b"tkhd")
+        if ta is None:
+            continue
+        mo = ta + (52 if b[ta] == 1 else 40)
+        if mo + 44 > tz:
+            continue
+        w, h = (x >> 16 for x in struct.unpack_from(">II", b, mo + 36))
+        found = {"at": moov[0] + mo, "matrix": bytes(b[mo:mo + 36]), "w": w, "h": h}
+        if struct.unpack_from(">I", b, ta)[0] & 1:
+            return found
+        fallback = fallback or found
+    return fallback
+
+
+def rotations_file(records):
+    return Path(records) / ROTATIONS
+
+
+def rotations(records):
+    try:
+        return json.loads(rotations_file(records).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_json(path, data):
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    this_computer.replace(tmp, path)
+
+
+def rotations_done(records):
+    """True once the backup's clips have been looked at and every planned turn is checked (or there was nothing
+    to turn), so the backup can skip the step."""
+    d = rotations(records)
+    return d.get("status") == "done"
+
+
+def turned(records):
+    """The clips turned upright in this backup, from its log: [{"original", "turn"}]. [] when none."""
+    return [t for t in rotations(records).get("turns", []) if t.get("turn") and t.get("status") == "checked"]
+
+
+def turned_words(records):
+    """One plain line for the report, or "" when no clip was turned."""
+    n = len(turned(records))
+    if not n:
+        return ""
+    one = n == 1
+    return (f"{n} video clip{'' if one else 's'} {'was' if one else 'were'} filmed with the camera on its side and "
+            f"{'has' if one else 'have'} been turned upright in this backup, so {'it plays' if one else 'they play'} the right way up everywhere. "
+            "Only the orientation note in the file was changed, not a single frame, and the clip on your memory card is exactly as it was.")
+
+
+def _turn_of(records, root, rec, sheet_turns, group_of):
+    """(turn, how) for one clip: from the clip pages, from its still, or from a fresh look at three frames (a Mac
+    only). (None, why) when nothing can be told."""
+    orig, cur = rec.get("original") or rec["file"], rec["file"]
+    for key in (cur, orig):
+        if key in sheet_turns:
+            t = sheet_turns[key]
+            if t.get("sure"):
+                return t["turn"], "the people in it"
+            if t.get("turn"):
+                return t["turn"], "the clip beside it"
+            break                                   # on the pages, but nobody in it: judged below, or borrowed
+    gid = group_of.get(cur) or group_of.get(orig)
+    if gid:
+        name = f"{gid}_{Path(cur).stem}.jpg"
+        known = turns(Path(records) / "groups")
+        for n in (name, f"{gid}_{Path(orig).stem}.jpg"):
+            if n in known and known[n].get("sure"):
+                return known[n]["turn"], known[n].get("from", "the people in it")
+            if n in known and known[n].get("turn"):
+                return known[n]["turn"], known[n].get("from", "the clip beside it")
+    if not this_computer.MAC:
+        return None, "no way to look on a PC yet"
+    try:
+        video = _video()
+        scratch = Path(records) / ".turn-look"
+        pics, folder, _ = _three(video, root / cur, scratch, Path(cur).stem[:40] or "clip")
+    except Exception:  # noqa: BLE001
+        pics, folder = [], None
+    turn, sure = 0, False
+    for q in (pics[1:2] + pics[:1] + pics[2:]):
+        turn, sure = look(q)
+        if sure:
+            break
+    if folder:
+        shutil.rmtree(folder, ignore_errors=True)
+    try:
+        scratch.rmdir()
+    except OSError:
+        pass
+    if sure:
+        return turn, "the people in it"
+    return None, "nobody in it to go by"
+
+
+def plan_rotations(night):
+    """Which clips need turning, and by how much. Returns (root, records, plan): the log as it will be written,
+    with every clip of the backup in it (turn 0 and "left" entries included, so the report can say what was looked
+    at). Entries already checked in an earlier run are kept as they are."""
+    from where import locate
+    root, records = locate(night)
+    index = json.loads((records / "index.json").read_text(encoding="utf-8"))
+    files = json.loads((records / "manifest.json").read_text(encoding="utf-8")).get("files", {})
+    old = {t["original"]: t for t in rotations(records).get("turns", [])}
+    sheet_turns = {}
+    try:
+        for m in json.loads((records / "clip-sheets.json").read_text(encoding="utf-8")).get("clips", []):
+            sheet_turns[m["file"]] = m
+    except (OSError, ValueError):
+        pass
+    group_of = {}
+    try:
+        for g in json.loads((records / "groups.json").read_text(encoding="utf-8")).get("groups", []):
+            for f in g.get("files", []):
+                group_of[f] = g["id"]
+    except (OSError, ValueError):
+        pass
+    clip_recs = [r for r in index.get("photos", []) if is_clip(r)]
+    # the turn each clip gets; a clip nobody could judge takes the turn of the nearest judged clip in its group
+    turns_now, groups_order = {}, {}
+    for r in clip_recs:
+        orig = r.get("original") or r["file"]
+        if orig in old and old[orig].get("status") == "checked":
+            turns_now[orig] = (old[orig]["turn"], old[orig]["how"])
+            continue
+        turns_now[orig] = _turn_of(records, root, r, sheet_turns, group_of)
+        groups_order.setdefault(group_of.get(r["file"]) or group_of.get(orig) or "", []).append(orig)
+    for gid, origs in groups_order.items():
+        sure = [o for o in origs if turns_now[o][0] is not None]
+        for i, o in enumerate(origs):
+            if turns_now[o][0] is None and sure:
+                near = min(sure, key=lambda s: abs(origs.index(s) - i))
+                turns_now[o] = (turns_now[near][0], "the clip beside it")
+    plan = []
+    for r in clip_recs:
+        orig = r.get("original") or r["file"]
+        if orig in old and old[orig].get("status") == "checked":
+            plan.append(dict(old[orig], file=r["file"]))   # where the clip is now (the sort and a rename move it)
+            continue
+        turn, how = turns_now[orig]
+        entry = {"file": r["file"], "original": orig, "turn": turn or 0, "how": how, "status": "left"}
+        rec = files.get(orig) or {}
+        if orig in old and old[orig].get("status") in ("planned", "written"):
+            entry = dict(old[orig], file=r["file"])     # finish what an earlier run started, as it planned it
+            plan.append(entry)
+            continue
+        if not turn:
+            plan.append(entry)
+            continue
+        if not rec.get("sha256") or not (rec.get("dest") or {}).get("ok", True):
+            entry.update(status="left", why="no verified record in the backup, so it is left as it is")
+            plan.append(entry)
+            continue
+        tm = track_matrix(root / r["file"])
+        if tm is None:
+            entry.update(status="left", why="not a video this can read")
+            plan.append(entry)
+            continue
+        if tm["matrix"] != IDENTITY:
+            entry.update(status="left", why="already carries a turn of its own, so it is left as it is")
+            plan.append(entry)
+            continue
+        try:
+            size = (root / r["file"]).stat().st_size
+        except OSError:
+            size = None
+        if rec.get("size") is not None and size != rec.get("size"):
+            entry.update(status="left", why="not the size the backup recorded, so it is left as it is")
+            plan.append(entry)
+            continue
+        entry.update(status="planned", at=tm["at"], was=tm["matrix"].hex(), now=matrix_for(turn, tm["w"], tm["h"]).hex(),
+                     size=size, card_sha256=rec.get("card_sha256") or rec["sha256"])
+        plan.append(entry)
+    return root, records, plan
+
+
+def _hash_two(path, at, was, now, chunk=8 * 1024 * 1024):
+    """One read of the file, two hashes: (the file as it is, the file as it would be with `was` back in the
+    window at `at`). Also returns the bytes found in the window."""
+    import hashlib
+    real, asif = hashlib.sha256(), hashlib.sha256()
+    window = b""
+    pos = 0
+    with open(path, "rb") as f:
+        while True:
+            b = f.read(chunk)
+            if not b:
+                break
+            real.update(b)
+            end = pos + len(b)
+            if at < end and at + len(was) > pos:
+                lo, hi = max(at, pos) - pos, min(at + len(was), end) - pos
+                window += b[lo:hi]
+                asif.update(b[:lo] + was[max(at, pos) - at:min(at + len(was), end) - at] + b[hi:])
+            else:
+                asif.update(b)
+            pos = end
+    return real.hexdigest(), asif.hexdigest(), window
+
+
+def _write_window(path, at, data):
+    with open(path, "r+b") as f:
+        f.seek(at)
+        f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
+        f.seek(at)
+        return f.read(len(data))
+
+
+def _record_hash(records, original, current, new_sha, card_sha, turn):
+    """The manifest and the index carry the file's hash as it is now, and the card's beside it."""
+    mp = Path(records) / "manifest.json"
+    m = json.loads(mp.read_text(encoding="utf-8"))
+    rec = m.get("files", {}).get(original)
+    if rec is not None:
+        rec["sha256"], rec["card_sha256"], rec["turned"] = new_sha, card_sha, turn
+    _save_json(mp, m)
+    ip = Path(records) / "index.json"
+    ix = json.loads(ip.read_text(encoding="utf-8"))
+    for r in ix.get("photos", []):
+        if (r.get("original") or r["file"]) == original or r["file"] == current:
+            r["sha256"], r["card_sha256"], r["turned"] = new_sha, card_sha, turn
+    _save_json(ip, ix)
+
+
+def apply_rotations(night, dry_run=False, undo=False):
+    """Turn the sideways clips of a backup upright (or back, with undo). Prints one line per clip. 0 done or
+    nothing to do, 1 a problem (the log says which clip, and everything else is as it was)."""
+    root, records, plan = plan_rotations(night)
+    log_path = rotations_file(records)
+    log = dict(rotations(records), turns=plan, planned=datetime.now().isoformat(timespec="seconds"))
+    if undo:
+        todo = [t for t in plan if t.get("status") == "checked" and t.get("turn")]
+    else:
+        todo = [t for t in plan if t.get("status") in ("planned", "written")]
+    if not [t for t in plan if t.get("turn")]:
+        print("No video clip on this card needs turning." if plan else "No video clips on this card.")
+    for t in plan:
+        if t.get("turn") and t.get("status") in ("planned", "checked", "written"):
+            print(f"{Path(t['file']).name}: turn {t['turn']} ({t['how']})" + (": done" if t["status"] == "checked" and not undo else ""))
+        elif t.get("why"):
+            print(f"{Path(t['file']).name}: left as it is ({t['why']})")
+    if dry_run:
+        print(f"Dry run: {len(todo)} clip{'s' if len(todo) != 1 else ''} would be {'put back' if undo else 'turned'}. Nothing changed.")
+        return 0
+    if not todo:
+        log["status"] = "done"
+        _save_json(log_path, log)
+        return 0
+    log["status"] = "undoing" if undo else "turning"
+    _save_json(log_path, log)   # the log first, before any byte changes
+    problems = 0
+    for t in todo:
+        path = root / t["file"]
+        want, back = (bytes.fromhex(t["was"]), bytes.fromhex(t["now"])) if undo else (bytes.fromhex(t["now"]), bytes.fromhex(t["was"]))
+        try:
+            found = _write_window(path, t["at"], want)
+            if found != want:
+                raise OSError("the bytes read back are not what was written")
+            t["status"] = "written"
+            _save_json(log_path, log)
+            real, asif, window = _hash_two(path, t["at"], back, want)
+            if window != want:
+                raise OSError("the orientation note read back differently from what was written")
+            # one read, two hashes: the file as it is now, and as it would be with the other 36 bytes in place.
+            # Turning: the as-if hash must be the card's (so nothing else changed). Undoing: the file itself must
+            # now be the card's, and the as-if hash the one recorded when it was turned.
+            if undo:
+                if real != t["card_sha256"]:
+                    raise OSError("put back, but not byte for byte the card's file")
+                if t.get("sha256") and asif != t["sha256"]:
+                    raise OSError("the rest of the file does not match the backup's record")
+            elif asif != t["card_sha256"]:
+                raise OSError("the rest of the file does not match the backup's record")
+            if undo:
+                _record_hash(records, t["original"], t["file"], real, t["card_sha256"], 0)
+                t.update(status="undone", sha256=real, undone=datetime.now().isoformat(timespec="seconds"))
+                print(f"{Path(t['file']).name}: put back as the card has it, checked")
+            else:
+                _record_hash(records, t["original"], t["file"], real, t["card_sha256"], t["turn"])
+                t.update(status="checked", sha256=real, checked=datetime.now().isoformat(timespec="seconds"))
+                print(f"{Path(t['file']).name}: turned {t['turn']} degrees, checked against the card's record")
+        except OSError as e:
+            problems += 1
+            t["problem"] = str(e)
+            print(f"PROBLEM: {Path(t['file']).name}: {e}")
+        _save_json(log_path, log)
+    if undo:
+        log["turns"] = [dict(t, status="left", turn=0, how=t.get("how", "")) if t.get("status") == "undone" else t for t in log["turns"]]
+        for t in log["turns"]:
+            t.pop("undone", None)
+    log["status"] = "done" if not problems else "done with problems"
+    log["finished"] = datetime.now().isoformat(timespec="seconds")
+    _save_json(log_path, log)
+    return 1 if problems else 0
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "upright":
         # A backup whose clip stills were made before stills stood upright: each is made again from its clip (the
@@ -491,6 +869,13 @@ if __name__ == "__main__":
                 t = turns(records / "groups").get(n, {})
                 print(f"{n}: " + (f"turned {t['turn']} degrees" if t.get("turn") else "not turned") + f" ({t.get('from', 'not looked at')}); "
                       f"taken {t.get('at', '?')} s in, face score {t.get('face', '?')}")
+    elif len(sys.argv) >= 3 and sys.argv[1] == "rotate":
+        # Sideways clips stand up in the backup copy (the card is never changed; the log is written first).
+        flags = set(sys.argv[3:])
+        bad = flags - {"--dry-run", "--undo"}
+        if bad:
+            sys.exit("usage: clips.py rotate <a backup> [--dry-run] [--undo]")
+        sys.exit(apply_rotations(sys.argv[2], dry_run="--dry-run" in flags, undo="--undo" in flags))
     elif len(sys.argv) == 3 and sys.argv[1] == "sheets":
         code = sheets(sys.argv[2])
         if code == 0:
@@ -502,4 +887,4 @@ if __name__ == "__main__":
     elif len(sys.argv) == 3:
         print("made" if still(sys.argv[1], sys.argv[2]) else "no still")
     else:
-        sys.exit("usage: clips.py <video> <still.jpg>   |   clips.py upright <a backup's records>   |   clips.py sheets <a backup>")
+        sys.exit("usage: clips.py <video> <still.jpg>   |   clips.py upright <a backup's records>   |   clips.py sheets <a backup>   |   clips.py rotate <a backup> [--dry-run] [--undo]")

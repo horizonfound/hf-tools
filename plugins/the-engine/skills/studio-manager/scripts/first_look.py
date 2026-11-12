@@ -196,7 +196,7 @@ window.peekPicker=function(more,id,d,say){
   foot.querySelector('.use').disabled=empty>=0||!changed();foot.querySelector('.reset').hidden=!changed();
  }
  async function loadAll(){
-  try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id)+'&all=1',{cache:'no-store'});if(!r.ok)throw 0;const x=await r.json();photos=x.photos;index();showingAll=true;draw();}
+  try{const r=await fetch('peeks-more?shoot='+encodeURIComponent(id)+'&all=1',{cache:'no-store'});if(!r.ok)throw 0;const x=await r.json();photos=x.photos;index();showingAll=true;draw();}
   catch(e){foot.querySelector('.n').textContent='Could not load them all right now.';}}
  // photo n into spot i: from below, whatever was there goes back below; from another spot, the two trade places
  function put(n,i){const j=slots.indexOf(n);if(j===i)return;if(j>=0){slots[j]=slots[i];slots[i]=n;}else slots[i]=n;draw();}
@@ -248,9 +248,9 @@ window.peekPicker=function(more,id,d,say){
  foot.querySelector('.reset').addEventListener('click',()=>{slots=start.slice();draw();});
  foot.querySelector('.cancel2').addEventListener('click',()=>{closeBig();more.hidden=true;});
  foot.querySelector('.use').addEventListener('click',async()=>{
-  try{const r=await fetch('/peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:slots})});if(!r.ok)throw 0;
+  try{const r=await fetch('peeks-choose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,nums:slots})});if(!r.ok)throw 0;
    closeBig();more.hidden=true;say('Saving your picks...','on');
-   const t=setInterval(async()=>{try{const q=await fetch('/picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
+   const t=setInterval(async()=>{try{const q=await fetch('picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
     if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
   catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
  draw();
@@ -267,11 +267,11 @@ async function rename(id){const inp=document.getElementById(id);const name=inp.v
  if(name){inp.value=name;inp.dataset.was=name;inp.placeholder=inp.dataset.hint||inp.placeholder;inp.classList.remove('hint');inp.blur();}
  if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
  if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell Claude the name.'});return;}
- try{const r=await fetch('/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
+ try{const r=await fetch('rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
   if(!r.ok)throw 0;show(id,{state:'queued',line:'Renaming...'});poll();}
  catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell Claude the name instead.'});}}
 let timer=null;
-async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('/rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
+async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
  for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
  if(!busy){clearInterval(timer);timer=null;}}catch(e){}},1500);}
 document.querySelectorAll('.go').forEach(b=>{b.addEventListener('mousedown',ev=>ev.preventDefault());b.addEventListener('click',()=>rename(b.dataset.shoot));});
@@ -287,7 +287,7 @@ function niceDate(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateSt
 // "Show my editing queue": ask the Assistant for the queue page's address (it starts the page if it isn't up) and open it
 async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>{ev.preventDefault();
   if(!location.protocol.startsWith('http')){st.textContent='Ask Claude to show your editing queue.';st.className='qstate bad';return;}
-  try{const r=await fetch('/queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;location.href=d.url;}
+  try{const r=await fetch('queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;(window.top||window).location.href=d.url;}
   catch(e){st.textContent='Could not open the queue page. Ask Claude to show your editing queue.';st.className='qstate bad';}});}
 document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
 // The sneak peeks are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
@@ -299,14 +299,14 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
  ask.querySelector('.cancel').addEventListener('click',()=>{ask.hidden=true});
  ask.querySelector('.send').addEventListener('click',async()=>{
   if(!live){say('Open this page through the Assistant for this, or just tell Claude: "pick different sneak peeks for the beach shoot."','bad');return;}
-  try{const r=await fetch('/peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
+  try{const r=await fetch('peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();ask.hidden=true;say(d.words||'Got it.','on');}
   catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
  w.querySelector('.more').addEventListener('click',async()=>{
   ask.hidden=true;if(!more.hidden){more.hidden=true;return;}
   if(!live){say('Open this page through the Assistant for this, or tell Claude "show me more from the beach shoot."','bad');return;}
   say('');
-  try{const r=await fetch('/peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
+  try{const r=await fetch('peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
    window.peekPicker(more,id,d,say);more.hidden=false;}
   catch(e){say('Could not load more right now. Tell Claude "show me more from this shoot."','bad');}});
 });
@@ -320,7 +320,7 @@ document.querySelectorAll('.queue').forEach(q=>{
  save.addEventListener('click',async()=>{if(!inp.value)return;
   if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell Claude.';st.className='qstate bad';return;}
   save.disabled=true;
-  try{const r=await fetch('/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
+  try{const r=await fetch('queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();
    const was=q.querySelector('.queued');if(was)was.remove();const a=q.querySelector('.add');if(a)a.remove();
    pick.hidden=true;
@@ -455,10 +455,10 @@ const ask=async(row,url)=>{
  try{const r=await fetch(url,{cache:'no-store'});const j=await r.json();say(row,j.words||(j.ok?'':'Could not open it.'))}
  catch(e){say(row,'The Assistant is not running right now. Ask Claude to show the report, then try again.')}};
 document.querySelectorAll('.ph.clip[data-play]').forEach(p=>{
- const go=()=>{const row=rowOf(p.dataset.shoot);say(row,'Opening it...');ask(row,'/play?file='+encodeURIComponent(p.dataset.play))};
+ const go=()=>{const row=rowOf(p.dataset.shoot);say(row,'Opening it...');ask(row,'play?file='+encodeURIComponent(p.dataset.play))};
  p.addEventListener('click',go);p.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}})});
 document.querySelectorAll('.clips-row .all-clips').forEach(b=>b.addEventListener('click',()=>{
- const row=b.closest('.clips-row');say(row,'Opening the folder...');ask(row,'/open-clips?shoot='+encodeURIComponent(row.dataset.shoot))}));
+ const row=b.closest('.clips-row');say(row,'Opening the folder...');ask(row,'open-clips?shoot='+encodeURIComponent(row.dataset.shoot))}));
 })();</script>"""
 
 

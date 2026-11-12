@@ -116,7 +116,10 @@ def mixed(work):
     sheets = json.loads((st / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
     check("the sneak-peek pages hold photos only", all(not m["file"].upper().endswith(".MP4") for s in sheets.values() for m in s["list"])
           and sheets["s1"]["photos"] == 6, str({k: v["photos"] for k, v in sheets.items()}))
-    code, out = t.run("peek_sheets.py", "pick", session, "s1=1,2,3,4,5,6", "s2=1,2,3,4,5", env=env)
+    code, out = t.run("peek_sheets.py", "closer", session, "s1=1,2,3,4,5,6", "s2=1,2,3,4,5", env=env)
+    check("the close look runs (with the face check on a Mac)", code == 0, out[-300:])
+    checked = [f"--checked={sid} {n}: eyes open, mouth closed, sharp (a pretend photo)" for sid, nums in (("s1", range(1, 7)), ("s2", range(1, 6))) for n in nums]
+    code, out = t.run("peek_sheets.py", "pick", session, "s1=1,2,3,4,5,6", "s2=1,2,3,4,5", *checked, env=env)
     check("the sneak peeks are picked", code == 0, out[-300:])
 
     # a second sort plans nothing new
@@ -275,6 +278,111 @@ def upright_rules(work):
     check("a still with nobody in it takes the turn of the clip beside it, and only once", asked == [("a.jpg", 90)], str(asked))
 
 
+def turning(work):
+    """Sideways clips stand up in the backup copy (Dustin, Nov 11): the orientation note in the clip's own header is
+    set on the drive's copy, never on the card; the log is written first; one read proves nothing else changed and
+    gives the new hash, kept beside the card's; a second run does nothing; the sort, the settle and a rename still
+    prove every file; --undo puts the bytes back exactly; the report says what was turned."""
+    print("\nSideways clips turned upright in the backup copy")
+    sys.path.insert(0, str(SCRIPTS))
+    import clips
+    home, drive, card = work / "home3", work / "drive3", work / "CARD3"
+    home.mkdir(); drive.mkdir()
+    d = card / "DCIM" / "100CANON"
+    d.mkdir(parents=True)
+    env = {"STUDIO_HOME": str(home)}
+    start = datetime(2026, 6, 6, 10, 0, 0).astimezone()
+    for i in range(3):
+        clip_at(d / f"MVI_{8001 + i}.MP4", start + timedelta(minutes=3 * i))
+    before = card_hashes(card)
+    t.run("studio_file.py", "set", "--drive", drive, "--offered", "1", "--file-names", "shoot", env=env)
+    code, out = night(card, env, "turn card")
+    session = drive / "2026-11-11 turn card"
+    st = session / "_studio"
+    check("the backup copies the card and asks for the look", code == 4, out[-500:])
+    if code != 4:
+        return
+    decide(st, ["Chair"])
+    # nobody is in the test clips, so nothing was turned by the backup itself; now the clip pages say which way up
+    # each clip is (as the Mac's look would have), and the turn is asked for by hand
+    log = json.loads((st / "clip-rotations.json").read_text(encoding="utf-8")) if (st / "clip-rotations.json").is_file() else {}
+    if sys.platform == "darwin":
+        check("with nobody in any clip the backup turns nothing and says so in its log",
+              log.get("status") == "done" and all(x["status"] == "left" and not x["turn"] for x in log.get("turns", [])), str(log)[:400])
+    files = [f"DCIM/100CANON/MVI_{8001 + i}.MP4" for i in range(3)]
+    (st / "clip-sheets.json").write_text(json.dumps({"made": 3, "of": 3, "pages": [], "clips": [
+        {"n": 1, "file": files[0], "group": "g01", "turn": 90, "sure": True},
+        {"n": 2, "file": files[1], "group": "g01", "turn": 0, "sure": False},     # nobody: takes the clip beside it
+        {"n": 3, "file": files[2], "group": "g01", "turn": 270, "sure": True}]}), encoding="utf-8")
+    code, out = t.run("clips.py", "rotate", session, "--dry-run", env=env)
+    check("a dry run says what it would turn and changes nothing", code == 0 and "3 clips would be turned" in out and card_hashes(card) == before
+          and all(sha(session / f) == before[Path(f).name] for f in files), out[-500:])
+    code, out = t.run("clips.py", "rotate", session, env=env)
+    log = json.loads((st / "clip-rotations.json").read_text(encoding="utf-8"))
+    by = {x["original"]: x for x in log["turns"]}
+    check("the three clips are turned: 90, 90 borrowed from the clip beside it, and 270, each checked",
+          code == 0 and [(by[f]["turn"], by[f]["status"]) for f in files] == [(90, "checked"), (90, "checked"), (270, "checked")]
+          and by[files[1]]["how"] == "the clip beside it", out[-600:] + str(by)[:300])
+    manifest = json.loads((st / "manifest.json").read_text(encoding="utf-8"))["files"]
+    ix = {p.get("original") or p["file"]: p for p in json.loads((st / "index.json").read_text(encoding="utf-8"))["photos"]}
+    ok = True
+    for f, turn in zip(files, (90, 90, 270)):
+        tm = clips.track_matrix(session / f)
+        now = sha(session / f)
+        ok = ok and tm["matrix"] == clips.matrix_for(turn, tm["w"], tm["h"]) and now != before[Path(f).name]
+        ok = ok and manifest[f]["sha256"] == now and manifest[f]["card_sha256"] == before[Path(f).name] and manifest[f]["turned"] == turn
+        ok = ok and ix[f]["sha256"] == now and ix[f]["card_sha256"] == before[Path(f).name]
+        data = bytearray((session / f).read_bytes()); data[tm["at"]:tm["at"] + 36] = clips.IDENTITY
+        ok = ok and hashlib.sha256(bytes(data)).hexdigest() == before[Path(f).name]   # only those 36 bytes differ
+    check("each clip's header carries its turn, nothing else in the file changed, and the records keep both hashes", ok)
+    video = clips._video()
+    check("the video reader now sees the turn and the picture standing tall", video.facts(session / files[0])["rotation"] == 90
+          and video.facts(session / files[0])["w"] < video.facts(session / files[0])["h"])
+    code, out = t.run("clips.py", "rotate", session, env=env)
+    log2 = json.loads((st / "clip-rotations.json").read_text(encoding="utf-8"))
+    check("run again it does nothing", code == 0 and log2["turns"] == log["turns"] and all(sha(session / f) == manifest[f]["sha256"] for f in files), out[-300:])
+    # a run cut off after the log was written and the bytes changed, before the check: the next run finishes it
+    log2["turns"][0]["status"] = "written"; log2["turns"][0].pop("sha256", None); log2["status"] = "turning"
+    (st / "clip-rotations.json").write_text(json.dumps(log2), encoding="utf-8")
+    code, out = t.run("clips.py", "rotate", session, env=env)
+    log3 = json.loads((st / "clip-rotations.json").read_text(encoding="utf-8"))
+    check("a run cut off before its check is finished by the next run", code == 0 and log3["turns"][0]["status"] == "checked" and log3["status"] == "done", out[-300:])
+    # a clip changed on the drive since: refused, nothing written
+    bad = session / files[2]
+    data = bytearray(bad.read_bytes()); data[-1] ^= 1; bad.write_bytes(bytes(data))
+    log3["turns"][2]["status"] = "planned"; log3["turns"][2].pop("sha256", None)
+    (st / "clip-rotations.json").write_text(json.dumps(log3), encoding="utf-8")
+    code, out = t.run("clips.py", "rotate", session, env=env)
+    log4 = json.loads((st / "clip-rotations.json").read_text(encoding="utf-8"))
+    check("a clip whose bytes no longer match the backup's record is a problem, said plainly, and the run says so (exit 1)",
+          code == 1 and "PROBLEM" in out and "does not match" in out and log4["status"] == "done with problems", out[-400:])
+    data[-1] ^= 1; bad.write_bytes(bytes(data))
+    log4["turns"][2]["status"] = "checked"; log4["turns"][2].pop("problem", None); log4["status"] = "done"
+    log4["turns"][2]["sha256"] = sha(bad)
+    (st / "clip-rotations.json").write_text(json.dumps(log4), encoding="utf-8")
+    # the rest of the backup: sort, report, settle, all proving the turned files
+    code, out = night(card, env, "turn card")
+    records = drive / ".studio" / session.name
+    flat = drive / "2026-06-06 Chair"
+    check("the backup sorts and settles with the turned clips (exit 0), every file proved", code == 0 and (records / "settled.json").is_file()
+          and sorted(p.name for p in flat.glob("*.MP4")) == [f"Chair_{n:04d}_MVI_{8000 + n}.MP4" for n in range(1, 4)], out[-700:])
+    if (records / "report.html").is_file():
+        page = (records / "report.html").read_text(encoding="utf-8")
+        check("the report says the 3 clips were turned upright and the card is as it was",
+              "3 video clips were filmed with the camera on its side" in page and "memory card is exactly as it was" in page)
+    code, out = t.run("rename_shoot.py", records, "--shoot", "s1", "--name", "Green chair", env=env)
+    moved = drive / "2026-06-06 Green chair"
+    check("a rename after the turn still proves every clip", code == 0 and moved.is_dir() and len(list(moved.glob("*.MP4"))) == 3, out[-400:])
+    code, out = t.run("clips.py", "rotate", records, "--undo", env=env)
+    manifest = json.loads((records / "manifest.json").read_text(encoding="utf-8"))["files"]
+    check("--undo puts every clip back byte for byte as the card has it, and the records say so",
+          code == 0 and all(sha(p) == before[p.name.split("_", 2)[2]] for p in moved.glob("*.MP4"))
+          and all(manifest[f]["sha256"] == before[Path(f).name] and not manifest[f]["turned"] for f in files), out[-500:])
+    log5 = json.loads((records / "clip-rotations.json").read_text(encoding="utf-8"))
+    check("after the undo the log holds no turn, so a report rebuilt now says nothing about turning", not clips.turned(records) and log5["status"] == "done")
+    check("the card is exactly as it was", card_hashes(card) == before)
+
+
 def served(records, env):
     """The report's server: a click plays a clip the records list and nothing else; See all opens the clips' folder.
     The opener itself is swapped for a recorder, so no player and no folder window ever opens in a test."""
@@ -395,6 +503,7 @@ def main():
         mixed(work)
         video_only(work)
         upright_rules(work)
+        turning(work)
         quiet_card(work)
         undated(work)
     finally:
