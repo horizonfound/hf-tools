@@ -941,11 +941,19 @@ def extract_audio(video, out, timeout=600):
 # ---------------------------------------------------------------- a video's talking, for turning into words
 #
 # The sound a transcriber listens to (transcribe.py): 16,000 a second, one channel, 16-bit, a plain .wav on the
-# computer's own disk. ONE route on a Mac, file to file: afconvert straight to the file; if afconvert can't read
-# that video's sound, AVFoundation's own reader writing straight to the file. Never ffmpeg, even when this Mac
-# has one (every word's time must be the same on every Mac), never decode(), and never through Python's memory:
-# a 30-minute talk is 58 MB of samples, which decode() would hold two or three times over and loop through
-# slowly. Here nothing is held: memory is the same for ten seconds as for thirty minutes.
+# computer's own disk. ONE route on a Mac, file to file: AVFoundation's own reader writing straight to the file,
+# the same part of the Mac that makes the small copy the page plays, so a word's time and the picture it is
+# played against come from one clock. Only if that reader can't read the video's sound: afconvert straight to
+# the file. Never ffmpeg, even when this Mac has one (every word's time must be the same on every Mac), never
+# decode(), and never through Python's memory: a 30-minute talk is 58 MB of samples, which decode() would hold
+# two or three times over and loop through slowly. Here nothing is held: memory is the same for ten seconds as
+# for thirty minutes.
+#
+# Why the reader first (Nov 13, 2026; afconvert was first until then): on GitHub's Mac, an older macOS than the
+# one this was written on, afconvert left the AAC warm-up (2,112 samples, 44 ms) at the front of a .mov's sound,
+# so every word would have come back 44 ms late there, while the reader was within 0.1 ms on both Macs. How
+# afconvert treats that warm-up changes from one macOS to the next; the reader's answer did not. It costs under
+# a second for 20 minutes of talking. tests/transcribe_check.py measures both routes with clicks.
 
 SPEECH_RATE = 16000
 SPEECH_PART = 300                 # seconds of sound one run of AVFoundation's reader takes (see _speech_reader)
@@ -1065,8 +1073,10 @@ def speech_wav(video, out, rate=SPEECH_RATE, timeout=600):
     """The talking in a video as a small sound file a transcriber can listen to: `rate` a second (16,000), one
     channel, 16-bit, a plain .wav at `out` (which must not be there yet; put it on the computer's own disk).
     (path written, how) or (None, why in plain words; exactly _NO_SOUND when the video has no sound).
-    how: "afconvert" or "avfoundation". The video is only ever read. Written under a hidden name first and given
-    its real name only when whole. Nothing is held in memory: it goes from file to file.
+    how: "avfoundation" (the usual route: the Mac's own reader, whose times are the small copy's) or "afconvert"
+    (only when that reader could not read the sound; on some versions of macOS its times run 44 ms late for a
+    .mov, see the note above). The video is only ever read. Written under a hidden name first and given its
+    real name only when whole. Nothing is held in memory: it goes from file to file.
     A Mac only (no ffmpeg, on purpose: the word times must be the same on every Mac); on a PC nothing can turn
     talking into words yet, so this says so and makes nothing."""
     video, out = str(video), Path(out)
@@ -1075,29 +1085,36 @@ def speech_wav(video, out, rate=SPEECH_RATE, timeout=600):
     if out.exists():
         return None, f"there is already a file called {out.name} there"
     timeout = max(1.0, float(timeout))
+    import time
+    end = time.time() + timeout
     part = _scratch(out)
     _remove_ours(part)
     detail = ""
     try:
+        if not os.environ.get("ASSISTANT_NO_AVFOUNDATION"):
+            ok, why = _speech_reader(video, part, rate, timeout)
+            if ok:
+                if not _place(str(part), str(out)):
+                    return None, f"there is already a file called {out.name} there"
+                return out, "avfoundation"
+            if why == _NO_SOUND:
+                return None, why
+            if why == "it took too long":
+                return None, "getting the talking out of that video took too long"
+            detail = why or ""
+            _remove_ours(part)
         if _afconvert_ok():
             try:
                 r = subprocess.run(["afconvert", "-f", "WAVE", "-d", f"LEI16@{int(rate)}", "-c", "1", video, str(part)],  # pc-ok: Mac only (a PC returned above)
-                                   stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
+                                   stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", errors="replace",
+                                   timeout=max(1.0, end - time.time()))
             except subprocess.TimeoutExpired:
                 return None, "getting the talking out of that video took too long"
             if r.returncode == 0 and part.is_file() and part.stat().st_size > 44 and (_wav_duration(str(part)) or 0) > 0:
                 done = part if _place(str(part), str(out)) else None
                 return (out, "afconvert") if done else (None, f"there is already a file called {out.name} there")  # pc-ok: the name of the route, in the Mac branch
-            detail = _last_line(r.stderr)
-            _remove_ours(part)
-        if os.environ.get("ASSISTANT_NO_AVFOUNDATION"):
-            return None, "I couldn't read any sound in that video. " + detail
-        ok, why = _speech_reader(video, part, rate, timeout)
-        if not ok:
-            return None, (why if why == _NO_SOUND else "I couldn't read any sound in that video. " + (why or detail))
-        if not _place(str(part), str(out)):
-            return None, f"there is already a file called {out.name} there"
-        return out, "avfoundation"
+            detail = detail or _last_line(r.stderr)
+        return None, "I couldn't read any sound in that video. " + detail
     except OSError as e:
         return None, f"I couldn't get the talking out of that video ({e})"
     finally:

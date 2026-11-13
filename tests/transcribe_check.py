@@ -847,7 +847,9 @@ def part_sound():
     tone_file(short, 20)
     tone_file(long_, 1200)
     (d / "measure.py").write_text(MEASURE, encoding="utf-8")
-    for route, env in (("afconvert", {}), ("avfoundation", {"ASSISTANT_NO_AFCONVERT": "1"})):
+    # the usual route first (AVFoundation's reader, with nothing switched off), then the one behind it (afconvert,
+    # reached here by making this Mac answer as if its reader could not read the sound)
+    for route, env in (("avfoundation", {}), ("afconvert", {"ASSISTANT_NO_AVFOUNDATION": "1"})):
         mem = {}
         for name, src, secs in (("short", short, 20), ("long", long_, 1200)):
             out = d / f"{name}-{route}.wav"
@@ -1425,22 +1427,36 @@ def part_timing(clips):
     off_cp = max(abs(x - t) for x, t in zip(cp, truth))
     apart = max(abs(x - y) for x, y in zip(sp, cp))
     print(f"      (clicks: the sound is within {off_sp * 1000:.1f} ms of where they were put, the small copy within {off_cp * 1000:.1f} ms; "
-          f"the two are {apart * 1000:.1f} ms apart at most; the sound came through {how})")
+          f"the two are {apart * 1000:.1f} ms apart at most; the sound came through {how}, the small copy's through {how2})")
+    check("the sound the words are made from comes through AVFoundation's reader, the same part of the Mac that made the small copy "
+          "(never afconvert while the reader can read it: afconvert's times change from one macOS to the next)",
+          how == "avfoundation" and how2 == "avfoundation", (how, how2))
     check("the click times in the sound the words are made from and in the small copy the page plays agree within 20 ms", apart < 0.020, apart)
     check("...and both are within 20 ms of where the clicks really are", off_sp < 0.020 and off_cp < 0.020, (off_sp, off_cp))
-    os.environ["ASSISTANT_NO_AFCONVERT"] = "1"
+    # The route behind it: afconvert, used only when the reader can't read a video's sound. It is MEASURED here on
+    # every Mac and the number printed. On GitHub's Mac (Nov 13, 2026) it left the AAC warm-up, 2,112 samples at
+    # 48,000 a second (44.0 ms), at the front of this .mov's sound, so its clicks came back that much late; on
+    # macOS 27 it is exact. Either is a known answer; anything else is a failure.
+    os.environ["ASSISTANT_NO_AVFOUNDATION"] = "1"
     try:
-        wav2, how3 = sound.speech_wav(str(clip), d / "speech-reader.wav")
+        wav2, how3 = sound.speech_wav(str(clip), d / "speech-afconvert.wav")
     finally:
-        os.environ.pop("ASSISTANT_NO_AFCONVERT")
+        os.environ.pop("ASSISTANT_NO_AVFOUNDATION")
+    check("with the reader out of the way, afconvert still gets the talking out (the route behind it works)", wav2 is not None and how3 == "afconvert", how3)
     if wav2 is not None:
         a2, r2 = sound._read_wav(str(wav2))
         s2 = onsets(a2, r2)
-        apart2 = max(abs(x - y) for x, y in zip(s2, cp)) if s2 else 9
-        print(f"      (through AVFoundation's reader instead: {apart2 * 1000:.1f} ms apart at most)")
-        check("the other route (AVFoundation's reader) agrees with the small copy within 20 ms too", how3 == "avfoundation" and apart2 < 0.020, (how3, apart2))
-    else:
-        check("the other route (AVFoundation's reader) reads the clip", False, how3)
+        late = [x - t for x, t in zip(s2, truth)] if s2 else []
+        warmup = 2112 / 48000
+        exact = bool(late) and max(abs(x) for x in late) < 0.020
+        kept_warmup = bool(late) and all(abs(x - warmup) < 0.002 for x in late)
+        if exact:
+            print(f"      (through afconvert instead: within {max(abs(x) for x in late) * 1000:.1f} ms of where the clicks were put)")
+        elif kept_warmup:
+            print(f"      NOTE  through afconvert instead, every click is {sum(late) / len(late) * 1000:.1f} ms LATE on this Mac: its afconvert leaves the "
+                  f"AAC warm-up (2,112 samples, 44.0 ms) at the front of a .mov's sound. That is why afconvert is only the route behind the reader.")
+        check("afconvert's click times are a known answer: exact, or late by exactly the AAC warm-up (44.0 ms, give or take 2 ms) on a Mac "
+              "whose afconvert keeps it; never anything else", exact or kept_warmup, late)
 
 
 def main():

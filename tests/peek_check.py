@@ -37,7 +37,10 @@ def check(what, ok, more=""):
 
 def run(*args, env=None):
     e = dict(os.environ, **(env or {}))
-    r = subprocess.run([sys.executable, str(SCRIPTS / args[0]), *args[1:]], capture_output=True, text=True, env=e)
+    # The scripts print UTF-8 on every computer (this_computer sees to it), so their output is read as UTF-8
+    # here, never in the computer's own code page: on a PC that is cp1252, which turns the "·" in a verdict
+    # into two other characters, and the check of the printed verdicts failed there for that reason alone.
+    r = subprocess.run([sys.executable, str(SCRIPTS / args[0]), *args[1:]], capture_output=True, encoding="utf-8", errors="replace", env=e)
     return r.returncode, r.stdout + r.stderr
 
 
@@ -158,9 +161,19 @@ def picking(work):
     check("a hero with no face, in a shoot with faces: refused", code == 1 and "s1 7 is the hero" in out, out[-300:])
     code, out = run("peek_sheets.py", "pick", str(night), "s1=1,3,9,10,11,12", *[L("s1", n) for n in (1, 3, 9, 10, 11, 12)], env=env)
     check("a flagged photo that is not the hero: refused, with the way to say anyway", code == 1 and "s1 3: the face check found mouth open" in out and "anyway:" in out, out[-300:])
-    code, out = run("peek_sheets.py", "pick", str(night), "s1=1,13,9,10,11,12", *[L("s1", n) for n in (1, 13, 9, 10, 11, 12)], env=env)
-    check("a photo that was never on the close-look pages: refused (on a Mac)", (code == 1 and "s1 13: not on the close-look pages" in out) if this_computer.MAC else code == 0, out[-300:])
     check("a refused pick writes nothing", pj.read_text(encoding="utf-8") == before)
+    # A photo that was never put through closer. On a Mac that is refused, and nothing is written. A PC has no
+    # face check to have put it through, so there the lines are all that is asked: the pick is accepted, and so
+    # it IS written (the first Windows runs asked for "nothing written" after this accepted pick, and failed).
+    code, out = run("peek_sheets.py", "pick", str(night), "s1=1,13,9,10,11,12", *[L("s1", n) for n in (1, 13, 9, 10, 11, 12)], env=env)
+    after = pj.read_text(encoding="utf-8")
+    if this_computer.MAC:
+        check("a photo that was never on the close-look pages: refused (on a Mac)", code == 1 and "s1 13: not on the close-look pages" in out, out[-300:])
+        check("... and that refusal writes nothing either", after == before)
+    else:
+        check("a photo that was never on the close-look pages: accepted off a Mac (no face check to put it through)", code == 0 and "s1: 6 sneak peeks" in out, out[-300:])
+        got = [p["n"] for p in json.loads(after)["picks"] if p["shoot"] == "s1"]
+        check("... and that accepted pick is written, in the order asked", got == [1, 13, 9, 10, 11, 12], str(got))
     code, out = run("peek_sheets.py", "pick", str(night), "s1=1,3,9,10,11,12", "s2=1,2,3,4,5,6", *[L("s1", n) for n in (1, 9, 10, 11, 12)], L("s1", 3, "anyway: a laugh, mouth open on purpose, eyes open"),
                     *[L("s2", n, "no face: a landscape, no eyes or mouth to see, sharp") for n in (1, 2, 3, 4, 5, 6)], env=env)
     check("a clean hero, a flagged photo said anyway, and a landscape shoot with no faces: accepted", code == 0 and "s1: 6 sneak peeks" in out and "s2: 6 sneak peeks" in out, out[-300:])

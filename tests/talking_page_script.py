@@ -184,6 +184,15 @@ def run_page(t, c, s):
     a_, b_ = c.rect(word(4)), c.rect(word(6))
     c.drag((a_["x"] + 2, a_["cy"]), (b_["right"] - 2, b_["cy"]), steps=8)
     c.wait_for("document.getElementById('selBar').style.display === 'flex'", 5)
+    # The bar shows from the drag's FIRST step, and the page moves it on every `selectionchange`, which a browser
+    # hands over a moment AFTER the highlight itself has grown. So give the last one up to 5 s to arrive before
+    # measuring (on GitHub's Mac, Nov 13, the bar was read where the step before the last had put it, 4.7 px
+    # left). The measure and the check below are what they were: a bar that never gets there still FAILS.
+    try:
+        c.wait_for("(function(){ var b = document.getElementById('selBar').getBoundingClientRect(), s = window.getSelection().getRangeAt(0).getBoundingClientRect();"
+                   " return Math.abs(b.left + b.width / 2 - (s.left + s.width / 2)) < 2; })()", 5)
+    except Exception as e:
+        print("      (the bar did not come to the middle of the highlight in 5 s; measured as it stands: %s)" % str(e)[:200])
     bar = c.js("(function(){ var b = document.getElementById('selBar'), r = b.getBoundingClientRect(), s = window.getSelection().getRangeAt(0).getBoundingClientRect();"
                " return {kids: Array.from(b.children).map(function(e){ return e.tagName === 'I' ? '|' : e.textContent; }), top: r.top, want: Math.max(8, s.top - 48), l: r.left, r: r.right,"
                " mid: r.left + r.width / 2, smid: s.left + s.width / 2, got: window.Talk.selectedWords(), paused: document.getElementById('vid').paused}; })()")

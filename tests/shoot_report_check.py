@@ -4,7 +4,9 @@
 
     python3 tests/shoot_report_check.py [--port 8871]
 
-Nothing under ~/.studio is touched (STUDIO_HOME points at a scratch folder); the server runs on 127.0.0.1 only.
+Nothing under ~/.studio is touched (STUDIO_HOME points at a scratch folder); the servers run on 127.0.0.1 only.
+The report server is on --port; the editing-queue server the test starts for the queue-url route is on --port + 30
+(or the next free one of the 20 after it). Both are the test's own programs and are stopped before it ends.
 """
 import argparse
 import json
@@ -49,6 +51,18 @@ def get(url, method="GET", body=None):
             return r.status, r.headers, r.read()
     except urllib.error.HTTPError as ex:
         return ex.code, ex.headers, ex.read()
+
+
+def first_line(proc, starts):
+    """The address a page server prints as it comes up (the second word of its line that starts so), or None if
+    the program ended without printing it."""
+    for _ in range(100):
+        line = proc.stdout.readline()
+        if line.startswith(starts):
+            return line.split(":", 1)[1].split()[0]
+        if not line:
+            break
+    return None
 
 
 def main():
@@ -154,16 +168,18 @@ def main():
         # the server, started on card 2, serves the shoot's page and every card
         proc = subprocess.Popen([sys.executable, str(SCRIPTS / "serve_report.py"), str(n2), "--port", str(a.port)],
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, **env))
+        # The queue-url route starts an editing-queue server that is meant to outlive its starter when none answers
+        # (serve_report.queue_url). Left to do that here, it stayed running after every run of this test: on a Mac
+        # a stray program per run, on a PC a program holding logs/queue.log open, so the scratch folder could not
+        # be removed and the test ended in an error with every check passed. So the test starts the queue server
+        # itself, as its own program it can stop, and the route must find that one and start no second.
+        qproc = subprocess.Popen([sys.executable, str(SCRIPTS / "edit_queue.py"), "serve", "--port", str(a.port + 30)],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, **env))
         try:
-            base = None
-            for _ in range(100):
-                line = proc.stdout.readline()
-                if line.startswith("Report:"):
-                    base = line.split()[1].rsplit("/", 1)[0]
-                    break
-                if not line:
-                    break
-                time.sleep(0.05)
+            queue_page = first_line(qproc, "Editing queue:")
+            check("the test's own editing-queue server starts", bool(queue_page), "")
+            base = first_line(proc, "Report:")
+            base = base and base.rsplit("/", 1)[0]
             check("the server starts", bool(base), "")
             if base:
                 st, hd, body = get(base + "/report.html")
@@ -190,7 +206,14 @@ def main():
                 st, hd, body = get(base + "/")
                 check("the bare address goes to the shoot's page", st == 200 and b"on both cards, safely backed up" in body, str(st))
                 st, hd, body = get(base + "/card/1/queue-url")
-                check("a small route under a card's prefix answers (queue-url)", st in (200, 503), str(st))
+                if queue_page:
+                    check("a small route under a card's prefix answers (queue-url), with the queue page already running",
+                          st == 200 and json.loads(body).get("url") == queue_page, f"{st} {body[:120]!r}")
+                    check("the report server started no second queue server (nothing left running after the test)",
+                          not (work / "studio-home" / "logs" / "queue.log").exists())
+                else:
+                    print("SKIPPED: the queue-url route (the test's own editing-queue server did not start, and asking "
+                          "the route without it would leave a queue server running after the test)")
                 st, hd, body = get(base + "/card/2/rename", method="POST", body=json.dumps({"shoot": "s1", "name": "Fake beach renamed"}).encode())
                 time.sleep(0.3)
                 st1, _, b1 = get(base + "/card/1/rename-status")
@@ -202,11 +225,14 @@ def main():
                     if json.loads(b2).get("s1", {}).get("state") in ("done", "problem"):
                         break
         finally:
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            for pr in (proc, qproc):
+                pr.terminate()
+                try:
+                    pr.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pr.kill()
+                    pr.wait(timeout=10)
+                pr.stdout.close()
 
         # night.py --with links as the card is backed up (the arguments are read; a whole night is pc_smoke's job)
         code, out = run("night.py", "--help", env=env)

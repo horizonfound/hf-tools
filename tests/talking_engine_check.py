@@ -23,6 +23,13 @@ import talking as T  # noqa: E402
 
 fails = 0
 
+# A PC's own code page (cp1252) cannot spell every character a check below names (the digit "٣", say), and a
+# print that cannot be spelled would stop the test before its verdict. Same lines as the other tests.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 
 def check(name, cond, got=None):
     global fails
