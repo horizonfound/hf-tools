@@ -249,6 +249,10 @@ def part_rules():
           "if r.isFinal { finish() }" in flat and "if all.isEmpty { fail(" in flat and "} else { finish() }" in flat)
     check("swift: never Apple's servers (refuses when this Mac can't do it by itself)",
           'guard rec.supportsOnDeviceRecognition else { fail("servers") }' in flat and "req.requiresOnDeviceRecognition = true" in flat)
+    check("the page's note about the box's \"sent to Apple\" sentence stands only while the Swift holds both by-itself lines, and the servers line is still there to back it",
+          'guard rec.supportsOnDeviceRecognition else { fail("servers") }' in flat and "req.requiresOnDeviceRecognition = true" in flat
+          and "I only ask your Mac to do it by itself, and I stop if it can't." in TR.APPLE_NOTE and "servers" in TR.OUR_JOB_WORDS
+          and not re.search(r"nothing leaves|never sent|not sent|isn't sent", TR.APPLE_NOTE))
     check("swift: \"can this Mac do it by itself?\" is asked before \"is it available?\" (a Mac that needs Apple's servers, offline, says servers)",
           0 < flat.find("guard rec.supportsOnDeviceRecognition else") < flat.find("guard rec.isAvailable else"))
     check("swift: times rounded to 3 places, confidence to 2", "(x * 1000).rounded() / 1000" in flat and "($0.conf * 100).rounded() / 100" in flat)

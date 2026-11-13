@@ -137,11 +137,11 @@ The page looks for your cut and your photos every few seconds and shows them by 
 
 ## "Set up talking reels"
 
-Turning their talking into words is done by the Mac's own Speech Recognition, in a small app the Assistant builds on their Mac the first time. Building it needs one free piece from Apple (its Command Line Tools: the same piece a Mac's Python comes with, so most Macs running the Assistant already have it). When it is missing, the page says "Talking reels need one more thing from Apple on this Mac before the first one. Tell your assistant: set up talking reels."
+Turning their talking into words is done by the Mac's own Speech Recognition, in a small app the Assistant builds on their Mac the first time (the Mac calls it Assistant Transcriber: that is the name in the Mac's box and in System Settings). Building it needs one free piece from Apple (its Command Line Tools: the same piece a Mac's Python comes with, so most Macs running the Assistant already have it). When it is missing, the page says "Talking reels need one more thing from Apple on this Mac before the first one. Tell your assistant: set up talking reels."
 
 1. `talking_rec.py setup --check`. It says, for you: whether Apple's tools were found, whether the small app that listens is built, and what the Mac last said about Speech Recognition. It sets nothing up.
 2. **Everything found and built:** "Nothing to set up: it is ready." Say "Talking reels are set up. Press Edit my video on the page." and stop.
-3. **Otherwise `talking_rec.py setup`.** It builds the small app and says "Set up." Then: "That's done. Press Edit my video on the page. The first time, your Mac will ask once if The Assistant may use Speech Recognition: say yes in that box."
+3. **Otherwise `talking_rec.py setup`.** It builds the small app and says "Set up." Then: "That's done. Press Edit my video on the page. The first time, your Mac will ask once if Assistant Transcriber may use Speech Recognition: press Allow in that box."
 4. **If it stops because Apple's tools are not on this Mac,** ask first, with buttons: "Your Mac needs one free piece from Apple for talking reels. I can bring up Apple's window for it. OK?" [Yes, bring it up] [Not now]. **Never run `xcode-select --install` without their yes:** it puts Apple's own install window on their screen. On yes, run it once, and say: "A window just popped up from Apple: click Install, then Agree. It takes five to ten minutes. Tell me when it says it's done." Then stop and wait. When they say it's done, run `talking_rec.py setup` again.
 5. **Any other stop** names what is in the way and what to ask them for (Apple's licence not accepted yet: open Xcode once and agree; Apple's tools older than this macOS: run Software Update). Say it in one plain line. When it says the Mac's own words are at the end of the talking log, read the log's last lines and tell them plainly what is in the way; don't send them round again with nothing changed. Their photo reel, carousel and stories are not affected, and say so.
 
@@ -151,15 +151,16 @@ Never send them to a terminal, a download page or anything else to install.
 
 ## When the Mac asks
 
-The first time a video is turned into a script, their Mac asks whether The Assistant may use Speech Recognition. **That box is theirs to answer. You never click it, and you never use computer control on any system box or on System Settings.** The page says what is happening while it waits; if they ask you, say the same in your own line:
+The first time a video is turned into a script, their Mac asks: Allow "Assistant Transcriber" to access what is said using speech recognition? with two buttons, Don't Allow and Allow (seen Nov 12 on macOS 27.2). **That box is theirs to answer. You never click it, and you never use computer control on any system box or on System Settings.** The page says what is happening while it waits; if they ask you, say the same in your own line:
 
-- **The Mac is asking:** "Your Mac is asking if The Assistant may use Speech Recognition. Say yes in that box and it carries on. The box may be behind this window."
-- **Nobody answered, so it stopped:** "Press Edit my video again, and say yes when the Mac asks." (Nobody has seen the Mac's real box yet, so never name its button: say "say yes in that box", as the page does.)
-- **They said no, or it is switched off:** the Mac never asks twice. "Open System Settings, then Privacy & Security, then Speech Recognition, and switch on The Assistant. Then press Edit my video again."
+- **The Mac is asking:** "Your Mac is asking if Assistant Transcriber may use Speech Recognition. Press Allow in that box and it carries on. The box may be behind this window."
+- **They ask about "sent to Apple":** the box says "Speech data from this app will be sent to Apple to process your requests." That sentence is Apple's, the same on every box like this. Say: "That's Apple's wording on every box like this. The Assistant only asks your Mac to do it by itself, and stops if your Mac can't." Never say nothing is sent, and never say it is fine to ignore the box: say what the Assistant asks for, and that the choice is theirs.
+- **Nobody answered, so it stopped:** "Press Edit my video again, and press Allow when the Mac asks."
+- **They said no, or it is switched off:** the Mac never asks twice. "Open System Settings, then Privacy & Security, then Speech Recognition, and switch on Assistant Transcriber. Then press Edit my video again."
 - **Dictation is off:** "Open System Settings, then Keyboard, and switch on Dictation. Then press Edit my video again."
 - **Screen Time or a work profile holds it off,** or **this Mac can only do it by sending the sound to Apple:** it can't be done on this Mac, and the Assistant won't send their video's sound anywhere. Say so plainly; don't look for a way round.
 
-The video itself is read as a file. The microphone is never used, and nothing leaves their computer.
+The video itself is read as a file. The microphone is never used. The Assistant only asks the Mac to turn the talking into words by itself, and stops if the Mac can't.
 
 ## On a PC
 
@@ -175,7 +176,7 @@ A talking reel is not in the posting queue and does not show on the post kit's R
 
 Say "first time on this, tell me if anything looks off" the first time each of these comes up, and keep going:
 
-- **Turning real talking into words.** The Mac's own Speech Recognition route is written and has never run: not the small app's build, not the Mac's question, not a real talk. Every test used a stand-in.
-- **The project in CapCut.** Nobody has opened a talking reel project in CapCut yet: the speeds, Punch in and Slow zoom, a photo's spot and size, themselves in the corner, a video stretch and the captions are all written from Nicole's notes and unseen.
+- **Turning real talking into words** has run on one Mac only: Dustin's, macOS 27.2, two real videos (a 25-second one and a second), and the Mac's box answered with Allow; it did not ask again for the second video. Not tried: Don't Allow and the way back through System Settings, nobody answering, a Mac that can't do it by itself, a Mac without Apple's tools, an older macOS, a long talk, a silent video, a second Mac.
+- **The project in CapCut.** Three talking reels have been made and opened in CapCut (Nov 12), and they worked; Slow zoom looked smooth to Dustin's eye on a steady clip. Not looked at one by one yet: the speeds, Punch in, a photo's spot and size, themselves in the corner, a video stretch and the captions are written from Nicole's notes. If they say two slow zooms side by side look odd (the picture snaps back to normal size at the cut and grows again), or that a slow zoom on a short stretch looks fast, say that is how it works today and that you'll pass it on.
 - **A real phone video** (High Efficiency, 4K, held sideways, twenty minutes), and anyone's own hands on the page.
 - **Any language but English.**

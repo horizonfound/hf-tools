@@ -17,11 +17,13 @@ just this once), "asking" (the Mac is asking them a question).
 
 Three to start:
   MacSpeech   the Mac's own Speech Recognition, inside a small app built on this Mac the first time (from
-              transcriber/transcribe.swift and transcriber/Info.plist beside this file). WRITTEN, NEVER RUN:
-              the first real build and the first permission box are Dustin's own to do (the plan's hand step).
-              (To keep that claim exact: the Swift source was type-checked once with Apple's compiler, which
-              makes no program and starts nothing. Two of its lines, the order of the "by itself?" and
-              "available?" questions, were swapped after that and have not been through the compiler since.)
+              transcriber/transcribe.swift and transcriber/Info.plist beside this file). FIRST BUILT AND RUN
+              Nov 12, 2026, by Dustin's own hand: his Mac, macOS 27.2; the build took 4 s; two real videos (a
+              handheld 25-second one, 60 words; a second, steady one); the Mac's box answered Allow, and it
+              did not ask again for the second video. The box names the app "Assistant Transcriber". Not
+              tried: Don't Allow and the way back, nobody answering, a Mac that can't do it by itself, a Mac
+              without Apple's tools, an older macOS, a long video, a silent video, a second Mac. Every test
+              still uses pretend ones.
   Pretend     answers from the JSON file named in TALKING_PRETEND. Every test uses this one; it is only ever
               picked by name, never by itself.
   Nobody      a PC, or a Mac older than macOS 13: says so, makes nothing.
@@ -423,7 +425,7 @@ def _why_not_built(out, tools):
 
 def real_builder(scratch, tools, deadline=None):
     """Build and sign the app in `scratch` (a new folder inside home); return the built app's path.
-    WRITTEN, NEVER RUN (the plan's hand step). Signed for this Mac only ("-"), then the signature is checked.
+    FIRST BUILT AND RUN Nov 12, 2026 (Dustin's Mac, macOS 27.2, 4 s to build, two real videos, the Allow answer only). Signed for this Mac only ("-"), then the signature is checked.
     Each tool gets its own limit or what is left before `deadline`, whichever is less."""
     _never_real("building the transcriber app")
     app = Path(scratch) / APP_NAME
@@ -452,7 +454,7 @@ def app_command(app, args):
 
 
 def real_starter(cmd):
-    """Start the command app_command() made. WRITTEN, NEVER RUN (the plan's hand step)."""
+    """Start the command app_command() made. First run Nov 12, 2026 (Dustin's Mac, macOS 27.2)."""
     _never_real("starting the transcriber app")
     if not os.path.isabs(cmd[0]):
         raise ValueError("a program is only ever run by its full path here")
@@ -468,7 +470,7 @@ def _on_a_drive(path):
 def _no_speech(detail):
     """Is this the Mac saying it heard no speech? Apple reports a recording with sound and no talking as an
     error with no words ("No speech detected", kAFAssistantErrorDomain 1110), which the app answers as "failed".
-    Read here, in Python, so the Swift stays frozen. UNPROVEN until the hand step tries a silent clip."""
+    Read here, in Python, so the Swift stays frozen. UNPROVEN: the Nov 12 hand step tried no silent clip."""
     low = str(detail or "").lower()
     return "no speech" in low or bool(re.search(r"\bkafassistanterrordomain 1110\b", low))
 
@@ -482,7 +484,7 @@ def _read(p):
 
 
 class MacSpeech(Transcriber):
-    """The Mac's own Speech Recognition. WRITTEN, NEVER RUN until the hand step (see the notes at the top).
+    """The Mac's own Speech Recognition. First built and run Nov 12, 2026, on one Mac (see the notes at the top).
     `builder` and `starter` are the two things that touch the real app; a test hands in pretend ones."""
     name = "mac-speech"
 

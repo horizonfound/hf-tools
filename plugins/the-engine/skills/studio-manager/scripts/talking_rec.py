@@ -36,8 +36,9 @@ assistant-make-a-reel/scripts/talking_make.py in a job of its own, as Make my re
 below. make_for_page() is what the page asks after.
 
 Edit my video on the page (start(), then `talking_rec.py job`, the Assistant's own command) turns the video into
-words in a job of its own: see "turning a video into words" below. The Mac's own Speech Recognition route is
-WRITTEN, NEVER RUN until Dustin's hand step; every test uses the pretend transcriber.
+words in a job of its own: see "turning a video into words" below. The Mac's own Speech Recognition route first
+ran on Nov 12, 2026 (Dustin's Mac, macOS 27.2, two real videos, the first 25 seconds and 60 words, the Allow answer
+only; the Mac did not ask again for the second); every test still uses the pretend transcriber.
 
 <shoot> is the name as the page wrote it in the line they pasted, or a few words of it. Write the two files in
 the scratchpad, never in their folders, and hand them over with --file (never on the command line).
@@ -654,20 +655,25 @@ JOB_WORDS = {
     "no_talking": "I couldn't hear any talking in that video.",
 }
 # Ours: states hers never reaches, or reaches with words that would be wrong. Every one a DRAFT for Nicole to
-# reword; the permission lines stay drafts until the real box has been seen (the plan's hand step). Each with
-# its reason. (line, why it is ours)
+# reword. Each with its reason. (line, why it is ours)
+# The Mac's real box was seen on Nov 12, 2026 (Dustin's Mac, macOS 27.2). Title: Allow "Assistant Transcriber" to
+# access what is said using speech recognition?  Apple's own fixed sentence: "Speech data from this app will be
+# sent to Apple to process your requests. This will also help Apple improve its speech recognition technology."
+# Then the plist's line: "So your talking video turns into a script you can edit."  Buttons: [Don't Allow] [Allow].
+# The app it names is the plist's CFBundleName, "Assistant Transcriber" (not its display name, "The Assistant"),
+# and that is its name in System Settings too, so the permission lines name that app and that button.
 OUR_JOB_WORDS = {
     "setup": ("Setting up, just this once…",
               "hers has the transcriber built by hand beforehand; ours builds it on their Mac the first time"),
-    "asking": ("Your Mac is asking if The Assistant may use Speech Recognition. Say yes in that box and I'll carry on. "
-               "(It may be behind this window.)",
+    "asking": ("Your Mac is asking if Assistant Transcriber may use Speech Recognition. Press Allow in that box and "
+               "I'll carry on. (It may be behind this window.)",
                "hers waits in silence while macOS asks"),
-    "no_answer": ("Your Mac asked if The Assistant may use Speech Recognition, and nobody answered, so I stopped. "
-                  "Press Edit my video to try again.",
+    "no_answer": ("Your Mac asked if Assistant Transcriber may use Speech Recognition, and nobody answered, so I "
+                  "stopped. Press Edit my video to try again, and press Allow when the box comes up.",
                   "hers would wait an hour"),
-    "refused": ("Speech Recognition is turned off for The Assistant, so I can't turn your talking into words yet. To turn "
-                "it on: open System Settings, then Privacy & Security, then Speech Recognition, and switch on The "
-                "Assistant. Then press Edit my video again.",
+    "refused": ("Speech Recognition is turned off for Assistant Transcriber, so I can't turn your talking into words "
+                "yet. To turn it on: open System Settings, then Privacy & Security, then Speech Recognition, and switch "
+                "on Assistant Transcriber. Then press Edit my video again.",
                 "hers says \"click Allow, then try again\", which is wrong once refused: macOS never asks twice"),
     "restricted": ("This Mac doesn't allow Speech Recognition (Screen Time or a work profile is holding it off), so I "
                    "can't turn your talking into words on it.",
@@ -707,6 +713,12 @@ OUR_JOB_WORDS = {
                "hers shows the Mac's own error words in brackets; ours keeps those in the log"),
     "pc": (this_computer.NO_TALKING_PC, "hers has no PC"),
 }
+# Ours, shown under the "asking" line while the Mac's box is up. The box carries Apple's fixed sentence about speech
+# data being sent to Apple; the app only ever asks the Mac to do it by itself (transcribe.swift: the "by itself?"
+# question first, requiresOnDeviceRecognition = true, and "servers" otherwise). It says what the app ASKS FOR and
+# no more: nobody has watched the network, so no line of ours says nothing is sent. A draft for Nicole.
+APPLE_NOTE = ("The box says speech data will be sent to Apple. Apple puts that sentence on every box like this. I only "
+              "ask your Mac to do it by itself, and I stop if it can't.")
 # What video.preview_copy says, as this page's own lines (its `words` are the footage page's, never passed on).
 COPY_STATES = {"lowspace": "lowspace", "failed": "unreadable", "busy": "waited", "pc": "pc", "hevc_pc": "pc"}
 
@@ -1413,7 +1425,8 @@ def cmd_setup(check=False):
     perm = rep.get("permission") or {}
     if "permission" in rep:
         say("  Speech Recognition, as last seen: " + (f"{perm.get('state')} ({perm.get('when')})" if perm.get("state") else
-            "never asked yet (the Mac asks the first time a video is turned into a script)"))
+            "never asked yet (the Mac asks the first time a video is turned into a script; its box names Assistant "
+            "Transcriber and the button is Allow)"))
     if check:
         return 0
     if not tr.needs_setup():
@@ -1461,7 +1474,8 @@ def _setup_now(tr):
             say("  Apple's tools are older than this macOS. Ask them to run Software Update (it offers the newer "
                 "Command Line Tools), then run this again.")
         return 2
-    say("Set up. The first video turned into a script will make the Mac ask once about Speech Recognition.")
+    say("Set up. The first video turned into a script will make the Mac ask once about Speech Recognition (the box "
+        "names Assistant Transcriber; the button is Allow).")
     return 0
 
 

@@ -294,6 +294,10 @@ OUR_WORDS = {
                 "reel page's own line for it says its moments and the reel still work, which is not so on this page"),
     "vp_lowspace": ("{length} · your photo drive is almost full, so I couldn't get this one ready",
                     "the same, when the reason is a nearly full drive (her own page says \"almost full\")"),
+    "asking_note": (TR.APPLE_NOTE,
+                    "the Mac's box carries Apple's fixed sentence about sending speech data to Apple; ours only ever "
+                    "asks the Mac to do it by itself (transcribe.swift), and a photographer reading the box needs to "
+                    "hear that while they decide (seen on the real box, Nov 12)"),
     "undo_title_pc": ("Undo (Ctrl+Z)", "a PC has no ⌘ key"),
     "redo_title_pc": ("Redo (Ctrl+Shift+Z)", "a PC has no ⌘ key"),
 }

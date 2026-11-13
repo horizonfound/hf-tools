@@ -728,7 +728,7 @@ def check_talking():
         ("the assistant never clicks a system box", ("You never click it, and you never use computer control on any system box or on System Settings", "The Mac never asks twice".lower())),
         ("an empty cut is a cut", ('{"cut": [], "why": []}',)),
         ("cut first, then place", ("Cut first, all the way through to its Saved line, then place", "Do the whole cut first")),
-        ("what is not proven yet", ("## Not proven yet, honestly", "has never run", "Nobody has opened a talking reel project in CapCut yet", "Any language but English")),
+        ("what is not proven yet", ("## Not proven yet, honestly", "has run on one Mac only", "Three talking reels have been made and opened in CapCut", "Slow zoom looked smooth to Dustin's eye on a steady clip", "Any language but English")),
         ("Make it in CapCut is theirs, on the page", ("You have no command to press it for them", "A project already in CapCut is never changed")),
     ):
         miss = [w for w in words if w not in flat and w not in flat.lower()]
@@ -744,9 +744,21 @@ def check_talking():
          , re.findall(r".{30}\b(?:she|he|her|his|him)\b.{30}", re.sub(r"Nicole's|her photo rules", "", quoted.replace(re.sub(r"\s+", " ", talking.RULES).strip(), "")), re.I)[:3])
 
     # stage E's review: each of these was a finding, and each check fails with its fix taken out
-    case("the part never names the button on the Mac's box (nobody has seen it): \"say yes in that box\", as the page's own line",
-         "click allow" not in flat.lower() and flat.count("ay yes in that box") >= 3 and "Say yes in that box" in talking_rec.OUR_JOB_WORDS["asking"][0]
-         and "say yes when the Mac asks" in flat, re.findall(r".{20}[Cc]lick Allow.{20}", flat))
+    # the hand test (Nov 12, macOS 27.2): the Mac's box names "Assistant Transcriber" and its buttons are Don't Allow
+    # and Allow, so the part and the page name that app and that button, and nothing says the box is unseen
+    case("the part names what the Mac's real box names: Assistant Transcriber, and its button, Allow (never \"The Assistant\" as the app the Mac asks about)",
+         "Assistant Transcriber may use Speech Recognition" in flat and "The Assistant may use" not in flat and "switch on The Assistant" not in flat
+         and "switch on Assistant Transcriber" in flat and "Press Allow in that box" in flat and "Press Allow in that box" in talking_rec.OUR_JOB_WORDS["asking"][0]
+         and "press Allow when the Mac asks" in flat and "ay yes in that box" not in flat,
+         re.findall(r".{20}(?:The Assistant may use|switch on The Assistant|ay yes in that box).{20}", flat))
+    case("the part no longer says nobody has seen the Mac's box, or that turning talking into words has never run",
+         "Nobody has seen the Mac's real box" not in flat and "has never run" not in flat and "Nobody has opened a talking reel" not in flat
+         and "seen Nov 12 on macOS 27.2" in flat and "Not tried: Don't Allow and the way back" in flat)
+    case("the box's \"sent to Apple\" sentence: the part answers as the page does (what the Assistant asks for), and neither says nothing leaves the computer",
+         "Speech data from this app will be sent to Apple to process your requests." in flat and "only asks your Mac to do it by itself" in flat
+         and "I only ask your Mac to do it by itself" in talking_rec.APPLE_NOTE and "Never say nothing is sent" in flat
+         and "nothing leaves" not in flat and not re.search(r"nothing leaves|never sent|is not sent|isn't sent", talking_rec.APPLE_NOTE),
+         re.findall(r".{20}nothing leaves.{20}", flat))
     case("the replace-my-cuts question never uses \"mine\" for two people: [Keep my cuts], not [Keep mine]", "[Keep my cuts] [Replace them]" in flat and "[Keep mine]" not in flat)
     case("the part goes by the line, not the exit number, and names setup's and open's own exits as the scripts give them",
          "Go by the line, not the exit number" in flat and "`setup` has exits of its own: 3 with its STOP" in flat and "1 with \"Not possible here\" on a PC" in flat

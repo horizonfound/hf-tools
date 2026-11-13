@@ -648,6 +648,10 @@ SLACK = 1e-3                # hers: 1 ms of slack when asking whether a piece li
 # The slow zoom's two keyframes are timed in the VIDEO's own clock (hers: "timed in the clip's own source time").
 # Other accounts of CapCut's files time them from the start of the clip. Nothing here was ever written by CapCut
 # itself, so this is one switch in one function (_zoom_times): "video" (hers) or "clip".
+# Judged by eye on Nov 12, 2026 (Dustin, CapCut 9.6.0, a steady clip): "really smooth... I didn't see any
+# jittering", and a zoom across a closed pause carries on as one zoom (1.0 -> 1.1128, then 1.1128 -> 1.12). So
+# "video" stays. As hers, and on the owners' list: two separate slow zooms side by side snap back to 1.0 at the
+# cut, and a short stretch makes the fixed 12% look faster.
 ZOOM_CLOCK = "video"
 
 

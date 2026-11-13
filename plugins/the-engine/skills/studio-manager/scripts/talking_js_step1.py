@@ -60,8 +60,9 @@ function showVideos(){
   var s = $('status');
   s.classList.remove('bad');
   if (swapAsk) T.rich(s, W.swap_ask, {'new': swapAsk, old: rec.video});       // never written over by a refresh
-  // ours: while the Mac is asking its question the line is only that (her "a minute of video" would read oddly after it)
-  else if ((st.working || rec.status === 'working') && rec.step === W.job_asking) T.rich(s, '{b}{step}{eb}', {step: rec.step});
+  // ours: while the Mac is asking its question the line is that, in bold, and under it our note about the box's
+  // "sent to Apple" sentence (her "a minute of video" would read oddly after it). Both filled in as text.
+  else if ((st.working || rec.status === 'working') && rec.step === W.job_asking) T.rich(s, '{b}{step}{eb}{br}{note}', {step: rec.step, note: W.asking_note});
   else if (st.working || rec.status === 'working') T.rich(s, W.status_working, {step: rec.step || W.working});
   else if (said) { s.textContent = said; s.classList.add('bad'); }
   // a job that stopped: its line, in red. (When this video had a script already, that script is still theirs to

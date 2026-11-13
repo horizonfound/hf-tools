@@ -4,7 +4,7 @@
 
 **A draft for Dustin to send or not. Not sent: nothing here has gone to Nicole or Slack (rule 10).** Same rule as v19 to v22: identical for the photographer, our way underneath. Built on branch `v24`, checked on pretend kits only, with a pretend transcriber. The plan it was built from is `docs/handoff-v24-build-2026-11-12.md`.
 
-**The short version of what is not proven** (section 10 has it all): the small app that turns talking into words has never been built or run; nobody has seen the Mac's Speech Recognition box; no real talking video has been tried; nobody has opened one of these reels in CapCut; nobody's own hand has been on the page.
+**The short version of what is not proven** (section 10 has it all): the small app that turns talking into words has been built and run once (Dustin's hand test, Nov 12: one Mac (Dustin's, macOS 27.2), two real videos (a handheld 25-second one, 60 words; a second, steady one), the Allow answer only), and three talking reels were made and opened in CapCut. The slow zoom looked smooth to Dustin's eye on a steady clip. Not tried: Don't Allow and the way back through System Settings, nobody answering, a Mac without Apple's tools, an older macOS, a Mac that can't do it by itself, a long video, a silent video on the real app, a second Mac, Windows.
 
 ## 1. Built as yours
 
@@ -23,7 +23,7 @@ A photographer sees none of these.
 - **Where the record lives:** in the shoot's own hidden folder (`talking.json`, with the version before kept), not `<studio>/talking/<shoot>.json`. Your field names and shapes are kept. The words and their times sit in a file of their own, written once per video, so each save stays small.
 - **Nothing installed:** no ffmpeg or ffprobe. The video's facts, the small copy and the sound come from the Mac's own parts.
 - **Turning a video into words is a job of its own,** not a thread inside the page server, so the server starting over cannot kill it and a job that died reads as plain words, never a page stuck on "Getting your video ready…". It has stated time limits.
-- **The small app is built on their Mac the first time,** from a short source inside the Assistant (yours is built by hand beforehand). It needs Apple's Command Line Tools. It is started only through the Mac's own `open`, so macOS asks its question in the app's own name. Its names are yours ("The Assistant", "Assistant Transcriber", your sentence in the permission box).
+- **The small app is built on their Mac the first time,** from a short source inside the Assistant (yours is built by hand beforehand). It needs Apple's Command Line Tools. It is started only through the Mac's own `open`, so macOS asks its question in the app's own name. Its names are yours ("The Assistant", "Assistant Transcriber", your sentence in the permission box). **Seen on the real box, Nov 12:** macOS names the app "Assistant Transcriber" (not "The Assistant"), in the box and in System Settings, so our lines now name it that way. Changing the name the box shows means changing your `Info.plist`, which makes the Mac ask everyone again; we left it.
 - **The CapCut project is written by a second builder inside our `capcut.py`,** not by patching the first. Photo reels are byte for byte what they were.
 - **The chat commands find a shoot by a few words** and take a file, not `--studio` and `--content` paths.
 - **The page never gets a path.** A shoot is its folder name, a photo its number, a video a key. The record still keeps your `v` and `video` as file names.
@@ -57,7 +57,7 @@ A photographer sees none of these.
 
 ## 4. The CapCut project: where ours differs
 
-Nobody has opened one of these in CapCut yet, yours or ours, so all of this is on paper.
+Three of ours have been made and opened in CapCut (Dustin, Nov 12: they worked), and the slow zoom looked smooth to his eye on a steady clip (point 10). Nobody has looked at the other points one by one, so those are still on paper.
 
 1. **Every time sits on a whole frame.** CapCut moves times onto its 30 fps grid when it opens a project; in October that put every cut a frame late. Ours puts each edge on a frame and takes the photo, corner and caption times from those same edges. Pieces differ from yours by at most half a frame.
 2. **One material for the talking video,** not one per piece; no "photo, 5 s" note on a video.
@@ -68,7 +68,7 @@ Nobody has opened one of these in CapCut yet, yours or ours, so all of this is o
 7. **A photo or Footage video that has gone stops the make** and says which kind is missing. Yours leaves that stretch out without a word (question 13).
 8. **A record changed by hand** is held to the page's own limits before it reaches CapCut.
 9. **A second talking reel of a shoot** is "<shoot> talking reel 2". Yours would clash on the name.
-10. **The slow zoom's keyframes** are timed as in your file (the video's own clock). Other accounts of CapCut's files time them from the start of the clip. It is one switch in one place; a ten-minute hand-made CapCut project would settle it (question 17).
+10. **The slow zoom's keyframes** are timed as in your file (the video's own clock). Other accounts of CapCut's files time them from the start of the clip. It is one switch in one place. **Seen Nov 12:** on a steady clip in CapCut the slow zoom was "really smooth... I didn't see any jittering" (Dustin), and a zoom across a closed pause carries on as one zoom. Two things he noticed, both as yours: two separate slow zooms side by side snap back to normal size at the cut and start growing again, which looks odd; and a short stretch makes the zoom look faster, since the 12% is fixed. Would you leave those, alternate them, or join two that touch?
 
 ## 5. Small behaviours that differ from yours
 
@@ -77,7 +77,7 @@ Nobody has opened one of these in CapCut yet, yours or ours, so all of this is o
 1. **A long refusal from Edit my video stays in the status line, in red.** Yours shows it as a toast for 2.6 seconds.
 2. **Choosing another video chip takes the swap question away,** and it is asked again the next time. Yours went ahead with the swap unasked.
 3. **A job's stopped line shows in red whenever the record carries a problem,** even when an earlier script is still ready underneath.
-4. **While the Mac asks about Speech Recognition the status is only that line,** without "A minute of video takes about a minute." beside it.
+4. **While the Mac asks about Speech Recognition the status is that line in bold, and under it one plain line about the box's "sent to Apple" sentence** (new Nov 12, after the real box was seen), without "A minute of video takes about a minute." beside it.
 5. **Below 520 px wide the two "who places the photos" choices stack** instead of sitting side by side.
 6. **The three lines to copy are slanted DM Sans,** not your serif (Dustin's no-serif rule, Nov 7).
 7. **Lines of ours where yours had none** (all in `talking_page.OUR_WORDS`, each with its reason, all drafts for you to reword): a video still being copied in; "couldn't reach the Assistant"; "couldn't open the folder"; "select and copy" when the clipboard is refused; the PC's Undo and Redo tooltips; a Footage video that is not ready yet; and the video picker's two (`vp_cant`, `vp_lowspace`).
@@ -155,9 +155,10 @@ All drafts, all yours to reword. 40 on the page (`talking_page.OUR_WORDS`):
 | Made "{project}" in CapCut. {note} | the same, with capcut.py's own note after it on the same line (what to do so the reel shows up in CapCut), as the photo reel's page shows it |
 | This shoot isn't ready for this yet. Tell your assistant: make posts from this shoot. | the pickers' own line says "to Claude", which no line on this page may; the same page, reworded |
 | Setting up, just this once… | hers has the transcriber built by hand beforehand; ours builds it on their Mac the first time |
-| Your Mac is asking if The Assistant may use Speech Recognition. Say yes in that box and I'll carry on. (It may be behind this window.) | hers waits in silence while macOS asks |
-| Your Mac asked if The Assistant may use Speech Recognition, and nobody answered, so I stopped. Press Edit my video to try again. | hers would wait an hour |
-| Speech Recognition is turned off for The Assistant, so I can't turn your talking into words yet. To turn it on: open System Settings, then Privacy & Security, then Speech Recognition, and switch on The Assistant. Then press Edit my video again. | hers says "click Allow, then try again", which is wrong once refused: macOS never asks twice |
+| Your Mac is asking if Assistant Transcriber may use Speech Recognition. Press Allow in that box and I'll carry on. (It may be behind this window.) | hers waits in silence while macOS asks |
+| The box says speech data will be sent to Apple. Apple puts that sentence on every box like this. I only ask your Mac to do it by itself, and I stop if it can't. | shown under the line above while the box is up: the Mac's box carries Apple's fixed sentence about sending speech data to Apple, and a photographer reading it needs to hear what the Assistant asks for while they decide (new Nov 12) |
+| Your Mac asked if Assistant Transcriber may use Speech Recognition, and nobody answered, so I stopped. Press Edit my video to try again, and press Allow when the box comes up. | hers would wait an hour |
+| Speech Recognition is turned off for Assistant Transcriber, so I can't turn your talking into words yet. To turn it on: open System Settings, then Privacy & Security, then Speech Recognition, and switch on Assistant Transcriber. Then press Edit my video again. | hers says "click Allow, then try again", which is wrong once refused: macOS never asks twice |
 | This Mac doesn't allow Speech Recognition (Screen Time or a work profile is holding it off), so I can't turn your talking into words on it. | hers shows the Mac's own error words |
 | Your Mac's Dictation looks to be turned off, and I need it to turn your talking into words. To turn it on: open System Settings, then Keyboard, and switch on Dictation. Then press Edit my video again. | hers shows the Mac's own error words |
 | This Mac can only turn talking into words by sending the sound to Apple, and I won't send your video's sound anywhere. So I can't make a script on this Mac yet. | hers sends the sound to Apple without a word (rules 7 and 8) |
@@ -187,7 +188,7 @@ One more on the page, shared with every picker: "I can't find that shoot's posts
 
 **What the assistant is told to say in the chat** (`parts/talking-reel.md`; ours, since yours has no instructions file for these):
 - The setup talk when Apple's tools are missing ("click Install, five to ten minutes, tell me when it's done").
-- The permission lines: "say yes in that box" (never "click Allow": nobody has seen the box's real button yet), and where to switch Speech Recognition on once refused.
+- The permission lines: "Press Allow in that box" (the real box's button, seen Nov 12; your "click Allow" had the button right), the app named as the box names it (Assistant Transcriber), what to say when they ask about the box's "sent to Apple" sentence, and where to switch Speech Recognition on once refused.
 - Both "replace?" questions, with the [Keep my cuts] choice.
 - The PC line, the same as the page's.
 - It also answers to their own words ("open my talking reel", "is my script ready", "cut it tighter"), treats an empty cut as a cut, and never places photos before the script is cut unless they asked for the photos alone.
@@ -230,7 +231,7 @@ Each with what was built, so nothing waited.
 14. **A talking video that is not 9:16.** Built: fills the frame in CapCut. Right?
 15. **English only,** as yours. Another language is a named gap.
 16. **The app's names,** yours. macOS will show "The Assistant" in its box.
-17. **Ten minutes of someone's time in CapCut:** a throwaway project made by hand (one clip at 1.5x with two scale keyframes, a clip on a second layer, a moved text) so we can read how CapCut itself writes a slow zoom and its layers.
+17. **Ten minutes of someone's time in CapCut:** a throwaway project made by hand (one clip at 1.5x with two scale keyframes, a clip on a second layer, a moved text) so we can read how CapCut itself writes its layers. (The slow zoom itself looked smooth to Dustin's eye on Nov 12.)
 18. **The 36 small behaviours** in section 5: keep each, or turn it round.
 
 ## 9. When Claude Code asks a permission question (outside Auto mode)
@@ -241,13 +242,13 @@ Each with what was built, so nothing waited.
 
 ## 10. Not proven yet
 
-- **The small app has never been built or run,** on any Mac. Apple's compiler was run once on the app's source to check it for mistakes (nothing was built or started); the source was changed after that and has not been checked again. Whether that one check was inside "never build" is Dustin's call.
+- **The small app has been built and run once** (Dustin's hand test, Nov 12): one Mac (Dustin's, macOS 27.2), two real videos (a handheld 25-second one, 60 words; a second, steady one), the Allow answer only; the Mac did not ask again for the second video. Not tried: Don't Allow and the way back through System Settings, nobody answering, a Mac without Apple's tools, an older macOS, a Mac that can't do it by itself, a long video, a silent video on the real app, a second Mac, Windows.
 - **The one-time setup on a Mac without Apple's tools** has never been walked through (Apple's install window, then picking up again).
 - **Which Macs can do it without Apple's servers** is not known. The stop that says the sound won't be sent anywhere has only been reached with the pretend transcriber.
-- **The Speech Recognition box has never been seen:** its words, its buttons, whether it comes to the front, whether a rebuild asks again. Two of our lines (Dictation off; no talking heard) rest on guesses about what Apple's error says.
-- **No real talking video:** only 3 and 6 second self-made clips. Not a phone video (HEVC, 4K, HDR, held sideways), not a long talk, not another language.
-- **Nobody has opened a talking reel in CapCut.** To look at, one by one: a sped-up piece; a punch in; a slow zoom; a photo in each spot, moved and resized; themselves in the corner, in step; a phone video stored turned; a video stretch, muted, from its start point; captions above a full-screen photo; cuts landing on the words.
-- **Nobody's own hand on the page,** and no look by hand in the Claude app's pane: a hidden Chrome only. The same goes for the reel page's third card, "Talking to camera".
+- **The Speech Recognition box has been seen once (Nov 12, macOS 27.2) and answered with Allow.** Title: Allow "Assistant Transcriber" to access what is said using speech recognition? Then Apple's own sentence, "Speech data from this app will be sent to Apple to process your requests. This will also help Apple improve its speech recognition technology.", then yours, "So your talking video turns into a script you can edit." Buttons: Don't Allow, Allow. Not seen: Don't Allow and the way back, nobody answering, whether it always comes to the front, whether a rebuild asks again. Two of our lines (Dictation off; no talking heard) rest on guesses about what Apple's error says.
+- **Two real talking videos** (Nov 12: a handheld one, 25 seconds, 60 words; a second, steady one); otherwise only 3 and 6 second self-made clips. Not a phone video (HEVC, 4K, HDR, held sideways), not a long talk, not another language.
+- **Three talking reels have been made and opened in CapCut** (Dustin, Nov 12: they worked), and the slow zoom looked smooth to his eye on a steady clip. Still to look at, one by one: a sped-up piece; a punch in; a photo in each spot, moved and resized; themselves in the corner, in step; a phone video stored turned; a video stretch, muted, from its start point; captions above a full-screen photo; cuts landing on the words.
+- **One hand on the page** (Dustin, Nov 12, a practice shoot: Edit my video, the photo picker, Make it in CapCut); before that a hidden Chrome only. The same goes for the reel page's third card, "Talking to camera".
 - **The design preview** in the pane by anyone's hand, with real large photos, or on a PC's Chrome. The card can show a slightly older picture when the designer is left within about 2 seconds of a change.
 - **A fresh session** given the three pasted lines.
 - **Windows:** nothing has run there, and GitHub's checks have not run on any of this yet.

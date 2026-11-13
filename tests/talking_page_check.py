@@ -372,6 +372,20 @@ def check_words(s):
     case("no word on the page says \"Claude\" (hers: \"my assistant\", \"your assistant\")",
          not [v for v in list(w.values()) + ours_lines if "claude" in v.lower()], [v for v in list(w.values()) + ours_lines if "claude" in v.lower()][:3])
     case("every line of ours has its reason beside it", all(isinstance(v, tuple) and len(v) == 2 and v[0] and len(v[1]) > 10 for v in tp.OUR_WORDS.values()))
+    # the hand test (Nov 12): the Mac's box and System Settings name the app by the plist's CFBundleName
+    import plistlib
+    with open(REEL / "transcriber" / "Info.plist", "rb") as f:
+        app_name = plistlib.load(f)["CFBundleName"]
+    perm = [tp.OUR_WORDS["job_" + k][0] for k in ("asking", "no_answer", "refused")]
+    case("the three permission lines name the app as the Mac's box does (the plist's name, Assistant Transcriber), and the button, Allow",
+         app_name == "Assistant Transcriber" and all(app_name in v for v in perm) and perm[2].count(app_name) == 2
+         and "Press Allow in that box" in perm[0] and "press Allow when the box comes up" in perm[1], perm)
+    case("no line of ours names The Assistant as the app the Mac asks about",
+         not [v for v in ours_lines if "The Assistant may use" in v or "switch on The Assistant" in v or "for The Assistant" in v],
+         [v for v in ours_lines if "The Assistant may use" in v or "switch on The Assistant" in v or "for The Assistant" in v])
+    case("the note about the box's \"sent to Apple\" sentence is ours, is talking_rec's own, and says what is asked for, never that nothing is sent",
+         tp.OUR_WORDS["asking_note"][0] == s.TR.APPLE_NOTE and "asking_note" not in w and "only ask your Mac to do it by itself" in s.TR.APPLE_NOTE
+         and "stop if it can't" in s.TR.APPLE_NOTE and not re.search(r"nothing leaves|never sent|not sent|isn't sent", s.TR.APPLE_NOTE))
     case("no key is both hers and ours", not set(w) & set(tp.OUR_WORDS), sorted(set(w) & set(tp.OUR_WORDS)))
     case("her engine's and her server's lines are the very ones talking_rec sends",
          all(w["job_" + k] == v for k, v in s.TR.JOB_WORDS.items()) and all(w["make_" + k] == v for k, v in s.TR.MAKE_WORDS.items()))
@@ -1132,8 +1146,10 @@ def check_edit(c, s, kit, k1, k2):
         seen.add((status(c), c.text("#status b") if c.count("#status b") else ""))
         return c.js("!window.Talk.ST.working && window.Talk.REC.status === 'ready'")
     wait_for(watch2, 40, 0.25)
-    case("while the Mac is asking about Speech Recognition the status line says so, whole and in bold (ours; no \"a minute\" after it)",
-         (W["job_asking"], W["job_asking"]) in seen, sorted(seen))
+    case("while the Mac is asking about Speech Recognition the status line says so, whole and in bold, and under it our note about the box's \"sent to Apple\" sentence, not in bold (ours; no \"a minute\" after it)",
+         (W["job_asking"] + " " + W["asking_note"], W["job_asking"]) in seen or (W["job_asking"] + W["asking_note"], W["job_asking"]) in seen, sorted(seen))
+    case("...the note is on a line of its own, put in as text", c.js("(function(){var d=document.createElement('div');window.Talk.rich(d,'{b}{step}{eb}{br}{note}',{step:'a<i>',note:'b<b>'});"
+         "return [d.childNodes.length, d.childNodes[1].nodeName, d.childNodes[2].nodeType, d.textContent, d.querySelectorAll('i').length];})()") == [3, "BR", 3, "a<i>b<b>", 0])
     case("...then ready, on the new video, the first one's edit kept",
          status(c).startswith("%s: %d words, " % (V2, len(SAID2))) and s.state(KIT)["rec"]["kept_for"] == [V1] and c.js("window.Talk.REC.cut.length") == 0, status(c))
     case("a new script on the page empties Undo (its steps were another video's word numbers)", c.js("window.Talk.UNDO.length === 0"))
