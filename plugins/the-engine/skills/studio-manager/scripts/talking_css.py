@@ -231,7 +231,7 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .screen{user-select:none;-webkit-user-select:none}
 .screen .movable,.screen .knob,.screen .cap{touch-action:none}
 /* the line down the middle while a dragged thing is snapped to it (the designer's blue; drawn only, never pressed) */
-.screen .cline{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:#1f8fff;z-index:10;pointer-events:none;display:none}
+.screen .cline{position:absolute;left:50%;top:0;bottom:0;width:1px;margin-left:-0.5px;background:#1f8fff;z-index:10;pointer-events:none;display:none}
 .screen .cline.on{display:block}
 html{scroll-padding-bottom:calc(var(--dock) + 12px)}
 /* the two small menus for Speed and Zoom on the timeline (Dustin, Nov 13) */
