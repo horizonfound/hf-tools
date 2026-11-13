@@ -549,7 +549,8 @@ def run_page(c, s):
                 return {name: g.getAttribute('aria-label'), label: g.querySelector('.lb').textContent, labelHidden: g.querySelector('.lb').getAttribute('aria-hidden'),
                         opts: Array.from(g.querySelectorAll('[role=radio]')).map(function(d){
                           var r = d.getBoundingClientRect(), e = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-                          return {t: d.textContent, v: d.getAttribute('data-amount') || d.getAttribute('data-pace'), on: d.getAttribute('aria-checked') === 'true',
+                          var rg = document.createRange(); rg.selectNodeContents(d); var w = rg.getBoundingClientRect();
+                          return {gl: w.left - r.left, gr: r.right - w.right, t: d.textContent, v: d.getAttribute('data-amount') || d.getAttribute('data-pace'), on: d.getAttribute('aria-checked') === 'true',
                                   bg: getComputedStyle(d).backgroundColor, seen: e === d, tab: d.tabIndex, top: r.top, left: r.left, right: r.right}; })}; })};
     })()"""
 
@@ -593,6 +594,9 @@ def run_page(c, s):
          and [[o["v"] for o in x["opts"]] for x in g] == [["subtle", "medium", "strong"], ["quick", "whole"]], g)
     case("...what a zoom has by itself is lit, and only that: Medium and Whole clip (filled, like a button that is on)",
          lit(g[0]) == ["medium"] and lit(g[1]) == ["whole"] and all((o["bg"] == INK) == o["on"] for x in g for o in x["opts"]), [(o["v"], o["bg"]) for x in g for o in x["opts"]])
+    gaps = [(o["t"], round(o["gl"], 1), round(o["gr"], 1)) for x in g for o in x["opts"]]
+    case("...every word in a row has room on both sides of it inside its box (5 px or more: Medium sat 1.7 px from the line before Strong)",
+         all(gl >= 5 and gr >= 5 for _t, gl, gr in gaps), gaps)
     case("...a screen reader hears each row as a named radio group (the row's name once: the words drawn are hidden from it), its choices radios with checked or not",
          c.js("Array.from(document.querySelectorAll('#tlZoomList [role=radiogroup]')).filter(function(g){ return !g.hidden; }).map(function(g){ return [g.getAttribute('aria-label'), g.querySelector('.lb').getAttribute('aria-hidden'), "
               "Array.from(g.querySelectorAll('[role=radio]')).map(function(d){ return d.getAttribute('aria-checked'); }).join()]; })")
@@ -763,6 +767,19 @@ def run_page(c, s):
     case("...a Strong punch in with Quick push starts near 1 and pushes in to 1.24 on the same curve, then holds",
          all(abs(sc - eng.zoom_value(zp, tt, max(0.1, span))) < 1e-5 for sc, tt, span in seen) and seen[0][0] < 1.1 and seen[-1][0] == 1.24, seen)
 
+    # the styles add no easing of their own: what the script asks for is what is drawn, at once
+    DRAWN = ("(function(a, b){ var v = document.getElementById('vid'), T = window.Talk, m = function(){ return +(/matrix\\(([0-9.]+)/.exec(getComputedStyle(v).transform) || [0, 1])[1]; }; "
+             "v.currentTime = a; T.frame(); var before = m(); v.currentTime = b; T.frame(); return [before, m(), getComputedStyle(v).transitionDuration]; })")
+    d = c.js(DRAWN + "(0.1, 0.78)")
+    case("...and the picture is drawn at the size asked for at that very moment (no second easing in the styles: it made a Quick push take half a second on the page, a third in CapCut)",
+         d[0] == 1 and abs(d[1] - 1.24) < 1e-6 and d[2] == "0s", d)
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "punch"}])
+    c.wait_for("document.getElementById('vid').readyState >= 1", 15)
+    d = c.js(DRAWN + "(0.1, 0.5)")
+    back = c.js(DRAWN + "(0.5, 0.1)")
+    case("a Punch in with Instant is a cut on the page as in CapCut: 1 before its first word, 1.15 the moment it starts, and 1 again the moment it ends (it glided in and out over a quarter second)",
+         d[0] == 1 and abs(d[1] - 1.15) < 1e-6 and abs(back[0] - 1.15) < 1e-6 and back[1] == 1, (d, back))
+
     # a phone's width: the rows fit, inside the window, and the bar keeps still
     try:
         fits = []
@@ -778,9 +795,9 @@ def run_page(c, s):
             r2 = rows()
             fits.append((width, in_window(r) and in_window(r2), r["up"], r["side"] == 0 == r2["side"],
                          all(o["seen"] for x in r["groups"] for o in x["opts"]), all(len({round(o["top"]) for o in x["opts"]}) == 1 for x in r["groups"]),
-                         [len(x["opts"]) for x in r["groups"]] == [3, 2], c.js(SHAPE) == before, is_open() == "tlZoom", lit(r2["groups"][1]) == ["push"]))
+                         [len(x["opts"]) for x in r["groups"]] == [3, 2], all(o["gl"] >= 5 and o["gr"] >= 5 for x in r["groups"] + r2["groups"] for o in x["opts"]), c.js(SHAPE) == before, is_open() == "tlZoom", lit(r2["groups"][1]) == ["push"]))
             c.key("Escape")
-        case("at a phone's width (375 and 336): the menu with its two rows is whole inside the window, opening upward; every choice is on its row and can be pressed; nothing scrolls "
+        case("at a phone's width (375 and 336): the menu with its two rows is whole inside the window, opening upward; every choice is on its row, with room around its word, and can be pressed; nothing scrolls "
              "sideways; and after a choice the menu is still open and the bar has not moved", all(all(x[1:]) for x in fits), fits)
     finally:
         c.desktop()

@@ -368,8 +368,8 @@ def run_page(t, c, s):
     at(WORDS[5]["start"] + 0.01)
     back = c.js("(function(){ var v = document.getElementById('vid'), cs = getComputedStyle(v); return [v.style.left, v.style.width, document.getElementById('screen').classList.contains('pip'), cs.transitionDuration, cs.transformOrigin, v.offsetWidth, v.offsetHeight, window.__scale()]; })()")
     ox, oy = [float(x.replace("px", "")) for x in back[4].split()[:2]]
-    case("off those words they fill the screen again, with no zoom; the zoom turns around 50% 45% and eases over a quarter of a second",
-         back[:4] == ["", "", False, "0.25s"] and abs(ox - back[5] * 0.5) < 0.6 and abs(oy - back[6] * 0.45) < 0.6 and back[7] == 1, back)
+    case("off those words they fill the screen again, with no zoom; the zoom turns around 50% 45%, and the styles add no easing of their own (the curve is drawn frame by frame, as CapCut plays it)",
+         back[:4] == ["", "", False, "0s"] and abs(ox - back[5] * 0.5) < 0.6 and abs(oy - back[6] * 0.45) < 0.6 and back[7] == 1, back)
 
     # several photos flash through the stretch, each for an equal share of its time on the reel
     save_js({"shots": [stretch(ns=[3, 1, 2])], "zooms": []})

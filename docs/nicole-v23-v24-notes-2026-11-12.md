@@ -266,6 +266,9 @@ Dustin watched the zooms and said the slow zoom has a "robotic steady zoom speed
 - **Not tried:** nobody has watched an eased zoom, a Quick zoom or a Quick push in a real CapCut project yet; nobody's hand has been on the two rows; the amounts and times are first guesses.
 - It changes something of yours (the steady zoom), so it is yours and Dustin's to keep, tune or put back.
 
+- **One style of yours is gone because of it:** the video's quarter-second easing of the zoom (`transition: transform .25s`). The page now draws the curve itself, frame by frame, and with your easing on top a Punch in with Instant glided in where CapCut cuts, and a Quick push ran about half a second where CapCut takes a third. So the preview now shows a punch in as the hard cut it is.
+- Yours and Dustin's to say: whether How much should stay as set when a zoom is switched between Slow zoom and Punch in (today it goes back to Medium); and whether How fast should grey out on a clip too short for Quick and Whole clip to differ (under a second).
+
 ## 8. For Nicole and Dustin to settle
 
 Each with what was built, so nothing waited.

@@ -50,7 +50,9 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 @media(max-width:820px){.edit{grid-template-columns:1fr}}
 .phone{position:sticky;top:12px}
 .screen{position:relative;height:min(600px,calc(100vh - var(--dock) - 70px));min-height:320px;aspect-ratio:9/16;margin:0 auto;background:#111;border-radius:22px;overflow:hidden;box-shadow:0 12px 30px -12px rgba(31,36,48,.45);cursor:pointer}
-.screen #vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 45%;transition:transform .25s var(--ease);z-index:2}
+/* no transition on the zoom: the script draws the curve frame by frame (T.zoomValue), so a second easing here would make
+   an Instant punch glide and a Quick push run long, where the CapCut project cuts and takes a third of a second */
+.screen #vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 45%;z-index:2}
 .screen .phw{position:absolute;z-index:3;display:none}
 .screen .phw img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 .screen .phw video{display:none;width:100%;height:100%;object-fit:cover;pointer-events:none}
@@ -262,7 +264,8 @@ html{scroll-padding-bottom:calc(var(--dock) + 12px)}
 .tl-mg+.tl-mg{margin-top:.5rem}
 .tl-mg .lb{display:block;font:600 11.5px/1.2 var(--sans);color:var(--ink-2);margin:0 0 .28rem .1rem}
 .tl-seg{display:flex;border-radius:8px;box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
-.tl-so{flex:1 1 0;min-width:0;text-align:center;padding:.42rem .5rem;font:600 12.5px/1.2 var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;border-left:1px solid var(--line);user-select:none;-webkit-user-select:none}
+/* each choice takes the room its word needs, then shares what is left: equal thirds squeezed "Medium" against its edge */
+.tl-so{flex:1 1 auto;min-width:0;text-align:center;padding:.42rem .4rem;font:600 12.5px/1.2 var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;border-left:1px solid var(--line);user-select:none;-webkit-user-select:none}
 .tl-so:first-child{border-left:0}
 .tl-so:hover,.tl-so:focus-visible{background:#F3F1EB}
 .tl-so[aria-checked=true]{background:var(--ink);color:#fff}
