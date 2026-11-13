@@ -52,9 +52,11 @@ byte for byte what it was (tests/talking_multi_check.py holds that). To take it 
     word of each other one. A clip whose words were cut meanwhile just drops out.
   - Slow zoom: each run of picked clips that sit side by side on the reel gets ONE zoom, from the run's first word
     to its last (the cut words between them included, which is how one zoom already carries on across a closed
-    pause). Picked clips that do not touch get a zoom each. Whatever zoom was on those words is replaced; a zoom
-    that reaches past the picked clips is trimmed to what is left outside, never lost (T.setRange, as one clip's
-    press has always done).
+    pause). Picked clips that do not touch get a zoom each. Whatever zoom was on those words is replaced (a zoom
+    that sat only on cut words between two picked clips goes with it; Undo brings it back); a zoom that reaches
+    past the picked clips is trimmed to what is left outside, never lost (T.setRange, as one clip's press has
+    always done). A run that already sits whole inside one slow zoom is left alone (inSlowZoom): pressing Slow zoom
+    on clips of a long zoom never breaks it up. (ONE clip picked is hers and does break it, as it always has.)
   - Punch in: the run's words are cleared the same way, then each picked clip gets its own punch in. None: the
     run's words are cleared (so no stray zoom is left on cut words between two picked clips).
   - Speed: each picked clip, exactly as a press on each in turn. Delete (the button or the key): every picked
@@ -510,18 +512,26 @@ function speedClips(mny, v){
     return {speeds: s.map(function(r){ return {a: r.a, b: r.b, v: r.v}; })};
   });
 }
-// several: one slow zoom across each run of clips side by side; a punch in on each clip; None clears each run
+// several: one slow zoom across each run of clips side by side; a punch in on each clip; None clears each run.
+// A run that already sits whole inside ONE slow zoom is left as it is: Slow zoom is already what those clips have
+// (the chip is lit), and replacing it would break a long zoom into separate ones on clips nobody picked.
+function inSlowZoom(r){ return T.ZL.some(function(q){ return q.kind === 'zoom' && q.a <= r.a && q.b >= r.b; }); }
 function zoomClips(mny, kind){
-  var runs = runsOf(mny), joined = runs.filter(function(r){ return r.clips.length > 1; });
+  var runs = runsOf(mny);
+  if (kind === 'zoom') runs = runs.filter(function(r){ return !inSlowZoom(r); });
+  if (!runs.length) return;                                           // every picked clip is in a slow zoom already
+  var joined = runs.filter(function(r){ return r.clips.length > 1; });
   T.save(function(){
-    var z = T.ZL;
-    runs.forEach(function(r){
+    var z = T.ZL, now = kind === 'zoom' ? runs.filter(function(r){ return !inSlowZoom(r); }) : runs;
+    if (!now.length) return null;
+    now.forEach(function(r){
       z = T.setRange(z, r.a, r.b, kind === 'zoom' ? {kind: 'zoom'} : null);
       if (kind === 'punch') r.clips.forEach(function(c){ z = T.setRange(z, c[0], c[1], {kind: 'punch'}); });
     });
     return {zooms: z.map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};
   });
-  if (kind === 'zoom' && joined.length) T.toast(runs.length === 1 ? T.fill(W.zoom_joined, {n: mny.length}) : W.zoom_some_joined);
+  if (kind === 'zoom' && joined.length)
+    T.toast(runs.length === 1 ? T.fill(W.zoom_joined, {n: runs[0].clips.length}) : joined.length < runs.length ? W.zoom_some_joined : W.zoom_all_joined);
 }
 function speedClip(v){
   var mny = many(); if (mny) { speedClips(mny, v); return; }

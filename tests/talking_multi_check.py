@@ -22,11 +22,12 @@ On the real page, in a hidden Chrome, with real Command, Ctrl and Shift clicks:
   - every picked clip LOOKS picked (her own mark), the little x is not drawn, the button reads "Delete 3 clips",
     the line under her help line says how many, the script outlines every picked clip's words;
   - Slow zoom: one zoom across clips side by side (also across cut words), a zoom each for clips that do not
-    touch, a zoom that reached past the picked clips trimmed and not lost;
+    touch, a zoom that reached past the picked clips trimmed and not lost; clips already inside one long slow
+    zoom left as they are (nothing saved);
   - Punch in on each, None on all, Speed on each, Delete on all (button and key), Split as ever;
   - one press is ONE step of Undo and one of Redo, by button and by key;
   - with ONE clip picked, what the page sends is byte for byte what her code sends (the exact text of each save),
-    and, where git can show it, every line of the timeline's script as it was before this (commit eb2e9d9) is
+    and every line of the timeline's script as it was before this (commit eb2e9d9, kept in tests/fixtures) is
     still there, in order, but for the sixteen lines named below;
   - a reload keeps what was done; a picked clip the chat cuts drops out; phone width does not break; no page
     error, nothing asked of the internet, every word on the page as text.
@@ -43,6 +44,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -58,6 +60,7 @@ KIT = "2026-09-29 ZoÃ«'s <b>several clips" if not t.WINDOWS else "2026-09-29 ZoÃ
 TALK = "talk.mp4"
 BEFORE = "eb2e9d9"          # the commit before several clips could be picked
 JS_FILE = "plugins/the-engine/skills/studio-manager/scripts/talking_js_timeline.py"
+OLD_SCRIPT = "talking_js_timeline_before_several.txt"      # that file at commit BEFORE, kept so the check runs anywhere
 
 # 21 words in seven sentences of three: seven clips, c0..c6, whose first words are 0, 3, 6, 9, 12, 15, 18.
 SAID = ["One", "two", "three.", "Four", "<b>five</b>", "six.", "Seven", "eight", "nine.", "Ten", "eleven", "twelve.",
@@ -179,7 +182,7 @@ def zoom_values(s):
 def run_requests(s):
     tp, TR = s.tp, s.TR
     make(s)
-    ours = ("multi_hint", "multi_hint_pc", "multi_selected", "delete_clips", "delete_title_many", "cut_clips", "zoom_joined", "zoom_some_joined")
+    ours = ("multi_hint", "multi_hint_pc", "multi_selected", "delete_clips", "delete_title_many", "cut_clips", "zoom_joined", "zoom_some_joined", "zoom_all_joined")
     case("every word for several clips is OURS (in OUR_WORDS with its reason), none of them a key of hers, none says \"Claude\"",
          all(k in tp.OUR_WORDS and k not in tp.WORDS and len(tp.OUR_WORDS[k][1]) > 10 and "claude" not in tp.OUR_WORDS[k][0].lower() for k in ours),
          [k for k in ours if k not in tp.OUR_WORDS or k in tp.WORDS])
@@ -207,6 +210,26 @@ def run_requests(s):
     case("the page carries our line under her help line, in an element of its own; hers is still first and whole",
          code == 200 and ("<div class='tl-hint' id='tlHint'>" + _html.escape(pw["tl_hint"]) + "</div><div class='tl-hint more' id='tlMulti' aria-live='polite'>"
                           + _html.escape(pw["multi_hint"]) + "</div>") in page, code)
+
+    # the page is TOLD whether it is a PC (Ctrl-click adds there, Command-click on a Mac): the fact the server sends
+    def facts(text):
+        a = text.index("id='talkData'")
+        a = text.index(">", a) + 1
+        return json.loads(text[a:text.index("</script>", a)])
+    try:
+        served = facts(page).get("pc")
+    except (ValueError, KeyError):
+        served = "unreadable"
+    case("the page the server sends says whether this is a PC, truly (so Ctrl-click, not the Windows key, adds a clip there)",
+         served is bool(this_computer.WINDOWS), served)
+    try:
+        this_computer.WINDOWS = True
+        as_pc = facts(tp.page_html(KIT)).get("pc")
+        this_computer.WINDOWS = False
+        as_mac = facts(tp.page_html(KIT)).get("pc")
+    finally:
+        this_computer.WINDOWS = was
+    case("...built as a PC the page's facts say pc, built as a Mac they say not", as_pc is True and as_mac is False, (as_pc, as_mac))
 
     # ---- one slow zoom across a run, as the Assistant's side takes it ----
     seed(s)
@@ -454,6 +477,71 @@ def run_page(c, s):
          rec().get("zooms") == [{"a": 0, "b": 2, "kind": "zoom"}, {"a": 6, "b": 8, "kind": "zoom"}, {"a": 12, "b": 14, "kind": "zoom"}] and toast() == "" and m()["n"] == [1, 0],
          (rec().get("zooms"), toast()))
 
+    # ================= Slow zoom on clips that are already inside one long slow zoom =================
+    def quiet(fn, wait=0.8):
+        """A press that should save nothing: how many saves it sent."""
+        n = c.js("window.__saves.length")
+        fn()
+        time.sleep(wait)
+        return c.js("window.__saves.length") - n
+    long_zoom = [{"a": 0, "b": 14, "kind": "zoom"}]
+    open_it(zooms=long_zoom)
+    click(3)
+    click(9, meta=True)
+    lit = [x_[2] for x_ in c.js("window.__tools().zoom")]
+    n = quiet(lambda: chip("tlZoom", "z", "zoom"))
+    v = zoom_values(s)
+    case("two clips of one long slow zoom picked (not side by side), Slow zoom pressed: the chip was lit already, nothing is saved, and the long zoom is still ONE zoom",
+         lit == [False, False, True] and n == 0 and rec().get("zooms") == long_zoom and m()["n"] == [0, 0] and toast() == ""
+         and v[0][1] == 1.0 and v[4][2] == 1.12 and all(v[k][2] == v[k + 1][1] for k in range(4)), (lit, n, rec().get("zooms"), toast()))
+    click(6, meta=True)
+    n = quiet(lambda: chip("tlZoom", "z", "zoom"))
+    case("...the same with three of its clips side by side picked: left as it is", n == 0 and rec().get("zooms") == long_zoom and m()["n"] == [0, 0], (n, rec().get("zooms")))
+    click(15, meta=True)
+    sent = press(lambda: chip("tlZoom", "z", "zoom"))
+    case("...with a clip outside it picked as well: only that clip gets a zoom; the long zoom is not broken up",
+         len(sent) == 1 and rec().get("zooms") == long_zoom + [{"a": 15, "b": 17, "kind": "zoom"}] and m()["n"] == [1, 0], rec().get("zooms"))
+    open_it(zooms=[{"a": 3, "b": 8, "kind": "zoom"}])
+    click(3)
+    click(9, shift=True)
+    press(lambda: chip("tlZoom", "z", "zoom"))
+    case("a run that reaches PAST the slow zoom it started in is still made one zoom", rec().get("zooms") == [{"a": 3, "b": 11, "kind": "zoom"}] and toast() == fill("zoom_joined", n=3),
+         (rec().get("zooms"), toast()))
+    open_it(zooms=long_zoom)
+    click(3)
+    click(9, meta=True)
+    press(lambda: chip("tlZoom", "z", "punch"))
+    case("Punch in on clips of a long slow zoom still changes them (only Slow zoom on a slow zoom is left alone)",
+         rec().get("zooms") == [{"a": 0, "b": 2, "kind": "zoom"}, {"a": 3, "b": 5, "kind": "punch"}, {"a": 6, "b": 8, "kind": "zoom"}, {"a": 9, "b": 11, "kind": "punch"},
+                                {"a": 12, "b": 14, "kind": "zoom"}], rec().get("zooms"))
+
+    # ---- the toast: two groups side by side and no clip by itself; a second press saves nothing ----
+    open_it()
+    click(0)
+    click(3, meta=True)
+    click(9, meta=True)
+    click(12, meta=True)
+    press(lambda: chip("tlZoom", "z", "zoom"))
+    case("two groups of clips side by side, no clip by itself: the toast does not speak of \"the others\"",
+         rec().get("zooms") == [{"a": 0, "b": 5, "kind": "zoom"}, {"a": 9, "b": 14, "kind": "zoom"}] and toast() == W["zoom_all_joined"] and "others" not in W["zoom_all_joined"], toast())
+    c.wait_for("!document.getElementById('toast').classList.contains('on')", 15)
+    n = quiet(lambda: chip("tlZoom", "z", "zoom"))
+    case("...pressed again on the same clips: nothing saved, no toast again, still one step of Undo", n == 0 and toast() == "" and m()["n"] == [1, 0], (n, toast(), m()["n"]))
+
+    # ---- the Zoom chip is lit only when every picked clip agrees ----
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom"}, {"a": 6, "b": 8, "kind": "punch"}])
+    click(3)
+    click(6, meta=True)
+    case("two clips with different zooms picked: no Zoom chip is lit", [x_[2] for x_ in c.js("window.__tools().zoom")] == [False, False, False], c.js("window.__tools().zoom"))
+
+    # ---- a press on a clip's end handle lets go of the others ----
+    open_it()
+    click(3)
+    click(9, shift=True)
+    c.click(clip(6) + " .tl-clip-h.r", check=False)
+    g = m()
+    case("three picked, then a press on one clip's end: only that clip is picked", g["picked"] == [6] and g["more"] == [] and g["xs"] == 1, g)
+
     # ================= across cut words =================
     open_it(cut=[[9, 11]])
     case("with the middle clip cut, six clips are left", c.js("window.__clips().map(function(x){ return x.w; })") == [0, 3, 6, 12, 15, 18])
@@ -568,6 +656,12 @@ def run_page(c, s):
     case("...and takes it out", m()["picked"] == [3], m())
     click(9, shift=True)
     case("...Shift-click picks the run there too", m()["picked"] == [3, 6, 9], m())
+    click(3)
+    click(9, ctrl=True)
+    click(15, ctrl=True, shift=True)
+    case("...Ctrl with Shift adds the run to what is picked", m()["picked"] == [3, 9, 12, 15], m())
+    click(3)
+    click(9, shift=True)
     c.click("#tlRuler", check=False, ctrl=True)
     case("...a Ctrl-click that is not on a clip does nothing, as before", m()["picked"] == [3, 6, 9], m())
 
@@ -584,6 +678,12 @@ def run_page(c, s):
                     " document.getElementById('dock').getBoundingClientRect().bottom, parseInt(document.body.style.paddingBottom), document.getElementById('dock').offsetHeight]")
         case("phone width: no sideways scroll; our line wraps inside the window and inside the dock, and the page still leaves the dock its room",
              wide[0] <= 0 and wide[1] == 390 and wide[2] <= 390.5 and wide[3] >= 0 and wide[4] <= wide[5] + 0.5 and wide[6] == wide[7] + 24, wide)
+        click(0)
+        click(3, meta=True)
+        click(6, meta=True)
+        tall = c.js("[parseInt(document.body.style.paddingBottom), document.getElementById('dock').offsetHeight, document.getElementById('tlMulti').textContent]")
+        case("...with three picked our line is longer and the dock taller: the page measures the dock's room again",
+             tall[1] > wide[7] and tall[0] == tall[1] + 24 and tall[2] == fill("multi_selected", n=3), (tall, wide[7]))
     finally:
         c.desktop()
 
@@ -591,14 +691,17 @@ def run_page(c, s):
 # ---------- the script as it was is still all there ----------
 
 def check_lines():
+    # the script as it was is kept beside the tests (so this runs anywhere, GitHub's one-commit checkout included)
+    kept = (HERE / "fixtures" / OLD_SCRIPT).read_text(encoding="utf-8")
     try:
         r = subprocess.run(["git", "-C", str(ROOT), "show", "%s:%s" % (BEFORE, JS_FILE)], capture_output=True, text=True, encoding="utf-8", timeout=30)
     except (OSError, subprocess.SubprocessError):
         r = None
     if r is None or r.returncode != 0 or "selPiece" not in r.stdout:
-        t.skip("every line of the timeline's script as it was is still there: git can't show commit %s here" % BEFORE)
-        return
-    old, new = r.stdout.splitlines(), (ROOT / JS_FILE).read_text(encoding="utf-8").splitlines()
+        t.skip("the kept copy of the script as it was is what git has at commit %s: git can't show that commit here" % BEFORE)
+    else:
+        case("the kept copy of the script as it was is exactly what git has at commit %s" % BEFORE, r.stdout.splitlines() == kept.splitlines())
+    old, new = kept.splitlines(), (ROOT / JS_FILE).read_text(encoding="utf-8").splitlines()
     at, missing = 0, []
     for line in old:
         try:

@@ -314,6 +314,8 @@ OUR_WORDS = {
     "zoom_joined": ("One slow zoom across {n} clips", "says that the clips side by side now share one zoom (each still shows her Slow zoom badge)"),
     "zoom_some_joined": ("Slow zoom added. Clips side by side share one long zoom; the others each have their own.",
                          "the same, when only some of the picked clips touch"),
+    "zoom_all_joined": ("Slow zoom added. Clips side by side share one long zoom.",
+                        "the same, when there is more than one group of clips side by side and no clip by itself"),
 }
 OUR_WORDS["made_only"] = (
     "Made \"{project}\" in CapCut.",
