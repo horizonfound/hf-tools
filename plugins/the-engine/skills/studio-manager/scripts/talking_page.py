@@ -764,8 +764,10 @@ def _dock(w):
         "<span class='tl-sep'></span>"
         # Speed and Zoom: a small menu each, made by talking_js_timeline.py (her words inside; Dustin, Nov 13)
         "<span class='tl-group' id='tlSpeed'></span><span class='tl-group' id='tlZoom'></span>"
+        # Undo and Redo wrap as a pair, never one alone on a row (review, Nov 13)
+        "<span class='tl-ur'>"
         "<button class='btn small' id='tlUndo' type='button' disabled title='" + q(w["undo_title"]) + "'>" + e(w["undo"]) + "</button>"
-        "<button class='btn small' id='tlRedo' type='button' disabled title='" + q(w["redo_title"]) + "'>" + e(w["redo"]) + "</button>"
+        "<button class='btn small' id='tlRedo' type='button' disabled title='" + q(w["redo_title"]) + "'>" + e(w["redo"]) + "</button></span>"
         "<span class='tl-scale'><button id='tlOut' type='button' aria-label='" + q(w["zoom_out"]) + "'>&minus;</button>"
         "<input type='range' id='tlScale' min='0' max='100' value='0' aria-label='" + q(w["zoom_tl"]) + "'>"
         "<button id='tlIn' type='button' aria-label='" + q(w["zoom_in"]) + "'>+</button></span></div>"

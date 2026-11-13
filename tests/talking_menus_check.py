@@ -28,8 +28,11 @@ On the real page, in a hidden Chrome, with a real mouse and real keys:
     choose, Tab closes; the spacebar never plays the video behind an open menu;
   - a photo picked, or the picked clip cut from the chat with the menu open: grey, and the menu closes itself;
   - a window with no room above the button: the list goes under it, still whole inside the window;
-  - phone width: no sideways scroll, the lists inside the window, a finger's tap chooses, and when a button's
-    words make the bar wrap, the dock's room is measured again at once;
+  - phone width: no sideways scroll, the lists inside the window, a finger's tap chooses;
+  - the review round: the bar keeps its shape (each button's words have the room of their longest, so no button
+    moves when another clip is picked) and Undo and Redo are never parted, at eight widths; Backspace and Delete
+    do nothing inside an open list; the window losing the keyboard closes it; no item is shaded unless the pointer
+    or the keyboard is on it;
   - everything is text (no element made from a string), no page error, nothing asked of the internet.
 
 What it never does: touch the real ~/.studio (STUDIO_HOME is a scratch folder; the real one is listed before and
@@ -87,7 +90,7 @@ HELPERS = r"""
     };
   };
   window.__bar = function(){
-    return Array.from(document.querySelector('#tl .tl-row').children).map(function(e){ return e.id || e.className; });
+    var out = []; Array.from(document.querySelector('#tl .tl-row').children).forEach(function(e){ if (e.className === 'tl-ur') Array.from(e.children).forEach(function(k){ out.push(k.id); }); else out.push(e.id || e.className); }); return out;
   };
   window.__room = function(){ return [parseInt(document.body.style.paddingBottom), $('dock').offsetHeight, document.documentElement.scrollWidth - document.documentElement.clientWidth]; };
 })();
@@ -114,7 +117,8 @@ def run_python(s):
     b = page.find("id='tlUndo'")
     between = page[page.find("</button>", a) + 9:page.rfind("<button", 0, b)]
     case("the bar the page carries: after Delete clip a thin separator, then a place each for the Speed and the Zoom menu, then Undo; no bare word Speed or Zoom between them",
-         a > 0 and b > a and between == "<span class='tl-sep'></span><span class='tl-group' id='tlSpeed'></span><span class='tl-group' id='tlZoom'></span>", between[:300])
+         a > 0 and b > a and between == "<span class='tl-sep'></span><span class='tl-group' id='tlSpeed'></span><span class='tl-group' id='tlZoom'></span><span class='tl-ur'>"
+         and "id='tlRedo'" in page[b:page.find("</span>", b)], between[:300])
     js = tp.talking_js_timeline.JS
     code = "\n".join(x for x in js.splitlines() if not x.lstrip().startswith("//"))      # the script without its notes
     case("...the page carries no chip for a speed or a zoom on the timeline any more, and the menus are made of elements and text (the timeline's script never writes HTML from a string)",
@@ -430,30 +434,88 @@ def run_page(c, s):
         case("...and a tap anywhere else closes it", is_open() is None)
     finally:
         c.desktop()
-    # the dock's room when a button's words make the bar wrap: a width is looked for at which the bar is one line
-    # taller with clip 3 picked ("1.25×", "Slow zoom") than with clip 0 picked ("1×", "None")
-    tm.seed(s, zooms=[{"a": 3, "b": 5, "kind": "zoom"}], speeds=[{"a": 3, "b": 5, "v": 1.25}])
-    found = None
+    # ---- the review round (Nov 13) ----
+    # the bar keeps its shape: each button's value has the room of its longest word, so picking another clip, or
+    # choosing from a menu, never moves a button; and Undo and Redo are never parted
+    tm.seed(s, zooms=[{"a": 3, "b": 5, "kind": "zoom"}], speeds=[{"a": 3, "b": 5, "v": 1.5}])
+    SHAPE = ("(function(){ var row = document.querySelector('#tl .tl-row').getBoundingClientRect().top, b = function(id){ var r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top - row), Math.round(r.width)]; };"
+             " return {speed: b('tlSpeedBtn'), zoom: b('tlZoomBtn'), undo: b('tlUndo'), redo: b('tlRedo'), scale: b('tlScale'), dock: document.getElementById('dock').offsetHeight,"
+             " words: [document.querySelector('#tlSpeedBtn .val').textContent, document.querySelector('#tlZoomBtn .val').textContent],"
+             " side: document.documentElement.scrollWidth - document.documentElement.clientWidth}; })()")
+    moves, parted, sideways, words = [], [], [], None
     try:
-        for width in range(330, 1100, 8):
-            c.phone(width=width, height=900, touch=False)
+        # 840, 430 and 336 are widths at which Undo and Redo would part without their pairing (found by trying every 6 px)
+        for width, height in ((1280, 800), (1100, 800), (840, 800), (800, 793), (640, 800), (430, 800), (375, 812), (336, 800)):
+            c.phone(width=width, height=height, scale=1, touch=False)
             c.open("about:blank")
             c.open(s.url("/talking.html" + s.q(KIT)))
             c.wait_for("window.Talk && window.Talk.loaded && document.querySelectorAll('#tlClips .tl-clip').length > 0", 15)
-            # the 3-second look measures the dock too: held off, so what is seen is what the press itself did
-            c.js("window.Talk.poll = function(){}")
-            hs = c.js("(function(){ var T = window.Talk, d = document.getElementById('dock'), b = function(w){ var e = document.querySelector('#tlClips .tl-clip[data-w=\"' + w + '\"]'),"
-                      " r = e.getBoundingClientRect(), o = {bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse'};"
-                      " e.dispatchEvent(new PointerEvent('pointerdown', o)); o.buttons = 0; document.getElementById('tlTrack').dispatchEvent(new PointerEvent('pointerup', o)); return [d.offsetHeight, parseInt(document.body.style.paddingBottom),"
-                      " document.documentElement.scrollWidth - document.documentElement.clientWidth]; }; var a = b(0), z = b(3), y = b(0); return [a, z, y]; })()")
-            if hs[1][0] - hs[0][0] >= 20:          # a whole line taller
-                found = (width, hs)
-                break
-        case("at a width where the longer words make the bar wrap (found: %s px), picking the clip with \"1.25×\" and \"Slow zoom\" makes the dock taller, and the page gives it that room "
-             "AT ONCE (and takes it back when the other clip is picked); no sideways scroll" % (found[0] if found else "none"),
-             bool(found) and found[1][1][0] > found[1][0][0] and all(h[1] == h[0] + 24 and h[2] <= 0 for h in found[1]) and found[1][2][0] == found[1][0][0], found)
+            c.wait_for("document.fonts.status === 'loaded'", 10)
+            seen = [c.js(SHAPE)]                       # nothing picked
+            click(0)
+            seen.append(c.js(SHAPE))                   # 1×, None
+            click(3)
+            seen.append(c.js(SHAPE))                   # 1.5×, Slow zoom
+            click(9, meta=True)
+            seen.append(c.js(SHAPE))                   # Mixed, Mixed
+            if width == 1280:
+                words = [g["words"] for g in seen]
+            for n, g in enumerate(seen[1:]):
+                # several picked: our line under the timeline is longer and may take a second line at a narrow
+                # width, as it always has, so the dock's height is compared for one clip picked only
+                keys = ("speed", "zoom", "undo", "redo", "scale") + (("dock",) if n < 2 else ())
+                if any(g[k] != seen[0][k] for k in keys):
+                    moves.append((width, g["words"], {k: (seen[0][k], g[k]) for k in keys if g[k] != seen[0][k]}))
+            for g in seen:
+                if g["undo"][1] != g["redo"][1]:
+                    parted.append((width, g["words"], g["undo"], g["redo"]))
+                if g["side"] > 0:
+                    sideways.append((width, g["words"], g["side"]))
+        case("the four states really differ in their words (nothing picked, 1× and None, 1.5× and Slow zoom, Mixed and Mixed)",
+             words == [["1×", "None"], ["1×", "None"], ["1.5×", "Slow zoom"], ["Mixed", "Mixed"]], words)
+        case("the bar keeps its shape at eight window widths from 1280 down to 336: with another clip picked, or several that disagree, the two menu buttons, Undo, Redo and the "
+             "timeline's own zoom stay exactly where they were in the bar, and with one clip picked the dock is the same height", not moves, moves[:3])
+        case("...Undo and Redo sit side by side on one row at every one of those widths, in every state", not parted, parted[:3])
+        case("...and nothing scrolls sideways at any of them", not sideways, sideways[:3])
     finally:
         c.desktop()
+
+    # Delete or Backspace inside an open list does nothing: the picked clip is not deleted
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom"}])
+    click(3)
+    open_menu("tlZoom")
+    clips = c.count("#tlClips .tl-clip")
+    n = quiet(lambda: (c.key("Backspace"), c.key("Delete")))
+    case("with a menu open, Backspace and Delete delete nothing: no save, the same clips, the clip still picked, the menu still open",
+         n == 0 and c.count("#tlClips .tl-clip") == clips and not rec().get("cut") and multi()["sel"] == "clip" and is_open() == "tlZoom", (n, c.count("#tlClips .tl-clip"), rec().get("cut"), is_open()))
+    c.key("Escape")
+    sent = press(lambda: c.key("Backspace"))
+    case("...and with the menu closed, Backspace deletes the picked clip as ever", [saved_text(b) for b in sent] == ['"saved":{"cut":[[3,5]]}}'], sent)
+
+    # the window losing the keyboard closes the menu
+    open_it()
+    click(3)
+    open_menu("tlSpeed")
+    c.js("window.dispatchEvent(new Event('blur'))")
+    case("the window losing the keyboard closes the open menu, saving nothing", is_open() is None and not menu("tlSpeed")["open"], is_open())
+
+    # the shading: only under the pointer or the keyboard's own ring, so with Mixed no item looks like the choice
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "punch"}], speeds=[{"a": 3, "b": 5, "v": 1.5}])
+    click(3)
+    click(9, meta=True)
+    open_menu("tlZoom")
+    c.mouse_move(5, 5)
+    BGS = "Array.from(document.querySelectorAll('#tlZoomList [role=menuitemradio]')).map(function(d){ return getComputedStyle(d).backgroundColor; })"
+    bgs = c.js(BGS)
+    case("Mixed, opened with the mouse: no item is shaded as if it were the choice (and none is checked)",
+         all(b in ("rgba(0, 0, 0, 0)", "transparent") for b in bgs) and not any(menu("tlZoom")["checked"]), bgs)
+    c.key("ArrowDown")
+    bgs = c.js(BGS)
+    case("...moved to with the arrow keys, the item the keyboard is on is shaded (and only that one)",
+         [b in ("rgba(0, 0, 0, 0)", "transparent") for b in bgs] == [True, False, True] and menu("tlZoom")["focus"] == 1, (bgs, menu("tlZoom")["focus"]))
+    c.key("Escape")
+    arrow = c.js("parseFloat(getComputedStyle(document.querySelector('#tlZoomBtn .car')).fontSize)")
+    case("the little arrow that says a list opens is drawn at 14 px or more (it was 10, and read as a dot)", arrow >= 14, arrow)
 
 
 def main():

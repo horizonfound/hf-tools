@@ -231,7 +231,9 @@ Dustin was shown three ways to tidy the timeline's button bar and chose this one
 - The list opens above its button, so it never covers the clips; it closes on a press elsewhere, on choosing, and on Escape (Escape closes the menu first and leaves the picked clips picked). It works from the keyboard and at phone width.
 - **Not changed:** the Move / None / Punch in / Slow zoom row under each paragraph of your script stays exactly as it is for now. Nothing in the saved record, the Assistant's side or CapCut changed.
 - Lines of ours for it (drafts for you): "{name}:" (only the colon after your word, as in "Speed: 1×") and "Mixed". Everything else in the menus is yours.
-- Not tried: anyone's own hand, a real PC, a real touch screen (taps were tried only with Chrome's pretend finger).
+- After a review (Nov 13): the buttons in the bar stay where they are whichever clip is picked (each button keeps room for its longest word, so "Speed: 1×" has a little blank room inside it); Undo and Redo always sit together; Backspace and Delete do nothing while a list is open (before, they deleted the picked clip); the little arrow is bigger; and with "Mixed" no item in the list looks chosen.
+- Left for the two of you: the two buttons have no tooltip, and nothing says why they are grey when no clip is picked (your chips were grey without a word too). A tooltip would be a new line of ours, for example "Pick a clip first, then choose its speed".
+- Not tried: anyone's own hand, the Claude app's own window, a real PC, a real touch screen (taps were tried only with Chrome's pretend finger), a screen reader speaking it.
 - It replaces something of yours, so it is yours to keep, change or put back.
 
 ## 8. For Nicole and Dustin to settle

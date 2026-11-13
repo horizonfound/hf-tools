@@ -740,6 +740,7 @@ def check_talking():
     ):
         miss = [w for w in words if w not in flat and w not in flat.lower()]
         case(f"the part: {what}", not miss, miss)
+    case("the part: the word chip is nowhere in it (the timeline has menus now)", "chip" not in flat.lower(), [m.start() for m in re.finditer("chip", flat.lower())][:3])
     case("(the core's own words for Apple's window are still the ones the part borrows)", "click Install, then Agree. It takes five to ten minutes." in core)
     case("where the Mac's switch is, the part says as the page does", "Privacy & Security, then Speech Recognition" in flat and "Privacy & Security, then Speech Recognition" in talking_rec.line_for("refused")
          and "then Keyboard, and switch on Dictation" in flat and "then Keyboard, and switch on Dictation" in talking_rec.line_for("dictation_off"))

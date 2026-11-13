@@ -83,6 +83,10 @@ button with her own words for every item, the choice the picked clip has checked
     what is picked alone (the next Escape lets go of several, as ever);
   - keys: Enter, Space, Down or Up on the button open it; the arrows, Home and End move; Enter or Space choose;
     the button has the keyboard again afterwards. role menu and menuitemradio, aria-checked, aria-expanded.
+  - the review round (Nov 13): each button's words have the room of their longest (Delete clip's too), so no
+    button in the bar moves when another clip is picked or a choice is made; Undo and Redo wrap as a pair;
+    Backspace and Delete do nothing inside an open list; an item is shaded only under the pointer or the
+    keyboard's ring.
 
 What it gives the other parts: T.pickedWords() (the words of the clip or clips picked, for the script's outline),
 T.renderTimeline(), T.tl() (what a test may read: {pps, selw, sel, drag, making, more, picked, menu, menuUp}),
@@ -274,7 +278,14 @@ function makeMenu(id, name, attr, items, choose){
   btn.type = 'button'; btn.disabled = true; btn.id = id + 'Btn'; list.id = id + 'List';
   btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', list.id);
   car.setAttribute('aria-hidden', 'true');
-  btn.appendChild(el('span', 'nm', T.fill(W.menu_label, {name: name}))); btn.appendChild(val); btn.appendChild(car);
+  // the value's room is as wide as the longest thing it can say (every item, and Mixed), each laid unseen in the
+  // same spot, so the bar never changes shape, and Undo and Redo never move, when the choice or the picked clip
+  // changes (review, Nov 13). The unseen words are drawn by the styles from data-w: text, never HTML, in no name.
+  var room = el('span', 'vw'); room.appendChild(val);
+  items.map(function(it){ return it[1]; }).concat([W.mixed]).forEach(function(s){
+    var z = el('span', 'sz'); z.setAttribute('aria-hidden', 'true'); z.setAttribute('data-w', s); room.appendChild(z);
+  });
+  btn.appendChild(el('span', 'nm', T.fill(W.menu_label, {name: name}))); btn.appendChild(room); btn.appendChild(car);
   list.setAttribute('role', 'menu'); list.setAttribute('aria-label', name); list.hidden = true;
   items.forEach(function(it, k){
     var d = el('div', 'tl-mi'), tick = el('span', 'tick', '✓');
@@ -326,6 +337,17 @@ function menuState(m, off, text, cur, lit){
   if (off && OPEN === m) closeMenu(false);
   return was !== text;
 }
+// the Delete button's words change too (Delete clip, Delete photo, Delete 3 clips): the same unseen words hold
+// its room, so picking several clips never pushes the buttons after it along (up to nine clips; more is a digit wider)
+var cutVal = el('span', 'val', $('tlCut').textContent);
+(function(){
+  var b = $('tlCut'), room = el('span', 'vw');
+  b.textContent = ''; room.appendChild(cutVal);
+  [W.delete_clip, W.delete_photo, T.fill(W.delete_clips, {n: 8})].forEach(function(s){
+    var z = el('span', 'sz'); z.setAttribute('aria-hidden', 'true'); z.setAttribute('data-w', s); room.appendChild(z);
+  });
+  b.appendChild(room);
+})();
 var speedMenu = makeMenu('tlSpeed', W.speed, 'v', SPEEDS.map(function(v){ return [v, T.fill(W.speed_x, {v: v})]; }), function(v){ speedClip(v); });
 var zoomMenu = makeMenu('tlZoom', W.zoom, 'z', MOVES, function(kind){ zoomClip(kind); });
 // a press anywhere else closes the open menu (and still does whatever it was a press on)
@@ -351,12 +373,13 @@ addEventListener('keydown', function(e){
   else if (k === 'Home') { stop(); m.items[0].focus({preventScroll: true}); }
   else if (k === 'End') { stop(); m.items[n - 1].focus({preventScroll: true}); }
   else if (k === 'Enter' || k === ' ') { stop(); if (i >= 0) m.items[i].click(); else closeMenu(true); }      // never playing behind the open menu
+  else if ((k === 'Delete' || k === 'Backspace') && !e.metaKey && !e.ctrlKey) stop();      // never deleting the picked clip from inside an open list
 }, true);
 function toolState(){
   var p = selPiece(), zk = zoomKind(p), mny = many();
   var ph = TLSEL === 'photo' && !!T.findShot(T.SELSHOT);
   $('tlCut').disabled = !(ph || (TLSEL === 'clip' && p));
-  $('tlCut').textContent = ph ? W.delete_photo : mny ? T.fill(W.delete_clips, {n: mny.length}) : W.delete_clip;
+  cutVal.textContent = ph ? W.delete_photo : mny ? T.fill(W.delete_clips, {n: mny.length}) : W.delete_clip;
   $('tlCut').title = mny && !ph ? W.delete_title_many : W.delete_title;
   // several: our line under her help line; when its words change the dock may grow a line, so its room is measured again
   var ml = mny ? T.fill(W.multi_selected, {n: mny.length}) : W.multi_hint;
