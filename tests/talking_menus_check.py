@@ -461,9 +461,9 @@ def run_page(c, s):
             if width == 1280:
                 words = [g["words"] for g in seen]
             for n, g in enumerate(seen[1:]):
-                # several picked: our line under the timeline is longer and may take a second line at a narrow
-                # width, as it always has, so the dock's height is compared for one clip picked only
-                keys = ("speed", "zoom", "undo", "redo", "scale") + (("dock",) if n < 2 else ())
+                # several picked: our line under the timeline is longer, but it holds the room of its longest words
+                # at every width (multiRoom), so the dock's height is compared in every state
+                keys = ("speed", "zoom", "undo", "redo", "scale", "dock")
                 if any(g[k] != seen[0][k] for k in keys):
                     moves.append((width, g["words"], {k: (seen[0][k], g[k]) for k in keys if g[k] != seen[0][k]}))
             for g in seen:
@@ -474,7 +474,7 @@ def run_page(c, s):
         case("the four states really differ in their words (nothing picked, 1× and None, 1.5× and Slow zoom, Mixed and Mixed)",
              words == [["1×", "None"], ["1×", "None"], ["1.5×", "Slow zoom"], ["Mixed", "Mixed"]], words)
         case("the bar keeps its shape at eight window widths from 1280 down to 336: with another clip picked, or several that disagree, the two menu buttons, Undo, Redo and the "
-             "timeline's own zoom stay exactly where they were in the bar, and with one clip picked the dock is the same height", not moves, moves[:3])
+             "timeline's own zoom stay exactly where they were in the bar, and the dock is the same height (the line under the timeline keeps room for its longest words)", not moves, moves[:3])
         case("...Undo and Redo sit side by side on one row at every one of those widths, in every state", not parted, parted[:3])
         case("...and nothing scrolls sideways at any of them", not sideways, sideways[:3])
     finally:

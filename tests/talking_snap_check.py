@@ -419,6 +419,111 @@ def run_page(c, s):
     got = shot()["me"]
     case("their round handle is as it was: sizing through the middle does not snap and shows no line", kn is False and got["x"] != 0.5 and got["w"] == old(0.36, 4) and not on(), (kn, got))
 
+    # ================= set a little off the middle on purpose, then moved straight up or down =================
+    scr = c.js("(function(){ var r = document.getElementById('screen').getBoundingClientRect(); return [r.width, r.height]; })()")
+    offx = round(0.5 + 4.0 / scr[0], 4)                      # 4 px right of the middle: inside the distance, not centered
+    save_js({"shots": [], "captions": True, "cap_pos": {"x": offx, "y": 0.71}, "cap_size": 1})
+    at(WORDS[3]["start"] + 0.02)
+    was = rev()
+    p = grab("#cap")
+    seen = []
+    for dx, dy in ((0, 8), (1, 14), (-2, 20), (0, 20)):
+        to(p, dx, dy)
+        seen.append([on(), held()["cap_pos"]["x"]])
+    c.mouse_release()
+    moved(was)
+    got = rec().get("cap_pos") or {}
+    case("a caption set 4 px off the middle and dragged straight down (the hand wobbling a px or two sideways) keeps its spot: no line at any moment, "
+         "and the saved left-to-right number is the one it had, not 0.5",
+         [x[0] for x in seen] == [False] * 4 and seen[2][1] == old(offx, -2) and got == {"x": offx, "y": old(0.71, 20, True)} and got["x"] != 0.5, (offx, seen, got))
+    was = rev()
+    p = grab("#cap")
+    to(p, 5, 6)
+    s0 = [on(), held()["cap_pos"]["x"]]
+    to(p, -3, 10)
+    s1 = [on(), held()["cap_pos"]["x"]]
+    c.mouse_release()
+    moved(was)
+    case("...the same caption dragged sideways first (5 px), then to within the distance: now it snaps, and is saved exactly centered",
+         s0 == [False, old(offx, 5)] and s1 == [True, 0.5] and (rec().get("cap_pos") or {}).get("x") == 0.5 and not on(), (s0, s1, rec().get("cap_pos")))
+    save_js({"captions": False, "cap_pos": None, "shots": [stretch(spot="center", pos={"x": offx, "y": 0.44, "w": 0.704})]})
+    at(mid)
+    c.wait_for("window.__pic().loaded", 10)
+    was = rev()
+    p = grab("#phFront")
+    to(p, 0, 10); to(p, 1, 22)
+    pd = [on(), held()["pos"]["x"]]
+    c.mouse_release()
+    moved(was)
+    case("...and a photo set 4 px off the middle, dragged straight down, keeps its spot too: no line, the old number",
+         pd == [False, old(offx, 1)] and shot()["pos"]["x"] == old(offx, 1) and shot()["pos"]["x"] != 0.5 and not on(), (pd, shot()["pos"]))
+    save_js({"shots": [stretch(spot="pip", me={"x": offx, "y": 0.7, "w": 0.36})]})
+    at(mid)
+    was = rev()
+    p = grab("#vid")
+    to(p, 0, -10); to(p, -1, -22)
+    md = [on(), held()["me"]["x"]]
+    c.mouse_release()
+    moved(was)
+    case("...and so does themselves in the corner", md == [False, old(offx, -1)] and shot()["me"]["x"] == old(offx, -1) and shot()["me"]["x"] != 0.5 and not on(), (md, shot()["me"]))
+
+    # ================= left to right only: nothing snaps up and down =================
+    def to_vertical_middle(start_y):
+        """Whole px to drag down (or up) so the thing's middle ends 2 px below the preview's middle, top to bottom."""
+        return int(round((0.5 - start_y) * scr[1])) + 2
+
+    save_js({"shots": [stretch(spot="center")]})
+    at(mid)
+    c.wait_for("window.__pic().loaded", 10)
+    dy = to_vertical_middle(0.44)
+    was = rev()
+    p = grab("#phFront")
+    to(p, -20, dy // 2); to(p, -40, dy)
+    v0 = [on(), held()["pos"]["y"]]
+    to(p, 2, dy)
+    v1 = [on(), held()["pos"]["x"], held()["pos"]["y"]]
+    c.mouse_release()
+    moved(was)
+    got = shot()["pos"]
+    case("a photo dragged to 2 px from the preview's middle TOP TO BOTTOM, off to the side: nothing snaps up and down and no line shows; "
+         "brought to the middle left to right there, only x is centered and y is still the old sum",
+         v0 == [False, old(0.44, dy, True)] and v0[1] != 0.5 and abs(v0[1] - 0.5) * scr[1] < 3 and v1 == [True, 0.5, old(0.44, dy, True)]
+         and got["x"] == 0.5 and got["y"] == old(0.44, dy, True) and got["y"] != 0.5, (dy, v0, v1, got))
+    save_js({"shots": [stretch(spot="pip", me={"x": 0.3, "y": 0.44, "w": 0.36})]})
+    at(mid)
+    was = rev()
+    p = grab("#vid")
+    to(p, 0, dy // 2); to(p, 0, dy)
+    v0 = [on(), held()["me"]["y"]]
+    c.mouse_release()
+    moved(was)
+    got = shot()["me"]
+    case("...themselves in the corner likewise: 2 px from the middle top to bottom, y is the old sum, never 0.5, and no line",
+         v0 == [False, old(0.44, dy, True)] and got == {"x": 0.3, "y": old(0.44, dy, True), "w": 0.36} and got["y"] != 0.5 and abs(got["y"] - 0.5) * scr[1] < 3, (v0, got))
+    save_js({"shots": [], "captions": True, "cap_pos": {"x": 0.3, "y": 0.44}, "cap_size": 1})
+    at(WORDS[3]["start"] + 0.02)
+    was = rev()
+    p = grab("#cap")
+    to(p, 0, dy // 2); to(p, 0, dy)
+    v0 = [on(), held()["cap_pos"]["y"]]
+    c.mouse_release()
+    moved(was)
+    got = rec().get("cap_pos") or {}
+    case("...and the caption likewise", v0 == [False, old(0.44, dy, True)] and got == {"x": 0.3, "y": old(0.44, dy, True)} and got["y"] != 0.5, (v0, got))
+    # exactly on the edge of the distance counts, from either side
+    save_js({"cap_pos": None, "cap_size": 1})
+    at(WORDS[3]["start"] + 0.02)
+    was = rev()
+    p = grab("#cap")
+    to(p, 20, 12)
+    edge = []
+    for dx in (SNAP + 1, SNAP, -(SNAP + 1), -SNAP):
+        to(p, dx, 12)
+        edge.append(on())
+    c.mouse_release()
+    moved(was)
+    case("exactly %d px from the middle counts as within the distance on BOTH sides (%d px does not)" % (SNAP, SNAP + 1), edge == [False, True, False, True], edge)
+
     # ================= never saved, nothing broken =================
     save_js({"shots": [], "captions": True, "cap_pos": None, "cap_size": 1})
     blob = json.dumps(rec())

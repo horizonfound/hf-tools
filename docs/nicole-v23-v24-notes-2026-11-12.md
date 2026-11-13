@@ -245,6 +245,9 @@ Dustin asked for it: "when I'm dragging the text around... there should be like 
 - **Not changed:** the round handles (making something bigger or smaller), up and down, the timeline, the saved record's fields, CapCut. The line is only drawn on the page; it is not part of the reel.
 - No words were added. Nothing on the page says Option turns it off; if you want a hint, that would be a new line for the two of you to word, and where it goes is yours too (only your two tick boxes sit under the preview).
 - Not tried: anyone's own hand, the Claude app's own window, a real PC, a real touch screen (tried only with Chrome's pretend finger; a finger has no Option key).
+- After a review the same day: something you set a little off the middle on purpose stays there when you drag it straight up or down (it only catches on the middle once your hand has gone a few px sideways); and nothing ever catches up and down. Something already centered stays centered when moved up or down.
+- Left for your hands: right at the edge of the catch, a pixel of wobble makes the thing hop and the line blink. If it feels twitchy it can be made to hold on a little longer before letting go.
+- One more of ours from the same review, on the timeline: when a second clip was picked in a narrow window, the bar and the timeline moved up about 18 px, because our line under the timeline grew from one row to two. The line now keeps room for its longest words, so nothing moves. In a narrow window that leaves one empty row under the hint while only one clip is picked.
 - It goes beyond your page, so it is yours to keep, change or take out.
 
 ## 8. For Nicole and Dustin to settle

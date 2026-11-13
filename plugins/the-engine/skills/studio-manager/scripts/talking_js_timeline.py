@@ -375,13 +375,36 @@ addEventListener('keydown', function(e){
   else if (k === 'Enter' || k === ' ') { stop(); if (i >= 0) m.items[i].click(); else closeMenu(true); }      // never playing behind the open menu
   else if ((k === 'Delete' || k === 'Backspace') && !e.metaKey && !e.ctrlKey) stop();      // never deleting the picked clip from inside an open list
 }, true);
+// ours: the line under the timeline keeps the room of its longest words at this width, so the bar and the timeline
+// do not move up when a second clip is picked and the line grows from one row to two. Measured on a copy nobody
+// sees or hears; measured again only when the line's width changes (or the fonts arrive).
+var multiW = -1;
+function multiRoom(){
+  var el = $('tlMulti'), wd = el.clientWidth;
+  if (!wd || wd === multiW) return;
+  multiW = wd;
+  var c = el.cloneNode(false), tall = 0;
+  c.removeAttribute('id'); c.removeAttribute('aria-live'); c.setAttribute('aria-hidden', 'true');
+  c.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;min-height:0;width:' + wd + 'px';
+  el.parentNode.appendChild(c);
+  [W.multi_hint, T.fill(W.multi_selected, {n: 88})].forEach(function(words){ c.textContent = words; tall = Math.max(tall, c.offsetHeight); });
+  el.parentNode.removeChild(c);
+  if (el.style.minHeight !== tall + 'px') {
+    el.style.minHeight = tall + 'px';
+    var dh = $('dock').offsetHeight;
+    if (dh !== dockWas) { dockWas = dh; T.sizeDock(); }
+  }
+}
+try { document.fonts.ready.then(function(){ multiW = -1; multiRoom(); }); } catch (e) {}
 function toolState(){
+  multiRoom();
   var p = selPiece(), zk = zoomKind(p), mny = many();
   var ph = TLSEL === 'photo' && !!T.findShot(T.SELSHOT);
   $('tlCut').disabled = !(ph || (TLSEL === 'clip' && p));
   cutVal.textContent = ph ? W.delete_photo : mny ? T.fill(W.delete_clips, {n: mny.length}) : W.delete_clip;
   $('tlCut').title = mny && !ph ? W.delete_title_many : W.delete_title;
-  // several: our line under her help line; when its words change the dock may grow a line, so its room is measured again
+  // several: our line under her help line. It holds the room of its longest words (multiRoom), so the dock should
+  // not grow; its room is measured again all the same
   var ml = mny ? T.fill(W.multi_selected, {n: mny.length}) : W.multi_hint;
   if ($('tlMulti').textContent !== ml) {
     $('tlMulti').textContent = ml;

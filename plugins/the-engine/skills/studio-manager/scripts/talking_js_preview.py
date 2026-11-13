@@ -57,7 +57,9 @@ Ours:
     preview's middle, left to right, it sits exactly on it (x is 0.5 exactly, which is what is saved and what
     CapCut gets) and a thin blue line (#cline, the designer's blue) runs down the whole preview there. Further
     away it lets go and the line goes, and x is the very number it was before this was built. Option (Alt on a
-    PC) held during the drag turns it off, at once, with the mouse still. Left to right only. The line is drawn
+    PC) held during the drag turns it off, at once, with the mouse still. Left to right only. A thing that was NOT
+    centered snaps only once the hand has gone more than SIDE_PX (3) px sideways in that drag, so a drag straight
+    up or down keeps the left-to-right spot it had; a thing already exactly centered stays so. The line is drawn
     only: never saved, hidden from screen readers, gone the moment the drag ends however it ends.
 
 What the timeline's part uses from here: T.frame(playing) (it says 'frame' {t, R, playing} to whoever listens:
@@ -74,6 +76,7 @@ var vid = $('vid'), bv = $('bvid'), sc = $('screen'), wrap = $('phFront'), img =
 var ME = {x: (50 + 1080 * 0.36 / 2) / 1080, y: (1920 - 60 - 1920 * 0.36 / 2) / 1920, w: 0.36};     // them, small, bottom left
 var CAP = {x: 0.5, y: 0.71};
 var SNAP_PX = 6;               // ours: how near the preview's middle, in screen px, a dragged thing snaps to it
+var SIDE_PX = 3;               // ours: how far sideways the hand must go in a drag before a thing that was off the middle may snap to it
 var CLICK_PX = 3, PUNCH = 1.15, SLOW = 0.12, SLOW_OUTSIDE = 1.06, RESEEK = 0.35, CAP_SHARE = 0.035;
 var pdrag = null;              // a drag on the preview
 var held = null;               // what that drag has in hand: {a, pos} | {a, me} | {cap_pos} | {cap_size}
@@ -354,7 +357,7 @@ sc.addEventListener('pointerdown', function(e){
   var st = kind === 'capsize' ? capSize() : kind === 'cap' ? capPos() : (kind === 'memove' || kind === 'mesize') ? meOf(x) : boxOf(x, p);
   pdrag = {kind: kind, a: onShot ? x.a : null, ratio: ratio(p), start: typeof st === 'number' ? st : {x: st.x, y: st.y, w: st.w},
            sx: e.clientX, sy: e.clientY, r: sc.getBoundingClientRect(), moved: false, id: e.pointerId, live: null,
-           cx: null, cy: null, alt: false, snap: false};
+           cx: null, cy: null, alt: false, snap: false, side: false};
   if (onShot) T.SELSHOT = x.a;
   try { sc.setPointerCapture(e.pointerId); } catch (err) {}
 });
@@ -381,8 +384,15 @@ function dragTo(){
   if (!d.moved && Math.abs(d.cx - d.sx) + Math.abs(d.cy - d.sy) > CLICK_PX) d.moved = true;
   if (!d.moved || !d.r.width || !d.r.height) return;
   var dx = (d.cx - d.sx) / d.r.width, dy = (d.cy - d.sy) / d.r.height, st = d.start, w, nx = st.x + dx, snap = false;
-  // moved, never sized: its middle within SNAP_PX of the preview's middle sits exactly on it (unless Option is held)
-  if ((d.kind === 'move' || d.kind === 'memove' || d.kind === 'cap') && !d.alt && Math.abs(nx - 0.5) * d.r.width <= SNAP_PX) { nx = 0.5; snap = true; }
+  // the hand has gone sideways in this drag (more than SIDE_PX, at any moment): only then may a thing that was NOT
+  // centered be pulled to the middle. A drag straight up or down keeps the left-to-right spot it had, so something
+  // set a few px off the middle on purpose is not centered by moving it down. A thing already exactly centered
+  // stays centered through the hand's wobble.
+  if (Math.abs(d.cx - d.sx) > SIDE_PX) d.side = true;
+  // moved, never sized: its middle within SNAP_PX of the preview's middle sits exactly on it (unless Option is held).
+  // Left to right only: up and down never snaps. The hair added to SNAP_PX makes exactly 6 px count on both sides.
+  if ((d.kind === 'move' || d.kind === 'memove' || d.kind === 'cap') && !d.alt && (d.side || st.x === 0.5)
+      && Math.abs(nx - 0.5) * d.r.width <= SNAP_PX + 0.01) { nx = 0.5; snap = true; }
   if (d.kind === 'move' || d.kind === 'memove') d.live = {x: r4(nx), y: r4(st.y + dy), w: st.w};
   else if (d.kind === 'size') {                     // the top left corner stays put
     w = cl(st.w + dx, 0.1, 1.6);

@@ -712,8 +712,8 @@ def run_page(c, s):
         click(3, meta=True)
         click(6, meta=True)
         tall = c.js("[parseInt(document.body.style.paddingBottom), document.getElementById('dock').offsetHeight, document.getElementById('tlMulti').textContent]")
-        case("...with three picked our line is longer and the dock taller: the page measures the dock's room again",
-             tall[1] > wide[7] and tall[0] == tall[1] + 24 and tall[2] == fill("multi_selected", n=3), (tall, wide[7]))
+        case("...with three picked our line is longer, and the dock is the height it was: the line kept room for its longest words, so nothing moved up",
+             tall[1] == wide[7] and tall[0] == tall[1] + 24 and tall[2] == fill("multi_selected", n=3), (tall, wide[7]))
     finally:
         c.desktop()
 
