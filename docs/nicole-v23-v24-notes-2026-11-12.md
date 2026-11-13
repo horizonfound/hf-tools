@@ -236,6 +236,17 @@ Dustin was shown three ways to tidy the timeline's button bar and chose this one
 - Not tried: anyone's own hand, the Claude app's own window, a real PC, a real touch screen (taps were tried only with Chrome's pretend finger), a screen reader speaking it.
 - It replaces something of yours, so it is yours to keep, change or put back.
 
+### A line that shows when something is centered on the preview (ours; yours has none) (Nov 13)
+
+Dustin asked for it: "when I'm dragging the text around... there should be like a snap to the center point that shows a vertical line straight down so that you know that the text is centered right there."
+
+- What it does: in step 2, while the caption, a photo or yourself in the corner is dragged on the preview, it catches on the middle of the preview (left to right) when it comes within about 6 px of it, and a thin blue line shows straight down the preview there. Drag on and it lets go; let go and the line is gone. Holding Option (Alt on a PC) while dragging turns the catch off.
+- When it is let go on the line, what is saved is exactly centered, so the CapCut reel has it exactly centered too. Anywhere else, what is saved is just what it was before.
+- **Not changed:** the round handles (making something bigger or smaller), up and down, the timeline, the saved record's fields, CapCut. The line is only drawn on the page; it is not part of the reel.
+- No words were added. Nothing on the page says Option turns it off; if you want a hint, that would be a new line for the two of you to word, and where it goes is yours too (only your two tick boxes sit under the preview).
+- Not tried: anyone's own hand, the Claude app's own window, a real PC, a real touch screen (tried only with Chrome's pretend finger; a finger has no Option key).
+- It goes beyond your page, so it is yours to keep, change or take out.
+
 ## 8. For Nicole and Dustin to settle
 
 Each with what was built, so nothing waited.

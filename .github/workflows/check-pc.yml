@@ -97,6 +97,9 @@ name: Check it on a Windows PC
 #   tests/talking_menus_check.py    the two small menus for Speed and Zoom on the talking reel's timeline (Dustin,
 #                                   Nov 13, in place of the chips): our two words and the bar by request on Windows
 #                                   (--no-chrome), and the real page with a real mouse and keys in "mac-page".
+#   tests/talking_snap_check.py     the centered line on the talking reel's preview (Dustin, Nov 13; ours): the
+#                                   line in the page and its styles by request on Windows (--no-chrome), and real
+#                                   drags of the caption, a photo and themselves in the corner in "mac-page".
 #   tests/talking_page_check.py (whole), tests/design_preview_check.py, tests/kit_cards_check.py
 #                                   a job of its own on the Mac, "mac-page", which may fail without failing the check
 #                                   (as windows-page: nobody has seen these pages in GitHub's Chrome yet): the talking
@@ -249,6 +252,9 @@ jobs:
       - name: The two small menus for Speed and Zoom on the talking reel's timeline (our words, the bar; the page in a browser is checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/talking_menus_check.py --no-chrome
+      - name: The centered line on the talking reel's preview (the line in the page, hidden from screen readers, its styles ours; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_snap_check.py --no-chrome
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -465,6 +471,9 @@ jobs:
       - name: The two small menus for Speed and Zoom on the talking reel's timeline (open, choose, Mixed, Escape, the keys, phone width, the same saves as the chips)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_menus_check.py
+      - name: The centered line on the talking reel's preview (a dragged caption, photo or corner picture snaps to the middle and saves exactly 0.5; Option turns it off; no line left behind)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_snap_check.py
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci

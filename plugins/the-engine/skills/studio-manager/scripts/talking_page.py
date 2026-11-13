@@ -704,7 +704,7 @@ def _step2(w):
         "<i class='knob' id='phKnob' title='" + q(w["knob_photo"]) + "'></i>"
         "<i class='knob' id='meKnob' title='" + q(w["knob_me"]) + "'></i>"
         "<i class='knob' id='capKnob' title='" + q(w["knob_cap"]) + "'></i>"
-        "<div class='cap' id='cap'></div>" + guides + "</div>"
+        "<div class='cap' id='cap'></div>" + guides + "<i class='cline' id='cline' aria-hidden='true'></i></div>"
         # nothing but these two checkboxes ever sits under the preview (her v24, section 3). autocomplete off: a
         # browser must not put back, on a reload, a tick it remembers ("Play the cut version" is remembered nowhere,
         # and the guides only under the key the page itself keeps)
