@@ -191,7 +191,11 @@ def check_preview_browser(case, work, port, make_kit, Server, post, get_json):
             got = kept(1)
             took = time.time() - t0
             case("first visit: the page sent one picture of the design by itself, about a second and a half after it opened", got and len(posts()) == 1
-                 and stats() == dict(stats(), sent=1, kept=1, refused=0, failed=0, drawn=1), (stats(), len(posts()), round(took, 1)))
+                 # a first try may find a photo's small copy not made yet (a slow machine: GitHub's Mac did);
+                 # the page then waits and tries again by itself, which is the design. What must hold is
+                 # one picture drawn, one sent, one kept, none refused, and no more tries than the page allows.
+                 and stats() == dict(stats(), sent=1, kept=1, refused=0, drawn=1)
+                 and 0 <= stats()["failed"] <= c.js("Designer.previewer.rules.tries"), (stats(), len(posts()), round(took, 1)))
             req = posts()[0] if posts() else {"url": "", "status": None}
             case("first visit: ...to /design-preview, naming the kit by its folder name, the design by its id and the layout by its counter; answered 200",
                  f"kit={KQ}" in req["url"] and f"design={A}" in req["url"] and "rev=0" in req["url"] and req["status"] == 200 and "kind=" not in req["url"], req)
