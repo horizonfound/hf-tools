@@ -18,7 +18,8 @@ Hers, kept number for number (each has its check in tests/talking_page_check.py 
     view; on empty track clears. The picked clip's words are outlined in the script. A picked clip or photo block
     has a small round x, and the button reads Delete clip or Delete photo; the x, the button and the Delete or
     Backspace key remove it (the key only with something picked and no words highlighted). Deleting a clip cuts
-    its words. Speed and Zoom chips are grey with no clip picked; badges "1.5x", "Punch in", "Slow zoom";
+    its words. Speed and Zoom are grey with no clip picked (hers are chips; ours are two small menus, see the
+    end of these notes); badges "1.5x", "Punch in", "Slow zoom";
   - a clip's end dragged in cuts to the nearest word edge; dragged out it brings back the cut words touching the
     clip whose time falls within the dragged distance x the clip's speed. A photo block's end goes to the nearest
     KEPT word by the reel's time; it only ever changes which words the photo covers;
@@ -67,8 +68,25 @@ byte for byte what it was (tests/talking_multi_check.py holds that). To take it 
   - nothing new is asked of the Assistant's side: a press sends {zooms}, {speeds} or {cut} as one clip's does, and
     talking_rec checks them as ever. T.setRange keeps zooms from overlapping.
 
+Ours, in place of her chips (Dustin, Nov 13: "C is the best. By far... any user interface that can be cleaner and
+still have everything necessary is fantastic"): TWO SMALL MENUS. Her bar had the word Speed and four chips, the
+word Zoom and three; the bare words looked pressable and were not, and turning a zoom off meant finding None. Now
+Speed and Zoom are one button each ("Speed: 1× ▾", "Zoom: Slow zoom ▾") and a press opens a short list at the
+button with her own words for every item, the choice the picked clip has checked.
+  - choosing an item calls speedClip(v) or zoomClip(kind), the functions her chips called: the save is byte for
+    byte the same, one save and one Undo step, and everything about several clips above is unchanged;
+  - the button looks on (filled) when a picked clip has a zoom, or a speed that is not 1×; with several picked
+    that do not agree it reads Mixed and no item is checked; with no clip picked both are grey, as the chips were;
+  - the list opens above its button (the bar sits on the timeline) and under it only with no room above, always
+    whole inside the window; one open at a time; it closes on a press anywhere else, on choosing, when the other
+    opens, when the window is resized or loses the keyboard, and on Escape, which closes the menu FIRST and leaves
+    what is picked alone (the next Escape lets go of several, as ever);
+  - keys: Enter, Space, Down or Up on the button open it; the arrows, Home and End move; Enter or Space choose;
+    the button has the keyboard again afterwards. role menu and menuitemradio, aria-checked, aria-expanded.
+
 What it gives the other parts: T.pickedWords() (the words of the clip or clips picked, for the script's outline),
-T.renderTimeline(), T.tl() (what a test may read: {pps, selw, sel, drag, making, more, picked}), T.tlRuns (a test).
+T.renderTimeline(), T.tl() (what a test may read: {pps, selw, sel, drag, making, more, picked, menu, menuUp}),
+T.tlRuns (a test).
 """
 
 JS = r"""
@@ -245,21 +263,95 @@ function renderTimeline(){
   $('tlTime').textContent = fmt(R) + ' / ' + fmt(tot);
   moveHead(R);
 }
-// the chips are made once; a press looks up the clip picked at that moment
-var speedChips = SPEEDS.map(function(v){
-  var b = el('button', 'chip', T.fill(W.speed_x, {v: v}));
-  b.type = 'button'; b.disabled = true; b.setAttribute('data-v', v);
-  b.addEventListener('click', function(){ speedClip(v); });
-  $('tlSpeed').appendChild(b);
-  return b;
-});
-var zoomChips = MOVES.map(function(m){
-  var b = el('button', 'chip', m[1]);
-  b.type = 'button'; b.disabled = true; b.setAttribute('data-z', m[0]);
-  b.addEventListener('click', function(){ zoomClip(m[0]); });
-  $('tlZoom').appendChild(b);
-  return b;
-});
+// ---- the two small menus (Dustin, Nov 13: Speed and Zoom are one button each, with a short list at the button) ----
+// A menu is made once; choosing an item is a press on what was that chip: speedClip(v) or zoomClip(kind) look up
+// the clip picked at that moment, exactly as the chips did. Only how a choice is pressed is new.
+var OPEN = null;               // menus: the one that is open (never two), or null
+var MENU_GAP = 6, MENU_EDGE = 6;
+function makeMenu(id, name, attr, items, choose){
+  var host = $(id), btn = el('button', 'btn small tl-mb'), val = el('span', 'val'), car = el('span', 'car', '▾'), list = el('div', 'tl-ml');
+  var m = {id: id, btn: btn, val: val, list: list, items: [], cur: -1};
+  btn.type = 'button'; btn.disabled = true; btn.id = id + 'Btn'; list.id = id + 'List';
+  btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', list.id);
+  car.setAttribute('aria-hidden', 'true');
+  btn.appendChild(el('span', 'nm', T.fill(W.menu_label, {name: name}))); btn.appendChild(val); btn.appendChild(car);
+  list.setAttribute('role', 'menu'); list.setAttribute('aria-label', name); list.hidden = true;
+  items.forEach(function(it, k){
+    var d = el('div', 'tl-mi'), tick = el('span', 'tick', '✓');
+    tick.setAttribute('aria-hidden', 'true');
+    d.setAttribute('role', 'menuitemradio'); d.setAttribute('aria-checked', 'false'); d.setAttribute('data-' + attr, it[0]); d.tabIndex = -1;
+    d.appendChild(tick); d.appendChild(el('span', 't', it[1]));
+    // choosing: the menu closes, the button has the keyboard again, and then the press is the chip's own
+    d.addEventListener('click', function(){ if (OPEN !== m || btn.disabled) return; closeMenu(true); choose(it[0]); });
+    list.appendChild(d); m.items.push(d);
+  });
+  btn.addEventListener('click', function(){ if (OPEN === m) closeMenu(true); else openMenu(m, 'cur'); });
+  host.appendChild(btn); host.appendChild(list);
+  return m;
+}
+// where the list goes: above its button (below it would lie over the clips being changed), under it only when
+// there is no room above; always whole inside the window, whatever the dock or the window's edge
+function placeMenu(m){
+  var l = m.list, r = m.btn.getBoundingClientRect(), de = document.documentElement;
+  l.style.minWidth = Math.round(r.width) + 'px';
+  var h = l.offsetHeight, w = l.offsetWidth, top = r.top - MENU_GAP - h;
+  m.up = top >= MENU_EDGE;
+  if (!m.up) top = r.bottom + MENU_GAP;
+  l.style.top = cl(top, MENU_EDGE, Math.max(MENU_EDGE, de.clientHeight - h - MENU_EDGE)) + 'px';
+  l.style.left = cl(r.left, MENU_EDGE, Math.max(MENU_EDGE, de.clientWidth - w - MENU_EDGE)) + 'px';
+}
+function openMenu(m, at){
+  if (m.btn.disabled) return;
+  if (OPEN) closeMenu(false);
+  OPEN = m;
+  m.list.hidden = false; m.btn.setAttribute('aria-expanded', 'true');
+  placeMenu(m);
+  var k = at === 'last' ? m.items.length - 1 : m.cur >= 0 ? m.cur : 0;
+  m.items[k].focus({preventScroll: true});
+}
+function closeMenu(back){
+  var m = OPEN; if (!m) return;
+  OPEN = null;
+  m.list.hidden = true; m.btn.setAttribute('aria-expanded', 'false');
+  if (back && !m.btn.disabled) m.btn.focus({preventScroll: true});
+}
+// what a menu's button says and which item is checked: text is the one choice every picked clip agrees on (or
+// Mixed), cur its place in the list (-1: none checked), lit whether the button looks on. True when its words changed.
+function menuState(m, off, text, cur, lit){
+  var was = m.val.textContent;
+  m.btn.disabled = off; m.cur = cur;
+  m.btn.classList.toggle('on', lit);
+  if (was !== text) m.val.textContent = text;
+  m.items.forEach(function(d, k){ d.setAttribute('aria-checked', k === cur ? 'true' : 'false'); });
+  if (off && OPEN === m) closeMenu(false);
+  return was !== text;
+}
+var speedMenu = makeMenu('tlSpeed', W.speed, 'v', SPEEDS.map(function(v){ return [v, T.fill(W.speed_x, {v: v})]; }), function(v){ speedClip(v); });
+var zoomMenu = makeMenu('tlZoom', W.zoom, 'z', MOVES, function(kind){ zoomClip(kind); });
+// a press anywhere else closes the open menu (and still does whatever it was a press on)
+function outsideMenu(e){ if (OPEN && !OPEN.list.contains(e.target) && !OPEN.btn.contains(e.target)) closeMenu(false); }
+document.addEventListener('pointerdown', outsideMenu, true);
+document.addEventListener('mousedown', outsideMenu, true);
+addEventListener('blur', function(){ closeMenu(false); });
+// the keys, heard before anyone else's (so Escape closes the menu FIRST and what is picked stays picked; the next
+// Escape is the timeline's, as ever): on a menu's button Enter, Space, Down and Up open it; in it the arrows, Home
+// and End move, Enter and Space choose, Escape closes with the button focused again, Tab closes and moves on
+addEventListener('keydown', function(e){
+  var k = e.key, m = OPEN, stop = function(){ e.preventDefault(); e.stopImmediatePropagation(); };
+  if (!m) {
+    var b = e.target === speedMenu.btn ? speedMenu : e.target === zoomMenu.btn ? zoomMenu : null;
+    if (b && !e.metaKey && !e.ctrlKey && !e.altKey && (k === 'Enter' || k === ' ' || k === 'ArrowDown' || k === 'ArrowUp')) { stop(); openMenu(b, k === 'ArrowUp' ? 'last' : 'cur'); }
+    return;
+  }
+  var i = m.items.indexOf(document.activeElement), n = m.items.length;
+  if (k === 'Escape') { stop(); closeMenu(true); }
+  else if (k === 'Tab') closeMenu(false);
+  else if (k === 'ArrowDown') { stop(); m.items[(i + 1) % n].focus({preventScroll: true}); }
+  else if (k === 'ArrowUp') { stop(); m.items[(i <= 0 ? n : i) - 1].focus({preventScroll: true}); }
+  else if (k === 'Home') { stop(); m.items[0].focus({preventScroll: true}); }
+  else if (k === 'End') { stop(); m.items[n - 1].focus({preventScroll: true}); }
+  else if (k === 'Enter' || k === ' ') { stop(); if (i >= 0) m.items[i].click(); else closeMenu(true); }      // never playing behind the open menu
+}, true);
 function toolState(){
   var p = selPiece(), zk = zoomKind(p), mny = many();
   var ph = TLSEL === 'photo' && !!T.findShot(T.SELSHOT);
@@ -273,15 +365,29 @@ function toolState(){
     var dh = $('dock').offsetHeight;
     if (dh !== dockWas) { dockWas = dh; T.sizeDock(); }
   }
-  speedChips.forEach(function(b, k){
-    // several: a chip is lit only when every picked clip is at that speed
+  // menus: an item is checked on the rule that lit its chip (several: only when every picked clip agrees; when
+  // they do not, the button reads Mixed and nothing is checked). The Speed button looks on when a picked clip is
+  // not at 1×, the Zoom button when one has a zoom. Nothing picked: both grey, as the chips were.
+  var sAt = -1, zAt = -1;
+  SPEEDS.forEach(function(v, k){
     var on = mny ? mny.every(function(q){ return q.speed === SPEEDS[k]; }) : !!p && p.speed === SPEEDS[k];
-    b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on) sAt = k;
   });
-  zoomChips.forEach(function(b, k){
+  MOVES.forEach(function(mv, k){
     var on = mny ? mny.every(function(q){ return zoomKind(q) === MOVES[k][0]; }) : !!p && zk === MOVES[k][0];
-    b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on) zAt = k;
   });
+  var all = mny || (p ? [p] : []);
+  var sSame = all.every(function(q){ return q.speed === all[0].speed; });
+  var grew = menuState(speedMenu, !p, !p ? T.fill(W.speed_x, {v: 1}) : !sSame ? W.mixed : T.fill(W.speed_x, {v: all[0].speed}), sAt,
+                       all.some(function(q){ return q.speed !== 1; }));
+  grew = menuState(zoomMenu, !p, !p ? MOVES[0][1] : zAt < 0 ? W.mixed : MOVES[zAt][1], zAt, all.some(function(q){ return !!zoomKind(q); })) || grew;
+  // a button whose words changed can wrap the bar at a narrow width: the dock's room is measured again
+  if (grew) {
+    var dh2 = $('dock').offsetHeight;
+    if (dh2 !== dockWas) { dockWas = dh2; T.sizeDock(); }
+    if (OPEN) placeMenu(OPEN);
+  }
   T.undoButtons();
 }
 function moveHead(R, playing){
@@ -659,7 +765,7 @@ T.on('apply', function(a){
   var h = $('dock').offsetHeight;
   if (h !== dockWas) { dockWas = h; T.sizeDock(); if (vid.paused && T.frame) T.frame(); }
 });
-T.on('resize', function(){ if (T.ready() && !drag) renderTimeline(); });
+T.on('resize', function(){ closeMenu(false); if (T.ready() && !drag) renderTimeline(); });
 T.on('photos', function(){ if (T.ready() && !drag) renderTimeline(); });
 
 T.makeReady = true;
@@ -670,7 +776,7 @@ T.pickedWords = function(){
 };
 T.renderTimeline = renderTimeline;
 T.tl = function(){
-  return {pps: PPS, selw: SELW, sel: TLSEL, drag: !!drag, making: making, more: MORE.slice(),
+  return {pps: PPS, selw: SELW, sel: TLSEL, drag: !!drag, making: making, more: MORE.slice(), menu: OPEN ? OPEN.id : null, menuUp: OPEN ? !!OPEN.up : null,
           picked: (TLSEL === 'clip' ? selPieces() : []).map(function(p){ return p.words[0]; })};
 };
 T.tlRuns = function(){ return runsOf(selPieces()); };

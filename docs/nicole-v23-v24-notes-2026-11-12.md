@@ -223,6 +223,17 @@ Dustin held Command, clicked three clips and pressed Slow zoom in the hand test,
 - Not yet pressed by anyone's own hand, a joined zoom has not been opened in CapCut, and nothing of it has run on a PC (there Ctrl was tried only by telling the Mac's test page it is a PC). On a phone or tablet there is no way to pick several, and the hint line still shows.
 - It goes beyond your page, so it is yours to keep, change or take out.
 
+### Speed and Zoom as two small menus (ours; yours are rows of chips) (Nov 13)
+
+Dustin was shown three ways to tidy the timeline's button bar and chose this one: "I think C is the best. By far. I think any user interface that can be cleaner and still have everything necessary is fantastic." What bothered him in the chips: the bare words Speed and Zoom looked like buttons and were not, turning a zoom off meant finding None among the chips, and the bar felt cluttered.
+
+- What changed: where your bar had the word Speed and four chips and the word Zoom and three, ours has two small buttons, "Speed: 1× ▾" and "Zoom: None ▾", after a thin separator. A press opens a short list at the button with your words in your order (1×, 1.25×, 1.5×, 2×; None, Punch in, Slow zoom); the picked clip's choice has a check mark; choosing does exactly what a press on that chip did (the page saves the same thing, character for character, one Undo step). The button is filled when the clip has a zoom, or a speed that is not 1×. With several clips picked that do not agree it reads "Mixed". With no clip picked both are grey, as your chips were.
+- The list opens above its button, so it never covers the clips; it closes on a press elsewhere, on choosing, and on Escape (Escape closes the menu first and leaves the picked clips picked). It works from the keyboard and at phone width.
+- **Not changed:** the Move / None / Punch in / Slow zoom row under each paragraph of your script stays exactly as it is for now. Nothing in the saved record, the Assistant's side or CapCut changed.
+- Lines of ours for it (drafts for you): "{name}:" (only the colon after your word, as in "Speed: 1×") and "Mixed". Everything else in the menus is yours.
+- Not tried: anyone's own hand, a real PC, a real touch screen (taps were tried only with Chrome's pretend finger).
+- It replaces something of yours, so it is yours to keep, change or put back.
+
 ## 8. For Nicole and Dustin to settle
 
 Each with what was built, so nothing waited.

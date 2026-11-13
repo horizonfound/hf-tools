@@ -316,6 +316,9 @@ OUR_WORDS = {
                          "the same, when only some of the picked clips touch"),
     "zoom_all_joined": ("Slow zoom added. Clips side by side share one long zoom.",
                         "the same, when there is more than one group of clips side by side and no clip by itself"),
+    # the two small menus for Speed and Zoom on the timeline (Dustin, Nov 13; hers are rows of chips)
+    "menu_label": ("{name}:", "her words Speed and Zoom now sit inside a button, before what the clip has: \"Speed: 1×\", \"Zoom: Slow zoom\""),
+    "mixed": ("Mixed", "what a menu's button says when the clips picked do not agree (hers picks one clip at a time)"),
 }
 OUR_WORDS["made_only"] = (
     "Made \"{project}\" in CapCut.",
@@ -758,8 +761,9 @@ def _dock(w):
         "<span class='tl-time' id='tlTime'>0:00.0 / 0:00.0</span><span class='tl-sep'></span>"
         "<button class='btn small' id='tlSplit' type='button' title='" + q(w["split_title"]) + "'>" + e(w["split"]) + "</button>"
         "<button class='btn small' id='tlCut' type='button' disabled title='" + q(w["delete_title"]) + "'>" + e(w["delete_clip"]) + "</button>"
-        "<span class='tl-group' id='tlSpeed'><span class='lbl'>" + e(w["speed"]) + "</span></span>"
-        "<span class='tl-group' id='tlZoom'><span class='lbl'>" + e(w["zoom"]) + "</span></span>"
+        "<span class='tl-sep'></span>"
+        # Speed and Zoom: a small menu each, made by talking_js_timeline.py (her words inside; Dustin, Nov 13)
+        "<span class='tl-group' id='tlSpeed'></span><span class='tl-group' id='tlZoom'></span>"
         "<button class='btn small' id='tlUndo' type='button' disabled title='" + q(w["undo_title"]) + "'>" + e(w["undo"]) + "</button>"
         "<button class='btn small' id='tlRedo' type='button' disabled title='" + q(w["redo_title"]) + "'>" + e(w["redo"]) + "</button>"
         "<span class='tl-scale'><button id='tlOut' type='button' aria-label='" + q(w["zoom_out"]) + "'>&minus;</button>"

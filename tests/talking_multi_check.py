@@ -28,7 +28,8 @@ On the real page, in a hidden Chrome, with real Command, Ctrl and Shift clicks:
   - one press is ONE step of Undo and one of Redo, by button and by key;
   - with ONE clip picked, what the page sends is byte for byte what her code sends (the exact text of each save),
     and every line of the timeline's script as it was before this (commit eb2e9d9, kept in tests/fixtures) is
-    still there, in order, but for the sixteen lines named below;
+    still there, in order, but for the lines named below (sixteen changed for this, and the chips' own lines,
+    which went when Speed and Zoom became two small menus on Nov 13: tests/talking_menus_check.py);
   - a reload keeps what was done; a picked clip the chat cuts drops out; phone width does not break; no page
     error, nothing asked of the internet, every word on the page as text.
 
@@ -39,6 +40,7 @@ hidden Chrome are this test's own and are stopped at the end.
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only.
 """
 import argparse
+import difflib
 import json
 import shutil
 import subprocess
@@ -87,6 +89,33 @@ CHANGED_LINES = [
     "  if (!a.ready) { if (drag) endDrag(null, true); SELW = null; TLSEL = null; return; }",
     "T.pickedWords = function(){ var p = selPiece(); return p ? p.words : []; };",
     "T.tl = function(){ return {pps: PPS, selw: SELW, sel: TLSEL, drag: !!drag, making: making}; };",
+]
+
+# The lines that went when Speed and Zoom became two small menus (Dustin, Nov 13): the chips themselves, how each was
+# lit, and two lines of notes. What a choice DOES is not among them: speedClip and zoomClip are as they were (the
+# case under this one holds their words), and tests/talking_menus_check.py holds what each choice sends.
+MENU_LINES = [
+    '    its words. Speed and Zoom chips are grey with no clip picked; badges "1.5x", "Punch in", "Slow zoom";',
+    "// the chips are made once; a press looks up the clip picked at that moment",
+    "var speedChips = SPEEDS.map(function(v){",
+    "  var b = el('button', 'chip', T.fill(W.speed_x, {v: v}));",
+    "  b.type = 'button'; b.disabled = true; b.setAttribute('data-v', v);",
+    "  b.addEventListener('click', function(){ speedClip(v); });",
+    "  $('tlSpeed').appendChild(b);",
+    "  return b;",
+    "});",
+    "var zoomChips = MOVES.map(function(m){",
+    "  var b = el('button', 'chip', m[1]);",
+    "  b.type = 'button'; b.disabled = true; b.setAttribute('data-z', m[0]);",
+    "  b.addEventListener('click', function(){ zoomClip(m[0]); });",
+    "  $('tlZoom').appendChild(b);",
+    "  return b;",
+    "});",
+    "  speedChips.forEach(function(b, k){",
+    "    b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');",
+    "  zoomChips.forEach(function(b, k){",
+    "    b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');",
+    "T.on('resize', function(){ if (T.ready() && !drag) renderTimeline(); });",
 ]
 
 HELPERS = r"""
@@ -294,7 +323,8 @@ def run_page(c, s):
         c.click(clip(w0), check=False, **mods)
 
     def chip(group_id, attr, value):
-        c.click('#%s .chip[data-%s="%s"]' % (group_id, attr, value))
+        # what was a press on a chip: the menu's button, then the item (Dustin, Nov 13: two small menus)
+        tpt.menu_pick(c, group_id, attr=attr, value=value)
 
     def moved(was, seconds=10):
         c.wait_for("window.Talk.rev !== %d" % was, seconds, tell="document.getElementById('toast').textContent")
@@ -364,7 +394,7 @@ def run_page(c, s):
          g5["picked"] == [3] and g5["xs"] == 1 and g5["cut"] == [W["delete_clip"], False, W["delete_title"]] and g5["line"] == W["multi_hint"] and g5["more"] == [], g5)
     click(3, meta=True)
     g6 = m()
-    case("...and out of the last one: nothing picked, the button and the chips grey",
+    case("...and out of the last one: nothing picked, the button and the two menus grey",
          g6["picked"] == [] and g6["on"] == [] and g6["sel"] is None and g6["cut"][1] is True and c.js("window.__tools().zoom.every(function(x){ return x[1]; })"), g6)
     click(9, meta=True)
     case("Command-click with nothing picked picks that clip", m()["picked"] == [9] and m()["xs"] == 1, m())
@@ -411,7 +441,7 @@ def run_page(c, s):
     g = m()
     case("Slow zoom with three clips side by side picked: ONE save, and it is ONE zoom from the run's first word to its last",
          len(sent) == 1 and saved_text(sent[0]) == '"saved":{"zooms":[{"a":3,"b":11,"kind":"zoom"}]}}' and rec().get("zooms") == [{"a": 3, "b": 11, "kind": "zoom"}], sent)
-    case("...the toast says so, every clip of the run wears her Slow zoom badge, the summary counts one zoom, and they stay picked with the chip lit",
+    case("...the toast says so, every clip of the run wears her Slow zoom badge, the summary counts one zoom, and they stay picked with Slow zoom checked in the menu",
          toast() == fill("zoom_joined", n=3) and [x["bd"] for x in c.js("window.__clips()")] == [[], [W["slow_zoom"]], [W["slow_zoom"]], [W["slow_zoom"]], [], [], []]
          and "1 zoom" in g["sum"] and g["picked"] == [3, 6, 9] and [x[2] for x in c.js("window.__tools().zoom")] == [False, False, True], (toast(), g))
     case("...it is ONE step of Undo", g["n"] == [1, 0], g["n"])
@@ -491,7 +521,7 @@ def run_page(c, s):
     lit = [x_[2] for x_ in c.js("window.__tools().zoom")]
     n = quiet(lambda: chip("tlZoom", "z", "zoom"))
     v = zoom_values(s)
-    case("two clips of one long slow zoom picked (not side by side), Slow zoom pressed: the chip was lit already, nothing is saved, and the long zoom is still ONE zoom",
+    case("two clips of one long slow zoom picked (not side by side), Slow zoom chosen: it was checked already, nothing is saved, and the long zoom is still ONE zoom",
          lit == [False, False, True] and n == 0 and rec().get("zooms") == long_zoom and m()["n"] == [0, 0] and toast() == ""
          and v[0][1] == 1.0 and v[4][2] == 1.12 and all(v[k][2] == v[k + 1][1] for k in range(4)), (lit, n, rec().get("zooms"), toast()))
     click(6, meta=True)
@@ -528,11 +558,11 @@ def run_page(c, s):
     n = quiet(lambda: chip("tlZoom", "z", "zoom"))
     case("...pressed again on the same clips: nothing saved, no toast again, still one step of Undo", n == 0 and toast() == "" and m()["n"] == [1, 0], (n, toast(), m()["n"]))
 
-    # ---- the Zoom chip is lit only when every picked clip agrees ----
+    # ---- a Zoom item is checked only when every picked clip agrees ----
     open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom"}, {"a": 6, "b": 8, "kind": "punch"}])
     click(3)
     click(6, meta=True)
-    case("two clips with different zooms picked: no Zoom chip is lit", [x_[2] for x_ in c.js("window.__tools().zoom")] == [False, False, False], c.js("window.__tools().zoom"))
+    case("two clips with different zooms picked: no Zoom item is checked", [x_[2] for x_ in c.js("window.__tools().zoom")] == [False, False, False], c.js("window.__tools().zoom"))
 
     # ---- a press on a clip's end handle lets go of the others ----
     open_it()
@@ -569,7 +599,7 @@ def run_page(c, s):
     click(0)
     press(lambda: chip("tlSpeed", "v", "2"))
     click(6, meta=True)
-    case("two picked clips at different speeds: no speed chip is lit", [x[2] for x in c.js("window.__tools().speed")] == [False] * 4 and m()["picked"] == [0, 6], c.js("window.__tools().speed"))
+    case("two picked clips at different speeds: no speed item is checked", [x[2] for x in c.js("window.__tools().speed")] == [False] * 4 and m()["picked"] == [0, 6], c.js("window.__tools().speed"))
     press(lambda: chip("tlSpeed", "v", "1"))
     case("1× with both picked puts both back, in one step", rec().get("speeds") == [] and m()["n"] == [3, 0], rec().get("speeds"))
     undo_button()
@@ -702,14 +732,14 @@ def check_lines():
     else:
         case("the kept copy of the script as it was is exactly what git has at commit %s" % BEFORE, r.stdout.splitlines() == kept.splitlines())
     old, new = kept.splitlines(), (ROOT / JS_FILE).read_text(encoding="utf-8").splitlines()
-    at, missing = 0, []
-    for line in old:
-        try:
-            at = new.index(line, at) + 1
-        except ValueError:
-            missing.append(line)
-    case("every line of the timeline's script as it was before several clips (%d lines) is still there, in order, but for the %d lines named in this test"
-         % (len(old), len(CHANGED_LINES)), sorted(missing) == sorted(CHANGED_LINES), [x for x in missing if x not in CHANGED_LINES][:4] or [x for x in CHANGED_LINES if x not in missing][:4])
+    # the old lines that are no longer there, in order (the longest run of lines the two share is what "still there"
+    # means: a plain search for each line in turn would let a common line like "});" match far ahead and lose the rest)
+    same = difflib.SequenceMatcher(None, old, new, autojunk=False)
+    missing = [old[i] for tag, i1, i2, _j1, _j2 in same.get_opcodes() if tag in ("replace", "delete") for i in range(i1, i2)]
+    named = CHANGED_LINES + MENU_LINES
+    case("every line of the timeline's script as it was before several clips (%d lines) is still there, in order, but for the %d lines named in this test "
+         "(%d changed for several clips, %d for the two small menus that took the chips' place)" % (len(old), len(named), len(CHANGED_LINES), len(MENU_LINES)),
+         sorted(missing) == sorted(named), [x for x in missing if x not in named][:4] or [x for x in named if x not in missing][:4])
     src = "\n".join(new)
 
     def body(name):

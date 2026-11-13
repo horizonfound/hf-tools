@@ -231,6 +231,20 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .screen{user-select:none;-webkit-user-select:none}
 .screen .movable,.screen .knob,.screen .cap{touch-action:none}
 html{scroll-padding-bottom:calc(var(--dock) + 12px)}
+/* the two small menus for Speed and Zoom on the timeline (Dustin, Nov 13) */
+.tl-mb{gap:.3rem;white-space:nowrap}
+@media(max-width:640px){#tlCut+.tl-sep{display:none}}
+.tl-mb .nm{font-weight:500;color:var(--ink-2)}
+.tl-mb .car{font-size:10px;color:var(--ink-2)}
+.tl-mb.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tl-mb.on .nm,.tl-mb.on .car{color:rgba(255,255,255,.78)}
+.tl-mb[aria-expanded=true]{border-color:var(--coral)}
+.tl-ml{position:fixed;z-index:66;left:0;top:0;box-sizing:border-box;background:var(--paper);border-radius:12px;padding:.3rem;box-shadow:0 0 0 1px var(--line),0 14px 34px -12px rgba(31,36,48,.45);max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);overflow-y:auto}
+.tl-mi{display:flex;align-items:center;gap:.45rem;padding:.5rem .8rem .5rem .5rem;border-radius:8px;font:600 13px/1.2 var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;user-select:none;-webkit-user-select:none}
+.tl-mi .tick{width:1em;text-align:center;visibility:hidden;color:var(--coral-2)}
+.tl-mi[aria-checked=true] .tick{visibility:visible}
+.tl-mi:hover,.tl-mi:focus{background:#F3F1EB;outline:none}
+.tl-mi:focus-visible{outline:2px solid var(--coral-2);outline-offset:-2px}
 .tl-x{user-select:none;-webkit-user-select:none}
 """
 

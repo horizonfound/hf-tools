@@ -9,7 +9,7 @@ hidden Chrome (`c`). What is checked, in the plan's own order (docs/handoff-v24-
 the dock sized into --dock; the scale and the ruler's steps, number for number; the words under the clips past 55
 px a second; picking a clip and a photo block, the round x, Delete clip and Delete photo, the keys; a clip's end
 dragged in (cuts) and out (brings back), with her three toasts; a photo block's end (a video keeps its video and
-its start point); Split and its three toasts; the Speed and Zoom chips; the timeline's own zoom (slider, buttons,
+its start point); Split and its three toasts; the Speed and Zoom menus; the timeline's own zoom (slider, buttons,
 Ctrl or Cmd with the wheel around the mouse, a plain wheel sideways); the line followed while playing; Undo and
 Redo by button and by key, to 60 steps, emptied when the chat changes things, and an Undo that names a Footage
 video since gone; and Make it in CapCut from the press to her result box, with Undo still live afterwards. And
@@ -57,6 +57,18 @@ def _long_words():
 
 LONG_WORDS = _long_words()
 
+def menu_pick(c, menu_id, nth=None, attr=None, value=None):
+    """Choose from the Speed or the Zoom menu as a hand does: a press on its button, then on the item (the nth, or
+    the one whose data-<attr> is value). What was a press on that chip."""
+    c.click("#%sBtn" % menu_id, check=False)
+    c.wait_for("window.Talk.tl().menu === %r" % menu_id, 5)
+    if nth is not None:
+        c.click("#%s [role=menuitemradio]" % menu_id, nth=nth, check=False)
+    else:
+        c.click('#%s [role=menuitemradio][data-%s="%s"]' % (menu_id, attr, value), check=False)
+    c.wait_for("window.Talk.tl().menu === null", 5)
+
+
 HELPERS = r"""
 window.__wheels = [];
 window.addEventListener('wheel', function(e){ window.__wheels.push([e.deltaY, e.deltaX, e.defaultPrevented]); }, true);
@@ -87,9 +99,19 @@ window.__blocks = function(){
   });
 };
 window.__tools = function(){
-  var g = function(id){ return Array.from(document.querySelectorAll('#' + id + ' .chip')).map(function(b){ return [b.textContent, b.disabled, b.classList.contains('on')]; }); };
+  // Speed and Zoom are a small menu each (Dustin, Nov 13). One row per item of the list, in the shape the chips had:
+  // [its words, greyed (the menu's button is off), checked]; and the button itself: {label, value, off, on, open}.
+  var g = function(id){
+    var b = document.getElementById(id + 'Btn');
+    return Array.from(document.querySelectorAll('#' + id + ' [role=menuitemradio]')).map(function(d){ return [d.querySelector('.t').textContent, b.disabled, d.getAttribute('aria-checked') === 'true']; });
+  };
+  var mb = function(id){
+    var b = document.getElementById(id + 'Btn');
+    return {label: b.querySelector('.nm').textContent, value: b.querySelector('.val').textContent, off: b.disabled, on: b.classList.contains('on'),
+            open: b.getAttribute('aria-expanded') === 'true' && !document.getElementById(id + 'List').hidden};
+  };
   var cut = document.getElementById('tlCut');
-  return {speed: g('tlSpeed'), zoom: g('tlZoom'), cut: [cut.textContent, cut.disabled],
+  return {speed: g('tlSpeed'), zoom: g('tlZoom'), speedBtn: mb('tlSpeed'), zoomBtn: mb('tlZoom'), cut: [cut.textContent, cut.disabled],
           undo: document.getElementById('tlUndo').disabled, redo: document.getElementById('tlRedo').disabled,
           n: [window.Talk.UNDO.length, window.Talk.REDO.length]};
 };
@@ -352,11 +374,12 @@ def run_page(t, c, s):
          and near(c.js("parseFloat(document.querySelectorAll('#tlWords .tl-w')[7].style.left)"), PAD + rs(ps[1], 7) * g["pps"], 0.5)
          and c.js("document.querySelectorAll('#tlWords .tl-w')[2].textContent") == "<b>bold</b>" and c.js("document.querySelectorAll('#tlWords .tl-w *').length") == 0, (g["pps"], g["nwords"], g["hint"]))
     tools0 = tools()
-    grey = c.js("[getComputedStyle(document.querySelector('#tlSpeed .chip')).opacity, getComputedStyle(document.getElementById('tlUndo')).opacity]")
-    case("with nothing picked: the Speed chips (1×, 1.25×, 1.5×, 2×) and the Zoom chips (None, Punch in, Slow zoom) are grey, Delete clip is off, no round x anywhere, Undo and Redo grey",
+    grey = c.js("[getComputedStyle(document.getElementById('tlSpeedBtn')).opacity, getComputedStyle(document.getElementById('tlZoomBtn')).opacity, getComputedStyle(document.getElementById('tlUndo')).opacity]")
+    case("with nothing picked: the Speed menu (1×, 1.25×, 1.5×, 2×) and the Zoom menu (None, Punch in, Slow zoom) are grey, Delete clip is off, no round x anywhere, Undo and Redo grey",
          [x[0] for x in tools0["speed"]] == ["1×", "1.25×", "1.5×", "2×"] and [x[0] for x in tools0["zoom"]] == ["None", "Punch in", "Slow zoom"]
          and all(x[1] and not x[2] for x in tools0["speed"] + tools0["zoom"]) and tools0["cut"] == ["🗑 Delete clip", True] and tools0["undo"] and tools0["redo"]
-         and c.count("#tl .tl-x") == 0 and grey == ["0.4", "0.4"] and g["sel"] is None and g["selw"] is None, (tools0, grey))
+         and c.count("#tl .tl-x") == 0 and grey == ["0.4", "0.4", "0.4"] and tools0["speedBtn"] == {"label": "Speed:", "value": "1×", "off": True, "on": False, "open": False}
+         and tools0["zoomBtn"] == {"label": "Zoom:", "value": "None", "off": True, "on": False, "open": False} and g["sel"] is None and g["selw"] is None, (tools0, grey))
     case("Make it in CapCut is live as soon as there is something to make", c.js("window.__result().btn") == [W["make"], False])
 
     # ================= picking, scrubbing =================
@@ -368,7 +391,7 @@ def run_page(t, c, s):
          [x_["on"] for x_ in cl_] == [False, True, False] and cl_[1]["x"] == W["tl_clip_x"] and [x_["x"] for x_ in cl_].count(None) == 2 and g["sel"] == "clip" and g["selw"] == 6
          and near(now_R(), R, 0.02) and near(g["head"], PAD + R * g["pps"], 3) and g["time"].startswith(c.js("window.Talk.tlFmt(%r)" % now_R())), (cl_[1], g["head"], R, now_R()))
     tools1 = tools()
-    case("...the picked clip's words are outlined in the script, the Speed and Zoom chips come alive showing what it has (1×, None), and the button reads Delete clip",
+    case("...the picked clip's words are outlined in the script, the Speed and Zoom menus come alive with what it has checked (1×, None), and the button reads Delete clip",
          c.js("window.__picked()") == ps[1]["words"] and [x_[1] for x_ in tools1["speed"] + tools1["zoom"]] == [False] * 7 and [x_[2] for x_ in tools1["speed"]] == [True, False, False, False]
          and [x_[2] for x_ in tools1["zoom"]] == [True, False, False] and tools1["cut"] == ["🗑 Delete clip", False], (c.js("window.__picked()"), tools1))
     ru = c.rect("#tlRuler")
@@ -377,7 +400,7 @@ def run_page(t, c, s):
     c.mouse_press()
     c.mouse_release()
     g = tl()
-    case("a press on empty track clears what was picked (no outline, no x, grey chips) and still moves the line",
+    case("a press on empty track clears what was picked (no outline, no x, grey menus) and still moves the line",
          g["sel"] is None and g["selw"] is None and not any(x_["on"] or x_["x"] for x_ in clips()) and c.js("window.__picked()") == [] and all(x_[1] for x_ in tools()["speed"])
          and tools()["cut"][1] is True and near(now_R(), (100 + g["scroll"] - PAD) / g["pps"], 0.02), (g["sel"], now_R()))
     c.mouse_move(g["left"] + 60, ru["cy"])
@@ -397,7 +420,7 @@ def run_page(t, c, s):
     press(clip_sel(6), 0.5)
     was, n0 = rev(), tools()["n"][0]
     tot0 = tl()["total"]
-    c.click("#tlSpeed .chip", nth=2, check=False)
+    menu_pick(c, "tlSpeed", 2)
     moved(was)
     p1 = piece_of(6)
     cl_ = clips()
@@ -406,19 +429,19 @@ def run_page(t, c, s):
          and tl()["total"] < tot0 - 0.1 and "fast" in c.js("window.Talk.wordEl(8).className") and "· 1 sped up" in c.text("#sum") and tools()["n"][0] == n0 + 1
          and [x_[2] for x_ in tools()["speed"]] == [False, False, True, False] and cl_[1]["on"], (rec().get("speeds"), cl_[1], c.text("#sum")))
     was = rev()
-    c.click("#tlZoom .chip", nth=1, check=False)
+    menu_pick(c, "tlZoom", 1)
     moved(was)
-    case("Zoom Punch in on the picked clip: saved over its words, its badge beside the speed's, the chip lit",
+    case("Zoom Punch in on the picked clip: saved over its words, its badge beside the speed's, its item checked",
          rec().get("zooms") == [{"a": 6, "b": 12, "kind": "punch"}] and clips()[1]["bd"] == ["1.5×", "Punch in"] and [x_[2] for x_ in tools()["zoom"]] == [False, True, False], (rec().get("zooms"), clips()[1]["bd"]))
     was = rev()
-    c.click("#tlZoom .chip", nth=2, check=False)
+    menu_pick(c, "tlZoom", 2)
     moved(was)
     case("...Slow zoom takes its place", rec().get("zooms") == [{"a": 6, "b": 12, "kind": "zoom"}] and clips()[1]["bd"] == ["1.5×", "Slow zoom"])
     was = rev()
-    c.click("#tlZoom .chip", nth=0, check=False)
+    menu_pick(c, "tlZoom", 0)
     moved(was)
     was = rev()
-    c.click("#tlSpeed .chip", nth=0, check=False)
+    menu_pick(c, "tlSpeed", 0)
     moved(was)
     case("...None and 1× take them off again (a speed of 1 is no speed-up: nothing is kept for it)",
          rec().get("zooms") == [] and rec().get("speeds") == [] and clips()[1]["bd"] == [] and not clips()[1]["fast"] and near(tl()["total"], tot0, 0.002), (rec().get("zooms"), rec().get("speeds")))
@@ -573,7 +596,7 @@ def run_page(t, c, s):
     g, bl, tools2 = tl(), blocks(), tools()
     seg = c.rect('#script .seg[data-a="1"]')
     room = c.js("window.innerHeight - document.getElementById('dock').offsetHeight")
-    case("a press on a photo block picks it: outlined, its round x (\"Delete this photo\"), the button reads Delete photo, and the clip chips go grey",
+    case("a press on a photo block picks it: outlined, its round x (\"Delete this photo\"), the button reads Delete photo, and the clip's two menus go grey",
          [b_["on"] for b_ in bl] == [True, False, False] and bl[0]["x"] == W["tl_photo_x"] and g["sel"] == "photo" and g["selw"] is None and tools2["cut"] == ["🗑 Delete photo", False]
          and all(x_[1] for x_ in tools2["speed"] + tools2["zoom"]) and c.js("window.Talk.SELSHOT") == 1, (bl[0], tools2["cut"]))
     case("...and its bar in the script is lit and in view", "on" in c.js("document.querySelector('#script .seg[data-a=\"1\"]').className") and 0 <= seg["y"] and seg["bottom"] <= room + 1, (seg, room))

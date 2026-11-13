@@ -735,6 +735,8 @@ def check_talking():
           "Slow zoom on clips that sit side by side becomes one long zoom across all of them", "one Undo takes that whole press back",
           "rule 3 stands, and you still have no command for a zoom or a speed", "tell them how to make them one",
           "nobody has yet pressed it by hand or opened a joined zoom in CapCut")),
+        ("Speed and Zoom are a small menu each (Dustin, Nov 13), and no line still speaks of chips on the timeline",
+         ("Speed and Zoom are a small menu each", "To take a zoom off a clip they pick the clip and choose None there", "Both are grey until a clip is picked")),
     ):
         miss = [w for w in words if w not in flat and w not in flat.lower()]
         case(f"the part: {what}", not miss, miss)
