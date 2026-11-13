@@ -300,6 +300,20 @@ OUR_WORDS = {
                     "hear that while they decide (seen on the real box, Nov 12)"),
     "undo_title_pc": ("Undo (Ctrl+Z)", "a PC has no ⌘ key"),
     "redo_title_pc": ("Redo (Ctrl+Shift+Z)", "a PC has no ⌘ key"),
+    # several clips picked at once on the timeline (Dustin, Nov 12; hers picks one clip at a time)
+    "multi_hint": ("Hold Command and click to select more than one clip · hold Shift and click to select every clip in between",
+                   "hers has no way to pick several clips; a line of its own under her help line, which stays word for word"),
+    "multi_hint_pc": ("Hold Ctrl and click to select more than one clip · hold Shift and click to select every clip in between",
+                      "a PC has no Command key"),
+    "multi_selected": ("{n} clips selected · Speed, Zoom and Delete change all of them · a Slow zoom on clips side by side is one "
+                       "long zoom · press Escape to let go",
+                       "what is picked, and what a press will now do, said where the help line is"),
+    "delete_clips": ("🗑 Delete {n} clips", "her button reads Delete clip; with several picked it says how many it will take"),
+    "delete_title_many": ("Delete the clips you picked (or press Delete)", "her tooltip, for several"),
+    "cut_clips": ("Cut {n} clips. Undo brings them back, or find them crossed out in your script.", "her line for one clip, for several"),
+    "zoom_joined": ("One slow zoom across {n} clips", "says that the clips side by side now share one zoom (each still shows her Slow zoom badge)"),
+    "zoom_some_joined": ("Slow zoom added. Clips side by side share one long zoom; the others each have their own.",
+                         "the same, when only some of the picked clips touch"),
 }
 OUR_WORDS["made_only"] = (
     "Made \"{project}\" in CapCut.",
@@ -332,6 +346,7 @@ def page_words():
         w.setdefault(k, line)
     if this_computer.WINDOWS:
         w["undo_title"], w["redo_title"] = w["undo_title_pc"], w["redo_title_pc"]
+        w["multi_hint"] = w["multi_hint_pc"]
         w["made_open"] = w["made_open"].replace("quit and reopen", "close and reopen")      # decision 2b.11
     return w
 
@@ -751,7 +766,8 @@ def _dock(w):
         "<div class='tl-track' id='tlTrack'><div class='tl-inner' id='tlInner'><div class='tl-ruler' id='tlRuler'></div>"
         "<div class='tl-photos' id='tlPhotos'></div><div class='tl-clips' id='tlClips'></div>"
         "<div class='tl-words off' id='tlWords'></div><div class='tl-head' id='tlHead'></div></div></div>"
-        "<div class='tl-hint' id='tlHint'>" + e(w["tl_hint"]) + "</div></div></div>"
+        "<div class='tl-hint' id='tlHint'>" + e(w["tl_hint"]) + "</div>"
+        "<div class='tl-hint more' id='tlMulti' aria-live='polite'>" + e(w["multi_hint"]) + "</div></div></div>"
         "<div class='make'><div class='in'><span class='sum' id='sum'>" + e(w["sum_empty"]) + "</span>"
         "<button class='btn main' id='makeBtn' type='button' disabled>" + e(w["make"]) + "</button></div></div></div>")
 

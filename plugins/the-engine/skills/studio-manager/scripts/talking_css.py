@@ -194,6 +194,7 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .tl-head{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--coral-2);pointer-events:none;z-index:5}
 .tl-head::before{content:"";position:absolute;top:0;left:-5px;width:12px;height:12px;border-radius:0 0 6px 6px;background:var(--coral-2)}
 .tl-hint{font-size:12px;color:var(--ink-2);margin-top:.35rem}
+.tl-hint.more{margin-top:.1rem}
 .make{background:var(--paper);border-top:1px solid var(--line)}
 .make .in{max-width:1180px;margin:0 auto;padding:.7rem clamp(16px,4vw,40px);display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .make .sum{font-size:14px;color:var(--ink-2)}.make .sum b{color:var(--ink)}

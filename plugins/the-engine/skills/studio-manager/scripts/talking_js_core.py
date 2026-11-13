@@ -249,6 +249,9 @@ function apply(st, how){
   }
   T.emit('apply', {changed: how !== 'poll' || moved, ready: ready, how: how, outside: outside});
   summary(); undoButtons();
+  // ours: the make bar's line has just been written and can wrap at a narrow width, after the dock's room was
+  // measured (at phone width the page left 37 px too little under itself); measured again, last
+  sizeDock();
 }
 // the short answer: nothing moved; only whether a video is being worked on, and how Make it in CapCut stands
 function small(st){

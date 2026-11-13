@@ -211,6 +211,16 @@ One more on the page, shared with every picker: "I can't find that shoot's posts
 
 Two of yours changed by one word on a PC only: "Finder" and "Your Mac" take the PC's words, "quit and reopen" reads "close and reopen", and the Undo and Redo tooltips say Ctrl.
 
+### Picking several clips on the timeline (ours; yours picks one)
+
+Dustin held Command, clicked three clips and pressed Slow zoom in the hand test, expecting one long zoom, as other video editors do. Built on top of yours, so it can come out if you would rather not have it:
+
+- Command-click (Ctrl-click on a PC) adds a clip to what is picked or takes it out; Shift-click picks every clip from the one clicked last to that one; a plain click picks one, exactly as yours.
+- Slow zoom on picked clips side by side is one zoom across all of them; Punch in, None, Speed and Delete act on each; one press is one Undo. Split is yours, unchanged.
+- With one clip picked, what the page saves is character for character what yours saves.
+- Lines of ours for it (all drafts for you): "Hold Command and click to select more than one clip · hold Shift and click to select every clip in between" (a line of its own under your help line, which is untouched); "{n} clips selected · Speed, Zoom and Delete change all of them · a Slow zoom on clips side by side is one long zoom · press Escape to let go"; "🗑 Delete {n} clips"; "Delete the clips you picked (or press Delete)"; "Cut {n} clips. Undo brings them back, or find them crossed out in your script."; "One slow zoom across {n} clips"; "Slow zoom added. Clips side by side share one long zoom; the others each have their own."
+- Not yet pressed by anyone's own hand, and a joined zoom has not been opened in CapCut.
+
 ## 8. For Nicole and Dustin to settle
 
 Each with what was built, so nothing waited.

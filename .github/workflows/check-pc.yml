@@ -91,6 +91,9 @@ name: Check it on a Windows PC
 #   tests/transcribe_check.py       a job of its own on the Mac, "mac-talking", under the guard: turning a talking
 #                                   video into words with the PRETEND transcriber only (the real app is never built
 #                                   or started, so macOS never asks anything), on 6-second clips the Mac makes itself.
+#   tests/talking_multi_check.py    several clips picked at once on the talking reel's timeline (Dustin, Nov 12): by
+#                                   request on Windows (--no-chrome), and the real page with real Command, Ctrl and
+#                                   Shift clicks in the "mac-page" job below.
 #   tests/talking_page_check.py (whole), tests/design_preview_check.py, tests/kit_cards_check.py
 #                                   a job of its own on the Mac, "mac-page", which may fail without failing the check
 #                                   (as windows-page: nobody has seen these pages in GitHub's Chrome yet): the talking
@@ -237,6 +240,9 @@ jobs:
       - name: The talking reel page (every route and refusal; the page in a browser is checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/talking_page_check.py --no-chrome
+      - name: Several clips picked at once on the talking reel's timeline (our words, one zoom across a run in the CapCut plan; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/talking_multi_check.py --no-chrome
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -447,6 +453,9 @@ jobs:
       - name: The talking reel page, whole (step 1, the script, the preview, the timeline, her words, the door on the reel page)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_page_check.py
+      - name: Several clips picked at once on the talking reel's timeline (Command-click, Shift-click, one zoom across clips side by side, one Undo)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_multi_check.py
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci

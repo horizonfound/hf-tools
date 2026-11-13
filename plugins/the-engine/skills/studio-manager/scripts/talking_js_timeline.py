@@ -41,8 +41,32 @@ Ours:
     make in them, or none at all) the button comes back with plain words: the page never stays on "Making it…".
     The record's counter does not move for a make, so Undo is as it was afterwards.
 
-What it gives the other parts: T.pickedWords() (the words of the clip picked, for the script's outline),
-T.renderTimeline(), T.tl() (what a test may read: {pps, selw, sel, drag, making}).
+Ours, on top of hers (Dustin, Nov 12: "I held down Command and clicked another one... that's how other video
+editors work"): SEVERAL CLIPS PICKED AT ONCE. Everything for it is marked "several" below and sits beside her
+one-clip code, never inside it: with one clip picked not one line of hers runs differently, and what is saved is
+byte for byte what it was (tests/talking_multi_check.py holds that). To take it out: MORE stays empty.
+  - Command-click a clip (Ctrl-click on a PC) adds it to what is picked, or takes it out. Shift-click picks every
+    clip from the one last clicked to this one (with Command or Ctrl as well, it adds them). Neither moves the
+    line or starts a scrub. A plain press picks just that clip, as ever; Escape lets go of several.
+  - what is picked is still WORDS, looked up afresh every time: SELW is a word of the clip clicked last, MORE a
+    word of each other one. A clip whose words were cut meanwhile just drops out.
+  - Slow zoom: each run of picked clips that sit side by side on the reel gets ONE zoom, from the run's first word
+    to its last (the cut words between them included, which is how one zoom already carries on across a closed
+    pause). Picked clips that do not touch get a zoom each. Whatever zoom was on those words is replaced; a zoom
+    that reaches past the picked clips is trimmed to what is left outside, never lost (T.setRange, as one clip's
+    press has always done).
+  - Punch in: the run's words are cleared the same way, then each picked clip gets its own punch in. None: the
+    run's words are cleared (so no stray zoom is left on cut words between two picked clips).
+  - Speed: each picked clip, exactly as a press on each in turn. Delete (the button or the key): every picked
+    clip's words are cut. The little round x is not drawn while several are picked (an x on one clip that took
+    three would surprise). Split is as ever: the clip under the line, whatever is picked, and then only the new
+    clip is picked.
+  - one press is ONE save, so one step of Undo and one of Redo.
+  - nothing new is asked of the Assistant's side: a press sends {zooms}, {speeds} or {cut} as one clip's does, and
+    talking_rec checks them as ever. T.setRange keeps zooms from overlapping.
+
+What it gives the other parts: T.pickedWords() (the words of the clip or clips picked, for the script's outline),
+T.renderTimeline(), T.tl() (what a test may read: {pps, selw, sel, drag, making, more, picked}), T.tlRuns (a test).
 """
 
 JS = r"""
@@ -59,6 +83,9 @@ var MAKE_LOST = 5;             // ours: that many answers in a row with no make 
 var PPS = 20;                  // px a second, as drawn
 var SELW = null;               // a word of the clip picked (the clip is looked up from it every time)
 var TLSEL = null;              // what is picked on the timeline: 'clip', 'photo' or nothing
+var MORE = [];                 // several: a word of each OTHER clip picked along with SELW's (empty: hers, exactly)
+var ANCHOR = null;             // several: a word of the clip a Shift-click reaches from (the one clicked last)
+var PC = !!T.DATA.pc;          // several: the key that adds a clip is Command on a Mac and Ctrl on a PC
 var drag = null;               // a press on the track: scrubbing, a clip's end, or a photo block's end
 var making = null;             // the make this page follows: its id, or true while the press is on its way
 
@@ -74,6 +101,64 @@ function selPiece(){
   var ps = T.P();
   for (var i = 0; i < ps.length; i++) if (ps[i].words.indexOf(SELW) >= 0) return ps[i];
   return null;
+}
+// ---- several clips picked at once (ours) ----
+function pieceIx(w){ var ps = T.P(); for (var i = 0; i < ps.length; i++) if (ps[i].words.indexOf(w) >= 0) return i; return -1; }
+// every clip picked, in play order, looked up afresh from the words held
+function selPieces(){
+  var ps = T.P(), on = {}, out = [];
+  (SELW == null ? [] : [SELW]).concat(MORE).forEach(function(w){ var i = pieceIx(w); if (i >= 0) on[i] = true; });
+  ps.forEach(function(p, i){ if (on[i]) out.push(p); });
+  return out;
+}
+// the clips picked when there are two or more, else null (and then everything below is hers, untouched)
+function many(){
+  if (!MORE.length || TLSEL !== 'clip') return null;
+  var l = selPieces();
+  return l.length > 1 ? l : null;
+}
+// a clip whose words were cut meanwhile drops out; if that was the one clicked last, another takes its place
+function tidy(){
+  if (!MORE.length) return;
+  var k0 = SELW == null ? -1 : pieceIx(SELW), seen = {}, keep = [];
+  MORE.forEach(function(w){ var i = pieceIx(w); if (i >= 0 && i !== k0 && !seen[i]) { seen[i] = true; keep.push(w); } });
+  if (k0 < 0 && keep.length && TLSEL === 'clip') SELW = keep.pop();
+  MORE = keep;
+}
+function letGo(){ MORE = []; ANCHOR = null; }
+// Command-click (Ctrl on a PC): in or out. Shift-click: every clip from the one clicked last to this one.
+function pickMore(w0, add, range){
+  var ps = T.P(), k = pieceIx(w0), on = {}, first = k, i;
+  if (k < 0) return;
+  if (TLSEL === 'clip') (SELW == null ? [] : [SELW]).concat(MORE).forEach(function(w){ var j = pieceIx(w); if (j >= 0) on[j] = true; });
+  if (range) {
+    var a = ANCHOR != null ? pieceIx(ANCHOR) : -1;
+    if (a < 0 && TLSEL === 'clip' && SELW != null) a = pieceIx(SELW);
+    if (a < 0) a = k;
+    if (!add) on = {};
+    for (i = Math.min(a, k); i <= Math.max(a, k); i++) on[i] = true;
+    ANCHOR = ps[a].words[0];
+  } else if (on[k]) { delete on[k]; first = -1; ANCHOR = null; }
+  else { on[k] = true; ANCHOR = ps[k].words[0]; }
+  var list = Object.keys(on).map(Number).sort(function(x, y){ return x - y; });
+  if (!list.length) { SELW = null; MORE = []; TLSEL = null; }
+  else {
+    if (first < 0) first = list[list.length - 1];
+    SELW = ps[first].words[0]; TLSEL = 'clip';
+    MORE = list.filter(function(j){ return j !== first; }).map(function(j){ return ps[j].words[0]; });
+  }
+  renderTimeline(); picked();
+}
+// picked clips that sit side by side on the reel, as runs: [{a: the run's first word, b: its last, clips: [[a, b], ...]}]
+function runsOf(list){
+  var ps = T.P(), runs = [], prev = null;
+  list.forEach(function(p){
+    var i = ps.indexOf(p), a = p.words[0], b = p.words[p.words.length - 1], q = prev == null ? null : ps[prev];
+    if (q && i === prev + 1 && Math.abs(q.at + q.dur - p.at) < 0.002) { var r = runs[runs.length - 1]; r.b = b; r.clips.push([a, b]); }
+    else runs.push({a: a, b: b, clips: [[a, b]]});
+    prev = i;
+  });
+  return runs;
 }
 function pieceOf(w0){ var ps = T.P(); for (var i = 0; i < ps.length; i++) if (ps[i].words[0] === w0) return ps[i]; return null; }
 function zoomKind(p){ return p && p.zoom != null && T.ZL[p.zoom] ? T.ZL[p.zoom].kind : ''; }
@@ -123,15 +208,16 @@ function renderTimeline(){
   });
   $('tlPhotos').textContent = ''; $('tlPhotos').appendChild(row);
   // the clips
-  var sel = selPiece(), clips = document.createDocumentFragment();
+  tidy();
+  var sel = selPiece(), clips = document.createDocumentFragment(), mny = many();
   ps.forEach(function(p){
     var txt = p.words.map(function(j){ return words[j] ? words[j].w : ''; }).join(' '), zk = zoomKind(p);
-    var d = el('div', 'tl-clip' + (p === sel ? ' on' : '') + (p.speed !== 1 ? ' fast' : ''));
+    var d = el('div', 'tl-clip' + (p === sel || (mny && mny.indexOf(p) >= 0) ? ' on' : '') + (p.speed !== 1 ? ' fast' : ''));
     d.setAttribute('data-w', p.words[0]);
     d.style.left = X(p.at) + 'px'; d.style.width = Math.max(CLIP_MIN, p.dur * PPS - 2) + 'px';
     d.title = T.fill(W.tl_clip_title, {words: txt});
     var ha = el('i', 'tl-clip-h'); ha.setAttribute('data-cedge', 'a'); d.appendChild(ha);
-    if (TLSEL === 'clip' && p === sel) d.appendChild(round_x(W.tl_clip_x));
+    if (TLSEL === 'clip' && p === sel && !mny) d.appendChild(round_x(W.tl_clip_x));
     if (p.speed !== 1) d.appendChild(el('b', 'bd', T.fill(W.speed_x, {v: p.speed})));
     if (zk) d.appendChild(el('b', 'bd', zk === 'punch' ? W.punch : W.slow_zoom));
     d.appendChild(el('span', '', txt));
@@ -173,16 +259,25 @@ var zoomChips = MOVES.map(function(m){
   return b;
 });
 function toolState(){
-  var p = selPiece(), zk = zoomKind(p);
+  var p = selPiece(), zk = zoomKind(p), mny = many();
   var ph = TLSEL === 'photo' && !!T.findShot(T.SELSHOT);
   $('tlCut').disabled = !(ph || (TLSEL === 'clip' && p));
-  $('tlCut').textContent = ph ? W.delete_photo : W.delete_clip;
+  $('tlCut').textContent = ph ? W.delete_photo : mny ? T.fill(W.delete_clips, {n: mny.length}) : W.delete_clip;
+  $('tlCut').title = mny && !ph ? W.delete_title_many : W.delete_title;
+  // several: our line under her help line; when its words change the dock may grow a line, so its room is measured again
+  var ml = mny ? T.fill(W.multi_selected, {n: mny.length}) : W.multi_hint;
+  if ($('tlMulti').textContent !== ml) {
+    $('tlMulti').textContent = ml;
+    var dh = $('dock').offsetHeight;
+    if (dh !== dockWas) { dockWas = dh; T.sizeDock(); }
+  }
   speedChips.forEach(function(b, k){
-    var on = !!p && p.speed === SPEEDS[k];
+    // several: a chip is lit only when every picked clip is at that speed
+    var on = mny ? mny.every(function(q){ return q.speed === SPEEDS[k]; }) : !!p && p.speed === SPEEDS[k];
     b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   zoomChips.forEach(function(b, k){
-    var on = !!p && zk === MOVES[k][0];
+    var on = mny ? mny.every(function(q){ return zoomKind(q) === MOVES[k][0]; }) : !!p && zk === MOVES[k][0];
     b.disabled = !p; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   T.undoButtons();
@@ -213,15 +308,23 @@ function picked(){ T.markPicked(); T.markShot(); }
 
 // ---- a press on the track: scrub, pick, or take hold of an end ----
 track.addEventListener('pointerdown', function(e){
-  if (e.button !== 0 || e.ctrlKey || drag || !T.ready()) return;      // a Control-click is the Mac's right click
+  if (e.button !== 0 || drag || !T.ready()) return;
   var t = e.target;
   if (!t || !t.closest) return;
+  // several: Command-click (Ctrl-click on a PC) or Shift-click ON A CLIP; anywhere else the press is hers
+  var mclip = (PC || !e.ctrlKey) && !t.closest('.tl-x') ? t.closest('.tl-clip') : null;
+  if (mclip && ((PC ? e.ctrlKey : e.metaKey) || e.shiftKey)) {
+    e.preventDefault();
+    pickMore(+mclip.getAttribute('data-w'), PC ? e.ctrlKey : e.metaKey, e.shiftKey);
+    return;
+  }
+  if (e.ctrlKey) return;                                              // a Control-click is the Mac's right click
   if (t.closest('.tl-x')) { e.preventDefault(); deleteSelected(); return; }      // the little x on what is picked
   var clip = t.closest('.tl-clip'), ph = t.closest('.tl-ph'), edge = t.closest('.tl-ph-h'), cedge = t.closest('.tl-clip-h');
   try { track.setPointerCapture(e.pointerId); } catch (err) {}
   if (cedge && clip) {
     drag = {cedge: cedge.getAttribute('data-cedge'), w0: +clip.getAttribute('data-w'), x: e.clientX, moved: false, id: e.pointerId};
-    SELW = drag.w0;
+    SELW = drag.w0; letGo();
     return;
   }
   if (edge && ph) {
@@ -232,6 +335,7 @@ track.addEventListener('pointerdown', function(e){
   if (clip) { SELW = +clip.getAttribute('data-w'); TLSEL = 'clip'; }
   else if (ph) { SELW = null; TLSEL = 'photo'; }
   else { SELW = null; TLSEL = null; }
+  letGo(); if (clip) ANCHOR = SELW;                                   // several: a plain press picks just this one
   if (ph) {
     T.SELSHOT = +ph.getAttribute('data-a');
     var bar = document.querySelector('#script .seg[data-a="' + T.SELSHOT + '"]');
@@ -320,7 +424,7 @@ $('tlSplit').addEventListener('click', function(){
     var m = (words[p.words[j - 1]].end + words[p.words[j]].start) / 2, d = Math.abs(m - t);
     if (d < bd) { bd = d; best = p.words[j]; }
   }
-  SELW = best;
+  SELW = best; letGo();
   T.save(function(){
     var s = (T.REC.splits || []).slice();
     if (s.indexOf(best) < 0) s.push(best);
@@ -373,6 +477,14 @@ function cutClip(){
   saveCut(list, true);
   T.toast(W.cut_clip);
 }
+// several: every picked clip's words, in one save (one step of Undo)
+function cutClips(mny){
+  var list = [];
+  mny.forEach(function(p){ list = list.concat(p.words); });
+  SELW = null; letGo();
+  saveCut(list, true);
+  T.toast(T.fill(W.cut_clips, {n: mny.length}));
+}
 function deleteSelected(){
   if (TLSEL === 'photo') {
     var a = T.SELSHOT;
@@ -382,12 +494,37 @@ function deleteSelected(){
     T.toast(W.photo_deleted);
     renderTimeline(); picked();
   } else if (TLSEL === 'clip' || selPiece()) {
-    cutClip(); TLSEL = null;
+    var mny = many();
+    if (mny) cutClips(mny); else cutClip();
+    TLSEL = null;
     renderTimeline(); picked();
   }
 }
 $('tlCut').addEventListener('click', deleteSelected);
+// several: each picked clip, as a press on each in turn, in one save
+function speedClips(mny, v){
+  var rs = mny.map(function(p){ return [p.words[0], p.words[p.words.length - 1]]; });
+  T.save(function(){
+    var s = T.REC.speeds || [];
+    rs.forEach(function(r){ s = T.setRange(s, r[0], r[1], v === 1 ? null : {v: v}); });
+    return {speeds: s.map(function(r){ return {a: r.a, b: r.b, v: r.v}; })};
+  });
+}
+// several: one slow zoom across each run of clips side by side; a punch in on each clip; None clears each run
+function zoomClips(mny, kind){
+  var runs = runsOf(mny), joined = runs.filter(function(r){ return r.clips.length > 1; });
+  T.save(function(){
+    var z = T.ZL;
+    runs.forEach(function(r){
+      z = T.setRange(z, r.a, r.b, kind === 'zoom' ? {kind: 'zoom'} : null);
+      if (kind === 'punch') r.clips.forEach(function(c){ z = T.setRange(z, c[0], c[1], {kind: 'punch'}); });
+    });
+    return {zooms: z.map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};
+  });
+  if (kind === 'zoom' && joined.length) T.toast(runs.length === 1 ? T.fill(W.zoom_joined, {n: mny.length}) : W.zoom_some_joined);
+}
 function speedClip(v){
+  var mny = many(); if (mny) { speedClips(mny, v); return; }
   var p = selPiece(); if (!p) return;
   var a = p.words[0], b = p.words[p.words.length - 1];
   T.save(function(){
@@ -395,6 +532,7 @@ function speedClip(v){
   });
 }
 function zoomClip(kind){
+  var mny = many(); if (mny) { zoomClips(mny, kind); return; }
   var p = selPiece(); if (!p) return;
   var a = p.words[0], b = p.words[p.words.length - 1];
   T.save(function(){
@@ -411,6 +549,8 @@ document.addEventListener('keydown', function(e){
   if (mod && !e.altKey && k === 'z') { e.preventDefault(); if (e.shiftKey) T.redo(); else T.undo(); }
   else if (mod && !e.altKey && k === 'y') { e.preventDefault(); T.redo(); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && !mod && TLSEL && !T.selectedWords()) { e.preventDefault(); deleteSelected(); }
+  // several: Escape lets go of them (with one clip picked, or a menu open, Escape is as it was)
+  else if (e.key === 'Escape' && !mod && many() && !$('pmenu').classList.contains('open')) { SELW = null; TLSEL = null; letGo(); renderTimeline(); picked(); }
 }, true);
 
 // ---- Make it in CapCut, and the result box ----
@@ -500,7 +640,7 @@ T.on('shot', function(){
 var dockWas = 0;
 T.on('apply', function(a){
   showMake(T.ST.make);
-  if (!a.ready) { if (drag) endDrag(null, true); SELW = null; TLSEL = null; return; }
+  if (!a.ready) { if (drag) endDrag(null, true); SELW = null; TLSEL = null; letGo(); return; }
   if (a.changed || !$('tlClips').firstChild) {
     if (TLSEL === 'photo' && !T.findShot(T.SELSHOT)) TLSEL = null;
     if (drag && (drag.cedge || drag.edge)) toolState(); else renderTimeline();      // never under a held end: drawn at the drop
@@ -513,9 +653,17 @@ T.on('resize', function(){ if (T.ready() && !drag) renderTimeline(); });
 T.on('photos', function(){ if (T.ready() && !drag) renderTimeline(); });
 
 T.makeReady = true;
-T.pickedWords = function(){ var p = selPiece(); return p ? p.words : []; };
+T.pickedWords = function(){
+  var mny = many();
+  if (mny) { var all = []; mny.forEach(function(q){ all = all.concat(q.words); }); return all; }
+  var p = selPiece(); return p ? p.words : [];
+};
 T.renderTimeline = renderTimeline;
-T.tl = function(){ return {pps: PPS, selw: SELW, sel: TLSEL, drag: !!drag, making: making}; };
+T.tl = function(){
+  return {pps: PPS, selw: SELW, sel: TLSEL, drag: !!drag, making: making, more: MORE.slice(),
+          picked: (TLSEL === 'clip' ? selPieces() : []).map(function(p){ return p.words[0]; })};
+};
+T.tlRuns = function(){ return runsOf(selPieces()); };
 T.tlFmt = fmt; T.tlTick = fmtTick;
 })();
 """

@@ -730,6 +730,11 @@ def check_talking():
         ("cut first, then place", ("Cut first, all the way through to its Saved line, then place", "Do the whole cut first")),
         ("what is not proven yet", ("## Not proven yet, honestly", "has run on one Mac only", "Three talking reels have been made and opened in CapCut", "Slow zoom looked smooth to Dustin's eye on a steady clip", "Any language but English")),
         ("Make it in CapCut is theirs, on the page", ("You have no command to press it for them", "A project already in CapCut is never changed")),
+        ("several clips at once is theirs to press, and rule 3 stands",
+         ("Holding Command (Ctrl on a PC) and clicking another adds it", "holding Shift and clicking picks every clip from the one clicked last to that one",
+          "Slow zoom on clips that sit side by side becomes one long zoom across all of them", "one Undo takes that whole press back",
+          "rule 3 stands, and you still have no command for a zoom or a speed", "tell them how to make them one",
+          "nobody has yet pressed it by hand or opened a joined zoom in CapCut")),
     ):
         miss = [w for w in words if w not in flat and w not in flat.lower()]
         case(f"the part: {what}", not miss, miss)
