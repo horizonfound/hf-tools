@@ -200,7 +200,7 @@ def zoom_values(s):
         kf = seg["common_keyframes"]
         if kf:
             ks = kf[0]["keyframe_list"]
-            out.append((p["zoom"], round(ks[0]["values"][0] / fill, 4), round(ks[1]["values"][0] / fill, 4), round(seg["clip"]["scale"]["x"] / fill, 4)))
+            out.append((p["zoom"], round(ks[0]["values"][0] / fill, 4), round(ks[-1]["values"][0] / fill, 4), round(seg["clip"]["scale"]["x"] / fill, 4)))
         else:
             out.append((p["zoom"], None, None, round(seg["clip"]["scale"]["x"] / fill, 4)))
     return out
@@ -736,18 +736,22 @@ def check_lines():
     # means: a plain search for each line in turn would let a common line like "});" match far ahead and lose the rest)
     same = difflib.SequenceMatcher(None, old, new, autojunk=False)
     missing = [old[i] for tag, i1, i2, _j1, _j2 in same.get_opcodes() if tag in ("replace", "delete") for i in range(i1, i2)]
-    named = CHANGED_LINES + MENU_LINES
+    # Nov 13, how much and how fast a zoom moves: ONE more of her lines changed, the one-clip Zoom's save, so that a
+    # zoom keeps its amount and pace (every other zoom's too). With no amount or pace anywhere it sends what it did.
+    zoom_set_lines = ["    return {zooms: T.setRange(T.ZL, a, b, kind ? {kind: kind} : null).map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};"]
+    named = CHANGED_LINES + MENU_LINES + zoom_set_lines
     case("every line of the timeline's script as it was before several clips (%d lines) is still there, in order, but for the %d lines named in this test "
-         "(%d changed for several clips, %d for the two small menus that took the chips' place)" % (len(old), len(named), len(CHANGED_LINES), len(MENU_LINES)),
+         "(%d changed for several clips, %d for the two small menus that took the chips' place, 1 for a zoom's amount and pace)" % (len(old), len(named), len(CHANGED_LINES), len(MENU_LINES)),
          sorted(missing) == sorted(named), [x for x in missing if x not in named][:4] or [x for x in named if x not in missing][:4])
     src = "\n".join(new)
 
     def body(name):
         a = src.index("\nfunction %s(" % name)
         return src[a:src.index("\n}", a)]
-    case("her one-clip Speed, Zoom and cut are word for word what they were, each reached when fewer than two clips are picked",
+    case("her one-clip Speed and cut are word for word what they were, and her one-clip Zoom but for carrying a zoom's amount and pace (Nov 13), each reached when fewer than two clips are picked",
          "var a = p.words[0], b = p.words[p.words.length - 1];\n  T.save(function(){\n    return {speeds: T.setRange(T.REC.speeds || [], a, b, v === 1 ? null : {v: v}).map(function(r){ return {a: r.a, b: r.b, v: r.v}; })};" in body("speedClip")
-         and "return {zooms: T.setRange(T.ZL, a, b, kind ? {kind: kind} : null).map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};" in body("zoomClip")
+         and "var a = p.words[0], b = p.words[p.words.length - 1];\n  T.save(function(){" in body("zoomClip") and "var was = T.zoomAt(a), put = kind ? {kind: kind} : null;" in body("zoomClip")
+         and "return {zooms: T.setRange(T.ZL, a, b, put).map(T.zoomOut)};" in body("zoomClip")
          and "var list = p.words.slice();\n  SELW = null;\n  saveCut(list, true);\n  T.toast(W.cut_clip);" in body("cutClip")
          and "if (!MORE.length || TLSEL !== 'clip') return null;" in body("many"))
 

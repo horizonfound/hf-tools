@@ -319,6 +319,17 @@ OUR_WORDS = {
     # the two small menus for Speed and Zoom on the timeline (Dustin, Nov 13; hers are rows of chips)
     "menu_label": ("{name}:", "her words Speed and Zoom now sit inside a button, before what the clip has: \"Speed: 1×\", \"Zoom: Slow zoom\""),
     "mixed": ("Mixed", "what a menu's button says when the clips picked do not agree (hers picks one clip at a time)"),
+    # how much and how fast a zoom moves, two rows under the Zoom menu's items (Dustin, Nov 13: presets, no
+    # sliders; hers has one amount and a steady speed). Drafts for Nicole.
+    "how_much": ("How much", "the name of the row that sets how far a zoom goes in"),
+    "amt_subtle": ("Subtle", "the smallest of the three amounts"),
+    "amt_medium": ("Medium", "the middle amount: hers, what every zoom has until one is chosen"),
+    "amt_strong": ("Strong", "the largest of the three amounts"),
+    "how_fast": ("How fast", "the name of the row that sets how quickly a zoom moves"),
+    "pace_quick": ("Quick", "a slow zoom that moves in its first second and then holds"),
+    "pace_whole": ("Whole clip", "a slow zoom that moves across its whole stretch: hers"),
+    "pace_instant": ("Instant", "a punch in that is simply closer from its first frame: hers"),
+    "pace_push": ("Quick push", "a punch in that pushes in over about a third of a second and then holds"),
 }
 OUR_WORDS["made_only"] = (
     "Made \"{project}\" in CapCut.",
@@ -786,7 +797,10 @@ def page_html(kit_name):
     w = page_words()
     short = reel_page.short_name(kit_name)
     kq = quote(kit_name, safe="")
-    data = {"kit": kit_name, "short": short, "words": w, "lookEvery": LOOK_EVERY_MS, "toastMs": TOAST_MS,
+    eng = TR._engine()                                 # how much and how fast a zoom moves: the engine's own numbers
+    zoom = {"amount": eng.ZOOM_AMOUNT, "amounts": list(eng.ZOOM_AMOUNTS), "amountDefault": eng.AMOUNT_DEFAULT,
+            "pace": {k: list(v) for k, v in eng.ZOOM_PACE.items()}, "paceDefault": eng.PACE_DEFAULT, "secs": eng.MOVE_SECS}
+    data = {"kit": kit_name, "short": short, "words": w, "lookEvery": LOOK_EVERY_MS, "toastMs": TOAST_MS, "zoom": zoom,
             "undoSteps": UNDO_STEPS, "pc": bool(this_computer.WINDOWS), "footageEvery": FOOTAGE_EVERY_MS,
             "copiesEvery": COPIES_EVERY_MS, "copiesTries": COPIES_TRIES,
             "previewDone": list(reel_page.DONE_STATES)}

@@ -46,7 +46,8 @@ the scratchpad, never in their folders, and hand them over with --file (never on
 Where things are kept, all in the kit's hidden folder (nothing of theirs is in the computer's own Assistant folder;
 only the transcriber's own app, when it has one, and the scratch sound of a job at work, in <that folder>/talking/,
 the sound removed when the job ends):
-    .kit/talking.json            the record: which video, their cuts, splits, speeds, zooms, photo stretches,
+    .kit/talking.json            the record: which video, their cuts, splits, speeds, zooms (a zoom may carry how
+                                 much and how fast, "amount" and "pace", only when they chose one), photo stretches,
                                  captions. Her field names. Saved whole or not at all, one writer at a time
                                  (.kit/talking.lock), with a counter ("rev") that moves on with every change.
     .kit/talking.prev.json       the record as it was before the last change
@@ -1658,12 +1659,27 @@ def _f_speeds(v, ctx):
 def _f_zooms(v, ctx):
     if not isinstance(v, list) or len(v) > MAX_RANGES:
         _no("zooms")
+    eng = _engine()
     out = []
     for r in v:
-        if not isinstance(r, dict) or set(r) - {"a", "b", "kind"} or r.get("kind") not in ("punch", "zoom"):
+        if not isinstance(r, dict) or set(r) - {"a", "b", "kind", "amount", "pace"} or r.get("kind") not in ("punch", "zoom"):
             _no("zooms")
         a, b = _range(r, ctx["n"], "zooms")
-        out.append({"a": a, "b": b, "kind": r["kind"]})
+        z = {"a": a, "b": b, "kind": r["kind"]}
+        # ours (Dustin, Nov 13): how much and how fast, each one of the engine's own names for that kind of zoom
+        # or the save is refused. What a zoom has by itself (Medium; Whole clip; Instant) is never written, so a
+        # zoom nobody set is stored exactly as it always was.
+        if "amount" in r:
+            if not isinstance(r["amount"], str) or r["amount"] not in eng.ZOOM_AMOUNT[z["kind"]]:
+                _no("zooms")
+            if r["amount"] != eng.AMOUNT_DEFAULT:
+                z["amount"] = r["amount"]
+        if "pace" in r:
+            if not isinstance(r["pace"], str) or r["pace"] not in eng.ZOOM_PACE[z["kind"]]:
+                _no("zooms")
+            if r["pace"] != eng.PACE_DEFAULT[z["kind"]]:
+                z["pace"] = r["pace"]
+        out.append(z)
     return out
 
 

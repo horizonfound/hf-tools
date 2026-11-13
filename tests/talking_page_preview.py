@@ -116,8 +116,10 @@ def run_requests(t, s):
          "querySelector('video')" not in code and "getElementsByTagName" not in code and not re.search(r"['\"](bar|sel)['\"]", code))
     case("the Footage list is never asked for from the preview (only the video picker asks)", "/reel-footage" not in code)
     case("the phone guides are remembered under her key, talkGuides", code.count("'talkGuides'") == 2 and "localStorage" in code)
-    case("a slow zoom's span is never under 0.1 s, a punch in is CapCut's own number, and the second video is set again past 0.35 s",
-         "Math.max(0.1, zs[1] - zs[0])" in code and "PUNCH = %s" % capcut.PUNCH in code and "RESEEK = 0.35" in code and "SLOW_OUTSIDE = 1.06" in code)
+    case("a slow zoom's span is never under 0.1 s, a zoom's amounts are the engine's own (the ones CapCut gets: none is written in the preview's script any more), "
+         "and the second video is set again past 0.35 s",
+         "Math.max(0.1, zs[1] - zs[0])" in code and "T.zoomValue(zr, R - zs[0]" in code and "T.zoomAmount(zr)" in code and "PUNCH" not in code and "SLOW" not in code
+         and "RESEEK = 0.35" in code and capcut.PUNCH == 1.15 and capcut.ZOOM_TO == 1.12)
     case("a stretch is never held by the drag: it keeps the start word, and looks the stretch up when the save's turn comes",
          "T.findShot(d.a)" in code and "x: x," not in code[code.index("pdrag = {"):code.index("pdrag = {") + 400])
     page = s.tp.page_html(KIT)

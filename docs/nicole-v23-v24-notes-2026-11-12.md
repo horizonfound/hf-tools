@@ -250,6 +250,22 @@ Dustin asked for it: "when I'm dragging the text around... there should be like 
 - One more of ours from the same review, on the timeline: when a second clip was picked in a narrow window, the bar and the timeline moved up about 18 px, because our line under the timeline grew from one row to two. The line now keeps room for its longest words, so nothing moves. In a narrow window that leaves one empty row under the hint while only one clip is picked.
 - It goes beyond your page, so it is yours to keep, change or take out.
 
+### How much and how fast a zoom moves, and zooms that ease (ours; yours has one amount and a steady speed) (Nov 13)
+
+Dustin watched the zooms and said the slow zoom has a "robotic steady zoom speed", that it should be "more dynamic and interesting looking", and that it is "not landing right currently. feels off". He asked to control the amount and the speed. Shown three drawings he chose the one with presets and no sliders: "let's do A and keep it simple and consistent".
+
+- **This one changes how every Slow zoom looks, yours included.** Your slow zoom moves at one steady speed from start to end. Ours now eases: it starts slowly, moves quicker in the middle and settles slowly at the end. It still starts at 1.0 and ends on your 1.12 over the same words. It is still one zoom across a closed pause or a change of speed.
+- What was added to the Zoom menu on the timeline, under None / Punch in / Slow zoom and a thin line, only when the picked clip has a zoom:
+  - **How much:** Subtle | Medium | Strong. Medium is your number (Slow zoom 1.12, Punch in 1.15). First values for the others, to be tuned by eye: Slow zoom 1.06 and 1.20; Punch in 1.075 and 1.24.
+  - **How fast:** for a Slow zoom, Quick (it moves in the first second, then holds there) or Whole clip (yours); for a Punch in, Instant (yours: simply closer from the first frame) or Quick push (it pushes in over about a third of a second, then holds).
+- A press on a choice saves at once and the menu stays open, so both can be set. The button still reads "Zoom: Slow zoom". With several clips picked the choice goes to all of their zooms.
+- A zoom nobody touched is saved exactly as before, and a Punch in nobody touched makes exactly the CapCut project it made before.
+- In CapCut the easing is written as a row of ordinary keyframes along the curve (CapCut's own curve setting is not something we can write with confidence from outside).
+- **Not changed:** the Move row under each paragraph of your script (it makes a zoom with Medium, Whole clip or Instant), speed, split, delete, the centered line, anything else on the page.
+- Lines of ours for it, all drafts for you: "How much", "Subtle", "Medium", "Strong", "How fast", "Quick", "Whole clip", "Instant", "Quick push".
+- **Not tried:** nobody has watched an eased zoom, a Quick zoom or a Quick push in a real CapCut project yet; nobody's hand has been on the two rows; the amounts and times are first guesses.
+- It changes something of yours (the steady zoom), so it is yours and Dustin's to keep, tune or put back.
+
 ## 8. For Nicole and Dustin to settle
 
 Each with what was built, so nothing waited.

@@ -23,7 +23,9 @@ Hers, kept number for number (each has its check in tests/talking_page_check.py 
     rounded to .01;
   - a punch in is 1.15; a slow zoom grows by .12 across its whole span (never under .1 s), and shows 1.06 outside
     a piece; neither shows while they are in the corner; the zoom turns around 50% 45% and eases over .25 s (the
-    styles);
+    styles). Those are a zoom nobody set (Medium; Whole clip; Instant). Ours (Dustin, Nov 13): how much and how
+    fast are each zoom's own, the numbers the engine's (DATA.zoom), and a moving zoom is no longer steady: it
+    eases on the one curve the CapCut project is cut from (T.zoomValue, in talking_js_core.py);
   - captions: one word at a time, its size the screen's height x .035 x their size; its handle sits on the
     word's bottom right corner and is there only while a word shows; "Put the captions back to how they were"
     shows only when the spot or the size was changed;
@@ -77,7 +79,7 @@ var ME = {x: (50 + 1080 * 0.36 / 2) / 1080, y: (1920 - 60 - 1920 * 0.36 / 2) / 1
 var CAP = {x: 0.5, y: 0.71};
 var SNAP_PX = 6;               // ours: how near the preview's middle, in screen px, a dragged thing snaps to it
 var SIDE_PX = 3;               // ours: how far sideways the hand must go in a drag before a thing that was off the middle may snap to it
-var CLICK_PX = 3, PUNCH = 1.15, SLOW = 0.12, SLOW_OUTSIDE = 1.06, RESEEK = 0.35, CAP_SHARE = 0.035;
+var CLICK_PX = 3, RESEEK = 0.35, CAP_SHARE = 0.035;
 var pdrag = null;              // a drag on the preview
 var held = null;               // what that drag has in hand: {a, pos} | {a, me} | {cap_pos} | {cap_size}
 var swallow = false;           // the press that just ended was a drag's: its click neither plays nor pauses
@@ -242,11 +244,14 @@ function frame(playing){
   } else quietVideo();
 
   // the zoom (never while they are in the corner)
-  var z = 1, zk = pc ? pc.zoom : null, kind = zk != null && T.ZL[zk] ? T.ZL[zk].kind : (pc ? '' : T.zoomOf(wi));
-  if (kind === 'punch') z = PUNCH;
-  if (kind === 'zoom') {
+  // How much and how fast are the zoom's own; the move eases on the one curve the CapCut project is cut from
+  // (T.zoomValue is talking.zoom_value, the same function of the reel's time). Outside a piece (those words cut,
+  // the whole video showing) a punch in shows its amount and a slow zoom half of its, as hers showed 1.06.
+  var z = 1, zk = pc ? pc.zoom : null, zr = zk != null && T.ZL[zk] ? T.ZL[zk] : (pc ? null : T.zoomAt(wi));
+  if (zr) {
     var zs = zk != null ? zoomSpan(zk) : [NaN, NaN];
-    z = isFinite(zs[0]) ? 1 + SLOW * Math.min(1, Math.max(0, (R - zs[0]) / Math.max(0.1, zs[1] - zs[0]))) : SLOW_OUTSIDE;
+    if (isFinite(zs[0])) z = T.zoomValue(zr, R - zs[0], Math.max(0.1, zs[1] - zs[0]));
+    else z = zr.kind === 'punch' ? T.zoomAmount(zr) : r4(1 + (T.zoomAmount(zr) - 1) / 2);
   }
   vid.style.transform = sc.classList.contains('pip') ? '' : 'scale(' + z + ')';
 

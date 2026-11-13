@@ -737,6 +737,9 @@ def check_talking():
           "nobody has yet pressed it by hand or opened a joined zoom in CapCut")),
         ("Speed and Zoom are a small menu each (Dustin, Nov 13), and no line still speaks of chips on the timeline",
          ("Speed and Zoom are a small menu each", "To take a zoom off a clip they pick the clip and choose None there", "Both are grey until a clip is picked")),
+        ("How much and How fast (Dustin, Nov 13) are theirs to press too: the rows are said in the page's own words, no command sets them, and nobody has watched an eased zoom in CapCut",
+         ("**How much** (Subtle, Medium, Strong)", "**How fast**", "Quick push", "Whole clip", "the menu stays open so they can set both",
+          "these are theirs to press: you have no command for them (rule 3)", "nobody has watched an eased zoom in a real CapCut project yet")),
     ):
         miss = [w for w in words if w not in flat and w not in flat.lower()]
         case(f"the part: {what}", not miss, miss)

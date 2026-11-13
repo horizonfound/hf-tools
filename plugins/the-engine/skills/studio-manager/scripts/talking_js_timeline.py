@@ -75,6 +75,10 @@ Speed and Zoom are one button each ("Speed: 1× ▾", "Zoom: Slow zoom ▾") and
 button with her own words for every item, the choice the picked clip has checked.
   - choosing an item calls speedClip(v) or zoomClip(kind), the functions her chips called: the save is byte for
     byte the same, one save and one Undo step, and everything about several clips above is unchanged;
+  - ours (Dustin, Nov 13, his pick of three drawings: presets, no sliders): under the Zoom menu's three items and a
+    hairline, How much (Subtle | Medium | Strong) and How fast (a slow zoom: Quick | Whole clip; a punch in:
+    Instant | Quick push), shown only while a picked clip has a zoom. A choice saves at once and the menu stays
+    open; the button's words do not change. See menuRow, zoomRows and zoomSet;
   - the button looks on (filled) when a picked clip has a zoom, or a speed that is not 1×; with several picked
     that do not agree it reads Mixed and no item is checked; with no clip picked both are grey, as the chips were;
   - the list opens above its button (the bar sits on the timeline) and under it only with no room above, always
@@ -300,6 +304,30 @@ function makeMenu(id, name, attr, items, choose){
   host.appendChild(btn); host.appendChild(list);
   return m;
 }
+// Ours (Dustin, Nov 13: "let's do A and keep it simple and consistent"): under the Zoom menu's three items and a
+// hairline, two rows of joined choices for the picked clips' zoom: How much (Subtle | Medium | Strong) and How fast
+// (a slow zoom: Quick | Whole clip; a punch in: Instant | Quick push). They show only while a picked clip has a
+// zoom. Choosing one saves at once (one save, one step of Undo) and the menu STAYS OPEN, so both can be set.
+// Each row is a named radio group (role radiogroup, its choices role radio); the arrows reach them like the items above.
+function menuRow(m, name, attr, opts, choose){
+  var g = el('div', 'tl-mg'), lb = el('span', 'lb', name), seg = el('div', 'tl-seg'), row = {g: g, items: [], attr: attr};
+  lb.setAttribute('aria-hidden', 'true');
+  g.setAttribute('role', 'radiogroup'); g.setAttribute('aria-label', name);
+  opts.forEach(function(o){
+    var d = el('div', 'tl-so', o[1]);
+    d.setAttribute('role', 'radio'); d.setAttribute('aria-checked', 'false'); d.setAttribute('data-' + attr, o[0]); d.tabIndex = -1;
+    d.addEventListener('click', function(){ if (OPEN !== m || m.btn.disabled || g.hidden || m.more.hidden) return; choose(o[0]); });
+    seg.appendChild(d); row.items.push(d);
+  });
+  g.appendChild(lb); g.appendChild(seg); m.more.appendChild(g);
+  return row;
+}
+// what the arrows walk through: the menu's items, then the choices of whichever rows are showing
+function menuStops(m){
+  var out = m.items.slice();
+  if (m.rows && !m.more.hidden) m.rows.forEach(function(r){ if (!r.g.hidden) out = out.concat(r.items); });
+  return out;
+}
 // where the list goes: above its button (below it would lie over the clips being changed), under it only when
 // there is no room above; always whole inside the window, whatever the dock or the window's edge
 function placeMenu(m){
@@ -319,6 +347,7 @@ function openMenu(m, at){
   placeMenu(m);
   var k = at === 'last' ? m.items.length - 1 : m.cur >= 0 ? m.cur : 0;
   m.items[k].focus({preventScroll: true});
+  if (m.rows) placeMenu(m);
 }
 function closeMenu(back){
   var m = OPEN; if (!m) return;
@@ -350,6 +379,42 @@ var cutVal = el('span', 'val', $('tlCut').textContent);
 })();
 var speedMenu = makeMenu('tlSpeed', W.speed, 'v', SPEEDS.map(function(v){ return [v, T.fill(W.speed_x, {v: v})]; }), function(v){ speedClip(v); });
 var zoomMenu = makeMenu('tlZoom', W.zoom, 'z', MOVES, function(kind){ zoomClip(kind); });
+var ZS = T.ZS;
+var AMT_W = {subtle: W.amt_subtle, medium: W.amt_medium, strong: W.amt_strong};
+var PACE_W = {quick: W.pace_quick, whole: W.pace_whole, instant: W.pace_instant, push: W.pace_push};
+zoomMenu.more = el('div', 'tl-mx'); zoomMenu.more.hidden = true; zoomMenu.list.appendChild(zoomMenu.more);
+zoomMenu.rowAmount = menuRow(zoomMenu, W.how_much, 'amount', ZS.amounts.map(function(a){ return [a, AMT_W[a]]; }), function(v){ zoomSet('amount', v); });
+function paceRow(kind){             // How fast has a row for each kind of zoom; the one of the picked zooms' kind shows
+  var r = menuRow(zoomMenu, W.how_fast, 'pace', ZS.pace[kind].map(function(p){ return [p, PACE_W[p]]; }), function(v){ zoomSet('pace', v); });
+  r.g.setAttribute('data-kind', kind);
+  return r;
+}
+zoomMenu.rowPace = {zoom: paceRow('zoom'), punch: paceRow('punch')};
+zoomMenu.rows = [zoomMenu.rowAmount, zoomMenu.rowPace.zoom, zoomMenu.rowPace.punch];
+// the picked clips' zooms, each once (a slow zoom joined across clips is ONE zoom: it has one setting)
+function pickedZooms(){
+  var all = many() || (selPiece() ? [selPiece()] : []), ks = [];
+  all.forEach(function(q){ if (q.zoom != null && T.ZL[q.zoom] && ks.indexOf(q.zoom) < 0) ks.push(q.zoom); });
+  return ks.map(function(k){ return T.ZL[k]; });
+}
+// the rows follow what is picked: there only with a zoom; a choice is lit only when every picked zoom agrees; How
+// fast is the row of the picked zooms' kind, and is not shown when a punch in and a slow zoom are picked together
+function zoomRows(){
+  var m = zoomMenu, zs = pickedZooms(), was = [m.more.hidden, m.rowPace.zoom.g.hidden, m.rowPace.punch.g.hidden].join();
+  var kind = zs.length && zs.every(function(z){ return z.kind === zs[0].kind; }) ? zs[0].kind : '';
+  var agreed = function(f){ return zs.length && zs.every(function(z){ return f(z) === f(zs[0]); }) ? f(zs[0]) : ''; };
+  var amount = agreed(T.zoomAmountName), pace = kind ? agreed(T.zoomPace) : '';
+  m.more.hidden = !zs.length;
+  m.rowAmount.items.forEach(function(d){ d.setAttribute('aria-checked', d.getAttribute('data-amount') === amount ? 'true' : 'false'); });
+  ['zoom', 'punch'].forEach(function(k){
+    m.rowPace[k].g.hidden = kind !== k;
+    m.rowPace[k].items.forEach(function(d){ d.setAttribute('aria-checked', kind === k && d.getAttribute('data-pace') === pace ? 'true' : 'false'); });
+  });
+  if (OPEN === m && was !== [m.more.hidden, m.rowPace.zoom.g.hidden, m.rowPace.punch.g.hidden].join()) {
+    if (menuStops(m).indexOf(document.activeElement) < 0) m.items[m.cur >= 0 ? m.cur : 0].focus({preventScroll: true});
+    placeMenu(m);
+  }
+}
 // a press anywhere else closes the open menu (and still does whatever it was a press on)
 function outsideMenu(e){ if (OPEN && !OPEN.list.contains(e.target) && !OPEN.btn.contains(e.target)) closeMenu(false); }
 document.addEventListener('pointerdown', outsideMenu, true);
@@ -365,14 +430,14 @@ addEventListener('keydown', function(e){
     if (b && !e.metaKey && !e.ctrlKey && !e.altKey && (k === 'Enter' || k === ' ' || k === 'ArrowDown' || k === 'ArrowUp')) { stop(); openMenu(b, k === 'ArrowUp' ? 'last' : 'cur'); }
     return;
   }
-  var i = m.items.indexOf(document.activeElement), n = m.items.length;
+  var st = menuStops(m), i = st.indexOf(document.activeElement), n = st.length, inRow = i >= m.items.length;
   if (k === 'Escape') { stop(); closeMenu(true); }
   else if (k === 'Tab') closeMenu(false);
-  else if (k === 'ArrowDown') { stop(); m.items[(i + 1) % n].focus({preventScroll: true}); }
-  else if (k === 'ArrowUp') { stop(); m.items[(i <= 0 ? n : i) - 1].focus({preventScroll: true}); }
-  else if (k === 'Home') { stop(); m.items[0].focus({preventScroll: true}); }
-  else if (k === 'End') { stop(); m.items[n - 1].focus({preventScroll: true}); }
-  else if (k === 'Enter' || k === ' ') { stop(); if (i >= 0) m.items[i].click(); else closeMenu(true); }      // never playing behind the open menu
+  else if (k === 'ArrowDown' || (inRow && k === 'ArrowRight')) { stop(); st[(i + 1) % n].focus({preventScroll: true}); }
+  else if (k === 'ArrowUp' || (inRow && k === 'ArrowLeft')) { stop(); st[(i <= 0 ? n : i) - 1].focus({preventScroll: true}); }
+  else if (k === 'Home') { stop(); st[0].focus({preventScroll: true}); }
+  else if (k === 'End') { stop(); st[n - 1].focus({preventScroll: true}); }
+  else if (k === 'Enter' || k === ' ') { stop(); if (i >= 0) st[i].click(); else closeMenu(true); }      // never playing behind the open menu
   else if ((k === 'Delete' || k === 'Backspace') && !e.metaKey && !e.ctrlKey) stop();      // never deleting the picked clip from inside an open list
 }, true);
 // ours: the line under the timeline keeps the room of its longest words at this width, so the bar and the timeline
@@ -434,6 +499,7 @@ function toolState(){
     if (dh2 !== dockWas) { dockWas = dh2; T.sizeDock(); }
     if (OPEN) placeMenu(OPEN);
   }
+  zoomRows();
   T.undoButtons();
 }
 function moveHead(R, playing){
@@ -680,7 +746,7 @@ function zoomClips(mny, kind){
       z = T.setRange(z, r.a, r.b, kind === 'zoom' ? {kind: 'zoom'} : null);
       if (kind === 'punch') r.clips.forEach(function(c){ z = T.setRange(z, c[0], c[1], {kind: 'punch'}); });
     });
-    return {zooms: z.map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};
+    return {zooms: z.map(T.zoomOut)};
   });
   if (kind === 'zoom' && joined.length)
     T.toast(runs.length === 1 ? T.fill(W.zoom_joined, {n: runs[0].clips.length}) : joined.length < runs.length ? W.zoom_some_joined : W.zoom_all_joined);
@@ -698,7 +764,31 @@ function zoomClip(kind){
   var p = selPiece(); if (!p) return;
   var a = p.words[0], b = p.words[p.words.length - 1];
   T.save(function(){
-    return {zooms: T.setRange(T.ZL, a, b, kind ? {kind: kind} : null).map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};
+    // the kind the clip already has, chosen again, keeps how much and how fast it had; a new kind starts as made
+    var was = T.zoomAt(a), put = kind ? {kind: kind} : null;
+    if (put && was && was.kind === kind) { if (was.amount) put.amount = was.amount; if (was.pace) put.pace = was.pace; }
+    return {zooms: T.setRange(T.ZL, a, b, put).map(T.zoomOut)};
+  });
+}
+// How much / How fast, from the Zoom menu's rows: every picked clip's zoom gets the choice, in one save. What a
+// zoom has by itself (Medium; Whole clip; Instant) is never written. A zoom is found again by its words when the
+// save's turn comes; one that is gone by then is simply not changed.
+function zoomSet(field, v){
+  var want = pickedZooms().map(function(z){ return z.a + ':' + z.b + ':' + z.kind; });
+  if (!want.length) return;
+  T.save(function(){
+    var hit = false, out = T.ZL.map(function(z){
+      var o = T.zoomOut(z);
+      if (want.indexOf(z.a + ':' + z.b + ':' + z.kind) < 0) return o;
+      if (field === 'amount' ? !Object.prototype.hasOwnProperty.call(ZS.amount[z.kind], v) : ZS.pace[z.kind].indexOf(v) < 0) return o;
+      var was = JSON.stringify(o);
+      delete o[field];
+      if (v !== (field === 'amount' ? ZS.amountDefault : ZS.paceDefault[z.kind])) o[field] = v;
+      o = T.zoomOut(o);
+      if (JSON.stringify(o) !== was) hit = true;       // the choice it already has: nothing to save
+      return o;
+    });
+    return hit ? {zooms: out} : null;
   });
 }
 

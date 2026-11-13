@@ -210,7 +210,7 @@ function changeCut(add){
     return {cut: T.toRanges(s)};
   });
 }
-function zoomsOut(list){ return list.map(function(z){ return {a: z.a, b: z.b, kind: z.kind}; }); }
+function zoomsOut(list){ return list.map(T.zoomOut); }      // every other zoom keeps how much and how fast it has
 function zoomWords(kind){
   var r = selectedWords(); if (!r) return;
   doneSel();

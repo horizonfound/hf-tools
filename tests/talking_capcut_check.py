@@ -16,6 +16,7 @@ Every line must say PASS (or SKIP). Python 3.9, standard library only, a Mac or 
 """
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -125,6 +126,55 @@ def end(t):
 
 def near(a, b, tol=2e-6):
     return abs(a - b) <= tol
+
+
+# ---- the zoom checks' own fixed pretend plan (Nov 13): seven pieces one after another on the reel. Pieces 1, 2, 3
+# are zoom 0 (the middle one at 1.5x; the last after a closed pause in the video), piece 5 is zoom 1.
+# tests/fixtures/talking-zoom-before.json is what the builder made of it BEFORE zooms got an amount and a pace.
+ZOOM_BEFORE = ROOT / "tests" / "fixtures" / "talking-zoom-before.json"
+ID = re.compile(r"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$")
+
+
+def zoom_pieces():
+    spec = [(1.0, 2.0, 1.0, None), (2.0, 3.3, 1.0, 0), (3.3, 4.8, 1.5, 0), (6.0, 7.7, 1.0, 0), (7.7, 8.4, 1.0, None),
+            (9.0, 11.6, 1.0, 1), (11.6, 12.5, 1.0, None)]
+    out, at = [], 0.0
+    for k, (a, b, sp, z) in enumerate(spec):
+        dur = round((b - a) / sp, 3)
+        out.append({"from": a, "to": b, "speed": sp, "zoom": z, "sentence": k, "at": round(at, 3), "dur": dur})
+        at += dur
+    return out
+
+
+def zoom_plan(zooms):
+    return {"name": "Zoom check talking reel", "photos": [], "song": None, "hook": None, "files": ["/nowhere/talk.mp4"], "cover": None,
+            "video": {"path": "/nowhere/talk.mp4", "w": 1080, "h": 1920, "length": 60.0},
+            "pieces": zoom_pieces(), "zooms": zooms, "shots": [], "captions": None, "cap_pos": None, "cap_size": 1}
+
+
+def scrub(x, seen):
+    """A project with every id replaced by its order of appearance, so two builds can be compared whole."""
+    if isinstance(x, dict):
+        return {k: scrub(v, seen) for k, v in x.items()}
+    if isinstance(x, list):
+        return [scrub(v, seen) for v in x]
+    if isinstance(x, str) and ID.match(x):
+        return "id-%d" % seen.setdefault(x, len(seen))
+    return x
+
+
+def zoom_layer(capcut, parts, *zooms):
+    d, _ = capcut.build_talking(zoom_plan(list(zooms)), parts, None)
+    return d["tracks"][0]["segments"]
+
+
+def keys_of(seg):
+    """A piece's zoom keyframes as (seconds on the reel, value); [] for none."""
+    out = []
+    for k in (seg.get("common_keyframes") or [{"keyframe_list": []}])[0]["keyframe_list"]:
+        t = seg["target_timerange"]["start"] + (k["time_offset"] - seg["source_timerange"]["start"]) / seg["speed"]
+        out.append((t / US, k["values"][0]))
+    return out
 
 
 def make_kit(folder, photos):
@@ -302,21 +352,131 @@ try:
     zs = [s for s, p in zip(main["segments"], pcs) if p["zoom"] == 0]
     keys = [s["common_keyframes"][0]["keyframe_list"] for s in zs]
     check("a slow zoom across three pieces (a split and a photo's edges fall inside it): 1.0 at its start, 1.12 at its end",
-          len(zs) == 3 and keys[0][0]["values"] == [1.0] and keys[-1][1]["values"] == [1.12], [[k["values"] for k in ks] for ks in keys])
+          len(zs) == 3 and keys[0][0]["values"] == [1.0] and keys[-1][-1]["values"] == [1.12], [[k["values"] for k in ks] for ks in keys])
     check("...the values meet where one piece hands over to the next, and each piece starts at its first value",
-          all(a[1]["values"] == b[0]["values"] for a, b in zip(keys, keys[1:]))
+          all(a[-1]["values"] == b[0]["values"] for a, b in zip(keys, keys[1:]))
           and all(s["clip"]["scale"]["x"] == ks[0]["values"][0] == s["clip"]["scale"]["y"] for s, ks in zip(zs, keys))
-          and all(ks[0]["values"][0] < ks[1]["values"][0] for ks in keys))
-    check("...its keyframes are CapCut's uniform-scale kind, two a piece, timed in the video's own clock (hers)",
-          all(s["common_keyframes"][0]["property_type"] == "KFTypeScaleX" and len(ks) == 2
-              and ks[0]["time_offset"] == s["source_timerange"]["start"] and ks[1]["time_offset"] == end(s["source_timerange"]) for s, ks in zip(zs, keys))
+          and all(x["values"][0] < y["values"][0] for ks in keys for x, y in zip(ks, ks[1:])))
+    check("...its keyframes are CapCut's uniform-scale kind, the first at the piece's start and the last at its end, timed in the "
+          "video's own clock (hers), each later than the one before (ours, Nov 13: more than two, the points of the eased curve)",
+          all(s["common_keyframes"][0]["property_type"] == "KFTypeScaleX" and len(ks) >= 2
+              and ks[0]["time_offset"] == s["source_timerange"]["start"] and ks[-1]["time_offset"] == end(s["source_timerange"])
+              and all(x["time_offset"] < y["time_offset"] for x, y in zip(ks, ks[1:])) for s, ks in zip(zs, keys))
           and capcut.ZOOM_CLOCK == "video")
     capcut.ZOOM_CLOCK = "clip"
     d2, _ = capcut.build_talking(plan, parts, None)
     capcut.ZOOM_CLOCK = "video"
     z2 = [s for s, p in zip(d2["tracks"][0]["segments"], pcs) if p["zoom"] == 0]
     check("...and the one switch times them from the start of each clip instead, should CapCut want that",
-          all([k["time_offset"] for k in s["common_keyframes"][0]["keyframe_list"]] == [0, s["target_timerange"]["duration"]] for s in z2))
+          all([k["time_offset"] for k in s["common_keyframes"][0]["keyframe_list"]][::len(s["common_keyframes"][0]["keyframe_list"]) - 1]
+              == [0, s["target_timerange"]["duration"]] for s in z2))
+
+
+    # ================= how much, how fast, and the eased move (Dustin, Nov 13) =================
+    eng_z = TR._engine()
+    before = json.loads(ZOOM_BEFORE.read_text(encoding="utf-8"))
+    Z0, Z1 = {"a": 2, "b": 7, "kind": "zoom"}, {"a": 14, "b": 16, "kind": "zoom"}
+    P0, P1 = {"a": 2, "b": 7, "kind": "punch"}, {"a": 14, "b": 16, "kind": "punch"}
+    d_p, _ = capcut.build_talking(zoom_plan([P0, P1]), parts, None)
+    check("a punch in nobody set makes the very layer it made before zooms had an amount or a pace (the whole main layer, ids aside)",
+          json.dumps(scrub(d_p["tracks"][0], {}), sort_keys=True) == json.dumps(before["punch_in"], sort_keys=True))
+    check("...and the plan of a record with no amount and no pace carries its zooms exactly as before: a, b and kind, in that order",
+          json.dumps(plan["zooms"]) == json.dumps([{"a": 2, "b": 7, "kind": "zoom"}, {"a": 14, "b": 16, "kind": "punch"}]), plan["zooms"])
+    check("Medium is the amount there was: the engine's table says a slow zoom 1.12 and a punch in 1.15, and that is what a zoom has by itself",
+          eng_z.ZOOM_AMOUNT["zoom"]["medium"] == 1.12 == capcut.ZOOM_TO and eng_z.ZOOM_AMOUNT["punch"]["medium"] == 1.15 == capcut.PUNCH
+          and eng_z.AMOUNT_DEFAULT == "medium" and eng_z.PACE_DEFAULT == {"zoom": "whole", "punch": "instant"})
+    check("the amounts and the seconds, each in the engine and nowhere else: slow zoom 1.06 / 1.12 / 1.20, punch in 1.075 / 1.15 / 1.24, "
+          "Quick 1 s, Quick push 0.35 s",
+          eng_z.ZOOM_AMOUNT == {"zoom": {"subtle": 1.06, "medium": 1.12, "strong": 1.20}, "punch": {"subtle": 1.075, "medium": 1.15, "strong": 1.24}}
+          and eng_z.MOVE_SECS == {"quick": 1.0, "push": 0.35} and eng_z.ZOOM_PACE == {"zoom": ("quick", "whole"), "punch": ("instant", "push")})
+    check("the one curve: 0 at the start, a half at the half, 1 at the end, exactly; slow at both ends; never outside 0 to 1",
+          (eng_z.ease(0), eng_z.ease(0.5), eng_z.ease(1)) == (0.0, 0.5, 1.0) and eng_z.ease(0.25) == 0.15625 and eng_z.ease(0.75) == 0.84375
+          and eng_z.ease(-3) == 0.0 and eng_z.ease(7) == 1.0 and eng_z.ease(0.1) < 0.1 and eng_z.ease(0.9) > 0.9)
+
+    segs = zoom_layer(capcut, parts, Z0, Z1)
+    slow = [s for s in segs if s.get("common_keyframes")]
+    kk = [keys_of(s) for s in slow]
+    old = before["slow_zoom_ends"]
+    check("a slow zoom nobody set (Medium, Whole clip) still starts at 1.0 and ends on 1.12 exactly, on the very keyframe times it had before",
+          len(slow) == 4 == len(old)
+          and all([k["time_offset"] for k in s["common_keyframes"][0]["keyframe_list"]][::len(s["common_keyframes"][0]["keyframe_list"]) - 1]
+                  == [o[1][0], o[2][0]] for s, o in zip(slow, old))
+          and kk[0][0][1] == 1.0 == old[0][1][1] and kk[2][-1][1] == 1.12 == old[2][2][1] and kk[3][0][1] == 1.0 and kk[3][-1][1] == 1.12,
+          [(k[0], k[-1]) for k in kk])
+
+    def on_curve(ks, t0, move, to, tol=2e-6):
+        return all(abs(v - round(1.0 + (to - 1.0) * eng_z.ease((t - t0) / move), 6)) <= tol for t, v in ks)
+    run = kk[0] + kk[1] + kk[2]                       # zoom 0: reel 1.0 to 5.0, across a 1.5x piece and a closed pause
+    check("...but it eases: every keyframe sits on the engine's curve (not on the straight line), going up all the way",
+          on_curve(run, 1.0, 4.0, 1.12) and on_curve(kk[3], 5.7, 2.6, 1.12)
+          and all(a[1] <= b[1] for a, b in zip(run, run[1:])) and all(a[1] < b[1] for ks in kk for a, b in zip(ks, ks[1:]))
+          and abs(run[len(kk[0])][1] - (1.0 + 0.12 * 1.3 / 4.0)) > 0.005, (kk[0][-1], 1.0 + 0.12 * 1.3 / 4.0))
+    check("...ONE curve across a change of speed and a closed pause: each piece starts on the value the one before ended on, "
+          "and the clip's own scale is its first keyframe",
+          kk[0][-1][1] == kk[1][0][1] and kk[1][-1][1] == kk[2][0][1] and 1.0 < kk[0][-1][1] < kk[1][-1][1] < 1.12
+          and all(s["clip"]["scale"] == {"x": ks[0][1], "y": ks[0][1]} for s, ks in zip(slow, kk)), [(k[0][1], k[-1][1]) for k in kk[:3]])
+    gaps = [b[0] - a[0] for ks in kk for a, b in zip(ks, ks[1:])]
+    check("...written as ordinary keyframes, a point about every 0.15 s of the move (never more than 0.2 s apart here), each later "
+          "than the one before in the video's own clock",
+          max(gaps) <= 0.2 + 1e-6 and len(run) - 2 >= 5 and all(k["property_type"] == "KFTypeScaleX" for s in slow for k in s["common_keyframes"])
+          and all(x["time_offset"] < y["time_offset"] for s in slow for x, y in zip(s["common_keyframes"][0]["keyframe_list"], s["common_keyframes"][0]["keyframe_list"][1:])),
+          (max(gaps), len(run)))
+    check("...a move has at least five points and a very long one no more than forty-one; a zoom one frame long still has its two ends",
+          len(capcut.zoom_points(0, 6, 0, 6, 30.0)) == 5 and len(capcut.zoom_points(0, 9000, 0, 9000, 30.0)) == 41
+          and capcut.zoom_points(0, 1, 0, 1, 30.0) == [0, 1] and capcut.zoom_points(10, 300, 100, 130, 30.0)[0] == 100
+          and capcut.zoom_points(10, 300, 100, 130, 30.0)[-1] == 130)
+
+    def ends(*zooms):                                  # (scale, first value, last value, how many keyframes) of each zoomed piece
+        out = []
+        for s in zoom_layer(capcut, parts, *zooms):
+            ks = keys_of(s)
+            out.append((s["clip"]["scale"]["x"], ks[0][1] if ks else None, ks[-1][1] if ks else None, len(ks)))
+        return out
+    e_s, e_g = ends(dict(Z0, amount="subtle"), dict(Z1, amount="strong")), ends(dict(P0, amount="subtle"), dict(P1, amount="strong"))
+    check("How much reaches the project: a Subtle slow zoom ends on 1.06 and a Strong one on 1.20; a Subtle punch in sits at 1.075 "
+          "and a Strong one at 1.24, with no keyframes",
+          e_s[1][1] == 1.0 and e_s[3][2] == 1.06 and e_s[5][1:3] == (1.0, 1.2) and [x[0] for x in e_g[1:4]] == [1.075] * 3 and e_g[5] == (1.24, None, None, 0)
+          and e_g[0][0] == e_g[4][0] == 1.0, (e_s, e_g))
+    check("...and a setting nobody could have chosen is read as the zoom's own (Medium; Whole clip; Instant), never an error",
+          ends(dict(Z0, amount="huge", pace="push"), dict(P1, amount=7, pace="whole")) == ends(Z0, P1))
+
+    q = zoom_layer(capcut, parts, dict(Z0, pace="quick", amount="strong"), Z1)
+    qk = keys_of(q[1])
+    check("Quick: the slow zoom's move takes its first second (eased, on the curve), then HOLDS: the keyframes after it all say the "
+          "amount, and the pieces after it sit at the amount with no keyframes",
+          qk[0] == (1.0, 1.0) and on_curve([x for x in qk if x[0] <= 2.0 + 1e-6], 1.0, 1.0, 1.2)
+          and [v for t, v in qk if t >= 2.0 - 1e-6] == [1.2, 1.2] and abs(qk[-1][0] - 2.3) < 1e-6 and len(qk) >= 6
+          and [(s["clip"]["scale"]["x"], len(keys_of(s))) for s in q[2:4]] == [(1.2, 0), (1.2, 0)], qk)
+    qq = zoom_layer(capcut, parts, Z0, dict(Z1, pace="quick"))
+    check("...Whole clip beside it is unchanged, and a Quick zoom on its own clip ends its move a second in",
+          [keys_of(s) for s in qq[1:4]] == kk[:3] and [v for t, v in keys_of(qq[5]) if t >= 6.7 - 1e-6][0] == 1.12
+          and max(v for t, v in keys_of(qq[5]) if t < 6.7 - 1e-6) < 1.12)
+    pp = zoom_layer(capcut, parts, P0, dict(P1, pace="push", amount="strong"))
+    pk = keys_of(pp[5])
+    moving = [x for x in pk if x[1] < 1.24]
+    check("Quick push: the punch in starts at 1.0, pushes in on the curve over a third of a second (10 frames, five points), then holds "
+          "at its amount to the end of the clip; an Instant punch in beside it is as it always was",
+          pk[0] == (5.7, 1.0) and pk[-1] == (5.7 + 2.6, 1.24) and len(moving) == 4 and len(pk) == 6 and abs(moving[-1][0] - 5.7) < 10 / 30.0
+          and on_curve(pk, 5.7, 10 / 30.0, 1.24) and all(a[1] <= b[1] for a, b in zip(pk, pk[1:]))
+          and [(s["clip"]["scale"]["x"], len(keys_of(s))) for s in pp[1:4]] == [(1.15, 0)] * 3, pk)
+    check("...a move is never longer than its stretch: Quick on 12 frames and Quick push on 6 take all of them; Whole clip the "
+          "stretch; Instant none",
+          capcut.zoom_move_frames({"kind": "zoom", "pace": "quick"}, 12, 30.0) == 12 and capcut.zoom_move_frames({"kind": "punch", "pace": "push"}, 6, 30.0) == 6
+          and capcut.zoom_move_frames({"kind": "zoom"}, 77, 30.0) == 77 and capcut.zoom_move_frames({"kind": "punch"}, 77, 30.0) == 0
+          and capcut.zoom_move_frames({"kind": "zoom", "pace": "quick"}, 300, 30.0) == 30 and capcut.zoom_move_frames({"kind": "punch", "pace": "push"}, 300, 30.0) == 10)
+    capcut.ZOOM_CLOCK = "clip"
+    ck = zoom_layer(capcut, parts, Z0, Z1)[2]["common_keyframes"][0]["keyframe_list"]
+    capcut.ZOOM_CLOCK = "video"
+    check("...and with the one switch the same points are timed from the start of each clip (a 1.5x piece: its own length on the reel)",
+          ck[0]["time_offset"] == 0 and ck[-1]["time_offset"] == segs[2]["target_timerange"]["duration"]
+          and [k["values"] for k in ck] == [k["values"] for k in segs[2]["common_keyframes"][0]["keyframe_list"]])
+    # the engine's own function of time is what the builder cut its points from
+    check("the engine's function of time (the one the page's preview draws) gives the same values as the project's keyframes",
+          all(abs(eng_z.zoom_value(Z0, t - 1.0, 4.0) - v) <= 2e-6 for t, v in run)
+          and all(abs(eng_z.zoom_value(dict(Z0, pace="quick", amount="strong"), t - 1.0, 4.0) - v) <= 2e-6 for t, v in qk)
+          and eng_z.zoom_value(P1, 0.0, 2.6) == 1.15 == eng_z.zoom_value(P1, 2.0, 2.6)
+          and eng_z.zoom_value(dict(P1, pace="push"), 0.0, 2.6) == 1.0 and eng_z.zoom_value(dict(P1, pace="push"), 0.35, 2.6) == 1.15
+          and eng_z.zoom_value(dict(Z1, pace="quick"), 0.3, 0.6) == eng_z.zoom_value(Z1, 0.3, 0.6) == 1.06)
 
     # the photo layer
     starts = {s["target_timerange"]["start"] for s in main["segments"]}

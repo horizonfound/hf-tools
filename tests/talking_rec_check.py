@@ -263,6 +263,33 @@ try:
     refused("a zoom with no kind", {"zooms": [{"a": 0, "b": 1}]})
     refused("a zoom that runs backwards", {"zooms": [{"a": 3, "b": 1, "kind": "zoom"}]})
     refused("501 zooms", {"zooms": [{"a": 0, "b": 0, "kind": "zoom"}] * 501})
+    # how much and how fast (Dustin, Nov 13): two fields a zoom may carry, written only when they were chosen
+    plain = [{"a": 0, "b": 1, "kind": "punch"}, {"a": 3, "b": L, "kind": "zoom"}]
+    check("a zoom nobody set is stored exactly as it always was: a, b and kind, in that order, and no word of an amount or a pace in the file",
+          json.dumps(rec()["zooms"]) == json.dumps(plain) and b"amount" not in REC.read_bytes() and b"pace" not in REC.read_bytes(), rec()["zooms"])
+    good("zooms: how much and how fast, each kind its own", {"zooms": [{"a": 0, "b": 1, "kind": "punch", "amount": "strong", "pace": "push"},
+                                                                       {"a": 3, "b": L, "kind": "zoom", "pace": "quick", "amount": "subtle"}]},
+         "zooms", [{"a": 0, "b": 1, "kind": "punch", "amount": "strong", "pace": "push"}, {"a": 3, "b": L, "kind": "zoom", "amount": "subtle", "pace": "quick"}])
+    check("... the page is told them with its zooms, and they are still there in the engine's reading",
+          TR.state_for_page(KIT)["zooms"] == rec()["zooms"] and TR._engine().zooms(rec()) == rec()["zooms"])
+    before_rev = rec()["rev"]
+    good("zooms: what a zoom has by itself (Medium; Instant; Whole clip) is never written, so choosing it takes the field away",
+         {"zooms": [{"a": 0, "b": 1, "kind": "punch", "amount": "medium", "pace": "instant"}, {"a": 3, "b": L, "kind": "zoom", "amount": "medium", "pace": "whole"}]},
+         "zooms", plain)
+    check("... and the record's zooms are byte for byte what a save with no such fields leaves", json.dumps(rec()["zooms"]) == json.dumps(plain)
+          and rec()["rev"] == before_rev + 1)
+    code, ans = sv({"zooms": [{"a": 0, "b": 1, "kind": "punch", "amount": "medium"}, {"a": 3, "b": L, "kind": "zoom", "pace": "whole"}]})
+    check("... saving the same thing again, spelled with its defaults, is nothing to write (no new step)", code == 200 and rec()["rev"] == before_rev + 1, (code, rec()["rev"]))
+    refused("a zoom with an amount that isn't one", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "amount": "huge"}]})
+    refused("a zoom whose amount is a number", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "amount": 1.3}]})
+    refused("a zoom whose amount is nothing", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "amount": None}]})
+    refused("a zoom with a pace that isn't one", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "pace": "slowly"}]})
+    refused("a slow zoom with a punch in's pace (Quick push)", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "pace": "push"}]})
+    refused("a slow zoom with a punch in's pace (Instant)", {"zooms": [{"a": 0, "b": 1, "kind": "zoom", "pace": "instant"}]})
+    refused("a punch in with a slow zoom's pace (Whole clip)", {"zooms": [{"a": 0, "b": 1, "kind": "punch", "pace": "whole"}]})
+    refused("a punch in with a slow zoom's pace (Quick)", {"zooms": [{"a": 0, "b": 1, "kind": "punch", "pace": "quick"}]})
+    refused("a zoom whose pace is a list", {"zooms": [{"a": 0, "b": 1, "kind": "punch", "pace": ["push"]}]})
+    refused("a zoom with a field too many", {"zooms": [{"a": 0, "b": 1, "kind": "punch", "speed": 2}]})
     good("zooms emptied", {"zooms": []}, "zooms", [])
 
     def shot(a, b, **kw):

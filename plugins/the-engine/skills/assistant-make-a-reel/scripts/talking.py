@@ -13,7 +13,8 @@ The record (her field names; they are the page's contract):
     cut        [[first word, last word], ...]  words taken out
     splits     [word number, ...]              where they split a clip (that word starts a new piece)
     speeds     [{"a", "b", "v"}]               sped-up stretches (1.25, 1.5 or 2)
-    zooms      [{"a", "b", "kind"}]            "punch" (a punch in) or "zoom" (a slow zoom)
+    zooms      [{"a", "b", "kind"}]            "punch" (a punch in) or "zoom" (a slow zoom); ours, and only when
+                                               they chose one (Dustin, Nov 13): "amount" and "pace", see ZOOM_AMOUNT
     shots      [{"a", "b", "ns", "v", "from", "spot", "pos", "me"}]   photos (ns) or one Footage video (v) on words
     moves, photos                              v23's one-per-sentence fields, read only when the newer ones are empty
 
@@ -35,6 +36,69 @@ SPOTS = ("full", "pip", "center", "corner")              # hers, v24: Full scree
 OLD_SPOTS = {"behind": "full", "top": "center"}          # hers: Behind you and Across the top were dropped (Nicole, Nov 12); read only
 MOVES = ("", "punch", "zoom")                            # hers
 SPEEDS = (1.0, 1.25, 1.5, 2.0)                           # hers
+
+# How much and how fast a zoom moves (Dustin, Nov 13: the steady zoom felt "robotic", he wanted the amount and the
+# speed, and chose presets over sliders: "keep it simple and consistent"). Every number is here and nowhere else:
+# the CapCut builder and the page's preview both read these. FIRST VALUES, to be tuned by eye.
+#   amount: the scale the zoom ends on. Medium is hers exactly (a slow zoom to 1.12, a punch in at 1.15), and is
+#           what a zoom with no "amount" has. A punch in's Subtle is half its extra, its Strong 1.6 times it.
+#   pace:   a slow zoom moves across its whole stretch ("whole", hers, the default) or in its first second and
+#           then holds ("quick"); a punch in is simply closer from its first frame ("instant", hers, the default)
+#           or pushes in over about a third of a second and then holds ("push").
+# A default is never written into a record: a zoom nobody set has only a, b and kind, as it always had.
+ZOOM_AMOUNT = {"zoom": {"subtle": 1.06, "medium": 1.12, "strong": 1.20},
+               "punch": {"subtle": 1.075, "medium": 1.15, "strong": 1.24}}
+ZOOM_AMOUNTS = ("subtle", "medium", "strong")            # the order the page shows them in
+AMOUNT_DEFAULT = "medium"
+ZOOM_PACE = {"zoom": ("quick", "whole"), "punch": ("instant", "push")}       # the order the page shows them in
+PACE_DEFAULT = {"zoom": "whole", "punch": "instant"}
+MOVE_SECS = {"quick": 1.0, "push": 0.35}                 # how long the move takes (or the whole stretch, if shorter)
+
+
+def ease(x):
+    """How far along a moving zoom is (0 to 1) when `x` (0 to 1) of its time has gone: slow, quicker, slow again
+    (smoothstep), in place of a steady speed. The ONE curve: the page's preview has the same line of arithmetic,
+    and the CapCut project is written as points on it. ease(0) is 0, ease(.5) is .5 and ease(1) is 1, exactly."""
+    x = min(1.0, max(0.0, float(x)))
+    return x * x * (3.0 - 2.0 * x)
+
+
+def zoom_amount(z):
+    """The scale a zoom ends on (ZOOM_AMOUNT). Anything unreadable is Medium, hers."""
+    z = z if isinstance(z, dict) else {}
+    table = ZOOM_AMOUNT.get(z.get("kind")) or ZOOM_AMOUNT["zoom"]
+    a = z.get("amount")
+    return table[a] if isinstance(a, str) and a in table else table[AMOUNT_DEFAULT]
+
+
+def zoom_pace(z):
+    """A zoom's pace by name (ZOOM_PACE). Anything unreadable, or a pace of the other kind, is that kind's own."""
+    z = z if isinstance(z, dict) else {}
+    kind = z.get("kind") if z.get("kind") in ZOOM_PACE else "zoom"
+    p = z.get("pace")
+    return p if isinstance(p, str) and p in ZOOM_PACE[kind] else PACE_DEFAULT[kind]
+
+
+def zoom_move(z, span):
+    """How long a zoom's move lasts, in the units of `span` when a second is 1 (seconds on the reel): the whole
+    stretch for a slow zoom's "whole", MOVE_SECS (or the stretch, if shorter) for "quick" and "push", and 0 for a
+    punch in's "instant" (no move: the stretch is simply closer)."""
+    pace = zoom_pace(z)
+    if pace == "instant":
+        return 0.0
+    if pace == "whole":
+        return float(span)
+    return min(float(span), MOVE_SECS[pace])
+
+
+def zoom_value(z, t, span):
+    """THE function of time: a zoom's scale `t` seconds into its stretch of `span` seconds on the reel. 1.0 at the
+    start of a move, the amount from the move's end on. The page's preview draws this; CapCut gets points on it."""
+    end = zoom_amount(z)
+    move = zoom_move(z, span)
+    if move <= 0:
+        return end
+    return 1.0 + (end - 1.0) * ease(t / move)
 BIG = 10 ** 12                                           # ours: no word number, photo number or second is ever larger
 
 # hers: a sentence never ends on one of these (the word plainly runs on: "the shoot for / Aurora's family")
@@ -195,7 +259,8 @@ def kept(rec):
 
 def zooms(rec):
     """Hers: zooms as word ranges [{"a", "b", "kind": "punch" | "zoom"}]. Older records kept one per sentence
-    ("moves"), read only when there are no zooms."""
+    ("moves"), read only when there are no zooms. Ours: "amount" and "pace" come along only when they are set to
+    something other than what a zoom has by itself, so a zoom nobody set reads exactly as it always did."""
     rec = _d(rec)
     z = []
     for x in _list(rec, "zooms"):
@@ -204,7 +269,13 @@ def zooms(rec):
         a, b = _whole(x.get("a")), _whole(x.get("b"))
         if a is None or b is None:
             continue
-        z.append({"a": a, "b": b, "kind": x["kind"]})
+        r = {"a": a, "b": b, "kind": x["kind"]}
+        am, pc = x.get("amount"), x.get("pace")
+        if isinstance(am, str) and am in ZOOM_AMOUNT[r["kind"]] and am != AMOUNT_DEFAULT:
+            r["amount"] = am
+        if isinstance(pc, str) and pc in ZOOM_PACE[r["kind"]] and pc != PACE_DEFAULT[r["kind"]]:
+            r["pace"] = pc
+        z.append(r)
     moves = rec.get("moves")
     if not z and isinstance(moves, dict) and moves:
         sents = _list(rec, "sentences")

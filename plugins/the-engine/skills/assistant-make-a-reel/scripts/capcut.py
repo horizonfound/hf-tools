@@ -48,6 +48,7 @@ import argparse
 import copy
 import errno
 import json
+import math
 import os
 import re
 import shutil
@@ -62,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "studio-m
 import pictures  # noqa: E402  (small pictures and a photo's size, on a Mac or a PC)
 import sound  # noqa: E402  (a song's length, on a Mac or a PC)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
+import talking  # noqa: E402  (a talking reel's arithmetic: how much and how fast a zoom moves, and its one curve)
 this_computer.utf8_output()
 
 HERE = Path(__file__).resolve().parent
@@ -623,7 +625,7 @@ def build(plan, parts, platform):
 #      "video": {"path", "w", "h" (as it is SHOWN: a phone video held upright is stored turned), "length"},
 #      "pieces": [{"from", "to" (seconds in the video), "speed", "zoom" (a place in "zooms" or None),
 #                  "at", "dur" (seconds on the reel)}, …]                            talking.pieces(), in play order
-#      "zooms": [{"a", "b", "kind": "punch" | "zoom"}],
+#      "zooms": [{"a", "b", "kind": "punch" | "zoom", and only when set: "amount", "pace"}],   talking.zooms()
 #      "shots": [{"at", "dur" (on the reel), "spot": "full" | "pip" | "center" | "corner",
 #                 "pos": {x, y, w} or None, "me": {x, y, w} or None,
 #                 "photos": [{"path", "w", "h"}, …]  or  "video": {"path", "w", "h", "length", "from"}}, …],
@@ -638,8 +640,8 @@ def build(plan, parts, platform):
 # exactly. A sped-up piece shows its frame length times its speed of the video (one rule, for the main piece and
 # its corner copy). A piece differs from hers by at most half a frame.
 
-PUNCH = 1.15                # hers: a punch in is the piece at 1.15
-ZOOM_TO = 1.12              # hers: a slow zoom goes from 1.0 to 1.12 across its words
+PUNCH = talking.ZOOM_AMOUNT["punch"]["medium"]      # hers: a punch in is the piece at 1.15 (Medium; talking.ZOOM_AMOUNT)
+ZOOM_TO = talking.ZOOM_AMOUNT["zoom"]["medium"]     # hers: a slow zoom goes from 1.0 to 1.12 across its words (Medium)
 ME_DEFAULT = {"x": (50 + CANVAS[0] * 0.36 / 2) / CANVAS[0],          # hers: them, small, bottom left
               "y": (CANVAS[1] - 60 - CANVAS[1] * 0.36 / 2) / CANVAS[1], "w": 0.36}
 CAP_DEFAULT = {"x": 0.5, "y": 0.71}                                   # hers: captions low in the middle
@@ -653,6 +655,15 @@ SLACK = 1e-3                # hers: 1 ms of slack when asking whether a piece li
 # "video" stays. As hers, and on the owners' list: two separate slow zooms side by side snap back to 1.0 at the
 # cut, and a short stretch makes the fixed 12% look faster.
 ZOOM_CLOCK = "video"
+# A moving zoom EASES (Dustin, Nov 13: the steady one felt "robotic"): slow, quicker, slow again, on the one curve
+# talking.ease. CapCut's own curve fields are unproven from outside, so the curve is written as several ordinary
+# straight-line keyframes of the kind above, a point about every ZOOM_STEP seconds of the move, never fewer than
+# ZOOM_MIN_STEPS + 1 points for a whole move nor more than ZOOM_MAX_STEPS + 1. The points are counted across the
+# WHOLE move, so a zoom cut into pieces (a closed pause, a split, a change of speed, a joined run of clips) is
+# still one curve: each piece starts on the value the one before ended on. NOBODY HAS WATCHED ONE IN CAPCUT YET.
+ZOOM_STEP = 0.15
+ZOOM_MIN_STEPS = 4
+ZOOM_MAX_STEPS = 40
 
 
 def fit_scale(w, h):
@@ -719,16 +730,45 @@ def _zoom_times(source, target):
     return source["start"], source["start"] + source["duration"]
 
 
-def zoom_keyframes(P, t0, t1, v0, v1):
-    """A slow zoom on one clip: CapCut's scale keyframes, v0 at t0 and v1 at t1, in a straight line (hers; the
-    piece is typed from her field list, see parts.json's _about)."""
+def zoom_keyframes(P, t0, t1, v0, v1, between=()):
+    """A zoom on one clip: CapCut's scale keyframes, v0 at t0 and v1 at t1, a straight line from each to the next
+    (hers; the piece is typed from her field list, see parts.json's _about). `between` is more (time, value)
+    points of the same kind, in order: how an eased zoom is written (see ZOOM_STEP)."""
     prop = copy.deepcopy(P["scale_keyframe"]["property"])
     prop["id"] = uid()
-    for t, v in ((t0, v0), (t1, v1)):
+    for t, v in [(t0, v0)] + list(between) + [(t1, v1)]:
         k = copy.deepcopy(P["scale_keyframe"]["keyframe"])
         k.update({"id": uid(), "time_offset": int(t), "values": [v]})
         prop["keyframe_list"].append(k)
     return [prop]
+
+
+def zoom_move_frames(z, span, fps):
+    """How many frames a zoom's move lasts, of the `span` frames its whole stretch has on the reel: 0 for a punch
+    in that is simply closer (no move), else at least 1 (talking.zoom_move, on the frame grid)."""
+    secs = talking.zoom_move(z, span / fps)
+    if secs <= 0:
+        return 0
+    return max(1, min(int(span), int(round(secs * fps))))
+
+
+def zoom_points(za, move, a, b, fps):
+    """The frames a piece's zoom keyframes sit on. The piece runs a..b on the reel; the zoom's move starts at
+    frame za and lasts `move` frames. Always a and b; between them the points of the WHOLE move's own grid (so
+    every piece of one zoom is cut from the same curve), and the frame the move ends on, after which it holds."""
+    steps = max(ZOOM_MIN_STEPS, min(ZOOM_MAX_STEPS, int(math.ceil(move / fps / ZOOM_STEP))))
+    steps = max(1, min(steps, move))
+    grid = {za + int(round(i * move / steps)) for i in range(steps + 1)}
+    return sorted({a, b} | {f for f in grid if a < f < b})
+
+
+def zoom_scale(z, f, za, move):
+    """A zoom's scale at reel frame f, before the video's own fill: 1.0 where its move starts (frame za), the
+    amount from the move's end on, and talking.ease between."""
+    end = talking.zoom_amount(z)
+    if move <= 0 or f >= za + move:
+        return end
+    return 1.0 + (end - 1.0) * talking.ease((f - za) / move)
 
 
 def overlay_track(P, segs, k):
@@ -846,15 +886,20 @@ def build_talking(plan, parts, platform):
         _set_speed(seg, mats, sp)
         zi = p.get("zoom")
         z = zooms[zi] if type(zi) is int and 0 <= zi < len(zooms) and isinstance(zooms[zi], dict) else None
-        if z and z.get("kind") == "punch":
-            s = round(fill * PUNCH, 6)
-            seg["clip"]["scale"] = {"x": s, "y": s}
-        elif z and z.get("kind") == "zoom":            # 1.0 to 1.12 across the whole zoom, piece by piece
+        if z and z.get("kind") in ("punch", "zoom"):
+            # how much and how fast are the zoom's own (talking.ZOOM_AMOUNT); a zoom nobody set is hers: a punch
+            # in simply sits at 1.15, a slow zoom runs 1.0 to 1.12 across its whole stretch, piece by piece
             za, zb = frames(zi)
-            v0 = round(fill * (1.0 + (ZOOM_TO - 1.0) * (a - za) / max(1, zb - za)), 6)
-            v1 = round(fill * (1.0 + (ZOOM_TO - 1.0) * (b - za) / max(1, zb - za)), 6)
-            seg["clip"]["scale"] = {"x": v0, "y": v0}
-            seg["common_keyframes"] = zoom_keyframes(P, *_zoom_times(source, target), v0, v1)
+            move = zoom_move_frames(z, zb - za, fps)
+            if move <= 0 or a >= za + move:            # no move in this piece: it sits at the amount, no keyframes
+                s = round(fill * talking.zoom_amount(z), 6)
+                seg["clip"]["scale"] = {"x": s, "y": s}
+            else:                                      # the eased move, as points on its one curve
+                t_a, t_b = _zoom_times(source, target)
+                pts = [(t_a + int(round((t_b - t_a) * (f - a) / max(1, b - a))), round(fill * zoom_scale(z, f, za, move), 6))
+                       for f in zoom_points(za, move, a, b, fps)]
+                seg["clip"]["scale"] = {"x": pts[0][1], "y": pts[0][1]}
+                seg["common_keyframes"] = zoom_keyframes(P, t_a, t_b, pts[0][1], pts[-1][1], pts[1:-1])
         main["segments"].append(seg)
     d["tracks"].append(main)
 

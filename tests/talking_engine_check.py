@@ -246,6 +246,36 @@ check("zooms: punch and zoom only, as {a, b, kind}", z == [{"a": 0, "b": 1, "kin
 old = {"sentences": [[0, 1], [2, 4]], "moves": {"1": "zoom", "0": "", "7": "punch"}}
 check("zooms: v23's moves (one per sentence) are read when there are no zooms", T.zooms(old) == [{"a": 2, "b": 4, "kind": "zoom"}], T.zooms(old))
 check("zooms: ... and not when there are", T.zooms(dict(old, zooms=[{"a": 0, "b": 0, "kind": "punch"}])) == [{"a": 0, "b": 0, "kind": "punch"}])
+# how much and how fast (Dustin, Nov 13)
+z = T.zooms({"zooms": [{"a": 0, "b": 1, "kind": "punch", "amount": "strong", "pace": "push"}, {"a": 2, "b": 3, "kind": "zoom", "pace": "quick", "amount": "subtle"},
+                       {"a": 4, "b": 5, "kind": "zoom", "amount": "medium", "pace": "whole"}, {"a": 6, "b": 7, "kind": "punch", "amount": "huge", "pace": "quick"},
+                       {"a": 8, "b": 9, "kind": "zoom", "amount": 2, "pace": "instant"}]})
+check("zooms: an amount and a pace come along only when they are one of that kind's own and not what a zoom has by itself",
+      z == [{"a": 0, "b": 1, "kind": "punch", "amount": "strong", "pace": "push"}, {"a": 2, "b": 3, "kind": "zoom", "amount": "subtle", "pace": "quick"},
+            {"a": 4, "b": 5, "kind": "zoom"}, {"a": 6, "b": 7, "kind": "punch"}, {"a": 8, "b": 9, "kind": "zoom"}]
+      and [list(x) for x in z[:2]] == [["a", "b", "kind", "amount", "pace"]] * 2, z)
+check("zooms: Medium is hers exactly, and is what a zoom with no amount has; the other amounts are each kind's own",
+      T.zoom_amount({"kind": "zoom"}) == 1.12 and T.zoom_amount({"kind": "punch"}) == 1.15 and T.zoom_amount({"kind": "zoom", "amount": "subtle"}) == 1.06
+      and T.zoom_amount({"kind": "zoom", "amount": "strong"}) == 1.2 and T.zoom_amount({"kind": "punch", "amount": "subtle"}) == 1.075
+      and T.zoom_amount({"kind": "punch", "amount": "strong"}) == 1.24 and T.zoom_amount({"kind": "punch", "amount": "huge"}) == 1.15 and T.zoom_amount(None) == 1.12)
+check("zooms: a pace is the kind's own or the kind's default",
+      [T.zoom_pace(x) for x in ({"kind": "zoom"}, {"kind": "punch"}, {"kind": "zoom", "pace": "quick"}, {"kind": "punch", "pace": "push"},
+                                {"kind": "zoom", "pace": "push"}, {"kind": "punch", "pace": "whole"}, {"kind": "zoom", "pace": 3})]
+      == ["whole", "instant", "quick", "push", "whole", "instant", "whole"])
+check("zooms: how long the move lasts: the whole stretch; a second (Quick) or 0.35 s (Quick push), or the stretch if shorter; none for Instant",
+      [T.zoom_move(x, sp) for x, sp in (({"kind": "zoom"}, 7.5), ({"kind": "zoom", "pace": "quick"}, 7.5), ({"kind": "zoom", "pace": "quick"}, 0.4),
+                                         ({"kind": "punch", "pace": "push"}, 7.5), ({"kind": "punch", "pace": "push"}, 0.2), ({"kind": "punch"}, 7.5))]
+      == [7.5, 1.0, 0.4, 0.35, 0.2, 0.0])
+ZQ = {"kind": "zoom", "pace": "quick", "amount": "strong"}
+vals = [T.zoom_value({"kind": "zoom"}, t / 10.0, 4.0) for t in range(41)]
+check("the function of time: a slow zoom starts at 1.0 and ends on its amount exactly, is half way at the half, never goes back, "
+      "and is NOT steady (slower than a straight line at first, quicker in the middle)",
+      vals[0] == 1.0 and vals[40] == 1.12 and abs(vals[20] - 1.06) < 1e-12 and all(a <= b for a, b in zip(vals, vals[1:]))
+      and vals[4] < 1.0 + 0.12 * 0.1 - 0.005 and (vals[21] - vals[19]) > 1.4 * 0.12 * 0.05 and T.ease(0.25) == 0.15625, (vals[4], vals[20]))
+check("... Quick moves in its first second and then holds; Quick push in 0.35 s and then holds; Instant is its amount all along",
+      T.zoom_value(ZQ, 0, 4.0) == 1.0 and T.zoom_value(ZQ, 0.5, 4.0) == 1.1 and T.zoom_value(ZQ, 1.0, 4.0) == 1.2 == T.zoom_value(ZQ, 3.9, 4.0)
+      and T.zoom_value({"kind": "punch", "pace": "push"}, 0, 3.0) == 1.0 and T.zoom_value({"kind": "punch", "pace": "push"}, 0.35, 3.0) == 1.15
+      == T.zoom_value({"kind": "punch", "pace": "push"}, 2.9, 3.0) and T.zoom_value({"kind": "punch"}, 0, 3.0) == 1.15 == T.zoom_value({"kind": "punch"}, 3.0, 3.0))
 
 s = T.shots({"shots": [{"a": 3, "b": 4, "ns": [2, "7", "x", True], "spot": "behind"},
                        {"a": 0, "b": 1, "ns": [1], "spot": "top", "pos": {"x": 0.5, "y": 0.4, "w": 0.6}},

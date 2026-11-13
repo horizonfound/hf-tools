@@ -66,3 +66,7 @@ This needs a Mac (for `afconvert`) and ffmpeg with libmp3lame. The output differ
 ## A test clip
 
 `loud-tone-3s.mp4` (about 20 KB, added Nov 7) is a 3-second, 320 x 180 H.264 video with AAC sound, made on a Mac with AVFoundation by the same maker `tests/video_check.py` uses: three solid colours, one a second, and a synthetic tone that is quiet for 1.5 seconds and then loud. No camera, no person, nothing recorded. `tests/pc_video.py` reads its sound through `video.loudness` (Media Foundation on a PC, `afconvert` on a Mac) and checks that the loud half is found and that the video is never copied to read it.
+
+## A talking reel's zooms, as they were (added Nov 13)
+
+`talking-zoom-before.json` is what `capcut.build_talking` made of the zoom checks' own fixed pretend plan (`zoom_plan` in `tests/talking_capcut_check.py`) at commit 2b7c5c6, before a zoom could carry an amount and a pace and before a moving zoom eased: the whole main layer for two punch ins nobody set (which must come out the same for ever, ids aside), and each slow-zoom piece's two steady keyframes (whose first and last still hold). Numbers only; no file, name or photo of anyone's.

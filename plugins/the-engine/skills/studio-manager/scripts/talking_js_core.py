@@ -22,6 +22,8 @@ It makes window.Talk (T below), which holds:
                  a change this page did not make (her Undo would wipe the assistant's cut with one press).
   the time sums  hers, number for number: P, total, pieceAt (0.02 s before a piece), reelAt, srcAt (ends at
                  to - 0.02), and the word ranges: cutSet, toRanges, setRange, zoomOf, speedOf, wordsOf
+  a zoom's move  ours (Dustin, Nov 13): T.ZS (the engine's amounts, paces and seconds), T.zoomAt(i), T.zoomOut(z)
+                 (a zoom as a save sends it), T.zoomAmount(z), T.zoomPace(z), T.ease(x), T.zoomValue(z, t, span)
   small things   toast, copy (the older copy call first: the app's pane refuses the newer one), post, ask,
                  fill and rich (a line's blanks, always filled as TEXT), secs, sizeDock, summary
 
@@ -124,7 +126,29 @@ function setRange(list, a, b, extra){
   if (extra) out.push(same(extra, {a: a, b: b}));
   return out.sort(function(x, y){ return x.a - y.a; });
 }
-function zoomOf(i){ for (var k = 0; k < T.ZL.length; k++) if (i >= T.ZL[k].a && i <= T.ZL[k].b) return T.ZL[k].kind; return ''; }
+function zoomAt(i){ for (var k = 0; k < T.ZL.length; k++) if (i >= T.ZL[k].a && i <= T.ZL[k].b) return T.ZL[k]; return null; }
+function zoomOf(i){ var z = zoomAt(i); return z ? z.kind : ''; }
+// ---- how much and how fast a zoom moves (ours, Dustin, Nov 13). Every number is the engine's own (talking.py's
+// ZOOM_AMOUNT, ZOOM_PACE, MOVE_SECS, sent with the page as DATA.zoom); the curve is talking.ease, line for line.
+var ZS = DATA.zoom;
+function has(o, k){ return !!o && typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k); }
+// a zoom as a save sends it: hers ({a, b, kind}), with how much and how fast only when they were chosen
+function zoomOut(z){
+  var o = {a: z.a, b: z.b, kind: z.kind};
+  if (has(ZS.amount[z.kind], z.amount) && z.amount !== ZS.amountDefault) o.amount = z.amount;
+  if ((ZS.pace[z.kind] || []).indexOf(z.pace) >= 0 && z.pace !== ZS.paceDefault[z.kind]) o.pace = z.pace;
+  return o;
+}
+function zoomAmountName(z){ return has(ZS.amount[z.kind], z.amount) ? z.amount : ZS.amountDefault; }
+function zoomPace(z){ return (ZS.pace[z.kind] || []).indexOf(z.pace) >= 0 ? z.pace : ZS.paceDefault[z.kind]; }
+function zoomAmount(z){ return (ZS.amount[z.kind] || ZS.amount.zoom)[zoomAmountName(z)]; }
+function ease(x){ x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }
+function zoomMove(z, span){ var p = zoomPace(z); return p === 'instant' ? 0 : p === 'whole' ? span : Math.min(span, ZS.secs[p]); }
+// THE function of time (talking.zoom_value): a zoom's scale t seconds into its stretch of `span` seconds on the reel
+function zoomValue(z, t, span){
+  var end = zoomAmount(z), mv = zoomMove(z, span);
+  return mv <= 0 ? end : 1 + (end - 1) * ease(t / mv);
+}
 function speedOf(i){ var s = T.REC.speeds || []; for (var k = 0; k < s.length; k++) if (i >= s[k].a && i <= s[k].b) return s[k].v; return 1; }
 function wordsOf(a, b, max){
   var t = (T.REC.words || []).slice(a, b + 1).map(function(w){ return w.w; }).join(' ').replace(/ '/g, "'");
@@ -290,6 +314,8 @@ $('tlRedo').addEventListener('click', redo);
 T.fill = fill; T.rich = rich; T.toast = toast; T.copy = copy; T.ask = ask; T.post = post;
 T.P = P; T.total = total; T.secs = secs; T.pieceAt = pieceAt; T.reelAt = reelAt; T.srcAt = srcAt;
 T.cutSet = cutSet; T.toRanges = toRanges; T.setRange = setRange; T.zoomOf = zoomOf; T.speedOf = speedOf; T.wordsOf = wordsOf;
+T.ZS = ZS; T.zoomAt = zoomAt; T.zoomOut = zoomOut; T.zoomAmountName = zoomAmountName; T.zoomPace = zoomPace; T.zoomAmount = zoomAmount;
+T.ease = ease; T.zoomMove = zoomMove; T.zoomValue = zoomValue;
 T.snap = snap; T.save = save; T.undo = undo; T.redo = redo; T.forget = forget; T.undoButtons = undoButtons;
 T.summary = summary; T.sizeDock = sizeDock; T.apply = apply; T.poll = poll; T.quiet = quiet;
 T.start = function(){

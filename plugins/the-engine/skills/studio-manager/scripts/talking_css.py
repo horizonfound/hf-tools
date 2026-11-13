@@ -256,6 +256,18 @@ html{scroll-padding-bottom:calc(var(--dock) + 12px)}
 .tl-mi:focus{outline:none}
 .tl-mi:focus-visible{outline:2px solid var(--coral-2);outline-offset:-2px}
 .tl-x{user-select:none;-webkit-user-select:none}
+/* How much and How fast, under the Zoom menu's items (Dustin, Nov 13): two rows of joined choices */
+.tl-mx{border-top:1px solid var(--line);margin-top:.3rem;padding:.5rem .5rem .35rem}
+.tl-mx[hidden],.tl-mg[hidden]{display:none}
+.tl-mg+.tl-mg{margin-top:.5rem}
+.tl-mg .lb{display:block;font:600 11.5px/1.2 var(--sans);color:var(--ink-2);margin:0 0 .28rem .1rem}
+.tl-seg{display:flex;border-radius:8px;box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.tl-so{flex:1 1 0;min-width:0;text-align:center;padding:.42rem .5rem;font:600 12.5px/1.2 var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;border-left:1px solid var(--line);user-select:none;-webkit-user-select:none}
+.tl-so:first-child{border-left:0}
+.tl-so:hover,.tl-so:focus-visible{background:#F3F1EB}
+.tl-so[aria-checked=true]{background:var(--ink);color:#fff}
+.tl-so:focus{outline:none}
+.tl-so:focus-visible{outline:2px solid var(--coral-2);outline-offset:-2px}
 """
 
 

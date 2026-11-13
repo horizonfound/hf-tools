@@ -1,0 +1,752 @@
+{
+ "_about": "The main layer capcut.build_talking made of the zoom checks' fixed pretend plan BEFORE zooms got an amount, a pace and an eased move (Nov 13, 2026; commit 2b7c5c6), ids replaced by their order. punch_in: two punch ins with no settings, the whole layer, which must come out the same for ever. slow_zoom_ends: for each piece of the two slow zooms, its scale and its two steady keyframes [time, value] as they were; the first and last still hold, the hand-overs between pieces now sit on the eased curve. Made by tests/talking_capcut_check.py's own plan (zoom_plan).",
+ "punch_in": {
+  "attribute": 0,
+  "flag": 0,
+  "id": "id-0",
+  "is_default_name": true,
+  "name": "",
+  "segments": [
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.0,
+      "y": 1.0
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-1",
+     "id-2",
+     "id-3",
+     "id-4",
+     "id-5",
+     "id-6",
+     "id-7"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-8",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 1000000,
+     "start": 1000000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 1000000,
+     "start": 0
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.15,
+      "y": 1.15
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-10",
+     "id-11",
+     "id-12",
+     "id-13",
+     "id-14",
+     "id-15",
+     "id-16"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-17",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 1300000,
+     "start": 2000000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 1300000,
+     "start": 1000000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.15,
+      "y": 1.15
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-18",
+     "id-19",
+     "id-20",
+     "id-21",
+     "id-22",
+     "id-23",
+     "id-24"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-25",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 1500000,
+     "start": 3300000
+    },
+    "speed": 1.5,
+    "state": 0,
+    "target_timerange": {
+     "duration": 1000000,
+     "start": 2300000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.15,
+      "y": 1.15
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-26",
+     "id-27",
+     "id-28",
+     "id-29",
+     "id-30",
+     "id-31",
+     "id-32"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-33",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 1700000,
+     "start": 6000000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 1700000,
+     "start": 3300000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.0,
+      "y": 1.0
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-34",
+     "id-35",
+     "id-36",
+     "id-37",
+     "id-38",
+     "id-39",
+     "id-40"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-41",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 700000,
+     "start": 7700000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 700000,
+     "start": 5000000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.15,
+      "y": 1.15
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-42",
+     "id-43",
+     "id-44",
+     "id-45",
+     "id-46",
+     "id-47",
+     "id-48"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-49",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 2600000,
+     "start": 9000000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 2600000,
+     "start": 5700000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   },
+   {
+    "caption_info": null,
+    "cartoon": false,
+    "clip": {
+     "alpha": 1.0,
+     "flip": {
+      "horizontal": false,
+      "vertical": false
+     },
+     "rotation": 0.0,
+     "scale": {
+      "x": 1.0,
+      "y": 1.0
+     },
+     "transform": {
+      "x": 0.0,
+      "y": 0.0
+     }
+    },
+    "color_correct_alg_result": "",
+    "common_keyframes": [],
+    "desc": "true",
+    "digital_human_template_group_id": "",
+    "enable_adjust": true,
+    "enable_adjust_mask": false,
+    "enable_color_adjust_pro": false,
+    "enable_color_correct_adjust": false,
+    "enable_color_curves": true,
+    "enable_color_match_adjust": false,
+    "enable_color_wheels": true,
+    "enable_hsl": false,
+    "enable_hsl_curves": true,
+    "enable_lut": true,
+    "enable_mask_shadow": false,
+    "enable_mask_stroke": false,
+    "enable_smart_color_adjust": false,
+    "enable_video_mask": true,
+    "extra_material_refs": [
+     "id-50",
+     "id-51",
+     "id-52",
+     "id-53",
+     "id-54",
+     "id-55",
+     "id-56"
+    ],
+    "group_id": "",
+    "hdr_settings": {
+     "intensity": 1.0,
+     "mode": 1,
+     "nits": 1000
+    },
+    "hdr_vivid_settings": null,
+    "id": "id-57",
+    "intensifies_audio": false,
+    "is_loop": false,
+    "is_placeholder": false,
+    "is_tone_modify": false,
+    "keyframe_refs": [],
+    "last_nonzero_volume": 1.0,
+    "lyric_keyframes": null,
+    "material_id": "id-9",
+    "raw_segment_id": "",
+    "render_index": 0,
+    "render_timerange": {
+     "duration": 0,
+     "start": 0
+    },
+    "responsive_layout": {
+     "enable": false,
+     "horizontal_pos_layout": 0,
+     "size_layout": 0,
+     "target_follow": "",
+     "vertical_pos_layout": 0
+    },
+    "reverse": false,
+    "segment_color_tag": "",
+    "source": "segmentsourcenormal",
+    "source_timerange": {
+     "duration": 900000,
+     "start": 11600000
+    },
+    "speed": 1.0,
+    "state": 0,
+    "target_timerange": {
+     "duration": 900000,
+     "start": 8300000
+    },
+    "template_id": "",
+    "template_scene": "default",
+    "track_attribute": 0,
+    "track_render_index": 0,
+    "uniform_scale": {
+     "on": true,
+     "value": 1.0
+    },
+    "visible": true,
+    "volume": 1.0
+   }
+  ],
+  "type": "video"
+ },
+ "slow_zoom_ends": [
+  [
+   1.0,
+   [
+    2000000,
+    1.0
+   ],
+   [
+    3300000,
+    1.039
+   ]
+  ],
+  [
+   1.039,
+   [
+    3300000,
+    1.039
+   ],
+   [
+    4800000,
+    1.069
+   ]
+  ],
+  [
+   1.069,
+   [
+    6000000,
+    1.069
+   ],
+   [
+    7700000,
+    1.12
+   ]
+  ],
+  [
+   1.0,
+   [
+    9000000,
+    1.0
+   ],
+   [
+    11600000,
+    1.12
+   ]
+  ]
+ ]
+}

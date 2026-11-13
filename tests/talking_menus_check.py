@@ -35,6 +35,10 @@ On the real page, in a hidden Chrome, with a real mouse and real keys:
     or the keyboard is on it;
   - everything is text (no element made from a string), no page error, nothing asked of the internet.
 
+Since Nov 13 also the two rows under the Zoom menu's items, How much and How fast (shown only with a zoom, the lit
+choice, one save and one Undo, the menu staying open, several clips, the keys, phone widths), and the preview's
+zoom checked value for value against the engine's function of time.
+
 What it never does: touch the real ~/.studio (STUDIO_HOME is a scratch folder; the real one is listed before and
 after), start the real transcriber, write into CapCut, or play a video. The page server (port 9670 up) and the
 hidden Chrome are this test's own and are stopped at the end.
@@ -42,6 +46,7 @@ hidden Chrome are this test's own and are stopped at the end.
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only.
 """
 import argparse
+import re
 import html as _html
 import json
 import shutil
@@ -119,6 +124,19 @@ def run_python(s):
     case("the bar the page carries: after Delete clip a thin separator, then a place each for the Speed and the Zoom menu, then Undo; no bare word Speed or Zoom between them",
          a > 0 and b > a and between == "<span class='tl-sep'></span><span class='tl-group' id='tlSpeed'></span><span class='tl-group' id='tlZoom'></span><span class='tl-ur'>"
          and "id='tlRedo'" in page[b:page.find("</span>", b)], between[:300])
+    rows = {"how_much": "How much", "amt_subtle": "Subtle", "amt_medium": "Medium", "amt_strong": "Strong", "how_fast": "How fast",
+            "pace_quick": "Quick", "pace_whole": "Whole clip", "pace_instant": "Instant", "pace_push": "Quick push"}
+    case("the nine words of How much and How fast (Nov 13) are OURS, each with its reason, none a key of hers, none says \"Claude\"",
+         all(k in tp.OUR_WORDS and k not in tp.WORDS and tp.OUR_WORDS[k][0] == v and len(tp.OUR_WORDS[k][1]) > 10 and "claude" not in v.lower() for k, v in rows.items())
+         and all(W[k] == v for k, v in rows.items()), [tp.OUR_WORDS.get(k) for k in rows])
+    eng = s.TR._engine()
+    m = re.search(r'"zoom": (\{.*?\}\}), "undoSteps"', page)
+    sent = json.loads(m.group(1)) if m else None
+    case("the page is handed the engine's own numbers for how much and how fast (no number of them is written in the page's script)",
+         sent == {"amount": eng.ZOOM_AMOUNT, "amounts": list(eng.ZOOM_AMOUNTS), "amountDefault": "medium",
+                  "pace": {"zoom": ["quick", "whole"], "punch": ["instant", "push"]}, "paceDefault": {"zoom": "whole", "punch": "instant"}, "secs": eng.MOVE_SECS}
+         and not any(n in "\n".join(ln.split("//")[0] for ln in (tp.talking_js_preview.JS + tp.talking_js_core.JS + tp.talking_js_timeline.JS).splitlines())
+                     for n in ("1.15", "1.12", "1.06", "1.075", "1.24")), sent)
     js = tp.talking_js_timeline.JS
     code = "\n".join(x for x in js.splitlines() if not x.lstrip().startswith("//"))      # the script without its notes
     case("...the page carries no chip for a speed or a zoom on the timeline any more, and the menus are made of elements and text (the timeline's script never writes HTML from a string)",
@@ -516,6 +534,257 @@ def run_page(c, s):
     c.key("Escape")
     arrow = c.js("parseFloat(getComputedStyle(document.querySelector('#tlZoomBtn .car')).fontSize)")
     case("the little arrow that says a list opens is drawn at 14 px or more (it was 10, and read as a dot)", arrow >= 14, arrow)
+
+
+    # ================= How much and How fast: two rows under the Zoom menu's items (Dustin, Nov 13) =================
+    ROWS = r"""(function(){
+      var l = document.getElementById('tlZoomList'), more = l.querySelector('.tl-mx'), de = document.documentElement;
+      var vis = function(e){ return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; };
+      var last = Array.from(l.querySelectorAll('.tl-mi')).pop().getBoundingClientRect(), q = l.getBoundingClientRect();
+      return {shown: vis(more), line: getComputedStyle(more).borderTopWidth, under: vis(more) && more.getBoundingClientRect().top >= last.bottom - 0.5,
+              box: [q.left, q.top, q.right, q.bottom], win: [de.clientWidth, de.clientHeight], side: de.scrollWidth - de.clientWidth,
+              up: window.Talk.tl().menuUp, btnTop: document.getElementById('tlZoomBtn').getBoundingClientRect().top,
+              focus: document.activeElement ? (document.activeElement.getAttribute('data-amount') || document.activeElement.getAttribute('data-pace') || document.activeElement.getAttribute('data-z') || document.activeElement.id) : null,
+              groups: Array.from(l.querySelectorAll('[role=radiogroup]')).filter(vis).map(function(g){
+                return {name: g.getAttribute('aria-label'), label: g.querySelector('.lb').textContent, labelHidden: g.querySelector('.lb').getAttribute('aria-hidden'),
+                        opts: Array.from(g.querySelectorAll('[role=radio]')).map(function(d){
+                          var r = d.getBoundingClientRect(), e = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+                          return {t: d.textContent, v: d.getAttribute('data-amount') || d.getAttribute('data-pace'), on: d.getAttribute('aria-checked') === 'true',
+                                  bg: getComputedStyle(d).backgroundColor, seen: e === d, tab: d.tabIndex, top: r.top, left: r.left, right: r.right}; })}; })};
+    })()"""
+
+    def rows():
+        return c.js(ROWS)
+
+    def lit(g):
+        return [o["v"] for o in g["opts"] if o["on"]]
+
+    def radio(v):
+        return '#tlZoomList [role=radio][data-amount="%s"], #tlZoomList [role=radio][data-pace="%s"]' % (v, v)
+
+    def in_window(r):
+        x0, y0, x1, y1 = r["box"]
+        return x0 >= 0 and y0 >= 0 and x1 <= r["win"][0] + 0.5 and y1 <= r["win"][1] + 0.5
+
+    case("the page holds the engine's own numbers for a zoom (the same table the CapCut builder reads)",
+         c.js("window.Talk.ZS.amount") == s.TR._engine().ZOOM_AMOUNT and c.js("window.Talk.ZS.secs") == s.TR._engine().MOVE_SECS)
+
+    # with None: no rows
+    open_it()
+    click(3)
+    open_menu("tlZoom")
+    r = rows()
+    case("a clip with no zoom: the Zoom menu is its three items and nothing more (no How much, no How fast, no hairline)",
+         not r["shown"] and r["groups"] == [] and menu("tlZoom")["texts"] == [W["move_none"], W["punch"], W["slow_zoom"]], r)
+    c.key("ArrowDown"); c.key("ArrowDown"); c.key("ArrowDown")
+    case("...and the arrows walk only those three (three presses down from None are back on None)", rows()["focus"] == "" and menu("tlZoom")["focus"] == 0, rows()["focus"])
+    c.key("Escape")
+
+    # a slow zoom nobody set
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom"}])
+    click(3)
+    shape0 = c.js(SHAPE)
+    open_menu("tlZoom")
+    r = rows()
+    g = r["groups"]
+    case("a clip with a Slow zoom: under the three items and a hairline, two rows, How much (Subtle | Medium | Strong) and How fast (Quick | Whole clip)",
+         r["shown"] and r["under"] and r["line"] == "1px" and [x["name"] for x in g] == ["How much", "How fast"]
+         and [[o["t"] for o in x["opts"]] for x in g] == [["Subtle", "Medium", "Strong"], ["Quick", "Whole clip"]]
+         and [[o["v"] for o in x["opts"]] for x in g] == [["subtle", "medium", "strong"], ["quick", "whole"]], g)
+    case("...what a zoom has by itself is lit, and only that: Medium and Whole clip (filled, like a button that is on)",
+         lit(g[0]) == ["medium"] and lit(g[1]) == ["whole"] and all((o["bg"] == INK) == o["on"] for x in g for o in x["opts"]), [(o["v"], o["bg"]) for x in g for o in x["opts"]])
+    case("...a screen reader hears each row as a named radio group (the row's name once: the words drawn are hidden from it), its choices radios with checked or not",
+         c.js("Array.from(document.querySelectorAll('#tlZoomList [role=radiogroup]')).filter(function(g){ return !g.hidden; }).map(function(g){ return [g.getAttribute('aria-label'), g.querySelector('.lb').getAttribute('aria-hidden'), "
+              "Array.from(g.querySelectorAll('[role=radio]')).map(function(d){ return d.getAttribute('aria-checked'); }).join()]; })")
+         == [["How much", "true", "false,true,false"], ["How fast", "true", "true,false".replace("true,false", "false,true")]])
+    case("...each choice of a row sits beside the next on one line (joined), nothing lies over any of them, and the list is whole inside the window, above its button",
+         all(len({round(o["top"]) for o in x["opts"]}) == 1 and all(abs(a["right"] - b["left"]) < 1.5 for a, b in zip(x["opts"], x["opts"][1:])) and all(o["seen"] for o in x["opts"]) for x in g)
+         and in_window(r) and r["up"] is True and r["box"][3] <= r["btnTop"], (r["box"], r["btnTop"]))
+    n0 = multi()["n"]
+    sent = press(lambda: c.click(radio("strong"), check=False))
+    r = rows()
+    case("choosing Strong saves at once, in ONE save that says only that (the zoom with its amount; nothing else is added)",
+         [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"zoom","amount":"strong"}]}}']
+         and rec().get("zooms") == [{"a": 3, "b": 5, "kind": "zoom", "amount": "strong"}], sent)
+    case("...the menu STAYS OPEN with Strong lit now (and Medium not), the keyboard still on Strong, and it is one step of Undo",
+         is_open() == "tlZoom" and lit(r["groups"][0]) == ["strong"] and lit(r["groups"][1]) == ["whole"] and r["focus"] == "strong" and multi()["n"] == [n0[0] + 1, 0], (is_open(), r["focus"], multi()["n"]))
+    sent = press(lambda: c.click(radio("quick"), check=False))
+    r = rows()
+    case("...so both can be set: Quick is one more save, the menu still open, Strong and Quick both lit",
+         [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"zoom","amount":"strong","pace":"quick"}]}}']
+         and is_open() == "tlZoom" and lit(r["groups"][0]) == ["strong"] and lit(r["groups"][1]) == ["quick"] and multi()["n"] == [n0[0] + 2, 0], (sent, is_open()))
+    case("...the Zoom button still reads \"Zoom: Slow zoom\" (the choice is not put in the button), and the bar is exactly where and what it was",
+         menu("tlZoom")["name"] == "Zoom: Slow zoom" and c.js(SHAPE) == shape0, (menu("tlZoom")["name"], c.js(SHAPE), shape0))
+    n = quiet(lambda: c.click(radio("quick"), check=False))
+    case("...a press on the choice it already has saves nothing and is no step of Undo; the menu stays open", n == 0 and is_open() == "tlZoom" and multi()["n"] == [n0[0] + 2, 0], n)
+    case("...the CapCut plan (built here, never written into CapCut) has that clip's zoom ending on 1.2, the Strong amount",
+         [x[2] for x in tm.zoom_values(s) if x[0] == 0] == [1.2] or max(x[3] for x in tm.zoom_values(s)) == 1.2, tm.zoom_values(s))
+    sent = press(lambda: c.click(radio("medium"), check=False))
+    case("choosing Medium again takes the amount out of the record (what a zoom has by itself is never written); Quick stays",
+         [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"zoom","pace":"quick"}]}}'] and lit(rows()["groups"][0]) == ["medium"], sent)
+    press(lambda: c.click(radio("whole"), check=False))
+    case("...and Whole clip again leaves the zoom exactly as a zoom nobody set: a, b and kind", json.dumps(rec().get("zooms")) == json.dumps([{"a": 3, "b": 5, "kind": "zoom"}]), rec().get("zooms"))
+    c.key("Escape")
+    press(lambda: c.click("#tlUndo"))
+    press(lambda: c.click("#tlUndo"))
+    case("Undo twice brings back Quick, then Strong with it: each choice was its own step", rec().get("zooms") == [{"a": 3, "b": 5, "kind": "zoom", "amount": "strong", "pace": "quick"}], rec().get("zooms"))
+
+    # the kinds: a punch in has its own How fast; a new kind starts as made; the same kind again keeps what it had
+    open_menu("tlZoom")
+    sent = press(lambda: c.click(item("tlZoom", 1), check=False))
+    case("choosing Punch in on a clip with a Strong, Quick slow zoom closes the menu, as ever, and the new punch in starts as made (no amount, no pace)",
+         is_open() is None and [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"punch"}]}}'], sent)
+    open_menu("tlZoom")
+    g = rows()["groups"]
+    case("a clip with a Punch in: How much is the same row, and How fast is Instant | Quick push, with Medium and Instant lit",
+         [x["name"] for x in g] == ["How much", "How fast"] and [o["t"] for o in g[1]["opts"]] == ["Instant", "Quick push"] and [o["v"] for o in g[1]["opts"]] == ["instant", "push"]
+         and lit(g[0]) == ["medium"] and lit(g[1]) == ["instant"], g)
+    press(lambda: c.click(radio("push"), check=False))
+    press(lambda: c.click(radio("subtle"), check=False))
+    case("...Quick push and Subtle are saved on the punch in", rec().get("zooms") == [{"a": 3, "b": 5, "kind": "punch", "amount": "subtle", "pace": "push"}], rec().get("zooms"))
+    n = quiet(lambda: c.click(item("tlZoom", 1), check=False))
+    case("...choosing Punch in again on that clip keeps what it has (Subtle, Quick push), and the menu closes",
+         rec().get("zooms") == [{"a": 3, "b": 5, "kind": "punch", "amount": "subtle", "pace": "push"}] and is_open() is None, (n, rec().get("zooms")))
+    open_menu("tlZoom")
+    press(lambda: c.click(item("tlZoom", 0), check=False))
+    open_menu("tlZoom")
+    case("...and None takes the zoom away, and the rows with it", rec().get("zooms") == [] and not rows()["shown"], rec().get("zooms"))
+    c.key("Escape")
+
+    # another clip's change leaves a zoom's settings alone
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom", "amount": "strong", "pace": "quick"}])
+    click(9)
+    open_menu("tlZoom")
+    press(lambda: c.click(item("tlZoom", 1), check=False))
+    case("a zoom on ANOTHER clip changes nothing of this one: the Strong, Quick slow zoom is saved back with both",
+         rec().get("zooms") == [{"a": 3, "b": 5, "kind": "zoom", "amount": "strong", "pace": "quick"}, {"a": 9, "b": 11, "kind": "punch"}], rec().get("zooms"))
+    press(lambda: c.js("document.querySelector('#script [data-move=\"zoom\"][data-k=\"5\"]').click()"))
+    case("...nor does a Move pressed under a sentence in the script, which makes a zoom as made (no amount, no pace)",
+         rec().get("zooms") == [{"a": 3, "b": 5, "kind": "zoom", "amount": "strong", "pace": "quick"}, {"a": 9, "b": 11, "kind": "punch"}, {"a": 15, "b": 17, "kind": "zoom"}], rec().get("zooms"))
+
+    # several clips
+    click(3)
+    click(9, meta=True)
+    open_menu("tlZoom")
+    g = rows()["groups"]
+    case("a Slow zoom and a Punch in picked together: How much shows with nothing lit (Strong and Medium disagree); How fast is not shown (its choices are not the same for the two)",
+         [x["name"] for x in g] == ["How much"] and lit(g[0]) == [], g)
+    sent = press(lambda: c.click(radio("subtle"), check=False))
+    g = rows()["groups"]
+    case("...choosing Subtle gives it to both picked zooms in ONE save, leaves the third zoom alone, and now Subtle is lit; the menu stays open, both clips stay picked",
+         len(sent) == 1 and rec().get("zooms") == [{"a": 3, "b": 5, "kind": "zoom", "amount": "subtle", "pace": "quick"}, {"a": 9, "b": 11, "kind": "punch", "amount": "subtle"},
+                                                    {"a": 15, "b": 17, "kind": "zoom"}]
+         and lit(g[0]) == ["subtle"] and is_open() == "tlZoom" and multi()["picked"] == [3, 9], (sent, rec().get("zooms")))
+    c.key("Escape")
+    click(3)
+    click(15, meta=True)
+    open_menu("tlZoom")
+    g = rows()["groups"]
+    case("two Slow zooms picked that differ in both: both rows show (they are one kind) and nothing is lit in either",
+         [x["name"] for x in g] == ["How much", "How fast"] and lit(g[0]) == [] and lit(g[1]) == [] and menu("tlZoom")["value"] == W["slow_zoom"], g)
+    press(lambda: c.click(radio("whole"), check=False))
+    g = rows()["groups"]
+    case("...Whole clip on both: lit, and the Quick is gone from the record",
+         lit(g[1]) == ["whole"] and rec().get("zooms")[0] == {"a": 3, "b": 5, "kind": "zoom", "amount": "subtle"} and rec().get("zooms")[2] == {"a": 15, "b": 17, "kind": "zoom"}, rec().get("zooms"))
+    c.key("Escape")
+    click(3)
+    click(12, meta=True)
+    open_menu("tlZoom")
+    g = rows()["groups"]
+    case("a clip with a zoom and a clip with none picked together: the rows show (a picked clip has a zoom) and speak for the zoom there is",
+         lit(g[0]) == ["subtle"] and lit(g[1]) == ["whole"], g)
+    press(lambda: c.click(radio("strong"), check=False))
+    case("...and a choice changes that zoom only; the clip with none still has none", rec().get("zooms")[0] == {"a": 3, "b": 5, "kind": "zoom", "amount": "strong"} and len(rec().get("zooms")) == 3, rec().get("zooms"))
+    c.key("Escape")
+
+    # one slow zoom joined across clips is ONE zoom
+    open_it(zooms=[{"a": 3, "b": 8, "kind": "zoom"}])
+    click(6)
+    open_menu("tlZoom")
+    sent = press(lambda: c.click(radio("quick"), check=False))
+    v = tm.zoom_values(s)
+    case("a slow zoom joined across two clips is one zoom with one setting: Quick chosen with only its second clip picked is saved on the whole zoom, never a piece of it",
+         [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":8,"kind":"zoom","pace":"quick"}]}}'], sent)
+    case("...in the CapCut plan it is still ONE move: 1.0 at the run's start, and the second clip starts on the value the first ended on",
+         v[1][1] == 1.0 and (v[2][1] == v[1][2] if v[2][1] is not None else v[2][3] == v[1][2]), v)
+    c.key("Escape")
+
+    # the keys
+    open_it(zooms=[{"a": 3, "b": 5, "kind": "zoom"}])
+    click(3)
+    c.js("document.getElementById('tlZoomBtn').focus()")
+    c.key("Enter")
+    walk = [rows()["focus"]]
+    for k in ("ArrowDown", "ArrowRight", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp", "ArrowLeft", "End", "Home"):
+        c.key(k)
+        walk.append(rows()["focus"])
+    case("the keyboard reaches every choice: from Slow zoom the arrows go down into How much (Subtle, Medium, Strong), on into How fast (Quick, Whole clip), round to None and back; "
+         "Left and Right move along a row; End is the last choice, Home the first item",
+         walk == ["zoom", "subtle", "medium", "strong", "quick", "whole", "", "whole", "quick", "whole", ""], walk)
+    case("...every choice can hold the keyboard without being a stop of its own on the page (tabindex -1, like the items above)",
+         all(o["tab"] == -1 for x in rows()["groups"] for o in x["opts"]))
+    c.key("End")
+    c.key("ArrowLeft")
+    sent = press(lambda: c.key("Enter"))
+    case("...Enter on a choice chooses it and the menu stays open with the keyboard where it was; the space bar the same, and neither plays the video",
+         [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"zoom","pace":"quick"}]}}'] and is_open() == "tlZoom" and rows()["focus"] == "quick"
+         and c.js("document.getElementById('vid').paused") is True, (sent, is_open(), rows()["focus"]))
+    c.key("ArrowUp")
+    sent = press(lambda: c.key(" "))
+    case("...(the space bar on Strong)", [saved_text(b) for b in sent] == ['"saved":{"zooms":[{"a":3,"b":5,"kind":"zoom","amount":"strong","pace":"quick"}]}}']
+         and is_open() == "tlZoom" and c.js("document.getElementById('vid').paused") is True, sent)
+    c.key("Escape")
+    case("...Escape closes it with the keyboard back on the Zoom button, and the clip still picked",
+         is_open() is None and c.js("document.activeElement.id") == "tlZoomBtn" and multi()["sel"] == "clip", c.js("document.activeElement.id"))
+
+    # the preview draws the same function of time as the CapCut plan is cut from
+    eng = s.TR._engine()
+    grid = [(z, tt, span) for z in ({"kind": "zoom"}, {"kind": "zoom", "amount": "subtle"}, {"kind": "zoom", "amount": "strong", "pace": "quick"}, {"kind": "punch"},
+                                    {"kind": "punch", "amount": "strong", "pace": "push"}, {"kind": "punch", "amount": "subtle"}, {"kind": "zoom", "pace": "quick"})
+            for span in (0.2, 0.9, 4.0) for tt in (0.0, 0.07, 0.2, 0.35, 0.5, 0.9, 1.0, 2.0, 4.0) if tt <= span]
+    theirs = c.js("(%s).map(function(x){ return window.Talk.zoomValue(x[0], x[1], x[2]); })" % json.dumps(grid))
+    case("the page's function of time for a zoom is the engine's, value for value (every amount and pace, short stretches and long): the preview and the CapCut plan follow one curve",
+         len(grid) > 100 and all(abs(a - eng.zoom_value(z, tt, span)) < 1e-12 for a, (z, tt, span) in zip(theirs, grid))
+         and c.js("[0, 0.25, 0.5, 0.75, 1, -2, 9].map(window.Talk.ease)") == [0, 0.15625, 0.5, 0.84375, 1, 0, 1], theirs[:6])
+    SCALE = ("(function(tt){ var v = document.getElementById('vid'); v.currentTime = tt; window.Talk.frame(); var m = /scale\\(([0-9.]+)\\)/.exec(v.style.transform || ''), T = window.Talk, "
+             "R = T.reelAt(tt), zs = T.zoomSpan(0); return [m ? +m[1] : null, R - zs[0], zs[1] - zs[0]]; })")
+    seen = [c.js(SCALE + "(%r)" % tt) for tt in (0.45, 0.5, 0.6, 0.7, 0.8)]
+    zq = {"kind": "zoom", "amount": "strong", "pace": "quick"}
+    case("...and the preview really draws it: on the Strong, Quick slow zoom the picture's scale at five moments is the engine's value for that moment, growing, never a straight line",
+         all(abs(sc - eng.zoom_value(zq, tt, max(0.1, span))) < 1e-5 for sc, tt, span in seen) and all(a[0] < b[0] for a, b in zip(seen, seen[1:]))
+         and 1.0 <= seen[0][0] < seen[-1][0] <= 1.2, seen)
+    tm.seed(s, zooms=[{"a": 3, "b": 5, "kind": "punch", "pace": "push", "amount": "strong"}])
+    c.open("about:blank")
+    c.open(s.url("/talking.html" + s.q(KIT)))
+    c.wait_for("window.Talk && window.Talk.loaded && document.querySelectorAll('#tlClips .tl-clip').length > 0", 15)
+    c.wait_for("document.getElementById('vid').readyState >= 1", 15)
+    seen = [c.js(SCALE + "(%r)" % tt) for tt in (0.44, 0.5, 0.6, 0.78)]
+    zp = {"kind": "punch", "amount": "strong", "pace": "push"}
+    case("...a Strong punch in with Quick push starts near 1 and pushes in to 1.24 on the same curve, then holds",
+         all(abs(sc - eng.zoom_value(zp, tt, max(0.1, span))) < 1e-5 for sc, tt, span in seen) and seen[0][0] < 1.1 and seen[-1][0] == 1.24, seen)
+
+    # a phone's width: the rows fit, inside the window, and the bar keeps still
+    try:
+        fits = []
+        for width, height in ((375, 812), (336, 800)):
+            c.phone(width=width, height=height, scale=1, touch=False)
+            open_it(zooms=[{"a": 3, "b": 5, "kind": "punch"}])
+            c.wait_for("document.fonts.status === 'loaded'", 10)
+            click(3)
+            before = c.js(SHAPE)
+            open_menu("tlZoom")
+            r = rows()
+            press(lambda: c.click(radio("push"), check=False))
+            r2 = rows()
+            fits.append((width, in_window(r) and in_window(r2), r["up"], r["side"] == 0 == r2["side"],
+                         all(o["seen"] for x in r["groups"] for o in x["opts"]), all(len({round(o["top"]) for o in x["opts"]}) == 1 for x in r["groups"]),
+                         [len(x["opts"]) for x in r["groups"]] == [3, 2], c.js(SHAPE) == before, is_open() == "tlZoom", lit(r2["groups"][1]) == ["push"]))
+            c.key("Escape")
+        case("at a phone's width (375 and 336): the menu with its two rows is whole inside the window, opening upward; every choice is on its row and can be pressed; nothing scrolls "
+             "sideways; and after a choice the menu is still open and the bar has not moved", all(all(x[1:]) for x in fits), fits)
+    finally:
+        c.desktop()
+    case("nothing on the page threw while the rows were used", not c.js("window.Talk.faults") and c.js("window.__dialogs") == 0, c.js("window.Talk.faults"))
 
 
 def main():
