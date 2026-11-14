@@ -118,6 +118,11 @@ name: Check it on a Windows PC
 #                                   the Mac's sips, so it is Mac only: on a PC only the /design-preview routes are
 #                                   tried, in pc_design.py), in a hidden Chrome, one at a time under the guard.
 #                                   None of these has run on GitHub yet: the first push is the test.
+#   tests/design_v26_check.py       Nicole's v26 for the stories designer, in "mac-page" too (it draws its pretend kits
+#                                   with the Mac's sips): sets of stories, the note and the line of "Let my assistant
+#                                   choose the photos", design.py story-note and story-fill, her four story templates
+#                                   (My editing queue filled from the editing queue), Redo, the x on a story's label.
+#                                   On Windows the same machinery, without a page, is part 15 of tests/pc_design.py.
 #   tests/fixtures/decode_report.py information only: what Windows' own decoder makes of the MP3 and M4A
 #                                   songs with nothing extra installed (may fail without failing the check)
 #   tests/pc_design_page.py  a job of its own, "windows-page", which may fail without failing the check (a first
@@ -144,11 +149,11 @@ on:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
-            "tests/design_preview_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
-            "tests/design_preview_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
+            "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -505,6 +510,9 @@ jobs:
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci
+      - name: Nicole's v26 for the stories designer (sets of stories, Let my assistant choose with story-note and story-fill, her four templates, Redo, the x on a story's label; the real page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_v26_check.py --work /private/tmp/design-v26-ci
       - name: The post kit's cards (her three cards, and the preview of a design whose slides aren't saved yet)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/kit_cards_check.py --work /private/tmp/kit-cards-ci

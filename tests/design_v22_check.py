@@ -244,8 +244,8 @@ def check_v22_page(case, work):
         case(f"v22: single slide \"{name}\": one slide on {bg}, her {len(fr)} frames exactly, empty, no words", ok, t and (t["template"]["bg"], frames_of(t["template"])))
     for sid, name in REMOVED:
         case(f"v22: \"{name}\" is no longer a starter template (hers)", sid not in by and name not in [t["name"] for t in st])
-    case("v22: stories have no single slides of their own (their layouts are that), and their seven layouts are as they were",
-         design.KINDS["stories"]["singles"] == [] and len(design.STORY_STARTERS) == 7 and design.KINDS["carousel"]["singles"] is sg)
+    case("v22: stories have no single slides of their own (their layouts are that), and their seven layouts are as they were (after her four v26 templates)",
+         design.KINDS["stories"]["singles"] == [] and len(design.STORY_STARTERS) == 11 and [x["id"] for x in design.STORY_STARTERS[-7:]] == ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"] and design.KINDS["carousel"]["singles"] is sg)
     got = her_numbers()
     if got is None:
         print("SKIP  v22: her page is not beside the project, so this file's tables were not checked against it", flush=True)
@@ -326,7 +326,7 @@ def check_v22_server(case, work, port, make_kit, Server, post, get_json, ask):
         case("v22 server: none of the five she removed is among them", not ({t["name"] for t in S["starters"] + S["singles"]} & {n for _, n in REMOVED if n not in ("Side by side",)} - set())
              and not ({t["id"] for t in S["starters"]} & {i for i, _ in REMOVED}))
         code, SS = get_json(P, f"/design-state?kit={KQ}&kind=stories")
-        case("v22 server: stories are given no single slides, and their seven layouts as before", code == 200 and SS.get("singles") == [] and len(SS["starters"]) == 7, SS.get("singles"))
+        case("v22 server: stories are given no single slides, and their seven layouts as before (after her four v26 templates)", code == 200 and SS.get("singles") == [] and len(SS["starters"]) == 11, SS.get("singles"))
         # ---- a design made from a starter she removed ----
         code, out = post(P, "/design-new", {"kit": kit_name, "token": "v22filmstrip001", "stamp": S["stamp"], "state": FILM, "name": "From Film strip"})
         did = out and out.get("design", {}).get("id")
@@ -1035,8 +1035,8 @@ def check_v22_browser(case, work, port, make_kit, Server, post, get_json):
                                  "secs: Array.from(document.querySelectorAll('#gallery .dz-sec')).map(function(x){ return x.textContent; }), singles: !!document.getElementById('gallery-singles'), "
                                  "use: Array.from(new Set(Array.from(document.querySelectorAll('#gallery .dz-use')).map(function(x){ return x.textContent; }))), "
                                  "n: document.querySelectorAll('#gallery-starters .dz-card').length})"))
-            case("v22 browser: the stories designer has no \"+ Add slides\" and no single slides: its window is \"Add stories\" with its three sections and seven layouts, as before",
-                 g == {"add": False, "h": "Add stories", "secs": ["Start with", "Your templates", "Layouts"], "singles": False, "use": ["Add"], "n": 7}, g)
+            case("v22 browser: the stories designer has no \"+ Add slides\" and no single slides: its window is \"Add stories\" with its three sections and its layouts (her four v26 templates, then her seven grids)",
+                 g == {"add": False, "h": "Add stories", "secs": ["Start with", "Your templates", "Layouts"], "singles": False, "use": ["Add"], "n": 11}, g)
             case("v22 browser: nothing went wrong on the stories page", not c2.page_errors(), c2.page_errors())
     finally:
         srv.stop()

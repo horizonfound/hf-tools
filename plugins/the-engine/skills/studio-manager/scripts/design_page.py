@@ -23,6 +23,7 @@ files, so nothing Python does can change a character of it:
     design_js_designs.py DESIGN_DESIGNS_JS the shoot menu, the design's name, My designs, Duplicate, + New
                                            design (the gallery), Save as template, Fill empty frames
     design_js_save.py    DESIGN_SAVE_JS    Preview swipe, the profile grid's crop, and Save slides
+    design_js_ask.py     DESIGN_ASK_JS     stories: "Let my assistant choose the photos" (the note, the line to copy)
 
 SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
 (Designer.start()) only after every part is in place.
@@ -47,6 +48,7 @@ import brand  # noqa: E402
 import look  # noqa: E402
 from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
 from design_js_core import DESIGN_CORE_JS  # noqa: E402
+from design_js_ask import DESIGN_ASK_CSS, DESIGN_ASK_JS  # noqa: E402
 from design_js_designs import DESIGN_DESIGNS_CSS, DESIGN_DESIGNS_JS  # noqa: E402
 from design_js_edit import DESIGN_EDIT_JS  # noqa: E402
 from design_js_model import DESIGN_MODEL_JS  # noqa: E402
@@ -140,12 +142,23 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 /* (v22: "+ Add slides" is in the design's row too, so from 1024 to 1179 the word "Design" before the name box is left
    out and "Duplicate design" reads "Duplicate": the row stays one row) */
 @media(min-width:1024px) and (max-width:1179px){#g-design>.lbl{display:none}}
+/* (v26: Redo sits beside Undo, so from 1024 to 1179 the slider that sizes the slides goes without its word "Size" and
+   is a little shorter: the slides' row stays one row with five brand colors saved. Its tooltip and its name for a
+   screen reader still say what it is.) */
+@media(min-width:1024px) and (max-width:1179px){#g-view>.lbl{display:none}#view-size{width:44px}}
 @media(max-width:1179px){.d-tools{gap:3px}.group{padding:3px 5px}.group .dz-name{width:180px}.group .tb.dz-strong{max-width:180px}.group .tx-words{width:180px}.group .fp-btn{min-width:140px;max-width:170px}.group input[type=range]{width:68px}#view-size{width:64px}.tb{padding:4px 6px}.sw{width:20px;height:20px}#g-brand .bc-row{gap:4px}#g-brand .bc-sw{width:20px;height:20px}}
 
 .stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(31,36,48,.45)}
 .stripwrap{position:relative;display:inline-block;vertical-align:top}
 .labels{position:absolute;left:0;top:-22px;height:20px;width:100%;pointer-events:none}
 .labels span{position:absolute;top:0;font-size:12px;color:var(--soft);transform:translateX(-50%);white-space:nowrap}
+body[data-kind=stories] .labels span{display:inline-flex;align-items:center;gap:5px}
+/* stories: the small x on a story's label removes that story (hers, v26). The labels let presses through; the x takes them. */
+.labels .labx{pointer-events:auto;position:relative;border:0;background:var(--chip);color:var(--ink);width:17px;height:17px;border-radius:50%;font:700 12px/1 var(--sans);cursor:pointer;padding:0;display:grid;place-items:center}
+.labels .labx::after{content:'';position:absolute;top:-5px;right:-5px;bottom:-5px;left:-5px}
+.labels .labx:hover{background:var(--accent);color:#fff}
+.labels .labx[hidden]{display:none}
+.labels .labx:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
 .strip{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 0 0 1px var(--line)}
 .over{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:5}
 .seam{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(47,124,246,.75);pointer-events:none;z-index:9000}
@@ -239,10 +252,11 @@ SCRIPTS = [
     ("DESIGN_PAINT_JS", DESIGN_PAINT_JS),
     ("DESIGN_DESIGNS_JS", DESIGN_DESIGNS_JS),
     ("DESIGN_SAVE_JS", DESIGN_SAVE_JS),
+    ("DESIGN_ASK_JS", DESIGN_ASK_JS),
 ]
 
 # The styles of the parts added after the strip, in the order their scripts go on the page.
-PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS
+PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS + DESIGN_ASK_CSS
 
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))
@@ -259,6 +273,7 @@ SNAP_TITLE = ("Photos line up with the slides and with each other as you drag. "
 # The bar at the bottom of the window: looking at the carousel as Instagram will show it, and saving it.
 PREVIEW = "Preview swipe"
 GRID_CROP = "Profile grid crop"
+REDO = "Redo"                   # hers, v26: beside Undo (Cmd+Shift+Z or Cmd+Y; Ctrl on a PC)
 # The label of the slider that sets how large the slides are drawn on this page ("Size", as on Nicole's page; a
 # text box has a Size of its own, so the slider's name for a screen reader says which this one is).
 VIEW = "Size"
@@ -274,9 +289,21 @@ OPEN_CAROUSEL = "Open the Carousel folder"
 STORY_TITLE = "Stories designer"
 STORY_TAB = "Stories Designer"
 STORY_LEDE = ("Each box is one Instagram story (9:16). Behind the scenes, a sneak peek, a few favorites: make them here "
-              "instead of on your phone. The red bands show where Instagram's own buttons sit, so keep your words out of them.")
+              "instead of on your phone. The red bands show where Instagram's own buttons sit, so keep your words out of them. "
+              "Untick Show Instagram's guides to hide them.")       # her last sentence (v26)
 STORY_PREVIEW = "Preview"
-STORY_BANDS = "Show Instagram's buttons"
+STORY_BANDS = "Show Instagram's guides"     # hers, v26: Nicole couldn't find it as "Show Instagram's buttons"
+# "Let my assistant choose the photos" (hers, v26; stories only): a note for the assistant, kept with the set of
+# stories, and a line to copy into the chat. Every line here is hers, whole.
+ASK_BUTTON = "Let my assistant choose the photos"
+ASK_HEAD = "Tell your assistant what you want"
+ASK_SUB = "Optional. Your assistant picks a story with a good mix from this shoot, and follows your note."
+ASK_EXAMPLE = "For example: \u201cStart with the big laugh, then the details, and end on the two of them walking away.\u201d"
+ASK_PLACE = "Optional: what you'd like in your stories"
+ASK_THEN = "Then copy this into the chat, and your assistant fills in your stories:"
+ASK_LINE = "Pick my story photos"           # the page adds " for <shoot>", and ", and follow my note" when there is one
+ASK_COPY = "Copy"
+ASK_MAX = 600
 SAVE_STORIES = "Save stories"
 OPEN_STORIES = "Open the Stories folder"
 KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
@@ -343,7 +370,8 @@ def page_html(kit_name, kind="carousel"):
         "<input type='range' id='view-size' min='40' max='480' value='230' aria-label='" + html.escape(U(VIEW_LABEL), quote=True) + "' title='" + html.escape(U(VIEW_LABEL), quote=True) + "'></div>"
         "<div class='group' id='g-snap'><label class='hint' title='" + html.escape(U(SNAP_TITLE), quote=True) + "'>"
         "<input type='checkbox' id='snap' checked aria-label='Snap into line'> Snap into line</label></div>"
-        "<div class='group' id='g-undo'><button class='tb' id='undo' type='button' disabled>Undo</button></div>"
+        "<div class='group' id='g-undo'><button class='tb' id='undo' type='button' disabled>Undo</button>"
+        "<button class='tb' id='redo' type='button' disabled>" + html.escape(REDO) + "</button></div>"
         "</div>"
         "<p class='gline' id='toolline' role='status'></p>"
         # The bar for the selected thing. One line first: the lines a press brings (#slides-line here; the + Add
@@ -358,8 +386,20 @@ def page_html(kit_name, kind="carousel"):
         "<section class='stage' id='stage'><div class='stripwrap' id='stripwrap'><div class='labels' id='labels'></div>"
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
-        "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span></div>"
-        "<p class='hint' id='trayhint'>" + html.escape(U(TRAY_HINT)) + "</p>"
+        "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span>"
+        # stories: "Let my assistant choose the photos", beside the photos' heading (hers, v26)
+        + ("<button class='tb ask-btn' id='ask-pick' type='button' aria-expanded='false' aria-controls='ask-box'>" + html.escape(ASK_BUTTON) + "</button>" if story else "")
+        + "</div>"
+        + ("<div class='ask-box' id='ask-box' hidden>"
+           "<label for='ask-note'><b>" + html.escape(ASK_HEAD) + "</b> " + html.escape(ASK_SUB)
+           + "<span class='ask-ex'>" + html.escape(ASK_EXAMPLE) + "</span></label>"
+           "<textarea id='ask-note' rows='2' maxlength='" + str(ASK_MAX) + "' placeholder='" + html.escape(ASK_PLACE, quote=True) + "'></textarea>"
+           "<p>" + html.escape(ASK_THEN) + "</p>"
+           "<div class='ask-line'><span id='ask-words'>" + html.escape(ASK_LINE) + "</span>"
+           "<button class='tb' type='button' id='ask-copy'>" + html.escape(ASK_COPY) + "</button></div>"
+           "<p class='gline' id='ask-said' role='status'></p>"
+           "</div>" if story else "")
+        + "<p class='hint' id='trayhint'>" + html.escape(U(TRAY_HINT)) + "</p>"
         "<div class='thumbs' id='thumbs'></div></section>"
         # The bar at the bottom of the window. Every line Save slides says, its two questions' buttons, and
         # "Open the Carousel folder" with the answer it brings, are here, beside the button that was pressed.

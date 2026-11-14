@@ -142,6 +142,7 @@ def check_table():
         '"look through my footage for <shoot>" (and "... and follow my notes")': ["../assistant-make-a-reel/SKILL.md"],
         '"lay out my stories"': ["parts/arrange.md"],
         '"make my stories"': ["parts/arrange.md"],
+        '"Pick my story photos for <shoot>"': ["parts/arrange.md"],
         '"make a single post"': ["parts/arrange.md"],
         '"show my post kit"': ["parts/post-kit.md"],
         '"lay out my carousel"': ["parts/arrange.md"],
@@ -878,8 +879,50 @@ def check_talking():
     case("where-things-live says the earlier edits and what a --replace replaced are kept", "`earlier`" in live and "`replaced`" in live and "the last 12" in live)
 
 
+# ---------- Nicole's v26: sets of stories, and the assistant choosing a story's photos ----------
+
+def check_stories_v26():
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("## Making stories: the stories designer", 1)[1].split("\n## ", 1)[0]
+    flat = " ".join(part.split())
+    design = read(SCRIPTS / "design.py")
+    page = read(SCRIPTS / "design_page.py")
+    case("stories: a shoot's stories come in sets, and nothing says there is only one design any more",
+         "**A shoot's stories come in sets**" in part and "My story sets" in part and "+ New set of stories" in part and "has **one** stories design" not in arr
+         and "one stories design" not in read(SM / "parts" / "where-things-live.md"))
+    case("stories: the two commands of the assistant's pick are in the part, as design.py has them",
+         'design.py story-note "<kit>" [--design <id>]' in part and 'design.py story-fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
+         and 'sub.add_parser("story-note")' in design and 'sub.add_parser("story-fill")' in design and '"--replace"' in design)
+    case("stories: the page's line and its button are named as the page has them",
+         '"Pick my story photos for <shoot>"' in part and '"..., and follow my note"' in part and '"Let my assistant choose the photos"' in part
+         and 'ASK_BUTTON = "Let my assistant choose the photos"' in page and 'ASK_LINE = "Pick my story photos"' in page)
+    case("stories: choosing is the assistant's job, the note is theirs and comes first, one look at the sheet",
+         "Choosing and ordering the photos is your job (rule 11); the note is theirs and outranks your taste" in flat and "One look at the sheet, never photo by photo" in flat
+         and "never pretend" in flat)
+    case("stories: --replace only when they asked; a refusal changes nothing; the set before is kept",
+         "use it only when they asked you to choose again" in flat and "changes nothing when it refuses" in flat and "The set as it was before your pick is kept beside it; nothing is deleted." in flat)
+    case("stories: the assistant never touches the words (rule 11), also when the note asks for words",
+         "**You never touch the words.**" in part and "it never adds, changes or removes a text box, and neither do you" in flat and "The words are yours" in flat
+         and "**The words on a story are theirs.**" in part)
+    case("stories: the template words are placeholders the assistant never fills in; My editing queue fills itself from their queue",
+         "are placeholders for them to change: you never fill them in" in flat and "**My editing queue** fills its list by itself from their editing queue" in flat
+         and "If your shoot is on here, your gallery is on its way." in flat and "I can't reach your editing queue right now." in flat
+         and 'QUEUE_CLOSING = "If your shoot is on here, your gallery is on its way."' in design and 'QUEUE_CANT = "I can\'t reach your editing queue right now."' in design)
+    case("stories: her four templates, the guides' new name, Redo and the x on a label are in the part; the old name of the tick is gone",
+         all(x in flat for x in ("**Gallery delivered**", "**My editing queue**", "**The full story**", "**Seamless swipe**", "\"Show Instagram's guides\"", "**Redo** sits beside Undo",
+                                 "has a small x that removes that story, even an empty one")) and "Show Instagram's buttons" not in arr)
+    case("stories: Save stories names a set after the set, and the kit shows the set saved last",
+         "named after the set" in flat and "shows the set that was saved last as the stories" in flat)
+    case("stories: an open page takes the pick by itself; otherwise open that set by its id", "The open page shows your pick by itself within a few seconds" in flat
+         and 'design.py open "<kit>" --kind stories --design <id>' in flat)
+    case("where-things-live.md: the note and who filled a set are named, and a saved set is named after the set",
+         "`ask`, the note they wrote for you" in read(SM / "parts" / "where-things-live.md") and "`filled_by`" in read(SM / "parts" / "where-things-live.md")
+         and '"<the set\'s name> - 01.jpg"' in read(SM / "parts" / "where-things-live.md"))
+
+
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking):
+    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
+               check_stories_v26):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

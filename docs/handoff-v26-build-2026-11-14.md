@@ -177,3 +177,62 @@ Two reviewers read stage B. Five should-fix findings and a handful of notes; all
 
 **A thing to know.** During this round's take-it-out runs, one run (the test's server started without the switch) opened a real folder picker on this Mac; it was closed straight away and the test now cannot do that. An older picker from the first build (process 20477, started 10:16 on Nov 14, "Pick the folder your finished photos are in...") may still be open: press Cancel on it. Nothing is behind it; whatever is chosen there goes nowhere.
 
+
+## Stage C, built (Nov 14): the stories designer
+
+**What a photographer sees** (all of it in the stories designer; the carousel's designer changes in one thing only, Redo).
+
+- **"Show Instagram's guides"** is the tick's name, and her intro ends "Untick Show Instagram's guides to hide them."
+- **The stories stay in view while the photos scroll under them.** Ours already did this (the stage has stuck to the top of the window since Nov 6, in both designers); it is now checked on the stories page with 40 photos.
+- **"Let my assistant choose the photos"**, a button beside the photos' heading. It opens her box: "Tell your assistant what you want" (optional, 600 letters), her example, and the line to copy, "Pick my story photos for <shoot>", which ends ", and follow my note" only while there is a note. Copy says Copied for a moment.
+- **The chat's side of it.** `design.py story-note "<kit>"` prints their note word for word and the set's frames in the order they are filled (which story, tall or wide, which are empty). `design.py story-fill "<kit>" --photos 3,8,12` puts the assistant's pick in. An open page shows the pick by itself within a few seconds (it looks for ten minutes after Copy is pressed) and says "Your assistant's pick is in your stories." The instructions are in `parts/arrange.md`, under "Making stories": choosing photos is the assistant's job, the note is theirs and comes first, and the words on a story are never touched (rule 11).
+- **Her four templates, first among the layouts, in her order, with her placeholder words:** Gallery delivered (4 stories), My editing queue (1, no photo), The full story (10), Seamless swipe (6, one wide photo across the first three). Then her seven grids, as before.
+- **My editing queue fills itself when it is added:** the shoots still to edit, in the queue's own order, each as they named it ("1   Garcia wedding"), twelve at the most and then "+ 2 more", with "If your shoot is on here, your gallery is on its way." under it. An empty queue says "Nothing in your editing queue right now". It is ordinary text from then on: they restyle it and can Save as template.
+- **Redo** beside Undo (Cmd+Shift+Z or Cmd+Y; Ctrl on a PC), in both designers. A new change empties it.
+- **Sets of stories.** The name box, "My story sets ▾" and "+ New set of stories" show in stories, like a carousel's designs. Duplicate is not shown (hers). This replaces "one stories design a shoot".
+- **A small x on each story's label** removes that story, even an empty one; the stories after it move up; the line says "Removed story 6. Undo brings it back."
+
+**Our way underneath.**
+- **A shoot's one stories design from before is its first set:** the same file in `story-designs/`, opened as it was, nothing written by opening it. A new set is a new file beside it ("<Shoot> stories 2"). There is still no way to delete a set.
+- **Which set the kit shows:** the set **saved** last (`kit.json` `stories_set`, as before), whichever set it came from; while no stories are saved, the card's small picture is of the set **changed** last. Exactly what a carousel's designs do, with no new code in `kit.py`. Save stories names the files after the set ("Beach stories 2 - 01.jpg").
+- **The note is kept with the set, never in its layout** (`ask` in the set's record; hers keeps it inside the layout). So a note changes no story, no Undo step and no "Already saved": a set saved, then given a new note, still says "Already saved as ...". It is checked like a name (text, 600 letters, no control characters) and reaches the page only as text. A carousel's design takes no note.
+- **The assistant's pick is written like any change:** under the design's lock, checked like a layout from the page, the set as it was kept beside it, the counter one higher, so a page that has not seen it is told there is something newer and never saves an older layout over it. The same pick again writes nothing. It refuses more photos than there are frames, a number that is not on the kit's sheet, and a photo given twice, and changes nothing when it refuses. It never adds, changes or removes a text box.
+- **The queue's names come from a route of the designer's own,** `GET /design-queue` (names and a count, nothing else; refused to another website and to another host's name), read from `edit_queue` the moment the template is added. Not from `/home-data`, which has no queue in ours. A queue that can't be read gives her line, "I can't reach your editing queue right now.", in the Add stories window, which stays open, and nothing is added.
+- **The page opens the set its address names,** so a reload stays on the same set (hers opens the newest on every load). With no set named it opens the one changed last.
+- **Saved stories and slides are byte for byte what they were.** Nothing that draws them changed (`design_js_paint.py`, `design_js_save.py`, `design_js_type.py`, `design_js_text.py` and `design_js_model.py` are untouched), and it was tried once by hand: two pretend shoots with the very same photos, one served by the code as it was before this stage and one by the code as it is, the same presses on each page (five stories with a text box in Figtree, Save stories; the carousel's first design, Save slides). All five stories and all seven slides came out byte-identical.
+- New file `scripts/design_js_ask.py` (the button, the box, the follow). The page's words for it are in `design_page.py` (`ASK_*`), hers whole.
+
+**Choices where her spec was silent (plainest behaviour).**
+1. `story-fill` fills the **empty** frames, in the page's own filling order. `--replace` puts the pick into every frame; the instructions allow it only when they asked to choose again. A set with no frame at all gets one story for each photo, each filling its story.
+2. With no `--design`, the chat's commands take the set changed last (the one they were just typing the note into) and list the others.
+3. "+ New set of stories" opens the new empty set without throwing the Add stories window over it (hers); that window still opens by itself when a page opens on a shoot whose stories are empty.
+4. The x is on stories' labels only (hers), and is not shown at one story. Its line is in the bar's first line, beside the Slides line (hers: the bottom line).
+5. Redo is emptied by any new change of theirs, not by a text box's height being set right when its font arrives.
+6. A template that is added lands on the set's own background (hers does the same: a template's cream background is only ever seen on its card in the window).
+7. The card of My editing queue reads "1 story · 0 photos" (hers: "0 photo").
+8. Copy uses the older copy call only, the one the Claude app's pane allows (the designer page has a rule against the newer one; hers falls back to it).
+9. From 1024 to 1179 px wide the slider that sizes the slides loses its word "Size" and is a little shorter, so the slides' row stays one row with Redo in it and five brand colors saved.
+10. A shoot's name in the queue story is one line, 80 letters at the most (as a design's name is cleaned).
+
+**Hers left out, on purpose.** Her `askQueueNames` box ("How should your clients show?": full names, first names, initials, no names) and the due dates and counts beside it: they are in her file but nothing calls them (her note: "a busier first version was too much"). Her browser-storage memory of which set was open (ours is the address). Her idea for later, offering a Gallery delivered set when a shoot is marked delivered.
+
+**Tests.** `tests/design_v26_check.py` (new; `design_check.py --only v26`, or by itself with `--work`): 205 checks with the real page in a hidden Chrome (her words looked for in her page when her folder is beside the project, her four templates number for number, the rules by themselves, every route and refusal, the two commands, and the page driven with a real mouse and keys). Thirty pieces of the new behaviour were each taken out in a scratch copy and the test failed each time (seventeen by request, thirteen on the real page). `tests/pc_design.py` has a part 15 for a PC (sets, the note, the pick, the queue's names; no page). `tests/skill_text_check.py` holds the instructions. The older stories, v22, save and layout checks were brought up to date where they said "one stories design", "seven layouts" or "Show Instagram's buttons". In GitHub's check: the new file in the Mac's page job, part 15 on Windows.
+
+**Not tried.** Dustin's or Nicole's own hand; the Claude app's pane (Copy was pressed in a hidden Chrome, where the copy call was stood in for; the pane's own clipboard was proved for the home page on Oct 30, not for this box); a fresh session following the new instructions from the pasted line; a real shoot's photos and a real editing queue; the assistant actually choosing photos from a sheet for stories; a wide photo across three stories saved and looked at on a phone; her templates' words in Figtree with no internet (Figtree comes from Google; without it they show in Georgia, as any story text does); a second window open on the same set while the pick arrives; a real PC (the first push runs part 15 there); a touch screen (the x is 17 px drawn, with a larger area that takes the press).
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **A template lands on the set's background, not its own.** Gallery delivered, My editing queue and The full story are cream in the window and white on the stories unless they change Background (hers does the same). Say if a template added to an EMPTY set should bring its background.
+2. **Our lines where hers has none:** "Your assistant's pick is in your stories."; the name box's and the menu's names for a screen reader; the tooltip of + New set of stories; "That set of stories isn't here, so this is your newest one."; the two lines when a new set can't be made; "That note is longer than fits. Keep it under 600 letters." (never seen from the page: the box stops at 600).
+3. **The assistant fills empty frames only, unless asked to redo.** Say if "Pick my story photos" pasted a second time should replace the photos already there.
+4. **No command puts the earlier photos back** after a pick they don't like. The set as it was is kept on the drive, and the page's Undo does not reach across the pick. The instructions say: pick again, or they move photos themselves. A "put it back" command is its own small job.
+5. **The page follows the assistant's pick for ten minutes after Copy.** After that a reload, or "show my stories", shows it.
+6. **Duplicate is not offered for a set of stories** (hers).
+7. **The word "Size" is hidden between 1024 and 1179 px** (item 9 above).
+8. **Client names on a public story.** My editing queue shows each shoot as it is named in their editing queue (hers, by her choice: the names question was "too much"). They can take a name off by hand.
+
+**For later stages.**
+- Stage K (the post kit): the Stories card counts "saved designs"; with sets, her v26 post kit may word it differently. The card's link opens the stories designer with no set named, so it opens the set changed last.
+- Stage E: carry the eight items above into the note for Nicole; CLAUDE.md should say sets of stories replaced one design a shoot, and that Redo is in both designers.
+- `design_js_designs.py`'s `makeDesign` now sends the kind (before, only a carousel ever made a new design from the page).
+- The designer's routes gained `GET /design-queue` (`posting_queue.py` hands it to `design.handle_get`). `/home-data` still has no `queue`.
+- A test that starts a page server for the designer should set `STUDIO_NO_WINDOWS_FOR_TESTS`, as the new one does.

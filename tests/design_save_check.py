@@ -235,8 +235,8 @@ def check_designs_page(case, work):
     case("a shoot's link is its kit folder's name and nothing else (and, in the stories designer, the kind)", "a.href = '/design.html?kit=' + encodeURIComponent(s.kit) + D.KQ;" in d and d.count(".href") == 1 and ".href" not in sv)
     asked = sorted(set(re.findall(r"'(/[a-z][a-z.-]*)[?']", d + sv)))
     case("every address the later parts name is one of the Assistant's own routes (and the designer's own page, for another shoot)",
-         asked == ["/design-commit", "/design-new", "/design-preview", "/design-slide", "/design-state", "/design-template", "/design.html", "/open"]
-         and len(re.findall(r"\bfetch\(", d + sv)) == 6 and "XMLHttpRequest" not in d + sv and "sendBeacon" not in d + sv and "WebSocket" not in d + sv, asked)
+         asked == ["/design-commit", "/design-new", "/design-preview", "/design-queue", "/design-slide", "/design-state", "/design-template", "/design.html", "/open"]
+         and len(re.findall(r"\bfetch\(", d + sv)) == 7 and "XMLHttpRequest" not in d + sv and "sendBeacon" not in d + sv and "WebSocket" not in d + sv, asked)
     case("there is no way to delete a design or a template on the page", not re.search(r"[Dd]elete|[Tt]rash|/design-delete|/design-remove", d + sv))
     # the bar at the bottom: every line Save slides says is beside the button that was pressed
     case("designer page: the Save slides line, its two answers, and Open the Carousel folder with its own line are in one bar with the button, in that order",

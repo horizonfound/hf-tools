@@ -235,8 +235,12 @@ DESIGN_EDIT_JS = r"""
     while (seams.length < st.slides - 1) { var sm = el('div', STORY ? 'seam story' : 'seam'); strip.appendChild(sm); seams.push(sm); }
     seams.forEach(function(sm, i){ sm.style.left = (i + 1) * W * s + 'px'; });
     while (labels.children.length > st.slides) labels.lastChild.remove();
-    while (labels.children.length < st.slides) labels.appendChild(el('span', '', WORDS.slide(labels.children.length + 1)));
-    for (var k = 0; k < st.slides; k++) labels.children[k].style.left = (k + 0.5) * W * s + 'px';
+    while (labels.children.length < st.slides) labels.appendChild(label(labels.children.length + 1));
+    for (var k = 0; k < st.slides; k++) {
+      labels.children[k].style.left = (k + 0.5) * W * s + 'px';
+      // the x that removes a story is there only while there is more than one (hers)
+      if (STORY) { var lx = labels.children[k].lastChild; lx.hidden = st.slides <= 1; lx.disabled = D.blocked; }
+    }
     drawBands(st, s);
     var b = D.selected();
     if (b) {
@@ -247,6 +251,25 @@ DESIGN_EDIT_JS = r"""
     else if (G.redo) G.redo();          // a drag is going on: what it shows is drawn again over the fresh strip
   }
   D.on('render', draw);
+  // A slide's label. A story's label also has a small x (Nicole, Nov 13): it removes that story, even an empty one;
+  // the stories after it move up, and Undo brings it back.
+  function label(k){
+    var sp = el('span', '', WORDS.slide(k));
+    if (STORY) {
+      var x = el('button', 'labx', '\u00d7'); x.type = 'button'; x.dataset.k = String(k);
+      x.title = WORDS.removeStory(k); x.setAttribute('aria-label', WORDS.removeStory(k));
+      sp.appendChild(x);
+    }
+    return sp;
+  }
+  labels.addEventListener('click', function(e){
+    var x = e.target.closest ? e.target.closest('button.labx') : null;
+    if (!x || !D.st || D.blocked) return;
+    e.stopPropagation();
+    var k = Number(x.dataset.k), r = M.removeStory(D.st, k - 1);
+    if (r.why) { lines('slides', why(r)); return; }
+    if (D.setState(r.st, {sel: null, adjust: false})) lines('slides', WORDS.removed(k));       // said after the change, which wipes the line before
+  });
   // Stories: Instagram's buttons cover these parts of every story, shaded while the tick at the bottom is on. On the
   // strip only; nothing here is ever in a saved story.
   function drawBands(st, s){
@@ -353,6 +376,7 @@ DESIGN_EDIT_JS = r"""
   bgc.addEventListener('change', function(){ if (!D.setState(function(st){ return M.setBg(st, bgc.value); })) D.render(); });
   bgc.addEventListener('blur', function(){ D.render(); });
   $('undo').addEventListener('click', function(){ D.undo(); });
+  $('redo').addEventListener('click', function(){ D.redo(); });
 
   // ---------- how large the slides are drawn: the Size slider ----------
   // From every slide fitting across the window (its small end, which follows the window and the number of
@@ -403,6 +427,7 @@ DESIGN_EDIT_JS = r"""
     Array.prototype.forEach.call(document.querySelectorAll('#g-bg .sw'), function(x){ x.classList.toggle('on', x.dataset.c === st.bg); });
     if (document.activeElement !== bgc) bgc.value = st.bg;
     $('undo').disabled = off || !D.canUndo();
+    $('redo').disabled = off || !D.canRedo();
     if (delStory) { delStory.disabled = off || st.slides <= 1; oneLine.hidden = st.slides > 1; }
     syncSize();
     D.label(adjBtn, D.adjust ? WORDS.insideDone : WORDS.inside);
@@ -597,6 +622,9 @@ DESIGN_EDIT_JS = r"""
     var range = tag === 'INPUT' && type === 'range';
     if (tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable) || (tag === 'INPUT' && !/^(range|checkbox|radio|color|button)$/.test(type))) return;
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); D.undo(); return; }
+    // Redo (hers, v26): Cmd+Shift+Z or Cmd+Y; Ctrl on a PC
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); D.redo(); return; }
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); D.redo(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     // a tray photo reached with the Tab key is put in with Return, so nothing here needs a mouse
     if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('th')) { e.preventDefault(); clickPhoto(Number(t.dataset.n)); return; }

@@ -1804,7 +1804,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path in ("/design.html", "/design-state", "/design-font-file", "/design-preview"):
+        if path in ("/design.html", "/design-state", "/design-font-file", "/design-preview", "/design-queue"):
             # the carousel designer: every one of its requests is design.py's to answer
             import design
             return design.handle_get(self, path, urlsplit(self.path).query)

@@ -1219,8 +1219,6 @@ def stories_checks(kit):
     ok, bad = no_path(st)
     check("stories: no path, no backslash and nothing of the scratch folder in what the page is given", ok, bad)
     check("stories: the preview's name is \"yourname\" (no handle known)", st["handle"] == "yourname")
-    code, out = design.new_design(kit, kind="stories")
-    check("stories: a second stories design is refused", code == 409 and out.get("why") == "one", (code, out))
     did = st["design"]["id"]
     d = design.load_design(kit, did, "stories")
     state = {"slides": 3, "bg": "#ffffff", "blocks": [
@@ -1264,6 +1262,68 @@ def stories_checks(kit):
     else:
         cant = design.cant_save(kit, "L" * 80, kind="stories")
         check("stories: on a PC a long name is measured in the Stories folder, said in a story's words (or fits)", cant is None or ("stor" in cant[1] and "slide" not in cant[1]), cant)
+
+
+def v26_checks(kit):
+    """Nicole's v26, as a PC runs it: sets of stories, the note for the assistant, the assistant's pick, the editing
+    queue's names. Records only: an accent and an emoji in every name, no path in anything a page is given."""
+    st = design.state_for_page(kit, kind="stories")
+    A = st["design"]["id"]
+    check("v26: the page is given her four story templates first, each a layout a story may hold, My editing queue marked to be filled",
+          [t["id"] for t in st["starters"]][:4] == ["sg-delivered", "sg-queue", "sg-full", "sg-seamless"] and len(st["starters"]) == 11
+          and st["starters"][1].get("fill") == "queue" and no_path(st)[0], [t["id"] for t in st["starters"]])
+    first = design.design_path(kit, A, "stories").read_bytes()
+    code, out = design.new_design(kit, state={"slides": 1, "bg": "#ffffff", "blocks": []}, token=token("n"), kind="stories")
+    B = out.get("design", {}).get("id")
+    check("v26: a second set of stories is made beside the first (no longer one a shoot), named \"... stories 2\"; the first set's file is untouched",
+          code == 200 and B and B != A and out["design"]["name"].endswith(" stories 2") and design.design_path(kit, A, "stories").read_bytes() == first, (code, out.get("words")))
+    st2 = design.state_for_page(kit, A, "stories")
+    check("v26: a set asked for by its id is the one opened; with none named, the one changed last", st2["design"]["id"] == A and design.state_for_page(kit, kind="stories")["design"]["id"] == B)
+    d = design.load_design(kit, A, "stories")
+    state = {"slides": 2, "bg": "#ffffff", "blocks": [
+        {"id": 1, "n": None, "x": 0, "y": 0, "w": 1080, "h": 1920, "ox": 0.5, "oy": 0.5, "zoom": 1},
+        {"id": 2, "n": None, "x": 1080, "y": 0, "w": 1080, "h": 1920, "ox": 0.5, "oy": 0.5, "zoom": 1},
+        {"id": 3, "type": "text", "text": "Zoë’s day 🌊", "font": "Figtree", "size": 72, "weight": 700, "italic": False, "upper": False, "al": "center",
+         "ls": 0, "lh": 1.3, "color": "#111111", "x": 130, "y": 806.4, "w": 820, "h": 93.6, "look": "box", "boxColor": "#ffffff"}]}
+    note = "Start with Zoë’s laugh 🌊,\r\nthen the détails"
+    body = {"kit": kit.name, "kind": "stories", "design": A, "page": PAGE, "base": d["rev"], "stamp": arrange.sheet_stamp(kit), "state": state, "ask": note}
+    code, out = design.save_from_page(body)
+    d = design.load_design(kit, A, "stories")
+    raw = design.design_path(kit, A, "stories").read_bytes()
+    check("v26: the note for the assistant is kept with the set, accents and emoji and all, its line break one line break, as UTF-8, never in the layout",
+          code == 200 and d.get("ask") == "Start with Zoë’s laugh 🌊,\nthen the détails" and "ask" not in d["state"] and b"\r" not in raw, (code, out.get("words"), d.get("ask")))
+    check("v26: the page is given the note back as text, with no path beside it", design.state_for_page(kit, A, "stories")["design"]["ask"] == d["ask"] and no_path(design.state_for_page(kit, A, "stories"))[0])
+    before = design.design_path(kit, A, "stories").read_bytes()
+    res, words, got = design.story_fill(kit, [2, 3], A)
+    d2 = design.load_design(kit, A, "stories")
+    check("v26: the assistant's pick goes into the set's empty frames, in order; the text box and the note are as they were; the counter is one higher",
+          res == "done" and [b.get("n") for b in d2["state"]["blocks"] if b.get("type") != "text"] == [2, 3] and d2["state"]["blocks"][2] == d["state"]["blocks"][2]
+          and d2.get("ask") == d["ask"] and d2["rev"] == d["rev"] + 1, (res, words))
+    check("v26: the set as it was before the pick is kept beside it, byte for byte, and the words say what was done with no path in them",
+          design.prev_path(kit, A, "stories").read_bytes() == before and no_path(words)[0], words)
+    kept = design.design_path(kit, A, "stories").read_bytes()
+    res, words, _ = design.story_fill(kit, [2, 3], A, replace=True)
+    check("v26: the same pick again changes nothing and writes nothing", res == "same" and design.design_path(kit, A, "stories").read_bytes() == kept, (res, words))
+    for what, nums, rep_ in (("a photo that is not in the shoot", [999], True), ("a photo given twice", [1, 1], True), ("more photos than frames", [1, 2, 3], True), ("every frame full", [1], False)):
+        res, words, _ = design.story_fill(kit, nums, A, replace=rep_)
+        check(f"v26: the pick is refused ({what}) in plain words, and the set is byte for byte as it was",
+              res == "problem" and bool(words) and no_path(words)[0] and design.design_path(kit, A, "stories").read_bytes() == kept, (res, words))
+    res, words, _ = design.story_fill(kit, [1, 2], B)
+    db = design.load_design(kit, B, "stories")
+    check("v26: on a set with nothing on it the pick becomes one story for each photo", res == "done" and db["state"]["slides"] == 2
+          and [(b["n"], b["x"], b["w"], b["h"]) for b in db["state"]["blocks"]] == [(1, 0, 1080, 1920), (2, 1080, 1080, 1920)], (res, words))
+    check("v26: with no editing queue there are no names (an empty list, not a problem)", design.queue_names() == [])
+    queue = {"shoots": [{"id": "a", "name": "Zoë & Été 🌊", "status": "waiting", "due": "2026-12-02", "added": "2026-11-01T10:00:00"},
+                        {"id": "b", "name": "CON: aux / nul?", "status": "waiting", "due": "2026-12-01", "added": "2026-11-01T10:01:00"},
+                        {"id": "c", "name": "Delivered", "status": "finished"}], "picks": {}, "manual_order": False}
+    (STUDIO / "queue.json").write_text(json.dumps(queue, ensure_ascii=False), encoding="utf-8")
+    check("v26: the editing queue's names, in its order, as they were named (an accent, an emoji, characters a PC refuses in a file's name: names are only ever text)",
+          design.queue_names() == ["CON: aux / nul?", "Zoë & Été 🌊"], design.queue_names())
+    (STUDIO / "queue.json").write_bytes(b"\xff\xfe not a queue")
+    check("v26: a queue that can't be read is \"can't reach\", never a crash and never an empty story", design.queue_names() is None)
+    (STUDIO / "queue.json").write_text(json.dumps(queue, ensure_ascii=False), encoding="utf-8")
+    check("v26: the note is cleaned the same on both computers (600 letters, no control characters, a PC's line ends made one)",
+          design.clean_ask("a\r\nb") == "a\nb" and design.clean_ask("x" * 601) is None and design.clean_ask("a\x07b") == "a b")
 
 
 def v22_checks(kit):
@@ -1332,6 +1392,7 @@ part("11: how long a path may be on a PC", long_checks, KIT)
 part("12: the real page server: refusals change nothing, a save goes through", server_checks, make_kit("2026-11-08 Server"))
 part("13: the stories designer", stories_checks, make_kit("2026-11-09 Zoë’s stories 🌊"))
 part("14: Nicole's v22: her starters and single slides, and Rename on a template", v22_checks, make_kit("2026-11-10 Rename"))
+part("15: Nicole's v26: sets of stories, the note for the assistant, the assistant's pick, the editing queue's names", v26_checks, make_kit("2026-11-13 Zoë’s sets 🌊"))
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))
