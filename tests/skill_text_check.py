@@ -924,9 +924,57 @@ def check_stories_v26():
          and '"<the set\'s name> - 01.jpg"' in read(SM / "parts" / "where-things-live.md"))
 
 
+def check_several_reels():
+    """Several reels from one shoot (Nicole's v25, stage G of the v26 build): the instructions say what the scripts do."""
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("**Several reels from one shoot", 1)[1].split('**"Look through my footage for <shoot>"**', 1)[0]
+    flat = " ".join(part.split())
+    rp, kit, foot, tr = read(SCRIPTS / "reel_page.py"), read(SCRIPTS / "kit.py"), read(SCRIPTS / "footage.py"), read(SCRIPTS / "talking_rec.py")
+    case("several reels: the bar is named as the page has it (Your reels, + Start a new reel, Rename), with her default names",
+         "**Your reels**" in part and "**+ Start a new reel**" in part and "**Rename**" in part and '"Reel 1", "Reel 2"' in part
+         and '"reels_label": "Your reels"' in rp and '"reels_new": "+ Start a new reel"' in rp and 'REEL_FIRST = "Reel 1"' in rp)
+    case("several reels: a new reel is blank on \"I'll drag them in myself\", with every clip found; every reel fully separate; the folders are the shoot's",
+         "\"I'll drag them in myself\" with nothing in it, no pick of yours, footage not chosen, no song, and every clip you have found for the shoot, as found" in flat
+         and "**Every reel is fully separate:**" in part and "Nothing done in one reel changes another." in flat and "shared by all its reels" in flat)
+    case("several reels: every command acts on the reel open on the page and says which; the part names each command's way to name another, as the scripts have them",
+         "**Every command acts on the reel that is open on the page**" in part and "each of them says first which reel it is about" in flat
+         and '--for-reel "Reel 2"' in part and 'footage.py scan "<kit>" --reel "Reel 2"' in part and 'footage.py moments "<kit>" --file <file> --reel "Reel 2"' in part
+         and 'reel_page.py show "<kit>" --reel "Reel 2"' in part and 'reel_page.py make "<kit>" --reel "Reel 2"' in part
+         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 2)
+    case("several reels: the chat's reels command, as reel_page.py has it, in the part and in the part's command block",
+         'reel_page.py reels "<kit>" --new [--name "Kitchen"]' in flat and '--rename "Reel 2" --to "Kitchen"' in flat and '--open "Reel 1"' in flat
+         and 'python3 <scripts>/reel_page.py reels "<kit>" [--new [--name "<name>"] | --open "<reel\'s name>" | --rename "<reel\'s name>" --to "<name>"]' in arr
+         and 'sub.add_parser("reels"' in rp and all(('rl.add_argument("%s"' % a) in rp for a in ("--new", "--name", "--open", "--rename", "--to")))
+    case("several reels: a pasted line that names a reel is checked against the reel open on the page first",
+         "run `reel_page.py reels \"<kit>\"` first and check that the reel named is the one open on the page" in flat and "say which reel your pick went to" in flat)
+    case("several reels: a new reel has no pick until they ask, and a pick waits under Let my assistant choose",
+         "Pick for it only when they ask." in flat and 'your pick waits under "Let my assistant choose": tell them to press it' in flat)
+    case("several reels: a reel is never removed, said plainly; two reels never share a name (the scripts refuse it)",
+         "**A reel can never be removed** (nothing is deleted)" in part and "Two reels of one shoot never share a name" in flat and "NAME_TAKEN" in read(SCRIPTS / "reels.py"))
+    case("several reels: CapCut's projects are named for the shoot, not the reel; each reel's mixes are its own",
+         'the first one made is "<shoot> reel", the next "<shoot> reel 2", whichever reel on the page it came from' in flat and "gives the next mix of that reel" in flat
+         and "def mix_number(" in rp)
+    reel = read(REEL / "SKILL.md")
+    case("several reels: the reel skill says so in a paragraph and sends to the part",
+         "**A shoot can have several reels (Nicole, Nov 12).**" in reel and '`--for-reel "<reel\'s name>"` saves it for another' in " ".join(reel.split())
+         and '"Several reels from one shoot"' in reel)
+    talk = " ".join(read(SM / "parts" / "talking-reel.md").split())
+    case("several talking reels: the bar, a new one at step 1, each its own, --reel on the five commands, her refusal line word for word, never removed",
+         "**Your talking reels**" in talk and "**+ Start a new talking reel**" in talk and "A new one starts at step 1 with no video chosen" in talk
+         and '"Talking reel 1", "Talking reel 2"' in talk and "`status`, `show`, `cut`, `photos` and `place` act on the one open on the page" in talk
+         and 'add `--reel "<its name>"`' in talk and "I'm still turning your video into a script. Give it a minute, then try again." in talk
+         and 'STILL_SCRIPT = "I\'m still turning your video into a script. Give it a minute, then try again."' in tr and "Rename always works" in talk
+         and "A talking reel can never be removed" in talk and 's.add_argument("--reel"' in tr)
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    case("where-things-live.md names the list of reels in both records, every clip found, and where the first reel's pick stays",
+         "the others wait in `versions`" in where and "`current` naming the open one" in where and "`moments_found` is every clip found for the shoot" in where
+         and "the first reel's pick of yours stays in `kit.json`" in where and where.count("wait in `versions`") == 2
+         and '"moments_found"' in foot and "REEL_KEYS" in rp)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26):
+               check_stories_v26, check_several_reels):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

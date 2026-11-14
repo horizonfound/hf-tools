@@ -301,3 +301,72 @@ Nicole's notes, section 2 (and the intro from section 1). The naming question it
 - Many other pages still say "Tell Claude" (the pickers, the designer, the posting page, the kit, reminders): not this stage's. Their tests hold those words, so changing them means changing both.
 - `first_look.shoots_section(studio, closing=True)` has a new argument; `first_look.closing_html(photos, wrap)` and `first_look.NEXT_CSS` are what the shoot's page uses.
 - The older tests' pretend backups (`tests/fake_night.py`) cannot be renamed for real ("no sorted photos found"); a test that needs a real rename needs `original` records.
+
+
+## Stage G, built (Nov 14): several reels from one shoot
+
+Nicole's v25, section 2: "There's other photos from this shoot that I want to make as its own separate reel. And I don't want to deselect everything and lose it. I just want to start a new one."
+
+**What a photographer sees.**
+- **On the reel page, a bar under the title: "Your reels".** A drop-down of the shoot's reels, **+ Start a new reel**, and **Rename** (the name turns into a box with Save and Cancel; Enter saves, Escape cancels). Her words, her layout, her styles.
+- **+ Start a new reel** saves the reel they were on exactly as it is, then opens a blank one: "I'll drag them in myself" with nothing in it, no pick of the assistant's, footage not chosen, no song, and every clip found for the shoot, as found. The page reloads on it (hers).
+- **Choosing another reel in the drop-down** saves first, then reloads on that reel, exactly as they left it.
+- **Names** are "Reel 1", "Reel 2" and so on until renamed (the next number that is free, as hers).
+- **Every reel is fully separate:** photos, order, Longer and Quicker, the song picked, footage or just photos, the style, the vibe, the clips with their lengths and which are selected, their notes and feel, and the assistant's picks. The songs in the Music folder and the videos in the Footage folder are the shoot's.
+- **On the talking reel page, the same bar: "Your talking reels"** and **+ Start a new talking reel**. A new one starts at step 1 with no video chosen. Each has its own video, script edit, cuts, photos, zooms and captions; two may use the same video and cut it differently. Names are "Talking reel 1", "Talking reel 2".
+- **While a video is being turned into a script,** the page will not start or open another talking reel: "I'm still turning your video into a script. Give it a minute, then try again." (hers). Rename still works.
+- **In CapCut** nothing changes: projects are named for the shoot, "<shoot> reel", then "<shoot> reel 2", whichever reel on the page they came from (hers does the same). Talking reels: "<shoot> talking reel", then "... talking reel 2".
+
+**Our way underneath.**
+- **One new file, `scripts/reels.py`,** holds the list for both records. Her record shape is kept: `versions` is a list of `{id, name, data}`, `current` is the open reel's id, the open reel's fields stay at the top of the record, the others wait in their `data`. Nothing is ever dropped; there is no way to remove a reel.
+- **A shoot with one reel is byte for byte as before.** No list is written until a second reel is started (or the first is renamed). Checked against the code before this stage, out of git: the same saves give the same bytes in `reel-page.json`, its `.prev`, `talking.json`, its `.prev` and `talking-words.json`. One exception, on purpose and hers: a **new footage look** (`footage.py moments`) now also writes `moments_found`, every clip found for the shoot, which is what a new reel starts with.
+- **Where hers and ours differ in the record, and why.** In hers the assistant's pick (`claude`) is always in the reel record. In ours the pick has always lived in the kit's own record (`kit.json`, `picks.reel` with `reel_marks` and `reel_earlier`), which the post kit, the posting queue and every older kit read, and which the page server never writes. So: **the shoot's first reel keeps its pick in `kit.json`, exactly as before; every reel started after it keeps its own in the reel record** (`claude`, with `claude_earlier`, the last 12 picks it replaced, and `claude_at`). A pick for one reel never changes another's.
+- **Nothing of one reel can be written into another.** Every save, every clip change and every Make my reel from the page says which reel the page is showing. When another window has started or opened a different reel, that ask is refused, nothing is written, and the page is given the newest and shows it. Starting, opening or renaming a reel also moves the record's counter, so a page a step behind is told there is something newer (the rule the page already had).
+- **Saved whole, the version before kept,** under the record's own lock, as every change to these records is. Opening the reel that is already open, the same name again, and the same pick again each write nothing.
+- **A reel being made knows which reel it is.** The job is written down with the reel it was started on, so the reel is made from that reel's clips and noted as that reel's, also when they open another reel while it is being made. `made` entries carry `version` once a shoot has several reels; an entry without one is the first reel's (hers).
+- **The next mix is each reel's own.** Making a reel again with the same photos, vibe and style gives the next mix of that reel; another reel with the same photos starts at its own first mix. (Hers counts every make of the shoot together.)
+- **The chat's commands act on the reel being worked on, and can name another:** `kit.py picks --reel ... [--for-reel "<name>"]`, `footage.py scan` and `moments [--reel "<name>"]`, `reel_page.py show` and `make [--reel "<name>"]`, `talking_rec.py status / show / cut / photos / place [--reel "<name>"]`. When a shoot has more than one, each says first which reel it is about. A few words of a name are enough when they fit only one reel; a name that fits none stops and lists the reels. Naming another reel changes that reel only: the one open on the page stays open and untouched.
+- **New, for the chat:** `reel_page.py reels "<kit>"` lists the reels; `--new [--name]`, `--open "<name>"` and `--rename "<name>" --to "<name>"` are the page's three moves from the chat, through the same checks.
+- **The talking record:** every key but the list, the open reel's id and the record's own counter (`v`, `rev`, `updated`, `from`) belongs to the reel being worked on (hers: every key but `versions` and `current`). The words of a video are never put away with a reel: they are the video's, kept beside (`talking-words.json`). A reel that comes back up on words that were made again since has its edit started afresh, what was there kept, as a video's edit always was.
+- **A numbered list that is re-made** (a photo exported again) finds every reel's photos again by file name, the put-away reels too.
+- **The routes** are `POST /reel-version` and `POST /talking-version` on the Assistant's one page server, behind the pickers' same-page-only guard, every field checked; another website's press, another host's name and a cross-site press are refused. A reel's name reaches the page as text only. The page never sees a path.
+- **One bar, two pages:** the bar's markup and script are the reel page's (`reel_page.reels_bar`, `REELS_JS`), used by both.
+
+**Choices where her spec was silent (plainest behaviour).**
+1. **Two reels of one shoot can't share a name** (ours; hers allows it). The chat tells reels apart by name. The line is ours: "Another reel of this shoot already has that name. Give this one a different name."
+2. **A refused name leaves the Rename box open** with the line that says why (hers closes the box and shows the line).
+3. A name is one line of plain text, 40 letters at the most (her box's length); a name that is only spaces is "Give the reel a name." (hers).
+4. **A shoot keeps at most 99 reels** (hers has no end; nothing can be removed, so there is one). Ours: "A shoot keeps up to 99 reels. Rename one you're done with and use it again."
+5. **The talking page also refuses a new or other talking reel while a reel is being made in CapCut** (ours: "I'm still making this reel in CapCut. Give it a minute, then try again."). Hers makes a reel inside one request, so the question never comes up there.
+6. A new reel's clips come without the mark of a length they set in another reel. For a record from before `moments_found`, a new reel starts with every clip any reel still has that is not their own (hers).
+7. `kit.py picks --for-reel` with no `--reel` is refused; a pick for a later reel is checked before anything is written (a wrong number changes nothing anywhere).
+8. After the assistant picks for a reel that is on "I'll drag them in myself" (every new reel is), the pick waits under "Let my assistant choose", as it does today for the first reel. Stage H's line ("Your assistant hasn't picked for this reel yet...") goes here.
+9. The post kit's Reel card and the posting queue's cover photos show **the reel being worked on** (hers did the same before her per-reel previews). Stage K gives each reel its own.
+10. The older reel picker (`arrange.py`, opened by name, linked from nowhere) still writes the first reel's pick.
+11. The talking page's bar says that page's own "can't reach" and "didn't work" lines when a press does not go through (her talking page shows its own post's words there).
+12. Rename moves the record's counter too, so another open window shows the new name within a few seconds.
+
+**Hers left out, on purpose.** Nothing a photographer sees. Her `photoLine()` (the copy line with the reel's name) is stage H's.
+
+**Tests.** `tests/reels_check.py` (new): the list by itself, her words both ways against her v25 pages and server, the reel page and the talking reel by request, a shoot with one reel byte for byte against the code before the stage, a reel made into a pretend CapCut folder, and both bars in a hidden Chrome (her words, + Start a new reel with a change saved first, the drop-down, Rename with Save, Cancel, Enter and Escape, a name with a tag in it shown as letters, a phone's width). 158 checks with the pages (131 without), the same on both Pythons. 46 pieces of the stage were each taken out in a scratch copy and a check failed each time (34 by request, 12 on the real pages). `tests/skill_text_check.py` holds the new instruction lines to the scripts (443 checks). In GitHub's check: by request on Windows, with the pages on the Mac's page job.
+
+Also run after the change, one at a time, both Pythons, all passing: `reel_page_check.py` 343, `reel_fixes_check.py` 41, `reel_door_check.py` 47, `reel_footage_check.py` 183, `footage_look_check.py` 88, `posting_panel_check.py` 88, `arrange_check.py` 660, `talking_page_check.py` 573, `talking_multi_check.py` 92, `talking_menus_check.py` 108, `talking_snap_check.py` 48, `talking_rec_check.py`, `talking_engine_check.py`, `talking_capcut_check.py`, `pc_reel_page.py` 49, `pc_talking.py`, `pc_smoke.py` 230 (183 on Apple's 3.9), `look_check.py` 75; `tools/check_pc.py` and `tools/check_plugin.py` clean. `kit_steps_check.py` (98 of 99) and `kit_cards_check.py` (125 or 126 of 127) fail only on what they failed on before this stage (see "For later stages").
+
+**Not tried.** Dustin's or Nicole's own hand; the Claude app's pane; a real shoot; a real reel made from a second reel and opened in CapCut; a talking reel made from a second talking reel; two real windows by hand (the checks send what a second window would); a fresh session following the new instructions; Windows (the first push runs it); a touch screen; a screen reader reading the bar.
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **Two reels can't share a name**, and a refused name keeps the box open (choices 1 and 2).
+2. **At most 99 reels a shoot**, and no way to remove one. Say if a reel should be removable (it would go nowhere: kept in the record, only hidden).
+3. **Our three lines:** the name-taken line, the 99 line, and "I'm still making this reel in CapCut. Give it a minute, then try again."
+4. **CapCut's projects are named for the shoot, not the reel** (hers too). With two reels called "Kitchen" and "White backdrop", CapCut shows "<shoot> reel" and "<shoot> reel 2". Say if the reel's name should be in the project's name.
+5. **The next mix is each reel's own** (hers counts the shoot's makes together).
+6. **The first reel's pick lives in the kit's record, later reels' in the reel record.** Nothing they can see; said so it is known.
+7. **Remove a song** is still not built and is hers to answer (the waiting list, item 1).
+
+**For later stages.**
+- Stage H (the photo note): `photo_ask` belongs in `saved`, so it is per reel by itself; add it to `reel_page.SAVE_FIELDS` and to `reel_fresh`. The copy line's reel name is `window.Reel.reels.name()` (the name, or "" when the shoot has one reel). "Checks the record's current reel matches the name" is `reel_page.py reels "<kit>"`, and `kit.py picks --for-reel`.
+- Stage I (trim): clips are per reel (`moments` at the top of the record is the open reel's); `reel_fresh` drops the "set" mark for a new reel.
+- Stage J (songs): the Music folder is the shoot's; which song is picked is `saved.song`, per reel already.
+- Stage K (post kit, posting queue): one reel's own fields are `reel_page.as_reel(rec, id)` (a copy to read); its pick is `reel_page.assistant_pick`; whose a `made` entry is, `reel_page.made_for`; the list, `reels.listed(rec, reel_page.REEL_FIRST)`. `kit.json`'s `reel` is the newest reel made, of any reel. `order_for_kit_page` is the open reel.
+- The bar's words are in their own tables (`reel_page.REELS_WORDS`, `talking_page.REELS_WORDS`), checked against her v25 pages by `tests/reels_check.py`; `reel_page.WORDS` is still compared with her v19/v23 page by `tests/reel_page_check.py`.
+- `tests/kit_cards_check.py` has two failures that are older than this stage (shown on the code as committed before it): `need_both` / `need_caption` (stage K's), and "nothing was asked of the internet by the kit page" (it asks Google for Figtree; it came with the stories designer).

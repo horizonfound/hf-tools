@@ -8,6 +8,9 @@
                                            CapCut's music, words on the first photo, a second take under another
                                            name) or when the page said "Ask your assistant to make the reel instead":
                                            the page's order, song and vibe, made exactly as the page makes it
+    python3 reel_page.py reels "beach" [--new [--name N] | --open "<reel>" | --rename "<reel>" --to "<name>"]
+                                           the shoot's reels (her v25: several reels from one shoot), and the page's
+                                           own three moves from the chat; show and make take --reel "<reel>"
     python3 reel_page.py job "<kit>" --id <id>   (the page server's own) make the reel a page asked for
 
 The photographer sees her page: her words (WORDS below, word for word from her reel-maker.html and server.py),
@@ -34,6 +37,10 @@ Routes, all on the posting server (posting_queue.py hands them here):
   POST /reel-open                {kit, what: "music"}: makes <kit>/Music if it isn't there and opens it (finder.py)
   POST /reel-make                {kit, stamp, picks, song, vibe, test}: Make my reel; answers with a job to ask after
   GET  /reel-job?kit=&id=        how that job is going: queued, running, done (her lines) or problem (her words)
+  POST /reel-version             {kit, op: new | switch | rename, id, name}: her "Your reels" bar (v25): start a new
+                                 reel, work on another, rename one. /reel-save, /reel-make and /reel-moment may
+                                 carry "reel", the reel the page is showing: when that is no longer the one being
+                                 worked on, nothing is written and the page is given the newest
   POST /reel-capcut              {kit, from?}: Open CapCut (capcut.py's own open), in her words (capcut.OPEN_WORDS);
                                  "from": "kit" is the post kit's Reel card (her "Open in CapCut" button)
 Small copies of the photos are arrange.py's (/kit-photo, .kit/previews), the same the pickers use.
@@ -47,6 +54,15 @@ Records:
                                   "claude_bts" and "made"; Claude's moments are written only by footage.py moments,
                                   which keeps those of an earlier look in "earlier_looks"}. Her record (BUILD.md section 8), minus her "claude", which
                                   is read from kit.json picks.reel every time.
+                                  Several reels (her v25, reels.py): her shape. "versions": [{id, name, data}] and
+                                  "current"; the reel being worked on keeps its fields at the top (REEL_KEYS: saved,
+                                  moments, claude_bts, and for a reel after the first its own "claude"), the others
+                                  wait in their "data"; "made" entries carry "version"; "moments_found" is every clip
+                                  found for the shoot. A record with no "versions" is one reel and is written byte
+                                  for byte as before. One difference from hers, on purpose: the FIRST reel's pick of
+                                  the Assistant's stays in kit.json (picks.reel), where the post kit, the posting
+                                  queue and every older kit read it, and which the page server never writes; only a
+                                  reel started after it keeps its "claude" here (assistant_pick, set_assistant_pick).
   <kit>/.kit/reel-page.prev.json  the version before, kept whole
   <kit>/.kit/reel-page.lock       held by every writer (this_computer.try_lock, through arrange.locked), never removed
   <kit>/.kit/reel-job.json        Make my reel's newest job: {id, state, ask: {picks, song id, vibe, dry, stamp}, pid,
@@ -75,6 +91,7 @@ Python 3.9, standard library only. Nothing here is Mac-only: the small copies ar
 pictures.py's Pillow on a PC), the lock is this_computer.try_lock, and the page's words name no Mac thing.
 """
 import argparse
+import copy
 import hashlib
 import html
 import json
@@ -94,6 +111,7 @@ sys.path.insert(0, str(HERE))
 import this_computer  # noqa: E402
 import arrange  # noqa: E402
 import kit as kit_mod  # noqa: E402
+import reels  # noqa: E402
 import brand  # noqa: E402
 import look  # noqa: E402
 
@@ -118,6 +136,16 @@ SONG_EVERY_MS = 3000    # hers: the song list is looked at again every 3 seconds
 JOB_EVERY_MS = 700      # how often the page asks how Make my reel is going (ours: hers waited on one long request)
 JOB_BOOT = 20.0         # seconds a job may take to start before "queued" means it never did
 
+# Several reels from one shoot (Nicole's v25, Nov 12; reels.py). Hers: REEL_FIRST, REEL_LIVE.
+REEL_FIRST = "Reel 1"                  # hers: a record with no list of reels is this one reel
+REEL_WORD = "Reel"                     # hers: a new one is "Reel 2", "Reel 3"...
+# What belongs to ONE reel (hers: saved, moments, claude, claude_bts, claude_at; ours beside them: when the moments
+# were last changed, the moments Remove took out (Undo's), and the Assistant's earlier picks for that reel).
+# Everything else in the record is the shoot's: the counter, the numbered list's stamp and names, "made" (each
+# entry says which reel), "moments_found", "earlier_looks".
+REEL_KEYS = ("saved", "moments", "moments_at", "claude_bts", "removed", "claude", "claude_earlier", "claude_at")
+REEL_LIVE = lambda rec: REEL_KEYS      # noqa: E731
+CLAUDE_EARLIER_KEPT = 12               # as kit.py's REEL_EARLIER_KEPT
 RECORD = "reel-page.json"
 PREV = "reel-page.prev.json"
 LOCK = "reel-page.lock"
@@ -185,7 +213,7 @@ FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answer
 
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
              "/reel-strip", "/reel-moment-still")
-POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment")
+POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version")
 
 # ---------- the words: hers, word for word (reel-maker.html and server.py, handoff v19) ----------
 # Each is shown exactly as written here. "_html" words carry her own <b>; {short}, {n}, {k}, {max} are filled in.
@@ -421,8 +449,31 @@ WORDS = {
     "plan_own_sound": " (the footage keeps its own sound).",
 }
 
+# Several reels from one shoot (her v25, Nov 12): the "Your reels" bar under the title. Hers, word for word
+# (pages/reel-maker.html and server.py ver_op, handoff v25); tests/reels_check.py compares them with her page.
+REELS_WORDS = {
+    "reels_first": REEL_FIRST,
+    "reels_label": "Your reels",
+    "reels_which": "Which reel you're working on",
+    "reels_new": "+ Start a new reel",
+    "reels_rename": "Rename",
+    "reels_name": "The reel's name",
+    "reels_save": "Save",
+    "reels_cancel": "Cancel",
+    "reels_starting": "Saving this reel and starting a new one…",
+    "reels_opening": "Opening that reel…",
+    "reels_reach": "I can't reach the page right now. Check the photo drive is plugged in.",
+    "reels_failed": "That didn't work.",
+    "reels_no_name": reels.NO_NAME,
+    "reels_gone": reels.GONE,
+}
+
 # Lines that are ours, not hers, each with why (they go on the "Tell Nicole" list):
 OUR_WORDS = {
+    # several reels (v25): hers lets two reels share a name; the chat tells them apart by name, so ours does not.
+    # And nothing can ever be removed, so there is an end to how many a shoot keeps (hers has none).
+    "reels_taken": reels.NAME_TAKEN,
+    "reels_most": reels.TOO_MANY,
     # decision 23: her server keeps the first 40 without a word
     "too_many": f"A reel holds up to {MAX_PICKS} photos. Take one out first.",
     # decision 21: only when a second window saved first
@@ -569,6 +620,95 @@ def claude_order(kit, rec_kit=None, on_sheet=None):
     return out
 
 
+def _clean_order(lst, on_sheet=None):
+    """A list of {n, h} from a record, read for what makes sense: whole numbers, none twice, marks + - or none."""
+    out, seen = [], set()
+    for x in lst if isinstance(lst, list) else []:
+        if isinstance(x, dict) and type(x.get("n")) is int and x["n"] not in seen and (on_sheet is None or x["n"] in on_sheet):
+            seen.add(x["n"])
+            out.append({"n": x["n"], "h": x.get("h") if x.get("h") in ("+", "-") else ""})
+    return out
+
+
+def _lines_as_orders(got, on_sheet=None):
+    out = []
+    for text in got if isinstance(got, list) else []:
+        if not isinstance(text, str):
+            continue
+        one = [{"n": int(n), "h": m} for n, m in re.findall(r"(\d+)([+-]?)", text)]
+        if on_sheet is not None:
+            one = [x for x in one if x["n"] in on_sheet]
+        if one:
+            out.append(one)
+    return out
+
+
+def assistant_pick(kit, rec, rec_kit=None, on_sheet=None):
+    """The Assistant's photo pick for the reel being worked on, as her record's "claude": [{n, h}].
+    The shoot's first reel (and a shoot with only one) keeps its pick where it always was, in kit.json
+    (claude_order): the post kit, the posting queue and every older kit read it there. Every reel started after
+    it keeps its own in this record ("claude", written by kit.py picks --reel through set_assistant_pick), so a
+    pick for one reel never changes another's."""
+    if reels.current(rec, REEL_FIRST) == reels.FIRST_ID:
+        return claude_order(kit, rec_kit, on_sheet)
+    return _clean_order(rec.get("claude"), on_sheet)
+
+
+def assistant_earlier(rec, rec_kit, on_sheet=None):
+    """The Assistant's earlier picks for the reel being worked on (earlier_orders, per reel)."""
+    if reels.current(rec, REEL_FIRST) == reels.FIRST_ID:
+        return earlier_orders(rec_kit, on_sheet)
+    return _lines_as_orders(rec.get("claude_earlier"), on_sheet)
+
+
+def _order_text(lst):
+    return ",".join(f"{x['n']}{x.get('h') or ''}" for x in lst or [])
+
+
+def set_assistant_pick(kit, vid, text):
+    """kit.py picks --reel, for a reel that is not the shoot's first: the pick ("19,4,10+,14-") goes into that
+    reel only, in this record, under its lock, the version before kept. The pick it replaces is kept
+    ("claude_earlier", the last 12, none twice), as kit.json keeps reel_earlier. The same pick again writes
+    nothing. Returns (how many photos, the reel's name). Raises ValueError(words) and writes nothing when a
+    number is not on the numbered list, the reel is not there, or the pick is the first reel's (kit.json's)."""
+    nums, marks = kit_mod.parse_reel(text)
+    with arrange.locked(lock_path(kit)):
+        rec, rows, stamp = sync(kit)
+        if not rows:
+            raise ValueError("couldn't read this shoot's numbered list")
+        on_sheet = {x["n"] for x in rows}
+        bad = [n for n in nums if n not in on_sheet]
+        if bad:
+            raise ValueError(f"no photo numbered {bad[0]} on the sheet.")
+        if len(set(nums)) != len(nums):
+            raise ValueError("a photo is in that pick twice.")
+        if len(nums) > MAX_PICKS:
+            raise ValueError(OUR_WORDS["too_many"])
+        if vid == reels.FIRST_ID or vid not in {v["id"] for v in reels.listed(rec, REEL_FIRST)}:
+            raise ValueError(reels.GONE)
+        name = reels.name_of(rec, vid, REEL_FIRST)
+        new = [{"n": n, "h": marks.get(str(n), "")} for n in nums]
+        try:
+            with reels.turned(rec, vid, REEL_LIVE, REEL_FIRST):
+                old = _clean_order(rec.get("claude"))
+                if old == new:
+                    return len(new), name
+                if old:
+                    line = _order_text(old)
+                    kept = [t for t in (rec.get("claude_earlier") if isinstance(rec.get("claude_earlier"), list) else [])
+                            if isinstance(t, str) and t != line]
+                    rec["claude_earlier"] = (kept + [line])[-CLAUDE_EARLIER_KEPT:]
+                rec["claude"] = new
+                rec["claude_at"] = time.time()
+        except reels.Wrong as e:
+            raise ValueError(str(e))
+        rec["rev"] = int(rec.get("rev") or 0) + 1      # an open page on that reel takes the new pick
+        rec.pop("from", None)
+        _stamp_names(rec, rows, stamp)
+        save(kit, rec)
+        return len(new), name
+
+
 def earlier_orders(rec_kit, on_sheet=None):
     """The Assistant's earlier picks for this reel (kit.json "reel_earlier", written by kit.py picks when a new
     pick replaces one), each as [{n, h}], only photos on the numbered list. An order the page shows that is
@@ -587,9 +727,16 @@ def earlier_orders(rec_kit, on_sheet=None):
 
 
 def _numbers_in(saved, rec=None):
-    """Every photo number the record mentions: the saved orders, and (from the footage stage) Claude's footage
-    order and the photos the moments are matched to."""
+    """Every photo number ONE reel mentions: the saved orders, and (from the footage stage) Claude's footage
+    order and the photos the moments are matched to; for a reel after the first, the Assistant's pick too."""
     out = set()
+    for key in ("claude",):
+        for x in (rec or {}).get(key) or []:
+            if isinstance(x, dict) and type(x.get("n")) is int:
+                out.add(x["n"])
+    for text in (rec or {}).get("claude_earlier") or []:
+        if isinstance(text, str):
+            out.update(int(n) for n in re.findall(r"(\d+)[+-]?", text))
     for key in ("picks", "mine_picks"):
         for x in (saved or {}).get(key) or []:
             if isinstance(x, dict) and type(x.get("n")) is int:
@@ -628,22 +775,26 @@ def sync(kit):
     stamp = arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return rec, [], ""
-    if rec.get("stamp") and rec.get("stamp") != stamp and isinstance(rec.get("saved"), dict):
+    if rec.get("stamp") and rec.get("stamp") != stamp and (isinstance(rec.get("saved"), dict) or reels.several(rec)):
         # the list was re-made: find each photo again by its file name
         n_of = {}
         for x in rows:
             n_of.setdefault(arrange.photo_name(x), x["n"])
         old = rec.get("names") or {}
-        s = rec["saved"]
-        for key in ("picks", "mine_picks"):
-            if isinstance(s.get(key), list):
-                s[key] = _refind(s[key], old, n_of)
-        if isinstance(rec.get("claude_bts"), list):
-            rec["claude_bts"] = _refind(rec["claude_bts"], old, n_of)
-        for m in rec.get("moments") or []:
-            if isinstance(m, dict) and type(m.get("photo")) is int:
-                nm = old.get(str(m["photo"]))
-                m["photo"] = n_of.get(nm) if nm else None
+        for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):      # every reel of the shoot, the open one first
+            s = d.get("saved")
+            for key in ("picks", "mine_picks"):
+                if isinstance(s, dict) and isinstance(s.get(key), list):
+                    s[key] = _refind(s[key], old, n_of)
+            for key in ("claude_bts", "claude"):
+                if isinstance(d.get(key), list):
+                    d[key] = _refind(d[key], old, n_of)
+            if isinstance(d.get("claude_earlier"), list):
+                d["claude_earlier"] = [t for t in (_order_text(_refind(one, old, n_of)) for one in _lines_as_orders(d["claude_earlier"])) if t]
+            for m in d.get("moments") or []:
+                if isinstance(m, dict) and type(m.get("photo")) is int:
+                    nm = old.get(str(m["photo"]))
+                    m["photo"] = n_of.get(nm) if nm else None
         _stamp_names(rec, rows, stamp)
         rec["rev"] = int(rec.get("rev") or 0) + 1
         rec.pop("from", None)
@@ -657,18 +808,104 @@ def _names(saved, name_of, rec=None):
 
 def _stamp_names(rec, rows, stamp):
     """The record's file name for every number it mentions, and the numbered list it is in line with."""
-    rec["names"] = _names(rec.get("saved") if isinstance(rec.get("saved"), dict) else {},
-                          {x["n"]: arrange.photo_name(x) for x in rows}, rec)
+    name_of = {x["n"]: arrange.photo_name(x) for x in rows}
+    names = {}
+    for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):          # every reel of the shoot
+        names.update(_names(d.get("saved") if isinstance(d.get("saved"), dict) else {}, name_of, d))
+    rec["names"] = {k: names[k] for k in sorted(names, key=int)}
     rec["stamp"] = stamp
 
 
-def state(kit):
+def as_reel(rec, vid):
+    """The record as it would read with reel `vid` open: a copy, to READ (nothing is saved, and which reel is
+    being worked on does not change). The record itself when that reel is the open one, or `vid` is None."""
+    if vid is None or vid == reels.current(rec, REEL_FIRST):
+        return rec
+    rec = copy.deepcopy(rec)
+    reels.switch(rec, vid, REEL_LIVE, REEL_FIRST)
+    return rec
+
+
+def which_reel(kit, words):
+    """For a chat command's --reel: (the reel's id, None), or (None, plain words listing the shoot's reels).
+    No words: the reel being worked on."""
+    rec = load(kit)
+    if not words:
+        return reels.current(rec, REEL_FIRST), None
+    return reels.find(rec, words, REEL_FIRST)
+
+
+def reel_names(kit):
+    """(the shoot's reels as [{id, name}], the id of the one being worked on)."""
+    rec = load(kit)
+    return reels.listed(rec, REEL_FIRST), reels.current(rec, REEL_FIRST)
+
+
+def found_moments(rec):
+    """Hers (found_moments): the clips the Assistant found for the shoot, untouched; a new reel starts with all
+    of them. "moments_found" is kept by footage.py moments; a record from before it (or with none) gives every
+    clip any reel still has that is not the photographer's own, the first one of each id."""
+    got = rec.get("moments_found")
+    if isinstance(got, list) and got:
+        return [m for m in got if isinstance(m, dict)]
+    seen, out = set(), []
+    for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):
+        for m in moments_of(d):
+            if m.get("by") != "you" and m["id"] not in seen:
+                seen.add(m["id"])
+                out.append(m)
+    return out
+
+
+def reel_fresh(rec):
+    """Hers (reel_fresh): what a new reel starts with. "I'll drag them in myself" with nothing in it, no
+    assistant picks, footage not chosen, no song, every clip found for the shoot, all as found."""
+    ms = []
+    for m in copy.deepcopy(found_moments(rec)):
+        m["keep"] = True
+        m.pop("set", None)                    # a length they set in another reel is that reel's
+        ms.append(m)
+    return {"moments": ms,
+            "saved": {"picks": [], "mine": True, "mine_picks": [], "song": None, "vibe": "beat", "footage": None,
+                      "style": "first", "ask": "", "feel": "", "sel": {}, "updated": time.time()}}
+
+
+def version_from_page(body):
+    """POST /reel-version {kit, op: new | switch | rename, id, name, base?}: hers (/reel/version). Start a new
+    reel, work on another, or rename one. Under the record's lock, written whole with the version before kept;
+    the counter moves on, so a page that has not seen it can never save one reel's choices into another.
+    (status, {ok, versions, current, rev} or {ok: False, words})."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    ask = {k: v for k, v in body.items() if k != "kit"}
+    with arrange.locked(lock_path(kit)):
+        rec, rows, stamp = sync(kit)
+        if not rows:
+            return _bad(NOT_READY, 404)
+        try:
+            changed = reels.op(rec, ask, REEL_LIVE, reel_fresh, REEL_FIRST, REEL_WORD)
+        except reels.Wrong as e:
+            return _bad(str(e) or NOT_UNDERSTOOD)
+        if changed:
+            rec["rev"] = int(rec.get("rev") or 0) + 1
+            rec.pop("from", None)
+            _stamp_names(rec, rows, stamp)
+            save(kit, rec)
+        out = {"ok": True, "rev": int(rec.get("rev") or 0)}
+        out.update(reels.info(rec, REEL_FIRST))
+    return 200, out
+
+
+def state(kit, reel=None):
     """Everything the page draws from. No path and no file name is in it. None when the numbered list can't be
-    read right now."""
+    read right now. `reel` (a chat command naming another reel): that reel's choices, read only."""
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
     if not rows:
         return None
+    open_reel = reels.current(rec, REEL_FIRST)
+    rec = as_reel(rec, reel)
     rec_kit = kit_mod.load_rec(kit)
     photos, made = arrange.page_photos(kit, rec_kit, rows)
     on_sheet = {x["n"] for x in rows}
@@ -680,8 +917,8 @@ def state(kit):
         "kit_page": kit_mod.rec_path(kit).is_file(),
         "stamp": stamp, "rev": int(rec.get("rev") or 0), "total": len(rows),
         "photos": photos, "previews": {"made": made, "of": len(rows)},
-        "claude": claude_order(kit, rec_kit, on_sheet),
-        "claude_earlier": earlier_orders(rec_kit, on_sheet),
+        "claude": assistant_pick(kit, rec, rec_kit, on_sheet),
+        "claude_earlier": assistant_earlier(rec, rec_kit, on_sheet),
         "saved": _for_page(saved, on_sheet),
         "max": MAX_PICKS,
         "songs": songs_for_page(kit, rec_kit),
@@ -691,6 +928,9 @@ def state(kit):
         # /reel-footage, which the page asks only once they chose footage (asking starts the previews)
         "moments": moments_for_page(kit, rec, on_sheet),
         "claude_bts": _bts_of(rec, on_sheet),
+        # hers (GET /reel): the shoot's reels and which one is being worked on ("on_page": the one the page has,
+        # also when a chat command reads another)
+        "versions": reels.listed(rec, REEL_FIRST), "current": reels.current(rec, REEL_FIRST), "on_page": open_reel,
     }
 
 
@@ -725,11 +965,12 @@ def _order_used(saved, claude, earlier=()):
     return list(claude)
 
 
-def current_picks(kit):
+def current_picks(kit, reel=None):
     """The order Make my reel uses when it is not handed one by the page, as reel.py reads it ("19,4,10+,14-"):
     their own when they chose "I'll drag them in myself", otherwise Claude's newest, with the Longer / Quicker
-    they set on the same photos (her followClaude). "" when there is nothing yet."""
-    st = state(kit)
+    they set on the same photos (her followClaude). "" when there is nothing yet. The reel being worked on,
+    or the one named."""
+    st = state(kit, reel)
     if st is None:
         return ""
     return ",".join(f"{x['n']}{x.get('h') or ''}" for x in _order_used(st["saved"], st["claude"], st.get("claude_earlier")))
@@ -746,17 +987,20 @@ def order_for_kit_page(kit, rows=None, rec_kit=None):
     rec = load(kit)
     saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
     stamp = arrange.sheet_stamp(kit)
-    if saved and rec.get("stamp") and stamp and rec.get("stamp") != stamp:
+    if rec.get("stamp") and stamp and rec.get("stamp") != stamp:
         n_of = {}
         for x in rows:
             n_of.setdefault(arrange.photo_name(x), x["n"])
-        saved = dict(saved)
-        for key in ("picks", "mine_picks"):
-            if isinstance(saved.get(key), list):
-                saved[key] = _refind(saved[key], rec.get("names") or {}, n_of)
+        if saved:
+            saved = dict(saved)
+            for key in ("picks", "mine_picks"):
+                if isinstance(saved.get(key), list):
+                    saved[key] = _refind(saved[key], rec.get("names") or {}, n_of)
+        if isinstance(rec.get("claude"), list):          # a reel after the first keeps its pick here
+            rec = dict(rec, claude=_refind(rec["claude"], rec.get("names") or {}, n_of), claude_earlier=[])
     on_sheet = {x["n"] for x in rows}
     rec_kit = rec_kit if rec_kit is not None else kit_mod.load_rec(kit)
-    return _order_used(_for_page(saved, on_sheet), claude_order(kit, rec_kit, on_sheet), earlier_orders(rec_kit, on_sheet))
+    return _order_used(_for_page(saved, on_sheet), assistant_pick(kit, rec, rec_kit, on_sheet), assistant_earlier(rec, rec_kit, on_sheet))
 
 
 def _when_of(iso):
@@ -1437,7 +1681,9 @@ def change_moments(body):
     do = body.get("do")
     allowed = {"add": {"video", "start", "seconds"}, "update": {"id", "start", "end"}, "remove": {"id"},
                "restore": {"id", "at"}}.get(do)
-    if allowed is None or set(body) - {"kit", "do"} - allowed:
+    if allowed is None or set(body) - {"kit", "do", "reel"} - allowed:
+        return _bad()
+    if "reel" in body and not (isinstance(body["reel"], str) and reels.ID.fullmatch(body["reel"])):
         return _bad()
     if do != "add" and (not isinstance(body.get("id"), str) or not MOMENT_ID.fullmatch(body["id"])):
         return _bad()
@@ -1447,6 +1693,8 @@ def change_moments(body):
         rec, rows, stamp = sync(kit)
         if not rows:
             return _bad(NOT_READY, 404)
+        if _other_reel(body, rec):
+            return _bad(OUR_WORDS["newer"], 409, why="newer")
         on_sheet = {x["n"] for x in rows}
         ms = moments_of(rec)
         if do == "add":
@@ -1698,6 +1946,14 @@ def _bad(words=NOT_UNDERSTOOD, code=400, **more):
     return code, d
 
 
+def _other_reel(body, rec):
+    """A page says which reel it has open ("reel"). True when that is no longer the reel being worked on (another
+    window started or opened another): nothing of that page's may be written into this reel. A page that does
+    not say is taken as before."""
+    got = body.get("reel")
+    return got is not None and got != reels.current(rec, REEL_FIRST)
+
+
 def save_from_page(body):
     """One save from the page. Returns (status, answer). Checks, in order: the kit, the numbered list's stamp,
     the counter the page had last seen, then every field it sent (the whole save is refused if any one is
@@ -1711,7 +1967,9 @@ def save_from_page(body):
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
-    if set(body) - {"kit", "stamp", "base", "page", "saved"}:
+    if set(body) - {"kit", "stamp", "base", "page", "saved", "reel"}:
+        return _bad()
+    if "reel" in body and not (isinstance(body["reel"], str) and reels.ID.fullmatch(body["reel"])):
         return _bad()
     base, page, sent = body.get("base"), body.get("page"), body.get("saved")
     if type(base) is not int or base < 0 or not isinstance(page, str) or not PAGE_ID.fullmatch(page):
@@ -1724,6 +1982,7 @@ def save_from_page(body):
             return _bad(NOT_READY, 404)
         if body.get("stamp") != stamp:
             return _bad(OUR_WORDS["photos_changed"], 409, why="photos")
+        other = _other_reel(body, rec)
         on_sheet = {x["n"] for x in rows}
         stored = rec.get("saved") if isinstance(rec.get("saved"), dict) else {}
         try:
@@ -1737,16 +1996,16 @@ def save_from_page(body):
             return _bad()
         # More than a reel holds is refused, with one way through: an order that is ALREADY that long (an
         # older pick of Claude's) may be re-ordered and made shorter here, never longer.
-        longest = len(claude_order(kit, None, on_sheet))
+        longest = len(assistant_pick(kit, rec, None, on_sheet))
         for key in ("picks", "mine_picks"):
             if isinstance(clean.get(key), list) and len(clean[key]) > max(MAX_PICKS, longest, len(stored.get(key) or [])):
                 return _bad(OUR_WORDS["too_many"], 400, why="many")
         rev = int(rec.get("rev") or 0)
-        if all(stored.get(k) == v for k, v in clean.items()):
+        if not other and all(stored.get(k) == v for k, v in clean.items()):
             return 200, {"ok": True, "rev": rev}      # what is stored already: nothing to write
         src = rec.get("from") if isinstance(rec.get("from"), dict) else {}
         own = src.get("page") == page and src.get("base") == base
-        if not (REV_CHECK and base != rev and not own):
+        if not other and not (REV_CHECK and base != rev and not own):
             new = dict(stored)
             new.update(clean)
             new["updated"] = time.time()
@@ -1850,6 +2109,20 @@ def _made_by(kit, jid):
     return None
 
 
+def made_for(m):
+    """Which reel a "made" entry belongs to (hers: old entries count as v1)."""
+    v = m.get("version") if isinstance(m, dict) else None
+    return v if isinstance(v, str) and reels.ID.fullmatch(v) else reels.FIRST_ID
+
+
+def mix_number(made, picks, vibe, style, which):
+    """Hers (her "variation"): how many reels of the same photos, vibe and footage style were made before, so the
+    next is the next mix. Of the same reel (ours): two reels of one shoot that hold the same photos each start
+    at their own first mix."""
+    return sum(1 for m in made or [] if isinstance(m, dict) and m.get("picks") == picks and m.get("vibe") == vibe
+               and m.get("footage") == style and made_for(m) == which)
+
+
 def capcut_say(st):
     """The line under "It's in CapCut": hers when the reel is in CapCut's list (or a Mac's open CapCut adds it by
     itself); else ours, saying what to do (v19 review)."""
@@ -1868,7 +2141,9 @@ def start_make(body):
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
-    if set(body) - {"kit", "stamp", "picks", "song", "vibe", "test", "footage", "style", "clips"}:
+    if set(body) - {"kit", "stamp", "picks", "song", "vibe", "test", "footage", "style", "clips", "reel"}:
+        return _bad()
+    if "reel" in body and not (isinstance(body["reel"], str) and reels.ID.fullmatch(body["reel"])):
         return _bad()
     rows = arrange.sheet_rows(kit)
     if not rows:
@@ -1903,11 +2178,17 @@ def start_make(body):
     if clips is not None and (not isinstance(clips, list) or len(clips) > MAX_CLIPS
                               or any(not isinstance(x, str) or not MOMENT_ID.fullmatch(x) for x in clips)):
         return _bad()
+    with arrange.locked(lock_path(kit)):
+        page_rec = load(kit)
+    if _other_reel(body, page_rec):
+        return _bad(OUR_WORDS["newer"], 409, why="newer", state=state(kit))
     if footage:
-        with arrange.locked(lock_path(kit)):
-            ms = moments_of(load(kit))
+        ms = moments_of(page_rec)
         if not ms:
             return _bad(WORDS["no_moments"].replace("{_}", ""), 400, why="footage")
+    # which reel this is, written down with the job: the reel is made from that reel's clips and noted as that
+    # reel's, also when they open another while it is being made. Only once the shoot has more than one.
+    which = {"reel": reels.current(page_rec, REEL_FIRST)} if reels.several(page_rec) else {}
     with _JOB_ROUTE:
         j = read_job(kit) or {}
         if job_running(kit) or (j.get("state") == "queued" and not j.get("pid") and time.time() - float(j.get("t") or 0) < JOB_BOOT):
@@ -1916,7 +2197,7 @@ def start_make(body):
         write_job(kit, {"id": jid, "state": "queued", "t": time.time(), "dry": test,
                         "ask": {"picks": _picks_text(picks), "song": song, "vibe": vibe, "dry": test,
                                 "stamp": body.get("stamp"), "footage": style if footage else None,
-                                "clips": list(clips) if footage and clips is not None else None}})
+                                "clips": list(clips) if footage and clips is not None else None, **which}})
         try:
             arrange.HOME.mkdir(parents=True, exist_ok=True)
             with open(arrange.LOG, "a", encoding="utf-8") as out:
@@ -2054,11 +2335,17 @@ def _make(kit, ask, jid, t0):
     picks = ask["picks"]
     with arrange.locked(lock_path(kit)):
         page_rec = load(kit)
+    # the reel this make is for (several reels, v25): the one the job was started on, else the one being worked on
+    which = ask.get("reel") if isinstance(ask.get("reel"), str) else reels.current(page_rec, REEL_FIRST)
+    try:
+        page_rec = as_reel(page_rec, which)
+    except reels.Wrong:
+        return {"state": "problem", "problem": reels.GONE}
     made = page_rec.get("made") or []
     style = ask.get("footage") if ask.get("footage") in STYLES else None
-    # hers: the next reel of the same photos, vibe and footage style is the next mix
-    variation = sum(1 for m in made if isinstance(m, dict) and m.get("picks") == picks and m.get("vibe") == ask["vibe"]
-                    and m.get("footage") == style)
+    # hers: the next reel of the same photos, vibe and footage style is the next mix (of the same reel, ours:
+    # two reels of one shoot that happen to hold the same photos each start at their first mix)
+    variation = mix_number(made, picks, ask["vibe"], style, which)
     # The numbers on the page are the kit's numbered list (.kit/sheet.json); reel.py is handed that same list in
     # its working folder, so a photo exported since can never shift a number to another photo.
     rows = arrange.sheet_rows(kit)
@@ -2115,9 +2402,12 @@ def _make(kit, ask, jid, t0):
     if not dry and project:
         with arrange.locked(lock_path(kit)):
             rec = load(kit)
-            rec.setdefault("made", []).append({"project": project, "picks": picks, "vibe": ask["vibe"], "footage": style,
-                                               "clips": [c["moment"] for c in clip_list] if clip_list else None,
-                                               "song": song_name, "song_id": ask.get("song") or "", "when": time.time()})
+            entry = {"project": project, "picks": picks, "vibe": ask["vibe"], "footage": style,
+                     "clips": [c["moment"] for c in clip_list] if clip_list else None,
+                     "song": song_name, "song_id": ask.get("song") or "", "when": time.time()}
+            if reels.several(rec):
+                entry["version"] = which        # hers: which reel it was; an entry without one is the first reel's
+            rec.setdefault("made", []).append(entry)
             save(kit, rec)
         try:                     # the kit's own record of its reel, through its command (kit.json is only theirs to write)
             k = subprocess.run([sys.executable, str(HERE / "kit.py"), "reel-made", str(kit), "--project", project, "--picks", picks],
@@ -2524,8 +2814,11 @@ def handle_post(handler, path, query):
         body = _json_body(handler, path)
         if body is None:
             return
+        if path == "/reel-version" and _cross_site(handler):         # a press from another website's page
+            return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
         route = {"/reel-save": save_from_page, "/reel-make": start_make, "/reel-open": open_music,
-                 "/reel-capcut": open_capcut_for_page, "/reel-moment": change_moments}.get(path)
+                 "/reel-capcut": open_capcut_for_page, "/reel-moment": change_moments,
+                 "/reel-version": version_from_page}.get(path)
         if route is None:
             return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
         code, out = route(body)
@@ -2732,6 +3025,115 @@ FONT_CSS = "".join(
 # The page itself takes its font from look.py (/look-font, answered by the posting server). FONT_CSS (with Fraunces)
 # is kept for kit pages saved before Nov 7 that still ask for it, and /reel-font answers exactly as before.
 
+# Her rules for the "Your reels" bar (v25), as she wrote them, in look.py's names.
+REELS_CSS = r"""
+.reels{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1.2rem;padding:.75rem .9rem;background:var(--paper);border:1px solid var(--line);border-radius:16px;max-width:42em}
+.reels label{font:600 13px/1 var(--sans);color:var(--ink-2);letter-spacing:.02em}
+.reels select,.reels input{font:600 14px/1.2 var(--sans);color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:999px;padding:.55rem 2rem .55rem .9rem;min-width:11em;max-width:100%}
+.reels select{appearance:none;-webkit-appearance:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 16px) 52%,calc(100% - 11px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.reels input{padding-right:.9rem}
+.reels .btn{padding:.55rem .95rem;font-size:13.5px}
+.reels .btn.new{background:var(--ink);color:#fff;border-color:var(--ink)}
+.reels .msg{font-size:13px;color:var(--ink-2);flex-basis:100%}
+.reels .msg:empty{display:none}
+.reels [hidden]{display:none!important}
+.reels #verRenBox{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.6rem}
+"""
+
+
+def reels_bar(w, label="reels_label", which="reels_which", new="reels_new"):
+    """Her "Your reels" bar (v25), as she wrote it: a drop-down of the shoot's reels, + Start a new reel, Rename
+    (the name turns into a box with Save and Cancel). The talking reel page draws the same bar with its own
+    three lines. Every name is put in by the page's script as text."""
+    e = html.escape
+    return ("<div class='reels' id='reels'>"
+            "<label for='verSel'>" + e(w[label]) + "</label>"
+            "<select id='verSel' aria-label='" + e(w[which], quote=True) + "'></select>"
+            "<button class='btn new' id='verNew' type='button'>" + e(w[new]) + "</button>"
+            "<button class='btn' id='verRen' type='button'>" + e(w["reels_rename"]) + "</button>"
+            "<span id='verRenBox' hidden><input id='verName' maxlength='" + str(reels.NAME_MAX) + "' aria-label='"
+            + e(w["reels_name"], quote=True) + "'> <button class='btn' id='verSave' type='button'>" + e(w["reels_save"])
+            + "</button> <button class='btn' id='verCancel' type='button'>" + e(w["reels_cancel"]) + "</button></span>"
+            "<span class='msg' id='verMsg' role='status'></span>"
+            "</div>")
+
+
+# The bar's script, one for both pages (the reel page and the talking reel page): hers (verOp and its buttons),
+# with ours underneath. `host` is what the page hands it: post(body) -> a promise of {code, j}; flush() -> a
+# promise that this reel is saved exactly as it is (hers: "this reel is saved exactly as it is first"); words.
+REELS_JS = r"""
+(function(){
+  'use strict';
+  window.ReelsBar = function(host){
+    var $ = function(id){ return document.getElementById(id); };
+    var W = host.words, VERS = [], CUR = 'v1', busy = false;
+    function msg(t){ $('verMsg').textContent = t || ''; }
+    function show(){
+      var sel = $('verSel');
+      if (document.activeElement === sel && sel.options.length === VERS.length) return;   // never under their hand
+      sel.textContent = '';
+      VERS.forEach(function(v){
+        var o = document.createElement('option');
+        o.value = v.id; o.textContent = v.name; o.selected = v.id === CUR;
+        sel.appendChild(o);
+      });
+      sel.value = CUR;
+    }
+    function set(vers, cur){
+      if (!Array.isArray(vers) || !vers.length) return;
+      VERS = vers; CUR = cur || vers[0].id;
+      if (!busy) show();
+    }
+    function op(body){
+      if (busy) return Promise.resolve(null);
+      busy = true;
+      msg(body.op === 'new' ? W.reels_starting : body.op === 'switch' ? W.reels_opening : '');
+      return Promise.resolve(host.flush()).then(function(saved){
+        if (saved === false) throw new Error('not saved');
+        return host.post(body);
+      }).then(function(res){
+        busy = false;
+        var j = (res && res.j) || {};
+        if (!res || res.code !== 200 || !j.ok) { msg(j.words || W.reels_failed); show(); return null; }
+        return j;
+      }).catch(function(){ busy = false; msg(W.reels_reach); show(); return null; });
+    }
+    function renDone(){ $('verRenBox').hidden = true; $('verRen').hidden = false; $('verSel').hidden = false; }
+    $('verSel').onchange = function(){
+      var to = $('verSel').value;
+      if (to === CUR) return;
+      op({op: 'switch', id: to}).then(function(j){ if (j) host.reload(); });
+    };
+    $('verNew').onclick = function(){ op({op: 'new'}).then(function(j){ if (j) host.reload(); }); };
+    $('verRen').onclick = function(){
+      var v = VERS.filter(function(x){ return x.id === CUR; })[0] || {};
+      $('verName').value = v.name || '';
+      $('verRenBox').hidden = false; $('verRen').hidden = true; $('verSel').hidden = true;
+      msg('');
+      $('verName').focus(); $('verName').select();
+    };
+    $('verCancel').onclick = function(){ renDone(); $('verRen').focus(); };
+    $('verSave').onclick = function(){
+      var name = $('verName').value.trim();
+      if (!name) return;
+      op({op: 'rename', id: CUR, name: name}).then(function(j){
+        if (!j) return;                              // the box stays open with the line that says why
+        set(j.versions, j.current); msg(''); renDone(); show();
+        if (host.renamed) host.renamed(j);
+        $('verRen').focus();
+      });
+    };
+    $('verName').onkeydown = function(e){
+      if (e.key === 'Enter') { e.preventDefault(); $('verSave').click(); }
+      if (e.key === 'Escape') { e.preventDefault(); $('verCancel').click(); }
+      e.stopPropagation();
+    };
+    return {set: set, current: function(){ return CUR; }, list: function(){ return VERS.slice(); },
+            name: function(){ var v = VERS.filter(function(x){ return x.id === CUR; })[0]; return VERS.length > 1 && v ? v.name : ''; }};
+  };
+})();
+"""
+
 OUR_CSS = r"""
 [hidden]{display:none!important}
 .reelwrap{position:relative}
@@ -2913,6 +3315,7 @@ def page_html(kit_name, short, kit_page=False):
         w["not_looked_h3"] = w["clips_need_h3"]
         w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
     title = w["reel_of"].replace("{short}", short)
+    w.update(REELS_WORDS)
     data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
@@ -2926,14 +3329,14 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
         "<span id='backWords'>" + e(back_words) + "</span></a>" + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
         "<h1 id='title'>" + e(title) + "<em>.</em></h1>"
-        "<p class='lede'>" + w["lede_html"] + "</p></header>"
+        "<p class='lede'>" + w["lede_html"] + "</p>" + reels_bar(w) + "</header>"
         + steps +
         "<div class='result' id='result'></div>"
         "</div>"
@@ -2941,7 +3344,7 @@ def page_html(kit_name, short, kit_page=False):
         "<button class='btn main' id='makeBtn' type='button'>" + e(w["make"]) + "</button></div></div>"
         "<div class='lb' id='lb'><img id='lbimg' alt=''></div>"
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
-        "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + CORE_JS + "</script>"
+        "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
         "<script>" + ORDER_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
         "<script>" + FOOTAGE_JS + "</script><script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
@@ -3005,7 +3408,7 @@ CORE_JS = r"""
   // a name this page gives itself, new on every load and kept nowhere: it lets the Assistant tell this page's
   // own save (whose answer never arrived) from a save made in another window
   var PAGE = (Math.random().toString(36).slice(2, 12) + Date.now().toString(36)).replace(/[^a-z0-9]/g, '');
-  var parts = [], S = null, rev = 0, stamp = '', blocked = false;
+  var parts = [], S = null, rev = 0, stamp = '', blocked = false, REEL = null;
   var saving = false, dirty = false, timer = null, retryT = null, followT = null;
 
   function notice(text, reload){
@@ -3018,7 +3421,37 @@ CORE_JS = r"""
     notice(W.photos_changed, true);
   }
   function fields(){ var out = {}; parts.forEach(function(p){ if (p.fields) { var f = p.fields(); for (var k in f) out[k] = f[k]; } }); return out; }
-  function adopt(st, first){ S = st; rev = st.rev; stamp = st.stamp; parts.forEach(function(p){ if (p.adopt) p.adopt(st, first); }); }
+  function adopt(st, first){
+    S = st; rev = st.rev; stamp = st.stamp;
+    REEL = st.current || null;                       // which of the shoot's reels this page is showing (v25)
+    if (BAR) BAR.set(st.versions, st.current);
+    parts.forEach(function(p){ if (p.adopt) p.adopt(st, first); });
+  }
+  function withReel(o){ if (REEL) o.reel = REEL; return o; }
+  // "This reel is saved exactly as it is first" (hers, before a new reel is started or another opened): true
+  // once nothing of this page is waiting to be saved, false when it would not save in a few seconds
+  function flush(){
+    return new Promise(function(done){
+      var t0 = Date.now();
+      (function wait(){
+        if (blocked || !S) return done(true);
+        if (!dirty && !saving) return done(true);
+        if (Date.now() - t0 > 6000) return done(false);
+        if (dirty && !saving && !retryT) send();
+        setTimeout(wait, 50);
+      })();
+    });
+  }
+  var BAR = !window.ReelsBar || !$('reels') ? null : window.ReelsBar({
+    words: W, flush: flush,
+    post: function(b){ b.kit = KIT; return R_post('/reel-version', b); },
+    reload: function(){ location.reload(); },
+    renamed: function(j){ if (typeof j.rev === 'number') rev = j.rev; if (S) { S.versions = j.versions; S.current = j.current; S.rev = rev; } }
+  });
+  function R_post(url, obj){
+    return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(obj)})
+      .then(function(r){ if (r.status >= 500) throw new Error('no answer'); return r.json().then(function(j){ return {code: r.status, j: j}; }); });
+  }
   function save(){
     var out = $('result'); if (out && out.classList.contains('bad')) out.className = 'result';   // hers: they changed something, the old problem no longer applies
     if (blocked || !S) return;
@@ -3026,9 +3459,9 @@ CORE_JS = r"""
     clearTimeout(timer);
     timer = setTimeout(send, DATA.saveAfter);
   }
-  function body(){ return JSON.stringify({kit: KIT, stamp: stamp, base: rev, page: PAGE, saved: fields()}); }
+  function body(){ return JSON.stringify(withReel({kit: KIT, stamp: stamp, base: rev, page: PAGE, saved: fields()})); }
   function send(){
-    clearTimeout(timer); clearTimeout(retryT);
+    clearTimeout(timer); clearTimeout(retryT); retryT = null;
     if (saving || blocked || !dirty || !S) return;
     saving = true; dirty = false;
     fetch('/reel-save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: body()})
@@ -3072,6 +3505,7 @@ CORE_JS = r"""
       if (st.stamp !== stamp) { photosChanged(); return; }
       if (st.rev !== rev) { adopt(st, false); return; }          // saved in another window: shown as it is now
       S = st;
+      if (BAR) BAR.set(st.versions, st.current);
       parts.forEach(function(p){ if (p.follow) p.follow(st); });
     }).catch(function(){});
   }
@@ -3088,8 +3522,12 @@ CORE_JS = r"""
   }
   var R = window.Reel = {data: DATA, words: W, kit: KIT, q: Q, $: $, esc: esc, fill: fill, part: function(p){ parts.push(p); },
     save: save, notice: notice, start: start, state: function(){ return S; }, busy: null, followNow: follow,
+    // several reels (v25): which reel this page shows goes with every ask, so nothing of one reel is ever
+    // written into another when a second window has opened a different one
+    withReel: withReel, reels: BAR, flush: flush,
     // a POST of the page's own (arrange.guard checks it): {code, j}; a server that gave no answer throws
     post: function(url, obj){
+      if (url === '/reel-moment' || url === '/reel-make') withReel(obj);
       return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(obj)})
         .then(function(r){ if (r.status >= 500) throw new Error('no answer'); return r.json().then(function(j){ return {code: r.status, j: j}; }); });
     },
@@ -3943,20 +4381,69 @@ def cmd_open(kit):
     return 0
 
 
-def cmd_show(kit):
-    st = state(kit)
+def _reel_or_stop(kit, words):
+    """A chat command's --reel: the reel's id, or None after saying why not (nothing was changed)."""
+    vid, why = which_reel(kit, words)
+    if vid is None:
+        say(f"STOP: {why} Nothing was changed.")
+    return vid
+
+
+def reels_line(vs, cur, shown=None):
+    """One line naming the shoot's reels, the one being worked on marked (and the one a command is about)."""
+    return ", ".join(f"\"{v['name']}\"" + (" (the one open on the page)" if v["id"] == cur else "")
+                     + (" (this one)" if shown and v["id"] == shown and shown != cur else "") for v in vs)
+
+
+def cmd_reels(kit, a):
+    """reel_page.py reels "<kit>" [--new [--name N] | --open "<reel>" | --rename "<reel>" --to "<name>"]:
+    the shoot's reels, and the page's own three moves from the chat (the same checks, the same record)."""
+    ask = None
+    if a.new:
+        ask = {"op": "new", **({"name": a.name} if a.name else {})}
+    elif a.open or a.rename:
+        vid = _reel_or_stop(kit, a.open or a.rename)
+        if vid is None:
+            return 1
+        if a.rename and not a.to:
+            say("STOP: --rename needs --to \"<the new name>\". Nothing was changed.")
+            return 1
+        ask = {"op": "switch", "id": vid} if a.open else {"op": "rename", "id": vid, "name": a.to}
+    if ask is not None:
+        code, out = version_from_page(dict(ask, kit=kit.name))
+        if code != 200:
+            say(f"STOP: {out.get('words')} Nothing was changed.")
+            return 1
+    vs, cur = reel_names(kit)
+    say(f"{short_name(kit.name)}: {len(vs)} reel{'s' if len(vs) != 1 else ''}: {reels_line(vs, cur)}.")
+    if ask is not None and ask["op"] != "rename":
+        say("The page shows it after a reload (or \"show my reel page\").")
+    return 0
+
+
+def cmd_show(kit, reel=None):
+    vid = None
+    if reel:
+        vid = _reel_or_stop(kit, reel)
+        if vid is None:
+            return 1
+    st = state(kit, vid)
     if st is None:
         say("STOP: couldn't read this shoot's numbered list. Nothing was changed.")
         return 1
     saved = st["saved"] or {}
     say(f"{st['short']}  ({kit.name})")
+    if len(st["versions"]) > 1:
+        say(f"  This shoot's reels: {reels_line(st['versions'], st['on_page'], st['current'])}. "
+            f"What follows is \"{reels.name_of({'versions': st['versions']}, st['current'], REEL_FIRST)}\"."
+            + ("" if st["current"] != st["on_page"] else " Name another with --reel \"<its name>\"."))
     say(f"  Claude's order: {','.join(str(x['n']) + x['h'] for x in st['claude']) or '(none yet)'}")
     if saved:
         whose = "their own order" if saved.get("mine") else "the assistant's order"
         say(f"  On the page: {whose}")
     else:
         say("  On the page: nothing saved yet")
-    say(f"  The order Make my reel uses: {current_picks(kit) or '(none yet)'}")
+    say(f"  The order Make my reel uses: {current_picks(kit, vid) or '(none yet)'}")
     sid = saved.get("song")
     if sid is None:
         say("  Song: not picked on the page yet")
@@ -3969,7 +4456,7 @@ def cmd_show(kit):
     vibe = saved.get("vibe")
     say(f"  Vibe: {WORDS['vibe_' + vibe + '_b'] if vibe in VIBES else 'not picked on the page yet'}"
         + ("" if vibe in VIBES else f" (Make my reel would use {WORDS['vibe_' + default_vibe() + '_b']})"))
-    rec = load(kit)
+    rec = as_reel(load(kit), vid)
     ms = moments_of(rec)
     foot = saved.get("footage")
     if foot is True:
@@ -3992,6 +4479,8 @@ def cmd_show(kit):
     if saved.get("ask") or saved.get("feel"):
         say(f"  Their notes for the footage look: {saved.get('ask') or '(none)'}; the feel: {saved.get('feel') or '(none)'}")
     made = [m for m in (rec.get("made") or []) if isinstance(m, dict)]
+    if len(st["versions"]) > 1:
+        made = [m for m in made if made_for(m) == st["current"]]
     if made:
         say(f"  Reels made from the page: {len(made)}, the newest \"{made[-1].get('project')}\"")
     say(f"  Saved {st['rev']} time{'s' if st['rev'] != 1 else ''}")
@@ -4001,12 +4490,17 @@ def cmd_show(kit):
 def cmd_make(kit, a):
     """Claude's own Make my reel (see the top of this file): what the page would hand reel.py, made the same way,
     one reel at a time on this computer. A song comes from the page, unless they asked for CapCut's own music."""
-    st = state(kit)
+    vid = None
+    if getattr(a, "reel", None):
+        vid = _reel_or_stop(kit, a.reel)
+        if vid is None:
+            return 1
+    st = state(kit, vid)
     if st is None:
         say("STOP: couldn't read this shoot's numbered list. Nothing was made.")
         return 1
     saved = st["saved"] or {}
-    picks = current_picks(kit)
+    picks = current_picks(kit, vid)
     if not picks:
         say("STOP: there's no order for this reel yet: pick the photos first (kit.py picks --reel), or they put them in order on the page.")
         return 1
@@ -4015,10 +4509,13 @@ def cmd_make(kit, a):
         return 1
     vibe = saved.get("vibe") if saved.get("vibe") in VIBES else default_vibe()
     ask = {"picks": picks, "vibe": vibe, "dry": bool(a.dry_run), "stamp": st["stamp"]}
+    if len(st["versions"]) > 1:
+        ask["reel"] = st["current"]             # this reel's clips, and noted as this reel's
+        say(f"(Making \"{reels.name_of({'versions': st['versions']}, st['current'], REEL_FIRST)}\", one of this shoot's {len(st['versions'])} reels.)")
     if saved.get("footage") is True:            # behind the scenes, as the page would make it: its style, its clips
         style = saved.get("style") if saved.get("style") in STYLES else "first"
         with arrange.locked(lock_path(kit)):
-            ms = moments_of(load(kit))
+            ms = moments_of(as_reel(load(kit), vid))
         clips = chosen_clips(saved, ms)
         if not clips:
             say("STOP: footage is on for this reel, but no clips are selected on the page (Select your clips, in step 1). "
@@ -4068,9 +4565,19 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("open").add_argument("words")
-    sub.add_parser("show").add_argument("words")
+    sh = sub.add_parser("show")
+    sh.add_argument("words")
+    sh.add_argument("--reel", help="another of the shoot's reels, by name (without it: the one being worked on)")
+    rl = sub.add_parser("reels", help="the shoot's reels; start a new one, open another, or rename one")
+    rl.add_argument("words")
+    rl.add_argument("--new", action="store_true", help="start a new reel (the one being worked on is kept as it is)")
+    rl.add_argument("--name", help="with --new: its name (without it: Reel 2, Reel 3...)")
+    rl.add_argument("--open", help="work on this reel (its name)")
+    rl.add_argument("--rename", help="rename this reel (its name now)")
+    rl.add_argument("--to", help="with --rename: the new name")
     m = sub.add_parser("make", help="Claude's own Make my reel: the page's order, song and vibe")
     m.add_argument("words")
+    m.add_argument("--reel", help="another of the shoot's reels, by name (without it: the one being worked on)")
     m.add_argument("--capcut-song", help="a song from CapCut's music (only when they asked for it, after the licence note)")
     m.add_argument("--hook", help="words on the first photo, when they asked for them")
     m.add_argument("--name", help="another name for the CapCut project (a second take)")
@@ -4093,7 +4600,9 @@ def main():
             return cmd_open(kit)
         if a.cmd == "make":
             return cmd_make(kit, a)
-        return cmd_show(kit)
+        if a.cmd == "reels":
+            return cmd_reels(kit, a)
+        return cmd_show(kit, a.reel)
     except arrange.Busy:
         say("STOP: this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.")
         return 2

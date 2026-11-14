@@ -36,6 +36,8 @@ its folder name; everything wrapped so the server stays up):
                                          was made before comes back with its edit, nothing transcribed again;
                                          otherwise a job of its own turns it into words (talking_rec.start)
     POST /talking-save  {kit, base, page, saved}   talking_rec.save_from_page (up to SAVE_CAP bytes)
+    POST /talking-version {kit, op: new | switch | rename, id, name}   her "Your talking reels" bar (v25):
+                                         talking_rec.version_op
     POST /talking-make  {kit[, dry]}     Make it in CapCut, in a job of its own (talking_rec.start_make); the page
                                          then asks /talking-state how it stands ("make") and shows her result box.
                                          `dry: true` (hers too; her page never sends it) plans and writes nothing
@@ -71,7 +73,7 @@ import talking_js_preview  # noqa: E402
 import talking_js_timeline  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
-POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make")
+POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version")
 SAVE_CAP = 200000            # hers: a save may be this big (2000 cuts and 500 stretches)
 LOOK_EVERY_MS = 3000         # hers: the page looks for the assistant's cut, and a finished script, every 3 seconds
 TOAST_MS = 2600              # hers
@@ -273,7 +275,21 @@ WORDS.update({"job_" + k: v for k, v in TR.JOB_WORDS.items()})       # her engin
 WORDS.update({"make_" + k: v for k, v in TR.MAKE_WORDS.items()})     # her server's lines (server.py make_talking)
 
 # Every line of ours on this page, each with why it is ours. (line, reason.) All drafts for Nicole to reword.
+# Several talking reels from one shoot (her v25, Nov 12): the "Your talking reels" bar under the title. Hers,
+# word for word (pages/talking-reel.html and server.py, handoff v25; tests/reels_check.py compares them with her
+# page). The bar itself and its script are the reel page's (reel_page.reels_bar, REELS_JS): one bar, two pages.
+REELS_WORDS = dict({k: v for k, v in reel_page.REELS_WORDS.items() if k not in ("reels_reach", "reels_failed")},
+                   reels_label="Your talking reels",
+                   reels_which="Which talking reel you're working on",
+                   reels_new="+ Start a new talking reel",
+                   reels_first=TR.TALK_FIRST,
+                   reels_still_script=TR.STILL_SCRIPT)
+
 OUR_WORDS = {
+    # several talking reels (v25): see reels.py; and a reel being made in CapCut is not left half way
+    "reels_taken": (TR.reels.NAME_TAKEN, "hers lets two reels share a name; the chat tells them apart by name"),
+    "reels_most": (TR.reels.TOO_MANY, "nothing can ever be removed, so there is an end to how many a shoot keeps"),
+    "reels_still_making": (TR.STILL_MAKING, "hers makes a reel inside one request; ours is a job the page can ask about meanwhile"),
     "coming": ("{name} is still being copied into your Talking folder. It shows up here when it's done.",
                "hers lists a video while it is still copying in, and Edit my video then reads half a file; ours "
                "waits for it, as the reel page does for Footage"),
@@ -358,8 +374,12 @@ def page_words():
     """Every word the page's script may show: hers, then ours (the line only). On a PC her "Finder" is this
     computer's word for it and the two Undo tooltips name Ctrl."""
     w = {k: reel_page.pc_words(v) for k, v in WORDS.items()}
+    for k, line in REELS_WORDS.items():
+        w.setdefault(k, reel_page.pc_words(line))
     for k, (line, _why) in OUR_WORDS.items():
         w.setdefault(k, line)
+    # the bar's two "it didn't go through" lines are this page's own (her talking page shows its own post's words)
+    w["reels_reach"], w["reels_failed"] = w["cant_reach"], w["didnt_work"]
     if this_computer.WINDOWS:
         w["undo_title"], w["redo_title"] = w["undo_title_pc"], w["redo_title_pc"]
         w["multi_hint"] = w["multi_hint_pc"]
@@ -614,8 +634,19 @@ def handle_get(handler, path, query):
             pass
 
 
+def version_from_page(body):
+    """POST /talking-version {kit, op: new | switch | rename, id, name}: hers (/talking/version). Start a new
+    talking reel, work on another, or rename one (talking_rec.version_op checks every field)."""
+    if not isinstance(body, dict) or set(body) - {"kit", "op", "id", "name"}:
+        return _bad()
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    return TR.version_op(kit, {k: v for k, v in body.items() if k != "kit"})
+
+
 ROUTES = {"/talking-open": open_talking, "/talking-start": start_from_page, "/talking-save": save_from_page,
-          "/talking-make": make_from_page}
+          "/talking-make": make_from_page, "/talking-version": version_from_page}
 
 
 def handle_post(handler, path, query):
@@ -627,6 +658,8 @@ def handle_post(handler, path, query):
         body = reel_page._json_body(handler, path, SAVE_CAP if path == "/talking-save" else reel_page.POST_CAP)
         if body is None:
             return
+        if path == "/talking-version" and _cross_site(handler):      # a press from another website's page
+            return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
         if route is None:
             return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 404)
         code, out = route(body)
@@ -815,11 +848,12 @@ def page_html(kit_name):
         + e(w["back_kit"]) + "</a>" + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
         "<h1 id='title'>" + e(w["title"].replace("{short}", short)) + "<em>.</em></h1>"
-        "<p class='lede'>" + e(w["lede"]) + "</p></header>"
+        "<p class='lede'>" + e(w["lede"]) + "</p>" + reel_page.reels_bar(w) + "</header>"
         + _step1(w, short) + _step2(w) + _step3(w) +
         "<div class='result' id='result'></div></div>"
         + _floating(w) + _dock(w) +
         "<script type='application/json' id='talkData'>" + _json_for_script(data) + "</script>"
+        "<script>" + reel_page.REELS_JS + "</script>"
         "<script>" + "\n".join(JS_PARTS) + "\n" + START_JS + "</script></body></html>")
 
 

@@ -82,6 +82,8 @@ The second prints the page's address on its last line. Load it in the Claude app
 
 **"Pick my reel photos for the beach shoot"** is what the page tells them to say when you haven't picked yet (or they want a fresh pick). Do Steps 1 and 2 the same way and save it with `kit.py picks --reel`; a page that is already open shows the new pick by itself within a few seconds while "Let my assistant choose" is on (if it hasn't, load its address in the pane again). If they are on "I'll drag them in myself", their own order stays on the screen and yours is under "Let my assistant choose"; say so in a few words. Then the one line on how it flows, and nothing else.
 
+**A shoot can have several reels (Nicole, Nov 12).** The page's "Your reels" bar starts a new one beside the first, each with its own photos, song, clips, notes and its own pick of yours. `kit.py picks --reel` saves your pick for the reel that is open on the page, and says which reel that is when there is more than one; `--for-reel "<reel's name>"` saves it for another. `footage.py scan` and `moments` and `reel_page.py show` and `make` take `--reel "<reel's name>"` the same way. A new reel has no pick until they ask for one, and a pick for one reel never changes another. The whole of it is in the Assistant's `<assistant>/parts/arrange.md`, "Several reels from one shoot".
+
 If they would rather say a change than drag it ("swap 3 for 5", "start with the couple"), do it their way with `kit.py picks` again, and mention once if it now puts near-twins or three close-ups together. More about the page, and what to do when a line starting ARRANGED comes up, is in the Assistant's `<assistant>/parts/arrange.md`.
 
 ## Behind-the-scenes footage: "Look through my footage for <shoot>"

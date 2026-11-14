@@ -489,6 +489,59 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
     return picks
 
 
+def cmd_picks(kit, a):
+    """kit.py picks. A reel pick goes to the reel being worked on on the reel page (Nicole's v25: several reels
+    from one shoot, each with its own pick), or to the one --for-reel names. The shoot's first reel keeps its
+    pick here in kit.json, exactly as before there were several; a later reel keeps its own in the reel page's
+    record (reel_page.set_assistant_pick), so a pick for one reel never changes another's. Everything is checked
+    before anything is written."""
+    reel, later = a.reel, None
+    if a.for_reel and a.reel is None:
+        say("STOP: --for-reel goes with --reel (the pick it is for). Nothing was changed."); return 1
+    if a.reel is not None:
+        import reel_page
+        vid, why = reel_page.which_reel(kit, a.for_reel)
+        if vid is None:
+            say(f"STOP: {why} Nothing was changed."); return 1
+        vs, cur = reel_page.reel_names(kit)
+        if vid != "v1":
+            # a later reel: its numbers are checked here first, so a wrong one stops everything before kit.json moves
+            by_n = numbered(kit)
+            ns, _marks = parse_reel(a.reel)
+            bad = [n for n in ns if n not in by_n]
+            if bad:
+                say(f"STOP: no photo numbered {bad[0]} on the sheet."); return 1
+            if len(set(ns)) != len(ns):
+                say("STOP: a photo is in that pick twice. Nothing was changed."); return 1
+            if len(ns) > reel_page.MAX_PICKS:
+                say("STOP: " + reel_page.OUR_WORDS["too_many"] + " Nothing was changed."); return 1
+            reel, later = None, vid
+    p = set_picks(kit, a.singles, a.stories, a.carousel, reel, a.cover) if any(
+        v is not None for v in (a.singles, a.stories, a.carousel, reel, a.cover)) else load_rec(kit).get("picks", {})
+    shown = {k: len(v) for k, v in p.items() if v and not (later and k == "reel")}
+    line = ", ".join(f"{k} {n}" for k, n in shown.items())
+    if later:
+        import reel_page
+        try:
+            n, name = reel_page.set_assistant_pick(kit, later, a.reel)
+        except ValueError as e:
+            say(f"STOP: {e} The reel's pick was not changed."); return 1
+        except arrange_busy() as e:  # noqa: F841
+            say("STOP: this shoot's reel page is being written by something else right now. The reel's pick was not changed. Try again in a moment."); return 2
+        say("Picks: " + (line + ", " if line else "") + f"reel {n} (for \"{name}\", one of this shoot's {len(vs)} reels)")
+        return 0
+    if a.reel is not None and len(vs) > 1:
+        say("Picks: " + line + f" (the reel pick is for \"{next(v['name'] for v in vs if v['id'] == 'v1')}\", one of this shoot's {len(vs)} reels)")
+        return 0
+    say("Picks: " + line)
+    return 0
+
+
+def arrange_busy():
+    import arrange
+    return arrange.Busy
+
+
 # ---------- building the pieces ----------
 
 def size_of(p):
@@ -2317,6 +2370,8 @@ def main():
     pk = sub.add_parser("picks"); pk.add_argument("words")
     for k in ("singles", "stories", "carousel", "reel", "cover"):
         pk.add_argument(f"--{k}")
+    pk.add_argument("--for-reel", help="with --reel, when the shoot has several reels: the reel this pick is for, by "
+                                       "its name (without it: the reel being worked on on the reel page)")
     sub.add_parser("build").add_argument("words")
     rl = sub.add_parser("reel-made"); rl.add_argument("words"); rl.add_argument("--project", required=True)
     rl.add_argument("--picks", help="the order it was made in, as reel.py read it (19,4,10+,14-), when not Claude's pick")
@@ -2371,8 +2426,7 @@ def main():
     if a.cmd == "sheet":
         return sheet(kit)
     if a.cmd == "picks":
-        p = set_picks(kit, a.singles, a.stories, a.carousel, a.reel, a.cover)
-        say("Picks: " + ", ".join(f"{k} {len(v)}" for k, v in p.items() if v)); return 0
+        return cmd_picks(kit, a)
     if a.cmd == "build":
         return build(kit)
     if a.cmd == "reel-made":

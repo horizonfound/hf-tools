@@ -2188,7 +2188,7 @@ class Handler(SimpleHTTPRequestHandler):
             # size), reads a refused body away, and answers in the page's own words.
             import arrange
             return arrange.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment"):
+        if path in ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version"):
             # the reel page: reel_page.py checks each of these the way arrange.py does (above)
             import reel_page
             return reel_page.handle_post(self, path, urlsplit(self.path).query)
@@ -2196,7 +2196,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the words page: words_page.py checks each of these the way arrange.py does (above)
             import words_page
             return words_page.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make"):
+        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version"):
             # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
             import talking_page
             return talking_page.handle_post(self, path, urlsplit(self.path).query)

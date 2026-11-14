@@ -274,6 +274,23 @@ html{scroll-padding-bottom:calc(var(--dock) + 12px)}
 """
 
 
+# Her rules for the "Your talking reels" bar (v25, pages/talking-reel.html), as she wrote them, in look.py's names.
+# The one line after hers is ours: the Rename box's three things sit on one line with the same gaps.
+REELS_CSS = r"""
+.reels{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin-top:.9rem;padding:.6rem .8rem;background:var(--paper);border:1px solid var(--line);border-radius:14px;max-width:52em}
+.reels label{font:600 12.5px/1 var(--sans);color:var(--ink-2);letter-spacing:.02em}
+.reels select,.reels input{font:600 13.5px/1.2 var(--sans);color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:999px;padding:.5rem 2rem .5rem .85rem;min-width:11em;max-width:100%}
+.reels select{appearance:none;-webkit-appearance:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 16px) 52%,calc(100% - 11px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.reels input{padding-right:.85rem}
+.reels .btn{padding:.5rem .9rem;font-size:13px}
+.reels .btn.new{background:var(--ink);color:#fff;border-color:var(--ink)}
+.reels .msg{font-size:12.5px;color:var(--ink-2);flex-basis:100%}
+.reels .msg:empty{display:none}
+.reels [hidden]{display:none!important}
+.reels #verRenBox{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.55rem}
+"""
+
+
 def css():
     """Everything after look.head_css() in the page's <style>."""
-    return VARS + STYLE + OUR_CSS
+    return VARS + STYLE + REELS_CSS + OUR_CSS
