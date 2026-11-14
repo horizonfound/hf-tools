@@ -146,3 +146,34 @@ Two reviewers drove the queue page beside Nicole's. Her words, order and states 
 - `tests/kit_steps_check.py` has one check failing before and after this stage (her v26 post-kit.html no longer has two of our kit lines): stage K's.
 - `home.card_in()` has a tests' switch, `STUDIO_CARD_FOR_TESTS` ("none" or "NAME:files"), so a test never looks at a real drive for a card.
 - `home.fingerprint()` no longer moves when a press is recorded; it now moves when `kit-archive.json` changes.
+
+## Stage B, the review round (Nov 14): the home base and its two screens
+
+Two reviewers read stage B. Five should-fix findings and a handful of notes; all real, all fixed but the ones named at the end, each fix with a check that fails without it.
+
+**Fixed.**
+- **One backup is one backup, however the queue spells it.** A backup whose queue records named its records folder two ways (the day folder it settled out of, and where it settled to) showed as "2 cards", both labelled "card 1", with "Cards safe to format". Now each spelling is looked up first and shoots are grouped by where the records really are, so "N cards" comes only from our link (`shoot.json`). The same shoot of one backup listed twice in the queue shows once (the one still to edit, else the delivered one, else the first).
+- **One odd record never blanks a list.** A queue record with a due date that is not a day, no id, or a records folder that is not text is left out (a bad due date: the shoot still shows, with no date); a kit record that is a list, or has a number for a date, no longer hides every other kit (`posts.kits`). When the Assistant cannot read the backups or the kits at all (an unreadable `queue.json`), the screen keeps the list it had, or says her "can't reach" line; it never says "Nothing backed up yet" or "No post kits yet". The post kits still show when only the queue is broken, and the home page still comes (before, `/home` dropped the connection).
+- **A test can no longer put a window on anyone's screen.** New tests' switch `STUDIO_NO_WINDOWS_FOR_TESTS`: with it set, a folder window, a video player, the folder picker, CapCut, and the report and queue page servers all answer without opening or starting anything (`this_computer.no_windows()`, honoured in `finder.py`, `this_computer.pick_folder`, `serve_report.py`, `posting_queue.open_capcut`). `tests/home_base_check.py` and `tests/edit_queue_v26_check.py` run their servers with it; the home base test asks its server for the picker only after proving in the program that the switch holds. Use it in any test that starts a page server.
+- **A long name with no place to break no longer makes a phone scroll sideways** (the Today lines on the home page, the "A card is in" line on the Back up a card screen).
+- **A shoot's small picture reaches the page only as the queue's own** (`queue-thumbs/...`), never an absolute path or one with ".." from a queue file changed by hand.
+- **The kit folder button's route (`/open`) also refuses another website's ask,** like the six listed before.
+- **A damaged kit archive list is set aside whole** (`kit-archive.unreadable-<date>-<n>.json`), never copied over the last good list before; a list of the wrong shape is read as no list, never as names.
+- **A kit's photo count is its pictures only** (a text file in its Photos folder is not a photo), as hers.
+- **Instructions:** `parts/photos-in.md` and `parts/on-a-pc.md` now send people to the Make posts screen for the Select the folder button (they said the home page). `parts/hello.md` and `SKILL.md`: a press on Back up a card or Make posts from a shoot may only be someone looking at their backups or post kits, so it is answered first only when what they typed is about it or is nothing in particular; otherwise the assistant answers what they asked and marks the press seen.
+- Small: the unused `home.kit_thumbs` is gone; a page left while its pictures load no longer writes a line in the server's log.
+
+**Not changed, on purpose.**
+- A kit's three small pictures are kept by folder name for good: a kit whose photos change keeps its old small pictures (the old home page did the same). Remaking them when the photos change is its own small job.
+- A search for a kit that is archived says "No post kit called ... yet." above a closed "Archived (1)" that holds the match. That is exactly what her page does: hers to change (for the note to Nicole).
+- `home.gather()` still collects recent shoots and kits the page no longer shows (the hello uses the kits).
+
+**Theirs to settle, added to the nine above:**
+10. **A press on step 1 or step 3 is still recorded,** and the instructions now treat it as possibly "just looking". Say if a press on those two cards should not be recorded at all (hers records nothing), or only the Copy press on "backup now" and the folder picker.
+11. **The same shoot twice in the queue shows once** on the Back up a card screen (our choice; the editing queue itself still lists both).
+12. **Searching for an archived kit** reads as "no such kit" above the closed Archived list (hers).
+
+**Tests** (this Mac, pretend data, one at a time): `tests/home_base_check.py` is 213 checks with the hidden Chrome and 128 without (182 and 103 before). 23 behaviours of this round were each taken out in a scratch copy and the test failed each time. `tests/skill_text_check.py` holds the three instruction lines.
+
+**A thing to know.** During this round's take-it-out runs, one run (the test's server started without the switch) opened a real folder picker on this Mac; it was closed straight away and the test now cannot do that. An older picker from the first build (process 20477, started 10:16 on Nov 14, "Pick the folder your finished photos are in...") may still be open: press Cancel on it. Nothing is behind it; whatever is chosen there goes nowhere.
+

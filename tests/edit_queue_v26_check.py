@@ -164,7 +164,8 @@ class Setup:
         # STUDIO_POSTING_PORT: a page server the queue server starts is this test's own, on this test's port;
         # REMINDERS_BACKEND=none: it never asks a calendar
         self.env = dict(os.environ, STUDIO_HOME=str(self.home), STUDIO_TODAY=TODAY, PYTHONIOENCODING="utf-8",
-                        STUDIO_POSTING_PORT=str(port + 10), REMINDERS_BACKEND="none")
+                        STUDIO_POSTING_PORT=str(port + 10), REMINDERS_BACKEND="none",
+                        STUDIO_NO_WINDOWS_FOR_TESTS="1")      # a folder window is never opened by this test
         self.started = []           # ports of page servers the queue server started (stopped at the end)
         self.proc = None
 

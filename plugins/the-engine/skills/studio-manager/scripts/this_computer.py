@@ -657,11 +657,24 @@ def known_folder(name):
     return Path.home() / name
 
 
+# ---------------------------------------------------------------- the tests' switch: no windows
+
+def no_windows():
+    """True only inside a test (STUDIO_NO_WINDOWS_FOR_TESTS set): nothing may then show on the screen or start
+    another program. A folder window, the folder picker, a video player, CapCut and the report and queue page
+    servers all answer without opening anything (finder.py, pick_folder below, serve_report.py,
+    posting_queue.open_capcut), so a test that presses a button's route by mistake, or because a guard was
+    taken out, never puts a window on someone's screen or leaves a folder picker waiting."""
+    return bool(os.environ.get("STUDIO_NO_WINDOWS_FOR_TESTS"))
+
+
 # ---------------------------------------------------------------- the folder picker
 
 def pick_folder(prompt):
     """The computer's own "choose a folder" window. (path, "") when they chose one, (None, "cancelled") when
     they closed it, (None, why) when the window could not be shown."""
+    if no_windows():
+        return None, "cancelled"
     try:
         if MAC:
             script = ('tell application "System Events" to activate\n'

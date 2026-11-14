@@ -1611,6 +1611,8 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
         return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
     if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
+    if this_computer.no_windows():      # inside a test: CapCut is never started
+        return True, ""
     capcut = _capcut()
     damaged = unsure = False
     with _CAPCUT_LOCK:                 # one press at a time: what capcut.py notes about a press is read before the next
@@ -1836,13 +1838,13 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
-        if path == "/open":
-            return self.open_kit_folder(urlsplit(self.path).query)
-        if path in ("/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
+        if path in ("/open", "/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
                 and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
             # these open a folder window, a folder picker or another page server: for this server's own pages
             # only, never for a page of another website (the Host was checked above)
             return self.answer({"ok": False, "words": ""}, HTTPStatus.FORBIDDEN)
+        if path == "/open":
+            return self.open_kit_folder(urlsplit(self.path).query)
         if path == "/open-home":
             return self.open_home_folder()
         if path == "/open-drop":

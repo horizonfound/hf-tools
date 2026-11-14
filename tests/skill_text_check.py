@@ -609,6 +609,16 @@ def check_whole_build():
          said == ["sound like you"], said)
     pages = [f.name for f in sorted(SCRIPTS.glob("*.py")) if re.search(r"captions? (?:that )?sounds? like you|captions in your voice|captions written the way you write", read(f))]
     case("no page script promises captions that sound like them", not pages, pages)
+    # (Nov 14, the home base's review round) the folder picker's button is on the Make posts screen, not the home page
+    flat = lambda p: re.sub(r"\s+", " ", read(SM / "parts" / p))  # noqa: E731
+    case("photos-in.md and on-a-pc.md send them to the Make posts screen for the Select the folder button, never to the home page",
+         "the Make posts screen's \"Select the folder with your finished photos\" button opens it" in flat("photos-in.md")
+         and "use the Select the folder button on the Make posts screen" in flat("on-a-pc.md")
+         and not re.search(r"home page's \"Select the folder|Select the folder button on the home page", flat("photos-in.md") + flat("on-a-pc.md")))
+    # a press on step 1 or 3 opens a screen that also lists backups and kits: it may be someone only looking
+    case("hello.md: a press on Back up a card or Make posts may only be someone looking; what they asked is answered, then home.py seen",
+         "may only be someone looking" in flat("hello.md") and "answer what they asked, say nothing about the press, and run `home.py seen`" in flat("hello.md")
+         and "may only be someone looking" in re.sub(r"\s+", " ", read(SM / "SKILL.md")))
     # the PC's "what can't you do" list names reminders, and the PC part points at the reminder section
     pc = re.sub(r"\s+", " ", read(SM / "parts" / "on-a-pc.md"))
     lst = pc.split('## "What can\'t you do on a PC?"', 1)[-1].split("## ", 1)[0]

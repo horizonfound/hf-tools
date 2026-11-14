@@ -128,6 +128,8 @@ def report_url(studio):
     can't see this computer's own pages, so the server would always look gone and another one be started."""
     studio = Path(studio)
     f = studio / "report-url.txt"
+    if this_computer.no_windows():      # inside a test: no page server is started
+        return None
 
     def serving(url):
         try:
@@ -158,6 +160,8 @@ def report_url(studio):
 def queue_url():
     """The live queue page's address. If no queue server answers, start one (edit_queue.py serve) and wait for its line.
     "Is it up?" is asked never through a proxy (this_computer.open_local), as in report_url."""
+    if this_computer.no_windows():      # inside a test: no page server is started
+        return None
     try:
         import edit_queue
         f = edit_queue.HOME / "queue-url.txt"

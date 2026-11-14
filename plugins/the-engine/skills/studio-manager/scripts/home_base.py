@@ -191,7 +191,8 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .sec{margin-top:2rem}.sec h2{margin:0 0 .3rem;font:600 13px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
 .sec .say{margin:0;color:var(--ink-2);font-size:14.5px}
 .todayl{display:grid;gap:.5rem;margin:.6rem 0 0;padding:0;list-style:none}
-.todayl li{display:flex;gap:.6rem;align-items:baseline;font-size:15px;flex-wrap:wrap}
+.todayl li{display:flex;gap:.6rem;align-items:baseline;font-size:15px;min-width:0}
+.todayl li>span{min-width:0;overflow-wrap:anywhere}
 .todayl li::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ocean);flex:none;transform:translateY(-1px)}
 .todayl li.late::before{background:#C2412D}.todayl li.soon::before{background:#D9A400}.todayl li.card::before{background:var(--coral)}
 .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:14px;padding:.9rem 0 .4rem}
@@ -211,7 +212,8 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .steps .num{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--coral);color:#fff;font:700 14px/1 var(--sans)}
 .steps b{color:var(--ink)}.steps p{margin:.1rem 0 .5rem;font-size:15.5px}.steps small{color:var(--ink-2);font-size:13px}
 .steps small.block{display:block;margin-top:.5rem}
-.steps .status{color:var(--coral-2);font:600 13.5px/1.4 var(--sans)}
+.steps .status{color:var(--coral-2);font:600 13.5px/1.4 var(--sans);overflow-wrap:anywhere}
+.steps .st>div{min-width:0}
 .paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:.4rem}
 .paste .words{font:500 17px/1 var(--sans);background:var(--cream);color:var(--ink);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
 .paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}.paste .copy:hover{background:var(--coral-2)}
@@ -224,7 +226,8 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .shoot .acts{display:flex;gap:6px;flex-wrap:wrap}
 .backup{background:var(--paper);border-radius:22px;padding:1.1rem 1.2rem 1rem;margin-top:1rem;box-shadow:0 1px 0 var(--line)}
 .backup .top{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
-.backup h3{margin:0;font:600 19px/1.2 var(--sans);letter-spacing:-.01em}.backup .meta{color:var(--ink-2);font-size:13.5px}
+.backup h3{margin:0;font:600 19px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}.backup .meta{color:var(--ink-2);font-size:13.5px;overflow-wrap:anywhere}
+.backup .top>div{min-width:0}
 .backup .cards{grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))}
 .backup .shoot{background:var(--cream);box-shadow:none}
 .empty{color:var(--ink-2);font-size:15px;padding:.6rem 0;overflow-wrap:anywhere}
@@ -335,8 +338,11 @@ function render(){
 async function load(){
   let g;
   try { g = await homeData(); } catch (e) { if (!got) $('backups').innerHTML = `<p class="empty">${esc(W.b_cant)}</p>`; return; }
-  got = true;
   $('cardStatus').textContent = g.card ? fill(W.b_card_in, {name: g.card.name, files: many(g.card.files)}) : W.b_card_out;
+  // the backups could not be read just now: the list as it last was stays, or her "can't reach" line; an empty
+  // list here would say "Nothing backed up yet", which is not true
+  if (g.problem_backups) { if (!got) { $('backups').innerHTML = `<p class="empty">${esc(W.b_cant)}</p>`; $('olderBox').innerHTML = ''; } return g; }
+  got = true;
   GROUPS = g.groups || [];
   render();
   return g;
@@ -388,6 +394,7 @@ function render(){
 async function load(){
   let g;
   try { g = await homeData(); } catch (e) { if (!got) $('recent').innerHTML = `<p class="empty">${esc(W.m_cant)}</p>`; return; }
+  if (g.problem_kits) { if (!got) { $('recent').innerHTML = `<p class="empty">${esc(W.m_cant)}</p>`; $('olderBox').innerHTML = ''; } return g; }
   got = true;
   KITS = g.kits || []; render();
   return g;
@@ -535,36 +542,84 @@ def backup_status(studio):
     return out
 
 
+def _thumb_ok(t):
+    """A shoot's small picture as the queue itself writes it ("queue-thumbs/<id>/0.jpg"), and nothing else: never
+    an absolute path, never ".." (a queue file changed by hand must not put a path on the page)."""
+    if not isinstance(t, str) or not t.startswith("queue-thumbs/") or "\\" in t:
+        return False
+    parts = t.split("/")
+    if any(p in ("", ".", "..") for p in parts):
+        return False
+    try:
+        return (HOME / t).is_file()
+    except (OSError, ValueError):
+        return False
+
+
+def _due(edit_queue, iso):
+    """A due date in the queue's own words; None for none, and for one that is not a day (a shoot is still shown)."""
+    try:
+        return edit_queue.due_words(iso) if iso else None
+    except (ValueError, TypeError):
+        return None
+
+
+_RANK = {"waiting": 0, "finished": 1, "archived": 2}
+
+
 def backups(q=None):
     """Every backup the editing queue knows, as the Back up a card screen shows them: the cards of one shoot
-    together (linked by shoot_report.py, never by name), newest first. Names and numbers only, never a path."""
+    together (linked by shoot_report.py, never by name), newest first. Names and numbers only, never a path.
+    A backup is its records folder as it is found NOW: two queue records that spell one backup's records two ways
+    (the day folder it settled out of, and where it settled to) are one backup, never "2 cards". One odd record
+    in the queue is left out; it never takes the other backups with it."""
     import edit_queue
     import shoot_report
     q = q or edit_queue.load()
     today = edit_queue.today().isoformat()
-    by = {}
+    by, found_at = {}, {}
     for s in q.get("shoots") or []:
-        if not s.get("studio"):
-            continue
-        b = by.setdefault(place_key(s["studio"]), {"studio": s["studio"], "added": "", "shoots": []})
-        b["added"] = max(b["added"], s.get("added") or "")
         try:
-            folder = edit_queue.folder_of(s)
+            if not isinstance(s, dict) or not s.get("studio") or not isinstance(s["studio"], str):
+                continue
+            if s["studio"] not in found_at:                     # each spelling looked up once
+                found_at[s["studio"]] = records_of(s["studio"])
+            rec = found_at[s["studio"]]
+            try:
+                folder = edit_queue.folder_of(s)
+            except Exception:  # noqa: BLE001
+                folder = None
+            found = bool(folder) and folder.is_dir()
+            drive, plugged = (None, True) if found else drive_here(folder or s.get("folder") or s["studio"])
+            st = s.get("status", "waiting")
+            st = st if st in ("waiting", "finished") else "archived"
+            due = s.get("due") if (st == "waiting" and isinstance(s.get("due"), str)) else None
+            shoot = {
+                "id": str(s["id"]), "name": str(s.get("name") or ""), "shot": s.get("shot") if isinstance(s.get("shot"), str) else None,
+                "count": s.get("count") if isinstance(s.get("count"), int) else 0, "clips": s.get("clips") if isinstance(s.get("clips"), int) else 0,
+                "status": st, "due": _due(edit_queue, due), "late": bool(due) and due < today,
+                "thumbs": [t for t in (s.get("thumbs") or [])[:3] if _thumb_ok(t)],
+                "drive": drive, "plugged": plugged, "found": found}
+            added = s.get("added") if isinstance(s.get("added"), str) else ""
         except Exception:  # noqa: BLE001
-            folder = None
-        found = bool(folder) and folder.is_dir()
-        drive, plugged = (None, True) if found else drive_here(folder or s.get("folder") or s["studio"])
-        st = s.get("status", "waiting")
-        b["shoots"].append({
-            "id": s["id"], "name": s.get("name") or "", "shot": s.get("shot"), "count": s.get("count") or 0, "clips": s.get("clips") or 0,
-            "status": st if st in ("waiting", "finished") else "archived",
-            "due": edit_queue.due_words(s["due"]) if (st == "waiting" and s.get("due")) else None,
-            "late": st == "waiting" and bool(s.get("due")) and s["due"] < today,
-            "thumbs": [t for t in (s.get("thumbs") or [])[:3] if isinstance(t, str) and (HOME / t).is_file()],
-            "drive": drive, "plugged": plugged, "found": found})
+            continue
+        b = by.setdefault(place_key(rec or s["studio"]), {"studio": s["studio"], "rec": rec, "added": "", "shoots": [], "_ids": {}})
+        b["added"] = max(b["added"], added)
+        # the same shoot of the same backup listed twice in the queue (once per spelling) shows once: the one
+        # still to edit, else the delivered one, else the first
+        sid = s.get("shoot")
+        if rec and isinstance(sid, str) and sid in b["_ids"]:
+            at = b["_ids"][sid]
+            if _RANK[shoot["status"]] < _RANK[b["shoots"][at]["status"]]:
+                b["shoots"][at] = shoot
+            continue
+        if rec and isinstance(sid, str):
+            b["_ids"][sid] = len(b["shoots"])
+        b["shoots"].append(shoot)
     groups = {}
     for b in by.values():
-        rec = records_of(b["studio"])
+        rec = b.pop("rec")
+        b.pop("_ids", None)
         key, card_no = place_key(rec or b["studio"]), 1
         if rec:
             b.update(backup_status(rec))
@@ -611,13 +666,11 @@ def kits():
         d = Path(k["path"])
         if d.is_symlink() or not (d / ".kit" / "kit.json").is_file():
             continue                                    # not a kit the page could open
-        photos = k.get("photos") or 0
-        if not photos:
-            try:                                        # a kit that points at the folder Lightroom exported to
-                import kit as kit_mod
-                photos = len(kit_mod.photo_files(kit_mod.photos_dir(d)))
-            except Exception:  # noqa: BLE001
-                photos = 0
+        try:                                            # pictures only (a stray text file in Photos is no photo), and
+            import kit as kit_mod                       # a kit that points at the folder Lightroom exported to
+            photos = len(kit_mod.photo_files(kit_mod.photos_dir(d)))
+        except (Exception, SystemExit):  # noqa: BLE001
+            photos = 0
         day = k.get("date") if isinstance(k.get("date"), str) else ""
         out.append({"folder": k["folder"], "name": str(k.get("name") or k["folder"]), "date": day or "", "photos": photos,
                     "archived": k["folder"] in arch})
@@ -635,11 +688,11 @@ def data():
         pass
     try:
         out["groups"] = backups()
-    except Exception as e:  # noqa: BLE001
-        out["problem_backups"] = e.__class__.__name__
-    try:
+    except (Exception, SystemExit) as e:  # noqa: BLE001  (an unreadable queue.json ends edit_queue.load with SystemExit)
+        out["problem_backups"] = e.__class__.__name__       # the Back up a card screen then says it can't reach them,
+    try:                                                    # never "Nothing backed up yet"; the kits still show
         out["kits"] = kits()
-    except Exception as e:  # noqa: BLE001
+    except (Exception, SystemExit) as e:  # noqa: BLE001
         out["problem_kits"] = e.__class__.__name__
     try:
         out["stamp"] = home.fingerprint()
@@ -653,12 +706,26 @@ def data():
 _ARCHIVE_LOCK = threading.Lock()
 
 
-def archived():
+def _archive_read():
+    """The archived list as saved: a list of names, or None when the file is there and is not
+    {"archived": [names]} (damaged, or changed by hand into something else). No file: an empty list."""
     try:
-        d = json.loads(ARCHIVE.read_text(encoding="utf-8"))
-        return set(x for x in (d.get("archived") or []) if isinstance(x, str))
-    except (OSError, ValueError, AttributeError):
-        return set()
+        raw = ARCHIVE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError):
+        return None
+    try:
+        d = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(d, dict) or not isinstance(d.get("archived"), list) or not all(isinstance(x, str) for x in d["archived"]):
+        return None
+    return d["archived"]
+
+
+def archived():
+    return set(_archive_read() or [])
 
 
 def set_archived(folder, on):
@@ -671,7 +738,17 @@ def set_archived(folder, on):
         new = set(now)
         (new.add if on else new.discard)(folder)
         HOME.mkdir(parents=True, exist_ok=True)
-        if ARCHIVE.is_file():
+        if ARCHIVE.is_file() and _archive_read() is None:
+            # a list that can't be read is set aside under a name of its own, never copied over the last good
+            # list before (kit-archive.prev.json) and never written over
+            n = 1
+            while True:
+                aside = ARCHIVE.with_name(f"kit-archive.unreadable-{date.today().isoformat()}-{n}.json")
+                if not aside.exists():
+                    break
+                n += 1
+            aside.write_bytes(ARCHIVE.read_bytes())
+        elif ARCHIVE.is_file():
             tmp = ARCHIVE_PREV.with_name(f"{ARCHIVE_PREV.name}.{os.getpid()}-{threading.get_ident()}.tmp")
             tmp.write_bytes(ARCHIVE.read_bytes())
             this_computer.replace(tmp, ARCHIVE_PREV)
@@ -731,14 +808,14 @@ def _cross_site(handler):
 
 
 def _send(handler, body, ctype, code=200, cache="no-store"):
-    handler.send_response(code)
-    handler.send_header("Content-Type", ctype)
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", cache)
-    handler.end_headers()
-    try:
+    try:                # a page left while its pictures load closes the line: nothing to say, nothing to log
+        handler.send_response(code)
+        handler.send_header("Content-Type", ctype)
+        handler.send_header("Content-Length", str(len(body)))
+        handler.send_header("Cache-Control", cache)
+        handler.end_headers()
         handler.wfile.write(body)
-    except (BrokenPipeError, ConnectionResetError, OSError):
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         pass
 
 

@@ -274,7 +274,7 @@ def gather():
             same = [s for s in backed if same_place(s.get("studio"), last["studio"])]
             g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same),
                                 "clips": sum(s.get("clips") or 0 for s in same)}
-    except Exception:
+    except (Exception, SystemExit):     # an unreadable queue.json ends edit_queue.load with SystemExit: the page still comes
         pass
     try:
         import posting_queue
@@ -342,25 +342,6 @@ def _in_address(t):
     return str(t).replace("%", "%25").replace("#", "%23").replace("?", "%3F")
 
 
-def kit_thumbs(k):
-    """Three small previews of a kit's photos, in ~/.studio/home-thumbs/, made once."""
-    try:
-        import kit as kit_mod
-        kd = Path(k["path"])
-        rec = kit_mod.load_rec(kd)
-        photos = kit_mod.photo_files(kit_mod.photos_dir(kd, rec))[:3]
-        out = []
-        (HOME / "home-thumbs").mkdir(parents=True, exist_ok=True)
-        for i, src in enumerate(photos, 1):
-            dst = HOME / "home-thumbs" / f"{k['folder']}-{i}.jpg"
-            if not dst.exists() and not kit_mod.fit(Path(src), dst, (240, 240)):
-                continue
-            out.append(dst.relative_to(HOME).as_posix())
-        return out
-    except Exception:
-        return []
-
-
 def nice_day(iso):
     """ "Nov 13, 2026", as the screens write a day."""
     try:
@@ -405,7 +386,7 @@ def page_html():
     g = gather()
     e = html.escape
     Wd = home_base.W
-    today_html = "".join(f"<li class='{k}'>{w}</li>" for k, w in today_items(g))
+    today_html = "".join(f"<li class='{k}'><span>{w}</span></li>" for k, w in today_items(g))
     cards = []
     for n, (item, href, name, blurb, go) in enumerate(STEPS, 1):
         go_id = "" if href else " id='editingWords'"

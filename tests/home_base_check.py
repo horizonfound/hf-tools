@@ -138,7 +138,9 @@ class World:
         self.place.mkdir(parents=True)
         self.assistant = work / "kit drive" / "The Assistant"
         self.env = dict(os.environ, STUDIO_HOME=str(self.home), STUDIO_TODAY=TODAY, PYTHONIOENCODING="utf-8",
-                        STUDIO_CARD_FOR_TESTS="none", REMINDERS_BACKEND="none")
+                        STUDIO_CARD_FOR_TESTS="none", REMINDERS_BACKEND="none",
+                        # nothing this test's server is asked may open a window, a folder picker or another server
+                        STUDIO_NO_WINDOWS_FOR_TESTS="1")
         self.proc = None
         self.shoots = []            # the queue's records
         self.records = {}           # a backup's name -> its records folder
@@ -235,6 +237,8 @@ class World:
         (d / "Photos").mkdir()
         for i in range(photos):
             (d / "Photos" / ("photo %d.jpg" % (i + 1))).write_bytes(TINY_JPEG)
+        if photos:
+            (d / "Photos" / "notes about this shoot.txt").write_text("theirs, and not a photo", encoding="utf-8")
         rec = {"name": name, "folder": folder, "source": "drop"}
         if day:
             rec["date"] = day
@@ -484,7 +488,7 @@ def check_data(w, hb):
     case("a plain folder with no kit record is not listed", "Just a folder" not in kits)
     order = [k["folder"] for k in d["kits"]]
     case("newest first, the undated one last", order[0] == "2026-11-30 With pictures" and order[-1] == "No date kit", order[:2] + order[-1:])
-    case("each with its name, its day and how many photos", kits["2026-11-30 With pictures"] == {"folder": "2026-11-30 With pictures", "name": "With pictures", "date": "2026-11-30", "photos": 3, "archived": False},
+    case("each with its name, its day and how many photos (a text file in its Photos folder is not a photo)", kits["2026-11-30 With pictures"] == {"folder": "2026-11-30 With pictures", "name": "With pictures", "date": "2026-11-30", "photos": 3, "archived": False},
          kits["2026-11-30 With pictures"])
     # in the program itself: the card line, and the manifest read once
     os.environ["STUDIO_CARD_FOR_TESTS"] = "EOS_DIGITAL:3931"
@@ -510,6 +514,91 @@ def check_data(w, hb):
     (rec / "manifest.json").write_text(json.dumps(manifest("friday card", second=str(w.work / "second drive" / "friday card"))), encoding="utf-8")
     case("a backup's manifest is read again when it changes (a problem fixed, a problem found)", a["safe"] is True and b["safe"] is False and hb.backup_status(rec)["safe"] is True)
 
+    check_data_review(w, hb)
+
+
+def check_data_review(w, hb):
+    """The review round (Nov 14): one backup spelled two ways, one odd record, a path as a picture, a broken queue."""
+    import copy
+    base = json.loads((w.home / "queue.json").read_text(encoding="utf-8"))
+    old_way = str(w.place / "friday card" / "_studio")          # the day folder the friday card settled out of
+
+    def friday(q):
+        return [g for g in hb.backups(q) if any(s["id"].startswith("friday-card-") for b in g["backups"] for s in b["shoots"])]
+
+    q = copy.deepcopy(base)
+    next(s for s in q["shoots"] if s["id"] == "friday-card-2")["studio"] = old_way
+    g = friday(q)
+    case("ONE backup whose queue records spell its records folder two ways is one backup: never \"2 cards\", every shoot under it",
+         len(g) == 1 and len(g[0]["backups"]) == 1 and sorted(s["id"] for s in g[0]["backups"][0]["shoots"]) == ["friday-card-1", "friday-card-2", "friday-card-3"]
+         and g[0]["backups"][0]["card_no"] == 1, [(b["card_no"], [s["id"] for s in b["shoots"]]) for x in g for b in x["backups"]])
+    q = copy.deepcopy(base)
+    twin = dict(next(s for s in q["shoots"] if s["id"] == "friday-card-1"), id="friday-card-1-again", studio=old_way, status="archived", due=None)
+    q["shoots"].insert(0, twin)
+    g = friday(q)
+    ids = [s["id"] for x in g for b in x["backups"] for s in b["shoots"]]
+    case("the same shoot of one backup listed twice in the queue (once per spelling) shows once: the one still to edit",
+         len(g) == 1 and len(g[0]["backups"]) == 1 and sorted(ids) == ["friday-card-1", "friday-card-2", "friday-card-3"], ids)
+    # one odd record never takes the others with it
+    for label, change in (("a due date that is not a day", lambda s: s.update(due="soon")), ("no id", lambda s: s.pop("id")),
+                          ("a records folder that is not text", lambda s: s.update(studio=7)), ("a shoot that is not a record", None)):
+        q = copy.deepcopy(base)
+        if change:
+            change(next(s for s in q["shoots"] if s.get("id") == "friday-card-1"))
+        else:
+            q["shoots"].insert(0, "not a shoot")
+        try:
+            got = hb.backups(q)
+            names = [s["name"] for x in got for b in x["backups"] for s in b["shoots"]]
+            why = ""
+        except Exception as e:  # noqa: BLE001
+            names, why = [], e.__class__.__name__
+        case("one odd record in the queue (%s) never hides the other backups" % label, "Patio session" in names and "Lee wedding" in names and len(names) >= len([s for s in base["shoots"] if s.get("studio")]) - 1, why or len(names))
+    q = copy.deepcopy(base)
+    next(s for s in q["shoots"] if s["id"] == "friday-card-1")["due"] = "soon"
+    s1 = next(s for x in hb.backups(q) for b in x["backups"] for s in b["shoots"] if s["id"] == "friday-card-1")
+    case("... and a shoot whose due date is not a day is still shown, to edit, with no date", s1["status"] == "waiting" and s1["due"] is None and s1["late"] is False, s1)
+    # a small picture is only ever one the queue itself made
+    (w.home / "queue-thumbs" / "friday-card-1").mkdir(parents=True, exist_ok=True)
+    (w.home / "queue-thumbs" / "friday-card-1" / "0.jpg").write_bytes(TINY_JPEG)
+    outside = w.work / "outside.jpg"
+    outside.write_bytes(TINY_JPEG)
+    q = copy.deepcopy(base)
+    next(s for s in q["shoots"] if s["id"] == "friday-card-1")["thumbs"] = [str(outside), "queue-thumbs/friday-card-1/0.jpg", "queue-thumbs/../../outside.jpg"]
+    s1 = next(s for x in hb.backups(q) for b in x["backups"] for s in b["shoots"] if s["id"] == "friday-card-1")
+    case("a shoot's small picture reaches the page only as the queue's own (queue-thumbs/...): never a path, never \"..\"", s1["thumbs"] == ["queue-thumbs/friday-card-1/0.jpg"], s1["thumbs"])
+    # one odd kit record never hides the other kits
+    rec = w.assistant / "Your Content" / "No date kit" / ".kit" / "kit.json"
+    kept = rec.read_bytes()
+    try:
+        for label, odd in (("a date that is a number", json.dumps({"name": "No date kit", "date": 20261114})), ("a record that is a list", "[1, 2]")):
+            rec.write_text(odd, encoding="utf-8")
+            d = hb.data()
+            case("one odd kit record (%s) never hides the other kits" % label, "problem_kits" not in d and {k["folder"] for k in d["kits"]} == set(w.kits), d.get("problem_kits"))
+    finally:
+        rec.write_bytes(kept)
+    # a queue that can't be read: the screens are told so (never an empty list), and the kits still show
+    qf = w.home / "queue.json"
+    kept = qf.read_bytes()
+    try:
+        qf.write_text("{broken", encoding="utf-8")
+        try:
+            d, why = hb.data(), ""
+        except BaseException as e:  # noqa: BLE001
+            d, why = {}, e.__class__.__name__
+        case("a queue.json that can't be read: the screens are told the backups couldn't be read, and the post kits still show",
+             bool(d.get("problem_backups")) and d.get("groups") == [] and len(d.get("kits") or []) == len(w.kits), why or d.get("problem_backups"))
+        import home
+        try:
+            page, why = home.page_html(), ""
+        except BaseException as e:  # noqa: BLE001
+            page, why = "", e.__class__.__name__
+        case("... and the home page still comes", "Your workflow, step by step" in page, why)
+        code, raw = w.http("GET", "/home")
+        case("... from the page server too (it answers, it does not drop the line)", code == 200 and b"Your workflow, step by step" in raw, code)
+    finally:
+        qf.write_bytes(kept)
+
 
 # ---------------------------------------------------------------- the routes
 
@@ -531,9 +620,10 @@ def check_routes(w, hb):
         case("a request for %s that names another host is refused" % path.split("?")[0], code == 403, code)
     code, raw = w.http("GET", "/home-data", headers={"Sec-Fetch-Site": "cross-site"})
     case("another website's page cannot read what the screens draw from", code == 403 and b"Garcia" not in raw, code)
-    for path in ("/open-home", "/open-shoot?id=friday-card-1", "/report-url?id=latest", "/pick-folder", "/queue-url"):
+    for path in ("/open-home", "/open-shoot?id=friday-card-1", "/report-url?id=latest", "/pick-folder", "/queue-url", "/open?kit=%s&sub=" % quote("2026-11-30 With pictures")):
         code, raw = w.http("GET", path, headers={"Sec-Fetch-Site": "cross-site"})
         case("another website's page cannot press %s (a folder window, a picker, a page server)" % path.split("?")[0], code == 403, code)
+    check_no_windows(w)
 
     # See the report
     code, raw = w.http("GET", "/report-url?id=no-such-shoot")
@@ -605,6 +695,21 @@ def check_routes(w, hb):
     case("a press that is too big is refused before it is read", code == 413 and f.read_bytes() == kept, code)
     code, out = w.archive(kit, False)
     case("after all that, Bring it back still works, and the list is empty again", code == 200 and out == {"ok": True, "archived": []}, out)
+    # a list that was damaged (by hand, by a disk): set aside whole, the last good list before never written over
+    w.archive(kit, True)
+    w.archive("2026-11-30 With pictures", True)
+    good_prev = prev.read_bytes()
+    f.write_text("{broken", encoding="utf-8")
+    code, out = w.archive("No date kit", True)
+    aside = sorted(p.name for p in w.home.glob("kit-archive.unreadable-*.json"))
+    case("a damaged archive list is set aside under a name of its own; the list before is not written over",
+         code == 200 and out == {"ok": True, "archived": ["No date kit"]} and prev.read_bytes() == good_prev and len(aside) == 1
+         and (w.home / aside[0]).read_text(encoding="utf-8") == "{broken", (code, out, aside))
+    for odd in ('{"archived": "nope"}', '{"archived": {"a": 1}}', '{"archived": ["x", 7]}', '"nope"'):
+        f.write_text(odd, encoding="utf-8")
+        got = {k["folder"] for k in w.data()["kits"] if k["archived"]}
+        case("an archive list of the wrong shape (%s) is read as no list, never as names" % odd, got == set() and hb.archived() == set(), sorted(got))
+    f.write_text(json.dumps({"archived": []}), encoding="utf-8")
 
     # the other pages point at the real routes
     import edit_queue
@@ -618,6 +723,57 @@ def check_routes(w, hb):
             if re.search(r"\b8799\b|home=test|assistantHomeTest", t):
                 hits.append(p.name)
     case("no port 8799 and no ?home=test anywhere in the plugin", not hits, hits)
+
+
+def check_no_windows(w):
+    """The tests' own switch (STUDIO_NO_WINDOWS_FOR_TESTS): with it set, nothing shows on the screen and no other
+    program or server is started, so a guard that fails here can never put a window or a folder picker on
+    someone's screen. Checked in the program itself, with the computer's own commands watched, never run."""
+    import finder
+    import serve_report
+    import this_computer
+    ran = []
+
+    def watch(*a, **k):
+        ran.append(a[0] if a else k.get("args"))
+        raise OSError("a test never runs this")
+
+    case("this test's page server runs with the no-windows switch set", w.env.get("STUDIO_NO_WINDOWS_FOR_TESTS") == "1")
+    real = (this_computer.subprocess.run, finder.subprocess.run, getattr(os, "startfile", None), serve_report.fresh.start_server)
+    os.environ["STUDIO_NO_WINDOWS_FOR_TESTS"] = "1"
+    try:
+        this_computer.subprocess.run = finder.subprocess.run = watch
+        if real[2]:
+            os.startfile = watch
+        serve_report.fresh.start_server = watch
+        picked = this_computer.pick_folder("a test")
+        opened = finder.open_folder(w.place)
+        played = finder.open_file(w.place / "nothing.mp4")
+        page = w.records["friday card"] / "report.html"       # a report there is to show, so a server would be started for it
+        page.write_text("<p>a pretend report</p>", encoding="utf-8")
+        try:
+            report = serve_report.report_url(w.records["friday card"])
+        finally:
+            page.unlink()
+        queue = serve_report.queue_url()
+    finally:
+        this_computer.subprocess.run, finder.subprocess.run = real[0], real[1]
+        if real[2]:
+            os.startfile = real[2]
+        serve_report.fresh.start_server = real[3]
+        os.environ.pop("STUDIO_NO_WINDOWS_FOR_TESTS", None)
+    case("with the switch, the folder picker never opens (it answers as if closed)", picked == (None, "cancelled") and not ran, (picked, ran[:1]))
+    case("with the switch, no folder window and no player opens", opened == (True, "") and played == (True, "") and not ran, (opened, played, ran[:1]))
+    case("with the switch, no report server and no queue server is started", report is None and queue is None and not ran, (report, queue, ran[:1]))
+    # and through the page server itself: the same-page asks answer, and nothing is left running or waiting.
+    # Asked only when the program itself has just proved it opens nothing (a real picker must never appear).
+    if not (w.env.get("STUDIO_NO_WINDOWS_FOR_TESTS") == "1" and picked == (None, "cancelled") and opened == (True, "") and not ran):
+        case("the server is not asked for a picker or a folder while the switch does not hold", False)
+        return
+    code, raw = w.http("GET", "/pick-folder")
+    case("the server, asked for the folder picker by its own page, answers at once with no folder chosen", code == 200 and json.loads(raw).get("words") == "No folder chosen.", raw[:200])
+    code, raw = w.http("GET", "/open-home")
+    case("... and Open my Assistant folder answers its line", code == 200 and json.loads(raw).get("words") == "Opened The Assistant in %s." % this_computer.FILES_APP, raw[:200])
 
 
 # ---------------------------------------------------------------- the pages, in a hidden Chrome
@@ -891,7 +1047,40 @@ def check_make_page(c, w):
     case("make posts: Open the post kit opens a kit whose page was never written", "Kit shoot 01" in c.js("document.body.textContent") and c.js("location.pathname").endswith("/Post%20kit.html"), c.js("location.pathname"))
 
 
+def check_cant_read(c, w):
+    """The review round: when the Assistant says it could not read the backups (or the kits) just now, the screen
+    keeps the list it had, or says her "can't reach" line; it never says there is nothing."""
+    for path, ready, box, row, problem, cant, none in (
+            ("/backups", "document.querySelectorAll('#backups .backup').length > 0", "#backups", "#backups .backup", "problem_backups", "b_cant", "b_none"),
+            ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0", "#recent", "#recent .shoot", "problem_kits", "m_cant", "m_none")):
+        c.open(w.url(path))
+        c.wait_for(ready, 15)
+        had = c.count(row)
+        c.js("homeData = async () => ({ok: true, card: null, groups: [], kits: [], %s: 'KeyError', stamp: ''})" % problem)
+        c.js("load()")
+        case("%s: the records could not be read just now: the list it had stays" % path, c.count(row) == had and had > 0, (had, c.count(row)))
+        c.js("got = false")
+        c.js("load()")
+        said = c.js("document.querySelector(%s).textContent.trim()" % json.dumps(box))
+        case("%s: ... and with no list yet it says her \"can't reach\" line, never that there is nothing" % path,
+             said == c.js("W.%s" % cant) and said != c.js("W.%s" % none) and c.count(row) == 0, said)
+
+
 def check_phone(c, w):
+    # a name with no place to break (an underscore-joined shoot name; a long card name) never widens a page
+    long_name = "Lee_wedding_" + "x" * 100
+    qf = w.home / "queue.json"
+    kept = qf.read_bytes()
+    q = json.loads(kept.decode("utf-8"))
+    next(s for s in q["shoots"] if s["name"] == "Lee wedding")["name"] = long_name       # late, so it is on Today too
+    qf.write_text(json.dumps(q, indent=1), encoding="utf-8")
+    try:
+        check_phone_pages(c, w, long_name)
+    finally:
+        qf.write_bytes(kept)
+
+
+def check_phone_pages(c, w, long_name):
     c.phone(width=375, height=800)
     try:
         for path, ready in (("/home", "document.querySelectorAll('.flow .item').length == 5"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
@@ -900,7 +1089,12 @@ def check_phone(c, w):
             c.wait_for(ready, 15)
             if path == "/backups":
                 c.js("document.querySelector('#older').click()")
-            case("phone width: %s has no sideways scroll" % path, no_sideways(c, 375), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
+                c.js("document.querySelector('#cardStatus').textContent = fill(W.b_card_in, {name: %s, files: '3,931'})" % json.dumps("CARD_" + "W" * 100))
+            if path == "/home":
+                case("phone width: the long name is on Today", long_name in c.js("document.querySelector('#today').textContent"))
+            if path == "/backups":
+                case("phone width: the long name is on a backup, and the long card name in the steps box", backup_of(c, long_name) >= 0 and "WWWWWWWW" in c.text("#cardStatus"))
+            case("phone width: %s has no sideways scroll, with a 100-letter name that has no place to break" % path, no_sideways(c, 375), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
             if path != "/home":
                 case("phone width: %s: the Back to home button reads Home" % path, c.js("getComputedStyle(document.querySelector('.homelink .long')).display") == "none"
                      and c.js("getComputedStyle(document.querySelector('.homelink .short')).display") != "none")
@@ -909,6 +1103,8 @@ def check_phone(c, w):
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)
+            if path == "/backups":
+                c.js("document.querySelector('#cardStatus').textContent = fill(W.b_card_in, {name: %s, files: '3,931'})" % json.dumps("CARD_" + "W" * 100))
             case("a narrow phone (336): %s has no sideways scroll" % path, no_sideways(c, 336), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
     finally:
         c.desktop()
@@ -951,6 +1147,7 @@ def main():
                 c.js("window.__asked = []")
                 group("the Back up a card screen", check_backups_page, c, w)
                 group("the Make posts screen", check_make_page, c, w)
+                group("when the records can't be read", check_cant_read, c, w)
                 group("phone width", check_phone, c, w)
     finally:
         w.stop()
