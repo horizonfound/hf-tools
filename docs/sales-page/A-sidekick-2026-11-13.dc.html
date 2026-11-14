@@ -35,6 +35,31 @@ summary{cursor:pointer}
 .note::after{content:"";position:absolute;right:0;bottom:0;border-style:solid;border-width:0 0 14px 14px;border-color:transparent transparent transparent #8E3D1F}
 .card{background:#FFFFFF;border:1px solid #E6E2D8;border-radius:14px;box-shadow:0 8px 24px rgba(31,36,48,.06);box-sizing:border-box}
 .only-sm{display:none}
+.pic{background-color:#E7E1D5;background-size:cover;background-position:center;background-repeat:no-repeat}
+.pic-bf1{background-image:url(/_blob/e5715a33ee723c1368e632f09f7c9759);background-position:center 30%}
+.pic-bf2{background-image:url(/_blob/6d5d7912b3471a883888195ba0d820cd);background-position:center 30%}
+.pic-bmd{background-image:url(/_blob/2173c4bcc3082115dd160340234eacc8);background-position:center 30%}
+.pic-bbig{background-image:url(/_blob/69b08bf00128209a7a79fc3856e4ac60);background-position:center 30%}
+.pic-bwide{background-image:url(/_blob/10791438e8171e23251f1e935fe1b457)}
+.pic-bms{background-image:url(/_blob/ee9b107b6d1f6f30fe0a3a1cafe658b1)}
+.pic-walk{background-image:url(/_blob/c92c5b26341b95605e01c0d5c2132cb5);background-position:center 30%}
+.pic-sil{background-image:url(/_blob/aab42d63351649400cbcacf1de35b2a9)}
+.pic-bbw{background-image:url(/_blob/4eefaf2164719ddfb3a3aedb5fdab7e0);background-position:center 30%}
+.pic-wveil{background-image:url(/_blob/c57704a235f3018881ad6c3fcbab2e2b)}
+.pic-wcouple{background-image:url(/_blob/0e18cb76cb2b109501745b6a9c01b739);background-position:center 30%}
+.pic-wlawn{background-image:url(/_blob/2305d6d583fd0a53c51e2f937b6ecb7e);background-position:center 30%}
+.pic-wgreen{background-image:url(/_blob/5136b7c95f2e062c50544befc26aefe4)}
+.pic-wbouq{background-image:url(/_blob/d283069c8e19e5549228bed319c70202);background-position:center 30%}
+.pic-kiss{background-image:url(/_blob/47741e42b23c21ee90a33785589ff068);background-position:center 30%}
+.pic-psmile{background-image:url(/_blob/055f6d510c917838282c08bafcb7fbf1);background-position:center 30%}
+.pic-pprof{background-image:url(/_blob/4887591ad322d578638ca495a1cde3bb);background-position:center 30%}
+.pic-pbw{background-image:url(/_blob/35980a8a85c7d099759c1dd041019aa3);background-position:center 30%}
+.pic-home{background-image:url(/_blob/295690e2855060c56d695e5ce310fa89)}
+.pic-baby{background-image:url(/_blob/8a2f4f30cd32e582b5b98796ac15b12f)}
+.feed{opacity:.72}
+.kc{transition:border-color .3s}
+.kc.on{border-color:#B9542F}
+.kc.on .kt{color:#B9542F !important}
 @media (max-width:700px){.only-lg{display:none !important}.only-sm{display:inline}}
 
 @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
@@ -78,7 +103,7 @@ summary{cursor:pointer}
 .mqw:hover .mq{animation-play-state:paused}
 .files{animation:filescroll 10.8s ease-in-out infinite}
 .t1{animation:tka 10.8s linear infinite}.t2{animation:tkb 10.8s linear infinite}.t3{animation:tkc 10.8s linear infinite}
-.fr0 span{animation-delay:-10.8s}.fr1 span{animation-delay:-9s}.fr2 span{animation-delay:-7.2s}.fr3 span{animation-delay:-5.4s}.fr4 span{animation-delay:-3.6s}.fr5 span{animation-delay:-1.8s}
+.fr0 span{animation-delay:-9s}.fr1 span{animation-delay:-7.2s}.fr2 span{animation-delay:-5.4s}.fr3 span{animation-delay:-3.6s}.fr4 span{animation-delay:-1.8s}.fr5 span{animation-delay:0s}
 .type{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;animation:typing .9s steps(10) both}
 .pop{animation:pop .35s ease-out both}
 .th span{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5B6170;margin-right:4px;animation:dots 1s infinite}
@@ -127,7 +152,6 @@ summary{cursor:pointer}
 .tick svg{opacity:0;transition:opacity .2s}
 .tick.on{background:#B9542F;border-color:#B9542F}.tick.on svg{opacity:1}
 .tick.ink.on{background:#1F2430;border-color:#1F2430}
-.bd{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid #5B6170;margin-left:6px;vertical-align:middle;box-sizing:border-box}
 .rng{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;margin:0;cursor:grab}
 .rng::-webkit-slider-runnable-track{height:6px;border-radius:6px;background:#E6E2D8}
 .rng::-moz-range-track{height:6px;border-radius:6px;background:#E6E2D8}
@@ -197,20 +221,20 @@ html{scroll-behavior:auto}
 <div style="flex: 1.3 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
 <div class="lbl">The Assistant, by Horizon Found. For photographers.</div>
 <h1 style="font-size: clamp(38px, 4.2vw, 58px); line-height: 1.04; letter-spacing: -0.03em; font-weight: 700">The busy work around your photos <s class="hs">is all on you</s> <span class="hn">has help now.</span></h1>
-<p style="font-size: 18px; color: #3A3F4D; max-width: 580px">Put a memory card in, say "backup now", and walk away. Your assistant copies the card to your drive, checks every file, sorts the shoots and leaves you a report. No card today? Point it at a folder of finished photos and work through a reel, a carousel and stories <span class="cab">confirm after beta</span>. You stay the photographer.</p>
+<p style="font-size: 18px; color: #3A3F4D; max-width: 580px">Put a memory card in, say "backup now", and walk away. Your assistant copies the card to your drive, checks every file, sorts the shoots and leaves you a report. No card today? Point it at a folder of finished photos and work through a reel, a carousel and stories. You stay the photographer.</p>
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px">
 <a href="#close" onClick="{{openForm}}" class="btn">{{cta}}</a>
 <a href="#demo" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: #1F2430; font-weight: 500; text-decoration: underline; text-underline-offset: 4px">See an evening with it
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10m0 0l-4-4m4 4l4-4" stroke="#1F2430" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
 </div>
-<p style="font-size: 14px; color: #5B6170; max-width: 560px">It is Claude, on your own computer. One-time purchase. It runs on your own paid Claude plan, which is a separate monthly cost. Mac today. Windows PC: confirm after beta.</p>
+<p style="font-size: 14px; color: #5B6170; max-width: 560px">It is Claude, on your own computer. One-time purchase. It runs on your own paid Claude plan, which is a separate monthly cost. Mac today. Windows PC is coming.</p>
 </div>
 
 <div class="hcard" style="position: relative; flex: 1 1 380px; min-width: 0; max-width: 470px; margin: 0 auto; padding: 62px 0 40px; box-sizing: border-box">
 <div class="card" style="padding: 24px 24px 20px; box-shadow: 0 24px 60px rgba(31,36,48,.12)">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
 <div style="font-size: 11px; font-weight: 700; letter-spacing: .14em; color: #B9542F">YOUR REPORT</div>
-<div style="font-size: 11px; color: #5B6170">A drawing. [SCREENSHOT: the report]</div>
+<div style="font-size: 11px; color: #5B6170">A drawing</div>
 </div>
 <div style="display: flex; gap: 12px; align-items: flex-start; margin-top: 12px">
 <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><circle cx="17" cy="17" r="16" fill="#E3F1E8"></circle><path d="M10 17.5l5 5 9-10" stroke="#1F5A3C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -219,7 +243,7 @@ html{scroll-behavior:auto}
 <div style="font-size: 16px; color: #3A3F4D; margin-top: 4px">The card is safe to format when you're ready.</div>
 </div>
 </div>
-<div style="height: 132px; overflow: hidden; margin-top: 16px; border-top: 1px solid #E6E2D8; border-bottom: 1px solid #E6E2D8" aria-hidden="true">
+<div style="height: 88px; overflow: hidden; margin-top: 16px; border-top: 1px solid #E6E2D8; border-bottom: 1px solid #E6E2D8" aria-hidden="true">
 <div class="files" style="font-size: 13px; font-variant-numeric: tabular-nums">
 <div class="fr4" style="height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px"><b style="font-weight: 500">IMG_4475.CR3</b><div style="display: flex; gap: 6px; color: #1F5A3C"><span class="t1" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> copied</span></span><span class="t2" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> read back</span></span><span class="t3" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg> matches</span></div></div>
 <div class="fr5" style="height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px"><b style="font-weight: 500">IMG_4476.CR3</b><div style="display: flex; gap: 6px; color: #1F5A3C"><span class="t1" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> copied</span></span><span class="t2" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> read back</span></span><span class="t3" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg> matches</span></div></div>
@@ -232,6 +256,7 @@ html{scroll-behavior:auto}
 <div class="fr0" style="height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px"><b style="font-weight: 500">IMG_4471.CR3</b><div style="display: flex; gap: 6px; color: #1F5A3C"><span class="t1" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> copied</span></span><span class="t2" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="only-lg"> read back</span></span><span class="t3" style="white-space: nowrap"><svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="vertical-align: -1px"><path d="M2.5 7.5l3 3 6-7" stroke="#1F5A3C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg> matches</span></div></div>
 </div>
 </div>
+<div style="display: flex; gap: 6px; margin-top: 12px" aria-hidden="true"><div class="pic pic-sil" style="flex: 1.6; height: 56px; border-radius: 6px"></div><div class="pic pic-bmd" style="flex: 1; height: 56px; border-radius: 6px"></div><div class="pic pic-walk" style="flex: 1; height: 56px; border-radius: 6px"></div><div class="pic pic-bbw" style="flex: 1; height: 56px; border-radius: 6px"></div><div class="pic pic-bms" style="flex: 1.3; height: 56px; border-radius: 6px"></div><div class="pic pic-bwide" style="flex: 1.3; height: 56px; border-radius: 6px"></div></div>
 <div style="display: flex; justify-content: flex-end; margin-top: 14px">
 <div class="dpill" style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 700">
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 4.5a1 1 0 011-1h3.2l1.3 1.5h6.5a1 1 0 011 1v6a1 1 0 01-1 1h-11a1 1 0 01-1-1z" stroke="#1F2430" stroke-width="1.4" stroke-linejoin="round"></path></svg>Open photo folder</div>
@@ -271,7 +296,7 @@ html{scroll-behavior:auto}
 <div class="lbl lbl-d">An evening with it</div>
 <h2 class="h2">Say two words. <span style="color: #F28A66">Walk away.</span></h2>
 </div>
-<p style="font-size: 17px; color: #C9CCD6; max-width: 400px">This is the part that has run on real memory cards. Watch it once.</p>
+<p style="font-size: 17px; color: #C9CCD6; max-width: 400px">The numbers are from a real memory card. It plays by itself, on a loop.</p>
 </div>
 
 <div style="position: relative; margin-top: 22px">
@@ -306,9 +331,9 @@ html{scroll-behavior:auto}
 <sc-if value="{{b2}}" hint-placeholder-val="{{false}}"><div class="fin" style="height: 266px; display: flex; flex-direction: column; justify-content: center; gap: 16px">
 <div style="font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #B9542F">2. SORTING</div>
 <div style="display: flex; align-items: stretch; height: 84px" aria-hidden="true">
-<div class="sq" style="flex: 3; background: #D9B48A; border-radius: 6px"></div><div class="sq" style="flex: 2; background: #CDA57A; border-radius: 6px"></div><div style="flex: 2; background: #C2976B; border-radius: 6px; margin-right: 14px"></div>
-<div class="sq" style="flex: 2; background: #9DB3A6; border-radius: 6px"></div><div class="sq" style="flex: 3; background: #8DA598; border-radius: 6px"></div><div style="flex: 2; background: #7D978A; border-radius: 6px; margin-right: 14px"></div>
-<div class="sq" style="flex: 2; background: #B3A2B8; border-radius: 6px"></div><div style="flex: 2; background: #A391A9; border-radius: 6px"></div>
+<div class="sq pic pic-sil" style="flex: 3; border-radius: 6px"></div><div class="sq pic pic-bmd" style="flex: 2; border-radius: 6px"></div><div class="pic pic-walk" style="flex: 2; border-radius: 6px; margin-right: 14px"></div>
+<div class="sq pic pic-wlawn" style="flex: 2; border-radius: 6px"></div><div class="sq pic pic-wgreen" style="flex: 3; border-radius: 6px"></div><div class="pic pic-wcouple" style="flex: 2; border-radius: 6px; margin-right: 14px"></div>
+<div class="sq pic pic-psmile" style="flex: 2; border-radius: 6px"></div><div class="pic pic-pbw" style="flex: 2; border-radius: 6px"></div>
 </div>
 <div style="font-size: 22px; font-weight: 700; line-height: 1.25">8 groups by the gaps in time. <span class="sqt" style="display: inline-block">One look. <span style="color: #D4643F">3 shoots.</span></span></div>
 </div></sc-if>
@@ -316,12 +341,11 @@ html{scroll-behavior:auto}
 <sc-if value="{{b3}}" hint-placeholder-val="{{false}}"><div style="height: 266px; display: flex; flex-direction: column; justify-content: center; gap: 12px">
 <div style="font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #B9542F">3. THREE FOLDERS, NAMED</div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(84px, 30%), 1fr)); gap: 8px">
-<div class="d1 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div style="flex: 1; height: 46px; border-radius: 6px; background: #D9B48A"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #CDA57A"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #C2976B"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-24 Black-sand beach</div></div>
-<div class="d2 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div style="flex: 1; height: 46px; border-radius: 6px; background: #9DB3A6"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #8DA598"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #7D978A"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-24 Sunrise palm grove</div></div>
-<div class="d3 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div style="flex: 1; height: 46px; border-radius: 6px; background: #B3A2B8"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #A391A9"></div><div style="flex: 1; height: 46px; border-radius: 6px; background: #94819B"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-25 Morning yoga</div></div>
+<div class="d1 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div class="pic pic-sil" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-bmd" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-walk" style="flex: 1; height: 46px; border-radius: 6px"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-24 Black-sand beach</div></div>
+<div class="d2 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div class="pic pic-wlawn" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-wgreen" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-wcouple" style="flex: 1; height: 46px; border-radius: 6px"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-24 Sunrise palm grove</div></div>
+<div class="d3 card" style="padding: 10px; border-radius: 12px"><div style="display: flex; gap: 4px"><div class="pic pic-psmile" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-pprof" style="flex: 1; height: 46px; border-radius: 6px"></div><div class="pic pic-pbw" style="flex: 1; height: 46px; border-radius: 6px"></div></div><div style="font-size: 12px; font-weight: 700; line-height: 1.3; margin-top: 8px">2022-06-25 Morning yoga</div></div>
 </div>
 <div class="sqt" style="font-size: 13px; color: #3A3F4D"><span style="font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; background: #F1EEE6; padding: 3px 7px; border-radius: 5px">Black-sand-beach_0001_IMG_4471.CR3</span> the camera's own name stays inside</div>
-<div class="only-lg" style="font-size: 11px; color: #5B6170">[PHOTO: three frames from each test shoot]</div>
 </div></sc-if>
 
 <sc-if value="{{b4}}" hint-placeholder-val="{{true}}"><div class="su" style="height: 266px; display: flex; flex-direction: column; justify-content: center; gap: 12px">
@@ -331,12 +355,12 @@ html{scroll-behavior:auto}
 <div><div style="font-size: clamp(20px, 2.2vw, 26px); font-weight: 700; line-height: 1.2">Everything is on your drive and verified.</div><div style="font-size: 15px; color: #3A3F4D">The card is safe to format when you're ready.</div></div>
 </div>
 <div style="display: flex; gap: 8px; padding: 6px 4px 0" aria-hidden="true">
-<div class="d1 pk" style="flex: 1.5; border-radius: 8px; background: #D9B48A; rotate: -2deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
-<div class="d1 pk" style="flex: 1; border-radius: 8px; background: #8DA598; rotate: 2deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
-<div class="d2 pk" style="flex: 1; border-radius: 8px; background: #C2976B; rotate: -1deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
-<div class="d2 pk" style="flex: 1; border-radius: 8px; background: #A391A9; rotate: 3deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
-<div class="d3 pk" style="flex: 1; border-radius: 8px; background: #CDA57A; rotate: -3deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
-<div class="d3 pk" style="flex: 1; border-radius: 8px; background: #7D978A; rotate: 1deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d1 pk pic pic-sil" style="flex: 1.5; border-radius: 8px; rotate: -2deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d1 pk pic pic-wlawn" style="flex: 1; border-radius: 8px; rotate: 2deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d2 pk pic pic-bmd" style="flex: 1; border-radius: 8px; rotate: -1deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d2 pk pic pic-psmile" style="flex: 1; border-radius: 8px; rotate: 3deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d3 pk pic pic-walk" style="flex: 1; border-radius: 8px; rotate: -3deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
+<div class="d3 pk pic pic-wcouple" style="flex: 1; border-radius: 8px; rotate: 1deg; box-shadow: 0 6px 14px rgba(31,36,48,.14)"></div>
 </div>
 <div style="font-size: 14px; color: #3A3F4D">Six sneak peeks to edit first<span class="only-lg">, marked "sneak peek" so they filter in Lightroom (RAW files)</span>.</div>
 </div></sc-if>
@@ -433,17 +457,17 @@ html{scroll-behavior:auto}
 <span class="cab cab-d" style="position: absolute; right: 14px; top: 14px"><span class="gd"></span>Run on real cards</span>
 <div style="background: #FAFAF6; color: #1F2430; border-radius: 12px; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
 <div style="flex: 1 1 200px; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px" aria-hidden="true">
-<div style="grid-column: span 2; grid-row: span 2; height: 150px; border-radius: 8px; background: #D9B48A"></div>
-<div style="height: 72px; border-radius: 8px; background: #8DA598"></div>
-<div style="height: 72px; border-radius: 8px; background: #C2976B"></div>
-<div style="height: 60px; border-radius: 8px; background: #A391A9"></div>
-<div style="height: 60px; border-radius: 8px; background: #CDA57A"></div>
-<div style="height: 60px; border-radius: 8px; background: #7D978A"></div>
+<div class="pic pic-sil" style="grid-column: span 2; grid-row: span 2; height: 150px; border-radius: 8px"></div>
+<div class="pic pic-bmd" style="height: 72px; border-radius: 8px"></div>
+<div class="pic pic-walk" style="height: 72px; border-radius: 8px"></div>
+<div class="pic pic-bbw" style="height: 60px; border-radius: 8px"></div>
+<div class="pic pic-bms" style="height: 60px; border-radius: 8px"></div>
+<div class="pic pic-bwide" style="height: 60px; border-radius: 8px"></div>
 </div>
 <div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
 <div style="font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #B9542F">01 OF 3 SHOOTS</div>
 <div style="font-size: 19px; font-weight: 700; line-height: 1.2">2022-06-24 Black-sand beach</div>
-<div style="font-size: 13px; color: #5B6170">Six sneak peeks to edit first. [PHOTO: Nicole's test shoot]</div>
+<div style="font-size: 13px; color: #5B6170">Six sneak peeks to edit first.</div>
 <div style="display: flex; flex-wrap: wrap; gap: 8px"><span class="dpill" style="display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700">Open photo folder</span><span class="dpill" style="display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700">Add to my editing queue</span></div>
 </div>
 </div>
@@ -458,29 +482,28 @@ html{scroll-behavior:auto}
 <div><div class="lbl lbl-d" style="font-size: 11px; font-weight: 700; letter-spacing: .12em">Stays yours</div><p style="color: #E4E1DA">The editing, all of it. It does not cull, edit or deliver galleries. Which shoots are client work. Every due date.</p></div>
 </div>
 <div style="flex: 1.3 1 440px; min-width: 0; position: relative; background: #2A3040; border-radius: 16px; padding: 44px 22px 22px; box-sizing: border-box">
-<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">Confirm after beta</span>
+<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">Example names</span>
 <div style="display: flex; flex-direction: column; gap: 10px; color: #1F2430">
 <div class="qd" style="background: #FAFAF6; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
 <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #B9542F; display: flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box"><svg class="qc" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
-<div style="width: 44px; height: 44px; border-radius: 8px; background: #D9B48A; flex: none"></div>
+<div class="pic pic-bf1" style="width: 44px; height: 44px; border-radius: 8px; flex: none"></div>
 <div style="flex: 1; min-width: 0"><div style="font-weight: 700">Garcia family</div><div style="font-size: 13px; color: #5B6170">212 photos</div></div>
 <span style="font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: #FBE3D6; color: #8E3D1F; white-space: nowrap">due in 3 days</span>
 </div>
 <div style="background: #FAFAF6; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
 <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #A9ADB8; flex: none; box-sizing: border-box"></div>
-<div style="width: 44px; height: 44px; border-radius: 8px; background: #8DA598; flex: none"></div>
+<div style="width: 44px; height: 44px; border-radius: 8px; background: #E7E1D5; border: 1.5px dashed #B9B2A4; box-sizing: border-box; flex: none"></div>
 <div style="flex: 1; min-width: 0"><div style="font-weight: 700">Cassandra</div><div style="font-size: 13px; color: #5B6170">From your list. No photos behind it yet.</div></div>
 <span style="font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: #ECE8DE; color: #3A3F4D; white-space: nowrap">due Nov 24</span>
 </div>
 <div style="background: #FAFAF6; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
 <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #A9ADB8; flex: none; box-sizing: border-box"></div>
-<div style="width: 44px; height: 44px; border-radius: 8px; background: #A391A9; flex: none"></div>
+<div class="pic pic-psmile" style="width: 44px; height: 44px; border-radius: 8px; flex: none"></div>
 <div style="flex: 1; min-width: 0"><div style="font-weight: 700">Morning yoga</div><div style="font-size: 13px; color: #5B6170">264 photos</div></div>
 <span style="font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; border: 1px dashed #A9ADB8; color: #5B6170; white-space: nowrap">Set a due date</span>
 </div>
 <div class="qr" style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid #4A5166; color: #C9CCD6; font-size: 13px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#F28A66" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Finished: Garcia family</div>
 </div>
-<div style="font-size: 11px; color: #A9ADB8; margin-top: 8px">Example names. [SCREENSHOT: the real queue page]</div>
 </div>
 </div></sc-if>
 
@@ -492,16 +515,15 @@ html{scroll-behavior:auto}
 <div><div class="lbl lbl-d" style="font-size: 11px; font-weight: 700; letter-spacing: .12em">Stays yours</div><p style="color: #E4E1DA">The stories and the details. If you did not say a detail, it asks or leaves it out. The final order. The song. The finished look in CapCut. No hashtags. No AI-made pictures.</p></div>
 </div>
 <div style="flex: 1.3 1 440px; min-width: 0; position: relative; background: #2A3040; border-radius: 16px; padding: 44px 22px 22px; box-sizing: border-box">
-<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">Confirm after beta</span>
+<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">A drawing</span>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 12px">
-<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; border-radius: 8px; background: #D9B48A"></div><div style="font-weight: 700">Reel</div>
+<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div class="pic pic-bwide" style="height: 96px; border-radius: 8px"></div><div style="font-weight: 700">Reel</div>
 <span class="l1" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">1 Make it</span><span class="l2" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">2 Your words</span><span class="l3" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">3 Add to my queue</span></div>
-<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; border-radius: 8px; background: #8DA598"></div><div style="font-weight: 700">Carousel</div>
+<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div class="pic pic-bms" style="height: 96px; border-radius: 8px"></div><div style="font-weight: 700">Carousel</div>
 <span class="l1" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">1 Make it</span><span class="l2" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">2 Your words</span><span class="l3" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">3 Add to my queue</span></div>
-<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div style="height: 96px; border-radius: 8px; background: #A391A9"></div><div style="font-weight: 700">Stories</div>
+<div style="background: #1F2430; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px"><div class="pic pic-sil" style="height: 96px; border-radius: 8px"></div><div style="font-weight: 700">Stories</div>
 <span class="l1" style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1px solid #4A5166; color: #C9CCD6">1 Make it</span><span style="font-size: 12px; padding: 6px 10px; color: #A9ADB8">Saved to your Stories folder. No words step.</span></div>
 </div>
-<div style="font-size: 11px; color: #A9ADB8; margin-top: 10px">A drawing. [SCREENSHOT: the real post kit page]</div>
 </div>
 </div></sc-if>
 
@@ -513,24 +535,23 @@ html{scroll-behavior:auto}
 <div><div class="lbl lbl-d" style="font-size: 11px; font-weight: 700; letter-spacing: .12em">Stays yours</div><p style="color: #E4E1DA">Posting, always. Nothing is posted for you. The order, the dates, how often.</p></div>
 </div>
 <div style="flex: 1.3 1 440px; min-width: 0; position: relative; background: #2A3040; border-radius: 16px; padding: 44px 22px 22px; box-sizing: border-box">
-<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">Confirm after beta</span>
+<span class="cab cab-d" style="position: absolute; right: 14px; top: 14px">Example names and dates</span>
 <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
 <div style="flex: 1 1 240px; min-width: 0; max-width: 300px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px">
-<sc-for list="{{gridTop}}" as="g" hint-placeholder-count="3"><button draggable="true" onClick="{{g.pick}}" onDragStart="{{g.dragStart}}" onDragOver="{{g.dragOver}}" onDrop="{{g.drop}}" aria-label="{{g.aria}}" class="gt" style="height: 84px; border-radius: 4px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 5px; box-sizing: border-box; cursor: grab; outline-offset: -2px; {{g.var}}"><span style="font-size: 11px; font-weight: 700; background: #B9542F; color: #FFFFFF; padding: 2px 6px; border-radius: 5px">{{g.date}}</span><span style="font-size: 11px; font-weight: 700; color: #1F2430; background: rgba(255,255,255,.8); padding: 1px 5px; border-radius: 4px">{{g.name}}</span></button></sc-for>
-<div style="height: 84px; border-radius: 4px; background: #59617A"></div><div style="height: 84px; border-radius: 4px; background: #4F576E"></div><div style="height: 84px; border-radius: 4px; background: #59617A"></div>
-<div style="height: 84px; border-radius: 4px; background: #4F576E"></div><div style="height: 84px; border-radius: 4px; background: #59617A"></div><div style="height: 84px; border-radius: 4px; background: #4F576E"></div>
+<sc-for list="{{gridTop}}" as="g" hint-placeholder-count="3"><button draggable="true" onClick="{{g.pick}}" onDragStart="{{g.dragStart}}" onDragOver="{{g.dragOver}}" onDrop="{{g.drop}}" aria-label="{{g.aria}}" class="gt {{g.pic}}" style="height: 84px; border-radius: 4px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 5px; box-sizing: border-box; cursor: grab; outline-offset: -2px; {{g.var}}"><span style="font-size: 11px; font-weight: 700; background: #B9542F; color: #FFFFFF; padding: 2px 6px; border-radius: 5px">{{g.date}}</span><span style="font-size: 11px; font-weight: 700; color: #1F2430; background: rgba(255,255,255,.8); padding: 1px 5px; border-radius: 4px; font-size: 10px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box">{{g.name}}</span></button></sc-for>
+<div class="pic pic-wveil feed" style="height: 84px; border-radius: 4px"></div><div class="pic pic-pbw feed" style="height: 84px; border-radius: 4px"></div><div class="pic pic-baby feed" style="height: 84px; border-radius: 4px"></div>
+<div class="pic pic-wbouq feed" style="height: 84px; border-radius: 4px"></div><div class="pic pic-home feed" style="height: 84px; border-radius: 4px"></div><div class="pic pic-kiss feed" style="height: 84px; border-radius: 4px"></div>
 </div>
 <div style="flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px">
 <div style="color: #C9CCD6">Drag one outlined piece onto another, or press one and then another, to swap them. The dates follow the spot.</div>
 <div style="background: #1F2430; border-radius: 12px; padding: 12px 14px"><div style="font-size: 22px; font-weight: 700; color: #FFFFFF">3 weeks of posts</div><div style="height: 8px; border-radius: 8px; background: #3A4155; margin-top: 8px; overflow: hidden"><div style="width: 60%; height: 8px; background: #F28A66; border-radius: 8px"></div></div><div style="font-size: 11px; color: #A9ADB8; margin-top: 6px">example</div></div>
-<div style="font-size: 11px; color: #A9ADB8">Grey tiles: what is on your feed now. Example names and dates. [SCREENSHOT: the real posting page]</div>
+<div style="font-size: 11px; color: #A9ADB8">The outlined pieces are new. The rest is what is on your feed now.</div>
 </div>
 </div>
 </div>
 </div></sc-if>
 </div>
 
-<p style="font-size: 14px; color: #C9CCD6; max-width: 900px; margin-top: 16px">Step 1 has run on real cards on a Mac. Steps 2 to 4 are built and have run on practice shoots on our own Macs; "confirm after beta" means real photographers have not put them through real shoots yet.</p>
 </div>
 </div>
 
@@ -585,7 +606,7 @@ html{scroll-behavior:auto}
 <div style="max-width: 1240px; margin: 0 auto; padding: 40px 28px 36px; box-sizing: border-box">
 <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 40px">
 <div style="display: flex; flex-direction: column; gap: 12px">
-<div class="lbl lbl-b">No card today? <span class="cab">confirm after beta</span></div>
+<div class="lbl lbl-b">No card today?</div>
 <h2 class="h2">One folder of finished photos. <span style="color: #B9542F">Three things to post.</span></h2>
 </div>
 <p style="font-size: 16px; color: #3A3F4D; max-width: 1100px">Most weeks you are not shooting. You have finished galleries on a drive and nothing going up. Start here. You do not need to back anything up first.</p>
@@ -595,12 +616,12 @@ html{scroll-behavior:auto}
 <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
 <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
 <div style="position: relative; height: 92px" aria-hidden="true">
-<div style="position: absolute; left: 8%; top: 10px; width: 34%; height: 76px; border-radius: 8px; background: #D9B48A; transform: rotate(-8deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
-<div style="position: absolute; left: 32%; top: 4px; width: 34%; height: 80px; border-radius: 8px; background: #8DA598; transform: rotate(2deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
-<div style="position: absolute; left: 56%; top: 10px; width: 34%; height: 76px; border-radius: 8px; background: #A391A9; transform: rotate(9deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
+<div class="pic pic-bf1" style="position: absolute; left: 8%; top: 10px; width: 34%; height: 76px; border-radius: 8px; transform: rotate(-8deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
+<div class="pic pic-bmd" style="position: absolute; left: 32%; top: 4px; width: 34%; height: 80px; border-radius: 8px; transform: rotate(2deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
+<div class="pic pic-bbig" style="position: absolute; left: 56%; top: 10px; width: 34%; height: 76px; border-radius: 8px; transform: rotate(9deg); box-shadow: 0 4px 10px rgba(31,36,48,.14)"></div>
 </div>
-<div><div style="font-weight: 700; font-size: 17px">Garcia family, final exports</div><div style="font-size: 14px; color: #5B6170">48 finished photos. <span style="font-size: 11px">example</span> [PHOTO: a finished family shoot of Nicole's]</div></div>
-<div><button class="obtn" onClick="{{playPosts}}" style="gap: 8px"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 109.6-3.7M12.5 1.5v3h-3" stroke="#B9542F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>Play it again</button></div>
+<div><div style="font-weight: 700; font-size: 17px">Garcia family, final exports</div><div style="font-size: 14px; color: #5B6170">48 finished photos. <span style="font-size: 11px">example</span></div></div>
+<div style="display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: #B9542F; font-weight: 700; font-size: 13px"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 109.6-3.7M12.5 1.5v3h-3" stroke="#B9542F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>playing on a loop</div>
 </div>
 <div class="nsh" style="align-self: flex-end; width: 250px; max-width: 100%; transform: rotate(-2deg)"><div class="note">It puts the cuts on the beat. The order, the song and the look stay yours.</div></div>
 </div>
@@ -611,7 +632,7 @@ html{scroll-behavior:auto}
 <div style="overflow-x: auto; margin-top: 8px; padding-top: 4px">
 <div style="position: relative; min-width: {{tlMin}}px">
 <div style="position: relative; height: 56px">
-<sc-for list="{{blocks}}" as="b" hint-placeholder-count="8"><button class="blk" onClick="{{b.cycle}}" aria-label="{{b.aria}}" style="position: absolute; top: 0; height: 56px; display: flex; align-items: flex-end; padding: 2px; box-sizing: border-box; border-radius: 6px; overflow: hidden; {{b.pos}}"><span style="font-size: 10px; font-weight: 700; letter-spacing: -0.01em; color: #1F2430; background: rgba(255,255,255,.78); padding: 1px 3px; border-radius: 4px">{{b.label}}</span></button></sc-for>
+<sc-for list="{{blocks}}" as="b" hint-placeholder-count="8"><button class="blk {{b.pic}}" onClick="{{b.cycle}}" aria-label="{{b.aria}}" style="position: absolute; top: 0; height: 56px; display: flex; align-items: flex-end; padding: 2px; box-sizing: border-box; border-radius: 6px; overflow: hidden; {{b.pos}}"><span style="font-size: 10px; font-weight: 700; letter-spacing: -0.01em; color: #1F2430; background: rgba(255,255,255,.78); padding: 1px 3px; border-radius: 4px">{{b.label}}</span></button></sc-for>
 </div>
 <div style="height: 10px; margin-top: 4px; {{tickBg}}" aria-hidden="true"></div>
 <svg width="100%" height="30" viewBox="0 0 320 34" preserveAspectRatio="none" aria-hidden="true" style="display: block; margin-top: 2px"><path d="M0 14.0L2 28.4L4 4.4L6 23.6L8 11.1L10 24.4L12 12.4L14 20.0L16 11.1L18 25.1L20 11.0L22 24.1L24 4.0L26 28.3L28 13.6L30 28.4L32 2.6L34 23.1L36 11.2L38 23.6L40 13.1L42 20.1L44 11.0L46 25.8L48 10.2L50 24.6L52 3.6L54 28.1L56 13.3L58 28.4L60 5.4L62 22.7L64 10.7L66 22.8L68 13.7L70 20.2L72 10.2L74 26.4L76 11.0L78 25.1L80 2.0L82 27.9L84 12.9L86 28.3L88 6.0L90 22.2L92 11.6L94 22.0L96 13.6L98 20.4L100 9.5L102 26.9L104 11.1L106 25.6L108 3.2L110 27.6L112 12.2L114 28.1L116 6.6L118 21.8L120 12.0L122 21.2L124 13.1L126 20.6L128 7.4L130 27.4L132 11.3L134 26.0L136 3.0L138 27.3L140 12.3L142 27.8L144 5.7L146 21.4L148 12.3L150 20.3L152 12.6L154 20.8L156 8.0L158 27.8L160 10.9L162 26.4L164 3.0L166 26.9L168 12.0L170 27.5L172 8.0L174 21.0L176 12.5L178 20.5L180 12.1L182 21.2L184 7.3L186 28.2L188 11.7L190 26.8L192 2.0L194 26.4L196 11.8L198 27.1L200 8.8L202 20.7L204 13.3L206 21.4L208 11.1L210 21.5L212 6.7L214 28.4L216 12.0L218 27.2L220 3.2L222 26.0L224 11.0L226 26.6L228 9.5L230 20.5L232 13.8L234 22.3L236 11.3L238 21.9L240 4.0L242 28.6L244 12.3L246 27.5L248 3.4L250 25.5L252 11.5L254 26.1L256 9.3L258 20.3L260 13.6L262 23.1L264 11.0L266 22.3L268 5.5L270 28.8L272 12.3L274 27.7L276 3.6L278 25.0L280 11.4L282 25.5L284 11.0L286 20.1L288 12.7L290 23.9L292 10.8L294 22.8L296 4.9L298 28.8L300 13.0L302 27.9L304 2.0L306 24.5L308 11.4L310 24.8L312 11.8L314 20.0L316 12.3L318 24.6L320 9.8" stroke="#A9ADB8" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"></path></svg>
@@ -622,19 +643,19 @@ html{scroll-behavior:auto}
 </div>
 
 <div id="posts-kit" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 14px">
-<div class="card" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
-<div style="height: 52px" aria-hidden="true"><sc-if value="{{fReel}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl" style="flex: 3; border-radius: 6px; background: #D9B48A"></div><div class="dl2" style="flex: 2; border-radius: 6px; background: #8DA598"></div><div class="dl3" style="flex: 1; border-radius: 6px; background: #C2976B"></div><div class="dl3" style="flex: 2; border-radius: 6px; background: #A391A9"></div></div></sc-if></div>
-<div style="font-size: 14px; color: #3A3F4D"><div style="font-weight: 700; font-size: 17px; color: #1F2430">Reel</div>Cut on the beat of your song. Opens in CapCut for you to finish.</div>
+<div class="{{kc.a}}" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
+<div style="height: 52px" aria-hidden="true"><sc-if value="{{fReel}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl pic pic-bwide" style="flex: 3; border-radius: 6px"></div><div class="dl2 pic pic-bf1" style="flex: 2; border-radius: 6px"></div><div class="dl3 pic pic-bmd" style="flex: 1; border-radius: 6px"></div><div class="dl3 pic pic-bms" style="flex: 2; border-radius: 6px"></div></div></sc-if></div>
+<div style="font-size: 14px; color: #3A3F4D"><div class="kt" style="font-weight: 700; font-size: 17px; color: #1F2430; transition: color .3s">Reel</div>Cut on the beat of your song. Opens in CapCut for you to finish.</div>
 <div style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; font-weight: 700; color: #3A3F4D; margin-top: auto; white-space: nowrap"><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Make it</span><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Your words</span><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Add to my queue</span></div>
 </div>
-<div class="card" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
-<div style="height: 52px" aria-hidden="true"><sc-if value="{{fCar}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl" style="width: 42px; border-radius: 6px; background: #8DA598"></div><div class="dl2" style="width: 42px; border-radius: 6px; background: #D9B48A; display: flex; align-items: flex-end; padding: 3px; box-sizing: border-box; font-size: 9px; font-weight: 700; color: #1F2430; line-height: 1">your text</div><div class="dl3" style="width: 42px; border-radius: 6px; background: #A391A9"></div><div class="dl3" style="width: 42px; border-radius: 6px; background: #CDA57A"></div></div></sc-if></div>
-<div style="font-size: 14px; color: #3A3F4D"><div style="font-weight: 700; font-size: 17px; color: #1F2430">Carousel</div>Up to 20 slides that match, with your text and colors.</div>
+<div class="{{kc.b}}" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
+<div style="height: 52px" aria-hidden="true"><sc-if value="{{fCar}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl pic pic-bf2" style="width: 42px; border-radius: 6px"></div><div class="dl2 pic pic-bbig" style="width: 42px; border-radius: 6px; display: flex; align-items: flex-end; padding: 3px; box-sizing: border-box; font-size: 9px; font-weight: 700; color: #1F2430; line-height: 1"><span style="background: rgba(255,255,255,.86); padding: 2px 3px; border-radius: 3px">your text</span></div><div class="dl3 pic pic-bbw" style="width: 42px; border-radius: 6px"></div><div class="dl3 pic pic-sil" style="width: 42px; border-radius: 6px"></div></div></sc-if></div>
+<div style="font-size: 14px; color: #3A3F4D"><div class="kt" style="font-weight: 700; font-size: 17px; color: #1F2430; transition: color .3s">Carousel</div>Up to 20 slides that match, with your text and colors.</div>
 <div style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; font-weight: 700; color: #3A3F4D; margin-top: auto; white-space: nowrap"><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Make it</span><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Your words</span><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Add to my queue</span></div>
 </div>
-<div class="card" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
-<div style="height: 52px" aria-hidden="true"><sc-if value="{{fSto}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl" style="width: 30px; border-radius: 6px; background: #A391A9"></div><div class="dl2" style="width: 30px; border-radius: 6px; background: #D9B48A"></div><div class="dl3" style="width: 30px; border-radius: 6px; background: #8DA598"></div></div></sc-if></div>
-<div style="font-size: 14px; color: #3A3F4D"><div style="font-weight: 700; font-size: 17px; color: #1F2430">Stories</div>At Instagram's size, clear of Instagram's buttons.</div>
+<div class="{{kc.c}}" style="padding: 12px 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: none">
+<div style="height: 52px" aria-hidden="true"><sc-if value="{{fSto}}" hint-placeholder-val="{{true}}"><div style="height: 52px; display: flex; gap: 4px"><div class="dl pic pic-walk" style="width: 30px; border-radius: 6px"></div><div class="dl2 pic pic-bf1" style="width: 30px; border-radius: 6px"></div><div class="dl3 pic pic-bmd" style="width: 30px; border-radius: 6px"></div></div></sc-if></div>
+<div style="font-size: 14px; color: #3A3F4D"><div class="kt" style="font-weight: 700; font-size: 17px; color: #1F2430; transition: color .3s">Stories</div>At Instagram's size, clear of Instagram's buttons.</div>
 <div style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; font-weight: 700; color: #3A3F4D; margin-top: auto; white-space: nowrap"><span class="dpill" style="padding: 3px 6px; border-radius: 8px">Make it</span><span style="padding: 3px 0; font-weight: 500; color: #5B6170">Saved to your Stories folder.</span></div>
 </div>
 </div>
@@ -642,7 +663,7 @@ html{scroll-behavior:auto}
 </div>
 
 <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 30px; margin-top: 18px">
-<p style="font-size: 13px; color: #5B6170; max-width: 800px">A test reel written by the Assistant opened, played and exported in CapCut 9.6 on a Mac with its cuts on the beat. The timing has been reworked since, and the pages drawn here have not been through real shoots yet: confirm after beta. Reels need the CapCut desktop app (free).</p>
+<p style="font-size: 13px; color: #5B6170; max-width: 800px">Your reel opens in CapCut with every cut already on the beat, ready for you to style and export. Reels need the CapCut desktop app (free).</p>
 <a href="#close" onClick="{{openForm}}" class="btn">{{cta}}</a>
 </div>
 </div>
@@ -671,8 +692,8 @@ html{scroll-behavior:auto}
 </div>
 <div class="mqw" style="overflow: hidden; padding: 4px 0 32px">
 <div class="mq mq-r">
-<div style="display: flex; align-items: center"><span class="chip"><i>"</i>what's in my queue?<i>"</i></span><span class="chip"><i>"</i>Cassandra's due Friday<i>"</i></span><span class="chip"><i>"</i>add these to my editing queue<i>"</i></span><span class="chip"><i>"</i>I'm done with the beach shoot<i>"</i></span><span class="chip"><i>"</i>make my posts<i>"</i></span><span class="chip"><i>"</i>make a reel from this shoot<i>"</i></span><span class="chip"><i>"</i>lay out my carousel<i>"</i></span><span class="chip"><i>"</i>make my stories<i>"</i></span><span class="chip"><i>"</i>write my words for the beach reel<i>"</i></span><span class="chip"><i>"</i>show my posting queue<i>"</i></span><span class="chip"><i>"</i>read my Instagram grid<i>"</i></span><span class="cab cab-d" style="margin-right: 12px">this row: confirm after beta</span></div>
-<div style="display: flex; align-items: center" aria-hidden="true"><span class="chip"><i>"</i>what's in my queue?<i>"</i></span><span class="chip"><i>"</i>Cassandra's due Friday<i>"</i></span><span class="chip"><i>"</i>add these to my editing queue<i>"</i></span><span class="chip"><i>"</i>I'm done with the beach shoot<i>"</i></span><span class="chip"><i>"</i>make my posts<i>"</i></span><span class="chip"><i>"</i>make a reel from this shoot<i>"</i></span><span class="chip"><i>"</i>lay out my carousel<i>"</i></span><span class="chip"><i>"</i>make my stories<i>"</i></span><span class="chip"><i>"</i>write my words for the beach reel<i>"</i></span><span class="chip"><i>"</i>show my posting queue<i>"</i></span><span class="chip"><i>"</i>read my Instagram grid<i>"</i></span><span class="cab cab-d" style="margin-right: 12px">this row: confirm after beta</span></div>
+<div style="display: flex; align-items: center"><span class="chip"><i>"</i>what's in my queue?<i>"</i></span><span class="chip"><i>"</i>Cassandra's due Friday<i>"</i></span><span class="chip"><i>"</i>add these to my editing queue<i>"</i></span><span class="chip"><i>"</i>I'm done with the beach shoot<i>"</i></span><span class="chip"><i>"</i>make my posts<i>"</i></span><span class="chip"><i>"</i>make a reel from this shoot<i>"</i></span><span class="chip"><i>"</i>lay out my carousel<i>"</i></span><span class="chip"><i>"</i>make my stories<i>"</i></span><span class="chip"><i>"</i>write my words for the beach reel<i>"</i></span><span class="chip"><i>"</i>show my posting queue<i>"</i></span><span class="chip"><i>"</i>read my Instagram grid<i>"</i></span></div>
+<div style="display: flex; align-items: center" aria-hidden="true"><span class="chip"><i>"</i>what's in my queue?<i>"</i></span><span class="chip"><i>"</i>Cassandra's due Friday<i>"</i></span><span class="chip"><i>"</i>add these to my editing queue<i>"</i></span><span class="chip"><i>"</i>I'm done with the beach shoot<i>"</i></span><span class="chip"><i>"</i>make my posts<i>"</i></span><span class="chip"><i>"</i>make a reel from this shoot<i>"</i></span><span class="chip"><i>"</i>lay out my carousel<i>"</i></span><span class="chip"><i>"</i>make my stories<i>"</i></span><span class="chip"><i>"</i>write my words for the beach reel<i>"</i></span><span class="chip"><i>"</i>show my posting queue<i>"</i></span><span class="chip"><i>"</i>read my Instagram grid<i>"</i></span></div>
 </div>
 </div>
 </div>
@@ -695,10 +716,9 @@ html{scroll-behavior:auto}
 <div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.a}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Copying the card and checking every file</span></div>
 <div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.b}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Sorting the shoots and naming the folders</span></div>
 <div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.c}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Pulling six photos to get you started</span></div>
-<div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.d}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Keeping the lists: what is due, what is ready to post<span class="bd" aria-hidden="true"></span><span class="sr"> (confirm after beta)</span></span></div>
-<div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.e}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Sizing every slide and putting the cuts on the beat<span class="bd" aria-hidden="true"></span><span class="sr"> (confirm after beta)</span></span></div>
+<div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.d}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Keeping the lists: what is due, what is ready to post</span></div>
+<div style="display: flex; gap: 10px; align-items: center"><span class="tick {{lt.e}}"><svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span>Sizing every slide and putting the cuts on the beat</span></div>
 </div>
-<div style="font-size: 12px; color: #5B6170; margin-top: 10px"><span class="bd" aria-hidden="true" style="margin-left: 0; margin-right: 6px"></span>Dot: confirm after beta.</div>
 </div>
 <div class="card" style="padding: 18px 22px; border: 2px solid #1F2430">
 <div style="font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #1F2430; margin-bottom: 10px">YOU DECIDE</div>
@@ -759,9 +779,8 @@ html{scroll-behavior:auto}
 <div class="rv" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div><b>Back up a card:</b> copy, check every file, sort, name, six sneak peeks, the report</div></div>
 <div class="rv" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div><b>My editing queue:</b> every shoot listed, due dates, soonest on top</div></div>
 <div class="rv2" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div><b>Make posts from a shoot:</b> reel, carousel, stories, help with your words</div></div>
-<div class="rv2" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div><b>My posting queue:</b> what is ready, your grid, the dates<div style="margin-top: 6px"><span class="cab" style="white-space: normal; line-height: 1.3">Editing queue, posts and posting queue: confirm after beta</span></div></div></div>
-<div class="rv3" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div>The setup guide, step by step, with pictures <span class="cab">confirm after beta</span></div></div>
-<div class="rv3" style="padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><span class="phx" style="white-space: normal; display: inline-block; font-size: 14px">[DECIDE: anything else for the first group, such as a live setup call]</span></div>
+<div class="rv2" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div><b>My posting queue:</b> what is ready, your grid, the dates</div></div>
+<div class="rv3" style="display: flex; gap: 10px; align-items: flex-start; padding-bottom: 9px; border-bottom: 1px dashed #D8D2C5"><svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M2.5 7.5l3 3 6-7" stroke="#B9542F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div>The setup guide, step by step, with pictures</div></div>
 </div>
 <div class="rv4" style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-top: 12px; font-weight: 700; font-size: 18px"><span>One payment:</span><span class="phx" style="font-size: 40px; line-height: 1.1">[PRICE]</span><span>No subscription to us.</span></div>
 </div>
@@ -773,13 +792,13 @@ html{scroll-behavior:auto}
 <div style="background: #1F2430; color: #FAFAF6; border-radius: 14px; padding: 22px 26px; font-size: 16px; box-sizing: border-box">
 <div style="font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #F28A66; margin-bottom: 12px">WHAT YOU NEED</div>
 <div style="display: flex; flex-direction: column; gap: 10px">
-<div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><rect x="4" y="4" width="14" height="10" rx="1.5" stroke="#F28A66" stroke-width="1.6"></rect><path d="M2 17h18" stroke="#F28A66" stroke-width="1.6" stroke-linecap="round"></path></svg><div><b>A Mac.</b> Windows PC: confirm after beta. A PC will need two extra installs.</div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><rect x="4" y="4" width="14" height="10" rx="1.5" stroke="#F28A66" stroke-width="1.6"></rect><path d="M2 17h18" stroke="#F28A66" stroke-width="1.6" stroke-linecap="round"></path></svg><div><b>A Mac.</b> Windows PC is coming, and will need two extra installs.</div></div>
 <div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M11 3v16M3 11h16M5.5 5.5l11 11M16.5 5.5l-11 11" stroke="#F28A66" stroke-width="1.6" stroke-linecap="round"></path></svg><div><b>The Claude desktop app on a paid Claude plan.</b> That is a separate monthly cost you pay Anthropic, not us.</div></div>
 <div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><rect x="3" y="6" width="16" height="10" rx="2" stroke="#F28A66" stroke-width="1.6"></rect><circle cx="15.5" cy="11" r="1" fill="#F28A66"></circle></svg><div><b>An external hard drive for your photos.</b> Strongly recommended.</div></div>
 <div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M6 3h8l3 3v13H6z" stroke="#F28A66" stroke-width="1.6" stroke-linejoin="round"></path><path d="M9 3v4m3-4v4" stroke="#F28A66" stroke-width="1.6" stroke-linecap="round"></path></svg><div><b>A card reader,</b> for backups. Not needed for posts.</div></div>
 <div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><rect x="3" y="5" width="16" height="12" rx="1.5" stroke="#F28A66" stroke-width="1.6"></rect><path d="M7 5v12M15 5v12M3 9h4M3 13h4M15 9h4M15 13h4" stroke="#F28A66" stroke-width="1.4"></path></svg><div><b>CapCut on your computer (free),</b> for reels.</div></div>
 <div style="display: flex; gap: 12px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true" style="flex: none; margin-top: 2px"><circle cx="11" cy="11" r="8" stroke="#F28A66" stroke-width="1.6"></circle><path d="M11 6.5V11l3 2" stroke="#F28A66" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-<details style="flex: 1; min-width: 0"><summary style="min-height: 44px"><b>About twenty minutes to set up, once</b> <span class="cab cab-d">confirm after beta</span><span style="display: block; font-size: 14px; color: #C9CCD6">The guide walks you through each click. Press to see the four steps.</span></summary>
+<details style="flex: 1; min-width: 0"><summary style="min-height: 44px"><b>About twenty minutes to set up, once</b><span style="display: block; font-size: 14px; color: #C9CCD6">The guide walks you through each click. Press to see the four steps.</span></summary>
 <ol style="margin: 8px 0 0; padding-left: 20px; font-size: 15px; color: #E4E1DA; display: flex; flex-direction: column; gap: 3px"><li>Install the Claude app.</li><li>Add the Assistant in its settings.</li><li>Pick a folder.</li><li>Choose one setting so a backup can keep going while you are away.</li></ol></details></div>
 </div>
 <div style="border-top: 1px solid #3A4155; margin-top: 14px; padding-top: 12px">
@@ -789,7 +808,7 @@ html{scroll-behavior:auto}
 </div>
 </div>
 <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 30px; margin-top: 22px">
-<div style="font-size: 17px; font-weight: 700">Doors open <span class="{{dateCls}}">{{dateText}}</span>. <span class="phx" style="font-weight: 500; white-space: normal">[GUARANTEE: decide]</span></div>
+<div style="font-size: 17px; font-weight: 700">Doors open <span class="{{dateCls}}">{{dateText}}</span>.</div>
 <a href="#close" onClick="{{openForm}}" class="btn">{{cta}}</a>
 </div>
 </div>
@@ -798,12 +817,12 @@ html{scroll-behavior:auto}
 <div style="background: #F3F0E8; border-top: 1px solid #E6E2D8; border-bottom: 1px solid #E6E2D8">
 <div style="max-width: 1240px; margin: 0 auto; padding: 40px 28px 36px; box-sizing: border-box">
 <div style="display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: stretch">
-<div class="ph" style="flex: 1 1 300px; min-width: 0; min-height: 220px; border-radius: 16px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; box-sizing: border-box; color: #5B6170; font-size: 14px"><span class="tab">PHOTO</span>[PHOTO: Nicole at her desk with a card reader and a drive]</div>
+<div class="ph" style="flex: 1 1 300px; min-width: 0; min-height: 220px; border-radius: 16px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; box-sizing: border-box; color: #5B6170; font-size: 14px"><span class="tab">PHOTO</span>[PHOTO: Nicole]</div>
 <div style="flex: 1.6 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
 <div class="lbl lbl-b">Who made it</div>
 <h2 class="h2">Built by a photographer <span style="color: #B9542F">and the person who builds her tools.</span></h2>
-<p style="font-size: 17px; color: #3A3F4D">Horizon Found is Nicole and Dustin. Nicole is a photographer and teaches photographers. Dustin builds the tools. The backup was run on Nicole's own memory cards. The four steps, the timing of the reel cuts and the pages where you drag photos into order began as Nicole's own designs. <span class="phx" style="font-size: 13px">[NICOLE TO APPROVE: heading and paragraph]</span></p>
-<div style="border: 1.5px dashed #D4643F; border-radius: 12px; padding: 12px 16px; color: #A2441F; background: #FFF6F1; font-size: 15px">[QUOTE: Nicole, in her own words, on why they built it]</div>
+<p style="font-size: 17px; color: #3A3F4D">Horizon Found is Nicole and Dustin. Nicole is a photographer and teaches photographers. Dustin builds the tools. The backup was run on Nicole's own memory cards. The four steps, the timing of the reel cuts and the pages where you drag photos into order began as Nicole's own designs.</p>
+<div style="border: 1.5px dashed #D4643F; border-radius: 12px; padding: 12px 16px; color: #A2441F; background: #FFF6F1; font-size: 15px">[QUOTE: Nicole, in her own words]</div>
 </div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 18px; margin-top: 22px">
@@ -811,7 +830,6 @@ html{scroll-behavior:auto}
 <div class="fl2"><div style="border: 1.5px dashed #B9B2A4; border-radius: 14px; padding: 10px 16px; min-height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; font-size: 14px; transform: rotate(1deg)"><svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true"><path d="M2 18c0-8 3-13 9-16M15 18c0-8 3-13 9-16" stroke="#C9C1B1" stroke-width="3" stroke-linecap="round"></path></svg><b style="color: #A2441F">[QUOTE]</b></div></div>
 <div class="fl3"><div style="border: 1.5px dashed #B9B2A4; border-radius: 14px; padding: 10px 16px; min-height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; font-size: 14px; transform: rotate(-0.6deg)"><svg width="26" height="20" viewBox="0 0 26 20" fill="none" aria-hidden="true"><path d="M2 18c0-8 3-13 9-16M15 18c0-8 3-13 9-16" stroke="#C9C1B1" stroke-width="3" stroke-linecap="round"></path></svg><b style="color: #A2441F">[QUOTE]</b></div></div>
 </div>
-<p style="font-size: 15px; color: #3A3F4D; margin-top: 14px">No testers yet, so no quotes yet. Nothing goes here until a real photographer says it.</p>
 </div>
 </div>
 
@@ -823,7 +841,7 @@ html{scroll-behavior:auto}
 </div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 10px 24px; margin-top: 22px; align-items: start">
 <div style="display: flex; flex-direction: column; gap: 10px">
-<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.a.exp}}" onClick="{{q.a.go}}"><span><i>"</i>I'm not good with computers. Can I set this up?<i>"</i></span><span class="{{q.a.pm}}" aria-hidden="true"></span></button><div class="{{q.a.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">If you can install an app and follow a guide with pictures, yes. It is about twenty minutes, once <span class="cab">confirm after beta</span>: install the Claude app, add the Assistant in its settings, pick a folder, choose one setting. A Mac that has never had developer tools may show an Apple install window first; you click Install and wait, about five to ten minutes by Apple's own estimate (confirm after beta).</p></div></div></div>
+<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.a.exp}}" onClick="{{q.a.go}}"><span><i>"</i>I'm not good with computers. Can I set this up?<i>"</i></span><span class="{{q.a.pm}}" aria-hidden="true"></span></button><div class="{{q.a.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">If you can install an app and follow a guide with pictures, yes. It is about twenty minutes, once: install the Claude app, add the Assistant in its settings, pick a folder, choose one setting. A Mac that has never had developer tools may show an Apple install window first; you click Install and wait a few minutes.</p></div></div></div>
 <div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.b.exp}}" onClick="{{q.b.go}}"><span><i>"</i>Do I have to pay for Claude too?<i>"</i></span><span class="{{q.b.pm}}" aria-hidden="true"></span></button><div class="{{q.b.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">Yes. The Assistant is a one-time purchase from us. It runs inside Claude, on a paid Claude plan that you pay Anthropic for each month. We do not control that price.</p></div></div></div>
 <div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.c.exp}}" onClick="{{q.c.go}}"><span><i>"</i>Will it touch my memory card?<i>"</i></span><span class="{{q.c.pm}}" aria-hidden="true"></span></button><div class="{{q.c.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">It only reads it. Nothing on the card is changed, renamed or deleted, and you format it yourself, after the report says everything is on your drive and verified.</p></div></div></div>
 <div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.d.exp}}" onClick="{{q.d.go}}"><span><i>"</i>Is AI going to change my photos or write my captions?<i>"</i></span><span class="{{q.d.pm}}" aria-hidden="true"></span></button><div class="{{q.d.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">No AI-made pictures, ever. For posts it makes sized copies of your finished photos and leaves your originals alone. For captions it asks you about the shoot and tidies what you said, like an editor. The ideas and details are yours. Captions are optional. No hashtags.</p></div></div></div>
@@ -831,9 +849,9 @@ html{scroll-behavior:auto}
 </div>
 <div style="display: flex; flex-direction: column; gap: 10px">
 <div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.f.exp}}" onClick="{{q.f.go}}"><span><i>"</i>Does it find blinks and duplicates?<i>"</i></span><span class="{{q.f.pm}}" aria-hidden="true"></span></button><div class="{{q.f.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">No. It does not cull. It pulls six sneak peeks per shoot to get you started, a first pass you can swap.</p></div></div></div>
-<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.g.exp}}" onClick="{{q.g.go}}"><span><i>"</i>I'm on a PC.<i>"</i></span><span class="{{q.g.pm}}" aria-hidden="true"></span></button><div class="{{q.g.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">Not yet. It is built for Windows but has never run on a photographer's own PC: <span class="cab">confirm after beta</span>. Join the list and tell us you are on a PC.</p></div></div></div>
+<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.g.exp}}" onClick="{{q.g.go}}"><span><i>"</i>I'm on a PC.<i>"</i></span><span class="{{q.g.pm}}" aria-hidden="true"></span></button><div class="{{q.g.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">Not yet. The Assistant is for the Mac today, and Windows PC is coming. Join the list and tell us you are on a PC.</p></div></div></div>
 <div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.h.exp}}" onClick="{{q.h.go}}"><span><i>"</i>What if I stop using it, or Claude changes?<i>"</i></span><span class="{{q.h.pm}}" aria-hidden="true"></span></button><div class="{{q.h.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">Your photos and posts are ordinary files in ordinary folders on your own drive, with names you can read. They open without us.</p></div></div></div>
-<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.i.exp}}" onClick="{{q.i.go}}"><span><i>"</i>Who else is using it?<i>"</i></span><span class="{{q.i.pm}}" aria-hidden="true"></span></button><div class="{{q.i.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">So far, the two of us. Every measured number on this page is a real run on one Mac; anything marked example is a drawing. Testers come next, and their words will go on this page when they exist.</p></div></div></div>
+<div class="card" style="border-radius: 12px; box-shadow: none"><button class="fqb" aria-expanded="{{q.i.exp}}" onClick="{{q.i.go}}"><span><i>"</i>Who else is using it?<i>"</i></span><span class="{{q.i.pm}}" aria-hidden="true"></span></button><div class="{{q.i.body}}"><div><p style="padding: 0 18px 16px; font-size: 15px; color: #3A3F4D">It is new. Horizon Found built it and ran it on Nicole's own memory cards first. Every measured number on this page is a real run on one Mac; anything marked example is a drawing.</p></div></div></div>
 </div>
 </div>
 </div>
@@ -848,18 +866,18 @@ html{scroll-behavior:auto}
 <div style="position: relative; max-width: 1060px; margin: 0 auto; padding: 36px 28px 20px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px">
 <div class="lbl lbl-d">Doors open <span class="{{dateClsD}}">{{dateText}}</span></div>
 <h2 style="font-size: clamp(32px, 3.4vw, 48px); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; text-wrap: balance">Go make pictures. <span style="color: #F28A66">The rest has help now.</span></h2>
-<p style="font-size: 17px; color: #C9CCD6; max-width: 700px">Put a card in the day you install it, say "backup now", answer a few questions once, and come back to: Everything is on your drive and verified. Or choose a folder of finished photos and say "make my posts" <span class="cab cab-d">confirm after beta</span>.</p>
+<p style="font-size: 17px; color: #C9CCD6; max-width: 700px">Put a card in the day you install it, say "backup now", answer a few questions once, and come back to: Everything is on your drive and verified. Or choose a folder of finished photos and say "make my posts".</p>
 <div style="min-height: 92px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px">
 <sc-if value="{{showBtn}}" hint-placeholder-val="{{true}}"><button class="btn" onClick="{{openForm}}" style="min-height: 60px; padding: 0 36px; font-size: 19px">{{cta}}</button></sc-if>
 <sc-if value="{{showForm}}" hint-placeholder-val="{{false}}"><div class="pop" style="display: flex; flex-wrap: wrap; gap: 10px; width: 100%; max-width: 480px; min-height: 60px; align-items: center"><input class="inp" type="email" placeholder="Your email" aria-label="Your email" autocomplete="email" autofocus="autofocus" onChange="{{setEmail}}" onKeyDown="{{formKey}}" /><button class="btn" onClick="{{sendForm}}" style="flex: 0 0 auto">Tell me</button></div></sc-if>
-<sc-if value="{{showSent}}" hint-placeholder-val="{{false}}"><div class="pop" style="min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: 17px; font-weight: 700">Got it. <span style="font-weight: 400; color: #C9CCD6">(This is a mock-up: nothing was sent or saved.)</span></div></sc-if>
+<sc-if value="{{showSent}}" hint-placeholder-val="{{false}}"><div class="pop" style="min-height: 60px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; font-size: 17px; font-weight: 700">Got it.</div></sc-if>
 <sc-if value="{{showHint}}" hint-placeholder-val="{{false}}"><div style="font-size: 14px; color: #F28A66" role="status">Type your email first.</div></sc-if>
-<sc-if value="{{showMock}}" hint-placeholder-val="{{false}}"><div style="font-size: 14px; color: #C9CCD6" role="status">This is a mock-up: checkout is not connected yet.</div></sc-if>
+<sc-if value="{{showMock}}" hint-placeholder-val="{{false}}"><div style="font-size: 14px; color: #C9CCD6" role="status">Checkout opens here.</div></sc-if>
 <sc-if value="{{showLineWait}}" hint-placeholder-val="{{true}}"><div style="font-size: 14px; color: #C9CCD6">We'll email you when doors open. <span class="phx-d">[PRICE]</span>, once. Runs on your own Claude plan, a separate monthly cost.</div></sc-if>
 <sc-if value="{{showLineOpen}}" hint-placeholder-val="{{false}}"><div style="font-size: 14px; color: #C9CCD6"><span class="phx-d">[PRICE]</span>, once. Runs on your own Claude plan, a separate monthly cost.</div></sc-if>
 </div>
 </div>
-<div style="position: relative; max-width: 1240px; margin: 0 auto; padding: 14px 28px 22px; box-sizing: border-box; border-top: 1px solid #3A4155; font-size: 13px; color: #C9CCD6; text-align: center">The Assistant, by Horizon Found. It is Claude, running on your own computer and your own Claude plan. Mac today. Windows PC: confirm after beta. Nothing is posted or sent for you. CapCut, Lightroom, Instagram and Claude belong to their own companies; we are not part of them. <span class="phx-d">[LINKS: terms, privacy, contact]</span></div>
+<div style="position: relative; max-width: 1240px; margin: 0 auto; padding: 14px 28px 22px; box-sizing: border-box; border-top: 1px solid #3A4155; font-size: 13px; color: #C9CCD6; text-align: center">The Assistant, by Horizon Found. It is Claude, running on your own computer and your own Claude plan. Mac today. Windows PC is coming. Nothing is posted or sent for you. CapCut, Lightroom, Instagram and Claude belong to their own companies; we are not part of them. Terms. Privacy. Contact.</div>
 </div>
 
 </div>
@@ -871,7 +889,7 @@ class Component extends DCLogic {
     tab: 0, side: 'card', fReel: true, fCar: true, fSto: true,
     marks: [2, 1, 0, 1, 1, 0, 2, 1], said: '', h: 50, faq: 0,
     form: false, sent: false, email: '', formHint: false, now: Date.now(),
-    grid: [0, 1, 2], gridPick: -1
+    grid: [0, 1, 2], gridPick: -1, kit: 0
   };
 
   componentDidMount() {
@@ -984,15 +1002,14 @@ class Component extends DCLogic {
     this.set({ demo: 6 + i, n: 3931 });
   }
 
-  flash(key, ms) {
-    this.set({ [key]: false });
-    this.later(() => this.set({ [key]: true }), ms);
-  }
-
+  /* it loops: the three pieces are dealt out one by one, the last one holds
+     for about four seconds, then the kit is dealt again */
   playPosts() {
-    this.flash('fReel', 80);
-    this.flash('fCar', 800);
-    this.flash('fSto', 1500);
+    this.set({ fReel: false, fCar: false, fSto: false, kit: 0 });
+    this.later(() => this.set({ fReel: true, kit: 1 }), 80);
+    this.later(() => this.set({ fCar: true, kit: 2 }), 800);
+    this.later(() => this.set({ fSto: true, kit: 3 }), 1500);
+    this.later(() => this.playPosts(), 6400);
   }
 
   nudge() {
@@ -1073,16 +1090,17 @@ class Component extends DCLogic {
     });
 
     const pieces = [
-      { name: 'Beach reel', bg: '#D9B48A' },
-      { name: 'Garcia carousel', bg: '#8DA598' },
-      { name: 'Yoga reel', bg: '#A391A9' }
+      { name: 'Beach reel', pic: 'pic pic-sil' },
+      { name: 'Garcia carousel', pic: 'pic pic-bf1' },
+      { name: 'Yoga reel', pic: 'pic pic-psmile' }
     ];
     const dates = ['Dec 5', 'Dec 3', 'Dec 1'];
     const gridTop = s.grid.map((pi, slot) => ({
       name: pieces[pi].name,
       date: dates[slot],
       aria: pieces[pi].name + ', going out ' + dates[slot] + '. Press it, then press another piece to swap them.',
-      var: 'background:' + pieces[pi].bg + ';outline:' + (s.gridPick === slot ? '4px solid #FFFFFF' : '2px solid #F28A66'),
+      pic: pieces[pi].pic,
+      var: 'outline:' + (s.gridPick === slot ? '4px solid #FFFFFF' : '2px solid #F28A66'),
       pick: () => { if (s.gridPick < 0) this.set({ gridPick: slot }); else this.swap(s.gridPick, slot); },
       dragStart: (e) => {
         this.dragFrom = slot;
@@ -1100,7 +1118,7 @@ class Component extends DCLogic {
        least 46px wide, so on a phone the bar scrolls sideways */
     const beatsFor = [1, 2, 3];
     const labelFor = ['Quicker', 'Normal', 'Longer'];
-    const tints = ['#D9B48A', '#8DA598', '#C2976B', '#A391A9', '#CDA57A', '#9DB3A6', '#B3A2B8', '#7D978A'];
+    const pics = ['bf1', 'bwide', 'bmd', 'bf2', 'bms', 'bbig', 'sil', 'walk'];
     const total = s.marks.reduce((a, m) => a + beatsFor[m], 0);
     const unit = 100 / total;
     let start = 0;
@@ -1108,9 +1126,9 @@ class Component extends DCLogic {
       const beats = beatsFor[m];
       const b = {
         label: labelFor[m],
+        pic: 'pic pic-' + pics[i % pics.length],
         aria: 'Photo ' + (i + 1) + ', ' + labelFor[m] + '. Press to change how long it stays.',
-        pos: 'left:' + (start * unit).toFixed(3) + '%;width:calc(' + (beats * unit).toFixed(3) + '% - 2px);background:' + tints[i % tints.length] +
-          ';animation-delay:' + (start / total * 8 - 8).toFixed(2) + 's',
+        pos: 'left:' + (start * unit).toFixed(3) + '%;width:calc(' + (beats * unit).toFixed(3) + '% - 2px);animation-delay:' + (start / total * 8 - 8).toFixed(2) + 's',
         cycle: () => { const marks = s.marks.slice(); marks[i] = (m + 1) % 3; this.set({ marks: marks }); }
       };
       start += beats;
@@ -1158,7 +1176,7 @@ class Component extends DCLogic {
       b0: s.demo < 6, b1: s.demo === 6, b2: s.demo === 7, b3: s.demo === 8, b4: s.demo >= 9,
       nText: s.n.toLocaleString('en-US'),
       yesVar: s.demo >= 4 ? 'background:#8E3D1F;transform:scale(.92)' : 'background:#B9542F',
-      beat: beat, replayDemo: () => { this.demoTouched = true; this.playDemo(); },
+      beat: beat,
 
       tabs: tabs, tab1: s.tab === 0, tab2: s.tab === 1, tab3: s.tab === 2, tab4: s.tab === 3,
       gridTop: gridTop,
@@ -1170,7 +1188,7 @@ class Component extends DCLogic {
       showDrive: () => { this.touchedSide = true; this.set({ side: 'drive' }); },
 
       fReel: s.fReel, fCar: s.fCar, fSto: s.fSto,
-      playPosts: () => this.playPosts(),
+      kc: { a: s.kit === 1 ? 'card kc on' : 'card kc', b: s.kit === 2 ? 'card kc on' : 'card kc', c: s.kit === 3 ? 'card kc on' : 'card kc' },
       blocks: blocks, tlMin: total * 46, tickBg: tickBg,
 
       sayBackup: () => this.say('backup'), sayPick: () => this.say('pick'),

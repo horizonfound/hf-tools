@@ -33,8 +33,8 @@ a{color:inherit}
 .btn:active{transform:scale(.97)}
 .phx{border:1px dashed currentColor;border-radius:5px;padding:0 5px;white-space:nowrap}
 .pc{background:#FFFFFF;border:1px solid #E6E2D8;border-radius:12px;box-sizing:border-box}
-.print{background:#E9E5DA;border:8px solid #FFFFFF;box-shadow:0 4px 14px rgba(31,36,48,.07);box-sizing:border-box}
-.t2{background:#E1DCCF}.t3{background:#DCD6C8}
+.print{background-color:#E9E5DA;border:8px solid #FFFFFF;box-shadow:0 4px 14px rgba(31,36,48,.07);box-sizing:border-box}
+.t2{background-color:#E1DCCF}.t3{background-color:#DCD6C8}
 .cap{font-size:12px;color:#666B77}
 .tx{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;font-size:13px;font-weight:600;color:#B9542F;white-space:nowrap}
 .tx:hover{text-decoration:underline}
@@ -92,6 +92,8 @@ a{color:inherit}
 .steps .stp:hover,.steps .stp:focus-visible{opacity:1;border-color:#1F2430}
 .stp .sn{font-size:36px;line-height:1;font-weight:300;color:#1F2430;transition:color .25s}
 .stp:hover .sn{color:#B9542F}
+.stp.cur{border-color:#B9542F}
+.stp.cur .sn{color:#B9542F}
 .bub{display:inline-block;background:#F1EEE6;border-radius:14px 14px 14px 4px;padding:9px 14px;font-size:15px;font-weight:500;min-height:22px}
 .track{position:relative;height:2px;background:#E6E2D8;margin:0 0 18px}
 .dot{position:absolute;top:-5px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#B9542F;transition:left .7s ease}
@@ -120,7 +122,7 @@ a{color:inherit}
 .mini{background:#FFFFFF;border:1px solid #E6E2D8;border-radius:8px;padding:8px;box-sizing:border-box;font-size:10px;line-height:1.3;color:#3A3F4B;width:112px}
 
 /* report */
-.rp .mp{width:48px;height:36px;border:4px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,36,48,.08);box-sizing:border-box;position:relative;transition:transform .7s ease;flex:none}
+.rp .mp{background-color:#E1DCCF;width:48px;height:36px;border:4px solid #FFFFFF;box-shadow:0 2px 8px rgba(31,36,48,.08);box-sizing:border-box;position:relative;transition:transform .7s ease;flex:none}
 .rp .mp:hover{transform:scale(1.25);z-index:3}
 .m1{--x:-40px;--y:44px;--r:-11deg}.m2{--x:-64px;--y:58px;--r:8deg}.m3{--x:-30px;--y:40px;--r:14deg}.m4{--x:-20px;--y:0px;--r:9deg}.m5{--x:-52px;--y:6px;--r:-6deg}.m6{--x:-74px;--y:-8px;--r:-13deg}.m7{--x:-34px;--y:-46px;--r:12deg}.m8{--x:-70px;--y:-40px;--r:-9deg}.m9{--x:-48px;--y:-56px;--r:5deg}
 .rp.piled .mp{transform:translate(var(--x),var(--y)) rotate(var(--r))}
@@ -171,9 +173,9 @@ a{color:inherit}
 .sld{position:relative;width:104px;height:130px;background:#FFFFFF;border:1px solid #D9D4C8;box-sizing:border-box;flex:none;overflow:hidden;cursor:pointer;display:block}
 .sld.sel{outline:2px solid #2F7CF6;outline-offset:2px}
 .sld.wide{overflow:visible;z-index:2}
-.sp{position:absolute;background:#DCD6C8;transition:all .35s ease}
+.sp{position:absolute;background-color:#DCD6C8;transition:all .35s ease}
 .sto{position:relative;width:86px;height:152px;background:#FFFFFF;border:1px solid #D9D4C8;box-sizing:border-box;flex:none;display:flex;flex-direction:column;gap:3px;padding:3px;cursor:pointer}
-.sto i{display:block;flex:1 1 0;background:#DCD6C8;animation:pop .3s ease both}
+.sto i{display:block;flex:1 1 0;background-color:#DCD6C8;animation:pop .3s ease both}
 .band{position:absolute;left:0;right:0;border:1px dashed #8A8F9B;box-sizing:border-box;pointer-events:none}
 .sh{background:linear-gradient(#B9542F,#B9542F) no-repeat left bottom;background-size:100% 2px;animation:under .8s ease both}
 
@@ -218,11 +220,39 @@ a{color:inherit}
 .c1{--x:180px;--y:-6px;--r:-8deg}.c2{--x:80px;--y:8px;--r:6deg}.c3{--x:0px;--y:-4px;--r:-3deg}.c4{--x:-80px;--y:10px;--r:9deg}.c5{--x:-180px;--y:-2px;--r:-5deg}
 .cl.ok .cp{transform:none}
 .cp .print{height:70px;border-width:5px}
-.cp .tick{position:absolute;right:9px;top:9px}
+.cp .tick{position:absolute;right:8px;top:8px;background:#FFFFFF;border-radius:50%;padding:2px;opacity:0;transition:opacity .3s ease .9s}
+.cl.ok .cp .tick{opacity:1}
 .strike{position:absolute;left:-4px;right:-4px;top:52%;height:1.5px;background:#B9542F;transform:scaleX(0);transform-origin:left;transition:transform .5s ease 1.7s}
 .ok .strike{transform:scaleX(1)}
 .madeprint{transform:rotate(-3deg)}
 .quote{padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+
+/* photos (stock stand-ins) */
+.ph-beach-family-1{background-image:url(/_blob/e5715a33ee723c1368e632f09f7c9759);background-size:cover;background-position:center}
+.ph-beach-family-2{background-image:url(/_blob/6d5d7912b3471a883888195ba0d820cd);background-size:cover;background-position:center}
+.ph-beach-mother-daughter{background-image:url(/_blob/2173c4bcc3082115dd160340234eacc8);background-size:cover;background-position:center}
+.ph-beach-family-big{background-image:url(/_blob/69b08bf00128209a7a79fc3856e4ac60);background-size:cover;background-position:center}
+.ph-beach-family-wide{background-image:url(/_blob/10791438e8171e23251f1e935fe1b457);background-size:cover;background-position:center}
+.ph-beach-mother-son-wide{background-image:url(/_blob/ee9b107b6d1f6f30fe0a3a1cafe658b1);background-size:cover;background-position:center}
+.ph-sunset-walk{background-image:url(/_blob/c92c5b26341b95605e01c0d5c2132cb5);background-size:cover;background-position:center}
+.ph-beach-silhouettes-wide{background-image:url(/_blob/aab42d63351649400cbcacf1de35b2a9);background-size:cover;background-position:center}
+.ph-beach-couple-bw{background-image:url(/_blob/4eefaf2164719ddfb3a3aedb5fdab7e0);background-size:cover;background-position:center}
+.ph-wedding-veil-wide{background-image:url(/_blob/c57704a235f3018881ad6c3fcbab2e2b);background-size:cover;background-position:center}
+.ph-wedding-couple{background-image:url(/_blob/0e18cb76cb2b109501745b6a9c01b739);background-size:cover;background-position:center}
+.ph-wedding-lawn{background-image:url(/_blob/2305d6d583fd0a53c51e2f937b6ecb7e);background-size:cover;background-position:center}
+.ph-wedding-green-wide{background-image:url(/_blob/5136b7c95f2e062c50544befc26aefe4);background-size:cover;background-position:center}
+.ph-wedding-bouquet{background-image:url(/_blob/d283069c8e19e5549228bed319c70202);background-size:cover;background-position:center}
+.ph-couple-kiss{background-image:url(/_blob/47741e42b23c21ee90a33785589ff068);background-size:cover;background-position:center}
+.ph-portrait-smile{background-image:url(/_blob/055f6d510c917838282c08bafcb7fbf1);background-size:cover;background-position:center}
+.ph-portrait-profile{background-image:url(/_blob/4887591ad322d578638ca495a1cde3bb);background-size:cover;background-position:center}
+.ph-portrait-bw{background-image:url(/_blob/35980a8a85c7d099759c1dd041019aa3);background-size:cover;background-position:center}
+.ph-home-mother-daughter-wide{background-image:url(/_blob/295690e2855060c56d695e5ce310fa89);background-size:cover;background-position:center}
+.ph-baby-kiss-wide{background-image:url(/_blob/8a2f4f30cd32e582b5b98796ac15b12f);background-size:cover;background-position:center}
+.scr{position:absolute;left:0;top:0;right:0;bottom:0;background:linear-gradient(to top,rgba(31,36,48,.62),rgba(31,36,48,.18))}
+.bn{display:inline-block;background:rgba(255,255,255,.92);border-radius:3px;padding:0 4px;line-height:15px}
+.qt{display:block;width:22px;height:28px;background-color:#E9E5DA}
+.pt{display:block;width:30px;height:30px;flex:none;background-color:#E1DCCF}
+.wp{border:2px solid #FFFFFF;box-shadow:0 2px 6px rgba(31,36,48,.14)}
 
 @supports (animation-timeline: view()){
   .rv{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 35%}
@@ -255,6 +285,8 @@ a{color:inherit}
   html{scroll-behavior:auto}
   *,*::before,*::after{animation:none !important;transition:none !important}
   .rv{opacity:1;transform:none}
+  .lp{display:none}
+  .cp .tick{opacity:1}
   .mq{flex-wrap:wrap;width:auto}
   .mq .dup{display:none}
   .mqw{-webkit-mask-image:none;mask-image:none}
@@ -305,23 +337,23 @@ a{color:inherit}
     <div style="flex: 1 1 360px; min-width: 0">
       <div class="pile" role="group" aria-label="Five scenes from the week after a shoot">
         <button class="{{hp.a.cls}}" onClick="{{hp.a.go}}" aria-label="Scene one: 11 pm. A full card on the desk.">
-          <span class="print" style="display: block"><svg aria-hidden="true" width="46" height="58" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 22px; bottom: 18px"><path d="M3 3h30l10 10v42H3z" stroke="#8A8F9B" stroke-width="2" stroke-linejoin="round"></path><path d="M11 9v9M18 9v9M25 9v9" stroke="#8A8F9B" stroke-width="2" stroke-linecap="round"></path></svg></span>
+          <span class="print ph-beach-family-wide" style="display: block"><span class="scr"></span><svg aria-hidden="true" width="46" height="58" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 22px; bottom: 18px"><path d="M3 3h30l10 10v42H3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path><path d="M11 9v9M18 9v9M25 9v9" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg></span>
           <span class="cap">Sat, 11:04 pm · the card</span>
         </button>
         <button class="{{hp.b.cls}}" onClick="{{hp.b.go}}" aria-label="Scene two: A folder called to sort.">
-          <span class="print t2" style="display: block"><span style="position: absolute; left: 20px; bottom: 20px; width: 110px; height: 70px; border: 2px solid #8A8F9B; border-radius: 4px; box-sizing: border-box"><span style="position: absolute; left: -2px; top: -18px; height: 18px; padding: 0 8px; border: 2px solid #8A8F9B; border-bottom: 0; border-radius: 4px 4px 0 0; font-size: 11px; font-weight: 600; color: #4A4F5B; line-height: 16px; box-sizing: border-box">to sort</span></span></span>
+          <span class="print t2 ph-wedding-veil-wide" style="display: block"><span class="scr"></span><span style="position: absolute; left: 20px; bottom: 20px; width: 110px; height: 70px; border: 2px solid #FFFFFF; border-radius: 4px; box-sizing: border-box"><span style="position: absolute; left: -2px; top: -18px; height: 18px; padding: 0 8px; border: 2px solid #FFFFFF; border-bottom: 0; border-radius: 4px 4px 0 0; font-size: 11px; font-weight: 600; color: #FFFFFF; line-height: 16px; box-sizing: border-box">to sort</span></span></span>
           <span class="cap">Desktop · to sort</span>
         </button>
         <button class="{{hp.c.cls}}" onClick="{{hp.c.go}}" aria-label="Scene three: A client waiting on a gallery.">
-          <span class="print t3" style="display: block"><span style="position: absolute; left: 20px; bottom: 22px; width: 120px; height: 44px; border-radius: 14px 14px 14px 4px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; padding: 0 12px; box-sizing: border-box"><span style="width: 9px; height: 9px; border-radius: 50%; background: #B9542F; flex: none"></span><span style="height: 6px; flex: 1; background: #D9D4C8; border-radius: 3px"></span></span></span>
+          <span class="print t3 ph-home-mother-daughter-wide" style="display: block"><span style="position: absolute; left: 20px; bottom: 22px; width: 120px; height: 44px; border-radius: 14px 14px 14px 4px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; padding: 0 12px; box-sizing: border-box"><span style="width: 9px; height: 9px; border-radius: 50%; background: #B9542F; flex: none"></span><span style="height: 6px; flex: 1; background: #D9D4C8; border-radius: 3px"></span></span></span>
           <span class="cap">Tue · "when will it be ready?"</span>
         </button>
         <button class="{{hp.d.cls}}" onClick="{{hp.d.go}}" aria-label="Scene four: A shoot from spring that never got posted.">
-          <span class="print" style="display: block"><span style="position: absolute; right: 14px; top: 0; padding: 4px 8px 5px; background: #FFFFFF; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #4A4F5B; border-radius: 0 0 4px 4px">APR</span></span>
+          <span class="print ph-wedding-green-wide" style="display: block"><span style="position: absolute; right: 14px; top: 0; padding: 4px 8px 5px; background: #FFFFFF; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #4A4F5B; border-radius: 0 0 4px 4px">APR</span></span>
           <span class="cap">April · never posted</span>
         </button>
         <button class="{{hp.e.cls}}" onClick="{{hp.e.go}}" aria-label="Scene five: A reel, half built, still open in CapCut.">
-          <span class="print t2" style="display: block"><span style="position: absolute; left: 18px; right: 18px; bottom: 20px; display: flex; flex-direction: column; gap: 6px"><span style="height: 9px; width: 78%; background: #A9ADB8; border-radius: 2px"></span><span style="height: 9px; width: 52%; background: #A9ADB8; border-radius: 2px; margin-left: 14%"></span><span style="height: 9px; width: 34%; background: #A9ADB8; border-radius: 2px"></span></span></span>
+          <span class="print t2 ph-beach-silhouettes-wide" style="display: block"><span class="scr"></span><span style="position: absolute; left: 18px; right: 18px; bottom: 20px; display: flex; flex-direction: column; gap: 6px"><span style="height: 9px; width: 78%; background: #FFFFFF; border-radius: 2px"></span><span style="height: 9px; width: 52%; background: #FFFFFF; border-radius: 2px; margin-left: 14%"></span><span style="height: 9px; width: 34%; background: #FFFFFF; border-radius: 2px"></span></span></span>
           <span class="cap">Thu, late · the reel</span>
         </button>
       </div>
@@ -340,7 +372,7 @@ a{color:inherit}
       <p class="body" style="max-width: 560px">The Assistant is a helper that lives inside the Claude app on your own computer. You talk to it in plain words. It does the busy work around your photos, in the order that work happens. There are four steps. Start with whichever one you are on today.</p>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 14px; margin-top: 14px"><div class="track" aria-hidden="true" style="flex: 1 1 0; margin: 0"><span class="dot" style="left: {{dotLeft}}"></span></div><button class="tx" onClick="{{playPath}}">Play again</button></div>
+    <div style="display: flex; align-items: center; gap: 14px; margin-top: 14px"><div class="track" aria-hidden="true" style="flex: 1 1 0; margin: 0"><span class="dot" style="left: {{dotLeft}}"></span></div><span class="cap lp" style="white-space: nowrap">Playing on a loop</span></div>
 
     <div id="steps-row" class="steps" style="margin-top: 6px">
       <a href="#ch1" class="{{st.a.cls}}">
@@ -407,7 +439,7 @@ a{color:inherit}
         <div class="lbl">Sat</div>
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 0s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
-          <div class="sa"><span class="print" style="width: 92px; height: 70px; border-width: 5px; transform: rotate(-7deg); position: relative"><svg width="24" height="30" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 10px; top: 14px"><path d="M3 3h30l10 10v42H3z" stroke="#8A8F9B" stroke-width="4" stroke-linejoin="round"></path></svg><svg width="24" height="30" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 40px; top: 20px; transform: rotate(14deg)"><path d="M3 3h30l10 10v42H3z" stroke="#8A8F9B" stroke-width="4" stroke-linejoin="round"></path></svg></span></div>
+          <div class="sa"><span class="print ph-beach-silhouettes-wide" style="width: 92px; height: 70px; border-width: 5px; transform: rotate(-7deg); position: relative"><span class="scr"></span><svg width="24" height="30" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 10px; top: 14px; z-index: 1"><path d="M3 3h30l10 10v42H3z" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"></path></svg><svg width="24" height="30" viewBox="0 0 46 58" fill="none" style="position: absolute; left: 40px; top: 20px; transform: rotate(14deg); z-index: 1"><path d="M3 3h30l10 10v42H3z" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"></path></svg></span></div>
           <div class="sb"><span class="mini"><b style="display: block; font-size: 10px">Your backup</b><span style="display: block; height: 4px; background: #2F7A55; border-radius: 2px; margin: 6px 0"></span><span style="color: #235E41; font-weight: 600">verified</span> · 3 shoots</span></div>
         </div>
         <div class="wt"><p class="ta">Shoot day. Two full cards. You get home late and leave them on the desk.</p><p class="tb">Card in. 'Backup now.' You go eat dinner. The report is waiting: every file checked, shoots sorted and named, six sneak peeks in each.</p></div>
@@ -416,7 +448,7 @@ a{color:inherit}
         <div class="lbl">Sun</div>
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .12s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
-          <div class="sa"><span class="print t2" style="width: 80px; height: 62px; border-width: 5px; transform: rotate(6deg) translateX(-10px)"></span><span class="print t3" style="width: 80px; height: 62px; border-width: 5px; transform: rotate(-9deg) translate(-34px, 8px)"></span></div>
+          <div class="sa"><span class="print t2 ph-beach-family-wide" style="width: 80px; height: 62px; border-width: 5px; transform: rotate(6deg) translateX(-10px)"></span><span class="print t3 ph-beach-mother-son-wide" style="width: 80px; height: 62px; border-width: 5px; transform: rotate(-9deg) translate(-34px, 8px)"></span></div>
           <div class="sb"><svg width="46" height="58" viewBox="0 0 46 58" fill="none"><path d="M3 3h30l10 10v42H3z" stroke="#3A3F4B" stroke-width="2" stroke-linejoin="round"></path><path d="M11 9v9M18 9v9M25 9v9" stroke="#3A3F4B" stroke-width="2" stroke-linecap="round"></path><path d="M14 38l6 6 12-13" stroke="#2F7A55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
         </div>
         <div class="wt"><p class="ta">You drag the folders across and hope everything copied. You do not format the card. Just in case.</p><p class="tb">You format the card without the knot in your stomach. Day off.</p></div>
@@ -425,7 +457,7 @@ a{color:inherit}
         <div class="lbl">Mon</div>
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .24s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
-          <div class="sa"><span style="position: relative; width: 96px; height: 70px; display: block"><span style="position: absolute; left: 0; top: 20px; width: 70px; height: 44px; border: 2px solid #8A8F9B; border-radius: 3px; transform: rotate(-8deg); background: #E9E5DA"></span><span style="position: absolute; left: 14px; top: 12px; width: 70px; height: 44px; border: 2px solid #8A8F9B; border-radius: 3px; transform: rotate(5deg); background: #E1DCCF"></span><span style="position: absolute; left: 24px; top: 22px; width: 70px; height: 44px; border: 2px solid #8A8F9B; border-radius: 3px; transform: rotate(-2deg); background: #F1EEE6; font-size: 10px; font-weight: 600; color: #4A4F5B; display: flex; align-items: center; justify-content: center">to sort</span></span></div>
+          <div class="sa"><span style="position: relative; width: 96px; height: 70px; display: block"><span class="wp ph-wedding-veil-wide" style="position: absolute; left: 0; top: 20px; width: 70px; height: 44px; border-radius: 3px; transform: rotate(-8deg)"></span><span class="wp ph-portrait-smile" style="position: absolute; left: 14px; top: 12px; width: 70px; height: 44px; border-radius: 3px; transform: rotate(5deg)"></span><span class="wp ph-baby-kiss-wide" style="position: absolute; left: 24px; top: 22px; width: 70px; height: 44px; border-radius: 3px; transform: rotate(-2deg); font-size: 10px; font-weight: 600; color: #3A3F4B; display: flex; align-items: center; justify-content: center"><span style="background: #FFFFFF; border-radius: 3px; padding: 1px 6px">to sort</span></span></span></div>
           <div class="sb"><span class="mini" style="display: flex; flex-direction: column; gap: 5px"><b style="font-size: 10px">Black-sand beach</b><span class="tag soon" style="font-size: 10px; align-self: flex-start; padding: 2px 7px">due Nov 24</span></span></div>
         </div>
         <div class="wt"><p class="ta">The photos land in 'to sort'. So does last month.</p><p class="tb">One button on the report and the shoot is in your editing queue, with its due date.</p></div>
@@ -443,8 +475,8 @@ a{color:inherit}
         <div class="lbl">Wed</div>
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .48s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
-          <div class="sa"><span class="print t3" style="width: 96px; height: 72px; border-width: 5px; transform: rotate(5deg)"></span></div>
-          <div class="sb"><span class="print t3" style="width: 96px; height: 72px; border-width: 5px; position: relative"><span style="position: absolute; right: -5px; top: -5px; width: 14px; height: 14px; background: #B9542F; border-radius: 2px 2px 2px 9px"></span></span></div>
+          <div class="sa"><span class="print t3 ph-beach-mother-son-wide" style="width: 96px; height: 72px; border-width: 5px; transform: rotate(5deg)"></span></div>
+          <div class="sb"><span class="print t3 ph-beach-mother-son-wide" style="width: 96px; height: 72px; border-width: 5px; position: relative"><span style="position: absolute; right: -5px; top: -5px; width: 14px; height: 14px; background: #B9542F; border-radius: 2px 2px 2px 9px"></span></span></div>
         </div>
         <div class="wt"><p class="ta">You edit. Late.</p><p class="tb">You edit. That part was always yours. The sneak peeks carry their 'sneak peek' keyword, so you filter to them in Lightroom and start there.</p></div>
       </div>
@@ -453,7 +485,7 @@ a{color:inherit}
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .6s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
           <div class="sa"><span style="width: 104px; display: flex; flex-direction: column; gap: 6px; transform: rotate(-3deg)"><span style="height: 12px; width: 82%; background: #A9ADB8; border-radius: 2px"></span><span style="height: 12px; width: 48%; background: #A9ADB8; border-radius: 2px; margin-left: 20%"></span><span style="height: 12px; width: 30%; background: #A9ADB8; border-radius: 2px"></span></span></div>
-          <div class="sb"><span style="width: 108px; display: block"><span style="display: flex; gap: 2px"><span style="height: 30px; flex: 1; background: #DCD6C8"></span><span style="height: 30px; flex: 2; background: #E1DCCF"></span><span style="height: 30px; flex: 1; background: #DCD6C8"></span><span style="height: 30px; flex: 1; background: #E9E5DA"></span><span style="height: 30px; flex: 2; background: #DCD6C8"></span></span><span style="display: flex; gap: 2px; margin-top: 4px"><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 2; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 2; border-left: 2px solid #B9542F"></span></span></span></div>
+          <div class="sb"><span style="width: 108px; display: block"><span style="display: flex; gap: 2px"><span class="ph-beach-family-1" style="height: 30px; flex: 1"></span><span class="ph-beach-family-wide" style="height: 30px; flex: 2"></span><span class="ph-beach-mother-daughter" style="height: 30px; flex: 1"></span><span class="ph-sunset-walk" style="height: 30px; flex: 1"></span><span class="ph-beach-silhouettes-wide" style="height: 30px; flex: 2"></span></span><span style="display: flex; gap: 2px; margin-top: 4px"><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 2; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 1; border-left: 2px solid #B9542F"></span><span style="height: 9px; flex: 2; border-left: 2px solid #B9542F"></span></span></span></div>
         </div>
         <div class="wt"><p class="ta">You open CapCut to make a reel. You nudge clips toward the beat for a while. You close it.</p><p class="tb">'I'm done with the beach shoot.' Your post kit opens. Pick a song: the reel is in CapCut, cut on the beat. Lay out the slides. Answer a few questions for the caption.</p></div>
       </div>
@@ -461,8 +493,8 @@ a{color:inherit}
         <div class="lbl">Fri</div>
         <svg class="tick wtick" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .72s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg>
         <div class="ws" aria-hidden="true">
-          <div class="sa"><span style="display: grid; grid-template-columns: repeat(3, 28px); gap: 3px; transform: rotate(3deg)"><span style="height: 28px; background: #DCD6C8"></span><span style="height: 28px; background: #E1DCCF"></span><span style="height: 28px; background: #DCD6C8"></span><span style="height: 28px; background: #E1DCCF"></span><span style="height: 28px; background: #DCD6C8"></span><span style="height: 28px; background: #E1DCCF"></span></span></div>
-          <div class="sb"><span style="display: grid; grid-template-columns: repeat(3, 28px); gap: 3px"><span style="height: 28px; background: #E9E5DA; outline: 2px solid #B9542F; outline-offset: -2px"></span><span style="height: 28px; background: #E1DCCF; outline: 2px solid #B9542F; outline-offset: -2px"></span><span style="height: 28px; background: #DCD6C8"></span><span style="height: 28px; background: #E1DCCF"></span><span style="height: 28px; background: #DCD6C8"></span><span style="height: 28px; background: #E1DCCF"></span></span></div>
+          <div class="sa"><span style="display: grid; grid-template-columns: repeat(3, 28px); gap: 3px; transform: rotate(3deg)"><span class="ph-portrait-smile" style="height: 28px"></span><span class="ph-wedding-couple" style="height: 28px"></span><span class="ph-couple-kiss" style="height: 28px"></span><span class="ph-wedding-bouquet" style="height: 28px"></span><span class="ph-portrait-bw" style="height: 28px"></span><span class="ph-wedding-veil-wide" style="height: 28px"></span></span></div>
+          <div class="sb"><span style="display: grid; grid-template-columns: repeat(3, 28px); gap: 3px"><span class="ph-beach-family-1" style="height: 28px; outline: 2px solid #B9542F; outline-offset: -2px"></span><span class="ph-beach-silhouettes-wide" style="height: 28px; outline: 2px solid #B9542F; outline-offset: -2px"></span><span class="ph-portrait-smile" style="height: 28px"></span><span class="ph-wedding-couple" style="height: 28px"></span><span class="ph-couple-kiss" style="height: 28px"></span><span class="ph-wedding-bouquet" style="height: 28px"></span></span></div>
         </div>
         <div class="wt"><p class="ta">You post nothing. Again.</p><p class="tb">Your posting queue shows what is ready and how many weeks you have. You copy the caption and post. Yourself.</p></div>
       </div>
@@ -496,11 +528,11 @@ a{color:inherit}
       <div id="rep" class="{{repCls}}" style="padding: 16px 20px 18px">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
           <b style="font-size: 16px">Your backup</b>
-          <button class="tx" onClick="{{playRep}}">Replay</button>
+          <span class="cap lp" style="white-space: nowrap">Playing on a loop</span>
         </div>
         <div style="display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap">
           <span style="font-size: 30px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums">{{repN}}</span><span style="font-size: 15px">files</span>
-          <span class="sm" style="margin-left: auto" aria-live="polite">{{repLabel}}</span>
+          <span class="sm" style="margin-left: auto">{{repLabel}}</span>
         </div>
         <div style="position: relative; height: 5px; background: #EFECE4; border-radius: 3px; margin-top: 8px; overflow: hidden" aria-hidden="true">
           <span style="position: absolute; left: 0; top: 0; bottom: 0; background: #1F2430; border-radius: 3px; width: {{repCopyW}}"></span>
@@ -510,15 +542,15 @@ a{color:inherit}
         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 14px">
           <div style="display: flex; align-items: center; gap: 10px">
             <div class="fname" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px"><input class="fin" value="{{fold.a.val}}" onChange="{{fold.a.chg}}" onKeyDown="{{fold.a.key}}" aria-label="Name of the first shoot folder" /><button class="tx" onClick="{{fold.a.ren}}">Rename</button></div>
-            <div style="display: flex; gap: 5px"><span class="mp m1" style="background: #DCD6C8" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m2" style="background: #E1DCCF" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m3 only-lg" style="background: #E9E5DA"></span></div>
+            <div style="display: flex; gap: 5px"><span class="mp m1 ph-beach-family-wide" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m2 ph-beach-mother-son-wide" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m3 only-lg ph-beach-silhouettes-wide"></span></div>
           </div>
           <div style="display: flex; align-items: center; gap: 10px">
             <div class="fname" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px"><input class="fin" value="{{fold.b.val}}" onChange="{{fold.b.chg}}" onKeyDown="{{fold.b.key}}" aria-label="Name of the second shoot folder" /><button class="tx" onClick="{{fold.b.ren}}">Rename</button></div>
-            <div style="display: flex; gap: 5px"><span class="mp m4" style="background: #E9E5DA" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m5" style="background: #DCD6C8" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m6 only-lg" style="background: #E1DCCF"></span></div>
+            <div style="display: flex; gap: 5px"><span class="mp m4 ph-couple-kiss" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m5 ph-portrait-profile" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m6 only-lg ph-sunset-walk"></span></div>
           </div>
           <div style="display: flex; align-items: center; gap: 10px">
             <div class="fname" style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px"><input class="fin" value="{{fold.c.val}}" onChange="{{fold.c.chg}}" onKeyDown="{{fold.c.key}}" aria-label="Name of the third shoot folder" /><button class="tx" onClick="{{fold.c.ren}}">Rename</button></div>
-            <div style="display: flex; gap: 5px"><span class="mp m7" style="background: #E1DCCF" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m8" style="background: #E9E5DA" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m9 only-lg" style="background: #DCD6C8"></span></div>
+            <div style="display: flex; gap: 5px"><span class="mp m7 ph-portrait-smile" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m8 ph-wedding-lawn" role="img" aria-label="Photo, tagged sneak peek"><i class="tg"></i></span><span class="mp m9 only-lg ph-portrait-bw"></span></div>
           </div>
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; margin-top: 4px">
@@ -571,7 +603,7 @@ a{color:inherit}
             <sc-for list="{{qRows}}" as="r" hint-placeholder-count="3">
               <div class="{{r.cls}}" style="top: {{r.top}}" draggable="{{r.drag}}" onDragStart="{{r.dragStart}}" onDragOver="{{r.dragOver}}" onDrop="{{r.drop}}">
                 <button class="cb" onClick="{{r.tick}}" aria-label="{{r.tickAria}}"><span><svg class="{{r.tickCls}}" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg></span></button>
-                <span class="only-lg" style="display: flex; gap: 3px; flex: none" aria-hidden="true"><i style="display: block; width: 22px; height: 28px; background: #DCD6C8"></i><i style="display: block; width: 22px; height: 28px; background: #E9E5DA"></i><i style="display: block; width: 22px; height: 28px; background: #E1DCCF"></i></span>
+                <span class="only-lg" style="display: flex; gap: 3px; flex: none" aria-hidden="true"><i class="{{r.t1}}"></i><i class="{{r.t2}}"></i><i class="{{r.t3}}"></i></span>
                 <span style="flex: 1 1 0; min-width: 0; padding-left: 4px"><b style="display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</b><span style="display: block; font-size: 12px; color: #666B77; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.sub}}</span></span>
                 <sc-if value="{{r.asking}}" hint-placeholder-val="{{false}}"><button class="tx" onClick="{{r.keep}}">Keep</button><button class="tx" onClick="{{r.pickDate}}" style="margin-right: 6px">Pick a date</button></sc-if>
                 <sc-if value="{{r.plain}}" hint-placeholder-val="{{true}}"><span class="{{r.tagCls}}">{{r.tag}}</span></sc-if>
@@ -626,7 +658,7 @@ a{color:inherit}
             <div class="head" aria-hidden="true"></div>
             <div style="display: flex">
               <sc-for list="{{blocks}}" as="b" hint-placeholder-count="8">
-                <button class="{{b.cls}}" style="{{b.style}}" draggable="true" onClick="{{b.pick}}" onDragStart="{{b.dragStart}}" onDragOver="{{b.dragOver}}" onDrop="{{b.drop}}" aria-label="{{b.aria}}">{{b.n}}</button>
+                <button class="{{b.cls}}" style="{{b.style}}" draggable="true" onClick="{{b.pick}}" onDragStart="{{b.dragStart}}" onDragOver="{{b.dragOver}}" onDrop="{{b.drop}}" aria-label="{{b.aria}}"><span class="bn">{{b.n}}</span></button>
               </sc-for>
             </div>
             <div style="display: flex; margin-top: 4px" aria-hidden="true">
@@ -657,8 +689,8 @@ a{color:inherit}
         <div style="flex: 2 1 420px; min-width: 0; display: flex; flex-wrap: wrap; gap: 18px 24px; align-items: flex-start">
           <div style="position: relative; width: 150px; height: 266px; background: #DCD6C8; border-radius: 8px; flex: none" aria-hidden="true">
             <svg width="34" height="34" viewBox="0 0 34 34" fill="none" style="position: absolute; left: 58px; top: 116px"><circle cx="17" cy="17" r="16" fill="#FFFFFF"></circle><path d="M13.5 10.5v13l10-6.5z" fill="#1F2430"></path></svg>
-            <span class="{{talk.ov1}}" style="left: 14px; top: 28px; background: #E9E5DA"></span>
-            <span class="{{talk.ov2}}" style="right: 14px; top: 82px; background: #F1EEE6"></span>
+            <span class="{{talk.ov1}}" style="left: 14px; top: 28px"></span>
+            <span class="{{talk.ov2}}" style="right: 14px; top: 82px"></span>
           </div>
           <div style="flex: 1 1 240px; min-width: 0">
             <div class="lbl" style="font-size: 11px">What you said</div>
@@ -667,7 +699,7 @@ a{color:inherit}
               <div class="lbl" style="font-size: 11px">Trimmed, nothing added</div>
               <p style="font-size: 18px; line-height: 1.5; font-weight: 500; margin-top: 6px">This was a sunrise session, and the wind did half the work for us.</p>
             </div>
-            <button class="tx" onClick="{{playTalk}}" style="margin-top: 6px">Replay</button>
+            <p class="cap lp" style="margin-top: 10px">Playing on a loop</p>
           </div>
         </div>
       </div>
@@ -689,7 +721,7 @@ a{color:inherit}
           <div style="overflow-x: auto; padding: 6px 4px 8px; margin-top: 4px">
             <div style="display: flex; gap: 10px; width: max-content">
               <sc-for list="{{slides}}" as="s" hint-placeholder-count="4">
-                <button class="{{s.cls}}" onClick="{{s.pick}}" aria-label="{{s.aria}}"><span class="sp" style="{{s.photo}}"></span><span style="position: absolute; left: 10px; right: 10px; bottom: 16px; height: 5px; background: #C9C4B8; border-radius: 2px; transition: opacity .3s; {{s.textLine}}"></span></button>
+                <button class="{{s.cls}}" onClick="{{s.pick}}" aria-label="{{s.aria}}"><span class="{{s.pcls}}" style="{{s.photo}}"></span><span style="position: absolute; left: 10px; right: 10px; bottom: 16px; height: 5px; background: #C9C4B8; border-radius: 2px; transition: opacity .3s; {{s.textLine}}"></span></button>
               </sc-for>
             </div>
           </div>
@@ -712,7 +744,7 @@ a{color:inherit}
           <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start">
             <sc-for list="{{stories}}" as="y" hint-placeholder-count="3">
               <button class="sto" onClick="{{y.cycle}}" aria-label="{{y.aria}}">
-                <i></i><sc-if value="{{y.two}}" hint-placeholder-val="{{true}}"><i></i></sc-if><sc-if value="{{y.three}}" hint-placeholder-val="{{false}}"><i></i></sc-if>
+                <i class="{{y.a}}"></i><sc-if value="{{y.two}}" hint-placeholder-val="{{true}}"><i class="{{y.b}}"></i></sc-if><sc-if value="{{y.three}}" hint-placeholder-val="{{false}}"><i class="{{y.c}}"></i></sc-if>
                 <span class="band" style="top: 0; height: 20px"></span><span class="band" style="bottom: 0; height: 32px"></span>
               </button>
             </sc-for>
@@ -734,7 +766,7 @@ a{color:inherit}
           <p class="body" style="font-size: 15.5px; margin-top: 10px">No blank caption box. Your assistant asks a few questions about the shoot, and shapes what you said into a caption, the way an editor would. The stories and the details are yours. If you did not say it, it is not in there. For a reel, it gives you a set of hooks to choose from. No hashtags.</p>
         </div>
         <div style="flex: 2 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><p style="background: #F1EEE6; border-radius: 14px 14px 14px 4px; padding: 9px 14px; font-size: 15px; font-weight: 500">What was the day like?</p><button class="tx" onClick="{{playWords}}">Replay</button></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><p style="background: #F1EEE6; border-radius: 14px 14px 14px 4px; padding: 9px 14px; font-size: 15px; font-weight: 500">What was the day like?</p><span class="cap lp" style="white-space: nowrap">Playing on a loop</span></div>
           <div style="align-self: flex-end; max-width: 440px; background: #1F2430; color: #FAFAF6; border-radius: 14px 14px 4px 14px; padding: 9px 14px; font-size: 15px; line-height: 1.5; min-height: 22px">
             <sc-if value="{{wTyping}}" hint-placeholder-val="{{false}}"><span>{{wTyped}}<span class="caret" style="background: #FAFAF6" aria-hidden="true"></span></span></sc-if>
             <sc-if value="{{wDone}}" hint-placeholder-val="{{true}}"><span>super <span class="{{wSh}}">windy morning</span>, <span class="{{wSh}}">the kids would not stop laughing</span>, <span class="{{wSh}}">we gave up on the posed ones pretty fast</span></span></sc-if>
@@ -781,7 +813,7 @@ a{color:inherit}
         </div>
         <sc-for list="{{ready}}" as="p" hint-placeholder-count="3">
           <div style="border-top: 1px solid #EFECE4; padding: 6px 0 0">
-            <div style="display: flex; align-items: center; gap: 10px"><i style="display: block; width: 30px; height: 30px; flex: none; background: {{p.tint}}"></i><b style="flex: 1 1 0; min-width: 0; font-size: 14px">{{p.name}}</b><span class="tag">{{p.day}}</span></div>
+            <div style="display: flex; align-items: center; gap: 10px"><i class="{{p.cls}}"></i><b style="flex: 1 1 0; min-width: 0; font-size: 14px">{{p.name}}</b><span class="tag">{{p.day}}</span></div>
             <sc-if value="{{p.closed}}" hint-placeholder-val="{{true}}">
               <div style="display: flex; flex-wrap: wrap; gap: 0 16px; align-items: center">
                 <button class="tx" onClick="{{p.copy}}">{{p.copyLabel}}</button>
@@ -800,10 +832,10 @@ a{color:inherit}
       <div style="flex: 1 1 210px; min-width: 0">
         <div class="{{gridCls}}">
           <sc-for list="{{gridTop}}" as="g" hint-placeholder-count="3">
-            <button class="gt nt" draggable="true" onClick="{{g.pick}}" onDragStart="{{g.dragStart}}" onDragOver="{{g.dragOver}}" onDrop="{{g.drop}}" aria-label="{{g.aria}}" style="cursor: grab; outline-offset: -2px; {{g.style}}"><span style="font-size: 10px; font-weight: 700; background: #FFFFFF; color: #8E3D1F; padding: 1px 5px; border-radius: 3px">{{g.date}}</span></button>
+            <button class="{{g.cls}}" draggable="true" onClick="{{g.pick}}" onDragStart="{{g.dragStart}}" onDragOver="{{g.dragOver}}" onDrop="{{g.drop}}" aria-label="{{g.aria}}" style="cursor: grab; outline-offset: -2px; {{g.style}}"><span style="font-size: 10px; font-weight: 700; background: #FFFFFF; color: #8E3D1F; padding: 1px 5px; border-radius: 3px">{{g.date}}</span></button>
           </sc-for>
-          <div class="gt ot" style="background: #E9E5DA"></div><div class="gt ot" style="background: #DCD6C8"></div><div class="gt ot" style="background: #E1DCCF"></div>
-          <div class="gt ot" style="background: #DCD6C8"></div><div class="gt ot" style="background: #E1DCCF"></div><div class="gt ot" style="background: #E9E5DA"></div>
+          <div class="gt ot ph-portrait-smile"></div><div class="gt ot ph-wedding-couple"></div><div class="gt ot ph-couple-kiss"></div>
+          <div class="gt ot ph-wedding-bouquet"></div><div class="gt ot ph-portrait-bw"></div><div class="gt ot ph-wedding-veil-wide"></div>
         </div>
         <p class="cap" style="margin-top: 8px">Your grid, with what's coming. Drag one outlined post onto another to swap them. The dates follow.</p>
         <sc-if value="{{remOn}}" hint-placeholder-val="{{false}}">
@@ -958,11 +990,11 @@ a{color:inherit}
       <div style="margin-top: 20px"><a class="btn full" href="#price">Get the Assistant · <span class="phx">[PRICE]</span></a></div>
       <p class="sm" style="margin-top: 12px">One-time purchase. Runs in the Claude desktop app on your Mac. {{doorLine}} <span class="{{dateCls}}">{{date}}</span>.</p>
       <div style="display: flex; justify-content: center; gap: clamp(6px, 1.4vw, 18px); margin-top: 20px">
-        <div class="cp c1"><div class="print"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .9s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Backed up</p></div>
-        <div class="cp c2"><div class="print t2"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.02s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Sorted</p></div>
-        <div class="cp c3"><div class="print t3"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.14s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">In the queue</p></div>
-        <div class="cp c4"><div class="print"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.26s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Posted</p></div>
-        <div class="cp c5"><div class="print t2"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.38s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Finished</p></div>
+        <div class="cp c1"><div class="print ph-beach-family-wide"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: .9s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Backed up</p></div>
+        <div class="cp c2"><div class="print t2 ph-wedding-veil-wide"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.02s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Sorted</p></div>
+        <div class="cp c3"><div class="print t3 ph-beach-mother-son-wide"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.14s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">In the queue</p></div>
+        <div class="cp c4"><div class="print ph-home-mother-daughter-wide"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.26s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Posted</p></div>
+        <div class="cp c5"><div class="print t2 ph-beach-silhouettes-wide"></div><svg class="tick" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path style="transition-delay: 1.38s" d="M3 8.5l3.2 3.2L13 5" stroke="#2F7A55" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"></path></svg><p class="cap only-lg" style="margin-top: 6px">Finished</p></div>
       </div>
     </div>
   </div>
@@ -1019,6 +1051,7 @@ class Component extends DCLogic {
   componentDidMount() {
     this.groups = {};
     this.dead = false;
+    this.vis = {};
     this.pauseUntil = 0;
     this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.reduce) return;
@@ -1042,9 +1075,20 @@ class Component extends DCLogic {
 
   at(g, ms, fn) {
     this.groups = this.groups || {};
-    const id = setTimeout(() => { if (!this.dead) fn(); }, ms);
+    const id = setTimeout(() => {
+      if (this.groups[g]) this.groups[g] = this.groups[g].filter((x) => x !== id);
+      if (!this.dead) fn();
+    }, ms);
     (this.groups[g] = this.groups[g] || []).push(id);
     return id;
+  }
+
+  /* run fn after ms; if the piece named by id is off screen by then, wait until it is back */
+  again(g, id, ms, fn) {
+    this.at(g, ms, () => {
+      if (this.vis && this.vis[id] === false) { this.again(g, id, 1500, fn); return; }
+      fn();
+    });
   }
 
   every(g, ms, fn) {
@@ -1073,7 +1117,7 @@ class Component extends DCLogic {
     this.set({ hero: i });
   }
 
-  /* each self-playing piece runs the first time most of it is on screen */
+  /* each self-playing piece starts the first time most of it is on screen; the walk-throughs then loop */
   watch() {
     const jobs = {
       'steps-row': () => this.playPath(),
@@ -1100,22 +1144,25 @@ class Component extends DCLogic {
       'post-card': { gridIn: false },
       'close-prints': { closeOk: false }
     };
-    const els = Object.keys(jobs).map((id) => document.getElementById(id)).filter(Boolean);
+    const keep = { 'steps-row': true, 'rep': true, 'stage': true };
+    const els = Object.keys(jobs).concat(['stage']).map((id) => document.getElementById(id)).filter(Boolean);
     if (!els.length || !('IntersectionObserver' in window)) return;
     const first = {};
     els.forEach((el) => Object.assign(first, resets[el.id] || {}));
     this.set(first);
     this.io = new IntersectionObserver((entries) => {
       entries.forEach((en) => {
-        if (!en.isIntersecting) return;
+        const id = en.target.id;
+        this.vis[id] = !!en.isIntersecting;
+        if (!en.isIntersecting || !jobs[id]) return;
         const viewH = (en.rootBounds && en.rootBounds.height) || window.innerHeight || 800;
         const enough = en.intersectionRatio >= 0.5 || en.intersectionRect.height >= viewH * 0.5;
         if (!enough) return;
-        this.io.unobserve(en.target);
-        const job = jobs[en.target.id];
+        const job = jobs[id];
+        if (keep[id]) jobs[id] = null; else this.io.unobserve(en.target);
         if (job && !this.dead) job();
       });
-    }, { threshold: [0.15, 0.3, 0.5, 0.7, 0.9] });
+    }, { threshold: [0, 0.15, 0.3, 0.5, 0.7, 0.9] });
     els.forEach((el) => this.io.observe(el));
   }
 
@@ -1149,6 +1196,8 @@ class Component extends DCLogic {
       this.at('path', t, () => this.set({ path: i + 1, pathAt: -1 }));
       t += 300;
     });
+    /* hold on the last step for about four seconds, then start again */
+    this.again('path', 'steps-row', t + 3700, () => this.playPath());
   }
 
   playRep() {
@@ -1165,9 +1214,19 @@ class Component extends DCLogic {
     this.at('rep', 3750, () => this.set({ rep: 3 }));
     this.at('rep', 5000, () => this.set({ rep: 4 }));
     this.at('rep', 5900, () => this.set({ rep: 5 }));
+    /* hold on the finished report for about four seconds, then start again; wait while someone is renaming a folder */
+    const next = () => {
+      if (this.repTouched) return;
+      const el = document.getElementById('rep');
+      const over = el && el.matches && el.matches(':hover');
+      if (el && (over || (document.activeElement && el.contains(document.activeElement)))) { this.again('rep', 'rep', 4000, next); return; }
+      this.playRep();
+    };
+    this.again('rep', 'rep', 9900, next);
   }
 
   rename(i) {
+    this.repTouched = true;
     const name = String(this.state.drafts[i] || '').trim();
     if (!name) return;
     const names = this.state.names.slice();
@@ -1272,6 +1331,8 @@ class Component extends DCLogic {
 
   /* the posts stage */
   goTab(i) {
+    this.stop('talk');
+    this.stop('words');
     this.set({ tab: i });
     if (i === 1) this.playTalk();
     if (i === 4) this.playWords();
@@ -1282,6 +1343,7 @@ class Component extends DCLogic {
     if (this.reduce) { this.set({ talk: 4 }); return; }
     this.set({ talk: 0 });
     [700, 1500, 2400, 3200].forEach((ms, i) => this.at('talk', ms, () => this.set({ talk: i + 1 })));
+    this.again('talk', 'stage', 7200, () => { if (this.state.tab === 1) this.playTalk(); });
   }
 
   playWords() {
@@ -1300,6 +1362,7 @@ class Component extends DCLogic {
     const end = 600 + (this.K.ANSWER.length / 2) * 24 + 500;
     this.at('words', end, () => this.set({ words: 2 }));
     this.at('words', end + 1100, () => this.set({ words: 3 }));
+    this.again('words', 'stage', end + 5100, () => { if (this.state.tab === 4) this.playWords(); });
   }
 
   swapPrints(a, b) {
@@ -1367,7 +1430,7 @@ class Component extends DCLogic {
     const st = {};
     keys.slice(0, 4).forEach((k, i) => {
       const done = i < s.path;
-      st[k] = { cls: 'pc stp' + (done ? ' ok' : ''), typed: done ? this.K.SAYS[i] : (s.pathAt === i ? s.typed : '') };
+      st[k] = { cls: 'pc stp' + (done ? ' ok' : '') + (s.pathAt === i ? ' cur' : ''), typed: done ? this.K.SAYS[i] : (s.pathAt === i ? s.typed : '') };
     });
     const dotAt = s.pathAt >= 0 ? s.pathAt : Math.min(s.path, 3);
 
@@ -1379,8 +1442,8 @@ class Component extends DCLogic {
     keys.slice(0, 3).forEach((k, i) => {
       fold[k] = {
         val: s.drafts[i],
-        chg: (e) => { const d = s.drafts.slice(); d[i] = e.target.value; this.set({ drafts: d, renMsg: '' }); },
-        key: (e) => { if (e.key === 'Enter') this.rename(i); },
+        chg: (e) => { this.repTouched = true; const d = s.drafts.slice(); d[i] = e.target.value; this.set({ drafts: d, renMsg: '' }); },
+        key: (e) => { this.repTouched = true; if (e.key === 'Enter') this.rename(i); },
         ren: () => this.rename(i)
       };
     });
@@ -1395,6 +1458,11 @@ class Component extends DCLogic {
       return 'due ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
     const H = 54;
+    const thumbs = {
+      g: ['home-mother-daughter-wide', 'baby-kiss-wide', 'beach-mother-daughter'],
+      b: ['beach-family-1', 'beach-silhouettes-wide', 'beach-family-2'],
+      h: ['wedding-couple', 'wedding-veil-wide', 'wedding-bouquet']
+    };
     const all = [];
     s.q.forEach((r, i) => all.push({ r: r, top: i * H, done: false, i: i }));
     s.done.forEach((r, i) => all.push({ r: r, top: s.q.length * H + 30 + i * H, done: true, i: i }));
@@ -1406,6 +1474,9 @@ class Component extends DCLogic {
       return {
         cls: 'qrow' + (x.done ? ' fin2' : '') + (s.qHint && r.id === 'h' && !x.done ? ' hint' : '') + (r.fresh ? ' new' : ''),
         top: x.top + 'px',
+        t1: thumbs[r.id] ? 'qt ph-' + thumbs[r.id][0] : 'qt',
+        t2: thumbs[r.id] ? 'qt ph-' + thumbs[r.id][1] : 'qt',
+        t3: thumbs[r.id] ? 'qt ph-' + thumbs[r.id][2] : 'qt',
         name: r.name,
         sub: asking ? ('Moved ' + s.moved.dir + '. New due date?') : r.count,
         tag: x.done ? 'edited' : tagOf(r.ord),
@@ -1448,7 +1519,7 @@ class Component extends DCLogic {
     keys.slice(0, 4).forEach((k, i) => {
       pc[k] = { cls: s.pace === i ? 'chip on' : 'chip', go: () => this.set({ pace: i, beats: this.K.PACES[i].slice(), reelMade: false }) };
     });
-    const tints = ['#DCD6C8', '#E9E5DA', '#D3CCBC', '#E1DCCF', '#DCD6C8', '#EDE9DF', '#D3CCBC', '#E1DCCF'];
+    const shots = ['beach-family-1', 'beach-family-wide', 'beach-mother-daughter', 'beach-silhouettes-wide', 'beach-family-2', 'beach-mother-son-wide', 'sunset-walk', 'beach-family-big'];
     const total = s.beats.reduce((a, b) => a + b, 0);
     let start = 0;
     const cuts = {};
@@ -1459,8 +1530,8 @@ class Component extends DCLogic {
       const delay = frac === 0 ? 0 : -(6 - frac * 6);
       return {
         n: pi + 1,
-        cls: 'blk' + (s.reelSel === slot ? ' sel' : ''),
-        style: 'flex: ' + s.beats[slot] + ' 1 0; background: ' + tints[pi] + '; animation-delay: ' + delay.toFixed(2) + 's',
+        cls: 'blk ph-' + shots[pi] + (s.reelSel === slot ? ' sel' : ''),
+        style: 'flex: ' + s.beats[slot] + ' 1 0; animation-delay: ' + delay.toFixed(2) + 's',
         aria: 'Photo ' + (pi + 1) + ', held for ' + s.beats[slot] + (s.beats[slot] === 1 ? ' beat' : ' beats') + '. Press it, then press another photo to swap them.',
         pick: () => {
           if (s.reelSel < 0) this.set({ reelSel: slot });
@@ -1498,8 +1569,8 @@ class Component extends DCLogic {
       s1: s.talk >= 1 ? 'stum cut' : 'stum',
       s2: s.talk >= 2 ? 'stum cut' : 'stum',
       out: s.talk >= 3 ? 'fade in' : 'fade',
-      ov1: s.talk >= 4 ? 'ov in' : 'ov',
-      ov2: s.talk >= 4 ? 'ov in' : 'ov'
+      ov1: s.talk >= 4 ? 'ov in ph-beach-family-wide' : 'ov ph-beach-family-wide',
+      ov2: s.talk >= 4 ? 'ov in ph-beach-mother-son-wide' : 'ov ph-beach-mother-son-wide'
     };
 
     const kinds = ['fill', 'across', 'top', 'border'];
@@ -1508,18 +1579,24 @@ class Component extends DCLogic {
       lay[k] = { cls: s.carLay[s.carSel] === kinds[i] ? 'chip on' : 'chip', go: () => this.setLayout(kinds[i]) };
     });
     const photoFor = { fill: 'left: 0; top: 0; right: 0; bottom: 0', across: 'left: 0; top: 0; bottom: 0; right: -114px', top: 'left: 0; top: 0; right: 0; bottom: 56px', border: 'left: 12px; top: 12px; right: 12px; bottom: 12px' };
+    const slidePh = ['beach-family-1', 'beach-mother-daughter', 'beach-silhouettes-wide', 'beach-family-2'];
     const slides = s.carLay.map((kind, i) => {
       const covered = i > 0 && s.carLay[i - 1] === 'across';
       return {
         cls: 'sld' + (s.carSel === i ? ' sel' : '') + (kind === 'across' ? ' wide' : ''),
-        photo: (covered ? 'left: 0; top: 0; right: 0; bottom: 0; opacity: 0' : photoFor[kind]) + '; background: ' + tints[i + 1],
+        pcls: 'sp ph-' + slidePh[i],
+        photo: covered ? 'left: 0; top: 0; right: 0; bottom: 0; opacity: 0' : photoFor[kind],
         textLine: kind === 'top' && !covered ? 'opacity: 1' : 'opacity: 0',
         aria: 'Slide ' + (i + 1) + '. Press to select it, then choose a layout.',
         pick: () => this.set({ carSel: i })
       };
     });
 
+    const storyPh = [['beach-family-big', 'beach-family-1', 'sunset-walk'], ['beach-mother-daughter', 'beach-couple-bw', 'beach-family-2'], ['beach-silhouettes-wide', 'beach-family-wide', 'beach-mother-son-wide']];
     const stories = s.sto.map((n, i) => ({
+      a: 'ph-' + storyPh[i][0],
+      b: 'ph-' + storyPh[i][1],
+      c: 'ph-' + storyPh[i][2],
       two: n >= 2,
       three: n >= 3,
       aria: 'Story ' + (i + 1) + ', ' + n + (n === 1 ? ' photo' : ' photos') + '. Press to change the grid.',
@@ -1537,9 +1614,9 @@ class Component extends DCLogic {
     const weeks = s.line.length / rhy.per;
     const tankLine = weeks === 1 ? '1 week of posts' : (weeks === 1.5 ? 'A week and a half of posts' : weeks + ' weeks of posts');
     const pieces = [
-      { name: 'Black-sand beach reel', tint: '#D3CCBC' },
-      { name: 'Garcia family carousel', tint: '#E1DCCF' },
-      { name: 'Palm grove reel', tint: '#C9C2B2' }
+      { name: 'Black-sand beach reel', ph: 'beach-family-1' },
+      { name: 'Garcia family carousel', ph: 'home-mother-daughter-wide' },
+      { name: 'Palm grove reel', ph: 'portrait-profile' }
     ];
     const rh = {};
     keys.slice(0, 3).forEach((k, i) => {
@@ -1549,7 +1626,7 @@ class Component extends DCLogic {
       const setTime = (t) => () => this.set({ rem: { p: pi, time: t }, remOpen: -1 });
       return {
         name: pieces[pi].name,
-        tint: pieces[pi].tint,
+        cls: 'pt ph-' + pieces[pi].ph,
         day: rhy.day[pos],
         copyLabel: s.copied === pi ? 'Copied.' : 'Copy caption',
         open: s.remOpen === pi,
@@ -1566,7 +1643,8 @@ class Component extends DCLogic {
       return {
         date: rhy.short[pos],
         aria: pieces[pi].name + ', going out ' + rhy.short[pos] + '. Press it, then press another outlined post to swap them.',
-        style: 'background: ' + pieces[pi].tint + '; outline: ' + (s.gridPick === pos ? '3px solid #1F2430' : '2px solid #B9542F') + '; transition-delay: ' + (slot * 0.15) + 's',
+        cls: 'gt nt ph-' + pieces[pi].ph,
+        style: 'outline: ' + (s.gridPick === pos ? '3px solid #1F2430' : '2px solid #B9542F') + '; transition-delay: ' + (slot * 0.15) + 's',
         pick: () => { if (s.gridPick < 0) this.set({ gridPick: pos }); else this.swapLine(s.gridPick, pos); },
         dragStart: (e) => {
           this.dragTile = pos;
@@ -1597,7 +1675,6 @@ class Component extends DCLogic {
 
       st: st,
       dotLeft: (12.5 + 25 * dotAt) + '%',
-      playPath: () => this.playPath(),
 
       weekCls: withA ? 'wk with' : 'wk now',
       swNowCls: withA ? '' : 'on',
@@ -1625,7 +1702,6 @@ class Component extends DCLogic {
       repCheckW: s.rep >= 2 ? '100%' : '0%',
       fold: fold,
       renMsg: s.renMsg,
-      playRep: () => this.playRep(),
       proof: {
         files: Math.round(3931 * s.proofT).toLocaleString('en-US'),
         min: String(Math.round(7 * s.proofT)),
@@ -1655,7 +1731,6 @@ class Component extends DCLogic {
       makeReel: () => this.set({ reelMade: true }),
       reelMsg: s.reelMade ? 'Your reel is in CapCut. Every cut is on a beat.' : '',
       talk: talk,
-      playTalk: () => this.playTalk(),
       lay: lay,
       slides: slides,
       carTitle: s.carTitle,
@@ -1671,7 +1746,6 @@ class Component extends DCLogic {
       wSh: s.words >= 2 ? 'sh' : '',
       wCap: s.words >= 2 ? 'fade in' : 'fade',
       wTag: s.words >= 3 ? 'fade in' : 'fade',
-      playWords: () => this.playWords(),
 
       tankLine: tankLine,
       tankW: Math.round((weeks / 3) * 100) + '%',

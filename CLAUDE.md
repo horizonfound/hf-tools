@@ -670,7 +670,7 @@ The October mock-ups are history (they sell "The Studio", three staff, culling, 
 - **No "confirm after beta" and no beta talk on the page: "I want this to be simulated as though it's a real page... official."** That is for the mock-ups. Nothing is invented all the same: price, date, photos and quotes are quiet placeholders, and before a page goes live every claim on it has to have become true (rule 7 still decides what ships).
 - The date to show for now is Cyber Monday, Mon Nov 30, 2026.
 - Demos should play by themselves on a loop with their labels tracking, not wait to be clicked.
-- He wants real photos in place of the tinted tiles. **Open: which photos** (a folder of theirs, or stock stand-ins); asked in the canvas's comment thread.
+- He wants real photos in place of the tinted tiles: **"Use stock photos"** (Nov 14). Twenty free Unsplash photos (a beach family, a wedding, portraits) are stand-ins on all three pages; small copies are in `dist/sales-photos/` on Dustin's Mac (not in git). Nicole's own photo and customer quotes stay placeholders: no stock stranger stands in for a real person. All three pages now read as official (A's beta marks are gone too), and their walk-throughs loop by themselves.
 - Spine: Nicole's home base demo of Nov 13 (`Assistant home base demo (Nov 13).html`, from Slack): four steps in the order of the work, "Start wherever you are today".
 - Structure and kinds of motion follow Meg's Reels Editing Engine page (her full page is closed; the Internet Archive has Oct 17). The teardown is `docs/sales-page/meg-architecture.md`. Rule 9 holds: none of her words, pictures, colours or fonts; a short list of her phrases is banned in the builds.
 - Look: DM Sans only, cream, ink, coral. No serif.

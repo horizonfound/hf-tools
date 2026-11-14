@@ -156,7 +156,6 @@ em{font-style:normal;color:#B9542F}
 .cday{display:flex;align-items:center;justify-content:center;height:24px;border-radius:6px;font-size:11px;font-weight:600;background:#F1EEE6}
 .cday.pk{background:#B9542F;color:#FFFFFF}
 .krow{display:flex;align-items:center;gap:8px;color:#2F7A55;font-weight:600;font-size:12px;min-height:18px}
-.endc{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(22,24,30,.84);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:20px;animation:fade .3s ease-out both}
 /* chapter modules */
 .chip{display:flex;flex-direction:column;padding:6px 12px;border:1px solid #E6E2D8;border-radius:10px;flex:1 1 90px}
 .chip b{font-size:17px;font-weight:600;line-height:22px}
@@ -168,7 +167,7 @@ em{font-style:normal;color:#B9542F}
 .mz.a .ph{animation:pop .25s ease-out both}
 .mz.b .ph{animation:popb .25s ease-out both}
 .mz .ph:nth-child(2){animation-delay:.1s}.mz .ph:nth-child(3){animation-delay:.2s}.mz .ph:nth-child(4){animation-delay:.3s}.mz .ph:nth-child(5){animation-delay:.4s}.mz .ph:nth-child(6){animation-delay:.5s}
-.spk{position:absolute;left:4px;top:4px;font-size:9.5px;font-weight:700;letter-spacing:.02em;line-height:12px;background:#B9542F;color:#FFFFFF;padding:0 4px;border-radius:3px}
+.spk{position:absolute;left:3px;top:3px;font-size:9.5px;font-weight:700;letter-spacing:0;line-height:13px;background:#B9542F;color:#FFFFFF;padding:0 3px;border-radius:3px;white-space:nowrap}
 .days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .day{min-height:44px;border-radius:8px;font-size:13px;font-weight:600;background:#F6F4EE;transition:background .15s,color .15s}
 .day:hover,.day.pk{background:#B9542F;color:#FFFFFF}
@@ -207,7 +206,7 @@ em{font-style:normal;color:#B9542F}
 .ngr.in .ntile{animation:dropin .3s ease-out both}
 .ngr.wait .ntile{opacity:0}
 .ntile small{font-size:9.5px;font-weight:700;background:rgba(255,255,255,.86);padding:0 4px;border-radius:3px;line-height:14px;color:#1F2430}
-.otile{height:70px;border-radius:5px;background:#E6E2D8}
+.otile{height:70px;border-radius:5px;background-color:#E6E2D8}
 .prow{display:flex;align-items:center;gap:6px;min-height:48px;border-top:1px solid #EEEAE0}
 .rcap{min-height:20px}
 .prow.x3{display:none}
@@ -285,6 +284,37 @@ em{font-style:normal;color:#B9542F}
 .ctr.in .cfill{width:76%}
 .ftl{color:#8B909C;text-decoration:none;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
 .ftl:hover{color:#FAFAF6}
+/* the photos: free stock stand-ins, one class each */
+.pic{background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#D8D3C6}
+.ph.pic::after{content:none}
+.ph-beach-family-1{background-image:url(/_blob/e5715a33ee723c1368e632f09f7c9759)}
+.ph-beach-family-2{background-image:url(/_blob/6d5d7912b3471a883888195ba0d820cd)}
+.ph-beach-mother-daughter{background-image:url(/_blob/2173c4bcc3082115dd160340234eacc8)}
+.ph-beach-family-big{background-image:url(/_blob/69b08bf00128209a7a79fc3856e4ac60)}
+.ph-beach-family-wide{background-image:url(/_blob/10791438e8171e23251f1e935fe1b457)}
+.ph-beach-mother-son-wide{background-image:url(/_blob/ee9b107b6d1f6f30fe0a3a1cafe658b1)}
+.ph-sunset-walk{background-image:url(/_blob/c92c5b26341b95605e01c0d5c2132cb5)}
+.ph-beach-silhouettes-wide{background-image:url(/_blob/aab42d63351649400cbcacf1de35b2a9)}
+.ph-beach-couple-bw{background-image:url(/_blob/4eefaf2164719ddfb3a3aedb5fdab7e0)}
+.ph-wedding-veil-wide{background-image:url(/_blob/c57704a235f3018881ad6c3fcbab2e2b)}
+.ph-wedding-couple{background-image:url(/_blob/0e18cb76cb2b109501745b6a9c01b739)}
+.ph-wedding-lawn{background-image:url(/_blob/2305d6d583fd0a53c51e2f937b6ecb7e)}
+.ph-wedding-green-wide{background-image:url(/_blob/5136b7c95f2e062c50544befc26aefe4)}
+.ph-wedding-bouquet{background-image:url(/_blob/d283069c8e19e5549228bed319c70202)}
+.ph-couple-kiss{background-image:url(/_blob/47741e42b23c21ee90a33785589ff068)}
+.ph-portrait-smile{background-image:url(/_blob/055f6d510c917838282c08bafcb7fbf1)}
+.ph-portrait-profile{background-image:url(/_blob/4887591ad322d578638ca495a1cde3bb)}
+.ph-portrait-bw{background-image:url(/_blob/35980a8a85c7d099759c1dd041019aa3)}
+.ph-home-mother-daughter-wide{background-image:url(/_blob/295690e2855060c56d695e5ce310fa89)}
+.ph-baby-kiss-wide{background-image:url(/_blob/8a2f4f30cd32e582b5b98796ac15b12f)}
+.slph::before{content:"";position:absolute;left:0;right:0;bottom:0;height:84px;background:linear-gradient(rgba(22,24,30,0),rgba(22,24,30,.62))}
+.slphl::before{content:"";position:absolute;left:0;right:0;bottom:0;height:84px;background:linear-gradient(rgba(250,250,246,0),rgba(250,250,246,.78))}
+.tph{box-shadow:0 0 0 1.5px #F28A66}
+.gt.old{opacity:.5}
+.gt.glit{box-shadow:0 0 0 1.5px #F28A66}
+.nw{outline:2px solid #B9542F;outline-offset:-2px}
+.emp{background:#E6E2D8}
+.fth{width:16px;height:16px;border-radius:4px;flex:none}
 @supports (animation-timeline: view()) {
 .rv{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 35%}
 .rv2{animation:rise linear both;animation-timeline:view();animation-range:entry 6% entry 41%}
@@ -384,12 +414,12 @@ html{scroll-behavior:auto}
 <div class="{{map.tokCls}} only-lg" aria-hidden="true">
 <span class="lb">{{map.label}}</span>
 <sc-if value="{{map.s0}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 22px; height: 30px; border-radius: 3px 8px 3px 3px; background: #F28A66"></span></span></sc-if>
-<sc-if value="{{map.s1}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; transform: rotate(-8deg)"></span><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; margin-bottom: 4px"></span><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; transform: rotate(8deg)"></span></span></sc-if>
-<sc-if value="{{map.s2}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 58px; height: 28px; border-radius: 5px; background: #F28A66; display: flex; align-items: center; justify-content: flex-end; padding: 0 5px; box-sizing: border-box"><span style="width: 20px; height: 10px; border-radius: 5px; background: #16181E"></span></span></span></sc-if>
-<sc-if value="{{map.s3}}" hint-placeholder-val="{{true}}"><span class="shape fin"><span style="width: 18px; height: 32px; border-radius: 3px; background: #F28A66; display: flex; align-items: center; justify-content: center"><span style="border-left: 7px solid #16181E; border-top: 4px solid transparent; border-bottom: 4px solid transparent"></span></span><span style="width: 22px; height: 27px; border-radius: 3px; background: #F28A66; display: flex; align-items: flex-end; justify-content: center; gap: 2px; padding-bottom: 3px; box-sizing: border-box"><span style="width: 3px; height: 3px; border-radius: 50%; background: #16181E"></span><span style="width: 3px; height: 3px; border-radius: 50%; background: #16181E"></span></span><span style="width: 18px; height: 32px; border-radius: 3px; background: #F28A66; display: flex; align-items: center; justify-content: center"><span style="width: 10px; height: 2px; background: #16181E"></span></span></span></sc-if>
+<sc-if value="{{map.s1}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span class="pic tph ph-beach-family-wide" style="width: 24px; height: 18px; border-radius: 3px; transform: rotate(-8deg)"></span><span class="pic tph ph-wedding-veil-wide" style="width: 24px; height: 18px; border-radius: 3px; margin-bottom: 4px"></span><span class="pic tph ph-home-mother-daughter-wide" style="width: 24px; height: 18px; border-radius: 3px; transform: rotate(8deg)"></span></span></sc-if>
+<sc-if value="{{map.s2}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 58px; height: 28px; border-radius: 5px; background: #F28A66; display: flex; align-items: center; justify-content: space-between; padding: 0 5px 0 4px; box-sizing: border-box"><span class="pic ph-beach-family-2" style="width: 20px; height: 20px; border-radius: 3px"></span><span style="width: 20px; height: 10px; border-radius: 5px; background: #16181E"></span></span></span></sc-if>
+<sc-if value="{{map.s3}}" hint-placeholder-val="{{true}}"><span class="shape fin"><span class="pic tph ph-beach-family-1" style="width: 18px; height: 32px; border-radius: 3px; display: flex; align-items: center; justify-content: center"><span style="border-left: 7px solid #FFFFFF; border-top: 4px solid transparent; border-bottom: 4px solid transparent; filter: drop-shadow(0 0 2px rgba(22,24,30,.9))"></span></span><span class="pic tph ph-beach-mother-daughter" style="width: 22px; height: 27px; border-radius: 3px; display: flex; align-items: flex-end; justify-content: center; gap: 2px; padding-bottom: 3px; box-sizing: border-box"><span style="width: 3px; height: 3px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 2px rgba(22,24,30,.9)"></span><span style="width: 3px; height: 3px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 2px rgba(22,24,30,.9)"></span></span><span class="pic tph ph-sunset-walk" style="width: 18px; height: 32px; border-radius: 3px; display: flex; align-items: center; justify-content: center"><span style="width: 10px; height: 2px; background: #FFFFFF; box-shadow: 0 0 2px rgba(22,24,30,.9)"></span></span></span></sc-if>
 </div>
 <!-- the grid at the end of the line -->
-<div class="mgrid" style="position: absolute; right: 2.6%; top: 126px; display: grid; grid-template-columns: repeat(3, 14px); gap: 3px" aria-hidden="true"><span class="{{map.g}}"></span><span class="{{map.g}}" style="transition-delay: .25s"></span><span class="{{map.g}}" style="transition-delay: .5s"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span></div>
+<div class="mgrid" style="position: absolute; right: 2.6%; top: 126px; display: grid; grid-template-columns: repeat(3, 14px); gap: 3px" aria-hidden="true"><span class="{{map.g1}}"></span><span class="{{map.g2}}"></span><span class="{{map.g3}}"></span><span class="gt old pic ph-wedding-couple"></span><span class="gt old pic ph-portrait-smile"></span><span class="gt old pic ph-couple-kiss"></span><span class="gt old pic ph-wedding-lawn"></span><span class="gt old pic ph-portrait-bw"></span><span class="gt old pic ph-baby-kiss-wide"></span></div>
 <div class="q8 only-lg" style="position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 13px; line-height: 18px">Press any step to jump to it.</div>
 <div class="{{map.labCls}}" aria-hidden="true">{{map.label}}</div>
 </div>
@@ -456,19 +486,19 @@ html{scroll-behavior:auto}
 <sc-if value="{{r.s1}}" hint-placeholder-val="{{false}}"><div>
 <sc-if value="{{r.idle}}" hint-placeholder-val="{{false}}"><div class="q8 fin" style="padding: 8px 4px">A memory card is in. Nothing starts until you say so.</div></sc-if>
 <sc-if value="{{r.prog}}" hint-placeholder-val="{{false}}"><div class="fin" style="padding: 8px 4px"><div style="display: flex; justify-content: space-between; color: #C9CCD3"><span>Copying and checking every file</span><span class="num">{{r.n}} of 3,931</span></div><div style="height: 6px; border-radius: 6px; background: rgba(255,255,255,.12); margin-top: 10px; overflow: hidden"><div style="height: 6px; background: #F28A66; {{r.progW}}"></div></div></div></sc-if>
-<sc-if value="{{r.rep}}" hint-placeholder-val="{{false}}"><div class="pc pop"><div class="tiny" style="color: #6B6F7A">Your report</div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 16px; line-height: 22px; font-weight: 600"><span class="ck" style="flex: none; {{r.t1}}"></span><span>All 3,931 files have been safely backed up and verified.</span></div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 14px; line-height: 20px"><span class="ck" style="flex: none; {{r.t2}}"></span><span>The card is safe to format when you're ready.</span></div><div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap"><span class="tg">3 shoots found</span><span class="tg">Six sneak peeks each</span></div><div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 26px"><sc-if value="{{r.f1}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Garcia family</b><span class="q6">212 photos</span></span></sc-if><sc-if value="{{r.f2}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Park minis</b><span class="q6">1,480 photos</span></span></sc-if><sc-if value="{{r.f3}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Harbor at dusk</b><span class="q6">2,237 photos</span></span></sc-if></div></div></sc-if>
+<sc-if value="{{r.rep}}" hint-placeholder-val="{{false}}"><div class="pc pop"><div class="tiny" style="color: #6B6F7A">Your report</div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 16px; line-height: 22px; font-weight: 600"><span class="ck" style="flex: none; {{r.t1}}"></span><span>All 3,931 files have been safely backed up and verified.</span></div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 14px; line-height: 20px"><span class="ck" style="flex: none; {{r.t2}}"></span><span>The card is safe to format when you're ready.</span></div><div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap"><span class="tg">3 shoots found</span><span class="tg">Six sneak peeks each</span></div><div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 26px"><sc-if value="{{r.f1}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><span class="fth pic ph-beach-family-2"></span><b style="font-weight: 600">Garcia family</b><span class="q6">212 photos</span></span></sc-if><sc-if value="{{r.f2}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><span class="fth pic ph-home-mother-daughter-wide"></span><b style="font-weight: 600">Park minis</b><span class="q6">1,480 photos</span></span></sc-if><sc-if value="{{r.f3}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><span class="fth pic ph-beach-silhouettes-wide"></span><b style="font-weight: 600">Harbor at dusk</b><span class="q6">2,237 photos</span></span></sc-if></div></div></sc-if>
 </div></sc-if>
 <!-- scene 2 -->
 <sc-if value="{{r.s2}}" hint-placeholder-val="{{false}}"><div>
-<sc-if value="{{r.blk}}" hint-placeholder-val="{{false}}"><div class="pc fin" style="position: relative"><div class="tiny" style="color: #6B6F7A">Shoot 1 of 3</div><div style="display: flex; gap: 12px; margin-top: 8px; align-items: flex-start"><div style="display: grid; grid-template-columns: repeat(3, 34px); gap: 3px; flex: none"><span class="ph" style="height: 34px; background: #DCD7CB"></span><span class="ph" style="height: 34px; background: #CFC9BB"></span><span class="ph" style="height: 34px; background: #E3DED3"></span></div><div style="flex: 1 1 auto; min-width: 0"><div style="border: 1px dashed #B9B4A6; border-radius: 8px; padding: 6px 10px; font-weight: 600; font-size: 14px; background: #FFFFFF">Garcia family</div><div style="position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; margin-top: 8px; font-weight: 600; color: #FFFFFF; {{r.btn}}">Add to my editing queue<sc-if value="{{r.press}}" hint-placeholder-val="{{false}}"><span class="cur fin" style="right: 14px; top: 16px"></span></sc-if></div><sc-if value="{{r.cal}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 8px; max-width: 250px"><div style="font-size: 11px; font-weight: 600; color: #6B6F7A; margin-bottom: 4px">November</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px"><span class="cday">15</span><span class="cday">16</span><span class="cday">17</span><span class="cday">18</span><span class="cday">19</span><span class="{{r.pk}}">20</span><span class="cday">21</span></div></div></sc-if><sc-if value="{{r.conf}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; color: #2F7A55; font-weight: 600"><span class="ck"></span> In your editing queue, due Fri, Nov 20.</div></sc-if></div></div></div></sc-if>
+<sc-if value="{{r.blk}}" hint-placeholder-val="{{false}}"><div class="pc fin" style="position: relative"><div class="tiny" style="color: #6B6F7A">Shoot 1 of 3</div><div style="display: flex; gap: 12px; margin-top: 8px; align-items: flex-start"><div style="display: grid; grid-template-columns: repeat(3, 34px); gap: 3px; flex: none"><span class="ph pic ph-beach-family-2" style="height: 34px"></span><span class="ph pic ph-beach-mother-daughter" style="height: 34px"></span><span class="ph pic ph-beach-family-wide" style="height: 34px"></span></div><div style="flex: 1 1 auto; min-width: 0"><div style="border: 1px dashed #B9B4A6; border-radius: 8px; padding: 6px 10px; font-weight: 600; font-size: 14px; background: #FFFFFF">Garcia family</div><div style="position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; margin-top: 8px; font-weight: 600; color: #FFFFFF; {{r.btn}}">Add to my editing queue<sc-if value="{{r.press}}" hint-placeholder-val="{{false}}"><span class="cur fin" style="right: 14px; top: 16px"></span></sc-if></div><sc-if value="{{r.cal}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 8px; max-width: 250px"><div style="font-size: 11px; font-weight: 600; color: #6B6F7A; margin-bottom: 4px">November</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px"><span class="cday">15</span><span class="cday">16</span><span class="cday">17</span><span class="cday">18</span><span class="cday">19</span><span class="{{r.pk}}">20</span><span class="cday">21</span></div></div></sc-if><sc-if value="{{r.conf}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; color: #2F7A55; font-weight: 600"><span class="ck"></span> In your editing queue, due Fri, Nov 20.</div></sc-if></div></div></div></sc-if>
 <sc-if value="{{r.queue}}" hint-placeholder-val="{{false}}"><div class="pc pop"><div style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 15px; font-weight: 600">Editing queue</b><span class="q6">3 shoots to edit</span></div><div class="pop" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 10px; background: #FFFFFF; animation-delay: .3s"><b style="font-weight: 600">Garcia family</b><span class="tg warm">due in 6 days</span></div><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 6px; background: #FFFFFF"><b style="font-weight: 600">Lena and Marcus</b><span class="tg">due in 9 days</span></div><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 6px; background: #FFFFFF"><b style="font-weight: 600">Harbor minis</b><span class="tg">due in 2 weeks</span></div></div></sc-if>
 </div></sc-if>
 <!-- scene 3 -->
 <sc-if value="{{r.s3}}" hint-placeholder-val="{{false}}"><div class="pc fin"><div style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 15px; font-weight: 600">Garcia family, post kit</b><span class="q6">From your finished photos</span></div>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px">
-<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Reel</b><div class="ph" style="height: 84px; background: #DCD7CB; margin-top: 6px"></div><div style="display: flex; gap: 3px; margin-top: 6px"><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.a}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.b}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.c}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.d}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.e}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.f}}"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k1}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> Made. Open in CapCut.</span></sc-if></div></div>
-<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Carousel</b><div class="ph" style="height: 84px; background: #CFC9BB; margin-top: 6px"></div><div style="display: flex; gap: 4px; justify-content: center; margin-top: 6px; height: 8px; align-items: center"><span style="width: 5px; height: 5px; border-radius: 50%; background: #B9542F"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k2}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 7 slides saved.</span></sc-if></div></div>
-<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Stories</b><div class="ph" style="height: 84px; background: #E3DED3; margin-top: 6px"></div><div style="height: 8px; margin-top: 6px"></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k3}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 3 saved.</span></sc-if></div></div>
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Reel</b><div class="{{r.reelPh}}" style="height: 84px; margin-top: 6px"></div><div style="display: flex; gap: 3px; margin-top: 6px"><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.a}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.b}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.c}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.d}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.e}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.f}}"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k1}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> Made. Open in CapCut.</span></sc-if></div></div>
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Carousel</b><div class="ph pic ph-beach-mother-son-wide" style="height: 84px; margin-top: 6px"></div><div style="display: flex; gap: 4px; justify-content: center; margin-top: 6px; height: 8px; align-items: center"><span style="width: 5px; height: 5px; border-radius: 50%; background: #B9542F"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k2}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 7 slides saved.</span></sc-if></div></div>
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Stories</b><div class="ph pic ph-beach-silhouettes-wide" style="height: 84px; margin-top: 6px"></div><div style="height: 8px; margin-top: 6px"></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k3}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 3 saved.</span></sc-if></div></div>
 </div></div></sc-if>
 <!-- scene 4 -->
 <sc-if value="{{r.s4}}" hint-placeholder-val="{{true}}"><div class="pc fin"><b style="font-size: 17px; line-height: 22px; font-weight: 600">3 posts ready</b>
@@ -478,11 +508,10 @@ html{scroll-behavior:auto}
 <div style="border-top: 1px solid #E6E2D8; padding: 9px 0"><b style="font-weight: 600">Garcia family carousel</b><span class="q6"> &middot; Fri</span></div>
 <div style="border-top: 1px solid #E6E2D8; padding: 9px 0"><b style="font-weight: 600">Harbor minis reel</b><span class="q6"> &middot; next Tue</span></div>
 </div>
-<div style="display: grid; grid-template-columns: repeat(3, 44px); gap: 3px; flex: none"><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g1}}"></span><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g2}}"></span><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g3}}"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span></div>
+<div style="display: grid; grid-template-columns: repeat(3, 44px); gap: 3px; flex: none"><span class="{{r.g1}}" style="height: 44px; border-radius: 4px; box-sizing: border-box"></span><span class="{{r.g2}}" style="height: 44px; border-radius: 4px; box-sizing: border-box"></span><span class="{{r.g3}}" style="height: 44px; border-radius: 4px; box-sizing: border-box"></span><span class="pic ph-wedding-veil-wide" style="height: 44px; border-radius: 4px"></span><span class="pic ph-portrait-profile" style="height: 44px; border-radius: 4px"></span><span class="pic ph-couple-kiss" style="height: 44px; border-radius: 4px"></span><span class="pic ph-wedding-bouquet" style="height: 44px; border-radius: 4px"></span><span class="pic ph-baby-kiss-wide" style="height: 44px; border-radius: 4px"></span><span class="pic ph-portrait-bw" style="height: 44px; border-radius: 4px"></span></div>
 </div></div></sc-if>
 </div>
 </div>
-<sc-if value="{{r.end}}" hint-placeholder-val="{{true}}"><div class="endc"><div style="font-size: clamp(22px, 2.6vw, 30px); line-height: 1.2; font-weight: 600; letter-spacing: -0.01em">Card to grid. <em>A few words and a few presses.</em></div><button class="btn" onClick="{{runReplay}}">{{runEndLabel}}</button></div></sc-if>
 </div>
 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px; margin-top: 10px; font-size: 14px; line-height: 20px">
 <div class="rcap" style="font-weight: 600; flex: 1 1 100%">
@@ -491,7 +520,7 @@ html{scroll-behavior:auto}
 <sc-if value="{{r.s3}}" hint-placeholder-val="{{false}}"><span class="fin">Your finished photos became three things to post.</span></sc-if>
 <sc-if value="{{r.s4}}" hint-placeholder-val="{{true}}"><span class="fin">You post it yourself, when you are ready. It never posts for you.</span></sc-if>
 </div>
-<div class="q8" style="font-size: 13px; flex: 1 1 100%">The backup numbers are from a real card.</div>
+<div class="q8" style="font-size: 13px; flex: 1 1 100%">{{loopNote}} The backup numbers are from a real card.</div>
 </div>
 </div>
 </div>
@@ -525,7 +554,7 @@ html{scroll-behavior:auto}
 <button role="tab" aria-selected="{{t.c.sel}}" class="{{t.c.cls}}" onClick="{{t.c.go}}">{{t.c.label}}</button>
 </div>
 <div style="display: flex; flex-wrap: wrap; gap: 14px 16px; margin-top: 12px; align-items: flex-start">
-<div class="{{c1.mzCls}}"><sc-for list="{{mz}}" as="m" hint-placeholder-count="6"><span class="ph" style="position: relative; {{m.bg}}"><span class="spk">sneak peek</span></span></sc-for></div>
+<div class="{{c1.mzCls}}"><sc-for list="{{mz}}" as="m" hint-placeholder-count="6"><span class="{{m.cls}}" style="position: relative"><span class="spk">sneak peek</span></span></sc-for></div>
 <div style="flex: 1 1 260px; min-width: 0">
 <div class="q6 num">{{c1.count}}</div>
 <div style="display: flex; gap: 6px; margin-top: 4px"><input class="inp" style="flex: 1 1 auto" type="text" maxlength="40" value="{{c1.name}}" onChange="{{c1.onName}}" onKeyDown="{{c1.onKey}}" aria-label="The name of this shoot" /><button class="sb" onClick="{{c1.rename}}">Rename</button></div>
@@ -572,7 +601,7 @@ html{scroll-behavior:auto}
 <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px">
 <sc-for list="{{qs}}" as="c" hint-placeholder-count="4"><div class="{{c.cls}}" draggable="true" onDragStart="{{c.dragStart}}" onDragOver="{{c.dragOver}}" onDrop="{{c.drop}}">
 <button class="cb" onClick="{{c.tick}}" aria-label="{{c.aria}}"><i><span class="ck"></span></i></button>
-<sc-if value="{{c.thumbs}}" hint-placeholder-val="{{true}}"><span class="thm" style="display: flex; gap: 3px; flex: none"><span class="ph" style="width: 30px; height: 30px; background: #DCD7CB"></span><span class="ph" style="width: 30px; height: 30px; background: #CFC9BB"></span><span class="ph" style="width: 30px; height: 30px; background: #E3DED3"></span></span></sc-if>
+<sc-if value="{{c.thumbs}}" hint-placeholder-val="{{true}}"><span class="thm" style="display: flex; gap: 3px; flex: none"><span class="{{c.t1}}" style="width: 30px; height: 30px"></span><span class="{{c.t2}}" style="width: 30px; height: 30px"></span><span class="{{c.t3}}" style="width: 30px; height: 30px"></span></span></sc-if>
 <span style="flex: 1 1 110px; min-width: 0"><b style="display: block; font-weight: 600; font-size: 14px; overflow-wrap: anywhere">{{c.name}}</b><span class="q6 num" style="display: block; font-size: 12px; line-height: 16px">{{c.meta}}</span></span>
 <sc-if value="{{c.hasTag}}" hint-placeholder-val="{{true}}"><span class="{{c.tagCls}}">{{c.tag}}</span></sc-if>
 <sc-if value="{{c.noDate}}" hint-placeholder-val="{{false}}"><button class="lk" onClick="{{c.setDate}}">Set a due date</button></sc-if>
@@ -626,7 +655,7 @@ html{scroll-behavior:auto}
 </div>
 <div class="mod" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-start">
 <div style="flex: none"><b style="display: block; font-size: 15px; font-weight: 600; margin-bottom: 6px">Slide 1 of 7</b>
-<div style="position: relative; width: 168px; height: 210px; border: 1px solid #E6E2D8; overflow: hidden; {{b3.canvas}}"><span class="ph" style="position: absolute; border-radius: 0; background: #746E62; transition: left .25s ease-out, top .25s ease-out, right .25s ease-out, bottom .25s ease-out; {{b3.photo}}"></span><span style="position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; overflow-wrap: anywhere; transition: left .25s ease-out, top .25s ease-out; {{b3.text}}">{{b3.textVal}}</span></div></div>
+<div style="position: relative; width: 168px; height: 210px; border: 1px solid #E6E2D8; overflow: hidden; {{b3.canvas}}"><span class="{{b3.photoCls}}" style="position: absolute; border-radius: 0; transition: left .25s ease-out, top .25s ease-out, right .25s ease-out, bottom .25s ease-out; {{b3.photo}}"></span><span style="position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; overflow-wrap: anywhere; transition: left .25s ease-out, top .25s ease-out; {{b3.text}}">{{b3.textVal}}</span></div></div>
 <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
 <div role="group" aria-label="Layout" style="display: flex; flex-wrap: wrap; gap: 4px"><button class="{{lay.a.cls}}" onClick="{{lay.a.go}}">Fill slide</button><button class="{{lay.b.cls}}" onClick="{{lay.b.go}}">Top half</button><button class="{{lay.c.cls}}" onClick="{{lay.c.go}}">Left half</button><button class="sb" onClick="{{b3.border}}">Add border</button></div>
 <input class="inp" type="text" maxlength="40" value="{{b3.textVal}}" onChange="{{b3.onText}}" aria-label="The words on the slide" />
@@ -634,7 +663,7 @@ html{scroll-behavior:auto}
 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px"><button class="sb co" onClick="{{b3.save}}">Save slides</button><sc-if value="{{b3.saving}}" hint-placeholder-val="{{false}}"><span class="q6" style="font-weight: 600">Saving...</span></sc-if><sc-if value="{{b3.saved}}" hint-placeholder-val="{{false}}"><span class="fin" style="color: #2F7A55; font-weight: 600"><span class="ck"></span> 7 slides are in your Carousel folder.</span></sc-if></div>
 </div>
 </div>
-<p class="hint">Try it: change the pace and press Play. Then type your own words on the slide.</p>
+<p class="hint">{{reelNote}} Try it: change the pace, press a photo, or type your own words on the slide.</p>
 </div>
 </div></div></div>
 </div>
@@ -666,7 +695,7 @@ html{scroll-behavior:auto}
 <div style="font-weight: 600; margin-bottom: 6px">Your grid, with what is coming</div>
 <div class="{{p4.gridCls}}" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px">
 <sc-for list="{{ntiles}}" as="nt" hint-placeholder-count="6"><button class="{{nt.cls}}" style="border: 0; {{nt.style}}" draggable="true" onClick="{{nt.pick}}" onDragStart="{{nt.dragStart}}" onDragOver="{{nt.dragOver}}" onDrop="{{nt.drop}}" aria-label="{{nt.aria}}"><small class="num">{{nt.date}}</small><span style="display: flex; align-items: center; justify-content: space-between; width: 100%"><small>{{nt.kind}}</small><sc-if value="{{nt.rem}}" hint-placeholder-val="{{false}}"><svg class="fin" width="14" height="14" viewBox="0 0 14 14" fill="#FFFFFF" stroke="#1F2430" stroke-width="1.4" aria-hidden="true"><rect x="1.5" y="2.5" width="11" height="10" rx="2"/><path d="M1.5 6h11M4.5 1v3M9.500 1v3"/></svg></sc-if></span></button></sc-for>
-<span class="otile"></span><span class="otile"></span><span class="otile"></span>
+<span class="otile pic ph-beach-couple-bw"></span><span class="otile pic ph-sunset-walk"></span><span class="otile pic ph-beach-silhouettes-wide"></span>
 </div>
 <p class="q6" style="margin-top: 6px; font-size: 12px; line-height: 17px">{{p4.note}}</p>
 </div>
@@ -852,9 +881,9 @@ class Component extends DCLogic {
     tab: 0, names: ['Black-sand beach', 'Sunrise palm grove', 'Morning yoga'], draft: null, ren: 0,
     folder: false, mos: 0, mosFlip: false, cal1: false, due1: [0, 0, 0], fly: false,
     q: [
-      { id: 'g', name: 'Garcia family', meta: 'shot Nov 14 · 212 photos', due: 6, thumbs: true },
-      { id: 'l', name: 'Lena and Marcus', meta: 'shot Nov 7 · 1,140 photos', due: 9, thumbs: true },
-      { id: 'h', name: 'Harbor minis', meta: 'shot Nov 1 · 480 photos', due: 14, thumbs: true },
+      { id: 'g', name: 'Garcia family', meta: 'shot Nov 14 · 212 photos', due: 6, thumbs: ['beach-family-2', 'beach-mother-daughter', 'beach-family-wide'] },
+      { id: 'l', name: 'Lena and Marcus', meta: 'shot Nov 7 · 1,140 photos', due: 9, thumbs: ['wedding-couple', 'wedding-veil-wide', 'wedding-bouquet'] },
+      { id: 'h', name: 'Harbor minis', meta: 'shot Nov 1 · 480 photos', due: 14, thumbs: ['portrait-smile', 'home-mother-daughter-wide', 'baby-kiss-wide'] },
       { id: 'c', name: 'Cassandra', meta: 'From the list you already keep', due: null, thumbs: false }
     ],
     going: null, qOrder: null, moved: null, qCal: null, addOpen: false, addName: '', addDate: '', addMsg: '',
@@ -870,7 +899,7 @@ class Component extends DCLogic {
     this.n = 0;
     this.mapT = 0;
     this.fired = {};
-    this.vis = { map: true, run: true, rules: true };
+    this.vis = { map: true, run: true, rules: true, reel: true };
     this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     this.timers.push(setInterval(() => this.tick(), 100));
     if (this.reduce) { this.set({ runT: 79 }); return; }
@@ -906,17 +935,17 @@ class Component extends DCLogic {
     if (this.n % 10 === 0) patch.now = Date.now();
     if (!this.reduce) {
       if (this.vis.map && !(this.mapHover > Date.now())) {
-        this.mapT = (this.mapT + 1) % 160;
+        this.mapT = (this.mapT + 1) % 165;
         const m = this.mapStep(this.mapT);
         if (m !== s.map) patch.map = m;
       }
       if (s.runPlay && this.vis.run) {
-        const t = Math.min(260, s.runT + 1);
-        patch.runT = t;
-        if (t >= 260) patch.runPlay = false;
+        /* the last scene holds about four seconds, then it starts again */
+        patch.runT = s.runT + 1 >= 280 ? 0 : s.runT + 1;
       }
       if (s.seen.steps && s.typed < 34) patch.typed = s.typed + 1;
-      if (s.playT >= 0 && s.playT < 40) patch.playT = s.playT + 1;
+      /* the reel plays through (4 s), rests four seconds, and plays again */
+      if (s.playT >= 0 && this.vis.reel) patch.playT = s.playT + 1 > 80 ? 0 : s.playT + 1;
       if (this.vis.rules && !this.pairTouched && this.n % 40 === 0) {
         patch.pair = (s.pair + 1) % 7;
         patch.pairFlip = !s.pairFlip;
@@ -927,7 +956,7 @@ class Component extends DCLogic {
     if (Object.keys(patch).length) this.set(patch);
   }
 
-  mapStep(t) { return t < 15 ? 0 : t < 45 ? 1 : t < 75 ? 2 : t < 105 ? 3 : t < 125 ? 4 : t < 145 ? 5 : 6; }
+  mapStep(t) { return t < 15 ? 0 : t < 45 ? 1 : t < 75 ? 2 : t < 105 ? 3 : t < 125 ? 4 : t < 150 ? 5 : 6; }
 
   /* start each self-playing part the first time enough of it is on screen,
      and keep track of which looping parts are in view so they rest off screen */
@@ -944,12 +973,12 @@ class Component extends DCLogic {
       'offer-card': () => this.see('offer'),
       'close-track': () => this.see('close')
     };
-    const visKey = { 'map': 'map', 'run-win': 'run', 'rules-slider': 'rules' };
+    const visKey = { 'map': 'map', 'run-win': 'run', 'rules-slider': 'rules', 'ch3-a': 'reel' };
     const ids = Object.keys(jobs);
     const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
     if (!('IntersectionObserver' in window)) return true;
     if (els.length < ids.length) return false;
-    this.vis = { map: false, run: false, rules: false };
+    this.vis = { map: false, run: false, rules: false, reel: false };
     this.mapT = 0;
     this.set({
       map: 0, typed: 0, runT: 0, runPlay: false, chipT: 0,
@@ -1033,8 +1062,9 @@ class Component extends DCLogic {
 
   qPatch(id, patch) { return this.state.q.map((x) => (x.id === id ? Object.assign({}, x, patch) : x)); }
 
-  /* the run-through's four scenes, in tenths of a second: 8 s, then 6 s each */
-  bounds() { return [0, 80, 140, 200, 260]; }
+  /* the run-through's four scenes, in tenths of a second: 8 s, 6 s, 6 s, then
+     8 s for the last one, which is done by 3.8 s and holds until it loops */
+  bounds() { return [0, 80, 140, 200, 280]; }
 
   jump(i) {
     const B = this.bounds();
@@ -1082,7 +1112,9 @@ class Component extends DCLogic {
       label: ['A full card', '3 shoots, named your way', 'Due Friday', 'Reel. Carousel. Stories.',
         'On your grid, ready when you are', 'On your grid, ready when you are', 'On your grid, ready when you are'][M],
       s0: M === 0, s1: M === 1, s2: M === 2, s3: M >= 3,
-      g: M >= 5 ? 'gt lit' : 'gt',
+      g1: M >= 5 ? 'gt glit pic ph-beach-family-1' : 'gt',
+      g2: M >= 5 ? 'gt glit pic ph-beach-mother-daughter' : 'gt',
+      g3: M >= 5 ? 'gt glit pic ph-sunset-walk' : 'gt',
       labCls: 'only-sm mlab p' + Math.max(1, Math.min(4, M)) + (M === 0 ? ' hid' : ''),
       side: M === 3 ? 'sidef pulse' : 'sidef'
     };
@@ -1106,7 +1138,8 @@ class Component extends DCLogic {
     const lit = sc > 2 ? 6 : (sc === 2 && u >= 22 ? Math.min(6, Math.floor((u - 22) / 2) + 1) : 0);
     const bt = {};
     keys.slice(0, 6).forEach((k, i) => { bt[k] = 'background:' + (i < lit ? '#B9542F' : '#E6E2D8'); });
-    const tile = (on) => (on ? 'background:#F0A27F;outline:2px solid #B9542F;outline-offset:-2px' : 'background:#E6E2D8');
+    const tile = (on, ph) => (on ? 'pic nw fin ph-' + ph : 'emp');
+    const reelCut = ['beach-family-wide', 'beach-mother-daughter', 'beach-silhouettes-wide', 'beach-family-2', 'beach-mother-son-wide', 'sunset-walk'];
     const r = {
       s1: sc === 0, s2: sc === 1, s3: sc === 2, s4: sc === 3,
       chatA: sc <= 1, chatB: sc >= 2,
@@ -1128,16 +1161,15 @@ class Component extends DCLogic {
       c1: sc > 2 || (sc === 2 && u >= 3), c2: sc > 2 || (sc === 2 && u >= 12), cDots: sc === 2 && u >= 8 && u < 12,
       c3: sc > 2 || (sc === 2 && u >= 18),
       bt: bt, k1: sc > 2 || u >= 34, k2: sc > 2 || u >= 42, k3: sc > 2 || u >= 50,
-      g1: tile(u >= 8), g2: tile(u >= 14), g3: tile(u >= 20),
+      g1: tile(u >= 8, 'beach-family-1'), g2: tile(u >= 14, 'beach-mother-daughter'), g3: tile(u >= 20, 'sunset-walk'),
+      reelPh: 'ph pic ph-' + reelCut[Math.max(0, Math.min(5, lit - 1))],
       press4: u >= 34 && u < 38, copied: u >= 38, notCopied: u < 38,
-      copyBtn: u >= 38 ? 'color:#2F7A55;border:1px solid #2F7A55' : 'color:#1F2430;border:1px solid #B9B4A6',
-      end: T >= B[4]
+      copyBtn: u >= 38 ? 'color:#2F7A55;border:1px solid #2F7A55' : 'color:#1F2430;border:1px solid #B9B4A6'
     };
     const seg = {};
     keys.slice(0, 4).forEach((k, i) => {
       seg[k] = { cls: T >= B[i] ? 'seg on' : 'seg', fill: 'width:' + Math.round(clamp((T - B[i]) / (B[i + 1] - B[i])) * 100) + '%', go: () => this.jump(i) };
     });
-    const runReplay = () => { this.runTouched = true; if (this.reduce) this.set({ runT: B[1] - 1, runPlay: false }); else this.set({ runT: 0, runPlay: true }); };
 
     /* chapter 1: the report */
     const name = s.names[s.tab];
@@ -1149,8 +1181,13 @@ class Component extends DCLogic {
         go: () => this.set({ tab: i, draft: null, ren: 0, cal1: false, mosFlip: !s.mosFlip })
       };
     });
-    const tints = ['#DCD7CB', '#C9C2B2', '#E3DED3', '#BFB8A8', '#D3CCBD', '#EAE6DC'];
-    const mz = tints.map((x, i) => ({ bg: 'background:' + tints[(i + s.mos + s.tab * 2) % 6] }));
+    /* six sneak peeks per shoot; Pick again and Show me more bring others round */
+    const peeks = [
+      ['beach-couple-bw', 'beach-silhouettes-wide', 'sunset-walk', 'beach-family-wide', 'beach-mother-daughter', 'beach-mother-son-wide', 'beach-family-1', 'beach-family-2', 'beach-family-big'],
+      ['wedding-couple', 'wedding-veil-wide', 'wedding-bouquet', 'wedding-green-wide', 'couple-kiss', 'wedding-lawn'],
+      ['portrait-profile', 'home-mother-daughter-wide', 'portrait-smile', 'baby-kiss-wide', 'portrait-bw', 'couple-kiss']
+    ][s.tab];
+    const mz = [0, 1, 2, 3, 4, 5].map((i) => ({ cls: 'ph pic ph-' + peeks[(i + s.mos) % peeks.length] }));
     const rename = () => {
       const typed = (s.draft == null ? name : s.draft).trim() || name;
       const tab = s.tab;
@@ -1196,6 +1233,7 @@ class Component extends DCLogic {
       return {
         cls: 'qc' + (s.going === x.id ? ' go' : '') + (x.id === 'c' && !this.qTouched ? (s.seen.ch2 ? ' new' : ' w0') : ''),
         name: x.name, meta: x.meta, thumbs: !!x.thumbs,
+        t1: x.thumbs ? 'ph pic ph-' + x.thumbs[0] : 'ph', t2: x.thumbs ? 'ph pic ph-' + x.thumbs[1] : 'ph', t3: x.thumbs ? 'ph pic ph-' + x.thumbs[2] : 'ph',
         hasTag: x.due != null, noDate: x.due == null && !moved,
         tag: x.due != null ? this.tagFor(x.due) : '',
         tagCls: 'tg' + (x.due != null && x.due <= 7 ? ' warm' : '') + (x.id === 'g' && s.seen.ch2 && !this.qTouched ? ' pl' : ''),
@@ -1251,7 +1289,7 @@ class Component extends DCLogic {
 
     /* chapter 3: the reel on the beat. Every photo is a whole number of beats. */
     const base = [[2, 1, 2, 2, 2, 3], [2, 1, 1, 4, 1, 3], [2, 2, 2, 2, 2, 2], [4, 3, 2, 1, 1, 1]][s.pace];
-    const reelTints = ['#DCD7CB', '#BFB8A8', '#D3CCBD', '#C9C2B2', '#E3DED3', '#B8B1A1', '#D9D2C2', '#C4BDAD'];
+    const reelPics = ['beach-family-wide', 'beach-mother-daughter', 'beach-silhouettes-wide', 'beach-family-2', 'beach-mother-son-wide', 'sunset-walk'];
     const beatNow = s.playT >= 0 && s.playT < 40 ? s.playT / 40 * 12 : -1;
     const tiles = [];
     let start = 0;
@@ -1260,9 +1298,8 @@ class Component extends DCLogic {
       const beats = mk === 1 ? base[p] + 1 : mk === 2 ? 1 : base[p];
       tiles[id] = {
         num: String(id + 1), mark: ['', 'Longer', 'Quick'][mk], hasMark: mk > 0, markCls: ['', 'lg', 'qk'][mk],
-        cls: 'til' + (beatNow >= start && beatNow < start + beats ? ' act' : ''),
-        style: 'left:calc(' + (start / 12 * 100).toFixed(3) + '% + 2px);width:calc(' + (beats / 12 * 100).toFixed(3) + '% - 3px);background:' +
-          reelTints[id] + ';animation-delay:' + (p * 0.14).toFixed(2) + 's',
+        cls: 'til pic ph-' + reelPics[id] + (beatNow >= start && beatNow < start + beats ? ' act' : ''),
+        style: 'left:calc(' + (start / 12 * 100).toFixed(3) + '% + 2px);width:calc(' + (beats / 12 * 100).toFixed(3) + '% - 3px);animation-delay:' + (p * 0.14).toFixed(2) + 's',
         aria: 'Photo ' + (id + 1) + ', ' + ['Normal', 'Longer', 'Quicker'][mk] + ', ' + beats + (beats === 1 ? ' beat' : ' beats') + '. Press to change how long it stays.',
         cycle: () => { const marks = s.marks.slice(); marks[id] = (mk + 1) % 3; this.set({ marks: marks }); },
         dragStart: (e) => { this.dragT = id; if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(id)); } catch (err) {} } },
@@ -1286,7 +1323,7 @@ class Component extends DCLogic {
     for (let i = 0; i < 48; i++) waves.push({ h: 'height:' + (5 + (i * 37) % 17) + 'px' });
     const a3 = {
       tlsCls: s.seen.ch3 ? 'tls in' : 'tls wait', more: start > 12,
-      playing: beatNow >= 0, head: 'left:' + (s.playT / 40 * 100).toFixed(1) + '%',
+      playing: beatNow >= 0, head: 'left:' + (Math.min(40, s.playT) / 40 * 100).toFixed(1) + '%',
       status: s.playT >= 0,
       play: () => this.set({ playT: this.reduce ? 40 : 0 })
     };
@@ -1300,6 +1337,7 @@ class Component extends DCLogic {
     const touch = (patch) => this.set(Object.assign({ saveSt: 0 }, patch));
     const b3 = {
       canvas: 'background:' + (half ? hex[s.sCol] : '#FAFAF6'),
+      photoCls: 'ph pic ph-beach-family-1' + (half ? '' : (s.sCol === 1 || s.sCol === 4 ? ' slph' : ' slphl')),
       photo: ['left:' + b + 'px;top:' + b + 'px;right:' + b + 'px;bottom:' + b + 'px',
         'left:' + b + 'px;top:' + b + 'px;right:' + b + 'px;bottom:105px',
         'left:' + b + 'px;top:' + b + 'px;right:84px;bottom:' + b + 'px'][s.lay],
@@ -1322,7 +1360,16 @@ class Component extends DCLogic {
     /* chapter 4: the posting queue. pOrder is the order posts go out. */
     const pieces = ['Garcia reel', 'Garcia carousel', 'Harbor reel', 'Harbor carousel', 'Lena and Marcus reel', 'Lena and Marcus carousel'];
     const offs = { 1: [3, 10, 17, 24, 31, 38], 2: [3, 6, 10, 13, 17, 20], 3: [2, 4, 6, 9, 11, 13] }[s.rhythm];
-    const gridTints = ['#D9B48A', '#8DA598', '#C2976B', '#A391A9', '#CDA57A', '#9DB3A6', '#B3A2B8', '#7D978A'];
+    /* the photo that stands for each piece in the grid; pressing a selected
+       tile again brings the next one round */
+    const gridPics = [
+      ['beach-family-1', 'beach-family-wide', 'beach-family-2'],
+      ['beach-mother-daughter', 'beach-family-big', 'beach-mother-son-wide'],
+      ['portrait-smile', 'portrait-profile'],
+      ['home-mother-daughter-wide', 'baby-kiss-wide', 'portrait-bw'],
+      ['wedding-couple', 'wedding-bouquet', 'wedding-lawn'],
+      ['wedding-veil-wide', 'wedding-green-wide']
+    ];
     const shortDate = (off) => this.dayLabel(off).replace(',', '');
     const swap = (i, j) => {
       const o = s.pOrder.slice();
@@ -1335,12 +1382,12 @@ class Component extends DCLogic {
       const pc = s.pOrder[i];
       ntiles.push({
         date: shortDate(offs[i]), kind: pc % 2 ? 'Carousel' : 'Reel', rem: !!s.rem[pc],
-        cls: 'ntile' + (s.pSel === i ? ' sel' : ''),
-        style: 'background:' + gridTints[(pc + s.pVar[pc] * 3) % 8] + ';animation-delay:' + (k * 0.1).toFixed(1) + 's',
+        cls: 'ntile pic ph-' + gridPics[pc][s.pVar[pc] % gridPics[pc].length] + (s.pSel === i ? ' sel' : ''),
+        style: 'animation-delay:' + (k * 0.1).toFixed(1) + 's',
         aria: pieces[pc] + ', going out ' + shortDate(offs[i]) + '. Press it, then press another new tile to swap them.',
         pick: () => {
           if (s.pSel < 0) this.set({ pSel: i });
-          else if (s.pSel === i) { const v = s.pVar.slice(); v[pc] = (v[pc] + 1) % 3; this.set({ pVar: v, pSel: -1 }); }
+          else if (s.pSel === i) { const v = s.pVar.slice(); v[pc] = (v[pc] + 1) % gridPics[pc].length; this.set({ pVar: v, pSel: -1 }); }
           else swap(s.pSel, i);
         },
         dragStart: (e) => { this.dragP = i; if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (err) {} } },
@@ -1415,8 +1462,10 @@ class Component extends DCLogic {
       sxCls: 'sx ' + (Math.floor(s.now / 1000) % 2 ? 'a' : 'b'),
       mapIn: () => { this.mapHover = Date.now() + 6000; }, mapOut: () => { this.mapHover = 0; },
       map: map, st: st, say: say,
-      seg: seg, r: r, runReplay: runReplay, runEndLabel: this.reduce ? 'Back to the start' : 'Replay',
-      runToggle: () => { this.runTouched = true; if (T >= B[4]) runReplay(); else this.set({ runPlay: !s.runPlay }); },
+      loopNote: this.reduce ? 'Press a step to see it.' : 'Playing on a loop. Press a step to jump to it.',
+      reelNote: this.reduce ? 'Press Play to see the reel.' : 'The reel plays on a loop.',
+      seg: seg, r: r,
+      runToggle: () => { this.runTouched = true; this.set({ runPlay: !s.runPlay }); },
       runToggleLabel: s.runPlay ? 'Pause the run-through' : 'Play the run-through',
       runPlaying: s.runPlay, runPaused: !s.runPlay,
       c1: c1, t: tabs, mz: mz, days1: days1,
