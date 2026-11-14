@@ -7,7 +7,7 @@ Dustin, Nov 14: "grab all the latest stuff from Nicole... and let's start buildi
 - `Carousel-designer-and-reel-picker-handoff-v26-updates-since-v25.zip` (unpacked in `reference-private/nicole-handoff-v26-2026-11-13/`, data only, never run, never pushed): `UPDATE-v26.md`, `NOTES-from-Nicole-Nov-13.md` (her notes, sections 1 to 14), a clickable demo of the home base, her test home pages, her stories designer page, and her changes to `edit_queue.py`.
 - "Notes for v25": the same notes file, byte for byte.
 - One screenshot: the first-backup question "how do you like a shoot folder named?" with her comment "i think client name then date is probably best rather than date first".
-- **No v25 zip was ever posted.** v26 says "unzip v19, then v20 to v25, and this one on top", so v25 exists on her Mac. Until it is sent, anything v25 changed in files v26 does not carry is unknown to us.
+- **The v25 zip arrived Nov 14, 8:39am** (`reference-private/nicole-handoff-v25-2026-11-13/`): `UPDATE-v25.md`, her reel page, talking reel page, post kit, timing (`bts_reel.py`), `footage.py`, her posting queue changes, a re-recorded acceptance test, three screenshots.
 
 ## The rule, as before
 
@@ -21,9 +21,19 @@ Identical for the photographer (her words whole, the same behaviour), our way un
 - **D. The report's words** (her notes, section 2): why there are two folders; "Does everything look right?"; Open this folder on each shoot; the sneak peeks explained; the closing line changed.
 - **E. Instructions, the notes for Nicole, CLAUDE.md, the full test sweep.**
 
+## v25 stages (after A to D; the timing first, since her note says it matters most)
+
+- **F. The timing on the song's real hits** (`timing.py`, and the chat reel maker): every vibe moves its beat grid onto hits you can hear and avoids cuts where the song doesn't hit; "No song" works; her 22 acceptance cases re-recorded.
+- **G. Several reels per shoot** (reel page, talking reel page, records, `footage.py`): Your reels bar, Start a new reel, Rename, every reel fully separate.
+- **H. The photographer picks:** nothing picked until they ask; the photo note and its copy line; "make my posts" only brings photos in and opens the post kit.
+- **I. Trim a clip; select several photos like Lightroom.**
+- **J. Songs:** a short song starts after a glitchy opening; a replaced recording's sound taken again; Remove (to the Trash, never deleted; a PC's Recycle Bin).
+- **K. The post kit and posting queue:** captions optional (it asks); a preview of each reel; Which reel goes in your queue; each reel its own piece; the reel cover picker in play order.
+- **L. Smaller:** the home page lists every shoot in Your Content; shorter holds when photos are alike.
+
 ## Waiting on Dustin and Nicole (not built until they say)
 
-1. **The v25 zip.**
+1. **Remove a song (v25) is NOT built: a question for Nicole (Dustin, Nov 14: "flag that as a note that she needs to address, I'm not sure what she had in mind").** Hers moves the recording and its sound files from the shoot's Music folder to the Mac's Trash. Dustin's first thought: only take it off the list and leave the file where it is. Ask her which she meant, in the note for her. Until then the reel page has no Remove on a song.
 2. **The folder-naming question at setup.** Nicole: it reads as "name this folder"; ask "do you name your shoots a specific way?" with a box, and suggest name then date. Dustin, Oct 24: year first stays as the recommended one. They differ on which is suggested.
 3. **The drop box keeps a second full copy** (about 5 GB for Nicole). Her suggestion: clear it to the Trash after a checked sort when the photos came through the folder picker, or copy straight into Your Content. Either changes "nothing is deleted" or the Oct 30 design.
 4. Set aside by Nicole herself: a logo for queue screenshots, centering on faces, gallery upload.
