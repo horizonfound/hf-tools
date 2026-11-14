@@ -258,6 +258,19 @@ def check_reel_skill():
     case("Step 4: On every beat has rhythm (her v22): Longer about three beats, Quicker one, plain one or two, never one beat each",
          "On every beat has rhythm (Nicole, Nov 10)" in step4 and "about three beats" in step4 and "never one beat each" in step4
          and "planned so that three one-beat plain photos don't come in a row" in step4)
+    case("Step 4: every vibe lands on beats you can hear (her v25, Nov 13), the chat's reel maker the same, her dry-run line, "
+         "and most cuts, never a promise of every one",
+         "Every vibe lands on beats you can hear in their song (Nicole, Nov 13)" in step4
+         and "for a reel made from the chat with `reel.py make` just the same" in step4
+         and "Real hits: 13 of 14 cuts land on a hit you can hear." in step4
+         and "**Most cuts, not a promise of every one:**" in step4 and "With no song there are no hits to find" in step4)
+    alike = "When the photos are much alike, keep it fast (Nicole, Nov 13)"
+    case("photos that are much alike (her v25 pacing note): the opener plain, few Longers, more Quickers, in the reel skill's "
+         "Step 2 and in curating.md's step 7, in her words",
+         all(alike in x and "the first photo should not be so long" in x and "leave the opener plain" in x
+             for x in (t.split("## Step 2", 1)[-1].split("\n## ", 1)[0], read(PLUGIN / "shared" / "curating.md"))))
+    case("parts/arrange.md: whichever vibe, the cuts land on beats you can hear",
+         "the cuts land on beats you can hear in their song" in read(PLUGIN / "skills" / "studio-manager" / "parts" / "arrange.md"))
     # The made reel does not always keep the plan (same in her engine: the song's hits and the bar can pull a plain
     # opener or a Longer photo to one beat), so the words say "aims" and never promise it (review, Nov 11).
     case("... and those lengths are aims, not promises: a Longer or the opener can land on one beat, one-beat photos can fall together",

@@ -31,9 +31,11 @@ on the beat. Claude does the choosing; this does the counting.
         (src: where in the video the clip starts; seconds: its card's length; length: the whole video's).
 
 The vibe (timing.py, Nicole's engine, Nov 6): every cut lands on a whole beat, every photo stays at least one
-beat and about half a second, and nothing is left out to fit. "beat" (On every beat, the default) is a new
-photo on the beat with a longer hold where the song hits; "mixed" (A little of everything) is some quick,
-some long, changing where the music turns over; "calm" is longer looks; "build" starts calm, speeds up toward
+beat and about half a second, and nothing is left out to fit. In every vibe the beats are moved onto the
+hits you can hear in the song, and cuts keep off beats where the song doesn't hit (her v25, Nov 13); a dry
+run says how many did ("Real hits: 13 of 14 cuts land on a hit you can hear."). "beat" (On every beat, the
+default) is a new photo on the beat with a longer hold where the song hits; "mixed" (A little of everything)
+is some quick, some longer, every change on a beat you can hear; "calm" is longer looks; "build" starts calm, speeds up toward
 the end, then lands. None is a fixed template: one search over the whole reel fits each to its own song,
 photos and clips. Claude's marks count in every vibe ("7+" Longer, about twice as long; "11-" Quicker, one
 beat). The old names still work: "fast" is beat, "steady" is calm. A clip runs whole beats, never longer
@@ -443,6 +445,7 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
              "wide_clips": wide_clips, "clips": clips,
              "photo_count": photo_no,
              "beats_line": timing.beats_line(items, holds), "hits_line": timing.hits_line(grid, i0, holds),
+             "real_hits_line": timing.real_hits_line(grid, i0, holds),
              "kind_note": timing.kind_note(items, vibe, song, song_length) if got["squeezed"] else None}
     return out, facts
 
@@ -645,6 +648,8 @@ def cmd_make(a):
         say(f"The clip at {k} in the reel ({Path(pieces[k - 1]['path']).name}) is wide, so it's zoomed to fill the tall screen and loses its sides "
             f"(slide it in CapCut if anything important is cut off).")
     if a.dry_run:
+        if facts["real_hits_line"]:
+            say(facts["real_hits_line"])
         if facts["hits_line"]:
             say(facts["hits_line"])
         say(facts["beats_line"])

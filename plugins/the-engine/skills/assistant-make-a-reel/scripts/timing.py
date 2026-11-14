@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The Assistant by Horizon Found. How long each piece of a reel stays on screen: Nicole's timing engine
-(her bts_reel.py, handoff v19, Nov 6, 2026), written as plain code that reel.py calls. Photos and video
-clips alike, every vibe, with a song or without.
+(her bts_reel.py, handoff v19, Nov 6, 2026; the song's real hits from her handoff v25, Nov 13), written as
+plain code that reel.py calls. Photos and video clips alike, every vibe, with a song or without.
 
 Her rules, in her words where she gave them:
   - Every cut lands on a whole beat, whichever vibe they pick. "The a little bit of everything is awesome. I
@@ -13,6 +13,14 @@ Her rules, in her words where she gave them:
   - On every beat has rhythm (her handoff v22, Nov 10): plain photos run one beat or two in a mix that is the
     reel's own, a Longer photo aims for three beats, a plain opener for two, and three one-beat photos never
     sit in a row in the plan unless they marked them all Quicker.
+  - Every vibe lands on the song's real hits (her handoff v25, Nov 13: "They all have to land on beats and have
+    to actually listen to the song. It can't be auto or random, it has to actually work for each individual
+    song."). The beat grid is evenly spaced, so on a song with a loose beat (a screen recording, a ballad) its
+    ticks drift off what you hear. Three steps, for every vibe: (1) find the hits you can hear (audible_hits);
+    (2) move each grid tick onto the hit nearest it, when one is within a sixth of a beat, and mark the ticks
+    with no hit near them (onto_hits, Grid.ON); (3) in the one search, a cut on a tick with no hit costs
+    W_EMPTY, so cuts move onto beats you can hear wherever the photo lengths allow. Her "cut purely from hit
+    to hit" (HITGRID), which she tried and left switched off, is not here.
   - The vibes are not fixed templates: "those are not set in stone templates. Those should change for every
     single thing that's made." One search over the whole reel (dynamic programming) picks every length
     together: each piece has a natural length for the vibe and a few others it may take at a small cost; cuts
@@ -56,6 +64,14 @@ WORDS = {"beat": "one photo on every beat", "mixed": "a little of everything", "
 EVEN_BPM = 100.0          # no song: an even 100 beats a minute (the footage keeps its own sound)
 MIN_SHOW = 0.45           # no photo on screen for less than about half a second (on a very fast song: two beats)
 W_HIT, W_DOWN = 0.6, 0.35  # landing on a hit; a long hold or a clip ending on the 1 of a bar
+W_EMPTY = 0.9             # a cut where the song doesn't hit at all (Nicole, Nov 12; her handoff v25)
+# A hit you can hear (hers, v25): a jump in the sound that stands out HIT_STANDS_OUT standard deviations above
+# the music HIT_AROUND seconds either side of it, never two closer than HIT_APART. A grid tick moves onto a hit
+# within a sixth of a beat (SNAP_MOST seconds at the most). A song with fewer than HITS_AT_LEAST such hits keeps
+# its plain grid, every tick counted as heard.
+HIT_STANDS_OUT, HIT_AROUND, HIT_APART = 0.8, 1.5, 0.2
+SNAP_PART, SNAP_MOST = 6, 0.09
+HITS_AT_LEAST = 8
 
 
 def vibe_of(name):
@@ -69,12 +85,16 @@ def vibe_of(name):
 
 class Grid:
     """The song's beats and the points halfway between them.
-    T: the time of every grid point; P: its place in the bar (1, 2, 3, 4; 0 for a half point);
-    HIT: how hard the song hits there and ENERGY: how loud that beat is, each ranked 0 (weakest) to 1;
-    period: one beat in seconds; info: the half-point grid as beats_lite.best_start reads it."""
+    T: the time of every grid point (moved onto the hit you can hear there, when there is one); P: its place in
+    the bar (1, 2, 3, 4; 0 for a half point); HIT: how hard the song hits there and ENERGY: how loud that beat
+    is, each ranked 0 (weakest) to 1; ON: 1 where the point sits on a hit you can hear, 0 where the song doesn't
+    hit (all 1 with no song, or a song with too few hits to tell); hits: the times of those hits, [] when ON
+    says nothing; period: one beat in seconds; info: the half-point grid as beats_lite.best_start reads it."""
 
-    def __init__(self, T, P, HIT, ENERGY, period, tempo, meter, info, song, beats_from=None):
+    def __init__(self, T, P, HIT, ENERGY, period, tempo, meter, info, song, beats_from=None, ON=None, hits=None):
         self.T, self.P, self.HIT, self.ENERGY = T, P, HIT, ENERGY
+        self.ON = ON if ON is not None else [1] * len(T)
+        self.hits = hits or []
         self.period, self.half = period, period / 2
         self.tempo, self.meter, self.info, self.song, self.beats_from = tempo, meter, info, song, beats_from
 
@@ -88,6 +108,55 @@ def rank(v):
     for r, k in enumerate(order):
         out[k] = r / max(1, len(v) - 1)
     return out
+
+
+def audible_hits(o, fps=None):
+    """Step 1 (hers, v25). The moments the song really hits, from o, how much the sound jumps at every moment
+    (beats_lite's own listening, fps values a second): a peak (nothing higher three values either side) that
+    stands out HIT_STANDS_OUT standard deviations above the music HIT_AROUND seconds either side of it. Never
+    two closer than HIT_APART: the louder is kept. [(seconds, how hard), ...] in time order."""
+    fps = fps or beats_lite.FPS
+    n = len(o)
+    win = int(HIT_AROUND * fps)
+    found = []
+    for i in range(2, n - 2):
+        v = o[i]
+        if v <= 0 or any(v < o[k] for k in range(max(0, i - 3), min(n, i + 4))):
+            continue
+        seg = o[max(0, i - win):min(n, i + win)]
+        m = sum(seg) / len(seg)
+        sd = (sum((x - m) ** 2 for x in seg) / len(seg)) ** 0.5
+        if v >= m + HIT_STANDS_OUT * sd:
+            found.append((i / fps, v))
+    hits = []
+    for t, v in found:
+        if hits and t - hits[-1][0] < HIT_APART:
+            if v > hits[-1][1]:
+                hits[-1] = (t, v)
+            continue
+        hits.append((t, v))
+    return hits
+
+
+def onto_hits(T, hit_times, period):
+    """Step 2 (hers, v25). Moves each grid point in T (changed in place) onto the hit nearest it, when that hit
+    is within a sixth of a beat (SNAP_MOST seconds at the most) and still between the points either side, so the
+    grid never folds over. Returns ON: 1 for a point now on a hit, 0 for one with no hit near it."""
+    ON = [0] * len(T)
+    if not hit_times:
+        return ON
+    snap = min(SNAP_MOST, period / SNAP_PART)
+    k = 0
+    for j in range(len(T)):
+        while k + 1 < len(hit_times) and hit_times[k + 1] <= T[j]:
+            k += 1
+        d, q = min((abs(hit_times[q] - T[j]), q) for q in (k, k + 1) if q < len(hit_times))
+        before = T[j - 1] if j else -1.0
+        after = T[j + 1] if j + 1 < len(T) else 1e9
+        if d <= snap and before < hit_times[q] < after:
+            T[j] = hit_times[q]
+            ON[j] = 1
+    return ON
 
 
 _GRIDS = {}
@@ -125,9 +194,16 @@ def song_grid(path, beat_file=None):
         h = int(round(t * beats_lite.FPS))
         hits.append(max(o[max(0, h - 2):h + 3], default=0.0) if o else 0.0)
     half = i["period"] / 2
+    # The song's real hits (hers, v25). How hard each point hits was read above, where the even grid put it; the
+    # point's time then moves onto the hit, and nb is the same list best_start and the cuts read.
+    heard = audible_hits(o) if o else []
+    ON, hit_times = None, []
+    if len(heard) >= HITS_AT_LEAST:
+        hit_times = [round(t, 4) for t, _ in heard]
+        ON = onto_hits(nb, hit_times, half * 2)
     info = {"beats": nb, "bar_pos": pos, "energy": en, "duration": i.get("duration", 0), "period": half}
     g = Grid(nb, pos, rank(hits or [0.0] * len(nb)), rank(en or [0.0] * len(nb)), half * 2,
-             i.get("tempo") or 0, i.get("meter") or 4, info, str(path), i.get("beats_from"))
+             i.get("tempo") or 0, i.get("meter") or 4, info, str(path), i.get("beats_from"), ON, hit_times)
     if key:
         _GRIDS[key] = g
     return g, None
@@ -290,7 +366,7 @@ def plan_holds(items, grid, vibe, seed, j0, j_end):
     one a whole number of beats). None if it can't fit."""
     cand = candidates(items, grid, vibe, seed, j0)
     INF = float("inf")
-    HIT, P = grid.HIT, grid.P
+    HIT, P, ON = grid.HIT, grid.P, grid.ON
     best = {j0: (0.0, None, None)}                             # position -> (cost, previous position, hold)
     layers = [best]
     for i, x in enumerate(items):
@@ -300,7 +376,7 @@ def plan_holds(items, grid, vibe, seed, j0, j_end):
                 e = j + h
                 if e > j_end:
                     continue
-                c = c0 + hc - W_HIT * HIT[e]
+                c = c0 + hc - W_HIT * HIT[e] + (0 if ON[e] else W_EMPTY)   # step 3: not where the song doesn't hit
                 if P[e] == 1 and (h >= 4 or x["kind"] == "clip"):
                     c -= W_DOWN
                 if c < nxt.get(e, (INF,))[0]:
@@ -390,6 +466,19 @@ def hits_line(grid, j0, holds):
     avg = sum(grid.HIT[j] for j in beats_only) / len(beats_only)
     return (f"Hits: the cuts land on beats {sum(grid.HIT[j] for j in cuts) / len(cuts):.2f} strong on average "
             f"(0 weakest, 1 strongest), against {avg:.2f} for every beat in that stretch.")
+
+
+def real_hits_line(grid, j0, holds):
+    """'Real hits: 13 of 14 cuts land on a hit you can hear.' (her dry run's line, v25). The cuts between the
+    pieces are counted, not the reel's end. None with no song, a song with too few hits to tell, or a reel of
+    one piece (no cut to count; hers would say "0 of 0")."""
+    if not grid.song or not grid.hits or len(holds) < 2:
+        return None
+    cuts, e = [], j0
+    for h in holds:
+        e += h
+        cuts.append(e)
+    return f"Real hits: {sum(grid.ON[c] for c in cuts[:-1])} of {len(cuts) - 1} cuts land on a hit you can hear."
 
 
 def kind_note(items, vibe, song, song_length=0.0):

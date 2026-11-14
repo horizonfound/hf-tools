@@ -367,7 +367,8 @@ WORDS = {
     "vibe_rec": "Recommended",
     "vibe_beat_s": "Quick and punchy, a new photo on the beat, with a longer hold where the song hits.",
     "vibe_mixed_b": "A little of everything",
-    "vibe_mixed_s": "Some quick, some long, changing where the music turns over.",
+    # hers since v25 (Nov 13), when every vibe moved onto the song's real hits (timing.py)
+    "vibe_mixed_s": "Some quick, some longer, and every change lands on a beat you can hear in your song.",
     "vibe_calm_b": "Calm",
     "vibe_calm_s": "Longer looks, room to breathe. Best with fewer photos or a longer song.",
     "vibe_build_b": "Build",
