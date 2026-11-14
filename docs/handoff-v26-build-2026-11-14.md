@@ -247,3 +247,57 @@ Two reviewers read stage B. Five should-fix findings and a handful of notes; all
 - `design_js_designs.py`'s `makeDesign` now sends the kind (before, only a carousel ever made a new design from the page).
 - The designer's routes gained `GET /design-queue` (`posting_queue.py` hands it to `design.handle_get`). `/home-data` still has no `queue`.
 - A test that starts a page server for the designer should set `STUDIO_NO_WINDOWS_FOR_TESTS`, as the new one does.
+
+
+## Stage D, built (Nov 14): the report after a backup
+
+Nicole's notes, section 2 (and the intro from section 1). The naming question itself is untouched: it waits on the owners.
+
+**What a photographer sees on the report.**
+- **Why there are several folders,** above the shoots, when the card held more than one shoot and they are filed: her line, "Since these were two days, I put them in two separate folders. You can name them in the boxes below." It is used only when that is what happened (every shoot one day of its own). Any other split (two shoots in one day, three shoots over two days, a shoot across midnight) gets ours, which claims no days: "Since these looked like two different shoots, I put them in two separate folders. You can name them in the boxes below." The count is in words up to twelve.
+- **Each shoot has its own "Open this folder"** under its name box, and what happened is said right under that button ("Opened 2026-06-24 Beach in Finder."). The where-box at the bottom stays.
+- **"Does everything look right? If so, add it to your editing queue."** right above Add to my editing queue. It goes when the shoot is in the queue.
+- **The sneak peeks explained:** "I picked six photos that could be great sneak peeks to send your client. They're marked 'sneak peek' in Lightroom, if you want to do a quick edit on them." then Dustin's "Not feeling them? Just say what you'd rather see." and the two buttons, Pick again and Show me more, as before. The first sentence is bold.
+  - **JPEG shooters (and HEIC, DNG, TIFF, PNG) are never told their picks are marked in Lightroom,** since they are not: "They're the ones shown here. They aren't marked in Lightroom: to mark this kind of photo (a JPEG, for one) I'd have to write inside it, and I never change your photos." Some of each: "Four of them are marked 'sneak peek' in Lightroom... The others are a kind of photo I'd have to write inside to mark, and I never change your photos."
+  - A shoot with three to five picks (an older backup) says its own number and has no buttons, as before.
+- **The next step, once, under the shoots:** "Open your folder to start editing. When your edits are done, come back to your home base and click Make posts from a shoot." A card of only video clips gets only the first sentence. On a shoot's page for several cards it is said once for the whole shoot, not in every card's section.
+- **The old line is gone everywhere:** "Whenever you're finished with your edits, let me know and I'll turn your favorites into a reel." was only ever said in the chat (the end of a backup, and the reel skill when all it had was a backup). Both now say the new next step.
+- **The setup intro** (`parts/first-backup-setup.md`) has a third part, between what was found and the "few quick questions" line: "Here's what's about to happen. I'll copy every photo to your drive and check each one against the card. If the card has more than one shoot on it, each one goes in its own folder, and you can name them on the report afterwards. Then I'll pick a few sneak peeks from each shoot, and you'll get a report that shows all of it."
+- **Video-clip-only shoots keep their own words** ("5 video clips", See all 5 video clips, Open video folder); they also get Open this folder and the look-right line.
+- **The report's lines say "your assistant", never "Claude"** (thirteen lines on the page and three the report's server answers with).
+
+**Our way underneath.**
+- New words live in `first_look.WORDS` (hers) and `first_look.OUR_WORDS` (ours, drafts).
+- **`GET open-shoot?shoot=<id>` on the report's server** (`serve_report.py`): the page sends a shoot's id and nothing else. The folder is the one the backup's records name for that shoot at that moment (so a rename or a settle is followed), and it must be inside the place the backup's photos are in; records changed by hand to point anywhere else open nothing. Another website's ask is refused (403). A folder that is gone gets the Back up a card screen's own line ("I can't find this folder anymore. If you moved or renamed it in Finder, tell your assistant where it went."; File Explorer on a PC). It works inside each card's section of a several-card page (`/card/N/open-shoot`).
+- Whether a pick is "marked in Lightroom" is told from the kind of file (`sneak_peeks.NO_SIDECAR`), so it is right with the drive unplugged too.
+- Two older faults the new test found, fixed: a press on the where-box's button also ran the Rename code and threw an error in the page (nothing was renamed; the handler was bound to every `.go`); and at a narrow phone width (336) the green "safe to format" pill made the report scroll sideways.
+
+**Choices where her notes were silent.**
+1. Her folders line takes the place of the older lede ("Each one is already in its own folder, named by date...") when it shows; one shoot keeps the older lede.
+2. No folders line while shoots are not filed yet, and no Open this folder on a shoot with no folder.
+3. Open this folder sits between the name box and the editing queue line.
+4. "Not feeling them? Just say what you'd rather see." (Dustin, Nov 5) is kept after her sneak peeks line, since the two buttons need a lead-in.
+5. The next step is one box under all the shoots, not a line per shoot.
+6. A press on Open this folder answers under its own button, not in the page's bottom toast.
+7. With six picks of mixed kinds, the count that are marked is said as a word ("Four of them").
+
+**Hers left as it is, and theirs to settle (for the note to Nicole, stage E).**
+1. **"to send your client" is said for every shoot,** also one that is just for them (hers, whole).
+2. **Our line when the split was not days** ("Since these looked like two different shoots...").
+3. **Our JPEG lines** for the sneak peeks, and "{Four} of them are marked...".
+4. **Our come-back line** ("When your edits are done, come back to your home base and click Make posts from a shoot."), and that a card of only video clips is not told to make posts.
+5. **Her line for a moved folder promises something the assistant cannot do** (same as stage B's item 7).
+6. **The setup intro's words** are ours (she asked for the intro, gave no words).
+7. A photo that already had a sidecar of the photographer's own (rated in Lightroom before) is counted as marked by its kind, though the Assistant left that sidecar alone. Rare; not handled.
+
+**Not built, on purpose:** the folder-naming question and its choices (waiting); anything in `night.py` (it prints no closing words; the chat's closing words are in `parts/backup.md`).
+
+**Tests:** `tests/report_v26_check.py` (new): 103 checks with the page in a hidden Chrome and Pillow, 98 on Apple's Python (no Pillow: Show me more on the pretend backup with pictures is skipped), 77 without Chrome. Its pretend backups are made with no add-on, so every part but that one runs on both Pythons. 23 behaviours were each taken out in a scratch copy and the test failed each time. In GitHub's check: without Chrome on Windows, with Chrome on the Mac's page job. Also run after the change, both Pythons: `shoot_report_check.py` (42; needs Pillow), `clips_check.py`, `peek_check.py`, `look_check.py` (75), `skill_text_check.py` (432), `pc_smoke.py` (230 / 183), `home_base_check.py --no-chrome` (128); both tool checks clean.
+
+**Not tried:** Dustin's or Nicole's own hand; the Claude app's pane; a real backup's report; a real Finder window from Open this folder (the tests run with the no-windows switch); Rename followed by Open this folder on a real sorted backup (the route is checked against changed records; the pretend backups cannot be renamed for real); a shoot renamed while its page is open; a PC (first push); a touch screen.
+
+**For later stages.**
+- Stage E: carry the seven items above into the note for Nicole. CLAUDE.md: the Oct 24 "handoff line" is retired; the report has Open this folder per shoot and `GET open-shoot`; the report's lines say "your assistant".
+- Many other pages still say "Tell Claude" (the pickers, the designer, the posting page, the kit, reminders): not this stage's. Their tests hold those words, so changing them means changing both.
+- `first_look.shoots_section(studio, closing=True)` has a new argument; `first_look.closing_html(photos, wrap)` and `first_look.NEXT_CSS` are what the shoot's page uses.
+- The older tests' pretend backups (`tests/fake_night.py`) cannot be renamed for real ("no sorted photos found"); a test that needs a real rename needs `original` records.

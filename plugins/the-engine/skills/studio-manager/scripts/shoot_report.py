@@ -180,11 +180,12 @@ def facts(rec):
             "ok": ok_dest, "problems": problems, "sample": m.get("sample"), "finished": m.get("finished"),
             "seconds": work if work else None, "started": m.get("started"),
             "all_good": not problems and ok_dest == total and (ok_second == total if second else True),
-            "words": clips.words(media - n_clips, n_clips), "name": m.get("session", rec.name)}
+            "words": clips.words(media - n_clips, n_clips), "photos": media - n_clips, "name": m.get("session", rec.name)}
 
 
 def build(data):
     import brand
+    import first_look
     import look
     import report_page as rp
     e = html.escape
@@ -208,7 +209,7 @@ def build(data):
     finished = max((f["finished"] for _, f in rows if f and f["finished"]), default=None)
     both = "both" if n == 2 else f"all {n}"
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(brand.title(shoot))}</title><style>{look.head_css()}{rp.CSS}{CSS}</style></head><body>",
+           f"<title>{e(brand.title(shoot))}</title><style>{look.head_css()}{rp.CSS}{CSS}{first_look.NEXT_CSS}</style></head><body>",
            f"<div class='wrap'><div class='bar'>{rp.home_link()}{brand.bar()}",
            f"<span class='when'>{e(rp.nice_time(finished)) if finished else 'Still running'}</span></div></div>",
            "<section class='wrap hero'>", f"<span class='eyebrow'>Backup report · {e(shoot)} · {n} cards</span>"]
@@ -261,6 +262,10 @@ def build(data):
             out.append(f"<section class='wrap card-block' id='card-{k}'><div class='card-strip'><span class='eyebrow'>Card {k} of {n}</span>"
                        f"<h2>{e(c.get('name') or 'This card')}</h2><span class='pill small wait'>Not found right now</span></div>"
                        "<p class='also'>Its records aren't where they were. Is the drive plugged in?</p></section>")
+    # the next step, once for the whole shoot (each card's own section leaves it out): open the folder and start
+    # editing, and where to come back to when the edits are done (Nicole, Nov 13)
+    if any(f for _, f in rows):
+        out.append(first_look.closing_html(photos=any(f and f.get("photos") for _, f in rows)))
     out.append("<footer class='foot'><div class='wrap'>Your memory cards are exactly as they were.</div>"
                f"<div class='wordmark'>{e(brand.name())}</div></footer>")
     out.append(FRAMES_SCRIPT + rp.REFRESH_SCRIPT + "</body></html>")

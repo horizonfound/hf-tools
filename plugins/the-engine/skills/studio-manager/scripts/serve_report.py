@@ -87,7 +87,7 @@ class Renames:
                     why = last.replace("STOP: ", "")
                     if not why or "/" in why or "\\" in why:   # no file paths on the page (a PC's use backslashes)
                         why = "Something stopped the rename, and nothing was changed."
-                    self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell Claude and it'll sort it out."}
+                    self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell your assistant and it'll sort it out."}
             try:  # the report shows the new name and folder
                 rebuild_report(self.session)
             except Exception as ex:
@@ -225,7 +225,7 @@ class Picks:
                                errors="replace", **quiet())
             with self.lock:
                 self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
-                                        else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell Claude and it'll sort it out."})
+                                        else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell your assistant and it'll sort it out."})
             try:
                 rebuild_report(self.session)
             except Exception as ex:
@@ -386,6 +386,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if parts.path in ("/play", "/open-clips"):
             return self.clips(parts)
+        if parts.path == "/open-shoot":
+            return self.open_shoot(parts)
         if parts.path != "/open":
             return super().do_GET()
         want = parse_qs(parts.query).get("path", [""])[0]
@@ -426,6 +428,52 @@ class Handler(SimpleHTTPRequestHandler):
                 ok, words = True, f"Opened {target.name or str(target)} in {this_computer.FILES_APP}."
             self.last_open[str(target)] = now
         print(f"open asked: {target} -> {'ok' if ok else 'no'}: {words}", flush=True)
+        out = json.dumps({"ok": ok, "words": words}).encode()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(out)
+
+    def open_shoot(self, parts):
+        """GET /open-shoot?shoot=<id>: each shoot's own "Open this folder" on the report (Nicole, Nov 13). The page
+        sends the shoot's id and nothing else; the folder is the one the backup's records name for that shoot today
+        (a rename or a settle is followed), and it must sit inside the place the backup's photos are in. Another
+        website's ask is refused. A folder that is not there gets the line the Back up a card screen says for it."""
+        if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            return self.send_error(HTTPStatus.FORBIDDEN)
+        import first_look
+        sid = parse_qs(parts.query).get("shoot", [""])[0][:40]
+        ok, words = False, first_look.OUR_WORDS["no_shoot"]
+        try:
+            from where import locate
+            root, records = locate(self.studio)
+            shoot = next((s for s in json.loads((records / "shoots.json").read_text(encoding="utf-8"))["shoots"] if s.get("id") == sid), None)
+            folder = (shoot or {}).get("folder")
+            if sid and folder and isinstance(folder, str):
+                root = Path(root)
+                target = root / folder
+                inside = target.resolve() != root.resolve() and target.resolve().is_relative_to(root.resolve())
+                now = time.monotonic()
+                last = self.last_open.get(str(target))
+                if not inside:
+                    pass                                   # not a shoot's own folder: the first answer stands
+                elif not root.is_dir():
+                    words = first_look.WORDS["unplugged"].format(drive=this_computer.drive_words(root) or "another drive")
+                elif not target.is_dir():
+                    words = first_look.WORDS["moved"].format(files_app=this_computer.FILES_APP)
+                elif last is not None and now - last <= 1.0:
+                    ok, words = True, f"Opened {target.name} in {this_computer.FILES_APP}."   # the second half of a double click
+                else:
+                    ok, why = show_in_finder(target)
+                    APP = this_computer.FILES_APP
+                    words = (f"Opened {target.name} in {APP}, behind this window. Click {APP} in {this_computer.APP_BAR} to see it." if why == "behind"
+                             else f"Opened {target.name} in {APP}.") if ok else f"Couldn't open {APP}. ({why})"
+                    self.last_open[str(target)] = now
+        except Exception as e:  # noqa: BLE001  (a click must always get an answer in plain words)
+            ok, words = False, "Something went wrong opening that. Tell your assistant and it'll sort it out."
+            print(f"open-shoot asked: failed: {e.__class__.__name__}: {e}", flush=True)
+        print(f"open asked: /open-shoot {sid!r} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
@@ -478,7 +526,7 @@ class Handler(SimpleHTTPRequestHandler):
                              else f"Opened {name} in {APP}.") if ok else f"Couldn't open {APP}. ({why})"
                 self.last_open[str(target)] = now
         except Exception as e:  # noqa: BLE001  (a click must always get an answer in plain words)
-            ok, words = False, "Something went wrong opening that. Tell Claude and it'll sort it out."
+            ok, words = False, "Something went wrong opening that. Tell your assistant and it'll sort it out."
             print(f"clips asked: {parts.path} failed: {e.__class__.__name__}: {e}", flush=True)
         print(f"open asked: {parts.path} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()

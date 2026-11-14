@@ -77,6 +77,12 @@ name: Check it on a Windows PC
 #                                   the cards of one shoot as one, a sample never safe to format) and Make posts
 #                                   (post kits, Archive and Bring it back) (--no-chrome on Windows; the pages in a
 #                                   hidden Chrome on the Mac's page job)
+#   tests/report_v26_check.py       Nicole's notes of Nov 13 on the report after a backup: why there are several
+#                                   folders (never "days" when it was not days), "Does everything look right?",
+#                                   each shoot's own Open this folder (GET open-shoot on the report's server),
+#                                   the sneak peeks explained (and never "marked in Lightroom" for JPEGs), the next
+#                                   step in place of the old reel line. Its pretend backups need no add-on
+#                                   (--no-chrome on Windows; the page in a hidden Chrome on the Mac's page job)
 #   tests/reminders_check.py        posting-day reminders themselves (reminders.py), against a pretend calendar and
 #                                   never a real one: Nicole's 19 checks, the calendar file a PC gets (its shape,
 #                                   the steady id per post, a cancel), the merge and the races, the command line.
@@ -147,11 +153,11 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
@@ -240,6 +246,9 @@ jobs:
       - name: The home base and its two screens after Nicole's v26 (what Back up a card and Make posts read, the cards of one shoot as one backup, a sample never safe to format, Archive and Bring it back, every refusal, her words; the pages in a browser are checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/home_base_check.py --no-chrome
+      - name: The report after a backup, as Nicole's notes ask (why several folders, Does everything look right, each shoot's own Open this folder and its route, the sneak peeks said truly for RAW and JPEG, the next step; the page in a browser is checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/report_v26_check.py --no-chrome
       - name: Posting-day reminders on the posting page (a pretend calendar only - the background round, a slow or failing calendar, the command line, the PC's calendar files; the page in a browser is checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/posting_reminders_page_check.py --no-chrome
@@ -504,6 +513,9 @@ jobs:
       - name: The home base and its two screens after Nicole's v26 in a hidden Chrome (the four cards and where each goes, Your backups with Show older and the search, 2 cards, Your post kits with Archive and Bring it back, phone width)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_base_check.py
+      - name: The report after a backup in a hidden Chrome (the folders line, Open this folder said under its own button, Add to my editing queue, Pick again, Show me more, a shoot on two cards, phone width)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/report_v26_check.py
       - name: The centered line on the talking reel's preview (a dragged caption, photo or corner picture snaps to the middle and saves exactly 0.5; Option turns it off; no line left behind)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/talking_snap_check.py
