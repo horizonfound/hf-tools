@@ -90,6 +90,18 @@ The page is built so the steps still to come slot in where hers has them: SECTIO
 only the steps that show. The page's script is a small core (CORE_JS: the record, saving, following) with one
 part per step (ORDER_JS is step 2); each later step adds its own part and its own fields to SAVE_FIELDS.
 
+Her v25, sections 4 and 8 (Nov 13; stage I of the v26 build), both on the page only:
+  * Trim a clip: each clip card has Trim, which opens her panel (trim_panel(), written above the scripts; TRIM_JS):
+    the clip on a loop with its sound, a strip of the video's stills about 8 seconds either side, the kept part
+    outlined, a start handle, an end handle, the middle to slide it, arrows of a quarter second, her readout.
+    Done is the card's own change (POST /reel-moment, do: update) with the start AND the end: 1 to 15 seconds,
+    anything else refused whole, never past the video's ends. Cancel, the x, Escape and a click outside save
+    nothing. A PC takes no stills from a video yet, so its timeline has no pictures and one line of ours says so.
+  * Select several photos, like Lightroom (ORDER_JS): click, Shift-click, Cmd- or Ctrl-click, Escape; a drag of
+    any selected photo moves them all (ReelModel.many); two bars, "N selected", with what can be done to all of
+    them. What is selected is the page's own and is never saved; one action on a selection is one save and one
+    step of Undo.
+
 Python 3.9, standard library only. Nothing here is Mac-only: the small copies are arrange.py's (sips on a Mac,
 pictures.py's Pillow on a PC), the lock is this_computer.try_lock, and the page's words name no Mac thing.
 """
@@ -488,6 +500,49 @@ PICK_WORDS = {
 }
 PHOTO_ASK_MAX = 600                                # her box's length, and what her server keeps
 
+# Trim a clip (her v25, section 4: "I can't trim it from a specific end."): each clip card has Trim, which opens a
+# panel with the clip on a loop, a filmstrip, a start handle and an end handle. Hers, word for word
+# (pages/reel-maker.html, handoff v25); tests/reel_trim_select_check.py compares them with her page.
+TRIM_WORDS = {
+    "trim_btn": "✂ Trim",
+    "trim_btn_title": "Trim the start and the end",
+    "trim_title": "Your clip",
+    "trim_close": "Close",
+    "trim_hint": "Drag the left handle to choose where it starts and the right handle to choose where it ends. Drag the middle to slide the whole clip. It plays on a loop as you go.",
+    "trim_novid": "The preview of this video is still being made. You can still trim it with the timeline.",
+    "trim_start_title": "Where it starts",
+    "trim_end_title": "Where it ends",
+    "trim_start": "Start",
+    "trim_end": "End",
+    "trim_earlier": "A quarter second earlier",
+    "trim_later": "A quarter second later",
+    "trim_play": "▶ Play it again",
+    "trim_cancel": "Cancel",
+    "trim_done": "Done",
+    "trim_say_html": "Starts <b>{a}</b> · ends <b>{b}</b> · <b>{len} s</b>",
+    # the line over the clip cards, as her v25 has it (her v19 line had no Trim in it; WORDS keeps that one)
+    "moments_tail": "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it.",
+}
+TRIM_WINDOW = 16.0      # hers: the filmstrip shows about 8 seconds either side of the clip...
+TRIM_SPAN_MIN = 20.0    # ...and never less than 20 seconds of the video (or all of a shorter one)
+TRIM_NUDGE = 0.25       # hers: the arrow buttons move an end a quarter second
+TRIM_GRID = 0.05        # hers: a handle moves in twentieths of a second
+
+# Select several photos, like Lightroom (her v25, section 8): click, Shift-click, Cmd/Ctrl-click, Escape; a drag of
+# any selected photo moves them all; a bar with what can be done to all of them at once. Hers, word for word.
+# (The tag on the photos being dragged, "N photos", is in her style rule: SELECT_CSS.)
+SELECT_WORDS = {
+    "sel_n": "{n} selected.",
+    "sel_reel_say": " Drag any of them and they all move together. ",
+    "sel_longer": "Longer",
+    "sel_quicker": "Quicker",
+    "sel_neither": "Neither",
+    "sel_out": "Take them out",
+    "sel_clear": "Clear",
+    "sel_all_say": " Drag any of them up into your order, or ",
+    "sel_add": "Add them to the end",
+}
+
 # Lines that are ours, not hers, each with why (they go on the "Tell Nicole" list):
 OUR_WORDS = {
     # several reels (v25): hers lets two reels share a name; the chat tells them apart by name, so ours does not.
@@ -529,6 +584,13 @@ OUR_WORDS = {
     # this_computer's NO_LOOK_PC, WATCH_PC_HTML, NOT_LOOKED_PC_HTML and MOMENTS_PC: decision 26, drafts for Nicole)
     # v19 review: a video still being copied into the Footage folder is listed, and waited for, until it is whole
     # (hers read it part way and said it couldn't make a preview)
+    # Trim (v25): her one line under the player is for a preview "still being made"; a video whose preview will never
+    # come (a failed copy, no room, a PC that can't play it) gets ours, so the panel never promises one
+    "trim_stuck": "This video can't be played here. You can still trim it with the timeline.",
+    # a PC takes no stills from a video yet (video.py's named gap), so the timeline in the Trim panel has no pictures
+    "trim_no_stills_pc": "On a PC the timeline has no pictures along it yet. The handles, the arrows and the times work the same.",
+    # the Assistant's own check of a trim (her page can't send one outside 1 to 15 seconds; hers would quietly bend it)
+    "trim_length": "A clip is 1 to 15 seconds long.",
     "coming_small": "still copying in",
     "coming": "{name} is still being copied into your Footage folder. It shows up here when it's done.",
 }
@@ -1767,10 +1829,21 @@ def change_moments(body):
             length = length or float(m["end"])
             start = _num(s_in) if s_in is not None else float(m["start"])
             end = _num(e_in) if e_in is not None else float(m["end"])
-            start = max(0.0, min(start, length - 0.5))
-            if s_in is not None and e_in is None and end - start < MOMENT_MIN:
-                end = start + (float(m["end"]) - float(m["start"]))      # a new start keeps the length it had
-            end = max(start + MOMENT_MIN, min(end, start + MOMENT_MAX, length))
+            if s_in is not None and e_in is not None:
+                # Trim's Done (her v25): where it starts AND where it ends. Her page only ever sends 1 to 15
+                # seconds from 0 on; anything else is refused whole, never bent into shape without a word (ours)
+                if start < 0 or not (MOMENT_MIN - 0.011 <= end - start <= MOMENT_MAX + 0.011):
+                    return _bad(OUR_WORDS["trim_length"])
+                if end > length:                       # the page knows the length to a tenth: slide it back inside
+                    start, end = max(0.0, start - (end - length)), length
+            else:
+                start = max(0.0, min(start, length - 0.5))
+                if s_in is not None and e_in is None and end - start < MOMENT_MIN:
+                    end = start + (float(m["end"]) - float(m["start"]))      # a new start keeps the length it had
+                end = max(start + MOMENT_MIN, min(end, start + MOMENT_MAX, length))
+                if end > length:                       # never past the video's end (hers could leave it half a
+                    end = length                       # second past, when the start sat right at the end)
+                    start = max(0.0, min(start, end - MOMENT_MIN))
             m.update(start=round(start, 2), end=round(end, 2), set=True)
             if m.get("by") == "you":
                 m["label"] = WORDS["your_pick_at"].replace("{t}", mmss(start))
@@ -3166,6 +3239,56 @@ PICK_CSS = r"""
 .photoask .line span{overflow-wrap:anywhere;min-width:0}
 """
 
+# Her v25 style rules for selecting several photos, each as she wrote it (the tag on the photos being dragged gets
+# its words, " photos", from her rule; ours sits on the lifted copy our own drag draws, by the same rule).
+SELECT_CSS = r"""
+.tile.picked .ph{outline:3px solid var(--coral-2);outline-offset:2px;border-radius:12px}
+.tile.picked .ph::after,.pick.picked::after{content:'\2713';position:absolute;bottom:6px;left:6px;width:20px;height:20px;border-radius:50%;background:var(--coral-2);color:#fff;display:grid;place-items:center;font:700 11px/1 var(--sans);z-index:2}
+.pick.picked{outline:3px solid var(--coral-2);outline-offset:1px}
+.tile.riding{opacity:.3}
+[data-count]::before{content:attr(data-count) ' photos';position:absolute;z-index:5;top:-10px;right:-10px;background:var(--ink);color:#fff;font:600 11px/1 var(--sans);padding:5px 8px;border-radius:999px;white-space:nowrap}
+.tile[data-count],.pick[data-count]{position:relative}
+.selbar{margin:.2rem 0 .7rem;font-size:13.5px;color:var(--ink-2);display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+.selbar b{color:var(--ink)}
+.selbar button{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:.35rem .7rem;font:600 12.5px/1 var(--sans);cursor:pointer;color:var(--ink)}
+.selbar button:hover{border-color:var(--coral)}
+"""
+
+# Her v25 style rules for the Trim button on a clip card and for the trim panel, each as she wrote it. Ours, after
+# them: the line a PC shows under the timeline.
+TRIM_CSS = r"""
+.mom .len button.tr{width:auto;padding:0 .55rem;font:600 12.5px/1 var(--sans);margin-left:.15rem}
+.trim{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(31,36,48,.45)}
+.trim[hidden]{display:none}
+.trim .box{background:var(--paper);border-radius:20px;width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:1.2rem 1.2rem 1rem;box-shadow:0 20px 60px rgba(31,36,48,.3)}
+.trim h3{margin:0 0 .2rem;font:600 18px/1.25 var(--sans)}
+.trim .hint{margin:0 0 .8rem;color:var(--ink-2);font-size:13.5px}
+.trim .x{float:right;border:0;background:none;font-size:22px;line-height:1;color:var(--ink-2);cursor:pointer}
+.trim .vwrap{display:flex;justify-content:center;background:#111;border-radius:12px;overflow:hidden}
+.trim video{max-height:min(42vh,380px);max-width:100%;display:block}
+.trim .novid{color:#ddd;font-size:13px;padding:2rem 1rem}
+.trim .bar{position:relative;height:74px;margin:1.1rem 0 0;border-radius:10px;background:var(--sand-l);overflow:visible;touch-action:none;cursor:pointer;user-select:none}
+.trim .film{position:absolute;inset:0;border-radius:10px;overflow:hidden}
+.trim .film img{position:absolute;top:0;height:100%;object-fit:cover}
+.trim .dim{position:absolute;top:0;bottom:0;background:rgba(31,36,48,.55);pointer-events:none}
+.trim .dim.l{left:0;border-radius:10px 0 0 10px}.trim .dim.r{right:0;border-radius:0 10px 10px 0}
+.trim .sel{position:absolute;top:-3px;bottom:-3px;border:3px solid var(--coral);border-radius:8px;box-sizing:border-box;cursor:grab}
+.trim .h{position:absolute;top:-3px;bottom:-3px;width:18px;background:var(--coral);cursor:ew-resize;display:flex;align-items:center;justify-content:center}
+.trim .h::after{content:'';width:3px;height:22px;border-radius:2px;background:#fff}
+.trim .h.a{left:-12px;border-radius:8px 0 0 8px}.trim .h.b{right:-12px;border-radius:0 8px 8px 0}
+.trim .head{position:absolute;top:-6px;bottom:-6px;width:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);pointer-events:none}
+.trim .ticks{position:relative;height:18px;margin-top:.35rem;font-size:11px;color:var(--ink-2)}
+.trim .ticks span{position:absolute;transform:translateX(-50%)}.trim .ticks span:first-child{transform:none}.trim .ticks span:last-child{transform:translateX(-100%)}
+.trim .say{margin:.5rem 0 .2rem;font-size:14.5px;text-align:center}
+.trim .nudges{display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;margin:.5rem 0 .2rem;font-size:13px;color:var(--ink-2)}
+.trim .nudges > span{display:flex;align-items:center;gap:.3rem}
+.trim .nudges button,.trim .acts button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:.45rem .75rem;font:600 13px/1 var(--sans);cursor:pointer}
+.trim .acts{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.9rem}
+.trim .acts .main{background:var(--ink);color:#fff;border-color:var(--ink)}
+.trim .acts .main:hover{background:var(--coral-2);border-color:var(--coral-2)}
+.trim .pcnote{margin:.5rem 0 0;font-size:13px;color:var(--ink-2);text-align:center}
+"""
+
 OUR_CSS = r"""
 [hidden]{display:none!important}
 .reelwrap{position:relative}
@@ -3282,10 +3405,12 @@ def _order_section(w, num):
         "<span><i style='background:var(--quick)'></i>" + e(w["legend_quick"]) + "</span></div></div></div>"
         "<div class='tools'><button class='btn small' id='undoBtn' type='button' disabled>" + e(w["undo"]) + "</button>"
         "<span class='tools-say' id='undoSay'></span><span class='notice' id='notice'></span></div>"
+        "<p class='selbar' id='reelSel' hidden></p>"
         "<div class='reelwrap' id='reelwrap'><div id='reel'></div></div>"
         "<div class='count' id='count'></div>"
         "<div class='count warn limit' id='limit'>" + e(OUR_WORDS["too_many"]) + "</div>"
-        "<details class='all' id='allBox'><summary>" + e(w["all_summary"]) + "</summary><div id='all'></div></details>"
+        "<details class='all' id='allBox'><summary>" + e(w["all_summary"]) + "</summary>"
+        "<p class='selbar' id='allSel' hidden></p><div id='all'></div></details>"
         "</section>")
 
 
@@ -3316,6 +3441,38 @@ def _vibe_section(w, num):
         "<p class='say'>" + e(w["vibe_say"]) + "</p>"
         "<div class='vibes' id='vibes'>" + cards + "</div>"
         "</section>")
+
+
+def trim_panel(w):
+    """Her trim panel (reel-maker.html #trim, handoff v25), written above the page's scripts, which wire it up on
+    load. Hidden until Trim is pressed on a clip card. On a PC, where no stills are taken from a video yet, one
+    line of ours under the timeline says why it has no pictures."""
+    e = html.escape
+
+    def nudge(which, word):
+        return ("<span>" + e(word) + " <button type='button' data-n='" + which + ":-" + str(TRIM_NUDGE) + "' title='" + e(w["trim_earlier"], quote=True)
+                + "' aria-label='" + e(word + ": " + w["trim_earlier"], quote=True) + "'>&#9664;</button>"
+                "<button type='button' data-n='" + which + ":" + str(TRIM_NUDGE) + "' title='" + e(w["trim_later"], quote=True)
+                + "' aria-label='" + e(word + ": " + w["trim_later"], quote=True) + "'>&#9654;</button></span>")
+    return (
+        "<div class='trim' id='trim' hidden role='dialog' aria-modal='true' aria-labelledby='trimName'><div class='box'>"
+        "<button class='x' id='trimX' type='button' aria-label='" + e(w["trim_close"], quote=True) + "'>&times;</button>"
+        "<h3 id='trimName'>" + e(w["trim_title"]) + "</h3>"
+        "<p class='hint'>" + e(w["trim_hint"]) + "</p>"
+        "<div class='vwrap'><video id='trimVid' playsinline></video><p class='novid' id='trimNoVid' hidden>" + e(w["trim_novid"]) + "</p></div>"
+        "<div class='bar' id='trimBar'><div class='film' id='trimFilm'></div>"
+        "<div class='dim l' id='trimDimL'></div><div class='dim r' id='trimDimR'></div>"
+        "<div class='sel' id='trimSel'><span class='h a' data-h='a' title='" + e(w["trim_start_title"], quote=True) + "'></span>"
+        "<span class='h b' data-h='b' title='" + e(w["trim_end_title"], quote=True) + "'></span></div>"
+        "<div class='head' id='trimHead'></div></div>"
+        "<div class='ticks' id='trimTicks'></div>"
+        + ("<p class='pcnote' id='trimPcNote'>" + e(OUR_WORDS["trim_no_stills_pc"]) + "</p>" if pc_footage() else "") +
+        "<p class='say' id='trimSay'></p>"
+        "<div class='nudges'>" + nudge("a", w["trim_start"])
+        + "<button type='button' id='trimPlay'>" + e(w["trim_play"]) + "</button>" + nudge("b", w["trim_end"]) + "</div>"
+        "<div class='acts'><button type='button' id='trimCancel'>" + e(w["trim_cancel"]) + "</button>"
+        "<button type='button' class='main' id='trimDone'>" + e(w["trim_done"]) + "</button></div>"
+        "</div></div>")
 
 
 TALK_SPOT = "<!--talk-->"   # where step 1's third card goes; page_html writes it, since it alone knows the shoot
@@ -3359,11 +3516,15 @@ def page_html(kit_name, short, kit_page=False):
     title = w["reel_of"].replace("{short}", short)
     w.update(REELS_WORDS)
     w.update(PICK_WORDS)
+    w.update(TRIM_WORDS)
+    w.update(SELECT_WORDS)
     data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
             "styles": list(STYLES), "styleMax": STYLE_MAX, "useSeconds": USE_SECONDS, "step": MOMENT_STEP,
-            "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY}
+            "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY,
+            "trimMin": MOMENT_MIN, "trimMax": MOMENT_MAX, "trimWindow": TRIM_WINDOW, "trimSpanMin": TRIM_SPAN_MIN,
+            "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID}
     # her numbers as written (step 1 to 5, step 4 hidden until footage is chosen); the page renumbers them (hers)
     steps = "".join(fn(w, i) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
     steps = steps.replace(TALK_SPOT, talk_card(w, kit_name))
@@ -3372,8 +3533,9 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + PICK_CSS + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + TRIM_CSS + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
+        + trim_panel(w) +
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
         "<span id='backWords'>" + e(back_words) + "</span></a>" + brand.bar() + "</div>"
@@ -3389,7 +3551,7 @@ def page_html(kit_name, short, kit_page=False):
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
         "<script>" + ORDER_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
-        "<script>" + FOOTAGE_JS + "</script><script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
+        "<script>" + FOOTAGE_JS + "</script><script>" + TRIM_JS + "</script><script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
 
@@ -3434,7 +3596,22 @@ MODEL_JS = r"""
     }
     return rects.length;
   }
-  root.ReelModel = {at: at, copy: copy, insertAt: insertAt, takeOut: takeOut, sameNums: sameNums, landing: landing};
+  // Several photos to one place (her v25: select several, like Lightroom). ns: their numbers, in the order they
+  // are to sit. They land together in the gap before the photo now at pos; one already in the list moves there
+  // and keeps its mark, one that is not comes in with the mark they last gave it (marks), or none. Everything
+  // else keeps its order. The same order as before: the list itself.
+  function many(list, ns, pos, marks){
+    var set = {}, by = {}, i;
+    ns.forEach(function(n){ set[n] = true; });
+    list.forEach(function(r){ by[r.n] = r; });
+    pos = clampPos(pos, list.length);
+    var keep = function(r){ return !set[r.n]; };
+    var out = list.slice(0, pos).filter(keep).concat(
+      ns.map(function(n){ return by[n] || {n: n, h: (marks && marks[n]) || ''}; }), list.slice(pos).filter(keep));
+    if (out.length === list.length) { for (i = 0; i < out.length; i++) { if (out[i] !== list[i]) return out; } return list; }
+    return out;
+  }
+  root.ReelModel = {at: at, copy: copy, insertAt: insertAt, takeOut: takeOut, sameNums: sameNums, landing: landing, many: many};
 })(typeof window !== 'undefined' ? window : this);
 """
 
@@ -3626,6 +3803,89 @@ ORDER_JS = r"""
   }
   function limit(on){ $('limit').classList.toggle('on', !!on); }
 
+  // ---- select several photos and move them together, like Lightroom (her v25): click one, Shift-click another
+  // for everything between, Cmd- or Ctrl-click to add or drop one, Escape to let go. Drag any selected photo and
+  // they all go. SEL: the photos selected in the order; ALLSEL: in All your photos. Never saved: it is the
+  // page's own, and one action on a selection is one save and one step of Undo. ----
+  var SEL = {}, ANCHOR = null, ALLSEL = {}, ALLANCHOR = null;
+  var press = {shift: false, add: false, on: null};      // the keys held at the last press, and what it was on
+  function size(set){ return Object.keys(set).length; }
+  function setOf(list){ var o = {}; list.forEach(function(n){ o[n] = true; }); return o; }
+  function selNums(){ return reel.map(function(r){ return r.n; }).filter(function(n){ return SEL[n]; }); }        // as they play
+  function allBatch(){ return photos.map(function(p){ return p.n; }).filter(function(n){ return ALLSEL[n]; }); }  // as the shoot has them
+  function selectTile(n, m){
+    var order = reel.map(function(r){ return r.n; });
+    if (m.shift && ANCHOR !== null && order.indexOf(ANCHOR) >= 0) {
+      var a = order.indexOf(ANCHOR), b = order.indexOf(n);
+      var range = order.slice(Math.min(a, b), Math.max(a, b) + 1);
+      SEL = setOf(m.add ? Object.keys(SEL).map(Number).concat(range) : range);
+    } else if (m.add) {
+      if (SEL[n]) delete SEL[n]; else SEL[n] = true;
+      ANCHOR = n;
+    } else {
+      SEL = (size(SEL) === 1 && SEL[n]) ? {} : setOf([n]);
+      ANCHOR = n;
+    }
+    paintSel();
+  }
+  // a press on a photo in All your photos: true when it selected (Shift or Cmd/Ctrl), false for a plain click,
+  // which adds the photo or takes it out as it always did
+  function selectPick(n, m){
+    var order = photos.map(function(p){ return p.n; });
+    if (m.shift && ALLANCHOR !== null && order.indexOf(ALLANCHOR) >= 0) {
+      var a = order.indexOf(ALLANCHOR), z = order.indexOf(n);
+      ALLSEL = setOf(order.slice(Math.min(a, z), Math.max(a, z) + 1)); paintSel(); return true;
+    }
+    if (m.add) { if (ALLSEL[n]) delete ALLSEL[n]; else ALLSEL[n] = true; ALLANCHOR = n; paintSel(); return true; }
+    ALLANCHOR = n;
+    if (size(ALLSEL)) { ALLSEL = {}; paintSel(); }
+    return false;
+  }
+  function selBar(el, n, say, buttons, attr){
+    el.innerHTML = '';
+    if (n < 2) { el.hidden = true; return; }
+    el.hidden = false;
+    var b = document.createElement('b'); b.textContent = R.fill(W.sel_n, {n: n});
+    el.appendChild(b); el.appendChild(document.createTextNode(say));
+    buttons.forEach(function(x){
+      var k = document.createElement('button'); k.type = 'button'; k.setAttribute(attr, x[0]); k.textContent = x[1];
+      k.onclick = function(e){ e.preventDefault(); x[2](); };
+      el.appendChild(k);
+    });
+  }
+  function markAll(h){
+    reel = reel.map(function(r){ if (!SEL[r.n]) return r; marks[r.n] = h; return {n: r.n, h: h}; });
+    refresh();
+  }
+  function paintSel(){
+    var inReel = setOf(reel.map(function(r){ return r.n; }));
+    Object.keys(SEL).forEach(function(n){ if (!inReel[n]) delete SEL[n]; });        // a photo taken out is let go
+    reelEl.querySelectorAll('.tile').forEach(function(t){ t.classList.toggle('picked', !!SEL[+t.dataset.n]); });
+    allEl.querySelectorAll('.pick').forEach(function(t){ t.classList.toggle('picked', !!ALLSEL[+t.dataset.n]); });
+    selBar($('reelSel'), size(SEL), W.sel_reel_say, [
+      ['long', W.sel_longer, function(){ markAll('+'); }], ['quick', W.sel_quicker, function(){ markAll('-'); }],
+      ['plain', W.sel_neither, function(){ markAll(''); }],
+      ['out', W.sel_out, function(){ reel = reel.filter(function(r){ return !SEL[r.n]; }); SEL = {}; setMode(true); refresh(); }],
+      ['clear', W.sel_clear, function(){ SEL = {}; paintSel(); }]], 'data-s');
+    selBar($('allSel'), size(ALLSEL), W.sel_all_say, [
+      ['add', W.sel_add, function(){ if (addBatch(allBatch(), reel.length)) { ALLSEL = {}; paintSel(); } }],
+      ['clear', W.sel_clear, function(){ ALLSEL = {}; paintSel(); }]], 'data-a');
+  }
+  // photos from All your photos, in the shoot's order, to a place in the reel (hers). More than a reel holds:
+  // nothing is added and the line under the reel says so (ours, as for one photo).
+  function addBatch(ns, at){
+    var next = M.many(reel, ns, at, marks);
+    if (next.length > MAX) { limit(true); return false; }
+    reel = next; setMode(true); refresh();
+    return true;
+  }
+  document.addEventListener('pointerdown', function(e){ press.on = e.target; }, true);
+  document.addEventListener('pointerup', function(e){ press.shift = !!e.shiftKey; press.add = !!(e.metaKey || e.ctrlKey); }, true);
+  document.addEventListener('keydown', function(e){
+    if (e.target && e.target.closest && e.target.closest('input,textarea')) return;
+    if (e.key === 'Escape' && (size(SEL) || size(ALLSEL))) { SEL = {}; ALLSEL = {}; paintSel(); }
+  });
+
   // ---- drawing ----
   function picture(holder, p, size){
     var wait = holder.querySelector('.wait');
@@ -3665,6 +3925,7 @@ ORDER_JS = r"""
       (quicks ? R.fill(W.n_quicker, {k: quicks}) : '') + (n && n < 6 ? W.few : n > 20 ? W.lots : '');
     c.className = 'count' + ((n && n < 6) || n > 20 ? ' warn' : '');
     $('step1').classList.toggle('done', n >= 1);
+    paintSel();
     if (R.changed) R.changed();                 // the bar at the bottom (hers: summary())
   }
   function buildAll(){
@@ -3677,7 +3938,10 @@ ORDER_JS = r"""
       b.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(p.n); } };
       // a click that came with no press of a pointer before it (detail 0: VoiceOver's VO-Space, Switch Control, a
       // script) adds or takes out the photo as hers does; a real press is the drag code's (its click callback)
-      b.onclick = function(e){ if (e.detail === 0 && !(e.target.closest && e.target.closest('.zoom'))) toggle(p.n); };
+      b.onclick = function(e){
+        if (e.detail !== 0 || (e.target.closest && e.target.closest('.zoom'))) return;
+        if (!selectPick(p.n, {shift: !!e.shiftKey, add: !!(e.metaKey || e.ctrlKey)})) toggle(p.n);
+      };
       b.querySelector('.zoom').onclick = function(e){ e.stopPropagation(); openBig(p.n); };
       allEl.appendChild(b);
     });
@@ -3688,6 +3952,7 @@ ORDER_JS = r"""
       var p = pos[+el.dataset.n];
       el.classList.toggle('in', !!p);
       el.querySelector('.badge').textContent = p || '';
+      el.classList.toggle('picked', !!ALLSEL[+el.dataset.n]);
     });
   }
   function refreshPictures(){
@@ -3778,7 +4043,22 @@ ORDER_JS = r"""
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && lb.classList.contains('on')) lb.classList.remove('on'); });
 
   // ---- dragging (ours: a photo is lifted and a bar shows where it will land) ----
-  var target = null;
+  var target = null, riding = null;      // riding: the selection being dragged, {from: 'row' | 'all', ns}, or false
+  function ride(t){                      // once a drag: is this photo one of several selected? Then they all go
+    var n = +t.dataset.n, row = t.classList.contains('tile');
+    riding = false;
+    if (row && SEL[n] && size(SEL) > 1) riding = {from: 'row', ns: selNums()};
+    else if (!row && ALLSEL[n] && size(ALLSEL) > 1) riding = {from: 'all', ns: allBatch()};
+    if (!riding) return;
+    if (row) reelEl.querySelectorAll('.tile.picked').forEach(function(k){ if (k !== t) k.classList.add('riding'); });
+    var lift = document.querySelector('.arr-lift');
+    if (lift) lift.dataset.count = riding.ns.length;          // her tag: "3 photos"
+  }
+  function rideOver(){
+    reelEl.querySelectorAll('.riding').forEach(function(k){ k.classList.remove('riding'); });
+    var r = riding; riding = null;
+    return r;
+  }
   function inside(r, x, y){ return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
   function clearIns(){ insEl.classList.remove('on'); }
   function showIns(pos, tiles, y){
@@ -3796,10 +4076,19 @@ ORDER_JS = r"""
   }
   function over(x, y, t){
     clearIns(); target = null;
+    if (riding === null) ride(t);
     var n = +t.dataset.n, at = M.at(reel, n), fromRow = t.classList.contains('tile');
     if (inside(wrapEl.getBoundingClientRect(), x, y)) {
       var tiles = Array.prototype.slice.call(reelEl.querySelectorAll('.tile'));
       var pos = M.landing(tiles.map(function(k){ return k.getBoundingClientRect(); }), x, y);
+      if (riding) {                                           // the whole selection lands here, in its order
+        var next = M.many(reel, riding.ns, pos, marks);
+        if (next === reel) return;                            // where they already are
+        if (next.length > MAX) { target = {kind: 'full'}; return; }
+        target = {kind: 'many', pos: pos};
+        showIns(pos, tiles, y);
+        return;
+      }
       if (at >= 0 && (pos === at || pos === at + 1)) return;          // where it already is
       if (at < 0 && reel.length >= MAX) { target = {kind: 'full'}; return; }
       target = {kind: 'in', pos: pos};
@@ -3809,10 +4098,18 @@ ORDER_JS = r"""
     if (R.data.dragOut && fromRow && inside(allEl.getBoundingClientRect(), x, y)) target = {kind: 'out'};
   }
   function drop(t){
-    var n = +t.dataset.n, tg = target;
+    var n = +t.dataset.n, tg = target, went = rideOver();
     target = null; clearIns();
     if (!tg) return;
     if (tg.kind === 'full') { limit(true); return; }
+    if (tg.kind === 'many') {
+      if (!went) return;
+      if (went.from === 'all') { if (addBatch(went.ns, tg.pos)) { ALLSEL = {}; paintSel(); } return; }
+      var moved = M.many(reel, went.ns, tg.pos, marks);
+      if (moved === reel) return;
+      reel = moved; setMode(true); refresh();
+      return;
+    }
     if (tg.kind === 'out') { reel = M.takeOut(reel, n); setMode(true); refresh(); return; }
     var next = M.insertAt(reel, n, tg.pos, MAX);
     if (next == null) { limit(true); return; }
@@ -3827,8 +4124,14 @@ ORDER_JS = r"""
     canDrag: function(t, e){ return !!R.state() && !(e.pointerType === 'touch' && t.classList.contains('pick')); },
     picture: function(t){ return t.classList.contains('tile') ? t.querySelector('.ph') : t; },
     over: over, drop: drop,
-    cancel: function(){ target = null; clearIns(); },
-    click: function(t){ if (t.classList.contains('pick')) toggle(+t.dataset.n); },
+    cancel: function(){ target = null; clearIns(); rideOver(); },
+    // a press with no drag. Below: a plain click adds the photo or takes it out, as before; with Shift or
+    // Cmd/Ctrl it selects. In the order: a click on the photo itself selects it (hers).
+    click: function(t){
+      var n = +t.dataset.n;
+      if (t.classList.contains('pick')) { if (!selectPick(n, press)) toggle(n); return; }
+      if (press.on && press.on.closest && press.on.closest('.ph')) selectTile(n, press);
+    },
     scrollBox: null
   });
   R.busy = function(){ return drag.busy(); };
@@ -4138,7 +4441,7 @@ FOOTAGE_JS = r"""
   }
 
   // ---- a moment's clip plays right on its card, from its start to its end (hers) ----
-  var cardPlaying = null;
+  var cardPlaying = null, waiting = [];
   function stopCard(){
     if (!cardPlaying) return;
     var v = cardPlaying.v, card = cardPlaying.card; cardPlaying = null;
@@ -4161,6 +4464,13 @@ FOOTAGE_JS = r"""
     v.addEventListener('ended', stopCard);
   }
   R.cardPlaying = function(){ return cardPlaying ? cardPlaying.id : null; };
+  // what the Trim panel needs from here: a clip's video as the page knows it, the addresses, and the one way a
+  // clip is changed
+  R.clips = {video: function(key){ return vids.filter(function(x){ return x.key === key; })[0] || null; },
+    videoUrl: videoUrl, stripUrl: stripUrl, mmss: mmss, stop: stopCard,
+    change: function(m, change){ changeMoment(m, change); },
+    // the list of videos, asked for now: then(fn) runs once it is here (a press on Trim before the first list arrived)
+    fresh: function(fn){ waiting.push(fn); loadFootage(); }};
   var lenT = null;
   function changeMoment(m, change){
     var body = {kit: R.kit, do: 'update', id: m.id};
@@ -4242,7 +4552,8 @@ FOOTAGE_JS = r"""
         '<span class="tx">' + (m.by === 'you' ? '<span class="yours">' + esc(W.your_pick) + '</span>' : '') + '<b>' + esc(m.label || W.a_moment) + '</b>' +
         '<small>' + esc(m.name) + ' · ' + esc(fill(W.span, {a: mmss(m.start), b: mmss(m.end)})) + '</small>' +
         '<span class="len"><span><button class="ls" type="button" title="' + esc(W.shorter) + '" aria-label="' + esc(W.shorter_label) + '">&minus;</button><b>' + (m.end - m.start).toFixed(1) + ' s</b>' +
-        '<button class="lg" type="button" title="' + esc(W.longer) + '" aria-label="' + esc(W.longer_label) + '">+</button></span><button class="rm" type="button">' + esc(W.remove) + '</button></span>' +
+        '<button class="lg" type="button" title="' + esc(W.longer) + '" aria-label="' + esc(W.longer_label) + '">+</button>' +
+        '<button class="tr" type="button" title="' + esc(W.trim_btn_title) + '">' + esc(W.trim_btn) + '</button></span><button class="rm" type="button">' + esc(W.remove) + '</button></span>' +
         '<button class="usebtn" type="button"' + (off ? ' disabled' : '') + '>' + esc(pickW) + '</button></span></div>';
     }).join('');
     box.querySelectorAll('.mom').forEach(function(b){
@@ -4253,6 +4564,7 @@ FOOTAGE_JS = r"""
       b.querySelector('.ls').onclick = function(){ changeMoment(m, {end: Math.round((m.end - D.step) * 100) / 100}); };
       b.querySelector('.lg').onclick = function(){ changeMoment(m, {end: Math.round((m.end + D.step) * 100) / 100}); };
       b.querySelector('.rm').onclick = function(){ removeMoment(m); };
+      b.querySelector('.tr').onclick = function(){ if (R.openTrim) R.openTrim(m); };
       b.querySelector('.usebtn').onclick = function(){ toggleClip(m); };
     });
   }
@@ -4261,13 +4573,14 @@ FOOTAGE_JS = r"""
   function loadFootage(){
     if (footage !== true) return;
     fetch('/reel-footage?' + R.q, {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(f){
-      if (!f || !f.ok) return;
+      if (!f || !f.ok) { waiting = []; return; }
       vids = f.videos || [];
       var s = JSON.stringify(vids.map(function(v){ return [v.key, v.name, v.preview, (v.strip || []).length, v.words]; }));
       if (s !== vsig) { vsig = s; renderVideos(); }
       R.setClaudeBts(f.claude_bts || []);
       fromServer(f.moments);
-    }).catch(function(){});
+      var w = waiting; waiting = []; w.forEach(function(fn){ fn(); });
+    }).catch(function(){ waiting = []; });
   }
   setInterval(function(){ if (!document.hidden && R.state()) loadFootage(); }, D.footEvery);
 
@@ -4310,6 +4623,117 @@ FOOTAGE_JS = r"""
     },
     follow: function(st){ fromServer(st.moments); }
   });
+})();
+"""
+
+
+# Trim (her v25, section 4): where a clip starts and where it ends. Her panel and what it does, wired on load to
+# the markup trim_panel() wrote above the scripts. Nothing is saved until Done; Cancel, the x, a click outside
+# and Escape close it and change nothing. Done is the card's own change (POST /reel-moment, do: update, with
+# the start and the end), so the Assistant checks it like any other.
+TRIM_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, fill = R.fill, D = R.data, C = R.clips;
+  var MIN = D.trimMin, MAX = D.trimMax, GRID = 1 / D.trimGrid;
+  var TR = {m: null, v: null, a: 0, b: 0, w0: 0, w1: 0, len: 0, drag: null, grab: 0};
+  // hers: 0:31.6, always with the tenth
+  function fmt2(t){ t = Math.max(0, t); var m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+  function cents(t){ return Math.round(t * 100) / 100; }
+  function open(m, again){
+    C.stop(); document.querySelectorAll('.viewer video').forEach(function(v){ v.pause(); });
+    var src = C.video(m.key);
+    // pressed before the page had its list of videos: get the list, then open (hers does nothing here)
+    if (!src) { if (again !== true) C.fresh(function(){ open(m, true); }); return; }
+    var len = src.length || m.end + 10;
+    TR.m = m; TR.a = m.start; TR.b = m.end; TR.len = len; TR.drag = null;
+    var span = Math.max(D.trimSpanMin, (m.end - m.start) + D.trimWindow);          // about 8 seconds either side of the clip
+    TR.w0 = Math.max(0, (m.start + m.end) / 2 - span / 2); TR.w1 = Math.min(len, TR.w0 + span); TR.w0 = Math.max(0, TR.w1 - span);
+    $('trimName').textContent = m.label || W.trim_title;
+    var film = $('trimFilm'), wide = TR.w1 - TR.w0;
+    film.innerHTML = '';
+    (src.strip || []).filter(function(x){ return x.t >= TR.w0 - D.stripEvery && x.t <= TR.w1; }).forEach(function(x){
+      var img = document.createElement('img'); img.alt = '';
+      img.src = C.stripUrl(src.key, x.n);
+      img.style.left = ((x.t - TR.w0) / wide * 100) + '%'; img.style.width = (D.stripEvery / wide * 100) + '%';
+      film.appendChild(img);
+    });
+    var v = $('trimVid'), no = $('trimNoVid');
+    if (src.preview === 'ready') { v.src = C.videoUrl(src.key); v.hidden = false; no.hidden = true; }
+    else {
+      v.removeAttribute('src'); v.hidden = true; no.hidden = false;
+      no.textContent = (src.preview === 'failed' || src.preview === 'lowspace' || src.preview === 'pc' || src.preview === 'hevc_pc') ? W.trim_stuck : W.trim_novid;
+    }
+    TR.v = v;
+    v.onloadedmetadata = function(){ v.currentTime = TR.a; v.play().catch(function(){}); };
+    v.ontimeupdate = function(){ if (!TR.drag && (v.currentTime >= TR.b || v.currentTime < TR.a - 0.3)) v.currentTime = TR.a; head(); };
+    $('trim').hidden = false; draw();
+  }
+  function close(){
+    $('trim').hidden = true;
+    if (TR.v) { TR.v.pause(); TR.v.onloadedmetadata = TR.v.ontimeupdate = null; }
+    TR.m = null; TR.drag = null;
+  }
+  function draw(){
+    var wide = TR.w1 - TR.w0, L = (TR.a - TR.w0) / wide * 100, Rt = (TR.b - TR.w0) / wide * 100;
+    $('trimSel').style.left = L + '%'; $('trimSel').style.width = (Rt - L) + '%';
+    $('trimDimL').style.width = L + '%'; $('trimDimR').style.left = Rt + '%';
+    $('trimSay').innerHTML = fill(W.trim_say_html, {a: fmt2(TR.a), b: fmt2(TR.b), len: (TR.b - TR.a).toFixed(1)});     // numbers only
+    var ticks = $('trimTicks'); ticks.innerHTML = '';
+    [0, 0.25, 0.5, 0.75, 1].forEach(function(f){
+      var sp = document.createElement('span'); sp.style.left = (f * 100) + '%';
+      sp.textContent = C.mmss(Math.round((TR.w0 + f * wide) * 2) / 2); ticks.appendChild(sp);
+    });
+  }
+  function head(){ if (!TR.v || !TR.m) return; $('trimHead').style.left = ((TR.v.currentTime - TR.w0) / (TR.w1 - TR.w0) * 100) + '%'; }
+  // hers: an end moves in twentieths of a second, the clip stays 1 to 15 seconds and inside the video; the middle
+  // slides the whole clip and keeps its length
+  function set(a, b, which){
+    a = Math.round(a * GRID) / GRID; b = Math.round(b * GRID) / GRID;
+    if (which === 'a') { a = Math.max(0, Math.min(a, b - MIN, TR.len - MIN)); a = Math.max(a, b - MAX); }
+    else if (which === 'b') { b = Math.min(TR.len, Math.max(b, a + MIN)); b = Math.min(b, a + MAX); }
+    else { var d = b - a; a = Math.max(0, Math.min(a, TR.len - d)); b = a + d; }
+    TR.a = a; TR.b = b; draw();
+    if (TR.v && TR.v.readyState) TR.v.currentTime = which === 'b' ? Math.max(a, b - 0.05) : a;
+  }
+  function at(ev){ var r = $('trimBar').getBoundingClientRect(); return TR.w0 + Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * (TR.w1 - TR.w0); }
+  var bar = $('trimBar');
+  bar.addEventListener('pointerdown', function(ev){
+    if (!TR.m) return;
+    var t = at(ev), h = ev.target.closest ? ev.target.closest('[data-h]') : null;
+    TR.drag = h ? h.dataset.h : (t > TR.a && t < TR.b ? 'move' : (Math.abs(t - TR.a) < Math.abs(t - TR.b) ? 'a' : 'b'));
+    TR.grab = t - TR.a;
+    if (!h && TR.drag !== 'move') set(TR.drag === 'a' ? t : TR.a, TR.drag === 'b' ? t : TR.b, TR.drag);
+    if (TR.v) TR.v.pause();
+    try { bar.setPointerCapture(ev.pointerId); } catch (e) {}
+    ev.preventDefault();
+  });
+  bar.addEventListener('pointermove', function(ev){
+    if (!TR.drag) return;
+    var t = at(ev);
+    if (TR.drag === 'a') set(t, TR.b, 'a');
+    else if (TR.drag === 'b') set(TR.a, t, 'b');
+    else set(t - TR.grab, t - TR.grab + (TR.b - TR.a), 'move');
+  });
+  function up(){ if (!TR.drag) return; TR.drag = null; if (TR.v && TR.v.readyState) { TR.v.currentTime = TR.a; TR.v.play().catch(function(){}); } }
+  bar.addEventListener('pointerup', up); bar.addEventListener('pointercancel', up);
+  document.querySelectorAll('#trim [data-n]').forEach(function(b){ b.onclick = function(){
+    if (!TR.m) return;
+    var p = b.dataset.n.split(':'), d = +p[1];
+    if (p[0] === 'a') set(TR.a + d, TR.b, 'a'); else set(TR.a, TR.b + d, 'b');
+    if (TR.v && TR.v.readyState && TR.v.paused) TR.v.play().catch(function(){});
+  }; });
+  $('trimPlay').onclick = function(){ if (!TR.v || TR.v.hidden) return; TR.v.currentTime = TR.a; TR.v.play().catch(function(){}); };
+  $('trimCancel').onclick = close; $('trimX').onclick = close;
+  $('trim').addEventListener('click', function(ev){ if (ev.target === $('trim')) close(); });
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape' && !$('trim').hidden) close(); });
+  $('trimDone').onclick = function(){
+    var m = TR.m; if (!m) return;
+    var a = cents(TR.a), b = cents(TR.b); close();
+    C.change(m, {start: a, end: b});
+  };
+  R.openTrim = open;
+  R.trim = function(){ return TR.m ? {id: TR.m.id, a: TR.a, b: TR.b, w0: TR.w0, w1: TR.w1, len: TR.len} : null; };
 })();
 """
 

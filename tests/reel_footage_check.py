@@ -106,7 +106,8 @@ HERS_MAKE = {
     "clips_need": "<h3>One more thing: your clips</h3><p>Select the clip or clips to use under <b>Select your clips</b> in step 1, or choose <b>Just photos</b>.</p>",
     "not_looked": "<h3>I haven't looked through your footage yet</h3><p>Add your videos in step 1, then copy the line into the chat. The moments I find show up under <b>Select your clips</b> in step 1. Or choose <b>Just photos</b>.</p>",
 }
-TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, or Remove it."
+# her v25 line (Nov 13): Trim is named in it (reel_page.TRIM_WORDS; tests/reel_trim_select_check.py holds it to her page)
+TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it."
 
 
 def rp():

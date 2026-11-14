@@ -423,3 +423,64 @@ Also run after the change, one at a time, both Pythons, all passing: `reel_page_
 - Stage K: `reel_page.photo_note(saved)` is a reel's note as text. The kit's Reel card line is still v20's.
 - Stage E: carry the seven items above; CLAUDE.md should say "make my posts" only brings photos in, name `reel_page.py note`, `photo_ask`, `PICK_WORDS`, and that rule 11's last sentence changed.
 - `tests/reel_page_check.py` still compares `reel_page.WORDS` with her v19/v23 page; `PICK_WORDS` and `REELS_WORDS` are compared with her v25 page by their own tests. The not-picked line moved out of `WORDS`.
+
+## Stage I, built (Nov 14): trim a clip, and select several photos like Lightroom
+
+Nicole's v25, section 4: "I can't trim it from a specific end." And section 8: "It should work like programs for photography work. If I click on number one and I hold down shift and I click on 7, it should select all of them, so I can just drag a whole batch." Both are on the reel page only; the chat has no part in either.
+
+**What a photographer sees.**
+- **Each clip card has "✂ Trim"** after − and +, which still work as quick length buttons. The line over the cards is her v25 one ("...use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it.").
+- **Trim opens her panel over the page:** the clip on a loop with its sound; a strip of the video's own stills, about 8 seconds either side of the clip; the part they are keeping outlined in coral, the rest dimmed; a start handle and an end handle; dragging the middle slides the whole clip and keeps its length; ◀ ▶ beside Start and End move an end a quarter second; "▶ Play it again"; and her readout, "Starts 0:31.6 · ends 0:34.0 · 2.4 s".
+- **A clip is 1 to 15 seconds and never runs past the ends of its video.** The handles stop there.
+- **Done saves. Cancel, the ×, Escape and a click outside the panel close it and change nothing.** After Done the card shows the new length and plays it, as it does after − or +.
+- **In the photo order:** a click on a photo selects it (her outline and check mark); Shift-click selects everything between it and the last one clicked; Cmd-click or Ctrl-click adds or drops one; Escape lets them all go. **Dragging any selected photo moves the whole selection** to where it lands, in the order it had: the others fade while it moves and a tag on the one being carried says "3 photos".
+- **With two or more selected, a bar:** "N selected. Drag any of them and they all move together." with **Longer, Quicker, Neither, Take them out, Clear**.
+- **In All your photos** a plain click still adds a photo or takes it out. Shift-click and Cmd-click select there; then they drag any of them up into the order, or press **Add them to the end** (the bar there: "N selected. Drag any of them up into your order, or" Add them to the end, Clear). They land in the shoot's order; one that was already in the reel moves there and keeps its mark.
+- **One action on a selection is one save and one press of Undo.**
+
+**Our way underneath.**
+- **Nothing new is saved and no new route.** Done is the clip card's own change, `POST /reel-moment` with `do: "update"`, now with the start AND the end together. It goes through the same guard, lock and whole-record save (the version before kept) as − and +, is marked as a length they set, and is per reel like every clip (stage G).
+- **The Assistant checks a trim itself.** A start and an end together must be 1 to 15 seconds from 0 on, both numbers: anything else is refused whole and nothing is written ("A clip is 1 to 15 seconds long.", ours). Hers bends whatever arrives into shape without a word. A trim that reaches past the video's end (the page knows the length to a tenth of a second) is slid back inside it, its length kept.
+- **A fault of hers mended on the way:** with − and + (or a new start alone) a clip whose start sat right at the end of its video could be saved ending up to half a second past the video. Now it ends at the end.
+- **What is selected is the page's own.** It is never saved, never sent, and gone after a reload. The record's fields are exactly what they were.
+- **Our own drag, not hers.** Hers moves photos with a library from the internet (SortableJS); ours is the page's own pointer drag, as before, so a selection is carried by it: the tag sits on the lifted copy (her style rule, word for word, supplies " photos"), the bar that shows where a photo will land shows where the selection will land, and Escape in the middle of a drag puts everything back with the selection kept.
+- **Her words are in two tables of their own,** `reel_page.TRIM_WORDS` and `reel_page.SELECT_WORDS`, and her 39 style rules for the panel, the Trim button, a selected photo, the tag and the bars are in `TRIM_CSS` and `SELECT_CSS`, each as she wrote it. The panel's markup is written above the page's scripts (`reel_page.trim_panel`), as her note asks. The rule for several photos going to one place is `ReelModel.many` in the page's model.
+- **A PC.** A PC takes no stills from a video yet (the gap `video.py` already names), so the timeline in its Trim panel has no pictures. The panel says so, in a line of ours: "On a PC the timeline has no pictures along it yet. The handles, the arrows and the times work the same." A video that plays on the page plays in the panel. Selecting several needs nothing a PC lacks; Ctrl-click is the PC's Cmd-click.
+- **The instructions:** `parts/arrange.md` (what Trim is and what the panel has, so the assistant can point to it; selecting several, key by key; that it has no command for either and can't see a selection) and `parts/on-a-pc.md` (the gap, in the page's own two lines).
+
+**Choices where her spec was silent (plainest behaviour).**
+1. **A trim outside 1 to 15 seconds is refused, not bent** (above). Her page can never send one, so nobody sees the difference.
+2. **More photos than a reel holds.** Add them to the end, or a drag up, that would take the reel past 40 photos adds none of them, shows the line already under the reel ("A reel holds up to 40 photos. Take one out first.") and keeps them selected so one can be let go. Hers has no limit on the page (her server keeps the first 40 without a word).
+3. **A video that will never have a preview** (the copy failed, no room, a PC that can't play it): the panel says "This video can't be played here. You can still trim it with the timeline." (ours). Her one line there says the preview "is still being made", which would never come true. While a preview really is being made, her line shows.
+4. **Trim pressed in the first second, before the page has its list of videos:** the panel opens as soon as the list is there. Hers does nothing on that press.
+5. **Escape** follows hers exactly, which means one press does two things when both apply: it closes the Trim panel (or the big photo) and also lets go of whatever is selected.
+6. **A finger:** a tap on a photo in the order selects it (hers: a click). There is no Shift or Cmd on a phone, so several can't be selected there (hers the same).
+7. **Only a press on the photo itself selects** (hers: `.ph`); the thin frame round the Longer and Quicker buttons does nothing.
+8. **The assistant's order.** Moving or taking out a selection makes the order theirs ("I'll drag them in myself"), as moving one photo does; Longer, Quicker and Neither on a selection keep whose order it is, as the buttons under one photo do (hers).
+9. **The arrows' names for a screen reader** are her words joined: "Start: A quarter second earlier". Hers gives the arrows a tooltip only.
+10. **A click outside the panel closes it** (hers does too; it is not in her written list of ways out).
+
+**Hers left out, on purpose.** Nothing a photographer sees. SortableJS (ours never loads anything from the internet). Her `/strip` and `/preview` addresses are our `/reel-strip` and `/reel-video`, which were there already.
+
+**Tests.** `tests/reel_trim_select_check.py` (new): her words both ways against her v25 reel page and her style rules each as she wrote it; a trim by request on the 3-second clip in `tests/fixtures` (saved, refused, slid back inside, another website and another reel refused); and the real page in a hidden Chrome with the real Shift, Cmd and Ctrl keys and real drags: selecting, the two bars, a drag of the whole selection from the order and from All your photos, more than a reel holds, a phone's width; then the trim panel on a 40-second clip the test makes with the Mac's own tools (the loop with sound, the filmstrip, both handles, the middle, the arrows, 1 to 15 seconds, the video's ends, the four ways out, Done), and the panel as a PC has it. 153 checks with the page (43 without), the same on both Pythons. 54 pieces of the stage were each taken out in a scratch copy and a check failed each time (9 by request, 23 of selecting, 22 of the panel). `tests/skill_text_check.py` has a new section for this stage (480 checks). In GitHub's check: by request on Windows, with the page on the Mac's page job. `--only select | trim | pc` runs one part of the page.
+
+Also run after the change, one at a time, both Pythons, all passing: `reel_page_check.py` 343, `reel_fixes_check.py` 41, `reel_door_check.py` 47, `reel_footage_check.py` 183 (its line over the clip cards is now her v25 one), `footage_look_check.py` 88, `reels_check.py` 158, `picks_ask_check.py` 76, `talking_page_check.py` 573, `pc_reel_page.py` 49, `pc_smoke.py` 230 (183 on Apple's 3.9), `look_check.py` 75; `tools/check_pc.py` and `tools/check_plugin.py` clean. Not run: `kit_cards_check.py` and `kit_steps_check.py` (nothing they read changed; their one older failure each is stage K's).
+
+**Not tried.** Dustin's or Nicole's own hand; the Claude app's pane; a real shoot's footage (a phone's 4K HEVC video trims through its small copy: how smoothly the panel's player seeks on one is not known); a clip trimmed on the page and then made into a real CapCut reel (the make reads the same start and end it always did); a real PC (the PC's way was run on this Mac with the stills switched off); a touch screen's drag of a handle (a tap and a mouse were tried; the handles are 18 px wide); a screen reader on the panel (it is marked as a dialog, as hers, and the keyboard is not kept inside it, as hers); a shoot of hundreds of photos with a big selection dragged while the row scrolls.
+
+**Found on the way, not this stage's, not fixed.** With footage on, a wide video's player under "Watch your footage" is 420 px wide (her rule, since v19), so at a phone's width the whole reel page scrolls sideways. The Trim panel sits inside the window all the same.
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **Our three lines:** "This video can't be played here. You can still trim it with the timeline."; the PC line under the timeline; and "A clip is 1 to 15 seconds long." (which only a faulty page could ever be told).
+2. **Past 40 photos:** the whole batch is refused and stays selected (choice 2). Say if it should add as many as fit instead.
+3. **Escape doing two things at once** (choice 5), as hers. Say if Escape should only close what is on top.
+4. **The wide video's player at a phone's width** (above): hers, and worth a look by whoever next touches step 1's styles.
+5. **Remove a song** is still not built and is hers to answer (the waiting list, item 1).
+
+**For later stages.**
+- Stage J (songs): nothing here touches the song step.
+- Stage K (post kit, posting queue): a trimmed clip is just a moment with a new start and end and `set: true`; nothing new to read.
+- Stage E (note for Nicole, CLAUDE.md): carry the five items above. CLAUDE.md should say the reel page has Trim on each clip card and selecting several photos, name `TRIM_WORDS`, `SELECT_WORDS`, `trim_panel` and `ReelModel.many`, and say a trim is checked by the Assistant (1 to 15 seconds, refused outside).
+- `reel_page.WORDS["moments_tail"]` is still her v19 line (held to her v19 page by `reel_page_check.py`); the page shows `TRIM_WORDS["moments_tail"]`, her v25 one. A stage that moves the whole comparison to her v25 page can drop the older one.
+- New styles go in their own blocks (`SELECT_CSS`, `TRIM_CSS`), never inside `STYLE`.
+- On the page: `window.Reel.clips` (a clip's video, the addresses, `change`, `fresh`), `window.Reel.openTrim(m)`, `window.Reel.trim()` (what the panel holds, for tests).

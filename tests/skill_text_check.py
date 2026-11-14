@@ -1059,9 +1059,38 @@ def check_photographer_picks():
     case("the page's lines are quoted as the page has them: 'your assistant', never 'Claude'", not said, said)
 
 
+def check_trim_and_select():
+    """Trim a clip, and select several photos like Lightroom (Nicole's v25, sections 4 and 8; stage I of the v26
+    build). Both are the page's own: the instructions say what the page does, in the page's words, and that the
+    assistant has no command for either."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, pc = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "on-a-pc.md").split())
+    words = dict(re.findall(r'^    "(trim_btn|trim_done|trim_cancel|sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|trim_stuck|trim_no_stills_pc)": "([^"]+)"', rp, re.M))
+    case("the page's words for Trim and for selecting several are in reel_page.py (11 of them)", len(words) == 11, sorted(words))
+    case("arrange.md names the Trim button as the card shows it, and what the panel has: the loop with sound, the stills, the handles, the middle, the quarter second",
+         ("**" + words.get("trim_btn", "?") + "**") in arr and all(x in arr for x in ("plays on a loop with its sound", "about 8 seconds either side", "the left handle for where it starts",
+                                                                                  "the right handle for where it ends", "the middle to slide the whole clip", "a quarter second")))
+    case("arrange.md gives the panel's readout as the page writes it, and its limits (1 to 15 seconds, never past the video's ends)",
+         '"Starts 0:31.6 · ends 0:34.0 · 2.4 s"' in arr and "A clip is 1 to 15 seconds and never runs past the ends of its video." in arr
+         and "MOMENT_MIN, MOMENT_MAX = 1.0, 15.0" in rp)
+    case("arrange.md: Done saves; Cancel, the x, Escape and a click outside change nothing; the assistant has no command that trims",
+         ("**" + words.get("trim_done", "?") + "** saves it") in arr and words.get("trim_cancel", "?") + ", the ×, Escape or a click outside the panel closes it and changes nothing" in arr
+         and "You have no command that trims a clip" in arr)
+    case("arrange.md: selecting several, key by key (click, Shift-click, Cmd-click or Ctrl-click on a PC, Escape), and a drag moves the whole selection in order",
+         all(x in arr for x in ("a click on a photo in the order selects it", "Shift-click selects everything between it and the last one clicked",
+                                "Cmd-click (Ctrl-click on a PC) adds or drops one", "Escape lets them all go",
+                                "Dragging any selected photo moves the whole selection to where it lands, in order", "a tag on it says how many photos are moving")))
+    bar = "**%s, %s, %s, %s** and **%s**" % tuple(words.get(k, "?") for k in ("sel_longer", "sel_quicker", "sel_neither", "sel_out", "sel_clear"))
+    case("arrange.md names the bar's five buttons as the page has them, and Add them to the end below", bar in arr and ("**" + words.get("sel_add", "?") + "**") in arr, bar)
+    case("arrange.md: in All your photos a plain click still adds or takes out; one press of Undo takes a whole batch back; a selection is the page's own",
+         "a plain click still adds a photo or takes it out" in arr and "one press of Undo takes the whole batch back" in arr and "you can't see it and nothing saves it" in arr)
+    case("on-a-pc.md names the gap honestly, in the page's own two lines: no pictures along the timeline, and a video that can't be played there",
+         ('"' + words.get("trim_no_stills_pc", "?") + '"') in pc and ('"' + words.get("trim_stuck", "?") + '"') in pc and "a PC takes no stills from a video yet" in pc)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
