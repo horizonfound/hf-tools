@@ -7,7 +7,8 @@ Her rules, in her words where she gave them:
   - Every cut lands on a whole beat, whichever vibe they pick. "The a little bit of everything is awesome. I
     love how some are short and fast, but they still need to land on the beat... And that goes for calm and
     build."
-  - Every photo stays at least one whole beat and about half a second (MIN_SHOW): no half-beat cuts. On one of
+  - Every photo stays at least one whole beat and about half a second (MIN_SHOW, measured on the even beat,
+    before any tick moves onto a hit): no half-beat cuts. On one of
     her test reels the half-beat pairs were 0.3 s a photo: "so fast it like disappears before you even see anything".
     Quicker means the shortest: one beat. The last photo always gets at least two beats.
   - On every beat has rhythm (her handoff v22, Nov 10): plain photos run one beat or two in a mix that is the
@@ -21,6 +22,10 @@ Her rules, in her words where she gave them:
     with no hit near them (onto_hits, Grid.ON); (3) in the one search, a cut on a tick with no hit costs
     W_EMPTY, so cuts move onto beats you can hear wherever the photo lengths allow. Her "cut purely from hit
     to hit" (HITGRID), which she tried and left switched off, is not here.
+    A song from CapCut's own music, which hers does not have, keeps its beats exactly on the beat marks CapCut
+    shows in the project (Oct 25): steps 1 and 3 apply, and step 2 only marks, it moves nothing (ON_CAPCUT_MARKS).
+    Because a tick may move, a one-beat photo can come out a little under MIN_SHOW (about a third of a second
+    at the least, on a song of about 111 to 133 beats a minute): hers is the same, and it is theirs to settle.
   - The vibes are not fixed templates: "those are not set in stone templates. Those should change for every
     single thing that's made." One search over the whole reel (dynamic programming) picks every length
     together: each piece has a natural length for the vibe and a few others it may take at a small cost; cuts
@@ -72,6 +77,10 @@ W_EMPTY = 0.9             # a cut where the song doesn't hit at all (Nicole, Nov
 HIT_STANDS_OUT, HIT_AROUND, HIT_APART = 0.8, 1.5, 0.2
 SNAP_PART, SNAP_MOST = 6, 0.09
 HITS_AT_LEAST = 8
+# A song from CapCut's own music comes with CapCut's beat list, and CapCut shows those beat marks in the project.
+# Its ticks stay on those marks: a tick with a hit within reach is marked as heard and left where CapCut put it.
+# Nicole's has no CapCut songs, so this is ours; False would move them like any other song. Theirs to settle.
+ON_CAPCUT_MARKS = True
 
 
 def vibe_of(name):
@@ -85,7 +94,8 @@ def vibe_of(name):
 
 class Grid:
     """The song's beats and the points halfway between them.
-    T: the time of every grid point (moved onto the hit you can hear there, when there is one); P: its place in
+    T: the time of every grid point (moved onto the hit you can hear there, when there is one; never moved for
+    a CapCut song's own beat marks); P: its place in
     the bar (1, 2, 3, 4; 0 for a half point); HIT: how hard the song hits there and ENERGY: how loud that beat
     is, each ranked 0 (weakest) to 1; ON: 1 where the point sits on a hit you can hear, 0 where the song doesn't
     hit (all 1 with no song, or a song with too few hits to tell); hits: the times of those hits, [] when ON
@@ -138,10 +148,11 @@ def audible_hits(o, fps=None):
     return hits
 
 
-def onto_hits(T, hit_times, period):
+def onto_hits(T, hit_times, period, move=True):
     """Step 2 (hers, v25). Moves each grid point in T (changed in place) onto the hit nearest it, when that hit
     is within a sixth of a beat (SNAP_MOST seconds at the most) and still between the points either side, so the
-    grid never folds over. Returns ON: 1 for a point now on a hit, 0 for one with no hit near it."""
+    grid never folds over. Returns ON: 1 for a point now on a hit, 0 for one with no hit near it.
+    move=False (a CapCut song's own beat marks): the same marks, and no point moves."""
     ON = [0] * len(T)
     if not hit_times:
         return ON
@@ -154,7 +165,8 @@ def onto_hits(T, hit_times, period):
         before = T[j - 1] if j else -1.0
         after = T[j + 1] if j + 1 < len(T) else 1e9
         if d <= snap and before < hit_times[q] < after:
-            T[j] = hit_times[q]
+            if move:
+                T[j] = hit_times[q]
             ON[j] = 1
     return ON
 
@@ -200,7 +212,8 @@ def song_grid(path, beat_file=None):
     ON, hit_times = None, []
     if len(heard) >= HITS_AT_LEAST:
         hit_times = [round(t, 4) for t, _ in heard]
-        ON = onto_hits(nb, hit_times, half * 2)
+        ON = onto_hits(nb, hit_times, half * 2,
+                       move=not (ON_CAPCUT_MARKS and i.get("beats_from") == "capcut"))
     info = {"beats": nb, "bar_pos": pos, "energy": en, "duration": i.get("duration", 0), "period": half}
     g = Grid(nb, pos, rank(hits or [0.0] * len(nb)), rank(en or [0.0] * len(nb)), half * 2,
              i.get("tempo") or 0, i.get("meter") or 4, info, str(path), i.get("beats_from"), ON, hit_times)

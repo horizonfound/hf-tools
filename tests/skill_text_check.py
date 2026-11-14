@@ -264,6 +264,11 @@ def check_reel_skill():
          and "for a reel made from the chat with `reel.py make` just the same" in step4
          and "Real hits: 13 of 14 cuts land on a hit you can hear." in step4
          and "**Most cuts, not a promise of every one:**" in step4 and "With no song there are no hits to find" in step4)
+    case("the reel skill: a CapCut song's beats stay on CapCut's own marks, and the half second is 'about', never a promise "
+         "(review, Nov 14)",
+         "those beats are never moved (CapCut shows the marks in the project)" in t
+         and "cuts still keep off the marks where the song doesn't hit" in t
+         and "never promise the half second to the frame" in t)
     alike = "When the photos are much alike, keep it fast (Nicole, Nov 13)"
     case("photos that are much alike (her v25 pacing note): the opener plain, few Longers, more Quickers, in the reel skill's "
          "Step 2 and in curating.md's step 7, in her words",

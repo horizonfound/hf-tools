@@ -27,6 +27,8 @@ Her 22 acceptance lines, re-recorded for this, are in tests/reel_timing_check.py
   - "No song" works in every vibe, photos only and with clips (her v25 fix: it had crashed);
   - CapCut's times stay on whole frames: every cut on the frame at or just before its (moved) beat;
   - a song with too few hits to tell keeps its plain grid, exactly;
+  - a song from CapCut's own music (a made-up CapCut beat list over the loose song): its beats stay exactly on
+    CapCut's marks, the marks with no hit are still marked, and every vibe plans (review, Nov 14);
   - reel.py make --dry-run (the chat's reel maker) goes through the same three steps and says so in her line:
     "Real hits: 13 of 14 cuts land on a hit you can hear.";
   - the reel page's line for A little of everything is hers (v25);
@@ -153,6 +155,20 @@ def _main(work):
     check("two jumps a quarter of a second apart: two hits", len(got) == 9, str(got))
     check("silence, and a sound too short to judge: no hits, nothing breaks",
           timing.audible_hits([0.0] * 500) == [] and timing.audible_hits([]) == [] and timing.audible_hits([1.0, 2.0]) == [])
+    # The music "either side" runs from 1.5 s before the jump up to, not counting, 1.5 s after it (hers: the far
+    # end is left out). A very loud moment exactly at either end shows which values are read.
+    win, at = int(timing.HIT_AROUND * FPS), int(round(4.5 * FPS))
+    base = [0.1 + 0.01 * math.sin(k / 2.0) for k in range(int(9.0 * FPS))]
+    base[at] = 1.0
+
+    def is_hit(extra):
+        o = list(base)
+        o[extra] = 1000.0
+        return any(abs(t - at / FPS) < 1e-9 for t, _ in timing.audible_hits(o))
+    check("the music around a jump: the moment exactly 1.5 s before it is counted, the moment exactly 1.5 s after "
+          "it is not (as hers), and one step nearer on that side is",
+          is_hit(at + win) and not is_hit(at - win) and not is_hit(at + win - 1) and is_hit(at - win - 1),
+          f"{is_hit(at + win)} {is_hit(at - win)} {is_hit(at + win - 1)} {is_hit(at - win - 1)}")
     check("her numbers: 0.8 standard deviations, 1.5 s either side, 0.2 s apart, a sixth of a beat, 0.09 s, 0.9",
           (timing.HIT_STANDS_OUT, timing.HIT_AROUND, timing.HIT_APART, timing.SNAP_PART, timing.SNAP_MOST, timing.W_EMPTY)
           == (0.8, 1.5, 0.2, 6, 0.09, 0.9))
@@ -318,7 +334,7 @@ def _main(work):
             i["period"] = 0.6
         return i
 
-    def marks_only(T, hit_times, period):                          # step 2 taken out: the marks, but no tick moved
+    def marks_only(T, hit_times, period, move=True):               # step 2 taken out: the marks, but no tick moved
         return real_onto(list(T), hit_times, period)
 
     def tight(vibe, items, move=True):
@@ -461,6 +477,58 @@ def _main(work):
         if code != 0 or "Real hits" in out or "Beats per piece: " not in out or "Traceback" in out:
             bad.append(f"{vibe}: exit {code}: {out[-300:]}")
     check("with no song, every vibe: a plan, her beats line, and nothing said about hits", not bad, "; ".join(bad[:2]))
+
+    # ------------------------------------------------------------ a song from CapCut's own music
+    print("\n-- a song from CapCut's own music: CapCut's beat marks stay where CapCut put them")
+    import json
+    marks = [300 + 600 * k for k in range(48)]                 # CapCut's list: perfectly even, in thousandths of a second
+    beat_file = work / "capcut beats.json"
+    beat_file.write_text(json.dumps({"time": marks, "value": [(k % 4) + 1 for k in range(48)]}), encoding="utf-8")
+
+    def capcut_grid(**change):
+        saved = {k: getattr(timing, k) for k in change}
+        timing._GRIDS.clear()
+        for k, v in change.items():
+            setattr(timing, k, v)
+        try:
+            return timing.song_grid(str(song), str(beat_file))[0]
+        finally:
+            for k, v in saved.items():
+                setattr(timing, k, v)
+            timing._GRIDS.clear()
+    cg, moved_g = capcut_grid(), capcut_grid(ON_CAPCUT_MARKS=False)
+    cb = list(range(0, len(cg.T), 2))
+    check("its beats are CapCut's own, to the thousandth of a second: not one moved, and the grid runs forward",
+          cg.beats_from == "capcut" and [round(cg.T[j] * 1000) for j in cb] == marks
+          and all(abs(cg.T[j] - marks[n] / 1000.0) < 1e-9 for n, j in enumerate(cb)) and all(a < b for a, b in zip(cg.T, cg.T[1:])),
+          str([round(cg.T[j], 4) for j in cb][:8]))
+    check(f"... the marks with a hit within reach are marked as heard ({sum(cg.ON[j] for j in cb)} of {len(cb)}), the "
+          f"silent ones as empty, and the hits are kept for the Real hits line",
+          0.6 * len(cb) <= sum(cg.ON[j] for j in cb) < len(cb) and len(cg.hits) >= timing.HITS_AT_LEAST,
+          f"{sum(cg.ON[j] for j in cb)} of {len(cb)}, {len(cg.hits)} hits")
+    drift = [abs(a - b) for a, b in zip(moved_g.T, cg.T)]
+    check(f"... the same marks as when the ticks do move (the switch, ON_CAPCUT_MARKS, off: {sum(d > 1e-9 for d in drift)} "
+          f"ticks move, the most by {max(drift):.3f} s), so only the moving is left out",
+          moved_g.ON == cg.ON and sum(d > 1e-9 for d in drift) >= 10 and timing.ON_CAPCUT_MARKS is True,
+          f"{sum(d > 1e-9 for d in drift)} moved")
+    T = [0.0, 0.3, 0.6, 0.9, 1.2]
+    check("step 2 asked only to mark: the same marks, and no tick moves",
+          timing.onto_hits(T, [0.05, 0.58, 1.0], 0.6, move=False) == timing.onto_hits([0.0, 0.3, 0.6, 0.9, 1.2], [0.05, 0.58, 1.0], 0.6)
+          and T == [0.0, 0.3, 0.6, 0.9, 1.2])
+    bad, seen = [], []
+    for vibe in timing.VIBES:
+        timing._GRIDS.clear()
+        pieces, facts = reel.plan_reel(photos(14, True), str(song), vibe, None, beat_file=str(beat_file))
+        m = re.match(r"Real hits: (\d+) of 13 cuts land on a hit you can hear\.$", (facts or {}).get("real_hits_line") or "")
+        if not pieces or len(pieces) != 14 or not m:
+            bad.append(f"{vibe}: {str(facts)[:200]}")
+            continue
+        seen.append(f"{timing.NAMES[vibe]} {m.group(1)} of 13")
+        g2 = timing.song_grid(str(song), str(beat_file))[0]
+        if [round(g2.T[j] * 1000) for j in range(0, len(g2.T), 2)] != marks:
+            bad.append(f"{vibe}: the beats moved off CapCut's marks")
+    timing._GRIDS.clear()
+    check("every vibe plans on it, all 14 photos, with her Real hits line (" + "; ".join(seen) + ")", not bad, "; ".join(bad[:2]))
 
     # ------------------------------------------------------------ words, and plain Python
     print("\n-- the page's words, and plain Python")

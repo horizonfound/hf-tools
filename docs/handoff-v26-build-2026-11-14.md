@@ -46,6 +46,23 @@ Identical for the photographer (her words whole, the same behaviour), our way un
 - **CapCut times are still whole frames:** a cut sits on the frame at or just before its (moved) beat. `tests/capcut_even.py` is unchanged and still the same, since its kept projects are built from fixed plans, not through the timing.
 - **Left out, as hers:** her hit-to-hit cutting (`HITGRID`), which she tried and left switched off.
 - **The pacing note (her section 10)** is in the instructions only (`shared/curating.md` step 7, the reel skill's Step 2): when the photos are much alike, the opener stays plain, few Longers, more Quickers. Her engine has no change for it, so ours has none. Stage L need not build it again unless Dustin and Nicole want the engine itself to shorten holds.
-- **Tests:** `tests/reel_hits_check.py` (new, 39 checks, each step taken out in a scratch copy and seen to fail), `tests/reel_timing_check.py` (96, her 22 among them).
+- **Tests:** `tests/reel_hits_check.py` (new, 39 checks at first, 45 after the review round below, each step taken out in a scratch copy and seen to fail), `tests/reel_timing_check.py` (96, her 22 among them).
 - **Not tried:** a real reel watched in CapCut with the new timing; her own counts on her songs (minea, november, Aurora, Hannah: those songs are not here); a song with CapCut's own beat list; Windows (the first push runs it).
 - **Theirs to settle:** the "Real hits" line is only in a dry run (as hers); the page never shows how many cuts landed on a hit. A song with fewer than eight hits keeps its plain grid with nothing said (as hers).
+
+### Stage F, the review round (Nov 14)
+
+Two reviewers read the timing beside hers and found no fidelity fault. One thing was fixed and four are written down for the note to Nicole (stage E).
+
+- **Fixed: a song from CapCut's own music keeps its beats on CapCut's beat marks.** Nicole's has no CapCut songs, so her spec is silent; ours offers them from the chat (`reel.py make --capcut-song`) and carries CapCut's beat marks into the project (Oct 25: "the cuts match the beat marks CapCut shows"). As first built, step 2 moved those beats too: on a made-up even CapCut list over the test's loose song, 38 of 48 beats moved off CapCut's marks, by up to 0.05 s (0.09 s is the most it could be). Now, for a CapCut song, step 1 (find the hits) and step 3 (a cut on a mark with no hit costs 0.9) apply, and step 2 only marks: no beat moves. One switch, `timing.ON_CAPCUT_MARKS`. Checked in `tests/reel_hits_check.py` (now 45 checks); not tried on a real CapCut song.
+- **Also added:** a check that pins the edge of "the music 1.5 s either side" (the far end is not counted, as hers), which before only her two real songs held, and those never run on GitHub.
+- **Words:** the reel skill says a CapCut song's beats are never moved, and that "about half a second" is about, never a promise to the frame. The headers of `timing.py`, `reel.py` and `beats_lite.analyze` say the same.
+
+**For the note to Nicole (stage E), and theirs to settle:**
+1. **A one-beat photo can now be on screen for about a third of a second.** Her half-second floor is worked out on the even beat, before any tick moves; two ticks that move toward each other (0.09 s each at the most) can leave a one-beat photo at about two thirds of a beat, as little as 0.30 s on a song of about 111 to 133 beats a minute. Her engine does exactly the same, so ours is left as hers. On her two acceptance songs it does not show (shortest 0.53 s and 0.67 s). It is the length she sent back on Hannah reel 26, so she should say: leave it, or size the shortest hold from the moved times.
+2. **Her page line promises more than the engine gives.** "Every change lands on a beat you can hear in your song" is hers and is kept whole; on her own acceptance songs 12 of 14 and 17 of 20 cuts land on a hit in some vibes. Our instructions tell the assistant "most cuts, not a promise of every one" (ours, a draft).
+3. **A CapCut song's beats stay on CapCut's marks** (above). Say if they should move onto the hits like any other song.
+4. **A reel of one piece prints no "Real hits" line** in a dry run (hers: "0 of 0").
+5. **Remove a song** is still not built and is hers to answer (the waiting list, item 1).
+
+**For the builder of stage I (trim a clip), an older fault, not this stage's:** a clip whose card is the whole video can stop the reel with "... is only 2.40 seconds of video, and nothing in a reel stays on screen for less than one beat (2.43 s here)" when its whole-beat length comes out a frame or two over the video's own length (22 of 480 tries on the loose test song, 23 before stage F). Hers has no such stop. When the overshoot is under about 0.2 s, take a beat off or let the clip end a few frames short, and reword the line.

@@ -32,8 +32,10 @@ on the beat. Claude does the choosing; this does the counting.
 
 The vibe (timing.py, Nicole's engine, Nov 6): every cut lands on a whole beat, every photo stays at least one
 beat and about half a second, and nothing is left out to fit. In every vibe the beats are moved onto the
-hits you can hear in the song, and cuts keep off beats where the song doesn't hit (her v25, Nov 13); a dry
-run says how many did ("Real hits: 13 of 14 cuts land on a hit you can hear."). "beat" (On every beat, the
+hits you can hear in the song (by 0.09 s at the most, so a one-beat photo on a fast song can come out a little
+under half a second, as hers), and cuts keep off beats where the song doesn't hit (her v25, Nov 13); a dry
+run says how many did ("Real hits: 13 of 14 cuts land on a hit you can hear."). A --capcut-song keeps its
+beats on CapCut's own beat marks: nothing moves, and cuts still keep off the marks with no hit. "beat" (On every beat, the
 default) is a new photo on the beat with a longer hold where the song hits; "mixed" (A little of everything)
 is some quick, some longer, every change on a beat you can hear; "calm" is longer looks; "build" starts calm, speeds up toward
 the end, then lands. None is a fixed template: one search over the whole reel fits each to its own song,
@@ -372,7 +374,8 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
     to tell them), or (None, {"problem": what to say}).
 
     The timing is Nicole's (timing.py): one search over the whole reel, every cut on a whole beat, every photo
-    at least one beat and about half a second, nothing left out to fit. The reel starts on the first beat of a
+    at least one beat and about half a second (a little under, at times, where a beat moved onto a hit),
+    nothing left out to fit. The reel starts on the first beat of a
     bar, and every time is a whole video frame (CapCut moves anything else onto its frame grid, which made cuts
     land late). Each cut is placed on the frame at or just before its beat, never after: a cut that arrives
     with the beat, or a hair early, feels on time; a frame late feels off."""
