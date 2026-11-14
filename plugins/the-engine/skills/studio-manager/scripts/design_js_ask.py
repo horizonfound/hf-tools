@@ -12,9 +12,10 @@ page has neither, and this script then does nothing at all.
     the line      "Pick my story photos for <shoot>", with ", and follow my note" only while there is a note (hers).
                   The shoot's name goes on the page as text.
     Copy          copies the line (the older copy call: the Claude app's pane refuses the newer one), says
-                  "Copied" for a moment, and from then on, for ten minutes, the page looks every few seconds for the
+                  "Copied" for a moment, tells the Assistant which set was asked about (POST /design-asked: a time
+                  noted with the set, nothing else), and from then on, for ten minutes, the page looks every few seconds for the
                   assistant's pick: when the set on the Assistant's side is newer than this page's and nothing here
-                  is unsaved, in the middle of a drag or under an open window, the page takes it (Designer.load), so
+                  is unsaved, in the middle of a drag, under an open window or being typed into a box, the page takes it (Designer.load), so
                   the stories fill in beside the chat without a reload.
 
 Nothing is kept in the browser.
@@ -64,6 +65,11 @@ DESIGN_ASK_JS = r"""
   // a set was opened (or the newest came from the Assistant): its own note, unless they are typing one right now
   D.on('design', function(){
     if (document.activeElement !== note) note.value = ask();
+    else if (D.design && !D.blocked && note.value.trim().slice(0, MAX) !== ask()) {
+      // they are typing a note right now: theirs stays, in the box and with the set, and is saved like any typing
+      D.design.ask = note.value.trim().slice(0, MAX);
+      D.save.queue();
+    }
     note.disabled = false;
     said.textContent = '';
     show();
@@ -85,6 +91,14 @@ DESIGN_ASK_JS = r"""
     clearTimeout(backT);
     backT = setTimeout(function(){ copyBtn.textContent = AW.copy; }, 1500);
     said.textContent = '';
+    // which set they asked about: the line they paste names none, so the Assistant is told it is this one (only a
+    // time is noted with the set; nothing about its stories changes). No answer is waited for.
+    if (D.design) {
+      try {
+        fetch('/design-asked', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({kit: D.KIT, kind: 'stories', design: D.design.id})}).then(null, function(){});
+      } catch (e) {}
+    }
     watch();
   });
 
@@ -95,8 +109,15 @@ DESIGN_ASK_JS = r"""
     until = Date.now() + WATCH;
     if (!timer) timer = setInterval(look, EVERY);
   }
+  // Are they typing in a box (a story's words, the set's name, a size)? Then the pick waits until they leave it:
+  // taking it would close the box under their hands and lose what they type next. The note's own box does not count.
+  function typing(){
+    var a = document.activeElement, tag = (a && a.tagName) || '', type = String((a && a.type) || '').toLowerCase();
+    if (!a || a === note) return false;
+    return tag === 'TEXTAREA' || a.isContentEditable || (tag === 'INPUT' && /^(text|number|search|)$/.test(type));
+  }
   function busy(){
-    return D.blocked || !D.save.idle() || (D.modals && D.modals.any()) || document.body.classList.contains('d-dragging') || document.hidden;
+    return typing() || D.blocked || !D.save.idle() || (D.modals && D.modals.any()) || document.body.classList.contains('d-dragging') || document.hidden;
   }
   function look(){
     if (Date.now() > until || !D.design) { stop(); return; }
@@ -114,7 +135,7 @@ DESIGN_ASK_JS = r"""
       })
       .then(null, function(){ asking = false; });
   }
-  D.ask = {line: line, watching: function(){ return !!timer; }, look: look, EVERY: EVERY};
+  D.ask = {line: line, watching: function(){ return !!timer; }, look: look, typing: typing, EVERY: EVERY};
 })();
 """
 

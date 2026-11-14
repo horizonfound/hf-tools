@@ -2179,7 +2179,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         path = urlsplit(self.path).path
         if path in ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
-                    "/design-preview"):
+                    "/design-preview", "/design-asked"):
             # the carousel designer: design.py checks each of these the way arrange.py does (below)
             import design
             return design.handle_post(self, path, urlsplit(self.path).query)

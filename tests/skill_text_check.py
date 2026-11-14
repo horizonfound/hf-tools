@@ -893,6 +893,10 @@ def check_stories_v26():
     case("stories: the two commands of the assistant's pick are in the part, as design.py has them",
          'design.py story-note "<kit>" [--design <id>]' in part and 'design.py story-fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
          and 'sub.add_parser("story-note")' in design and 'sub.add_parser("story-fill")' in design and '"--replace"' in design)
+    case("stories: the part says which set a command takes (Copy pressed, or changed, last), that a rerun is harmless, and the record's name for it; design.py has all three",
+         "the set they pressed Copy on, or changed, last" in part and "Running the very same command again is harmless: it answers `SAME:`" in part
+         and "a photo that is already in the set" in part and "`asked`, the time they last pressed Copy there" in read(SM / "parts" / "where-things-live.md")
+         and "def _post_asked(" in design and "def _pick_there(" in design and '"/design-asked"' in design)
     case("stories: the page's line and its button are named as the page has them",
          '"Pick my story photos for <shoot>"' in part and '"..., and follow my note"' in part and '"Let my assistant choose the photos"' in part
          and 'ASK_BUTTON = "Let my assistant choose the photos"' in page and 'ASK_LINE = "Pick my story photos"' in page)

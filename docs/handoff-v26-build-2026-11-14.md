@@ -204,14 +204,14 @@ Two reviewers read stage B. Five should-fix findings and a handful of notes; all
 
 **Choices where her spec was silent (plainest behaviour).**
 1. `story-fill` fills the **empty** frames, in the page's own filling order. `--replace` puts the pick into every frame; the instructions allow it only when they asked to choose again. A set with no frame at all gets one story for each photo, each filling its story.
-2. With no `--design`, the chat's commands take the set changed last (the one they were just typing the note into) and list the others.
+2. With no `--design`, the chat's commands take the set they pressed Copy on, or changed, last (see the review round below) and list the others.
 3. "+ New set of stories" opens the new empty set without throwing the Add stories window over it (hers); that window still opens by itself when a page opens on a shoot whose stories are empty.
 4. The x is on stories' labels only (hers), and is not shown at one story. Its line is in the bar's first line, beside the Slides line (hers: the bottom line).
 5. Redo is emptied by any new change of theirs, not by a text box's height being set right when its font arrives.
 6. A template that is added lands on the set's own background (hers does the same: a template's cream background is only ever seen on its card in the window).
 7. The card of My editing queue reads "1 story · 0 photos" (hers: "0 photo").
 8. Copy uses the older copy call only, the one the Claude app's pane allows (the designer page has a rule against the newer one; hers falls back to it).
-9. From 1024 to 1179 px wide the slider that sizes the slides loses its word "Size" and is a little shorter, so the slides' row stays one row with Redo in it and five brand colors saved.
+9. From 1024 to 1179 px wide the slider that sizes the slides loses its word "Size" and is a little shorter, so the slides' row stays one row with Redo in it and five brand colors saved. **This is in both designers, the carousel's too** (Redo is in both), so it is a second small change to the carousel's page beside Redo.
 10. A shoot's name in the queue story is one line, 80 letters at the most (as a design's name is cleaned).
 
 **Hers left out, on purpose.** Her `askQueueNames` box ("How should your clients show?": full names, first names, initials, no names) and the due dates and counts beside it: they are in her file but nothing calls them (her note: "a busier first version was too much"). Her browser-storage memory of which set was open (ours is the address). Her idea for later, offering a Gallery delivered set when a shoot is marked delivered.
@@ -227,8 +227,19 @@ Two reviewers read stage B. Five should-fix findings and a handful of notes; all
 4. **No command puts the earlier photos back** after a pick they don't like. The set as it was is kept on the drive, and the page's Undo does not reach across the pick. The instructions say: pick again, or they move photos themselves. A "put it back" command is its own small job.
 5. **The page follows the assistant's pick for ten minutes after Copy.** After that a reload, or "show my stories", shows it.
 6. **Duplicate is not offered for a set of stories** (hers).
-7. **The word "Size" is hidden between 1024 and 1179 px** (item 9 above).
+7. **The word "Size" is hidden between 1024 and 1179 px, in both designers, the carousel's included** (item 9 above).
 8. **Client names on a public story.** My editing queue shows each shoot as it is named in their editing queue (hers, by her choice: the names question was "too much"). They can take a name off by hand.
+
+**The review round (Nov 14).** Two reviewers; every should-fix was real and is fixed, each with a check that fails without it.
+- **The assistant fills the set they asked about.** The line they paste names no set, so with two sets the chat took the one changed last, which could be a different one from the set open on the page. Now Copy tells the Assistant which set it was pressed on (`POST /design-asked`: only a time, `asked`, is noted in the set's record; its stories, counter, name, note and the version kept beside it are untouched), and `story-note` and `story-fill` with no `--design` take the set asked about, or changed, last, whichever is later.
+- **`story-fill` is safe to run twice.** The very same command again answers `SAME:` and writes nothing, with or without frames to start from (before, a pick that left frames empty was put in a second time, and a set that had no frames answered with a refusal). A photo that is already in the set is refused rather than put in twice, unless `--replace`.
+- **The pick never lands under their hands.** With the caret in a box (a story's words, the set's name, a size) the page waits and takes the pick when they leave the box. A note they are typing while the newest set arrives stays in its box and is saved with the set.
+- **A page's lost save, sent again after the assistant's pick, never wipes the pick:** this already held; it now has a check.
+- **`story-note` reads right:** a frame across several stories is "stories 1 to 3" (it said "story 2 (across 3 stories)"), and a frame of no particular shape "takes any photo".
+- Smaller: one odd record in the editing queue no longer makes My editing queue say it can't reach the queue; a note that is not text at all is refused with the plain "couldn't understand" line, not "longer than fits"; a shoot's folder with a quote in its name is quoted in the command lines the commands print, so they run as pasted.
+- **Left as they are, and theirs to settle:** (9) a set with several BLANK stories and nothing on them keeps those blank stories in front of the assistant's pick (our page's own Add stories has done the same since v19; in hers a set with nothing on it is simply replaced by what is added); (10) a new set is "<Shoot> stories" when that name is free (the first set was renamed), where hers would count the sets and say "<Shoot> stories 2"; (11) when a page's save is refused because the assistant's pick is newer, the line is the usual "This design was changed somewhere else. Here's the newest.", which reads oddly when the "somewhere else" is the assistant they just asked: the wording is theirs; (12) a photo already in the set is refused on a second pick without `--replace` (so the assistant never puts one photo in twice by accident; they can still do it by hand).
+- Tests after the round: `design_v26_check.py` 238 with the page (165 without), `pc_design.py` 247 (246 on Apple's 3.9), `skill_text_check.py` 432. Twelve pieces of the round were each taken out in a scratch copy and a check failed each time (nine by request, three on the page).
+- Not tried: the typing wait with the caret in a real story's text box by hand (the check uses the set's name box and a box made for the test); Copy's note of the set in the Claude app's pane.
 
 **For later stages.**
 - Stage K (the post kit): the Stories card counts "saved designs"; with sets, her v26 post kit may word it differently. The card's link opens the stories designer with no set named, so it opens the set changed last.

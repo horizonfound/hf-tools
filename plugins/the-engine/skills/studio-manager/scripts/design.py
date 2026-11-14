@@ -38,6 +38,9 @@ stories are saved, a small picture of the set CHANGED last, exactly as a carouse
   * "Let my assistant choose the photos": the note they write for the assistant is kept with the set, as "ask"
     (text, up to 600 letters, never part of the layout, so it never changes a saved story). The chat's side is
     story-note (reads the note and the set's frames) and story-fill (puts the assistant's pick in the frames);
+    with no set named they take the set Copy was pressed on, or that was changed, last (Copy notes a time with
+    the set, "asked", through POST /design-asked: nothing else about the set changes). story-fill is safe to run
+    twice: the same pick again writes nothing, and a photo already in the set is never put in a second time;
     choosing photos is the assistant's job, the words on a story are the photographer's (rule 11).
   * Her story templates come first among the layouts, in her order, with her placeholder words: Gallery delivered
     (4), My editing queue (1; no photo; its list is filled on the page from GET /design-queue, the editing queue's
@@ -842,8 +845,20 @@ def queue_names():
     try:
         import edit_queue
         out = []
-        for s in edit_queue.waiting(edit_queue.load()):
-            name = clean_name(str(s.get("name") or "")[:NAME_MAX]) if isinstance(s, dict) else None
+        q = edit_queue.load()
+        # One odd record (not a record at all, or a date that is not text) is left out or read as undated, so it
+        # never blanks the whole list: the sort in edit_queue.waiting would stop on it.
+        tidy = []
+        for s in (q.get("shoots") if isinstance(q.get("shoots"), list) else []):
+            if not isinstance(s, dict):
+                continue
+            s = dict(s)
+            for key in ("due", "added"):
+                if key in s and not isinstance(s[key], str):
+                    s[key] = ""
+            tidy.append(s)
+        for s in edit_queue.waiting(dict(q, shoots=tidy)):
+            name = clean_name(str(s.get("name") or "")[:NAME_MAX]) if isinstance(s.get("name"), str) else None
             if name:
                 out.append(name)
         return out
@@ -1268,7 +1283,8 @@ def save_from_page(body):
         if kind == STORIES and "ask" in body:
             ask = clean_ask(body.get("ask"))
             if ask is None:
-                return 400, {"ok": False, "why": "ask", "words": ASK_BAD}
+                # too long is theirs to put right; anything else (not text at all) was never a note
+                return 400, {"ok": False, "why": "ask", "words": ASK_BAD if isinstance(body.get("ask"), str) and _writable(body.get("ask")) else NOT_UNDERSTOOD}
         same = state == d["state"] and name == d["name"] and ask == (d.get("ask") or "")
         src = d.get("from") if isinstance(d.get("from"), dict) else {}
         own = src.get("page") == page and src.get("base") == base
@@ -2396,7 +2412,7 @@ def _get_queue(handler):
 
 GET_PATHS = ("/design.html", "/design-state", "/design-font-file", "/design-preview", "/design-queue")
 POST_PATHS = ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
-              "/design-preview")
+              "/design-preview", "/design-asked")
 
 
 def handle_get(handler, path, query):
@@ -2484,6 +2500,57 @@ def _post_new(body):
         return 409, {"ok": False, "why": "photos", "words": PHOTOS_CHANGED}
     return new_design(kit, state=body.get("state") if "state" in body else None,
                       name=body.get("name") if "name" in body else None, token=token, copy=copy, kind=kind)
+
+
+def _post_asked(body):
+    """Copy was pressed in "Let my assistant choose" on a set of stories: note WHICH set they asked about, so the
+    chat's commands take that one and not merely the set changed last (the line they paste names no set). Only a
+    time is written into the set's own record ("asked"): the layout, the counter, the name, the note, "t" and the
+    version kept beside it are all as they were. Safe to press any number of times."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return 404, {"ok": False, "words": CANT_FIND}
+    if kind_ok(body.get("kind")) != STORIES:
+        return 400, {"ok": False, "why": "kind", "words": NOT_UNDERSTOOD}
+    did = body.get("design")
+    if not isinstance(did, str) or not ID.fullmatch(did):
+        return 400, {"ok": False, "why": "design", "words": NOT_UNDERSTOOD}
+    deep = too_deep(kit, STORIES)            # a PC only
+    if deep:
+        return 409, {"ok": False, "why": "deep", "words": deep}
+    with arrange.locked(design_lock(kit)):
+        d = _read_json(design_path(kit, did, STORIES))
+        if load_design(kit, did, STORIES) is None or not isinstance(d, dict):
+            return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
+        d["asked"] = round(time.time(), 3)
+        arrange.write_whole(design_path(kit, did, STORIES), d)
+    return 200, {"ok": True}
+
+
+def _asked_or_changed(d):
+    """When a set of stories was last changed, or last asked about with Copy, whichever is later: the chat's
+    commands take the set this is newest for."""
+    def num(v):
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
+    return max(num(d.get("t")), num(d.get("asked")))
+
+
+def _arg(text):
+    """A value for a command line the assistant is handed, quoted so it can be run as pasted: plain double quotes
+    for an ordinary name; a name with a quote, a $, a backtick or a backslash in it is quoted the shell's own way."""
+    text = str(text)
+    if this_computer.WINDOWS:
+        return kit_mod._pc_arg(text)
+    if not set('"$`\\!').intersection(text):
+        return f'"{text}"'
+    return "'" + text.replace("'", "'\"'\"'") + "'"
+
+
+def _pick_there(frames, nums):
+    """Are these photos already in the frames, in this order (other frames between them or not)? Then the pick was
+    made before, and making it again must change nothing."""
+    have = iter(b.get("n") for b in frames)
+    return bool(nums) and all(any(n == x for x in have) for n in nums)
 
 
 def _post_template(body):
@@ -2716,6 +2783,8 @@ def handle_post(handler, path, query):
             code, out = _post_brand(body)
         elif path == "/design-font":
             code, out = add_font(body.get("add"))
+        elif path == "/design-asked":
+            code, out = _post_asked(body)
         else:
             code, out = _post_commit(body)
         arrange._send_json(handler, out, code)
@@ -2780,8 +2849,18 @@ def _shape_wanted(b):
     return "wide" if ar > 1.15 else "tall" if ar < 0.9 else "any"       # DesignPlan.RULES.wide and .tall
 
 
+def _where(b, slides, w):
+    """Which story a frame is on, in words: "story 2", or "stories 1 to 3" for a frame that lies across several
+    (the first and the last story it covers a real part of)."""
+    eps = w * 0.02                       # a frame that only just pokes into the next story is not "across" it
+    first = max(0, min(slides - 1, int(math.floor((b["x"] + eps) / w))))
+    last = max(first, min(slides - 1, int(math.ceil((b["x"] + b["w"] - eps) / w)) - 1))
+    return f"story {first + 1}" if last == first else f"stories {first + 1} to {last + 1}"
+
+
 def _story_set(kit, did=None):
-    """The set of stories a chat command is about: the one named, else the one changed last. (design, every set)."""
+    """The set of stories a chat command is about: the one named, else the one they pressed Copy on, or changed,
+    last (the line they paste names no set). (design, every set)."""
     rows, stamp = arrange.sheet_rows(kit), arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return None, []
@@ -2789,7 +2868,7 @@ def _story_set(kit, did=None):
         if ensure_design(kit, STORIES) is None:
             return None, []
         designs = [_sync(kit, d, rows, stamp, STORIES) for d in list_designs(kit, STORIES)]
-    designs.sort(key=lambda d: (float(d.get("t") or 0), d["id"]), reverse=True)
+    designs.sort(key=lambda d: (_asked_or_changed(d), d["id"]), reverse=True)
     if did is not None:
         return next((d for d in designs if d["id"] == did), None), designs
     return designs[0], designs
@@ -2815,7 +2894,7 @@ def cmd_story_note(kit, did=None):
     st = d["state"]
     say(f"{rec.get('name') or kit.name}  ({kit.name})  stories")
     if len(designs) > 1:
-        say(f"This shoot has {len(designs)} sets of stories. The one changed last is used unless you name another with --design:")
+        say(f"This shoot has {len(designs)} sets of stories. The one they asked about with Copy, or changed, last is used unless you name another with --design:")
         for x in designs:
             say(f"  {x['id']}  \"{x['name']}\"  {x['state']['slides']} stor{'ies' if x['state']['slides'] != 1 else 'y'}" + ("  <- this one" if x["id"] == d["id"] else ""))
     say(f"SET: \"{d['name']}\"  (--design {d['id']})  {st['slides']} stor{'ies' if st['slides'] != 1 else 'y'}")
@@ -2834,20 +2913,20 @@ def cmd_story_note(kit, did=None):
         say(f"FRAMES: {len(frames)} ({len(empty)} empty). story-fill puts your photos into the EMPTY frames in this order"
             + (" (--replace: into every frame, in this order):" if len(empty) < len(frames) else ":"))
         for i, b in enumerate(frames, 1):
-            story = max(0, min(st["slides"] - 1, int((b["x"] + b["w"] / 2) // k["w"]))) + 1
-            across = max(1, round(b["w"] / k["w"])) if b["w"] > k["w"] * 1.5 else 1
-            say(f"  {i:>2}  story {story}" + (f" (across {across} stories)" if across > 1 else "") + f"  wants a {_shape_wanted(b)} photo"
+            say(f"  {i:>2}  {_where(b, st['slides'], k['w'])}  " + ("takes any photo" if _shape_wanted(b) == "any" else f"wants a {_shape_wanted(b)} photo")
                 + ("" if b.get("n") is None else f"  has photo {b['n']}"))
     texts = [b for b in st["blocks"] if b.get("type") == "text"]
     if texts:
         say(f"WORDS: {len(texts)} text box{'es' if len(texts) != 1 else ''} on these stories. They are the photographer's: never change, add or suggest them.")
-    say(f"PHOTOS: {len(arrange.sheet_rows(kit))} in this shoot, numbered as on the kit's sheet (kit.py sheet \"{kit.name}\").")
-    say(f"THEN: design.py story-fill \"{kit.name}\" --photos N,N,N --design {d['id']}")
+    say(f"PHOTOS: {len(arrange.sheet_rows(kit))} in this shoot, numbered as on the kit's sheet (kit.py sheet {_arg(kit.name)}).")
+    say(f"THEN: design.py story-fill {_arg(kit.name)} --photos N,N,N --design {d['id']}")
     return 0
 
 
 def story_fill(kit, nums, did=None, replace=False):
     """Put the assistant's pick into a set's frames, in order. Returns (status, words, design).
+    Safe to run twice: photos that already sit in the frames in this order are "same" and nothing is written; a
+    photo that is already in the set is refused rather than put in a second time (unless replace).
     Empty frames are filled in their own order (every frame, with replace); a set with no frame at all gets one
     story for each photo, each filling its story (on an empty set they become its stories, otherwise they go after
     the last one). Nothing is taken out, no text box is touched, the version before is kept beside the set, and the
@@ -2869,7 +2948,7 @@ def story_fill(kit, nums, did=None, replace=False):
     with arrange.locked(design_lock(kit)):
         if ensure_design(kit, STORIES) is None:
             return "problem", "couldn't read this shoot's numbered list. Nothing was changed.", None
-        designs = sorted(list_designs(kit, STORIES), key=lambda d: (float(d.get("t") or 0), d["id"]), reverse=True)
+        designs = sorted(list_designs(kit, STORIES), key=lambda d: (_asked_or_changed(d), d["id"]), reverse=True)
         d = next((x for x in designs if x["id"] == did), None) if did is not None else designs[0]
         if d is None:
             return "problem", f"this shoot has no set of stories with the id {did}. (design.py show --kind stories lists them.)", None
@@ -2893,6 +2972,16 @@ def story_fill(kit, nums, did=None, replace=False):
             left = 0
         else:
             targets = frames if replace else [b for b in frames if b.get("n") is None]
+            if not replace:
+                # Safe to run twice: when these photos already sit in the frames in this order, the pick was made
+                # before (the first answer was lost, or cut off), and nothing is written.
+                if _pick_there(frames, nums):
+                    return "same", f"\"{d['name']}\" already holds exactly that pick. Nothing was changed.", d
+                there = sorted({b["n"] for b in frames if b.get("n") is not None}.intersection(nums))
+                if there:
+                    return "problem", (f"photo {', '.join(str(n) for n in there)} {'is' if len(there) == 1 else 'are'} already in \"{d['name']}\". "
+                                       "Give only photos that are not in it yet, or add --replace to put your whole pick "
+                                       "into the frames in order. Nothing was changed."), None
             if not targets:
                 return "problem", (f"every frame in \"{d['name']}\" already has a photo ({len(frames)}). Add --replace to put your "
                                    "pick in their place, or have them press + Add stories for more room. Nothing was changed."), None
@@ -2935,7 +3024,7 @@ def cmd_story_fill(kit, photos, did=None, replace=False):
         return 1
     say(("FILLED: " if state == "done" else "SAME: ") + words)
     say("The version before is kept beside the set. No words were added or changed.")
-    say(f"SHOW IT: design.py open \"{kit.name}\" --kind stories --design {d['id']}   (an open page shows it by itself within a few seconds)")
+    say(f"SHOW IT: design.py open {_arg(kit.name)} --kind stories --design {d['id']}   (an open page shows it by itself within a few seconds)")
     return 0
 
 

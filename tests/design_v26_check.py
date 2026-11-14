@@ -295,6 +295,9 @@ def check_v26_page(case, work):
         case("v26 rules: " + name, ok, detail)
 
 
+TOO_LONG = "That note is longer than fits. Keep it under 600 letters."
+
+
 def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, run, jpeg):
     target = work / "v26"
     ok, out = make_kit(target, "Set beach", 14)
@@ -367,6 +370,7 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
             code, out = save(S1, ask=bad)
             case(f"v26 server: a note that is {what} is refused in plain words, and the set is as it was",
                  code == 400 and out.get("ok") is False and out.get("why") == "ask" and isinstance(out.get("words"), str) and out["words"] and (sdesigns / f"{A}.json").read_bytes() == kept, (code, out))
+            case(f"v26 server: ... and only a note that is too long is told it is too long ({what})", (out.get("words") == TOO_LONG) == (what == "601 letters"), out.get("words"))
         html = "<img src=x onerror=window.__pwn=1>\"'&"
         code, out = save(S1, ask=html)
         case("v26 server: a note that looks like page code is kept as the text it is", code == 200 and disk(A).get("ask") == html, (code, out))
@@ -515,6 +519,8 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
             code, o = run(env, "design.py", "story-fill", kit_name, *args)
             case(f"v26 server: story-fill refused: {what}; it says why, and the set is byte for byte as it was", code != 0 and words in o and (sdesigns / f"{A}.json").read_bytes() == filled, o[-300:])
         code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "8,12", "--design", A)
+        case("v26 server: the very same story-fill run a second time (its first answer was lost): SAME, exit 0, and nothing is written",
+             code == 0 and "SAME:" in o and (sdesigns / f"{A}.json").read_bytes() == filled and (sdesigns / f"{A}.prev.json").read_bytes() == pre, o[-300:])
         code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "1,8,12", "--design", A, "--replace")
         case("v26 server: story-fill with the very pick the set holds: SAME, and nothing is written", code == 0 and "SAME:" in o and (sdesigns / f"{A}.json").read_bytes() == filled, o[-300:])
         code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "9,10", "--design", A, "--replace")
@@ -526,6 +532,91 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
              code == 0 and dc["state"]["slides"] == 3 and [(b["n"], b["x"], b["w"], b["h"]) for b in dc["state"]["blocks"]] == [(2, 0, W, H), (4, W, W, H), (6, 2 * W, W, H)], o[-300:])
         code, o = run(env, "design.py", "story-fill", kit_name, "--photos", ",".join(str(i) for i in range(1, 15)) , "--design", C, "--replace")
         case("v26 server: (a set holds what it is given room for: 14 photos into 3 frames is refused)", code != 0 and "Give 3 at the most" in o, o[-200:])
+        # ---------- the review round: safe to run twice, the right set, plain lines ----------
+        cbytes = (sdesigns / f"{C}.json").read_bytes()
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "2,4,6", "--design", C)
+        case("v26 server: story-fill twice on a set that had no frames: the second run is SAME (not a refusal), and the set is byte for byte as the first left it",
+             code == 0 and "SAME:" in o and (sdesigns / f"{C}.json").read_bytes() == cbytes, (code, o[-300:]))
+        seam = json.loads(json.dumps(next(x for x in st["starters"] if x["id"] == "sg-seamless")["template"]))
+        code, out = J(post(P, "/design-new", {"kit": kit_name, "kind": "stories", "token": "v26newset00004", "stamp": STAMP, "state": seam}))
+        SM = out and out.get("design", {}).get("id")
+        case("v26 server: (a set made from Seamless swipe: five empty frames)", code == 200 and SM and len([b for b in out["design"]["state"]["blocks"] if b.get("type") != "text"]) == 5, (code, out and out.get("words")))
+        code, on = run(env, "design.py", "story-note", kit_name, "--design", SM)
+        case("v26 server: story-note says the wide photo lies across \"stories 1 to 3\" (never \"story 2\")",
+             code == 0 and re.search(r"\n\s+1\s+stories 1 to 3\s+wants a wide photo", on) and "across" not in on, on[-800:])
+        case("v26 server: ... and a frame of no particular shape \"takes any photo\" (never \"wants a any photo\")", "takes any photo" in on and "a any" not in on, on[-800:])
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "3,8", "--design", SM)
+        once = (sdesigns / f"{SM}.json").read_bytes()
+        once_prev = (sdesigns / f"{SM}.prev.json").read_bytes()
+        ns = [b.get("n") for b in sorted((b for b in json.loads(once)["state"]["blocks"] if b.get("type") != "text"), key=lambda b: (b.get("slot") or 0, b["x"], b["y"], b["id"]))]
+        case("v26 server: story-fill with fewer photos than empty frames fills the first ones", code == 0 and ns == [3, 8, None, None, None], (ns, o[-300:]))
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "3,8", "--design", SM)
+        case("v26 server: ... and the same command again does NOT put the same photos in a second time: SAME, the set and the version kept beside it byte for byte as they were",
+             code == 0 and "SAME:" in o and (sdesigns / f"{SM}.json").read_bytes() == once and (sdesigns / f"{SM}.prev.json").read_bytes() == once_prev, (code, o[-300:]))
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "8,9", "--design", SM)
+        case("v26 server: a pick with a photo that is already in the set (and is not the same pick) is refused, saying which, and nothing changes",
+             code != 0 and "photo 8 is already in" in o and (sdesigns / f"{SM}.json").read_bytes() == once, (code, o[-300:]))
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "9,10", "--design", SM)
+        ns = [b.get("n") for b in sorted((b for b in disk(SM)["state"]["blocks"] if b.get("type") != "text"), key=lambda b: (b.get("slot") or 0, b["x"], b["y"], b["id"]))]
+        case("v26 server: ... while new photos go into the frames still empty", code == 0 and ns == [3, 8, 9, 10, None], (ns, o[-300:]))
+
+        # a page's save whose answer was lost, sent again AFTER the assistant's pick, never wipes the pick
+        r0 = disk(A)["rev"]
+        S9 = {"slides": 3, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, None, W), _frame(3, None, 2 * W), _text(4, 130, 806.4)]}
+        body9 = {"kit": kit_name, "kind": "stories", "design": A, "stamp": STAMP, "base": r0, "page": "v26serverpage09", "state": S9}
+        code, out = J(post(P, "/design", body9))
+        code2, o = run(env, "design.py", "story-fill", kit_name, "--photos", "3,4", "--design", A)
+        code3, out3 = J(post(P, "/design", body9))
+        case("v26 server: a page saves, the assistant's pick lands, and the page sends that very save again (its answer was lost): told there is something newer, and the pick is still in the set",
+             code == 200 and code2 == 0 and code3 == 409 and out3.get("why") == "newer" and [b.get("n") for b in disk(A)["state"]["blocks"] if b.get("type") != "text"] == [1, 3, 4],
+             (code, code2, code3, out3 and out3.get("why"), [b.get("n") for b in disk(A)["state"]["blocks"] if b.get("type") != "text"]))
+
+        # Copy tells the Assistant WHICH set was asked about
+        code, on = run(env, "design.py", "story-note", kit_name)
+        case("v26 server: (the first set was changed last, so with no set named the chat takes it)", code == 0 and "SET: \"Set beach stories\"" in on, on[:400])
+        bb, bprev = disk(B), (sdesigns / f"{B}.prev.json").read_bytes()
+        code, out = J(post(P, "/design-asked", {"kit": kit_name, "kind": "stories", "design": B}))
+        ba = disk(B)
+        case("v26 server: Copy pressed on an OLDER set: the Assistant notes when, and nothing else about the set changes (layout, counter, name, note, when it was changed, the version beside it)",
+             code == 200 and out == {"ok": True} and isinstance(ba.get("asked"), float) and {k: v for k, v in ba.items() if k != "asked"} == bb
+             and (sdesigns / f"{B}.prev.json").read_bytes() == bprev, (code, out))
+        code, on = run(env, "design.py", "story-note", kit_name)
+        case("v26 server: ... and story-note with no set named now takes the set they pressed Copy on, not the one changed last", code == 0 and "SET: \"Set beach stories 2\"" in on, on[:400])
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "5,6")
+        case("v26 server: ... story-fill with no set named goes to that same set", code == 0 and "\"Set beach stories 2\"" in o and disk(A)["rev"] == r0 + 2, o[-300:])
+        code, out = J(post(P, "/design-asked", {"kit": kit_name, "kind": "stories", "design": B}))
+        case("v26 server: Copy pressed again is harmless", code == 200 and {k: v for k, v in disk(B).items() if k != "asked"} == bb)
+        cwas = (cdesigns / f"{CID}.json").read_bytes()
+        for what, b, want in (("a carousel's design", {"kit": kit_name, "design": CID}, 400), ("a carousel named as stories", {"kit": kit_name, "kind": "stories", "design": CID}, 404),
+                              ("an id that is not one", {"kit": kit_name, "kind": "stories", "design": "../etc"}, 400),
+                              ("a set that is not there", {"kit": kit_name, "kind": "stories", "design": "dnosuchset0001"}, 404),
+                              ("a shoot that is not there", {"kit": "../studio", "kind": "stories", "design": B}, 404)):
+            code, out = J(post(P, "/design-asked", b))
+            case(f"v26 server: /design-asked refused for {what}, in plain words, nothing written", code == want and out.get("ok") is False and (cdesigns / f"{CID}.json").read_bytes() == cwas
+                 and {k: v for k, v in disk(B).items() if k != "asked"} == bb, (code, out))
+        code, _, raw = ask(P, "POST", "/design-asked", body=json.dumps({"kit": kit_name, "kind": "stories", "design": A}).encode(), headers={"Content-Type": "application/json", "Origin": "http://evil.example"})
+        case("v26 server: /design-asked from another website is refused, and the first set has no mark", code == 403 and "asked" not in disk(A), (code, raw[:120]))
+        code, o = run(env, "design.py", "story-fill", kit_name, "--photos", "2,4,7", "--design", C, "--replace")
+        code, on = run(env, "design.py", "story-note", kit_name)
+        case("v26 server: a set CHANGED after that Copy is the one taken again (whichever is later, asked or changed)", code == 0 and "SET: \"Set beach stories 3\"" in on, on[:400])
+
+        # one odd record in the editing queue never blanks the list
+        qd = json.loads((studio / "queue.json").read_text(encoding="utf-8"))
+        qd["shoots"] = ["just a string", None, {"id": "o1", "name": "Odd due", "status": "waiting", "due": 20261201, "added": 7},
+                        {"id": "o2", "name": 12, "status": "waiting"}] + qd["shoots"][:2]
+        (studio / "queue.json").write_text(json.dumps(qd), encoding="utf-8")
+        code, _, raw = ask(P, "GET", "/design-queue")
+        qo = json.loads(raw)
+        case("v26 server: odd records in the editing queue (not a record, a date that is a number, a name that is a number) are left out or read as undated; the others still show",
+             code == 200 and qo.get("ok") and qo["names"] == ["Shoot 1", "Shoot 2", "Odd due"], (code, raw[:200]))
+
+        # the lines the commands print can be run as pasted, whatever the shoot's folder is called
+        if os.name != "nt":
+            import shlex
+            import design as design_mod
+            odd = ['2026-11-01 Set beach', '2026-11-01 Zoë "Q" & 🎉', "It's \"both\" $HOME `x`", "back\\slash", "bang!"]
+            case("v26 server: a shoot's folder in a printed command line is quoted so the line runs as pasted (a quote, an apostrophe, a $, a backtick)",
+                 all(shlex.split(design_mod._arg(n)) == [n] for n in odd) and design_mod._arg(odd[0]) == f'"{odd[0]}"', [design_mod._arg(n) for n in odd])
         case("v26 server: no command touched a photo, and the Stories folder still holds both saved sets exactly", _tree(kit / "Photos") == photos_before
              and all(_tree(stories_dir).get(k) == v for k, v in saved_tree.items()))
         text = [s for a in seen for s in _strings(a)]
@@ -754,6 +845,35 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             case("v26 browser: ... the words on the stories are untouched, the note is still in its box, and a quiet line says the pick is in",
                  texts(sF) == texts(sA) and c.js("document.getElementById('ask-note').value") == note and c.text("#ask-said") == "Your assistant’s pick is in your stories.", c.text("#ask-said"))
             case("v26 browser: ... nothing of it was sent back as a change of theirs (the set on the drive is the assistant's, once)", disk(A)["state"] == sF and disk(A).get("filled_by") == "assistant")
+            # ---- the review round: which set was asked about, and never under their hands ----
+            case("v26 browser: Copy told the Assistant which set was asked about (a time noted with the set)", isinstance(disk(A).get("asked"), float), disk(A).get("asked"))
+            typing = Jx("{area: (function(){ var t = document.createElement('textarea'); document.body.appendChild(t); t.focus(); var r = Designer.ask.typing(); t.remove(); return r; })(), "
+                        "note: (function(){ document.getElementById('ask-note').focus(); return Designer.ask.typing(); })()}")
+            case("v26 browser: \"typing\" is true with the caret in a box of words, and false in the note's own box", typing == {"area": True, "note": False}, typing)
+            c.click("#d-name-box")
+            code, outf = run(env, "design.py", "story-fill", kit_name, "--photos", "37,36,35,34,33,32,31", "--design", A, "--replace")
+            c.js("Designer.ask.look(); true")
+            time.sleep(6)
+            c.js("Designer.ask.look(); true")
+            time.sleep(1)
+            held = Jx("{ns: Designer.st.blocks.filter(function(b){ return b.type !== 'text'; }).map(function(b){ return b.n; }).join(','), focus: document.activeElement.id, typing: Designer.ask.typing()}")
+            case("v26 browser: with the caret in a box (the set's name), a newer pick from the assistant is NOT taken: the box stays theirs and the stories do not change under their hands",
+                 code == 0 and held == {"ns": "31,32,33,34,35,36,37", "focus": "d-name-box", "typing": True}, held)
+            c.js("document.activeElement.blur(); true")
+            try:
+                c.wait_for("Designer.st.blocks.filter(function(b){ return b.type !== 'text'; }).map(function(b){ return b.n; }).join(',') === '37,36,35,34,33,32,31'", 14)
+                took2 = True
+            except cd.Timeout:
+                took2 = False
+            case("v26 browser: ... and it is taken once they leave the box", took2, c.js("Designer.st.blocks.map(function(b){ return b.n; }).join(',')"))
+            sF = st()
+            # a note being typed while the newest set arrives stays theirs, and is saved
+            c.click("#ask-note")
+            c.js("document.getElementById('ask-note').value = 'Typed as the pick came in'; true")
+            c.js("Designer.load(Designer.design.id).then(function(){ return true; })")
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 10)
+            case("v26 browser: a note in the box that differs when the newest set arrives (they were typing) is kept in the box AND saved with the set",
+                 c.js("document.getElementById('ask-note').value") == "Typed as the pick came in" and disk(A).get("ask") == "Typed as the pick came in" and disk(A)["state"] == sF, disk(A).get("ask"))
             note_box = Jx("{v: document.getElementById('ask-note').value}")
             c.click("#ask-note")
             c.key("Mod+a")

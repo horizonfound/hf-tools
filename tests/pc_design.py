@@ -1312,7 +1312,21 @@ def v26_checks(kit):
     db = design.load_design(kit, B, "stories")
     check("v26: on a set with nothing on it the pick becomes one story for each photo", res == "done" and db["state"]["slides"] == 2
           and [(b["n"], b["x"], b["w"], b["h"]) for b in db["state"]["blocks"]] == [(1, 0, 1080, 1920), (2, 1080, 1080, 1920)], (res, words))
+    # the review round: safe to run twice, and the set they pressed Copy on
+    kept_a, kept_b = design.design_path(kit, A, "stories").read_bytes(), design.design_path(kit, B, "stories").read_bytes()
+    r1, _, _ = design.story_fill(kit, [2, 3], A)
+    r2, _, _ = design.story_fill(kit, [1, 2], B)
+    check("v26: the very same pick run again (no --replace, with and without frames to start from) is \"same\", and both sets are byte for byte as they were",
+          (r1, r2) == ("same", "same") and design.design_path(kit, A, "stories").read_bytes() == kept_a and design.design_path(kit, B, "stories").read_bytes() == kept_b, (r1, r2))
+    check("v26: (the second set was changed last, so a chat command with no set named takes it)", design._story_set(kit)[0]["id"] == B)
+    code, out = design._post_asked({"kit": kit.name, "kind": "stories", "design": A})
+    da = json.loads(design.design_path(kit, A, "stories").read_text(encoding="utf-8"))
+    check("v26: Copy pressed on the older set: only a time is noted with it, and the chat's commands now take that set",
+          code == 200 and {k: v for k, v in da.items() if k != "asked"} == json.loads(kept_a.decode("utf-8")) and design._story_set(kit)[0]["id"] == A
+          and design.load_design(kit, A, "stories")["rev"] == d2["rev"], (code, out))
     check("v26: with no editing queue there are no names (an empty list, not a problem)", design.queue_names() == [])
+    (STUDIO / "queue.json").write_text(json.dumps({"shoots": ["odd", None, {"id": "x", "name": "Still here", "status": "waiting", "due": 7}], "picks": {}, "manual_order": False}), encoding="utf-8")
+    check("v26: one odd record in the editing queue never blanks the names", design.queue_names() == ["Still here"], design.queue_names())
     queue = {"shoots": [{"id": "a", "name": "Zoë & Été 🌊", "status": "waiting", "due": "2026-12-02", "added": "2026-11-01T10:00:00"},
                         {"id": "b", "name": "CON: aux / nul?", "status": "waiting", "due": "2026-12-01", "added": "2026-11-01T10:01:00"},
                         {"id": "c", "name": "Delivered", "status": "finished"}], "picks": {}, "manual_order": False}
