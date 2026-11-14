@@ -1832,8 +1832,17 @@ class Handler(SimpleHTTPRequestHandler):
             # serve_content decodes the address and checks it part by part (never "." or ".."). The old check here,
             # for ".." anywhere in the address as sent, only kept out a kit named like "Beach... sunset" (Nov 6).
             return self.serve_content(path[len("/content/"):])
+        if path in ("/backups", "/make-posts", "/home-data", "/kit-thumb"):
+            # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
+            import home_base
+            return home_base.handle_get(self, path, urlsplit(self.path).query)
         if path == "/open":
             return self.open_kit_folder(urlsplit(self.path).query)
+        if path in ("/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
+                and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            # these open a folder window, a folder picker or another page server: for this server's own pages
+            # only, never for a page of another website (the Host was checked above)
+            return self.answer({"ok": False, "words": ""}, HTTPStatus.FORBIDDEN)
         if path == "/open-home":
             return self.open_home_folder()
         if path == "/open-drop":
@@ -1899,7 +1908,7 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up, or plug in the drive it lives on."})
         if drop:
             h = h / posts.DROP_NAME
             h.mkdir(exist_ok=True)
@@ -1918,7 +1927,7 @@ class Handler(SimpleHTTPRequestHandler):
             s = next((x for x in edit_queue.load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
             ok, words = edit_queue.open_folder(s) if s else (False, "I don't know that shoot.")
         except Exception as e:  # noqa: BLE001
-            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask Claude."
+            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask your assistant."
         self.answer({"ok": ok, "words": words})
 
     def report_url(self, query):
@@ -1937,19 +1946,22 @@ class Handler(SimpleHTTPRequestHandler):
                 s = next((x for x in shoots if x["id"] == sid), None)
             if not s or not s.get("studio"):
                 return self.answer({"ok": False, "words": "There's no report for this one. It didn't come from a backup."})
-            studio = Path(s["studio"])
-            if not studio.is_dir():
-                drive = this_computer.drive_words(studio) or "the drive"   # "Big Kahuna"; on a PC "the drive that was E:"
+            # the backup's records wherever they are now (before or after it settled), as the queue's own
+            # Open photo folder finds a shoot's folder; a shoot on more than one card opens the shoot's one page
+            import home_base
+            studio = home_base.records_of(s["studio"])
+            if studio is None or not studio.is_dir():
+                drive = this_computer.drive_words(s["studio"]) or "the drive"   # "Big Kahuna"; on a PC "the drive that was E:"
                 return self.answer({"ok": False, "words": f"Plug in {drive} to see this report."})
             import serve_report
             url = serve_report.report_url(studio)
             if not url:
-                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and Claude will."})
+                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and your assistant will."})
             # always the top of the report (Dustin, Nov 5: jumping to the shoot's name box opened it "scrolled
             # half way down the page", which read as a glitch)
             return self.answer({"ok": True, "url": url})
         except Exception as e:  # noqa: BLE001
-            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and Claude will."})
+            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and your assistant will."})
 
     def pick_folder(self):
         """The home page's "Choose the folder your finished photos are in": the computer's own folder picker
@@ -1959,11 +1971,11 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up."})
         if not (this_computer.MAC or this_computer.WINDOWS):
             return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
         if this_computer.WINDOWS:
-            no_window = ("The folder window didn't open. Tell Claude which folder your finished photos are in (you can copy its "
+            no_window = ("The folder window didn't open. Tell your assistant which folder your finished photos are in (you can copy its "
                          f"address from the top of its {this_computer.FILES_APP} window), and it'll copy the photos for you.")
         else:
             no_window = f"The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the {this_computer.COPY_KEY} key so it copies)."
@@ -1972,7 +1984,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.answer({"ok": False, "words": "No folder chosen." if why == "cancelled" else no_window})
         got = posts.bring(h, folder)
         if not got:
-            return self.answer({"ok": False, "words": "Something stopped the copy. Tell Claude and it'll sort it out."})
+            return self.answer({"ok": False, "words": "Something stopped the copy. Tell your assistant and it'll sort it out."})
         copied, skipped, dest = got
         left = ", ".join(posts.plural(n, k) for k, n in sorted(skipped.items()))
         label = Path(folder).name
@@ -1987,7 +1999,7 @@ class Handler(SimpleHTTPRequestHandler):
         """The live editing-queue page's address, starting its server if needed (serve_report has the logic)."""
         import serve_report
         u = serve_report.queue_url()
-        self.answer({"url": u, "words": None if u else "Ask Claude: show my editing queue"})
+        self.answer({"url": u, "words": None if u else "Ask your assistant: show my editing queue"})
 
     def open_kit_folder(self, query):
         """A kit page's "Open the ... folder" button: only a kit in Content, or one of its own folders
@@ -2186,6 +2198,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
             import talking_page
             return talking_page.handle_post(self, path, urlsplit(self.path).query)
+        if path == "/kit-archive":
+            # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
+            import home_base
+            return home_base.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":

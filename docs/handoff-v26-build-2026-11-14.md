@@ -89,3 +89,60 @@ Two reviewers drove the queue page beside Nicole's. Her words, order and states 
 5. **Only a delivered shoot can be archived; Mark as delivered clears an old archive mark; a delivered shoot archived before the next chat is not offered a reel until it is brought back** (the first builder's choices where hers is silent).
 6. **Make posts from this shoot opens the Make posts screen, not that shoot's own kit** (as hers; the link carries no shoot).
 
+
+## Stage B, built (Nov 14): the home base and its two screens
+
+**What a photographer sees.** The home page is Nicole's home base: "Welcome to your home base.", her two paragraphs, Today, then "Your workflow, step by step" with four cards in the order of the work (1 Back up a card, 2 My editing queue, 3 Make posts from a shoot, 4 My posting queue) and Open my Assistant folder as a small card. No recent-shoots list, no drop-down steps. Steps 1 and 3 open screens of their own:
+
+- **Back up a card** (`/backups`): her two paragraphs, the light steps box (whether a card is in; "backup now" with Copy), and **Your backups**: the 10 newest, "Show 9 older backups" with month headings, a search by shoot name. Each backup: Card safe to format, Second copy made / No second copy, Something needs a look: see the report. Each shoot: To edit with its due date / Edited / Just for you, then Open this folder with See the report under it. A drive that isn't plugged in and a folder that was moved each have her line in place of a dead button.
+- **Make posts from a shoot** (`/make-posts`): the steps box (Select the folder with your finished photos, then "make my posts" with Copy), and **Your post kits**: the 20 newest, Show older by month, a search that includes archived kits, Archive and Bring it back.
+
+**Our way underneath.**
+- New file `scripts/home_base.py`: her words whole in `WORDS` (ours, four lines, in `OUR_WORDS`), the look (her layout in `look.py`'s colours and font, no serif, nothing from the internet), both screens, what they read, the kit archive. `home.py` draws the home page from it. Routes on the posting server: `GET /backups`, `/make-posts`, `/home-data`, `/kit-thumb`, `POST /kit-archive`.
+- **The cards of one shoot are one backup ("2 cards") from our own link** (`shoot.json`, written by `night.py --with` or `shoot_report.py link`), never from the backups' names. Two backups that only look alike by name ("Smith day", "Smith day, card 2") stay two.
+- **A sample backup never says safe to format.** It says "Keep the card: this was a sample" (the report's own words). "Card safe to format" needs: finished, no problems, every file's copy checked, the second copy too when there is one.
+- **Read live, nothing new stored.** Every backup's records are found where they are now (settled or not, `where.locate`), its manifest read once per change. See the report now finds a settled backup's records too (before, a queue record that still named the day folder said "Plug in the drive").
+- **The kit archive is one small list,** `~/.studio/kit-archive.json`, with the list before kept beside it. A second press writes nothing. No kit is ever moved. A press is checked field by field behind the pickers' guard; a name that is not a kit in Your Content right now is refused in her words ("That shoot isn't in your content folder.").
+- **Every shoot folder in Your Content that holds a kit record is listed,** also one whose page was never written (v25 section 10); its page is built when it is opened.
+- **The page never sees a path.** A shoot is its id, a kit its folder name, a drive its name.
+- **Another website cannot press the buttons.** The routes that open a folder window, the folder picker, a report or the queue (`/open-home`, `/open-drop`, `/open-shoot`, `/report-url`, `/pick-folder`, `/queue-url`) and `/home-data` now refuse a cross-site ask. Older than v26.
+- **The pages follow what changes:** a backup that lands, a kit that is made, a shoot marked as delivered in the chat show on an open screen within a few seconds, without a reload.
+- **Pressing a card no longer reloads the home page.** Before, recording a press changed the page's stamp, so the page reloaded and wiped the line a press had just put under its button.
+- Every "Back to home" already went to `/home`; the editing queue's "Make posts from this shoot" now lands on a real screen. No port 8799 anywhere.
+- The lines these buttons answer with say "your assistant", never "Claude".
+
+**Choices where her spec was silent (plainest behaviour):**
+1. A search inside a two-card shoot shows only the shoots that match; when only one card's shoot matches, it shows without "2 cards" (exactly what her page does).
+2. A backup still running shows "Something needs a look: see the report" (hers: anything not finished is not safe).
+3. A second copy counts as made only when every file's second copy was checked (hers: whenever a second place was named).
+4. A shoot with video clips reads "20 photos and 4 video clips" (hers would say photos).
+5. The kit search looks at the kit's name and its folder name (hers: the short name).
+6. A kit's three small pictures are made the first time they are shown, one at a time, and kept.
+7. A folder in Your Content with no kit record (made by hand) is not listed: there is no page it could open.
+8. Today's last-backup line reads "Nov 13, 2026" (hers), not "yesterday".
+9. With no Assistant folder yet, the folder card and the folder button say "There's no The Assistant folder yet. Ask your assistant to set one up." in place (the old drop-down with "set up my Assistant folder" to paste is gone with the drop-downs).
+10. Post kit pages keep "Back to home" going to the home page (hers sent it to the Make posts screen only on her test copy).
+
+**Hers left out, on purpose:** her three test-copy lines, `?home=test`, port 8799, the `/hp/` pass-through (one server here), the 20-second cache (ours reads each manifest once per change instead), grouping cards by name.
+
+**Tests:** `tests/home_base_check.py` (new): 182 checks with the pages in a hidden Chrome, 103 without, on both Pythons. Her words are compared with her three pages both ways (ours in hers, hers in ours; her three test-copy lines are the named list left out). 28 behaviours were each taken out in a scratch copy and the test failed each time. In GitHub's check: without Chrome on Windows, with Chrome on the Mac's page job.
+
+**Not tried:** Dustin's or Nicole's own hand; the Claude app's pane; a real backup, a real two-card shoot, a real drive unplugged (the tests use records and empty folders, and a drive name that is on no computer); hundreds of real backups (how long the first read takes); real photos in a kit's small pictures; Open this folder, the folder picker and See the report pressed for real from these screens (the test answers them inside the page so no Finder window or report server opens; the routes themselves are older and unchanged but for where a report's records are looked for); Windows (first push); a touch screen.
+
+**Theirs to settle (for the note to Nicole, stage E):**
+1. **"Single photos" is back on the Make posts card** (hers: "reels, carousels, single photos, stories and captions"). The Nov 11 fix round had taken "single photos" out, since the kit has no Singles card (a single post is a one-slide carousel). Built: hers, whole.
+2. **"It also picks six photos from each shoot... and marks them "sneak peek" in Lightroom"** is on the Back up a card screen for everyone. True on a Mac for RAW shoots; a shoot of only video clips gets no sneak peeks, and JPEG shooters get no Lightroom mark. Built: hers, whole.
+3. **Someone brand new sees "Nothing due and nothing waiting." under Today** (hers). Ours used to say "Once you've backed up a shoot or made some posts, what's due and what's ready to post shows up here." for a first-timer (Dustin, Nov 5: never list what is empty). Built: hers.
+4. **The heading is always "Welcome to your home base."** "Welcome back." and "Hi, I'm Sherman." are gone from the page (the hello in the chat still follows how well they know it).
+5. **"Edited" on a backup's shoot means marked as delivered** in the editing queue (her word here; the queue itself says Delivered). A delivered shoot that was then archived in the queue also reads Edited.
+6. **Our lines:** "Keep the card: this was a sample"; "video clip(s)" in a count; the saved copy's "This is a saved copy. Ask your assistant to “show the Assistant” for the live one."
+7. **A moved folder:** her line says "tell your assistant where it went", and the assistant has no way to re-point a backup's records. The instructions say to say so plainly and that moving it back makes the button work. A real re-point command is its own job.
+8. **Archive asks nothing first** on a post kit (hers; the editing queue's Archive asks "Are you sure?").
+9. **No chat command archives a kit** (the button only).
+
+**For later stages:**
+- Stage K (the post kit) and stage H ("make my posts" only brings photos in and opens the post kit): the Make posts screen's step 2 already says "Your shoot's post kit opens, and it shows up below."
+- Stage C's "My editing queue" story fills from the queue: hers read `/home-data`'s `queue`; ours has no `queue` in `/home-data` yet. Add it there (names in queue order) or read `edit_queue` directly.
+- `tests/kit_steps_check.py` has one check failing before and after this stage (her v26 post-kit.html no longer has two of our kit lines): stage K's.
+- `home.card_in()` has a tests' switch, `STUDIO_CARD_FOR_TESTS` ("none" or "NAME:files"), so a test never looks at a real drive for a card.
+- `home.fingerprint()` no longer moves when a press is recorded; it now moves when `kit-archive.json` changes.

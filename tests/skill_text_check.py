@@ -122,7 +122,8 @@ def check_search():
          line.startswith("Reel: the pick is saved; the reel is made on the reel page") and "not here" in line
          and not re.search(r'say\("Reel: run reel\.py make', kit) and kit.count("say(REEL_LINE + ") == 2, line[:200])
     home = read(SCRIPTS / "home.py")
-    case("the home page names no reel picker", not re.search(r"picker", home.split("# ---------- the page ----------", 1)[-1].split("CSS_EXTRA", 1)[0], re.I))
+    case("the home page names no reel picker", not re.search(r"\bpicker", home.split("# ---------- the page ----------", 1)[-1].split("def _in_address", 1)[0], re.I)
+         and not re.search(r"reel picker", read(SCRIPTS / "home_base.py"), re.I))
 
 
 # ---------- 2. the core table ----------
@@ -590,12 +591,14 @@ def check_whole_build():
     import json
     # Nicole, v20: never say on a page that the words "sound like you". The Assistant shapes what they said like an editor would.
     banned = re.compile(r"sounds? like you|in your voice|the way you write", re.I)
-    home = read(SCRIPTS / "home.py")
-    card = re.search(r'\("posts", "Make posts from a shoot",\s*"([^"]+)"', home)
-    case("the home page's Make posts card promises no captions that 'sound like you' or are 'written the way you write'",
-         bool(card) and not banned.search(card.group(1)) and "captions" in card.group(1), card.group(1) if card else "card not found")
-    case("... and names the kit's three pieces (no 'single photos': a single post is a one-slide carousel)",
-         bool(card) and "single photos" not in card.group(1) and all(w in card.group(1) for w in ("a reel", "a carousel", "stories")))
+    # (Nov 14: the home base's words are Nicole's v26, whole, in home_base.WORDS. Her Make posts card names
+    # "reels, carousels, single photos, stories and captions"; a single post is made in the carousel designer.)
+    base = read(SCRIPTS / "home_base.py")
+    cards = re.findall(r'"(?:c3_p|m_lede)": "([^"]+)"', base)
+    case("the home base's Make posts card and screen promise no captions that 'sound like you' or are 'written the way you write'",
+         len(cards) == 2 and not any(banned.search(c) for c in cards) and all("captions" in c for c in cards), cards)
+    case("... and name what the kit makes, in her words (v26)",
+         len(cards) == 2 and all(all(w in c for w in ("reels", "carousels", "stories")) for c in cards))
     plug = json.loads(read(PLUGIN / ".claude-plugin" / "plugin.json"))["description"]
     market = json.loads(read(ROOT / ".claude-plugin" / "marketplace.json"))["plugins"][0]["description"]
     case("the plugin's one-line description promises no captions 'in your voice'", not banned.search(plug), plug)
