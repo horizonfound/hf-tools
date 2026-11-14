@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gold hour, six ways</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;color:#2B2520;background:#F1EFEB;-webkit-font-smoothing:antialiased;font-size:16px;line-height:24px}
+h1,h2,h3,p{margin:0;padding:0}
+.pg{width:1440px;margin:0 auto;padding:48px 40px 48px;box-sizing:border-box}
+.tiny{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;line-height:18px}
+.gw{display:flex;gap:28px;margin-top:12px;align-items:flex-start}
+.gp{flex:none;width:300px;height:237px;border-radius:12px;border:1px solid rgba(43,37,32,.12);box-sizing:border-box;background-color:#D1CCC0;background-size:cover;background-position:center}
+.gs{flex:1 1 0;min-width:0;display:grid;grid-template-columns:repeat(8,1fr);gap:14px 10px}
+.gs div{min-width:0;font-size:11px;line-height:15px;color:#6A625A}
+.gs b{display:block;color:#2B2520;font-weight:600}
+.gn{font-size:13px;line-height:20px;color:#6A625A;margin-top:12px}
+.gs i{display:block;height:44px;border-radius:8px;border:1px solid rgba(43,37,32,.10);margin-bottom:6px;box-sizing:border-box}
+.cw{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:28px;padding:36px 36px 38px;margin-top:32px;box-sizing:border-box}
+.cw .tiny{color:var(--accentText)}
+.top{display:flex;gap:40px;align-items:flex-start}
+.tl{flex:0 0 500px}
+.tr{flex:1 1 0;min-width:0}
+.nm{font-size:40px;line-height:46px;letter-spacing:-.02em;font-weight:600}
+.pick{display:inline-block;font-size:12px;line-height:18px;font-weight:600;padding:3px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--inkSoft);margin-bottom:10px}
+.one{font-size:17px;line-height:26px;margin-top:10px}
+.fg{font-size:13px;line-height:20px;color:var(--inkSoft);margin-top:12px}
+.fg b{color:var(--ink);font-weight:600}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:14px 8px}
+.sw div{font-size:11.5px;line-height:15px;color:var(--inkSoft);min-width:0}
+.sw i{display:flex;align-items:center;justify-content:center;height:54px;border-radius:10px;border:1px solid rgba(0,0,0,.08);margin-bottom:6px;box-sizing:border-box;font-style:normal;font-size:15px;font-weight:600}
+.sw b{display:block;color:var(--ink);font-weight:600}
+.sw .x i{height:34px}
+.st{display:flex;gap:26px;margin-top:16px;font-size:13px;line-height:20px;font-weight:600;align-items:center}
+.st span{display:inline-flex;align-items:center;gap:7px}
+.st i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.minis{display:flex;gap:28px;margin-top:30px;align-items:stretch}
+.mc{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+.fr{margin-top:8px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 10px 30px rgba(60,40,20,.07);flex:1 1 auto;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel);font-size:14px;font-weight:600}
+.bar small{font-weight:400;color:var(--inkSoft);font-size:13px}
+.b{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 20px;border-radius:999px;background:var(--accent);border:1px solid var(--accentEdge);color:var(--accentInk);font-weight:600;font-size:14px;box-sizing:border-box;white-space:nowrap}
+.b.s{height:32px;padding:0 14px;font-size:13px}
+.o{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 18px;border-radius:999px;border:1.5px solid var(--accentText);color:var(--accentText);font-weight:600;font-size:14px;box-sizing:border-box;white-space:nowrap;background:transparent}
+.pg .o{border-color:var(--ink);color:var(--ink)}
+.pg .b{box-shadow:0 1px 2px rgba(90,60,10,.18)}
+.o.s{height:32px;padding:0 14px;font-size:13px;border-width:1px;border-color:var(--lineStrong);color:var(--ink);background:var(--panel)}
+.hero{padding:26px 28px 22px;text-align:center}
+.hero h3{font-size:31px;line-height:35px;letter-spacing:-.02em;font-weight:600;margin-top:8px;text-wrap:balance}
+.hero h3 em,.sm em{font-style:normal;color:var(--accentText)}
+.hero p{font-size:14px;line-height:21px;color:var(--inkSoft);max-width:500px;margin:10px auto 0}
+.row{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.pts{display:flex;gap:10px;padding:0 28px}
+.pt{background-size:cover;background-position:center;border-radius:10px;background-color:var(--bgAlt)}
+.pts .pt{flex:1 1 0;height:168px}
+.alt{background:var(--bgAlt);padding:18px 28px 20px;margin-top:22px;flex:1 1 auto}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.stp{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 12px 13px;font-size:13px;line-height:18px;font-weight:600}
+.stp u{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--second);color:var(--secondInk);font-size:12px;text-decoration:none;margin-bottom:8px}
+.foot{background:var(--panel);color:var(--ink);border-top:1px solid var(--line);padding:12px 28px;font-size:13px;line-height:19px;display:flex;justify-content:space-between;align-items:center}
+.foot b{font-weight:600}
+.foot.dk{background:var(--deep);color:var(--deepInk);border-top-color:var(--deep)}
+.cap{font-size:12.5px;line-height:18px;color:var(--inkSoft);margin-top:8px}
+.app{padding:20px 24px 22px;flex:1 1 auto}
+.app h3{font-size:25px;line-height:30px;letter-spacing:-.01em;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-sizing:border-box}
+.td{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;line-height:20px;padding:7px 0;border-top:1px solid var(--line)}
+.td:first-of-type{border-top:0}
+.pill{font-size:12px;line-height:18px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.acts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+.act{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.act b{font-size:14.5px;line-height:20px;font-weight:600}
+.act span.d{font-size:12.5px;line-height:18px;color:var(--inkSoft)}
+.act .b,.act .o{margin-top:4px}
+.shoot{display:flex;align-items:center;gap:12px;margin-top:12px}
+.shoot .pt{flex:none;width:56px;height:56px}
+.shoot div.t{flex:1 1 auto;min-width:0;font-size:13.5px;line-height:19px}
+.shoot div.t b{display:block;font-weight:600;font-size:14.5px}
+.shoot div.t span{color:var(--inkSoft)}
+.tintb{background:var(--tint);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:13.5px;line-height:20px}
+.tintb b{font-weight:600;color:var(--accentText)}
+.cmp{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:16px}
+.sm{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.sm .in{padding:18px 18px 16px}
+.sm h4{margin:6px 0 0;font-size:19px;line-height:23px;font-weight:600;letter-spacing:-.01em}
+.sm .pt{height:120px;margin-top:14px}
+.sm .dp{background:var(--bgAlt);color:var(--ink);border-top:1px solid var(--line);font-size:12px;line-height:18px;padding:8px 18px;font-weight:600}
+
+.cmp{grid-template-columns:repeat(6,1fr);gap:14px}
+.sm .in{padding:16px 16px 14px}
+.sm h4{font-size:16px;line-height:20px}
+.sm .pt{height:96px;margin-top:12px}
+.sm .dp{padding:7px 16px;display:flex;align-items:center;gap:8px}
+.sm .dp u{flex:none;width:14px;height:14px;border-radius:50%;background:var(--second);border:1px solid rgba(0,0,0,.08);box-sizing:border-box}
+.trs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.trd{background:#FBFAF7;border:1px solid rgba(43,37,32,.12);border-radius:14px;padding:14px 16px 14px;box-sizing:border-box;display:flex;flex-direction:column}
+.trd p{font-size:13.5px;line-height:20px;color:#2B2520}
+.trd .src{font-size:12px;line-height:18px;color:#6A625A;margin-top:8px}
+.trd .src b{color:#2B2520;font-weight:600}
+.trd .dots{display:flex;gap:6px;margin-bottom:10px}
+.trd .dots i{width:34px;height:22px;border-radius:6px;border:1px solid rgba(43,37,32,.12);box-sizing:border-box;display:block}
+.cw{padding:30px 36px 32px;margin-top:24px}
+.tl{flex:0 0 470px}
+.nm{font-size:36px;line-height:42px}
+.one{font-size:16px;line-height:24px;margin-top:8px}
+.sw{gap:10px 8px}
+.sw i{height:46px}
+.sw .x i{height:26px}
+.st{margin-top:12px}
+.fg{margin-top:8px}
+.minis{margin-top:22px}
+.hero{padding:20px 28px 18px}
+.hero h3{font-size:29px;line-height:33px}
+.row{margin-top:14px}
+.pts .pt{height:150px}
+.alt{margin-top:18px;padding:14px 28px 16px}
+.steps{margin-top:8px}
+.stp{display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:12.5px;line-height:16px}
+.stp u{flex:none;margin-bottom:0}
+.app{padding:16px 24px 18px}
+.app h3{font-size:23px;line-height:28px}
+.card{padding:12px 16px}
+.td{padding:6px 0}
+.acts{margin-top:10px}
+.act{gap:6px}
+.act b{display:flex;align-items:center;gap:8px}
+.act b u{flex:none;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--second);color:var(--secondInk);font-size:12px;text-decoration:none}
+.shoot{margin-top:10px}
+.shoot .pt{width:48px;height:48px}
+.tintb{margin-top:10px;padding:10px 16px}
+.foot{margin-top:auto}
+.dkb{height:8px;background:var(--deep);flex:none}
+.sm{display:flex;flex-direction:column}
+.sm .in{flex:1 1 auto}
+.sm .pt{height:84px;background-position:center 40%}
+.sm .dp{background:var(--second);color:var(--secondInk);border-top:0;padding:10px 16px;display:block;font-size:12.5px;line-height:18px}
+.sm .dp small{display:block;font-size:11px;line-height:16px;font-weight:500}
+.st{gap:20px}
+.cw1{--bg:#FAF4E6;--bgAlt:#F2E8D0;--panel:#FFFCF3;--line:#E4D9BE;--lineStrong:#9A8E74;--accentEdge:#A87C1E;--ink:#231E16;--inkSoft:#645B4E;--accent:#C8962E;--accentInk:#2A2010;--accentText:#7D5A0C;--second:#A9C0C9;--secondInk:#244656;--tint:#F7EDD3;--deep:#4A3424;--deepInk:#F8F0E0;--good:#55683F;--attention:#8C5A3C;--late:#A3412E}
+.cw2{--bg:#F8F5EB;--bgAlt:#ECEBDA;--panel:#FFFDF6;--line:#DEDCC6;--lineStrong:#8F8F78;--accentEdge:#A67D1F;--ink:#22201A;--inkSoft:#5F5C4E;--accent:#CB9A38;--accentInk:#2A2010;--accentText:#7A5810;--second:#B7C3A3;--secondInk:#2F3D24;--tint:#EEF0DF;--deep:#343B2B;--deepInk:#F5F0E0;--good:#2F6F6A;--attention:#8C5A3C;--late:#A3412E}
+.cw3{--bg:#FAF3EA;--bgAlt:#F3E5D6;--panel:#FFFCF6;--line:#E7D8C6;--lineStrong:#9C8C78;--accentEdge:#A1761C;--ink:#281E17;--inkSoft:#68594C;--accent:#C28D2A;--accentInk:#2A1E0E;--accentText:#7C560C;--second:#DDA98A;--secondInk:#4A2516;--tint:#F9EADD;--deep:#5A3323;--deepInk:#F9EEE0;--good:#55683F;--attention:#80573A;--late:#873A4E}
+.cw4{--bg:#F7F3EB;--bgAlt:#EDE5D6;--panel:#FFFDF8;--line:#E0D7C6;--lineStrong:#978B78;--accentEdge:#987020;--ink:#2C2018;--inkSoft:#66584B;--accent:#B88A34;--accentInk:#281C0E;--accentText:#75540F;--second:#C9BBA1;--secondInk:#3C2B1C;--tint:#F3EBDB;--deep:#3B2A1F;--deepInk:#F6EEE0;--good:#55683F;--attention:#96512A;--late:#9E3F35}
+.cw5{--bg:#F9F6EE;--bgAlt:#F3EBD4;--panel:#FFFDF7;--line:#E6DDC6;--lineStrong:#988E76;--accentEdge:#A47C1E;--ink:#24201A;--inkSoft:#625B50;--accent:#D6AB46;--accentInk:#2A2010;--accentText:#7A5A0E;--second:#D4BC72;--secondInk:#3E3010;--tint:#F8EFCF;--deep:#4A3626;--deepInk:#F8F0E0;--good:#2F6F6A;--attention:#8C5A3C;--late:#A3412E}
+.cw6{--bg:#F7F5EF;--bgAlt:#E5EBEA;--panel:#FEFDF9;--line:#DAD9CF;--lineStrong:#8E8F84;--accentEdge:#A87C1E;--ink:#231F19;--inkSoft:#5F5A50;--accent:#C8962E;--accentInk:#2A2010;--accentText:#7A590D;--second:#86A7B5;--secondInk:#16303B;--tint:#E6EEEF;--deep:#463325;--deepInk:#F7F0E2;--good:#55683F;--attention:#8C5A3C;--late:#A3412E}
+.ph-beach-family-1{background-image:url(/_blob/e5715a33ee723c1368e632f09f7c9759)}
+.ph-beach-family-2{background-image:url(/_blob/6d5d7912b3471a883888195ba0d820cd)}
+.ph-beach-mother-daughter{background-image:url(/_blob/2173c4bcc3082115dd160340234eacc8)}
+.ph-sunset-walk{background-image:url(/_blob/c92c5b26341b95605e01c0d5c2132cb5)}
+.ph-beach-family-wide{background-image:url(/_blob/10791438e8171e23251f1e935fe1b457)}
+.ph-wedding-couple{background-image:url(/_blob/0e18cb76cb2b109501745b6a9c01b739)}
+.ph-portrait-smile{background-image:url(/_blob/055f6d510c917838282c08bafcb7fbf1)}
+</style>
+</helmet>
+<div class="pg">
+<div class="tiny" style="color: #8A5A3C">The Assistant, by Horizon Found</div>
+<h1 style="font-size: 52px; line-height: 58px; letter-spacing: -0.02em; font-weight: 600; margin-top: 6px">Gold hour, six ways</h1>
+<p style="font-size: 18px; line-height: 27px; margin-top: 8px; color: #5F564D; max-width: 980px">Your favorite was Gold hour sand. Here are six takes on it: the one you picked, and five that each lean on a color pairing that is current right now. Same bone paper, warm dark words and gold button in all of them. Tell me which feels like you, or which two to mix.</p>
+<div style="margin-top: 30px">
+<h2 style="font-size: 30px; line-height: 36px; letter-spacing: -0.02em; font-weight: 600">What is current</h2>
+<p style="font-size: 15px; line-height: 23px; color: #5F564D; margin-top: 6px">Six pairings from this year's color forecasts that sit inside the gold hour feel. They come from paint, fashion and one web design studio. The swatches are our colors from the take that uses each one, not the publishers' own.</p>
+<div class="trs"><div class="trd"><div class="dots"><i style="background: #FAF4E6"></i><i style="background: #C8962E"></i><i style="background: #A9C0C9"></i><i style="background: #4A3424"></i><i style="background: #55683F"></i></div><p>A cozy off-white, a golden neutral, a watery pale blue, a spiced brown and a deep olive, together in Benjamin Moore&#x27;s Color Trends 2027 palette.</p><div class="src" style="margin-top: auto; padding-top: 8px">Source: <b>Benjamin Moore&#x27;s own press release</b>. Used in: <b>Gold hour sand</b>.</div></div><div class="trd"><div class="dots"><i style="background: #B7C3A3"></i><i style="background: #CB9A38"></i><i style="background: #F8F5EB"></i><i style="background: #343B2B"></i></div><p>Green is the color family picked most often for 2027. Dulux&#x27;s pick is a soft sage, Soulful Sage, and its warm &#x27;Glow&#x27; companion palette includes honey and clay tones.</p><div class="src" style="margin-top: auto; padding-top: 8px">Source: <b>Dulux</b>. Used in: <b>Honey and palm</b>.</div></div><div class="trd"><div class="dots"><i style="background: #DDA98A"></i><i style="background: #C28D2A"></i><i style="background: #FAF3EA"></i><i style="background: #5A3323"></i></div><p>Dutch Boy&#x27;s 2027 Color of the Year, Deep Rooted, is an earthy orange, described by HGTV as a terracotta pot warmed by the sun at golden hour. Dutch Boy&#x27;s own Essence palette sets it beside an antique white.</p><div class="src" style="margin-top: auto; padding-top: 8px">Source: <b>HGTV</b>. Used in: <b>Gold and clay</b>.</div></div><div class="trd"><div class="dots"><i style="background: #B88A34"></i><i style="background: #C9BBA1"></i><i style="background: #3B2A1F"></i><i style="background: #F7F3EB"></i></div><p>Rich gold and classic khaki are among the seven colors Wallpaper* says define 2026, and chocolate brown tops the 1stDibs designer survey.</p><div class="src" style="margin-top: auto; padding-top: 8px">Sources: <b>Wallpaper*, Homes &amp; Gardens</b>. Used in: <b>Ochre and chocolate</b>.</div></div><div class="trd"><div class="dots"><i style="background: #F8EFCF"></i><i style="background: #D4BC72"></i><i style="background: #4A3626"></i><i style="background: #F9F6EE"></i></div><p>Pantone&#x27;s New York Fashion Week Spring/Summer 2027 report has a pale butter yellow in its top ten, and a dark golden brown, a warm off-white and a muted herbal green among its five core neutrals.</p><div class="src" style="margin-top: auto; padding-top: 8px">Source: <b>FashionUnited</b>. Used in: <b>Butter and bone</b>.</div></div><div class="trd"><div class="dots"><i style="background: #86A7B5"></i><i style="background: #463325"></i><i style="background: #E5EBEA"></i><i style="background: #FEFDF9"></i></div><p>Showit studio Davey &amp; Krista&#x27;s 2026 palettes for creative businesses pair a blue slate with cinnamon wood, desert sand and a warm white.</p><div class="src" style="margin-top: auto; padding-top: 8px">Source: <b>Davey &amp; Krista</b>. Used in: <b>Gold and deep sea</b>.</div></div></div>
+</div>
+<div style="margin-top: 34px">
+<h2 style="font-size: 30px; line-height: 36px; letter-spacing: -0.02em; font-weight: 600">Same page, six ways</h2>
+<p style="font-size: 15px; line-height: 23px; color: #5F564D; margin-top: 6px">The quick look. The band along the bottom of each card is that take's second color, the main thing that changes. The detail of each one is below.</p>
+<div class="cmp"><div class="sm cw1"><div class="in"><div class="tiny" style="color: var(--accentText)">Gold hour sand</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #A9C0C9</small></div></div><div class="sm cw2"><div class="in"><div class="tiny" style="color: var(--accentText)">Honey and palm</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #B7C3A3</small></div></div><div class="sm cw3"><div class="in"><div class="tiny" style="color: var(--accentText)">Gold and clay</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #DDA98A</small></div></div><div class="sm cw4"><div class="in"><div class="tiny" style="color: var(--accentText)">Ochre and chocolate</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #C9BBA1</small></div></div><div class="sm cw5"><div class="in"><div class="tiny" style="color: var(--accentText)">Butter and bone</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #D4BC72</small></div></div><div class="sm cw6"><div class="in"><div class="tiny" style="color: var(--accentText)">Gold and deep sea</div><h4>One assistant for the whole job around your photos. <em>From the card to the post.</em></h4><div style="margin-top: 12px"><span class="b s">Get The Assistant</span></div><div class="pt ph-beach-family-wide"></div></div><div class="dp">Card to grid.<small>Second color #86A7B5</small></div></div></div>
+</div>
+
+<div class="cw cw1">
+<div class="top">
+<div class="tl">
+<div class="pick">The one you picked</div><br><div class="tiny">Gold hour 1 of 6</div>
+<h2 class="nm">Gold hour sand</h2>
+<p class="one">Late-afternoon beach light: buttery bone paper, lava-black words, and the mustard gold from your overlay text as the button.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> Nothing: this is Gold hour sand exactly as you saw it, here so the other five can be judged against it.</p>
+<p class="fg"><b>Leans on.</b> The reference, unchanged. Benjamin Moore&#x27;s Color Trends 2027 palette happens to have the same recipe: a cozy off-white, a golden neutral, a watery pale blue, a spiced brown and a deep olive. Source: Benjamin Moore&#x27;s own press release.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #FAF4E6"></i><b>Background</b>#FAF4E6</div><div><i style="background: #F2E8D0"></i><b>Second background</b>#F2E8D0</div><div><i style="background: #FFFCF3"></i><b>Card</b>#FFFCF3</div><div><i style="background: #231E16"></i><b>Text</b>#231E16</div><div><i style="background: #645B4E"></i><b>Quiet text</b>#645B4E</div><div><i style="background: #C8962E; color: #2A2010">Aa</i><b>Main button</b>#C8962E</div><div><i style="background: #7D5A0C"></i><b>Accent words</b>#7D5A0C</div><div><i style="background: #A9C0C9; color: #244656">Aa</i><b>Second color</b>#A9C0C9</div><div><i style="background: #F7EDD3"></i><b>Wash</b>#F7EDD3</div><div><i style="background: #E4D9BE"></i><b>Lines</b>#E4D9BE</div><div><i style="background: #9A8E74"></i><b>Outline button edges</b>#9A8E74</div><div><i style="background: #4A3424; color: #F8F0E0">Aa</i><b>Dark band, footer only</b>#4A3424</div><div class="x"><i style="background: #8FA8B6"></i><b>Sea haze</b>#8FA8B6</div><div class="x"><i style="background: #BD9378"></i><b>Clay skin</b>#BD9378</div><div class="x"><i style="background: #767F63"></i><b>Olive leaf</b>#767F63</div><div class="x"><i style="background: #BDB9B0"></i><b>Stone</b>#BDB9B0</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #55683F</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #8C5A3C</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #A3412E</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #A87C1E</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the sand tones (#d1ccc0, #ddddda) lifted lighter and warmed toward the mustard; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard of your overlay text (#d8ac4b) taken a step deeper so it stands off the page, with a darker gold edge and dark words on it; the second color is the hazy ocean (#8fa8b6) made paler, with deep ocean (#305c72) words; good is the olive (#767f63) darkened, heads up is driftwood brown (#866340) so it never looks like the brand gold, late the clay-rose (#a97d79) deepened.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cw cw2">
+<div class="top">
+<div class="tl">
+<div class="pick">My pick of the six</div><br><div class="tiny">Gold hour 2 of 6</div>
+<h2 class="nm">Honey and palm</h2>
+<p class="one">The same late-afternoon gold, standing under the palms: bone paper with the yellow turned down, a honey button, and a soft sage green where the sea haze was.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> The pale sea-haze blue becomes a pale palm sage, the paper loses some yellow, the dark band turns from driftwood to deep foliage, and the gold warms a touch toward honey.</p>
+<p class="fg"><b>Leans on.</b> Green is the most repeated color family among the 2027 paint picks (Dulux, Behr, Sherwin-Williams and Benjamin Moore all chose a green). Dulux&#x27;s is a soft sage, Soulful Sage, with a warm &#x27;Glow&#x27; companion palette that includes honey and clay tones. Gold with sage is our pairing, not a published one. Source: Dulux.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #F8F5EB"></i><b>Background</b>#F8F5EB</div><div><i style="background: #ECEBDA"></i><b>Second background</b>#ECEBDA</div><div><i style="background: #FFFDF6"></i><b>Card</b>#FFFDF6</div><div><i style="background: #22201A"></i><b>Text</b>#22201A</div><div><i style="background: #5F5C4E"></i><b>Quiet text</b>#5F5C4E</div><div><i style="background: #CB9A38; color: #2A2010">Aa</i><b>Main button</b>#CB9A38</div><div><i style="background: #7A5810"></i><b>Accent words</b>#7A5810</div><div><i style="background: #B7C3A3; color: #2F3D24">Aa</i><b>Second color</b>#B7C3A3</div><div><i style="background: #EEF0DF"></i><b>Wash</b>#EEF0DF</div><div><i style="background: #DEDCC6"></i><b>Lines</b>#DEDCC6</div><div><i style="background: #8F8F78"></i><b>Outline button edges</b>#8F8F78</div><div><i style="background: #343B2B; color: #F5F0E0">Aa</i><b>Dark band, footer only</b>#343B2B</div><div class="x"><i style="background: #767F63"></i><b>Palm leaf</b>#767F63</div><div class="x"><i style="background: #2F362B"></i><b>Forest</b>#2F362B</div><div class="x"><i style="background: #BD9378"></i><b>Clay skin</b>#BD9378</div><div class="x"><i style="background: #D1CCC0"></i><b>Wet sand</b>#D1CCC0</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #2F6F6A</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #8C5A3C</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #A3412E</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #A67D1F</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the pale sand (#ddddda, #d1ccc0) lifted lighter with a breath of the olive (#767f63); text from the forest-black of the lava rock (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) pulled a little toward honey, with a darker edge and dark words; the second color is the palm and olive leaf (#767f63) made pale; the dark band is the deep foliage (#2f362b) warmed; good moves to a sea green from the deep ocean (#305c72) so a status never looks like the sage; heads up is driftwood (#866340), late the clay deepened.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cw cw3">
+<div class="top">
+<div class="tl">
+<div class="tiny">Gold hour 3 of 6</div>
+<h2 class="nm">Gold and clay</h2>
+<p class="one">Golden hour tipping into sunset: peach-warm sand paper, the gold button a shade deeper, and sun-warmed clay where the sea haze was. No blue anywhere.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> The sea-haze blue becomes a soft clay, the paper turns peachier, the gold goes one step deeper so it stays the loudest thing, and &#x27;late&#x27; moves from clay red to berry.</p>
+<p class="fg"><b>Leans on.</b> Dutch Boy&#x27;s 2027 Color of the Year, Deep Rooted, is an earthy orange, described by HGTV as a terracotta pot warmed by the sun at golden hour. Dutch Boy&#x27;s own Essence palette sets it beside an antique white. Source: HGTV.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #FAF3EA"></i><b>Background</b>#FAF3EA</div><div><i style="background: #F3E5D6"></i><b>Second background</b>#F3E5D6</div><div><i style="background: #FFFCF6"></i><b>Card</b>#FFFCF6</div><div><i style="background: #281E17"></i><b>Text</b>#281E17</div><div><i style="background: #68594C"></i><b>Quiet text</b>#68594C</div><div><i style="background: #C28D2A; color: #2A1E0E">Aa</i><b>Main button</b>#C28D2A</div><div><i style="background: #7C560C"></i><b>Accent words</b>#7C560C</div><div><i style="background: #DDA98A; color: #4A2516">Aa</i><b>Second color</b>#DDA98A</div><div><i style="background: #F9EADD"></i><b>Wash</b>#F9EADD</div><div><i style="background: #E7D8C6"></i><b>Lines</b>#E7D8C6</div><div><i style="background: #9C8C78"></i><b>Outline button edges</b>#9C8C78</div><div><i style="background: #5A3323; color: #F9EEE0">Aa</i><b>Dark band, footer only</b>#5A3323</div><div class="x"><i style="background: #A57C54"></i><b>Clay</b>#A57C54</div><div class="x"><i style="background: #E1B59C"></i><b>Peach skin</b>#E1B59C</div><div class="x"><i style="background: #D0BAB7"></i><b>Dusty rose</b>#D0BAB7</div><div class="x"><i style="background: #767F63"></i><b>Olive leaf</b>#767F63</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #55683F</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #80573A</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #873A4E</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #A1761C</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the pale sand (#d1ccc0) lifted and warmed with the peach of skin (#e1b59c); text from espresso driftwood (#382417) taken deeper; the button is the mustard overlay text (#d8ac4b) deepened toward amber so it stays louder than the clay; the second color is the clay and burnt-orange fabric in the grid (#a57c54, #e1b59c); the dark band is a red-brown driftwood (#866340) deepened; good is the olive (#767f63) darkened; heads up is driftwood; late moves to a berry from the dusty rose (#a97d79) so it never looks like the clay.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cw cw4">
+<div class="top">
+<div class="tl">
+<div class="tiny">Gold hour 4 of 6</div>
+<h2 class="nm">Ochre and chocolate</h2>
+<p class="one">The quiet, tonal one: stone-bone paper with almost no yellow in it, chocolate-brown words, a muddier ochre button, and khaki sand as the only second color.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> No blue at all: the second color becomes khaki sand, the paper loses most of its yellow so the button stands alone, the gold turns a step browner (ochre), and the words and dark band become true chocolate.</p>
+<p class="fg"><b>Leans on.</b> Chocolate brown is the top color in the 1stDibs designer survey, and rich gold and classic khaki are among the seven colors Wallpaper* says define 2026. Homes &amp; Gardens calls ochre the cozy neutral following butter yellow. Sources: Wallpaper*, Homes &amp; Gardens.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #F7F3EB"></i><b>Background</b>#F7F3EB</div><div><i style="background: #EDE5D6"></i><b>Second background</b>#EDE5D6</div><div><i style="background: #FFFDF8"></i><b>Card</b>#FFFDF8</div><div><i style="background: #2C2018"></i><b>Text</b>#2C2018</div><div><i style="background: #66584B"></i><b>Quiet text</b>#66584B</div><div><i style="background: #B88A34; color: #281C0E">Aa</i><b>Main button</b>#B88A34</div><div><i style="background: #75540F"></i><b>Accent words</b>#75540F</div><div><i style="background: #C9BBA1; color: #3C2B1C">Aa</i><b>Second color</b>#C9BBA1</div><div><i style="background: #F3EBDB"></i><b>Wash</b>#F3EBDB</div><div><i style="background: #E0D7C6"></i><b>Lines</b>#E0D7C6</div><div><i style="background: #978B78"></i><b>Outline button edges</b>#978B78</div><div><i style="background: #3B2A1F; color: #F6EEE0">Aa</i><b>Dark band, footer only</b>#3B2A1F</div><div class="x"><i style="background: #866340"></i><b>Driftwood</b>#866340</div><div class="x"><i style="background: #382417"></i><b>Espresso</b>#382417</div><div class="x"><i style="background: #BDB9B0"></i><b>Stone</b>#BDB9B0</div><div class="x"><i style="background: #D0BAB7"></i><b>Dusty rose</b>#D0BAB7</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #55683F</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #96512A</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #9E3F35</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #987020</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the wet sand and stone (#d1ccc0, #bdb9b0) lifted lighter and left nearly neutral; text and the dark band from the espresso driftwood (#382417); the button is the mustard overlay text (#d8ac4b) taken browner toward the driftwood (#866340), an ochre; the second color is the wet sand itself (#d1ccc0) a step deeper, a khaki; good is the olive (#767f63) darkened; heads up is a rust from the red-brown tree bark; late the clay-rose (#a97d79) deepened.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cw cw5">
+<div class="top">
+<div class="tl">
+<div class="tiny">Gold hour 5 of 6</div>
+<h2 class="nm">Butter and bone</h2>
+<p class="one">The softest one, and the all-yellow one: a whiter bone paper, a paler butter-gold button, a butter wash for highlights, and a straw butter as the second color. No green and no blue.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> The button goes paler and sunnier (so it leans harder on its dark edge), the paper goes whiter, highlights get a butter wash, and the sea haze becomes a straw butter, so the whole page stays in one yellow family.</p>
+<p class="fg"><b>Leans on.</b> Pantone&#x27;s New York Fashion Week Spring/Summer 2027 report has a pale butter yellow (Anise Flower) in its top ten, and a dark golden brown (Arrowwood), a warm off-white (Antique White) and a muted herbal green (Tarragon) among its five core neutrals, as reported by FashionUnited. Putting them together is our choice, and this take leaves the green out. Source: FashionUnited.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #F9F6EE"></i><b>Background</b>#F9F6EE</div><div><i style="background: #F3EBD4"></i><b>Second background</b>#F3EBD4</div><div><i style="background: #FFFDF7"></i><b>Card</b>#FFFDF7</div><div><i style="background: #24201A"></i><b>Text</b>#24201A</div><div><i style="background: #625B50"></i><b>Quiet text</b>#625B50</div><div><i style="background: #D6AB46; color: #2A2010">Aa</i><b>Main button</b>#D6AB46</div><div><i style="background: #7A5A0E"></i><b>Accent words</b>#7A5A0E</div><div><i style="background: #D4BC72; color: #3E3010">Aa</i><b>Second color</b>#D4BC72</div><div><i style="background: #F8EFCF"></i><b>Wash</b>#F8EFCF</div><div><i style="background: #E6DDC6"></i><b>Lines</b>#E6DDC6</div><div><i style="background: #988E76"></i><b>Outline button edges</b>#988E76</div><div><i style="background: #4A3626; color: #F8F0E0">Aa</i><b>Dark band, footer only</b>#4A3626</div><div class="x"><i style="background: #D8AC4B"></i><b>Mustard</b>#D8AC4B</div><div class="x"><i style="background: #866340"></i><b>Driftwood</b>#866340</div><div class="x"><i style="background: #DDDDDA"></i><b>Pale sand</b>#DDDDDA</div><div class="x"><i style="background: #E1B59C"></i><b>Peach skin</b>#E1B59C</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #2F6F6A</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #8C5A3C</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #A3412E</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #A47C1E</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the pale sand and soft white (#ddddda, #f3f4f5) barely warmed; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) almost as it appears on your posts, with a darker gold edge and dark words; the highlight wash is that same mustard made very pale, a butter; the second color is that mustard again, dusted with the wet sand (#d1ccc0) into a straw butter; the dark band is driftwood (#866340) deepened; good is a sea green from the deep ocean (#305c72), heads up driftwood, late the clay deepened.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cw cw6">
+<div class="top">
+<div class="tl">
+<div class="tiny">Gold hour 6 of 6</div>
+<h2 class="nm">Gold and deep sea</h2>
+<p class="one">Gold hour sand with the ocean turned up: a cooler stone-bone paper, the same gold button, and a real dusty sea blue instead of a pale haze. Dusty, never navy.</p>
+<p class="fg"><b>What changed from Gold hour sand.</b> The second color goes from a pale haze to a fuller dusty sea blue, the paper cools from butter to stone, and the highlight wash turns from butter to sea mist; the gold button is untouched.</p>
+<p class="fg"><b>Leans on.</b> Showit studio Davey &amp; Krista&#x27;s 2026 palettes for creative businesses pair a blue slate with cinnamon wood, desert sand and a warm white (&#x27;Soft Contrast + Earthy Warmth&#x27;). Source: Davey &amp; Krista.</p>
+</div>
+<div class="tr">
+<div class="sw"><div><i style="background: #F7F5EF"></i><b>Background</b>#F7F5EF</div><div><i style="background: #E5EBEA"></i><b>Second background</b>#E5EBEA</div><div><i style="background: #FEFDF9"></i><b>Card</b>#FEFDF9</div><div><i style="background: #231F19"></i><b>Text</b>#231F19</div><div><i style="background: #5F5A50"></i><b>Quiet text</b>#5F5A50</div><div><i style="background: #C8962E; color: #2A2010">Aa</i><b>Main button</b>#C8962E</div><div><i style="background: #7A590D"></i><b>Accent words</b>#7A590D</div><div><i style="background: #86A7B5; color: #16303B">Aa</i><b>Second color</b>#86A7B5</div><div><i style="background: #E6EEEF"></i><b>Wash</b>#E6EEEF</div><div><i style="background: #DAD9CF"></i><b>Lines</b>#DAD9CF</div><div><i style="background: #8E8F84"></i><b>Outline button edges</b>#8E8F84</div><div><i style="background: #463325; color: #F7F0E2">Aa</i><b>Dark band, footer only</b>#463325</div><div class="x"><i style="background: #638DA4"></i><b>Ocean</b>#638DA4</div><div class="x"><i style="background: #305C72"></i><b>Deep ocean</b>#305C72</div><div class="x"><i style="background: #9BB8DE"></i><b>Sky</b>#9BB8DE</div><div class="x"><i style="background: #BD9378"></i><b>Clay skin</b>#BD9378</div></div>
+<div class="st"><span><i style="background: var(--good)"></i><span style="color: var(--good)">Good #55683F</span></span><span><i style="background: var(--attention)"></i><span style="color: var(--attention)">Heads up #8C5A3C</span></span><span><i style="background: var(--late)"></i><span style="color: var(--late)">Late #A3412E</span></span><span><i style="background: var(--accentEdge)"></i><span style="color: var(--inkSoft)">Gold button edge #A87C1E</span></span></div>
+<p class="fg"><b>From the grid.</b> Backgrounds from the pale stone (#f3f4f5, #ddddda) with the second background a breath of sea haze (#8fa8b6); text from the black lava rock kept warm (#0c0f0a blended with #382417); the button is the mustard overlay text (#d8ac4b) a step deeper, as in the original; the second color is the ocean in your beach posts (#638da4) softened, with deep ocean (#305c72) taken darker for the words on it; the dark band stays warm driftwood so the page never turns blue; good is the olive (#767f63) darkened, heads up driftwood (#866340), late the clay deepened.</p>
+</div>
+</div>
+<div class="minis">
+<div class="mc">
+<div class="tiny">On the sales page</div>
+<div class="fr">
+<div class="bar"><span>The Assistant, <small>by Horizon Found</small></span><span class="b s">Get The Assistant</span></div>
+<div class="hero">
+<div class="tiny">The Assistant, by Horizon Found</div>
+<h3>One assistant for the whole job around your photos. <em>From the card to the post.</em></h3>
+<p>You talk to it in plain words, and it does the work around your photos.</p>
+<div class="row"><span class="b">Get The Assistant</span><span class="o">See one shoot go all the way through</span></div>
+</div>
+<div class="pts"><div class="pt ph-beach-family-1"></div><div class="pt ph-beach-family-2"></div><div class="pt ph-beach-mother-daughter"></div></div>
+<div class="alt">
+<div class="tiny">Four steps. Start wherever you are today.</div>
+<div class="steps"><div class="stp"><u>1</u>Back up a card</div><div class="stp"><u>2</u>My editing queue</div><div class="stp"><u>3</u>Make posts</div><div class="stp"><u>4</u>My posting queue</div></div>
+</div>
+<div class="foot"><span><b>Card to grid.</b> One assistant.</span><span>Runs on your own Mac. One-time purchase.</span></div>
+<div class="dkb"></div>
+</div>
+</div>
+<div class="mc">
+<div class="tiny">In The Assistant</div>
+<div class="fr">
+<div class="bar"><span>The Assistant</span><small>Home</small></div>
+<div class="app">
+<h3>Welcome back</h3>
+<div class="card" style="margin-top: 10px">
+<div class="tiny" style="margin-bottom: 4px">Today</div>
+<div class="td"><span>Garcia family, to edit</span><span class="pill" style="color: var(--attention)">Due Friday</span></div>
+<div class="td"><span>Garcia family reel</span><span class="pill" style="color: var(--good)">Posted</span></div>
+<div class="td"><span>Garcia family carousel</span><span class="pill" style="color: var(--late)">Late</span></div>
+</div>
+<div class="acts">
+<div class="card act"><b><u>1</u>Back up a card</b><span class="b s">Back up a card</span></div>
+<div class="card act"><b><u>2</u>My editing queue</b><span class="o s">My editing queue</span></div>
+<div class="card act"><b><u>3</u>Make posts from a shoot</b><span class="o s">Make posts</span></div>
+<div class="card act"><b><u>4</u>My posting queue</b><span class="o s">My posting queue</span></div>
+</div>
+<div class="card shoot"><div class="pt ph-beach-mother-daughter"></div><div class="t"><b>Garcia family</b><span>212 photos</span></div><span class="o s">Open photo folder</span></div>
+<div class="tintb"><b>No card today?</b> Start at step 3 with a folder of finished photos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p style="font-size: 16px; line-height: 24px; color: #5F564D; margin-top: 24px">Tell me which one feels like you, or which two to mix.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":7794}}'>
+class Component extends DCLogic { state = {}; renderVals() { return {}; } }
+</script>
+</body>
+</html>

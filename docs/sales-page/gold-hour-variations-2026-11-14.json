@@ -1,0 +1,272 @@
+[
+ {
+  "name": "Gold hour sand",
+  "oneLine": "Late-afternoon beach light: buttery bone paper, lava-black words, and the mustard gold from your overlay text as the button. This is the one colorway where the button is light with dark words on it.",
+  "fromTheGrid": "Backgrounds from the sand tones (#d1ccc0, #ddddda) lifted lighter and warmed toward the mustard; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard of your overlay text (#d8ac4b) taken a step deeper so it stands off the page, with a darker gold edge and dark words on it; the second color is the hazy ocean (#8fa8b6) made paler, with deep ocean (#305c72) words; good is the olive (#767f63) darkened, heads up is driftwood brown (#866340) so it never looks like the brand gold, late the clay-rose (#a97d79) deepened.",
+  "bg": "#FAF4E6",
+  "bgAlt": "#F2E8D0",
+  "panel": "#FFFCF3",
+  "line": "#E4D9BE",
+  "ink": "#231E16",
+  "inkSoft": "#645B4E",
+  "accent": "#C8962E",
+  "accentInk": "#2A2010",
+  "accentText": "#7D5A0C",
+  "second": "#A9C0C9",
+  "secondInk": "#244656",
+  "tint": "#F7EDD3",
+  "deep": "#4A3424",
+  "deepInk": "#F8F0E0",
+  "good": "#55683F",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Sea haze",
+    "hex": "#8FA8B6"
+   },
+   {
+    "name": "Clay skin",
+    "hex": "#BD9378"
+   },
+   {
+    "name": "Olive leaf",
+    "hex": "#767F63"
+   },
+   {
+    "name": "Stone",
+    "hex": "#BDB9B0"
+   }
+  ],
+  "lineStrong": "#9A8E74",
+  "accentEdge": "#A87C1E",
+  "trend": "The reference, unchanged. Benjamin Moore's Color Trends 2027 palette happens to have the same recipe: a cozy off-white, a golden neutral, a watery pale blue, a spiced brown and a deep olive.",
+  "sourceUrl": "https://www.benjaminmoore.com/en-us/press/benjamin-moore-announces-color-of-the-year-2027",
+  "whatChanged": "Nothing: this is Gold hour sand exactly as you saw it, here so the other five can be judged against it."
+ },
+ {
+  "name": "Honey and palm",
+  "oneLine": "The same late-afternoon gold, standing under the palms: bone paper with the yellow turned down, a honey button, and a soft sage green where the sea haze was.",
+  "fromTheGrid": "Backgrounds from the pale sand (#ddddda, #d1ccc0) lifted lighter with a breath of the olive (#767f63); text from the forest-black of the lava rock (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) pulled a little toward honey, with a darker edge and dark words; the second color is the palm and olive leaf (#767f63) made pale; the dark band is the deep foliage (#2f362b) warmed; good moves to a sea green from the deep ocean (#305c72) so a status never looks like the sage; heads up is driftwood (#866340), late the clay deepened.",
+  "bg": "#F8F5EB",
+  "bgAlt": "#ECEBDA",
+  "panel": "#FFFDF6",
+  "line": "#DEDCC6",
+  "ink": "#22201A",
+  "inkSoft": "#5F5C4E",
+  "accent": "#CB9A38",
+  "accentInk": "#2A2010",
+  "accentText": "#7A5810",
+  "second": "#B7C3A3",
+  "secondInk": "#2F3D24",
+  "tint": "#EEF0DF",
+  "deep": "#343B2B",
+  "deepInk": "#F5F0E0",
+  "good": "#2F6F6A",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Palm leaf",
+    "hex": "#767F63"
+   },
+   {
+    "name": "Forest",
+    "hex": "#2F362B"
+   },
+   {
+    "name": "Clay skin",
+    "hex": "#BD9378"
+   },
+   {
+    "name": "Wet sand",
+    "hex": "#D1CCC0"
+   }
+  ],
+  "lineStrong": "#8F8F78",
+  "accentEdge": "#A67D1F",
+  "trend": "Green is the most repeated color family among the 2027 paint picks (Dulux, Behr, Sherwin-Williams and Benjamin Moore all chose a green). Dulux's is a soft sage, Soulful Sage, with a warm 'Glow' companion palette that includes honey and clay tones. Gold with sage is our pairing, not a published one.",
+  "sourceUrl": "https://www.dulux.co.uk/en/colour-inspiration/colour-of-the-year-2027-soulful-sage",
+  "whatChanged": "The pale sea-haze blue becomes a pale palm sage, the paper loses some yellow, the dark band turns from driftwood to deep foliage, and the gold warms a touch toward honey."
+ },
+ {
+  "name": "Gold and clay",
+  "oneLine": "Golden hour tipping into sunset: peach-warm sand paper, the gold button a shade deeper, and sun-warmed clay where the sea haze was. No blue anywhere.",
+  "fromTheGrid": "Backgrounds from the pale sand (#d1ccc0) lifted and warmed with the peach of skin (#e1b59c); text from espresso driftwood (#382417) taken deeper; the button is the mustard overlay text (#d8ac4b) deepened toward amber so it stays louder than the clay; the second color is the clay and burnt-orange fabric in the grid (#a57c54, #e1b59c); the dark band is a red-brown driftwood (#866340) deepened; good is the olive (#767f63) darkened; heads up is driftwood; late moves to a berry from the dusty rose (#a97d79) so it never looks like the clay.",
+  "bg": "#FAF3EA",
+  "bgAlt": "#F3E5D6",
+  "panel": "#FFFCF6",
+  "line": "#E7D8C6",
+  "ink": "#281E17",
+  "inkSoft": "#68594C",
+  "accent": "#C28D2A",
+  "accentInk": "#2A1E0E",
+  "accentText": "#7C560C",
+  "second": "#DDA98A",
+  "secondInk": "#4A2516",
+  "tint": "#F9EADD",
+  "deep": "#5A3323",
+  "deepInk": "#F9EEE0",
+  "good": "#55683F",
+  "attention": "#80573A",
+  "late": "#873A4E",
+  "extras": [
+   {
+    "name": "Clay",
+    "hex": "#A57C54"
+   },
+   {
+    "name": "Peach skin",
+    "hex": "#E1B59C"
+   },
+   {
+    "name": "Dusty rose",
+    "hex": "#D0BAB7"
+   },
+   {
+    "name": "Olive leaf",
+    "hex": "#767F63"
+   }
+  ],
+  "lineStrong": "#9C8C78",
+  "accentEdge": "#A1761C",
+  "trend": "Dutch Boy's 2027 Color of the Year, Deep Rooted, is an earthy orange, described by HGTV as a terracotta pot warmed by the sun at golden hour. Dutch Boy's own Essence palette sets it beside an antique white.",
+  "sourceUrl": "https://www.hgtv.com/decorating/color/dutch-boy-paints-color-of-the-year",
+  "whatChanged": "The sea-haze blue becomes a soft clay, the paper turns peachier, the gold goes one step deeper so it stays the loudest thing, and 'late' moves from clay red to berry."
+ },
+ {
+  "name": "Ochre and chocolate",
+  "oneLine": "The quiet, tonal one: stone-bone paper with almost no yellow in it, chocolate-brown words, a muddier ochre button, and khaki sand as the only second color.",
+  "fromTheGrid": "Backgrounds from the wet sand and stone (#d1ccc0, #bdb9b0) lifted lighter and left nearly neutral; text and the dark band from the espresso driftwood (#382417); the button is the mustard overlay text (#d8ac4b) taken browner toward the driftwood (#866340), an ochre; the second color is the wet sand itself (#d1ccc0) a step deeper, a khaki; good is the olive (#767f63) darkened; heads up is a rust from the red-brown tree bark; late the clay-rose (#a97d79) deepened.",
+  "bg": "#F7F3EB",
+  "bgAlt": "#EDE5D6",
+  "panel": "#FFFDF8",
+  "line": "#E0D7C6",
+  "ink": "#2C2018",
+  "inkSoft": "#66584B",
+  "accent": "#B88A34",
+  "accentInk": "#281C0E",
+  "accentText": "#75540F",
+  "second": "#C9BBA1",
+  "secondInk": "#3C2B1C",
+  "tint": "#F3EBDB",
+  "deep": "#3B2A1F",
+  "deepInk": "#F6EEE0",
+  "good": "#55683F",
+  "attention": "#96512A",
+  "late": "#9E3F35",
+  "extras": [
+   {
+    "name": "Driftwood",
+    "hex": "#866340"
+   },
+   {
+    "name": "Espresso",
+    "hex": "#382417"
+   },
+   {
+    "name": "Stone",
+    "hex": "#BDB9B0"
+   },
+   {
+    "name": "Dusty rose",
+    "hex": "#D0BAB7"
+   }
+  ],
+  "lineStrong": "#978B78",
+  "accentEdge": "#987020",
+  "trend": "Chocolate brown is the top color in the 1stDibs designer survey, and rich gold and classic khaki are among the seven colors Wallpaper* says define 2026. Homes & Gardens calls ochre the cozy neutral following butter yellow.",
+  "sourceUrl": "https://www.wallpaper.com/design-interiors/colour-trends-2026",
+  "whatChanged": "No blue at all: the second color becomes khaki sand, the paper loses most of its yellow so the button stands alone, the gold turns a step browner (ochre), and the words and dark band become true chocolate."
+ },
+ {
+  "name": "Butter and bone",
+  "oneLine": "The softest one, and the all-yellow one: a whiter bone paper, a paler butter-gold button, a butter wash for highlights, and a straw butter as the second color. No green and no blue.",
+  "fromTheGrid": "Backgrounds from the pale sand and soft white (#ddddda, #f3f4f5) barely warmed; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) almost as it appears on your posts, with a darker gold edge and dark words; the highlight wash is that same mustard made very pale, a butter; the second color is that mustard again, dusted with the wet sand (#d1ccc0) into a straw butter; the dark band is driftwood (#866340) deepened; good is a sea green from the deep ocean (#305c72), heads up driftwood, late the clay deepened.",
+  "bg": "#F9F6EE",
+  "bgAlt": "#F3EBD4",
+  "panel": "#FFFDF7",
+  "line": "#E6DDC6",
+  "ink": "#24201A",
+  "inkSoft": "#625B50",
+  "accent": "#D6AB46",
+  "accentInk": "#2A2010",
+  "accentText": "#7A5A0E",
+  "second": "#D4BC72",
+  "secondInk": "#3E3010",
+  "tint": "#F8EFCF",
+  "deep": "#4A3626",
+  "deepInk": "#F8F0E0",
+  "good": "#2F6F6A",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Mustard",
+    "hex": "#D8AC4B"
+   },
+   {
+    "name": "Driftwood",
+    "hex": "#866340"
+   },
+   {
+    "name": "Pale sand",
+    "hex": "#DDDDDA"
+   },
+   {
+    "name": "Peach skin",
+    "hex": "#E1B59C"
+   }
+  ],
+  "lineStrong": "#988E76",
+  "accentEdge": "#A47C1E",
+  "trend": "Pantone's New York Fashion Week Spring/Summer 2027 report has a pale butter yellow (Anise Flower) in its top ten, and a dark golden brown (Arrowwood), a warm off-white (Antique White) and a muted herbal green (Tarragon) among its five core neutrals, as reported by FashionUnited. Putting them together is our choice, and this take leaves the green out.",
+  "sourceUrl": "https://fashionunited.uk/news/fashion/pantone-nyfw-spring-summer-2027-color-trend-report-the-top-10-colors/2026092190442",
+  "whatChanged": "The button goes paler and sunnier (so it leans harder on its dark edge), the paper goes whiter, highlights get a butter wash, and the sea haze becomes a straw butter, so the whole page stays in one yellow family."
+ },
+ {
+  "name": "Gold and deep sea",
+  "oneLine": "Gold hour sand with the ocean turned up: a cooler stone-bone paper, the same gold button, and a real dusty sea blue instead of a pale haze. Dusty, never navy.",
+  "fromTheGrid": "Backgrounds from the pale stone (#f3f4f5, #ddddda) with the second background a breath of sea haze (#8fa8b6); text from the black lava rock kept warm (#0c0f0a blended with #382417); the button is the mustard overlay text (#d8ac4b) a step deeper, as in the original; the second color is the ocean in your beach posts (#638da4) softened, with deep ocean (#305c72) taken darker for the words on it; the dark band stays warm driftwood so the page never turns blue; good is the olive (#767f63) darkened, heads up driftwood (#866340), late the clay deepened.",
+  "bg": "#F7F5EF",
+  "bgAlt": "#E5EBEA",
+  "panel": "#FEFDF9",
+  "line": "#DAD9CF",
+  "ink": "#231F19",
+  "inkSoft": "#5F5A50",
+  "accent": "#C8962E",
+  "accentInk": "#2A2010",
+  "accentText": "#7A590D",
+  "second": "#86A7B5",
+  "secondInk": "#16303B",
+  "tint": "#E6EEEF",
+  "deep": "#463325",
+  "deepInk": "#F7F0E2",
+  "good": "#55683F",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Ocean",
+    "hex": "#638DA4"
+   },
+   {
+    "name": "Deep ocean",
+    "hex": "#305C72"
+   },
+   {
+    "name": "Sky",
+    "hex": "#9BB8DE"
+   },
+   {
+    "name": "Clay skin",
+    "hex": "#BD9378"
+   }
+  ],
+  "lineStrong": "#8E8F84",
+  "accentEdge": "#A87C1E",
+  "trend": "Showit studio Davey & Krista's 2026 palettes for creative businesses pair a blue slate with cinnamon wood, desert sand and a warm white ('Soft Contrast + Earthy Warmth').",
+  "sourceUrl": "https://daveyandkrista.com/2026-color-trend/",
+  "whatChanged": "The second color goes from a pale haze to a fuller dusty sea blue, the paper cools from butter to stone, and the highlight wash turns from butter to sea mist; the gold button is untouched."
+ }
+]
