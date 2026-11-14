@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Your shoots: the editing queue on top (the shoots still to edit, with due
-dates, soonest due always on top) and, below the
-line, every shoot the Studio has backed up, newest first, each with a button
-that opens its folder. One page; "show my queue" and "show the archive" both
-open it.
+"""Your shoots: the editing queue on top (the client shoots still to edit and
+deliver, with due dates, soonest due always on top) and, below it, one "Find a
+shoot" search over everything, then Uploaded shoots (every backed-up shoot that
+is not in the queue), Delivered and Archived (two sections that open and close).
+One page; "show my queue" and "show the archive" both open it.
 
 It is the bridge between the backup and the reel: a backup's shoots are added
 when the photographer says so (some shoots are just for them), "I'm done with
@@ -19,8 +19,11 @@ Nothing here ever touches a photo.
     python3 edit_queue.py add-list --file names.txt      a whole list, in their order, no dates needed
     python3 edit_queue.py add-list --names "Cassandra, Toni, Sarah"   (a name can carry a date: "Toni: 2026-11-07")
     python3 edit_queue.py list                      what's waiting, soonest due first
-    python3 edit_queue.py done "beach"              mark finished (a word from the name is enough)
-    python3 edit_queue.py undo "beach"
+    python3 edit_queue.py done "beach"              mark as delivered (a word from the name is enough)
+    python3 edit_queue.py undo "beach"              back in the queue
+    python3 edit_queue.py unqueue "beach"           take it out of the queue: back to the uploaded shoots, no date
+    python3 edit_queue.py store "beach"             archive a delivered shoot (nothing is deleted)
+    python3 edit_queue.py unstore "beach"           bring an archived shoot back to Delivered
     python3 edit_queue.py due "beach" 1w            a new due date (1w 2w 3w, this-week, or 2026-11-07)
     python3 edit_queue.py move "beach" --to 1       put it first among shoots due the same day
     python3 edit_queue.py options                   the due choices, their most-picked first
@@ -34,9 +37,13 @@ Nothing here ever touches a photo.
     python3 edit_queue.py open "beach"              open that shoot's folder in Finder (File Explorer on a PC)
     python3 edit_queue.py serve                     the page, live: check off, drag, change dates, open folders
 
-A shoot is "waiting" (in the queue), "finished" (ticked off the queue) or
-"archived" (never queued: a shoot that was just for them). Finished and
-archived shoots are the archive.
+A shoot's status is "waiting" (in the queue), "finished" (delivered: ticked off
+the queue) or "archived" (an uploaded shoot: backed up, not in the queue; the
+word in the record is older than the page's). A delivered shoot the photographer
+archived also carries "stored": true and "stored_at" (Nicole, v26): the page's
+Archived section. So, on the page: the queue = waiting; Uploaded shoots =
+"archived"; Delivered = "finished" without "stored"; Archived = "finished" with
+"stored". Nothing is ever deleted from the list.
 """
 import argparse
 import errno
@@ -175,6 +182,64 @@ def finished(q):
     return sorted((s for s in q["shoots"] if s.get("status") == "finished"), key=lambda s: s.get("finished_at", ""), reverse=True)
 
 
+def is_stored(s):
+    """Delivered, then archived by the photographer (the page's Archived section). Only a delivered shoot can be."""
+    return s.get("status") == "finished" and bool(s.get("stored"))
+
+
+def uploaded(q):
+    """The page's Uploaded shoots: backed up (or taken out of the queue), not in the queue, not delivered."""
+    return [s for s in archive(q) if s.get("status") != "finished"]
+
+
+def delivered(q):
+    """The page's Delivered: ticked off the queue and not archived, newest first."""
+    return [s for s in finished(q) if not is_stored(s)]
+
+
+def stored(q):
+    """The page's Archived: delivered shoots put away, the one archived last first."""
+    return sorted((s for s in q["shoots"] if is_stored(s)), key=lambda s: s.get("stored_at") or "", reverse=True)
+
+
+# What a press on the page and a command from the chat both do (one copy of each change).
+_QUEUE_ONLY = ("finished_at", "finished_by", "offered", "reminded", "stored", "stored_at")
+
+
+def mark_delivered(s, by):
+    s["status"], s["finished_at"], s["finished_by"] = "finished", datetime.now().isoformat(timespec="seconds"), by
+    s.pop("stored", None)
+    s.pop("stored_at", None)
+
+
+def back_in_queue(q, s, due=None):
+    """Into the queue (again): from Uploaded, Delivered or Archived. Nothing of a delivery is kept."""
+    s["status"] = "waiting"
+    for k in _QUEUE_ONLY:
+        s.pop(k, None)
+    s["due"] = due
+    q["shoots"].remove(s)
+    place(q, s)
+
+
+def take_out(s):
+    """Take out of my queue (Nicole, v26): not a client shoot after all. Back to the uploaded shoots, no date."""
+    s["status"] = "archived"
+    for k in ("due",) + _QUEUE_ONLY:
+        s.pop(k, None)
+
+
+def put_away(s):
+    """Archive a delivered shoot (the page asks "Are you sure you want to archive this?" first)."""
+    s["stored"], s["stored_at"] = True, datetime.now().isoformat(timespec="seconds")
+
+
+def bring_back(s):
+    """Bring it back: an archived shoot is in Delivered again, as it was."""
+    s.pop("stored", None)
+    s.pop("stored_at", None)
+
+
 def reorder(q, ids):
     """Put the waiting shoots in this order; finished ones keep their place after them."""
     by_id = {s["id"]: s for s in q["shoots"]}
@@ -297,7 +362,7 @@ def add_from_night(q, night, shoot_id, when, name=None):
         was_waiting = is_waiting(x)
         x["due"], x["name"] = due, names.get(shoot_id) or x["name"]
         x["status"] = "waiting"
-        for k in ("finished_at", "finished_by", "offered", "reminded"):
+        for k in _QUEUE_ONLY:
             x.pop(k, None)
         if not was_waiting:
             q["shoots"].remove(x)
@@ -525,6 +590,20 @@ h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035e
 .line{display:flex;align-items:center;gap:1rem;margin:1.6rem 0 0;color:var(--ink-2)}
 .line::before,.line::after{content:"";flex:1;height:1px;background:var(--line)}
 .line span{font:600 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
+.fold{margin-top:1rem}.fold>summary{list-style:none;cursor:pointer}.fold>summary::-webkit-details-marker{display:none}
+.fold>summary .line span::after{content:' \25BE';font-size:10px}.fold[open]>summary .line span::after{content:' \25B4'}
+.fold>summary:focus-visible{outline:2px solid var(--coral);outline-offset:4px;border-radius:8px}
+.foldsay{margin:.8rem 0 .4rem;font-size:14px;color:var(--ink-2)}.foldempty{list-style:none;padding:.8rem 0;color:var(--ink-2);font-size:14px}
+.fold .alist{padding-bottom:1rem}.fold .acts{flex-wrap:wrap;justify-content:flex-end;gap:.5rem 1rem;max-width:34rem}
+.acts .mk{font:600 12.5px/1 var(--sans);color:var(--coral-2);text-decoration:none;padding:.45rem .2rem;white-space:nowrap}.acts .mk:hover{text-decoration:underline;text-underline-offset:3px}
+.acts .store,.acts .unstore{font:500 12.5px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;white-space:nowrap}
+.acts .store:hover,.acts .unstore:hover{color:var(--coral-2)}
+.meta .unq{border:0;background:none;padding:0;font:500 12.5px/1 var(--sans);color:var(--ink-2);text-decoration:underline;text-underline-offset:3px;cursor:pointer}.meta .unq:hover{color:var(--coral-2)}
+.sure{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .6rem;margin-top:.4rem;padding:.5rem .7rem;border-radius:12px;background:var(--coral-l);font-size:13px}
+.sure b{font-weight:600}
+.sure .yes{background:var(--ink);color:#fff;border:0;border-radius:999px;padding:.4rem .75rem;font:600 12.5px/1 var(--sans);cursor:pointer}
+.sure .no{background:transparent;border:0;font:600 12.5px/1 var(--sans);color:var(--ink-2);cursor:pointer;text-decoration:underline}
+.findall{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin:1.8rem 0 0}.findall .findsay{font-size:13px;color:var(--ink-2)}
 .arch-head{display:flex;flex-wrap:wrap;gap:.8rem 1rem;align-items:center;justify-content:space-between;padding:1.2rem 0 .2rem}
 .arch-head .count{font:500 14px/1.4 var(--sans);color:var(--ink-2)}
 .search{display:flex;align-items:center;gap:.5rem;background:var(--paper);border:1.5px solid var(--line);border-radius:999px;padding:.45rem .9rem;min-width:min(280px,100%);transition:border-color .2s}
@@ -532,7 +611,7 @@ h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035e
 .search input{border:0;outline:0;background:transparent;font:500 14px var(--sans);color:var(--ink);width:100%}
 .search svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:2;flex:none}
 .month{font:400 17px/1 var(--sans);color:var(--ink-2);margin:1.4rem 0 .5rem;padding-left:.2rem}
-.alist{display:block;margin:0;padding:0 0 3rem;list-style:none}
+.alist{display:block;margin:0;padding:0 0 1.4rem;list-style:none}.wrap{padding-bottom:3rem}
 .acard{display:grid;grid-template-columns:78px 1fr auto;gap:1rem;align-items:center;background:var(--paper);padding:.6rem 1rem .6rem .8rem;border-bottom:1px solid var(--line);transition:background .25s}
 .acard:hover{background:#FFFDF8}
 .month + .acard{border-top-left-radius:16px;border-top-right-radius:16px}
@@ -553,12 +632,12 @@ h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035e
 .requeue.addq{font:600 13px/1 var(--sans);color:var(--ink);background:transparent;border:1.5px solid var(--ink-2);border-radius:999px;padding:.5rem .85rem;text-decoration:none;transition:background .2s,color .2s,border-color .2s}
 .requeue.addq:hover{background:var(--ink);border-color:var(--ink);color:#fff}
 .tag.edited{background:var(--ocean-l);color:#2F6F6B;padding:.25rem .55rem;font-size:11.5px}
-.nomatch{color:var(--ink-2);padding:1rem 0 3rem}
+.nomatch{color:var(--ink-2);padding:1rem 0 0;margin:0}
 .acard.fresh{animation:pop .6s var(--ease)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:.7rem 1.2rem;border-radius:999px;font:500 14px var(--sans);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .offline{background:var(--coral-l);color:var(--coral-2);border-radius:14px;padding:.7rem 1rem;font-size:14px;margin-top:.4rem}
-@media (max-width:720px){.card{grid-template-columns:auto 1fr auto;padding:.9rem}.card .pics{grid-column:2/3;height:96px}.card .info{grid-column:2/3}.right{grid-row:1/3;grid-column:3}.n{display:none}.ask{grid-column:1/-1}.acard{grid-template-columns:84px 1fr;column-gap:.7rem;row-gap:.45rem;padding:.7rem .8rem}.acard .pics{grid-column:1;grid-row:1/3;align-self:start}.acard .info{grid-column:2}.acard .acts{grid-column:2;flex-wrap:wrap;gap:.4rem .9rem}.search{min-width:0;width:100%}}
+@media (max-width:720px){.card{grid-template-columns:auto 1fr auto;padding:.9rem}.card .pics{grid-column:2/3;height:96px}.card .info{grid-column:2/3}.right{grid-row:1/3;grid-column:3}.n{display:none}.ask{grid-column:1/-1}.acard{grid-template-columns:84px 1fr;column-gap:.7rem;row-gap:.45rem;padding:.7rem .8rem}.acard .pics{grid-column:1;grid-row:1/3;align-self:start}.acard .info{grid-column:2}.acard .acts{grid-column:2;flex-wrap:wrap;gap:.4rem .9rem}.fold .acts{justify-content:flex-start}.search{min-width:0;width:100%}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 """
 
@@ -581,7 +660,7 @@ function dueTag(iso){
 function esc(s){return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(t){const el = $('#toast');el.textContent = t;el.classList.add('on');clearTimeout(el._t);el._t = setTimeout(() => el.classList.remove('on'), 2200)}
 async function send(body){
-  if(!LIVE){toast('Open the queue through Claude to save changes');return false}
+  if(!LIVE){toast('Open the queue through your assistant to save changes');return false}
   try{const r = await fetch('/queue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
       if(!r.ok) throw 0; Q = await r.json(); return true}
   catch(e){toast('That did not save. Try again.');return false}
@@ -591,7 +670,7 @@ function render(order){
   const w = order ? order.map(id => Q.waiting.find(s => s.id == id)) : Q.waiting, list = $('#list'), first = Q.waiting[0];
   $('#count').innerHTML = w.length ? `${w.length} shoot${w.length==1?'':'s'} to edit` : 'All caught up';
   $('#next').innerHTML = first ? `Next up: <em>${esc(first.name)}</em>, ${esc(dueWords(first.due))}.` : '';
-  list.innerHTML = w.length ? '' : '<li class="empty"><b>Nothing waiting.</b><span>Shoots land here when you add them after a backup. Already have a list of clients to edit? Send Claude a screenshot of it, or type the names, and say "add these to my editing queue."</span></li>';
+  list.innerHTML = w.length ? '' : '<li class="empty"><b>Nothing waiting.</b><span>Shoots land here when you add them after a backup.</span></li>';
   w.forEach((s, i) => {
     const li = document.createElement('li');
     li.className = 'card'; li.dataset.id = s.id; li.draggable = true;
@@ -599,19 +678,22 @@ function render(order){
     li.innerHTML = `<span class="grip" title="Drag to reorder">&#8942;&#8942;</span>
       <div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
-        <div class="meta">${dueTag(s.due)}<button class="setdue" type="button">${s.due ? 'Change the date' : 'Set a due date'}</button>${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
+        <div class="meta">${dueTag(s.due)}<button class="setdue" type="button">${s.due ? 'Change the date' : 'Set a due date'}</button><button class="unq" type="button">Take out of my queue</button>${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
       <div class="right"><span class="n">${String(i + 1).padStart(2, '0')}</span>
-        <button class="check" title="Mark finished" aria-label="Mark ${esc(s.name)} finished"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
+        <button class="check" title="Mark as delivered" aria-label="Mark ${esc(s.name)} as delivered"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button></div>`;
     li.querySelector('.check').onclick = () => finish(li, s);
     li.querySelector('.setdue').onclick = () => pickDue(li, s);
+    // Take out of my queue (Nicole, v26): not a client shoot after all; back to the uploaded shoots, no date
+    li.querySelector('.unq').onclick = async () => { if(await send({action:'unqueue', id:s.id})){ render(); toast(`${s.name} is back in your uploaded shoots`) } };
     list.appendChild(li);
   });
-  renderArchive();
+  renderBelow();
 }
+function renderBelow(){ renderArchive(); renderFolds(); searchAll() }
 let FILTER = '';
 function renderArchive(fresh){
   const a = Q.archive, box = $('#alist');
-  $('#acount').textContent = a.length ? `${a.length} shoot${a.length==1?'':'s'}, newest first` : 'Shoots land here after a backup, and when you finish editing one.';
+  $('#acount').textContent = (a.length ? `${a.length} shoot${a.length==1?'':'s'}, newest first. ` : '') + 'Every shoot you back up lands here. When one is a client gallery you need to edit and deliver, add it to your editing queue.';
   const f = FILTER.trim().toLowerCase();
   const shown = f ? a.filter(s => s.name.toLowerCase().includes(f)) : a;
   let html = '', month = null;
@@ -621,19 +703,53 @@ function renderArchive(fresh){
     const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
     html += `<li class="acard${fresh == s.id ? ' fresh' : ''}" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
-        <div class="meta">${s.status == 'finished' ? `<span class="tag edited">Edited${s.finished_at ? ' ' + nice(s.finished_at.slice(0,10)) : ''}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
+        <div class="meta">${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
       <div class="acts">${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
-        ${s.status == 'finished' ? `<button class="requeue" data-id="${esc(s.id)}">Put back in my editing queue</button>` : `<button class="requeue addq" data-id="${esc(s.id)}">Add to my editing queue</button>`}</div></li>`;
+        <button class="requeue addq" data-id="${esc(s.id)}">Add to my editing queue</button></div></li>`;
   });
-  box.innerHTML = html || (a.length ? '' : '');
-  $('#nomatch').hidden = !(f && !shown.length);
+  box.innerHTML = html;
+  // (the "No shoot by that name." line is decided once every section has been searched: searchAll)
   box.querySelectorAll('.open-folder').forEach(b => b.onclick = () => openFolder(b.dataset.id));
   box.querySelectorAll('.requeue').forEach(b => b.onclick = async () => {
-    const added = b.classList.contains('addq');
-    if(await send({action:'requeue', id:b.dataset.id})){render(); toast(added ? 'Added to your editing queue. No due date yet.' : 'Back in your editing queue. No due date yet.'); window.scrollTo({top:0, behavior:'smooth'})}});
+    if(await send({action:'requeue', id:b.dataset.id})){render(); toast('Added to your editing queue. No due date yet.'); window.scrollTo({top:0, behavior:'smooth'})}});
+}
+// Delivered and Archived (Nicole, v26): the galleries they delivered, then the ones they put away. Nothing is deleted.
+function smallCard(s, acts){
+  const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
+  return `<li class="acard" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
+    <div class="info"><div class="name">${esc(s.name)}</div>
+      <div class="meta">${s.finished_at ? `<span class="tag edited">Delivered ${nice(s.finished_at.slice(0,10))}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
+    <div class="acts">${acts}</div></li>`;
+}
+function renderFolds(){
+  const f = FILTER.trim().toLowerCase(), hit = s => !f || s.name.toLowerCase().includes(f);
+  const d = (Q.delivered || []).filter(hit), st = (Q.stored || []).filter(hit);
+  if(f){ if(d.length) $('#delivered').open = true; if(st.length) $('#stored').open = true; }   // a match in there opens it
+  $('#dtitle').textContent = `Delivered (${d.length})`; $('#stitle').textContent = `Archived (${st.length})`;
+  // Make posts from this shoot: the Make posts screen on the Assistant's own page server, when its address is known
+  const posts = Q.make_posts ? `<a class="mk" href="${esc(Q.make_posts)}">Make posts from this shoot</a>` : '';
+  $('#dlist').innerHTML = d.map(s => smallCard(s,
+    `${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
+     ${posts}
+     <button class="requeue" data-id="${esc(s.id)}">Put back in my editing queue</button>
+     <button class="store" data-id="${esc(s.id)}">Archive</button>`)).join('') || '<li class="foldempty">Nothing delivered yet. Press the check mark on a shoot once its gallery is delivered.</li>';
+  $('#slist').innerHTML = st.map(s => smallCard(s,
+    `${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
+     <button class="unstore" data-id="${esc(s.id)}">Bring it back</button>`)).join('') || '<li class="foldempty">Nothing archived.</li>';
+  document.querySelectorAll('#dlist .open-folder, #slist .open-folder').forEach(b => b.onclick = () => openFolder(b.dataset.id));
+  document.querySelectorAll('#dlist .requeue').forEach(b => b.onclick = async () => { if(await send({action:'requeue', id:b.dataset.id})){render(); toast('Back in your editing queue. No due date yet.'); window.scrollTo({top:0, behavior:'smooth'})} });
+  document.querySelectorAll('#dlist .store').forEach(b => b.onclick = () => {
+    const acts = b.closest('.acts'); if(acts.querySelector('.sure')) return;
+    const box = document.createElement('div'); box.className = 'sure';
+    box.innerHTML = `<b>Are you sure you want to archive this?</b><button class="yes" type="button">Yes, archive it</button><button class="no" type="button">Cancel</button>`;
+    acts.appendChild(box);
+    box.querySelector('.no').onclick = () => box.remove();
+    box.querySelector('.yes').onclick = async () => { if(await send({action:'store', id:b.dataset.id})){ render(); toast('Archived. You can bring it back any time.') } };
+  });
+  document.querySelectorAll('#slist .unstore').forEach(b => b.onclick = async () => { if(await send({action:'unstore', id:b.dataset.id})){ render(); $('#delivered').open = true; toast('Back in Delivered.') } });
 }
 async function openFolder(id){
-  if(!LIVE){toast('Ask Claude to “show my shoots” to open folders from here');return}
+  if(!LIVE){toast('Ask your assistant to “show my shoots” to open folders from here');return}
   try{const r = await fetch('/open?id=' + encodeURIComponent(id)); const j = await r.json(); toast(j.words)}
   catch(e){toast('Could not open that folder.')}
 }
@@ -641,8 +757,8 @@ function dueWords(iso){if(!iso) return 'no due date';const n = days(iso);if(n<0)
 async function finish(li, s){
   li.classList.add('done');
   if(!(await send({action:'done', id:s.id}))){li.classList.remove('done');return}
-  toast(`${s.name}: finished, moved to your shoots below`);
-  setTimeout(() => {li.classList.add('leaving'); setTimeout(() => {render(); renderArchive(s.id)}, 600)}, 1400);
+  toast(`${s.name}: delivered, moved to Delivered below`);
+  setTimeout(() => {li.classList.add('leaving'); setTimeout(() => render(), 600)}, 1400);
 }
 // drag to reorder
 let dragId = null;
@@ -711,12 +827,20 @@ $('#addcancel').onclick = () => { $('#addform').hidden = true; $('#addname').val
 $('#addform').onsubmit = async e => {
   e.preventDefault(); const name = $('#addname').value.trim(), due = $('#adddue').value;
   if(!name){ $('#addname').focus(); return }
-  if(!LIVE){ $('#added').textContent = 'This is a saved copy. Ask Claude to pull up your queue, then add it there.'; return }
+  if(!LIVE){ $('#added').textContent = 'This is a saved copy. Ask your assistant to pull up your queue, then add it there.'; return }
   if(await send({action:'add', name, due})){ render(); $('#addname').value = ''; $('#adddue').value = '';
     $('#added').textContent = name + (due ? ' added, due ' + nice(due) + '.' : ' added, no due date yet.'); toast(name + ' is in your queue'); $('#addname').focus() }
-  else $('#added').textContent = 'Could not add it. Tell Claude instead.';
+  else $('#added').textContent = 'Could not add it. Tell your assistant instead.';
 };
-$('#q').addEventListener('input', e => {FILTER = e.target.value; renderArchive()});
+$('#q').addEventListener('input', e => {FILTER = e.target.value; renderBelow()});
+// One search for every shoot (Nicole, v26): the queue, uploaded, delivered and archived
+function searchAll(){
+  const f = FILTER.trim().toLowerCase();
+  let n = 0;
+  document.querySelectorAll('#list .card').forEach(c => { const ok = !f || c.querySelector('.name').textContent.toLowerCase().includes(f); c.style.display = ok ? '' : 'none'; if(ok) n++; });
+  n += document.querySelectorAll('#alist .acard, #dlist .acard, #slist .acard').length;
+  $('#nomatch').hidden = !(f && !n);
+}
 if(!LIVE) $('#offline').hidden = false;
 render();
 if(location.hash == '#archive') setTimeout(() => document.getElementById('archive').scrollIntoView({behavior:'smooth'}), 200);
@@ -725,22 +849,45 @@ if(location.hash == '#archive') setTimeout(() => document.getElementById('archiv
 
 def state(q):
     def pub(s):
-        d = {k: s.get(k) for k in ("id", "name", "shot", "due", "count", "thumbs", "finished_at", "status")}
+        d = {k: s.get(k) for k in ("id", "name", "shot", "due", "count", "thumbs", "finished_at", "status", "stored_at")}
         d["has_folder"] = bool(s.get("studio") or s.get("folder"))
         d["count_words"] = count_words(s)
         return d
-    return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)], "archive": [pub(s) for s in archive(q)]}
+    # "archive" is the page's Uploaded shoots (the key is older than the name); every shoot is in exactly one list
+    return {"today": today().isoformat(), "waiting": [pub(s) for s in waiting(q)],
+            "archive": [pub(s) for s in uploaded(q)],
+            "delivered": [pub(s) for s in delivered(q)],
+            "stored": [pub(s) for s in stored(q)],
+            "make_posts": make_posts_link()}
 
+
+def posting_base():
+    """The address of the Assistant's own page server (home, posts), as it last wrote it in posting-url.txt:
+    "http://127.0.0.1:8790". None when it has never run, or when the file holds anything but an address on this
+    computer (the address goes into links on the page)."""
+    try:
+        f = HOME / "posting-url.txt"
+        if f.exists():
+            base = f.read_text(encoding="utf-8").strip().rsplit("/", 1)[0]
+            if re.fullmatch(r"http://(127\.0\.0\.1|localhost):\d{2,5}", base):
+                return base
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def make_posts_link():
+    """Where "Make posts from this shoot" goes: the Make posts screen on the posting server (/make-posts).
+    None when that server's address is not known; the page then shows no such link (never a dead one)."""
+    base = posting_base()
+    return base + "/make-posts" if base else None
 
 
 def home_link():
     """A Home link to the Studio's home page, when its server has run (home.py; the address is kept in posting-url.txt)."""
-    try:
-        f = HOME / "posting-url.txt"
-        if f.exists():
-            return f"<a class='homelink' href='{f.read_text(encoding='utf-8').strip().rsplit('/', 1)[0]}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
-    except OSError:
-        pass
+    base = posting_base()
+    if base:
+        return f"<a class='homelink' href='{html.escape(base)}/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span><span class='short'>Home</span></a>"
     return ""
 
 
@@ -752,18 +899,24 @@ def page_html(q):
             f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}"
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Editing queue</span><h1 id='count'></h1><p class='lede' id='next'></p>"
-            "<span class='talk'>The soonest due date is always on top. Shoots with no date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down.</span>"
+            "<span class='talk'>This is your editing queue: the client shoots you need to edit and deliver. The soonest due date is always on top, and shoots with no due date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down. When a gallery is delivered, press the check mark. Not a client shoot? Take it out of your queue and it goes back to your uploaded shoots below.</span>"
             "<div class='addrow'><button class='addbtn' id='addbtn' type='button'><span class='plus'>+</span> Add a shoot</button>"
             "<form class='addform' id='addform' hidden><input type='text' id='addname' placeholder='Client or shoot name' maxlength='80' autocomplete='off'>"
             "<input type='date' id='adddue' title='Due date (optional)'><button type='submit' class='go'>Add to the queue</button><button type='button' class='cancel' id='addcancel'>Cancel</button>"
             "<span class='hint'>The date is optional. A shoot added here has no photos behind it yet, so its card shows no previews.</span></form><p class='added' id='added'></p></div>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “pull up my queue” to check things off and change dates.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask your assistant to “pull up my queue” to check things off and change dates.</p></header>"
             "<ol class='list' id='list'></ol>"
-            "<div class='line' id='archive'><span>Your shoots</span></div>"
-            "<div class='arch-head'><span class='count' id='acount'></span>"
-            "<label class='search'><svg viewBox='0 0 24 24'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>"
-            "<input id='q' type='search' placeholder='Find a shoot' autocomplete='off'></label></div>"
-            "<ul class='alist' id='alist'></ul><p class='nomatch' id='nomatch' hidden>No shoot by that name.</p></div>"
+            "<div class='findall'><label class='search'><svg viewBox='0 0 24 24'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>"
+            "<input id='q' type='search' placeholder='Find a shoot' autocomplete='off'></label>"
+            "<span class='findsay'>Looks through every shoot: your queue, uploaded, delivered and archived.</span></div>"
+            "<p class='nomatch' id='nomatch' hidden>No shoot by that name.</p>"
+            "<div class='line' id='archive'><span>Uploaded shoots</span></div>"
+            "<div class='arch-head'><span class='count' id='acount'></span></div>"
+            "<ul class='alist' id='alist'></ul>"
+            "<details class='fold' id='delivered'><summary><span class='line'><span id='dtitle'>Delivered</span></span></summary>"
+            "<p class='foldsay'>Galleries you've delivered, newest first. When you're done with one, archive it to keep this list tidy. Nothing is deleted.</p><ul class='alist' id='dlist'></ul></details>"
+            "<details class='fold' id='stored'><summary><span class='line'><span id='stitle'>Archived</span></span></summary>"
+            "<p class='foldsay'>Shoots you've archived. Bring one back any time.</p><ul class='alist' id='slist'></ul></details></div>"
             "<div class='toast' id='toast'></div>"
             f"<script type='application/json' id='data'>{data}</script><script>{SCRIPT}</script></body></html>")
 
@@ -857,19 +1010,32 @@ class Handler(SimpleHTTPRequestHandler):
             with _QUEUE_LOCK:               # two presses at once: the second reads the queue the first saved
                 q = load()
                 act = body.get("action")
-                if act in ("done", "undo", "due", "requeue"):
-                    s = next(x for x in q["shoots"] if x["id"] == body.get("id"))
-                    if act == "done":
-                        s["status"], s["finished_at"] = "finished", datetime.now().isoformat(timespec="seconds")
-                        s["finished_by"] = "page"
-                    elif act in ("undo", "requeue"):
-                        s["status"] = "waiting"
-                        for k in ("finished_at", "finished_by", "offered", "reminded"):
-                            s.pop(k, None)
-                        if act == "requeue":
-                            s["due"] = body.get("due") and due_date(body["due"])[0]
-                        q["shoots"].remove(s)
-                        place(q, s)
+                if act in ("done", "undo", "due", "requeue", "unqueue", "store", "unstore"):
+                    sid = body.get("id")
+                    s = next((x for x in q["shoots"] if x["id"] == sid), None) if isinstance(sid, str) else None
+                    if s is None:
+                        raise ValueError("no such shoot")       # a plain refusal (400), nothing changed
+                    if act == "done":                           # the check mark: Mark as delivered
+                        if not is_waiting(s):
+                            raise ValueError("that shoot is not in the queue")
+                        mark_delivered(s, "page")
+                    elif act in ("undo", "requeue"):            # from Uploaded, Delivered or Archived, into the queue
+                        if is_waiting(s):
+                            raise ValueError("that shoot is already in the queue")
+                        back_in_queue(q, s, due_date(body["due"])[0] if act == "requeue" and body.get("due") else
+                                      (s.get("due") if act == "undo" else None))
+                    elif act == "unqueue":                      # Take out of my queue: back to the uploaded shoots, no date
+                        if not is_waiting(s):
+                            raise ValueError("that shoot is not in the queue")
+                        take_out(s)
+                    elif act == "store":                        # Archive, after "Are you sure you want to archive this?"
+                        if s.get("status") != "finished" or is_stored(s):
+                            raise ValueError("only a delivered shoot can be archived")
+                        put_away(s)
+                    elif act == "unstore":                      # Bring it back: in Delivered again
+                        if not is_stored(s):
+                            raise ValueError("that shoot is not archived")
+                        bring_back(s)
                     else:
                         s["due"], how = due_date(body.get("due"))
                         s.pop("reminded", None)
@@ -881,7 +1047,7 @@ class Handler(SimpleHTTPRequestHandler):
                         raise ValueError("a name is needed")
                     add_manual(q, name, body.get("due") or None)
                 else:
-                    raise ValueError(act)
+                    raise ValueError("no such action")
                 save(q)
                 write_page(q)
                 out = json.dumps(state(q)).encode()
@@ -932,10 +1098,10 @@ def show(q, all_=False):
         extra = f", {count_words(s)}" if count_words(s) else ""
         say(f"{i}. {s['name']}: {due_words(s.get('due'))}{extra}")
     if all_:
-        a = archive(q)
-        say(f"Your shoots ({len(a)}):")
-        for s in a:
-            say(f"   {s.get('shot') or 'no date'}  {s['name']}" + ("  (edited)" if s.get("status") == "finished" else ""))
+        for title, rows in (("Uploaded shoots", uploaded(q)), ("Delivered", delivered(q)), ("Archived", stored(q))):
+            say(f"{title} ({len(rows)}):")
+            for s in rows:
+                say(f"   {s.get('shot') or 'no date'}  {s['name']}")
 
 
 def main():
@@ -947,7 +1113,7 @@ def main():
     a2.add_argument("--shot"); a2.add_argument("--folder")
     a3 = sub.add_parser("add-list"); a3.add_argument("--file", help="one name per line"); a3.add_argument("--names", help="names separated by commas")
     l = sub.add_parser("list"); l.add_argument("--all", action="store_true")
-    for c in ("done", "undo"):
+    for c in ("done", "undo", "unqueue", "store", "unstore"):
         x = sub.add_parser(c); x.add_argument("which")
     d = sub.add_parser("due"); d.add_argument("which"); d.add_argument("when")
     m = sub.add_parser("move"); m.add_argument("which"); m.add_argument("--to", type=int, required=True)
@@ -1000,21 +1166,41 @@ def main():
     elif a.cmd in ("done", "undo"):
         s = find(q, a.which)
         if a.cmd == "done":
-            if not is_waiting(s):
-                say(f"{s['name']} was already finished.")
+            if not is_waiting(s):            # only a shoot in the queue is ticked off (as before v26)
+                say(f"{s['name']} was already delivered." if s.get("status") == "finished"
+                    else f"{s['name']} isn't in the editing queue, so there is nothing to mark.")
                 return
-            s["status"], s["finished_at"], s["finished_by"] = "finished", datetime.now().isoformat(timespec="seconds"), "claude"
+            mark_delivered(s, "claude")
         else:
-            s["status"] = "waiting"
-            for k in ("finished_at", "finished_by", "offered", "reminded"):
-                s.pop(k, None)
-            q["shoots"].remove(s)
-            place(q, s)
+            if is_waiting(s):
+                say(f"{s['name']} is already in the queue.")
+                return
+            back_in_queue(q, s, s.get("due"))
         save(q)
         write_page(q)
-        say(f"{'Finished' if a.cmd == 'done' else 'Back in the queue'}: {s['name']}.")
+        say(f"{'Delivered' if a.cmd == 'done' else 'Back in the queue'}: {s['name']}.")
         if a.cmd == "done" and s.get("studio"):
             say(f"backup: {Path(s['studio'])}  shoot: {s['shoot']}")  # for the next step (finding the exports)
+    elif a.cmd == "unqueue":
+        s = find(q, a.which, include_finished=False)
+        take_out(s)
+        save(q)
+        write_page(q)
+        say(f"{s['name']} is back in your uploaded shoots.")
+    elif a.cmd in ("store", "unstore"):
+        want = stored(q) if a.cmd == "unstore" else delivered(q)
+        hits = [x for x in want if x["id"] == a.which or a.which.strip().lower() in x["name"].lower()]
+        exact = [x for x in hits if x["id"] == a.which or x["name"].lower() == a.which.strip().lower()]
+        hits = exact[:1] or hits
+        if len(hits) != 1:
+            where_ = "Archived" if a.cmd == "unstore" else "Delivered"
+            sys.exit(f"STOP: no shoot in {where_} matches '{a.which}'." if not hits else
+                     "STOP: more than one shoot matches '" + a.which + "': " + "; ".join(x["name"] for x in hits) + ". Say which.")
+        s = hits[0]
+        (put_away if a.cmd == "store" else bring_back)(s)
+        save(q)
+        write_page(q)
+        say(f"Archived: {s['name']}. Nothing is deleted; it can come back any time." if a.cmd == "store" else f"Back in Delivered: {s['name']}.")
     elif a.cmd == "due":
         s = find(q, a.which, include_finished=False)
         s["due"], how = due_date(a.when)
@@ -1079,7 +1265,9 @@ def main():
         if not ok:
             sys.exit(1)
     elif a.cmd == "offers":
-        hits = [s for s in finished(q) if s.get("finished_by") == "page" and not s.get("offered")]
+        # delivered on the page and not yet offered; not one they have since archived (put away: it waits, unmarked,
+        # and is offered once if it is brought back)
+        hits = [s for s in delivered(q) if s.get("finished_by") == "page" and not s.get("offered")]
         for s in hits:
             say(f"{s['name']}" + (f"  (backup: {s['studio']}  shoot: {s['shoot']})" if s.get("studio") else ""))
             if a.mark:

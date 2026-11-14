@@ -4,7 +4,7 @@ Part of the Assistant's instructions. The first-thing checks, the rules and how 
 
 ## When they come back to the report: about each shoot
 
-The backup may have finished while they were away, so these questions wait for their next message after it finished. Ask them before anything else they bring up (after the heads-up line, if any). The editing queue and the archive are simply part of the Assistant, never a yes/no: every shoot the Assistant backs up is in the archive, and a shoot is in the queue when it has a due date. (If `edit_queue.py status` says "never asked", run `edit_queue.py setup --on` quietly; "off" only if they once said so.)
+The backup may have finished while they were away, so these questions wait for their next message after it finished. Ask them before anything else they bring up (after the heads-up line, if any). The editing queue and the archive are simply part of the Assistant, never a yes/no: every shoot the Assistant backs up lands in Uploaded shoots on the queue page, and a shoot is in the queue when they add it with a due date. (If `edit_queue.py status` says "never asked", run `edit_queue.py setup --on` quietly; "off" only if they once said so.)
 
 **Only what they haven't already said.** If "What's on the card?" covered it (the name, who it's for, when it's due), that answer stands and the question below is skipped; a mini-session day where they named every family up front asks nothing here but the due dates. If they said something that doesn't fit the card ("the Smith family" but the card plainly holds two different days), say so in one line and ask.
 
