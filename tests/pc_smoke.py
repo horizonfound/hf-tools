@@ -904,6 +904,9 @@ _WORDS_CLOCK = [   # the clock in a page's words: "Friday, November 6 · 5:00 pm
     (re.compile(r"\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day, (?:January|February|March|April|May|June|July|August|"
                 r"September|October|November|December) \d{1,2}\b"), "<DAY>"),
     (re.compile(r"\b\d{1,2}:\d\d ?(?:am|pm|AM|PM)\b"), "<TIME>"),
+    # the due-date picker's earliest day is today: two runs either side of midnight differ by it and nothing else
+    # (GitHub's Mac ran one at 23:58 and the other at 00:00 UTC, Nov 13)
+    (re.compile(r"min='\d{4}-\d\d-\d\d'"), "min='<TODAY>'"),
     (re.compile(r"\b\d+(?:\.\d+)? (?:seconds?|sec|minutes?|min|hours?|hrs)\b"), "<TOOK>")]
 
 
