@@ -11,6 +11,9 @@
     python3 reel_page.py reels "beach" [--new [--name N] | --open "<reel>" | --rename "<reel>" --to "<name>"]
                                            the shoot's reels (her v25: several reels from one shoot), and the page's
                                            own three moves from the chat; show and make take --reel "<reel>"
+    python3 reel_page.py note "beach" [--reel "<reel>"]
+                                           before picking a reel's photos (her v25: nothing is picked until they
+                                           ask): which reel the pick is for, and their note for it, word for word
     python3 reel_page.py job "<kit>" --id <id>   (the page server's own) make the reel a page asked for
 
 The photographer sees her page: her words (WORDS below, word for word from her reel-maker.html and server.py),
@@ -50,7 +53,7 @@ Records:
                                   save), "from": {page, base} of the last save, "stamp": the numbered list it was saved
                                   against, "names": {number: file name} for every number it mentions (so a re-made
                                   list finds the same photos again), "saved": {picks, mine, mine_picks, song, vibe,
-                                  footage, style, sel, ask, feel, updated}, and, from the later stages, "moments",
+                                  footage, style, sel, ask, feel, photo_ask, updated}, and, from the later stages, "moments",
                                   "claude_bts" and "made"; Claude's moments are written only by footage.py moments,
                                   which keeps those of an earlier look in "earlier_looks"}. Her record (BUILD.md section 8), minus her "claude", which
                                   is read from kit.json picks.reel every time.
@@ -336,7 +339,6 @@ WORDS = {
     "claude_rec": "Recommended for behind-the-scenes reels",
     "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
     "claude_words_bts": "Your assistant picks your strongest photos, the ones with the most feeling and the best story, and fits your behind-the-scenes moments in between.",
-    "not_picked_html": "Your assistant hasn't picked for this shoot yet. In the chat, say <b>“pick my reel photos for {short}”</b> and they'll show up here.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Drag any photo to move it, or drag one up from all your photos below. Tap × to take one out.",
     "tip_html": "If there's a photo you really want on screen a little longer, tap <b>Longer</b> under it. If there are ones you'd like to flash by quicker, tap <b>Quicker</b>. Leave the rest alone.",
@@ -467,6 +469,24 @@ REELS_WORDS = {
     "reels_no_name": reels.NO_NAME,
     "reels_gone": reels.GONE,
 }
+
+# The photographer picks (her v25, section 3: "I choose, not you."): nothing is picked until they ask. A reel with
+# no pick of the Assistant's says so; under the two choices is a note box, optional and this reel's own
+# (saved.photo_ask), and the line to copy into the chat. Hers, word for word (pages/reel-maker.html, handoff v25);
+# tests/picks_ask_check.py compares them with her page.
+PICK_WORDS = {
+    "not_picked": "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
+    "photo_ask_b": "Tell your assistant which photos you'd like in this reel",
+    "photo_ask_opt": " Optional, and only for this reel.",
+    "photo_ask_ex": "For example: “Only the ones in front of the white backdrop.” or “Just the kitchen and the cupcakes.”",
+    "photo_ask_placeholder": "Optional: which photos to use, or leave out",
+    "photo_then": "Then copy this into the chat, and your assistant picks the photos for this reel:",
+    "photo_plain": "Pick my reel photos",
+    "photo_for": "Pick my reel photos for {short}",
+    "photo_reel": ", {name}",                      # only when the shoot has more than one reel
+    "photo_note": ", and follow my note",          # only when there is a note
+}
+PHOTO_ASK_MAX = 600                                # her box's length, and what her server keeps
 
 # Lines that are ours, not hers, each with why (they go on the "Tell Nicole" list):
 OUR_WORDS = {
@@ -1933,6 +1953,8 @@ SAVE_FIELDS = {
     "sel": lambda v, kit, ons: _sel(v),
     "ask": lambda v, kit, ons: _text(v, 600),
     "feel": lambda v, kit, ons: _feel(v),
+    # her v25 photo note: which photos they'd like in this reel, for the Assistant's pick (this reel's own)
+    "photo_ask": lambda v, kit, ons: _text(v, PHOTO_ASK_MAX),
 }
 
 
@@ -3134,6 +3156,16 @@ REELS_JS = r"""
 })();
 """
 
+# The photo note under "Put your photos in order" (her v25): her three rules as she wrote them, then two of ours
+# (her box is two rows, where our other note box's smallest height is three; a long name wraps in the line to copy).
+PICK_CSS = r"""
+.photoask{margin:1rem 0 .4rem;padding:.9rem 1rem;border:1px solid var(--line);border-radius:14px;background:var(--cream)}
+.photoask label{display:block;font-size:14.5px;margin-bottom:.5rem}.photoask .ex{display:block;color:var(--ink-2);font-size:13.5px;margin-top:.25rem}
+.photoask p{margin:.7rem 0 .45rem}
+.photoask textarea{min-height:3.4em}
+.photoask .line span{overflow-wrap:anywhere;min-width:0}
+"""
+
 OUR_CSS = r"""
 [hidden]{display:none!important}
 .reelwrap{position:relative}
@@ -3235,6 +3267,16 @@ def _order_section(w, num):
         "<span id='claudeWords'>" + e(w["claude_words"]) + "</span></button>"
         "<button class='opt' id='useMine' type='button'><b>" + e(w["mine_b"]) + "</b><span>" + e(w["mine_words"]) + "</span></button>"
         "</div>"
+        # her v25 note box: which photos they'd like in this reel, and the line to copy into the chat
+        "<div class='paste ask photoask' id='photoAskBox'>"
+        "<label for='photoAskIn'><b>" + e(w["photo_ask_b"]) + "</b>" + e(w["photo_ask_opt"])
+        + "<span class='ex'>" + e(w["photo_ask_ex"]) + "</span></label>"
+        "<textarea id='photoAskIn' rows='2' maxlength='" + str(PHOTO_ASK_MAX) + "' placeholder='"
+        + e(w["photo_ask_placeholder"], quote=True) + "'></textarea>"
+        "<p>" + e(w["photo_then"]) + "</p>"
+        "<div class='line'><span id='photoPaste'>" + e(w["photo_plain"]) + "</span>"
+        "<button class='btn' id='copyPhoto' type='button'>" + e(w["copy"]) + "</button></div>"
+        "</div>"
         "<div class='tip'><div><p>" + w["tip_html"] + "</p>"
         "<div class='legend'><span><i style='background:var(--long)'></i>" + e(w["legend_long"]) + "</span>"
         "<span><i style='background:var(--quick)'></i>" + e(w["legend_quick"]) + "</span></div></div></div>"
@@ -3316,6 +3358,7 @@ def page_html(kit_name, short, kit_page=False):
         w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
     title = w["reel_of"].replace("{short}", short)
     w.update(REELS_WORDS)
+    w.update(PICK_WORDS)
     data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
@@ -3329,7 +3372,7 @@ def page_html(kit_name, short, kit_page=False):
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + OUR_CSS + "</style></head>"
+        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + PICK_CSS + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
         "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
@@ -3446,7 +3489,7 @@ CORE_JS = r"""
     words: W, flush: flush,
     post: function(b){ b.kit = KIT; return R_post('/reel-version', b); },
     reload: function(){ location.reload(); },
-    renamed: function(j){ if (typeof j.rev === 'number') rev = j.rev; if (S) { S.versions = j.versions; S.current = j.current; S.rev = rev; } }
+    renamed: function(j){ if (typeof j.rev === 'number') rev = j.rev; if (S) { S.versions = j.versions; S.current = j.current; S.rev = rev; } if (R.photoLine) R.photoLine(); }
   });
   function R_post(url, obj){
     return fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(obj)})
@@ -3554,7 +3597,28 @@ ORDER_JS = r"""
   insEl.className = 'ins'; wrapEl.appendChild(insEl);
 
   var claudeOrder = function(){ return (footage && claudeBts.length) ? claudeBts : claude; };
-  function notPicked(){ $('claudeWords').innerHTML = R.fill(W.not_picked_html, {short: esc(short)}); }
+  function notPicked(){ $('claudeWords').textContent = W.not_picked; }
+  // her v25 photo note: which photos they'd like in this reel, and the line to copy into the chat. The reel's
+  // name is in the line only when the shoot has more than one reel, "and follow my note" only with a note.
+  var photoAsk = '';
+  function photoLine(){
+    var nm = R.reels ? R.reels.name() : '';
+    $('photoPaste').textContent = R.fill(W.photo_for, {short: short}) + (nm ? R.fill(W.photo_reel, {name: nm}) : '') + (photoAsk ? W.photo_note : '');
+  }
+  R.photoLine = photoLine;
+  $('photoAskIn').oninput = function(){ photoAsk = $('photoAskIn').value.trim(); photoLine(); R.save(); };
+  // Copy: the page's own copy first (the Claude app's pane allows it from a press), the newer way only if that failed
+  $('copyPhoto').onclick = function(){
+    var t = $('photoPaste').textContent, ok = false;
+    try {
+      var r = document.createRange(); r.selectNodeContents($('photoPaste'));
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      ok = document.execCommand('copy');
+      s.removeAllRanges();
+    } catch (e) { ok = false; }
+    if (!ok && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function(){});
+    $('copyPhoto').textContent = W.copied; setTimeout(function(){ $('copyPhoto').textContent = W.copy; }, 1600);
+  };
   function setMode(m){
     mine = m;
     $('useClaude').classList.toggle('on', !mine);
@@ -3786,7 +3850,7 @@ ORDER_JS = r"""
   R.part({
     fields: function(){
       if (mine) mineOrder = M.copy(reel);
-      return {picks: M.copy(reel), mine: mine, mine_picks: mineOrder ? M.copy(mineOrder) : null};
+      return {picks: M.copy(reel), mine: mine, mine_picks: mineOrder ? M.copy(mineOrder) : null, photo_ask: photoAsk};
     },
     adopt: function(st, first){
       short = st.short;
@@ -3801,6 +3865,12 @@ ORDER_JS = r"""
       claudeBts = known(st.claude_bts);
       earlier = (st.claude_earlier || []).map(known);
       var saved = st.saved;
+      // their note for this reel's photos: never changed under their hand
+      if (first || document.activeElement !== $('photoAskIn')) {
+        photoAsk = saved && typeof saved.photo_ask === 'string' ? saved.photo_ask.trim() : '';
+        $('photoAskIn').value = saved && typeof saved.photo_ask === 'string' ? saved.photo_ask : '';
+      }
+      photoLine();
       if (saved && Array.isArray(saved.picks)) {
         reel = known(saved.picks);
         mine = !!saved.mine;
@@ -4421,6 +4491,57 @@ def cmd_reels(kit, a):
     return 0
 
 
+def photo_note(saved):
+    """Their note for this reel's photos (her v25 saved.photo_ask), as one piece of text; "" when there is none."""
+    v = (saved or {}).get("photo_ask")
+    return v.strip() if isinstance(v, str) else ""
+
+
+def cmd_note(kit, reel=None):
+    """reel_page.py note "<kit>" [--reel "<the reel the pasted line names>"]: what the Assistant reads before it
+    picks a reel's photos (her v25, "Pick my reel photos for <shoot>, <reel name>, and follow my note"): which reel
+    the pick is for, whether that is the reel open on the page, and their note for that reel's photos, word for
+    word. It changes nothing."""
+    vid = None
+    if reel:
+        vid = _reel_or_stop(kit, reel)
+        if vid is None:
+            return 1
+    st = state(kit, vid)
+    if st is None:
+        say("STOP: couldn't read this shoot's numbered list (kit.py sheet makes it). Nothing was changed.")
+        return 1
+    several = len(st["versions"]) > 1
+    name = reels.name_of({"versions": st["versions"]}, st["current"], REEL_FIRST)
+    say(f"{st['short']}  ({kit.name})")
+    for_reel = ""
+    if not several:
+        say("  This shoot has one reel. The pick is for it.")
+    elif st["current"] == st["on_page"]:
+        say(f"  The pick is for \"{name}\", the reel open on the page ({len(st['versions'])} reels: {reels_line(st['versions'], st['on_page'])}).")
+    else:
+        on = reels.name_of({"versions": st["versions"]}, st["on_page"], REEL_FIRST)
+        say(f"  NOTE: the line names \"{name}\", but the reel open on the page is \"{on}\". The pick is for \"{name}\" only: "
+            f"save it with --for-reel, and tell them it shows when they open \"{name}\" in Your reels. "
+            f"Nothing of \"{on}\" changes.")
+        for_reel = f' --for-reel "{name}"'
+    if several and not reel:
+        say("  (If the line they pasted names another reel, run this again with --reel \"<that name>\".)")
+    note = photo_note(st["saved"])
+    if note:
+        say("  Their note for this reel's photos, word for word:")
+        for ln in note.splitlines():
+            say("    " + ln)
+        say("  Pick only what the note allows. It is theirs: follow it exactly, never widen it. If no photo in the "
+            "shoot fits it, or you can't tell which photos it means, say so and ask; don't fill in with photos it leaves out.")
+    else:
+        say("  No note for this reel's photos: choose from the whole shoot, the way curating.md says.")
+    have = ",".join(str(x["n"]) + x["h"] for x in st["claude"])
+    say(f"  Your pick for this reel so far: {have or '(none yet)'}")
+    say(f"  Save the pick, for this reel only: kit.py picks \"{kit.name}\" --reel <numbers, in play order, marked>{for_reel}")
+    return 0
+
+
 def cmd_show(kit, reel=None):
     vid = None
     if reel:
@@ -4476,6 +4597,8 @@ def cmd_show(kit, reel=None):
     if n_looks:
         mine = sum(1 for m in ms if m.get("by") != "you")
         say(f"  Footage looks (footage.py scan): {n_looks}; Claude's moments on the page: {mine}")
+    if photo_note(saved):
+        say(f"  Their note for this reel's photos (reel_page.py note): {' / '.join(photo_note(saved).splitlines())}")
     if saved.get("ask") or saved.get("feel"):
         say(f"  Their notes for the footage look: {saved.get('ask') or '(none)'}; the feel: {saved.get('feel') or '(none)'}")
     made = [m for m in (rec.get("made") or []) if isinstance(m, dict)]
@@ -4575,6 +4698,9 @@ def main():
     rl.add_argument("--open", help="work on this reel (its name)")
     rl.add_argument("--rename", help="rename this reel (its name now)")
     rl.add_argument("--to", help="with --rename: the new name")
+    nt = sub.add_parser("note", help="before picking a reel's photos: which reel the pick is for, and their note for it")
+    nt.add_argument("words")
+    nt.add_argument("--reel", help="the reel the line they pasted names (without it: the one being worked on)")
     m = sub.add_parser("make", help="Claude's own Make my reel: the page's order, song and vibe")
     m.add_argument("words")
     m.add_argument("--reel", help="another of the shoot's reels, by name (without it: the one being worked on)")
@@ -4602,6 +4728,8 @@ def main():
             return cmd_make(kit, a)
         if a.cmd == "reels":
             return cmd_reels(kit, a)
+        if a.cmd == "note":
+            return cmd_note(kit, a.reel)
         return cmd_show(kit, a.reel)
     except arrange.Busy:
         say("STOP: this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.")

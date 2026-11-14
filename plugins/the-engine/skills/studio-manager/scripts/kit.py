@@ -529,12 +529,29 @@ def cmd_picks(kit, a):
         except arrange_busy() as e:  # noqa: F841
             say("STOP: this shoot's reel page is being written by something else right now. The reel's pick was not changed. Try again in a moment."); return 2
         say("Picks: " + (line + ", " if line else "") + f"reel {n} (for \"{name}\", one of this shoot's {len(vs)} reels)")
+        _say_photo_note(kit, later)
         return 0
     if a.reel is not None and len(vs) > 1:
         say("Picks: " + line + f" (the reel pick is for \"{next(v['name'] for v in vs if v['id'] == 'v1')}\", one of this shoot's {len(vs)} reels)")
+        _say_photo_note(kit, "v1")
         return 0
     say("Picks: " + line)
+    if a.reel is not None:
+        _say_photo_note(kit, "v1")
     return 0
+
+
+def _say_photo_note(kit, vid):
+    """After a reel pick is saved: their note for that reel's photos, if they wrote one on the reel page (Nicole's
+    v25: the pick holds only what the note allows). Only said; the pick is saved either way."""
+    try:
+        import reel_page
+        note = reel_page.photo_note(reel_page.as_reel(reel_page.load(kit), vid).get("saved"))
+    except Exception:  # noqa: BLE001  (a reminder only)
+        return
+    if note:
+        say("Their note for this reel's photos: " + " / ".join(note.splitlines()))
+        say("The pick should hold only what that note allows (reel_page.py note prints it before you pick).")
 
 
 def arrange_busy():
@@ -2411,7 +2428,7 @@ def main():
             return 1
         rec = load_rec(kit)
         say(f"Kit: {kit}")
-        say(f"{len(rec.get('photos', []))} photos" + (f" at {rec['photos_dir']}" if rec.get("photos_dir") else "") + ". Next: the question, then kit.py sheet.")
+        say(f"{len(rec.get('photos', []))} photos" + (f" at {rec['photos_dir']}" if rec.get("photos_dir") else "") + ". Next: kit.py sheet (it numbers the photos for the pages), then show the post kit. Nothing is picked or made until they ask.")
         return 0
     kit = find_kit(a.words)
     if a.cmd == "told":

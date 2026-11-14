@@ -412,8 +412,9 @@ def cmd_scan(kit, every=None, reel=None):
         say("The reel's photo pick (the same with footage or without): "
             + ",".join(f"{n}{m}" for n, m in zip(nums, marks)) + ". Leave \"order\" out of the moments file and the page uses it.")
     else:
-        say("NOTE: there is no photo pick for this reel yet. Pick the photos first, exactly as for a reel with no footage "
-            "(the reel skill's Step 2, saved with kit.py picks --reel), never to match the footage.")
+        say("NOTE: there is no photo pick of yours for this reel, and that is as it should be: they choose the photos, "
+            "and you pick only when they ask (\"Pick my reel photos for <shoot>\"). Find the moments only: don't pick "
+            "photos for this look, and leave \"order\" out of the moments file.")
     with arrange.locked(reel_page.lock_path(kit)):
         rec = reel_page.as_reel(reel_page.load(kit), reel)
     own = [m for m in reel_page.moments_of(rec) if m.get("by") == "you"]

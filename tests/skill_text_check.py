@@ -36,7 +36,11 @@ Reads text only; nothing is run, started or written. What it checks:
     words in the reel skill's only; the reel skill no longer says "no zooms" without saying it is about a photo
     reel; the reel page's third card is named in parts/arrange.md; the PC gap is in parts/on-a-pc.md and the PC
     guide in the same words; and parts/where-things-live.md names every file the talking reel keeps, by the
-    scripts' own names. (For this last part the talking scripts are imported, only to read their words.)
+    scripts' own names. (For this last part the talking scripts are imported, only to read their words.);
+  * the photographer picks (Nicole's v25, stage H of the v26 build): nothing is picked until they ask; the pasted
+    line "Pick my reel photos for <shoot>" is answered with reel_page.py note first, the note followed exactly,
+    the pick saved for that reel only; "make my posts" and a new kit only number the photos and open the post
+    kit (no pick, no build, no question); the page's own lines are quoted word for word.
 
 Every line says PASS or FAIL; exit 1 only when something FAILED.
 """
@@ -284,9 +288,9 @@ def check_reel_skill():
          "**Those are aims, not promises.**" in step4 and "a Longer photo or a plain opener lands on one beat" in step4
          and "three or four one-beat photos fall together" in step4 and "never tell them it can't happen" in step4
          and "never three one-beat plain photos in a row" not in t and "(two to four, wherever the song hits)" not in t)
-    case("... a reel pick is fully marked wherever it is saved, the post kit's kit.py picks --reel included",
-         "**This holds wherever a reel pick is saved**, the post kit's `kit.py picks --reel` included" in step2
-         and "`--reel 7+,2,11-,4,9+`" in step2)
+    case("... a reel pick is fully marked whenever it is saved (and \"make my posts\" is no longer where one is saved: v25)",
+         "**This holds whenever a reel pick is saved** with `kit.py picks --reel`" in step2
+         and "`--reel 7+,2,11-,4,9+`" in step2 and "is where most reel picks are first saved" not in t)
     case("... their own order is kept on the page", "Their own order is always kept on the page; yours never replaces it." in step2)
     foot = t.split("## Behind-the-scenes footage", 1)[-1].split("\n## ", 1)[0]
     case("her footage rules 4 to 6: never a photo because of a clip, never limited to the footage's setting, the same picks with or without",
@@ -314,7 +318,7 @@ def check_doors():
          and "never that it can't happen" in arr and "a Longer photo holds about three beats" not in arr)
     kitp = read(SM / "parts" / "post-kit.md")
     case("post-kit.md: plain stories are the kit's, the stories designer is theirs from the Stories card",
-         "plain stories (one photo each)" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)
+         "plain stories (one photo each" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)
     case("post-kit.md: 'show my post kit' loads the kit page in the pane through home.py url", '## "Show my post kit"' in kitp and "home.py url" in kitp.split('## "Show my post kit"', 1)[1])
     case("post-kit.md: the kit's reel and carousel counts are guides", "about 8 to 14, a guide, not a rule" in kitp and "about 5 to 8, a guide" in kitp)
     # the design preview on the kit's cards (Nicole's v24, section 7; the stage G fix round): the assistant is told
@@ -940,13 +944,14 @@ def check_several_reels():
          "**Every command acts on the reel that is open on the page**" in part and "each of them says first which reel it is about" in flat
          and '--for-reel "Reel 2"' in part and 'footage.py scan "<kit>" --reel "Reel 2"' in part and 'footage.py moments "<kit>" --file <file> --reel "Reel 2"' in part
          and 'reel_page.py show "<kit>" --reel "Reel 2"' in part and 'reel_page.py make "<kit>" --reel "Reel 2"' in part
-         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 2)
+         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 3)
     case("several reels: the chat's reels command, as reel_page.py has it, in the part and in the part's command block",
          'reel_page.py reels "<kit>" --new [--name "Kitchen"]' in flat and '--rename "Reel 2" --to "Kitchen"' in flat and '--open "Reel 1"' in flat
          and 'python3 <scripts>/reel_page.py reels "<kit>" [--new [--name "<name>"] | --open "<reel\'s name>" | --rename "<reel\'s name>" --to "<name>"]' in arr
          and 'sub.add_parser("reels"' in rp and all(('rl.add_argument("%s"' % a) in rp for a in ("--new", "--name", "--open", "--rename", "--to")))
     case("several reels: a pasted line that names a reel is checked against the reel open on the page first",
-         "run `reel_page.py reels \"<kit>\"` first and check that the reel named is the one open on the page" in flat and "say which reel your pick went to" in flat)
+         "run `reel_page.py note \"<kit>\" --reel \"Kitchen\"` first: it checks that the reel named is the one open on the page" in flat
+         and "say which reel your pick went to" in flat and 'sub.add_parser("note"' in rp)
     case("several reels: a new reel has no pick until they ask, and a pick waits under Let my assistant choose",
          "Pick for it only when they ask." in flat and 'your pick waits under "Let my assistant choose": tell them to press it' in flat)
     case("several reels: a reel is never removed, said plainly; two reels never share a name (the scripts refuse it)",
@@ -972,9 +977,91 @@ def check_several_reels():
          and '"moments_found"' in foot and "REEL_KEYS" in rp)
 
 
+def check_photographer_picks():
+    """The photographer picks (Nicole's v25, sections 3 and 10; stage H of the v26 build): nothing is picked until
+    they ask, the photo note is read first and followed, and "make my posts" only brings the photos in and opens
+    the post kit. The instructions say what the page and the scripts do, in the page's own words."""
+    rp, kitsrc, foot = read(SCRIPTS / "reel_page.py"), read(SCRIPTS / "kit.py"), read(SCRIPTS / "footage.py")
+    arr, kitp, photos = read(SM / "parts" / "arrange.md"), read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "photos-in.md")
+    reel, cur, core = read(REEL / "SKILL.md"), read(PLUGIN / "shared" / "curating.md"), read(SM / "SKILL.md")
+    flat = lambda t: " ".join(t.split())  # noqa: E731
+    words = dict(re.findall(r'^    "(not_picked|photo_ask_b|photo_for|photo_note)": "([^"]+)"', rp, re.M))
+    case("the page's four lines are in reel_page.PICK_WORDS (the not-picked line, the box's title, the line to copy, its ending)", len(words) == 4, sorted(words))
+    not_picked, box = words.get("not_picked", "?"), words.get("photo_ask_b", "?")
+    case("arrange.md and post-kit.md quote the page's not-picked line word for word", ('"' + not_picked + '"') in flat(arr) and ('"' + not_picked + '"') in flat(kitp))
+    case("arrange.md and the reel skill name the note box by its title on the page", box in flat(arr) and box in flat(reel) and box in flat(cur))
+    case("arrange.md gives the line as the page builds it: the reel's name only with several reels, 'and follow my note' only with a note",
+         '**"Pick my reel photos for <shoot>"**' in arr and '**", and follow my note"**' in arr and '"Pick my reel photos for Beach, Kitchen, and follow my note"' in arr
+         and words.get("photo_for") == "Pick my reel photos for {short}" and words.get("photo_note") == ", and follow my note")
+    para = arr.split('**"Pick my reel photos for <shoot>"** (and', 1)[-1].split("\n\n", 1)[0]
+    case("arrange.md: the pasted line is answered in order: reel_page.py note first, the note decides, the pick saved for that reel only",
+         para.index('reel_page.py note "<kit>"') < para.index("**The note decides what may go in.**") < para.index("**for that reel only**")
+         and "It changes nothing." in para and '--for-reel "<name>"' in para and "A pick for one reel never changes another." in para)
+    case("... pick only what the note allows, never widen it, never fill in; ask when nothing fits",
+         "Pick only what it allows" in para and "never widen it" in para and "never fill in with photos it leaves out" in para and "ask one short question" in para)
+    case("... it is the only time a reel's photos are picked, and the marking rule still holds then",
+         "**It is the only time you pick a reel's photos**" in para and "about a third Longer, about a quarter Quicker" in para)
+    case("the command the instructions name is the script's: reel_page.py note, with --reel, and it prints the note word for word",
+         'sub.add_parser("note"' in rp and 'nt.add_argument("--reel"' in rp and "word for word" in rp.split("def cmd_note", 1)[1].split("\ndef ", 1)[0])
+    case("kit.py picks says the note again after a reel pick is saved (and the instructions lean on it)",
+         "_say_photo_note(kit, later)" in kitsrc and "prints their note again after" in flat(arr) and "prints their note again after it saves" in flat(reel))
+    case("arrange.md opens with who chooses: the photographer, and the assistant only when asked (her words)",
+         '**The photographer chooses; you pick only when they ask (Nicole, Nov 13: "I choose, not you.").**' in arr
+         and "Choosing and ordering the photos is your job and stays so. These pages are how the photographer moves things after you have picked" not in arr)
+    case("arrange.md: opening the reel page is not a reason to pick, and there is a line to say when nothing was picked",
+         "**Opening the page is not a reason to pick:**" in arr and "**When you have not picked** (the usual case):" in arr
+         and "put your photos in, add your song, and press Make my reel" in arr)
+    case("arrange.md: the carousel is picked only when they ask", "**Pick the carousel only when they ask you to**" in arr)
+    # the post kit: "make my posts" only brings the photos in and opens the post kit
+    steps = kitp.split("**Then, in order, without stopping:**", 1)[-1].split("**Only when they ask", 1)[0]
+    case("post-kit.md: making a kit only numbers the photos and opens the kit page: no pick, no build, no question",
+         "**This step is only the numbering: don't read the sheets and don't pick.**" in steps and "2. **Nothing is picked here.** No `kit.py picks`" in steps
+         and "no `kit.py build` as part of a kit" in steps and "**The reel is not made here**" in steps)
+    case("... none of the kit's steps runs kit.py picks or kit.py build as a command to do",
+         not re.search(r"^\d\. `kit\.py (picks|build)", steps, re.M))
+    case("post-kit.md: no question when a kit starts, about the shoot or how they write; what they say unasked is still kept through a file",
+         "**No question when a kit starts" in kitp and "Don't ask them to tell you about the shoot, and don't ask how they write." in kitp
+         and "tell me about this shoot. Who they are, what the day was like" not in kitp and "**If they tell you about the shoot anyway, unasked, keep it word for word.**" in kitp
+         and "kit.py told \"<kit>\" --text-file" in kitp)
+    case("post-kit.md: the voice question waits for the first caption they ask for, never a kit", "**The voice, asked once, the first time they ask you for a caption** (never when a kit is made" in kitp)
+    case("post-kit.md says it in her words, and what to say when the kit opens promises no pick",
+         "\"You're not supposed to do any of that. I choose, not you.\"" in kitp and "Nothing is picked yet" in kitp
+         and "Never add a pick, a caption or an offer to choose for them to that" in kitp)
+    case("post-kit.md: the picks and the plain pieces are still there, only when they ask",
+         "**Only when they ask: your pick for the carousel, and the plain singles, stories and cover.**" in kitp and "None of this is part of making a kit." in kitp
+         and "`kit.py build \"<kit>\"`" in kitp)
+    case("post-kit.md: \"I'm done with the shoot\" ends on the kit page too: nothing picked, no question",
+         "**Nothing is picked or made in the chat, and there is no question about the shoot**" in kitp.split("## The post kit", 1)[0])
+    case("photos-in.md: \"make my posts\" only brings the photos in and opens the post kit",
+         '**"Make my posts" only brings the photos in and opens the post kit' in photos and "Don't read the photos to pick, don't ask about the shoot, don't write anything." in photos
+         and "you pick them only if they ask" in photos)
+    case("kit.py start's own next-step line no longer sends the assistant to a question or a pick",
+         "Nothing is picked or made until they ask." in kitsrc and "Next: the question, then kit.py sheet." not in kitsrc)
+    case("the reel skill: they choose; Step 2 runs only when they ask, their note first",
+         '**They choose which photos go in (Nicole, Nov 13: "I choose, not you.")**' in reel and "## Step 2: when they ask for your pick, curate the set and put it on the page" in reel
+         and "**Nothing is picked until they ask (Nicole, Nov 13).**" in reel and "**Their note first.**" in reel and "**Pick only what the note allows**" in reel
+         and "**Stop here and open the page unless they asked for your pick:**" in reel and "(your main job)" not in reel)
+    case("the reel skill: a footage look is not a reason to pick photos, and footage.py says the same",
+         "don't pick photos because they asked for a footage look" in reel and "If the shoot has no reel pick yet, do Step 2 first." not in reel
+         and "Pick the photos first, exactly as for a reel with no footage" not in foot and "Find the moments only" in foot)
+    case("curating.md: you choose only when they ask; their photo note decides what may go in; the marking rule stays for when you do",
+         "**You choose only when they ask (Nicole, Nov 13:" in cur and "**Their photo note decides what may go in (Nicole, Nov 13).**" in cur
+         and "mark its rhythm: every reel, fully (Nicole, Nov 10)" in cur and "When the photos are much alike, keep it fast (Nicole, Nov 13)" in cur)
+    case("the core's rule: choosing is the assistant's when it is asked of it; the sneak peeks always",
+         "**Choosing and ordering photos is yours, when it is asked of you:**" in core and "**nothing is picked until they ask**" in core
+         and "you pick its photos only when they ask" in core)
+    case("hello.md's first-time explanation of Make posts no longer says the assistant picks the photos",
+         "you pick the photos; each piece's caption" not in read(SM / "parts" / "hello.md") and "you pick only when they ask" in read(SM / "parts" / "hello.md"))
+    case("canva.md: the Canva fill is never run by itself when a kit is made", "never by itself when a kit is made" in read(SM / "parts" / "canva.md"))
+    case("where-things-live.md names the note in the reel page's record", "`photo_ask`" in read(SM / "parts" / "where-things-live.md") and '"photo_ask"' in rp)
+    said = [ln[:140] for name, t in (("arrange", arr), ("post-kit", kitp), ("photos-in", photos), ("reel", reel))
+            for ln in t.splitlines() if re.search(r"\bClaude\b", ln) and re.search(r"hasn't picked|which photos you'd like", ln)]
+    case("the page's lines are quoted as the page has them: 'your assistant', never 'Claude'", not said, said)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels):
+               check_stories_v26, check_several_reels, check_photographer_picks):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

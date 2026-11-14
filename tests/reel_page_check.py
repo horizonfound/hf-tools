@@ -55,7 +55,8 @@ HERS = {
     "claude_b": "Let my assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
     "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
-    "not_picked": "Your assistant hasn't picked for this shoot yet. In the chat, say <b>“pick my reel photos for Fake beach”</b> and they'll show up here.",
+    # her v25 line (the photographer picks: tests/picks_ask_check.py has the rest of that stage)
+    "not_picked": "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Drag any photo to move it, or drag one up from all your photos below. Tap × to take one out.",
     "tip": "If there's a photo you really want on screen a little longer, tap <b>Longer</b> under it. If there are ones you'd like to flash by quicker, tap <b>Quicker</b>. Leave the rest alone.",
@@ -472,14 +473,14 @@ def check_page(c, s):
     for k in ("h2", "say", "claude_b", "claude_rec", "mine_b", "mine_words", "tip", "legend", "undo", "summary", "eyebrow", "lede",
               "title", "doc_title", "brand", "maker"):
         case("her words: %s" % k, t[k] == HERS[k], (t[k], HERS[k]))
-    case("her words: not picked yet, with the line to say in the chat", t["claude_html"] == HERS["not_picked"], t["claude_html"])
+    case("her words: not picked yet, and where to ask (her v25 line)", t["claude_html"] == HERS["not_picked"], t["claude_html"])
     case("her words: the empty reel", t["empty"] == '"%s"' % HERS["empty"], t["empty"])
     case("no pick yet: their own order is on, All your photos is open, the count says 0", t["mine_on"] and not t["claude_on"] and t["all_open"] and t["count"] == "0 photos", t)
     case("the step is numbered 2, after the footage (her renumbering: only the steps that show)", t["num"] == "2")
     case("the recommended tag is not shown without footage (BUILD.md: with footage only)", t["claude_rec_hidden"] is True)
     c.click("#useClaude")
     t = texts(c)
-    case("Let my assistant choose with no pick: the chat line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
+    case("Let my assistant choose with no pick: the same line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
 
     # Claude picks; on their own (empty) order the page doesn't follow, but the words change
     code, out = s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))

@@ -370,3 +370,56 @@ Also run after the change, one at a time, both Pythons, all passing: `reel_page_
 - Stage K (post kit, posting queue): one reel's own fields are `reel_page.as_reel(rec, id)` (a copy to read); its pick is `reel_page.assistant_pick`; whose a `made` entry is, `reel_page.made_for`; the list, `reels.listed(rec, reel_page.REEL_FIRST)`. `kit.json`'s `reel` is the newest reel made, of any reel. `order_for_kit_page` is the open reel.
 - The bar's words are in their own tables (`reel_page.REELS_WORDS`, `talking_page.REELS_WORDS`), checked against her v25 pages by `tests/reels_check.py`; `reel_page.WORDS` is still compared with her v19/v23 page by `tests/reel_page_check.py`.
 - `tests/kit_cards_check.py` has two failures that are older than this stage (shown on the code as committed before it): `need_both` / `need_caption` (stage K's), and "nothing was asked of the internet by the kit page" (it asks Google for Figtree; it came with the stories designer).
+
+## Stage H, built (Nov 14): the photographer picks
+
+Nicole's v25, section 3: "You're not supposed to do any of that. I choose, not you." And section 10: "make my posts" should only bring the photos in and open the post kit.
+
+**What a photographer sees.**
+- **"Make my posts" brings the photos in and opens the post kit, and stops.** Nothing is picked, nothing is made, nothing is written, and nothing is asked about the shoot. The same after "I'm done with the beach shoot".
+- **On the reel page, a reel with no pick says her line** under Let my assistant choose: "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat." (The older line, "...for this shoot yet. In the chat, say...", is gone.)
+- **Under the two choices in "Put your photos in order", her note box:** "Tell your assistant which photos you'd like in this reel", "Optional, and only for this reel.", her two examples, and the line to copy with a Copy button. The line is "Pick my reel photos for <shoot>", with the reel's name after the shoot only when the shoot has more than one reel, and ", and follow my note" only when there is a note.
+- **The note is each reel's own** and is saved by itself as they type.
+- **When they paste the line,** the assistant reads the note first, picks only what it allows, saves the pick for that reel only, and says in a line how it read the note. The pick waits under Let my assistant choose, as before.
+
+**Our way underneath.**
+- The note is `photo_ask` in the reel's `saved` (her name), checked like every field the page saves: text, her 600 letters at the most, the whole save refused if it is wrong. Because it sits in `saved` it is per reel by itself (stage G).
+- **New, for the chat: `reel_page.py note "<kit>" [--reel "<the reel the line names>"]`.** It changes nothing. It prints which reel the pick is for, whether that is the reel open on the page, the note word for word, and the command that saves the pick for that reel only. A name that fits no reel stops and lists the reels. `reel_page.py show` prints the note too, and `kit.py picks --reel` says the note again after it saves.
+- The words are in their own table, `reel_page.PICK_WORDS` (hers, word for word), and the box's styles in `PICK_CSS` (her three rules, two of ours).
+- `kit.py start` now ends "Next: kit.py sheet (it numbers the photos for the pages), then show the post kit. Nothing is picked or made until they ask."
+- **The instructions:** `parts/post-kit.md` (a kit only numbers the photos and opens the kit page; no question; the picks and the plain pieces moved to "Only when they ask"; the voice question waits for the first caption they ask for), `parts/photos-in.md`, `parts/arrange.md` (who chooses; the note box; the pasted line in five steps; the carousel picked only when asked), the reel skill (Step 2 runs only when they ask, their note first), `shared/curating.md` (you choose only when they ask; the note decides what may go in; the marking rule and the alike-photos rule stay for when it does pick), the core's rule on choosing, `parts/hello.md`, `parts/canva.md`, `parts/where-things-live.md`, and one line `footage.py scan` prints.
+
+**Choices where her spec was silent (plainest behaviour).**
+1. **The line names a reel that is not the one open on the page:** the pick goes to the reel the line names (`--for-reel`), the page stays where it is, and the assistant says which reel the pick went to. Hers says only "checks the record's current reel matches the name".
+2. **The line says "and follow my note" but the note has been cleared since:** pick from the whole shoot and say there was no note.
+3. **Nothing in the shoot fits the note, or the sheet can't show which photos it means:** the assistant says so and asks one short question. It never fills in with photos the note leaves out.
+4. **The note is kept as typed** (her page trims the spaces round it; ours sends it trimmed too) and a note that is not text, or is over 600 letters, refuses the save (hers cuts it at 600 without a word; her box cannot hold more either way).
+5. **A note written in another window** shows in the box when the box is not under their hand; it is never changed while they are typing in it.
+6. **A footage look ("Look through my footage") is not a reason to pick photos.** Before, the instructions and `footage.py scan` told the assistant to pick the reel's photos first when there was no pick. Now they say: find the moments only.
+7. **"Make a reel" from the chat** makes the kit if there is none, numbers the photos and opens the reel page, with a line of ours to say ("Your reel page is open beside us. ... If you'd rather I pick the photos, tell me which ones you'd like in the box under Put your photos in order and copy the line there into the chat."). It picks only when they also ask for a pick.
+8. **`kit.py sheet` still runs when a kit is made** (the pages need the numbered list), but the assistant is told not to read the sheets. `posting_queue.py add --kit` still runs: the reel and the carousel go in as not started.
+9. **What they say about the shoot unasked is still kept** (`kit.py told`), for the words step.
+10. **The carousel and the plain singles, stories and cover** are picked and made only when they ask in the chat; the commands are unchanged.
+
+**Hers left out, on purpose.** Nothing of section 3. (Section 10's "the home page lists a shoot without Post kit.html" is stage L's.)
+
+**Tests.** `tests/picks_ask_check.py` (new): her words both ways against her v25 reel page; the note by request (saved, refused, each reel its own, another website refused); `reel_page.py note`, `show` and `kit.py picks`; a new kit that picks and makes nothing; and the box on the real page in a hidden Chrome (her words, where it sits, the line with and without the reel's name and the note's ending, saved as they type, Copy, a second reel, Rename, a pick arriving, a phone's width). 76 checks with the page (51 without), the same on both Pythons. 21 pieces were each taken out in a scratch copy and a check failed each time. `tests/skill_text_check.py` has a new section for this stage (472 checks). In GitHub's check: by request on Windows, with the page on the Mac's page job.
+
+Also run after the change, one at a time, both Pythons, all passing: `reel_page_check.py` 343, `reels_check.py` 158, `reel_door_check.py` 47, `reel_fixes_check.py` 41, `reel_footage_check.py` 183, `footage_look_check.py` 88, `pc_reel_page.py` 49, `edit_queue_v26_check.py` 145, `review_fixes_c_check.py` 45, `posting_panel_check.py` 88, `home_base_check.py` 213, `arrange_check.py` 660, `pc_smoke.py` 230 (183 on Apple's 3.9), `words_check.py`, `look_check.py` 75, `design_check.py --only wire` 108 (3.12 only); `tools/check_pc.py` and `tools/check_plugin.py` clean. `kit_cards_check.py` (126 of 127) and `kit_steps_check.py` (98 of 99) fail only on `need_both` / `need_caption`, as before this stage (stage K's).
+
+**Not tried.** Dustin's or Nicole's own hand; the Claude app's pane; a real shoot; **a fresh session following the new instructions** ("make my posts" stopping at the kit page, and the pasted line with a real note read against real photos: whether the assistant can tell "in front of the white backdrop" from a contact sheet is not known); the real clipboard (the test stands in for it); Windows (the first push runs it); a touch screen; a screen reader on the box.
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **The carousel designer still makes a first design by itself** the first time it is opened for a shoot: one photo on each slide, the first eight photos when nothing was picked. That is a pick of a kind. Left as it is (her v25 says nothing of the carousel designer); say if it should open empty.
+2. **The Oct 30 question at the start of a kit is gone** ("tell me about this shoot"), and the "how I write" question moved to the first caption they ask for. Hers wins on posting (Dustin, Nov 10); said so it is known.
+3. **Rule 11 in CLAUDE.md** says choosing and ordering photos "is the Assistant's job and stays so". It now reads, in the instructions: the sneak peeks always; for a reel, a carousel or stories only when they ask. CLAUDE.md's wording is stage E's to bring in line, with Dustin's say.
+4. **A footage look no longer makes the assistant pick photos** (choice 6). With no pick and nothing dragged in, a reel with footage has clips and no photos until they choose some.
+5. **Our lines:** the one the assistant says when it opens a reel page it has not picked for, and "Nothing is picked yet: the reel, the carousel and the stories are each one press away, and you choose what goes in." Both drafts.
+6. **The post kit's Reel card** still says "Your assistant hasn't picked the reel photos yet. Click to pick them yourself." (her v20 line; stage K rebuilds the card from her v25 post kit).
+7. **Remove a song** is still not built and is hers to answer (the waiting list, item 1).
+
+**For later stages.**
+- Stage I (trim, select several): the note box sits between `.choice` and `.tip` in step 2 (`reel_page._order_section`); `R.photoLine()` redraws the line.
+- Stage K: `reel_page.photo_note(saved)` is a reel's note as text. The kit's Reel card line is still v20's.
+- Stage E: carry the seven items above; CLAUDE.md should say "make my posts" only brings photos in, name `reel_page.py note`, `photo_ask`, `PICK_WORDS`, and that rule 11's last sentence changed.
+- `tests/reel_page_check.py` still compares `reel_page.WORDS` with her v19/v23 page; `PICK_WORDS` and `REELS_WORDS` are compared with her v25 page by their own tests. The not-picked line moved out of `WORDS`.
