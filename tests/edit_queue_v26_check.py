@@ -9,8 +9,13 @@ nothing of the real ~/.studio, no drive, no photo):
   * the lists: every shoot is in exactly one of the queue, Uploaded shoots, Delivered and Archived, and what
     each chat command (done, undo, unqueue, store, unstore, list --all, offers, reminders) does to them;
   * the page server: each new action (unqueue, store, unstore) and what it leaves in the record; requeue and undo
-    clearing "stored"; every refusal a plain 400 with nothing changed (no such shoot, an id that is not text, a
-    shoot in the wrong place for the press, no such action); another website's name refused;
+    clearing "stored"; every refusal a plain 400 with nothing changed (no such shoot, an id that is not text, no
+    such action); a second press (a shoot already where the press would put it) answered 200 with nothing
+    changed; a press that does not fit where the shoot is answered 409 with the newest lists; a press from
+    another website (its Origin, a cross-site press, a wrong Host), or one too big, refused with nothing changed;
+  * the review round's fixes (Nov 14): a double press never says "That did not save"; a page a step behind the
+    chat redraws; Make posts from this shoot is on every delivered shoot and starts the Assistant's page server
+    when it is not running (the test's own, on the test's own port, stopped at the end);
   * the words: her lines on the page, compared with her own changed file when her handoff is on this computer
     (reference-private/, never pushed), both ways; "your assistant", never "Claude"; none of her test-only bits
     (port 8799, ?home=test, sessionStorage) and none of her removed Share my queue;
@@ -29,10 +34,12 @@ import json
 import os
 import re
 import shutil
+import threading
 import subprocess
 import sys
 import tempfile
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -111,12 +118,54 @@ def her_file():
     return None
 
 
+class Pretend(BaseHTTPRequestHandler):
+    """A stand-in for the Assistant's own page server: /home and /make-posts answer with a line of text."""
+    def do_GET(self):
+        out = ("<!doctype html><title>pretend</title><p id='where'>%s</p>" % self.path).encode()
+        self.send_response(200 if self.path in ("/home", "/make-posts") else 404)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    def log_message(self, *a):
+        pass
+
+
+def pretend_server(port):
+    srv = ThreadingHTTPServer(("127.0.0.1", port), Pretend)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def stop_listener(port):
+    """Stop whatever program is listening on this port (the page server the queue server started for this test)."""
+    try:
+        if WINDOWS:
+            out = subprocess.run(["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=30).stdout
+            pids = set(l.split()[-1] for l in out.splitlines() if "LISTENING" in l and (":%d " % port) in l)
+            for pid in pids:
+                subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, timeout=30)
+        else:
+            out = subprocess.run(["lsof", "-nP", "-iTCP:%d" % port, "-sTCP:LISTEN", "-t"], capture_output=True, text=True, timeout=30).stdout
+            pids = set(out.split())
+            for pid in pids:
+                os.kill(int(pid), 15)
+        return bool(pids)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+
+
 class Setup:
     def __init__(self, work, port):
         self.work, self.port0, self.port = work, port, None
         self.home = work / "studio-home"
         self.home.mkdir(parents=True, exist_ok=True)
-        self.env = dict(os.environ, STUDIO_HOME=str(self.home), STUDIO_TODAY=TODAY, PYTHONIOENCODING="utf-8")
+        # STUDIO_POSTING_PORT: a page server the queue server starts is this test's own, on this test's port;
+        # REMINDERS_BACKEND=none: it never asks a calendar
+        self.env = dict(os.environ, STUDIO_HOME=str(self.home), STUDIO_TODAY=TODAY, PYTHONIOENCODING="utf-8",
+                        STUDIO_POSTING_PORT=str(port + 10), REMINDERS_BACKEND="none")
+        self.started = []           # ports of page servers the queue server started (stopped at the end)
         self.proc = None
 
     def run(self, *args):
@@ -149,6 +198,9 @@ class Setup:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
         self.proc = None
+        for p in self.started:
+            stop_listener(p)
+        self.started = []
 
     def http(self, method, path, body=None, headers=None, raw=None):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
@@ -162,6 +214,14 @@ class Setup:
             return r.status, r.read()
         finally:
             c.close()
+
+    def http_at(self, port, path):
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=20)
+            c.request("GET", path)
+            return c.getresponse().status
+        except OSError:
+            return 0
 
     def post(self, body, **kw):
         code, raw = self.http("POST", "/queue", body, **kw)
@@ -197,7 +257,8 @@ def check_lists(s):
     code, out = s.run("done", "patio")
     case("done again: already delivered, nothing changed", code == 0 and "already delivered" in out, out)
     code, out = s.run("store", "beach")
-    case("store refuses a shoot that is not delivered", code != 0 and "no shoot in Delivered" in out and "stored" not in s.shoot("Beach day"), out)
+    case("store refuses a shoot that is not delivered, and says where it is (never that it does not exist)",
+         code != 0 and "Beach day is in the editing queue" in out and "only a delivered shoot can be archived" in out and "no shoot" not in out and "stored" not in s.shoot("Beach day"), out)
     code, out = s.run("store", "patio")
     rec = s.shoot("Patio session")
     case("store: a delivered shoot is archived, still \"finished\", with stored and stored_at",
@@ -205,8 +266,21 @@ def check_lists(s):
     code, out = s.run("unqueue", "beach")
     rec = s.shoot("Beach day")
     case("unqueue: back to the uploaded shoots, no date", code == 0 and "back in your uploaded shoots" in out and rec["status"] == "archived" and not rec.get("due"), out)
+    before = (s.home / "queue.json").read_bytes()
     code, out = s.run("unqueue", "beach")
-    case("unqueue refuses a shoot that is not in the queue", code != 0 and "no shoot matches" in out, out)
+    case("unqueue again: already there, said so, nothing changed", code == 0 and out == "Beach day is already in your uploaded shoots." and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("store", "patio")
+    case("store again: already archived, said so, nothing changed (the archived time is not rewritten)", code == 0 and out == "Patio session is already archived." and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("unqueue", "patio")
+    case("unqueue on an archived shoot: stops and says where it is", code != 0 and "Patio session is in Archived" in out and "no shoot" not in out and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("unstore", "garcia")
+    case("unstore on a shoot in the queue: stops and says where it is", code != 0 and "Garcia wedding is in the editing queue" in out and "isn't archived" in out and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("due", "patio", "1w")
+    case("due on a shoot that is not in the queue: says where it is, never \"no shoot matches\"", code != 0 and "Patio session isn't in the editing queue: it is in Archived" in out and "no shoot matches" not in out and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("where", "garcia")
+    case("where: the shoot and where it is, nothing changed", code == 0 and out.startswith("Garcia wedding: in the editing queue, due") and (s.home / "queue.json").read_bytes() == before, out)
+    code, out = s.run("where", "patio")
+    case("where: an archived shoot", code == 0 and out == "Patio session: in Archived." and (s.home / "queue.json").read_bytes() == before, out)
     code, out = s.run("done", "beach")
     case("done on an uploaded shoot marks nothing", code == 0 and "isn't in the editing queue" in out and s.shoot("Beach day")["status"] == "archived", out)
     q = eq.load()
@@ -242,7 +316,9 @@ def check_lists(s):
     rec = s.shoot("Patio session")
     case("undo from Archived: in the queue, nothing of the delivery kept", code == 0 and rec["status"] == "waiting" and not any(k in rec for k in ("stored", "stored_at", "finished_at", "finished_by")), rec)
     s.run("done", "patio")
-    s.run("unstore", "lee")
+    before = (s.home / "queue.json").read_bytes()
+    code, out = s.run("unstore", "lee")
+    case("unstore again: already in Delivered, said so, nothing changed", code == 0 and out == "Lee family is already in Delivered." and (s.home / "queue.json").read_bytes() == before, out)
     return eq
 
 
@@ -263,8 +339,13 @@ def check_words(eq):
     part = (SCRIPTS.parent / "parts" / "editing-queue.md").read_text(encoding="utf-8")
     case("the assistant's instructions use the page's words and know the three new commands",
          all(w in part for w in ("Mark as delivered", "Take out of my queue", "Uploaded shoots", "Delivered (n)", "Archived (n)", "Are you sure you want to archive this?",
-                                 "edit_queue.py unqueue", "edit_queue.py store", "edit_queue.py unstore"))
+                                 "edit_queue.py unqueue", "edit_queue.py store", "edit_queue.py unstore", "edit_queue.py where", "`#delivered`", "`#stored`"))
          and not any(w in part for w in ("tick to finish", "below the line", "Put back in the queue,")))
+    kitp = (SCRIPTS.parent / "parts" / "post-kit.md").read_text(encoding="utf-8")
+    step2 = kitp.split("\n2. ", 1)[1].split("\n3. ", 1)[0]
+    case("\"I'm done editing\" does not mark the shoot as delivered: the two parts agree",
+         "edit_queue.py where" in step2 and "Do not mark it as delivered here" in step2 and "stays in the editing queue until" in step2
+         and not step2.startswith("Mark it as delivered") and "does not mark it as delivered" in part, step2[:200])
     hers = her_file()
     if not hers:
         skip("her words against her own file: her handoff (reference-private) isn't on this computer")
@@ -292,7 +373,9 @@ def check_link(eq, s):
         f.unlink()
     st = eq.state(eq.load())
     page = eq.page_html(eq.load())
-    case("no posting server known: no Make posts address, no Home link, no dead link", st["make_posts"] is None and "homelink' href" not in page)
+    case("no posting server known: no address written into the page, no Home link", st["make_posts"] is None and "homelink' href" not in page)
+    src = (SCRIPTS / "edit_queue.py").read_text(encoding="utf-8")
+    case("Make posts from this shoot is drawn on every delivered shoot, address known or not", "Q.make_posts ?" not in src and "Q.make_posts || '#'" in src)
     for bad in ("javascript:alert(1)/x", "http://evil.example/posting.html", "http://127.0.0.1:8991'><script>alert(1)</script>/posting.html", "http://127.0.0.1:8799x/p"):
         f.write_text(bad, encoding="utf-8")
         page = eq.page_html(eq.load())
@@ -320,15 +403,37 @@ def check_server(s):
         ("store, an id that is a list", {"action": "store", "id": [patio]}),
         ("unstore, an id that is a number", {"action": "unstore", "id": 7}),
         ("unqueue, an id that is an object", {"action": "unqueue", "id": {"a": 1}}),
+        ("a body that is a list", ["store", patio]),
+        ("add, a name that is not text", {"action": "add", "name": ["x"]}),
+        ("add, a name of 5,000 letters", {"action": "add", "name": "x" * 5000}),
+    ]
+    # a second press: the shoot is already where the press would put it. 200, the lists, nothing changed or saved
+    again = [
+        ("done, a shoot that is already delivered", {"action": "done", "id": patio}, "delivered"),
+        ("unstore, a shoot already in Delivered", {"action": "unstore", "id": patio}, "delivered"),
+        ("unqueue, a shoot already in Uploaded shoots", {"action": "unqueue", "id": beach}, "archive"),
+        ("requeue, a shoot already in the queue", {"action": "requeue", "id": garcia}, "waiting"),
+        ("undo, a shoot already in the queue", {"action": "undo", "id": garcia}, "waiting"),
+    ]
+    for label, body, place in again:
+        code, out = s.post(body)
+        case("a second press is harmless (200, the lists, nothing changed): " + label,
+             code == 200 and isinstance(out, dict) and where(out, s.queue()["shoots"][[x["id"] for x in s.queue()["shoots"]].index(body["id"])]["name"]) == [place]
+             and (s.home / "queue.json").read_bytes() == before, (code, str(out)[:200]))
+    # a press that does not fit where the shoot is (a page a step behind the chat): 409 with the newest lists
+    elsewhere = [
         ("unqueue, a shoot that is delivered", {"action": "unqueue", "id": patio}),
-        ("unqueue, a shoot that is uploaded", {"action": "unqueue", "id": beach}),
         ("store, a shoot in the queue", {"action": "store", "id": garcia}),
         ("store, a shoot that is uploaded", {"action": "store", "id": beach}),
-        ("unstore, a shoot that is not archived", {"action": "unstore", "id": patio}),
-        ("done, a shoot that is already delivered", {"action": "done", "id": patio}),
-        ("requeue, a shoot already in the queue", {"action": "requeue", "id": garcia}),
-        ("a body that is a list", ["store", patio]),
+        ("unstore, a shoot in the queue", {"action": "unstore", "id": garcia}),
+        ("done, a shoot that is uploaded", {"action": "done", "id": beach}),
+        ("due, a shoot that is delivered", {"action": "due", "id": patio, "due": "2026-12-01"}),
+        ("due, a shoot that is uploaded", {"action": "due", "id": beach, "due": "2026-12-01"}),
     ]
+    for label, body in elsewhere:
+        code, out = s.post(body)
+        case("does not fit where the shoot is: 409 with the newest lists, nothing changed: " + label,
+             code == 409 and isinstance(out, dict) and set(out) >= {"waiting", "archive", "delivered", "stored"} and (s.home / "queue.json").read_bytes() == before, (code, str(out)[:200]))
     for label, body in refusals:
         code, out = s.post(body)
         case("refused, a plain 400, nothing changed: " + label, code == 400 and (s.home / "queue.json").read_bytes() == before, (code, str(out)[:200]))
@@ -336,12 +441,53 @@ def check_server(s):
     case("refused: a body that is not JSON", code == 400 and (s.home / "queue.json").read_bytes() == before, code)
     code, out = s.post({"action": "store", "id": patio}, headers={"Host": "evil.example"})
     case("refused: sent under another website's name", code == 403 and (s.home / "queue.json").read_bytes() == before, code)
+    # the same-page-only rule (the posting page's): another website's press never reaches the queue
+    code, out = s.post({"action": "unstore", "id": patio}, headers={"Origin": "http://evil.example", "Sec-Fetch-Site": "cross-site", "Content-Type": "text/plain"})
+    case("refused (403): a press from another website (its Origin, as plain text)", code == 403 and (s.home / "queue.json").read_bytes() == before, code)
+    code, out = s.post({"action": "done", "id": garcia}, headers={"Origin": "http://127.0.0.1:%d" % (s.port + 1)})
+    case("refused (403): the Origin of another page on this computer", code == 403 and (s.home / "queue.json").read_bytes() == before, code)
+    code, out = s.post({"action": "done", "id": garcia}, headers={"Sec-Fetch-Site": "cross-site"})
+    case("refused (403): a cross-site press with no Origin", code == 403 and (s.home / "queue.json").read_bytes() == before, code)
+    code, out = s.post(None, raw=json.dumps({"action": "add", "name": "Big", "pad": "x" * 70000}).encode())
+    case("refused (413): a press over 64 KB", code == 413 and (s.home / "queue.json").read_bytes() == before, code)
+    code, out = s.http("POST", "/queue", headers={"Content-Length": "-5", "Content-Type": "application/json"})
+    case("refused: a length below nothing (it does not wait for ever)", code == 413 and (s.home / "queue.json").read_bytes() == before, code)
+    code, out = s.http("GET", "/open?id=" + patio, headers={"Sec-Fetch-Site": "cross-site"})
+    case("refused (403): another website asking for a folder's window", code == 403, code)
+    code, out = s.http("GET", "/make-posts-url", headers={"Sec-Fetch-Site": "cross-site"})
+    case("refused (403): another website asking to start the page server", code == 403, code)
+    for own in ("http://127.0.0.1:%d" % s.port, "http://localhost:%d" % s.port):
+        code, out = s.post({"action": "done", "id": patio}, headers={"Origin": own, "Sec-Fetch-Site": "same-origin"})
+        case("the page's own press still works: Origin " + own, code == 200 and (s.home / "queue.json").read_bytes() == before, code)
+
+    # Make posts from this shoot / Back to home: where they go, started if it is not running
+    f = s.home / "posting-url.txt"
+    code, raw = s.http("GET", "/make-posts-url")
+    case("the page server is up (the test's pretend one): its Make posts address", code == 200 and json.loads(raw) == {"url": "http://127.0.0.1:%d/make-posts" % (s.port0 + 15)}, raw)
+    code, raw = s.http("GET", "/home-url")
+    case("and its home address", code == 200 and json.loads(raw) == {"url": "http://127.0.0.1:%d/home" % (s.port0 + 15)}, raw)
+    case("asking changed nothing in the queue", (s.home / "queue.json").read_bytes() == before)
+    f.write_text("http://127.0.0.1:%d/posting.html" % (s.port0 + 17), encoding="utf-8")      # an address nothing answers (after a restart)
+    code, raw = s.http("GET", "/make-posts-url")
+    got = json.loads(raw).get("url") or ""
+    m = re.fullmatch(r"http://127\.0\.0\.1:(\d+)/make-posts", got)
+    if m:
+        s.started.append(int(m.group(1)))
+    case("the page server is not running: it is started (the test's own port), and the address is the new one",
+         code == 200 and m and s.port0 + 10 <= int(m.group(1)) < s.port0 + 15 and s.http_at(int(m.group(1)), "/home") == 200, raw)
+    for p in s.started:
+        stop_listener(p)
+    f.write_text("http://127.0.0.1:%d/posting.html" % (s.port0 + 15), encoding="utf-8")
 
     code, st = s.post({"action": "store", "id": patio})
     rec = s.shoot("Patio session")
     case("store: Archived, out of Delivered, the record still \"finished\"", code == 200 and where(st, "Patio session") == ["stored"] and rec["status"] == "finished" and rec["stored"] is True and rec.get("stored_at"), (code, rec))
+    stamp = rec.get("stored_at")
+    before2 = (s.home / "queue.json").read_bytes()
+    time.sleep(1.1)
     code, out = s.post({"action": "store", "id": patio})
-    case("store twice: refused", code == 400)
+    case("store twice (a double press on Yes, archive it): 200, the lists, the record byte for byte as it was",
+         code == 200 and isinstance(out, dict) and where(out, "Patio session") == ["stored"] and (s.home / "queue.json").read_bytes() == before2 and s.shoot("Patio session").get("stored_at") == stamp, (code, str(out)[:200]))
     code, st = s.post({"action": "store", "id": lee})
     time.sleep(1.1)
     s.post({"action": "unstore", "id": patio})
@@ -407,6 +553,30 @@ def check_page(c, s):
     case("the Make posts link, on a delivered shoot, goes to the Assistant's own page server",
          c.js("Array.from(document.querySelectorAll('#dlist a.mk')).map(a => a.getAttribute('href') + '|' + a.textContent)") == ["http://127.0.0.1:%d/make-posts|Make posts from this shoot" % (s.port0 + 15)] * 2)
 
+    # Make posts from this shoot: a press asks the queue server where that screen is, and goes there
+    # (loaded while the page server's address is not known, so nothing but the press can find the way)
+    known = s.home / "posting-url.txt"
+    address = known.read_text(encoding="utf-8")
+    known.unlink()
+    c.reload()
+    c.wait_for("document.querySelectorAll('#list .card').length == 2", 10)
+    c.js("document.querySelector('#delivered').open = true")
+    case("with no address known the link is still on every delivered shoot", c.js("Array.from(document.querySelectorAll('#dlist a.mk')).map(a => a.getAttribute('href') + '|' + a.textContent)") == ["#|Make posts from this shoot"] * 2)
+    known.write_text(address, encoding="utf-8")
+    c.click("#dlist a.mk")
+    c.wait_for("location.pathname === '/make-posts'", 10)
+    case("a press on Make posts from this shoot lands on the page server's /make-posts", c.js("location.href") == "http://127.0.0.1:%d/make-posts" % (s.port0 + 15), c.js("location.href"))
+    c.open(s.url() + "#stored")
+    c.wait_for("document.querySelector('#stored').open", 10)
+    case("#stored opens Archived (\"show my archived shoots\"); Delivered stays closed", c.js("document.querySelector('#stored').open && !document.querySelector('#delivered').open"))
+    c.js("location.hash = '#delivered'")       # only the part after # changes, so the page is loaded again by hand
+    c.reload()
+    c.wait_for("document.querySelector('#delivered').open", 10)
+    case("#delivered opens Delivered", c.js("document.querySelector('#delivered').open && !document.querySelector('#stored').open"))
+    c.js("history.replaceState(null, '', location.pathname)")
+    c.reload()
+    c.wait_for("document.querySelectorAll('#list .card').length == 2", 10)
+
     # one search for everything
     search(c, "patio")
     case("searching for a delivered shoot opens Delivered and shows it; the queue and Uploaded hide the rest",
@@ -437,23 +607,30 @@ def check_page(c, s):
     case("Cancel takes the question away and archives nothing", c.count(row + " .sure") == 0 and "stored" not in s.shoot("Patio session"))
     c.click(row + " .store")
     c.wait_for("!!document.querySelector(%s)" % json.dumps(row + " .sure .yes"), 5)
-    c.click(row + " .sure .yes")
+    # a double press on Yes, archive it: both in one tick, as a double click sends them
+    c.js("(() => { window.__toasts = []; const t = document.querySelector('#toast'); new MutationObserver(() => window.__toasts.push(t.textContent)).observe(t, {childList:true, characterData:true, subtree:true}); const b = document.querySelector(%s); b.click(); b.click() })()" % json.dumps(row + " .sure .yes"))
     toast(c, "Archived. You can bring it back any time.")
+    time.sleep(0.6)
+    case("a double press on Yes, archive it never says \"That did not save\"", c.js("window.__toasts.length > 0 && window.__toasts.every(t => t === 'Archived. You can bring it back any time.')"), c.js("window.__toasts"))
     case("Yes, archive it: saved, out of Delivered, into Archived", s.shoot("Patio session").get("stored") is True and c.text("#dtitle") == "Delivered (1)" and c.text("#stitle") == "Archived (1)")
     search(c, "pat")
     case("searching for an archived shoot opens Archived and shows it", c.js("document.querySelector('#stored').open") and shown(c, "#slist .acard") == ["Patio session"] and c.js("document.querySelector('#nomatch').hidden"))
     search(c, "")
     case("an archived shoot has only Bring it back (no Archive, no Make posts)", c.js("Array.from(document.querySelectorAll('#slist .acard .acts > *')).map(e => e.textContent.trim())") == ["Bring it back"])
     c.js("document.querySelector('#delivered').open = false")
-    c.click("#slist .unstore")
+    c.js("(() => { window.__toasts.length = 0; const b = document.querySelector('#slist .unstore'); b.click(); b.click() })()")
     toast(c, "Back in Delivered.")
+    time.sleep(0.6)
+    case("a double press on Bring it back: only \"Back in Delivered.\"", c.js("window.__toasts.length > 0 && window.__toasts.every(t => t === 'Back in Delivered.')"), c.js("window.__toasts"))
     case("Bring it back: in Delivered again, and Delivered is open", "stored" not in s.shoot("Patio session") and c.js("document.querySelector('#delivered').open") and "Patio session" in shown(c, "#dlist .acard") and c.text("#stitle") == "Archived (0)")
     case("an empty Archived says so", c.js("document.querySelector('#slist').textContent.trim()") == "Nothing archived.")
 
     # Take out of my queue
     card = "#list .card[data-id=%s]" % json.dumps(s.shoot("Garcia wedding")["id"])
-    c.click(card + " .unq")
+    c.js("(() => { window.__toasts.length = 0; const b = document.querySelector(%s); b.click(); b.click() })()" % json.dumps(card + " .unq"))
     toast(c, "Garcia wedding is back in your uploaded shoots")
+    time.sleep(0.6)
+    case("a double press on Take out of my queue: only its own toast", c.js("window.__toasts.length > 0 && window.__toasts.every(t => t === 'Garcia wedding is back in your uploaded shoots')"), c.js("window.__toasts"))
     rec = s.shoot("Garcia wedding")
     case("Take out of my queue: saved, in Uploaded shoots with no date, with Add to my editing queue",
          rec["status"] == "archived" and not rec.get("due") and "Garcia wedding" in shown(c, "#alist .acard") and "Garcia wedding" not in shown(c, "#list .card")
@@ -462,16 +639,30 @@ def check_page(c, s):
     toast(c, "Added to your editing queue. No due date yet.")
     case("Add to my editing queue brings it back", s.shoot("Garcia wedding")["status"] == "waiting" and "Garcia wedding" in shown(c, "#list .card"))
 
-    # the check mark
-    c.click(card + " .check")
+    # the check mark, pressed twice in one tick
+    c.js("(() => { window.__toasts.length = 0; const b = document.querySelector(%s); b.click(); b.click() })()" % json.dumps(card + " .check"))
     toast(c, "Garcia wedding: delivered, moved to Delivered below")
+    stamp = s.shoot("Garcia wedding").get("finished_at")
+    case("between the two presses the card keeps its delivered look", c.js("document.querySelector(%s).classList.contains('done')" % json.dumps(card)))
     c.wait_for("!document.querySelector(%s)" % json.dumps(card), 8)
+    case("a double press on the check mark: the delivered toast only, one saved change",
+         c.js("window.__toasts.length === 1 && window.__toasts[0] === 'Garcia wedding: delivered, moved to Delivered below'") and s.shoot("Garcia wedding").get("finished_at") == stamp, c.js("window.__toasts"))
     case("the check mark: saved as delivered, out of the queue, in Delivered, not in Uploaded shoots",
          s.shoot("Garcia wedding")["status"] == "finished" and c.text("#dtitle") == "Delivered (3)" and "Garcia wedding" not in shown(c, "#alist .acard"))
     case("a delivered card says Delivered and the day", c.js("document.querySelector('#dlist .acard .tag.edited').textContent.startsWith('Delivered ')"))
     c.click("#dlist .acard[data-id=%s] .requeue" % json.dumps(s.shoot("Garcia wedding")["id"]))
     toast(c, "Back in your editing queue. No due date yet.")
     case("Put back in my editing queue", s.shoot("Garcia wedding")["status"] == "waiting")
+
+    # a page a step behind the chat: the chat takes the shoot out of the queue, then the page's check mark is pressed
+    s.run("unqueue", "garcia")
+    c.js("window.__toasts.length = 0")
+    c.click(card + " .check")
+    toast(c, "This shoot was changed somewhere else. Here's the newest.")
+    case("a page a step behind the chat: it says so, shows the newest lists, never \"That did not save. Try again.\"",
+         "Garcia wedding" not in shown(c, "#list .card") and "Garcia wedding" in shown(c, "#alist .acard") and s.shoot("Garcia wedding")["status"] == "archived"
+         and not c.js("window.__toasts.some(t => t.includes('did not save'))"), c.js("window.__toasts"))
+    s.run("undo", "garcia")
 
     # the last shoot out: the shorter empty line
     for n in ("Garcia wedding", NASTY):
@@ -489,6 +680,17 @@ def check_page(c, s):
     c.desktop()
     case("no errors on the page", not c.page_errors(), c.page_errors())
     case("the page asked for nothing outside this computer", not c.outside_requests(), c.outside_requests())
+    # Back to home goes the same way: the queue server is asked where home is (and starts it if it is not up)
+    known = s.home / "posting-url.txt"
+    address = known.read_text(encoding="utf-8")
+    known.write_text("http://127.0.0.1:%d/posting.html" % (s.port0 + 15) + "\n", encoding="utf-8")
+    c.reload()
+    c.wait_for("!!document.querySelector('.homelink')", 10)
+    c.js("document.querySelector('.homelink').setAttribute('href', 'http://127.0.0.1:%d/nowhere')" % (s.port0 + 17))   # a stale address on the page
+    c.click(".homelink")
+    c.wait_for("location.pathname === '/home'", 10)
+    case("Back to home asks the queue server for the address (a stale one on the page is not followed)", c.js("location.href") == "http://127.0.0.1:%d/home" % (s.port0 + 15), c.js("location.href"))
+    known.write_text(address, encoding="utf-8")
 
 
 def summary():
@@ -516,6 +718,7 @@ def main():
         if eq:
             group("the words", check_words, eq)
             group("the Make posts link", check_link, eq, s)
+        pretend = pretend_server(a.port + 15)      # stands in for the Assistant's own page server (/home, /make-posts)
         s.start()
         case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 20)
         group("the page server", check_server, s)
@@ -526,6 +729,10 @@ def main():
                 group("the page", check_page, c, s)
     finally:
         s.stop()
+        try:
+            pretend.shutdown()
+        except NameError:
+            pass
         chrome_drive.stop_all()
         if not keep:
             shutil.rmtree(str(work), ignore_errors=True)

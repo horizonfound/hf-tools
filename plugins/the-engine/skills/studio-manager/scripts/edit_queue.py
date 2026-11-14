@@ -24,6 +24,7 @@ Nothing here ever touches a photo.
     python3 edit_queue.py unqueue "beach"           take it out of the queue: back to the uploaded shoots, no date
     python3 edit_queue.py store "beach"             archive a delivered shoot (nothing is deleted)
     python3 edit_queue.py unstore "beach"           bring an archived shoot back to Delivered
+    python3 edit_queue.py where "beach"             which shoot that is and where it is (changes nothing)
     python3 edit_queue.py due "beach" 1w            a new due date (1w 2w 3w, this-week, or 2026-11-07)
     python3 edit_queue.py move "beach" --to 1       put it first among shoots due the same day
     python3 edit_queue.py options                   the due choices, their most-picked first
@@ -54,6 +55,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 from datetime import date, datetime, timedelta
 from functools import partial
 from http import HTTPStatus
@@ -77,6 +79,8 @@ THUMBS = HOME / "queue-thumbs"
 PAGE = HOME / "queue.html"
 HEADS_UP_DAYS = 3
 DUE_CHOICES = {"1w": ("1 week", 7), "2w": ("2 weeks", 14), "3w": ("3 weeks", 21)}
+_POSTING_LOCK = threading.Lock() # one look for (or start of) the Assistant's own page server at a time
+POST_CAP = 65536                 # a press on the queue page is a few hundred bytes (as the posting page's)
 _QUEUE_LOCK = threading.Lock()   # the page server answers two presses at once: one reads, changes and saves at a time
 
 
@@ -240,6 +244,58 @@ def bring_back(s):
     s.pop("stored_at", None)
 
 
+class Elsewhere(Exception):
+    """A press (or a command) meant for a shoot that is somewhere else than it thought: an Archive on a shoot that
+    is back in the queue, say. Nothing is changed; the page is handed the newest lists and redraws."""
+
+
+def where_words(s):
+    """Where a shoot is, in the page's own words."""
+    if is_waiting(s):
+        return "in the editing queue"
+    if s.get("status") != "finished":
+        return "in Uploaded shoots"
+    return "in Archived" if is_stored(s) else "in Delivered"
+
+
+def press(q, act, s, due=None, by="page"):
+    """One press on the page, or the same thing asked in the chat. True when something changed; False when the
+    shoot is already where the press would put it (a second press, or a page a step behind the chat: nothing is
+    changed, no date is rewritten); Elsewhere when the press does not fit where the shoot is."""
+    st = s.get("status", "waiting")
+    if act == "done":                           # the check mark: Mark as delivered
+        if st == "finished":
+            return False
+        if st != "waiting":
+            raise Elsewhere(f"{s['name']} is {where_words(s)}")
+        mark_delivered(s, by)
+    elif act in ("undo", "requeue"):            # from Uploaded, Delivered or Archived, into the queue
+        if st == "waiting":
+            return False
+        back_in_queue(q, s, due)
+    elif act == "unqueue":                      # Take out of my queue: back to the uploaded shoots, no date
+        if st == "finished":
+            raise Elsewhere(f"{s['name']} is {where_words(s)}")
+        if st != "waiting":
+            return False
+        take_out(s)
+    elif act == "store":                        # Archive, after "Are you sure you want to archive this?"
+        if st != "finished":
+            raise Elsewhere(f"{s['name']} is {where_words(s)}")
+        if is_stored(s):
+            return False
+        put_away(s)
+    elif act == "unstore":                      # Bring it back: in Delivered again
+        if st != "finished":
+            raise Elsewhere(f"{s['name']} is {where_words(s)}")
+        if not is_stored(s):
+            return False
+        bring_back(s)
+    else:
+        raise ValueError("no such action")
+    return True
+
+
 def reorder(q, ids):
     """Put the waiting shoots in this order; finished ones keep their place after them."""
     by_id = {s["id"]: s for s in q["shoots"]}
@@ -262,6 +318,11 @@ def find(q, text, include_finished=True):
     if len(hits) == 1:
         return hits[0]
     if not hits:
+        if not include_finished:        # not in the queue: say where it is, never that it does not exist
+            t2 = [s for s in q["shoots"] if s["id"] == text or t in s["name"].lower()]
+            if len(t2) == 1:
+                sys.exit(f"STOP: {t2[0]['name']} isn't in the editing queue: it is {where_words(t2[0])}. "
+                         f"To put it back in the queue: edit_queue.py undo \"{text}\".")
         sys.exit(f"STOP: no shoot matches '{text}'.")
     sys.exit("STOP: more than one shoot matches '" + text + "': " + "; ".join(s["name"] for s in hits) + ". Say which.")
 
@@ -662,6 +723,9 @@ function toast(t){const el = $('#toast');el.textContent = t;el.classList.add('on
 async function send(body){
   if(!LIVE){toast('Open the queue through your assistant to save changes');return false}
   try{const r = await fetch('/queue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      // 409: the shoot is somewhere else than this page thought (changed in the chat, or in another window):
+      // nothing was changed, the answer is the newest lists, and the page shows them
+      if(r.status == 409){ Q = await r.json(); render(); toast("This shoot was changed somewhere else. Here's the newest."); return false }
       if(!r.ok) throw 0; Q = await r.json(); return true}
   catch(e){toast('That did not save. Try again.');return false}
 }
@@ -674,7 +738,7 @@ function render(order){
   w.forEach((s, i) => {
     const li = document.createElement('li');
     li.className = 'card'; li.dataset.id = s.id; li.draggable = true;
-    const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt=""></span>`).join('') : '<div class="none">no previews</div>';
+    const pics = (s.thumbs || []).length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt=""></span>`).join('') : '<div class="none">no previews</div>';
     li.innerHTML = `<span class="grip" title="Drag to reorder">&#8942;&#8942;</span>
       <div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
@@ -700,7 +764,7 @@ function renderArchive(fresh){
   shown.forEach(s => {
     const m = s.shot ? new Date(s.shot + 'T12:00:00').toLocaleDateString('en-US', {month:'long', year:'numeric'}) : 'No date';
     if(m != month){ html += `<li class="month">${esc(m)}</li>`; month = m }
-    const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
+    const pics = (s.thumbs || []).length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
     html += `<li class="acard${fresh == s.id ? ' fresh' : ''}" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
       <div class="info"><div class="name">${esc(s.name)}</div>
         <div class="meta">${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
@@ -715,7 +779,7 @@ function renderArchive(fresh){
 }
 // Delivered and Archived (Nicole, v26): the galleries they delivered, then the ones they put away. Nothing is deleted.
 function smallCard(s, acts){
-  const pics = s.thumbs.length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
+  const pics = (s.thumbs || []).length ? s.thumbs.map(t => `<span><img src="${esc(t)}" alt="" loading="lazy"></span>`).join('') : '<div class="none">no previews</div>';
   return `<li class="acard" data-id="${esc(s.id)}"><div class="pics">${pics}</div>
     <div class="info"><div class="name">${esc(s.name)}</div>
       <div class="meta">${s.finished_at ? `<span class="tag edited">Delivered ${nice(s.finished_at.slice(0,10))}</span>` : ''}${s.shot ? `<span>Shot ${nice(s.shot)}</span>` : ''}${s.count_words ? `<span>${esc(s.count_words)}</span>` : ''}</div></div>
@@ -727,7 +791,8 @@ function renderFolds(){
   if(f){ if(d.length) $('#delivered').open = true; if(st.length) $('#stored').open = true; }   // a match in there opens it
   $('#dtitle').textContent = `Delivered (${d.length})`; $('#stitle').textContent = `Archived (${st.length})`;
   // Make posts from this shoot: the Make posts screen on the Assistant's own page server, when its address is known
-  const posts = Q.make_posts ? `<a class="mk" href="${esc(Q.make_posts)}">Make posts from this shoot</a>` : '';
+  // always shown (Nicole, v26); a press asks this server where that screen is, which starts the page server if it is not up
+  const posts = `<a class="mk" href="${esc(Q.make_posts || '#')}">Make posts from this shoot</a>`;
   $('#dlist').innerHTML = d.map(s => smallCard(s,
     `${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
      ${posts}
@@ -737,6 +802,7 @@ function renderFolds(){
     `${s.has_folder ? `<button class="open-folder" data-id="${esc(s.id)}">Open photo folder</button>` : ''}
      <button class="unstore" data-id="${esc(s.id)}">Bring it back</button>`)).join('') || '<li class="foldempty">Nothing archived.</li>';
   document.querySelectorAll('#dlist .open-folder, #slist .open-folder').forEach(b => b.onclick = () => openFolder(b.dataset.id));
+  document.querySelectorAll('#dlist a.mk').forEach(a => a.onclick = e => { e.preventDefault(); goTo('/make-posts-url', null) });
   document.querySelectorAll('#dlist .requeue').forEach(b => b.onclick = async () => { if(await send({action:'requeue', id:b.dataset.id})){render(); toast('Back in your editing queue. No due date yet.'); window.scrollTo({top:0, behavior:'smooth'})} });
   document.querySelectorAll('#dlist .store').forEach(b => b.onclick = () => {
     const acts = b.closest('.acts'); if(acts.querySelector('.sure')) return;
@@ -748,6 +814,13 @@ function renderFolds(){
   });
   document.querySelectorAll('#slist .unstore').forEach(b => b.onclick = async () => { if(await send({action:'unstore', id:b.dataset.id})){ render(); $('#delivered').open = true; toast('Back in Delivered.') } });
 }
+// A link to one of the Assistant's other pages (Make posts, Back to home): this server is asked where it is, and
+// starts that page server if it is not running (after the computer was restarted, say). Never a dead link.
+async function goTo(route, fallback){
+  if(!LIVE){ if(fallback) location.href = fallback; else toast('Open the queue through your assistant to make posts from here'); return }
+  try{ const r = await fetch(route); const j = await r.json(); if(j.url){ location.href = j.url; return } }catch(e){}
+  if(fallback) location.href = fallback; else toast("I couldn't open that just now. Tell your assistant: make my posts");
+}
 async function openFolder(id){
   if(!LIVE){toast('Ask your assistant to “show my shoots” to open folders from here');return}
   try{const r = await fetch('/open?id=' + encodeURIComponent(id)); const j = await r.json(); toast(j.words)}
@@ -755,6 +828,7 @@ async function openFolder(id){
 }
 function dueWords(iso){if(!iso) return 'no due date';const n = days(iso);if(n<0) return `${-n} day${n==-1?'':'s'} late`;if(n==0) return 'due today';if(n==1) return 'due tomorrow';if(n<=7) return `due in ${n} days`;return 'due ' + nice(iso)}
 async function finish(li, s){
+  if(li.classList.contains('done')) return;   // a second press while the first is on its way: one press, one toast
   li.classList.add('done');
   if(!(await send({action:'done', id:s.id}))){li.classList.remove('done');return}
   toast(`${s.name}: delivered, moved to Delivered below`);
@@ -844,6 +918,9 @@ function searchAll(){
 if(!LIVE) $('#offline').hidden = false;
 render();
 if(location.hash == '#archive') setTimeout(() => document.getElementById('archive').scrollIntoView({behavior:'smooth'}), 200);
+// #delivered and #stored open that section and scroll to it ("show what I've delivered", "show my archived shoots")
+if(location.hash == '#delivered' || location.hash == '#stored') setTimeout(() => { const d = document.getElementById(location.hash.slice(1)); d.open = true; d.scrollIntoView({behavior:'smooth'}) }, 200);
+{ const h = document.querySelector('.homelink'); if(h && LIVE) h.onclick = e => { e.preventDefault(); goTo('/home-url', h.getAttribute('href')) } }
 """
 
 
@@ -876,9 +953,42 @@ def posting_base():
     return None
 
 
+def posting_up(wait=8.0):
+    """The Assistant's own page server's address ("http://127.0.0.1:8790"), started if it is not running (as the
+    home page starts this one, the other way round: serve_report.queue_url). None if it could not be started.
+    "Is it up?" is asked never through a proxy (this_computer.open_local). STUDIO_POSTING_PORT, when set, is the
+    port a server started here begins looking at (the tests' own; a person's is the usual 8790)."""
+    def alive(base):
+        try:
+            this_computer.open_local(base + "/home", timeout=1).read(1)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+    with _POSTING_LOCK:
+        base = posting_base()
+        if base and alive(base):
+            return base
+        cmd = [sys.executable, str(HERE / "posting_queue.py"), "serve"]
+        port = os.environ.get("STUDIO_POSTING_PORT", "")
+        if port.isdigit():
+            cmd += ["--port", port]
+        try:
+            fresh.start_server(cmd, "posting")
+        except OSError:
+            return None
+        end = time.time() + wait
+        while time.time() < end:
+            time.sleep(0.1)
+            base = posting_base()
+            if base and alive(base):
+                return base
+    return None
+
+
 def make_posts_link():
     """Where "Make posts from this shoot" goes: the Make posts screen on the posting server (/make-posts).
-    None when that server's address is not known; the page then shows no such link (never a dead one)."""
+    None when that server's address is not known. The page shows the link all the same and a press asks
+    /make-posts-url, which starts that server when it is not running (never a dead link)."""
     base = posting_base()
     return base + "/make-posts" if base else None
 
@@ -950,6 +1060,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.FORBIDDEN)
         return False
 
+    def same_page(self):
+        """A press comes from the queue page itself: an Origin, when the browser sends one, is this server's own,
+        and the press is never another website's (the posting page's rule, and the pickers'). Before v26 only the
+        Host was looked at, so a page on another site could press the buttons here."""
+        port = self.server.server_address[1]
+        origin = self.headers.get("Origin")
+        if ((origin is not None and origin.strip().lower() not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}"))
+                or (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site"):
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return False
+        return True
+
+    def answer(self, d, code=HTTPStatus.OK):
+        out = json.dumps(d).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
     def list_directory(self, path):
         """Never a folder's list of files (Python's own server makes one for a folder's address)."""
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -985,17 +1116,21 @@ class Handler(SimpleHTTPRequestHandler):
                 return super().do_GET()
             self.send_error(HTTPStatus.NOT_FOUND)
             return
+        if p in ("/make-posts-url", "/home-url"):
+            # where "Make posts from this shoot" and "Back to home" go: the Assistant's own page server, started
+            # if it is not running. Only this page asks (it starts a program).
+            if not self.same_page():
+                return
+            base = posting_up()
+            return self.answer({"url": (base + ("/make-posts" if p == "/make-posts-url" else "/home")) if base else None})
         if p == "/open":
+            if not self.same_page():        # it opens a folder's window: never at another website's asking
+                return
             from urllib.parse import parse_qs
             sid = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
             s = next((x for x in load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
             ok, words = open_folder(s) if s else (False, "I don't know that shoot.")
-            out = json.dumps({"ok": ok, "words": words}).encode()
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(out)
-            return
+            return self.answer({"ok": ok, "words": words})
         self.send_error(HTTPStatus.NOT_FOUND)  # nothing else in ~/.studio is served
 
     def do_POST(self):
@@ -1004,53 +1139,53 @@ class Handler(SimpleHTTPRequestHandler):
         if urlsplit(self.path).path != "/queue":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
+        if not self.same_page():
+            return
         try:
             n = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            n = -1
+        if not 0 <= n <= POST_CAP:          # nothing is read
+            self.send_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            return
+        try:
             body = json.loads(self.rfile.read(n) or b"{}")
             with _QUEUE_LOCK:               # two presses at once: the second reads the queue the first saved
                 q = load()
                 act = body.get("action")
+                changed = True
                 if act in ("done", "undo", "due", "requeue", "unqueue", "store", "unstore"):
                     sid = body.get("id")
                     s = next((x for x in q["shoots"] if x["id"] == sid), None) if isinstance(sid, str) else None
                     if s is None:
                         raise ValueError("no such shoot")       # a plain refusal (400), nothing changed
-                    if act == "done":                           # the check mark: Mark as delivered
-                        if not is_waiting(s):
-                            raise ValueError("that shoot is not in the queue")
-                        mark_delivered(s, "page")
-                    elif act in ("undo", "requeue"):            # from Uploaded, Delivered or Archived, into the queue
-                        if is_waiting(s):
-                            raise ValueError("that shoot is already in the queue")
-                        back_in_queue(q, s, due_date(body["due"])[0] if act == "requeue" and body.get("due") else
-                                      (s.get("due") if act == "undo" else None))
-                    elif act == "unqueue":                      # Take out of my queue: back to the uploaded shoots, no date
-                        if not is_waiting(s):
-                            raise ValueError("that shoot is not in the queue")
-                        take_out(s)
-                    elif act == "store":                        # Archive, after "Are you sure you want to archive this?"
-                        if s.get("status") != "finished" or is_stored(s):
-                            raise ValueError("only a delivered shoot can be archived")
-                        put_away(s)
-                    elif act == "unstore":                      # Bring it back: in Delivered again
-                        if not is_stored(s):
-                            raise ValueError("that shoot is not archived")
-                        bring_back(s)
-                    else:
-                        s["due"], how = due_date(body.get("due"))
-                        s.pop("reminded", None)
+                    try:
+                        if act == "due":
+                            if not is_waiting(s):               # only a shoot in the queue has a due date
+                                raise Elsewhere(f"{s['name']} is {where_words(s)}")
+                            s["due"], how = due_date(body.get("due"))
+                            s.pop("reminded", None)
+                        else:
+                            # a second press (a double click, a page a step behind the chat) finds the shoot
+                            # already there: nothing is changed or saved, and the answer is the lists as they are
+                            changed = press(q, act, s, due_date(body["due"])[0] if act == "requeue" and body.get("due") else
+                                            (s.get("due") if act == "undo" else None))
+                    except Elsewhere:
+                        return self.answer(state(q), HTTPStatus.CONFLICT)
                 elif act == "order":
                     reorder(q, [str(i) for i in body.get("ids", [])])
                 elif act == "add":
-                    name = " ".join(str(body.get("name", "")).split())
-                    if not name:
-                        raise ValueError("a name is needed")
+                    name = body.get("name")
+                    name = " ".join(name.split()) if isinstance(name, str) else ""
+                    if not name or len(name) > 80:              # the page's box stops at 80
+                        raise ValueError("a name of up to 80 letters is needed")
                     add_manual(q, name, body.get("due") or None)
                 else:
                     raise ValueError("no such action")
-                save(q)
-                write_page(q)
-                out = json.dumps(state(q)).encode()
+                if changed:
+                    save(q)
+                    write_page(q)
+                out = state(q)
         except (StopIteration, ValueError, SystemExit, TypeError, AttributeError) as e:   # AttributeError: a body that isn't {...}
             self.send_error(HTTPStatus.BAD_REQUEST, str(e)[:200])
             return
@@ -1060,10 +1195,7 @@ class Handler(SimpleHTTPRequestHandler):
             say(f"queue: couldn't save the editing queue ({e.__class__.__name__}: {str(e)[:160]})")
             self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The editing queue couldn't be saved just now")
             return
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(out)
+        self.answer(out)
 
     def log_message(self, fmt, *args):
         pass
@@ -1113,7 +1245,7 @@ def main():
     a2.add_argument("--shot"); a2.add_argument("--folder")
     a3 = sub.add_parser("add-list"); a3.add_argument("--file", help="one name per line"); a3.add_argument("--names", help="names separated by commas")
     l = sub.add_parser("list"); l.add_argument("--all", action="store_true")
-    for c in ("done", "undo", "unqueue", "store", "unstore"):
+    for c in ("done", "undo", "unqueue", "store", "unstore", "where"):
         x = sub.add_parser(c); x.add_argument("which")
     d = sub.add_parser("due"); d.add_argument("which"); d.add_argument("when")
     m = sub.add_parser("move"); m.add_argument("which"); m.add_argument("--to", type=int, required=True)
@@ -1181,26 +1313,39 @@ def main():
         say(f"{'Delivered' if a.cmd == 'done' else 'Back in the queue'}: {s['name']}.")
         if a.cmd == "done" and s.get("studio"):
             say(f"backup: {Path(s['studio'])}  shoot: {s['shoot']}")  # for the next step (finding the exports)
-    elif a.cmd == "unqueue":
-        s = find(q, a.which, include_finished=False)
-        take_out(s)
-        save(q)
-        write_page(q)
-        say(f"{s['name']} is back in your uploaded shoots.")
-    elif a.cmd in ("store", "unstore"):
-        want = stored(q) if a.cmd == "unstore" else delivered(q)
-        hits = [x for x in want if x["id"] == a.which or a.which.strip().lower() in x["name"].lower()]
-        exact = [x for x in hits if x["id"] == a.which or x["name"].lower() == a.which.strip().lower()]
+    elif a.cmd == "where":
+        # which shoot they mean and where it is; changes nothing ("I'm done editing the beach shoot": the next
+        # step needs the backup and the shoot, and the shoot stays in the queue until its gallery is delivered)
+        s = find(q, a.which)
+        say(f"{s['name']}: {where_words(s)}" + (f", {due_words(s.get('due'))}" if is_waiting(s) else "") + ".")
+        if s.get("studio"):
+            say(f"backup: {Path(s['studio'])}  shoot: {s['shoot']}")
+    elif a.cmd in ("unqueue", "store", "unstore"):
+        # the shoot is looked for where the command would find it first (two shoots may share a word), then
+        # over everything, so a repeat or a shoot that is somewhere else is named with where it is
+        pool = {"unqueue": waiting(q), "store": delivered(q), "unstore": stored(q)}[a.cmd]
+        t = a.which.strip().lower()
+        hits = [x for x in pool if x["id"] == a.which or t in x["name"].lower()]
+        exact = [x for x in hits if x["id"] == a.which or x["name"].lower() == t]
         hits = exact[:1] or hits
-        if len(hits) != 1:
-            where_ = "Archived" if a.cmd == "unstore" else "Delivered"
-            sys.exit(f"STOP: no shoot in {where_} matches '{a.which}'." if not hits else
-                     "STOP: more than one shoot matches '" + a.which + "': " + "; ".join(x["name"] for x in hits) + ". Say which.")
-        s = hits[0]
-        (put_away if a.cmd == "store" else bring_back)(s)
+        if len(hits) > 1:
+            sys.exit("STOP: more than one shoot matches '" + a.which + "': " + "; ".join(x["name"] for x in hits) + ". Say which.")
+        s = hits[0] if hits else find(q, a.which)
+        try:
+            changed = press(q, a.cmd, s)
+        except Elsewhere:
+            sys.exit(f"STOP: {s['name']} is {where_words(s)}, so there is nothing to " +
+                     {"unqueue": "take out of the queue.", "store": "archive: only a delivered shoot can be archived.",
+                      "unstore": "bring back: it isn't archived."}[a.cmd])
+        if not changed:                 # asked twice: nothing changed, and that is fine
+            say({"unqueue": f"{s['name']} is already in your uploaded shoots.", "store": f"{s['name']} is already archived.",
+                 "unstore": f"{s['name']} is already in Delivered."}[a.cmd])
+            return
         save(q)
         write_page(q)
-        say(f"Archived: {s['name']}. Nothing is deleted; it can come back any time." if a.cmd == "store" else f"Back in Delivered: {s['name']}.")
+        say({"unqueue": f"{s['name']} is back in your uploaded shoots.",
+             "store": f"Archived: {s['name']}. Nothing is deleted; it can come back any time.",
+             "unstore": f"Back in Delivered: {s['name']}."}[a.cmd])
     elif a.cmd == "due":
         s = find(q, a.which, include_finished=False)
         s["due"], how = due_date(a.when)
@@ -1248,7 +1393,7 @@ def main():
         n = register_night(q, a.night)
         save(q)
         write_page(q)
-        say(f"{n} shoot{'s' if n != 1 else ''} added to your shoots." if n else "Those shoots were already there.")
+        say(f"{n} shoot{'s' if n != 1 else ''} added to Uploaded shoots." if n else "Those shoots were already there.")
     elif a.cmd == "scan":
         total = 0
         for night in nights_known():
@@ -1258,7 +1403,7 @@ def main():
                 continue  # a night that never finished, or a drive that is not plugged in
         save(q)
         write_page(q)
-        say(f"Found {total} shoot{'s' if total != 1 else ''} not in your shoots yet; added. {len(archive(q))} in all, {len(waiting(q))} in the queue.")
+        say(f"Found {total} shoot{'s' if total != 1 else ''} not in Uploaded shoots yet; added. {len(archive(q))} in all, {len(waiting(q))} in the queue.")
     elif a.cmd == "open":
         ok, words = open_folder(find(q, a.which))
         say(words)
