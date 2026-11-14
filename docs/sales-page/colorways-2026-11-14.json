@@ -1,0 +1,172 @@
+{
+ "colorways": [
+  {
+   "name": "Coral and driftwood",
+   "oneLine": "Closest to today's look, sun-washed: peach-warm sand paper, espresso-brown words, and your coral softened toward clay so it feels like terracotta, not a warning light.",
+   "fromTheGrid": "Backgrounds from the pale sand (#d1ccc0) lifted lighter and warmed with the peach of skin (#e1b59c); text from the darkest driftwood brown (#382417) taken deeper; the button is today's coral pulled toward the clay and driftwood browns (#a57c54, #866340); the second color is the peach of skin in warm light (#e1b59c); good and heads up come from the olive (#767f63) and the mustard (#d8ac4b), each darkened so it reads as text; late is a berry from the dusty rose (#a97d79), kept well away from the coral so the main button never looks like a warning.",
+   "bg": "#FAF3EA",
+   "bgAlt": "#F3E4D6",
+   "panel": "#FFFCF7",
+   "line": "#E6D8C8",
+   "ink": "#2B1F17",
+   "inkSoft": "#6B5A4C",
+   "accent": "#B9573A",
+   "accentInk": "#FFFDF9",
+   "accentText": "#A84E31",
+   "second": "#E1B59C",
+   "secondInk": "#4A2E1F",
+   "tint": "#FAEBE1",
+   "deep": "#382417",
+   "deepInk": "#F6EEE2",
+   "good": "#55683F",
+   "attention": "#8A6414",
+   "late": "#873A4E",
+   "extras": [
+    {
+     "name": "Driftwood",
+     "hex": "#A57C54"
+    },
+    {
+     "name": "Clay skin",
+     "hex": "#BD9378"
+    },
+    {
+     "name": "Dusty rose",
+     "hex": "#D0BAB7"
+    },
+    {
+     "name": "Wet sand",
+     "hex": "#D1CCC0"
+    }
+   ],
+   "lineStrong": "#9A8F7E",
+   "accentEdge": "#B9573A"
+  },
+  {
+   "name": "Palm and sand",
+   "oneLine": "Like standing in the shade of a palm on a pale beach: sand paper with a breath of green in it, deep forest-black words, and one calm green for the thing you press.",
+   "fromTheGrid": "Backgrounds from the sand and soft-white tones (#ddddda, #d1ccc0) lifted lighter, with a little of the olive (#767f63) in them; text from the forest-black of the lava rock and deep foliage (#1b2119, #2f362b); the button green from the palm and olive leaves (#767f63), deepened so white words read on it; the second color is the mustard of your overlay text (#d8ac4b); good is a sea green from the deep ocean (#305c72), so a status never looks like the brand green; extras are the ocean, peach skin, driftwood and dusty rose.",
+   "bg": "#F3F3EA",
+   "bgAlt": "#E6E9DA",
+   "panel": "#FDFDF7",
+   "line": "#D8DBC9",
+   "ink": "#1F241C",
+   "inkSoft": "#5C6154",
+   "accent": "#4F6B4A",
+   "accentInk": "#FFFFFF",
+   "accentText": "#44603F",
+   "second": "#D8AC4B",
+   "secondInk": "#2A2415",
+   "tint": "#E6ECDD",
+   "deep": "#2F3A2C",
+   "deepInk": "#F3EFE4",
+   "good": "#2F6F6A",
+   "attention": "#84600F",
+   "late": "#A1483A",
+   "extras": [
+    {
+     "name": "Ocean",
+     "hex": "#638DA4"
+    },
+    {
+     "name": "Peach skin",
+     "hex": "#E1B59C"
+    },
+    {
+     "name": "Driftwood",
+     "hex": "#A57C54"
+    },
+    {
+     "name": "Dusty rose",
+     "hex": "#D0BAB7"
+    }
+   ],
+   "lineStrong": "#8B907C",
+   "accentEdge": "#4F6B4A"
+  },
+  {
+   "name": "Sea and driftwood",
+   "oneLine": "Like a hazy morning at the water: cool pale stone paper, lava-black words, a dusty sea blue for the button, and peach skin tones for warmth.",
+   "fromTheGrid": "Backgrounds from the pale stone (#f3f4f5, #ddddda) with the second background a breath of sea haze (#8fa8b6); text from the black lava rock, kept warm and never blue (#0c0f0a blended with #382417); the button blue from the ocean (between #638da4 and #305c72, so it stays dusty and never navy); the second color is the peach of skin in warm light (#e1b59c); the optional dark band is warm lava; extras are mustard, olive, sky and driftwood.",
+   "bg": "#F4F4F1",
+   "bgAlt": "#E3EAEC",
+   "panel": "#FEFEFC",
+   "line": "#D5DADA",
+   "ink": "#23201B",
+   "inkSoft": "#5F5C54",
+   "accent": "#3F6E84",
+   "accentInk": "#FFFFFF",
+   "accentText": "#346178",
+   "second": "#E1B59C",
+   "secondInk": "#3A2417",
+   "tint": "#E1EAED",
+   "deep": "#2A2622",
+   "deepInk": "#F1EEE8",
+   "good": "#4C6B45",
+   "attention": "#84600F",
+   "late": "#A04A3F",
+   "extras": [
+    {
+     "name": "Mustard",
+     "hex": "#D8AC4B"
+    },
+    {
+     "name": "Olive",
+     "hex": "#767F63"
+    },
+    {
+     "name": "Sky",
+     "hex": "#9BB8DE"
+    },
+    {
+     "name": "Driftwood",
+     "hex": "#866340"
+    }
+   ],
+   "lineStrong": "#858E8F",
+   "accentEdge": "#3F6E84"
+  },
+  {
+   "name": "Gold hour sand",
+   "oneLine": "Late-afternoon beach light: buttery bone paper, lava-black words, and the mustard gold from your overlay text as the button. This is the one colorway where the button is light with dark words on it.",
+   "fromTheGrid": "Backgrounds from the sand tones (#d1ccc0, #ddddda) lifted lighter and warmed toward the mustard; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard of your overlay text (#d8ac4b) taken a step deeper so it stands off the page, with a darker gold edge and dark words on it; the second color is the hazy ocean (#8fa8b6) made paler, with deep ocean (#305c72) words; good is the olive (#767f63) darkened, heads up is driftwood brown (#866340) so it never looks like the brand gold, late the clay-rose (#a97d79) deepened.",
+   "bg": "#FAF4E6",
+   "bgAlt": "#F2E8D0",
+   "panel": "#FFFCF3",
+   "line": "#E4D9BE",
+   "ink": "#231E16",
+   "inkSoft": "#645B4E",
+   "accent": "#C8962E",
+   "accentInk": "#2A2010",
+   "accentText": "#7D5A0C",
+   "second": "#A9C0C9",
+   "secondInk": "#244656",
+   "tint": "#F7EDD3",
+   "deep": "#4A3424",
+   "deepInk": "#F8F0E0",
+   "good": "#55683F",
+   "attention": "#8C5A3C",
+   "late": "#A3412E",
+   "extras": [
+    {
+     "name": "Sea haze",
+     "hex": "#8FA8B6"
+    },
+    {
+     "name": "Clay skin",
+     "hex": "#BD9378"
+    },
+    {
+     "name": "Olive leaf",
+     "hex": "#767F63"
+    },
+    {
+     "name": "Stone",
+     "hex": "#BDB9B0"
+    }
+   ],
+   "lineStrong": "#9A8E74",
+   "accentEdge": "#A87C1E"
+  }
+ ]
+}

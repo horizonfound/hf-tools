@@ -676,3 +676,7 @@ The October mock-ups are history (they sell "The Studio", three staff, culling, 
 - Look: DM Sans only, cream, ink, coral. No serif.
 
 **Not seen by anyone on the real canvas when built:** all three were checked from their code and a stand-in copy in a hidden browser. The honest-claims sheet the copy was written from is in this chat's scratch folder, not in the project.
+
+## Color story: four light colorways from the Instagram grid (Dustin, Nov 14)
+
+Dustin on sales page C: the dark navy "feels a little too tech"; "a lighter background and just lighter tones in general with darker fonts... That's more our style." Draw the palette from Horizon Found's Instagram grid, harmonious, "without being too bold"; it "would also make its way into the actual assistant itself." So: **light backgrounds, warm dark type, no navy, no white-on-dark pages.** Four sample colorways are on the sales page canvas as a fourth board, "Color stories" (`docs/sales-page/ColorStories.dc.html`, tokens in `docs/sales-page/colorways-2026-11-14.json`): Coral and driftwood (today's coral softened toward clay, espresso text; the suggested start), Palm and sand (green button), Sea and driftwood (dusty sea blue), Gold hour sand (mustard button with dark words). Each is shown on a sales hero and on the Assistant's home page. **Nothing is chosen and nothing is recolored yet:** the three sales pages and every app page still wear the old look (`look.py`) until Dustin and Nicole pick. Checked in a stand-in browser only.
