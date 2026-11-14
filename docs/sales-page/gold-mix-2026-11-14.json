@@ -1,0 +1,137 @@
+[
+ {
+  "name": "Honey, palm and butter",
+  "oneLine": "Your two favorites as one: Butter and bone's whiter paper and butter highlights, with Honey and palm's deeper honey button and soft sage green beside it.",
+  "fromTheGrid": "Pale sand barely warmed for the paper; the mustard of your overlay text, pulled toward honey, as the button and made very pale as the wash; the palm and olive leaf made soft as the second color; lava and forest-black words; deep foliage for the dark band.",
+  "bg": "#F9F6EE",
+  "bgAlt": "#F3EBD4",
+  "panel": "#FFFDF7",
+  "line": "#E6DDC6",
+  "ink": "#23201A",
+  "inkSoft": "#605B4F",
+  "accent": "#CB9A38",
+  "accentInk": "#2A2010",
+  "accentText": "#7A5810",
+  "second": "#B7C3A3",
+  "secondInk": "#2F3D24",
+  "tint": "#F8EFCF",
+  "deep": "#343B2B",
+  "deepInk": "#F5F0E0",
+  "good": "#2F6F6A",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Straw butter",
+    "hex": "#D4BC72"
+   },
+   {
+    "name": "Palm leaf",
+    "hex": "#767F63"
+   },
+   {
+    "name": "Driftwood",
+    "hex": "#866340"
+   },
+   {
+    "name": "Peach skin",
+    "hex": "#E1B59C"
+   }
+  ],
+  "lineStrong": "#988E76",
+  "accentEdge": "#A67D1F",
+  "trend": "Both of the pairings your two favorites lean on: green as the most picked color family for 2027, and butter yellow with warm off-white in Pantone's Spring/Summer 2027 fashion report. Mixing them is our choice.",
+  "sourceUrl": "https://www.dulux.co.uk/en/colour-inspiration/colour-of-the-year-2027-soulful-sage",
+  "whatChanged": "From Butter and bone: the paper, the cards, the butter second background and the butter wash. From Honey and palm: the honey button, the sage second color and the deep palm for the dark band. Straw butter stays on as a supporting color."
+ },
+ {
+  "name": "Honey and palm",
+  "oneLine": "The same late-afternoon gold, standing under the palms: bone paper with the yellow turned down, a honey button, and a soft sage green where the sea haze was.",
+  "fromTheGrid": "Backgrounds from the pale sand (#ddddda, #d1ccc0) lifted lighter with a breath of the olive (#767f63); text from the forest-black of the lava rock (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) pulled a little toward honey, with a darker edge and dark words; the second color is the palm and olive leaf (#767f63) made pale; the dark band is the deep foliage (#2f362b) warmed; good moves to a sea green from the deep ocean (#305c72) so a status never looks like the sage; heads up is driftwood (#866340), late the clay deepened.",
+  "bg": "#F8F5EB",
+  "bgAlt": "#ECEBDA",
+  "panel": "#FFFDF6",
+  "line": "#DEDCC6",
+  "ink": "#22201A",
+  "inkSoft": "#5F5C4E",
+  "accent": "#CB9A38",
+  "accentInk": "#2A2010",
+  "accentText": "#7A5810",
+  "second": "#B7C3A3",
+  "secondInk": "#2F3D24",
+  "tint": "#EEF0DF",
+  "deep": "#343B2B",
+  "deepInk": "#F5F0E0",
+  "good": "#2F6F6A",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Palm leaf",
+    "hex": "#767F63"
+   },
+   {
+    "name": "Forest",
+    "hex": "#2F362B"
+   },
+   {
+    "name": "Clay skin",
+    "hex": "#BD9378"
+   },
+   {
+    "name": "Wet sand",
+    "hex": "#D1CCC0"
+   }
+  ],
+  "lineStrong": "#8F8F78",
+  "accentEdge": "#A67D1F",
+  "trend": "Green is the most repeated color family among the 2027 paint picks (Dulux, Behr, Sherwin-Williams and Benjamin Moore all chose a green). Dulux's is a soft sage, Soulful Sage, with a warm 'Glow' companion palette that includes honey and clay tones. Gold with sage is our pairing, not a published one.",
+  "sourceUrl": "https://www.dulux.co.uk/en/colour-inspiration/colour-of-the-year-2027-soulful-sage",
+  "whatChanged": "The pale sea-haze blue becomes a pale palm sage, the paper loses some yellow, the dark band turns from driftwood to deep foliage, and the gold warms a touch toward honey."
+ },
+ {
+  "name": "Butter and bone",
+  "oneLine": "The softest one, and the all-yellow one: a whiter bone paper, a paler butter-gold button, a butter wash for highlights, and a straw butter as the second color. No green and no blue.",
+  "fromTheGrid": "Backgrounds from the pale sand and soft white (#ddddda, #f3f4f5) barely warmed; text from the lava and forest-black (#1b2119) warmed with espresso (#382417); the button is the mustard overlay text (#d8ac4b) almost as it appears on your posts, with a darker gold edge and dark words; the highlight wash is that same mustard made very pale, a butter; the second color is that mustard again, dusted with the wet sand (#d1ccc0) into a straw butter; the dark band is driftwood (#866340) deepened; good is a sea green from the deep ocean (#305c72), heads up driftwood, late the clay deepened.",
+  "bg": "#F9F6EE",
+  "bgAlt": "#F3EBD4",
+  "panel": "#FFFDF7",
+  "line": "#E6DDC6",
+  "ink": "#24201A",
+  "inkSoft": "#625B50",
+  "accent": "#D6AB46",
+  "accentInk": "#2A2010",
+  "accentText": "#7A5A0E",
+  "second": "#D4BC72",
+  "secondInk": "#3E3010",
+  "tint": "#F8EFCF",
+  "deep": "#4A3626",
+  "deepInk": "#F8F0E0",
+  "good": "#2F6F6A",
+  "attention": "#8C5A3C",
+  "late": "#A3412E",
+  "extras": [
+   {
+    "name": "Mustard",
+    "hex": "#D8AC4B"
+   },
+   {
+    "name": "Driftwood",
+    "hex": "#866340"
+   },
+   {
+    "name": "Pale sand",
+    "hex": "#DDDDDA"
+   },
+   {
+    "name": "Peach skin",
+    "hex": "#E1B59C"
+   }
+  ],
+  "lineStrong": "#988E76",
+  "accentEdge": "#A47C1E",
+  "trend": "Pantone's New York Fashion Week Spring/Summer 2027 report has a pale butter yellow (Anise Flower) in its top ten, and a dark golden brown (Arrowwood), a warm off-white (Antique White) and a muted herbal green (Tarragon) among its five core neutrals, as reported by FashionUnited. Putting them together is our choice, and this take leaves the green out.",
+  "sourceUrl": "https://fashionunited.uk/news/fashion/pantone-nyfw-spring-summer-2027-color-trend-report-the-top-10-colors/2026092190442",
+  "whatChanged": "The button goes paler and sunnier (so it leans harder on its dark edge), the paper goes whiter, highlights get a butter wash, and the sea haze becomes a straw butter, so the whole page stays in one yellow family."
+ }
+]
