@@ -657,3 +657,22 @@ Nicole's handoffs v23 and v24 (in `reference-private/` beside the main checkout,
 ## The launch moves past Black Friday (Dustin, Nov 13, evening; a leaning, not yet a fixed day)
 
 Dustin: "we're going to change the launch date to like Cyber Monday, I think... I'm kind of okay with skipping past all the hoopla... Black Friday sale chaos. And maybe just kind of using that time to hype our launch... then potentially do the launch like Monday or Tuesday, like the 30th, or even like December 1st." So: **Black Friday week is for telling people it is coming; doors open Mon Nov 30 or Tue Dec 1, 2026.** He said "I think", and Nicole has not been heard on it, so treat the exact day as open. "Launch: Black Friday 2026 (Nov 27)" above is history. The Asana calendar is still the stale October one; nothing in it was changed.
+
+## The sales page: three mock-ups on one canvas (Dustin, Nov 13 to 14)
+
+The October mock-ups are history (they sell "The Studio", three staff, culling, galleries). Three new ones live on the design canvas "The Assistant sales page" (https://claude.ai/artifact/FZcYxCfE6ZdfbK4nxHj7Ga, private to Dustin), with copies in `docs/sales-page/`:
+- **A, the sidekick** (`A-sidekick-2026-11-13.dc.html`): "The busy work around your photos has help now." Its hero leans on the backup. Banked as a reference. Still carries "confirm after beta" marks.
+- **B, the story** (`StoryB.dc.html`): opens on the struggle as scenes, then "Here is what it is, in four steps", then the same week told twice, then a chapter per step.
+- **C, the whole system** (`SystemC.dc.html`): the hero is an animated map of the four steps with a shoot travelling from card to grid; then four cards, one shoot start to finish, a chapter per step. Dark-led, like Nicole's home base demo.
+
+**What Dustin has said about the page:**
+- The backup "is part of it, but it's not the most important thing. Really, it's the entire system as a whole": show everything as one workflow first (step one, two, three, four), then the detail of each phase. People will be confused at first about what it is.
+- **No "confirm after beta" and no beta talk on the page: "I want this to be simulated as though it's a real page... official."** That is for the mock-ups. Nothing is invented all the same: price, date, photos and quotes are quiet placeholders, and before a page goes live every claim on it has to have become true (rule 7 still decides what ships).
+- The date to show for now is Cyber Monday, Mon Nov 30, 2026.
+- Demos should play by themselves on a loop with their labels tracking, not wait to be clicked.
+- He wants real photos in place of the tinted tiles. **Open: which photos** (a folder of theirs, or stock stand-ins); asked in the canvas's comment thread.
+- Spine: Nicole's home base demo of Nov 13 (`Assistant home base demo (Nov 13).html`, from Slack): four steps in the order of the work, "Start wherever you are today".
+- Structure and kinds of motion follow Meg's Reels Editing Engine page (her full page is closed; the Internet Archive has Oct 17). The teardown is `docs/sales-page/meg-architecture.md`. Rule 9 holds: none of her words, pictures, colours or fonts; a short list of her phrases is banned in the builds.
+- Look: DM Sans only, cream, ink, coral. No serif.
+
+**Not seen by anyone on the real canvas when built:** all three were checked from their code and a stand-in copy in a hidden browser. The honest-claims sheet the copy was written from is in this chat's scratch folder, not in the project.

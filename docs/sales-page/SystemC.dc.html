@@ -1,0 +1,1437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Assistant sales page, the whole system</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+html{scroll-behavior:smooth}
+body{margin:0;font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;color:#1F2430;background:#F1EEE6;-webkit-font-smoothing:antialiased;font-size:16px;line-height:25px}
+h1,h2,h3,p,ul{margin:0;padding:0}
+ul{list-style:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+a{color:inherit}
+input{font:inherit;color:inherit}
+[id]{scroll-margin-top:60px}
+:focus-visible{outline:2px solid #F28A66;outline-offset:2px}
+.w{max-width:1200px;margin:0 auto;padding:0 32px;box-sizing:border-box}
+.num{font-variant-numeric:tabular-nums}
+.only-sm{display:none !important}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 26px;border-radius:999px;background:#B9542F;color:#FFFFFF;font-weight:600;font-size:15px;text-decoration:none;box-sizing:border-box;transition:background .2s}
+.btn:hover{background:#9C4423}
+.btn-s{min-height:44px;background:none;padding:0}
+.btn-s span{display:inline-flex;align-items:center;height:32px;padding:0 16px;border-radius:999px;background:#B9542F;transition:background .2s}
+.btn-s:hover{background:none}
+.btn-s:hover span{background:#9C4423}
+.lab{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#B9542F;line-height:22px}
+.lab-d{color:#F0A27F}
+.rg{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px solid currentColor;font-size:10px;letter-spacing:0;font-weight:600;flex:none;box-sizing:border-box}
+.h2{font-size:clamp(27px,3vw,38px);line-height:1.16;letter-spacing:-.02em;font-weight:600;text-wrap:balance}
+em{font-style:normal;color:#B9542F}
+.dk em{color:#F28A66}
+.dk{color:#FAFAF6}
+.q8{color:#8B909C}
+.q6{color:#6B6F7A}
+.tok{border:1px dashed currentColor;border-radius:6px;padding:0 6px;white-space:nowrap}
+.pan{background:#FAFAF6;border:1px solid #E6E2D8;border-radius:20px;padding:28px 32px;box-sizing:border-box}
+.sec{padding:8px 0}
+.split{display:flex;flex-wrap:wrap;gap:28px 40px;align-items:flex-start}
+.tx{flex:5 1 380px;min-width:0;font-size:15.5px;line-height:23px}
+.tx .h2{font-size:clamp(26px,2.6vw,34px)}
+.md{flex:7 1 520px;min-width:0}
+.mfirst{order:-1}
+.mod{background:#FFFFFF;border:1px solid #E6E2D8;border-radius:14px;padding:16px;box-sizing:border-box;font-size:13px;line-height:18px}
+.sb{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;border-radius:10px;border:1px solid #E6E2D8;background:#FFFFFF;font-size:13px;font-weight:600;color:#1F2430;box-sizing:border-box;transition:border-color .2s,background .2s,color .2s}
+.sb:hover{border-color:#B9542F}
+.sb.on{background:#1F2430;color:#FAFAF6;border-color:#1F2430}
+.sb.co{background:#B9542F;color:#FFFFFF;border-color:#B9542F}
+.sb.gn{color:#2F7A55;border-color:#2F7A55}
+.inp{min-height:44px;box-sizing:border-box;border:1px dashed #B9B4A6;border-radius:10px;padding:0 12px;background:#FFFFFF;font-size:14px;font-weight:600;min-width:0}
+.ck::before{content:"";display:inline-block;width:9px;height:4px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(-45deg)}
+.ph{display:flex;align-items:center;justify-content:center;border-radius:6px;position:relative;box-sizing:border-box}
+.ph::after{content:"";width:14px;height:10px;border:1.5px solid rgba(31,36,48,.32);border-radius:2px}
+.li{display:flex;gap:10px;font-size:14px;line-height:20px;padding:3px 0}
+.li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:#B9542F;margin-top:8px}
+.yours{font-size:14px;line-height:21px;color:#3A3F4D;border-top:1px solid #E6E2D8;padding-top:12px;margin-top:12px}
+.yours b{font-weight:600;color:#1F2430}
+.proof{display:flex;gap:8px;align-items:baseline;font-size:13.5px;line-height:20px;color:#2F7A55;font-weight:500;margin-top:10px}
+.hint{font-size:13px;color:#6B6F7A;margin-top:8px}
+.yah{display:flex;align-items:center;gap:0;margin-bottom:12px;font-size:11px;font-weight:600;letter-spacing:.08em;color:#6B6F7A}
+.yah i{flex:none;width:9px;height:9px;border-radius:50%;border:1.5px solid #B9B4A6;box-sizing:border-box}
+.yah i.d{background:#2F7A55;border-color:#2F7A55}
+.yah i.a{background:#B9542F;border-color:#B9542F;box-shadow:0 0 0 4px rgba(185,84,47,.16)}
+.yah u{flex:none;width:34px;height:1.5px;background:#D8D3C6;text-decoration:none}
+.yah span{margin:0 10px 0 8px;color:#B9542F;text-transform:uppercase}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes popb{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes fadeb{from{opacity:0}to{opacity:1}}
+@keyframes blink{50%{opacity:0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(242,138,102,.7)}100%{box-shadow:0 0 0 14px rgba(242,138,102,0)}}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes dropin{from{opacity:0;transform:translateY(-18px)}to{opacity:1;transform:none}}
+@keyframes slidein{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes inl{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+@keyframes inr{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+@keyframes inl2{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+@keyframes inr2{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+@keyframes fly{from{transform:translateY(0);opacity:1}to{transform:translateY(260px);opacity:0}}
+@keyframes zoom{from{transform:scale(1)}to{transform:scale(1.02)}}
+@keyframes dots{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes growy{from{transform:scaleY(0)}to{transform:none}}
+.pop{animation:pop .25s ease-out both}
+.fin{animation:fade .25s ease-out both}
+.pdot{width:6px;height:6px;border-radius:50%;background:#F28A66;animation:pulse 2s ease-in-out infinite;flex:none}
+.sx.a{animation:fade .15s ease-out}
+.sx.b{animation:fadeb .15s ease-out}
+/* the map */
+.map{position:relative;height:296px;background:#16181E;border:1px solid rgba(255,255,255,.1);border-bottom:0;border-radius:20px 20px 0 0;overflow:hidden}
+.trk{position:absolute;left:4%;right:7.5%;top:149px;height:2px;border-radius:2px;background:rgba(255,255,255,.14)}
+.fill{position:absolute;left:4%;top:149px;height:2px;border-radius:2px;background:#F28A66;width:calc((var(--n) - 4) * 1%);transition:width 1.6s ease-in-out}
+.fill.nt{transition:none}
+.st{position:absolute;left:calc(var(--n) * 1%);top:122px;transform:translateX(-50%);width:min(210px,24.5%);display:flex;flex-direction:column;align-items:center;text-align:center;text-decoration:none;gap:8px}
+.ring{position:relative;width:56px;height:56px;border-radius:50%;border:2px solid rgba(255,255,255,.28);background:#16181E;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#FAFAF6;box-sizing:border-box;transition:background .25s,border-color .25s,color .25s}
+.ring.on{background:#F28A66;border-color:#F28A66;color:#16181E}
+.ring.done{border-color:#F28A66}
+.ring .tk{position:absolute;right:-4px;top:-4px;width:18px;height:18px;border-radius:50%;background:#2F7A55;color:#FFFFFF;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .25s}
+.ring.on .tk,.ring.done .tk{opacity:1;transform:none}
+.st:hover .ring,.st:focus-visible .ring{background:#F28A66;border-color:#F28A66;color:#16181E}
+.st .cap{color:#8B909C;font-size:13px;line-height:18px;transition:color .2s}
+.st:hover .cap{color:#D5D7DD}
+.tkn{position:absolute;left:calc(var(--n) * 1%);top:60px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;transition:left 1.6s ease-in-out,opacity .25s;pointer-events:none}
+.tkn.nt{transition:opacity .25s}
+.tkn .lb{font-size:12px;font-weight:600;color:#F0A27F;white-space:nowrap;line-height:18px}
+.shape{height:32px;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+.p1,.m1{--n:12.5}.p2,.m2{--n:37.5}.p3,.m3{--n:62.5}.p4,.m4{--n:87.5}.m0,.m6{--n:4}.m5{--n:92.5}
+.fill.m6{--n:92.5}
+.tkn.m5,.tkn.m6{opacity:0}
+.gt{width:14px;height:14px;border-radius:3px;background:#4A5062;transition:background .3s}
+.gt.lit{background:#F28A66}
+.sidef.pulse .fd{animation:ping .9s ease-out 1}
+/* the board under the map: one panel, four columns, two rows */
+.brd{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#16181E;border:1px solid rgba(255,255,255,.1);border-top:0;border-radius:0 0 20px 20px;overflow:hidden}
+.bcol{display:flex;flex-direction:column;min-width:0;text-decoration:none;color:#FAFAF6;border-left:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.1);margin-left:-1px;transition:background .2s}
+.bcol:hover{background:#1B1E27}
+.bcol .rg{width:28px;height:28px;font-size:11px;color:#F0A27F;transition:background .2s,color .2s}
+.bcol:hover .rg{background:#F28A66;border-color:#F28A66;color:#16181E}
+.bttl{display:none;align-items:center;gap:10px;font-weight:600;font-size:16px;padding:14px 18px 0}
+.bsay{display:block;padding:12px 18px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.bget{display:flex;flex-direction:column;flex:1 1 auto;padding:12px 18px 14px}
+.rlx{visibility:hidden}
+.bub{display:block;width:fit-content;max-width:100%;box-sizing:border-box;background:#2B3040;border-radius:14px 14px 14px 4px;padding:8px 14px;font-size:15px;font-weight:500;min-height:41px;margin-top:4px}
+.car{display:inline-block;width:2px;height:16px;background:#F28A66;margin-left:2px;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+.sl li{display:flex;gap:9px;font-size:13px;line-height:18px;color:#C9CCD3;padding:4px 0}
+.sl li::before{content:"";flex:none;width:9px;height:4px;margin-top:5px;border-left:2px solid #56B98A;border-bottom:2px solid #56B98A;transform:rotate(-45deg);opacity:0;transition:opacity .25s}
+.sl.on li::before{opacity:1}
+.sl.on li:nth-child(2)::before{transition-delay:.1s}
+.sl.on li:nth-child(3)::before{transition-delay:.2s}
+.sl.on li:nth-child(4)::before{transition-delay:.3s}
+.tiny{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8B909C;line-height:16px}
+.mlab{position:absolute;left:84px;right:12px;top:calc(var(--n) * 3.6px + 64px);font-size:13px;line-height:18px;font-weight:600;color:#F0A27F;transition:top 1.6s ease-in-out,opacity .25s}
+.mlab.hid{opacity:0}
+/* run-through */
+.seg{flex:1 1 0;min-width:0;min-height:44px;display:flex;flex-direction:column;justify-content:center;gap:6px;text-align:left;font-size:12px;font-weight:600;color:#8B909C;letter-spacing:.04em}
+.seg.on{color:#FAFAF6}
+.seg i{display:block;height:3px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.seg i b{display:block;height:3px;background:#F28A66}
+.win{position:relative;background:#16181E;border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden}
+.wbody{display:flex;height:300px}
+.chat{flex:0 0 38%;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.1);padding:16px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;font-size:13px;line-height:18px}
+.me{align-self:flex-end;background:#F28A66;color:#16181E;font-weight:600;border-radius:12px 12px 4px 12px;padding:7px 12px;max-width:86%}
+.as{align-self:flex-start;background:#2B3040;border-radius:12px 12px 12px 4px;padding:7px 12px;max-width:86%}
+.td{display:inline-flex;gap:4px}
+.td b{width:5px;height:5px;border-radius:50%;background:#C9CCD3;animation:dots 1s infinite}
+.td b:nth-child(2){animation-delay:.15s}
+.td b:nth-child(3){animation-delay:.3s}
+.pane{flex:1 1 auto;min-width:0;padding:16px;box-sizing:border-box;position:relative;font-size:13px;line-height:18px;overflow:hidden}
+.pc{background:#FAFAF6;color:#1F2430;border-radius:12px;padding:16px;box-sizing:border-box}
+.cur{position:absolute;width:16px;height:16px;border-radius:50%;background:rgba(242,138,102,.9);box-shadow:0 0 0 5px rgba(242,138,102,.28)}
+.cday{display:flex;align-items:center;justify-content:center;height:24px;border-radius:6px;font-size:11px;font-weight:600;background:#F1EEE6}
+.cday.pk{background:#B9542F;color:#FFFFFF}
+.krow{display:flex;align-items:center;gap:8px;color:#2F7A55;font-weight:600;font-size:12px;min-height:18px}
+.endc{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(22,24,30,.84);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:20px;animation:fade .3s ease-out both}
+/* chapter modules */
+.chip{display:flex;flex-direction:column;padding:6px 12px;border:1px solid #E6E2D8;border-radius:10px;flex:1 1 90px}
+.chip b{font-size:17px;font-weight:600;line-height:22px}
+.tabb{min-height:44px;padding:0 12px;font-size:13px;font-weight:600;color:#6B6F7A;border-bottom:2px solid transparent;box-sizing:border-box}
+.tabb.on{color:#1F2430;border-bottom-color:#B9542F}
+.mz{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;width:200px;flex:none}
+.mz .ph{height:63px}
+.mz .ph:first-child{grid-column:span 2;grid-row:span 2;height:131px}
+.mz.a .ph{animation:pop .25s ease-out both}
+.mz.b .ph{animation:popb .25s ease-out both}
+.mz .ph:nth-child(2){animation-delay:.1s}.mz .ph:nth-child(3){animation-delay:.2s}.mz .ph:nth-child(4){animation-delay:.3s}.mz .ph:nth-child(5){animation-delay:.4s}.mz .ph:nth-child(6){animation-delay:.5s}
+.spk{position:absolute;left:4px;top:4px;font-size:9.5px;font-weight:700;letter-spacing:.02em;line-height:12px;background:#B9542F;color:#FFFFFF;padding:0 4px;border-radius:3px}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.day{min-height:44px;border-radius:8px;font-size:13px;font-weight:600;background:#F6F4EE;transition:background .15s,color .15s}
+.day:hover,.day.pk{background:#B9542F;color:#FFFFFF}
+.flyd{position:absolute;right:-22px;top:120px;width:10px;height:10px;border-radius:50%;background:#B9542F;animation:fly .5s ease-in both}
+.qc{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px;min-height:52px;border:1px solid #E6E2D8;border-radius:10px;padding:0 4px 0 0;background:#FFFFFF;transition:opacity .3s,background .3s}
+.qc.go{opacity:.45;background:#F6F4EE}
+.qc.new{animation:slidein .45s ease-out both}
+.cb{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none}
+.cb i{width:20px;height:20px;border-radius:50%;border:2px solid #B9B4A6;box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#FFFFFF;transition:background .2s,border-color .2s}
+.qc.go .cb i{background:#2F7A55;border-color:#2F7A55}
+.cb:hover i{border-color:#2F7A55}
+.tg{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid #D8D3C6;color:#55596A;white-space:nowrap}
+.tg.warm{background:#B9542F;border-color:#B9542F;color:#FFFFFF}
+.tg.pl{animation:ping .9s ease-out .5s 1}
+.arr{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#6B6F7A;border-radius:8px;flex:none}
+.arr:hover{color:#B9542F;background:#F6F4EE}
+.lk{font-size:13px;font-weight:600;color:#B9542F;text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
+.til{position:absolute;top:0;height:92px;border-radius:6px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;padding:4px;overflow:visible;transition:left .3s ease-out,width .3s ease-out,filter .15s;cursor:grab;text-align:left}
+.til::before{content:"";position:absolute;left:-2px;bottom:-24px;width:2px;height:24px;background:#B9542F}
+.til.act{filter:brightness(1.12);outline:2px solid #B9542F}
+.til small{font-size:10px;font-weight:700;background:rgba(255,255,255,.82);padding:0 4px;border-radius:3px;line-height:14px;color:#1F2430;max-width:100%;overflow:hidden;box-sizing:border-box}
+.til small.lg{box-shadow:inset 0 -2px 0 #2F7A55}
+.til small.qk{box-shadow:inset 0 -2px 0 #8A6BB0}
+.tls.in .til{animation:dropin .3s ease-out both}
+.tls.wait .til{opacity:0}
+.mz.w0 .ph{opacity:0}
+.qc.w0{opacity:0}
+.bt{flex:1 1 0;display:flex;align-items:flex-end}
+.bt i{display:block;width:2px;height:8px;background:#B9B4A6}
+.bt.one i{height:16px;background:#6B6F7A}
+.cdot{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none}
+.cdot i{width:22px;height:22px;border-radius:50%;box-sizing:border-box;border:1px solid #B9B4A6}
+.cdot.on i{box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #B9542F}
+.ntile{position:relative;height:70px;border-radius:5px;outline:2px solid #B9542F;outline-offset:-2px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;padding:4px;box-sizing:border-box;cursor:grab;text-align:left}
+.ntile.sel{outline:3px solid #1F2430}
+.ngr.in .ntile{animation:dropin .3s ease-out both}
+.ngr.wait .ntile{opacity:0}
+.ntile small{font-size:9.5px;font-weight:700;background:rgba(255,255,255,.86);padding:0 4px;border-radius:3px;line-height:14px;color:#1F2430}
+.otile{height:70px;border-radius:5px;background:#E6E2D8}
+.prow{display:flex;align-items:center;gap:6px;min-height:48px;border-top:1px solid #EEEAE0}
+.rcap{min-height:20px}
+.prow.x3{display:none}
+.prow.x3.show{display:flex}
+.tscroll{overflow-x:auto}
+.tscroll>div{min-width:564px}
+.onbg .lab{color:#A84A27}
+.onbg .q6{color:#5C606B}
+.tchip{min-height:44px;padding:0 9px;border-radius:8px;border:1px solid #E6E2D8;font-size:12px;font-weight:600;white-space:nowrap}
+.tchip:hover{border-color:#B9542F;color:#B9542F}
+/* say */
+.mq{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.mqt{display:flex;gap:12px;width:max-content;animation:drift 90s linear infinite}
+.mqt.rev{animation-direction:reverse}
+.mq:hover .mqt,.mq:focus-within .mqt{animation-play-state:paused}
+.pill{display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 18px 0 12px;border-radius:999px;background:#16181E;border:1px solid rgba(255,255,255,.14);color:#FAFAF6;font-size:15px;white-space:nowrap;text-decoration:none;transition:border-color .2s}
+.pill:hover{border-color:#F28A66}
+.pill .rg{color:#F0A27F}
+/* rules */
+.rule{display:flex;gap:12px;padding:14px 0;border-top:1px solid #E6E2D8}
+.rule svg{flex:none;margin-top:1px;transition:color .2s}
+.rule:hover svg{color:#B9542F}
+.rule h3{font-size:15px;line-height:21px;font-weight:600}
+.rule p{font-size:14px;line-height:20px;color:#3A3F4D;margin-top:2px}
+.rng{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;margin:0;cursor:pointer}
+.rng::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:#E6E2D8}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#B9542F;border:3px solid #FFFFFF;box-shadow:0 0 0 1px #B9542F;margin-top:-11px}
+.rng::-moz-range-track{height:4px;border-radius:4px;background:#E6E2D8}
+.rng::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#B9542F;border:3px solid #FFFFFF}
+.nch{flex:1 1 0;min-width:0;min-height:44px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#55596A}
+.nch i{width:2px;height:8px;background:#B9B4A6}
+.nch.on{color:#B9542F}
+.nch.on i{background:#B9542F}
+.sl-l.a{animation:inl .25s ease-out both}.sl-l.b{animation:inl2 .25s ease-out both}
+.sl-r.a{animation:inr .25s ease-out both}.sl-r.b{animation:inr2 .25s ease-out both}
+/* offer */
+.orow{position:relative;display:block;padding:0 0 14px 44px;text-decoration:none;color:#FAFAF6}
+.orow .rg{position:absolute;left:0;top:0;width:28px;height:28px;font-size:11px;background:#1F2430;color:#F0A27F;transition:background .2s,color .2s,border-color .2s}
+.orow:hover .rg{background:#F28A66;border-color:#F28A66;color:#16181E}
+.orow .gk{position:absolute;left:20px;top:-4px;width:14px;height:14px;border-radius:50%;background:#2F7A55;color:#FFFFFF;display:flex;align-items:center;justify-content:center;transform:scale(.8)}
+.vtr{position:absolute;left:13px;top:6px;bottom:0;width:2px;background:rgba(255,255,255,.14)}
+.vtr b{position:absolute;left:0;top:0;right:0;bottom:0;background:#F28A66;transform-origin:top}
+.orow:last-of-type::before{content:"";position:absolute;left:8px;top:28px;bottom:0;width:12px;background:#1F2430}
+.oc.in .vtr b{animation:growy 1.6s ease-out both}
+.oc.in .gk{animation:fade .3s ease-out both}
+.oc.in .orow:nth-of-type(1) .gk{animation-delay:.3s}.oc.in .orow:nth-of-type(2) .gk{animation-delay:.7s}.oc.in .orow:nth-of-type(3) .gk{animation-delay:1.1s}.oc.in .orow:nth-of-type(4) .gk{animation-delay:1.5s}
+.oc.in .price{animation:pop .4s ease-out 1.5s both}
+.oc.wait .vtr b{transform:scaleY(0)}.oc.wait .gk,.oc.wait .price{opacity:0}
+.need{display:flex;gap:10px;font-size:14px;line-height:20px;padding:6px 0;color:#3A3F4D}
+.need b{font-weight:600;color:#1F2430}
+.need::before{content:"";flex:none;width:9px;height:4px;margin-top:6px;border-left:2px solid #1F2430;border-bottom:2px solid #1F2430;transform:rotate(-45deg)}
+.hit{padding:12px 0;margin:-12px 0}
+.fq{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease-out,visibility .22s;visibility:hidden}
+.fq.open{grid-template-rows:1fr;visibility:visible}
+.fq>*{overflow:hidden;min-height:0}
+.fqb{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;text-align:left;font-size:16px;font-weight:600;line-height:21px;padding:2px 0}
+.fqb:hover{color:#B9542F}
+.pm{position:relative;width:14px;height:14px;flex:none;transition:transform .22s}
+.pm::before,.pm::after{content:"";position:absolute;left:0;top:6px;width:14px;height:2px;background:currentColor;border-radius:2px}
+.pm::after{transform:rotate(90deg)}
+.pm.open{transform:rotate(45deg)}
+.fr{width:44px;min-height:44px;display:flex;align-items:center;flex:none;color:#B9542F;text-decoration:none}
+.fr:hover .rg{background:#B9542F;color:#FFFFFF;border-color:#B9542F}
+.qbox{background:#FFFFFF;border:1px solid #E6E2D8;border-radius:14px;padding:12px 16px 14px;text-align:center;font-size:15px;line-height:21px;color:#6B6F7A}
+.qbox i{display:block;font-style:normal;font-size:34px;line-height:26px;height:22px;color:#B9542F;font-weight:700}
+.ctr{position:relative;display:flex;justify-content:space-between;max-width:720px;margin:0 auto}
+.ctr a{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:44px;min-height:44px;font-size:12px;color:#8B909C;text-decoration:none;flex:1 1 0}
+.ctr .ring{width:32px;height:32px;font-size:12px;border-width:1.5px;background:#1F2430}
+.ctr .ring .tk{width:14px;height:14px}
+.ctr a:hover .ring{background:#F28A66;border-color:#F28A66;color:#16181E}
+.ctr.in .ring{border-color:#F28A66}
+.ctr.in .ring .tk{opacity:1;transform:none;transition-delay:.5s}
+.ctr.in a:nth-of-type(2) .tk{transition-delay:1.1s}.ctr.in a:nth-of-type(3) .tk{transition-delay:1.7s}.ctr.in a:nth-of-type(4) .tk{transition-delay:2.3s}
+.cfill{position:absolute;left:12%;top:15px;height:2px;background:#F28A66;width:0;transition:width 2.4s ease-out}
+.ctr.in .cfill{width:76%}
+.ftl{color:#8B909C;text-decoration:none;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
+.ftl:hover{color:#FAFAF6}
+@supports (animation-timeline: view()) {
+.rv{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 35%}
+.rv2{animation:rise linear both;animation-timeline:view();animation-range:entry 6% entry 41%}
+.rv3{animation:rise linear both;animation-timeline:view();animation-range:entry 12% entry 47%}
+.rv4{animation:rise linear both;animation-timeline:view();animation-range:entry 18% entry 53%}
+}
+@media (max-width:1010px){.mfirst{order:0}.brd{grid-template-columns:repeat(2,minmax(0,1fr))}.bttl{display:flex}.rlx{visibility:visible}.brd-x{display:none !important}.mgrid{right:8px !important}}
+@media (max-width:860px){
+.wbody{height:372px}
+.rcap{min-height:40px}
+.mgrid{grid-template-columns:repeat(3,10px) !important}
+.gt{width:10px;height:10px}
+}
+@media (max-width:700px){
+.only-lg{display:none !important}
+.only-sm{display:block !important}
+.w{padding:0 16px}
+.pan{padding:20px 16px;border-radius:16px}
+.map{height:452px}
+.rcap{min-height:60px}
+.wbody{height:512px}
+.chat{position:absolute;left:0;right:0;bottom:0;z-index:2;flex:none;border-right:0;border-top:1px solid rgba(255,255,255,.1);background:rgba(22,24,30,.94);max-height:150px;overflow:hidden;padding:10px 12px}
+.pane{padding:12px 12px 160px}
+[id]{scroll-margin-top:84px}
+.brd{grid-template-columns:minmax(0,1fr)}
+.trk{left:35px;right:auto;top:32px;width:2px;height:330px}
+.fill{left:35px;top:32px;width:2px;height:calc((var(--n) - 4) * 3.6px);transition:height 1.6s ease-in-out}
+.st{left:8px;right:8px;width:auto;top:calc(var(--n) * 3.6px + 4px);transform:none;flex-direction:row;align-items:center;text-align:left;gap:14px}
+.mgrid{left:12px !important;right:auto !important;top:auto !important;bottom:16px}
+.seg span span{display:none}
+.mz{width:100%}
+.mz .ph,.mz .ph:first-child{grid-column:auto;grid-row:auto;height:70px}
+.qc .thm{display:none !important}
+.xtra{display:none !important}
+.xtra.show{display:flex !important}
+.mqt{animation-duration:130s}
+.pill{font-size:13px;height:44px}
+.fqb{font-size:16px}
+.ctr a span.nm{display:none}
+.yah u{width:18px}
+}
+@media (prefers-reduced-motion: reduce){
+html{scroll-behavior:auto}
+*,*::before,*::after{animation:none !important;transition:none !important}
+.mz.w0 .ph,.qc.w0,.tls.wait .til,.ngr.wait .ntile,.oc.wait .gk,.oc.wait .price{opacity:1}
+.oc.wait .vtr b{transform:none}
+.mqt{flex-wrap:wrap;justify-content:center;width:auto}
+.mqt .dup{display:none}
+.mq{-webkit-mask-image:none;mask-image:none}
+}
+</style>
+</helmet>
+<div id="top" style="background: #F1EEE6; overflow-x: clip">
+
+<!-- TOP BAR -->
+<div class="dk" style="position: sticky; top: 0; z-index: 50; background: #1F2430; border-bottom: 1px solid rgba(255,255,255,.1)">
+<div class="w" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px">
+<a href="#top" style="text-decoration: none; font-weight: 600; font-size: 15px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap">The Assistant <span class="q8 only-lg" style="font-weight: 400; font-size: 13px">by Horizon Found</span></a>
+<div class="only-lg num" style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #C9CCD3"><span class="pdot"></span><span>Doors open <span class="{{dateClsD}}" style="color: #F0A27F; font-weight: 600">{{dateText}}</span></span><sc-if value="{{counting}}" hint-placeholder-val="{{true}}"><span style="display: inline-flex; gap: 10px; margin-left: 6px"><span><b style="color: #FAFAF6">{{cd.d}}</b> days</span><span><b style="color: #FAFAF6">{{cd.h}}</b> hrs</span><span><b style="color: #FAFAF6">{{cd.m}}</b> min</span><span><b class="{{sxCls}}" style="color: #FAFAF6; display: inline-block">{{cd.s}}</b> sec</span></span></sc-if></div>
+<a class="btn btn-s" href="#offer"><span>Get The Assistant</span></a>
+</div>
+<div class="only-sm num" style="height: 28px; line-height: 28px; text-align: center; font-size: 12px; color: #C9CCD3; border-top: 1px solid rgba(255,255,255,.1)">Doors open <span class="{{dateClsD}}" style="color: #F0A27F; font-weight: 600">{{dateText}}</span><sc-if value="{{counting}}" hint-placeholder-val="{{true}}"><span> &nbsp; <b style="color: #FAFAF6">{{cd.d}}</b> days <b style="color: #FAFAF6">{{cd.h}}</b> hrs</span></sc-if></div>
+</div>
+
+<!-- HERO -->
+<div class="dk" style="background: #1F2430; padding: 44px 0 40px">
+<div class="w">
+<div style="max-width: 900px; margin: 0 auto; text-align: center">
+<div class="lab lab-d" style="justify-content: center">The Assistant, by Horizon Found</div>
+<h1 style="font-size: clamp(34px, 4.2vw, 54px); line-height: 1.07; letter-spacing: -0.02em; font-weight: 600; margin-top: 12px; text-wrap: balance">One assistant for the whole job around your photos. <em>From the card to the post.</em></h1>
+<p style="margin: 16px auto 0; max-width: 800px; color: #D5D7DD">The Assistant is a helper that lives inside the Claude app on your own Mac. You talk to it in plain words, and it does the work around your photos: it backs up the card, keeps track of what is due, turns finished photos into a reel, a carousel and stories, and lines them up for Instagram.</p>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 24px; margin-top: 20px">
+<a class="btn" href="#offer">Get The Assistant</a>
+<a href="#run" style="font-size: 15px; font-weight: 600; color: #F0A27F; text-underline-offset: 4px; min-height: 44px; display: inline-flex; align-items: center">See one shoot go all the way through</a>
+</div>
+<p style="font-size: 14px; line-height: 20px; margin-top: 10px; color: #C9CCD3">Runs in the Claude desktop app, on your own Mac. One-time purchase.</p>
+</div>
+
+<p class="q8 only-sm" style="font-size: 13px; line-height: 19px; margin-top: 20px; text-align: center">Press any step to jump to it. No card today? Start at step 3 with a folder of finished photos.</p>
+<div id="map" class="map" style="margin-top: 28px" onMouseEnter="{{mapIn}}" onMouseLeave="{{mapOut}}">
+<div class="tiny" style="position: absolute; left: 18px; top: 14px">The whole system</div>
+<div class="q8 brd-x only-lg" style="position: absolute; right: 18px; top: 12px; font-size: 12px; line-height: 18px">Four steps. Start wherever you are today.</div>
+<div class="trk"></div>
+<div class="{{map.fillCls}}"></div>
+<!-- the card resting at the start of the line -->
+<div class="only-lg" style="position: absolute; left: 4%; top: 136px; transform: translateX(-50%); width: 20px; height: 26px; border-radius: 3px 7px 3px 3px; border: 1.5px solid rgba(255,255,255,.3); background: #16181E; box-sizing: border-box"></div>
+<!-- the second way in -->
+<div class="{{map.side}} only-lg" style="position: absolute; left: 62.5%; top: 10px; transform: translateX(-50%); width: 250px; text-align: center">
+<div style="display: flex; align-items: center; justify-content: center; gap: 8px"><span class="fd" style="display: inline-flex; border-radius: 4px"><svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="#F0A27F" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg></span><span style="font-size: 12px; line-height: 16px; color: #C9CCD3; text-align: left">No card today? Start at step 3 with a folder of finished photos.</span></div>
+<div style="width: 0; height: 10px; margin: 4px auto 0; border-left: 1.5px dashed rgba(240,162,127,.7)"></div>
+</div>
+<a class="st p1" href="#ch1"><span class="{{st.a}}">01<span class="tk ck"></span></span><span><b style="display: block; font-size: 16px; font-weight: 600; line-height: 22px">Back up a card</b><span class="cap" style="display: block">Copied, checked, sorted, named.</span></span></a>
+<a class="st p2" href="#ch2"><span class="{{st.b}}">02<span class="tk ck"></span></span><span><b style="display: block; font-size: 16px; font-weight: 600; line-height: 22px">My editing queue</b><span class="cap" style="display: block">Every shoot listed. Soonest due on top.</span></span></a>
+<a class="st p3" href="#ch3"><span class="{{st.c}}">03<span class="tk ck"></span></span><span><b style="display: block; font-size: 16px; font-weight: 600; line-height: 22px">Make posts</b><span class="cap" style="display: block">A reel, a carousel, stories, your words.</span></span></a>
+<a class="st p4" href="#ch4"><span class="{{st.d}}">04<span class="tk ck"></span></span><span><b style="display: block; font-size: 16px; font-weight: 600; line-height: 22px">My posting queue</b><span class="cap" style="display: block">Ready, in order, on your grid.</span></span></a>
+<!-- the shoot travelling the line -->
+<div class="{{map.tokCls}} only-lg" aria-hidden="true">
+<span class="lb">{{map.label}}</span>
+<sc-if value="{{map.s0}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 22px; height: 30px; border-radius: 3px 8px 3px 3px; background: #F28A66"></span></span></sc-if>
+<sc-if value="{{map.s1}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; transform: rotate(-8deg)"></span><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; margin-bottom: 4px"></span><span style="width: 24px; height: 18px; border-radius: 3px; background: #F28A66; transform: rotate(8deg)"></span></span></sc-if>
+<sc-if value="{{map.s2}}" hint-placeholder-val="{{false}}"><span class="shape fin"><span style="width: 58px; height: 28px; border-radius: 5px; background: #F28A66; display: flex; align-items: center; justify-content: flex-end; padding: 0 5px; box-sizing: border-box"><span style="width: 20px; height: 10px; border-radius: 5px; background: #16181E"></span></span></span></sc-if>
+<sc-if value="{{map.s3}}" hint-placeholder-val="{{true}}"><span class="shape fin"><span style="width: 18px; height: 32px; border-radius: 3px; background: #F28A66; display: flex; align-items: center; justify-content: center"><span style="border-left: 7px solid #16181E; border-top: 4px solid transparent; border-bottom: 4px solid transparent"></span></span><span style="width: 22px; height: 27px; border-radius: 3px; background: #F28A66; display: flex; align-items: flex-end; justify-content: center; gap: 2px; padding-bottom: 3px; box-sizing: border-box"><span style="width: 3px; height: 3px; border-radius: 50%; background: #16181E"></span><span style="width: 3px; height: 3px; border-radius: 50%; background: #16181E"></span></span><span style="width: 18px; height: 32px; border-radius: 3px; background: #F28A66; display: flex; align-items: center; justify-content: center"><span style="width: 10px; height: 2px; background: #16181E"></span></span></span></sc-if>
+</div>
+<!-- the grid at the end of the line -->
+<div class="mgrid" style="position: absolute; right: 2.6%; top: 126px; display: grid; grid-template-columns: repeat(3, 14px); gap: 3px" aria-hidden="true"><span class="{{map.g}}"></span><span class="{{map.g}}" style="transition-delay: .25s"></span><span class="{{map.g}}" style="transition-delay: .5s"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span><span class="gt"></span></div>
+<div class="q8 only-lg" style="position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 13px; line-height: 18px">Press any step to jump to it.</div>
+<div class="{{map.labCls}}" aria-hidden="true">{{map.label}}</div>
+</div>
+<div id="steps-row" class="brd" aria-label="The four steps: what you say and what you get back">
+<a class="bcol rv" href="#ch1">
+<span class="bttl"><span class="rg">01</span>Back up a card</span>
+<span class="bsay"><span class="tiny" style="display: block">You say</span><span class="bub">{{say.a.text}}<sc-if value="{{say.a.caret}}" hint-placeholder-val="{{false}}"><span class="car"></span></sc-if></span></span>
+<span class="bget"><span class="tiny">You get back</span><ul class="{{say.a.cls}}" style="margin-top: 2px"><li>Every file copied to your drive and checked against the card</li><li>The card sorted into shoots, named your way</li><li class="xtra">Six sneak peeks per shoot, tagged for Lightroom</li><li class="xtra">One report, and the line that says the card is safe to format</li></ul><span style="margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 600; color: #F0A27F">See step 1 &rarr;</span></span>
+</a>
+<a class="bcol rv2" href="#ch2">
+<span class="bttl"><span class="rg">02</span>My editing queue</span>
+<span class="bsay"><span class="tiny rlx" style="display: block">You say</span><span class="bub">{{say.b.text}}<sc-if value="{{say.b.caret}}" hint-placeholder-val="{{false}}"><span class="car"></span></sc-if></span></span>
+<span class="bget"><span class="tiny rlx">You get back</span><ul class="{{say.b.cls}}" style="margin-top: 2px"><li>Every shoot you have backed up, in one list</li><li>Client shoots with their due dates, soonest on top</li><li class="xtra">Your existing list added from a screenshot of your notes</li></ul><span style="margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 600; color: #F0A27F">See step 2 &rarr;</span></span>
+</a>
+<a class="bcol rv3" href="#ch3">
+<span class="bttl"><span class="rg">03</span>Make posts from a shoot</span>
+<span class="bsay"><span class="tiny rlx" style="display: block">You say</span><span class="bub">{{say.c.text}}<sc-if value="{{say.c.caret}}" hint-placeholder-val="{{false}}"><span class="car"></span></sc-if></span></span>
+<span class="bget"><span class="tiny rlx">You get back</span><ul class="{{say.c.cls}}" style="margin-top: 2px"><li>A reel cut on the beat of your song, as a CapCut project you can edit</li><li>A carousel and stories laid out with your photos, text, fonts and colours</li><li class="xtra">Your own words shaped into a caption, with hooks for a reel</li></ul><span style="margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 600; color: #F0A27F">See step 3 &rarr;</span></span>
+</a>
+<a class="bcol rv4" href="#ch4">
+<span class="bttl"><span class="rg">04</span>My posting queue</span>
+<span class="bsay"><span class="tiny rlx" style="display: block">You say</span><span class="bub">{{say.d.text}}<sc-if value="{{say.d.caret}}" hint-placeholder-val="{{false}}"><span class="car"></span></sc-if></span></span>
+<span class="bget"><span class="tiny rlx">You get back</span><ul class="{{say.d.cls}}" style="margin-top: 2px"><li>What is ready, in order, at the rhythm you chose</li><li>How many weeks of posts you have</li><li class="xtra">Your Instagram grid with the new posts in it</li><li class="xtra">Copy caption in one click on posting day</li></ul><span style="margin-top: auto; padding-top: 8px; font-size: 13px; font-weight: 600; color: #F0A27F">See step 4 &rarr;</span></span>
+</a>
+</div>
+</div>
+</div>
+
+<!-- ONE SHOOT, START TO FINISH -->
+<div id="run" class="dk" style="background: #1F2430; padding: 28px 0 44px; border-top: 1px solid rgba(255,255,255,.1)">
+<div class="w" style="max-width: 1144px">
+<div class="lab lab-d rv">One shoot, start to finish</div>
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 32px; margin-top: 6px">
+<h2 class="h2 rv">Watch one shoot go <em>all the way through.</em></h2>
+<p class="rv2" style="color: #C9CCD3; flex: 1 1 320px; font-size: 15px; line-height: 22px">A family session on a Saturday. Here is everything that happens to it, and the few things you do.</p>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; margin-top: 14px">
+<button class="{{seg.a.cls}}" onClick="{{seg.a.go}}" aria-label="Scene 1, back up"><i><b style="height: 3px; {{seg.a.fill}}"></b></i><span>01<span> Back up</span></span></button>
+<button class="{{seg.b.cls}}" onClick="{{seg.b.go}}" aria-label="Scene 2, queue"><i><b style="height: 3px; {{seg.b.fill}}"></b></i><span>02<span> Queue</span></span></button>
+<button class="{{seg.c.cls}}" onClick="{{seg.c.go}}" aria-label="Scene 3, posts"><i><b style="height: 3px; {{seg.c.fill}}"></b></i><span>03<span> Posts</span></span></button>
+<button class="{{seg.d.cls}}" onClick="{{seg.d.go}}" aria-label="Scene 4, posting"><i><b style="height: 3px; {{seg.d.fill}}"></b></i><span>04<span> Posting</span></span></button>
+<button onClick="{{runToggle}}" aria-label="{{runToggleLabel}}" style="width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(255,255,255,.2); box-sizing: border-box"><sc-if value="{{runPlaying}}" hint-placeholder-val="{{true}}"><span style="display: flex; gap: 4px"><span style="width: 3px; height: 12px; background: #FAFAF6"></span><span style="width: 3px; height: 12px; background: #FAFAF6"></span></span></sc-if><sc-if value="{{runPaused}}" hint-placeholder-val="{{false}}"><span style="border-left: 11px solid #FAFAF6; border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px"></span></sc-if></button>
+</div>
+<div id="run-win" class="win" style="margin-top: 8px">
+<div style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,.1)"><span style="width: 9px; height: 9px; border-radius: 50%; background: #3A3F4D"></span><span style="width: 9px; height: 9px; border-radius: 50%; background: #3A3F4D"></span><span style="width: 9px; height: 9px; border-radius: 50%; background: #3A3F4D"></span><span class="q8" style="font-size: 12px; margin-left: 10px">The Assistant</span></div>
+<div class="wbody">
+<div class="chat">
+<sc-if value="{{r.chatA}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px">
+<sc-if value="{{r.a1}}" hint-placeholder-val="{{false}}"><div class="me pop">backup now</div></sc-if>
+<sc-if value="{{r.a2}}" hint-placeholder-val="{{false}}"><div class="as pop">Found your card. Same as usual?</div></sc-if>
+<sc-if value="{{r.a3}}" hint-placeholder-val="{{false}}"><div class="me pop">yes</div></sc-if>
+<sc-if value="{{r.a4}}" hint-placeholder-val="{{false}}"><div class="as pop">Starting now. You can walk away. I'll have the report ready when you're back.</div></sc-if>
+<sc-if value="{{r.aDots}}" hint-placeholder-val="{{false}}"><div class="as"><span class="td"><b></b><b></b><b></b></span></div></sc-if>
+</div></sc-if>
+<sc-if value="{{r.chatB}}" hint-placeholder-val="{{true}}"><div style="display: flex; flex-direction: column; gap: 8px">
+<sc-if value="{{r.c1}}" hint-placeholder-val="{{true}}"><div class="me pop">I'm done with the Garcia shoot</div></sc-if>
+<sc-if value="{{r.c2}}" hint-placeholder-val="{{true}}"><div class="as pop">Nice. A reel, a carousel and stories?</div></sc-if>
+<sc-if value="{{r.c3}}" hint-placeholder-val="{{true}}"><div class="me pop">yes, all three</div></sc-if>
+<sc-if value="{{r.cDots}}" hint-placeholder-val="{{false}}"><div class="as"><span class="td"><b></b><b></b><b></b></span></div></sc-if>
+</div></sc-if>
+</div>
+<div class="pane">
+<!-- scene 1 -->
+<sc-if value="{{r.s1}}" hint-placeholder-val="{{false}}"><div>
+<sc-if value="{{r.idle}}" hint-placeholder-val="{{false}}"><div class="q8 fin" style="padding: 8px 4px">A memory card is in. Nothing starts until you say so.</div></sc-if>
+<sc-if value="{{r.prog}}" hint-placeholder-val="{{false}}"><div class="fin" style="padding: 8px 4px"><div style="display: flex; justify-content: space-between; color: #C9CCD3"><span>Copying and checking every file</span><span class="num">{{r.n}} of 3,931</span></div><div style="height: 6px; border-radius: 6px; background: rgba(255,255,255,.12); margin-top: 10px; overflow: hidden"><div style="height: 6px; background: #F28A66; {{r.progW}}"></div></div></div></sc-if>
+<sc-if value="{{r.rep}}" hint-placeholder-val="{{false}}"><div class="pc pop"><div class="tiny" style="color: #6B6F7A">Your report</div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 16px; line-height: 22px; font-weight: 600"><span class="ck" style="flex: none; {{r.t1}}"></span><span>All 3,931 files have been safely backed up and verified.</span></div><div style="display: flex; gap: 10px; margin-top: 8px; font-size: 14px; line-height: 20px"><span class="ck" style="flex: none; {{r.t2}}"></span><span>The card is safe to format when you're ready.</span></div><div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap"><span class="tg">3 shoots found</span><span class="tg">Six sneak peeks each</span></div><div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 26px"><sc-if value="{{r.f1}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Garcia family</b><span class="q6">212 photos</span></span></sc-if><sc-if value="{{r.f2}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Park minis</b><span class="q6">1,480 photos</span></span></sc-if><sc-if value="{{r.f3}}" hint-placeholder-val="{{false}}"><span class="pop num" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid #E6E2D8; border-radius: 7px; background: #FFFFFF; font-size: 12px; white-space: nowrap"><svg width="14" height="11" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg><b style="font-weight: 600">Harbor at dusk</b><span class="q6">2,237 photos</span></span></sc-if></div></div></sc-if>
+</div></sc-if>
+<!-- scene 2 -->
+<sc-if value="{{r.s2}}" hint-placeholder-val="{{false}}"><div>
+<sc-if value="{{r.blk}}" hint-placeholder-val="{{false}}"><div class="pc fin" style="position: relative"><div class="tiny" style="color: #6B6F7A">Shoot 1 of 3</div><div style="display: flex; gap: 12px; margin-top: 8px; align-items: flex-start"><div style="display: grid; grid-template-columns: repeat(3, 34px); gap: 3px; flex: none"><span class="ph" style="height: 34px; background: #DCD7CB"></span><span class="ph" style="height: 34px; background: #CFC9BB"></span><span class="ph" style="height: 34px; background: #E3DED3"></span></div><div style="flex: 1 1 auto; min-width: 0"><div style="border: 1px dashed #B9B4A6; border-radius: 8px; padding: 6px 10px; font-weight: 600; font-size: 14px; background: #FFFFFF">Garcia family</div><div style="position: relative; display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 8px; margin-top: 8px; font-weight: 600; color: #FFFFFF; {{r.btn}}">Add to my editing queue<sc-if value="{{r.press}}" hint-placeholder-val="{{false}}"><span class="cur fin" style="right: 14px; top: 16px"></span></sc-if></div><sc-if value="{{r.cal}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 8px; max-width: 250px"><div style="font-size: 11px; font-weight: 600; color: #6B6F7A; margin-bottom: 4px">November</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px"><span class="cday">15</span><span class="cday">16</span><span class="cday">17</span><span class="cday">18</span><span class="cday">19</span><span class="{{r.pk}}">20</span><span class="cday">21</span></div></div></sc-if><sc-if value="{{r.conf}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 8px; color: #2F7A55; font-weight: 600"><span class="ck"></span> In your editing queue, due Fri, Nov 20.</div></sc-if></div></div></div></sc-if>
+<sc-if value="{{r.queue}}" hint-placeholder-val="{{false}}"><div class="pc pop"><div style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 15px; font-weight: 600">Editing queue</b><span class="q6">3 shoots to edit</span></div><div class="pop" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 10px; background: #FFFFFF; animation-delay: .3s"><b style="font-weight: 600">Garcia family</b><span class="tg warm">due in 6 days</span></div><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 6px; background: #FFFFFF"><b style="font-weight: 600">Lena and Marcus</b><span class="tg">due in 9 days</span></div><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #E6E2D8; border-radius: 8px; padding: 9px 12px; margin-top: 6px; background: #FFFFFF"><b style="font-weight: 600">Harbor minis</b><span class="tg">due in 2 weeks</span></div></div></sc-if>
+</div></sc-if>
+<!-- scene 3 -->
+<sc-if value="{{r.s3}}" hint-placeholder-val="{{false}}"><div class="pc fin"><div style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 15px; font-weight: 600">Garcia family, post kit</b><span class="q6">From your finished photos</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px">
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Reel</b><div class="ph" style="height: 84px; background: #DCD7CB; margin-top: 6px"></div><div style="display: flex; gap: 3px; margin-top: 6px"><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.a}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.b}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.c}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.d}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.e}}"></span><span style="flex: 1 1 0; height: 4px; border-radius: 2px; {{r.bt.f}}"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k1}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> Made. Open in CapCut.</span></sc-if></div></div>
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Carousel</b><div class="ph" style="height: 84px; background: #CFC9BB; margin-top: 6px"></div><div style="display: flex; gap: 4px; justify-content: center; margin-top: 6px; height: 8px; align-items: center"><span style="width: 5px; height: 5px; border-radius: 50%; background: #B9542F"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span><span style="width: 5px; height: 5px; border-radius: 50%; background: #D8D3C6"></span></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k2}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 7 slides saved.</span></sc-if></div></div>
+<div style="background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 10px; padding: 10px"><b style="font-weight: 600">Stories</b><div class="ph" style="height: 84px; background: #E3DED3; margin-top: 6px"></div><div style="height: 8px; margin-top: 6px"></div><div class="krow" style="margin-top: 6px"><sc-if value="{{r.k3}}" hint-placeholder-val="{{false}}"><span class="pop"><span class="ck"></span> 3 saved.</span></sc-if></div></div>
+</div></div></sc-if>
+<!-- scene 4 -->
+<sc-if value="{{r.s4}}" hint-placeholder-val="{{true}}"><div class="pc fin"><b style="font-size: 17px; line-height: 22px; font-weight: 600">3 posts ready</b>
+<div style="display: flex; gap: 14px; margin-top: 10px; align-items: flex-start; flex-wrap: wrap">
+<div style="flex: 1 1 220px; min-width: 0">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid #E6E2D8; padding: 7px 0"><span><b style="font-weight: 600">Garcia family reel</b><span class="q6"> &middot; Tue</span></span><span style="position: relative; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 600; white-space: nowrap; {{r.copyBtn}}"><sc-if value="{{r.copied}}" hint-placeholder-val="{{true}}"><span><span class="ck"></span> Copied</span></sc-if><sc-if value="{{r.notCopied}}" hint-placeholder-val="{{false}}"><span>Copy caption</span></sc-if><sc-if value="{{r.press4}}" hint-placeholder-val="{{false}}"><span class="cur fin" style="right: 8px; top: 14px"></span></sc-if></span></div>
+<div style="border-top: 1px solid #E6E2D8; padding: 9px 0"><b style="font-weight: 600">Garcia family carousel</b><span class="q6"> &middot; Fri</span></div>
+<div style="border-top: 1px solid #E6E2D8; padding: 9px 0"><b style="font-weight: 600">Harbor minis reel</b><span class="q6"> &middot; next Tue</span></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, 44px); gap: 3px; flex: none"><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g1}}"></span><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g2}}"></span><span style="height: 44px; border-radius: 4px; box-sizing: border-box; {{r.g3}}"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span><span style="height: 44px; border-radius: 4px; background: #E6E2D8"></span></div>
+</div></div></sc-if>
+</div>
+</div>
+<sc-if value="{{r.end}}" hint-placeholder-val="{{true}}"><div class="endc"><div style="font-size: clamp(22px, 2.6vw, 30px); line-height: 1.2; font-weight: 600; letter-spacing: -0.01em">Card to grid. <em>A few words and a few presses.</em></div><button class="btn" onClick="{{runReplay}}">{{runEndLabel}}</button></div></sc-if>
+</div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px; margin-top: 10px; font-size: 14px; line-height: 20px">
+<div class="rcap" style="font-weight: 600; flex: 1 1 100%">
+<sc-if value="{{r.s1}}" hint-placeholder-val="{{false}}"><span class="fin">You said "backup now" and left the room.</span></sc-if>
+<sc-if value="{{r.s2}}" hint-placeholder-val="{{false}}"><span class="fin">One press on the report. Now you know what is due.</span></sc-if>
+<sc-if value="{{r.s3}}" hint-placeholder-val="{{false}}"><span class="fin">Your finished photos became three things to post.</span></sc-if>
+<sc-if value="{{r.s4}}" hint-placeholder-val="{{true}}"><span class="fin">You post it yourself, when you are ready. It never posts for you.</span></sc-if>
+</div>
+<div class="q8" style="font-size: 13px; flex: 1 1 100%">The backup numbers are from a real card.</div>
+</div>
+</div>
+</div>
+
+<!-- 01 BACK UP A CARD -->
+<div id="ch1" class="sec" style="padding-top: 20px">
+<div class="w"><div class="pan"><div class="split">
+<div class="tx">
+<div class="yah" aria-hidden="true"><i class="a"></i><span>01 Back up a card</span><u></u><i></i><u></u><i></i><u></u><i></i></div>
+<h2 class="h2 rv">Card in. <em>Come back to a report.</em></h2>
+<p class="rv2" style="margin-top: 10px">Say "backup now" and walk away. Your assistant copies every file to your drive, reads each one back, and checks it against the card. Then it does the filing you used to do by hand.</p>
+<ul style="margin-top: 10px">
+<li class="li">Splits one card into separate shoots by the gaps in time.</li>
+<li class="li">Names the folders your way. The camera's own file name stays inside the new one.</li>
+<li class="li">Picks six sneak peeks per shoot and tags them "sneak peek" so they filter in Lightroom.</li>
+<li class="li">Backs up video clips too, kept apart from the photos.</li>
+<li class="li">Makes a second copy on a second drive, if you want one. Checked too.</li>
+<li class="li">Knows a card it has already backed up. Two cards from one day get one report.</li>
+</ul>
+<p class="yours"><b>Stays yours:</b> when it starts, which drive, what each shoot is called, which photos are the sneak peeks, and formatting the card.</p>
+</div>
+<div class="md">
+<div id="ch1-mod" class="mod" style="position: relative">
+<sc-if value="{{c1.fly}}" hint-placeholder-val="{{false}}"><span class="flyd only-lg" aria-hidden="true"></span></sc-if>
+<div style="display: flex; gap: 10px; font-size: 17px; line-height: 23px; font-weight: 600"><span class="ck" style="color: #2F7A55"></span><span>All 3,931 files have been safely backed up and verified.</span></div>
+<p class="q6" style="margin-top: 4px">The card is safe to format when you're ready.</p>
+<div class="num" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px"><span class="chip"><b>{{c1.files}}</b><span class="q6">files</span></span><span class="chip"><b>{{c1.gb}} GB</b><span class="q6">copied</span></span><span class="chip"><b>{{c1.shoots}}</b><span class="q6">shoots</span></span><span class="chip"><b>{{c1.min}} min</b><span class="q6">to copy and check</span></span></div>
+<div role="tablist" aria-label="Shoots on the card" style="display: flex; flex-wrap: wrap; gap: 0 4px; border-bottom: 1px solid #E6E2D8; margin-top: 8px">
+<button role="tab" aria-selected="{{t.a.sel}}" class="{{t.a.cls}}" onClick="{{t.a.go}}">{{t.a.label}}</button>
+<button role="tab" aria-selected="{{t.b.sel}}" class="{{t.b.cls}}" onClick="{{t.b.go}}">{{t.b.label}}</button>
+<button role="tab" aria-selected="{{t.c.sel}}" class="{{t.c.cls}}" onClick="{{t.c.go}}">{{t.c.label}}</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 14px 16px; margin-top: 12px; align-items: flex-start">
+<div class="{{c1.mzCls}}"><sc-for list="{{mz}}" as="m" hint-placeholder-count="6"><span class="ph" style="position: relative; {{m.bg}}"><span class="spk">sneak peek</span></span></sc-for></div>
+<div style="flex: 1 1 260px; min-width: 0">
+<div class="q6 num">{{c1.count}}</div>
+<div style="display: flex; gap: 6px; margin-top: 4px"><input class="inp" style="flex: 1 1 auto" type="text" maxlength="40" value="{{c1.name}}" onChange="{{c1.onName}}" onKeyDown="{{c1.onKey}}" aria-label="The name of this shoot" /><button class="sb" onClick="{{c1.rename}}">Rename</button></div>
+<div style="min-height: 20px; margin-top: 2px; font-weight: 600"><sc-if value="{{c1.renaming}}" hint-placeholder-val="{{false}}"><span class="q6">Renaming...</span></sc-if><sc-if value="{{c1.renamed}}" hint-placeholder-val="{{false}}"><span class="fin" style="color: #2F7A55"><span class="ck"></span> Done. Folder and photos renamed.</span></sc-if></div>
+<p style="margin-top: 2px; color: #3A3F4D">I pulled six to get things rolling. Not feeling them? Just say what you'd rather see.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px"><button class="sb" onClick="{{c1.again}}">Pick again</button><button class="sb" onClick="{{c1.more}}">Show me more</button><button class="sb" onClick="{{c1.toggleFolder}}" aria-expanded="{{c1.folderExp}}">Open photo folder</button></div>
+<div style="margin-top: 6px">
+<sc-if value="{{c1.showAdd}}" hint-placeholder-val="{{true}}"><button class="sb co" onClick="{{c1.openCal}}">Add to my editing queue</button></sc-if>
+<sc-if value="{{c1.calOpen}}" hint-placeholder-val="{{false}}"><div class="pop" style="border: 1px solid #E6E2D8; border-radius: 10px; padding: 8px"><div style="font-weight: 600; margin-bottom: 4px">When is it due? November</div><div class="days"><sc-for list="{{days1}}" as="d" hint-placeholder-count="14"><button class="day" onClick="{{d.pick}}" aria-label="{{d.aria}}">{{d.n}}</button></sc-for></div></div></sc-if>
+<sc-if value="{{c1.queued}}" hint-placeholder-val="{{false}}"><div class="pop" style="display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; min-height: 44px"><span style="color: #2F7A55; font-weight: 600"><span class="ck"></span> In your editing queue, due {{c1.dueText}}</span><button class="lk" onClick="{{c1.openCal}}">Change the date</button></div></sc-if>
+</div>
+</div>
+</div>
+<sc-if value="{{c1.folderOpen}}" hint-placeholder-val="{{false}}"><div class="pop" style="margin-top: 10px; border: 1px solid #E6E2D8; border-radius: 10px; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #F6F4EE; font-weight: 600; overflow-wrap: anywhere"><svg width="16" height="13" viewBox="0 0 20 16" fill="none" stroke="#B9542F" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M1 3a1.5 1.5 0 0 1 1.5-1.5h4l2 2.5h9A1.5 1.5 0 0 1 19 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 1 13.5z"/></svg>{{c1.folderName}}</div>
+<div class="num" style="padding: 6px 12px 8px 36px; color: #3A3F4D; overflow-wrap: anywhere"><div>{{c1.f1}}</div><div>{{c1.f2}}</div><div>{{c1.f3}}</div></div>
+<div class="q6" style="padding: 0 12px 8px">Your name first. The camera's name kept at the end.</div>
+</div></sc-if>
+</div>
+<p class="hint">Try it: rename the shoot, then open the folder.</p>
+</div>
+</div></div></div>
+</div>
+
+<!-- 02 MY EDITING QUEUE -->
+<div id="ch2" class="sec">
+<div class="w"><div class="pan"><div class="split">
+<div class="tx">
+<div class="yah" aria-hidden="true"><i class="d"></i><u></u><i class="a"></i><span>02 My editing queue</span><u></u><i></i><u></u><i></i></div>
+<h2 class="h2 rv">Know what is due <em>before the client asks.</em></h2>
+<p class="rv2" style="margin-top: 10px">Every shoot you back up lands in your list of shoots. One button on the report puts a client shoot in your queue with its due date. The soonest due date is always on top.</p>
+<ul style="margin-top: 10px">
+<li class="li">Keeps every backed-up shoot in one place, with previews and a button that opens its folder.</li>
+<li class="li">Takes the list you already keep. Send a screenshot of your notes, or type the names, and they go in as they are. Dates are optional.</li>
+<li class="li">Moves a shoot down to your finished shoots when you tick it. Nothing is deleted.</li>
+<li class="li">Says what is due when you ask: "what's in my queue".</li>
+</ul>
+<p class="yours"><b>Stays yours:</b> the editing, all of it. Which shoots are client work and which are just for you. Every due date.</p>
+</div>
+<div class="md mfirst">
+<div id="ch2-mod" class="mod">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><b style="font-size: 16px; font-weight: 600">Editing queue</b><span class="q6 num">{{q2.count}}</span></div>
+<p class="q6" style="margin-top: 2px">The soonest due date is always on top. Drag a shoot up or down, or use its arrows, to give it a new due date.</p>
+<div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px">
+<sc-for list="{{qs}}" as="c" hint-placeholder-count="4"><div class="{{c.cls}}" draggable="true" onDragStart="{{c.dragStart}}" onDragOver="{{c.dragOver}}" onDrop="{{c.drop}}">
+<button class="cb" onClick="{{c.tick}}" aria-label="{{c.aria}}"><i><span class="ck"></span></i></button>
+<sc-if value="{{c.thumbs}}" hint-placeholder-val="{{true}}"><span class="thm" style="display: flex; gap: 3px; flex: none"><span class="ph" style="width: 30px; height: 30px; background: #DCD7CB"></span><span class="ph" style="width: 30px; height: 30px; background: #CFC9BB"></span><span class="ph" style="width: 30px; height: 30px; background: #E3DED3"></span></span></sc-if>
+<span style="flex: 1 1 110px; min-width: 0"><b style="display: block; font-weight: 600; font-size: 14px; overflow-wrap: anywhere">{{c.name}}</b><span class="q6 num" style="display: block; font-size: 12px; line-height: 16px">{{c.meta}}</span></span>
+<sc-if value="{{c.hasTag}}" hint-placeholder-val="{{true}}"><span class="{{c.tagCls}}">{{c.tag}}</span></sc-if>
+<sc-if value="{{c.noDate}}" hint-placeholder-val="{{false}}"><button class="lk" onClick="{{c.setDate}}">Set a due date</button></sc-if>
+<span style="display: flex; flex: none"><button class="arr" onClick="{{c.up}}" aria-label="{{c.upAria}}"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 12V2M2.5 6.5L7 2l4.5 4.5"/></svg></button><button class="arr" onClick="{{c.down}}" aria-label="{{c.downAria}}"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v10M2.5 7.5L7 12l4.5-4.5"/></svg></button></span>
+<sc-if value="{{c.prompt}}" hint-placeholder-val="{{false}}"><span class="pop" style="flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 0 8px 6px 12px; font-weight: 600; color: #B9542F">{{c.promptText}}<button class="sb" onClick="{{c.keep}}">Keep</button><button class="sb" onClick="{{c.setDate}}">Pick a date</button></span></sc-if>
+</div></sc-for>
+</div>
+<div style="margin-top: 8px">
+<sc-if value="{{q2.calOpen}}" hint-placeholder-val="{{false}}"><div class="pop" style="border: 1px solid #E6E2D8; border-radius: 10px; padding: 8px; max-width: 340px"><div style="font-weight: 600; margin-bottom: 4px">{{q2.calTitle}}</div><div class="days"><sc-for list="{{days2}}" as="d" hint-placeholder-count="14"><button class="day" onClick="{{d.pick}}" aria-label="{{d.aria}}">{{d.n}}</button></sc-for></div></div></sc-if>
+<sc-if value="{{q2.showAddBtn}}" hint-placeholder-val="{{true}}"><div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px"><button class="sb" onClick="{{q2.openAdd}}">Add a shoot</button><sc-if value="{{q2.hasMsg}}" hint-placeholder-val="{{false}}"><span class="fin" style="color: #2F7A55; font-weight: 600"><span class="ck"></span> {{q2.addMsg}}</span></sc-if></div></sc-if>
+<sc-if value="{{q2.addOpen}}" hint-placeholder-val="{{false}}"><div class="pop" style="display: flex; flex-wrap: wrap; gap: 6px"><input class="inp" style="flex: 2 1 150px" type="text" maxlength="30" placeholder="Shoot or client name" aria-label="Shoot or client name" value="{{q2.addName}}" onChange="{{q2.onAddName}}" onKeyDown="{{q2.addKey}}" /><input class="inp" style="flex: 1 1 130px; font-weight: 500" type="date" min="2026-11-15" aria-label="Due date, optional" value="{{q2.addDate}}" onChange="{{q2.onAddDate}}" /><button class="sb co" onClick="{{q2.add}}">Add to the queue</button></div></sc-if>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #EEEAE0; min-height: 44px"><b class="q6 num" style="font-weight: 600">{{q2.finCount}}</b><sc-for list="{{fins}}" as="f" hint-placeholder-count="0"><button class="sb gn pop" onClick="{{f.back}}" aria-label="{{f.aria}}"><span class="ck"></span> {{f.name}}</button></sc-for><sc-if value="{{q2.hasFin}}" hint-placeholder-val="{{false}}"><a href="#ch3" class="lk fin">Finished. Want a reel from it? &rarr;</a></sc-if></div>
+</div>
+<p class="hint">Try it: tick a shoot, or add one of your own.</p>
+</div>
+</div></div></div>
+</div>
+
+<!-- 03 MAKE POSTS FROM A SHOOT -->
+<div id="ch3" class="sec">
+<div class="w"><div class="pan"><div class="split">
+<div class="tx">
+<div class="yah" aria-hidden="true"><i class="d"></i><u></u><i class="d"></i><u></u><i class="a"></i><span>03 Make posts from a shoot</span><u></u><i></i></div>
+<h2 class="h2 rv">One folder of finished photos. <em>A reel, a carousel, stories.</em></h2>
+<p class="rv2" style="margin-top: 10px">Point your assistant at a folder of finished photos. No card needed. It makes its own copies, leaves your originals where they are, and opens a post kit for that shoot. Work through it one piece at a time.</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px 20px; margin-top: 14px; font-size: 13.5px; line-height: 19px; color: #3A3F4D">
+<div><h3 style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #1F2430"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="1" width="9" height="14" rx="2"/><path d="M6.8 5.6v4.8L10.4 8z"/></svg>Reel</h3><p style="margin-top: 3px">It picks and orders photos for variety and flow. You drag them into the order you want, choose a song from your computer and a pace. It writes a CapCut project with hard cuts on the beat. You finish the look in CapCut.</p></div>
+<div><h3 style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #1F2430"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H7l-3 3v-3h-.5A1.5 1.5 0 0 1 2 9.500z"/></svg>Talking reel</h3><p style="margin-top: 3px">Record yourself talking. It trims the video like an editor would, without adding a word, and writes the CapCut project.</p></div>
+<div><h3 style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #1F2430"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="3" width="9" height="11" rx="1.5"/><path d="M5.500 1.500h7.500A1.5 1.5 0 0 1 14.5 3v9"/></svg>Carousel and stories</h3><p style="margin-top: 3px">Lay out slides inside the Assistant with your photos, your text, your fonts and your colours. Saved at Instagram's sizes, up to 20 slides.</p></div>
+<div><h3 style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #1F2430"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2l3 3-8.500 8.500H2.500v-3z"/></svg>Your words</h3><p style="margin-top: 3px">It asks a few questions about the shoot and shapes what you said into a caption, the way an editor would. For a reel you also get a set of hooks to choose from. It only goes as deep as you do.</p></div>
+</div>
+<p class="yours"><b>Stays yours:</b> which photos are in, the order, the song, the finished look, every idea and every detail in the caption.</p>
+<p class="proof"><span class="ck"></span><span>Every cut sits on a whole beat of your song.</span></p>
+</div>
+<div class="md">
+<div id="ch3-a" class="mod">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px"><b style="font-size: 15px; font-weight: 600">Your reel</b><div role="group" aria-label="Pace" style="display: flex; flex-wrap: wrap; gap: 4px"><button class="{{p.a.cls}}" aria-pressed="{{p.a.sel}}" onClick="{{p.a.go}}">On every beat</button><button class="{{p.b.cls}}" aria-pressed="{{p.b.sel}}" onClick="{{p.b.go}}">A little of everything</button><button class="{{p.c.cls}}" aria-pressed="{{p.c.sel}}" onClick="{{p.c.go}}">Calm</button><button class="{{p.d.cls}}" aria-pressed="{{p.d.sel}}" onClick="{{p.d.go}}">Build</button></div></div>
+<div class="tscroll" style="margin-top: 8px"><div>
+<div class="{{a3.tlsCls}}" style="position: relative; height: 118px; overflow: hidden">
+<sc-for list="{{tiles}}" as="tl" hint-placeholder-count="6"><button class="{{tl.cls}}" style="border: 0; {{tl.style}}" draggable="true" onClick="{{tl.cycle}}" onDragStart="{{tl.dragStart}}" onDragOver="{{tl.dragOver}}" onDrop="{{tl.drop}}" aria-label="{{tl.aria}}"><small>{{tl.num}}</small><sc-if value="{{tl.hasMark}}" hint-placeholder-val="{{false}}"><small class="{{tl.markCls}}">{{tl.mark}}</small></sc-if></button></sc-for>
+<sc-if value="{{a3.more}}" hint-placeholder-val="{{false}}"><span class="fin" style="position: absolute; right: 0; top: 0; height: 92px; display: flex; align-items: center; padding: 0 6px; background: rgba(255,255,255,.88); font-size: 11px; font-weight: 600; color: #55596A">continues</span></sc-if>
+</div>
+<div style="position: relative; height: 26px; margin-top: -26px; border-bottom: 1px solid #D8D3C6; pointer-events: none">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 26px; display: flex; align-items: flex-end; gap: 2px; opacity: .5" aria-hidden="true"><sc-for list="{{waves}}" as="wv" hint-placeholder-count="40"><span style="flex: 1 1 0; background: #D8D3C6; border-radius: 1px; {{wv.h}}"></span></sc-for></div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 26px; display: flex" aria-hidden="true"><sc-for list="{{beats}}" as="bt" hint-placeholder-count="12"><span class="{{bt.cls}}"><i></i></span></sc-for></div>
+<sc-if value="{{a3.playing}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: -92px; width: 2px; height: 118px; background: #1F2430; {{a3.head}}" aria-hidden="true"></span></sc-if>
+</div>
+</div></div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px"><button class="sb co" onClick="{{a3.play}}"><span style="border-left: 9px solid #FFFFFF; border-top: 6px solid transparent; border-bottom: 6px solid transparent"></span>Play</button><sc-if value="{{a3.status}}" hint-placeholder-val="{{false}}"><span class="fin" style="color: #2F7A55; font-weight: 600"><span class="ck"></span> Every cut on a beat.</span></sc-if><span class="q6" style="flex: 1 1 200px">Press a photo for Normal, Longer or Quicker. Hard cuts. No effects. You finish it in CapCut.</span></div>
+</div>
+<div class="mod" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-start">
+<div style="flex: none"><b style="display: block; font-size: 15px; font-weight: 600; margin-bottom: 6px">Slide 1 of 7</b>
+<div style="position: relative; width: 168px; height: 210px; border: 1px solid #E6E2D8; overflow: hidden; {{b3.canvas}}"><span class="ph" style="position: absolute; border-radius: 0; background: #746E62; transition: left .25s ease-out, top .25s ease-out, right .25s ease-out, bottom .25s ease-out; {{b3.photo}}"></span><span style="position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; overflow-wrap: anywhere; transition: left .25s ease-out, top .25s ease-out; {{b3.text}}">{{b3.textVal}}</span></div></div>
+<div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<div role="group" aria-label="Layout" style="display: flex; flex-wrap: wrap; gap: 4px"><button class="{{lay.a.cls}}" onClick="{{lay.a.go}}">Fill slide</button><button class="{{lay.b.cls}}" onClick="{{lay.b.go}}">Top half</button><button class="{{lay.c.cls}}" onClick="{{lay.c.go}}">Left half</button><button class="sb" onClick="{{b3.border}}">Add border</button></div>
+<input class="inp" type="text" maxlength="40" value="{{b3.textVal}}" onChange="{{b3.onText}}" aria-label="The words on the slide" />
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px"><button class="{{fn.a.cls}}" onClick="{{fn.a.go}}" style="font-family: Georgia, 'Times New Roman', serif">Serif</button><button class="{{fn.b.cls}}" onClick="{{fn.b.go}}">Sans</button><button class="{{fn.c.cls}}" onClick="{{fn.c.go}}" style="font-family: 'Snell Roundhand', 'Segoe Script', cursive">Script</button><span role="group" aria-label="Brand colours" style="display: inline-flex"><button class="{{col.a.cls}}" onClick="{{col.a.go}}" aria-label="Ink"><i style="background: #1F2430"></i></button><button class="{{col.b.cls}}" onClick="{{col.b.go}}" aria-label="Cream"><i style="background: #FAFAF6"></i></button><button class="{{col.c.cls}}" onClick="{{col.c.go}}" aria-label="Coral"><i style="background: #B9542F"></i></button><button class="{{col.d.cls}}" onClick="{{col.d.go}}" aria-label="Green"><i style="background: #2F7A55"></i></button><button class="{{col.e.cls}}" onClick="{{col.e.go}}" aria-label="Grey"><i style="background: #8B909C"></i></button></span></div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px"><button class="sb co" onClick="{{b3.save}}">Save slides</button><sc-if value="{{b3.saving}}" hint-placeholder-val="{{false}}"><span class="q6" style="font-weight: 600">Saving...</span></sc-if><sc-if value="{{b3.saved}}" hint-placeholder-val="{{false}}"><span class="fin" style="color: #2F7A55; font-weight: 600"><span class="ck"></span> 7 slides are in your Carousel folder.</span></sc-if></div>
+</div>
+</div>
+<p class="hint">Try it: change the pace and press Play. Then type your own words on the slide.</p>
+</div>
+</div></div></div>
+</div>
+
+<!-- 04 MY POSTING QUEUE -->
+<div id="ch4" class="sec" style="padding-bottom: 20px">
+<div class="w"><div class="pan"><div class="split">
+<div class="tx">
+<div class="yah" aria-hidden="true"><i class="d"></i><u></u><i class="d"></i><u></u><i class="d"></i><u></u><i class="a"></i><span>04 My posting queue</span></div>
+<h2 class="h2 rv">See the grid you will get. <em>Post when you are ready.</em></h2>
+<p class="rv2" style="margin-top: 10px">Finished reels and carousels stop piling up in folders. Your posting queue shows what is ready, in the order it goes out, with dates at the rhythm you chose.</p>
+<ul style="margin-top: 10px">
+<li class="li">Tells you how many weeks of posts you have, so you see a gap coming.</li>
+<li class="li">Shows your Instagram grid with the new posts in it, read from your own browser.</li>
+<li class="li">Lets you choose which photo stands for a reel or a carousel in the grid.</li>
+<li class="li">Copies the caption in one click on posting day.</li>
+<li class="li">Puts a reminder on your own calendar on posting day, if you ask. One post at a time, never assumed.</li>
+</ul>
+<p class="yours"><b>Stays yours:</b> posting, always. Nothing is ever posted for you. The order, the dates and how often are yours too.</p>
+</div>
+<div class="md">
+<div id="ch4-mod" class="mod">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px">
+<div style="flex: 1 1 200px"><b class="num" style="display: block; font-size: 20px; line-height: 26px; font-weight: 600">{{p4.head}}</b><div style="height: 6px; border-radius: 6px; background: #EEEAE0; margin-top: 6px; overflow: hidden"><div style="height: 6px; border-radius: 6px; background: #2F7A55; transition: width .4s ease-out; {{p4.tank}}"></div></div></div>
+<div role="group" aria-label="How often you post" style="display: flex; flex-wrap: wrap; gap: 4px"><button class="{{rh.a.cls}}" aria-pressed="{{rh.a.sel}}" onClick="{{rh.a.go}}">Once a week</button><button class="{{rh.b.cls}}" aria-pressed="{{rh.b.sel}}" onClick="{{rh.b.go}}">Twice a week</button><button class="{{rh.c.cls}}" aria-pressed="{{rh.c.sel}}" onClick="{{rh.c.go}}">Three a week</button></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 14px 18px; margin-top: 12px; align-items: flex-start">
+<div style="flex: 0 0 220px; max-width: 100%; min-width: 0">
+<div style="font-weight: 600; margin-bottom: 6px">Your grid, with what is coming</div>
+<div class="{{p4.gridCls}}" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px">
+<sc-for list="{{ntiles}}" as="nt" hint-placeholder-count="6"><button class="{{nt.cls}}" style="border: 0; {{nt.style}}" draggable="true" onClick="{{nt.pick}}" onDragStart="{{nt.dragStart}}" onDragOver="{{nt.dragOver}}" onDrop="{{nt.drop}}" aria-label="{{nt.aria}}"><small class="num">{{nt.date}}</small><span style="display: flex; align-items: center; justify-content: space-between; width: 100%"><small>{{nt.kind}}</small><sc-if value="{{nt.rem}}" hint-placeholder-val="{{false}}"><svg class="fin" width="14" height="14" viewBox="0 0 14 14" fill="#FFFFFF" stroke="#1F2430" stroke-width="1.4" aria-hidden="true"><rect x="1.5" y="2.5" width="11" height="10" rx="2"/><path d="M1.5 6h11M4.5 1v3M9.500 1v3"/></svg></sc-if></span></button></sc-for>
+<span class="otile"></span><span class="otile"></span><span class="otile"></span>
+</div>
+<p class="q6" style="margin-top: 6px; font-size: 12px; line-height: 17px">{{p4.note}}</p>
+</div>
+<div style="flex: 1.4 1 280px; min-width: 0">
+<div style="font-weight: 600; margin-bottom: 6px">Ready to post</div>
+<sc-for list="{{rows}}" as="rw" hint-placeholder-count="6"><div class="{{rw.cls}}">
+<span style="flex: 1 1 auto; min-width: 0"><b style="display: block; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{rw.name}}</b><span class="num" style="display: block; font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; {{rw.lineStyle}}">{{rw.line}}</span></span>
+<sc-if value="{{rw.showBtns}}" hint-placeholder-val="{{true}}"><span style="display: flex; gap: 4px; flex: none"><button class="{{rw.copyCls}}" onClick="{{rw.copy}}" style="min-width: 104px">{{rw.copyText}}</button><button class="sb" onClick="{{rw.openRem}}">{{rw.remLabel}}</button></span></sc-if>
+<sc-if value="{{rw.remOpen}}" hint-placeholder-val="{{false}}"><span class="pop" role="group" aria-label="What time?" style="display: flex; gap: 3px; flex: none"><button class="tchip" onClick="{{rw.t9}}">9 am</button><button class="tchip" onClick="{{rw.t12}}">Noon</button><button class="tchip" onClick="{{rw.t18}}">6 pm</button><button class="tchip" onClick="{{rw.t20}}">8 pm</button></span></sc-if>
+</div></sc-for>
+<button class="lk" onClick="{{p4.toggleAll}}">{{p4.allLabel}}</button>
+</div>
+</div>
+</div>
+<p class="hint"><span class="only-lg">Try it: drag a new tile, or change how often you post.</span><span class="only-sm">Try it: press two new tiles to swap them, or change how often you post.</span></p>
+</div>
+</div></div></div>
+</div>
+
+<!-- HOW YOU RUN IT -->
+<div class="dk" style="background: #1F2430; padding: 36px 0 40px">
+<div class="w" style="text-align: center">
+<div class="lab lab-d rv" style="justify-content: center">How you run it</div>
+<h2 class="h2 rv" style="margin-top: 6px">You just <em>say it.</em></h2>
+<p class="rv2" style="max-width: 720px; margin: 8px auto 0; color: #C9CCD3">No menus to learn. Talk to it the way you would talk to someone in the room. Typing works too, and a page with buttons sits beside the chat for everything.</p>
+</div>
+<div class="mq" style="margin-top: 20px"><div class="mqt"><sc-for list="{{pills1}}" as="pl" hint-placeholder-count="8"><sc-if value="{{pl.real}}" hint-placeholder-val="{{true}}"><a class="pill" href="{{pl.href}}"><sc-if value="{{pl.ring}}" hint-placeholder-val="{{true}}"><span class="rg">{{pl.n}}</span></sc-if>"{{pl.t}}"</a></sc-if><sc-if value="{{pl.copy}}" hint-placeholder-val="{{false}}"><span class="pill dup" aria-hidden="true"><sc-if value="{{pl.ring}}" hint-placeholder-val="{{true}}"><span class="rg">{{pl.n}}</span></sc-if>"{{pl.t}}"</span></sc-if></sc-for></div></div>
+<div class="mq" style="margin-top: 10px"><div class="mqt rev"><sc-for list="{{pills2}}" as="pl" hint-placeholder-count="8"><sc-if value="{{pl.real}}" hint-placeholder-val="{{true}}"><a class="pill" href="{{pl.href}}"><sc-if value="{{pl.ring}}" hint-placeholder-val="{{true}}"><span class="rg">{{pl.n}}</span></sc-if>"{{pl.t}}"</a></sc-if><sc-if value="{{pl.copy}}" hint-placeholder-val="{{false}}"><span class="pill dup" aria-hidden="true"><sc-if value="{{pl.ring}}" hint-placeholder-val="{{true}}"><span class="rg">{{pl.n}}</span></sc-if>"{{pl.t}}"</span></sc-if></sc-for></div></div>
+</div>
+
+<!-- WHAT STAYS YOURS -->
+<div id="rules" class="sec" style="padding-top: 20px">
+<div class="w"><div class="pan">
+<div class="lab rv">What stays yours</div>
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 32px; margin-top: 6px">
+<h2 class="h2 rv">It does the carrying. <em>You stay the photographer.</em></h2>
+<p class="rv2" style="flex: 1 1 260px; color: #3A3F4D">These are not settings. They are how it is built.</p>
+</div>
+<div class="split" style="margin-top: 16px">
+<div style="flex: 7 1 520px; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0 28px">
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.500h8l4 4v13H5z"/><path d="M8 13s1.200-2 3-2 3 2 3 2-1.200 2-3 2-3-2-3-2z"/><circle cx="11" cy="13" r=".7"/></svg><div><h3>Your card is only read.</h3><p>Nothing on it is changed, renamed or deleted. It stays exactly as the camera wrote it.</p></div></div>
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.500h14M8.500 6.500v-2h5v2M6 6.500l.800 12h8.400l.800-12M3 20L19 3"/></svg><div><h3>No photo is ever deleted.</h3><p>Not on the card, not on your drive. A file that is already there is compared, never replaced.</p></div></div>
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8.500"/><path d="M9 7.500v7l5.500-3.500z"/></svg><div><h3>Nothing starts until you say so.</h3><p>A backup begins when you say "backup now". Not before.</p></div></div>
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 3L9.500 12.500M19 3l-6 16-3.500-6.500L3 9z"/><path d="M3 20L8 15"/></svg><div><h3>Nothing posts. Nothing sends.</h3><p>You post it yourself, when you are ready.</p></div></div>
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="2.500" y="4" width="17" height="14" rx="2"/><path d="M2.500 15l5-5 4 4 2.500-2.500 5.500 5"/><circle cx="14.500" cy="8.500" r="1.200"/></svg><div><h3>Every frame is yours.</h3><p>No AI-made pictures. Photo reels are hard cuts on the beat. The finished look is yours to make in CapCut.</p></div></div>
+<div class="rule"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3l4 4L8 18H4v-4z"/><path d="M12.500 5.500l4 4"/></svg><div><h3>Your words stay your words.</h3><p>It is the editor of what you said, never the author. The details are only ever the ones you gave it. No hashtags.</p></div></div>
+</div>
+<div id="rules-slider" class="mod" style="flex: 5 1 380px; min-width: 0; padding: 18px">
+<div style="font-weight: 600; color: #55596A; margin-bottom: 8px">Drag to see who does what.</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div><div class="tiny" style="color: #6B6F7A">It does</div><div class="{{pair.lCls}}" style="font-size: 18px; line-height: 24px; font-weight: 600; min-height: 72px; margin-top: 4px">{{pair.l}}</div></div>
+<div style="text-align: right"><div class="tiny" style="color: #B9542F">You decide</div><div class="{{pair.rCls}}" style="font-size: 18px; line-height: 24px; font-weight: 600; min-height: 72px; margin-top: 4px; color: #B9542F">{{pair.r}}</div></div>
+</div>
+<input class="rng" type="range" min="0" max="6" step="1" value="{{pair.val}}" onChange="{{pair.set}}" aria-label="Step through what it does and what you decide" />
+<div class="only-lg" style="display: flex; padding: 0 6px" role="group" aria-label="Pick a pair"><button class="{{nc.a.cls}}" onClick="{{nc.a.go}}" aria-label="Pair 1, copy"><i></i>Copy</button><button class="{{nc.b.cls}}" onClick="{{nc.b.go}}" aria-label="Pair 2, sort"><i></i>Sort</button><button class="{{nc.c.cls}}" onClick="{{nc.c.go}}" aria-label="Pair 3, peeks"><i></i>Peeks</button><button class="{{nc.d.cls}}" onClick="{{nc.d.go}}" aria-label="Pair 4, queue"><i></i>Queue</button><button class="{{nc.e.cls}}" onClick="{{nc.e.go}}" aria-label="Pair 5, reel"><i></i>Reel</button><button class="{{nc.f.cls}}" onClick="{{nc.f.go}}" aria-label="Pair 6, words"><i></i>Words</button><button class="{{nc.g.cls}}" onClick="{{nc.g.go}}" aria-label="Pair 7, posting"><i></i>Posting</button></div>
+<p style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #EEEAE0; color: #3A3F4D; font-size: 14px; line-height: 20px">If something goes wrong in a backup, it stops and tells you plainly, at the top of the report. It does not guess.</p>
+</div>
+</div>
+</div></div>
+</div>
+
+<!-- WHAT YOU GET, WHAT YOU NEED -->
+<div id="offer" class="sec onbg">
+<div class="w"><div class="pan" style="background: none; border: 0; padding-top: 16px; padding-bottom: 12px">
+<div class="lab rv">What you get, what you need</div>
+<h2 class="h2 rv" style="margin-top: 6px">The whole system. <em>Paid for once.</em></h2>
+<div class="split" style="margin-top: 16px; align-items: stretch; gap: 16px">
+<div id="offer-card" class="{{oc.cls}} dk" style="flex: 7 1 520px; min-width: 0; background: #1F2430; border-radius: 20px; padding: 26px 28px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 20px 32px">
+<div style="flex: 3 1 300px; min-width: 0">
+<div style="font-size: 22px; line-height: 28px; font-weight: 600">The Assistant</div>
+<p style="color: #C9CCD3; font-size: 15px; line-height: 22px">All four steps, working as one.</p>
+<div style="position: relative; margin-top: 16px; font-size: 13.5px; line-height: 19px">
+<div class="vtr"><b></b></div>
+<a class="orow" href="#ch1"><span class="rg">01</span><span class="gk ck"></span><b style="display: block; font-size: 15px; line-height: 28px; font-weight: 600">Back up a card</b><span style="color: #C9CCD3">Copy, check every file, sort into shoots, name them your way, six sneak peeks, one report. Photos and video clips. Optional second drive.</span></a>
+<a class="orow" href="#ch2"><span class="rg">02</span><span class="gk ck"></span><b style="display: block; font-size: 15px; line-height: 28px; font-weight: 600">My editing queue</b><span style="color: #C9CCD3">Every shoot listed. Due dates, soonest on top. Your existing list added from a screenshot.</span></a>
+<a class="orow" href="#ch3"><span class="rg">03</span><span class="gk ck"></span><b style="display: block; font-size: 15px; line-height: 28px; font-weight: 600">Make posts from a shoot</b><span style="color: #C9CCD3">A reel on the beat as a CapCut project. A talking reel. A carousel and stories you lay out. Your words shaped into captions and hooks.</span></a>
+<a class="orow" href="#ch4" style="padding-bottom: 0"><span class="rg">04</span><span class="gk ck"></span><b style="display: block; font-size: 15px; line-height: 28px; font-weight: 600">My posting queue</b><span style="color: #C9CCD3">What is ready, in order. Weeks of posts in hand. Your grid with the new posts in it. Copy caption. Calendar reminders if you ask.</span></a>
+</div>
+</div>
+<div class="price" style="flex: 2 1 200px; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px">
+<span style="font-size: 52px; line-height: 64px; font-weight: 600; color: #F28A66; border: 1px dashed rgba(242,138,102,.7); border-radius: 12px; padding: 0 14px">[PRICE]</span>
+<p style="font-size: 14px; line-height: 20px; color: #C9CCD3">One-time purchase from Horizon Found. No subscription to us.</p>
+<a class="btn" href="#offer">Get The Assistant</a>
+<p style="font-size: 13px; line-height: 20px; color: #C9CCD3">Doors open <span class="{{dateClsD}}" style="color: #F0A27F; font-weight: 600">{{dateText}}</span>.</p>
+<p style="font-size: 13px; line-height: 19px; color: #8B909C; border-top: 1px solid rgba(255,255,255,.1); padding-top: 10px">Also included: a step-by-step setup guide.</p>
+</div>
+</div>
+<div style="flex: 5 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #E6E2D8; border-radius: 20px; padding: 22px 26px; box-sizing: border-box">
+<div style="font-size: 20px; line-height: 28px; font-weight: 600; margin-bottom: 6px">Before you buy</div>
+<div class="need"><span><b>A Mac.</b> Windows is coming.</span></div>
+<div class="need"><span><b>The Claude desktop app, on a paid Claude plan.</b> Pro or higher. The Assistant is Claude, and it runs on your own plan. That plan is a separate monthly cost, paid to Anthropic, not to us. <button class="hit" onClick="{{plan.toggle}}" aria-expanded="{{plan.exp}}" style="color: #B9542F; font-weight: 600; text-decoration: underline; text-underline-offset: 3px">What does that mean?</button><span class="{{plan.cls}}"><span><span style="display: block; padding-top: 4px; color: #1F2430">Claude is the app your assistant lives in. You sign up for Claude yourself, and the Assistant works inside it.</span></span></span></span></div>
+<div class="need"><span><b>An external hard drive.</b> Where your shoots live. A second drive is optional.</span></div>
+<div class="need"><span><b>A card reader, for backups.</b> Not needed for posts. A folder of finished photos is enough.</span></div>
+<div class="need"><span><b>CapCut on your Mac, for reels.</b> It is free.</span></div>
+<div class="need"><span><b>An internet connection.</b> It is Claude, so it works online.</span></div>
+<div class="need"><span><b>Optional:</b> Lightroom, for the sneak peek filter. The Mac's Calendar, for reminders.</span></div>
+<div class="need"><span><b>For talking reels:</b> English, macOS 13 or later, and a one-time free install from Apple.</span></div>
+<p class="q6" style="font-size: 13px; line-height: 19px; margin-top: 8px; padding-top: 10px; border-top: 1px solid #EEEAE0">It does the four steps above, and does them properly. Choosing, editing and posting stay with you.</p>
+</div>
+</div>
+</div></div>
+</div>
+
+<!-- WHO MADE IT -->
+<div id="makers" class="sec">
+<div class="w"><div class="pan"><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 24px 36px; align-items: start">
+<div>
+<div class="lab rv">Who made it</div>
+<h2 class="rv" style="font-size: clamp(24px, 2.4vw, 30px); line-height: 1.18; letter-spacing: -0.02em; font-weight: 600; margin-top: 6px; text-wrap: balance">Shaped by a photographer who teaches photographers.</h2>
+<div style="overflow: hidden; border-radius: 14px; margin-top: 14px; border: 1px solid #E6E2D8"><div style="height: 216px; background: #ECE9E0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #6B6F7A; font-size: 14px; animation: zoom 8s ease-in-out infinite alternate"><svg width="28" height="24" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.500A1.5 1.5 0 0 1 3.500 6h4l2-3h9l2 3h4A1.5 1.5 0 0 1 26 7.500v13a1.500 1.500 0 0 1-1.500 1.500h-21A1.500 1.500 0 0 1 2 20.500z"/><circle cx="14" cy="13.500" r="4.500"/></svg>[Photo: Nicole and Dustin]</div></div>
+</div>
+<div style="font-size: 15px; line-height: 23px; color: #3A3F4D; display: flex; flex-direction: column; gap: 12px">
+<p>Horizon Found is Nicole and Dustin. Nicole is a photographer and teaches photography. Dustin builds the tools.</p>
+<p>The Assistant follows the order Nicole's own work happens in: back up the card, edit, make the posts, get them ready to post. She shaped the four steps, the way a reel is timed to a song, and the pages you drag photos around on, by using them on her own shoots.</p>
+<p>It is built on Claude, and we say so. There is no hidden app.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div class="qbox rv"><i aria-hidden="true">&ldquo;</i>[Nicole's quote]<span style="display: block; font-size: 13px; color: #1F2430; font-weight: 600; margin-top: 4px">Nicole, Horizon Found</span></div>
+<div class="qbox rv2"><i aria-hidden="true">&ldquo;</i>[Photographer's quote, name, what they shoot]</div>
+<div class="qbox rv3"><i aria-hidden="true">&ldquo;</i>[Photographer's quote, name, what they shoot]</div>
+</div>
+</div></div></div>
+</div>
+
+<!-- BEFORE YOU DECIDE -->
+<div id="doubts" class="sec onbg" style="padding-bottom: 20px">
+<div class="w"><div class="pan" style="background: none; border: 0; padding-top: 14px; padding-bottom: 12px"><div class="split" style="gap: 20px 40px">
+<div style="flex: 4 1 280px; min-width: 0">
+<div class="lab rv">Before you decide</div>
+<h2 class="h2 rv" style="margin-top: 6px">The questions you probably have <em>first.</em></h2>
+<div class="yah" style="margin: 16px 0 0" aria-hidden="true"><i class="d"></i><u></u><i class="d"></i><u></u><i class="d"></i><u></u><i class="d"></i></div>
+<p class="q6" style="font-size: 14px; line-height: 20px; margin-top: 10px">A number beside a question takes you to that step.</p>
+<a class="btn" href="#offer" style="margin-top: 16px">Get The Assistant</a>
+</div>
+<div style="flex: 8 1 520px; min-width: 0; font-size: 15px; line-height: 22px; color: #3A3F4D">
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><span class="fr"></span><button class="fqb" aria-expanded="{{q.a.exp}}" onClick="{{q.a.go}}"><span>Is this an app?</span><span class="{{q.a.pm}}" aria-hidden="true"></span></button></div><div class="{{q.a.body}}"><div><p style="padding: 0 30px 12px 44px">It is a plugin for Claude. It lives inside the Claude desktop app on your own Mac, and you talk to it there. A page beside the chat shows your report, your queues and your posts.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><span class="fr"></span><button class="fqb" aria-expanded="{{q.b.exp}}" onClick="{{q.b.go}}"><span>Do I need a Claude plan as well?</span><span class="{{q.b.pm}}" aria-hidden="true"></span></button></div><div class="{{q.b.body}}"><div><p style="padding: 0 30px 12px 44px">Yes. The Assistant is Claude, running on your own paid Claude plan, Pro or higher. You buy the Assistant once from us. The Claude plan is a separate monthly cost, paid to Anthropic.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><span class="fr"></span><button class="fqb" aria-expanded="{{q.c.exp}}" onClick="{{q.c.go}}"><span>Can I set it up myself?</span><span class="{{q.c.pm}}" aria-hidden="true"></span></button></div><div class="{{q.c.body}}"><div><p style="padding: 0 30px 12px 44px">Yes. You install the Claude desktop app, add the Assistant in its settings, and answer a few questions on your first backup: which drive, how you name your shoots. The setup guide shows every step with pictures.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch1" aria-label="Go to step 1"><span class="rg">01</span></a><button class="fqb" aria-expanded="{{q.d.exp}}" onClick="{{q.d.go}}"><span>Is my memory card safe with it?</span><span class="{{q.d.pm}}" aria-hidden="true"></span></button></div><div class="{{q.d.body}}"><div><p style="padding: 0 30px 12px 44px">The card is only read. Nothing on it is changed, renamed or deleted. Every file is copied to your drive, read back, and checked against the card. You format the card yourself, after the report says it is safe to.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch3" aria-label="Go to step 3"><span class="rg">03</span></a><button class="fqb" aria-expanded="{{q.e.exp}}" onClick="{{q.e.go}}"><span>What if I have no card today?</span><span class="{{q.e.pm}}" aria-hidden="true"></span></button></div><div class="{{q.e.body}}"><div><p style="padding: 0 30px 12px 44px">Start at step 3. Choose a folder of finished photos and say "make my posts". Your originals stay where they are.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch1" aria-label="Go to step 1"><span class="rg">01</span></a><button class="fqb" aria-expanded="{{q.f.exp}}" onClick="{{q.f.go}}"><span>Does it choose or edit my photos for me?</span><span class="{{q.f.pm}}" aria-hidden="true"></span></button></div><div class="{{q.f.body}}"><div><p style="padding: 0 30px 12px 44px">No. Choosing and editing are yours. It picks six sneak peeks per shoot to get you started, and you can swap any of them.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch3" aria-label="Go to step 3"><span class="rg">03</span></a><button class="fqb" aria-expanded="{{q.g.exp}}" onClick="{{q.g.go}}"><span>Does it write my captions?</span><span class="{{q.g.pm}}" aria-hidden="true"></span></button></div><div class="{{q.g.body}}"><div><p style="padding: 0 30px 12px 44px">It asks you about the shoot and shapes what you said, the way an editor would. The ideas and the details are yours. It never makes one up.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch4" aria-label="Go to step 4"><span class="rg">04</span></a><button class="fqb" aria-expanded="{{q.h.exp}}" onClick="{{q.h.go}}"><span>Does it post to Instagram for me?</span><span class="{{q.h.pm}}" aria-hidden="true"></span></button></div><div class="{{q.h.body}}"><div><p style="padding: 0 30px 12px 44px">No. It lines up what is ready and shows you your grid. You post, when you are ready.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><a class="fr" href="#ch3" aria-label="Go to step 3"><span class="rg">03</span></a><button class="fqb" aria-expanded="{{q.i.exp}}" onClick="{{q.i.go}}"><span>Why CapCut?</span><span class="{{q.i.pm}}" aria-hidden="true"></span></button></div><div class="{{q.i.body}}"><div><p style="padding: 0 30px 12px 44px">A reel arrives as a CapCut project with your photos already cut on the beat. You open it, add your own look, and export. CapCut is free.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6"><div style="display: flex"><span class="fr"></span><button class="fqb" aria-expanded="{{q.j.exp}}" onClick="{{q.j.go}}"><span>Does it work on Windows?</span><span class="{{q.j.pm}}" aria-hidden="true"></span></button></div><div class="{{q.j.body}}"><div><p style="padding: 0 30px 12px 44px">It runs on a Mac. Windows is coming.</p></div></div></div>
+<div style="border-top: 1px solid #D8D3C6; border-bottom: 1px solid #D8D3C6"><div style="display: flex"><span class="fr"></span><button class="fqb" aria-expanded="{{q.k.exp}}" onClick="{{q.k.go}}"><span>What happens to my photos if I stop using it?</span><span class="{{q.k.pm}}" aria-hidden="true"></span></button></div><div class="{{q.k.body}}"><div><p style="padding: 0 30px 12px 44px">Nothing. They are ordinary files in ordinary folders on your own drive, named your way. You can open all of them without us.</p></div></div></div>
+</div>
+</div></div></div>
+</div>
+
+<!-- CLOSE -->
+<div class="dk" style="background: #1F2430; padding: 30px 0 22px; text-align: center">
+<div class="w">
+<div class="lab lab-d" style="justify-content: center">Doors open <span class="{{dateClsD}}">{{dateText}}</span></div>
+<h2 class="h2" style="margin-top: 6px; font-size: clamp(30px, 3.6vw, 46px)">Card to grid. <em>One assistant.</em></h2>
+<p style="max-width: 640px; margin: 8px auto 0; color: #C9CCD3">Back up the card. Know what is due. Make the posts. Line them up. Start wherever you are today.</p>
+<a class="btn" href="#offer" style="margin-top: 16px">Get The Assistant</a>
+<p style="font-size: 13px; line-height: 20px; color: #C9CCD3; margin-top: 8px"><span class="tok" style="color: #F0A27F">[PRICE]</span>, once. Doors open <span class="{{dateClsD}}" style="color: #F0A27F; font-weight: 600">{{dateText}}</span>.</p>
+<div id="close-track" class="{{cl.cls}}" style="margin-top: 14px">
+<span style="position: absolute; left: 12%; right: 12%; top: 15px; height: 2px; background: rgba(255,255,255,.14)"></span><span class="cfill"></span>
+<a href="#ch1"><span class="ring">01<span class="tk ck"></span></span><span class="nm">Back up a card</span></a>
+<a href="#ch2"><span class="ring">02<span class="tk ck"></span></span><span class="nm">My editing queue</span></a>
+<a href="#ch3"><span class="ring">03<span class="tk ck"></span></span><span class="nm">Make posts</span></a>
+<a href="#ch4"><span class="ring">04<span class="tk ck"></span></span><span class="nm">My posting queue</span></a>
+</div>
+</div>
+</div>
+<div style="background: #16181E; padding: 14px 0 16px; color: #8B909C; font-size: 13px; line-height: 19px">
+<div class="w">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 24px"><span style="color: #FAFAF6; font-weight: 600; font-size: 14px">The Assistant, <span style="font-weight: 400; color: #8B909C">by Horizon Found</span></span><span style="display: flex; flex-wrap: wrap; gap: 0 22px"><a class="ftl" href="#offer">Setup guide</a><a class="ftl" href="#top">Contact</a><a class="ftl" href="#top">Terms</a><a class="ftl" href="#top">Privacy</a></span></div>
+<p style="font-size: 12px; line-height: 17px; text-align: center; max-width: 860px; margin: 4px auto 0">The Assistant is a plugin for Claude and needs your own paid Claude plan. Claude is made by Anthropic. CapCut, Lightroom and Instagram belong to their owners. Horizon Found is not affiliated with them. &copy; 2026 Horizon Found</p>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":7800},"doorsOpen":{"editor":"text","default":"2026-11-30","section":"Launch"},"doorsState":{"editor":"enum","options":["countdown","open"],"default":"countdown","section":"Launch"}}'>
+class Component extends DCLogic {
+  state = {
+    now: Date.now(),
+    map: 5, typed: 99, runT: 260, runPlay: false, chipT: 1,
+    seen: { steps: true, ch1: true, ch2: true, ch3: true, ch4: true, offer: true, close: true },
+    tab: 0, names: ['Black-sand beach', 'Sunrise palm grove', 'Morning yoga'], draft: null, ren: 0,
+    folder: false, mos: 0, mosFlip: false, cal1: false, due1: [0, 0, 0], fly: false,
+    q: [
+      { id: 'g', name: 'Garcia family', meta: 'shot Nov 14 · 212 photos', due: 6, thumbs: true },
+      { id: 'l', name: 'Lena and Marcus', meta: 'shot Nov 7 · 1,140 photos', due: 9, thumbs: true },
+      { id: 'h', name: 'Harbor minis', meta: 'shot Nov 1 · 480 photos', due: 14, thumbs: true },
+      { id: 'c', name: 'Cassandra', meta: 'From the list you already keep', due: null, thumbs: false }
+    ],
+    going: null, qOrder: null, moved: null, qCal: null, addOpen: false, addName: '', addDate: '', addMsg: '',
+    pace: 0, marks: [0, 0, 0, 0, 0, 0], order: [0, 1, 2, 3, 4, 5], playT: -1,
+    lay: 0, bord: 0, sText: 'Saturday at the harbor', sFont: 1, sCol: 1, saveSt: 0,
+    rhythm: 2, pOrder: [0, 1, 2, 3, 4, 5], pSel: -1, pVar: [0, 0, 0, 0, 0, 0], copied: -1, remOpen: -1, rem: {}, showAll: false,
+    pair: 0, pairFlip: false, plan: false, faq: 0
+  };
+
+  componentDidMount() {
+    this.timers = [];
+    this.dead = false;
+    this.n = 0;
+    this.mapT = 0;
+    this.fired = {};
+    this.vis = { map: true, run: true, rules: true };
+    this.reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    this.timers.push(setInterval(() => this.tick(), 100));
+    if (this.reduce) { this.set({ runT: 79 }); return; }
+    if (!this.watch()) this.later(() => this.watch(), 300);
+  }
+
+  componentWillUnmount() {
+    this.dead = true;
+    (this.timers || []).forEach((id) => { clearTimeout(id); clearInterval(id); });
+    if (this.io) this.io.disconnect();
+  }
+
+  set(patch) { if (!this.dead) this.setState(patch); }
+
+  later(fn, ms) {
+    const id = setTimeout(() => {
+      this.timers = (this.timers || []).filter((x) => x !== id);
+      if (!this.dead) fn();
+    }, ms);
+    (this.timers = this.timers || []).push(id);
+    return id;
+  }
+
+  see(key) { this.set({ seen: Object.assign({}, this.state.seen, { [key]: true }) }); }
+
+  /* one clock, ten times a second: the countdown, the map loop, the
+     run-through, the typing on the step cards, the reel playhead and the
+     slider's own stepping. State only changes when something on screen does. */
+  tick() {
+    this.n += 1;
+    const s = this.state;
+    const patch = {};
+    if (this.n % 10 === 0) patch.now = Date.now();
+    if (!this.reduce) {
+      if (this.vis.map && !(this.mapHover > Date.now())) {
+        this.mapT = (this.mapT + 1) % 160;
+        const m = this.mapStep(this.mapT);
+        if (m !== s.map) patch.map = m;
+      }
+      if (s.runPlay && this.vis.run) {
+        const t = Math.min(260, s.runT + 1);
+        patch.runT = t;
+        if (t >= 260) patch.runPlay = false;
+      }
+      if (s.seen.steps && s.typed < 34) patch.typed = s.typed + 1;
+      if (s.playT >= 0 && s.playT < 40) patch.playT = s.playT + 1;
+      if (this.vis.rules && !this.pairTouched && this.n % 40 === 0) {
+        patch.pair = (s.pair + 1) % 7;
+        patch.pairFlip = !s.pairFlip;
+        this.pairSteps = (this.pairSteps || 0) + 1;
+        if (this.pairSteps >= 7) this.pairTouched = true;
+      }
+    }
+    if (Object.keys(patch).length) this.set(patch);
+  }
+
+  mapStep(t) { return t < 15 ? 0 : t < 45 ? 1 : t < 75 ? 2 : t < 105 ? 3 : t < 125 ? 4 : t < 145 ? 5 : 6; }
+
+  /* start each self-playing part the first time enough of it is on screen,
+     and keep track of which looping parts are in view so they rest off screen */
+  watch() {
+    const jobs = {
+      'map': () => {},
+      'steps-row': () => { this.set({ typed: 0 }); this.see('steps'); },
+      'run-win': () => { if (!this.runTouched) this.set({ runT: 0, runPlay: true }); },
+      'ch1-mod': () => { this.see('ch1'); this.count('chipT', 600); },
+      'ch2-mod': () => this.see('ch2'),
+      'ch3-a': () => { this.see('ch3'); this.later(() => { if (this.state.playT < 0) this.set({ playT: 0 }); }, 1300); },
+      'ch4-mod': () => this.see('ch4'),
+      'rules-slider': () => {},
+      'offer-card': () => this.see('offer'),
+      'close-track': () => this.see('close')
+    };
+    const visKey = { 'map': 'map', 'run-win': 'run', 'rules-slider': 'rules' };
+    const ids = Object.keys(jobs);
+    const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    if (!('IntersectionObserver' in window)) return true;
+    if (els.length < ids.length) return false;
+    this.vis = { map: false, run: false, rules: false };
+    this.mapT = 0;
+    this.set({
+      map: 0, typed: 0, runT: 0, runPlay: false, chipT: 0,
+      seen: { steps: false, ch1: false, ch2: false, ch3: false, ch4: false, offer: false, close: false }
+    });
+    this.io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        const id = en.target.id;
+        if (visKey[id]) this.vis[visKey[id]] = en.isIntersecting;
+        if (!en.isIntersecting || this.fired[id]) return;
+        const viewH = (en.rootBounds && en.rootBounds.height) || window.innerHeight || 800;
+        if (!(en.intersectionRatio >= 0.4 || en.intersectionRect.height >= viewH * 0.5)) return;
+        this.fired[id] = true;
+        if (!this.dead) jobs[id]();
+      });
+    }, { threshold: [0, 0.2, 0.4, 0.6, 0.8] });
+    els.forEach((el) => this.io.observe(el));
+    return true;
+  }
+
+  count(key, ms) {
+    const t0 = Date.now();
+    const id = setInterval(() => {
+      const p = Math.min(1, (Date.now() - t0) / ms);
+      this.set({ [key]: 1 - Math.pow(1 - p, 3) });
+      if (p >= 1) { clearInterval(id); this.timers = this.timers.filter((x) => x !== id); }
+    }, 60);
+    this.timers.push(id);
+  }
+
+  /* the demo's "today" is Saturday Nov 14, 2026; due dates are days from it */
+  dayDate(off) { return new Date(2026, 10, 14 + off); }
+  dayLabel(off) { return this.dayDate(off).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  days(pick) {
+    const out = [];
+    for (let off = 1; off <= 14; off++) {
+      out.push({ n: this.dayDate(off).getDate(), aria: 'Due ' + this.dayLabel(off), pick: () => pick(off) });
+    }
+    return out;
+  }
+  tagFor(due) {
+    if (due <= 0) return 'due today';
+    if (due === 1) return 'due tomorrow';
+    if (due < 14) return 'due in ' + due + ' days';
+    return 'due in ' + Math.round(due / 7) + ' weeks';
+  }
+
+  /* the editing queue as it is shown: soonest due on top, undated after,
+     unless a shoot was just moved and is waiting on Keep or a new date */
+  qView() {
+    const s = this.state;
+    const live = s.q.filter((x) => !x.done);
+    if (s.qOrder) {
+      const out = s.qOrder.map((id) => live.find((x) => x.id === id)).filter(Boolean);
+      live.forEach((x) => { if (out.indexOf(x) < 0) out.push(x); });
+      return out;
+    }
+    const dated = live.filter((x) => x.due != null).sort((a, b) => a.due - b.due);
+    return dated.concat(live.filter((x) => x.due == null));
+  }
+
+  qMove(id, to) {
+    const s = this.state;
+    const v = this.qView();
+    const from = v.findIndex((x) => x.id === id);
+    if (from < 0 || to < 0 || to >= v.length || to === from) return;
+    this.qTouched = true;
+    const it = v[from];
+    const crossed = v.slice(Math.min(from, to), Math.max(from, to) + 1).filter((x) => x !== it);
+    const nv = v.slice();
+    nv.splice(from, 1);
+    nv.splice(to, 0, it);
+    const ids = nv.map((x) => x.id);
+    if (it.due == null && crossed.every((x) => x.due == null)) {
+      const q = s.q.slice().sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      this.set({ q: q, qOrder: null, moved: null });
+    } else {
+      this.set({ qOrder: ids, moved: { id: id, dir: to < from ? 'up' : 'down' }, qCal: null });
+    }
+  }
+
+  qPatch(id, patch) { return this.state.q.map((x) => (x.id === id ? Object.assign({}, x, patch) : x)); }
+
+  /* the run-through's four scenes, in tenths of a second: 8 s, then 6 s each */
+  bounds() { return [0, 80, 140, 200, 260]; }
+
+  jump(i) {
+    const B = this.bounds();
+    this.runTouched = true;
+    if (this.reduce) this.set({ runT: B[i + 1] - 1, runPlay: false });
+    else this.set({ runT: B[i], runPlay: true });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'];
+    const two = (n) => String(n).padStart(2, '0');
+    const clamp = (x) => Math.max(0, Math.min(1, x));
+    const str = (b) => (b ? 'true' : 'false');
+    const val = (e) => String((e && e.target && e.target.value) || '');
+
+    /* doors: a real date typed into the tweak is shown and counted to; until
+       then the page shows [DATE] and no countdown */
+    const raw = String(this.props.doorsOpen == null ? '2026-11-30' : this.props.doorsOpen).trim();
+    let t = NaN;
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+      const p = raw.split('-').map(Number);
+      t = new Date(p[0], p[1] - 1, p[2], 9, 0, 0).getTime();
+    } else if (/\d/.test(raw) && /\b\d{4}\b/.test(raw)) {
+      t = Date.parse(raw);
+    }
+    const valid = !isNaN(t);
+    const open = (this.props.doorsState || 'countdown') === 'open';
+    const left = valid ? Math.max(0, t - s.now) : 0;
+    const cd = {
+      d: two(Math.floor(left / 86400000)), h: two(Math.floor(left / 3600000) % 24),
+      m: two(Math.floor(left / 60000) % 60), s: two(Math.floor(left / 1000) % 60)
+    };
+    const dateText = open ? 'now' : valid
+      ? new Date(t).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+      : (raw || '[DATE]');
+
+    /* the map */
+    const M = s.map;
+    const st = {};
+    keys.slice(0, 4).forEach((k, i) => { st[k] = M === i + 1 ? 'ring on' : (M > i + 1 ? 'ring done' : 'ring'); });
+    const map = {
+      fillCls: 'fill m' + M + (M === 0 ? ' nt' : ''),
+      tokCls: 'tkn m' + M + ((M === 0 || M === 6) ? ' nt' : ''),
+      label: ['A full card', '3 shoots, named your way', 'Due Friday', 'Reel. Carousel. Stories.',
+        'On your grid, ready when you are', 'On your grid, ready when you are', 'On your grid, ready when you are'][M],
+      s0: M === 0, s1: M === 1, s2: M === 2, s3: M >= 3,
+      g: M >= 5 ? 'gt lit' : 'gt',
+      labCls: 'only-sm mlab p' + Math.max(1, Math.min(4, M)) + (M === 0 ? ' hid' : ''),
+      side: M === 3 ? 'sidef pulse' : 'sidef'
+    };
+
+    /* the four spoken lines type themselves, one after another */
+    const lines = ['backup now', "what's in my queue", 'make my posts', 'show my posting queue'];
+    const say = {};
+    let at = 2;
+    lines.forEach((ln, i) => {
+      const shown = Math.max(0, Math.min(ln.length, (s.typed - at) * 4));
+      const done = shown >= ln.length;
+      say[keys[i]] = { text: '"' + ln.slice(0, shown) + (done ? '"' : ''), caret: s.typed >= at && !done, cls: done ? 'sl on' : 'sl' };
+      at += Math.ceil(ln.length / 4) + 3;
+    });
+
+    /* the run-through: scene 1 is eight seconds, the others six */
+    const B = this.bounds();
+    const T = s.runT;
+    const sc = T >= B[3] ? 3 : T >= B[2] ? 2 : T >= B[1] ? 1 : 0;
+    const u = T - B[sc];
+    const lit = sc > 2 ? 6 : (sc === 2 && u >= 22 ? Math.min(6, Math.floor((u - 22) / 2) + 1) : 0);
+    const bt = {};
+    keys.slice(0, 6).forEach((k, i) => { bt[k] = 'background:' + (i < lit ? '#B9542F' : '#E6E2D8'); });
+    const tile = (on) => (on ? 'background:#F0A27F;outline:2px solid #B9542F;outline-offset:-2px' : 'background:#E6E2D8');
+    const r = {
+      s1: sc === 0, s2: sc === 1, s3: sc === 2, s4: sc === 3,
+      chatA: sc <= 1, chatB: sc >= 2,
+      a1: sc > 0 || u >= 3, a2: sc > 0 || u >= 12, a3: sc > 0 || u >= 20, a4: sc > 0 || u >= 28,
+      aDots: sc === 0 && ((u >= 8 && u < 12) || (u >= 24 && u < 28)),
+      idle: sc === 0 && u < 28,
+      prog: sc === 0 && u >= 28 && u < 46,
+      n: Math.round(3931 * clamp((u - 28) / 16)).toLocaleString('en-US'),
+      progW: 'width:' + Math.round(clamp((u - 28) / 16) * 100) + '%',
+      rep: sc === 0 && u >= 46,
+      t1: u >= 50 ? 'color:#2F7A55' : 'color:#D8D3C6',
+      t2: u >= 54 ? 'color:#2F7A55' : 'color:#D8D3C6',
+      f1: u >= 58, f2: u >= 62, f3: u >= 66,
+      blk: sc === 1 && u < 38,
+      press: u >= 8 && u < 14,
+      btn: (u >= 8 && u < 14) ? 'background:#8E3D1F' : 'background:#B9542F',
+      cal: u >= 14 && u < 28, pk: u >= 22 ? 'cday pk' : 'cday', conf: u >= 28,
+      queue: sc === 1 && u >= 38,
+      c1: sc > 2 || (sc === 2 && u >= 3), c2: sc > 2 || (sc === 2 && u >= 12), cDots: sc === 2 && u >= 8 && u < 12,
+      c3: sc > 2 || (sc === 2 && u >= 18),
+      bt: bt, k1: sc > 2 || u >= 34, k2: sc > 2 || u >= 42, k3: sc > 2 || u >= 50,
+      g1: tile(u >= 8), g2: tile(u >= 14), g3: tile(u >= 20),
+      press4: u >= 34 && u < 38, copied: u >= 38, notCopied: u < 38,
+      copyBtn: u >= 38 ? 'color:#2F7A55;border:1px solid #2F7A55' : 'color:#1F2430;border:1px solid #B9B4A6',
+      end: T >= B[4]
+    };
+    const seg = {};
+    keys.slice(0, 4).forEach((k, i) => {
+      seg[k] = { cls: T >= B[i] ? 'seg on' : 'seg', fill: 'width:' + Math.round(clamp((T - B[i]) / (B[i + 1] - B[i])) * 100) + '%', go: () => this.jump(i) };
+    });
+    const runReplay = () => { this.runTouched = true; if (this.reduce) this.set({ runT: B[1] - 1, runPlay: false }); else this.set({ runT: 0, runPlay: true }); };
+
+    /* chapter 1: the report */
+    const name = s.names[s.tab];
+    const slug = name.trim().replace(/\s+/g, '-');
+    const tabs = {};
+    keys.slice(0, 3).forEach((k, i) => {
+      tabs[k] = {
+        cls: s.tab === i ? 'tabb on' : 'tabb', sel: str(s.tab === i), label: s.names[i],
+        go: () => this.set({ tab: i, draft: null, ren: 0, cal1: false, mosFlip: !s.mosFlip })
+      };
+    });
+    const tints = ['#DCD7CB', '#C9C2B2', '#E3DED3', '#BFB8A8', '#D3CCBD', '#EAE6DC'];
+    const mz = tints.map((x, i) => ({ bg: 'background:' + tints[(i + s.mos + s.tab * 2) % 6] }));
+    const rename = () => {
+      const typed = (s.draft == null ? name : s.draft).trim() || name;
+      const tab = s.tab;
+      this.set({ ren: 1 });
+      this.later(() => {
+        const names = this.state.names.slice();
+        names[tab] = typed;
+        if (this.state.tab === tab) this.set({ names: names, draft: null, ren: 2 });
+        else this.set({ names: names });
+      }, 500);
+    };
+    const due1 = s.due1[s.tab];
+    const c1 = {
+      files: Math.round(3931 * s.chipT).toLocaleString('en-US'), gb: Math.round(126 * s.chipT),
+      shoots: Math.round(3 * s.chipT), min: Math.round(7 * s.chipT),
+      count: ['3,389 photos', '276 photos', '264 photos'][s.tab],
+      name: s.draft == null ? name : s.draft,
+      onName: (e) => this.set({ draft: val(e), ren: 0 }),
+      onKey: (e) => { if (e && e.key === 'Enter') rename(); },
+      rename: rename, renaming: s.ren === 1, renamed: s.ren === 2,
+      mzCls: !s.seen.ch1 ? 'mz w0' : (s.mosFlip ? 'mz b' : 'mz a'),
+      again: () => this.set({ mos: s.mos + 1, mosFlip: !s.mosFlip }),
+      more: () => this.set({ mos: s.mos + 3, mosFlip: !s.mosFlip }),
+      showAdd: !s.cal1 && !due1, calOpen: s.cal1, queued: !s.cal1 && due1 > 0,
+      openCal: () => this.set({ cal1: true, folder: false }),
+      dueText: due1 ? this.dayLabel(due1) : '',
+      toggleFolder: () => this.set({ folder: !s.folder, cal1: false }), folderOpen: s.folder, folderExp: str(s.folder),
+      folderName: '2026-11-14 ' + name,
+      f1: slug + '_0001_IMG_4471.CR3', f2: slug + '_0002_IMG_4472.CR3', f3: slug + '_0003_IMG_4473.CR3',
+      fly: s.fly
+    };
+    const days1 = this.days((off) => {
+      const d = s.due1.slice();
+      d[s.tab] = off;
+      this.set({ due1: d, cal1: false, fly: true });
+      this.later(() => this.set({ fly: false }), 600);
+    });
+
+    /* chapter 2: the editing queue */
+    const view = this.qView();
+    const qs = view.map((x, i) => {
+      const moved = !!(s.moved && s.moved.id === x.id);
+      return {
+        cls: 'qc' + (s.going === x.id ? ' go' : '') + (x.id === 'c' && !this.qTouched ? (s.seen.ch2 ? ' new' : ' w0') : ''),
+        name: x.name, meta: x.meta, thumbs: !!x.thumbs,
+        hasTag: x.due != null, noDate: x.due == null && !moved,
+        tag: x.due != null ? this.tagFor(x.due) : '',
+        tagCls: 'tg' + (x.due != null && x.due <= 7 ? ' warm' : '') + (x.id === 'g' && s.seen.ch2 && !this.qTouched ? ' pl' : ''),
+        aria: 'Mark ' + x.name + ' finished',
+        upAria: 'Move ' + x.name + ' up', downAria: 'Move ' + x.name + ' down',
+        tick: () => {
+          this.qTouched = true;
+          this.set({ going: x.id });
+          this.later(() => this.set({ q: this.qPatch(x.id, { done: true }), going: null, qOrder: null, moved: null, qCal: null }), 400);
+        },
+        up: () => this.qMove(x.id, i - 1), down: () => this.qMove(x.id, i + 1),
+        dragStart: (e) => { this.dragQ = x.id; if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', x.id); } catch (err) {} } },
+        dragOver: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+        drop: (e) => { if (e && e.preventDefault) e.preventDefault(); if (this.dragQ != null) this.qMove(this.dragQ, i); this.dragQ = null; },
+        prompt: moved, promptText: moved ? (s.moved.dir === 'up' ? 'Moved up. New due date?' : 'Moved down. New due date?') : '',
+        keep: () => this.set({ qOrder: null, moved: null }),
+        setDate: () => { this.qTouched = true; this.set({ qCal: x.id, addOpen: false }); }
+      };
+    });
+    const calFor = s.qCal ? s.q.find((x) => x.id === s.qCal) : null;
+    const days2 = this.days((off) => {
+      if (calFor) this.set({ q: this.qPatch(calFor.id, { due: off }), qCal: null, qOrder: null, moved: null });
+    });
+    const addShoot = () => {
+      const nm = s.addName.trim();
+      if (!nm) return;
+      let due = null;
+      const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s.addDate);
+      if (m) {
+        const off = Math.round((new Date(+m[1], +m[2] - 1, +m[3]).getTime() - this.dayDate(0).getTime()) / 86400000);
+        if (off >= 0) due = off;
+      }
+      this.qTouched = true;
+      this.qn = (this.qn || 0) + 1;
+      this.set({
+        q: s.q.concat([{ id: 'n' + this.qn, name: nm, meta: 'No photos behind it yet', due: due, thumbs: false }]),
+        addOpen: false, addName: '', addDate: '', addMsg: nm + ' added.', qOrder: null, moved: null
+      });
+    };
+    const done = s.q.filter((x) => x.done);
+    const fins = done.map((x) => ({ name: x.name, aria: 'Put ' + x.name + ' back in the queue', back: () => this.set({ q: this.qPatch(x.id, { done: false }) }) }));
+    const q2 = {
+      count: view.length + (view.length === 1 ? ' shoot to edit' : ' shoots to edit'),
+      calOpen: !!calFor, calTitle: calFor ? 'When is ' + calFor.name + ' due? November' : '',
+      showAddBtn: !s.addOpen && !calFor, addOpen: s.addOpen && !calFor,
+      openAdd: () => this.set({ addOpen: true, addMsg: '' }),
+      addName: s.addName, onAddName: (e) => this.set({ addName: val(e) }),
+      addDate: s.addDate, onAddDate: (e) => this.set({ addDate: val(e) }),
+      addKey: (e) => { if (e && e.key === 'Enter') addShoot(); },
+      add: addShoot, addMsg: s.addMsg, hasMsg: !!s.addMsg,
+      finCount: 'Finished (' + done.length + ')', hasFin: done.length > 0
+    };
+
+    /* chapter 3: the reel on the beat. Every photo is a whole number of beats. */
+    const base = [[2, 1, 2, 2, 2, 3], [2, 1, 1, 4, 1, 3], [2, 2, 2, 2, 2, 2], [4, 3, 2, 1, 1, 1]][s.pace];
+    const reelTints = ['#DCD7CB', '#BFB8A8', '#D3CCBD', '#C9C2B2', '#E3DED3', '#B8B1A1', '#D9D2C2', '#C4BDAD'];
+    const beatNow = s.playT >= 0 && s.playT < 40 ? s.playT / 40 * 12 : -1;
+    const tiles = [];
+    let start = 0;
+    s.order.forEach((id, p) => {
+      const mk = s.marks[id];
+      const beats = mk === 1 ? base[p] + 1 : mk === 2 ? 1 : base[p];
+      tiles[id] = {
+        num: String(id + 1), mark: ['', 'Longer', 'Quick'][mk], hasMark: mk > 0, markCls: ['', 'lg', 'qk'][mk],
+        cls: 'til' + (beatNow >= start && beatNow < start + beats ? ' act' : ''),
+        style: 'left:calc(' + (start / 12 * 100).toFixed(3) + '% + 2px);width:calc(' + (beats / 12 * 100).toFixed(3) + '% - 3px);background:' +
+          reelTints[id] + ';animation-delay:' + (p * 0.14).toFixed(2) + 's',
+        aria: 'Photo ' + (id + 1) + ', ' + ['Normal', 'Longer', 'Quicker'][mk] + ', ' + beats + (beats === 1 ? ' beat' : ' beats') + '. Press to change how long it stays.',
+        cycle: () => { const marks = s.marks.slice(); marks[id] = (mk + 1) % 3; this.set({ marks: marks }); },
+        dragStart: (e) => { this.dragT = id; if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(id)); } catch (err) {} } },
+        dragOver: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+        drop: (e) => {
+          if (e && e.preventDefault) e.preventDefault();
+          if (this.dragT == null || this.dragT === id) return;
+          const order = s.order.filter((x) => x !== this.dragT);
+          order.splice(p, 0, this.dragT);
+          this.dragT = null;
+          this.set({ order: order });
+        }
+      };
+      start += beats;
+    });
+    const paces = {};
+    keys.slice(0, 4).forEach((k, i) => { paces[k] = { cls: s.pace === i ? 'sb on' : 'sb', sel: str(s.pace === i), go: () => this.set({ pace: i }) }; });
+    const beatsList = [];
+    for (let i = 0; i < 12; i++) beatsList.push({ cls: i % 4 === 0 ? 'bt one' : 'bt' });
+    const waves = [];
+    for (let i = 0; i < 48; i++) waves.push({ h: 'height:' + (5 + (i * 37) % 17) + 'px' });
+    const a3 = {
+      tlsCls: s.seen.ch3 ? 'tls in' : 'tls wait', more: start > 12,
+      playing: beatNow >= 0, head: 'left:' + (s.playT / 40 * 100).toFixed(1) + '%',
+      status: s.playT >= 0,
+      play: () => this.set({ playT: this.reduce ? 40 : 0 })
+    };
+
+    /* chapter 3: lay out a slide */
+    const hex = ['#1F2430', '#FAFAF6', '#B9542F', '#2F7A55', '#8B909C'];
+    const b = s.bord * 10;
+    const half = s.lay > 0;
+    const inkOn = s.sCol === 1 || s.sCol === 4;
+    const fam = ["Georgia,'Times New Roman',serif", "'DM Sans',system-ui,sans-serif", "'Snell Roundhand','Segoe Script',cursive"][s.sFont];
+    const touch = (patch) => this.set(Object.assign({ saveSt: 0 }, patch));
+    const b3 = {
+      canvas: 'background:' + (half ? hex[s.sCol] : '#FAFAF6'),
+      photo: ['left:' + b + 'px;top:' + b + 'px;right:' + b + 'px;bottom:' + b + 'px',
+        'left:' + b + 'px;top:' + b + 'px;right:' + b + 'px;bottom:105px',
+        'left:' + b + 'px;top:' + b + 'px;right:84px;bottom:' + b + 'px'][s.lay],
+      text: ['left:14px;right:14px;top:' + (146 - b) + 'px;height:50px;font-size:15px;line-height:19px',
+        'left:10px;right:10px;top:105px;height:105px;font-size:15px;line-height:19px',
+        'left:88px;right:6px;top:0;height:210px;font-size:12px;line-height:16px'][s.lay] +
+        ';font-family:' + fam + ';color:' + (half ? (inkOn ? '#1F2430' : '#FAFAF6') : hex[s.sCol]),
+      textVal: s.sText, onText: (e) => touch({ sText: val(e).slice(0, 40) }),
+      border: () => touch({ bord: (s.bord + 1) % 4 }),
+      save: () => { this.set({ saveSt: 1 }); this.later(() => this.set({ saveSt: 2 }), 600); },
+      saving: s.saveSt === 1, saved: s.saveSt === 2
+    };
+    const lay = {}, fn = {}, col = {};
+    keys.slice(0, 3).forEach((k, i) => {
+      lay[k] = { cls: s.lay === i ? 'sb on' : 'sb', go: () => touch({ lay: i }) };
+      fn[k] = { cls: s.sFont === i ? 'sb on' : 'sb', go: () => touch({ sFont: i }) };
+    });
+    keys.slice(0, 5).forEach((k, i) => { col[k] = { cls: s.sCol === i ? 'cdot on' : 'cdot', go: () => touch({ sCol: i }) }; });
+
+    /* chapter 4: the posting queue. pOrder is the order posts go out. */
+    const pieces = ['Garcia reel', 'Garcia carousel', 'Harbor reel', 'Harbor carousel', 'Lena and Marcus reel', 'Lena and Marcus carousel'];
+    const offs = { 1: [3, 10, 17, 24, 31, 38], 2: [3, 6, 10, 13, 17, 20], 3: [2, 4, 6, 9, 11, 13] }[s.rhythm];
+    const gridTints = ['#D9B48A', '#8DA598', '#C2976B', '#A391A9', '#CDA57A', '#9DB3A6', '#B3A2B8', '#7D978A'];
+    const shortDate = (off) => this.dayLabel(off).replace(',', '');
+    const swap = (i, j) => {
+      const o = s.pOrder.slice();
+      const x = o[i]; o[i] = o[j]; o[j] = x;
+      this.set({ pOrder: o, pSel: -1 });
+    };
+    const ntiles = [];
+    for (let k = 0; k < 6; k++) {
+      const i = 5 - k;
+      const pc = s.pOrder[i];
+      ntiles.push({
+        date: shortDate(offs[i]), kind: pc % 2 ? 'Carousel' : 'Reel', rem: !!s.rem[pc],
+        cls: 'ntile' + (s.pSel === i ? ' sel' : ''),
+        style: 'background:' + gridTints[(pc + s.pVar[pc] * 3) % 8] + ';animation-delay:' + (k * 0.1).toFixed(1) + 's',
+        aria: pieces[pc] + ', going out ' + shortDate(offs[i]) + '. Press it, then press another new tile to swap them.',
+        pick: () => {
+          if (s.pSel < 0) this.set({ pSel: i });
+          else if (s.pSel === i) { const v = s.pVar.slice(); v[pc] = (v[pc] + 1) % 3; this.set({ pVar: v, pSel: -1 }); }
+          else swap(s.pSel, i);
+        },
+        dragStart: (e) => { this.dragP = i; if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (err) {} } },
+        dragOver: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+        drop: (e) => { if (e && e.preventDefault) e.preventDefault(); if (this.dragP != null && this.dragP !== i) swap(this.dragP, i); this.dragP = null; }
+      });
+    }
+    const setRem = (pc, when) => { const rem = Object.assign({}, s.rem); rem[pc] = when; this.set({ rem: rem, remOpen: -1 }); };
+    const rows = s.pOrder.map((pc, i) => {
+      const wd = this.dayDate(offs[i]).toLocaleDateString('en-US', { weekday: 'short' });
+      return {
+        cls: 'prow' + (i >= 3 ? ' x3' : '') + (s.showAll ? ' show' : ''),
+        name: pieces[pc],
+        line: s.rem[pc] ? 'Reminder set for ' + wd + ', ' + s.rem[pc] + '.' : shortDate(offs[i]),
+        lineStyle: s.rem[pc] ? 'color:#2F7A55;font-weight:600' : 'color:#6B6F7A',
+        copyText: s.copied === pc ? 'Copied.' : 'Copy caption', copyCls: s.copied === pc ? 'sb gn' : 'sb',
+        copy: () => { this.set({ copied: pc }); clearTimeout(this.copyTimer); this.timers = this.timers.filter((x) => x !== this.copyTimer); this.copyTimer = this.later(() => this.set({ copied: -1 }), 2000); },
+        showBtns: s.remOpen !== pc, remOpen: s.remOpen === pc,
+        remLabel: s.rem[pc] ? 'Change time' : 'Remind me',
+        openRem: () => this.set({ remOpen: pc }),
+        t9: () => setRem(pc, '9 am'), t12: () => setRem(pc, 'noon'), t18: () => setRem(pc, '6 pm'), t20: () => setRem(pc, '8 pm')
+      };
+    });
+    const rh = {};
+    keys.slice(0, 3).forEach((k, i) => { rh[k] = { cls: s.rhythm === i + 1 ? 'sb on' : 'sb', sel: str(s.rhythm === i + 1), go: () => this.set({ rhythm: i + 1 }) }; });
+    const p4 = {
+      head: (6 / s.rhythm) + ' weeks of posts ready', tank: 'width:' + Math.round(100 / s.rhythm) + '%',
+      gridCls: s.seen.ch4 ? 'ngr in' : 'ngr wait',
+      note: s.pSel >= 0
+        ? 'Selected. Press another new tile to swap them, or press this one again to change the photo shown in your grid.'
+        : 'Outlined tiles are new. Drag them, or press two to swap them. The dates follow.',
+      toggleAll: () => this.set({ showAll: !s.showAll }), allLabel: s.showAll ? 'Show fewer' : 'Show all'
+    };
+
+    /* the phrases, each tied to its step */
+    const mk = (list) => list.concat(list).map((x, i) => ({
+      t: x[0], n: x[1], ring: !!x[1], href: x[1] ? '#ch' + Number(x[1]) : '#top',
+      real: i < list.length, copy: i >= list.length
+    }));
+    const pills1 = mk([['backup now', '01'], ["that's the Garcia family", '01'], ["the wedding's on two cards", '01'], ['show me the report', '01'],
+      ['call that one Harbor minis', '01'], ["what's in my queue", '02'], ["Cassandra's due Friday", '02'], ['add these to my editing queue', '02']]);
+    const pills2 = mk([["I'm done with the beach shoot", '03'], ['make my posts', '03'], ['make a reel from this shoot', '03'], ['lay out my carousel', '03'],
+      ['write my words for the reel', '03'], ['show my posting queue', '04'], ['read my Instagram grid', '04'], ["the carousel's ready to post", '04'], ['hi', '']]);
+
+    /* it does / you decide */
+    const pairs = [
+      ['Copies and checks every file', 'When the card gets formatted'],
+      ['Sorts the card into shoots', 'What each shoot is called'],
+      ['Picks six sneak peeks', 'Which six you keep'],
+      ['Keeps the list of what is due', 'Every due date'],
+      ['Cuts the reel on the beat', 'The song, the order, the look'],
+      ['Shapes your words', 'What you want to say'],
+      ['Lines up what is ready', 'When you post']
+    ];
+    const setPair = (i) => { this.pairTouched = true; if (i !== s.pair) this.set({ pair: i, pairFlip: !s.pairFlip }); };
+    const nc = {};
+    keys.slice(0, 7).forEach((k, i) => { nc[k] = { cls: s.pair === i ? 'nch on' : 'nch', go: () => setPair(i) }; });
+    const pair = {
+      l: pairs[s.pair][0], r: pairs[s.pair][1],
+      lCls: 'sl-l ' + (s.pairFlip ? 'b' : 'a'), rCls: 'sl-r ' + (s.pairFlip ? 'b' : 'a'),
+      val: s.pair, set: (e) => setPair(Math.max(0, Math.min(6, Number(val(e)) || 0)))
+    };
+
+    const q = {};
+    keys.forEach((k, i) => {
+      const on = s.faq === i;
+      q[k] = { exp: str(on), pm: on ? 'pm open' : 'pm', body: on ? 'fq open' : 'fq', go: () => this.set({ faq: on ? -1 : i }) };
+    });
+
+    return {
+      dateText: dateText, dateClsD: (valid || open) ? '' : 'tok', counting: valid && !open, cd: cd,
+      sxCls: 'sx ' + (Math.floor(s.now / 1000) % 2 ? 'a' : 'b'),
+      mapIn: () => { this.mapHover = Date.now() + 6000; }, mapOut: () => { this.mapHover = 0; },
+      map: map, st: st, say: say,
+      seg: seg, r: r, runReplay: runReplay, runEndLabel: this.reduce ? 'Back to the start' : 'Replay',
+      runToggle: () => { this.runTouched = true; if (T >= B[4]) runReplay(); else this.set({ runPlay: !s.runPlay }); },
+      runToggleLabel: s.runPlay ? 'Pause the run-through' : 'Play the run-through',
+      runPlaying: s.runPlay, runPaused: !s.runPlay,
+      c1: c1, t: tabs, mz: mz, days1: days1,
+      q2: q2, qs: qs, days2: days2, fins: fins,
+      p: paces, a3: a3, tiles: tiles, waves: waves, beats: beatsList,
+      b3: b3, lay: lay, fn: fn, col: col,
+      p4: p4, rh: rh, ntiles: ntiles, rows: rows,
+      pills1: pills1, pills2: pills2, pair: pair, nc: nc,
+      oc: { cls: s.seen.offer ? 'oc in' : 'oc wait' },
+      plan: { toggle: () => this.set({ plan: !s.plan }), exp: str(s.plan), cls: s.plan ? 'fq open' : 'fq' },
+      q: q,
+      cl: { cls: s.seen.close ? 'ctr in' : 'ctr' }
+    };
+  }
+}
+</script>
+</body>
+</html>
