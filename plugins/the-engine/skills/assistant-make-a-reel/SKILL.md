@@ -129,6 +129,10 @@ What is said in the footage can't be heard yet (there is no speech-to-text here)
 
 The page asks it: "Add your song". **Add my music** makes a Music folder for this shoot and opens it; they drag a song in (or a screen recording of a song playing: the page takes the sound from it once and keeps it beside the recording, or in the Music folder when the recording is in a folder of theirs outside Your Content). The page sees a new file by itself and says "Got it: <name>." **No song** is there too, with Nicole's line for business accounts. You don't ask which song, and you don't pick one.
 
+- **A short song that opens with a glitch (Nicole, Nov 12).** Screen recordings often open with a glitch and a moment of silence. For a song under 40 seconds the page starts the reel after the last silent gap in the song's first 12 seconds, on the first 1 of a bar after it; with no gap, at the top. The Plan line says where ("starting the song 4 seconds in"). You don't set it, and you never pass a start of your own for the page's reel.
+- **A recording they replaced.** A new recording under the same name as an earlier one gets its sound taken again on the next Make my reel, as "<name> sound 2.m4a"; the first is never written over, and the list shows the recording once.
+- **No Remove on a song.** The page has no button to remove a song and you have no command for one. Never move, rename or delete a song or a recording. Asked, say there's no button for that yet: the list shows what is in the shoot's Music folder, so a song they take out of it themselves leaves the list.
+
 What you still do, only when they bring it up:
 
 - **"Where do I get the song?"** A song file they bought or downloaded works (Artlist, Epidemic Sound, Musicbed and the like cover social posts). Songs bought or streamed in Apple Music are locked and cannot be read; say so plainly and suggest a downloaded song, a screen recording, or No song. **Never move, rename or tidy their recording or their song, and never save a song into Music, Downloads, Desktop or Documents yourself** (Nicole's first reel, Nov 5: CapCut showed "File not accessible"). The page's own Music folder is the place.

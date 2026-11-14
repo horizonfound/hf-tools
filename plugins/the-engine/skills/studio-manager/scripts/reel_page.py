@@ -85,6 +85,20 @@ an id made from where it is and its file name. A recording's sound is made once 
 Media Foundation on a PC) as "<name> sound.m4a" (".wav" on a PC) beside it, or in <kit>/Music when the recording
 sits in an export folder outside Your Content; a sound already there is used as it is, never written over.
 
+Her v25, section 5 (Nov 12; stage J of the v26 build). Remove a song is NOT built, in any form: it waits on Nicole.
+  * A short song starts after a glitchy opening (short_song_start): for a song under 40 seconds the reel starts
+    after the last silent gap that ends in its first 12 seconds, else at the top. Hers asks ffmpeg's silencedetect
+    (-50 dB, 0.3 s); ours measures the same in plain Python on the samples the beat is found on (sound.lead_in).
+    The start then lands as every start does: reel.py --song-start, the first 1 of a bar at or after it, on a
+    whole frame.
+  * A replaced recording gets its sound taken again (sound_for): "<name> sound 2.m4a" beside the first, which is
+    never written over; the song list hides them all. Hers goes by the files' times alone (a sound older than its
+    recording is stale). Ours keeps, in <kit>/.kit/reel-sounds.json (the version before beside it), which
+    recording each sound was taken from: its size, its time and a hash of its first megabyte. Same size and time:
+    the same recording. Same size and the same start: the same recording, its time noted afresh. Anything else: a
+    different recording, so the next name is looked at, and the first free one is made. A sound with no note
+    (made before this, or the note couldn't be written) goes by her rule.
+
 The page is built so the steps still to come slot in where hers has them: SECTIONS keeps her order (1 footage,
 2 the order, 3 the song, 4 the style, 5 the vibe), and an empty slot is simply left out; her renumbering counts
 only the steps that show. The page's script is a small core (CORE_JS: the record, saving, following) with one
@@ -140,7 +154,8 @@ REV_CHECK = True        # decision 21: two windows on one reel page: a save from
 UNDO_STEPS = 60         # hers
 SAVE_AFTER_MS = 500     # hers: a change is saved half a second after the last one
 FOLLOW_MS = 4000        # how often an open page asks for a fresh pick from Claude (hers looks every 4 s)
-SHORT_SONG_FROM_TOP = 40  # decision 8: a song shorter than this (seconds) starts at the top (her code), not where it picks up
+SHORT_SONG_FROM_TOP = 40  # decision 8: a song shorter than this (seconds) starts at the top (her code), not where it picks up;
+                          # since her v25: after the last silent gap in its first 12 seconds, when it has one (short_song_start)
 SOUND_BESIDE_OUTSIDE = False   # decision 4: a screen recording in a Photos folder outside Your Content (an export folder
                         # the kit only points to) has its sound made in <kit>/Music, never in their folder. True: beside it
 PLAN_WORDS = "nicole"   # decision 5: the Plan line in the result box is hers ("Plan: 14 photos, 15.2 seconds, every cut on
@@ -171,8 +186,14 @@ MAKE_LOCK = arrange.HOME / "reel-make.lock"   # one reel made at a time on this 
 SONG_EXTS = (".m4a", ".mp3", ".wav", ".aif", ".aiff", ".aac")   # hers
 VIDEO_EXTS = (".mov", ".mp4", ".m4v")                           # hers: a screen recording, whose sound is used
 SOUND = " sound"                      # hers: the sound of "<name>.mov" is kept as "<name> sound.m4a" (".wav" on a PC)
-SOUND_NAME = re.compile(r"(.+) sound(?: ([2-9]))?")    # "<name> sound", or "<name> sound 2" beside a damaged one (ours)
-SOUND_SPARES = 8        # "<name> sound 2" to "<name> sound 9": the most made beside sounds that couldn't be read
+SOUND_NAME = re.compile(r"(.+) sound(?: (\d{1,2}))?")  # "<name> sound", or "<name> sound 2"... (hers hides any number)
+SOUND_SPARES = 98       # "<name> sound 2" to "<name> sound 99": the most made for one recording's name, each beside the
+                        # ones before it: after a recording was replaced by a new one of the same name (her v25), or
+                        # beside a sound that couldn't be read (ours)
+SOUNDS = "reel-sounds.json"           # which recording each sound was taken from (sound_for): names, sizes, times, a hash
+SOUNDS_PREV = "reel-sounds.prev.json"
+SOUNDS_LOCK = "reel-sounds.lock"
+SOUND_HEAD = 1 << 20                  # how much of a recording's start is hashed to tell it from another (1 MB)
 SONG_ID = re.compile(r"[0-9a-f]{12}")
 JOB_ID = re.compile(r"[0-9a-f]{12}")
 HER_KINDS = ("Plan:", "Made", "Wide", "Dry run", "Beats per piece", "Your song is only", "I left out")   # her server.py
@@ -1288,12 +1309,136 @@ def _sound_ok(p):
         return False
 
 
+def short_song_start(song, seconds):
+    """Where a song starts when it is short (hers: song_lead_in for a song under 40 seconds, v25): after the last
+    silent gap that ends in its first 12 seconds, or 0.0, the top. None for a song that is not short (reel.py then
+    starts it where it picks up) or whose length nobody could read (hers: 99)."""
+    if not seconds or seconds >= SHORT_SONG_FROM_TOP:
+        return None
+    try:
+        t = float(_reel_module("sound").lead_in(song))
+    except Exception:  # noqa: BLE001  (a start nobody can measure is the top)
+        return 0.0
+    return t if 0 < t <= 12 else 0.0
+
+
+# Which recording a sound was taken from (her v25: a replaced recording gets its sound taken again).
+
+def sounds_path(kit):
+    return kit / ".kit" / SOUNDS
+
+
+def _sounds(kit):
+    d = _read_json(sounds_path(kit))
+    return d if isinstance(d, dict) and isinstance(d.get("sounds"), dict) else {"v": 1, "sounds": {}}
+
+
+def _read_json(p):
+    try:
+        return json.loads(Path(p).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def recording_print(video, head=True):
+    """What tells one recording from another of the same name: its size, its time, and (head=True) a hash of its
+    first megabyte. The recording is only read. None when it can't be."""
+    try:
+        st = Path(video).stat()
+        out = {"size": st.st_size, "time": st.st_mtime}
+        if head:
+            with open(video, "rb") as f:
+                out["head"] = hashlib.sha256(f.read(SOUND_HEAD)).hexdigest()
+        return out
+    except OSError:
+        return None
+
+
+def same_recording(note, video):
+    """Is this the recording a sound's note was written for? (yes or no, the note to keep: the same one, or the
+    same with the recording's new time.) By size, then time, then the hash of its start: read only when the size
+    matches and the time does not."""
+    if not isinstance(note, dict):
+        return False, None
+    now = recording_print(video, head=False)
+    if now is None or note.get("size") != now["size"]:
+        return False, None
+    if note.get("time") == now["time"]:
+        return True, note
+    full = recording_print(video)
+    if full is None or not note.get("head") or note.get("head") != full["head"]:
+        return False, None
+    return True, dict(note, time=full["time"])
+
+
+def _sound_key(kit, sound):
+    """A sound's name in the notes: the folder it is in (Music or Photos, never a path) and its file name."""
+    try:
+        where = "Music" if Path(os.path.realpath(sound.parent)) == Path(os.path.realpath(music_dir(kit))) else "Photos"
+    except OSError:
+        where = "Photos"
+    return where + "/" + arrange._nfc(sound.name)
+
+
+def _note_sound(kit, sound, video, how, note=None):
+    """Write down which recording this sound was taken from. Saved whole, the version before kept beside it, one
+    writer at a time. A note that can't be written (a drive that can't be written to) is logged and the make goes
+    on: the next look then goes by the files' times, as hers."""
+    try:
+        note = note or recording_print(video)
+        if note is None:
+            return
+        with arrange.locked(kit / ".kit" / SOUNDS_LOCK):
+            d = _sounds(kit)
+            key = _sound_key(kit, sound)
+            want = dict(note, of=arrange._nfc(Path(video).name), how=how)
+            have = d["sounds"].get(key)
+            if isinstance(have, dict) and {k: have.get(k) for k in want} == want:
+                return                             # nothing to change: nothing written (safe to run twice)
+            want["when"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            d["v"] = 1
+            d["sounds"][key] = want
+            p = sounds_path(kit)
+            try:
+                before = p.read_bytes()
+            except OSError:
+                before = None
+            if before is not None:
+                _write_bytes_whole(kit / ".kit" / SOUNDS_PREV, before)
+            arrange.write_whole(p, d)
+    except Exception as e:  # noqa: BLE001
+        arrange.log(f"reel page: couldn't note which recording a sound came from: {e.__class__.__name__}: {str(e)[:200]}")
+
+
+def _sound_is_of(kit, sound, video):
+    """Was this sound (one that can be read) taken from the recording that is there now? With a note: by the
+    recording's size, time and start (same_recording). With none: her rule, a sound at least as new as its
+    recording is that recording's, and it is noted so the next look need not go by times."""
+    key = _sound_key(kit, sound)
+    note = _sounds(kit)["sounds"].get(key)
+    if isinstance(note, dict):
+        same, keep = same_recording(note, video)
+        if same and keep is not note:
+            _note_sound(kit, sound, video, note.get("how") or "made", {k: keep[k] for k in ("size", "time", "head")})
+        return same
+    try:
+        mine = sound.stat().st_mtime >= Path(video).stat().st_mtime
+    except OSError:
+        return False
+    if mine:
+        _note_sound(kit, sound, video, "found")
+    return mine
+
+
 def sound_for(kit, s, deadline=None):
     """The sound of a screen recording (hers: sound_of), made ONCE and never written over: "<name> sound.m4a"
     beside the recording (a PC with no ffmpeg makes "<name> sound.wav"), or, when the recording sits in a Photos
     folder outside Your Content (an export folder the kit only points to), in the kit's own Music folder
-    (decision 4), since their folder is never written to. A sound already there is used when it can be read; one
-    that can't (cut off part way) is left exactly as it is and a new one is made beside it, "<name> sound 2.m4a".
+    (decision 4), since their folder is never written to. A sound already there is used when it can be read AND it
+    was taken from the recording that is there now (_sound_is_of). One that can't be read (cut off part way), or
+    that came from an earlier recording of the same name (her v25: they replaced the recording), is left exactly
+    as it is and the next name is looked at: "<name> sound 2.m4a", "sound 3"...; the first name with nothing
+    under it is made.
     deadline: the job's own (time.time() it must be done by). Returns (path, None) or (None, her plain words)."""
     video = s["path"]
     if s["where"] == "Photos" and not SOUND_BESIDE_OUTSIDE and not _inside_content(video):
@@ -1312,12 +1457,14 @@ def sound_for(kit, s, deadline=None):
     for extra in [""] + [f" {n}" for n in range(2, SOUND_SPARES + 2)]:
         names = [video.stem + SOUND + extra + ext for ext in (".m4a", ".wav")]
         have = [h for h in (_named(folder, n) for n in names) if h is not None]
-        good = next((h for h in have if _sound_ok(h)), None)
-        if good is not None:
-            return good, None
+        good = [h for h in have if _sound_ok(h)]
+        mine = next((h for h in good if _sound_is_of(kit, h, video)), None)
+        if mine is not None:
+            return mine, None
         if have:
-            arrange.log(f"reel page: a sound beside a recording couldn't be read, so it is left as it is: {have[0].name}")
-            continue
+            if not good:
+                arrange.log(f"reel page: a sound beside a recording couldn't be read, so it is left as it is: {have[0].name}")
+            continue                               # unreadable, or an earlier recording's: left as it is
         out = folder / names[0]                    # the first name with nothing under it
         break
     if out is None:
@@ -1327,6 +1474,7 @@ def sound_for(kit, s, deadline=None):
     left = (deadline - time.time()) if deadline else MAKE_LIMIT
     if left <= 1:
         return None, WORDS["too_long"]
+    before = recording_print(video)                # the recording as it is BEFORE its sound is read
     try:
         got, how = _reel_module("sound").extract_audio(video, out, timeout=left)
     except Exception as e:  # noqa: BLE001
@@ -1335,7 +1483,9 @@ def sound_for(kit, s, deadline=None):
     if not got:
         arrange.log(f"reel page: the sound of a recording couldn't be taken: {str(how)[:200]}")
         return None, WORDS["too_long"] if "took too long" in str(how) else WORDS["no_sound"]
-    return Path(got), None
+    if before is not None:
+        _note_sound(kit, Path(got), video, "made", before)   # a recording swapped while it was read won't match this
+    return Path(got), None                                   # note, so its sound is taken again next time
 
 
 # ---------- step 1: the footage (hers: server.py footage_list, previews, moments) ----------
@@ -2469,9 +2619,10 @@ def _make(kit, ask, jid, t0):
     if ask.get("hook"):
         cmd += ["--hook", ask["hook"]]          # Claude's make only (decision 15): words on the first photo, when they ask
     if song:
-        secs = capcut.song_length(str(song)) or 99
-        if secs < SHORT_SONG_FROM_TOP:
-            cmd += ["--song-start", "0"]            # decision 8: her code starts a short song at the top
+        start = short_song_start(song, capcut.song_length(str(song)))
+        if start is not None:
+            cmd += ["--song-start", "%.2f" % start]   # decision 8 and her v25: a short song starts at the top, or
+                                                      # after the silence a screen recording opens with
     if ask.get("dry"):
         cmd.append("--dry-run")
     left = deadline - time.time()

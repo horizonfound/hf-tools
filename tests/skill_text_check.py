@@ -1088,9 +1088,38 @@ def check_trim_and_select():
          ('"' + words.get("trim_no_stills_pc", "?") + '"') in pc and ('"' + words.get("trim_stuck", "?") + '"') in pc and "a PC takes no stills from a video yet" in pc)
 
 
+def check_songs_v25():
+    """Songs (Nicole's v25, section 5; stage J of the v26 build): a short song starts after a glitchy opening, a
+    replaced recording gets its sound taken again, and Remove a song is NOT built (it waits on Nicole): the
+    instructions say what the page does and never offer to remove a song."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    reel = " ".join(read(REEL / "SKILL.md").split())
+    gone = re.search(r'^    "song_gone": "([^"]+)"', rp, re.M)
+    case("the short-song line is 40 seconds in reel_page.py, and the gap is hers (-50 dB, 0.3 s, the first 12 seconds) in sound.py",
+         "SHORT_SONG_FROM_TOP = 40 " in rp and all(x in read(REEL / "scripts" / "sound.py") for x in ("LEAD_NOISE_DB = -50.0", "LEAD_GAP = 0.3 ", "LEAD_WITHIN = 12.0")))
+    for name, t in (("arrange.md", arr), ("the reel skill", reel)):
+        case(f"{name}: a song under 40 seconds starts after the last silent gap in its first 12 seconds, on the first 1 of a bar; no gap, the top",
+             "For a song under 40 seconds" in t and "after the last silent gap in the song's first 12 seconds, on the first 1 of a bar after it" in t
+             and ("with no gap it starts at the top" in t or "with no gap, at the top" in t) and '"starting the song 4 seconds in"' in t)
+        case(f"{name}: a replaced recording's sound is taken again as \"<name> sound 2.m4a\", the first never written over, the recording listed once",
+             '"<name> sound 2.m4a"' in t and "never written over" in t and "shows the recording once" in t)
+        case(f"{name}: there is no Remove on a song, the assistant has no command for one and never moves, renames or deletes a song",
+             "no button" in t and ("you have no command for it" in t or "you have no command for one" in t)
+             and ("never move, rename or delete a song or a recording" in t or "Never move, rename or delete a song or a recording" in t)
+             and "there's no button for that yet" in t)
+        case(f"{name} never tells the assistant to put a song in the Trash", "Trash" not in t and "Recycle Bin" not in t and "Put Back" not in t)
+    case("arrange.md gives the page's own line for a picked song that is gone", bool(gone) and ('"' + gone.group(1) + '"') in arr, gone and gone.group(1))
+    case("where-things-live.md names the note of which recording each sound came from, and what is in it",
+         "`reel-sounds.json`" in where and "`reel-sounds.prev.json`" in where and "`reel-sounds.lock`" in where and "a hash of its first megabyte, never a path" in where
+         and 'SOUNDS = "reel-sounds.json"' in rp and 'SOUNDS_PREV = "reel-sounds.prev.json"' in rp and 'SOUNDS_LOCK = "reel-sounds.lock"' in rp)
+    case("where-things-live.md: \"sound 2\" up to 99, none written over, and a sound with no line goes by the files' times",
+         'up to 99' in where and "SOUND_SPARES = 98 " in rp and "goes by the files' times" in where)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
