@@ -329,7 +329,7 @@ if (SCENARIO === 'preparing') {
 } else if (SCENARIO === 'carousel-made') {
   // the page opened with the slides already made for the order it shows (made earlier, or from the chat)
   check('opened with the slides already made for this order: the line and the folder button are there', text('doneline') === DONE5 && !byId('openfolder').hidden, text('doneline'));
-  check('and the Canva line, when the kit has Canva slides', !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('and the Canva line, when the kit has Canva slides', !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
   check('no asking beyond the slow watch', _timers.length === 1 && _timers[0].every, _timers.length);
   layout(10);
   clickButton(rowTile(16).querySelector('.x')); settle();
@@ -445,9 +445,9 @@ if (SCENARIO === 'preparing') {
   wait(179000); runIntervals();
   check('carousel: just under three minutes: still waiting', text('doneline') === 'Your slides are already being made. One moment.', text('doneline'));
   wait(2000); runIntervals();
-  check('carousel: after three minutes with no result it stops asking and says to tell Claude', text('doneline') === 'This is taking longer than it should. Tell Claude.' && byId('openfolder').hidden && _timers.length === 1, text('doneline') + ' timers ' + _timers.length);
+  check('carousel: after three minutes with no result it stops asking and says to tell Claude', text('doneline') === 'This is taking longer than it should. Tell your assistant.' && byId('openfolder').hidden && _timers.length === 1, text('doneline') + ' timers ' + _timers.length);
   runIntervals(); runIntervals();
-  check('carousel: having said that, the page does not go back to saying the slides are being made', text('doneline') === 'This is taking longer than it should. Tell Claude.' && _timers.length === 1, text('doneline'));
+  check('carousel: having said that, the page does not go back to saying the slides are being made', text('doneline') === 'This is taking longer than it should. Tell your assistant.' && _timers.length === 1, text('doneline'));
   // and if the result turns up later, the page shows it
   SERVER.st.job = {state: 'done', line: 'Done. 4 slides are in your Carousel folder.', rev: SERVER.st.rev, count: 4}; runIntervals();
   check('carousel: a result that turns up after that is still shown', text('doneline') === 'Done. 4 slides are in your Carousel folder.' && !byId('openfolder').hidden, text('doneline'));
@@ -459,7 +459,7 @@ if (SCENARIO === 'preparing') {
   dragTo(poolTile(14), 790, 100); release(790, 100); settle();
   clickButton(byId('happy')); settle();
   SERVER.st.job = {state: 'done', line: DONE5, rev: SERVER.st.rev, count: 5}; runIntervals();
-  check('carousel: with Canva slides in the kit, a line under the result says they show the old photos', text('doneline') === DONE5 && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('carousel: with Canva slides in the kit, a line under the result says they show the old photos', text('doneline') === DONE5 && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
 
   // under two photos, and a full carousel
   layout(10);
@@ -510,7 +510,7 @@ if (SCENARIO === 'preparing') {
 } else if (SCENARIO === 'carousel-same') {
   // the slides were already in this order (Claude's apply found nothing to change), and the kit's Canva
   // slides were made from another order: the Canva line belongs with this result too
-  check('slides already in this order, Canva slides from another order: the Canva line shows', text('doneline') === 'Your slides are already in this order.' && !byId('openfolder').hidden && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('slides already in this order, Canva slides from another order: the Canva line shows', text('doneline') === 'Your slides are already in this order.' && !byId('openfolder').hidden && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
   SERVER.st.canva = false; runIntervals();
   check('once Claude has filled the template again the Canva line goes by itself, and the result stays', byId('canvaline').hidden && text('canvaline') === '' && text('doneline') === 'Your slides are already in this order.', text('canvaline'));
 } else if (SCENARIO === 'carousel-long') {
@@ -527,7 +527,7 @@ if (SCENARIO === 'preparing') {
   clickButton(rowTile(21).querySelector('.x')); settle();
   check('another taken out (20): the button is on and the line is gone', !byId('happy').disabled && text('why') === '' && rowNums().length === 20, text('why'));
 } else if (SCENARIO === 'down') {
-  check('the Assistant not answering at the start: the page says so', text('l-reach') === 'Could not reach the Assistant. Tell Claude instead.' && !byId('l-reach').hidden, text('l-reach'));
+  check('the Assistant not answering at the start: the page says so', text('l-reach') === 'Could not reach the Assistant. Tell your assistant instead.' && !byId('l-reach').hidden, text('l-reach'));
   SERVER.mode = 'up'; runTimers();
   check('and it opens by itself once the Assistant is back', eq(rowNums(), [1, 6, 11, 16, 21]) && byId('l-reach').hidden && text('status') === 'Saved', rowNums());
 } else {
@@ -2582,7 +2582,7 @@ def check_carousel_fixes(work, port):
              folder_print(car) == car_mid and sorted(os.listdir(hid / "slides-older")) == older_mid and making() == [] and all(s_ == "done" for s_ in journals()), (plain(), journals(), making()))
         code, out = run(env, "arrange.py", "apply", str(kit), "--piece", "carousel", "--job")
         job = json.loads(job_file.read_text())
-        case("the page's own job says the same in plain words, with no file name", code == 1 and job.get("state") == "problem" and job.get("line") == arrange.IN_THE_WAY == "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. Your Carousel folder was left as it was. Tell Claude and it'll sort it out." and folder_print(car) == car_mid, job)
+        case("the page's own job says the same in plain words, with no file name", code == 1 and job.get("state") == "problem" and job.get("line") == arrange.IN_THE_WAY == "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. Your Carousel folder was left as it was. Tell your assistant and it'll sort it out." and folder_print(car) == car_mid, job)
 
         # ---- a move that cannot be finished is put back, never left half way for good ----
         shutil.move(str(car / stranger), str(aside_dir / stranger))

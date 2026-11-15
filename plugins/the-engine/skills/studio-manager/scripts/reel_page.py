@@ -2890,7 +2890,7 @@ def _get_page(handler, q):
         # a PC without Pillow, or a kit too deep in folders for a PC: say so. A Mac: never.
         cant = arrange.cant_make(kit, rows)
         if cant:
-            return arrange._send_page(handler, arrange_page.plain_page(cant[1] + " Tell Claude and it'll sort it out."))
+            return arrange._send_page(handler, arrange_page.plain_page(cant[1] + " Tell your assistant and it'll sort it out."))
         arrange.start_previews(kit)
     arrange._send_page(handler, page_html(kit.name, st["short"], st["kit_page"]))
 
@@ -3490,6 +3490,7 @@ TRIM_CSS = r"""
 
 OUR_CSS = r"""
 [hidden]{display:none!important}
+@media(max-width:620px){.viewer video.wide{width:100%}}
 .reelwrap{position:relative}
 .ins{position:absolute;width:4px;border-radius:3px;background:var(--coral-2);pointer-events:none;display:none;box-shadow:0 0 0 2px rgba(212,100,63,.22);z-index:3}
 .ins.on{display:block}

@@ -597,3 +597,70 @@ Older tests brought up to v25, each only where her behaviour changed: `kit_steps
 - `posting_queue.kit_piece(p, kit, "reel")` is the FIRST reel's piece; pass `version=` for another. `kit_reels(kit)` is [] for a shoot with one reel.
 - The panel's photos now sit in `#pick .ps` (one or two `.strip` rows inside it), not in a single `#pick > .strip`.
 - `tests/kit_cards_check.py`'s other older failure (the kit page asking Google for Figtree) still shows on some runs; it came with the stories designer.
+
+## Stage L, built (Nov 14): the smaller changes and loose ends of v25 and v26
+
+Every item of `UPDATE-v25.md`, `UPDATE-v26.md` and her notes was read again and matched to where it is built. Almost all of it was already in stages A to K. What this stage added is at the top; the full list is under it.
+
+**What changed in this stage.**
+- **No page tells them to talk to "Claude" any more: every page says "your assistant".** Nicole's own pages never say Claude, and v26 says so outright for the editing queue ("Everywhere on the page says 'your assistant', never 'Claude'"). The home base, the queue, the report, the reel page and the talking page already did. The older pages still had about forty lines of ours that said "Tell Claude and it'll sort it out", "Could not reach the Assistant. Tell Claude instead." and the like: the two pickers, the designer, the post kit, the posting queue page (its rhythm line, its grid line, "Not started. Say ... to Claude", the saved-copy line) and the reminders' "something got in the way" line. Each now says "your assistant" in the same sentence, nothing else reworded. The name of the app ("the Claude app") is untouched; so are the setup guides, which still say plainly that it runs on Claude.
+- **Both setup guides match the home base** (`docs/SETUP-GUIDE.md`, `docs/SETUP-GUIDE-PC.md`; the PDFs are not rebuilt). Gone: "your recent shoots" on the home page, "a box opens under it", the open question when a kit is made, "single posts, a carousel, stories and a reel cover ... plus hooks and a caption" made all at once, "I'm done ... (starts the reel and carousel)". In: the four steps, the two screens of their own, "make my posts" brings the photos in and opens the post kit and stops there, the three cards, a caption being optional, each shoot's own Open this folder on the report, See the report on the Back up a card screen, and "the beach gallery is delivered" beside "I'm done with the beach shoot".
+- **The words part says a caption is optional** (`parts/words.md`): never tell them a piece can't go in the queue until its words are written. It was already said in the post kit and posting queue parts; the part that writes captions still opened with "a post isn't finished until it has its caption" and nothing else.
+- **The two slash commands** (`/assistant`, `/studio`) told every hello to be a rundown of the day; they now send the hello through `parts/hello.md` and `home.py hello --mark`, as the Nov 5 hello stages always meant.
+- **Where things live** names the delivered date (`finished_at`) and what Take out of my queue does to a shoot's record. Every other new record was already there (checked by the new test, below).
+- **Another website can no longer ask the report's server to open a folder or play a clip.** `GET /open`, `/play` and `/open-clips` now refuse a cross-site ask (403), as `/open-shoot` already did (stage D's note).
+- **A wide video's player fits a phone's width on the reel page.** Her rule keeps it 420 px wide whatever the window, so with footage on the whole page scrolled sideways on a phone (stage I's note). Hers is kept whole; one rule of ours narrows it only in a window 620 px wide or less.
+- **A test that failed on and off is mended** (`tests/kit_cards_check.py`, "nothing was asked of the internet by the kit page"): the kit page never asked for anything; the stories designer, opened by a press earlier in the same test, asks Google for a story font, and that ask sometimes landed in the list as the kit page came back. The test driver now notes which page made each ask.
+
+**Every item, and where it is built.**
+
+| Hers | Where |
+|---|---|
+| v25 §2 several reels, talking reels, per-reel clips and picks | stage G (98997e7) |
+| v25 §3 nothing picked until they ask; the photo note; the copy line | stage H (4078e9b) |
+| v25 §4 Trim | stage I (f549449) |
+| v25 §5 a short song's glitchy opening; a replaced recording's sound | stage J (688d313) |
+| v25 §5 **Remove a song** | **not built: waiting on Nicole** (the waiting list, item 1) |
+| v25 §6 captions optional; reel previews; Which reel goes in your queue | stage K (ed5aaf1) |
+| v25 §7 each reel its own piece; the cover picker's two rows | stage K |
+| v25 §8 select several photos | stage I |
+| v25 §9 every vibe on the song's real hits; "No song"; the chat reel maker | stage F (e0c752d, 959ed90) |
+| v25 §10 pacing when the photos are alike | stage F, instructions only (`shared/curating.md`, the reel skill); her engine has no change for it |
+| v25 §10 the home page lists a shoot without its Post kit.html | stage B (`home_base.kits`, `home.gather`); pinned again by this stage's test |
+| v25 §10 "make my posts" only brings the photos in | stage H |
+| her `PREFERENCES.md` and `SELECTS.md` v25 sections | each line is one of the rows above; "finish and hand off before trying new ideas" is hers about her own handoffs |
+| v26 §3 the home base, Back up a card, Make posts, the kit archive | stage B (b307065, 919d0c4) |
+| v26 §3 the cards of one shoot as one backup, wired to our linked backups | stage B |
+| v26 §4 the editing queue | stage A (e3fa520, 94f82cf) |
+| v26 §5 the stories designer | stage C (b42c891, 83d1d81) |
+| v26 §6 her test-only bits (`?home=test`, port 8799) | not built, on purpose |
+| v26 §7 / notes §1 the folder-naming question | **not built: waiting on Dustin and Nicole** (item 2) |
+| v26 §7 / notes §2 the report's words; notes §1 the intro before the questions | stage D (b5af248) |
+| v26 §7 / notes §10 the drop box's second copy | **not built: waiting on Dustin and Nicole** (item 3) |
+| notes §3 to §9 the order of the home page and its two screens | stage B |
+| notes §11, §13 Delivered, Archived, Uploaded shoots, one Find a shoot | stage A |
+| notes §12, §14 the story templates, guides, Let my assistant choose, Redo, sets, the x on a label | stage C |
+| notes §12 "idea for later: when a shoot is marked delivered, offer to start a Gallery delivered set" | not built: hers says later |
+| notes §7 a fifth step, uploading galleries; a logo for queue screenshots; centering on faces | set aside by Nicole herself |
+
+**Choices where her spec was silent.**
+1. The "your assistant" change covers lines a photographer reads on a page. Lines only the assistant reads in the chat (a command's own output, such as "Waiting for Claude:") are left.
+2. A caption being optional is said in the words part as "the post kit's Add to my queue is the way in" when they are stuck on the words page's own Post it step, which still waits for a written caption (stage K's question for the owners stands).
+3. A folder in Your Content with no kit record (made by hand) is still not listed, as stage B chose: there is no page it could open. Everything the Assistant itself brings in has a record.
+4. The player's narrow-window rule starts at 620 px, the width where her own page already stacks the player above its side text.
+
+**Left out, or found and not done.**
+- **Remove a song,** the folder-naming question and clearing the drop box: waiting, as above.
+- **A clip whose card is the whole video can still stop a reel** ("... is only 2.40 seconds of video ...", stage F's note for stage I). Not fixed: the fix is either a clip that ends a few frames short or one slowed a hair, and neither has been seen in CapCut.
+- **`tests/reel_page_check.py` still compares the reel page's main word table with her v19/v23 page;** the v25 tables are compared by their own tests. Folding them together is a tidy-up of the test, not a change anyone sees.
+- **The two PDFs' own source pages** (`docs/install-guide/`) still show the older home page; only the two guides were changed.
+- `tests/shoot_report_check.py` still leaves a small page server running after it ends (older, from main).
+
+**Tests.** `tests/loose_ends_v26_check.py` (new, 64 checks, no browser, no server, no add-on, both Pythons, in GitHub's check on Windows and the Mac). Each change was put back in a scratch copy, one file at a time, and the test failed every time (twelve files, and the two places that list kits). Added to older tests: three cross-site refusals and one still-answered check in `tests/report_v26_check.py`; the phone-width player in `tests/reel_footage_check.py`. Both were seen to fail with their fix taken out (the report's three routes answered 200; the page was 474 px wide at a phone's 375). Run after the changes, one at a time, on both Pythons unless said (3.12 / Apple's 3.9): `loose_ends_v26_check` 64, `skill_text_check` 507, `reminders_check` 151, `pc_smoke` 230 / 183, `pc_reel_page` 49, `pc_arrange` 38 / 14, `pc_design` 247 / 246, `arrange_check` 660, `report_v26_check` 107 / 102, `review_fixes_c_check` 45, `posting_reminders_page_check` 116, `posting_panel_check` 88, `kit_cards_check` 127, `kit_steps_check` 100, `kit_reels_queue_check` 140, `reel_door_check` 47, `reel_fixes_check` 41, `reel_page_check` 343, `reel_footage_check` 184, `home_base_check` 213, `words_page_check` 195, `talking_page_check` 573, `reel_trim_select_check` 153; on 3.12 only (they draw with Pillow), `design_check` parts screen 100, server 732, fixes 102, page 631, wire 108. `tools/check_pc.py` and `tools/check_plugin.py` clean. The other parts of `design_check` and the tests of files this stage did not touch were not run again: stage E's sweep.
+
+**Not tried.** Anyone's own hand; the Claude app's pane; a real phone; Windows (the first push runs the new test there); the guides read start to finish by someone following them on a fresh Mac or PC.
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **"Your assistant" on every page.** Built: every page line of ours that named Claude now says "your assistant", to match hers. The guides and the plugin's description still say it is Claude (rule 8). Say if any page should name Claude after all.
+2. **Remove a song** is still not built and is hers to answer: to the Trash, or only off the list.
+3. **The setup guides' new wording** is ours, a draft, and the PDFs are not rebuilt.

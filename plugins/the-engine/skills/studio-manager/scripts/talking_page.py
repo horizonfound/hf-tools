@@ -357,12 +357,12 @@ OUR_WORDS["made_only_note"] = (
     "the photo reel's page shows it")
 OUR_WORDS["not_ready"] = (
     "This shoot isn't ready for this yet. Tell your assistant: make posts from this shoot.",
-    "the pickers' own line says \"to Claude\", which no line on this page may; the same page, reworded")
+    "the pickers' own line said \"to Claude\" when this page was built, which no line on this page may; the same page, reworded")
 OUR_WORDS.update({"job_" + k: v for k, v in TR.OUR_JOB_WORDS.items()})
 OUR_WORDS.update({"make_" + k: v for k, v in TR.OUR_MAKE_WORDS.items()})
 
 CANT_FIND = arrange.CANT_FIND
-NOT_READY = OUR_WORDS["not_ready"][0]   # the pickers' own "not ready" page (arrange.NOT_READY), without its "to Claude"
+NOT_READY = OUR_WORDS["not_ready"][0]   # the pickers' own "not ready" page (arrange.NOT_READY), in this page's own words (theirs said "to Claude" when this page was built)
 NOT_UNDERSTOOD = arrange.NOT_UNDERSTOOD
 
 

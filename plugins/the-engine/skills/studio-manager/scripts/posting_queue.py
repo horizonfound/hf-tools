@@ -1416,12 +1416,12 @@ const $=s=>document.querySelector(s);const toast=$('#toast');let tt;
 function say(m){toast.textContent=m;toast.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove('on'),2400)}
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}   // a shoot's name is theirs: only ever text
 function nice(iso){if(!iso)return'';const d=new Date(iso+'T12:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
-async function post(body){if(!live){say('This is a saved copy. Ask Claude to “show my posting queue” to change things.');return null}
- try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell Claude instead.');return null}}
+async function post(body){if(!live){say('This is a saved copy. Ask your assistant to “show my posting queue” to change things.');return null}
+ try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell your assistant instead.');return null}}
 function render(S){LAST=S;
  $('#tankh').innerHTML=S.tank_head;$('#tankp').textContent=S.tank_line;
  const bar=$('#tankbar');bar.className='tankbar'+(S.weeks===null?'':S.weeks<=1?' low':S.weeks<=2?' mid':'');bar.firstElementChild.style.width=(S.weeks===null?0:Math.min(100,S.weeks/4*100))+'%';
- $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell Claude to change it.`:`No posting rhythm yet. Tell Claude how often you like to post.`;
+ $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell your assistant to change it.`:`No posting rhythm yet. Tell your assistant how often you like to post.`;
  const g=$('#grid');if(PEL.parentNode===g)g.after(PEL);g.innerHTML='';   // the panel is kept (it lives under a row of the grid while open)
  const greens=S.greens.slice().reverse();  // Instagram shows the newest first: the last in line sits top-left
  const feed=S.feed&&S.feed.posts||[];const pinned=feed.filter(x=>x.pinned),rest=feed.filter(x=>!x.pinned);
@@ -1435,12 +1435,12 @@ function render(S){LAST=S;
  if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
- $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
+ $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to your assistant to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to your assistant.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
   items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}${x.reel_name?' · '+esc(x.reel_name):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
- mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to Claude.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
+ mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to your assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
  document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:'Posted. Nice.',ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);
  if(PICK)openPick(PICK,true);watchRemind();}   // an open panel survives every redraw: put back under its post's row, its photos and words read again
@@ -1492,7 +1492,7 @@ function copyText(t,what){   // the old way first: the Claude app's pane refuses
  try{a.select();a.setSelectionRange(0,t.length);ok=document.execCommand('copy')}catch(e){ok=false}a.remove();
  const said=()=>say(PW.copied.replace('{what}',what));
  if(ok){said();return}
- try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell Claude instead.'))}catch(e){say('Could not copy that. Tell Claude instead.')}}
+ try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell your assistant instead.'))}catch(e){say('Could not copy that. Tell your assistant instead.')}}
 function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
 function placePick(id){   // right under the row of the post that was clicked
  const g=$('#grid'),tiles=[...g.children].filter(c=>c!==PEL),t=tiles.find(c=>c.dataset&&c.dataset.id===id),i=tiles.indexOf(t);
@@ -1594,7 +1594,7 @@ const RW={set:'Set a reminder to post',on:'🔔 Reminder: ',close:'Close',
  pc_new_one:'Set a new reminder',
  pc_set_toast:'Reminder ready: {when}. Add it to your calendar.',pc_off_toast:'Reminder off. Take it off your calendar too.',
  pc_opened:'Opened in your calendar app. Say yes to it there.',pc_opened_n:'Opened {n} reminders in your calendar app. Say yes to each one there.',
- pc_open_cant:'I couldn’t open that calendar file. Tell Claude instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
+ pc_open_cant:'I couldn’t open that calendar file. Tell your assistant instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
 function hm(t){if(!t)return'';let[h,m]=t.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return h===12&&m===0&&ap==='pm'?'noon':`${h}${m?':'+String(m).padStart(2,'0'):''} ${ap}`}
 function RM(){return LAST.reminding||{}}
 function remindButton(x){if(!live||!RM().way)return null;
@@ -1726,7 +1726,7 @@ def page_html(p):
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show my posting queue” to change things.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask your assistant to “show my posting queue” to change things.</p></header>"
             "<section class='sec'><h2>Your Instagram grid, with your new posts in it</h2><p>Newest at the top, like Instagram. The outlined ones are your upcoming posts. Click one to pick the photo it shows. Drag one to a different spot to change the order; the dates update to match.</p>"
             "<p class='pickhint' id='pickhint' hidden>Click on a post to change the photo it shows in your grid, or to copy its caption.</p>"
             "<div class='grid' id='grid'></div><div class='pick' id='pick' hidden></div><p class='gridnote' id='gridnote'></p></section>"
@@ -1753,7 +1753,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     (the reel page's is "Open CapCut")."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
-        return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
+        return False, "The reel hasn't been made yet. Say “make the reel” to your assistant."
     if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
     if this_computer.no_windows():      # inside a test: CapCut is never started
@@ -1792,7 +1792,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
         words += " " + extra
     if damaged:                                  # pressing again would meet the same damaged list: Claude sorts it out
-        return True, words + " If it isn't in the list, tell Claude and it'll sort it out."
+        return True, words + " If it isn't in the list, tell your assistant and it'll sort it out."
     try:
         waiting = capcut.waiting()               # still not in CapCut's list: CapCut was open (or it couldn't be told)
     except Exception:  # noqa: BLE001  (a hint, never a reason for the button to fail)
@@ -1801,7 +1801,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
         if unsure:
             # pressing again would not help (this computer can't tell whether CapCut is open): Claude adds it with
             # `capcut.py open --closed` once they say CapCut is closed (parts/on-a-pc.md)
-            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell Claude “add my waiting reel”."
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell your assistant “add my waiting reel”."
         else:
             words += f" If it isn't in the list, {capcut.QUIT} CapCut and press {button} again, and I'll add it."
     return True, words
@@ -2271,7 +2271,7 @@ class Handler(SimpleHTTPRequestHandler):
         (the drive unplugged, or no such kit) her page says so, with her one line, and the answer is "not found".
         Should the page fail to build, the copy kit.py last saved is sent instead, but only one of today's page
         (kit.PAGE_MARK); a copy from before her three cards is never passed off as current, and the page says in one
-        line that something couldn't be read and to tell Claude."""
+        line that something couldn't be read and to tell your assistant."""
         import arrange
         import kit as kit_mod
         kit = arrange.kit_by_name(name)
@@ -2457,7 +2457,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
         except OSError as e:
             # the queue couldn't be saved (on a PC, another program held it longer than a few seconds; a full disk):
-            # an answer all the same, never a dropped connection. The page says to tell Claude.
+            # an answer all the same, never a dropped connection. The page says to tell your assistant.
             say(f"posting: couldn't save the posting queue ({e.__class__.__name__}: {str(e)[:160]})")
             self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The posting queue couldn't be saved just now")
             return

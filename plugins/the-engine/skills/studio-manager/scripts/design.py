@@ -255,7 +255,7 @@ TOO_MANY_TEMPLATES = "You have 200 templates, which is as many as fit."
 BRAND_FULL = "You've saved 16 brand colors, which is as many as fit. Take one off first."
 YOURS_FULL = "Your font list is full. The font still works in this design."
 SLIDE_AGAIN = "Something went wrong while the slides were being sent. Nothing was added to your Carousel folder. Press Save slides again."
-SLIDES_WAITING = "Too many unfinished saves are waiting. Tell Claude and it'll sort it out."
+SLIDES_WAITING = "Too many unfinished saves are waiting. Tell your assistant and it'll sort it out."
 SAVED_SET = "Saved {n} slides in your Carousel folder, named \"{base}\". Nothing was replaced."
 SAVED_ONE = "Saved 1 slide in your Carousel folder, named \"{base}\". Nothing was replaced."
 ALREADY = "Already saved as \"{base}\". Change something to save a new set."
@@ -276,7 +276,7 @@ LONG_NAME = ("Couldn't save the slides: with this design's name, a slide's own n
              "to open ({limit}). Nothing was added to your Carousel folder. Give the design a shorter name, then "
              "press Save slides again.")
 LONG_FOLDER = ("Couldn't save the slides: this shoot's folder sits too deep in other folders for this {pc} to open "
-               "a slide in it ({limit}). Nothing was added to your Carousel folder. Tell Claude and it'll sort it out.")
+               "a slide in it ({limit}). Nothing was added to your Carousel folder. Tell your assistant and it'll sort it out.")
 TOO_DEEP = ("This shoot's folder sits too deep in other folders for this {pc} to keep a design of its slides "
             "({limit}). Moving {where} nearer the top of the drive, or a shorter name for this shoot's folder, puts "
             "it right. Nothing was changed.")
@@ -2331,10 +2331,10 @@ def _get_page(handler, q):
         # "getting your photos ready" for ever. A Mac: never (arrange.cant_make).
         cant = arrange.cant_make(kit, arrange.sheet_rows(kit))
         if cant:
-            return _send_page(handler, design_page.plain_page(cant[1] + " Tell Claude and it'll sort it out."))
+            return _send_page(handler, design_page.plain_page(cant[1] + " Tell your assistant and it'll sort it out."))
     deep = too_deep(kit, kind)          # a PC only: the designer's own files would not fit either
     if deep:
-        return _send_page(handler, design_page.plain_page(deep + " Tell Claude and it'll sort it out."))
+        return _send_page(handler, design_page.plain_page(deep + " Tell your assistant and it'll sort it out."))
     if st["previews"]["made"] < st["previews"]["of"] and to_make:
         arrange.start_previews(kit)
     tidy(kit, kind=kind)                # day-old slides of saves that were never finished (the Assistant's own scratch)

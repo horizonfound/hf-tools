@@ -100,19 +100,19 @@ That's the setup. You never do it again.
 
 ## Part 2: Opening the Assistant, and your first backup
 
-**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi**. **[check: whether typing /assistant also works from an installed copy; the docs suggest it shows up as /the-engine:assistant, so "hi" is the one to teach]** The first time, the Assistant introduces itself and opens its home page beside the chat; once you've done a few things together it answers with the day instead (what's due, what's queued to post, whether it sees a card). You don't need a memory card to start: if you have photos you've already finished, you can begin with posts. The home page has a button for everything it can do, and your recent shoots. Click any button to see what it does; if it's something you do together, it tells you what to say. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
+**Opening the Assistant.** Click the Assistant in the left column, start a new chat, and just say **hi**. **[check: whether typing /assistant also works from an installed copy; the docs suggest it shows up as /the-engine:assistant, so "hi" is the one to teach]** The first time, the Assistant introduces itself and opens its home page beside the chat; once you've done a few things together it answers with the day instead (what's due, what's queued to post, whether it sees a card). You don't need a memory card to start: if you have photos you've already finished, you can begin with posts. The home page is your home base: what matters today, then the four steps in the order of the work (**Back up a card**, **My editing queue**, **Make posts from a shoot**, **My posting queue**), and **Open my Assistant folder**. You can start at any step. Back up a card and Make posts from a shoot each open a screen of their own, with the words to paste into the chat and a Copy button beside them. That's the whole interface. Say what you want, in your own words, the way you'd say it to a person.
 
 **The very first time, on a newer Mac: one free piece from Apple.** The Assistant runs on a small piece of software that Apple supplies but doesn't put on every Mac ahead of time. If yours doesn't have it yet, a window from Apple pops up the first time you say hi, asking to install "command line developer tools." Click **Install**, then **Agree**. It takes five to ten minutes. When it says it's done, tell the Assistant "done" and it picks up where it left off. You never see this again. **[check on a Mac that has never had it: the window's exact words, and how long it takes]** **[shot]**
 
 **Your first posts (no memory card needed).**
 
-1. On the home page, click **Make posts from a shoot**. A box opens under it that tells you what to do.
-2. The first time, it asks you to paste **set up my Assistant folder** into the chat. The Assistant asks where your posts should be kept (your photo drive is the usual answer) and makes one folder there, called The Assistant, with Your Content inside it.
-3. Back on the home page, click **Make posts from a shoot** again, then **Select the folder with your finished photos**. Pick the folder you exported from Lightroom. The Assistant makes its own copies of the JPEGs in it; your originals aren't moved or changed.
-4. Paste **make my posts** into the chat. The Assistant looks through what you brought, asks what to call the shoot, and asks one open question: anything you'd want to say about it. Say as much or as little as you like. The words in your captions come from what you tell it.
-5. It makes a post kit: single posts, a carousel, stories and a reel cover, all sized for Instagram, plus hooks and a caption, on one page with a Copy button on each. The reel is a project waiting in CapCut, cut to the beat, for you to style and export. **[check: on a Mac other than Dustin's, with that Mac's CapCut]**
+1. On the home page, click **Make posts from a shoot**. It opens a screen of its own: two steps at the top, and under them your post kits, once you have some.
+2. The first time, there is no Assistant folder yet, and the screen says so when you press its folder button. Type **set up my Assistant folder** in the chat. The Assistant asks where your posts should be kept (your photo drive is the usual answer) and makes one folder there, called The Assistant, with Your Content inside it.
+3. Back on the Make posts screen, click **Select the folder with your finished photos**. Pick the folder you exported from Lightroom. The Assistant makes its own copies of the JPEGs in it; your originals aren't moved or changed.
+4. Click **Copy** beside **make my posts** and paste it into the chat. The Assistant looks through what you brought, tells you what it will call the shoot (say so if it should be something else), and opens the shoot's post kit beside the chat. That is all it does by itself: it doesn't pick photos or write anything until you ask.
+5. The post kit is one page with three cards: **Reel**, **Carousel** and **Stories**. You choose the photos for each on its own page. If you'd like the Assistant to pick for you, the page gives you a line to copy into the chat. On the reel page you add your song, pick the vibe and press **Make my reel**; the reel is then a project waiting in CapCut, cut to the beat, for you to style and export. The carousel and the stories each have a designer for your own layouts and words (a carousel of one slide is a single post). A caption is written from what you tell the Assistant, on each piece's words page, and it's optional: **Add to my queue** works once a piece is made. **[check: on a Mac other than Dustin's, with that Mac's CapCut]**
 
-Nothing is ever posted for you. The kit is yours to post from.
+Nothing is ever posted for you. The kit is yours to post from. Every post kit you make is listed on the Make posts screen, newest first, each with **Open the post kit**.
 
 **Your first backup.**
 
@@ -134,7 +134,7 @@ From then on, "backup now" asks only those two quick questions.
 
 ### When you come back
 
-Your phone has tapped you, and the last thing in the chat is a button: **Show the report**. Click it. (If you were away a long while, the page beside the chat may have gone blank. That's normal; the button brings the report back.) Top to bottom: every photo backed up and checked, byte for byte, and the card is safe to format; what's on the card, one block per shoot, each with six sneak peeks picked to edit first; a note to your client, ready to copy; and a button that opens the folder your photos are in.
+Your phone has tapped you, and the last thing in the chat is a button: **Show the report**. Click it. (If you were away a long while, the page beside the chat may have gone blank. That's normal; the button brings the report back.) Top to bottom: every photo backed up and checked, byte for byte, and the card is safe to format; what's on the card, one block per shoot, each with its own **Open this folder** button and six sneak peeks picked to edit first; a note to your client, ready to copy; and, at the bottom, what to do next: open your folder to start editing, and come back to your home base when your edits are done.
 
 On each shoot:
 
@@ -146,13 +146,14 @@ On each shoot:
 
 In Lightroom, the sneak peeks are one filter away: the keyword **sneak peek**.
 
-**Getting around.** Every page has a **Back to home** button at the top left. On the home page, your recent shoots each have **See the report**, so you can always get back to a report to rename a shoot or change its sneak peeks.
+**Getting around.** Every page has a **Back to home** button at the top left. On the home page, **Back up a card** opens a screen that lists every backup you've made, newest first; each shoot there has **Open this folder** with **See the report** under it, so you can always get back to a report to rename a shoot or change its sneak peeks.
 
 ### Things to say to the Assistant
 
 - **show me the report** · **show my shoots** · **what's in my queue**
 - **the first one is the Garcia family** (names a shoot)
-- **I'm done with the beach shoot** (starts the reel and carousel)
+- **I'm done with the beach shoot** (opens that shoot's post kit, where you make the reel, the carousel and the stories)
+- **the beach gallery is delivered** (takes it off your editing queue)
 - **backup now** (always)
 
 ---

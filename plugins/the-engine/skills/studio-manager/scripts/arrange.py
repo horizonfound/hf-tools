@@ -131,8 +131,8 @@ PAGE_ID = re.compile(r"[A-Za-z0-9]{6,40}")     # the name an open page gives its
 ORIGIN_ENFORCED = True
 
 CANT_FIND = "I can't find that shoot's posts. Is the drive plugged in?"
-NOT_READY = "This shoot isn't ready for this yet. Say \"make posts from this shoot\" to Claude first."
-CANT_REACH = "Could not reach the Assistant. Tell Claude instead."
+NOT_READY = "This shoot isn't ready for this yet. Say \"make posts from this shoot\" to your assistant first."
+CANT_REACH = "Could not reach the Assistant. Tell your assistant instead."
 PHOTOS_CHANGED = "The photos in this shoot changed since this page opened."
 NEWER = "This order was changed somewhere else. Here's the newest."
 NOT_UNDERSTOOD = "That didn't arrive the way it should have. Reload the page and try again."
@@ -143,8 +143,8 @@ MAKING = "Making your slides..."
 ALREADY_MAKING = "Your slides are already being made. One moment."
 IN_ORDER = "Your slides are already in this order."
 LEFT_AS_WAS = "Your Carousel folder was left as it was."
-NOT_FINISHED = "Couldn't finish changing your slides. Nothing was lost. Tell Claude and it'll sort it out."
-IN_THE_WAY = "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."
+NOT_FINISHED = "Couldn't finish changing your slides. Nothing was lost. Tell your assistant and it'll sort it out."
+IN_THE_WAY = "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out."
 JOB_STOPPED = "Making your slides was interrupted. Press \"I'm happy with this order\" again and it will finish."
 JOB_BOOT = 20.0                         # seconds a job may take to start before "queued" means it never did
 JOB_OLD = 300.0                         # where locks can't be used: a job older than this is taken for dead
@@ -1150,8 +1150,8 @@ def carousel_done(kit, rev, nums):
         return {"job": False, "same": True, "line": IN_ORDER}
     write_job(kit, "queued", MAKING, rev, len(nums))
     if not start_job(kit):
-        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, len(nums))
-        return {"job": False, "same": False, "line": "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."}
+        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.", rev, len(nums))
+        return {"job": False, "same": False, "line": "Couldn't make the slides. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out."}
     return {"job": True, "same": False, "line": MAKING}
 
 
@@ -1244,7 +1244,7 @@ def _get_page(handler, q):
         # ready" for ever. A Mac: never.
         cant = cant_make(kit, rows)
         if cant:
-            return _send_page(handler, arrange_page.plain_page(cant[1] + " Tell Claude and it'll sort it out."))
+            return _send_page(handler, arrange_page.plain_page(cant[1] + " Tell your assistant and it'll sort it out."))
     if st["previews"]["made"] < st["previews"]["of"] and to_make:
         start_previews(kit)
     _send_page(handler, arrange_page.page_html(kit.name, piece))
@@ -1599,24 +1599,24 @@ def _job_line(res, n):
     if res.get("why") in ("photo", "make") and photos:
         if res.get("detail"):   # a PC only: kit.rebuild_carousel names the real reason (pictures.why_not); never set on a Mac
             return "problem", (f"Couldn't make the slides: photo {photos[0]} can't be opened on this {this_computer.COMPUTER} yet. "
-                               + LEFT_AS_WAS + " Tell Claude and it'll sort it out.")
+                               + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.")
         return "problem", f"Couldn't make the slides: photo {photos[0]} can't be read. Is the drive plugged in? " + LEFT_AS_WAS
     # The three below only ever come from a PC (kit.rebuild_carousel): no way to make pictures yet, or a slide's full
     # address longer than a PC allows. A Mac never gets them, so its words are as they were.
     if res.get("why") == "tools":
         return "problem", (f"Couldn't make the slides: this {this_computer.COMPUTER} needs one free add-on first. "
-                           + LEFT_AS_WAS + " Tell Claude and it'll sort it out.")
+                           + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.")
     if res.get("why") == "long" and res.get("deep"):
         return "problem", (f"Couldn't make the slides: this post kit's folder sits too deep in other folders on this "
-                           f"{this_computer.COMPUTER}. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.")
+                           f"{this_computer.COMPUTER}. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.")
     if res.get("why") == "long":
         return "problem", (f"Couldn't make the slides: a slide's name would be too long for this {this_computer.COMPUTER} "
-                           "to open. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.")
+                           "to open. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.")
     if res.get("why") == "move" or res.get("left"):
         return "problem", NOT_FINISHED
     if res.get("why") == "clash":
         return "problem", IN_THE_WAY
-    return "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out."
+    return "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out."
 
 
 def _pressed(p):
@@ -1707,7 +1707,7 @@ def run_carousel_job(kit):
                 with locked(kit_lock(kit)):
                     data, p = sync(kit, "carousel")
                     if p is None:
-                        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, n)
+                        write_job(kit, "problem", "Couldn't make the slides. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.", rev, n)
                         return 1
                     happy = _pressed(p)
                     if happy:
@@ -1744,7 +1744,7 @@ def run_carousel_job(kit):
             except (Exception, SystemExit):  # noqa: BLE001
                 moving = True
             try:
-                write_job(kit, "problem", NOT_FINISHED if moving else "Couldn't make the slides. " + LEFT_AS_WAS + " Tell Claude and it'll sort it out.", rev, n)
+                write_job(kit, "problem", NOT_FINISHED if moving else "Couldn't make the slides. " + LEFT_AS_WAS + " Tell your assistant and it'll sort it out.", rev, n)
             except OSError as e2:       # the kit's own folder is not there to write in: nothing is made in its place
                 log(f"slide job for {kit.name}: its state could not be written down ({e2.__class__.__name__})")
             return 1

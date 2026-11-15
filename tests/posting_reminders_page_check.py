@@ -462,7 +462,7 @@ def check_pc(s):
 
 # ---------------------------------------------------------------- the fix round (Nov 11)
 
-STOPPED_HERE = "Something on this computer got in the way. Tell Claude and it'll sort it out."
+STOPPED_HERE = "Something on this computer got in the way. Tell your assistant and it'll sort it out."
 WAITING = "🔔 Your reminder at 9 am is waiting until this post has a posting day."
 
 
@@ -901,7 +901,7 @@ def check_page_pc(c, s):
     line_is(c, "🔔 Your reminder for %s at 6 pm has changed. Add it to your calendar again." % d1)
     cfg(s, opener="fail")
     c.click("#pick .pr [data-m=add]")
-    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell Claude instead.")
+    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell your assistant instead.")
     case("a file that can't be opened: said plainly, and it is still waiting", toast is True and reminding(s).get("waiting") == {rid: "again"}, toast)
 
 

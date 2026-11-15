@@ -384,6 +384,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        # The three older routes that open a folder window or play a clip are for this report's own page: another
+        # website's ask is refused, as /open-shoot's is (the browser itself says where an ask comes from).
+        if parts.path in ("/play", "/open-clips", "/open") and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            return self.send_error(HTTPStatus.FORBIDDEN)
         if parts.path in ("/play", "/open-clips"):
             return self.clips(parts)
         if parts.path == "/open-shoot":

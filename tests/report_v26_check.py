@@ -389,6 +389,13 @@ def check_routes(base, night, cards_base, c1, c2):
     case("an ask under another name is refused (403)", st == 403, st)
     st, body = ask("?shoot=s1", {"Sec-Fetch-Site": "same-origin"})
     case("the report's own page may ask", st == 200 and json.loads(body).get("ok") is True, (st, body[:120]))
+    # the three older routes that open a folder window or play a clip: another website's ask is refused there too
+    for route in ("/open?path=" + urllib.parse.quote(str(night)), "/play?file=x.mp4", "/open-clips?shoot=s1"):
+        st, body = http(base + route, {"Sec-Fetch-Site": "cross-site"})
+        case("another website's ask of %s is refused (403)" % route.split("?")[0], st == 403, st)
+    st, body = http(base + "/open?path=" + urllib.parse.quote("/no folder of this report"), {"Sec-Fetch-Site": "same-origin"})
+    case("...and the report's own page is still answered there (a folder the report does not name: said plainly, nothing opened)",
+         st == 200 and json.loads(body).get("ok") is False, (st, body[:160]))
     # a folder that is gone, and one that the records point outside the backup
     studio = Path(night) / "_studio"
     keep = (studio / "shoots.json").read_text(encoding="utf-8")

@@ -141,6 +141,12 @@ name: Check it on a Windows PC
 #                                   ffmpeg's silencedetect would call a silence, measured in plain Python), a replaced
 #                                   recording gets its sound taken again ("<name> sound 2"), Remove a song NOT built.
 #                                   No server, no browser, no ffmpeg: the whole file on Windows and on the Mac.
+#   tests/loose_ends_v26_check.py   Nicole's v25 and v26, the smaller changes and loose ends (Nov 14): no page tells
+#                                   them to talk to "Claude" (every page says "your assistant"); every shoot in Your
+#                                   Content with a kit record is listed, also one whose page was never written; the
+#                                   instructions, where-things-live and both setup guides no longer describe what the
+#                                   home base, the post kit and sets of stories replaced. No server, no browser, no
+#                                   add-on: the whole file on Windows and on the Mac.
 #   tests/talking_page_check.py (whole), tests/design_preview_check.py, tests/kit_cards_check.py
 #                                   a job of its own on the Mac, "mac-page", which may fail without failing the check
 #                                   (as windows-page: nobody has seen these pages in GitHub's Chrome yet): the talking
@@ -179,11 +185,11 @@ on:
   workflow_dispatch:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -328,6 +334,9 @@ jobs:
       - name: Songs (Nicole's v25 - a short song starts after a glitch and a silence, measured with nothing installed; a replaced recording's sound taken again as "sound 2"; Remove a song not built)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/songs_check.py
+      - name: Loose ends of Nicole's v25 and v26 (no page says to tell Claude; every shoot in Your Content is listed, with or without its page; the instructions and both setup guides match the home base)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/loose_ends_v26_check.py
       - name: Information only - Windows' own decoder on the MP3 and M4A songs, nothing extra installed
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         continue-on-error: true
@@ -424,6 +433,9 @@ jobs:
       - name: Songs (a short song starts after a glitch and a silence; a replaced recording's sound taken again, for real with the Mac's own afconvert; Remove a song not built)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/songs_check.py
+      - name: Loose ends of Nicole's v25 and v26 (no page says to tell Claude; every shoot in Your Content is listed, with or without its page; the instructions and both setup guides match the home base)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/loose_ends_v26_check.py
       - name: The reel's video helper, the PC's way (headers built byte by byte; the named gap, tried on a Mac)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_video.py

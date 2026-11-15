@@ -39,7 +39,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -697,7 +697,12 @@ def check_browser(c, s):
     case("a press on the Reel card opens the reel page", went, c.js("location.href"))
     c.open(url)
     c.wait_for("document.querySelectorAll('a.piece').length === 3", 10)
-    outside = [u for u in c.outside_requests() if not u.startswith(("data:", "blob:", "about:", "chrome"))]
+    # Only what the kit page itself asked for: the presses above went to the stories designer and the reel page and
+    # back, and the designer asks Google for a story font, which could land in this list just as the kit page came back
+    # (it did, on and off). Each ask carries the page that made it.
+    outside = [r["url"] for r in list(c.requests) if not chrome_drive.is_this_computer(r["url"])
+               and not r["url"].startswith(("data:", "blob:", "about:", "chrome"))
+               and "/content/" in urlparse(r.get("doc") or "").path]
     case("nothing was asked of the internet by the kit page", not outside, outside[:3])
     case("no error on the page", c.page_errors() == [], c.page_errors()[:3])
 

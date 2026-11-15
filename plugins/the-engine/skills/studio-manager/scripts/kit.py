@@ -1794,11 +1794,11 @@ OUR_KIT_WORDS = {
     "canva_cover": "the reel cover",
     "canva_story": "story {n}",
     "opening": "Opening...",
-    "unreached": "Could not reach the Assistant. Tell Claude instead.",
-    "saved_copy": "This is a saved copy. Say “show the {name} kit” to Claude and the buttons work.",
+    "unreached": "Could not reach the Assistant. Tell your assistant instead.",
+    "saved_copy": "This is a saved copy. Say “show the {name} kit” to your assistant and the buttons work.",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
-    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell Claude, and it'll sort it out.",
+    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell your assistant, and it'll sort it out.",
 }
 # Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
 # three cards with their three steps, v20) and never sends one from before them in its place.

@@ -933,7 +933,8 @@ class Chrome:
             self._send("Page.handleJavaScriptDialog", {"accept": True})    # never leave the page stuck behind a box
         elif method == "Network.requestWillBeSent":
             r = p.get("request", {})
-            rec = {"url": r.get("url", ""), "method": r.get("method"), "type": p.get("type"), "status": None}
+            rec = {"url": r.get("url", ""), "method": r.get("method"), "type": p.get("type"), "status": None,
+                   "doc": p.get("documentURL", "")}     # the page that asked (so one page's asks can be told from the next's)
             self._req[p.get("requestId")] = rec
             if not rec["url"].startswith("data:"):
                 self.requests.append(rec)
