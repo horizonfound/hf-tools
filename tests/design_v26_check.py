@@ -20,6 +20,10 @@ real page in a hidden Chrome (check_v26_browser, another pretend kit and server)
 table (HERS); when her page is beside the project (reference-private/, never pushed) every one of them is also
 looked for in it, and that one case is left out when it is not there.
 
+The finished stories it sends are real 1080x1920 JPEGs made here: drawn with Pillow when this Python has it, and
+otherwise (Apple's own Python 3.9) drawn in plain Python and turned into JPEGs by the Mac's own sips, so the routes and
+commands are checked to the end on both. A computer with neither says SKIP for that half and carries on.
+
 Nothing here touches the real ~/.studio: every server and command gets a STUDIO_HOME inside the work folder, and the
 switch that keeps a test from opening a window (STUDIO_NO_WINDOWS_FOR_TESTS).
 """
@@ -191,6 +195,43 @@ t('removeStory: the layout it was given is not changed', S.slides === 4 && S.blo
 t('removeStory: the last one of all stays (why: one)', M.removeStory({slides: 1, bg: '#ffffff', blocks: []}, 0).why === 'one');
 JSON.stringify(out);
 """
+
+
+def plain_jpeg(work):
+    """A jpeg(w, h, seed) for a Python with no Pillow: a picture drawn in plain Python (a colour and a box, different
+    for every seed), turned into a JPEG by the Mac's own sips. None when this computer has no sips either."""
+    import struct
+    if not Path("/usr/bin/sips").exists():
+        return None
+    folder = Path(work) / "plain-jpegs"
+
+    def jpeg(w=W, h=H, seed=0, quality=85):
+        folder.mkdir(parents=True, exist_ok=True)
+        back = bytes(((seed * 31 + 90) % 256, (seed * 97 + 40) % 256, (seed * 53) % 256))        # a BMP is blue, green, red
+        box = bytes((220, 240, 250))
+        x0, x1 = w // 6, min(w, w // 2 + (seed * 7) % 200)
+        pad = b"\0" * (-(w * 3) % 4)
+        plain = back * w + pad
+        boxed = back * x0 + box * (x1 - x0) + back * (w - x1) + pad
+        rows = b"".join(boxed if h // 6 <= y < h // 2 else plain for y in range(h - 1, -1, -1))  # a BMP's rows run bottom up
+        head = b"BM" + struct.pack("<IHHI", 54 + len(rows), 0, 0, 54) + struct.pack("<IiiHHIIiiII", 40, w, h, 1, 24, 0, len(rows), 2835, 2835, 0, 0)
+        bmp, out = folder / f"{w}x{h}-{seed}.bmp", folder / f"{w}x{h}-{seed}.jpg"
+        bmp.write_bytes(head + rows)
+        r = subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", "-s", "formatOptions", str(quality), str(bmp), "--out", str(out)],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode != 0 or not out.is_file():
+            raise RuntimeError("sips could not make a test JPEG: " + (r.stdout + r.stderr)[-200:])
+        return out.read_bytes()
+    return jpeg
+
+
+def story_jpeg(work, pillow_jpeg):
+    """The way this run draws its finished stories: Pillow's when this Python has it, else sips', else None."""
+    try:
+        import PIL  # noqa: F401
+        return pillow_jpeg
+    except ImportError:
+        return plain_jpeg(work)
 
 
 def osascript(js_file):
@@ -1045,11 +1086,15 @@ def main():
     work.mkdir(parents=True)
     os.environ["STUDIO_HOME"] = str(work / "no-studio")         # nothing here may ever look at the real ~/.studio
     check_v26_page(dc.case, work)
-    try:
-        check_v26_server(dc.case, work, a.port, dc.make_kit, dc.Server, dc.post, dc.get_json, dc.ask, dc.run, dc.jpeg)
-    except Exception as e:  # noqa: BLE001
-        import traceback
-        dc.case("the checks of v26's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    jpeg = story_jpeg(work, dc.jpeg)
+    if jpeg is None:
+        print("SKIP  v26's routes and commands: no Pillow under this Python and no sips on this computer to draw the test's stories", flush=True)
+    else:
+        try:
+            check_v26_server(dc.case, work, a.port, dc.make_kit, dc.Server, dc.post, dc.get_json, dc.ask, dc.run, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            dc.case("the checks of v26's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     if not a.no_chrome:
         try:
             check_v26_browser(dc.case, work, a.port + 2, dc.make_kit, dc.Server, dc.post, dc.get_json, dc.run)
