@@ -19,7 +19,7 @@ Identical for the photographer (her words whole, the same behaviour), our way un
 - **B. The home base** (`home.py`, the posting server): the welcome words, Today, four step cards in the order of the work, Open my Assistant folder; no recent-shoots list. Two screens of their own: **Back up a card** (every backup: 10 newest, Show older by month, search; card safe to format, second copy, something needs a look; each shoot with Open this folder and See the report; drive unplugged; folder moved; the cards of one shoot shown as one backup, wired to our linked backups) and **Make posts from a shoot** (post kits: 20 newest, Show older, search, Archive by hand and Bring it back). Kit archive list kept in `~/.studio/kit-archive.json` (where things are saved stays ours).
 - **C. The stories designer** (`design*.py`): "Show Instagram's guides"; the stories stay in view while the photos scroll; Let my assistant choose (a note saved as `ask`, a line to copy into the chat, and the chat side of it); templates Gallery delivered (4), My editing queue (1, filled from the queue), The full story (10), Seamless swipe (6); Redo; sets of stories (replaces "one stories design per shoot"); x on each story's label.
 - **D. The report's words** (her notes, section 2): why there are two folders; "Does everything look right?"; Open this folder on each shoot; the sneak peeks explained; the closing line changed.
-- **E. Instructions, the notes for Nicole, CLAUDE.md, the full test sweep.**
+- **E. Instructions, the notes for Nicole, CLAUDE.md, the full test sweep.** (Done: see "Stage E" at the end.)
 
 ## v25 stages (after A to D; the timing first, since her note says it matters most)
 
@@ -30,6 +30,31 @@ Identical for the photographer (her words whole, the same behaviour), our way un
 - **J. Songs:** a short song starts after a glitchy opening; a replaced recording's sound taken again; Remove (to the Trash, never deleted; a PC's Recycle Bin).
 - **K. The post kit and posting queue:** captions optional (it asks); a preview of each reel; Which reel goes in your queue; each reel its own piece; the reel cover picker in play order.
 - **L. Smaller:** the home page lists every shoot in Your Content; shorter holds when photos are alike.
+
+## Where each stage stands (Nov 14, evening)
+
+Everything is on branch `v26` in the worktree `/Users/dustindamron/Projects/hf-tools-v24`. Not merged, not pushed. Nothing was sent to Nicole or Slack.
+
+| Stage | What | Stands | Commits |
+|---|---|---|---|
+| F | The timing on the song's real hits | built, reviewed, fixed | e0c752d, 959ed90 |
+| A | The editing queue | built, reviewed, fixed | e3fa520, 94f82cf |
+| B | The home base and its two screens | built, reviewed, fixed | b307065, 919d0c4 |
+| C | The stories designer | built, reviewed, fixed | b42c891, 83d1d81 |
+| D | The report after a backup | built (no review round) | b5af248 |
+| G | Several reels from one shoot | built (no review round) | 98997e7 |
+| H | The photographer picks | built (no review round) | 4078e9b |
+| I | Trim a clip; select several photos | built (no review round) | f549449 |
+| J | Songs (not Remove) | built (no review round) | 688d313 |
+| K | The post kit and posting queue with several reels; captions optional | built (no review round) | ed5aaf1 |
+| L | Smaller changes and loose ends | built (no review round) | 4c125fe |
+| E | The sweep, the final fix, the notes | done | d90a083, and the notes' commit |
+
+**Not built, waiting on Dustin and Nicole** (the list just below): Remove a song (a question for Nicole), the folder-naming question at setup, the drop box's second copy. Also not built, on purpose: her test-only wiring (port 8799, `?home=test`).
+
+**Stages D and G to L had no reviewers,** only their own builder's tests (each new behaviour taken out in a scratch copy and seen to fail). Stages F, A, B and C each had two reviewers and a fix round. Worth knowing before the merge.
+
+**Left before main:** Dustin's own hand on the pages; the first run on GitHub's Windows and Mac machines (nothing is pushed, so eleven new test files and the changed workflow have never run there); his say on the questions and on sending the note for Nicole; then the merge and a rebuilt upload file.
 
 ## Waiting on Dustin and Nicole (not built until they say)
 
@@ -664,3 +689,23 @@ Every item of `UPDATE-v25.md`, `UPDATE-v26.md` and her notes was read again and 
 1. **"Your assistant" on every page.** Built: every page line of ours that named Claude now says "your assistant", to match hers. The guides and the plugin's description still say it is Claude (rule 8). Say if any page should name Claude after all.
 2. **Remove a song** is still not built and is hers to answer: to the Trash, or only off the list.
 3. **The setup guides' new wording** is ours, a draft, and the PDFs are not rebuilt.
+
+## Stage E, done (Nov 14): the sweep, the final fix, and the notes
+
+**The sweep.** Every test in the project was run one at a time on the branch's head (4c125fe), Chrome tests under the 3000 MB guard and video tests under 800, on both Pythons (3.12 with Pillow, Apple's 3.9 without). 137 runs; 134 passed. The other three:
+- `tests/design_v26_check.py` on Apple's Python stopped half way (169 of 170): its routes-and-commands half draws seven finished stories with Pillow, which Apple's Python does not have. A fault of the test, not of the Assistant.
+- `tests/pc_plain_jpeg.py`, twice: a helper, not a test. Run bare it prints how to use it. Left as it is.
+
+Both tool checks were clean (one note: the skill's description is 1,016 characters, close to the 1,024 limit). All 168 Python files compile on 3.9. No test program or page server was left running, and the real `~/.studio` was unchanged before and after.
+
+**The final fix (d90a083).** `tests/design_v26_check.py` now draws its test pictures with Pillow when this Python has it, and otherwise in plain Python with the Mac's own `sips`; with neither it prints one SKIP line and carries on. After: 238 of 238 on both Pythons. No plugin file changed.
+
+**Counts from the sweep** (3.12 / Apple's 3.9 where they differ): `reel_hits_check` 45; `edit_queue_v26_check` 145; `home_base_check` 213; `design_v26_check` 238; `report_v26_check` 107 / 102; `reels_check` 158; `picks_ask_check` 76; `reel_trim_select_check` 153; `songs_check` 73; `kit_reels_queue_check` 140; `loose_ends_v26_check` 64; `reel_timing_check` 96; `skill_text_check` 507; `reel_page_check` 343; `reel_footage_check` 184; `kit_cards_check` 127; `kit_steps_check` 100; `words_page_check` 195; `posting_panel_check` 88; `posting_reminders_page_check` 116; `reminders_check` 151; `arrange_check` 660; `talking_page_check` 573; `talking_multi_check` 92; `talking_menus_check` 108; `talking_snap_check` 48; `pc_smoke` 230 / 183; `pc_design` 247 / 246; `pc_arrange` 38 / 14; `design_check` by part, 3.12 only: server 732, page 631, strip 177, text 143, designs 289, wire 108, fixes 102, screen 100, layout 161, stories 223, v22 259, preview 64, v26 259.
+
+**The notes.**
+- `CLAUDE.md`: a new section at the end, "Nicole's v25 and v26", and dated pointers on the earlier lines this build makes untrue (rule 11's last sentence, the Oct 24 handoff line, the queue's states, the Oct 30 home page, the question at the start of a kit, the reel page, "one design per shoot", Add to my queue waiting for a caption, the marking rule, the report's one folder button), and the repo layout.
+- `docs/nicole-v25-v26-notes-2026-11-14.md`: the draft note for Nicole, the Remove a song question first. **Not sent** (rule 10).
+
+**The older folder picker** stage B's fix round mentioned (process 20477) is no longer open (looked Nov 14, evening).
+
+**Still open, in one place.** The owners' questions are numbered in CLAUDE.md's new section (25 of them) and worded for Nicole in the note; the smaller ones stay under each stage above.
