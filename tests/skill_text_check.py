@@ -572,7 +572,7 @@ def check_posting():
          "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in flat
          and "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in page
          and "Nothing is waiting to be opened." in flat and "Nothing is waiting to be opened." in rem)
-    case("ready to post normally comes from Add to my queue, which needs its caption; offer the words",
+    case("ready to post normally comes from Add to my queue; the chat's ready does not check for a caption, so the assistant asks first",
          "Add to my queue" in flat and "does not check for a caption" in flat and "don't mark it ready silently" in flat and "`parts/words.md`" in flat)
     case("the panel's words come from the words page; changes go through parts/words.md",
          "nothing is written or changed in the posting queue" in flat and "that is `parts/words.md`, every time" in flat)
@@ -1117,9 +1117,52 @@ def check_songs_v25():
          'up to 99' in where and "SOUND_SPARES = 98 " in rp and "goes by the files' times" in where)
 
 
+def check_queue_v25():
+    """The post kit and the posting queue with several reels, captions optional (Nicole's v25, sections 6 and 7;
+    stage K of the v26 build): the instructions say what the pages say, and name commands that exist."""
+    sys.path.insert(0, str(SCRIPTS))
+    import kit
+    pq = read(SCRIPTS / "posting_queue.py")
+    rem = read(SCRIPTS / "reminders.py")
+    post = " ".join(read(SM / "parts" / "posting-queue.md").split())
+    kitp = " ".join(read(SM / "parts" / "post-kit.md").split())
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    K = kit.KIT_WORDS
+    question = K["nocap_title"].format(piece="reel") + ". " + K["nocap_text"]
+    for name, t in (("posting-queue.md", post), ("post-kit.md", kitp)):
+        case(f"{name}: a caption is optional, and the page's question is given in the page's own words, with its two buttons",
+             ('"' + question + '"') in t and f"**{K['nocap_add']}**" in t and f"**{K['nocap_write']}**" in t, question)
+        case(f"{name} no longer says Add to my queue needs a caption", "only works once the piece is made and has its caption" not in t
+             and "once it is made and has its caption" not in t and "write its caption first" not in t)
+    case("posting-queue.md: with no caption the assistant asks her question, never marks it ready silently, never presses them to write one",
+         "ask her question in her words" in post and "don't mark it ready silently" in post and "never press them to write one" in post)
+    case("post-kit.md: step 3 is locked only until the piece is made, in the page's own words", "Make your reel first..." in kitp
+         and '"Its caption can come later, or not at all."' in kitp and "Its caption can come later, or not at all." in K["ready_nocap"])
+    case("the chat's ready can name which reel, and the command takes it", '`posting_queue.py ready "beach reel" --reel "White Backdrop"`' in post
+         and 'sp.add_argument("--reel"' in pq and "def reel_piece_for(" in pq)
+    case("posting-queue.md: a reel that isn't made is refused, a name that fits none lists the reels, and never pick one for them",
+         "is refused with nothing changed" in post and "lists the shoot's reels" in post and "never pick one for them" in post
+         and "isn't made in CapCut yet" in pq)
+    case("posting-queue.md: the page's and the chat's name for a reel's post", '"<shoot> reel · <reel name>"' in post and '"<shoot> reel (<reel name>)"' in post
+         and "' · '+esc(x.reel_name)" in pq and "({p['reel_name']})" in pq)
+    case("posting-queue.md and post-kit.md: the kit page's question and each reel's place, in the page's own words",
+         all(('"' + K["which_title"] + '"') in t for t in (post, kitp)) and all(K[k] in post for k in ("r_made", "r_not", "r_in", "r_posted", "reel_empty")))
+    case("posting-queue.md: the reel cover picker in her words", all(x in post for x in ('"From your reel, in the order it plays"', "**+ Use a different photo**",
+                                                                                         '"Any other photo from the shoot"', "**Hide the other photos**"))
+         and all(("'" + x + "'") in pq for x in ("From your reel, in the order it plays", "+ Use a different photo", "Any other photo from the shoot", "Hide the other photos")))
+    note = re.search(r'^NO_CAPTION = "([^"]+)"', rem, re.M)
+    case("posting-queue.md says what a reminder's notes hold for a post with no caption, as reminders.py writes it",
+         bool(note) and ('"' + note.group(1) + '"') in post and "still gets its reminder" in post, note and note.group(1))
+    case("posting-queue.md: the first reel keeps its place, nothing is renamed; one caption for the shoot's reels",
+         "nothing already in the queue is renamed or moved" in post and "one caption and one set of hooks for the shoot's reels" in post)
+    case("arrange.md points a second reel at its own place in the queue", '`posting_queue.py ready "<shoot> reel" --reel "<name>"`' in arr)
+    case("where-things-live.md names what a reel's piece carries", "`version`" in where and "`reel_name`" in where and "`...-reel-v2`" in where
+         and 'x["version"], x["reel_name"] = ' in pq)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

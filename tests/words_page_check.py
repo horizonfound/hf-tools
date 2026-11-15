@@ -554,8 +554,10 @@ def check_queue(s, wp):
     s.save("reel", caption="")
     st = s.state()
     case("the reel is made: the page knows its CapCut project by name", st["kit"]["reel"] == PROJECT and st["kit"]["made"] is True, st["kit"])
-    code, j, _ = s.http("POST", "/words-queue", {"kit": KIT, "piece": "reel"})
-    case("a reel with no caption can't be added", code == 409 and not s.posting(), (code, j))
+    # v25: captions are optional on the post kit (the Assistant adds a made reel, caption or not: see
+    # tests/kit_reels_queue_check.py); this page's own step still waits for the caption, as hers does
+    case("a reel with no caption: this page's own queue step still waits for one (hers), its button disabled",
+         "if (!S.kit.made || !w.caption) {" in wp.SCRIPT and "b.disabled = true; b.id = 'addQueue';" in wp.SCRIPT)
     s.words("draft", "reel", {"caption": "MINI SESSIONS are coming to Laguna Beach on December 4th!!!", "hooks": HOOKS})
     for text in ("Hourly", "", "9 a week", ["3 a week"]):
         code, j, _ = s.http("POST", "/words-rhythm", {"text": text})

@@ -233,7 +233,10 @@ def slug(text):
 
 
 def piece_name(p):
-    return f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
+    """A piece in the chat's words: "Beach reel", "Beach single 2", and a reel that knows which of the shoot's
+    reels it is with that reel's name after it (hers, v25): "Beach reel (Fun Maternity)"."""
+    return (f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
+            + (f" ({p['reel_name']})" if isinstance(p.get("reel_name"), str) and p.get("reel_name") else ""))
 
 
 def thumb_file(pid, suffix=".jpg"):
@@ -284,7 +287,7 @@ def kit_role(x):
     pid = str(x.get("id") or "") if isinstance(x, dict) else ""
     if not (pid.startswith("kit:") or kit_folder(x)):
         return ""
-    if pid.endswith("-reel"):
+    if pid.endswith("-reel") or REEL_LATER.search(pid):
         return "reel"
     if pid.endswith("-carousel"):
         return "carousel"
@@ -293,12 +296,52 @@ def kit_role(x):
     return ""
 
 
-def kit_piece(p, kit_dir, role, n=None):
-    """This kit's reel or carousel (or its single post number n) in the queue, or None. role is kit_role's."""
+# One shoot, several reels (Nicole's v25: "It should know that it's Katie Austin's Fun Maternity, because I pressed
+# add to my queue"). Each reel has its own piece. The shoot's first reel keeps the kit's own reel piece, the one
+# every kit always had ("<the kit's name here>-reel"), so no piece already in a queue is ever renamed; every reel
+# started after it gets that name with the reel's own id after it ("...-reel-v2"). The kit's name here is already
+# one no other kit has (kit_sid), so a reel's piece can never be another shoot's. Which reel a piece is, is read
+# from its name (reel_version), never from a field the page could have sent.
+REEL_FIRST_ID = "v1"                                    # reels.FIRST_ID: the shoot's first reel
+REEL_LATER = re.compile(r"-reel-(v[1-9][0-9]{0,3})$")   # reels.ID, after the kit's own reel piece's name
+
+
+def reel_version(x):
+    """Which of its shoot's reels a kit's reel piece is: "v2" for "...-reel-v2", the first reel otherwise."""
+    m = REEL_LATER.search(str(x.get("id") or "")) if isinstance(x, dict) else None
+    return m.group(1) if m else REEL_FIRST_ID
+
+
+def kit_piece(p, kit_dir, role, n=None, version=None):
+    """This kit's reel or carousel (or its single post number n) in the queue, or None. role is kit_role's.
+    A reel: the shoot's first reel's piece, or with `version` that reel's own."""
+    want = version or REEL_FIRST_ID
     for x in p.get("pieces", []):
         if isinstance(x, dict) and kit_role(x) == role and same_kit(x, kit_dir) and (n is None or x.get("n") == n):
+            if role == "reel" and reel_version(x) != want:
+                continue
             return x
     return None
+
+
+def kit_reel_pieces(p, kit_dir):
+    """{reel id: its piece} for every reel of this kit that has a piece in the queue."""
+    out = {}
+    for x in p.get("pieces", []):
+        if isinstance(x, dict) and kit_role(x) == "reel" and same_kit(x, kit_dir):
+            out.setdefault(reel_version(x), x)
+    return out
+
+
+def kit_reels(kit_dir, rec=None):
+    """The shoot's reels when it has more than one (reel_page.reels_for_kit: [{id, name, made, project, order}]),
+    else []. A shoot with one reel is in the queue exactly as it always was. Anything that can't be read: []."""
+    try:
+        import reel_page
+        got = reel_page.reels_for_kit(Path(kit_dir), rec_kit=rec)
+    except (Exception, SystemExit):  # noqa: BLE001
+        return []
+    return got if isinstance(got, list) and len(got) > 1 else []
 
 
 def kit_sid(p, kit_dir):
@@ -313,7 +356,7 @@ def kit_sid(p, kit_dir):
     others = [x for x in pieces if kit_folder(x) and not same_kit(x, kit_dir)]
 
     def taken(sid):
-        own = re.compile(re.escape(sid) + r"-(reel|carousel|single-\d+)$")
+        own = re.compile(re.escape(sid) + r"-(reel(-v\d+)?|carousel|single-\d+)$")
         return any(x.get("shoot_id") == sid or own.match(str(x.get("id") or "")) for x in others)
     base = "kit:" + slug(name)
     if not taken(base):
@@ -353,22 +396,25 @@ def cover_file(kit_dir, role, rel, rec=None):
         return None
 
 
-def reel_first_photo(kit_dir, rec, photos):
+def reel_first_photo(kit_dir, rec, photos, reel=None):
     """The photo a reel's tile shows until they pick one: the reel's own first photo, in the order Make my reel
     would use (the reel page's record: reel_page.order_for_kit_page; Claude's pick when the page was never
     used). Nicole, Nov 10: "a reel's first tile should be the reel's first photo, not the kit's first photo".
-    Failing that, the first pick the kit record holds, then the kit's first photo, as before."""
+    Failing that, the first pick the kit record holds, then the kit's first photo, as before. `reel`: which of
+    the shoot's reels (v25); None is the reel being worked on, as before."""
     import arrange
     try:
         import reel_page
         rows = arrange.sheet_rows(kit_dir)
         by_n = {r["n"]: r for r in rows}
-        for x in reel_page.order_for_kit_page(kit_dir, rows, rec):
+        for x in reel_page.order_for_kit_page(kit_dir, rows, rec, reel=reel):
             f = arrange.photo_path(kit_dir, rec, by_n[x["n"]]) if x.get("n") in by_n else None
             if f is not None:
                 return f
     except (Exception, SystemExit):  # noqa: BLE001  (a tile only: the old way below still gives one)
         pass
+    if reel not in (None, REEL_FIRST_ID):
+        return photos[0] if photos else None       # the kit record's pick is the first reel's only
     try:
         pick = (rec.get("picks", {}).get("reel") or [None])[0]
         sheet_p = Path(kit_dir) / ".kit" / "sheet.json"
@@ -394,7 +440,8 @@ def find(p, text, statuses=None):
     rest = [w for w in words if w not in KINDS]
     hits = []
     for x in cands:
-        name = x["shoot_name"].lower()
+        # a reel that knows its name is found by it too: "beach reel white backdrop"
+        name = x["shoot_name"].lower() + (" " + x["reel_name"].lower() if isinstance(x.get("reel_name"), str) else "")
         if (not rest or all(w in name for w in rest)) and (not kind or x["kind"] == kind):
             hits.append(x)
     if len(hits) == 1:
@@ -403,6 +450,57 @@ def find(p, text, statuses=None):
         sys.exit(f"STOP: nothing in the posting queue matches \"{text}\".")
     names = ", ".join(piece_name(x) for x in hits)
     sys.exit(f"STOP: \"{text}\" could mean more than one: {names}. Say which.")
+
+
+def reel_pieces_by_words(p, text):
+    """(the kits' reel pieces a few words of a shoot's name fit, the folder names of the kits they are from)."""
+    t = str(text).strip().lower()
+    words = [w for w in re.split(r"[^a-z0-9]+", t) if w and w not in KINDS]
+    hits = [x for x in p["pieces"] if isinstance(x, dict) and kit_role(x) == "reel" and x.get("status") != "skipped"
+            and (x.get("id") == t or all(w in str(x.get("shoot_name") or "").lower() for w in words))]
+    return hits, sorted({_nfc(kit_folder(x)) for x in hits})
+
+
+def several_reels_kit(p, text):
+    """The kit a few words name, when it is one shoot with more than one reel (v25), else None. For `made`: the
+    reel maker says "<shoot> reel is made" without saying which reel, and with several reels that must never
+    change another reel's place in the queue (a reel already ready to post stays ready)."""
+    hits, names = reel_pieces_by_words(p, text)
+    if len(names) != 1:
+        return None
+    kit = piece_kit(hits[0])
+    return kit if kit is not None and kit_reels(kit) else None
+
+
+def reel_piece_for(p, text, reel_words):
+    """For the chat's `ready "<piece>" --reel "<reel name>"` (v25: one shoot, several reels): the piece of the
+    reel they named, made here when that reel has none yet, kept up to date either way. `text` finds the shoot
+    (any of its reel pieces will do: "beach reel"); `reel_words` is the reel's name, or a few words of it.
+    Stops in plain words, with nothing changed, when the shoot or the reel can't be told, or the reel isn't
+    made yet."""
+    hits, names = reel_pieces_by_words(p, text)
+    if not names:
+        sys.exit(f"STOP: no post kit's reel in the posting queue matches \"{text}\". Add the kit first (add --kit), then say which reel. Nothing changed.")
+    if len(names) > 1:
+        sys.exit(f"STOP: \"{text}\" could mean more than one shoot: {', '.join(names)}. Say which. Nothing changed.")
+    kit = piece_kit(hits[0])
+    if kit is None:
+        sys.exit(f"STOP: I can't reach the post kit of \"{names[0]}\" right now (is its drive plugged in?). Nothing changed.")
+    import reel_page
+    vid, why = reel_page.which_reel(kit, reel_words)
+    if vid is None:
+        sys.exit(f"STOP: {why} Nothing changed.")
+    info = reel_page.reels_for_kit(kit)
+    r = next((y for y in info if y["id"] == vid), None)
+    if r is None:
+        sys.exit("STOP: that reel isn't there anymore. Nothing changed.")
+    if not r["made"]:
+        sys.exit(f"STOP: \"{r['name']}\" isn't made in CapCut yet, so it can't go in the queue. They make it on the reel page (Make my reel). Nothing changed.")
+    add_for_kit(p, kit, reel=vid)
+    x = kit_piece(p, kit, "reel", version=vid)
+    if x is None:
+        sys.exit("STOP: that reel's place in the queue couldn't be made. Nothing changed.")
+    return x
 
 
 def queue_shoot(text):
@@ -445,12 +543,18 @@ def carousel_kind(shown):
     return "single" if shown.get("kind") == "laid-out" and len(shown.get("files") or []) == 1 else "carousel"
 
 
-def add_for_kit(p, kit_dir):
+def add_for_kit(p, kit_dir, reel=None):
     """The pieces of a post kit (kit.py): the reel and the carousel (in progress once made, waiting if not),
     and one piece per single post, each with its own thumbnail. Stories don't go on the grid, so they stay
     on the kit page only. Adding the same kit again updates what's there. The pieces are this kit's own by the
     folder they were made from (kit_sid, same_kit): another shoot whose name shortens alike is never touched.
-    A tile the photographer picked in the posting queue (the piece's "cover") is left as they picked it."""
+    A tile the photographer picked in the posting queue (the piece's "cover") is left as they picked it.
+
+    A shoot with several reels (v25): the kit's own reel piece is the first reel's, and every piece of a reel
+    carries which reel it is and that reel's name ("version", "reel_name": hers), kept up to date here (a reel
+    renamed since is shown by its new name). A reel started after the first gets a piece of its own only when it
+    is asked for by `reel` (its id: Add to my queue, or the chat's ready --reel), as hers; once it has one, it
+    is kept up to date like the rest. A shoot with one reel is in the queue exactly as it always was."""
     import kit as kit_mod
     kit_dir = Path(kit_dir)
     rec = kit_mod.load_rec(kit_dir)
@@ -485,9 +589,23 @@ def add_for_kit(p, kit_dir):
         return x
 
     out = []
-    reel = rec.get("reel")
-    out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", reel_first_photo(kit_dir, rec, photos),
-                      where=reel["project"] if reel else None))
+    several = kit_reels(kit_dir, rec)
+    if several:
+        have = kit_reel_pieces(p, kit_dir)
+        first = next((r for r in several if r["id"] == REEL_FIRST_ID), several[0])
+        base_id = have[REEL_FIRST_ID]["id"] if REEL_FIRST_ID in have else f"{sid}-reel"
+        for r in several:
+            is_first = r is first
+            if not (is_first or r["id"] in have or r["id"] == reel):
+                continue
+            x = upsert(base_id if is_first else f"{base_id}-{r['id']}", "reel", "yellow" if r["made"] else "red",
+                       reel_first_photo(kit_dir, rec, photos, reel=r["id"]), where=r["project"])
+            x["version"], x["reel_name"] = r["id"], r["name"]
+            out.append(x)
+    else:
+        made = rec.get("reel")
+        out.append(upsert(f"{sid}-reel", "reel", "yellow" if made else "red", reel_first_photo(kit_dir, rec, photos),
+                          where=made["project"] if made else None))
     shown = kit_mod.carousel_shown(kit_dir, rec)     # the slides the kit page shows as the carousel (kit.py's one rule)
     slides = shown["files"]
     out.append(upsert(f"{sid}-carousel", carousel_kind(shown), "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
@@ -844,6 +962,8 @@ def piece_kit(x):
 def panel_choices(x, kit):
     """The photos a post's tile can show, as the page draws them: [{src, rel, in_reel | first}].
     A reel: its own photos first, in the order Make my reel would use, then every other photo of the shoot.
+    With several reels in the shoot (v25), the photos of the reel this piece is, whichever reel is open on the
+    reel page (hers: /choices?kind=reel&version=vN; ours reads which reel from the piece itself).
     A carousel: the slides the kit page shows as the carousel, in order. (choices, are small copies still to make)"""
     import arrange
     import kit as kit_mod
@@ -860,7 +980,7 @@ def panel_choices(x, kit):
     if not rows:
         return [], False
     try:
-        order = [o["n"] for o in reel_page.order_for_kit_page(kit, rows, rec)]
+        order = [o["n"] for o in reel_page.order_for_kit_page(kit, rows, rec, reel=reel_version(x))]
     except (OSError, ValueError, TypeError, AttributeError, KeyError):
         order = []
     by_n = {r["n"]: r for r in rows}
@@ -1283,6 +1403,11 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .pick .warn{margin:.5rem 0 0;font-size:14px;color:#8a4a12;background:#FFF4EC;border-radius:10px;padding:.6rem .8rem;max-width:40em}
 .pick .warn:empty{display:none}
 .pick .sep{flex:none;align-self:center;font:600 10px/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);padding:0 .4rem;width:70px;text-align:center}
+/* a reel's cover (Nicole's v25): its own photos first, in the order they play; any other photo only when asked for */
+.pick .sub{margin:.8rem 0 0;font:600 11px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.pick .sub+.strip{padding-top:.45rem}
+.pick .more{margin:.5rem 0 .2rem}
+.pick .others[hidden]{display:none}
 """
 
 SCRIPT = r"""
@@ -1312,7 +1437,7 @@ function render(S){LAST=S;
  else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
  $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
-  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
+  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}${x.reel_name?' · '+esc(x.reel_name):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
  mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to Claude.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
@@ -1348,12 +1473,13 @@ function drag(S){if(!live)return;const g=$('#grid');drag.st={g,src:null,lift:nul
 // It opens right under the row of the post that was clicked, across all three columns; the clicked tile is outlined.
 // The photos and the words come from this same server (GET /posting/panel?id=), never from another one; a photo is
 // named by "Photos/<file>" or "Carousel/<file>", a post by its id. Every word of theirs is set as text, never as HTML.
-var LAST=D,PICK=null,PSEQ=0;
+var LAST=D,PICK=null,PSEQ=0,MORE=null;   // MORE: "Any other photo from the shoot" opened (true) or hidden (false) by hand in the open panel; null: not touched
 const PEL=$('#pick');
 const PW={reel_line:'Pick the photo your reel shows in your grid. When you post it, tap Edit cover and choose the same photo so your feed matches.',
  carousel_line:'Instagram shows a carousel’s first slide in your grid, so pick the slide you want people to see first.',
  done:'Done',finding:'Finding the photos…',cant:'I can’t find this post’s photos right now. Open its post kit once, then try again.',
- more:'More from the shoot',slide:'Slide ',
+ slide:'Slide ',from_reel:'From your reel, in the order it plays',use_other:'+ Use a different photo',hide_other:'Hide the other photos',
+ any_other:'Any other photo from the shoot',photo_n:'Photo {n} in your reel',
  warn:'This isn’t your first slide, so your real grid will show slide 1 instead. To match, move this one to the front in the carousel designer.',
  changed_reel:'Changed. Pick this one as the cover when you post.',changed_carousel:'Changed. That’s its photo in your grid now.',
  copy_caption:'Copy caption',copy_hook:'Copy my hook',open_words:'Open my words',write_words:'Write my words',no_caption:'No caption yet.',
@@ -1367,7 +1493,7 @@ function copyText(t,what){   // the old way first: the Claude app's pane refuses
  const said=()=>say(PW.copied.replace('{what}',what));
  if(ok){said();return}
  try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell Claude instead.'))}catch(e){say('Could not copy that. Tell Claude instead.')}}
-function closePick(){PICK=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
+function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
 function placePick(id){   // right under the row of the post that was clicked
  const g=$('#grid'),tiles=[...g.children].filter(c=>c!==PEL),t=tiles.find(c=>c.dataset&&c.dataset.id===id),i=tiles.indexOf(t);
  const end=tiles[Math.min(tiles.length-1,Math.floor(Math.max(0,i)/3)*3+2)];if(end)end.after(PEL);else g.appendChild(PEL);
@@ -1377,14 +1503,14 @@ function openPick(id,again){
  if(!live||!x||!x.role){if(PICK===id||again)closePick();return}
  if(PICK===id&&!again){closePick();return}    // the same post clicked again closes it
  const fresh=PEL.dataset.id!==id;PICK=id;PEL.hidden=false;placePick(id);
- if(fresh){PEL.dataset.id=id;PEL.textContent='';
-  const ph=mkel('div','ph'),hd=mkel('div');hd.appendChild(mkel('b',null,'Your '+(x.shoot_name||'')+' '+(KINDW[x.kind]||x.kind)));
+ if(fresh){PEL.dataset.id=id;PEL.textContent='';MORE=null;
+  const ph=mkel('div','ph'),hd=mkel('div');hd.appendChild(mkel('b',null,'Your '+(x.shoot_name||'')+' '+(KINDW[x.kind]||x.kind)+(x.reel_name?' · '+x.reel_name:'')));
   hd.appendChild(mkel('p',null,x.role==='reel'?PW.reel_line:PW.carousel_line));ph.appendChild(hd);
   const done=mkel('button','x',PW.done);done.type='button';done.onclick=closePick;ph.appendChild(done);PEL.appendChild(ph);
   PEL.appendChild(mkel('div','pw'));      // the button row: Copy caption, Copy my hook, [stage 4's reminder button], Open my words
   PEL.appendChild(mkel('div','pr'));      // the reminder drop-down opens here (closed, it is empty and takes no room)
   PEL.appendChild(mkel('div','pn'));      // ours: one plain line when the calendar could not be updated (empty otherwise)
-  const strip=mkel('div','strip');strip.appendChild(mkel('p','empty',PW.finding));PEL.appendChild(strip);
+  const ps=mkel('div','ps'),strip=mkel('div','strip');strip.appendChild(mkel('p','empty',PW.finding));ps.appendChild(strip);PEL.appendChild(ps);
   PEL.appendChild(mkel('p','warn'));
   if(!again)PEL.scrollIntoView({block:'nearest',behavior:'smooth'})}
  else remindNow(x);      // a redraw: the reminder's button and drop-down follow at once (the photos and words follow the fetch below)
@@ -1394,21 +1520,38 @@ function openPick(id,again){
   drawPick(x,P&&P.ok?P:{choices:[],cover:null,words:null},fresh)})}
 function drawPick(x,P,fresh){const el=PEL,reel=x.role==='reel',C=P.choices||[];
  drawWords(el,x,P.words);
- const strip=el.querySelector('.strip'),warn=el.querySelector('.warn'),at=strip.scrollLeft;strip.textContent='';warn.textContent='';
- if(!C.length){strip.appendChild(mkel('p','empty',PW.cant));return}
- const cur=P.cover||C[0].rel;let sep=false,on=null;
- C.forEach((c,i)=>{if(reel&&!c.in_reel&&!sep&&i>0){sep=true;strip.appendChild(mkel('span','sep',PW.more))}
-  const b=mkel('button','c'+(c.rel===cur?' on':''));b.type='button';b.dataset.rel=c.rel;if(!reel)b.title=PW.slide+(i+1);
+ const ps=el.querySelector('.ps'),warn=el.querySelector('.warn'),was=ps.querySelector('.strip'),at=was?was.scrollLeft:0;ps.textContent='';warn.textContent='';
+ const newStrip=()=>{const st=mkel('div','strip');ps.appendChild(st);return st};
+ if(!C.length){newStrip().appendChild(mkel('p','empty',PW.cant));return}
+ const cur=P.cover||C[0].rel;let on=null;
+ // one photo to pick: n is its number (a carousel's slide, or its place in the reel), 0 for none
+ const tile=(c,n)=>{const b=mkel('button','c'+(c.rel===cur?' on':''));b.type='button';b.dataset.rel=c.rel;
+  if(n)b.title=reel?PW.photo_n.replace('{n}',n):PW.slide+n;
   b.setAttribute('aria-pressed',c.rel===cur?'true':'false');
   const im=document.createElement('img');im.alt='';im.loading='lazy';let tries=0;
   im.onerror=()=>{if(tries++<8)setTimeout(()=>{im.src=c.src+(c.src.indexOf('?')<0?'?':'&')+'again='+tries},1500)};   // a small copy still being made
-  im.src=c.src;b.appendChild(im);if(!reel)b.appendChild(mkel('span','n',String(i+1)));
+  im.src=c.src;b.appendChild(im);if(n)b.appendChild(mkel('span','n',String(n)));
   if(c.rel===cur)on=b;
   b.onclick=async()=>{if(c.rel===cur)return;const S2=await post({action:'cover',id:x.id,rel:c.rel});if(S2){render(S2);say(reel?PW.changed_reel:PW.changed_carousel)}};
-  strip.appendChild(b)});
- const first=C.find(c=>c.first);
- warn.textContent=(!reel&&first&&cur!==first.rel)?PW.warn:'';
- if(fresh&&on)strip.scrollLeft=Math.max(0,on.offsetLeft-strip.offsetLeft-(strip.clientWidth-on.offsetWidth)/2);else strip.scrollLeft=at}
+  return b};
+ // A reel's cover (Nicole's v25): the reel's own photos first, in the order they play, numbered, like scrubbing
+ // through it on Instagram; any other photo from the shoot only when they ask for one, like Instagram's "Add from
+ // camera roll" (already open when the cover in use is one of those). A carousel is as it was.
+ const inReel=reel?C.filter(c=>c.in_reel):[],others=reel?C.filter(c=>!c.in_reel):[];
+ let first=null;
+ if(reel&&inReel.length){
+  ps.appendChild(mkel('p','sub',PW.from_reel));first=newStrip();inReel.forEach((c,i)=>first.appendChild(tile(c,i+1)));
+  if(others.length){
+   const open=MORE!==null?MORE:others.some(c=>c.rel===cur);
+   const mb=mkel('button','btn o more',open?PW.hide_other:PW.use_other);mb.type='button';mb.setAttribute('aria-expanded',open?'true':'false');ps.appendChild(mb);
+   const o=mkel('div','others');o.hidden=!open;o.appendChild(mkel('p','sub',PW.any_other));ps.appendChild(o);
+   const st=mkel('div','strip');o.appendChild(st);others.forEach(c=>st.appendChild(tile(c,0)));
+   mb.onclick=()=>{o.hidden=!o.hidden;MORE=!o.hidden;mb.textContent=o.hidden?PW.use_other:PW.hide_other;mb.setAttribute('aria-expanded',o.hidden?'false':'true');
+    if(!o.hidden)o.scrollIntoView({block:'nearest',behavior:'smooth'})}}}
+ else{first=newStrip();C.forEach((c,i)=>first.appendChild(tile(c,reel?0:i+1)))}
+ const one=C.find(c=>c.first);
+ warn.textContent=(!reel&&one&&cur!==one.rel)?PW.warn:'';
+ if(fresh&&on&&on.offsetParent){const st=on.parentNode;st.scrollLeft=Math.max(0,on.offsetLeft-st.offsetLeft-(st.clientWidth-on.offsetWidth)/2)}else if(first)first.scrollLeft=at}
 function drawWords(el,x,W){const w=el.querySelector('.pw');w.textContent='';if(!W||!x.folder)return;   // no words record for this post: no row
  const page='/words.html?kit='+encodeURIComponent(x.folder)+'&piece='+encodeURIComponent(W.piece);
  const link=t=>{const a=mkel('a','pwl',t+' →');a.href=page;return a};
@@ -1546,6 +1689,8 @@ def state(p):
         d["cover"] = x.get("cover") if isinstance(x.get("cover"), str) else None
         d["folder"] = kit_folder(x) or None
         d["role"] = panel_role(x)
+        # v25: which of the shoot's reels this is, by name (text only; the page shows "<shoot> reel · <name>")
+        d["reel_name"] = x["reel_name"][:40] if isinstance(x.get("reel_name"), str) and x.get("reel_name") else None
         if x["status"] == "yellow" and x.get("made_at"):
             d["days"] = (today() - date.fromisoformat(x["made_at"][:10])).days
         return d
@@ -2426,7 +2571,11 @@ def main():
     a_ = sub.add_parser("add"); a_.add_argument("--shoot"); a_.add_argument("--kit"); a_.add_argument("--kinds", default="reel,carousel")
     m = sub.add_parser("made"); m.add_argument("piece"); m.add_argument("--where")
     for c in ("ready", "unready", "posted", "skip"):
-        sub.add_parser(c).add_argument("piece")
+        sp = sub.add_parser(c)
+        sp.add_argument("piece")
+        if c == "ready":
+            # v25: a shoot with several reels. Which reel goes in the queue, by its name on the reel page
+            sp.add_argument("--reel", help="which of the shoot's reels, by name (a shoot with more than one reel)")
     mv = sub.add_parser("move"); mv.add_argument("piece"); mv.add_argument("--to", type=int, required=True)
     sub.add_parser("list"); sub.add_parser("tank"); sub.add_parser("page")
     r = sub.add_parser("reminders"); r.add_argument("--mark", action="store_true")
@@ -2507,7 +2656,7 @@ def main():
         kd = kit_mod.find_kit(a.kit)
         pieces = add_for_kit(p, kd)
         schedule(p); save(p); write_page(p)
-        say(f"{pieces[0]['shoot_name']}: {len(pieces)} pieces in the posting queue (" + ", ".join(f"{x['kind']}{' ' + str(x['n']) if x.get('n') else ''}: {x['status']}" for x in pieces) + ").")
+        say(f"{pieces[0]['shoot_name']}: {len(pieces)} pieces in the posting queue (" + ", ".join(f"{x['kind']}{' ' + str(x['n']) if x.get('n') else ''}{' (' + x['reel_name'] + ')' if x.get('reel_name') else ''}: {x['status']}" for x in pieces) + ").")
         calendar_in_step()
         return 0
     if a.cmd == "add":
@@ -2521,6 +2670,16 @@ def main():
         say(f"{shoot['name']}: {len(made)} piece{'s' if len(made) != 1 else ''} waiting to be made ({', '.join(kinds)})." if made else f"{shoot['name']} is already in the posting queue.")
         return 0
     if a.cmd == "made":
+        multi = several_reels_kit(p, a.piece) if "reel" in re.split(r"[^a-z0-9]+", a.piece.lower()) else None
+        if multi is not None:
+            # one shoot, several reels: which reel was made is in the reel page's record, so each reel's piece
+            # is brought up to date from there; none is put back from ready to post
+            got = add_for_kit(p, multi)
+            schedule(p); save(p); write_page(p)
+            say(f"{got[0]['shoot_name']} has more than one reel: each reel's place in the posting queue is up to date. "
+                "To put one in line, say which: ready \"<shoot> reel\" --reel \"<reel name>\".")
+            calendar_in_step()
+            return 0
         x = find(p, a.piece)
         set_status(p, x, "yellow", where=a.where)
         save(p); write_page(p)
@@ -2528,7 +2687,7 @@ def main():
         calendar_in_step()
         return 0
     if a.cmd in ("ready", "unready", "posted", "skip"):
-        x = find(p, a.piece)
+        x = reel_piece_for(p, a.piece, a.reel) if a.cmd == "ready" and getattr(a, "reel", None) else find(p, a.piece)
         set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[a.cmd])
         save(p); write_page(p)
         if a.cmd == "ready":

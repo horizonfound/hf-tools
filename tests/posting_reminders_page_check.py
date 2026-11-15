@@ -697,7 +697,7 @@ def check_page(c, s):
     row = c.js("Array.from(document.querySelectorAll('#pick .pw > *')).filter(function(e){ return e.textContent; }).map(function(e){ return e.textContent; })")
     case("the button row: Copy caption, Copy my hook, Set a reminder to post, Open my words →", row == ["Copy caption", "Copy my hook", SET, "Open my words →"], row)
     case("the drop-down is closed until they press the button, and takes no room", c.js(LINE) is None and c.js("document.querySelector('#pick .pr').getBoundingClientRect().height") == 0
-         and c.js("Array.from(%s.children).map(function(e){ return e.className; }).join(' ')" % ppc.PANEL) == "ph pw pr pn strip warn")
+         and c.js("Array.from(%s.children).map(function(e){ return e.className; }).join(' ')" % ppc.PANEL) == "ph pw pr pn ps warn")
     c.click("#pick [data-r]")
     case("pressed: 'Want a reminder on its posting day? ...' [Remind me] [I'll post it myself] and a small ×, hers",
          line_is(c, ASK) is True and c.js(BUTTONS) == ["Remind me", "I'll post it myself", "×"], (c.js(LINE), c.js(BUTTONS)))

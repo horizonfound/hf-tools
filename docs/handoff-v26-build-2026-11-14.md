@@ -533,3 +533,67 @@ Also run after the change, one at a time, both Pythons, all passing: `tests/fixt
 - Stage K (post kit, posting queue): nothing here changes a made reel's record. The song picked is still `saved.song`, an id made from the recording's folder and file name, so a replaced recording keeps its pick.
 - Stage E (note for Nicole, CLAUDE.md): carry the four items above. CLAUDE.md should name `sound.lead_in`, `reel_page.short_song_start`, `.kit/reel-sounds.json`, and say Remove a song is not built.
 - `reel_page_check.py` still gives "Old rec sound.m4a" a time one second OLDER than "Old rec.mov"; by her v25 rule that sound is an earlier recording's, so that test's make now also leaves an "Old rec sound 2.m4a" in its scratch kit. Its checks still hold (the old sound is used by nobody and never written over).
+
+## Stage K, built (Nov 14): the post kit and the posting queue with several reels; captions optional
+
+Nicole's v25, sections 6 and 7: "It should know that it's Katie Austin's Fun Maternity, because I pressed add to my queue."
+
+**What a photographer sees.**
+- **Captions are optional.** On the post kit, **Add to my queue** works once the piece is made, caption or not. With no caption the box says "Add it to your posting queue so you can see it in your feed and give it a date. Its caption can come later, or not at all." and a press opens her small box on the page: "You haven't written a caption for your reel yet. That's okay. Do you still want to add it to your posting queue, or write your caption first?" with **Add it to my queue** and **Write my caption** (the words page). It is a box on the page, never a browser pop-up; Escape and the x close it with nothing done. The same for a carousel. The two lines that asked for a caption first ("Make your reel and write its caption", "Write its caption") are gone.
+- **With more than one reel, the Reel card shows a preview of each reel by name:** up to 7 photos (then "+N"), then "In CapCut: <that reel's newest project>" or "Not made yet"; a reel with nothing in it says "No photos picked yet." One **Open in CapCut** under them when any is made.
+- **Step 3 lists each reel's place,** in her words: "Fun Maternity: down for Sun, Nov 15", "White Backdrop: made, not in your queue yet", "not made yet", "in your posting queue", "posted ✓".
+- **Add to my queue asks "Which reel goes in your queue?"** with a button for each reel that is made and not in the queue yet. With one left it does not ask. Then the caption question when there is no caption, then (the very first time) how often they post.
+- **In the posting queue each reel is its own post:** its own date, its own grid photo, its own reminder. The lists and the panel's heading say "<shoot> reel · <reel name>".
+- **The reel cover picker:** "From your reel, in the order it plays" first, that reel's own photos numbered in play order; then **+ Use a different photo**, which opens "Any other photo from the shoot" (**Hide the other photos** closes it). It is open already when the photo in use is one of those. A carousel's panel is as it was.
+- **A shoot with one reel sees one change only:** the caption is optional. Its card, its queue box, its piece in the queue and its panel's photos are what they were (the panel's photos are now in her two rows).
+
+**Our way underneath.**
+- **Each reel has its own piece; no id is renamed.** The shoot's first reel keeps the kit's own reel piece, the one every kit always had, with its date and its place in line. Every reel started after it gets that piece's name with the reel's id after it ("...-reel-v2"). The kit's name in the queue is already one no other kit has (`kit_sid`), so two shoots whose names shorten alike never share a reel piece (checked with two such shoots, two reels each). Which reel a piece is, is read from its name (`posting_queue.reel_version`), never from a field a page could send. Pieces also carry `version` and `reel_name` (hers), kept up to date whenever the kit is added: a reel renamed is shown by its new name.
+- **A shoot with one reel is in the queue with the same fields as ever** (no `version`, no `reel_name`).
+- **No second server and no command run by the page.** Hers runs `posting_queue.py reel-label` and then `ready` from her page server. Ours is one press on the route the kit page already used, `POST /words-queue {kit, piece, reel?}`, in the page server, under the queue's own lock: `posting_queue.add_for_kit(p, kit, reel=<id>)` makes or updates that reel's piece, then it is marked ready. `reel` must look like a reel id and be one of the shoot's reels, and that reel must be made; anything else is refused with nothing written. Another website's page, another host, and now also a press the browser itself marks cross-site, are refused.
+- **The kit page asks nothing of a second place for its reels:** the list of reels a press may offer is written into the button by the server (ids and names, as text), and the page is still built whole on every request. After an add only the boxes that changed are swapped, as before.
+- **The words in the box are set as text.** A reel's name with a tag in it shows as letters, on the kit page, in the box's buttons, in the posting page's lists and in the panel's heading.
+- **Which reel is made, and its newest project:** `reel_page.reels_for_kit` reads the reel page's record ("made" entries carry which reel; one without a mark is the first reel's, hers). A reel made from the chat the older way (only in `kit.json`) counts as the first reel's.
+- **The kit's own reel piece follows the first reel** once a shoot has several: its light is the first reel's (hers lights it from the newest reel of any).
+- **The cover picker's photos are that reel's own, whichever reel is open on the reel page:** `GET /posting/panel` reads which reel from the piece (`reel_page.order_for_kit_page(..., reel=)`). Hers asks her second server with `&version=vN`.
+- **The reel maker's "made" can no longer un-ready another reel's post.** `reel.py make` tells the queue "<shoot> reel is made" without saying which reel. For a shoot with several reels, `posting_queue.py made` now brings each reel's piece up to date from the reel page's record and changes nobody's light downwards.
+- **Reminders follow each reel's piece by themselves** (they always went by the piece's id). A post with no caption still gets its reminder; its notes say "No caption yet. Write it on your words page in the post kit." and fill in when a caption is written.
+- **The chat:** `posting_queue.py ready "<shoot> reel" --reel "<reel name>"` gives that reel its own piece and marks it ready; a reel that is not made, or a name that fits none, stops with nothing changed and says why. A reel's piece is found by its name too ("beach reel white backdrop"); "<shoot> reel" alone with two in the queue asks which. The chat's name for a piece is hers: "<shoot> reel (<reel name>)". With no caption the assistant asks her question in her words before marking anything ready.
+- **Files:** `kit.py` (the page), `words_page.py` (the route, its state), `posting_queue.py` (the pieces, the panel, the page, the commands), `reel_page.py` (`reels_for_kit`, a reel's own order), four parts of the instructions, `tests/kit_reels_queue_check.py` (new), five older tests brought up to v25, the GitHub check.
+
+**Choices where her spec was silent (plainest behaviour).**
+1. **A press that names no reel adds the reel being worked on** (hers). A reel id that is not one of the shoot's is refused (hers falls back to the reel being worked on).
+2. **A reel that is not made is refused by the Assistant too,** not only hidden by the page (hers has no check on her server).
+3. **A reel after the first gets its piece only when it goes in** (Add to my queue, or the chat's `ready --reel`), as hers. So "Still finishing" on the posting page shows the shoot's reel piece, not one row per made reel.
+4. **The kit's reel piece is named for the first reel as soon as the shoot has several** and the kit is added (hers names it only when the first reel itself is added).
+5. **The words page's own Add to my queue still waits for a caption** (her words page did not change in v25). With several reels it is about the reel being worked on: that reel's "is it made", that reel's place in the queue (hers adds that reel but shows the first reel's place).
+6. **The cover picker remembers whether they opened or hid "Any other photo from the shoot"** while the panel stays open (hers works it out again on every redraw, so picking one of the reel's own photos would close it under their hand).
+7. **A reel with no photos picked yet** has a plain row of every photo of the shoot, not numbered, with no headings (hers).
+8. **The box:** the button that opened it gets the keyboard back when it closes; a long reel name wraps inside its button (ours, two style lines). Tab can still leave the box: it is hers, with no focus trap.
+9. **`ready --reel` refuses a reel that is not made;** plain `ready` still marks whatever it is told (as before).
+10. **A shoot with one reel that was renamed** (a list of one) is one reel: nothing new is asked and its piece carries no name (hers: more than one).
+11. **There is no `reel-label` command** (hers is her own server's plumbing); `ready --reel` does both.
+12. The older "More from the shoot" divider is gone from the picker; its one style line is left, unused.
+
+**Hers left out, on purpose.** Her v26 post kit's test-home links (`?home=test`, the plan's rule). Her second server's `/choices` route and its open access (ours never had one). Nothing a photographer sees.
+
+**Tests.** `tests/kit_reels_queue_check.py` (new): her words and style lines against her v25 page and her posting queue changes; captions optional; a shoot with several reels by request (previews, each reel's place, what may be offered, each reel its own piece, no id renamed, a rename followed); two shoots whose names shorten alike; the queue's names and each reel's own cover photos; the chat; reminders on a pretend calendar; every refusal; and in a hidden Chrome the kit page (the box, its two buttons, Escape, the x, "Which reel goes in your queue?", the question skipped with one left, a name with a tag as letters, the very first add with two reels, a phone's width) and the posting page (the names, the two rows, + Use a different photo, open already, a carousel as it was, a phone's width). 51 pieces of the stage were each taken out in a scratch copy and a check failed each time (30 by request, 21 on the real pages). `tests/skill_text_check.py` holds the new instruction lines to the scripts. In GitHub's check: by request on Windows, with the pages on the Mac's page job. Counts are in the build's report.
+
+Older tests brought up to v25, each only where her behaviour changed: `kit_steps_check.py` and `kit_cards_check.py` (the caption is not asked for; their one long-standing failure, the two v24 lines, is gone with those lines), `words_page_check.py` (the route adds a made reel with no caption; the page's own step still waits), `posting_panel_check.py` and `posting_reminders_page_check.py` (the picker's two rows).
+
+**Not tried.** Dustin's or Nicole's own hand; the Claude app's pane; a real shoot with two real reels made in CapCut; the real Calendar (a pretend one only); a fresh session following the new instructions; Windows (the first push runs it); a touch screen; a screen reader on the box; a shoot with ten reels on the card (how long the page takes with many previews).
+
+**Theirs to settle (for the note to Nicole, stage E).**
+1. **One caption for all of a shoot's reels.** The words page has one Reel tab, so two reels of one shoot go out with the same caption and hooks unless they change them between posts, and the caption question is about the shoot's reel words, not that reel's. Hers is the same. Say if each reel should have its own words.
+2. **Two reels' reminders have the same title** ("Post your <shoot> reel today"), on different days. Say if the reel's name should be in it.
+3. **The words page still waits for a caption before its own Add to my queue;** the post kit does not. Say if the words page should follow.
+4. **"Still finishing" shows one row for the shoot's reels until a second reel goes in** (choice 3). Say if every made reel should have a row there.
+5. **Our lines in the chat** when `ready --reel` stops (a reel not made, a name that fits none), and the line `made` prints for a shoot with several reels.
+6. **In CapCut the projects are named for the shoot, not the reel** (stage G's question): the Reel card now shows them side by side, "White Backdrop ... In CapCut: Katie reel 4".
+7. **Remove a song** is still not built and is hers to answer (the waiting list, item 1).
+
+**For later stages.**
+- Stage L: nothing here lists shoots on the home page. Stage E (CLAUDE.md): say a caption is optional on the post kit; each reel is its own piece ("...-reel-v2", `version`, `reel_name`); `ready --reel`; the cover picker's two rows; `reel_page.reels_for_kit`; and that the long-standing `need_both` / `need_caption` failures of the two kit tests are gone.
+- `posting_queue.kit_piece(p, kit, "reel")` is the FIRST reel's piece; pass `version=` for another. `kit_reels(kit)` is [] for a shoot with one reel.
+- The panel's photos now sit in `#pick .ps` (one or two `.strip` rows inside it), not in a single `#pick > .strip`.
+- `tests/kit_cards_check.py`'s other older failure (the kit page asking Google for Figtree) still shows on some runs; it came with the stories designer.

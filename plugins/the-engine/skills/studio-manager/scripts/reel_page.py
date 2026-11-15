@@ -1079,15 +1079,21 @@ def current_picks(kit, reel=None):
     return ",".join(f"{x['n']}{x.get('h') or ''}" for x in _order_used(st["saved"], st["claude"], st.get("claude_earlier")))
 
 
-def order_for_kit_page(kit, rows=None, rec_kit=None):
+def order_for_kit_page(kit, rows=None, rec_kit=None, reel=None, rec=None):
     """The reel's photos in the order Make my reel would use (_order_used), for the post kit's Reel card (her
     kit_summary's reel_order). Reads only: nothing is saved and no lock is taken, so showing the kit page never
     changes the record. A record saved against an earlier numbered list is read the way sync() would bring it in
-    line (each photo found again by its file name), in memory only. [] when the numbered list can't be read."""
+    line (each photo found again by its file name), in memory only. [] when the numbered list can't be read.
+    `reel` (v25: a shoot with several reels): that reel's own order, whichever reel is open on the page; None is
+    the reel being worked on. `rec`: the reel page's record, when the caller has read it already."""
     rows = arrange.sheet_rows(kit) if rows is None else rows
     if not rows:
         return []
-    rec = load(kit)
+    rec = load(kit) if rec is None else rec
+    if reel is not None:
+        if reel not in {v["id"] for v in reels.listed(rec, REEL_FIRST)}:
+            return []
+        rec = as_reel(rec, reel)
     saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
     stamp = arrange.sheet_stamp(kit)
     if rec.get("stamp") and stamp and rec.get("stamp") != stamp:
@@ -1130,6 +1136,48 @@ def newest_project(kit, rec_kit=None):
     except (TypeError, ValueError):
         page_when = 0.0
     return chat["project"] if _when_of(chat.get("made")) > page_when + 1 else page["project"]
+
+
+def reels_for_kit(kit, rows=None, rec_kit=None):
+    """Every reel of the shoot, for the post kit and the posting queue (hers: reels_of, v25): [{id, name, made,
+    project, order}] in the order they were started. `made`: a reel of it is in CapCut; `project`: the newest
+    one's name; `order`: its photos in the order Make my reel would use, as [{n, h}] (at most 40, hers).
+    Whose a made reel is: its "made" entry says (made_for; one without a mark is the first reel's, hers). A reel
+    made from the chat the older way (kit.json "reel", with no entry in this record) is the first reel's too.
+    Reads only; a record that can't be read gives the one reel it always was."""
+    rows = arrange.sheet_rows(kit) if rows is None else rows
+    rec = load(kit)
+    try:
+        rec_kit = rec_kit if rec_kit is not None else kit_mod.load_rec(kit)
+    except (OSError, ValueError):
+        rec_kit = {}
+    if not isinstance(rec_kit, dict):
+        rec_kit = {}
+    last, known = {}, set()
+    for m in rec.get("made") or []:
+        if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]:
+            last[made_for(m)] = m
+            known.add(m["project"])
+    chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
+    chat_project = chat.get("project") if isinstance(chat.get("project"), str) and chat.get("project") else None
+    out = []
+    for v in reels.listed(rec, REEL_FIRST):
+        m = last.get(v["id"])
+        project = m["project"] if m else None
+        if v["id"] == reels.FIRST_ID and chat_project and chat_project not in known:
+            try:
+                page_when = float(m.get("when") or 0) if m else 0.0
+            except (TypeError, ValueError):
+                page_when = 0.0
+            if not m or _when_of(chat.get("made")) > page_when + 1:
+                project = chat_project
+        try:
+            order = order_for_kit_page(kit, rows, rec_kit, reel=v["id"], rec=rec) if rows else []
+        except (OSError, ValueError, TypeError, AttributeError, KeyError):
+            order = []
+        out.append({"id": v["id"], "name": v["name"], "made": bool(project), "project": project,
+                    "order": [{"n": x["n"], "h": x.get("h") or ""} for x in order][:40]})
+    return out
 
 
 # ---------- checking what a page sends ----------

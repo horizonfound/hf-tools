@@ -131,6 +131,12 @@ name: Check it on a Windows PC
 #                                   3-second clip in tests/fixtures. By request on Windows (--no-chrome) and in
 #                                   "mac-page" with real Shift, Cmd and Ctrl clicks, real drags, and the trim panel
 #                                   on a 40-second clip the test makes with the Mac's own tools.
+#   tests/kit_reels_queue_check.py  Nicole's v25, the post kit and the posting queue with several reels, captions
+#                                   optional (Nov 14): Add to my queue once the piece is made, the caption question
+#                                   in a box on the page, a preview of each reel, "Which reel goes in your queue?",
+#                                   each reel its own piece (no id renamed), the reel cover picker in play order,
+#                                   reminders per reel on a pretend calendar. By request on Windows (--no-chrome)
+#                                   and in "mac-page" with the kit page and the posting page in a hidden Chrome.
 #   tests/songs_check.py            Nicole's v25, songs (Nov 14): a short song starts after a glitchy opening (what
 #                                   ffmpeg's silencedetect would call a silence, measured in plain Python), a replaced
 #                                   recording gets its sound taken again ("<name> sound 2"), Remove a song NOT built.
@@ -173,11 +179,11 @@ on:
   workflow_dispatch:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -310,6 +316,9 @@ jobs:
       - name: Several reels from one shoot (Nicole's v25 - every reel fully separate, the two bars' routes, the chat's commands; the pages in a browser are checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/reels_check.py --no-chrome
+      - name: The post kit and the posting queue with several reels, captions optional (Nicole's v25 - each reel its own piece, no id renamed, the cover picker's photos per reel, the chat's ready --reel, reminders on a pretend calendar; the pages in a browser are checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/kit_reels_queue_check.py --no-chrome
       - name: The photographer picks (Nicole's v25 - nothing picked until they ask, the photo note per reel, what the assistant reads before it picks; the page in a browser is checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/picks_ask_check.py --no-chrome
@@ -556,6 +565,9 @@ jobs:
       - name: Several reels from one shoot (Your reels and Your talking reels on the real pages - start a new one, the drop-down, Rename with Save, Cancel, Enter and Escape)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/reels_check.py
+      - name: The post kit and the posting queue with several reels (the caption question in a box on the real page, Which reel goes in your queue, the reel cover picker's two rows on the real posting page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/kit_reels_queue_check.py
       - name: The photographer picks (the note box on the real page - her words, the line to copy with the reel's name and the note's ending, saved as they type, each reel its own)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/picks_ask_check.py
