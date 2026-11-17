@@ -856,7 +856,8 @@ HERS3 = {
     "say2": "Press <b>Add my music</b> and a Music folder for this shoot opens. Drag your song into it. A screen recording of the song playing works fine: I'll take the sound from it and keep it right beside the recording.",
     "button": "♫ Add my music",
     "note": "Posting from a business account? Music you didn't license can get your reel muted. The always-safe way: pick <b>No song</b>, make the reel, and add a song from Instagram's own music when you post.",
-    "none_b": "No song", "none_s": "I'll add music in Instagram when I post",
+    # her v27 (Nov 16): one drop-down in place of the rows (tests/reel_v27_page_check.py holds its words to her v27 page)
+    "choose": "Choose a song…", "none": "No song, I'll add music in Instagram", "rec": " (screen recording)",
     "opening": "Opening your Music folder in Finder...",
     "open": "Your Music folder is open in Finder. Drag your song in, and it will show up here by itself.",
     "open_behind": "Your Music folder is open in Finder, behind this window. Click Finder in the Dock to see it. Drag your song in, and it will show up here by itself.",
@@ -1304,15 +1305,18 @@ def page_texts3(c):
     return c.js("""(function(){
       function h(id){ var x = document.querySelector('#' + id + ' h2').cloneNode(true); x.querySelector('.num').remove(); return x.textContent; }
       var says = document.querySelectorAll('#step3 > p.say');
-      var none = document.querySelector('#songs .song.none');
+      var sel = document.getElementById('songSel'), opts = Array.from(sel.options);
+      var none = opts.filter(function(o){ return o.value === ''; })[0];
       return {h2: h('step3'), say1: says[0].textContent, say2: says[1].innerHTML, button: document.getElementById('addMusic').textContent,
-        note: document.querySelector('#step3 .note').innerHTML, none_b: none.querySelector('b').textContent, none_s: none.querySelector('small').textContent,
+        note: document.querySelector('#step3 .note').innerHTML, none_b: none ? none.textContent : '', choose: opts[0].disabled ? opts[0].textContent : '',
+        listen: document.getElementById('songPlay').textContent, listen_hidden: document.getElementById('songPlay').hidden,
+        rm: document.getElementById('songRm').textContent, rm_hidden: document.getElementById('songRm').hidden,
         h2v: h('step4'), sayv: document.querySelector('#step4 > p.say').textContent,
         cards: Array.from(document.querySelectorAll('#vibes .opt')).map(function(b){ var t = b.querySelector('b').cloneNode(true); var r = t.querySelector('.rec'); if (r) r.remove(); return [t.textContent, b.querySelector(':scope > span').textContent]; }),
         rec: Array.from(document.querySelectorAll('#vibes .opt')).filter(function(b){ return !!b.querySelector('.rec'); }).map(function(b){ return b.dataset.vibe + ':' + b.querySelector('.rec').textContent; }),
         nums: Array.from(document.querySelectorAll('section.step')).filter(function(s){ return !s.hidden; }).map(function(s){ return s.id + '=' + s.querySelector('.num').textContent; }),
-        songs: Array.from(document.querySelectorAll('#songs .song:not(.none)')).map(function(b){ return [b.querySelector('b').textContent, b.querySelector('small').textContent, b.classList.contains('on')]; }),
-        none_on: none.classList.contains('on'),
+        songs: opts.filter(function(o){ return o.value && o.value !== '__'; }).map(function(o){ return [o.textContent, o.value === sel.value]; }),
+        none_on: !!none && sel.value === '' && !opts[0].disabled,
         vibe_on: (document.querySelector('#vibes .opt.on') || {dataset: {}}).dataset.vibe,
         sum: document.getElementById('sum').textContent, sum_b: document.querySelector('#sum b').textContent,
         make: document.getElementById('makeBtn').textContent, make_off: document.getElementById('makeBtn').disabled,
@@ -1337,32 +1341,34 @@ def check_page_steps(c, s):
     if st["saved"].get("song") is not None or st["saved"]["picks"] != picks([3, 6, 9, 12, 15, 18, 21, 24]) or st["saved"].get("footage") is not False:
         s.http("POST", "/reel-save", save_body(st, {"picks": picks([3, 6, 9, 12, 15, 18, 21, 24]), "mine": True, "song": None, "vibe": "beat", "footage": False}, page="setup2"))
     c.open(s.page_url())
-    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songs .song').length > 1", 20)
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songSel option').length > 1", 20)
     t = page_texts3(c)
-    for k in ("h2", "say1", "say2", "button", "note", "none_b", "none_s"):
+    for k in ("h2", "say1", "say2", "button", "note"):
         case("her words, step 3: %s" % k, t[k] == HERS3[k], (t[k], HERS3[k]))
+    case("her v27 drop-down: 'Choose a song…' first (and only until one is picked), No song last, Listen and Remove this song hidden until a song is picked",
+         t["choose"] == HERS3["choose"] and t["none_b"] == HERS3["none"] and t["listen_hidden"] and t["rm_hidden"] and t["listen"] == "▶ Listen" and t["rm"] == "Remove this song", t)
     case("her words, step 5: the heading and the line", t["h2v"] == HERS5["h2"] and t["sayv"] == HERS5["say"], (t["h2v"], t["sayv"]))
     case("her words, step 5: the four vibes, in her order", t["cards"] == HERS5["cards"], t["cards"])
     case("Recommended on On every beat only (decision 7)", t["rec"] == ["beat:Recommended"], t["rec"])
     case("her renumbering with Just photos: the footage 1, the order 2, the song 3, the vibe 4 (the style hidden)",
          t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
-    case("her song list: each with her words for what it is and where",
-         [x[:2] for x in t["songs"]][:3] == [["Short beat", "Song, in your Music folder"], ["New rec", "Screen recording · I'll use its sound, in your Music folder"],
-                                              ["Beat one", "Song, in your Music folder"]] and ["Photo song", "Song, in your Photos folder"] in [x[:2] for x in t["songs"]], t["songs"])
-    case("no song picked yet: nothing is marked, and the step isn't done", not any(x[2] for x in t["songs"]) and not t["none_on"] and not t["done3"])
+    case("her song list in the drop-down: Music first, newest first, a recording says so (v27)",
+         [x[0] for x in t["songs"]][:3] == ["Short beat", "New rec (screen recording)", "Beat one"] and "Photo song" in [x[0] for x in t["songs"]], t["songs"])
+    case("no song picked yet: nothing is marked, and the step isn't done", not any(x[1] for x in t["songs"]) and not t["none_on"] and not t["done3"])
     case("the bar: her summary, word for word", t["sum"] == "8 photos · no song picked yet · on every beat" and t["sum_b"] == "8 photos", t["sum"])
     case("the bar: her button", t["make"] == "Make my reel" and not t["make_off"], t["make"])
 
     c.click("#makeBtn")
     t = page_texts3(c)
     case("Make my reel with no song: her \"One more thing\" box", t["result"] == "result on bad" and t["result_html"] == "<h3>One more thing: your song</h3><p>%s</p>" % NEED_SONG_HTML, t["result_html"])
-    c.click("#songs .song[data-id='%s']" % song_of(s, KIT, "Beat one"))
+    c.set_value("#songSel", song_of(s, KIT, "Beat one"))
     t = page_texts3(c)
-    case("picking a song marks it and clears the box (hers)", t["result"] == "result" and [x for x in t["songs"] if x[2]] == [["Beat one", "Song, in your Music folder", True]] and t["done3"], t["result"])
+    case("picking a song marks it, shows Listen and Remove this song, and clears the box (hers)", t["result"] == "result" and [x for x in t["songs"] if x[1]] == [["Beat one", True]] and t["done3"]
+         and not t["listen_hidden"] and not t["rm_hidden"] and t["choose"] == "", t)
     case("saved: the song, by its id", on_disk(s, {"song": song_of(s, KIT, "Beat one")}))
     case("the bar: the song's name", page_texts3(c)["sum"] == "8 photos · Beat one · on every beat", page_texts3(c)["sum"])
-    c.click("#songs .song.none")
-    case("No song: marked, saved as \"\"", page_texts3(c)["none_on"] and on_disk(s, {"song": ""}))
+    c.set_value("#songSel", "")
+    case("No song: marked, saved as \"\", and Listen and Remove go away", page_texts3(c)["none_on"] and on_disk(s, {"song": ""}) and page_texts3(c)["listen_hidden"] and page_texts3(c)["rm_hidden"])
     case("the bar: no song", page_texts3(c)["sum"] == "8 photos · no song · on every beat", page_texts3(c)["sum"])
     c.click("#vibes .opt[data-vibe='calm']")
     t = page_texts3(c)
@@ -1383,25 +1389,25 @@ def check_page_steps(c, s):
     except Exception:  # noqa: BLE001
         ok = False
     t = page_texts3(c)
-    case("a song dropped in the Music folder shows up and is picked by itself, \"Got it: <name>.\" (within her 3 s look)", ok and t["songs"][0] == ["Dropped in", "Song, in your Music folder", True], (t["waiting"], t["songs"][:1]))
+    case("a song dropped in the Music folder shows up and is picked by itself, \"Got it: <name>.\" (within her 3 s look)", ok and t["songs"][0] == ["Dropped in", True], (t["waiting"], t["songs"][:1]))
     case("saved: the new song", on_disk(s, {"song": song_of(s, KIT, "Dropped in")}))
     (s.kit / "Music" / "Dropped in.wav").rename(s.work / "Dropped in.wav")
     try:
-        c.wait_for("!Array.from(document.querySelectorAll('#songs .song b')).some(function(b){ return b.textContent === 'Dropped in'; })", 8)
+        c.wait_for("!Array.from(document.querySelectorAll('#songSel option')).some(function(o){ return o.textContent === 'Dropped in'; })", 8)
         ok = True
     except Exception:  # noqa: BLE001
         ok = False
     case("a song taken out of the folder goes from the list, and is no longer picked (hers)", ok and page_texts3(c)["sum"].startswith("8 photos · no song picked yet"), page_texts3(c)["sum"])
     c.reload()
-    c.wait_for("document.querySelectorAll('#songs .song').length > 1", 15)
+    c.wait_for("document.querySelectorAll('#songSel option').length > 1", 15)
     t = page_texts3(c)
     case("after a reload: the vibe as saved", t["vibe_on"] == "calm", t["vibe_on"])
 
     # a test make on the page (her &test=1)
     c.open(s.page_url() + "&test=1")
-    c.wait_for("document.querySelectorAll('#songs .song').length > 1", 15)
+    c.wait_for("document.querySelectorAll('#songSel option').length > 1", 15)
     case("&test=1: her button words", page_texts3(c)["make"] == "Make my reel (test: nothing is made)")
-    c.click("#songs .song[data-id='%s']" % song_of(s, KIT, "Beat one"))
+    c.set_value("#songSel", song_of(s, KIT, "Beat one"))
     c.click("#makeBtn")
     t = page_texts3(c)
     case("while it is made: her spinner words and her line in the box", "Making your reel..." in t["make"] and t["make_off"]
@@ -1416,7 +1422,7 @@ def check_page_steps(c, s):
 
     # a real make on the page
     c.open(s.page_url())
-    c.wait_for("document.querySelectorAll('#songs .song').length > 1", 15)
+    c.wait_for("document.querySelectorAll('#songSel option').length > 1", 15)
     before = sorted(os.listdir(s.store))
     c.click("#makeBtn")
     t = wait_result(c)

@@ -790,7 +790,7 @@ def check_test_make(c, s):
     rec["moments"] = []
     (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
     c.reload()
-    c.wait_for("document.querySelectorAll('#songs .song').length > 1 && !document.getElementById('btsBox').hidden", 15)
+    c.wait_for("document.querySelectorAll('#songSel option').length > 1 && !document.getElementById('btsBox').hidden", 15)
     case("no moments yet: her line over the empty cards", texts1(c)["moments_say"] == "The moments I find, and any you pick yourself below, show up here.", texts1(c)["moments_say"])
     c.click("#makeBtn")
     case("Make my reel with footage and nothing looked at yet: her \"I haven't looked through your footage yet\"",

@@ -40,7 +40,10 @@ Routes, all on the posting server (posting_queue.py hands them here):
   POST /reel-save                {kit, stamp, base, page, saved: {...}}: the page's choices, checked field by field
   GET  /reel-font?f=<name>       one of the plugin's own font files (FACES)
   GET  /reel-songs?kit=<folder>  step 3: the songs in the shoot's Music and Photos folders, {id, name, where, kind}
-  POST /reel-open                {kit, what: "music"}: makes <kit>/Music if it isn't there and opens it (finder.py)
+  POST /reel-open                {kit, what: "music" | "footage" | "photos"}: makes <kit>/Music (or Footage) if it isn't
+                                 there and opens it (finder.py); "photos" (her v27 + Add photos) opens the shoot's Photos
+                                 folder as it is. New photos there are numbered on the page's own poll (relist_if_changed)
+  GET  /reel-song?kit=&id=       her v27 Listen: the song to play, by id (a recording's sound, made once), in pieces
   POST /reel-make                {kit, stamp, picks, song, vibe, test}: Make my reel; answers with a job to ask after
   GET  /reel-job?kit=&id=        how that job is going: queued, running, done (her lines) or problem (her words)
   POST /reel-version             {kit, op: new | switch | rename, id, name}: her "Your reels" bar (v25): start a new
@@ -257,7 +260,7 @@ FACES = [
 FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answers to
 
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-             "/reel-strip", "/reel-moment-still")
+             "/reel-strip", "/reel-moment-still", "/reel-song")
 POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove")
 
 # ---------- the words: hers, word for word (reel-maker.html and server.py, handoff v19) ----------
@@ -420,12 +423,16 @@ WORDS = {
     "song_say2_html": "Press <b>Add my music</b> and a Music folder for this shoot opens. Drag your song into it. A screen recording of the song playing works fine: I'll take the sound from it and keep it right beside the recording.",
     "add_music": "♫ Add my music",
     "licence_html": "Posting from a business account? Music you didn't license can get your reel muted. The always-safe way: pick <b>No song</b>, make the reel, and add a song from Instagram's own music when you post.",
-    "song_recording": "Screen recording · I'll use its sound",
-    "song_song": "Song",
-    "song_in_music": "in your Music folder",
-    "song_in_photos": "in your Photos folder",
-    "no_song_b": "No song",
-    "no_song_s": "I'll add music in Instagram when I post",
+    # her v27 (Nov 16: "so it doesn't take up so much space"): one drop-down in place of the rows, Listen, and
+    # Remove this song (two taps, to the Trash: her v25 section 5, settled by v27; its four page lines and two
+    # server lines are below, with the Music folder's, since Lane E's route POST /reel-song-remove says them)
+    "song_choose": "Choose a song…",
+    "song_rec_tag": " (screen recording)",
+    "song_none": "No song, I'll add music in Instagram",
+    "song_aria": "Your song",
+    "listen": "▶ Listen",
+    "stop": "❚❚ Stop",
+    "song_off_list": "Take this song off the list",
     "got_it": "Got it: {name}.",
     "opening_music": "Opening your Music folder in Finder...",
     "music_open": "Your Music folder is open in Finder. Drag your song in, and it will show up here by itself.",
@@ -670,6 +677,9 @@ OUR_WORDS = {
     # the Assistant's own check of a trim (her page can't send one outside 1 to 15 seconds; hers would quietly bend it)
     "trim_length": "A clip is 1 to 15 seconds long.",
     "coming_small": "still copying in",
+    # Remove this song posts to /reel-song-remove (Lane E's route); a page served by an older server that has no
+    # such route is told so in plain words, and nothing is moved
+    "song_remove_soon": "Remove this song isn't finished yet, so nothing was moved. For now, drag the song out of the shoot's Music folder in Finder yourself.",
     "coming": "{name} is still being copied into your Footage folder. It shows up here when it's done.",
     # Remove this song (v27): hers would send a recording to the Trash from wherever list_songs found it; a
     # recording in the Photos folder is in a folder of theirs (an export folder the kit only points to), so
@@ -3361,6 +3371,30 @@ def send_range(handler, path, ctype):
             pass                                  # the player moved on; that's normal (hers)
 
 
+SONG_TYPES = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".aif": "audio/aiff", ".aiff": "audio/aiff", ".aac": "audio/aac"}   # else audio/mp4 (hers)
+
+
+def _get_song(handler, q):
+    """GET /reel-song?kit=&id=: the song to play on the page (her v27 Listen, and the watch step's sound later):
+    an audio file as it is, a screen recording's sound (made once, beside it: sound_for). By id, never a path;
+    in pieces when the player asks (send_range). 404 for an id that isn't one of the shoot's songs."""
+    if _cross_site(handler):
+        return handler.send_error(403)
+    kit = arrange.kit_by_name(_one(q, "kit"))
+    sid = _one(q, "id")
+    if kit is None or not SONG_ID.fullmatch(sid):
+        return handler.send_error(404)
+    s = song_by_id(kit, sid)
+    if s is None:
+        return handler.send_error(404)
+    path = s["path"]
+    if s["kind"] == "video":
+        path, _why = sound_for(kit, s)
+        if path is None:
+            return handler.send_error(404)
+    return send_range(handler, path, SONG_TYPES.get(Path(path).suffix.lower(), "audio/mp4"))
+
+
 def _get_font(handler, q):
     key = _one(q, "f")
     if key not in FACE_FILES:
@@ -3393,11 +3427,13 @@ def handle_get(handler, path, query):
             return _get_job_or_songs(handler, path, q)
         if path in ("/reel-footage", "/reel-video", "/reel-strip", "/reel-moment-still"):
             return _get_footage(handler, path, q)
+        if path == "/reel-song":
+            return _get_song(handler, q)
         return handler.send_error(404)
     except (Exception, SystemExit) as e:  # noqa: BLE001
         arrange.log(f"GET {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
         try:
-            if path in ("/reel-font", "/reel-video", "/reel-strip", "/reel-moment-still"):
+            if path in ("/reel-font", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-song"):
                 handler.send_error(404)
             elif path.endswith(".html"):
                 import arrange_page
@@ -4002,7 +4038,11 @@ def _song_section(w, num, kind="photos"):
         "<p class='say'>" + w["song_say2_html"] + "</p>"
         "<button class='btn main' id='addMusic' type='button'>" + e(w["add_music"]) + "</button>"
         "<p class='waiting' id='waiting'></p>"
-        "<div class='songs' id='songs'></div>"
+        # her v27: one drop-down, Listen, Remove this song (the old rows are gone)
+        "<div class='songpick' id='songPick'><select id='songSel' aria-label='" + e(w["song_aria"], quote=True) + "'></select>"
+        "<button class='btn small' id='songPlay' type='button' hidden>" + e(w["listen"]) + "</button>"
+        "<button class='linkbtn' id='songRm' type='button' hidden title='" + e(w["song_off_list"], quote=True) + "'>" + e(w["song_remove"]) + "</button>"
+        "<audio id='songAudio' preload='none'></audio></div>"
         "<p class='note'>" + w["licence_html"] + "</p>"
         "</section>")
 
@@ -4907,25 +4947,63 @@ SONG_JS = r"""
   'use strict';
   var R = window.Reel, W = R.words, $ = R.$, esc = R.esc;
   var songs = [], seen = null, song = null;          // song: null (not picked yet), '' (No song), or a song's id
+  var sel = $('songSel'), play = $('songPlay'), rm = $('songRm'), audio = $('songAudio');
   R.song = function(){ return song; };
   R.songName = function(){ var s = songs.filter(function(x){ return x.id === song; })[0]; return s ? s.name : ''; };
+  // hers (renderSongPick): "Choose a song…" until one is picked, each song (a recording says so), then No song
   function renderSongs(){
-    var box = $('songs');
-    var list = songs.map(function(s){
-      var on = song === s.id;
-      var what = s.kind === 'video' ? W.song_recording : W.song_song;
-      var where = s.where === 'Music' ? W.song_in_music : W.song_in_photos;
-      return '<button class="song ' + (on ? 'on' : '') + '" type="button" data-id="' + esc(s.id) + '"><span class="ic">' +
-        (s.kind === 'video' ? '&#9654;' : '&#9835;') + '</span><span><b>' + esc(s.name) + '</b><small>' + esc(what) + ', ' + esc(where) + '</small></span></button>';
-    }).join('');
-    box.innerHTML = list + '<button class="song none ' + (song === '' ? 'on' : '') + '" type="button" data-id=""><span class="ic">&ndash;</span><span><b>' +
-      esc(W.no_song_b) + '</b><small>' + esc(W.no_song_s) + '</small></span></button>';
-    box.querySelectorAll('.song').forEach(function(b){ b.onclick = function(){ song = b.dataset.id; renderSongs(); R.save(); if (R.changed) R.changed(); }; });
+    var keep = sel.value;
+    sel.innerHTML = (song === null ? '<option value="__" selected disabled>' + esc(W.song_choose) + '</option>' : '') +
+      songs.map(function(s){ return '<option value="' + esc(s.id) + '">' + esc(s.name) + (s.kind === 'video' ? esc(W.song_rec_tag) : '') + '</option>'; }).join('') +
+      '<option value="">' + esc(W.song_none) + '</option>';
+    if (song !== null) sel.value = song; else if (keep === '__' || !keep) sel.value = '__';
+    play.hidden = !song; rm.hidden = !song;
+    if (!song) stopSong();
     $('step3').classList.toggle('done', song !== null);
   }
+  function stopSong(){ try { audio.pause(); } catch (e) {} play.textContent = W.listen; }
+  sel.onchange = function(){
+    if (sel.value === '__') return;
+    song = sel.value; stopSong(); renderSongs(); R.save(); if (R.changed) R.changed();
+  };
+  // Listen: the song as it is, or a recording's sound, by its id (hers: /reel/song)
+  play.onclick = function(){
+    if (!song) return;
+    if (!audio.paused) { stopSong(); return; }
+    var u = '/reel-song?' + R.q + '&id=' + encodeURIComponent(song);
+    if (audio.getAttribute('src') !== u) audio.setAttribute('src', u);
+    audio.play().then(function(){ play.textContent = W.stop; }).catch(function(){});
+  };
+  audio.addEventListener('ended', function(){ play.textContent = W.listen; });
+  audio.addEventListener('pause', function(){ play.textContent = W.listen; });
+  // Remove this song: two taps (hers), then the Assistant moves it to the Trash and the reel goes back to no song
+  var sureT = null;
+  function unsure(){ clearTimeout(sureT); sureT = null; rm.classList.remove('sure'); rm.textContent = W.song_remove; }
+  rm.onclick = function(){
+    if (!song) return;
+    if (!rm.classList.contains('sure')) {
+      rm.classList.add('sure'); rm.textContent = W.song_sure;
+      clearTimeout(sureT); sureT = setTimeout(unsure, 4000);
+      return;
+    }
+    clearTimeout(sureT); sureT = null;
+    rm.classList.remove('sure'); rm.textContent = W.song_removing; rm.disabled = true;
+    var sid = song;
+    stopSong();
+    R.post('/reel-song-remove', {kit: R.kit, song: sid}).then(function(res){
+      var j = res.j || {};
+      rm.disabled = false; rm.textContent = W.song_remove;
+      if (res.code === 404 && !j.songs) { $('waiting').textContent = W.song_remove_soon; return; }
+      $('waiting').textContent = j.words || (j.ok ? W.song_trashed : W.didnt_work);
+      if (Array.isArray(j.songs)) take(j.songs, true);
+      if (j.ok && song === sid) song = null;      // the Assistant cleared the pick itself; its record is adopted on the next look
+      renderSongs(); if (R.changed) R.changed();
+      if (j.ok) R.followNow();
+    }).catch(function(){ rm.disabled = false; rm.textContent = W.song_remove; $('waiting').textContent = W.no_server_short; });
+  };
   // hers (loadSongs): a file that wasn't there on the last look is picked by itself
-  function take(list){
-    var fresh = seen ? list.filter(function(s){ return !seen[s.id]; }) : [];
+  function take(list, quiet){
+    var fresh = seen && !quiet ? list.filter(function(s){ return !seen[s.id]; }) : [];
     songs = list; seen = {}; list.forEach(function(s){ seen[s.id] = true; });
     if (fresh.length) { song = fresh[0].id; R.save(); $('waiting').textContent = R.fill(W.got_it, {name: fresh[0].name}); }
     if (song && !songs.some(function(s){ return s.id === song; })) song = null;
@@ -5697,6 +5775,10 @@ def cmd_show(kit, reel=None):
         say("  On the page: nothing saved yet")
     say(f"  The order Make my reel uses: {current_picks(kit, vid) or '(none yet)'}")
     sid = saved.get("song")
+    songs = list_songs(kit)
+    if songs:
+        say("  Songs in the shoot: " + "; ".join(f"{x['name']} ({'a screen recording' if x['kind'] == 'video' else 'a song'}, {x['where']}, id {x['id']})"
+                                                + (" <- picked" if x["id"] == sid else "") for x in songs))
     if sid is None:
         say("  Song: not picked on the page yet")
     elif sid == "":

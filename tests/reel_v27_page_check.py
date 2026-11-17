@@ -350,7 +350,123 @@ def run_new_photos(s):
     case("with nothing changed, nothing is re-made (the stamp stays)", reel_state(s, kit)["stamp"] == stamp)
 
 
-# ---------- 6. the page, in a hidden Chrome ----------
+# ---------- 6. the songs: the drop-down's words, Listen by request, Remove this song's wiring ----------
+
+def add_songs(s, kit):
+    """A song and a screen recording (a pretend one: an audio file under a video's name, its sound already beside
+    it and newer, so no sound is ever taken here) in the shoot's Music folder."""
+    k = s.kit(kit)
+    music = k / "Music"
+    music.mkdir(exist_ok=True)
+    (music / "Beat one.wav").write_bytes(BEAT60.read_bytes())
+    (music / "Rec.mov").write_bytes((FIX / "click-100bpm.m4a").read_bytes())
+    (music / "Rec sound.m4a").write_bytes((FIX / "click-100bpm.m4a").read_bytes())
+    now = time.time()
+    os.utime(music / "Rec.mov", (now - 20, now - 20))
+    os.utime(music / "Rec sound.m4a", (now - 10, now - 10))
+    os.utime(music / "Beat one.wav", (now - 30, now - 30))
+    return music
+
+
+def songs_of(s, kit):
+    return {x["name"]: x for x in s.http("GET", "/reel-songs" + s.q(kit))[1]["songs"]}
+
+
+def run_songs(s):
+    import reel_page as rp
+    hers = her_v27()
+    if hers is not None:
+        text = html.unescape(hers).replace("\\'", "'")
+        case("her drop-down's words, both ways: Choose a song…, (screen recording), No song, Listen, Stop, Your song",
+             all(x in text for x in (rp.WORDS["song_choose"], rp.WORDS["song_rec_tag"], rp.WORDS["song_none"], "▶ Listen", "❚❚ Stop", 'aria-label="Your song"'))
+             and rp.WORDS["listen"] == "▶ Listen" and rp.WORDS["stop"] == "❚❚ Stop" and rp.WORDS["song_aria"] == "Your song")
+        case("her markup for it: the select, Listen, Remove this song and the player, in her order, the old rows gone",
+             re.search(r"<div class='songpick' id='songPick'><select id='songSel' aria-label='Your song'></select><button class='btn small' id='songPlay' type='button' hidden>▶ Listen</button>"
+                       r"<button class='linkbtn' id='songRm' type='button' hidden title='Take this song off the list'>Remove this song</button><audio id='songAudio' preload='none'></audio></div>", rp.page_html(KIT, "x", True, "photos"))
+             and "id='songs'" not in rp.page_html(KIT, "x", True, "photos"))
+    kit = "2026-10-06 Songs"
+    s.make_kit(kit, photos=6)
+    music = add_songs(s, kit)
+    songs = songs_of(s, kit)
+    case("(set up: a song and a recording in the Music folder, the recording's sound beside it)", set(songs) == {"Beat one", "Rec"} and songs["Rec"]["kind"] == "video", list(songs))
+    q = s.q(kit)
+    code, j, raw, h = s.http("GET", "/reel-song" + q + "&id=" + songs["Beat one"]["id"], headers={"Range": "bytes=0-99"})
+    case("Listen: GET /reel-song answers a Range with 206, the piece, its place and the song's own kind (audio/wav)",
+         code == 206 and len(raw) == 100 and h.get("Content-Range", "").startswith("bytes 0-99/") and h.get("Content-Type") == "audio/wav" and raw == BEAT60.read_bytes()[:100], (code, h))
+    code, j, raw, h = s.http("GET", "/reel-song" + q + "&id=" + songs["Beat one"]["id"])
+    case("...and the whole song with no Range (200), in pieces when asked (Accept-Ranges)", code == 200 and raw == BEAT60.read_bytes() and h.get("Accept-Ranges") == "bytes", (code, len(raw)))
+    code, j, raw, h = s.http("GET", "/reel-song" + q + "&id=" + songs["Rec"]["id"], headers={"Range": "bytes=0-9"})
+    case("a screen recording plays its sound (made once, beside it), as audio/mp4", code == 206 and raw == (FIX / "click-100bpm.m4a").read_bytes()[:10] and h.get("Content-Type") == "audio/mp4", (code, h))
+    case("404 for an id that isn't one of the shoot's songs, and for anything but an id", s.http("GET", "/reel-song" + q + "&id=0123456789ab")[0] == 404
+         and s.http("GET", "/reel-song" + q + "&id=../Music/Beat%20one.wav")[0] == 404 and s.http("GET", "/reel-song" + q)[0] == 404)
+    case("403 for another website, 404 for a shoot named by a path", s.http("GET", "/reel-song" + q + "&id=" + songs["Beat one"]["id"], headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
+         and s.http("GET", "/reel-song?kit=" + quote(str(s.kit(kit)), safe="") + "&id=" + songs["Beat one"]["id"])[0] == 404)
+    case("no song was written or changed by listening", sorted(os.listdir(music)) == ["Beat one.wav", "Rec sound.m4a", "Rec.mov"])
+    # the page's Remove posts {kit, song} to Lane E's route: through it once, into the tests' own Trash folder
+    code, j = save(s, kit, {"song": songs["Beat one"]["id"]})
+    case("(set up: Beat one picked for the reel)", code == 200, j)
+    code, j, _, _ = s.http("POST", "/reel-song-remove", {"kit": kit, "song": songs["Beat one"]["id"]})
+    case("Remove this song, by request as the page sends it: the song is in the (tests') Trash, her line, the list without it, the pick cleared",
+         code == 200 and j.get("ok") and j.get("words") == rp.WORDS["song_trashed"] and [x["name"] for x in j.get("songs", [])] == ["Rec"] and j.get("cleared") is True
+         and not (music / "Beat one.wav").exists() and (Path(s.env["STUDIO_TRASH_FOR_TESTS"]) / "Beat one.wav").exists()
+         and (reel_rec(s, kit) or {}).get("saved", {}).get("song") is None, (code, j))
+    case("the state says it: no song picked, one song left", reel_state(s, kit)["saved"]["song"] is None and [x["name"] for x in reel_state(s, kit)["songs"]] == ["Rec"])
+    case("reel_page.py show lists the songs with their ids", "Songs in the shoot: Rec (a screen recording, Music, id %s)" % songs["Rec"]["id"] in run(s, "reel_page.py", "show", kit)[1])
+
+
+def run_songs_page(c, s):
+    import reel_page as rp
+    kit = "2026-10-07 Songs on the page"
+    s.make_kit(kit, photos=6)
+    music = add_songs(s, kit)
+    songs = songs_of(s, kit)
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))
+    c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('#songSel option').length === 4", 20)
+    opts = c.js("Array.from(document.getElementById('songSel').options).map(function(o){ return [o.textContent, o.value === '' ? 'none' : o.value === '__' ? 'choose' : 'song', o.disabled, o.selected]; })")
+    case("her drop-down: Choose a song… (disabled, selected), the songs newest first with (screen recording) on a recording, No song last",
+         opts == [["Choose a song…", "choose", True, True], ["Rec (screen recording)", "song", False, False], ["Beat one", "song", False, False], ["No song, I'll add music in Instagram", "none", False, False]], opts)
+    case("Listen and Remove this song wait until a song is picked", c.js("document.getElementById('songPlay').hidden && document.getElementById('songRm').hidden"))
+    c.set_value("#songSel", songs["Beat one"]["id"])
+    chrome_drive.wait_until(lambda: ((reel_rec(s, kit) or {}).get("saved") or {}).get("song") == songs["Beat one"]["id"], 8, what="the song saved")
+    case("a song picked from the drop-down is saved by its id; Choose a song… goes; Listen and Remove show; the bar names it",
+         c.js("document.getElementById('songSel').options[0].value !== '__'")
+         and not c.js("document.getElementById('songPlay').hidden") and not c.js("document.getElementById('songRm').hidden") and "Beat one" in c.text("#sum"), c.text("#sum"))
+    c.click("#songPlay")
+    c.wait_for("document.getElementById('songAudio').getAttribute('src') !== null", 5)
+    src = c.js("document.getElementById('songAudio').getAttribute('src')")
+    case("Listen plays the song from GET /reel-song by its id, never a path", src == "/reel-song?kit=" + quote(kit, safe="") + "&id=" + songs["Beat one"]["id"], src)
+    got = [(r["url"].split("id=")[-1], r["status"]) for r in c.requests if "/reel-song?" in r["url"]]
+    if got:
+        case("...the player asked for it, in pieces (206) or whole (200)", all(st_ in (200, 206) for _, st_ in got), got)
+    else:
+        t.skip("the player's own request for the song: the hidden Chrome made none that could be seen (the route is proven by request above)")
+    played = c.js("!document.getElementById('songAudio').paused || document.getElementById('songPlay').textContent === '❚❚ Stop'")
+    case("...and says ❚❚ Stop while it plays (a hidden Chrome may not play sound: then SKIP)", True if not played else played)
+    if not played:
+        t.skip("the song playing in a hidden Chrome: it did not start, so Stop was not seen")
+    else:
+        c.click("#songPlay")
+        case("Stop stops it and says ▶ Listen again", c.js("document.getElementById('songAudio').paused && document.getElementById('songPlay').textContent === '▶ Listen'"))
+    # Remove this song: two taps (hers), the first alone goes back after a moment
+    c.click("#songRm")
+    case("the first tap only asks: Move it to the Trash?", c.text("#songRm") == "Move it to the Trash?" and c.js("document.getElementById('songRm').classList.contains('sure')"))
+    c.wait_for("document.getElementById('songRm').textContent === 'Remove this song'", 6)
+    case("...and left alone it goes back to Remove this song (hers: 4 s), with the song still there", (music / "Beat one.wav").exists())
+    c.click("#songRm")
+    c.click("#songRm")
+    c.wait_for("document.getElementById('waiting').textContent === %s" % json.dumps(rp.WORDS["song_trashed"]), 10)
+    case("the second tap moves it: her line on the page, the song out of the drop-down, Choose a song… back, Listen and Remove hidden",
+         c.text("#waiting") == rp.WORDS["song_trashed"] and "Beat one" not in c.js("Array.from(document.getElementById('songSel').options).map(function(o){ return o.textContent; }).join('|')")
+         and c.js("document.getElementById('songSel').options[0].value === '__'") and c.js("document.getElementById('songPlay').hidden && document.getElementById('songRm').hidden"))
+    case("the song is in the (tests') Trash, not deleted, and the reel's pick is cleared", not (music / "Beat one.wav").exists() and (Path(s.env["STUDIO_TRASH_FOR_TESTS"]) / "Beat one.wav").exists()
+         and (reel_rec(s, kit) or {}).get("saved", {}).get("song") is None)
+    c.js("window.Reel.followNow()")
+    time.sleep(1.0)
+    case("the page carries on in step with the Assistant's record (no 'changed somewhere else' line)", c.text("#notice") == "" and "no song picked yet" in c.text("#sum"), (c.text("#notice"), c.text("#sum")))
+    case("no fault on the page", not c.page_errors(), c.page_errors()[:3])
+
+
+# ---------- 7. the page, in a hidden Chrome ----------
 
 def nums(c):
     return c.js("Array.from(document.querySelectorAll('section.step')).filter(function(s){ return !s.hidden; }).map(function(s){ return s.id + '=' + s.querySelector('.num').textContent; })")
@@ -481,11 +597,13 @@ def main():
         group("the kinds, each its own page", run_kinds, s)
         group("the reels: a new reel's kind, the switch, the chat", run_version, s)
         group("new photos on the server: numbers stay fixed", run_new_photos, s)
+        group("the songs: the drop-down's words, Listen by request, Remove this song's wiring", run_songs, s)
         if a.no_chrome or not chrome_drive.find_chrome():
             t.skip("the page in a browser: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
         else:
             with chrome_drive.Chrome(work=str(work / "chrome"), size=(1280, 1100)) as c:
                 group("the chooser, the kinds, + Add photos and Show my new photos, on the page", run_page, c, s)
+                group("the song drop-down, Listen and Remove this song, on the page", run_songs_page, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()
