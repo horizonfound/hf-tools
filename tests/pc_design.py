@@ -1269,8 +1269,8 @@ def v26_checks(kit):
     queue's names. Records only: an accent and an emoji in every name, no path in anything a page is given."""
     st = design.state_for_page(kit, kind="stories")
     A = st["design"]["id"]
-    check("v26: the page is given her four story templates first, each a layout a story may hold, My editing queue marked to be filled",
-          [t["id"] for t in st["starters"]][:4] == ["sg-delivered", "sg-queue", "sg-full", "sg-seamless"] and len(st["starters"]) == 11
+    check("v26: the page is given her four story templates first (then, since v27, her three collages and her seven grids: fourteen), each a layout a story may hold, My editing queue marked to be filled",
+          [t["id"] for t in st["starters"]][:4] == ["sg-delivered", "sg-queue", "sg-full", "sg-seamless"] and len(st["starters"]) == 14
           and st["starters"][1].get("fill") == "queue" and no_path(st)[0], [t["id"] for t in st["starters"]])
     first = design.design_path(kit, A, "stories").read_bytes()
     code, out = design.new_design(kit, state={"slides": 1, "bg": "#ffffff", "blocks": []}, token=token("n"), kind="stories")

@@ -270,8 +270,8 @@ def check_v26_page(case, work):
         missing = [k for k, v in HERS.items() if v not in her and v.replace("'", "\\'") not in her and v.replace("“", "“").replace("”", "”") not in her]
         case("v26 page: every word in this file's table is in her page, as she wrote it", not missing, missing)
         names = re.findall(r"\{ id: '(sg-[a-z0-9]+)', name: '([^']+)', slides: (\d+), bg: '(#[0-9a-f]{6})'", her)
-        case("v26 page: her page's story layouts, in her order, are this file's table and then her seven grids",
-             [(i, n, int(s), b) for i, n, s, b in names][:4] == [(t[0], t[1], t[2], t[3]) for t in HERS_TEMPLATES] and [n for _, n, _, _ in names][4:] == GRID_NAMES, names)
+        case("v26 page: her page's story layouts, in her order, start with this file's table and end with her seven grids",
+             [(i, n, int(s), b) for i, n, s, b in names][:4] == [(t[0], t[1], t[2], t[3]) for t in HERS_TEMPLATES] and [n for _, n, _, _ in names][-7:] == GRID_NAMES, names)
     # ---- the carousel's page is as it was, but for Redo (and, since v27, the ask box: tests/design_v27_check.py) ----
     for w in ("Show Instagram's", "Show Instagram&#x27;s"):
         case(f"v26 page: the carousel's page has nothing of it ({w})", w not in car)
@@ -279,8 +279,9 @@ def check_v26_page(case, work):
          all("<button class='tb' id='undo' type='button' disabled>Undo</button><button class='tb' id='redo' type='button' disabled>Redo</button>" in p for p in (story, car)))
     # ---- her templates, in design.py's own table ----
     st = design.STORY_STARTERS
-    case("v26 page: eleven story layouts: her four templates, then her seven grids", [x["id"] for x in st] == [t[0] for t in HERS_TEMPLATES] + ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"]
-         and [x["name"] for x in st] == [t[1] for t in HERS_TEMPLATES] + GRID_NAMES, [x["id"] for x in st])
+    case("v26 page: her four templates first, then (since v27) her three collages, then her seven grids", [x["id"] for x in st][:4] == [t[0] for t in HERS_TEMPLATES]
+         and [x["id"] for x in st][-7:] == ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"] and len(st) == 14
+         and [x["name"] for x in st][:4] == [t[1] for t in HERS_TEMPLATES] and [x["name"] for x in st][-7:] == GRID_NAMES, [x["id"] for x in st])
     for mine, (tid, name, slides, bg, frames, texts) in zip(st, HERS_TEMPLATES):
         tp = mine["template"]
         fr = [b for b in tp["blocks"] if b.get("type") != "text"]
@@ -300,6 +301,7 @@ def check_v26_page(case, work):
          not [b for b in q["template"]["blocks"] if b.get("type") != "text"] and q["template"]["slides"] == 1
          and [b["text"] for b in q["template"]["blocks"] if b["id"] == q["list"]] == [HERS["queue_place"]], q.get("list"))
     case("v26 page: no other layout asks to be filled from anywhere", all("fill" not in x and "list" not in x for x in st if x is not q))
+    st = st[:4] + st[-7:]           # the collages are v27's (tests/design_v27_check.py); the rest of this part is about her four and her grids
     seam = next(x for x in st if x["id"] == "sg-seamless")["template"]["blocks"][0]
     case("v26 page: Seamless swipe: one photo across the first three stories", seam["x"] == 0 and seam["w"] == 3 * W and seam["h"] == H)
     case("v26 page: every one of them is a layout a story may hold (checked like any design)", all(design.validate_state(x["template"], template=True, kind="stories")[0] == x["template"] for x in st))
@@ -372,7 +374,8 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         if not case("v26 server: the first visit to the stories answers", code == 200 and st and st.get("ok") is True, (code, st and st.get("words"))):
             return
         A, STAMP = st["design"]["id"], st["stamp"]
-        case("v26 server: the page is given her four templates, then her seven grids", [x["id"] for x in st["starters"]][:4] == [t[0] for t in HERS_TEMPLATES] and len(st["starters"]) == 11)
+        case("v26 server: the page is given her four templates first, then her seven grids last (the three collages between them are v27's)",
+             [x["id"] for x in st["starters"]][:4] == [t[0] for t in HERS_TEMPLATES] and len(st["starters"]) == 14 and [x["id"] for x in st["starters"]][-7:] == ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"])
         case("v26 server: My editing queue says it is filled from the queue, and which text box", st["starters"][1].get("fill") == "queue" and isinstance(st["starters"][1].get("list"), int))
         case("v26 server: the set comes with its note for the assistant, empty to start with", st["design"].get("ask") == "")
         code, cst = J(get_json(P, f"/design-state?kit={KQ}"))
@@ -780,8 +783,8 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             case("v26 browser: her intro ends by saying how to hide the bands", words["lede"].endswith(HERS["lede_end"]), words["lede"][-80:])
             names = Jx("Array.from(document.querySelectorAll('#gallery-starters .dz-cap b')).map(function(x){ return x.textContent; })")
             subs = Jx("Array.from(document.querySelectorAll('#gallery-starters .dz-cap small')).map(function(x){ return x.textContent; })")
-            case("v26 browser: the Add stories window: her four templates first, in her order, then her seven grids",
-                 names == ["Gallery delivered", "My editing queue", "The full story", "Seamless swipe"] + GRID_NAMES, names)
+            case("v26 browser: the Add stories window: her four templates first, in her order, then her seven grids last (her three v27 collages between: tests/design_v27_check.py)",
+                 names[:4] == ["Gallery delivered", "My editing queue", "The full story", "Seamless swipe"] and names[-7:] == GRID_NAMES and len(names) == 14, names)
             case("v26 browser: ... each says how many stories and photos it has", subs[:4] == ["4 stories · 7 photos", "1 story · 0 photos", "10 stories · 18 photos", "6 stories · 5 photos"], subs[:4])
             # ---- Gallery delivered ----
             add("starters", 1)

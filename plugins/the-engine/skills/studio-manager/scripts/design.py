@@ -797,8 +797,8 @@ def _story_text(x, y, w, text=DEFAULT_TEXT, **more):
 
 
 def _story_templates():
-    """Her four story templates (v26, Nov 13), in her order, with her placeholder words: whole sets of stories, added
-    after the last story like any layout. "My editing queue" holds no photo; the page fills its list from the editing
+    """Her four story templates (v26, Nov 13), in her order, with her placeholder words, then her three story collages
+    (v27, Nov 17): whole sets of stories, added after the last story like any layout. "My editing queue" holds no photo; the page fills its list from the editing
     queue when it is added ("fill": "queue", and "list" is the id of the text box the names go in)."""
     w, h, F, T = KINDS[STORIES]["w"], KINDS[STORIES]["h"], _F, _story_text
     cw, ch = (w - 12) / 2, (h - 12) / 2
@@ -836,6 +836,17 @@ def _story_templates():
           F(3 * w + 90, 300, 900, 1200),
           F(4 * w, 0, w, h),
           F(5 * w, 0, w, 950), F(5 * w, 970, w, 950)], []),
+        # her three story collages (v27, Nov 17): the carousel's Playful mosaic, Mood board and Overlapping collage,
+        # scaled by her onto one story, her numbers exactly; no words
+        ("sg-mosaic", "Playful mosaic", 1, "#f2efe8",
+         [F(91, 366, 259, 360), F(374, 200, 254, 526), F(650, 250, 231, 231), F(650, 503, 339, 525), F(266, 749, 361, 553),
+          F(650, 1051, 339, 260), F(582, 1335, 408, 385)], []),
+        ("sg-mood", "Mood board", 1, "#dcdad5",
+         [F(94, 360, 324, 567), F(457, 200, 337, 416), F(442, 639, 417, 551), F(40, 927, 383, 668), F(457, 1199, 284, 521),
+          F(796, 995, 244, 537)], []),
+        ("sg-overlap", "Overlapping collage", 1, "#d6d4cc",
+         [F(40, 200, 338, 413), F(410, 200, 335, 413), F(267, 519, 386, 306), F(693, 703, 294, 356), F(185, 828, 731, 596),
+          F(760, 1381, 280, 339)], []),
     ]
     out = _layouts(raw, STORIES)
     for t in out:
@@ -873,8 +884,8 @@ def queue_names():
 
 
 def _story_starters():
-    """The stories designer's layouts: her four templates (v26) first, then her grids (v19) that cover the whole
-    story, edge to edge, 12 px apart, each one story. "+ Add stories" puts what is picked after the last one."""
+    """The stories designer's layouts: her four templates (v26) and her three collages (v27) first, then her grids
+    (v19) that cover the whole story, edge to edge, 12 px apart, each one story. "+ Add stories" puts what is picked after the last one."""
     w, h, g = KINDS[STORIES]["w"], KINDS[STORIES]["h"], 12
     out = _story_templates()
     for sid, name, cols, rows in (("sg-1", "One photo", 1, 1), ("sg-2", "Two up", 1, 2), ("sg-3", "Three strips", 1, 3),

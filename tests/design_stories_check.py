@@ -216,9 +216,9 @@ def check_stories_page(case, work):
          ff["groups"][0]["name"] == "Story fonts" and [f["nick"] for f in ff["groups"][0]["fonts"]] == [k for _, k in FONTS]
          and [g["name"] for g in ff["groups"][1:]] == ["Serif", "Sans", "Script"] and [g["name"] for g in design.fonts_for_page()["groups"]] == ["Serif", "Sans", "Script"]
          and ff["default"] == "Figtree" and design.fonts_for_page()["default"] == "Playfair Display")
-    # (her four templates of v26 come first; tests/design_v26_check.py holds those. Her seven grids follow them.)
+    # (her four templates of v26 and her three collages of v27 come first; design_v26_check.py and design_v27_check.py hold those. Her seven grids follow them.)
     st = design.STORY_STARTERS[-7:]
-    ok = [x["name"] for x in st] == [g[0] for g in GRIDS] and len(design.STORY_STARTERS) == 11
+    ok = [x["name"] for x in st] == [g[0] for g in GRIDS] and len(design.STORY_STARTERS) == 14
     for x, (_, cols, rows) in zip(st, GRIDS):
         fr = x["template"]["blocks"]
         right = max(b["x"] + b["w"] for b in fr)
@@ -325,7 +325,7 @@ def check_stories_server(case, work, port, make_kit, Server, post, get_json, ask
              d["state"] == {"slides": 1, "bg": "#ffffff", "blocks": []} and d["name"] == "Fake beach stories" and (sdesigns / f"{DID}.json").is_file(), d)
         case("state: the stories design is kept apart from the carousel's (no carousel design was made by it)", not cdesigns.exists() or not list(cdesigns.glob("*.json")))
         case("state: a story's limits (1080 by 1920, 1 to 40, the bands at 250 and 340)", st["limits"]["h"] == SH and st["limits"]["slides"] == [1, 40] and st["limits"]["safe"] == [250, 340], st["limits"])
-        case("state: her seven layouts are the last seven starters (her four v26 templates come before them)", [x["name"] for x in st["starters"]][-7:] == [g[0] for g in GRIDS] and len(st["starters"]) == 11)
+        case("state: her seven layouts are the last seven starters (her four v26 templates and her three v27 collages come before them)", [x["name"] for x in st["starters"]][-7:] == [g[0] for g in GRIDS] and len(st["starters"]) == 14)
         case("state: a new text box starts the way hers does (Figtree, bold, 72, 1.3, black on a white box)",
              st["text"] == {"font": "Figtree", "size": 72, "weight": 700, "color": "#111111", "look": "box", "boxColor": "#ffffff", "lh": 1.3, "text": "Your words here"}, st["text"])
         case("state: the preview's name is \"yourname\" while their handle isn't known (decision 18), never hers", st["handle"] == "yourname" and "nicolelhill" not in json.dumps(st))
@@ -601,10 +601,10 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
                   "subs: Array.from(document.querySelectorAll('#gallery .dz-cap small')).map(function(x){ return x.textContent; })}")
             case("the window: her title, her line for a first story, her three sections, every card's button says Add",
                  g["h"] == HERS["gallery"] and g["sub"] == HERS["subEmpty"] and [x.title() for x in g["secs"]] == [x.title() for x in HERS["secs"]] and set(g["use"]) == {"Add"}, g)
-            case("the window: Blank story, One photo per story, her four templates (v26), then her seven layouts, with her words under them",
-                 g["names"] == ["Blank story", "One photo per story", "Gallery delivered", "My editing queue", "The full story", "Seamless swipe"] + [x[0] for x in GRIDS]
+            case("the window: Blank story, One photo per story, her four templates (v26), her three collages (v27), then her seven layouts, with her words under them",
+                 g["names"] == ["Blank story", "One photo per story", "Gallery delivered", "My editing queue", "The full story", "Seamless swipe", "Playful mosaic", "Mood board", "Overlapping collage"] + [x[0] for x in GRIDS]
                  and g["subs"][0] == HERS["blankSub"] and g["subs"][1] == "5 stories"
-                 and g["subs"][6:] == ["1 story · 1 photo", "1 story · 2 photos", "1 story · 3 photos", "1 story · 4 photos", "1 story · 6 photos", "1 story · 9 photos", "1 story · 12 photos"], g)
+                 and g["subs"][9:] == ["1 story · 1 photo", "1 story · 2 photos", "1 story · 3 photos", "1 story · 4 photos", "1 story · 6 photos", "1 story · 9 photos", "1 story · 12 photos"], g)
             words = J("{title: document.title, eyebrow: document.querySelector('.eyebrow').firstChild.textContent, save: document.getElementById('save-slides').textContent, "
                       "prev: document.getElementById('preview-btn').textContent, count: document.querySelector('#g-slides .lbl').textContent, "
                       "add: document.getElementById('new-design').textContent, nameShown: !document.getElementById('d-name-box').hidden, "
@@ -619,7 +619,7 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
             c.click("#new-design")
             c.wait_for("!document.getElementById('gallery').hidden", 5)
             case("+ Add stories again: her line says it goes after the last story and nothing is replaced", c.text("#gallery-sub") == HERS["subMore"], c.text("#gallery-sub"))
-            add("starters", 4 + 3)
+            add("starters", 7 + 3)           # her four v26 templates and her three v27 collages come before the grids
             s2 = st()
             new = s2["blocks"][5:]
             case("Three strips added: a sixth story, the first five exactly as they were", s2["slides"] == 6 and s2["blocks"][:5] == s1["blocks"], s2["slides"])
@@ -627,7 +627,7 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
                  len(new) == 3 and all(5 * SW <= b["x"] < 6 * SW for b in new) and sorted(b["y"] for b in new) == [0, 644, 1288] and all(b["n"] not in (1, 2, 3, 4, 5) and b["n"] for b in new), new)
             c.click("#new-design")
             c.wait_for("!document.getElementById('gallery').hidden", 5)
-            add("starters", 4 + 6)
+            add("starters", 7 + 6)
             s3 = st()
             case("Nine added: a seventh story, nothing before it changed", s3["slides"] == 7 and s3["blocks"][:8] == s2["blocks"] and len(s3["blocks"]) == 17, s3["slides"])
             case("the saved design follows the page", settled())
@@ -637,7 +637,7 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
             case("...and the one before", st() == s1)
             c.click("#new-design")
             c.wait_for("!document.getElementById('gallery').hidden", 5)
-            add("starters", 4 + 3)
+            add("starters", 7 + 3)
             s2b = st()
             case("settled after the undo and a new add", settled() and s2b["slides"] == 6)
             # ---- Remove this story ----
