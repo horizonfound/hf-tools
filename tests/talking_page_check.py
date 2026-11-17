@@ -573,7 +573,7 @@ def check_built(s):
     # span) is not carried
     case("the footer's .addph rules are her two (v27), and her old dashed .addph button is not carried",
          ".pickfoot .addph{margin:0 auto 0 0}" in css and ".addph{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.35rem 0 .2rem}" in css
-         and css.count(".addph") == 2 and "dashed" not in css and ".strip .addph" not in css, [ln for ln in css.splitlines() if "addph" in ln])
+         and css.count(".addph") == 2 and not re.search(r"\.addph\{[^}]*(border|dashed|height)", css) and ".strip .addph" not in css, [ln for ln in css.splitlines() if "addph" in ln])
     case("...nor their pieces in the page (no photo frame behind the video, no tag, no Photo row)",
          "phBack" not in page and "id='tag'" not in page and ">Photo<" not in page)
     ids = ("back", "title", "addVideo", "vids", "startBtn", "status", "askCut", "cutLine", "copyCut", "whoMe", "whoAsst", "placeAsk", "placeSay",
@@ -1263,13 +1263,19 @@ def check_edit(c, s, kit, k1, k2):
     # ---- the refresh and its pauses
     case("the 3-second look may run: the page is showing and the video is paused", c.js("window.Talk.quiet()") is True)
     for what, on, off in (("the photo menu open", "document.getElementById('pmenu').classList.add('open')", "document.getElementById('pmenu').classList.remove('open')"),
-                          ("the photo picker open", "document.getElementById('pick').classList.add('open')", "document.getElementById('pick').classList.remove('open')"),
                           ("the video picker open", "document.getElementById('vpick').classList.add('open')", "document.getElementById('vpick').classList.remove('open')"),
+                          ("the fix box open", "window.Talk.openFix(0, 0, null)", "window.Talk.closeFix()"),
                           ("a drag", "window.__drag = true; window.__busy || (window.__busy = window.Talk.busy(function(){ return window.__drag; }))", "window.__drag = false")):
         c.js(on)
         held = c.js("window.Talk.quiet()")
         c.js(off)
         case("...it waits during %s" % what, held is False and c.js("window.Talk.quiet()") is True)
+    # her v27 "+ Add more photos": with the PHOTO pop-up open the look runs on, asking for new photos (talking_page_script.py)
+    c.js("document.getElementById('pick').classList.add('open')")
+    held = c.js("[window.Talk.quiet(), window.Talk.photoPickOpen(), window.Talk.pickerOpen()]")
+    c.js("document.getElementById('pick').classList.remove('open')")
+    case("...it runs on with the photo pop-up open (her v27: new photos show up in it), which T.photoPickOpen says, and the keys still see a picker open",
+         held == [True, True, True] and c.js("window.Talk.photoPickOpen()") is False, held)
     played = c.js("(function(){ var v = document.getElementById('vid'); v.muted = true; return v.play().then(function(){ return true; }, function(){ return false; }); })()")
     if played:
         held = c.js("window.Talk.quiet()")

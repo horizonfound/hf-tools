@@ -160,9 +160,13 @@ def run_page(t, c, s):
     case("opening the talking page makes no talking record, no words file and no Talking folder", not made and not (kit / "Talking").exists()
          and not (kit / ".kit" / "talking.json").exists() and not (kit / ".kit" / "talking-words.json").exists(), made)
     case("...and nothing new at all outside the hidden folder's talking files", not [x for x in new if not (Path(x).parts[0] == ".kit" and "talking" in Path(x).name)], new)
-    c.click("#back")
+    # the way back (her v27): the path at the top, "<shoot> post kit"; her Back pill is still in the markup, hidden as on her page
+    pill = c.js("(function(){ var b = document.getElementById('back'); return [getComputedStyle(b).display, b.getAttribute('href'), b.textContent]; })()")
+    case("her Back to the post kit pill is there, hidden, still pointing at our post kit page for the same shoot (v27)",
+         pill == ["none", "/content/" + quote(name) + "/Post%20kit.html", "\u2190 " + s.tp.WORDS["back_kit"]], pill)
+    c.click("nav.crumbs a[href^='/content/']")
     c.wait_for("location.pathname.indexOf('/content/') === 0", 15, tell="location.href")
-    case("the talking page's way back is our post kit page for the same shoot", unquote(c.js("location.pathname")) == "/content/" + name + "/Post kit.html", c.js("location.pathname"))
+    case("the talking page's way back is the path at the top: our post kit page for the same shoot", unquote(c.js("location.pathname")) == "/content/" + name + "/Post kit.html", c.js("location.pathname"))
     case("no page errors on the way through", not c.page_errors(), c.page_errors()[:3])
     case("nothing asked of the internet", not c.outside_requests(), c.outside_requests()[:3])
 
