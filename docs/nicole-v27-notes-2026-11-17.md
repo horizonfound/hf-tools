@@ -27,6 +27,8 @@ Save my video: the `.part` file beside the output with no lock (two presses race
 - A PC, naming: "I can't take stills from a video on this PC yet, so I can't see your clips to name them here."
 - Save my video: "Your video is already being saved. One moment." / "Saving your video stopped before it finished. Nothing was saved. Press Save my video again." / "Saving your video took too long and was stopped. Nothing was saved. Try again, or press Make this one in CapCut." / "Save my video is for a B-roll reel. For this kind, press Make this one in CapCut." / "A file with that name appeared in the Reels folder just now, so the video was saved under the next number." / "Your Reels folder is open in Finder." / "I couldn't open the Reels folder. It's inside this shoot's post kit folder."
 - The watch step: "That part of the song is past its end. Pick another part."
+- The post kit's Reels card, for a B-roll reel saved with Save my video (your card says In CapCut for every made reel): "Saved as a video, in this shoot's Reels folder: Beach B-roll.mp4", and no Open in CapCut unless a project exists too.
+- The chat, when a photo that had gone is back in the Photos folder: "Back since the last list: 1 photo (number 3), with the number it had before."
 - Remove this song: "That one's in your Photos folder, so it stays. Take it out of that folder yourself if you'd like it off the list." / "Already in the Trash: {names}."
 
 ## Questions for you
@@ -44,3 +46,5 @@ Save my video: the `.part` file beside the output with no lock (two presses race
 11. Multi-select has no touch-screen way (no Shift or Cmd on a finger); not built, as yours. Fine for now?
 12. Remove this song on a PC goes to the Recycle Bin through Windows' own call (you suggested send2trash, an install). OK?
 13. Still open from v26, untouched by v27: the folder-naming question at setup, and the drop box's second copy.
+14. A photo that leaves the Photos folder and comes back (dragged out by mistake, or a re-export that deletes and re-copies) now takes its old number again, so a pick or a design that named it points at it once more; yours gave it a new number. Keep it this way?
+15. A B-roll video saved with Save my video counts as made on the post kit's Reels card and in the queue, with the card line above. OK, or would you rather it only count once it is made in CapCut?
