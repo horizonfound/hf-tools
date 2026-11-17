@@ -19,7 +19,7 @@ The rule from the Mac's first install (`docs/install-issues-2026-11-05.md`) hold
 > - **iPhone photos (HEIC) [Dustin and Nicole to decide].** A PC needs a second add-on (pillow-heif) to read them. The PDF says: export them as JPEGs.
 > - **The firewall box.** The Assistant's page servers listen on 127.0.0.1 only (`fresh.Server`), never on the network. Whether that still brings up Windows' "allow access" box is not documented by Microsoft or Anthropic. The PDF has one conditional row for it in Step 6 ("Leave Private networks ticked and click Allow access. It's for the Assistant's own pages, which run on this PC only."). If the walk-through never shows the box, take the row out. [check on a PC, with an ordinary (non-admin) account too: Microsoft says a non-admin's answer makes block rules]
 > - **"Customize" is becoming "Plugins".** Claude's help says the sidebar's Customize becomes Plugins (rolling out from Oct 29, for everyone on Nov 9). Step 4 says "Customize ... (newer copies of Claude may call it Plugins)". Once Nicole's or the tester's screen shows the new name, both PDFs should be updated to it.
-> - **Footage on a PC (v19, Nov 7).** A PC lists videos on the reel page, plays the usual kind (H.264: most cameras, an iPhone set to Most Compatible) and makes clip reels from moments picked with Use this moment. It takes no stills, so "Look through my footage" and the strip of stills don't work there. The PDF says so in plain words under "Not on a PC yet".
+> - **Footage on a PC (v19, Nov 7).** A PC lists videos on the reel page, plays the usual kind (H.264: most cameras, an iPhone set to Most Compatible) and makes clip reels from the clips you make on the timeline with Start here, End here and Add clip (v27, Nov 17). It takes no stills, so "Look through my footage", naming your clips and the strip of stills don't work there, and Save my video (a B-roll reel's finished MP4) isn't on a PC yet: Make this one in CapCut works there, and the words go with it. The PDF says so in plain words under "Not on a PC yet".
 > - **A note for whoever owns `parts/on-a-pc.md`** (from the Python research, Nov 7; done in the in-app instructions since, `parts/on-a-pc.md`): python.org says Python's automatic first-run install "should not generally be relied on" and suggests an explicit `py install default`; the source code shows the automatic install asks no questions (the PATH question comes only from the setup helper you get by clicking Open), and that it works offline from a bundled copy. And on a PC that already has an older Python, `python3 --version` installs nothing. Pillow 13 needs Python 3.11 or later, so an older Python gets an older Pillow.
 
 ---
@@ -213,11 +213,12 @@ Windows gives each drive and memory card a letter when it's plugged in, and a dr
 
 ### Not on a PC yet
 
-- **Looking through your videos for moments.** The reel page lists your videos and plays the usual kind (most cameras, or an iPhone set to Most Compatible), and you can pick a moment yourself with **Use this moment**. The Assistant can't pick moments for you yet.
+- **Looking through your videos for moments.** The reel page lists your videos and plays the usual kind (most cameras, or an iPhone set to Most Compatible), and you can make your own clips on its timeline with **Start here**, **End here** and **Add clip**. The Assistant can't pick moments for you, or name your clips, yet.
 - **iPhone videos in High Efficiency.** They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).
 - **iPhone photos (HEIC).** Export them as JPEGs first, and the Assistant can use those. **[Dustin and Nicole to decide]**
 - **Posting-day reminders don't reach your calendar by themselves.** The Assistant makes a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert. **[New Nov 11: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Talking reels.** Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here. **[New Nov 12: not in the PDF yet; wording is Dustin and Nicole's]**
+- **Saving a B-roll reel as a finished video.** Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
 
 > **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >
@@ -291,7 +292,7 @@ What to look at, in order:
 7. **The phone:** the Settings switch, the two /config lines, a real tap with the tester away from the PC.
 8. **Part 2, posts:** a real export folder (the folder window from the home page and whether it comes up in front, a post kit built, the reel page with a song from the Music folder and Make my reel, the carousel and stories designers with real photos, one reel opened in CapCut for Windows (if it doesn't open, one CapCut project folder zipped and sent to us), a Canva carousel brought into a kit, reading the Instagram grid).
 9. **Part 2, a card:** a real card (the drive letter, the letters on a second day with the card put in before the drive, Windows' note when a card goes in, the setup questions, a full backup, the report, Show the report after an hour away).
-10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Use this moment, a clip reel.
+10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Start here, End here and Add clip on the timeline, a clip reel; Save my video on a B-roll reel says it isn't on a PC yet.
 11. How long each step took, and the whole setup.
 
 After the walk-through: replace the drawings that turned out wrong (or swap them for the tester's screenshots), take the marks out of this file, update both PDFs if Settings now says Plugins, and only then send the PDF to a student.

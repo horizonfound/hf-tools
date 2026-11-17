@@ -1253,9 +1253,12 @@ def check_watch_direct_broll():
          "Watch your reel before you make it (Nicole, Nov 16)" in reel and "press play on the page to watch it" in reel and "Try another mix" in reel
          and "never \"make it\"" in reel and "You never describe a cut you haven't seen the plan of" in reel)
     case("the reel skill's make takes --variation and --song-start, and says what they are", "[--variation N] [--song-start S]" in reel and "`--variation N` is which mix" in reel and "`--song-start S` where the song starts" in reel)
-    case("the reel skill says what B-roll is (clips only, no photos, Words on screen, into CapCut as plain text) and that Save my video is not built yet",
+    case("the reel skill says what B-roll is (clips only, no photos, Words on screen, into CapCut as plain text) and what Save my video does (the finished MP4 in the shoot's Reels folder, never over the first, counts as made, no command of yours, the PC gap)",
          "B-roll (Nicole's v27, Nov 17) is a kind of reel with no photos" in reel and "Words on screen" in reel and "plain text over the whole reel" in reel
-         and "**Save my video**" in reel and "is not built yet" in reel)
+         and "**Save my video** (Nicole's v27) is the main button of a B-roll reel's watch step" in reel and "not built yet" not in reel and "isn't ready yet" not in reel
+         and "Saving your video, with your song and words. This takes about a minute." in reel and "in this shoot's Reels folder. It's ready to post." in reel
+         and "**Open the folder**" in reel and "never over the first" in reel and "A saved video counts as made" in reel and "You have no command for it" in reel
+         and "saving a finished video isn't on a PC yet" in reel and "Videos saved from the page" in reel)
     case("the core table sends Edit my reel to the reel skill", '| "Edit my reel for <shoot>[, <reel>], and follow my direction"' in core and 'the reel skill\'s "Edit my reel"' in core)
     case("arrange.md: the direct step in the page's words, its line's shapes, sent to the reel skill's Edit my reel, and told apart from the footage box",
          ("**" + words["direct_h2"] + "**") in arr and ('"' + words["direct_b"] + '"') in arr and "**\"Edit my reel for <shoot>\"**" in arr and ", and follow my direction" in arr
@@ -1263,11 +1266,61 @@ def check_watch_direct_broll():
     case("arrange.md: the watch step in the page's words (Another part of this song, Try another mix, Undo and Redo, Make this one in CapCut), the last step, and the page's not the assistant's",
          ("**" + words["watch_h2"] + "**") in arr and all(("**" + words[k] + "**") in arr for k in ("pv_part", "pv_mix", "pv_make")) and "**Undo** and **Redo**" in arr and "the last step, on every kind" in arr
          and "Press play on the page beside us" in arr)
-    case("arrange.md: B-roll is clips only with Words on screen, Save my video still being built; make takes --variation and --song-start",
-         "A B-roll reel is clips only" in arr and ("**" + words["os_wl"] + "**") in arr and "Save my video (the finished MP4 made on the page) is still being built" in arr
-         and "`--variation N` and `--song-start S`" in arr and "isn't ready yet" not in arr)
+    case("arrange.md: B-roll is clips only with Words on screen, Save my video built (the Reels folder, never over the first, Open the folder, counts as made, the PC gap, no command); make takes --variation and --song-start",
+         "A B-roll reel is clips only" in arr and ("**" + words["os_wl"] + "**") in arr and "**Save my video** (the finished MP4 made on the page, no CapCut needed) is the main button of its watch step" in arr
+         and "in the shoot's Reels folder" in arr and "never over the first" in arr and "**Open the folder**" in arr and "a saved video counts as made" in arr
+         and "saving a finished video isn't on a PC yet" in arr and "You have no command for it; asked for the file" in arr
+         and "`--variation N` and `--song-start S`" in arr and "[--variation N] [--song-start S]" in arr and "isn't ready yet" not in arr and "still being built" not in arr)
     case("where-things-live.md names direct, onscreen, the made entries' variation and song_start, and the preview's own folder",
          "`direct`, Nov 17" in where and "`onscreen`: the words, the font, the style" in where and "`variation`, which mix it was, and `song_start`" in where and "`reel-preview/`" in where)
+def check_instructions_v27_lane_a():
+    """Nicole's v27, Lane A's A17: the instructions say the reel page as it is. The chooser is the way in (the door
+    lines say "pick the kind"), the path at the top is the way back, the three chat lines of hers are in the reel
+    skill and the core table, nothing still says Use this moment, Watch your footage and pick your own, the Trim
+    panel as a thing on the page or "there's no Remove yet", the PC gaps (Save my video, the editor without stills,
+    naming) are named in the PC part and the PC guide in this_computer's own words, and the core's description
+    stays under 1,024 characters."""
+    sys.path.insert(0, str(SCRIPTS))
+    import this_computer
+    reel = " ".join(read(REEL / "SKILL.md").split())
+    core = read(SM / "SKILL.md")
+    arr = " ".join(read(SM / "parts" / "arrange.md").split())
+    pc = " ".join(read(SM / "parts" / "on-a-pc.md").split())
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    guide = " ".join(read(ROOT / "docs" / "SETUP-GUIDE-PC.md").split())
+    parts = {p.name: " ".join(read(p).split()) for p in sorted((SM / "parts").glob("*.md"))}
+    case("the reel skill and arrange.md open the page on the chooser: the door line says pick the kind of reel (Just photos, Behind the scenes, Talking to camera or B-roll)",
+         "Pick the kind of reel you want (Just photos, Behind the scenes, Talking to camera or B-roll)" in reel
+         and arr.count("Pick the kind of reel you want (Just photos, Behind the scenes, Talking to camera or B-roll)") == 1 and "Pick Just photos (or Behind the scenes, with your footage)" in arr
+         and "Choose Just photos (or add your footage)" not in reel + arr)
+    case("arrange.md says the path at the top is the way back (Reels is the chooser), not the old link",
+         "The path at the top of every reel page (Home › <shoot> post kit › Reels › B-roll) is the way back: Reels is the chooser" in arr and "goes back to the chooser" not in arr)
+    for line in ('"Name my clips for <shoot>"', '"Edit my reel for <shoot>[, <reel>], and follow my direction"', '"Pick my reel photos for <shoot>"', '"Look through my footage for <shoot>"'):
+        case("her line %s is in the reel skill and in the core's table (the core's rows say it in their own case)" % line, line in reel and line.lower() in core.lower())
+    case("the core's table sends \"save my video\" and \"where did my B-roll video go\" to the reel skill",
+         '"save my video", "where did my B-roll video go"' in core and "the reel skill, `../assistant-make-a-reel/SKILL.md`" in core.split('"save my video"')[1][:600])
+    stale = ("Use this moment", "Watch your footage and pick your own", "there's no Remove", "Remove a song isn't built", "not built yet", "still being built", "isn't ready yet")
+    found = [(name, w) for name, text in list(parts.items()) + [("reel SKILL.md", reel), ("core SKILL.md", " ".join(core.split()))] for w in stale if w in text]
+    case("no part, the reel skill or the core still says Use this moment, Watch your footage and pick your own, there's no Remove, not built yet, still being built or isn't ready yet", not found, found)
+    case("the Trim panel is only ever said to be gone from the page", "Trim panel" not in reel and arr.count("Trim panel") == 1 and "is gone from the page with v27" in arr
+         and all("Trim panel" not in t for n, t in parts.items() if n != "arrange.md"))
+    case("the PC part names Save my video's gap in this_computer.NO_VIDEO_PC's own words, with the clips' naming and the editor without stills",
+         this_computer.NO_VIDEO_PC in pc and "Save my video (a B-roll reel's finished MP4, Nicole's v27) isn't on a PC yet either" in pc
+         and "On a PC the timeline has no pictures along it yet. The trim, its ends and the times work the same." in pc
+         and "Naming their clips (\"Name my clips for <shoot>\") can't run on a PC either" in pc and "Don't offer to install anything for it" in pc)
+    case("the PC part's \"What can't you do on a PC?\" box and the PC guide's list both name it, in this_computer's words", ("> - Saving a B-roll reel as a finished video. " + this_computer.NO_VIDEO_PC) in read(SM / "parts" / "on-a-pc.md")
+         and ("- **Saving a B-roll reel as a finished video.** " + this_computer.NO_VIDEO_PC) in read(ROOT / "docs" / "SETUP-GUIDE-PC.md"))
+    case("the PC guide's footage lines say the editor's clips (Start here, End here, Add clip), not Use this moment, and the Save my video gap", "Use this moment" not in guide
+         and "Start here, End here and Add clip" in guide and "Save my video (a B-roll reel's finished MP4) isn't on a PC yet" in guide)
+    case("this_computer.NO_VIDEO_PC says what works instead (CapCut) and that the words go with it, no Finder or QuickTime",
+         "Make this one in CapCut works here, and your words go with it." in this_computer.NO_VIDEO_PC and not any(w in this_computer.NO_VIDEO_PC for w in ("Finder", "QuickTime")))
+    case("where-things-live.md: the Reels folder (theirs, beside Photos, Footage and Music, never written over), the made entry's video and seconds, reel-video/",
+         "`Reels`, inside the kit's folder beside Photos, Footage and Music" in where and "Nothing in it is ever written over" in where
+         and "with `video`, the file's name in the shoot's Reels folder, and `seconds`, and counts as made" in where and "`reel-video/` (Save my video's own" in where)
+    desc = re.search(r"^description:\s*(.*)$", core, re.M)
+    case("the core's description stays under 1,024 characters (the new lines live in the body)", desc and len(desc.group(1)) <= 1024, len(desc.group(1)) if desc else None)
+
+
 def check_posted_and_path_v27():
     """Posted on the post itself, the Reels card and the path at the top (Nicole's v27, Lane D): the instructions
     say what the pages say, in the pages' own words, and name commands that exist."""
@@ -1350,7 +1403,7 @@ def check_posted_and_path_v27():
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_posted_and_path_v27):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
