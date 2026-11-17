@@ -28,7 +28,8 @@ Ours:
   - a photo whose small copy is not made yet: the page looks once more when the picker opens, and the script's
     part keeps looking every few seconds (T.on('photos')); each copy shows in its place when it is made;
   - T.pickerOpen() says whether either picker is open, so the keys (the spacebar, Delete) leave the page behind
-    it alone (hers plays the talking video behind the open video picker).
+    it alone (hers plays the talking video behind the open video picker); since her v27 the fix box counts as
+    one too (talking_js_script.py's T.fixOpen).
 """
 
 JS = r"""
@@ -43,7 +44,8 @@ var VIDS = [], looks = 0;
 function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function isOpen(id){ return $(id).classList.contains('open'); }
 function over(a, b){ for (var k = 0; k < T.SH.length; k++) if (T.SH[k].a <= b && T.SH[k].b >= a) return T.SH[k]; return null; }
-T.pickerOpen = function(){ return isOpen('pick') || isOpen('vpick'); };
+// ...and the fix box (her v27) counts as one: a key pressed while it is open never reaches the video or the timeline
+T.pickerOpen = function(){ return isOpen('pick') || isOpen('vpick') || !!(T.fixOpen && T.fixOpen()); };
 
 // ---------- the photo picker ----------
 function showable(p){ return p.have || !p.missing; }

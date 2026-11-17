@@ -154,17 +154,15 @@ HERS_NOT_OURS = {
     # talking page calls it in item C8. Her crumbs script (two steps, Reels and Talking to camera) is taken out
     # before her lines are read (HER_CRUMBS); her nav's label stays and is named here.
     "Where you are": "the crumbs nav's label: Lane D's crumbs, called from this page in C8",
+    # her v27 fix box: her hover line as her template splits it (the attribute's name and the line's start); ours is
+    # the whole line, fixed_title, set as an attribute with the heard word filled in as text
+    'title="You fixed this. It was heard as "': "her hover line's first piece: ours is talking_page.WORDS fixed_title, whole (C2)",
 }
 # Hers in v27 and not built yet, each with the item of Lane C's plan that brings it. The words test lists them
 # every run; when an item lands its lines go into talking_page.WORDS (or BUILT_FROM_PARTS) and come OUT of here,
 # or the "nothing named as left out is ours" check fails.
 HERS_NOT_YET = {
-    # C2: Fix a word on the page
-    "Fixed word": "C2", "Wrong word? Double-click it and type the right one.": "C2", "Fix the words": "C2", "Fix": "C2",
-    "Undo fix": "C2", "The right words": "C2", "Go back to what was heard": "C2",
-    'title="You fixed this. It was heard as "': "C2 (her hover line, built from parts: fixed_title)",
-    "Type the right word first. To take a word out, use Cut.": "C2", "Back to what was heard": "C2",
-    "Fixed. Your captions use it now.": "C2",
+    # (C2, Fix a word on the page, landed Nov 17: its twelve lines are talking_page.WORDS sel_fix .. fixed_toast)
     # C4: Open CapCut in the bottom bar and in the result box
     "Open CapCut": "C4", "Open CapCut, click": "C4 (built from parts: made_say)", "your new project": "C4 (made_say)",
     "at the top of your projects, give your captions your look, and export.": "C4 (made_say)",
@@ -574,7 +572,8 @@ def check_built(s):
     ids = ("back", "title", "addVideo", "vids", "startBtn", "status", "askCut", "cutLine", "copyCut", "whoMe", "whoAsst", "placeAsk", "placeSay",
            "placeLine", "copyPlace", "editStep", "screen", "vid", "phFront", "bvid", "phKnob", "meKnob", "capKnob", "cap", "guides", "guidesOn",
            "cutMode", "script", "capStep", "capOn", "capOff", "capReset", "result", "selBar", "selPhoto", "selVideo", "selCut", "selBack", "selPunch",
-           "selZoom", "selNoZoom", "pick", "pickHead", "pickClose", "pickGrid", "pickCount", "pickUse", "dock", "tl", "tlPlay", "tlTime", "tlSplit",
+           "selZoom", "selNoZoom", "selFix", "fixBox", "fixIn", "fixOk", "fixBack", "fixNo",
+           "pick", "pickHead", "pickClose", "pickGrid", "pickCount", "pickUse", "dock", "tl", "tlPlay", "tlTime", "tlSplit",
            "tlCut", "tlSpeed", "tlZoom", "tlUndo", "tlRedo", "tlOut", "tlScale", "tlIn", "tlTrack", "tlInner", "tlRuler", "tlPhotos", "tlClips",
            "tlWords", "tlHead", "tlHint", "sum", "makeBtn", "vpick", "vpHead", "vpClose", "vpList", "vpPlayer", "vpVid", "vpAt", "vpUse", "vpOpen",
            "vpRefresh", "pmenu", "toast")
@@ -873,7 +872,7 @@ def allowed_text(s, extra=()):
             if seg:
                 pats.append(re.compile("".join(".+?" if re.fullmatch(r"\{\w+\}", p) else re.escape(p) for p in re.split(r"(\{\w+\})", seg)), re.S))
     import brand
-    own = set(extra) | {"1", "2", "3", ".", "+", "−", "0:00.0 / 0:00.0", "▶", "←", brand.PRODUCT, brand.MAKER, SHORT, V1, V2}
+    own = set(extra) | {"1", "2", "3", ".", "+", "−", "×", "0:00.0 / 0:00.0", "▶", "←", brand.PRODUCT, brand.MAKER, SHORT, V1, V2}   # × is her fix box's &times;
     own |= {" ".join(x.split()) for x in re.split(r"<[^>]+>", brand.bar()) if x.strip()}
 
     def ok(t):

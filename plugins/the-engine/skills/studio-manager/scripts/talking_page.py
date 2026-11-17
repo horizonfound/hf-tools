@@ -248,6 +248,20 @@ WORDS = {
     "brought_back": "Brought back “{words}”",
     "cut_said": "Cut “{words}”, sound and picture",
     "cut_clip": "Cut. Undo brings it back, or find it crossed out in your script.",
+    # fixing a word the transcriber got wrong (her v27, Nov 17): the legend, the highlight bar's fourth group, the
+    # small box, its hover line and its toasts
+    "legend_fixed": "Fixed word",
+    "legend_fix_hint": "Wrong word? Double-click it and type the right one.",
+    "sel_fix": "Fix the words",
+    "fix_ok": "Fix",
+    "fix_back": "Undo fix",
+    "fix_back_title": "Go back to what was heard",
+    "fix_in_label": "The right words",
+    "fix_cancel": "Cancel",
+    "fixed_title": "You fixed this. It was heard as \"{w0}\".",
+    "fix_empty": "Type the right word first. To take a word out, use Cut.",
+    "fix_back_toast": "Back to what was heard",
+    "fixed_toast": "Fixed. Your captions use it now.",
     "photo_deleted": "Photo deleted. Undo brings it back.",
     "nothing_undo": "Nothing to undo",
     "undone": "Undone",
@@ -740,7 +754,9 @@ def _step2(w):
         "<p class='say'>" + rich(w["s2_say"]) + "</p>"
         "<div class='legend'><span class='z-punch'>" + e(w["punch"]) + "</span><span class='z-zoom'>" + e(w["slow_zoom"]) + "</span>"
         "<span class='fast'>" + e(w["sped_up"]) + "</span>"
-        "<span style='text-decoration:line-through;color:#a7a2a0;text-decoration-color:#d4643f'>" + e(w["cut"]) + "</span></div>"
+        "<span style='text-decoration:line-through;color:#a7a2a0;text-decoration-color:#d4643f'>" + e(w["cut"]) + "</span>"
+        # her v27: a fixed word, and the hint at the legend's right (her margin-left:auto; it wraps under at phone width)
+        "<span class='fixed'>" + e(w["legend_fixed"]) + "</span><span class='lfix'>" + e(w["legend_fix_hint"]) + "</span></div>"
         "<div class='edit'><div class='phone'>"
         "<div class='screen' id='screen' title='" + q(w["screen_title"]) + "'>"
         "<video id='vid' playsinline preload='auto'></video>"
@@ -768,16 +784,23 @@ def _step3(w):
 
 
 def _floating(w):
-    """The highlight bar, the photo picker, the video picker, the photo menu and the toast: all hidden until the
-    page's script opens them."""
+    """The highlight bar, the fix box (her v27), the photo picker, the video picker, the photo menu and the
+    toast: all hidden until the page's script opens them."""
     e = html.escape
+    q = lambda s: e(s, quote=True)  # noqa: E731
     head = "<div style='display:flex;justify-content:space-between;align-items:center;gap:1rem'>"
     return (
         "<div class='sel' id='selBar'><button id='selPhoto' type='button'>" + e(w["sel_photo"]) + "</button>"
         "<button id='selVideo' type='button'>" + e(w["sel_video"]) + "</button><i></i>"
         "<button id='selCut' type='button'>" + e(w["cut"]) + "</button><button id='selBack' type='button'>" + e(w["sel_back"]) + "</button><i></i>"
         "<button id='selPunch' type='button'>" + e(w["punch"]) + "</button><button id='selZoom' type='button'>" + e(w["slow_zoom"]) + "</button>"
-        "<button id='selNoZoom' type='button'>" + e(w["sel_nozoom"]) + "</button></div>"
+        "<button id='selNoZoom' type='button'>" + e(w["sel_nozoom"]) + "</button><i></i>"
+        "<button id='selFix' type='button'>" + e(w["sel_fix"]) + "</button></div>"
+        # the fix box (her v27, Nov 17): her markup, built from parts; the × is her &times;
+        "<div class='fixbox' id='fixBox' hidden><input id='fixIn' type='text' maxlength='80' aria-label='" + q(w["fix_in_label"]) + "'>"
+        "<button id='fixOk' type='button'>" + e(w["fix_ok"]) + "</button>"
+        "<button class='fx' id='fixBack' type='button' hidden title='" + q(w["fix_back_title"]) + "'>" + e(w["fix_back"]) + "</button>"
+        "<button class='fx' id='fixNo' type='button' aria-label='" + q(w["fix_cancel"]) + "'>×</button></div>"
         "<div class='modal' id='pick'><div class='sheet'>" + head +
         "<b id='pickHead'>" + e(w["pick_head"]) + "</b><button class='btn small' id='pickClose' type='button'>" + e(w["close"]) + "</button></div>"
         "<p class='say' style='margin:.3rem 0 0'>" + e(w["pick_say"]) + "</p><div class='grid' id='pickGrid'></div>"

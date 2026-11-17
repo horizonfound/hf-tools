@@ -139,6 +139,15 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .sel{position:fixed;z-index:50;display:none;gap:5px;align-items:center;background:var(--ink);padding:6px;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
 .sel button{border:0;border-radius:999px;padding:.4rem .75rem;font:600 13px/1 var(--sans);cursor:pointer;background:#fff;color:var(--ink);white-space:nowrap}
 .sel button:hover{background:var(--coral-l)}
+/* fixing a word the transcriber got wrong (Nicole, Nov 17) */
+.words span.fixed,.legend .fixed{text-decoration:underline dotted var(--coral-2) 1.5px;text-underline-offset:4px}
+.words span.gone{color:#b9b4b2;font-style:italic}
+.legend .lfix{margin-left:auto;font-style:italic}
+.fixbox{position:fixed;z-index:60;display:flex;gap:5px;align-items:center;background:var(--ink);padding:6px;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.fixbox[hidden]{display:none!important}
+.fixbox input{font:500 15px/1.2 var(--sans);border:0;border-radius:9px;padding:.45rem .6rem;min-width:180px;outline:2px solid var(--coral)}
+.fixbox button{border:0;border-radius:999px;padding:.42rem .8rem;font:600 13px/1 var(--sans);cursor:pointer;background:var(--coral);color:#fff}
+.fixbox button.fx{background:#fff;color:var(--ink)}
 .sel i{width:1px;height:20px;background:rgba(255,255,255,.3);margin:0 2px}
 .modal{position:fixed;inset:0;background:rgba(20,22,28,.5);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
 .modal.open{display:flex}
@@ -230,6 +239,9 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .seg{user-select:none;-webkit-user-select:none;touch-action:none}
 .sthumbs{user-select:none;-webkit-user-select:none}
 .pmenu{max-width:calc(100vw - 16px)}
+/* the fix box on a phone: her 180 px box and its three buttons are wider than the window, so the box keeps to the
+   window and the input gives way (the page re-places the box as it does the highlight bar) */
+@media(max-width:520px){.fixbox{max-width:calc(100vw - 16px)}.fixbox input{min-width:0;width:120px;flex:1 1 100px}}
 .screen{user-select:none;-webkit-user-select:none}
 .screen .movable,.screen .knob,.screen .cap{touch-action:none}
 /* the line down the middle while a dragged thing is snapped to it (the designer's blue; drawn only, never pressed) */
