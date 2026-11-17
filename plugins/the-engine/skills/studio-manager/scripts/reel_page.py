@@ -3477,6 +3477,11 @@ def save_video_from_page(body):
     except reels.Wrong:
         saved0 = None
     saved0 = saved0 if isinstance(saved0, dict) else {}
+    # the kind first, so a reel of another kind is told Save my video is for B-roll, not that it has no footage
+    # moments yet (a reel the page doesn't offer the button on; the review of Nov 17); a reel that can't be
+    # read goes on to _ask_from_page, which says which reel is gone
+    if saved0 and reel_kind(saved0) != BROLL_STYLE:
+        return _bad(OUR_WORDS["video_broll_only"], 400, why="kind")
     body.setdefault("picks", [])
     if "vibe" not in body:
         body["vibe"] = saved0.get("vibe") if saved0.get("vibe") in VIBES else default_vibe()

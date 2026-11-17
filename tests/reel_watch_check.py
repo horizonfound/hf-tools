@@ -219,6 +219,11 @@ def check_preview(s):
         shutil.copy(rpc.BEAT60, music / "Test beat.wav")
     sid = rpc.song_of(s, KIT, "Test beat")
     case("(set up: the test beat in Music)", bool(sid), sid)
+    code, j, _ = s.http("POST", "/reel-save", rpc.save_body(st, {"kind": "photos", "picks": rpc.pk(PICKS), "mine": True, "song": sid, "vibe": "beat", "footage": False}, page="watch0"))
+    st = s.state()
+    code, j, _ = s.http("POST", "/reel-video", {"kit": KIT, "stamp": st["stamp"], "song": sid, "clips": [], "reel": st["current"]})
+    case("Save my video asked of a Just photos reel with no clips yet: our 'Save my video is for a B-roll reel' line, not the no-footage line (the kind is checked first)",
+         code == 400 and j.get("words") == R.OUR_WORDS["video_broll_only"] and j.get("why") == "kind", (code, j))
     before = (s.kit / ".kit" / "reel-page.json").read_bytes() if (s.kit / ".kit" / "reel-page.json").exists() else b""
     reels_before = sorted(os.listdir(s.kit / ".kit" / "reels")) if (s.kit / ".kit" / "reels").exists() else None
     page_picks = rpc.pk(PICKS)
