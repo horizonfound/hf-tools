@@ -135,7 +135,7 @@ def lede_of(pg):
 
 def shown_steps(pg):
     """The steps written on the page and which are hidden for this kind (data-kind-hidden), in her order."""
-    return [(m.group(1), bool(m.group(2))) for m in re.finditer(r"<section class='step' id='(\w+)'(?:( hidden data-kind-hidden='1')| hidden)?>", pg)]
+    return [(m.group(1), bool(m.group(2))) for m in re.finditer(r"<section class='step(?: watch)?' id='(\w+)'(?:( hidden data-kind-hidden='1')| hidden)?>", pg)]
 
 
 # ---------- 1. her words ----------
@@ -223,9 +223,11 @@ def run_kinds(s):
     import reel_page as rp
     kit = KIT
     short = kit[11:]
-    want = {"bts": [("step0", False), ("step1", False), ("step3", False), ("stepStyle", False), ("step4", False)],
-            "photos": [("step0", True), ("step1", False), ("step3", False), ("stepStyle", True), ("step4", False)],
-            "broll": [("step0", False), ("step1", True), ("step3", False), ("stepStyle", True), ("step4", True)]}
+    # since stage 4 (A13, A10): her "Would you like to direct this edit?" after the song (not on B-roll) and
+    # "Watch your reel before you make it" last, on every kind
+    want = {"bts": [("step0", False), ("step1", False), ("step3", False), ("stepDirect", False), ("stepStyle", False), ("step4", False), ("watch", False)],
+            "photos": [("step0", True), ("step1", False), ("step3", False), ("stepDirect", False), ("stepStyle", True), ("step4", False), ("watch", False)],
+            "broll": [("step0", False), ("step1", True), ("step3", False), ("stepDirect", True), ("stepStyle", True), ("step4", True), ("watch", False)]}
     for kind in KINDS:
         before = kit_bytes(s, kit)
         code, pg = page(s, kit, kind)

@@ -20,10 +20,11 @@ on the beat. Claude does the choosing; this does the counting.
     python3 reel.py make --folder "<edited photos>" --picks 7,2,11,4,9,1 --song "<file>" | --song none
                                                    | --capcut-song "<song name from CapCut's music>"
         [--clips clips.json]   video clips from their footage, placed in --picks as c1, c2...: c1,7,2,c2,11-,4
-        [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo"]
+        [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo" [--hook-whole]]
         [--pace beat|mixed|calm|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
         [--kit "<post kit folder>"]   the reel's working files go in that kit's hidden .kit/reels (REEL_WORK_IN_KIT)
-        [--status <file>]   a small JSON of what happened, for the reel page (ok, dry, short_song, project, plan)
+        [--status <file>]   a small JSON of what happened, for the reel page (ok, dry, short_song, project, plan, and the
+                            pieces as the page plays them before the reel is made: a photo by number, a clip by c1, c2...)
         Finds the beat, starts the song where it picks up, lays the photos (and clips) in that
         order, every cut on a beat, and writes the CapCut project (capcut.py).
         --dry-run prints the plan, ending with "Beats per piece: clip 6, 1, 1, 2, ..." and writes nothing.
@@ -130,6 +131,17 @@ def kit_workdir(kit):
     d = k / ".kit" / "reels"
     d.mkdir(exist_ok=True)              # only inside a .kit that is there: never a look-alike kit
     return d
+
+
+def work_of(a):
+    """The working folder of a make: --work when given (the reel page's preview keeps its own, beside Make my
+    reel's, so the two never share a file), else the kit's hidden .kit/reels, else ~/.studio/reels/<shoot>."""
+    w = getattr(a, "work", None)
+    if w:
+        d = Path(w).expanduser()
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return workdir(a.shoot, a.folder, getattr(a, "kit", None))
 
 
 def workdir(shoot, folder, kit=None):
@@ -304,7 +316,7 @@ def read_picks(a, n_clips=0):
     (the k-th clip in --clips; only when there are clips)."""
     same = os.path.normcase      # on a PC, E:\Photos and e:\photos are the same folder; on a Mac this changes nothing
     kit_list = kit_numbers(getattr(a, "kit", None), a.folder)
-    listing_file = workdir(a.shoot, a.folder, getattr(a, "kit", None)) / "photos.json"
+    listing_file = work_of(a) / "photos.json"
     if kit_list is not None:
         listing = kit_list       # a kit's one numbered list: the numbers Claude, the page and the kit page all mean
     elif listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
@@ -333,9 +345,10 @@ def read_picks(a, n_clips=0):
         picks.append(int(m.group(1)))
         hints.append(m.group(2) or None)
     bad = [n for n in picks if n not in by_n]
-    if bad or not picks:
+    if bad or not order:
         say(f"STOP: no photo numbered {', '.join(map(str, bad))} on the sheet." if bad else "STOP: no photos picked.")
         sys.exit(2)
+    # a reel of clips only (B-roll, Nicole's v27): c1,c2,c3 and no photo numbers is a whole reel
     if n_clips:
         used = [k for kind, k in order if kind == "clip"]
         twice = sorted({k + 1 for k in used if used.count(k) > 1})
@@ -684,11 +697,21 @@ def cmd_make(a):
                       "name": picked["name"] if picked else Path(song).name,
                       "capcut_material": picked["material"] if picked else None,
                       "capcut_beats": picked["beats"] if picked else None} if song else None),
-            "hook": {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]} if a.hook else None}
-    wd = workdir(a.shoot, a.folder, a.kit)
+            # the words: on the first piece (words on the first photo), or over the whole reel (--hook-whole:
+            # B-roll's words on screen, Nicole's v27; CapCut gets them as plain text to restyle)
+            "hook": ({"text": a.hook, "dur": facts["length"], "dur_f": pieces[-1]["start_f"] + pieces[-1]["dur_f"]} if a.hook_whole
+                     else {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]}) if a.hook else None}
+    wd = work_of(a)
     (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1), encoding="utf-8")
     plan_facts = {"clips": len(facts["clips"]), "photos": facts["photo_count"], "length": facts["length"],
                   "tempo": facts["tempo"], "song": bool(song), "song_from": facts["song_from"]}
+    # every piece as the reel page plays it before it is made (Nicole's v27, "Watch your reel before you make
+    # it"): a photo by its number, a clip by its place in --clips (c1, c2...) and where it starts in its video;
+    # never a path. The song's start and length go with them.
+    status_pieces = [dict({"kind": "photo", "n": picks[k]} if kind == "photo" else {"kind": "clip", "c": k + 1, "src": p["src"]},
+                          start=p["start"], dur=p["dur"], fill=bool(p.get("fill", True)))
+                     for (kind, k), p in zip(order, pieces)]
+    status_song = ({"from": facts["song_from"], "length": plan["song"]["length"]} if song else None)
     when = ""
     if song:
         f = facts["song_from"]
@@ -733,7 +756,7 @@ def cmd_make(a):
             say(facts["hits_line"])
         say(facts["beats_line"])
         say(f"Dry run: nothing written. The plan is in {wd / 'reel.json'}")
-        write_status(a, ok=True, plan=plan_facts)
+        write_status(a, ok=True, plan=plan_facts, pieces=status_pieces, song=status_song, variation=int(a.variation or 0))
         return
     store = Path(a.store).expanduser() if a.store else capcut.default_store()
     dest, draft = capcut.write(plan, store, a.ignore_open)
@@ -748,7 +771,8 @@ def cmd_make(a):
         say(capcut.write.note)
     if capcut.write.waiting:
         say(capcut.WAITING_HINT)
-    write_status(a, ok=True, project=dest.name, plan=plan_facts, listed=bool(capcut.write.listed),
+    write_status(a, ok=True, project=dest.name, plan=plan_facts, pieces=status_pieces, song=status_song,
+                 variation=int(a.variation or 0), listed=bool(capcut.write.listed),
                  left_to_capcut=bool(capcut.write.left_to_capcut), waiting=bool(capcut.write.waiting))
     rec = json.loads((wd / "reel.json").read_text(encoding="utf-8"))
     rec["capcut_project"] = str(dest)
@@ -818,6 +842,7 @@ def main():
     m.add_argument("--shoot-id", help="the shoot's id in that backup (s1, s2...)")
     m.add_argument("--name")
     m.add_argument("--hook")
+    m.add_argument("--hook-whole", action="store_true", help="the words stay on the whole reel (B-roll's words on screen), not only the first piece")
     m.add_argument("--clips", help="a JSON file of video clips (path, src, seconds, w, h, length), placed in --picks as c1, c2...")
     m.add_argument("--pace", "--vibe", dest="pace", choices=list(timing.VIBES) + list(timing.OLD_NAMES), default=timing.DEFAULT_PACE,
                    help="beat (On every beat), mixed (A little of everything), calm, build; "
@@ -830,6 +855,7 @@ def main():
     m.add_argument("--ignore-open", action="store_true")
     m.add_argument("--kit", help="the post kit this reel is for: its working files go in the kit's hidden .kit/reels")
     m.add_argument("--status", help="write what happened here as a small JSON, for the reel page")
+    m.add_argument("--work", help="a working folder of this run's own (the reel page's preview), in place of the kit's .kit/reels")
     s.add_argument("--kit", help="the post kit these photos are for: the sheet and photos.json go in its .kit/reels")
     s.add_argument("--before", help="the numbered list from last time (a kit's .kit/sheet.json): every photo on it keeps "
                                     "its number, new ones take the next, a photo gone keeps its number unused")
