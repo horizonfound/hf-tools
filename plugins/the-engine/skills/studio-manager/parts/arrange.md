@@ -101,7 +101,7 @@ The carousel has a second page, the designer, where the photographer builds fini
 **When to open it.** "Lay out my carousel", "design my carousel", "add text to my slides", "put words on the slides", "I want this photo across two slides", or anything else that means they want to arrange the slides themselves. They can also get there without you: the kit page's Carousel card ("Design my carousel →", or "Open my carousel →" once there is a design or a slide) opens it, and the carousel's picker shows "Lay out the slides" beside "Open the Carousel folder" once its slides are made. Not in the middle of a whole post kit being made. A shoot with no post kit has no designer; make the kit first (`parts/post-kit.md`).
 
 ```
-python3 <scripts>/design.py open "<kit>" [--design <id>]
+python3 <scripts>/design.py open "<kit>"
 python3 <scripts>/design.py show "<kit>"
 python3 <scripts>/design.py took "<kit folder>"
 python3 <scripts>/design.py tidy "<kit>"

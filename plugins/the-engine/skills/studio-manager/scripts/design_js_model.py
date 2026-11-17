@@ -2,7 +2,7 @@
 """The carousel designer's rules, as one script with no page in it (design_page.py puts it on the page).
 
 DESIGN_MODEL_JS makes window.DesignModel: where a photo sits inside its frame, what a move, a resize or a
-nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts (Show the whole photo among them: act 'whole', given the photo's own size), which slide a thing is on, adding and swapping photos, the
+nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts (Show the whole photo among them: act 'whole', given the photo's own size), the Crop window's box and what Done makes of it (cropFromBlock, cropResize, cropApply), which slide a thing is on, adding and swapping photos, the
 undo list, slides as things (insert, remove, the pieces a strip comes in and moving one), which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
@@ -26,7 +26,9 @@ DESIGN_MODEL_JS = r"""
     slides: [1, 20],        // fewest and most slides (one slide on its own is a single post)
     frameMin: 60,           // a frame is never smaller than this, either way
     onStrip: 40,            // at least this much of anything stays on the strip
-    zoom: [1, 3],           // a photo inside its frame
+    zoom: [1, 25],          // a photo inside its frame: the Crop window reaches 25 (a box 4% of the photo; hers the same)
+    zoomHand: 3,            // the Zoom slider's and the wheel's own top: a turn of the wheel never passes it by itself
+    cropMin: 0.04,          // the Crop window's box is never smaller than this much of the photo, either way (hers)
     blocks: 80,             // photos and text boxes in one design
     idMax: 1000000,
     inset: 70,              // "Add border" pulls each edge in by this much
@@ -113,7 +115,73 @@ DESIGN_MODEL_JS = r"""
     return {ox: r4(ox), oy: r4(oy)};
   }
   function zoomTo(v){ return r3(clamp(Number(v) || 1, RULES.zoom[0], RULES.zoom[1])); }
-  function zoomBy(zoom, deltaY){ return zoomTo((zoom >= 1 ? zoom : 1) * (deltaY < 0 ? RULES.wheel : 1 / RULES.wheel)); }
+  // One turn of the wheel. It never passes zoomHand by itself; a zoom the Crop window set past it can be wound down,
+  // and up again as far as it was.
+  function zoomBy(zoom, deltaY){
+    zoom = zoom >= 1 ? zoom : 1;
+    var top = Math.min(RULES.zoom[1], Math.max(RULES.zoomHand, zoom));
+    return r3(clamp(zoom * (deltaY < 0 ? RULES.wheel : 1 / RULES.wheel), RULES.zoom[0], top));
+  }
+
+  // ---- Crop (hers, v27): a box over the whole photo, kept as fractions of the photo {x, y, w, h}, which maps straight
+  //      onto the frame's zoom and crop: the frame shows exactly what is inside the box. With "Keep the frame's shape"
+  //      on, the box keeps the frame's shape (its corners only); off, the frame takes the box's shape, inside the space
+  //      it had, around the same middle. pw, ph are the photo's own size. ----
+  // The box a frame shows now (what the window opens with).
+  function cropFromBlock(b, pw, ph){
+    var L = layoutImg(b, pw, ph), w = Math.min(1, b.w / L.iw), h = Math.min(1, b.h / L.ih);
+    return {x: r4(clamp(-L.left / L.iw, 0, 1 - w)), y: r4(clamp(-L.top / L.ih, 0, 1 - h)), w: r4(w), h: r4(h)};
+  }
+  // The box's own shape, w / h in photo fractions, for a frame of ar = w / h strip pixels.
+  function cropK(ar, pw, ph){ return ar * ph / pw; }
+  // The largest box of shape k (cropK) that fits the photo, w wide if it can be, centred on cx, cy.
+  function fitLocked(k, cx, cy, w){
+    var h = w / k;
+    if (h > 1) { h = 1; w = k; }
+    if (w > 1) { w = 1; h = 1 / k; }
+    return {w: r4(w), h: r4(h), x: r4(clamp(cx - w / 2, 0, 1 - w)), y: r4(clamp(cy - h / 2, 0, 1 - h))};
+  }
+  // The box o dragged by dx, dy (fractions of the photo): it stays on the photo.
+  function cropMove(o, dx, dy){
+    return {x: r4(clamp(o.x + dx, 0, 1 - o.w)), y: r4(clamp(o.y + dy, 0, 1 - o.h)), w: o.w, h: o.h};
+  }
+  // A handle ('nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w') of the box o pulled by dx, dy. Each side stays on the photo
+  // and never nearer than cropMin to its opposite. With k (the frame's shape; corners only), the box keeps that shape
+  // and the opposite corner stays put.
+  function cropResize(o, handle, dx, dy, k){
+    var MIN = RULES.cropMin, l = o.x, t = o.y, r = o.x + o.w, btm = o.y + o.h, hw = handle.indexOf('w') >= 0, he = handle.indexOf('e') >= 0, hn = handle.indexOf('n') >= 0, hs = handle.indexOf('s') >= 0;
+    if (hw) l = Math.min(r - MIN, Math.max(0, o.x + dx));
+    if (he) r = Math.max(l + MIN, Math.min(1, r + dx));
+    if (hn) t = Math.min(btm - MIN, Math.max(0, o.y + dy));
+    if (hs) btm = Math.max(t + MIN, Math.min(1, btm + dy));
+    if (k > 0) {
+      var w = r - l, h = btm - t;
+      if (w / h > k) w = h * k; else h = w / k;
+      var ax = hw ? o.x + o.w : o.x, ay = hn ? o.y + o.h : o.y;
+      var maxW = hw ? ax : 1 - ax, maxH = hn ? ay : 1 - ay;
+      if (w > maxW) { w = maxW; h = w / k; }
+      if (h > maxH) { h = maxH; w = h * k; }
+      return {x: r4(hw ? ax - w : ax), y: r4(hn ? ay - h : ay), w: r4(w), h: r4(h)};
+    }
+    return {x: r4(l), y: r4(t), w: r4(r - l), h: r4(btm - t)};
+  }
+  // Done: the frame b showing exactly what is inside the box CR -> {x, y, w, h, zoom, ox, oy}. Unlocked, the frame
+  // takes the box's shape inside the space it had, around the same middle. Ours: the frame is never under frameMin
+  // and stays on the strip (fitFrame), and the zoom never past the most (hers could leave a sliver or run off).
+  function cropApply(b, CR, pw, ph, slides, locked){
+    var x = b.x, y = b.y, w = b.w, h = b.h;
+    if (!locked) {
+      var ar = (CR.w * pw) / (CR.h * ph);
+      if (ar < w / h) { var nw = h * ar; x += (w - nw) / 2; w = nw; }
+      else { var nh = w / ar; y += (h - nh) / 2; h = nh; }
+    }
+    var fr = fitFrame({x: x, y: y, w: w, h: h}, w, h, slides);
+    var c = fr.w / (CR.w * pw), cover = Math.max(fr.w / pw, fr.h / ph);
+    var zoom = zoomTo(c / cover), L = layoutImg(merge(fr, {zoom: zoom}), pw, ph);
+    var vw = fr.w / L.iw, vh = fr.h / L.ih;
+    var ox = vw < 0.999 ? clamp(CR.x / (1 - vw), 0, 1) : 0.5, oy = vh < 0.999 ? clamp(CR.y / (1 - vh), 0, 1) : 0.5;
+    return merge(fr, {zoom: zoom, ox: r4(ox), oy: r4(oy)});
+  }
 
   // ---- where things may be ----
   function slideOf(b, slides){ return clamp(Math.floor((b.x + b.w / 2) / W), 0, slides - 1); }
@@ -520,6 +588,7 @@ DESIGN_MODEL_JS = r"""
     clamp: clamp, r2: r2, isText: isText, isFrame: isFrame, isHole: isHole, typeOf: typeOf, same: same, copy: copy,
     indexOf: indexOf, find: find, merge: merge, tidy: tidy, patch: patch, nextId: nextId,
     layoutImg: layoutImg, pan: pan, zoomTo: zoomTo, zoomBy: zoomBy,
+    cropFromBlock: cropFromBlock, cropK: cropK, fitLocked: fitLocked, cropMove: cropMove, cropResize: cropResize, cropApply: cropApply,
     slideOf: slideOf, clampXY: clampXY, onStrip: onStrip,
     lines: lines, nearest: nearest, move: move, centered: centered, midWords: midWords, onSlides: onSlides, resize: resize, nudge: nudge,
     act: act, fitFrame: fitFrame, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,

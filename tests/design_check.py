@@ -58,7 +58,8 @@ story's label, Show Instagram's guides, and the stories staying in view.
 An eleventh part, tests/design_v27_check.py (--only v27 runs just it: its tables, words and rules, its routes and the chat's
 commands on --port + 36 and its real page on --port + 38): Nicole's v27 for both designers. The ask box on a carousel and
 design.py note / fill, her three story collages, Open folder always there with her answers, the [hidden] rule, the stage
-sticky on the carousel page.
+sticky on the carousel page, slides as things (+ and x on the labels, Add a slide before / after, Where should it go?, the
+grip), Show the whole photo, and the Crop window (the zoom up to 25).
 
 A ninth part, tests/design_preview_check.py (--only preview runs just it, on --port + 30): Nicole's v24, the small
 picture of a design that the page sends for the post kit, on the real page in the hidden Chrome. Its routes, with
@@ -413,7 +414,7 @@ def check_all(work, port):
         code, out = post(P, "/design", body(s4))
         b0 = json.loads(f.read_text(encoding="utf-8"))["state"]["blocks"][0]
         case("save: keys the Assistant does not know are dropped", code == 200 and "z" not in b0 and "evil" not in b0 and "extra" not in json.loads(f.read_text(encoding="utf-8"))["state"], b0)
-        case("save: where the photo sits in its frame, and its zoom, are brought into range", b0["ox"] == 1 and b0["oy"] == 0 and b0["zoom"] == 3, b0)
+        case("save: where the photo sits in its frame, and its zoom, are brought into range (the zoom to 25, the Crop window's most, since v27)", b0["ox"] == 1 and b0["oy"] == 0 and b0["zoom"] == 25, b0)
         REV[0] = out["rev"] if code == 200 else REV[0]
         text = {"id": 50, "type": "text", "text": "Zoë & Émile\r\nby the sea", "font": "Playfair Display", "size": 110, "weight": 700, "italic": True, "upper": False,
                 "al": "left", "ls": 4, "lh": 1.2, "color": "#FFFFFF", "x": 120, "y": 500, "w": 820, "h": 264}
@@ -1522,7 +1523,7 @@ def main():
             import traceback
             case("the checks of v27's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     if a.only in (None, "browser", "v27"):
-        real_page("v27: the carousel's ask box and fill, the story collages, Open folder, the [hidden] rule")
+        real_page("v27: the carousel's ask box and fill, the story collages, Open folder, the [hidden] rule, slides as things, Show the whole photo, Crop")
         try:
             design_v27_check.check_v27_browser(case, work, a.port + 38, make_kit, Server, post, get_json, run)
         except Exception as e:  # noqa: BLE001

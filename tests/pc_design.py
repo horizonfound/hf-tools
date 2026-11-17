@@ -1385,6 +1385,14 @@ def v27_checks(kit):
     app = tc.FILES_APP
     check("v27: Open folder's answers name this computer's file manager (File Explorer on a PC), never Finder on a PC",
           posting_queue.OPEN_WORDS["Carousel"].format(app=app) == f"Your Carousel folder is open in {app}." and (not WINDOWS or "Finder" not in posting_queue.OPEN_WORDS["Carousel"].format(app=app)))
+    # the Crop window's zoom (B11): a page-side crop the Assistant keeps up to 25 and brings a larger one into range; the
+    # finished slides a PC makes from the layout are unaffected (the page draws them)
+    zs = {"slides": 1, "bg": "#ffffff", "blocks": [{"id": 1, "n": 1, "x": 0, "y": 0, "w": 1080, "h": 1350, "ox": 0.1, "oy": 0.9, "zoom": 25}]}
+    ok25, _ = design.validate_state(zs, on_sheet={1})
+    ok26, _ = design.validate_state(dict(zs, blocks=[dict(zs["blocks"][0], zoom=26)]), on_sheet={1})
+    check("v27: a frame at zoom 25 (the Crop window's most) is a layout the Assistant takes, zoom 26 is brought to 25, and the page is told the range 1 to 25",
+          ok25 and ok25["blocks"][0]["zoom"] == 25 and ok26 and ok26["blocks"][0]["zoom"] == 25 and design.limits_for()["zoom"] == [1, 25] and design.limits_for("stories")["zoom"] == [1, 25],
+          (ok25 and ok25["blocks"][0].get("zoom"), ok26 and ok26["blocks"][0].get("zoom")))
 
 
 def v22_checks(kit):

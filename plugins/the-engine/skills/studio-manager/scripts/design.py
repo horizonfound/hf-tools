@@ -175,7 +175,8 @@ TEXT_W_MIN = 80                         # the narrowest a text box may be
 TEXT_H_MAX = 13500                      # a text box's height is worked out by the page from its lines
 ON_STRIP = 40                           # at least this much of every block stays on the strip
 XY_MAX = 100000                         # nothing sane is further from the strip than this
-ZOOM = (1, 3)
+ZOOM = (1, 25)                          # a photo inside its frame: the page's slider and wheel reach 3; the Crop window (hers, v27) up
+                                        # to 25, a box 4% of the photo, which is as far as her window goes (its MIN of .04)
 SIZE = (8, 600)                         # text size, in strip pixels
 LS = (-20, 200)                         # letter spacing, in strip pixels
 LH = (0.5, 3)                           # line height, as a multiple of the size

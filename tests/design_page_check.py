@@ -63,7 +63,9 @@ t('move inside: dragging a tall photo 27 down in a whole slide (270 to spare) ta
 t('move inside: it stops at the photo\'s own edge', eq(M.pan(full, 0, 1000, 1200, 1800), {ox: 0.5, oy: 0}) && eq(M.pan(full, 0, -1000, 1200, 1800), {ox: 0.5, oy: 1}));
 P = M.pan(full, -94.5, 0, 1800, 1200);
 t('move inside: a wide photo 94.5 to the left (945 to spare) takes ox from 0.5 to 0.6', eq(P, {ox: 0.6, oy: 0.5}), P);
-t('zoom: one turn of the wheel up is 1.05, down from 1 stays 1, and it never passes 3', M.zoomBy(1, -1) === 1.05 && M.zoomBy(1, 1) === 1 && M.zoomBy(2.95, -1) === 3 && M.zoomTo(5) === 3 && M.zoomTo(0.2) === 1 && M.zoomTo(2) === 2, [M.zoomBy(1, -1), M.zoomBy(1, 1), M.zoomBy(2.95, -1)]);
+t('zoom: one turn of the wheel up is 1.05, down from 1 stays 1, and it never passes 3 by itself (since v27 the Crop window may set up to 25, and the wheel winds such a zoom down)',
+  M.zoomBy(1, -1) === 1.05 && M.zoomBy(1, 1) === 1 && M.zoomBy(2.95, -1) === 3 && M.zoomTo(5) === 5 && M.zoomTo(30) === 25 && M.zoomTo(0.2) === 1 && M.zoomTo(2) === 2 && M.zoomBy(10, -1) === 10 && near(M.zoomBy(10, 1), 9.524, 0.001),
+  [M.zoomBy(1, -1), M.zoomBy(1, 1), M.zoomBy(2.95, -1), M.zoomBy(10, 1)]);
 
 // ---- where things may be ----
 t('slide-of: by the middle of the thing', M.slideOf({x: 1000, w: 1080}, 3) === 1 && M.slideOf({x: -500, w: 200}, 3) === 0 && M.slideOf({x: 9000, w: 200}, 3) === 2 && M.slideOf({x: 2300, w: 300}, 5) === 2);

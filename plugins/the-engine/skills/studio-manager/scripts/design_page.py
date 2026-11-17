@@ -24,6 +24,7 @@ files, so nothing Python does can change a character of it:
                                            design (the gallery), Save as template, Fill empty frames
     design_js_save.py    DESIGN_SAVE_JS    Preview swipe, the profile grid's crop, and Save slides
     design_js_ask.py     DESIGN_ASK_JS     "Let my assistant choose the photos" (the note, the line to copy), both kinds
+    design_js_crop.py    DESIGN_CROP_JS    the Crop window (hers, v27): the whole photo with a box, Done maps it onto the frame
 
 SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
 (Designer.start()) only after every part is in place.
@@ -48,6 +49,7 @@ import brand  # noqa: E402
 import look  # noqa: E402
 from design_js_brand import DESIGN_BRAND_CSS, DESIGN_BRAND_JS  # noqa: E402
 from design_js_core import DESIGN_CORE_JS  # noqa: E402
+from design_js_crop import DESIGN_CROP_CSS, DESIGN_CROP_JS  # noqa: E402
 from design_js_ask import DESIGN_ASK_CSS, DESIGN_ASK_JS  # noqa: E402
 from design_js_designs import DESIGN_DESIGNS_CSS, DESIGN_DESIGNS_JS  # noqa: E402
 from design_js_edit import DESIGN_EDIT_JS  # noqa: E402
@@ -261,10 +263,11 @@ SCRIPTS = [
     ("DESIGN_DESIGNS_JS", DESIGN_DESIGNS_JS),
     ("DESIGN_SAVE_JS", DESIGN_SAVE_JS),
     ("DESIGN_ASK_JS", DESIGN_ASK_JS),
+    ("DESIGN_CROP_JS", DESIGN_CROP_JS),
 ]
 
 # The styles of the parts added after the strip, in the order their scripts go on the page.
-PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS + DESIGN_ASK_CSS
+PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS + DESIGN_ASK_CSS + DESIGN_CROP_CSS
 
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))

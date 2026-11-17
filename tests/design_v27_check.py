@@ -16,7 +16,9 @@
                                CSS and as computed styles in the hidden Chrome
     the stage                  sticky on the carousel page too (v26 proved stories)
     slides as things           + and x on every label, Add a slide before / after, Remove this slide, Where should it go?, the grip (B8 to B10)
-    the photo inside its frame Show the whole photo (B12): the frame shrinks to the photo's own shape inside its space, never under 60 px
+    the photo inside its frame Show the whole photo (B12): the frame shrinks to the photo's own shape inside its space, never under 60 px;
+                               Crop (B11): the window with the whole photo and a box, the corners keeping the frame's shape, eight
+                               handles when unticked and the frame taking the box's shape, Done mapped onto zoom and crop up to 25
 
 Three parts, as the other parts have: the tables, the words and the rules by themselves (check_v27_page), the routes
 and the commands by request (check_v27_server, a pretend kit and a page server on the port it is given), and the real
@@ -86,6 +88,14 @@ HERS = {
     "whole": "Show the whole photo",
     "whole_title": "Shrink the frame to the photo's own shape, so the whole photo shows with space around it",
     "whole_done": "The whole photo shows now, with space around it. Undo puts the crop back.",
+    # Crop (B11): the button and its tooltip (her HTML line 306), the window's words (404-410) and its line (1212)
+    "crop": "Crop",
+    "crop_title": "See the whole photo and drag the edges to crop it",
+    "crop_hint": "Drag a corner to cut off the edges you don't want, and drag inside the box to move it. Only what's inside the box shows on your slide.",
+    "crop_lock": "Keep the frame's shape",
+    "crop_cancel": "Cancel", "crop_done": "Done",
+    "crop_lock_hint": "Untick Keep the frame's shape to crop each side on its own. The frame on your slide changes shape to match.",
+    "cropped": "Cropped. Undo takes it back.",
 }
 # Her lines that her page builds from pieces (a kind's word, a number): the piece in her page, and the line ours says for a slide
 # and for a story, with the number 3 where she puts one. Each is looked for in her page, and ours are checked against both kinds.
@@ -123,6 +133,9 @@ OUR_WORDS = {
     "It’s your only slide, so it stays.": "beside Remove this slide at one slide, where hers does nothing and says nothing (the stories' line is from v26)",
     "Put a new blank story in front of the one this is on": "her stories' tooltips still say slide (her page renames the three buttons only); ours say story, as every story word does (decision 20)",
     "It's behind this window: click <Finder> in <the Dock> to see it.": "added after her 'Your Carousel folder is open in Finder.' when macOS kept the browser in front (hers never knows); File Explorer and the taskbar on a PC",
+    "Only what's inside the box shows on your story.": "the end of her Crop hint in the stories designer: her one page says slide for both kinds; ours says story there, as every story word does (decision 20)",
+    "The frame on your story changes shape to match.": "the end of her Keep the frame's shape hint in the stories designer, the same way",
+    "Crop the photo": "the Crop window's name for a screen reader (hers: its aria-label, the same words)",
 }
 
 
@@ -368,6 +381,42 @@ t('whole: a block that is not there: nothing', M.act(st, 99, 'whole', {pw: 3, ph
 var edge = {slides: 1, bg: '#ffffff', blocks: [F(1, 1, -300, 0, 600, H)]};
 r = M.act(edge, 1, 'whole', {pw: 3000, ph: 2000});
 t('whole: a frame hanging off the strip\'s left edge keeps at least 40 px on the strip (clampXY)', r.st.blocks[0].x >= 40 - r.st.blocks[0].w && M.onStrip(r.st.blocks[0], 1), r.st.blocks[0]);
+// ---- Crop (B11): the box as fractions of the photo, and Done ----
+t('crop: the zoom runs 1 to 25 (the Crop window\'s most: a box 4% of the photo), the wheel\'s own top is 3, the box never under 4%', eq(M.RULES.zoom, [1, 25]) && M.RULES.zoomHand === 3 && M.RULES.cropMin === 0.04);
+var b1 = F(1, 1, 0, 0, W, H, {ox: 0.3, oy: 0.7, zoom: 2}), PW = 3000, PH = 2000;
+var CR = M.cropFromBlock(b1, PW, PH);
+t('crop: a frame filling the slide at zoom 2, held at .3 / .7, opens with the box it shows: .2667 by .5 of the photo at .22, .35', eq(CR, {x: 0.22, y: 0.35, w: 0.2667, h: 0.5}), CR);
+var p = M.cropApply(b1, CR, PW, PH, 1, true);
+t('crop: Done on that box, the shape kept: the very same frame, zoom and crop back (within 1e-3)', p.x === 0 && p.y === 0 && p.w === W && p.h === H && near(p.zoom, 2, 0.001) && near(p.ox, 0.3, 0.001) && near(p.oy, 0.7, 0.001), p);
+p = M.cropApply(b1, CR, PW, PH, 1, false);
+t('crop: ... and unlocked, a box of the frame\'s own shape leaves the frame as good as it was (a hair from the box\'s rounding), zoom and crop back', near(p.w, W, 0.5) && near(p.h, H, 0.5) && near(p.zoom, 2, 0.001) && near(p.ox, 0.3, 0.001) && near(p.oy, 0.7, 0.001), p);
+var b0 = F(1, 1, 0, 0, W, H);
+t('crop: a frame at zoom 1 centred opens with the largest box of its shape, centred: for a 3:2 photo in a 4:5 frame, .5333 wide, the whole height', eq(M.cropFromBlock(b0, PW, PH), {x: 0.2333, y: 0, w: 0.5333, h: 1}));
+var k = M.cropK(W / H, PW, PH);
+t('crop: the frame\'s shape in photo fractions (cropK) is .5333 for a 4:5 frame on a 3:2 photo, and fitLocked at the middle gives that same box', near(k, 0.5333, 0.0001) && eq(M.fitLocked(k, 0.5, 0.5, 1), {w: 0.5333, h: 1, x: 0.2333, y: 0}));
+t('crop: fitLocked of a wide shape (k = 2) a quarter wide, centred at .9, .9: the box stays on the photo', eq(M.fitLocked(2, 0.9, 0.9, 0.25), {w: 0.25, h: 0.125, x: 0.75, y: 0.8375}));
+var o = {x: 0.2, y: 0.2, w: 0.5, h: 0.5};
+t('crop: the se corner pulled in by .1, .2 with the shape free: the box is .4 by .3, its nw corner where it was', eq(M.cropResize(o, 'se', -0.1, -0.2, null), {x: 0.2, y: 0.2, w: 0.4, h: 0.3}));
+t('crop: ... with the shape kept (k = .5333): the box follows the smaller pull and keeps the shape, .16 by .3, the nw corner still put', eq(M.cropResize(o, 'se', -0.1, -0.2, k), {x: 0.2, y: 0.2, w: 0.16, h: 0.3}));
+t('crop: the nw corner pulled in by .1, .1 with the shape kept: the se corner (.7, .7) stays put', (function(){ var r = M.cropResize(o, 'nw', 0.1, 0.1, k); return near(r.x + r.w, 0.7, 0.0001) && near(r.y + r.h, 0.7, 0.0001) && near(r.w / r.h, k, 0.001); })(), M.cropResize(o, 'nw', 0.1, 0.1, k));
+t('crop: the n side pushed down past the bottom: the box is never under 4% tall', eq(M.cropResize(o, 'n', 0, 0.9, null), {x: 0.2, y: 0.66, w: 0.5, h: 0.04}));
+t('crop: the e side pulled past the photo\'s edge: the box stops at the edge', eq(M.cropResize(o, 'e', 0.9, 0, null), {x: 0.2, y: 0.2, w: 0.8, h: 0.5}));
+t('crop: the w side pushed past the e side, and the e side past the w side: 4% wide, never less, on the far side', eq(M.cropResize(o, 'w', 0.9, 0, null), {x: 0.66, y: 0.2, w: 0.04, h: 0.5}) && eq(M.cropResize(o, 'e', -0.9, 0, null), {x: 0.2, y: 0.2, w: 0.04, h: 0.5}));
+t('crop: the s side pushed past the n side: 4% tall', eq(M.cropResize(o, 's', 0, -0.9, null), {x: 0.2, y: 0.2, w: 0.5, h: 0.04}));
+t('crop: the se corner pulled past the edge with the shape kept: the box grows as far as the photo allows and keeps the shape', (function(){ var r = M.cropResize(o, 'se', 0.9, 0.9, k); return r.x === 0.2 && r.y === 0.2 && near(r.y + r.h, 1, 0.0001) && near(r.w / r.h, k, 0.001); })(), M.cropResize(o, 'se', 0.9, 0.9, k));
+t('crop: moved by .5, .5: the box stays on the photo', eq(M.cropMove(o, 0.5, 0.5), {x: 0.5, y: 0.5, w: 0.5, h: 0.5}) && eq(M.cropMove(o, -0.5, 0.1), {x: 0, y: 0.3, w: 0.5, h: 0.5}));
+t('crop: the box given to a resize or a move is untouched', eq(o, {x: 0.2, y: 0.2, w: 0.5, h: 0.5}));
+var wide = F(1, 1, 0, 0, W, 400), kw = M.cropK(W / 400, PW, PH), tiny = {x: 0.1, y: 0.1, w: 0.04, h: 0.04 / kw};
+p = M.cropApply(wide, tiny, PW, PH, 1, true);
+t('crop: a box 4% of the photo on its covering side gives zoom 25, the frame unchanged, the crop where the box was', eq([p.x, p.y, p.w, p.h, p.zoom], [0, 0, W, 400, 25]) && near(p.ox, 0.1 / 0.96, 0.001), p);
+p = M.cropApply(b1, {x: 0.4, y: 0, w: 0.04, h: 1}, PW, PH, 1, false);
+t('crop: unlocked, a tall thin box (4% wide, the whole height) on a frame filling the slide: the frame takes that shape, 81 by 1350, around the same middle, zoom 1', eq([p.x, p.y, p.w, p.h, p.zoom, p.oy], [499.5, 0, 81, H, 1, 0.5]) && near(p.ox, 0.4167, 0.001), p);
+p = M.cropApply(F(1, 1, 0, 0, 400, 400), {x: 0.5, y: 0.1, w: 0.04, h: 0.8}, PW, PH, 1, false);
+t('crop: unlocked, a box that would make the frame under 60 px wide (30 by 400): the frame is 60 wide (hers could leave 30), centred where it was, and the box\'s width still fills it (zoom 2.5, so the photo covers the frame)', p.w === 60 && p.h === 400 && p.x === 170 && p.y === 0 && p.zoom === 2.5, p);
+p = M.cropApply(F(1, 1, -300, 0, 600, H), {x: 0, y: 0, w: 1, h: 1}, PW, PH, 1, false);
+t('crop: unlocked on a frame hanging off the strip\'s left edge: the frame keeps at least 40 px on the strip', M.onStrip(p, 1), p);
+t('crop: Done with the whole photo in the box, shape free: zoom 1, the crop centred, the frame the photo\'s shape', (function(){ var q = M.cropApply(b1, {x: 0, y: 0, w: 1, h: 1}, PW, PH, 1, false); return q.zoom === 1 && q.ox === 0.5 && q.oy === 0.5 && near(q.w / q.h, PW / PH, 0.001); })());
+t('crop: the layout given to cropApply is untouched', eq(b1, F(1, 1, 0, 0, W, H, {ox: 0.3, oy: 0.7, zoom: 2})));
 JSON.stringify(out);
 """
 
@@ -513,6 +562,22 @@ def check_v27_page(case, work):
          "D.blockTypes.photo.natural(nodes[b.id], b)" in edit and "M.act(D.st, b.id, a, nat ? {pw: nat.w, ph: nat.h} : null)" in edit and "if (a === 'whole') lines('sel', WORDS.wholeDone);" in edit)
     case("v27 page: the Zoom slider stays 100 to 300 and shows a larger zoom as its end (a crop may go past it)",
          "zoomImg.min = '100'; zoomImg.max = '300'" in edit and "Math.min(3, photo ? (b.zoom || 1) : 1) * 100" in edit)
+    # ---- B11: Crop: her words in the crop part, the part on the page, the limits ----
+    crop = src["DESIGN_CROP_JS"]
+    for k in ("crop_title", "crop_hint", "crop_lock", "crop_cancel", "crop_done", "crop_lock_hint", "cropped"):
+        case(f"v27 page: her words in the crop part: {HERS[k][:60]}", "'" + HERS[k].replace("'", "\\'") + "'" in crop, HERS[k])
+    case("v27 page: the crop part is the last script on the page (after the designs part, whose windows it uses), and its styles are in the parts' CSS",
+         [n for n, _ in design_page.SCRIPTS][-1] == "DESIGN_CROP_JS" and ".cr-box{" in design_page.PART_CSS and ".dz-sheet.cr-sheet{" in design_page.PART_CSS)
+    case("v27 page: the Crop button is put between Show the whole photo and Move photo inside (her order), and the strip's press is handed to the crop part",
+         "group.insertBefore(cropBtn, adj)" in crop and "if (a === 'crop') { if (D.crop) D.crop.open(); return; }" in edit)
+    case("v27 page: the window's picture is the Assistant's made copy by number (never a path), and the box's maths are the model's",
+         "D.photoUrl(b.n, 'l')" in crop and "M.cropApply(b, cr, cr.pw, cr.ph, D.st.slides, locked)" in crop and "M.cropResize(drag.o, drag.h, dx, dy, lock.checked ? k() : null)" in crop and "/full/" not in crop)
+    case("v27 page: the Assistant's own limits give the page zoom 1 to 25 for both kinds, and the smallest frame is still 60",
+         design.limits_for("carousel")["zoom"] == [1, 25] and design.limits_for("stories")["zoom"] == [1, 25] and design.ZOOM == (1, 25) and design.FRAME_MIN == 60)
+    case("v27 page: the three story-worded lines of the crop window are listed under our words, with their reasons",
+         all(w in OUR_WORDS for w in ("Only what's inside the box shows on your story.", "The frame on your story changes shape to match.", "Crop the photo")))
+    case("v27 page: the window's two hints read in story words in the stories designer (the page's story words), and in her words on a carousel",
+         design.story_words(HERS["crop_hint"]).endswith("Only what's inside the box shows on your story.") and design.story_words(HERS["crop_lock_hint"]).endswith("The frame on your story changes shape to match."))
     js = work / "v27-photo.js"
     js.write_text("var MODEL_SRC = " + json.dumps(src["DESIGN_MODEL_JS"]) + ";\nvar CAROUSEL_LIMITS = " + json.dumps(design.limits_for("carousel")) + ";\n" + PHOTO_JS, encoding="utf-8")
     r = osascript(js)
@@ -706,6 +771,16 @@ def check_v27_server(case, work, port, make_kit, Server, post, get_json, ask, ru
                 b["n"] = i + 1
             code, out = J(post(P, "/design", {"kit": kit_name, "kind": "stories", "design": SID, "stamp": STAMP, "base": disk(SID, sdesigns)["rev"], "page": "v27serverpage02", "state": tpl}))
             case(f"v27 server: {c[1]} with photos in every frame is a set of stories the Assistant takes (overlapping frames are fine)", code == 200 and out.get("ok"), (code, out))
+        # ---- B11: the zoom past the slider, through the real save route ----
+        for z, want, what in ((25, 25, "zoom 25 (the Crop window's most) is kept"), (26, 25, "zoom 26 is brought to 25"), (3, 3, "an older design's zoom 3 is as it was"), (1.5, 1.5, "zoom 1.5 is kept")):
+            s_z = json.loads(json.dumps(S1))
+            s_z["blocks"][0].update(zoom=z, ox=0.25, oy=0.75)
+            code, out = save(s_z)
+            got = disk(A)["state"]["blocks"][0]
+            case(f"v27 server: {what}, the crop with it", code == 200 and out.get("ok") and got["zoom"] == want and got["ox"] == 0.25 and got["oy"] == 0.75, (code, out, got))
+        code, st3 = J(get_json(P, f"/design-state?kit={KQ}&design={A}"))
+        case("v27 server: the page is told the zoom runs 1 to 25 with every state, for the carousel and for stories",
+             st3["limits"]["zoom"] == [1, 25] and get_json(P, f"/design-state?kit={KQ}&kind=stories")[1]["limits"]["zoom"] == [1, 25], st3.get("limits", {}).get("zoom"))
         case("v27 server: nothing a page was given in this part names a folder on this computer", all(no_path(x, work)[0] for x in seen))
         case("v27 server: the photos were only ever read", _tree(kit / "Photos") == _tree(kit / "Photos"))
 
@@ -805,6 +880,8 @@ COPY_JS = r"""
 def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
     sys.path.insert(0, str(ROOT / "tests"))
     import chrome_drive as cd
+    sys.path.insert(0, str(SCRIPTS))
+    import design
     if not cd.find_chrome():
         print("SKIP  v27 on the real page: no Chrome on this computer", flush=True)
         return
@@ -1143,8 +1220,8 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             rev2 = disk()["rev"]
             c.click("#strip .blk[data-id='1']")
             grp = Jx("(function(){ var g = document.getElementById('sel-crop'); return {shown: !g.hidden, btns: Array.from(g.querySelectorAll('button')).map(function(b){ return [b.textContent, b.title, b.disabled]; })}; })()")
-            case("v27 browser: a photo selected: the Crop group runs Show the whole photo (her tooltip), Move photo inside, the empty-frame button, none off",
-                 grp["shown"] and grp["btns"][0] == [HERS["whole"], HERS["whole_title"], False] and grp["btns"][1][0] == "Move photo inside" and not any(b[2] for b in grp["btns"]), grp)
+            case("v27 browser: a photo selected: the Crop group runs Show the whole photo (her tooltip), Crop, Move photo inside, the empty-frame button, none off",
+                 grp["shown"] and grp["btns"][0] == [HERS["whole"], HERS["whole_title"], False] and grp["btns"][1][0] == "Crop" and grp["btns"][2][0] == "Move photo inside" and not any(b[2] for b in grp["btns"]), grp)
             nat = Jx("(function(){ var b = Designer.selected(), n = Designer.blockTypes.photo.natural(document.querySelector('#strip .blk[data-id=\"1\"]'), b); return n; })()")
             want = Jx("DesignModel.act(Designer.st, 1, 'whole', {pw: " + str(nat["w"]) + ", ph: " + str(nat["h"]) + "}).st")
             c.click("#whole-photo")
@@ -1161,8 +1238,130 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.js("Designer.select(null); Designer.setState(" + json.dumps({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, None, W, 100, 600, 600)]}) + ")")
             c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
             c.click("#strip .blk[data-id='2']")
-            case("v27 browser: an empty frame selected: Show the whole photo is off, like Move photo inside", c.js("document.getElementById('whole-photo').disabled && document.getElementById('adjust').disabled") is True)
+            case("v27 browser: an empty frame selected: Show the whole photo is off, like Move photo inside, and Crop too",
+                 c.js("document.getElementById('whole-photo').disabled && document.getElementById('adjust').disabled && document.getElementById('crop-btn').disabled") is True)
             case("v27 browser: nothing went wrong on the page through the photo's buttons", not c.page_errors(), c.page_errors()[:3])
+
+            # ---- Crop (B11) ----
+            def crop_open():
+                return c.js("!!(Designer.crop && Designer.crop.isOpen())")
+
+            def box():
+                return Jx("Designer.crop.box()")
+
+            def img_layout(bid):
+                return Jx("(function(){ var n = document.querySelector('#strip .blk[data-id=\"" + str(bid) + "\"]'), i = n.querySelector('img'), b = DesignModel.find(Designer.st, " + str(bid) + "); "
+                          "var L = DesignModel.layoutImg(b, i.naturalWidth, i.naturalHeight), s = Designer.scale; return {dl: i.offsetLeft - L.left * s, dt: i.offsetTop - L.top * s, dw: i.offsetWidth - L.iw * s, dh: i.offsetHeight - L.ih * s}; })()")
+
+            put({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, 2, W + 100, 100, 800, 800)]})
+            rev3 = disk()["rev"]
+            c.click("#strip .blk[data-id='1']")
+            order = Jx("Array.from(document.querySelectorAll('#sel-crop button')).map(function(b){ return [b.id, b.textContent, b.title]; })")
+            case("v27 browser: the Crop group runs Show the whole photo, Crop (her tooltip), Move photo inside, then the empty-frame button (her order)",
+                 [o[1] for o in order][:3] == [HERS["whole"], HERS["crop"], "Move photo inside"] and order[1][0] == "crop-btn" and order[1][2] == HERS["crop_title"], order)
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            words = Jx("(function(){ var m = document.getElementById('crop'); return {open: !m.hidden, h2: m.querySelector('h2').textContent, hint: m.querySelector('p.hint').textContent, "
+                       "lock: document.querySelector('label.cr-chk').textContent.trim(), locked: document.getElementById('crop-lock').checked, all: document.getElementById('crop-all').textContent, "
+                       "cancel: document.getElementById('crop-cancel').textContent, done: document.getElementById('crop-done').textContent, lockHint: document.getElementById('crop-hint').textContent, "
+                       "label: m.querySelector('[role=dialog]').getAttribute('aria-label'), focus: document.activeElement.id, src: document.getElementById('crop-img').getAttribute('src'), "
+                       "handles: Array.from(document.querySelectorAll('#crop-box i')).filter(function(i){ return getComputedStyle(i).display !== 'none'; }).map(function(i){ return i.dataset.h; }), "
+                       "z: Number(getComputedStyle(m).zIndex), sz: Number(getComputedStyle(document.getElementById('stage')).zIndex), "
+                       "over: (function(){ var r = document.getElementById('stage').getBoundingClientRect(); return m.contains(document.elementFromPoint(r.left + 20, r.top + 20)); })()}; })()")
+            case("v27 browser: Crop opens her window: her title, hint, Keep the frame's shape ticked, Show the whole photo, Cancel, Done, her untick hint; four corner handles only; Done has the keyboard",
+                 words["open"] and words["h2"] == "Crop" and words["hint"] == HERS["crop_hint"] and words["lock"] == HERS["crop_lock"] and words["locked"] and words["all"] == HERS["whole"]
+                 and words["cancel"] == HERS["crop_cancel"] and words["done"] == HERS["crop_done"] and words["lockHint"] == HERS["crop_lock_hint"] and words["label"] == "Crop the photo"
+                 and words["focus"] == "crop-done" and sorted(words["handles"]) == ["ne", "nw", "se", "sw"], words)
+            case("v27 browser: the window sits above the sticky stage (a press on the stage's corner lands in the window), and its picture is the made copy by number, no path",
+                 words["z"] > words["sz"] and words["over"] and words["src"].startswith("/kit-photo?") and "&n=1&size=l" in words["src"] and no_path(words["src"])[0], (words["z"], words["sz"], words["src"]))
+            nat1 = Jx("(function(){ var i = document.getElementById('crop-img'); return {w: i.naturalWidth, h: i.naturalHeight}; })()")
+            b_open = box()
+            want_box = Jx("DesignModel.cropFromBlock(DesignModel.find(Designer.st, 1), " + str(b_open["pw"]) + ", " + str(b_open["ph"]) + ")")
+            case("v27 browser: the box opens as what the frame shows now (a centred photo filling the slide: the largest box of the frame's shape, centred), of the photo's own shape",
+                 {k_: b_open[k_] for k_ in ("x", "y", "w", "h")} == want_box and abs(b_open["pw"] * nat1["h"] - b_open["ph"] * nat1["w"]) <= max(nat1["w"], nat1["h"]) and (b_open["h"] == 1 or b_open["w"] == 1), (b_open, want_box, nat1))
+            drawn = Jx("(function(){ var i = document.getElementById('crop-img'), b = document.getElementById('crop-box'); return {l: b.offsetLeft / i.clientWidth, t: b.offsetTop / i.clientHeight, w: b.offsetWidth / i.clientWidth, h: b.offsetHeight / i.clientHeight}; })()")
+            case("v27 browser: ... and the box is drawn over the picture at those fractions", all(abs(drawn[a] - b_open[b_]) < 0.01 for a, b_ in (("l", "x"), ("t", "y"), ("w", "w"), ("h", "h"))), (drawn, b_open))
+            hr = c.rect("#crop-box i[data-h=se]")
+            c.drag("#crop-box i[data-h=se]", (hr["cx"] - 90, hr["cy"] - 60), steps=10)
+            b1 = box()
+            kk = Jx("DesignModel.cropK(Designer.crop.box().ar, Designer.crop.box().pw, Designer.crop.box().ph)")
+            case("v27 browser: the se corner dragged in with the shape kept: the box is smaller, still the frame's shape, its nw corner where it was",
+                 b1["w"] < b_open["w"] and b1["h"] < b_open["h"] and abs(b1["w"] / b1["h"] - kk) < 0.01 and b1["x"] == b_open["x"] and b1["y"] == b_open["y"], (b1, kk))
+            c.drag("#crop-box", (c.rect("#crop-box")["cx"] + 40, c.rect("#crop-box")["cy"] + 30), steps=8)
+            b2 = box()
+            case("v27 browser: dragged inside the box: it moves, its size the same", b2["x"] > b1["x"] and b2["y"] > b1["y"] and b2["w"] == b1["w"] and b2["h"] == b1["h"], (b1, b2))
+            want = Jx("DesignModel.cropApply(DesignModel.find(Designer.st, 1), Designer.crop.box(), Designer.crop.box().pw, Designer.crop.box().ph, Designer.st.slides, true)")
+            c.click("#crop-done")
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            got = st()["blocks"][0]
+            case("v27 browser: Done: the frame shows exactly what was in the box (the model's cropApply: the same frame, a zoom past 1 and the crop), the window closed, her line beside the buttons, the photo still selected",
+                 {k_: got[k_] for k_ in want} == want and got["zoom"] > 1.2 and got["x"] == 0 and got["w"] == W and sel_line() == HERS["cropped"] and c.js("Designer.sel") == 1, (got, want, sel_line()))
+            lay = img_layout(1)
+            case("v27 browser: ... and the strip draws the photo inside its frame from that zoom and crop (the picture's place and size follow layoutImg)", all(abs(v) <= 1.5 for v in lay.values()), lay)
+            case("v27 browser: ... saved as one change (rev + 1)", settled() and disk()["rev"] == rev3 + 1 and disk()["state"]["blocks"][0]["zoom"] == got["zoom"], disk()["rev"])
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            b3 = box()
+            case("v27 browser: Crop opened again: the box is the one Done made (the round trip)", all(abs(b3[k_] - b2[k_]) < 0.002 for k_ in ("x", "y", "w", "h")), (b2, b3))
+            c.key("Escape")
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            case("v27 browser: Escape closes the window and changes nothing", st()["blocks"][0] == got and c.js("Designer.crop.box()") is None)
+            c.click("#undo")
+            case("v27 browser: Undo takes the crop back", st()["blocks"][0] == _frame(1, 1, 0), st()["blocks"][0])
+            # unlocked: eight handles, and the frame takes the box's shape
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            c.click("#crop-lock")
+            handles = Jx("Array.from(document.querySelectorAll('#crop-box i')).filter(function(i){ return getComputedStyle(i).display !== 'none'; }).map(function(i){ return i.dataset.h; })")
+            case("v27 browser: Keep the frame's shape unticked: eight handles", sorted(handles) == ["e", "n", "ne", "nw", "s", "se", "sw", "w"], handles)
+            b4 = box()
+            hr = c.rect("#crop-box i[data-h=e]")
+            c.drag("#crop-box i[data-h=e]", (hr["cx"] - 120, hr["cy"]), steps=10)
+            b5 = box()
+            case("v27 browser: the e side dragged in: the box is narrower, as tall as it was", b5["w"] < b4["w"] - 0.05 and b5["h"] == b4["h"] and b5["x"] == b4["x"], (b4, b5))
+            want = Jx("DesignModel.cropApply(DesignModel.find(Designer.st, 1), Designer.crop.box(), Designer.crop.box().pw, Designer.crop.box().ph, Designer.st.slides, false)")
+            c.click("#crop-done")
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            got2 = st()["blocks"][0]
+            case("v27 browser: Done unticked: the frame takes the box's shape inside the space it had, around the same middle (narrower than the slide, centred on it), her line",
+                 {k_: got2[k_] for k_ in want} == want and got2["w"] < W and abs(got2["x"] + got2["w"] / 2 - W / 2) < 1 and got2["h"] == H and abs(got2["w"] / got2["h"] - (b5["w"] * b5["pw"]) / (b5["h"] * b5["ph"])) < 0.01
+                 and sel_line() == HERS["cropped"], (got2, want))
+            case("v27 browser: ... the strip draws it so", all(abs(v) <= 1.5 for v in img_layout(1).values()), img_layout(1))
+            case("v27 browser: ... saved", settled())
+            c.click("#undo")
+            # Show the whole photo inside the window, Cancel, a press beside the window
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            hr = c.rect("#crop-box i[data-h=se]")
+            c.drag("#crop-box i[data-h=se]", (hr["cx"] - 90, hr["cy"] - 60), steps=8)
+            c.click("#crop-all")
+            b6 = box()
+            # (the strip now draws from the sharper copy, whose shape is the photo's to within a pixel, so the box is the same to a few thousandths)
+            case("v27 browser: Show the whole photo in the window, the shape kept: the largest box of the frame's shape, centred", all(abs(b6[k_] - want_box[k_]) < 0.003 for k_ in ("x", "y", "w", "h")), (b6, want_box))
+            c.click("#crop-lock")
+            c.click("#crop-all")
+            b7 = box()
+            case("v27 browser: ... and unticked: the whole photo, edge to edge", {k_: b7[k_] for k_ in ("x", "y", "w", "h")} == {"x": 0, "y": 0, "w": 1, "h": 1}, b7)
+            c.click("#crop-lock")
+            b8 = box()
+            case("v27 browser: ticked again: the box takes the frame's shape around its middle", all(abs(b8[k_] - want_box[k_]) < 0.003 for k_ in ("x", "y", "w", "h")), b8)
+            c.click("#crop-cancel")
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            case("v27 browser: Cancel closes the window and changes nothing", st()["blocks"][0] == _frame(1, 1, 0) and c.js("Designer.crop.box()") is None)
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            hr = c.rect("#crop-box i[data-h=se]")
+            c.drag("#crop-box i[data-h=se]", (hr["cx"] - 90, hr["cy"] - 60), steps=8)
+            c.click((6, 6))
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            case("v27 browser: a press beside the window closes it and changes nothing", st()["blocks"][0] == _frame(1, 1, 0) and settled())
+            # a zoom past the slider, kept and drawn
+            put({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, zoom=25, ox=0.1, oy=0.1), _frame(2, 2, W + 100, 100, 800, 800)]})
+            c.click("#strip .blk[data-id='1']")
+            z = Jx("{slider: document.getElementById('zoom-img').value, zoom: Designer.st.blocks[0].zoom}")
+            case("v27 browser: a frame at zoom 25 (a 4% crop) is kept by the Assistant and drawn 25 times the frame; the Zoom slider sits at its end, 300",
+                 disk()["state"]["blocks"][0]["zoom"] == 25 and z == {"slider": "300", "zoom": 25} and all(abs(v) <= 1.5 for v in img_layout(1).values()), (z, img_layout(1)))
+            case("v27 browser: nothing went wrong on the page through the Crop window", not c.page_errors(), c.page_errors()[:3])
 
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")
@@ -1234,6 +1433,20 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
             c.click("#labels .lab:nth-child(40) .labp")
             case("v27 browser: at 40 stories + is refused with the stories' number", c.text("#slides-line") == "That's the most Instagram allows (40 stories). Remove one first.", c.text("#slides-line"))
+            # Crop on a story: her words in story words, and Done on a story
+            c.js("Designer.select(null); Designer.setState(" + json.dumps({"slides": 1, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, h=SH)]}) + ")")
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            c.click("#strip .blk[data-id='1']")
+            c.click("#crop-btn")
+            c.wait_for("Designer.crop.isOpen() && document.getElementById('crop-img').clientWidth > 0", 8)
+            words = Jx("{hint: document.querySelector('#crop p.hint').textContent, lockHint: document.getElementById('crop-hint').textContent, btn: document.getElementById('crop-btn').title}")
+            case("v27 browser: Crop on a story: her two hints end in story words (ours), the tooltip hers",
+                 words == {"hint": design.story_words(HERS["crop_hint"]), "lockHint": design.story_words(HERS["crop_lock_hint"]), "btn": HERS["crop_title"]} and words["hint"].endswith("on your story."), words)
+            hr = c.rect("#crop-box i[data-h=nw]")
+            c.drag("#crop-box i[data-h=nw]", (hr["cx"] + 60, hr["cy"] + 90), steps=8)
+            c.click("#crop-done")
+            c.wait_for("!Designer.crop.isOpen()", 5)
+            case("v27 browser: Done on a story: the story's frame as it was, a zoom past 1, her line", st()["blocks"][0]["zoom"] > 1.1 and st()["blocks"][0]["h"] == SH and c.text("#selline") == HERS["cropped"], (st()["blocks"][0], c.text("#selline")))
             case("v27 browser: nothing went wrong on the stories page", not c.page_errors(), c.page_errors()[:3])
     finally:
         srv.stop()

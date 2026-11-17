@@ -156,7 +156,8 @@ name: Check it on a Windows PC
 #                                   tried, in pc_design.py), in a hidden Chrome, one at a time under the guard.
 #                                   None of these has run on GitHub yet: the first push is the test.
 #   tests/design_v27_check.py       Nicole's v27 for both designers, in "mac-page" too: the ask box and design.py note / fill
-#                                   on a carousel, her three story collages, Open folder, the [hidden] rule, the real page.
+#                                   on a carousel, her three story collages, Open folder, the [hidden] rule, slides as things,
+#                                   Show the whole photo, the Crop window; the real page.
 #   tests/design_v26_check.py       Nicole's v26 for the stories designer, in "mac-page" too (it draws its pretend kits
 #                                   with the Mac's sips): sets of stories, the note and the line of "Let my assistant
 #                                   choose the photos", design.py story-note and story-fill, her four story templates
@@ -597,7 +598,7 @@ jobs:
       - name: Nicole's v26 for the stories designer (sets of stories, Let my assistant choose with story-note and story-fill, her four templates, Redo, the x on a story's label; the real page)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_v26_check.py --work /private/tmp/design-v26-ci
-      - name: Nicole's v27 for the designer (the ask box and the fill command on a carousel, her three story collages, Open folder always there, the [hidden] rule; the real page)
+      - name: Nicole's v27 for the designer (the ask box and the fill command on a carousel, her three story collages, Open folder always there, the [hidden] rule, slides as things, Show the whole photo, the Crop window; the real page)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_v27_check.py --work /private/tmp/design-v27-ci
       - name: The post kit's cards (her three cards, and the preview of a design whose slides aren't saved yet)
