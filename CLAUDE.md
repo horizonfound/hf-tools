@@ -688,3 +688,17 @@ Dustin on sales page C: the dark navy "feels a little too tech"; "a lighter back
 **The color story is chosen, for now: "Honey, palm and butter" (Dustin, Nov 14: "Honey, palm and butter is amazing").** The values are in the note just above and in `docs/sales-page/gold-mix-2026-11-14.json`. Nicole has not been heard on it. Next: sales page C recolored in it as a new board beside the dark one; the Assistant's own pages (`look.py`) are not changed until Dustin says so.
 
 **Sales page C exists in the chosen colors (Nov 14):** `docs/sales-page/SystemC-honey.dc.html`, a seventh board on the canvas beside the dark C, which is kept. Same page, words and motion; every navy section is light, words are dark, buttons are gold with dark words, and the only dark area is the footer strip. Checked in a stand-in browser only; hover colors, phone width and things in motion were recolored by rule and not looked at. A and B are not recolored.
+
+## Updates from GitHub, tested on Dustin's account (Nov 17, 2am): the button works, automatic sync does not
+
+Dustin and the cloud session ran the Nov 7 test plan (`docs/plugin-updates-2026-11-07.md`) with two tiny test pushes (b35b985, 1d9b565; the test file is removed again).
+
+- **Before the test** his account's copy of hf-tools was still 49ca478, the Oct 16 "0.2.4" commit, with **Sync automatically already on** and the Claude GitHub App installed on the horizonfound account for a month (all repositories). So nothing had arrived by itself in a month.
+- **Check for updates works** (claude.ai in a browser: Plugins, Add, Manage marketplaces, "..." on hf-tools). It went to b35b985 at once, with a notice: "Executable files or settings may differ from the version you were using before this sync." The setup guide should mention that notice.
+- **Automatic sync did not fire** even right after a manual sync: test 2 sat for nine minutes; the button then brought it in.
+- **The Assistant was not installed on his account at all** (only the marketplace was). He added it from its page on claude.ai (search "Assistant", **Add**; it shows "From hf-tools"). It reached a running cloud session within about a minute.
+- **After the button, a new Code conversation in the desktop app (an empty folder) read "update test 2".** A conversation already running keeps the copy it started with.
+- **So for a customer today:** install from the marketplace once; for each update press Check for updates, then start a new conversation. Nothing arrives by itself.
+- **Not tried:** a customer's account (one that does not own the GitHub project; Nicole's is the next test, after she is on the newest version); pressing the button in the desktop app instead of the browser; whether a copy uploaded as a file and a marketplace copy clash; a PC.
+- **Dustin and Nicole's to choose:** ship with the button and say so in the guide; Anthropic's plugin directory (the only route documented as automatic: a public listing, a review of unknown length, a LICENSE file); or the Assistant setting up Claude Code's own updater on the customer's computer (undocumented for the desktop app, not built). Dustin's stated top priority is getting updates to arrive by themselves.
+- Also seen on the GitHub page: the Claude app there has read and write access to code on all of horizonfound's repositories, and asks to "Review request" for updated permissions. Left untouched.
