@@ -1093,6 +1093,19 @@ def check_save_one(case, work, env, kit, kit_name, studio, run, A, get_json, P, 
     code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000005", "rev": r, "count": 3, "one": 1}))
     case("v27 server: ... the next press finishes it under the name written down, and says so",
          code == 200 and out.get("file") == "Dune day carousel 1 - slide 01 updated.jpg" and (car_dir / out.get("file", "x")).read_bytes() == one and jrn(A, "v27one0000005")["state"] == "done", out)
+    # a save cut off after its record, whose staged slide is then gone and a file of THEIRS sits under the name written down:
+    # the next commit finds a file there that is not the slide (by its hash) and refuses; theirs is never taken for the slide
+    ask(P, "POST", f"/design-slide?kit={KQ}&design={A}&set=v27one0000010&i=3&of=3", body=two, headers=JH)
+    code, o = run(env_stop, "design.py", "commit", kit_name, "--design", A, "--set", "v27one0000010", "--rev", str(r), "--one", "3")
+    j10 = jrn(A, "v27one0000010")
+    theirs = car_dir / "Dune day carousel 1 - slide 03 updated.jpg"
+    if case("v27 server: (another save stopped dead after its record, for slide 3)", code == 9 and j10 and j10["state"] == "moving" and j10["files"][0]["final"] == theirs.name, (code, j10 and j10.get("state"))):
+        (kit / ".kit" / "design-staging" / f"{A}-v27one0000010" / "slide-03.jpg").unlink()      # the Assistant's own staged copy, gone (a pretend mishap)
+        theirs.write_bytes(b"a picture of theirs under that very name")
+        code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000010", "rev": r, "count": 3, "one": 3}))
+        case("v27 server: ... the next press finds their file under the name and refuses (the record is put back as undone, then the press finds nothing staged: why missing, her clause): their file is never taken for the slide, and is untouched",
+             code == 400 and out.get("ok") is False and out.get("why") in ("clash", "missing") and out.get("words") == design.ONE_WHY[out.get("why")] and theirs.read_bytes() == b"a picture of theirs under that very name"
+             and jrn(A, "v27one0000010")["state"] == "undone" and not (car_dir / "Dune day carousel 1 - slide 03 updated 2.jpg").exists(), (code, out))
     code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27set0000009", "rev": r, "count": 3}))
     case("v27 server: Save slides after single saves, with the layout as the set was saved from: \"Already saved as ...\" still (a single slide is not a set and changes none)",
          code == 200 and out.get("already") is True and out.get("base") == "Dune day carousel 1", out)
