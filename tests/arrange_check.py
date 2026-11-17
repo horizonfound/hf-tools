@@ -2077,7 +2077,10 @@ def check_carousel(work, port):
         code, h, data = ask(P, "GET", f"/arrange.html?kit={KQ}&piece=carousel")
         case("the carousel's picker still opens when asked for by name", code == 200 and b"data-piece='carousel'" in data, code)
         code, h, data = ask(P, "GET", html.unescape(links[0])) if len(links) == 2 else (0, {}, b"")
-        case("the Reel card opens the reel page (her reel maker)", code == 200 and "Put your photos in order".encode() in data, code)
+        case("the Reel card opens the reel page on her v27 chooser (Which reel do you want to create?), no step on it yet",
+             code == 200 and "Which reel do you want to create?".encode() in data and "Choose your photos".encode() not in data, code)
+        code, h, data = ask(P, "GET", html.unescape(links[0]) + "&kind=photos") if len(links) == 2 else (0, {}, b"")
+        case("...and a kind chosen (Just photos) is her reel maker, with its step Choose your photos", code == 200 and "Choose your photos".encode() in data, code)
         opened = tree_print(kit)
         case("opening the reel page added only its own lock to the kit (an empty file every writer of its record holds)",
              sorted(set(opened) - set(after)) == [".kit/reel-page.lock"] and all(opened[k] == v for k, v in after.items()), sorted(set(opened) ^ set(after)))
