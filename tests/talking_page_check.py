@@ -153,7 +153,7 @@ HERS_NOT_OURS = {
     # her v27 crumbs (section 7): the path at the top of every post kit page is Lane D's (look.crumbs); the
     # talking page calls it in item C8. Her crumbs script (two steps, Reels and Talking to camera) is taken out
     # before her lines are read (HER_CRUMBS); her nav's label stays and is named here.
-    "Where you are": "the crumbs nav's label: Lane D's crumbs, called from this page in C8",
+    "Where you are": "the crumbs nav's label: look.CRUMB_WORDS (Lane D's), drawn by look.crumbs, which this page calls (C8)",
     # her v27 fix box: her hover line as her template splits it (the attribute's name and the line's start); ours is
     # the whole line, fixed_title, set as an attribute with the heard word filled in as text
     'title="You fixed this. It was heard as "': "her hover line's first piece: ours is talking_page.WORDS fixed_title, whole (C2)",
@@ -456,6 +456,11 @@ def check_words(s):
          tp.OUR_WORDS["asking_note"][0] == s.TR.APPLE_NOTE and "asking_note" not in w and "only ask your Mac to do it by itself" in s.TR.APPLE_NOTE
          and "stop if it can't" in s.TR.APPLE_NOTE and not re.search(r"nothing leaves|never sent|not sent|isn't sent", s.TR.APPLE_NOTE))
     case("no key is both hers and ours", not set(w) & set(tp.OUR_WORDS), sorted(set(w) & set(tp.OUR_WORDS)))
+    if HERS27 is not None:
+        crumbs_line = HER_CRUMBS.search((HERS27 / "pages" / "talking-reel.html").read_text(encoding="utf-8"))
+        case("the two steps of the path this page adds after the post kit are her crumbs call's, word for word (Reels, Talking to camera); Home and the kit's crumb are Lane D's look",
+             bool(crumbs_line) and all("'%s'" % v in crumbs_line.group(0) for v in tp.CRUMB_WORDS.values()) and set(tp.CRUMB_WORDS) == {"reels", "here"}
+             and s.tp.look.CRUMB_WORDS["home"] == "Home" and s.tp.look.CRUMB_WORDS["where"] == "Where you are", crumbs_line.group(0) if crumbs_line else None)
     case("her engine's and her server's lines are the very ones talking_rec sends",
          all(w["job_" + k] == v for k, v in s.TR.JOB_WORDS.items()) and all(w["make_" + k] == v for k, v in s.TR.MAKE_WORDS.items()))
     case("her times: a look every 3 seconds, a toast for 2.6, 60 steps of Undo, a save of up to 200,000 bytes",
@@ -581,7 +586,18 @@ def check_built(s):
     case("her Open CapCut (v27) sits in the bar before Make it in CapCut, hidden until this reel has been made, with her rule for it",
          "<button class='btn' id='openCC' type='button' hidden>Open CapCut</button><button class='btn main' id='makeBtn'" in body
          and "#openCC{margin-left:auto;margin-right:.55rem}#openCC[hidden]{display:none!important}" in css)
-    case("the Back to the post kit link goes to this shoot's kit page", "href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'" in body)
+    case("the Back to the post kit link goes to this shoot's kit page, and is hidden as on her v27 page",
+         "<a class='homelink' id='back' style='display:none' href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'>" in body)
+    # her v27 path at the top: Home › <shoot> post kit › Reels › Talking to camera, inside the one .bar, after her hidden pill
+    bar = re.search(r"<div class='bar'>(.*?)</div><header", body, re.S)
+    nav = re.search(r"<nav class='crumbs' aria-label='([^']*)'>(.*?)</nav>", bar.group(1) if bar else "", re.S)
+    steps = re.findall(r"<a href='([^']*)'>([^<]*)</a>|<span class='here'( aria-current='page')?>([^<]*)</span>", nav.group(2)) if nav else []
+    case("the path at the top (v27): Home › <shoot> post kit › Reels › Talking to camera, built by look.crumbs inside the bar, every step but the last a link, the last where you are",
+         bool(nav) and nav.group(1) == "Where you are" and [(h, t) for h, t, _c, _s in steps if h] == [("/home", "Home"), ("/content/" + quote(KIT, safe="") + "/Post%20kit.html", html.escape(SHORT + " post kit")), ("/reel.html?kit=" + quote(KIT, safe=""), "Reels")]
+         and [(c_, s_) for h, t, c_, s_ in steps if not h] == [(" aria-current='page'", "Talking to camera")] and nav.group(2).count("class='sep'") == 3, steps)
+    case("...its links are paths of this server, the kit by its folder name: no address, no path on the disk",
+         bool(nav) and "://" not in nav.group(0) and str(s.work) not in nav.group(0) and "Your Content" not in nav.group(0))
+    case("...and her Back pill comes before it in the bar, then the Assistant's own name", bool(bar) and 0 < bar.group(1).find("id='back'") < bar.group(1).find("<nav class='crumbs'") < bar.group(1).find("The Assistant"))
     case("the page's files stay readable: each script file is one string and nothing else",
          all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"], sys.modules["talking_js_timeline"])))
     new = ("talking_page.py", "talking_css.py", "talking_js_core.py", "talking_js_step1.py", "talking_js_script.py", "talking_js_pick.py",
@@ -977,6 +993,12 @@ def check_page(c, s):
          and c.text("#sum") == "Add your video to start" and c.js("document.getElementById('makeBtn').disabled"), (c.text("#vids"), status(c), c.text("#sum")))
     case("...steps 2 and 3 and the timeline are not shown, nor either line to copy",
          c.js("['editStep','capStep','tl','askCut','placeAsk'].every(function(i){ return document.getElementById(i).hidden; })"))
+    crumbs = c.js("(function(){ var n = document.querySelector('.bar nav.crumbs'); if (!n) return null;"
+                  " return {shown: !!n.offsetParent, steps: Array.from(n.querySelectorAll('a, .here')).map(function(e){ return [e.tagName, e.textContent, e.getAttribute('href'), e.getAttribute('aria-current')]; }),"
+                  " back: document.getElementById('back').offsetParent === null && getComputedStyle(document.getElementById('back')).display === 'none'}; })()")
+    case("the path at the top shows on the page (Home › <shoot> post kit › Reels › Talking to camera), the last step not a link, and her Back pill is hidden",
+         crumbs is not None and crumbs["shown"] and crumbs["back"] and crumbs["steps"] == [["A", "Home", "/home", None], ["A", SHORT + " post kit", "/content/" + quote(KIT, safe="") + "/Post%20kit.html", None],
+                                                                                          ["A", "Reels", "/reel.html?kit=" + quote(KIT, safe=""), None], ["SPAN", "Talking to camera", None, "page"]], crumbs)
     case("the dock's room is measured into the page (the make bar never covers the last of it)",
          c.js("parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dock')) === document.getElementById('dock').offsetHeight && parseInt(document.body.style.paddingBottom) === document.getElementById('dock').offsetHeight + 24"))
     c.click("#addVideo")

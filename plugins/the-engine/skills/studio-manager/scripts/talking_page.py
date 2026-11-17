@@ -50,6 +50,11 @@ the reel page's record never rewritten; asked ONLY when the picker opens, since 
 ready), /reel-video, /reel-strip, /reel-open {what: "footage"}. The photos are the pickers' small copies
 (/kit-photo, by number); which photos there are rides on every whole state ("photos", see _to_draw).
 
+The path at the top (her v27, section 7; her page line 252: C([[C.postKit, C.kit], ['Reels', C.reels], ['Talking to
+camera', null]])): Home › <shoot> post kit › Reels › Talking to camera, built by look.crumbs (Lane D's, with its
+CSS and her Home link), the two steps after the post kit this page's own (CRUMB_WORDS). Her Back pill stays in
+the bar, hidden, as on her page. Reels links to the reel page of the same shoot (the chooser, once that lands).
+
 A Mac and a PC: the page opens on both. On a PC Edit my video answers this_computer.NO_TALKING_PC at once (a named
 gap); "Finder" reads File Explorer and the two Undo tooltips name Ctrl.
 """
@@ -311,6 +316,10 @@ REELS_WORDS = dict({k: v for k, v in reel_page.REELS_WORDS.items() if k not in (
                    reels_new="+ Start a new talking reel",
                    reels_first=TR.TALK_FIRST,
                    reels_still_script=TR.STILL_SCRIPT)
+
+# The path at the top (her v27 crumbs.js, called on her page as [[post kit, kit], ['Reels', reels], ['Talking to
+# camera', null]]): her two steps after the post kit, word for word; Home and the kit's crumb are look.CRUMB_WORDS.
+CRUMB_WORDS = {"reels": "Reels", "here": "Talking to camera"}
 
 OUR_WORDS = {
     # several talking reels (v25): see reels.py; and a reel being made in CapCut is not left half way
@@ -920,8 +929,12 @@ def page_html(kit_name):
         "<style>" + look.head_css() + talking_css.css() + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
-        "<div class='bar'><a class='homelink' id='back' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
-        + e(w["back_kit"]) + "</a>" + brand.bar() + "</div>"
+        # her v27 bar: her Back pill kept and hidden (style="display:none", as hers), then the path at the top
+        # (look.crumbs: every link a path of this server, the kit by its folder name, never a path on the disk)
+        "<div class='bar'><a class='homelink' id='back' style='display:none' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
+        + e(w["back_kit"]) + "</a>"
+        + look.crumbs(look.kit_trail(kit_name) + [(CRUMB_WORDS["reels"], "/reel.html?kit=" + kq), (CRUMB_WORDS["here"], None)])
+        + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
         "<h1 id='title'>" + e(w["title"].replace("{short}", short)) + "<em>.</em></h1>"
         "<p class='lede'>" + e(w["lede"]) + "</p>" + reel_page.reels_bar(w) + "</header>"
