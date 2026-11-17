@@ -190,9 +190,9 @@ try:
     check("state: her keys, and ours beside them",
           {"ok", "folder", "videos", "working", "rec", "pieces", "zooms", "shots", "captions"} <= set(st)
           and {"rev", "stamp", "short", "coming", "video_state"} <= set(st), sorted(st))
-    check("state: rec holds what her page reads, and nothing else of ours",
+    check("state: rec holds what her page reads (made, v27: whether this reel was made, never which project), and nothing else of ours",
           set(st["rec"]) == {"words", "sentences", "cut", "video", "status", "step", "problem", "info", "transcribed", "claude_cut",
-                             "photo_mode", "cap_size", "captions", "updated", "kept_for"}
+                             "photo_mode", "cap_size", "captions", "updated", "kept_for", "made"} and st["rec"]["made"] is False
           and set(st["rec"]["words"][0]) == {"w", "start", "end"} and st["rec"]["info"] == {"dur": 3.0}, sorted(st["rec"]))
     check("state: videos are {key, name}; the record's video is its name; it is the one the script was made from",
           st["videos"] == [{"key": KEY1, "name": "my talk.mp4"}, {"key": talks[1]["key"], "name": "second take.MOV"}]
@@ -1090,6 +1090,31 @@ try:
     check("... load(kit, reel) shows the other reel's fixed word", TR.load(FK, "v1")["words"][4] == dict(WORDS[4], w="WERE", w0="were"))
     code, ans = TR.version_op(FK, {"op": "switch", "id": "v1"})
     check("... and switching back brings them up", code == 200 and frec()["fixes"] == {"4": "WERE"} and TR.state_for_page(FK)["rec"]["words"][4]["w"] == "WERE")
+    # Open CapCut (v27): the newest project made from the OPEN reel; each talking reel keeps its own made list
+    check("last_made: nothing made from this reel yet, and the page's state says so (rec.made, her REC.made.length)",
+          TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False)
+    rev_before = frec()["rev"]
+    TR.note_made(FK, "Aurora talking reel")
+    TR.note_made(FK, "Aurora talking reel 2")
+    stm = TR.state_for_page(FK)
+    check("last_made names the newest project made from the open reel; the state tells the page only THAT one was made, never a project's name; the counter did not move",
+          TR.last_made(FK) == "Aurora talking reel 2" and stm["rec"]["made"] is True and "Aurora talking reel" not in json.dumps(stm) and frec()["rev"] == rev_before,
+          (TR.last_made(FK), stm["rec"].get("made"), frec()["rev"], rev_before))
+    code, ans = TR.version_op(FK, {"op": "switch", "id": "v2"})
+    check("another talking reel of the shoot has its own made list (none yet): last_made is None there and the page shows no Open CapCut, while the first reel's list is put away whole",
+          code == 200 and TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False
+          and [m["project"] for m in frec()["versions"][0]["data"]["made"]] == ["Aurora talking reel", "Aurora talking reel 2"], frec().get("versions"))
+    TR.note_made(FK, "Aurora talking reel 3")
+    check("... a make noted while it is open goes to it alone", TR.last_made(FK) == "Aurora talking reel 3" and TR.state_for_page(FK)["rec"]["made"] is True)
+    code, ans = TR.version_op(FK, {"op": "switch", "id": "v1"})
+    check("... and back on the first reel, its own newest", code == 200 and TR.last_made(FK) == "Aurora talking reel 2"
+          and [m["project"] for m in frec()["versions"][1]["data"]["made"]] == ["Aurora talking reel 3"])
+    TR.change(FK, lambda r: r.update(made=[{"project": 3}, "x", {"when": 1}, {"project": ""}]))
+    check("a record changed by hand: entries of made that don't name a project don't count, and the page shows no Open CapCut",
+          TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False)
+    TR.change(FK, lambda r: r.update(made="no"))
+    check("... made that isn't a list at all reads as none", TR.last_made(FK) is None and TR.state_for_page(FK)["ok"] and TR.state_for_page(FK)["rec"]["made"] is False)
+    TR.change(FK, lambda r: r.pop("made", None) and None)
     # a record changed by hand: fixes that aren't a map, or an entry that isn't a digit key and text, are left out
     TR.change(FK, lambda r: r.update(fixes={"4": "WERE", "x": "no", "5": 3, "99": "far"}))
     stf = TR.state_for_page(FK)

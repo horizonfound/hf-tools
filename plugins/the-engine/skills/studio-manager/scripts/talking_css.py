@@ -209,6 +209,7 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .make{background:var(--paper);border-top:1px solid var(--line)}
 .make .in{max-width:1180px;margin:0 auto;padding:.7rem clamp(16px,4vw,40px);display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .make .sum{font-size:14px;color:var(--ink-2)}.make .sum b{color:var(--ink)}
+#openCC{margin-left:auto;margin-right:.55rem}#openCC[hidden]{display:none!important}
 .result{margin-top:1rem}
 .result p{margin:.2rem 0}
 .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6rem 1rem;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:70;max-width:90vw;text-align:center}

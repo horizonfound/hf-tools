@@ -123,9 +123,11 @@ window.__pickWords = function(a, b){
   s.removeAllRanges(); s.addRange(r);
 };
 window.__result = function(){
-  var r = document.getElementById('result');
+  var r = document.getElementById('result'), b = r.querySelector('p.say b'), cc = r.querySelector('#openCC2'), sp = r.querySelector('#openCCsay');
   return {h2: r.querySelector('h2') ? r.querySelector('h2').textContent : null, ps: Array.from(r.querySelectorAll('p')).map(function(p){ return [p.className, p.textContent]; }),
-          kids: r.querySelectorAll('p *').length, btn: [document.getElementById('makeBtn').textContent, document.getElementById('makeBtn').disabled]};
+          kids: r.querySelectorAll('p *').length, btn: [document.getElementById('makeBtn').textContent, document.getElementById('makeBtn').disabled],
+          b: b ? b.textContent : null, bkids: b ? b.children.length : null, cc: cc ? [cc.textContent, cc.className, cc.type] : null, ccsay: sp ? [sp.textContent, sp.className] : null,
+          bar: document.getElementById('openCC').hidden};
 };
 """
 
@@ -793,6 +795,7 @@ def run_page(t, c, s):
     before = set(os.listdir(str(store)))
     save_js({"captions": False})
     n_undo, rev0 = tools()["n"], rev()
+    bar_before = c.js("window.__result().bar")
     c.click("#makeBtn", check=False)
     first = c.js("window.__result().btn")
     c.wait_for("window.__result().h2 !== null || window.__result().ps.length > 0", 60, tell="JSON.stringify(window.__tl())")
@@ -801,8 +804,41 @@ def run_page(t, c, s):
     name = SHORT + " talking reel"
     case("Make it in CapCut: the button reads \"Making it…\" and is off while the job works",
          first == [W["making"], True], first)
-    case("...then her result box: \"It's in CapCut\", the maker's one line naming the project, and \"Open CapCut, give your captions your look, and export.\"",
-         res["h2"] == W["made_h2"] and [p_[1] for p_ in res["ps"]] == [talking_make.MADE_LISTED.replace("{project}", name), W["made_say"]] and res["ps"][-1][0] == "say" and res["kids"] == 0, res)
+    say_line = W["made_say"].replace("{b}", "").replace("{eb}", "").replace("{project}", name)
+    case("...then her result box (v27): \"It's in CapCut\", the maker's one line naming the project, her say line with the project to click in bold, as text, then her Open CapCut and an empty span beside it",
+         res["h2"] == W["made_h2"] and res["ps"] == [["", talking_make.MADE_LISTED.replace("{project}", name)], ["say", say_line], ["", W["open_capcut"] + " "]]
+         and res["b"] == name and res["bkids"] == 0 and res["kids"] == 3 and res["cc"] == [W["open_capcut"], "btn main", "button"] and res["ccsay"] == ["", "say sm"], res)
+    case("Open CapCut was not in the bar before this reel was made, and is from the moment the box arrives", bar_before is True and res["bar"] is False, (bar_before, res["bar"]))
+    c.js("(function(){ var real = window.fetch, n = window.__cc = {posts: 0, bodies: []}; window.fetch = function(u, o){"
+         " if (String(u).indexOf('/talking-capcut') >= 0) { n.posts++; n.bodies.push(o && o.body); } return real.apply(this, arguments); }; })()")
+    c.click("#openCC2", check=False)
+    c.wait_for("window.__result().ccsay[0] !== ''", 10, tell="JSON.stringify(window.__result())")
+    cc = c.js("window.__cc")
+    case("the box's Open CapCut asks /talking-capcut with the kit and nothing else, and her line lands in the span beside it (CapCut never started: the test's switch)",
+         c.js("window.__result().ccsay[0]") == W["capcut_opening_say"] and cc["posts"] == 1 and json.loads(cc["bodies"][0]) == {"kit": KIT}, (cc, c.js("window.__result().ccsay")))
+    c.js("document.getElementById('toast').classList.remove('on'); 1")
+    c.click("#openCC")
+    c.wait_for("document.getElementById('toast').classList.contains('on')", 5)
+    case("the bar's Open CapCut asks the same and says her shorter line as a toast", toast() == W["capcut_opening_toast"] and c.js("window.__cc.posts") == 2, toast())
+    c.block_urls(["*talking-capcut*"])
+    try:
+        c.js("document.getElementById('openCCsay').textContent = ''")
+        c.click("#openCC2", check=False)
+        c.wait_for("window.__result().ccsay[0] !== ''", 10, tell="JSON.stringify(window.__result())")
+        case("the Assistant out of reach at the press: plain words in the span, nothing else changes", c.js("window.__result().ccsay[0]") == s.tp.OUR_WORDS["cant_reach"][0] and res["bar"] is False)
+    finally:
+        c.block_urls([])
+    c.js("window.__post0 = window.Talk.post; window.Talk.post = (function(real){ return function(p, b){ return p === '/talking-capcut' ? Promise.resolve({code: 200, j: {ok: false, words: 'not <b>now</b>'}}) : real(p, b); }; })(window.Talk.post)")
+    c.click("#openCC", check=False)
+    c.wait_for("document.getElementById('toast').textContent === 'not <b>now</b>'", 5)
+    case("a refusal from the Assistant is shown as text, in the toast from the bar", toast() == "not <b>now</b>" and c.js("document.querySelectorAll('#toast b').length") == 0)
+    c.js("window.Talk.post = (function(real){ return function(p, b){ return p === '/talking-capcut' ? Promise.resolve({code: 200, j: {ok: true, words: %s + ' If it isn\\'t in the list, quit CapCut and press Open CapCut again, and I\\'ll add it.'}}) : real(p, b); }; })(window.Talk.post)" % json.dumps(W["capcut_opening_say"]))
+    c.click("#openCC", check=False)
+    c.wait_for("document.getElementById('toast').textContent.indexOf('quit CapCut') > 0", 5)
+    case("...and a note the Assistant adds after her line (a reel that was waiting for CapCut's list) is kept after her toast line",
+         toast() == W["capcut_opening_toast"] + " If it isn't in the list, quit CapCut and press Open CapCut again, and I'll add it.", toast())
+    c.js("window.Talk.post = window.__post0; 1")
+    case("...the page's own post is back", c.js("window.Talk.post === window.__post0 && typeof window.Talk.post === 'function'"))
     case("...the project is in the (pretend) CapCut folder under the shoot's short name, and the button is back", name in made and res["btn"] == [W["make"], False] and tl()["making"] is None, (made, res["btn"]))
     case("...the record notes what was made, and its counter did NOT move: Undo is as live as it was", [m_["project"] for m_ in rec().get("made") or []] == [name] and rev() == rev0
          and tools()["n"] == n_undo and tools()["undo"] is False, (rec().get("made"), rev(), rev0, tools()["n"]))
@@ -812,6 +848,13 @@ def run_page(t, c, s):
     c.click("#tlUndo", check=False)
     moved(was)
     case("...and Undo still undoes", rec().get("captions") is False and toast() == W["undone"])
+    open_it()
+    case("the page opened again: Open CapCut is in the bar from the record's note alone (made before: CapCut is one click away), and no result box",
+         c.js("window.__result().bar") is False and c.js("window.__result().h2") is None and c.js("window.Talk.REC.made") is True)
+    c.js("window.Talk.REC.made = false; window.Talk.emit('apply', {ready: true, changed: false}); 1")
+    case("...and it hides again when the record says this reel was not made (another reel's page starts afresh)", c.js("window.__result().bar") is True)
+    c.js("window.Talk.poll(true)")
+    c.wait_for("window.Talk.REC.made === true", 10)
     texts = c.js(t.READ_TEXT)
     ok = t.allowed_text(s, extra=set(SAID) | {SHORT, TALK, FOOT, "❚❚", "you're", "×", "▶"})
     stray = [x_ for x_ in texts if not ok(x_) and not theirs(x_) and not tick.fullmatch(x_) and not re.fullmatch(r"\d:\d\d\.\d / \d:\d\d\.\d", x_)]

@@ -41,6 +41,10 @@ its folder name; everything wrapped so the server stays up):
     POST /talking-make  {kit[, dry]}     Make it in CapCut, in a job of its own (talking_rec.start_make); the page
                                          then asks /talking-state how it stands ("make") and shows her result box.
                                          `dry: true` (hers too; her page never sends it) plans and writes nothing
+    POST /talking-capcut {kit}           Open CapCut (her v27: the bar's button once a reel was made, and the
+                                         result box's): the reel page's road, posting_queue.open_capcut, naming
+                                         the open reel's newest project; her "I couldn't open CapCut." when this
+                                         reel was never made (open_capcut_for_page)
 The video picker uses the reel page's own routes: /reel-footage?kit=&for=talking (the list only: no "not ready",
 the reel page's record never rewritten; asked ONLY when the picker opens, since asking gets every Footage video
 ready), /reel-video, /reel-strip, /reel-open {what: "footage"}. The photos are the pickers' small copies
@@ -51,6 +55,7 @@ gap); "Finder" reads File Explorer and the two Undo tooltips name Ctrl.
 """
 import html
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -73,7 +78,7 @@ import talking_js_preview  # noqa: E402
 import talking_js_timeline  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
-POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version")
+POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version", "/talking-capcut")
 SAVE_CAP = 200000            # hers: a save may be this big (2000 cuts and 500 stretches)
 LOOK_EVERY_MS = 3000         # hers: the page looks for the assistant's cut, and a finished script, every 3 seconds
 TOAST_MS = 2600              # hers
@@ -278,7 +283,15 @@ WORDS = {
     "make": "Make it in CapCut",
     "making": "Making it…",
     "made_h2": "It's in CapCut",
-    "made_say": "Open CapCut, give your captions your look, and export.",
+    # v27: the say line names the project to click (her <b>${esc(r.project || 'your new project')}</b>)
+    "made_say": "Open CapCut, click {b}{project}{eb} at the top of your projects, give your captions your look, and export.",
+    "made_project_fallback": "your new project",
+    # v27: Open CapCut, in the bar once a reel was made and in the result box (her openCapCut and /capcut/open)
+    "open_capcut": "Open CapCut",
+    "capcut_opening_say": "CapCut is opening. Your newest project is at the top of the list.",     # the box's span
+    "capcut_opening_toast": "CapCut is opening. Your newest project is at the top.",             # the bar's toast
+    "capcut_cant": "I couldn't open CapCut.",
+    "capcut_missing": "CapCut doesn't seem to be on this Mac. It's free from capcut.com.",      # her server's; a Mac only
     # the one line her maker prints into the result box (talking_capcut.py; ours is talking_make.MADE_LISTED and
     # MADE_OPEN, the very same words: the test holds the two together)
     "made_listed": "Made \"{project}\" in CapCut. Open CapCut and it's at the top of your projects.",
@@ -659,8 +672,46 @@ def version_from_page(body):
     return TR.version_op(kit, {k: v for k, v in body.items() if k != "kit"})
 
 
+def open_capcut_for_page(body):
+    """POST /talking-capcut {kit}: Open CapCut (her v27 /capcut/open, which only runs `open -a CapCut`). Ours goes the
+    reel page's road (reel_page.open_capcut_for_page): posting_queue.open_capcut -> capcut.open_capcut, which starts
+    CapCut on a Mac or a PC, first adds a reel still waiting for CapCut's list when CapCut is surely closed, says
+    "taking a while" when the Mac's open was slow, and names the project to click. The project named is the open
+    talking reel's newest make (talking_rec.last_made); her "I couldn't open CapCut." when this reel was never
+    made (her route would open CapCut anyway; the page's button is hidden then, so only a crafted request gets
+    here). What worked reads her line (capcut_opening_say, with capcut.py's note after it when a reel was
+    waiting); a Mac with no CapCut reads her line too; everything else is posting_queue's own plain words (a PC,
+    a slow start, CapCut there but not starting). reel_page.TEST_CAPCUT: CapCut is never started from a test.
+    Answers {ok, words}."""
+    kit, bad = _kit_only(body)
+    if bad:
+        return bad
+    try:
+        project = TR.last_made(kit)
+    except TR.Unreadable:
+        return 200, {"ok": False, "words": TR.TROUBLE}
+    if not project:
+        return 200, {"ok": False, "words": WORDS["capcut_cant"]}
+    if os.environ.get(reel_page.TEST_CAPCUT):
+        arrange.log("talking page (test): would open CapCut")
+        return 200, {"ok": True, "words": WORDS["capcut_opening_say"]}
+    import posting_queue
+    ok, said = posting_queue.open_capcut({"reel": {"project": project}}, ok_words=WORDS["capcut_opening_say"],
+                                         button=WORDS["open_capcut"])
+    if ok:
+        return 200, {"ok": True, "words": said or WORDS["capcut_opening_say"]}
+    if this_computer.MAC and said.startswith(CAPCUT_NOT_INSTALLED):   # no CapCut on this Mac: her words for it
+        return 200, {"ok": False, "words": WORDS["capcut_missing"]}
+    return 200, {"ok": False, "words": said or WORDS["capcut_cant"]}
+
+
+# The start of posting_queue.open_capcut's line when no CapCut was found to start on a Mac ("CapCut doesn't seem to
+# be installed on this Mac. It's free from capcut.com."): on a Mac that answer is given in her words instead
+# (WORDS capcut_missing). tests/talking_page_check.py holds posting_queue to this start.
+CAPCUT_NOT_INSTALLED = "CapCut doesn't seem to be installed"
+
 ROUTES = {"/talking-open": open_talking, "/talking-start": start_from_page, "/talking-save": save_from_page,
-          "/talking-make": make_from_page, "/talking-version": version_from_page}
+          "/talking-make": make_from_page, "/talking-version": version_from_page, "/talking-capcut": open_capcut_for_page}
 
 
 def handle_post(handler, path, query):
@@ -819,7 +870,8 @@ def _floating(w):
 
 def _dock(w):
     """The timeline, then the make bar, fixed across the bottom. The timeline is hidden until there is a script;
-    Make it in CapCut is off until there is something to make (talking_js_timeline.py)."""
+    Make it in CapCut is off until there is something to make, and her Open CapCut (v27) beside it is hidden
+    until this reel has been made (talking_js_timeline.py)."""
     e = html.escape
     q = lambda s: e(s, quote=True)  # noqa: E731
     return (
@@ -844,6 +896,7 @@ def _dock(w):
         "<div class='tl-hint' id='tlHint'>" + e(w["tl_hint"]) + "</div>"
         "<div class='tl-hint more' id='tlMulti' aria-live='polite'>" + e(w["multi_hint"]) + "</div></div></div>"
         "<div class='make'><div class='in'><span class='sum' id='sum'>" + e(w["sum_empty"]) + "</span>"
+        "<button class='btn' id='openCC' type='button' hidden>" + e(w["open_capcut"]) + "</button>"
         "<button class='btn main' id='makeBtn' type='button' disabled>" + e(w["make"]) + "</button></div></div></div>")
 
 

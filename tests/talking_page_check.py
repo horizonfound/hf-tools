@@ -163,12 +163,7 @@ HERS_NOT_OURS = {
 # or the "nothing named as left out is ours" check fails.
 HERS_NOT_YET = {
     # (C2, Fix a word on the page, landed Nov 17: its twelve lines are talking_page.WORDS sel_fix .. fixed_toast)
-    # C4: Open CapCut in the bottom bar and in the result box
-    "Open CapCut": "C4", "Open CapCut, click": "C4 (built from parts: made_say)", "your new project": "C4 (made_say)",
-    "at the top of your projects, give your captions your look, and export.": "C4 (made_say)",
-    "CapCut is opening. Your newest project is at the top of the list.": "C4",
-    "CapCut is opening. Your newest project is at the top.": "C4", "I couldn't open CapCut.": "C4",
-    "CapCut doesn't seem to be on this Mac. It's free from capcut.com.": "C4 (her server's /capcut/open)",
+    # (C4, Open CapCut, landed Nov 17: its seven lines are talking_page.WORDS made_say .. capcut_missing)
     # C5: + Add more photos in the photo pop-up's footer
     "+ Add more photos": "C5", "Opens this shoot's Photos folder in Finder": "C5", "new photo": "C5 (built from parts: photos_in)",
     "in, at the end.": "C5 (photos_in)", "Opening your Photos folder in Finder...": "C5",
@@ -178,7 +173,7 @@ HERS_NOT_YET = {
 # Lines of ours that are still her v24 wording where v27 changed the line, each with the item that brings it
 # up to date: held to her v24 file, and the item must take the key out of here.
 STILL_V24 = {
-    "made_say": "C4: v27 names the project to click (Open CapCut, click <b>...</b> at the top of your projects, ...)",
+    # (made_say came up to v27 with C4, Nov 17: it names the project to click)
 }
 # ...and one of hers that is the END of a line her engine builds (the Mac's own error words come first)
 HERS_NOT_OURS_ENDS = {
@@ -575,7 +570,7 @@ def check_built(s):
            "selZoom", "selNoZoom", "selFix", "fixBox", "fixIn", "fixOk", "fixBack", "fixNo",
            "pick", "pickHead", "pickClose", "pickGrid", "pickCount", "pickUse", "dock", "tl", "tlPlay", "tlTime", "tlSplit",
            "tlCut", "tlSpeed", "tlZoom", "tlUndo", "tlRedo", "tlOut", "tlScale", "tlIn", "tlTrack", "tlInner", "tlRuler", "tlPhotos", "tlClips",
-           "tlWords", "tlHead", "tlHint", "sum", "makeBtn", "vpick", "vpHead", "vpClose", "vpList", "vpPlayer", "vpVid", "vpAt", "vpUse", "vpOpen",
+           "tlWords", "tlHead", "tlHint", "sum", "openCC", "makeBtn", "vpick", "vpHead", "vpClose", "vpList", "vpPlayer", "vpVid", "vpAt", "vpUse", "vpOpen",
            "vpRefresh", "pmenu", "toast")
     case("the whole page is there, every piece under her own name (%d)" % len(ids), not [i for i in ids if ("id='%s'" % i) not in body],
          [i for i in ids if ("id='%s'" % i) not in body])
@@ -583,6 +578,9 @@ def check_built(s):
          "id='editStep' hidden" in body and "id='capStep' hidden" in body and "id='tl' hidden" in body
          and re.search(r"id='makeBtn' type='button' disabled>Make it in CapCut<", body) and ">Add your video to start</span>" in body)
     case("every button says it is a button (none can send a form)", not re.findall(r"<button(?![^>]*type='button')[^>]*>", body))
+    case("her Open CapCut (v27) sits in the bar before Make it in CapCut, hidden until this reel has been made, with her rule for it",
+         "<button class='btn' id='openCC' type='button' hidden>Open CapCut</button><button class='btn main' id='makeBtn'" in body
+         and "#openCC{margin-left:auto;margin-right:.55rem}#openCC[hidden]{display:none!important}" in css)
     case("the Back to the post kit link goes to this shoot's kit page", "href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'" in body)
     case("the page's files stay readable: each script file is one string and nothing else",
          all(len([n for n in dir(m) if not n.startswith("_")]) == 1 for m in (sys.modules["talking_js_core"], sys.modules["talking_js_step1"], sys.modules["talking_js_timeline"])))
@@ -679,6 +677,60 @@ def check_routes(s):
     code2, sj, sraw, _h = s.http("GET", "/talking-state" + s.q(LONG_KIT) + "&rev=%d&mark=%s" % (lj["rev"], lj["mark"]))
     case("a 30-minute talk (4,500 words): the whole state is hundreds of kilobytes, the 3-second answer under 300 bytes",
          code == 200 and len(lraw) > 200000 and len(lj["rec"]["words"]) == 4500 and code2 == 200 and len(sraw) < 300 and "rec" not in sj, (len(lraw), len(sraw), round(t_full, 2)))
+
+    # ---- Open CapCut (v27): by request, CapCut never started
+    tp = s.tp
+    code, j = s.post("/talking-capcut", {"kit": ROUTES_KIT})
+    case("POST /talking-capcut with nothing made yet: her \"I couldn't open CapCut.\" (her route would open CapCut anyway; the button is hidden then)",
+         code == 200 and j == {"ok": False, "words": tp.WORDS["capcut_cant"]}, (code, j))
+    case("...and the state tells the page this reel was not made (rec.made, her REC.made.length)", s.state(ROUTES_KIT)["rec"]["made"] is False)
+    TR.note_made(kit, "Routes talking reel")
+    st_made = s.state(ROUTES_KIT)
+    case("once a reel was made (the record's note), the state says so, and never names the project (the route names the one to click)",
+         st_made["rec"]["made"] is True and "Routes talking reel" not in json.dumps(st_made), st_made["rec"].get("made"))
+    code, j = s.post("/talking-capcut", {"kit": ROUTES_KIT})
+    case("...then Open CapCut answers her line, and CapCut is never started from a test (reel_page.TEST_CAPCUT on the page server)",
+         code == 200 and j == {"ok": True, "words": tp.WORDS["capcut_opening_say"]}, (code, j))
+    # the road underneath, in this process: posting_queue.open_capcut is called as the reel page calls it, with
+    # her line to say and her button's name, and its answers come back as hers where she has a line
+    import posting_queue
+    real_open, calls = posting_queue.open_capcut, []
+
+    def fake(rec, ok_words=None, button="Open in CapCut"):
+        calls.append((rec, ok_words, button))
+        return fake.answer
+    posting_queue.open_capcut = fake
+    try:
+        waiting = tp.WORDS["capcut_opening_say"] + " If it isn't in the list, quit CapCut and press Open CapCut again, and I'll add it."
+        not_installed = "CapCut doesn't seem to be installed on this Mac. It's free from capcut.com."
+        slow = "CapCut is taking a while to start on this Mac. Give it a moment, then click “Routes talking reel” in its project list (near the top, newest first)."
+        fake.answer = (True, "")
+        a1 = tp.open_capcut_for_page({"kit": ROUTES_KIT})
+        fake.answer = (True, waiting)
+        a2 = tp.open_capcut_for_page({"kit": ROUTES_KIT})
+        fake.answer = (False, not_installed)
+        a3 = tp.open_capcut_for_page({"kit": ROUTES_KIT})
+        fake.answer = (False, slow)
+        a4 = tp.open_capcut_for_page({"kit": ROUTES_KIT})
+        fake.answer = (False, "")
+        a5 = tp.open_capcut_for_page({"kit": ROUTES_KIT})
+    finally:
+        posting_queue.open_capcut = real_open
+    case("the route goes the reel page's road: posting_queue.open_capcut with the open reel's newest project, her line to say, and her button's name",
+         len(calls) == 5 and all(c_ == ({"reel": {"project": "Routes talking reel"}}, tp.WORDS["capcut_opening_say"], tp.WORDS["open_capcut"]) for c_ in calls), calls[:1])
+    case("opened: her line; opened with a reel that was waiting for CapCut's list: her line with the Assistant's note after it, whole",
+         a1 == (200, {"ok": True, "words": tp.WORDS["capcut_opening_say"]}) and a2 == (200, {"ok": True, "words": waiting}), (a1, a2))
+    if WINDOWS:
+        case("a PC: posting_queue's own words come through whole (her \"this Mac\" line is a Mac's only)", a3 == (200, {"ok": False, "words": not_installed}), a3)
+    else:
+        case("no CapCut on this Mac: her line for it (her server's), in place of posting_queue's", a3 == (200, {"ok": False, "words": tp.WORDS["capcut_missing"]}), a3)
+    case("CapCut slow to start: posting_queue's own plain words, whole; no words at all: her \"I couldn't open CapCut.\"",
+         a4 == (200, {"ok": False, "words": slow}) and a5 == (200, {"ok": False, "words": tp.WORDS["capcut_cant"]}), (a4, a5))
+    pq_src = (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8")
+    case("posting_queue's no-CapCut line still starts as the talking page expects it to (talking_page.CAPCUT_NOT_INSTALLED)",
+         ('f"' + tp.CAPCUT_NOT_INSTALLED + " on this {this_computer.COMPUTER}. It's free from capcut.com.\"") in pq_src, tp.CAPCUT_NOT_INSTALLED)
+    case("Open CapCut takes the kit and nothing else, and refuses a kit it can't find", s.post("/talking-capcut", {"kit": ROUTES_KIT, "from": "kit"})[0] == 400
+         and s.post("/talking-capcut", {"kit": "Nope"})[0] == 404)
 
     # ---- the talking video's small copy
     code, _j, raw, hdr = s.http("GET", "/talking-video" + q)

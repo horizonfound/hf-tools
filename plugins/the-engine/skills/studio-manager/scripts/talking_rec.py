@@ -1708,6 +1708,9 @@ def state_for_page(kit, rev=None, mark=None):
     on_sheet = {x["n"] for x in arrange.sheet_rows(kit)}
     photos_gone = sorted({k for x in shots for k in x["ns"] if k not in on_sheet})
     out = {k: rec.get(k) for k in PAGE_REC if k in rec}
+    # her page shows Open CapCut in the bar once this reel was made (REC.made.length, v27): ours sends only whether
+    # it was, never the project names (the route names the one to click)
+    out["made"] = any(isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"] for m in _lst(rec, "made"))
     for k in ("video", "status", "step", "problem"):       # text or nothing, whatever the record holds
         if k in out and not isinstance(out[k], str):
             out[k] = None if k == "video" else ""
@@ -2405,9 +2408,19 @@ def make_for_page(kit):
             "problem": (problem if isinstance(problem, str) and problem else MAKE_WORDS["went_wrong"]) if state == "problem" else None}
 
 
+def last_made(kit):
+    """The newest CapCut project made from the talking reel being worked on (its "made" list, note_made), by name;
+    None when this reel was never made. The list is one of the reel's own fields (TALK_LIVE), so with several
+    talking reels (v25) each keeps its own: the one at the top of the record is the open reel's. Names only, no
+    path. Raises Unreadable when the record will not be read just now."""
+    made = [m for m in _lst(_slim(Path(kit)), "made") if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]]
+    return made[-1]["project"] if made else None
+
+
 def note_made(kit, project):
     """Hers: the record keeps each reel that was made, and when ("made": [{"project", "when"}]). Saved quietly:
-    the record's counter does not move (see change), so the page's next save and its Undo are as they were."""
+    the record's counter does not move (see change), so the page's next save and its Undo are as they were.
+    The list belongs to the reel being worked on (TALK_LIVE): with several talking reels each keeps its own."""
     def fn(rec):
         made = [m for m in _lst(rec, "made") if isinstance(m, dict)]
         made.append({"project": str(project), "when": time.time()})
