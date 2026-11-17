@@ -10,7 +10,7 @@ everything a hand does on it:
     its middle snaps first to the middle of a slide, to a seam it sits across and to half way up, shown with blue
     lines and a blue label ("Centered", ...; hers, v22), which also show for a moment after an arrow key lands it there
     double-click, or "Move photo inside": drag the picture inside its frame, wheel or slider to zoom
-    the one-click buttons, arrow keys, Delete, Cmd/Ctrl+Z, Escape
+    the one-click buttons (Show the whole photo among them, hers, v27), arrow keys, Delete, Cmd/Ctrl+Z, Escape
     the tray: every photo numbered as in the pickers; drag one onto a frame or a slide, or click it
     Slides - / +, the background, the Size slider (how large the slides are drawn), Undo
 
@@ -337,6 +337,10 @@ DESIGN_EDIT_JS = r"""
   [[STORY ? 'Fill story' : 'Fill slide', 'full'], ['Across 2 slides', 'span2'], ['Top half', 'top'], ['Bottom half', 'bottom'], ['Left half', 'left'],
    ['Right half', 'right'], ['Add border', 'margin']].forEach(function(x){ if (!(STORY && x[1] === 'span2')) D.selbar.button(g1, x[0], x[1]); });
   var g2 = D.selbar.group('sel-crop', 'Crop', function(kind){ return kind === 'photo'; });
+  // her order (v27): Show the whole photo, Crop (the crop part puts its button here, before Move photo inside), Move
+  // photo inside, Zoom, the empty-frame button
+  var wholeBtn = D.selbar.button(g2, WORDS.whole, 'whole', WORDS.wholeTitle);
+  wholeBtn.id = 'whole-photo';
   var adjBtn = D.selbar.button(g2, WORDS.inside, 'adjust');
   adjBtn.id = 'adjust';
   g2.appendChild(el('span', 'lbl', 'Zoom'));
@@ -376,12 +380,16 @@ DESIGN_EDIT_JS = r"""
     }
     if (a === 'delstory') { removeSlide(slideOf(b), 'sel'); return; }
     if (a === 'slidebefore' || a === 'slideafter') { insertSlide(a === 'slidebefore' ? slideOf(b) - 1 : slideOf(b), 'sel'); return; }
-    var r = M.act(D.st, b.id, a);
+    if (a === 'crop') { if (D.crop) D.crop.open(); return; }          // the crop part (design_js_crop.py) owns the window
+    // Show the whole photo needs the photo's own shape: the loaded picture's, as the strip draws it
+    var nat = a === 'whole' && D.typeOf(b) === 'photo' ? D.blockTypes.photo.natural(nodes[b.id], b) : null;
+    var r = M.act(D.st, b.id, a, nat ? {pw: nat.w, ph: nat.h} : null);
     if (r.why) { lines('sel', why(r)); return; }
     var o = {};
     if ('sel' in r) o.sel = r.sel;
-    if (a === 'empty') o.adjust = false;
-    if (!D.setState(r.st, o)) lines('', '');
+    if (a === 'empty' || a === 'whole') o.adjust = false;
+    if (!D.setState(r.st, o)) { lines('', ''); return; }
+    if (a === 'whole') lines('sel', WORDS.wholeDone);
     if (a === 'dup' && r.sel != null) reveal(r.sel);
   }
   $('selbar').addEventListener('click', function(e){
@@ -481,8 +489,11 @@ DESIGN_EDIT_JS = r"""
     adjBtn.classList.toggle('on', D.adjust);
     var photo = !!b && D.typeOf(b) === 'photo' && !M.isHole(b);
     adjBtn.disabled = !!b && !photo;
+    wholeBtn.disabled = !!b && !photo;
     zoomImg.disabled = !!b && !photo;
-    zoomImg.value = String(Math.round((photo ? (b.zoom || 1) : 1) * 100));
+    // the slider runs to 300%; a crop from the Crop window can go past it (hers), and then the slider sits at its end
+    // and leaves the zoom alone until it is moved
+    zoomImg.value = String(Math.round(Math.min(3, photo ? (b.zoom || 1) : 1) * 100));
     var u = M.used(st);
     Object.keys(tiles).forEach(function(n){ tiles[n].classList.toggle('used', !!u[n]); });
   });

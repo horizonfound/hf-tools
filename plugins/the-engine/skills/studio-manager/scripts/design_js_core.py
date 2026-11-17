@@ -79,6 +79,10 @@ DESIGN_CORE_JS = r"""
     hintHole: 'An empty frame. Click a photo below, or drag one onto it, to fill it.',
     hintOther: 'A text box. Drag to move it.',
     inside: 'Move photo inside', insideDone: 'Done moving',
+    // Show the whole photo (hers, v27): the button, its tooltip and its line
+    whole: 'Show the whole photo',
+    wholeTitle: 'Shrink the frame to the photo\'s own shape, so the whole photo shows with space around it',
+    wholeDone: 'The whole photo shows now, with space around it. Undo puts the crop back.',
     // why a press did nothing
     last: function(k){ return 'Slide ' + k + ' still has something on it. Move it or remove it first.'; },
     wide: 'Something is wider than the slides that would be left. Make it smaller first.',

@@ -15,6 +15,8 @@
     the [hidden] rule          one global rule beats every display:flex class (her v27 lesson), checked in the page's
                                CSS and as computed styles in the hidden Chrome
     the stage                  sticky on the carousel page too (v26 proved stories)
+    slides as things           + and x on every label, Add a slide before / after, Remove this slide, Where should it go?, the grip (B8 to B10)
+    the photo inside its frame Show the whole photo (B12): the frame shrinks to the photo's own shape inside its space, never under 60 px
 
 Three parts, as the other parts have: the tables, the words and the rules by themselves (check_v27_page), the routes
 and the commands by request (check_v27_server, a pretend kit and a page server on the port it is given), and the real
@@ -80,6 +82,10 @@ HERS = {
     "add_sub": "Pick what to add. It goes after your last slide. To put it somewhere else, close this, click the slide you want it next to, then press Add slides again.",
     "add_sub_story": "Pick what to add. It goes after your last story, and nothing you made is replaced.",
     "across_end": "A photo stretches across that spot, so I added it at the end instead.",
+    # Show the whole photo (B12): the button, its tooltip (her HTML line 306) and its line (her page line 940)
+    "whole": "Show the whole photo",
+    "whole_title": "Shrink the frame to the photo's own shape, so the whole photo shows with space around it",
+    "whole_done": "The whole photo shows now, with space around it. Undo puts the crop back.",
 }
 # Her lines that her page builds from pieces (a kind's word, a number): the piece in her page, and the line ours says for a slide
 # and for a story, with the number 3 where she puts one. Each is looked for in her page, and ours are checked against both kinds.
@@ -325,6 +331,47 @@ JSON.stringify(out);
 """
 
 
+# B12 (and B11) under the Mac's own JavaScript engine: the photo inside its frame, with no page.
+PHOTO_JS = r"""
+var out = [];
+function t(name, ok, detail){ out.push([name, !!ok, detail === undefined ? '' : JSON.stringify(detail)]); }
+function eq(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+function near(a, b, e){ return Math.abs(a - b) <= (e || 0.01); }
+var window = this;
+window.DESIGN_LIMITS = CAROUSEL_LIMITS;
+eval(MODEL_SRC);
+var M = window.DesignModel, W = 1080, H = 1350;
+function F(id, n, x, y, w, h, more){ var b = {id: id, n: n, x: x, y: y, w: w, h: h, ox: 0.5, oy: 0.5, zoom: 1}; for (var k in (more || {})) b[k] = more[k]; return b; }
+function TX(id, x, y){ return {id: id, type: 'text', text: 'Their words', font: 'Figtree', size: 72, weight: 700, italic: false, upper: false, al: 'center', ls: 0, lh: 1.3, color: '#111111', x: x, y: y, w: 800, h: 94}; }
+var st = {slides: 2, bg: '#ffffff', blocks: [F(1, 1, 0, 0, W, H, {ox: 0.1, oy: 0.9, zoom: 2.5}), F(2, 2, W + 100, 100, 800, 300), TX(3, 0, 1200), F(4, null, 0, 0, 500, 500)]};
+var was = JSON.stringify(st);
+// ---- Show the whole photo (B12) ----
+var r = M.act(st, 1, 'whole', {pw: 3000, ph: 2000});
+t('whole: a wide photo (3:2) in a tall frame filling the slide: the frame becomes 1080 by 720, centred up and down, the crop back to the middle at zoom 1',
+  eq(r.st.blocks[0], {id: 1, n: 1, x: 0, y: 315, w: 1080, h: 720, ox: 0.5, oy: 0.5, zoom: 1}), r.st.blocks[0]);
+t('whole: nothing else in the layout is touched, and the layout given is untouched', eq(r.st.blocks.slice(1), st.blocks.slice(1)) && JSON.stringify(st) === was);
+r = M.act(st, 2, 'whole', {pw: 2000, ph: 3000});
+t('whole: a tall photo (2:3) in a wide frame 800 by 300: the frame becomes 200 by 300, centred side to side in the space it had',
+  eq(r.st.blocks[1], {id: 2, n: 2, x: W + 400, y: 100, w: 200, h: 300, ox: 0.5, oy: 0.5, zoom: 1}), r.st.blocks[1]);
+r = M.act(st, 2, 'whole', {pw: 100, ph: 3000});
+t('whole: a very tall photo (1:30) in that wide short frame: hers would leave a 10 px sliver; ours never goes under 60 px wide (60 by 300, centred in the space, a sliver of the photo cut off rather than a frame too small to take hold of)',
+  eq(r.st.blocks[1], {id: 2, n: 2, x: W + 470, y: 100, w: 60, h: 300, ox: 0.5, oy: 0.5, zoom: 1}), r.st.blocks[1]);
+r = M.act(st, 2, 'whole', {pw: 3000, ph: 100});
+t('whole: a very wide photo (30:1) in it: 800 wide, never under 60 tall', eq(r.st.blocks[1], {id: 2, n: 2, x: W + 100, y: 220, w: 800, h: 60, ox: 0.5, oy: 0.5, zoom: 1}), r.st.blocks[1]);
+r = M.act(st, 1, 'whole', {pw: 1080, ph: 1350});
+t('whole: a photo of the frame\'s own shape: the frame stays, only the crop goes back to the middle at zoom 1', eq(r.st.blocks[0], F(1, 1, 0, 0, W, H)), r.st.blocks[0]);
+t('whole: the same again changes nothing (the very same layout back)', M.act(r.st, 1, 'whole', {pw: 1080, ph: 1350}).st === r.st);
+t('whole: a text box is ignored', M.act(st, 3, 'whole', {pw: 3, ph: 2}).st === st);
+t('whole: an empty frame is ignored', M.act(st, 4, 'whole', {pw: 3, ph: 2}).st === st);
+t('whole: with no photo size given, nothing changes', M.act(st, 1, 'whole').st === st && M.act(st, 1, 'whole', {pw: 0, ph: 0}).st === st);
+t('whole: a block that is not there: nothing', M.act(st, 99, 'whole', {pw: 3, ph: 2}).st === st);
+var edge = {slides: 1, bg: '#ffffff', blocks: [F(1, 1, -300, 0, 600, H)]};
+r = M.act(edge, 1, 'whole', {pw: 3000, ph: 2000});
+t('whole: a frame hanging off the strip\'s left edge keeps at least 40 px on the strip (clampXY)', r.st.blocks[0].x >= 40 - r.st.blocks[0].w && M.onStrip(r.st.blocks[0], 1), r.st.blocks[0]);
+JSON.stringify(out);
+"""
+
+
 def check_v27_page(case, work):
     sys.path.insert(0, str(SCRIPTS))
     import arrange_page
@@ -454,6 +501,26 @@ def check_v27_page(case, work):
     except ValueError:
         rows = None
     if case("v27 page: the slide rules ran by themselves (no page)", isinstance(rows, list) and len(rows) >= 30, (r.stdout[-300:], r.stderr[-300:])):
+        for name, ok, detail in rows:
+            case("v27 rules: " + name, ok, detail)
+
+    # ---- B12: Show the whole photo: her words, the button first in the Crop group, the rules by themselves ----
+    for k in ("whole", "whole_title", "whole_done"):
+        case(f"v27 page: her words in the core's table: {HERS[k][:60]}", "'" + HERS[k].replace("'", "\\'") + "'" in core, HERS[k])
+    case("v27 page: Show the whole photo is the first button of the Crop group, before Move photo inside, with her tooltip, in both kinds",
+         "var wholeBtn = D.selbar.button(g2, WORDS.whole, 'whole', WORDS.wholeTitle);" in edit and edit.index("WORDS.whole, 'whole'") < edit.index("D.selbar.button(g2, WORDS.inside, 'adjust')"))
+    case("v27 page: the page hands the model the photo's own shape for it (the loaded picture's, as the strip is drawn), and says her line after",
+         "D.blockTypes.photo.natural(nodes[b.id], b)" in edit and "M.act(D.st, b.id, a, nat ? {pw: nat.w, ph: nat.h} : null)" in edit and "if (a === 'whole') lines('sel', WORDS.wholeDone);" in edit)
+    case("v27 page: the Zoom slider stays 100 to 300 and shows a larger zoom as its end (a crop may go past it)",
+         "zoomImg.min = '100'; zoomImg.max = '300'" in edit and "Math.min(3, photo ? (b.zoom || 1) : 1) * 100" in edit)
+    js = work / "v27-photo.js"
+    js.write_text("var MODEL_SRC = " + json.dumps(src["DESIGN_MODEL_JS"]) + ";\nvar CAROUSEL_LIMITS = " + json.dumps(design.limits_for("carousel")) + ";\n" + PHOTO_JS, encoding="utf-8")
+    r = osascript(js)
+    try:
+        rows = json.loads(r.stdout)
+    except ValueError:
+        rows = None
+    if case("v27 page: the photo-in-its-frame rules ran by themselves (no page)", isinstance(rows, list) and len(rows) >= 10, (r.stdout[-300:], r.stderr[-300:])):
         for name, ok, detail in rows:
             case("v27 rules: " + name, ok, detail)
 
@@ -1070,6 +1137,32 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.drag("#labels .lab:nth-child(1) .slab", (lr["cx"] + 3, lr["cy"] + 1), steps=3)
             case("v27 browser: a press on the grip that barely moves is not a drag: nothing changes", st() == four_state() and slides_line() == "")
             case("v27 browser: nothing went wrong on the page through all of that", not c.page_errors(), c.page_errors()[:3])
+
+            # ================= the photo inside its frame (B12, B11) =================
+            put(four_state())
+            rev2 = disk()["rev"]
+            c.click("#strip .blk[data-id='1']")
+            grp = Jx("(function(){ var g = document.getElementById('sel-crop'); return {shown: !g.hidden, btns: Array.from(g.querySelectorAll('button')).map(function(b){ return [b.textContent, b.title, b.disabled]; })}; })()")
+            case("v27 browser: a photo selected: the Crop group runs Show the whole photo (her tooltip), Move photo inside, the empty-frame button, none off",
+                 grp["shown"] and grp["btns"][0] == [HERS["whole"], HERS["whole_title"], False] and grp["btns"][1][0] == "Move photo inside" and not any(b[2] for b in grp["btns"]), grp)
+            nat = Jx("(function(){ var b = Designer.selected(), n = Designer.blockTypes.photo.natural(document.querySelector('#strip .blk[data-id=\"1\"]'), b); return n; })()")
+            want = Jx("DesignModel.act(Designer.st, 1, 'whole', {pw: " + str(nat["w"]) + ", ph: " + str(nat["h"]) + "}).st")
+            c.click("#whole-photo")
+            case("v27 browser: Show the whole photo: the frame shrinks to the photo's own shape inside its slide, centred, the crop back to the middle; her line beside the buttons",
+                 st() == want and st()["blocks"][0]["zoom"] == 1 and st()["blocks"][0]["w"] * nat["h"] - st()["blocks"][0]["h"] * nat["w"] < 2 and st()["blocks"][0] != four_state()["blocks"][0]
+                 and sel_line() == HERS["whole_done"], (st()["blocks"][0], nat, sel_line()))
+            img = Jx("(function(){ var i = document.querySelector('#strip .blk[data-id=\"1\"] img'), n = i.parentNode; return {iw: i.offsetWidth, ih: i.offsetHeight, l: i.offsetLeft, t: i.offsetTop, fw: n.offsetWidth, fh: n.offsetHeight}; })()")
+            case("v27 browser: ... and the whole picture is drawn inside the frame, filling it exactly", abs(img["iw"] - img["fw"]) <= 1 and abs(img["ih"] - img["fh"]) <= 1 and abs(img["l"]) <= 1 and abs(img["t"]) <= 1, img)
+            case("v27 browser: ... saved as one change (rev + 1), the photo still selected", settled() and disk()["rev"] == rev2 + 1 and c.js("Designer.sel") == 1, disk()["rev"])
+            c.click("#undo")
+            case("v27 browser: Undo puts the crop back", st() == four_state())
+            c.click("#strip .blk[data-id='4']")
+            case("v27 browser: with a text box selected the Crop group is not shown at all", c.js("document.getElementById('sel-crop').hidden") is True)
+            c.js("Designer.select(null); Designer.setState(" + json.dumps({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, None, W, 100, 600, 600)]}) + ")")
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            c.click("#strip .blk[data-id='2']")
+            case("v27 browser: an empty frame selected: Show the whole photo is off, like Move photo inside", c.js("document.getElementById('whole-photo').disabled && document.getElementById('adjust').disabled") is True)
+            case("v27 browser: nothing went wrong on the page through the photo's buttons", not c.page_errors(), c.page_errors()[:3])
 
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")

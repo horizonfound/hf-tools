@@ -2,7 +2,7 @@
 """The carousel designer's rules, as one script with no page in it (design_page.py puts it on the page).
 
 DESIGN_MODEL_JS makes window.DesignModel: where a photo sits inside its frame, what a move, a resize or a
-nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts, which slide a thing is on, adding and swapping photos, the
+nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts (Show the whole photo among them: act 'whole', given the photo's own size), which slide a thing is on, adding and swapping photos, the
 undo list, slides as things (insert, remove, the pieces a strip comes in and moving one), which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
@@ -255,15 +255,34 @@ DESIGN_MODEL_JS = r"""
     return patch(st, id, {x: r2(c.x), y: r2(c.y)});
   }
 
+  // A frame of w by h strip pixels, centred where the frame of b was, never under frameMin on either side (a side
+  // that would be is brought to frameMin, and the photo covers the frame as ever, so a sliver of it is cut off rather
+  // than a frame too small to take hold of), and on the strip. -> {x, y, w, h}
+  function fitFrame(b, w, h, slides){
+    w = Math.max(RULES.frameMin, w); h = Math.max(RULES.frameMin, h);
+    var c = clampXY(b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h, slides);
+    return {x: r2(c.x), y: r2(c.y), w: r2(w), h: r2(h)};
+  }
+
   // ---- the one-click buttons. Returns {st, sel?, why?}: st is the same layout when nothing changed;
   //      sel is given only when the selection should change; why says what stopped it. ----
-  var FRAME_ONLY = {full: 1, span2: 1, top: 1, bottom: 1, left: 1, right: 1, margin: 1, empty: 1};
-  function act(st, id, a){
+  //      o: {pw, ph}: the photo's own size, which 'whole' (Show the whole photo) needs.
+  var FRAME_ONLY = {full: 1, span2: 1, top: 1, bottom: 1, left: 1, right: 1, margin: 1, empty: 1, whole: 1};
+  function act(st, id, a, o){
     var i = indexOf(st, id);
     if (i < 0) return {st: st};
     var b = st.blocks[i];
     if (FRAME_ONLY[a] && !isFrame(b)) return {st: st};
     var si = slideOf(b, st.slides), x0 = si * W, m = RULES.inset, blocks, c;
+    if (a === 'whole') {
+      // Show the whole photo (hers, v27): the frame shrinks to the photo's own shape inside the space it had, centred,
+      // the crop back to the middle at zoom 1, so the whole photo shows with the background around it. An empty frame
+      // is left alone. Ours: never under frameMin (hers could leave a sliver of a very tall photo in a wide short frame).
+      var pw = o && o.pw > 0 ? o.pw : 0, ph = o && o.ph > 0 ? o.ph : 0;
+      if (isHole(b) || !(pw && ph)) return {st: st};
+      var ar = pw / ph, wide = ar > b.w / b.h, nw = wide ? b.w : b.h * ar, nh = wide ? b.w / ar : b.h;
+      return {st: patch(st, id, merge(fitFrame(b, nw, nh, st.slides), {ox: 0.5, oy: 0.5, zoom: 1}))};
+    }
     if (a === 'full') return {st: patch(st, id, {x: x0, y: 0, w: W, h: H})};
     if (a === 'span2') {
       // on a single post (one slide) the second slide is added in the same step, so one Undo takes both back (hers)
@@ -503,7 +522,7 @@ DESIGN_MODEL_JS = r"""
     layoutImg: layoutImg, pan: pan, zoomTo: zoomTo, zoomBy: zoomBy,
     slideOf: slideOf, clampXY: clampXY, onStrip: onStrip,
     lines: lines, nearest: nearest, move: move, centered: centered, midWords: midWords, onSlides: onSlides, resize: resize, nudge: nudge,
-    act: act, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,
+    act: act, fitFrame: fitFrame, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,
     used: used, firstEmptySlide: firstEmptySlide, nextHole: nextHole, swapPhoto: swapPhoto, addPhoto: addPhoto,
     clickPhoto: clickPhoto, dropAt: dropAt, pickSize: pickSize, screenCopy: screenCopy,
     history: history, viewStart: viewStart, viewLow: viewLow, viewStep: viewStep
