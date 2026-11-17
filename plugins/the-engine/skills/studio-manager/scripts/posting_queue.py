@@ -1850,6 +1850,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.open_home_folder(drop=True)
         if path == "/open-shoot":
             return self.open_shoot(urlsplit(self.path).query)
+        if path == "/open-plugins":
+            # the update page's button: Claude's Plugins page in their own web browser, never the pane (updates.py)
+            import updates
+            return self.answer(updates.open_plugins())
         if path == "/queue-url":
             return self.queue_url()
         if path == "/report-url":
