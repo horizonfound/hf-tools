@@ -20,10 +20,11 @@ on the beat. Claude does the choosing; this does the counting.
     python3 reel.py make --folder "<edited photos>" --picks 7,2,11,4,9,1 --song "<file>" | --song none
                                                    | --capcut-song "<song name from CapCut's music>"
         [--clips clips.json]   video clips from their footage, placed in --picks as c1, c2...: c1,7,2,c2,11-,4
-        [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo"]
+        [--shoot "Black-sand beach"] [--night "<backup>" --shoot-id s1] [--name "..."] [--hook "Words on the first photo" [--hook-whole]]
         [--pace beat|mixed|calm|build] [--variation 2] [--song-start 41.3] [--fit] [--dry-run] [--store <CapCut projects>]
         [--kit "<post kit folder>"]   the reel's working files go in that kit's hidden .kit/reels (REEL_WORK_IN_KIT)
-        [--status <file>]   a small JSON of what happened, for the reel page (ok, dry, short_song, project, plan)
+        [--status <file>]   a small JSON of what happened, for the reel page (ok, dry, short_song, project, plan, and the
+                            pieces as the page plays them before the reel is made: a photo by number, a clip by c1, c2...)
         Finds the beat, starts the song where it picks up, lays the photos (and clips) in that
         order, every cut on a beat, and writes the CapCut project (capcut.py).
         --dry-run prints the plan, ending with "Beats per piece: clip 6, 1, 1, 2, ..." and writes nothing.
@@ -53,6 +54,7 @@ import subprocess
 import os
 import re
 import sys
+import unicodedata
 import time
 from pathlib import Path
 
@@ -131,6 +133,17 @@ def kit_workdir(kit):
     return d
 
 
+def work_of(a):
+    """The working folder of a make: --work when given (the reel page's preview keeps its own, beside Make my
+    reel's, so the two never share a file), else the kit's hidden .kit/reels, else ~/.studio/reels/<shoot>."""
+    w = getattr(a, "work", None)
+    if w:
+        d = Path(w).expanduser()
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return workdir(a.shoot, a.folder, getattr(a, "kit", None))
+
+
 def workdir(shoot, folder, kit=None):
     d = kit_workdir(kit)
     if d is not None:
@@ -187,22 +200,89 @@ def make_sheets(photos, out_dir, cell=200, per_row=6, labels=None, name="sheet")
     return paths
 
 
+def _photo_key(name):
+    """A file's name the way the numbered list tells photos apart: the name alone (never its folder), with its
+    letters composed one way (a Mac may store an accented name decomposed)."""
+    return unicodedata.normalize("NFC", Path(str(name)).name)
+
+
+def numbers_before(path):
+    """The numbered list from last time (a kit's .kit/sheet.json, or this folder's own photos.json), as
+    {file name: number}: what each photo was called then. Empty when there is no such list, or it can't be read.
+    A number that two rows share is kept for the first of them only."""
+    if not path:
+        return {}
+    try:
+        d = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+        rows = d.get("photos", []) if isinstance(d, dict) else []
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {}
+    out, taken = {}, set()
+    for x in sorted((x for x in rows if isinstance(x, dict) and type(x.get("n")) is int and x["n"] >= 1
+                     and isinstance(x.get("file"), str) and x["file"]), key=lambda x: x["n"]):
+        k = _photo_key(x["file"])
+        if k in out or x["n"] in taken:
+            continue
+        out[k] = x["n"]
+        taken.add(x["n"])
+    return out
+
+
+def number_photos(photos, before):
+    """Numbers that stay fixed when photos are added (Nicole's v27, Nov 14: "Add my photos"; her prepare()):
+    a photo on the list before keeps its number; a new photo takes the next number after the highest ever
+    given, in name order; a photo that is gone keeps its number unused, so no number ever means another photo
+    (hers numbered the kept ones again from 1, so a photo gone shifted the ones after it). A first list, with
+    nothing before, numbers by name from 1, as always. Returns (the photos in number order as [(n, path)],
+    the numbers added, the numbers gone)."""
+    by_key = {}
+    for p in photos:
+        by_key.setdefault(_photo_key(p.name), p)
+    kept = [(n, by_key[k]) for k, n in before.items() if k in by_key]
+    gone = sorted(n for k, n in before.items() if k not in by_key)
+    nxt = max(before.values(), default=0) + 1
+    seen = {k for k in before if k in by_key}
+    new = [p for p in photos if _photo_key(p.name) not in seen]     # photos is in name order already
+    added = []
+    for p in new:
+        kept.append((nxt, p))
+        added.append(nxt)
+        nxt += 1
+    kept.sort(key=lambda x: x[0])
+    return kept, added, gone
+
+
 def cmd_sheet(a):
     photos = edited_photos(a.folder)
     wd = workdir(a.shoot, a.folder, a.kit)
+    before = numbers_before(getattr(a, "before", None))
+    numbered, added, gone = number_photos(photos, before)
     listing = []
-    for i, p in enumerate(photos, 1):
+    for n, p in numbered:
         w, h = capcut.photo_size(p)
         way = "tall" if h > w * 1.05 else "wide" if w > h * 1.05 else "square"
-        listing.append({"n": i, "file": str(p), "w": w, "h": h, "way": way})
-    (wd / "photos.json").write_text(json.dumps({"folder": str(Path(a.folder)), "photos": listing}, indent=1), encoding="utf-8")
-    try:
-        sheets = make_sheets(photos, wd)
-    except Exception as e:  # a sheet is a convenience; the numbered list still works
-        sheets = []
-        say(f"(could not draw the sheet: {e})")
+        listing.append({"n": n, "file": str(p), "w": w, "h": h, "way": way})
+    out = {"folder": str(Path(a.folder)), "photos": listing}
+    if before:
+        out["added"], out["gone"] = added, gone      # for whoever asked: what the last list didn't have, and what it has lost
+    (wd / "photos.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    sheets = []
+    if not getattr(a, "no_sheets", False):        # --no-sheets: the list only (the reel page re-lists while it is open)
+        try:
+            sheets = make_sheets([p for _, p in numbered], wd, labels=[n for n, _ in numbered])
+        except Exception as e:  # a sheet is a convenience; the numbered list still works
+            say(f"(could not draw the sheet: {e})")
     tall = sum(1 for x in listing if x["way"] == "tall")
     say(f"{len(photos)} edited photos ({tall} tall, {len(photos) - tall} wide or square).")
+    if before:
+        if added:
+            say(f"New since the last list: {len(added)} photo{'s' if len(added) != 1 else ''}, numbered "
+                + (f"{added[0]} to {added[-1]}" if len(added) > 1 else str(added[0])) + ". Every other photo keeps its number.")
+        if gone:
+            say(f"Gone since the last list: {len(gone)} photo{'s' if len(gone) != 1 else ''} (number{'s' if len(gone) != 1 else ''} "
+                + ", ".join(str(n) for n in gone) + "); " + ("those numbers stay" if len(gone) != 1 else "that number stays") + " unused.")
+        if not added and not gone:
+            say("The same photos as the last list, with the same numbers.")
     for s in sheets:
         say(f"Sheet: {s}")
     note = _pictures_note() if sheets else None
@@ -236,7 +316,7 @@ def read_picks(a, n_clips=0):
     (the k-th clip in --clips; only when there are clips)."""
     same = os.path.normcase      # on a PC, E:\Photos and e:\photos are the same folder; on a Mac this changes nothing
     kit_list = kit_numbers(getattr(a, "kit", None), a.folder)
-    listing_file = workdir(a.shoot, a.folder, getattr(a, "kit", None)) / "photos.json"
+    listing_file = work_of(a) / "photos.json"
     if kit_list is not None:
         listing = kit_list       # a kit's one numbered list: the numbers Claude, the page and the kit page all mean
     elif listing_file.is_file() and same(json.loads(listing_file.read_text(encoding="utf-8")).get("folder") or "") == same(str(Path(a.folder))):
@@ -265,9 +345,10 @@ def read_picks(a, n_clips=0):
         picks.append(int(m.group(1)))
         hints.append(m.group(2) or None)
     bad = [n for n in picks if n not in by_n]
-    if bad or not picks:
+    if bad or not order:
         say(f"STOP: no photo numbered {', '.join(map(str, bad))} on the sheet." if bad else "STOP: no photos picked.")
         sys.exit(2)
+    # a reel of clips only (B-roll, Nicole's v27): c1,c2,c3 and no photo numbers is a whole reel
     if n_clips:
         used = [k for kind, k in order if kind == "clip"]
         twice = sorted({k + 1 for k in used if used.count(k) > 1})
@@ -418,11 +499,18 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
             length = float(x["length"])
             src = float(x["src"])
             if piece["dur"] > length + 1e-6:               # the whole video is shorter than one beat of the reel
-                which = x.get("label") or "a clip"
-                return None, {"problem": f"STOP: {which} ({Path(x['path']).name}) is only {length:.2f} seconds of "
-                                         f"video, and nothing in a reel stays on screen for less than one beat "
-                                         f"({piece['dur']:.2f} s here). Pick a longer moment for it, or take it out."}
-            if src + piece["dur"] > length:                # near the end of the video: start a little earlier
+                over = piece["dur"] - length
+                if over > timing.CLIP_OVERSHOOT + 1e-6:
+                    which = x.get("label") or "a clip"
+                    return None, {"problem": f"STOP: {which} ({Path(x['path']).name}) is only {length:.2f} seconds of "
+                                             f"video, and nothing in a reel stays on screen for less than one beat "
+                                             f"({piece['dur']:.2f} s here), even played a touch slower. Use a longer "
+                                             f"video for it, or take it out."}
+                # a hair short (Nicole's v27, "long clips work"; A20): held for the beat from the video's very start;
+                # in the project it plays a touch slower rather than run past the video's end (capcut.py)
+                piece["short_by"] = round(over, 3)
+                src = 0.0
+            elif src + piece["dur"] > length:              # near the end of the video: start a little earlier
                 src = max(0.0, length - piece["dur"] - 0.05)
             piece.update(clip=True, src=round(src, 3), length=length)
         out.append(piece)
@@ -609,11 +697,21 @@ def cmd_make(a):
                       "name": picked["name"] if picked else Path(song).name,
                       "capcut_material": picked["material"] if picked else None,
                       "capcut_beats": picked["beats"] if picked else None} if song else None),
-            "hook": {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]} if a.hook else None}
-    wd = workdir(a.shoot, a.folder, a.kit)
+            # the words: on the first piece (words on the first photo), or over the whole reel (--hook-whole:
+            # B-roll's words on screen, Nicole's v27; CapCut gets them as plain text to restyle)
+            "hook": ({"text": a.hook, "dur": facts["length"], "dur_f": pieces[-1]["start_f"] + pieces[-1]["dur_f"]} if a.hook_whole
+                     else {"text": a.hook, "dur": pieces[0]["dur"], "dur_f": pieces[0]["dur_f"]}) if a.hook else None}
+    wd = work_of(a)
     (wd / "reel.json").write_text(json.dumps({"plan": plan, "facts": facts}, indent=1), encoding="utf-8")
     plan_facts = {"clips": len(facts["clips"]), "photos": facts["photo_count"], "length": facts["length"],
                   "tempo": facts["tempo"], "song": bool(song), "song_from": facts["song_from"]}
+    # every piece as the reel page plays it before it is made (Nicole's v27, "Watch your reel before you make
+    # it"): a photo by its number, a clip by its place in --clips (c1, c2...) and where it starts in its video;
+    # never a path. The song's start and length go with them.
+    status_pieces = [dict({"kind": "photo", "n": picks[k]} if kind == "photo" else {"kind": "clip", "c": k + 1, "src": p["src"]},
+                          start=p["start"], dur=p["dur"], fill=bool(p.get("fill", True)))
+                     for (kind, k), p in zip(order, pieces)]
+    status_song = ({"from": facts["song_from"], "length": plan["song"]["length"]} if song else None)
     when = ""
     if song:
         f = facts["song_from"]
@@ -640,7 +738,8 @@ def cmd_make(a):
         say(facts["kind_note"])
     for k, p in enumerate(pieces, 1):
         if p.get("clip"):
-            say(f"  {k}. clip from {Path(p['path']).name} at {p['src']:.1f} s, {p['dur']:.1f} s long")
+            say(f"  {k}. clip from {Path(p['path']).name} at {p['src']:.1f} s, {p['dur']:.1f} s long"
+                + (f" (the whole video, {p['length']:.2f} s: it plays a touch slower to fill the beat)" if p.get("short_by") else ""))
     if facts["wide"] and not a.fit:
         if n_cl:                                     # count by place in the reel, as the clip lines above do
             say(f"Wide photos zoomed to fill the screen, by their place in the reel: "
@@ -657,7 +756,7 @@ def cmd_make(a):
             say(facts["hits_line"])
         say(facts["beats_line"])
         say(f"Dry run: nothing written. The plan is in {wd / 'reel.json'}")
-        write_status(a, ok=True, plan=plan_facts)
+        write_status(a, ok=True, plan=plan_facts, pieces=status_pieces, song=status_song, variation=int(a.variation or 0))
         return
     store = Path(a.store).expanduser() if a.store else capcut.default_store()
     dest, draft = capcut.write(plan, store, a.ignore_open)
@@ -672,7 +771,8 @@ def cmd_make(a):
         say(capcut.write.note)
     if capcut.write.waiting:
         say(capcut.WAITING_HINT)
-    write_status(a, ok=True, project=dest.name, plan=plan_facts, listed=bool(capcut.write.listed),
+    write_status(a, ok=True, project=dest.name, plan=plan_facts, pieces=status_pieces, song=status_song,
+                 variation=int(a.variation or 0), listed=bool(capcut.write.listed),
                  left_to_capcut=bool(capcut.write.left_to_capcut), waiting=bool(capcut.write.waiting))
     rec = json.loads((wd / "reel.json").read_text(encoding="utf-8"))
     rec["capcut_project"] = str(dest)
@@ -742,6 +842,7 @@ def main():
     m.add_argument("--shoot-id", help="the shoot's id in that backup (s1, s2...)")
     m.add_argument("--name")
     m.add_argument("--hook")
+    m.add_argument("--hook-whole", action="store_true", help="the words stay on the whole reel (B-roll's words on screen), not only the first piece")
     m.add_argument("--clips", help="a JSON file of video clips (path, src, seconds, w, h, length), placed in --picks as c1, c2...")
     m.add_argument("--pace", "--vibe", dest="pace", choices=list(timing.VIBES) + list(timing.OLD_NAMES), default=timing.DEFAULT_PACE,
                    help="beat (On every beat), mixed (A little of everything), calm, build; "
@@ -754,7 +855,11 @@ def main():
     m.add_argument("--ignore-open", action="store_true")
     m.add_argument("--kit", help="the post kit this reel is for: its working files go in the kit's hidden .kit/reels")
     m.add_argument("--status", help="write what happened here as a small JSON, for the reel page")
+    m.add_argument("--work", help="a working folder of this run's own (the reel page's preview), in place of the kit's .kit/reels")
     s.add_argument("--kit", help="the post kit these photos are for: the sheet and photos.json go in its .kit/reels")
+    s.add_argument("--before", help="the numbered list from last time (a kit's .kit/sheet.json): every photo on it keeps "
+                                    "its number, new ones take the next, a photo gone keeps its number unused")
+    s.add_argument("--no-sheets", action="store_true", help="the numbered list only, no contact sheet drawn (the reel page's own re-list)")
     t.add_argument("--kit")
     a = ap.parse_args()
     {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,

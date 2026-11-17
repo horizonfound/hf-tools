@@ -4,6 +4,7 @@ kept from before the talking reel's builder went into capcut.py (Nicole's v24, s
 
     python3 tests/capcut_even.py            compare: build the plans with capcut.py as it is now, against the kept file
     python3 tests/capcut_even.py --keep     (only ever run on capcut.py from BEFORE a change to build()) write the kept file
+    python3 tests/capcut_even.py --keep-short | --keep-broll    the two v27 projects' kept files (A20, A14), the same rule
 
 Every id CapCut's files carry is made fresh on every build, and a few fields hold the clock. evened() gives each
 id a number by where it first appears in the project and blanks the clock fields, so two builds of the same plan
@@ -24,6 +25,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REEL = ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "scripts"
 KEPT = ROOT / "tests" / "fixtures" / "capcut-photo-reels-before-v24.json"
+# Nicole's v27 (A20, Nov 17): a clip that is the whole of a short video, a few frames short of its hold, plays a
+# touch slower in the project rather than running past its video's end. Kept apart from the eight above, which
+# must stay byte for byte: this file was written from the commit that built it.
+KEPT_SHORT = ROOT / "tests" / "fixtures" / "capcut-short-clip-v27.json"
+# Nicole's v27 (A14, Nov 17): a B-roll reel, clips only, with its words on screen over the whole reel (reel.py
+# --hook-whole: the hook's dur is the reel's length, capped at the reel's end by build() as any hook is). Kept
+# apart too, from the commit that built it.
+KEPT_BROLL = ROOT / "tests" / "fixtures" / "capcut-broll-words-v27.json"
 UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 CLOCK = ("update_time", "create_time", "import_time", "import_time_ms", "tm_draft_create", "tm_draft_modified")
 
@@ -74,13 +83,35 @@ def plans():
     }
 
 
-def built():
+def plans_short():
+    """A20: a 2.40 s video used whole as the opening clip, held one beat of 2.4333 s (73 frames), then two photos."""
+    clip = {"path": "/pretend/Footage/short.mov", "w": 1080, "h": 1920, "clip": True, "src": 0.0, "length": 2.4, "short_by": 0.0333,
+            "start": 0.0, "dur": 73 / 30, "start_f": 0, "dur_f": 73}
+    ph = [{"path": "/pretend/Photos/a.jpg", "w": 4000, "h": 6000, "start": 73 / 30, "dur": 19 / 30, "start_f": 73, "dur_f": 19},
+          {"path": "/pretend/Photos/c.png", "w": 1080, "h": 1920, "start": 92 / 30, "dur": 38 / 30, "start_f": 92, "dur_f": 38}]
+    song = {"path": "/pretend/Music/song.m4a", "from": 0.0, "from_f": 0, "fade_out": 0.5, "length": 180.0, "name": "song.m4a",
+            "capcut_material": None, "capcut_beats": None}
+    return {"short clip, a touch slower": {"name": "Short clip reel", "photos": [clip] + ph, "song": song, "hook": None}}
+
+
+def plans_broll():
+    """A14: three clips and no photos, cut on the beat, the words on screen for the whole reel (2.5 s + 3 s + 4 s = 285 frames)."""
+    clips = [{"path": "/pretend/Footage/one.mov", "w": 1080, "h": 1920, "clip": True, "src": 0.5, "length": 6.0, "start": 0.0, "dur": 75 / 30, "start_f": 0, "dur_f": 75},
+             {"path": "/pretend/Footage/two.mov", "w": 1920, "h": 1080, "clip": True, "src": 1.0, "length": 6.0, "start": 75 / 30, "dur": 90 / 30, "start_f": 75, "dur_f": 90},
+             {"path": "/pretend/Footage/one.mov", "w": 1080, "h": 1920, "clip": True, "src": 2.0, "length": 6.0, "start": 165 / 30, "dur": 120 / 30, "start_f": 165, "dur_f": 120}]
+    song = {"path": "/pretend/Music/song.m4a", "from": 12.0, "from_f": 360, "fade_out": 0.5, "length": 180.0, "name": "song.m4a",
+            "capcut_material": None, "capcut_beats": None}
+    return {"B-roll, words over the whole reel": {"name": "Barn B-roll", "photos": clips, "song": song,
+                                                  "hook": {"text": "Golden hour at the barn", "dur": 9.5, "dur_f": 285}}}
+
+
+def built(which=plans):
     sys.path.insert(0, str(REEL))
     import capcut
     parts = capcut.load_parts()
     plat = {"platform": {"app_version": "9.6.0", "os": "mac"}, "version": 360000}
     out = {}
-    for name, plan in plans().items():
+    for name, plan in which().items():
         for label, p in (("", None), (" (their CapCut's version copied)", plat)):
             d, m = capcut.build(copy.deepcopy(plan), parts, p)
             out[name + label] = evened({"draft": d, "meta": m})
@@ -96,14 +127,28 @@ def mark(obj):
     return hashlib.sha256(text(obj).encode("utf-8")).hexdigest()
 
 
-def compare():
+def compare(kept_file=KEPT, which=plans):
     """(the names that differ from the kept ones, how many were compared)."""
-    kept = json.loads(KEPT.read_text(encoding="utf-8"))["projects"]
-    now = {k: mark(v) for k, v in built().items()}
+    kept = json.loads(kept_file.read_text(encoding="utf-8"))["projects"]
+    now = {k: mark(v) for k, v in built(which).items()}
     return sorted(k for k in set(kept) | set(now) if kept.get(k) != now.get(k)), len(kept)
 
 
 def main():
+    if "--keep-short" in sys.argv:
+        got = {k: mark(v) for k, v in built(plans_short).items()}
+        KEPT_SHORT.write_text(json.dumps({"about": "sha256 of the short-clip reel's CapCut project with its ids evened out "
+                                          "(tests/capcut_even.py), as capcut.py built it when A20 (Nicole's v27) was built, Nov 17, 2026",
+                                          "projects": got}, indent=1) + "\n", encoding="utf-8")
+        print(f"kept {len(got)} project in {KEPT_SHORT.name}")
+        return 0
+    if "--keep-broll" in sys.argv:
+        got = {k: mark(v) for k, v in built(plans_broll).items()}
+        KEPT_BROLL.write_text(json.dumps({"about": "sha256 of the B-roll reel's CapCut project (its words over the whole reel) with its ids evened "
+                                          "out (tests/capcut_even.py), as capcut.py built it when A14 (Nicole's v27) was built, Nov 17, 2026",
+                                          "projects": got}, indent=1) + "\n", encoding="utf-8")
+        print(f"kept {len(got)} project in {KEPT_BROLL.name}")
+        return 0
     if "--keep" in sys.argv:
         got = {k: mark(v) for k, v in built().items()}
         KEPT.write_text(json.dumps({"about": "sha256 of each photo reel's CapCut project with its ids evened out "
@@ -113,6 +158,18 @@ def main():
         return 0
     bad, n = compare()
     print(f"the same ({n} projects)" if not bad else f"DIFFERENT: {bad}")
+    if KEPT_SHORT.exists():
+        bad2, n2 = compare(KEPT_SHORT, plans_short)
+        print(f"the short clip's project: the same ({n2} project)" if not bad2 else f"the short clip's project: DIFFERENT: {bad2}")
+        bad = bad + bad2
+    else:
+        print("the short clip's project: no kept file yet (python3 tests/capcut_even.py --keep-short writes it)")
+    if KEPT_BROLL.exists():
+        bad3, n3 = compare(KEPT_BROLL, plans_broll)
+        print(f"the B-roll reel's project: the same ({n3} project)" if not bad3 else f"the B-roll reel's project: DIFFERENT: {bad3}")
+        bad = bad + bad3
+    else:
+        print("the B-roll reel's project: no kept file yet (python3 tests/capcut_even.py --keep-broll writes it)")
     return 1 if bad else 0
 
 

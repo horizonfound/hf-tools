@@ -604,6 +604,18 @@ def check_whole_build():
          len(cards) == 2 and not any(banned.search(c) for c in cards) and all("captions" in c for c in cards), cards)
     case("... and name what the kit makes, in her words (v26)",
          len(cards) == 2 and all(all(w in c for w in ("reels", "carousels", "stories")) for c in cards))
+    # (Nov 17, Nicole's v27 section 8) the Make posts screen says what a post kit is, and its third step happens inside the kit
+    wk = re.search(r'"m_what_h": "([^"]+)",\s*"m_what_p": "([^"]+)"', base)
+    case("the Make posts screen says what a post kit is, in her v27 words, and has a third step inside the post kit",
+         wk is not None and wk.group(1) == "What's a post kit?" and wk.group(2).startswith("It's one place for everything you'll post from a shoot.")
+         and wk.group(2).endswith("Nothing is ever posted for you.") and '"m_s3": "<b>Make your posts inside your post kit.</b>"' in base
+         and '"m_steps": "How to make a post kit from a shoot"' in base and "we'll build you a <b>post kit</b>" in base)
+    hello_flat = re.sub(r"\s+", " ", read(SM / "parts" / "hello.md"))
+    case("hello.md knows the screen's What's a post kit? box and its three steps, and answers \"what's a post kit?\" in her words",
+         "What's a post kit?" in hello_flat and "It's one place for everything you'll post from a shoot." in hello_flat and "three steps" in hello_flat
+         and "Make your posts inside your post kit" in hello_flat and "I'll bring your photos in and open your new post kit" in hello_flat)
+    case("photos-in.md: after \"make my posts\" the assistant does what the screen's step 2 promised, nothing more",
+         "I'll bring your photos in and open your new post kit." in re.sub(r"\s+", " ", read(SM / "parts" / "photos-in.md")))
     plug = json.loads(read(PLUGIN / ".claude-plugin" / "plugin.json"))["description"]
     market = json.loads(read(ROOT / ".claude-plugin" / "marketplace.json"))["plugins"][0]["description"]
     case("the plugin's one-line description promises no captions 'in your voice'", not banned.search(plug), plug)
@@ -828,9 +840,9 @@ def check_talking():
 
     # the door, in what Claude reads
     arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
-    case("parts/arrange.md names the reel page's third card in her words, as a link and not a choice",
-         ('"' + reel_page.WORDS["foot_talk_b"] + '"') in arr and ('"' + reel_page.WORDS["foot_talk_s"] + '"') in arr
-         and "it is a link, not a choice" in arr and "never gets the tick" in arr and "`parts/talking-reel.md`" in arr)
+    case("parts/arrange.md names the chooser's Talking to camera card (v27) in her words, as a link and not a choice",
+         ('"' + reel_page.KIND_WORDS["kind_talk_b"] + '"') in arr and ('"' + reel_page.KIND_WORDS["kind_talk_s"] + '"') in arr
+         and "is a link, not a choice" in arr and "changes nothing on the reel page" in arr and "`parts/talking-reel.md`" in arr)
 
     # the PC: a named gap, in the same words everywhere
     pc = read(SM / "parts" / "on-a-pc.md")
@@ -989,7 +1001,8 @@ def check_several_reels():
          "**Every command acts on the reel that is open on the page**" in part and "each of them says first which reel it is about" in flat
          and '--for-reel "Reel 2"' in part and 'footage.py scan "<kit>" --reel "Reel 2"' in part and 'footage.py moments "<kit>" --file <file> --reel "Reel 2"' in part
          and 'reel_page.py show "<kit>" --reel "Reel 2"' in part and 'reel_page.py make "<kit>" --reel "Reel 2"' in part
-         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 3)
+         and 'reel_page.py direct "<kit>" --reel "Reel 2"' in part
+         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 4)
     case("several reels: the chat's reels command, as reel_page.py has it, in the part and in the part's command block",
          'reel_page.py reels "<kit>" --new [--name "Kitchen"]' in flat and '--rename "Reel 2" --to "Kitchen"' in flat and '--open "Reel 1"' in flat
          and 'python3 <scripts>/reel_page.py reels "<kit>" [--new [--name "<name>"] | --open "<reel\'s name>" | --rename "<reel\'s name>" --to "<name>"]' in arr
@@ -1105,22 +1118,35 @@ def check_photographer_picks():
 
 
 def check_trim_and_select():
-    """Trim a clip, and select several photos like Lightroom (Nicole's v25, sections 4 and 8; stage I of the v26
-    build). Both are the page's own: the instructions say what the page does, in the page's words, and that the
-    assistant has no command for either."""
+    """Select several photos like Lightroom (Nicole's v25, section 8), and the footage editor that replaced her v25
+    Trim panel (her v27, section 3; Lane A's stage 3). Both are the page's own: the instructions say what the page
+    does, in the page's words, and that the assistant has no command for either; naming their clips is the
+    assistant's (the reel skill's section "Name my clips")."""
     rp = read(SCRIPTS / "reel_page.py")
     arr, pc = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "on-a-pc.md").split())
-    words = dict(re.findall(r'^    "(trim_btn|trim_done|trim_cancel|sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|trim_stuck|trim_no_stills_pc)": "([^"]+)"', rp, re.M))
-    case("the page's words for Trim and for selecting several are in reel_page.py (11 of them)", len(words) == 11, sorted(words))
-    case("arrange.md names the Trim button as the card shows it, and what the panel has: the loop with sound, the stills, the handles, the middle, the quarter second",
-         ("**" + words.get("trim_btn", "?") + "**") in arr and all(x in arr for x in ("plays on a loop with its sound", "about 8 seconds either side", "the left handle for where it starts",
-                                                                                  "the right handle for where it ends", "the middle to slide the whole clip", "a quarter second")))
-    case("arrange.md gives the panel's readout as the page writes it, and its limits (1 to 15 seconds, never past the video's ends)",
-         '"Starts 0:31.6 · ends 0:34.0 · 2.4 s"' in arr and "A clip is 1 to 15 seconds and never runs past the ends of its video." in arr
-         and "MOMENT_MIN, MOMENT_MAX = 1.0, 15.0" in rp)
-    case("arrange.md: Done saves; Cancel, the x, Escape and a click outside change nothing; the assistant has no command that trims",
-         ("**" + words.get("trim_done", "?") + "** saves it") in arr and words.get("trim_cancel", "?") + ", the ×, Escape or a click outside the panel closes it and changes nothing" in arr
-         and "You have no command that trims a clip" in arr)
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|editor_no_stills_pc)": "([^"]+)"', rp, re.M))
+    ed = dict(re.findall(r'^    "(ed_h3|ed_footage|ed_make|ed_in|ed_out|ed_add|ed_clear|ed_zoom|ed_whole|clips_wl|use|in_reel|play_clip|not_named|desc_say|desc_line)": "([^"]+)"', rp, re.M))
+    case("the page's words for selecting several and for the editor are in reel_page.py (7 and 16 of them)", len(words) == 7 and len(ed) == 16, (sorted(words), sorted(ed)))
+    case("the v25 Trim panel is off the page (TRIM_PANEL = False), its code kept behind the switch", "TRIM_PANEL = False" in rp and "if TRIM_PANEL:" in rp)
+    case("arrange.md names the editor's parts as the page shows them: Your footage, Footage, Make a clip, Start here, End here, Add clip, Clear, Your clips, Zoom in, Show the whole video",
+         all(("**" + ed[k] + "**") in arr for k in ("ed_h3", "ed_footage", "ed_make", "ed_zoom", "ed_whole", "clips_wl", "use", "in_reel"))
+         and all(ed[k] in arr for k in ("ed_in", "ed_out", "ed_add", "ed_clear")) and "**Add clip**" in arr, [k for k in ed if ed[k] not in arr])
+    case("arrange.md says how a clip is made (the orange stretch that grows, End here, the ends and the middle, 1 to 15 seconds, Add clip) and what happens after Add clip",
+         all(x in arr for x in ("Start here turns orange and plays", "orange striped stretch grows", "End here makes it solid", "drag an end to trim it", "the middle to slide it",
+                                "a clip is 1 to 15 seconds", "dashed with \"✓ Added\"", "the clip just added is never changed")))
+    case("arrange.md: a click on a card opens the clip, a drag across a clip only scrubs, a trimmed clip keeps its name, the assistant has no command that trims, makes or removes a clip",
+         all(x in arr for x in ("A click on a card opens that clip in the editor", ed["play_clip"], "Dragging across a clip on the timeline only scrubs; a plain click picks it",
+                                "A trimmed clip keeps a name it was given", "You have no command that trims, makes or removes a clip", "Her v25 Trim panel")))
+    case("arrange.md names YOUR PICK, Not named yet and the Name my clips line, and sends the naming to the reel skill",
+         "**YOUR PICK**" in arr and ("**\"" + ed["not_named"] + "\"**") in arr and ("**\"" + ed["desc_say"] + "\"**") in arr and ("**\"" + ed["desc_line"].replace("{short}", "<shoot>") + "\"**") in arr
+         and 'the reel skill\'s section "Name my clips"' in arr)
+    case("the reel skill has the section Name my clips: picks, read each sheet once, a short plain name (never a name, a feeling), no about, describe, the page shows them",
+         '## Name my clips: "Name my clips for <shoot>"' in reel and "footage.py picks" in reel and "Read each sheet once" in reel and "Never a person's name, a feeling, an occasion" in reel
+         and 'refuses an "about"' in reel and "footage.py describe" in reel and "Never write a clip's name into the reel page's records any other way" in reel)
+    case("the reel skill's footage look names any unnamed picks at its end, and sends the moments to Your clips (not Select your clips)",
+         "Then name any clips of their own that aren't named yet" in reel and 'under "Your clips" in the footage editor' in reel and "Select your clips" not in reel)
+    case("the core table sends Name my clips to the reel skill", '| "Name my clips for <shoot>"' in core and 'the reel skill\'s "Name my clips"' in core)
     case("arrange.md: selecting several, key by key (click, Shift-click, Cmd-click or Ctrl-click on a PC, Escape), and a drag moves the whole selection in order",
          all(x in arr for x in ("a click on a photo in the order selects it", "Shift-click selects everything between it and the last one clicked",
                                 "Cmd-click (Ctrl-click on a PC) adds or drops one", "Escape lets them all go",
@@ -1129,15 +1155,19 @@ def check_trim_and_select():
     case("arrange.md names the bar's five buttons as the page has them, and Add them to the end below", bar in arr and ("**" + words.get("sel_add", "?") + "**") in arr, bar)
     case("arrange.md: in All your photos a plain click still adds or takes out; one press of Undo takes a whole batch back; a selection is the page's own",
          "a plain click still adds a photo or takes it out" in arr and "one press of Undo takes the whole batch back" in arr and "you can't see it and nothing saves it" in arr)
-    case("on-a-pc.md names the gap honestly, in the page's own two lines: no pictures along the timeline, and a video that can't be played there",
-         ('"' + words.get("trim_no_stills_pc", "?") + '"') in pc and ('"' + words.get("trim_stuck", "?") + '"') in pc and "a PC takes no stills from a video yet" in pc)
+    case("on-a-pc.md names the editor's gap honestly, in the page's own line (no pictures along the timeline), Start here and End here, and that clips can't be named on a PC",
+         ('"' + words.get("editor_no_stills_pc", "?") + '"') in pc and "**Start here**, **End here** and **Add clip** work on it" in pc and "Use this moment" not in pc
+         and "can't see your clips to name them" in pc and "Naming their clips" in pc)
 
 
 def check_songs_v25():
     """Songs (Nicole's v25, section 5; stage J of the v26 build): a short song starts after a glitchy opening, a
-    replaced recording gets its sound taken again, and Remove a song is NOT built (it waits on Nicole): the
-    instructions say what the page does and never offer to remove a song."""
+    replaced recording gets its sound taken again, and Remove this song (her v27, built Nov 17, Lane E's E12):
+    the instructions say the page's button moves a song, and a recording's sounds, to the computer's own Trash,
+    never a delete, Put Back brings it back, a song in the Photos folder stays, and the assistant has no command
+    for it and never moves a song itself."""
     rp = read(SCRIPTS / "reel_page.py")
+    tc = read(SCRIPTS / "this_computer.py")
     arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
     reel = " ".join(read(REEL / "SKILL.md").split())
     gone = re.search(r'^    "song_gone": "([^"]+)"', rp, re.M)
@@ -1149,11 +1179,26 @@ def check_songs_v25():
              and ("with no gap it starts at the top" in t or "with no gap, at the top" in t) and '"starting the song 4 seconds in"' in t)
         case(f"{name}: a replaced recording's sound is taken again as \"<name> sound 2.m4a\", the first never written over, the recording listed once",
              '"<name> sound 2.m4a"' in t and "never written over" in t and "shows the recording once" in t)
-        case(f"{name}: there is no Remove on a song, the assistant has no command for one and never moves, renames or deletes a song",
-             "no button" in t and ("you have no command for it" in t or "you have no command for one" in t)
-             and ("never move, rename or delete a song or a recording" in t or "Never move, rename or delete a song or a recording" in t)
-             and "there's no button for that yet" in t)
-        case(f"{name} never tells the assistant to put a song in the Trash", "Trash" not in t and "Recycle Bin" not in t and "Put Back" not in t)
+        case(f"{name}: Remove this song is the page's button (two taps), to the computer's own Trash (the Recycle Bin on a PC), never a delete, and Put Back brings it back",
+             "**Remove this song**" in t and '"Move it to the Trash?"' in t and "the computer's own Trash (the Recycle Bin on a PC)" in t
+             and "never a delete" in t and "Put Back (Restore on a PC) brings it back" in t and "no button for that yet" not in t)
+        case(f"{name}: a recording's sounds go with it, the reel that had it picked goes back to no song, and another reel that picked it says her line when opened",
+             "every sound taken from a recording" in t and 'goes back to "no song picked yet"' in t and "another reel of the shoot that had it picked says" in t
+             and ('"' + (gone.group(1) if gone else "?") + '"') in t)
+        case(f"{name}: only a song in the shoot's own Music folder can go; one in the Photos folder stays and is theirs to take out",
+             "Only a song in the shoot's own Music folder can go" in t and "a recording in the Photos folder stays" in t and "theirs to take out of that folder themselves" in t)
+        case(f"{name}: the assistant has no command for it, never moves, renames or deletes a song itself, and points at the button",
+             "You have no command for it" in t and "never move, rename or delete a song or a recording yourself" in t and "point at the button" in t)
+    case("the route exists: POST /reel-song-remove in reel_page.py's list and remove_song goes through this_computer.trash_many, the one door",
+         '"/reel-song-remove"' in rp and "def remove_song(body):" in rp and "this_computer.trash_many(paths, music_dir(kit))" in rp and "def trash_many(paths, inside):" in tc)
+    case("her four page lines and her two server lines are in reel_page.WORDS, word for word",
+         all(x in rp for x in ('"song_remove": "Remove this song"', '"song_sure": "Move it to the Trash?"', '"song_removing": "Removing…"',
+                               '"song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back."',
+                               '"song_not_here": "That song isn\'t in this shoot\'s folder anymore."',
+                               '"song_cant_trash": "I couldn\'t move that song to the Trash. Drag it out of the shoot\'s Music folder in Finder instead."')))
+    case("where-things-live.md says a removed song is in the computer's own Trash with its sounds, its lines in reel-sounds.json dropped, nothing else written down",
+         "**Remove this song**" in where and "goes to the computer's own Trash with every sound taken from it" in where
+         and "its lines in `reel-sounds.json` are dropped, the version before kept" in where and "nothing else is written down about it" in where)
     case("arrange.md gives the page's own line for a picked song that is gone", bool(gone) and ('"' + gone.group(1) + '"') in arr, gone and gone.group(1))
     case("where-things-live.md names the note of which recording each sound came from, and what is in it",
          "`reel-sounds.json`" in where and "`reel-sounds.prev.json`" in where and "`reel-sounds.lock`" in where and "a hash of its first megabyte, never a path" in where
@@ -1205,9 +1250,67 @@ def check_queue_v25():
          and 'x["version"], x["reel_name"] = ' in pq)
 
 
+def check_trash_helper():
+    """The Trash helper (Nicole's v27, Nov 17; Lane E's E11): parts/where-things-live.md says nothing of the
+    photographer's is ever deleted, that the one door out is the computer's own Trash (the Recycle Bin on a PC)
+    through this_computer.py, names the way back in Nicole's words, and gives the assistant no command for it."""
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    tc = read(SCRIPTS / "this_computer.py")
+    case("where-things-live.md says nothing of the photographer's is ever deleted, and the Assistant keeps no Trash of its own",
+         "never delete a file or a folder of the photographer's" in where and "keeps no Trash of its own" in where)
+    case("where-things-live.md names the computer's own Trash and the Recycle Bin as the one door out, through this_computer.py's trash",
+         "Finder's Trash on a Mac, the Recycle Bin on a PC" in where and "`this_computer.py`'s `trash`" in where and "the only door" in where
+         and "def trash(path, inside):" in tc)
+    case("where-things-live.md says what the door refuses, in the helper's own terms (a link, a path outside the one folder, a drive with no Trash, never a delete)",
+         "refuses a link, a path outside the one folder it is told to work in, and a drive with no Trash, and it is never a delete" in where)
+    case("the way back is Nicole's line on a Mac (TRASH_BACK) and ours on a PC, in where-things-live.md word for word",
+         "open the Trash in Finder and choose Put Back" in where and "open the Recycle Bin in File Explorer and choose Restore" in where
+         and '"open the Trash in Finder and choose Put Back"' in tc and '"open the Recycle Bin in File Explorer and choose Restore"' in tc)
+    case("the assistant has no chat command that moves anything to the Trash, and asked to delete says it never deletes",
+         "You have no chat command that moves anything to the Trash" in where and "say you never delete" in where)
+    case("this_computer.py's own words name no Claude and no path", "Claude" not in tc[tc.index("TRASH_WORD ="):tc.index("def trash_for_tests")])
+
+
+def check_watch_direct_broll():
+    """Nicole's v27, Lane A's stage 4: Watch your reel before you make it, Would you like to direct this edit? and
+    B-roll on the page. The reel skill has the section "Edit my reel" (read the direction, arrange within it, set
+    it up with reel_page.py direct, say what was arranged), the core table sends the line there, arrange.md says
+    the two steps in the page's words and that the watch step is the page's (not the assistant's), the make takes
+    --variation and --song-start, and where-things-live.md names direct, onscreen and the preview's folder."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(direct_h2|direct_b|direct_for|direct_note|watch_h2|pv_part|pv_mix|pv_undo|pv_redo|pv_make|os_wl|os_save|sum_broll)": "([^"]+)"', rp, re.M))
+    case("the page's words for the direct step, the watch step and B-roll are in reel_page.py (13 of them)", len(words) == 13, sorted(words))
+    case("the reel skill has the section Edit my reel: read the direction with note, follow it exactly, never widen it, the style that fits, a moment not on a card is a look for that moment only, reel_page.py direct, say what was arranged",
+         '## Edit my reel: "Edit my reel for <shoot>[, <reel>], and follow my direction"' in reel and "reel_page.py note" in reel and "follow it exactly, never widen it" in reel
+         and "a footage look for that moment only" in reel and "reel_page.py direct" in reel and "--style first|reveal|backforth|bookends --clips" in reel
+         and "Never write the style, the clips or the order into the reel page's records any other way" in reel and "Say in two lines what you arranged" in reel)
+    case("the reel skill says the watch step is the page's: press play on the page, Try another mix, Undo; never describe a cut you haven't seen the plan of",
+         "Watch your reel before you make it (Nicole, Nov 16)" in reel and "press play on the page to watch it" in reel and "Try another mix" in reel
+         and "never \"make it\"" in reel and "You never describe a cut you haven't seen the plan of" in reel)
+    case("the reel skill's make takes --variation and --song-start, and says what they are", "[--variation N] [--song-start S]" in reel and "`--variation N` is which mix" in reel and "`--song-start S` where the song starts" in reel)
+    case("the reel skill says what B-roll is (clips only, no photos, Words on screen, into CapCut as plain text) and that Save my video is not built yet",
+         "B-roll (Nicole's v27, Nov 17) is a kind of reel with no photos" in reel and "Words on screen" in reel and "plain text over the whole reel" in reel
+         and "**Save my video**" in reel and "is not built yet" in reel)
+    case("the core table sends Edit my reel to the reel skill", '| "Edit my reel for <shoot>[, <reel>], and follow my direction"' in core and 'the reel skill\'s "Edit my reel"' in core)
+    case("arrange.md: the direct step in the page's words, its line's shapes, sent to the reel skill's Edit my reel, and told apart from the footage box",
+         ("**" + words["direct_h2"] + "**") in arr and ('"' + words["direct_b"] + '"') in arr and "**\"Edit my reel for <shoot>\"**" in arr and ", and follow my direction" in arr
+         and 'the reel skill\'s section "Edit my reel"' in arr and "reel_page.py direct" in arr and "This is a different note from the footage box in step 1" in arr)
+    case("arrange.md: the watch step in the page's words (Another part of this song, Try another mix, Undo and Redo, Make this one in CapCut), the last step, and the page's not the assistant's",
+         ("**" + words["watch_h2"] + "**") in arr and all(("**" + words[k] + "**") in arr for k in ("pv_part", "pv_mix", "pv_make")) and "**Undo** and **Redo**" in arr and "the last step, on every kind" in arr
+         and "Press play on the page beside us" in arr)
+    case("arrange.md: B-roll is clips only with Words on screen, Save my video still being built; make takes --variation and --song-start",
+         "A B-roll reel is clips only" in arr and ("**" + words["os_wl"] + "**") in arr and "Save my video (the finished MP4 made on the page) is still being built" in arr
+         and "`--variation N` and `--song-start S`" in arr and "isn't ready yet" not in arr)
+    case("where-things-live.md names direct, onscreen, the made entries' variation and song_start, and the preview's own folder",
+         "`direct`, Nov 17" in where and "`onscreen`: the words, the font, the style" in where and "`variation`, which mix it was, and `song_start`" in where and "`reel-preview/`" in where)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
+               check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
+               check_watch_direct_broll):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

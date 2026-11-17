@@ -1,0 +1,7 @@
+{
+ "about": "sha256 of the B-roll reel's CapCut project (its words over the whole reel) with its ids evened out (tests/capcut_even.py), as capcut.py built it when A14 (Nicole's v27) was built, Nov 17, 2026",
+ "projects": {
+  "B-roll, words over the whole reel": "0ba59bcd16b23e9cefd6740f1f4be3e0371d6a2f319edee5f5ccf432616af35d",
+  "B-roll, words over the whole reel (their CapCut's version copied)": "122fae8b35fa513306fbcf9f7fe4502afc78db52cfd0b3038904defd3251c15d"
+ }
+}

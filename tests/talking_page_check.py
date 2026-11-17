@@ -34,9 +34,9 @@ Parts (one per sub-stage of the page; the later ones are added as they are built
           photo block's ends, Split, Speed, Zoom, the timeline's own zoom, Undo and Redo by button and by key, and
           Make it in CapCut from the press to her result box (into the test's own pretend CapCut folder).
 
-  door    Stage E (tests/talking_page_door.py holds it): the way in. Step 1's third card on the reel page, "Talking
-          to camera": her two lines and her one style rule, a plain link third after the two choices, to the
-          talking page of the same shoot; a press on it leaves the reel page's record exactly as it was.
+  door    Stage E (tests/talking_page_door.py holds it): the way in. The Talking to camera card on the reel page's chooser (v27), "Talking
+          to camera": her two lines, a plain link third of her four kinds, to the talking page of the same shoot;
+          a press on it leaves the reel page's record exactly as it was.
 
 What it never does: touch the real ~/.studio (STUDIO_HOME is the scratch folder; the real one is listed before
 and after), build or start the real transcriber (TALKING_TRANSCRIBER=pretend, TALKING_NO_REAL=1), open a folder
@@ -1318,7 +1318,7 @@ def main():
             if s.proc is None:
                 s.start()
                 case("the page server is this test's own (port %d)" % s.port, a.port <= s.port < a.port + 10)
-            group("the door: the reel page's third card, by request", tpd.run_requests, me, s)
+            group("the door: the chooser's Talking to camera card, by request", tpd.run_requests, me, s)
             if a.no_chrome or not chrome_drive.find_chrome():
                 skip("the door on the page: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
             else:
