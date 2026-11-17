@@ -26,6 +26,12 @@ Her rules, in her words where she gave them:
     shows in the project (Oct 25): steps 1 and 3 apply, and step 2 only marks, it moves nothing (ON_CAPCUT_MARKS).
     Because a tick may move, a one-beat photo can come out a little under MIN_SHOW (about a third of a second
     at the least, on a song of about 111 to 133 beats a minute): hers is the same, and it is theirs to settle.
+  - The paces are clearly different (her handoff v27, Nov 16: changing the pace "does nothing change", because
+    Longer and Quicker held in every pace). Calm: a plain photo 4 beats, Longer 6, Quicker 2, even counts preferred
+    (she heard 3-beat holds as "missing the beat"), one beat only when nothing else fits. Build: three stages, 3
+    beats, then 2, then 1, then the last photo lands; Longer one more, Quicker one less. A little of everything: as
+    before, and every fourth photo holds 4 beats; Longer at least 3, Quicker 1. On every beat is untouched. The
+    numbers are the CALM_, BUILD_ and MIXED_ constants above candidates(); her v27 acceptance file proves them.
   - The vibes are not fixed templates: "those are not set in stone templates. Those should change for every
     single thing that's made." One search over the whole reel (dynamic programming) picks every length
     together: each piece has a natural length for the vibe and a few others it may take at a small cost; cuts
@@ -36,7 +42,9 @@ Her rules, in her words where she gave them:
     made and they are told exactly why (the STOP line).
   - A clip runs whole beats, never longer than its card or what is left of its video. An opening clip is 3 to 4 seconds and never under 3;
     later clips may shrink to 2 seconds on a short song; a card they made longer than 4.2 s keeps its length,
-    give or take a beat.
+    give or take a beat. A clip that is the whole of a video a hair shorter than one beat (under CLIP_OVERSHOOT)
+    is held for the beat and plays a touch slower in the project (her v27: "long clips work"); shorter than that,
+    the reel stops and says so.
   - "A little of everything" is mixed differently for every reel: seeded by the file names, the vibe and how
     many reels were already made with the same choices (variation), so Make my reel again gives a fresh mix,
     and the same choices give the same reel on any computer.
@@ -69,6 +77,12 @@ WORDS = {"beat": "one photo on every beat", "mixed": "a little of everything", "
 EVEN_BPM = 100.0          # no song: an even 100 beats a minute (the footage keeps its own sound)
 MIN_SHOW = 0.45           # no photo on screen for less than about half a second (on a very fast song: two beats)
 W_HIT, W_DOWN = 0.6, 0.35  # landing on a hit; a long hold or a clip ending on the 1 of a bar
+# A clip that is the whole of a short video (a 2.4 s phone clip used whole; her v27 editor makes 1 to 15 s clips
+# from any video) can come out a hair shorter than the one beat it must hold. Up to CLIP_OVERSHOOT seconds short
+# it is held anyway: in the project it plays a touch slower (capcut.py), never past the video's end. Shorter than
+# that, the reel stops and says so (reel.plan_reel). Ours (Nov 17); Nicole's call whether a held last frame would
+# be better than a slightly slowed clip.
+CLIP_OVERSHOOT = 0.2
 W_EMPTY = 0.9             # a cut where the song doesn't hit at all (Nicole, Nov 12; her handoff v25)
 # A hit you can hear (hers, v25): a jump in the sound that stands out HIT_STANDS_OUT standard deviations above
 # the music HIT_AROUND seconds either side of it, never two closer than HIT_APART. A grid tick moves onto a hit
@@ -81,6 +95,24 @@ HITS_AT_LEAST = 8
 # Its ticks stay on those marks: a tick with a hit within reach is marked as heard and left where CapCut put it.
 # Nicole's has no CapCut songs, so this is ours; False would move them like any other song. Theirs to settle.
 ON_CAPCUT_MARKS = True
+# The paces are clearly different (hers, v27, Nov 16: changing the pace "does nothing change"; Quicker and Longer
+# held in every pace, so the paces felt alike). What a plain photo, a Longer one and a Quicker one aim for, in half
+# beats (4 = two beats), and the other lengths each may take at a cost. Every number is hers, to the number; the
+# 22 lines in her acceptance file are what they prove. On every beat is untouched.
+#   Calm: a plain photo 4 beats, Longer 6, Quicker 2; even counts preferred (an odd count costs CALM_ODD_COST, since
+#   3-beat holds were what she heard as "missing the beat"); one beat only when nothing else fits (CALM_ONE_BEAT_COST:
+#   a 10-photo Calm on a 15 s song is made rather than stopped with the wrong reason).
+CALM_PLAIN, CALM_LONGER, CALM_QUICKER = 8, 12, 4
+CALM_CHOICES = [4, 6, 8, 12, 16]
+CALM_ODD_COST, CALM_ONE_BEAT_COST = 0.45, 3.0
+#   Build: three stages, 3 beats each, then 2, then 1, then the last photo lands; Longer one beat more, Quicker one
+#   beat less; it costs more to stray (2.0), so Build keeps its shape.
+BUILD_STAGES = (6, 4, 2)
+BUILD_CHOICES = [2, 4, 6, 8]
+#   A little of everything: as before, and every MIXED_HOLD_EVERY-th photo holds MIXED_HOLD (4 beats); Longer at
+#   least 3 beats (MIXED_LONGER_LEAST, or twice the aim), Quicker 1.
+MIXED_HOLD_EVERY, MIXED_HOLD, MIXED_LONGER_LEAST = 4, 8, 6
+MIXED_CHOICES = [2, 4, 6, 8, 12]
 
 
 def vibe_of(name):
@@ -347,21 +379,34 @@ def candidates(items, grid, vibe, seed, j0=None):
                 t = beat_t[pk]
                 c = _costs(t, [2, 4], 0.9)
         elif vibe == "calm":
-            t = {"+": 8, "-": 2}.get(mark, 4)
-            c = _costs(t, [2, 4, 6, 8], 1.0)
+            # Her v27 (Nicole, Nov 16: "a definite change"): Calm really breathes. A plain photo 4 beats, Longer 6,
+            # Quicker still 2, since in Calm even the quick ones get a moment.
+            t = {"+": CALM_LONGER, "-": CALM_QUICKER}.get(mark, CALM_PLAIN)
+            c = _costs(t, CALM_CHOICES, 1.0)
+            # Even counts (2, 4, 6, 8 beats) keep Calm on the count; a 3-beat hold only when the song really needs
+            # it (Nicole, Nov 16: Calm felt like it was "missing the beat on a couple").
+            c = sorted(((h, k + (CALM_ODD_COST if (h // 2) % 2 else 0)) for h, k in c), key=lambda x: x[1])
+            # One beat, only when the song is too short for anything else (a 10-photo Calm on a 15 s song used to
+            # stop with the wrong reason; now it is made, as before).
+            c.append((2, CALM_ONE_BEAT_COST))
         elif vibe == "build":
-            t = 4 if frac < 1 / 3 else 2
-            t = {"+": t * 2, "-": max(2, t // 2)}.get(mark, t)
-            c = _costs(t, [1, 2, 4, 6], 1.6)                   # Build keeps its shape: slow, then quick, then it lands
+            # Her v27 (Nov 16): Build in three clear stages: 3 beats each, then 2, then 1, then the last photo lands.
+            # Longer is one beat more, Quicker one beat less (never under one).
+            t = BUILD_STAGES[0] if frac < 1 / 3 else BUILD_STAGES[1] if frac < 2 / 3 else BUILD_STAGES[2]
+            t = {"+": t + 2, "-": max(2, t - 2)}.get(mark, t)
+            c = _costs(t, BUILD_CHOICES, 2.0)                  # Build keeps its shape: it costs more to stray
         else:
+            # Her v27 (Nov 16): a little of everything, with real long moments: every fourth photo holds 4 beats.
+            if not first and pk % MIXED_HOLD_EVERY == MIXED_HOLD_EVERY - 1:
+                mix[pk] = MIXED_HOLD
             t = 4 if first else mix[pk]
             if at is not None and at < len(grid.ENERGY):       # busier music, quicker photos; quieter, longer
                 if grid.ENERGY[at] > 0.85 and t == 4:
                     t = 2
                 elif grid.ENERGY[at] < 0.25 and t == 1:
                     t = 2
-            t = {"+": max(4, t * 2), "-": 1}.get(mark, t)
-            c = _costs(t, [1, 2, 4, 6, 8], 0.9)
+            t = {"+": max(MIXED_LONGER_LEAST, t * 2), "-": 2}.get(mark, t)   # Longer at least 3 beats, Quicker 1
+            c = _costs(t, MIXED_CHOICES, 0.9)
         if last:                                               # the last photo lands: never under two beats
             t = (6 if mark == "+" else 4) if vibe == "beat" else 8
             c = _costs(t, [4, 6, 8], 1.0)

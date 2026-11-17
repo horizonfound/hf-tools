@@ -66,6 +66,9 @@ name: Check it on a Windows PC
 #   tests/reel_hits_check.py        Nicole's v25: every vibe lands on the song's real hits (the hits you can hear, the
 #                                   ticks moved onto them, cuts kept off beats with no hit), on a loose song the test
 #                                   writes itself; "No song" in every vibe; whole frames; the chat's reel maker too
+#   tests/sheet_numbers_check.py   Nicole's v27: photo numbers stay fixed when photos are added (reel.py sheet is the one
+#                                   writer, kit.py sheet hands it the list before; new photos take the next numbers, a photo
+#                                   gone keeps its number unused)
 #   tests/words_check.py, words_page_check.py, kit_steps_check.py, posting_panel_check.py,
 #   posting_reminders_page_check.py   Nicole's v20 and v21: the words for a post, the words page, the kit's three
 #                                   steps, the posting queue's panel and its reminder drop-down (--no-chrome here:
@@ -139,10 +142,27 @@ name: Check it on a Windows PC
 #                                   each reel its own piece (no id renamed), the reel cover picker in play order,
 #                                   reminders per reel on a pretend calendar. By request on Windows (--no-chrome)
 #                                   and in "mac-page" with the kit page and the posting page in a hidden Chrome.
+#   tests/reel_v27_page_check.py    Nicole's v27, the reel page rebuilt (Nov 17, Lane A stage 2): the chooser of four
+#                                   kinds and each kind its own page, a reel's own kind, new photos numbered on the
+#                                   page's own poll with every other number kept, the song drop-down with Listen and
+#                                   Remove this song, Add this reel to my posting queue. By request on Windows
+#                                   (--no-chrome) and in "mac-page" with the pages in a hidden Chrome.
 #   tests/songs_check.py            Nicole's v25, songs (Nov 14): a short song starts after a glitchy opening (what
 #                                   ffmpeg's silencedetect would call a silence, measured in plain Python), a replaced
-#                                   recording gets its sound taken again ("<name> sound 2"), Remove a song NOT built.
-#                                   No server, no browser, no ffmpeg: the whole file on Windows and on the Mac.
+#                                   recording gets its sound taken again ("<name> sound 2"); and Remove this song (her
+#                                   v27, Nov 17): POST /reel-song-remove sends a song, and every sound taken from a
+#                                   recording, to the Trash (the run's own folder through the tests' switch; the real
+#                                   Trash is never touched), clears the open reel's pick, leaves a second reel alone,
+#                                   and refuses the rest with nothing moved. No server, no browser, no ffmpeg: the
+#                                   whole file on Windows and on the Mac.
+#   tests/trash_check.py            The Trash helper (Nicole's v27, Nov 17): this_computer.trash moves a file or a
+#                                   folder to the computer's own Trash (Finder's on a Mac; the Recycle Bin on a PC by
+#                                   Windows' own call, nothing installed) and is never a delete; it refuses a link, a
+#                                   path outside the one folder it is told, and a drive with no Trash; trash_many
+#                                   checks every path before the first move. In a test the switch sends items into
+#                                   the test's own folder, so the real Trash is never touched, and the real routes are
+#                                   tried with a stand-in. No server, no browser: the whole file on Windows and on
+#                                   the Mac (the PC branch's first real run is this job).
 #   tests/loose_ends_v26_check.py   Nicole's v25 and v26, the smaller changes and loose ends (Nov 14): no page tells
 #                                   them to talk to "Claude" (every page says "your assistant"); every shoot in Your
 #                                   Content with a kit record is listed, also one whose page was never written; the
@@ -186,12 +206,12 @@ name: Check it on a Windows PC
 on:
   workflow_dispatch:
   push:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_posted_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_posted_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
-    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_posted_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/songs_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
+    paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/posting_posted_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
@@ -261,6 +281,9 @@ jobs:
       - name: Every vibe lands on the song's real hits (Nicole's v25 - the three steps on a loose song made here, No song in every vibe, whole frames, the chat's reel maker)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/reel_hits_check.py
+      - name: Photo numbers stay fixed when photos are added (Nicole's v27 - reel.py sheet keeps every number, new photos take the next, a photo gone keeps its number unused)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/sheet_numbers_check.py
       - name: The words for a post (the record, Nicole's rules for writing and asking)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/words_check.py
@@ -339,9 +362,15 @@ jobs:
       - name: Trim a clip and select several photos (Nicole's v25 - her words, a trim by request kept 1 to 15 seconds and inside its video; the page in a browser is checked on the Mac)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/reel_trim_select_check.py --no-chrome
-      - name: Songs (Nicole's v25 - a short song starts after a glitch and a silence, measured with nothing installed; a replaced recording's sound taken again as "sound 2"; Remove a song not built)
+      - name: The reel page rebuilt (Nicole's v27 - the chooser of four kinds, each kind its own page, a reel's own kind, new photos numbered on the page's poll with the numbers kept, the song drop-down and Listen by request, the queue button's routes; the pages in a browser are checked on the Mac)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/reel_v27_page_check.py --no-chrome
+      - name: Songs (Nicole's v25 - a short song starts after a glitch and a silence, measured with nothing installed; a replaced recording's sound taken again as "sound 2"; and her v27's Remove this song - a song and its sounds to the Trash, never a delete, the open reel's pick cleared)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/songs_check.py
+      - name: The Trash helper (Nicole's v27 - the computer's own Recycle Bin through Windows' own call, nothing installed, never a delete; a link, a path outside its folder and a drive with no bin refused; every path checked before the first move; no test touches the real bin)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/trash_check.py
       - name: Loose ends of Nicole's v25 and v26 (no page says to tell Claude; every shoot in Your Content is listed, with or without its page; the instructions and both setup guides match the home base)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/loose_ends_v26_check.py
@@ -438,9 +467,12 @@ jobs:
       - name: The reel page's own machinery, so a PC fix never breaks the Mac
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_reel_page.py
-      - name: Songs (a short song starts after a glitch and a silence; a replaced recording's sound taken again, for real with the Mac's own afconvert; Remove a song not built)
+      - name: Songs (a short song starts after a glitch and a silence; a replaced recording's sound taken again, for real with the Mac's own afconvert; and her v27's Remove this song - a song and its sounds to the Trash, never a delete, the open reel's pick cleared)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/songs_check.py
+      - name: The Trash helper (Nicole's v27 - Finder's own Trash through osascript with the path as an argument, never a delete; a link, a path outside its folder and a drive with no Trash refused; every path checked before the first move; no test touches the real Trash)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/trash_check.py
       - name: Loose ends of Nicole's v25 and v26 (no page says to tell Claude; every shoot in Your Content is listed, with or without its page; the instructions and both setup guides match the home base)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/loose_ends_v26_check.py
@@ -462,6 +494,9 @@ jobs:
       - name: Every vibe lands on the song's real hits (Nicole's v25 - the three steps on a loose song made here, No song in every vibe, whole frames, the chat's reel maker)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/reel_hits_check.py
+      - name: Photo numbers stay fixed when photos are added (Nicole's v27 - reel.py sheet keeps every number, new photos take the next, a photo gone keeps its number unused)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/sheet_numbers_check.py
       - name: The words for a post (the record, Nicole's rules for writing and asking)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/words_check.py
@@ -594,6 +629,9 @@ jobs:
       - name: Trim a clip and select several photos (the real page - Shift, Cmd and Ctrl clicks, a drag of the whole selection, the bars; the trim panel's handles, arrows, loop and Done)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/reel_trim_select_check.py
+      - name: The reel page rebuilt (Nicole's v27 on the real pages - the chooser, the steps per kind, a switch under Your reels landing on the other reel's own kind, + Add photos and Show my new photos, the song drop-down with Listen and the two taps of Remove, Add this reel to my posting queue, phone width)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/reel_v27_page_check.py
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci

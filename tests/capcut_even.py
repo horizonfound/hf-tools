@@ -24,6 +24,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REEL = ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "scripts"
 KEPT = ROOT / "tests" / "fixtures" / "capcut-photo-reels-before-v24.json"
+# Nicole's v27 (A20, Nov 17): a clip that is the whole of a short video, a few frames short of its hold, plays a
+# touch slower in the project rather than running past its video's end. Kept apart from the eight above, which
+# must stay byte for byte: this file was written from the commit that built it.
+KEPT_SHORT = ROOT / "tests" / "fixtures" / "capcut-short-clip-v27.json"
 UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 CLOCK = ("update_time", "create_time", "import_time", "import_time_ms", "tm_draft_create", "tm_draft_modified")
 
@@ -74,13 +78,24 @@ def plans():
     }
 
 
-def built():
+def plans_short():
+    """A20: a 2.40 s video used whole as the opening clip, held one beat of 2.4333 s (73 frames), then two photos."""
+    clip = {"path": "/pretend/Footage/short.mov", "w": 1080, "h": 1920, "clip": True, "src": 0.0, "length": 2.4, "short_by": 0.0333,
+            "start": 0.0, "dur": 73 / 30, "start_f": 0, "dur_f": 73}
+    ph = [{"path": "/pretend/Photos/a.jpg", "w": 4000, "h": 6000, "start": 73 / 30, "dur": 19 / 30, "start_f": 73, "dur_f": 19},
+          {"path": "/pretend/Photos/c.png", "w": 1080, "h": 1920, "start": 92 / 30, "dur": 38 / 30, "start_f": 92, "dur_f": 38}]
+    song = {"path": "/pretend/Music/song.m4a", "from": 0.0, "from_f": 0, "fade_out": 0.5, "length": 180.0, "name": "song.m4a",
+            "capcut_material": None, "capcut_beats": None}
+    return {"short clip, a touch slower": {"name": "Short clip reel", "photos": [clip] + ph, "song": song, "hook": None}}
+
+
+def built(which=plans):
     sys.path.insert(0, str(REEL))
     import capcut
     parts = capcut.load_parts()
     plat = {"platform": {"app_version": "9.6.0", "os": "mac"}, "version": 360000}
     out = {}
-    for name, plan in plans().items():
+    for name, plan in which().items():
         for label, p in (("", None), (" (their CapCut's version copied)", plat)):
             d, m = capcut.build(copy.deepcopy(plan), parts, p)
             out[name + label] = evened({"draft": d, "meta": m})
@@ -96,14 +111,21 @@ def mark(obj):
     return hashlib.sha256(text(obj).encode("utf-8")).hexdigest()
 
 
-def compare():
+def compare(kept_file=KEPT, which=plans):
     """(the names that differ from the kept ones, how many were compared)."""
-    kept = json.loads(KEPT.read_text(encoding="utf-8"))["projects"]
-    now = {k: mark(v) for k, v in built().items()}
+    kept = json.loads(kept_file.read_text(encoding="utf-8"))["projects"]
+    now = {k: mark(v) for k, v in built(which).items()}
     return sorted(k for k in set(kept) | set(now) if kept.get(k) != now.get(k)), len(kept)
 
 
 def main():
+    if "--keep-short" in sys.argv:
+        got = {k: mark(v) for k, v in built(plans_short).items()}
+        KEPT_SHORT.write_text(json.dumps({"about": "sha256 of the short-clip reel's CapCut project with its ids evened out "
+                                          "(tests/capcut_even.py), as capcut.py built it when A20 (Nicole's v27) was built, Nov 17, 2026",
+                                          "projects": got}, indent=1) + "\n", encoding="utf-8")
+        print(f"kept {len(got)} project in {KEPT_SHORT.name}")
+        return 0
     if "--keep" in sys.argv:
         got = {k: mark(v) for k, v in built().items()}
         KEPT.write_text(json.dumps({"about": "sha256 of each photo reel's CapCut project with its ids evened out "
@@ -113,6 +135,12 @@ def main():
         return 0
     bad, n = compare()
     print(f"the same ({n} projects)" if not bad else f"DIFFERENT: {bad}")
+    if KEPT_SHORT.exists():
+        bad2, n2 = compare(KEPT_SHORT, plans_short)
+        print(f"the short clip's project: the same ({n2} project)" if not bad2 else f"the short clip's project: DIFFERENT: {bad2}")
+        bad = bad + bad2
+    else:
+        print("the short clip's project: no kept file yet (python3 tests/capcut_even.py --keep-short writes it)")
     return 1 if bad else 0
 
 

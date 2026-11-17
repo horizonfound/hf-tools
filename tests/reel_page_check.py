@@ -104,28 +104,61 @@ V23_RULE = "a.opt{text-decoration:none;display:block}\n"
 V23_AFTER = ".opt{position:relative}\n"
 
 
-def her_v23_page():
-    """Her v23 reel-maker.html (the reel page with the third card), or None when that handoff isn't here."""
-    for base in (ROOT, ROOT.parent / "hf-tools"):          # the folder beside this one, never a home path written out
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v23-*")):
+def her_page_of(version):
+    """Her reel-maker.html from one of her handoffs (v23, v25, v27...), or None when that handoff isn't here: in
+    this checkout, beside it, or in the main checkout (a worktree of a lane sits elsewhere)."""
+    for base in (ROOT, ROOT.parent / "hf-tools", Path("/Users/dustindamron/Projects/hf-tools")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-%s-*" % version)):
             f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
             if f.is_file():
                 return f.read_text(encoding="utf-8")
     return None
 
 
+def her_v23_page():
+    """Her v23 reel-maker.html (the reel page with the third card), or None when that handoff isn't here."""
+    return her_page_of("v23")
+
+
+def her_v27_page():
+    """Her v27 reel-maker.html (the chooser, the kinds, step 1 and 2 rebuilt, the song drop-down), or None."""
+    return her_page_of("v27")
+
+
 # A little of everything's line (her v25, Nov 13, when every vibe moved onto the song's real hits). Her v25 page is
 # the source for it; the rest of her v25 page (several reels, trim, the photo note) is for later stages.
 V25_WORDS = {"vibe_mixed_s": "Some quick, some longer, and every change lands on a beat you can hear in your song."}
+# Her v27 (Nov 17) rebuilt steps 1 to 3: these keys of reel_page.WORDS come from her v27 reel-maker.html (checked
+# against it in tests/reel_v27_page_check.py); the rest still come from her v19 page and server
+V27_KEYS = {"foot_h2", "paste_say", "ask_label_html", "ask_ex1", "ask_placeholder", "vids_one", "vids_n", "vids_total", "vids_ready",
+            "vids_getting", "vid_ready", "vid_added", "vid_getting_it", "order_h2", "order_say", "add_photos", "add_photos_say",
+            "new_photo", "new_photos", "show_new", "opening_photos", "photos_open", "cant_open_photos"}
 
 
 def her_v25_page():
     """Her v25 reel-maker.html, or None when that handoff isn't here."""
-    for base in (ROOT, ROOT.parent / "hf-tools"):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v25-*")):
-            f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
-            if f.is_file():
-                return f.read_text(encoding="utf-8")
+    return her_page_of("v25")
+
+
+# Remove this song (her v27, Nov 17; Lane E's E12): her four page lines (reel-maker.html, songRm) and her two server
+# lines (server.py, /music/remove). Her v27 pack is the source for them; the v27 pack is checked both ways below.
+V27_WORDS = {"song_remove": "Remove this song",
+             "song_sure": "Move it to the Trash?",
+             "song_removing": "Removing…",
+             "song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back.",
+             "song_not_here": "That song isn't in this shoot's folder anymore.",
+             "song_cant_trash": "I couldn't move that song to the Trash. Drag it out of the shoot's Music folder in Finder instead."}
+
+
+def her_v27_text():
+    """Her v27 reel-maker.html and server.py as one text, or None when that handoff isn't here (looked for where
+    her_folder looks, so a worktree finds the main checkout's copy too)."""
+    for base in (ROOT, ROOT.parent / "hf-tools", Path("/Users/dustindamron/Projects/hf-tools")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v27-*")):
+            f = h / "Carousel designer and reel picker"
+            if (f / "pages" / "reel-maker.html").is_file() and (f / "server.py").is_file():
+                t = (f / "pages" / "reel-maker.html").read_text(encoding="utf-8") + "\n" + (f / "server.py").read_text(encoding="utf-8")
+                return html.unescape(t).replace("\\'", "'")
     return None
 
 
@@ -199,8 +232,9 @@ class Setup:
     def url(self, path):
         return "http://127.0.0.1:%d%s" % (self.port, path)
 
-    def page_url(self):
-        return self.url("/reel.html?kit=" + KIT.replace(" ", "%20"))
+    def page_url(self, kind="photos"):
+        """One kind's page (her v27: with no kind the reel page is the chooser)."""
+        return self.url("/reel.html?kit=" + KIT.replace(" ", "%20") + ("&kind=" + kind if kind else ""))
 
     # plain HTTP, with any headers
     def http(self, method, path, body=None, headers=None):
@@ -249,21 +283,24 @@ def check_words():
         print("SKIP  her words against her own page: her handoff (reference-private) isn't on this computer", flush=True)
     else:
         bad = []
-        v23 = her_v23_page()
-        if v23 is None:
-            print("SKIP  the third card's two lines against her v23 page: that handoff isn't on this computer", flush=True)
-        else:
-            case("her v23 page is her v19 page with the third card and nothing else (two lines of words, one style rule, one line of script)",
-                 [x for x in v23.splitlines() if x not in (her_folder() / "pages" / "reel-maker.html").read_text(encoding="utf-8").splitlines()]
-                 == [V23_RULE.strip(), '      <a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>' % (V23_WORDS["foot_talk_b"], V23_WORDS["foot_talk_s"]),
-                     "$('modeTalk').href = 'talking-reel.html?shoot=' + encodeURIComponent(SHOOT);   // a talking-to-camera reel (Nicole, Nov 11)"])
+        v27 = her_v27_page()
         for k, v in rp.WORDS.items():
-            if (v23 is None and k in V23_WORDS) or k in V25_WORDS:
+            if k in V25_WORDS or k in V27_KEYS or k in V27_WORDS:
                 continue
             for frag in re.split(r"\{\w+\}", v):
                 if len(frag.strip()) >= 2 and frag not in t:
                     bad.append((k, frag))
-        case("every word in reel_page.WORDS (%d) is in her reel-maker.html or server.py, word for word" % len(rp.WORDS), not bad, bad[:5])
+        case("every word in reel_page.WORDS (%d) is in her reel-maker.html or server.py, word for word (her v25 and v27 words aside)" % len(rp.WORDS), not bad, bad[:5])
+        if v27 is None:
+            print("SKIP  her v27 words against her v27 page: that handoff isn't on this computer", flush=True)
+        else:
+            t27 = html.unescape(v27).replace("\\'", "'")
+            # four lines hers builds from pieces (`${k} new photo${k === 1 ? '' : 's'} in.`): their pieces are looked for
+            pieced = {"new_photo": [" new photo", " in."], "new_photos": [" new photo", "s", " in."], "vids_one": [" video", " added"], "vids_n": [" video", "s", " added"]}
+            bad = [(k, frag) for k in sorted(V27_KEYS) for frag in (pieced.get(k) or re.split(r"\{\w+\}", rp.WORDS[k])) if len(frag.strip()) >= 1 and frag not in t27]
+            case("every word of hers from v27 in reel_page.WORDS (%d keys) is in her v27 reel-maker.html, word for word" % len(V27_KEYS), not bad, bad[:5])
+            case("the old step-1 cards and their 'One more thing' box are gone from the page's words (her v27: the chooser decides the kind)",
+                 not any(k in rp.WORDS for k in ("foot_say", "foot_bts_b", "foot_photos_b", "foot_talk_b", "foot_need_h3")))
         bad = [(k, v) for k, v in HERS.items() for x in (v if isinstance(v, list) else [v])
                if k not in ("not_picked", "title", "doc_title", "take_out_label") and x not in t]
         case("every word this test expects on step 2 is hers", not bad, bad[:5])
@@ -276,7 +313,14 @@ def check_words():
     case("A little of everything's line is in reel_page.WORDS as she wrote it (v25), and the old line is nowhere in the page's words",
          {k: rp.WORDS.get(k) for k in V25_WORDS} == V25_WORDS
          and not any("changing where the music turns over" in str(v) for v in rp.WORDS.values()))
-    case("the third card's two lines are in reel_page.WORDS as she wrote them (v23)", {k: rp.WORDS.get(k) for k in V23_WORDS} == V23_WORDS)
+    v27 = her_v27_text()
+    if v27 is None:
+        print("SKIP  Remove this song's lines against her v27 page and server: that handoff isn't on this computer", flush=True)
+    else:
+        case("Remove this song's six lines (v27) are on her v27 page and in her server.py, word for word",
+             all(v in v27 for v in V27_WORDS.values()), [v for v in V27_WORDS.values() if v not in v27])
+    case("Remove this song's six lines are in reel_page.WORDS as she wrote them (v27)", {k: rp.WORDS.get(k) for k in V27_WORDS} == V27_WORDS,
+         {k: rp.WORDS.get(k) for k in V27_WORDS})
     case("the limit line is the plan's (decision 23)", rp.OUR_WORDS["too_many"] == OURS_TOO_MANY, rp.OUR_WORDS["too_many"])
     case("the defaults sit where the plan says: 40, no drag out, the two-window check on",
          rp.MAX_PICKS == 40 and rp.DRAG_OUT is False and rp.REV_CHECK is True)
@@ -285,7 +329,7 @@ def check_words():
          not re.search(r"https?://|//fonts|cdnjs|googleapis", page), re.findall(r"https?://\S{0,40}", page)[:3])
     case("no HTML5 drag in the page (our pointer drag only)", "draggable" not in page and "dragstart" not in page)
     case("her steps as written: the footage 1, the order 2 (the page renumbers the ones that show)",
-         "<span class='num'>1</span>Behind-the-scenes footage?" in page and "<span class='num'>2</span>Put your photos in order" in page)
+         "<span class='num'>1</span>Choose your behind-the-scenes footage" in page and "<span class='num'>2</span>Choose your photos" in page)
     m = re.search(r"<style>(.*?)</style>", page, re.S)
     her = None
     f = her_folder()
@@ -778,30 +822,30 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 EXPECTED = {   # her acceptance/expected.json, word for word (the same 22 lines tests/reel_timing_check.py holds)
-    # as she re-recorded them in handoff v25 (Nov 13: every vibe lands on the song's real hits; ten lines on her
-    # two real songs changed, the nine on the steady test beat did not)
+    # as she re-recorded them in handoff v27 (Nov 17: the paces are now clearly different; the 15 Calm, Build and
+    # A little of everything lines changed, the five On every beat lines, the STOP line and song2 first 20 beat did not)
     "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 1, 1, 2",
     "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 4, 2, 1, 1, 2",
     "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
     "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 1, 2, 1, 2, 3",
     "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 3, 1, 1, 1, 3",
-    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 3, 2, 1, 4",
-    "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
-    "song1 photos 10 mixed": "Beats per piece: 1, 1, 1, 1, 2, 2, 2, 1, 1, 4",
-    "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 1, 1, clip 6, 2, 1, 2, 1, 2, 2, 2, 1, 1, 4",
-    "song2 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 2, 1, 2, 3",
-    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 3, 2, 2, 2, 2, 4, 2, 2, 2, 4",
-    "beat60 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
+    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 3, 1, 1, 1, 4",
+    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 2, 1, 4, 1, 1, 1, 2, 1, 4, 1, 2, 1, 6, 2, 2, 1, 4",
+    "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 4, 1, 1, 1, 4",
+    "song1 photos 10 mixed": "Beats per piece: 2, 1, 1, 4, 2, 1, 2, 3, 1, 2",
+    "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 2, 4, clip 6, 2, 1, 3, 4, 2, 2, 2, 1, 1, 4",
+    "song2 first 14 calm": "Beats per piece: clip 6, 2, 4, 2, 2, 4, 2, 6, 2, 3, 2, 2, 2, 4, 4",
+    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2",
+    "beat60 first 14 calm": "Beats per piece: clip 6, 4, 4, 2, 4, 4, 4, 8, 4, 4, 6, 4, 2, 4, 4",
     "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 1, 2, 2, 2, 2",
-    "beat60 backforth 14 calm": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song2 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
-    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 3",
-    "beat60 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
-    "song1 photos 10 build": "Beats per piece: 2, 2, 2, 2, 1, 2, 2, 1, 1, 4",
-    "beat60 backforth 14 build": "Beats per piece: clip 6, 2, 2, clip 6, 1, 2, clip 5, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
+    "beat60 backforth 14 calm": "Beats per piece: clip 6, 4, 4, clip 6, 2, 4, clip 6, 4, 4, 4, 4, 4, 6, 4, 2, 4, 4",
+    "song2 first 14 build": "Beats per piece: clip 6, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 1, 1, 1, 3",
+    "song2 first 20 build": "Beats per piece: clip 6, 2, 3, 3, 3, 3, 4, 3, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 3",
+    "beat60 first 14 build": "Beats per piece: clip 6, 3, 3, 2, 3, 3, 2, 4, 2, 2, 3, 1, 1, 1, 4",
+    "song1 photos 10 build": "Beats per piece: 1, 3, 2, 2, 2, 3, 2, 1, 1, 2",
+    "beat60 backforth 14 build": "Beats per piece: clip 6, 3, 3, clip 6, 2, 4, clip 6, 3, 2, 3, 2, 2, 3, 1, 1, 1, 4",
     "song1 first 14 beat (too long for the song)": "STOP: Your song is only 15.4 seconds, and 1 clip and 14 photos need at least 14.2 seconds, even with every photo at one beat. Take a few photos out, or use a longer song.",
-    "beat60 first 14 mixed variation 2": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 1, 1, 4, 1, 1, 1, 3",
+    "beat60 first 14 mixed variation 2": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 4, 1, 1, 1, 4",
 }
 HER_PLAN = re.compile(r"^Plan: (\d+ clips? and )?\d+ photos?, \d+\.\d seconds, every cut on the beat"
                       r"( at about \d+ beats a minute(, starting the song at the top|, starting the song \d+ seconds in)\.|, no song( \(the footage keeps its own sound\))?\.)$")
@@ -960,7 +1004,7 @@ def check_songs(s):
     case("no Music folder yet: no songs, and it says so", code == 200 and j["songs"] == [] and j["music"] is False, j)
     case("refused: the song list for a kit named by a path", s.http("GET", "/reel-songs?kit=" + str(s.kit).replace(" ", "%20"))[0] == 404)
     case("refused: the song list asked for by another website", s.http("GET", "/reel-songs?" + q, headers={"Sec-Fetch-Site": "cross-site"})[0] == 403)
-    for name, b in (("another folder", {"kit": KIT, "what": "photos"}), ("a path", {"kit": KIT, "what": "/tmp"})):
+    for name, b in (("another folder", {"kit": KIT, "what": "desktop"}), ("a path", {"kit": KIT, "what": "/tmp"})):
         case("refused: Add my music for %s" % name, s.http("POST", "/reel-open", b)[0] == 400)
     code, j, _ = s.http("POST", "/reel-open", {"kit": KIT, "what": "music"})
     music = s.kit / "Music"

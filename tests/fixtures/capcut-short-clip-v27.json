@@ -1,0 +1,7 @@
+{
+ "about": "sha256 of the short-clip reel's CapCut project with its ids evened out (tests/capcut_even.py), as capcut.py built it when A20 (Nicole's v27) was built, Nov 17, 2026",
+ "projects": {
+  "short clip, a touch slower": "9e95ea296d8a1482395f1b2f595ec186b6e67ece956ff57ddfdb394d36d39316",
+  "short clip, a touch slower (their CapCut's version copied)": "68338632ae99072b4e00876f71c21e7f53f3de01f60f01fbe79b8350eb4c3632"
+ }
+}

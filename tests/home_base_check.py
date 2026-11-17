@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The home base and its two screens, after Nicole's v26 (stage B of the v26 build): the home page as the home
-base, Back up a card (/backups) and Make posts from a shoot (/make-posts).
+base, Back up a card (/backups) and Make posts from a shoot (/make-posts; its words are her v27's since Nov 17:
+the What's a post kit? box and the third step).
 
     python3 tests/home_base_check.py [--port 9820] [--work <a folder to keep the run in>] [--no-chrome]
 
@@ -8,7 +9,8 @@ What it does, on a pretend Assistant in a throwaway folder (a scratch STUDIO_HOM
 records and empty folders, pretend kits that are a record and three tiny pictures; no real drive, no card, no
 real kit, nothing of the real ~/.studio; the card that "is in" is a test switch, so no drive is ever looked at):
   * the words: her lines on our three pages, compared with her own pages when her handoff is on this computer
-    (reference-private/, never pushed), both ways, with the lines of hers left out on purpose named in
+    (reference-private/, never pushed; home-test.html and backups.html from her v26 pack, make-posts.html from the
+    newest pack that has it, v27 today), both ways, with the lines of hers left out on purpose named in
     HERS_NOT_OURS; "your assistant", never "Claude"; none of her test-only bits (port 8799, ?home=test);
   * what the screens read (/home-data): every backup the editing queue knows, read from each backup's own
     records wherever they are now (settled or not); the cards of one shoot as ONE backup, by the link
@@ -77,7 +79,7 @@ def skip(line):
     print("SKIP  " + line, flush=True)
 
 
-def her_folder():
+def her_roots():
     roots = [ROOT / "reference-private"]
     try:                                                   # a worktree: the main checkout's reference-private too
         out = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], capture_output=True, text=True, timeout=20).stdout.strip()
@@ -85,10 +87,26 @@ def her_folder():
             roots.append((ROOT / out).resolve().parent / "reference-private")
     except (OSError, subprocess.SubprocessError):
         pass
-    for r in roots:
+    return roots
+
+
+def her_folder():
+    """Her v26 pack (the home page and Back up a card changed last in v26)."""
+    for r in her_roots():
         for f in sorted(r.glob("nicole-handoff-v26-*/Carousel designer and reel picker/pages/home-test.html")):
             return f.parent.parent
     return None
+
+
+def her_newest(name):
+    """The newest pack of hers (v26 or later) that has pages/<name>: a later pack replaces only the files it has."""
+    found = []
+    for r in her_roots():
+        for f in r.glob("nicole-handoff-v2*-*/Carousel designer and reel picker/pages/" + name):
+            m = re.match(r"nicole-handoff-v(\d+)-", f.parents[2].name)
+            if m and int(m.group(1)) >= 26:
+                found.append((int(m.group(1)), f))
+    return max(found)[1] if found else None
 
 
 def stop_listener(port):
@@ -369,7 +387,7 @@ def check_words(w):
     ours_words = dict(home_base.WORDS)
     case("the pages say \"your assistant\", never \"Claude\"", "Claude" not in everything and "claude" not in everything.lower(), re.findall(r".{30}[Cc]laude.{20}", everything)[:3])
     case("none of her test-only bits: no port 8799, no ?home=test, no test-copy line, nothing kept in the browser",
-         not re.search(r"8799|home=test|assistantHome|localStorage|sessionStorage|test copy|Test copy|/hp/", everything))
+         not re.search(r"(?<![\d.])8799(?![\d.])|home=test|assistantHome|localStorage|sessionStorage|test copy|Test copy|/hp/", everything))   # 8799 as a port, not four digits inside a record's time stamp
     case("no em dash in any line of words", "—" not in everything and not any("—" in v for v in list(ours_words.values()) + list(home_base.OUR_WORDS.values())))
     case("nothing from the internet, and the shared look first in each page's styles",
          "googleapis" not in everything and "<link" not in everything and all(("<style>" + home.look.head_css()) in p for p in pages.values()))
@@ -392,6 +410,10 @@ def check_words(w):
         return home_base
     raw = {n: (hers / "pages" / n).read_text(encoding="utf-8") for n in ("home-test.html", "backups.html", "make-posts.html", "home-test.js")}
     raw["server.py"] = (hers / "server.py").read_text(encoding="utf-8")
+    newest = her_newest("make-posts.html")                 # v27 changed this one page (section 8); v26's is still beside it
+    case("her Make posts page is read from her newest pack that has it (v27 or later)", newest is not None and int(re.search(r"-v(\d+)-", newest.parents[2].name).group(1)) >= 27, newest)
+    if newest:
+        raw["make-posts.html"] = newest.read_text(encoding="utf-8")
     hers_all = untag("\n".join(raw.values()).replace("\\'", "'"))
     # 1. ours -> hers: every line in WORDS, cut at its gaps, is in her files
     missing = []
@@ -426,6 +448,19 @@ def check_words(w):
     case("every line her scripts write on the page is in ours", not lost, lost[:8])
     case("her words for a name that is not a kit, and her three states", home_base.WORDS["not_a_kit"] == "That shoot isn't in your content folder."
          and (home_base.WORDS["st_waiting"], home_base.WORDS["st_edited"], home_base.WORDS["st_just"]) == ("Waiting to be edited", "Edited", "Just for you"))
+    # Make posts, her v27 (section 8): the lede names the post kit, the What's a post kit? box sits between the lede
+    # and the steps title, the steps are three and the third has no button (it happens inside the post kit)
+    mp = html_mod.unescape(pages["/make-posts"].split("<script>", 1)[0])
+    case("make posts (v27): her lede, with post kit in bold", "we'll build you a <b>post kit</b>, and together we'll create your reels, carousels, single photos, stories and captions." in mp)
+    case("make posts (v27): the What's a post kit? box sits between the lede and the steps title, in her words",
+         re.search(r"</header><div class='whatkit'><p class='wk-h'>What's a post kit\?</p><p>It's one place for everything you'll post from a shoot\. .*?Nothing is ever posted for you\.</p></div><p class='steps-title'>How to make a post kit from a shoot</p>", mp))
+    steps = re.findall(r"<div class='st'><span class='num'>(\d)</span>(.*?)</div></div>", mp.split("<div class='steps light'>", 1)[1].split("<section", 1)[0])
+    case("make posts (v27): three steps, numbered 1, 2, 3", [n for n, _ in steps] == ["1", "2", "3"], [n for n, _ in steps])
+    case("make posts (v27): step 1 has the folder button, step 2 the words to paste, step 3 no button at all",
+         len(steps) == 3 and "id='pick'" in steps[0][1] and "class='paste'" in steps[1][1] and "<button" not in steps[2][1] and "<a " not in steps[2][1]
+         and "Make your posts inside your post kit." in steps[2][1] and "I'll bring your photos in and open your new post kit. You'll find it below any time, too." in steps[1][1])
+    case("make posts (v27): her v26 lines that v27 replaced are gone",
+         not any(x in mp for x in ("start here and we'll create your social media content", "How to make posts from a shoot", "Your shoot's post kit opens, and it shows up below")))
     return home_base
 
 
@@ -973,8 +1008,16 @@ def kit_names(c, sel="#recent .shoot b"):
 def check_make_page(c, w):
     c.open(w.url("/make-posts"))
     c.wait_for("document.querySelectorAll('#recent .shoot').length > 0", 15)
-    case("make posts: her heading, her paragraph, her steps box", c.text("h1") == "Make posts from a shoot." and len(texts(c, ".head .lede")) == 1
-         and c.text(".steps-title") == "How to make posts from a shoot" and c.text("#pick") == "Select the folder with your finished photos")
+    case("make posts: her heading, her paragraph, her steps box (v27: a post kit from a shoot, three steps)", c.text("h1") == "Make posts from a shoot." and len(texts(c, ".head .lede")) == 1
+         and c.text(".steps-title") == "How to make a post kit from a shoot" and c.text("#pick") == "Select the folder with your finished photos" and texts(c, ".steps .num") == ["1", "2", "3"],
+         (c.text(".steps-title"), texts(c, ".steps .num")))
+    case("make posts: the What's a post kit? box is drawn between the lede and the steps title, as her screenshot 08",
+         c.text(".whatkit .wk-h") == "What's a post kit?" and c.js("document.querySelector('.whatkit').previousElementSibling.className") == "head"
+         and c.js("document.querySelector('.whatkit').nextElementSibling.className") == "steps-title"
+         and c.js("document.querySelector('.whatkit').getBoundingClientRect().top") > c.js("document.querySelector('.head .lede').getBoundingClientRect().bottom"),
+         (c.text(".whatkit .wk-h"), c.js("document.querySelector('.whatkit').previousElementSibling.className"), c.js("document.querySelector('.whatkit').nextElementSibling.className")))
+    case("make posts: step 3 is words only, no button, and its small line is hers", c.count(".steps .st:nth-child(3) button, .steps .st:nth-child(3) a") == 0
+         and c.text(".steps .st:nth-child(3) small") == "Pick what you want to make: a reel, a carousel, stories or a caption. Each one walks you through it.")
     case("make posts: the words to paste", c.text(".paste .words") == "make my posts" and c.js("document.querySelector('.paste .copy').dataset.copy") == "make my posts")
     case("make posts: the 20 newest in one grid, and a button for the rest", c.count("#recent .shoot") == 20 and c.count("#recent h3.month") == 0 and c.text("#older") == "Show 7 older post kits",
          (c.count("#recent .shoot"), c.text("#older") if c.count("#older") else None))
@@ -1095,6 +1138,9 @@ def check_phone_pages(c, w, long_name):
             if path == "/backups":
                 case("phone width: the long name is on a backup, and the long card name in the steps box", backup_of(c, long_name) >= 0 and "WWWWWWWW" in c.text("#cardStatus"))
             case("phone width: %s has no sideways scroll, with a 100-letter name that has no place to break" % path, no_sideways(c, 375), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
+            if path == "/make-posts":
+                case("phone width: the What's a post kit? box fits the screen", c.js("(r => r.left >= 0 && r.right <= window.innerWidth && r.height > 40)(document.querySelector('.whatkit').getBoundingClientRect())"),
+                     c.js("[document.querySelector('.whatkit').getBoundingClientRect().right, window.innerWidth]"))
             if path != "/home":
                 case("phone width: %s: the Back to home button reads Home" % path, c.js("getComputedStyle(document.querySelector('.homelink .long')).display") == "none"
                      and c.js("getComputedStyle(document.querySelector('.homelink .short')).display") != "none")

@@ -260,7 +260,7 @@ def run_reel(s):
     k = s.kit(KIT)
     st = reel_state(s, KIT)
     case("a shoot with one reel: the page is told it has one, \"Reel 1\", and no record is written by looking",
-         st["versions"] == [{"id": "v1", "name": "Reel 1"}] and st["current"] == "v1" and reel_rec(s, KIT) is None, (st.get("versions"), reel_rec(s, KIT)))
+         st["versions"] == [{"id": "v1", "name": "Reel 1", "kind": None}] and st["current"] == "v1" and reel_rec(s, KIT) is None, (st.get("versions"), reel_rec(s, KIT)))
     code, j = save(s, KIT, {"picks": picks("1", "2+", "3-"), "mine": True, "mine_picks": picks("1", "2+", "3-"), "vibe": "calm", "footage": False,
                             "style": "reveal", "ask": "the laughing ones", "feel": "fun"}, reel="v1")
     case("a save that says which reel it is for (the page's own) is taken", code == 200 and j["ok"], j)
@@ -425,11 +425,12 @@ def run_reel(s):
     code, j, raw, _h = s.http("POST", "/reel-version", raw_body=b"x" * 70000, headers={"Content-Type": "application/json"})
     case("a body far too big is refused", code in (400, 413) and reel_bytes(s, KIT) == b4, code)
     case("no answer of the route has a path in it", str(k) not in json.dumps(ver(s, KIT, op="switch", id="v1")) and "Your Content" not in json.dumps(reel_state(s, KIT)["versions"]))
-    # ---- the chat's reels command
+    # ---- the chat's reels command (since v27 each reel's kind is named after it: left out here, tests/reel_v27_page_check.py has it)
+    nokind = lambda o: re.sub(r" \((behind the scenes|just photos|B-roll)\)", "", o)   # noqa: E731
     code, out = run(s, "reel_page.py", "reels", KIT)
-    case("reel_page.py reels lists the shoot's reels and marks the one open on the page", code == 0 and '3 reels: "Reel 1" (the one open on the page), "White backdrop", "Kitchen & <b>cupcakes</b>"' in out, out)
+    case("reel_page.py reels lists the shoot's reels and marks the one open on the page", code == 0 and '3 reels: "Reel 1" (the one open on the page), "White backdrop", "Kitchen & <b>cupcakes</b>"' in nokind(out), out)
     code, out = run(s, "reel_page.py", "reels", KIT, "--open", "white")
-    case("...--open works on another (a part of its name is enough)", code == 0 and reel_rec(s, KIT)["current"] == "v2" and '"White backdrop" (the one open on the page)' in out, out)
+    case("...--open works on another (a part of its name is enough)", code == 0 and reel_rec(s, KIT)["current"] == "v2" and '"White backdrop" (the one open on the page)' in nokind(out), out)
     code, out = run(s, "reel_page.py", "reels", KIT, "--rename", "kitchen", "--to", "Kitchen")
     case("...--rename --to renames one", code == 0 and reel_state(s, KIT)["versions"][2]["name"] == "Kitchen", out)
     code, out = run(s, "reel_page.py", "reels", KIT, "--open", "nope")
@@ -679,7 +680,7 @@ def run_reel_page(c, s):
     import reel_page as rp
     kit = "2026-09-27 Page <i>reel &amp; more" if not t.WINDOWS else "2026-09-27 Page reel"
     s.make_kit(kit, photos=8)
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))     # v27: the bar is on a kind's page (the chooser has none)
     c.wait_for("window.Reel && window.Reel.state()", 20)
     bar = c.js("(function(){ var b = document.getElementById('reels'); var h = document.querySelector('header.head'); return {inHead: h.contains(b), afterLede: b.previousElementSibling.className, "
                "label: b.querySelector('label').textContent, forSel: b.querySelector('label').htmlFor, aria: document.getElementById('verSel').getAttribute('aria-label'), "
