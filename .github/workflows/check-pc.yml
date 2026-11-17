@@ -184,8 +184,12 @@ name: Check it on a Windows PC
 #                                   tried, in pc_design.py), in a hidden Chrome, one at a time under the guard.
 #                                   None of these has run on GitHub yet: the first push is the test.
 #   tests/design_v27_check.py       Nicole's v27 for both designers, in "mac-page" too: the ask box and design.py note / fill
-#                                   on a carousel, her three story collages, Open folder, the [hidden] rule, slides as things,
-#                                   Show the whole photo, the Crop window; the real page.
+#                                   on a carousel, her three story collages, Open folder, the [hidden] rule, slides as things
+#                                   (+ and x, Where should it go?, the grip), Show the whole photo, the Crop window, several
+#                                   photos at once, See a photo big, Save just this slide, + Add photos with fixed numbers, and
+#                                   the path at the top; the real page in a hidden Chrome. On Windows the same machinery, without
+#                                   a page, is part 16 of tests/pc_design.py, and the buttons on the real page are looked for in
+#                                   tests/pc_design_page.py ("windows-page").
 #   tests/design_v26_check.py       Nicole's v26 for the stories designer, in "mac-page" too (it draws its pretend kits
 #                                   with the Mac's sips): sets of stories, the note and the line of "Let my assistant
 #                                   choose the photos", design.py story-note and story-fill, her four story templates

@@ -25,6 +25,14 @@
     see a photo big            (B14) a tray tile's ⤢ or a double-click opens the dark window, ‹ › and the arrow keys browse round,
                                Use this photo / Put it in the selected frame, Close, Escape; a single click puts the photo in only
                                after 230 ms; the picture by number, never a path
+    save just this slide       (B17) "Save just this slide" in the slide's group and "Save just slide N" beside Save slides: one slide
+                               drawn by the same painter and put beside the design's newest set as "<set> - slide 03 updated.jpg"
+                               (then "updated 2"), through the same staging, record and commit; a file of theirs under that name
+                               never taken for the slide; nothing in kit.json, no line for the chat; her saved and Stopped lines
+    + Add photos               (B16) the Photos folder opened through the Assistant, her lines in this computer's words, and photos
+                               dropped in joining the END of the tray with the next numbers (POST /design-photos, the one writer),
+                               every design's frames and counter untouched; a photo gone still asks for a Reload
+    the path at the top        (B21) Home › <shoot> post kit › Carousel | Stories by look.crumbs, her Back pills hidden
 
 Three parts, as the other parts have: the tables, the words and the rules by themselves (check_v27_page), the routes
 and the commands by request (check_v27_server, a pretend kit and a page server on the port it is given), and the real
