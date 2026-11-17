@@ -470,6 +470,29 @@ DESIGN_CORE_JS = r"""
     takeDesign(j.design);
     if (topLines()) poll();
   }
+  // Photos that joined the shoot (her + Add photos, v27): a fresh answer from /design-state whose list has grown while every
+  // photo this page knows kept its number. The list, the stamp and the design's counter are taken (the Assistant has brought
+  // the design in line with the new list, which changes none of its frames), the layout stays as it is here, and the new
+  // photos are given to the tray ('photos-added'). Nothing is taken while something here is unsaved, when the design on the
+  // Assistant's side is not this layout, or when a photo this page knows is gone or has another number: then null, and the
+  // caller treats it as the photos having changed (Reload). Returns the new photos, in number order, or null.
+  D.takePhotos = function(j){
+    if (!D.st || !D.design || D.blocked || !D.save.idle() || !j || !j.ok || !j.design || j.design.id !== D.design.id) return null;
+    if (JSON.stringify(M.tidy(j.design.state)) !== JSON.stringify(D.st)) return null;
+    var now = {};
+    j.photos.forEach(function(p){ now[p.n] = p; });
+    for (var k = 0; k < D.S.photos.length; k++) { if (!now[D.S.photos[k].n]) return null; }
+    var had = {};
+    D.S.photos.forEach(function(p){ had[p.n] = true; });
+    var fresh = j.photos.filter(function(p){ return !had[p.n]; }).sort(function(a, b){ return a.n - b.n; });
+    D.S = j; D.by = now;
+    rev = j.design.rev;
+    D.design.dropped = j.design.dropped || 0;
+    D.emit('photos-added', fresh);
+    if (topLines()) poll();
+    D.render();
+    return fresh;
+  };
   function wanted(){ var m = /[?&]design=([a-z0-9]{1,40})(?:&|$)/.exec(location.search); return m ? m[1] : ''; }
   function getState(id){
     return fetch('/design-state?' + Q + KQ + (id ? '&design=' + encodeURIComponent(id) : ''), {cache: 'no-store'}).then(function(r){ return r.json(); });

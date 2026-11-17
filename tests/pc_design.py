@@ -1428,6 +1428,27 @@ def v27_checks(kit):
     check("v27: a slide the design hasn't got, or a stale counter: refused in one clause each (her Stopped line), nothing added",
           res3["state"] == "problem" and res3["why"] == "slide" and res4["state"] == "problem" and res4["why"] == "changed"
           and all(not res[k].rstrip().endswith(".") for res in (res3, res4) for k in ("words",)) and len(os.listdir(car)) == len(listed) + 1, (res3, res4))
+    # + Add photos (B16): the page's words name this computer's file manager; the route re-lists through the one writer, every
+    # number kept, the new photo numbered after the last; the design's counter untouched
+    check("v27: + Add photos' lines on the page a PC serves name File Explorer, never Finder",
+          f"Opens this shoot&#x27;s Photos folder in {tc.FILES_APP}" in page and f"data-opening='Opening your Photos folder in {tc.FILES_APP}...'" in page
+          and (not WINDOWS or "Finder" not in page.split("id='add-photos-line'")[1].split("</p>")[0]))
+    code, out = design._post_photos({"kit": kit.name})
+    check("v27: POST /design-photos with nothing new: ok, nothing added, every number kept, no path", code == 200 and out.get("ok") and out.get("added") == 0 and out.get("kept") is True and no_path(out)[0], (code, out))
+    photos_dir = kit / "Photos"
+    first = sorted(photos_dir.iterdir())[0]
+    import shutil
+    shutil.copyfile(first, photos_dir / "zz new ✨.jpg")
+    t = time.time() - 30
+    os.utime(photos_dir / "zz new ✨.jpg", (t, t))
+    time.sleep(4.2)                                  # the folder is compared at most every 4 seconds a kit (Lane A's rule)
+    d_before = design.load_design(kit, A)
+    code, out = design._post_photos({"kit": kit.name})
+    rows_ = {x["n"]: Path(x["file"]).name for x in json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))["photos"]}
+    d_after = design.load_design(kit, A)
+    check("v27: a photo dropped in (an accent and an emoji in its name): the list is made again by the one writer, the photo numbered after the last, every other kept, and the design's counter has not moved",
+          code == 200 and out.get("relisted") is True and out.get("added") == 1 and out.get("kept") is True and out.get("first") == out.get("last") == max(rows_) and rows_[max(rows_)] == "zz new ✨.jpg"
+          and d_after["rev"] == d_before["rev"] and d_after["state"] == d_before["state"] and no_path(out)[0], (code, out, max(rows_), rows_.get(max(rows_))))
     # a PC: the single slide's own name is the one measured against the 260-character limit (a Mac: never measured)
     long_base = "x" * 70
     check("v27: cant_save measures the single slide's own file name on a PC and never on a Mac",

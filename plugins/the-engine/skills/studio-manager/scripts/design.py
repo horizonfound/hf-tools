@@ -1156,9 +1156,15 @@ def _sync(kit, d, rows, stamp, kind=CAROUSEL):
         else:
             b["n"] = new_n
     d["stamp"], d["names"] = stamp, _names_for(d["state"], rows)
-    d["rev"] = int(d["rev"]) + 1
-    d["dropped"] = dropped
-    d.pop("from", None)                 # no open page has seen this layout
+    if d["state"] != old["state"]:
+        # a frame's photo moved to another number or is gone: a change of the layout, so the counter moves and no open
+        # page's save is taken over it
+        d["rev"] = int(d["rev"]) + 1
+        d["dropped"] = dropped
+        d.pop("from", None)             # no open page has seen this layout
+    # else: photos joined the list and every one on it kept its number (her v27 + Add photos, A7): not a change of the
+    # layout, so the counter stays, an open page's unsaved change is still taken, and the page is not made to take the
+    # design afresh (which would clear its Undo and move the tray under their hands); only the stamp is written down
     return _store(kit, d, old, kind)
 
 
@@ -2571,7 +2577,7 @@ def _get_queue(handler):
 
 
 GET_PATHS = ("/design.html", "/design-state", "/design-font-file", "/design-preview", "/design-queue")
-POST_PATHS = ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
+POST_PATHS = ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit", "/design-photos",
               "/design-preview", "/design-asked")
 
 
@@ -2660,6 +2666,41 @@ def _post_new(body):
         return 409, {"ok": False, "why": "photos", "words": PHOTOS_CHANGED}
     return new_design(kit, state=body.get("state") if "state" in body else None,
                       name=body.get("name") if "name" in body else None, token=token, copy=copy, kind=kind)
+
+
+def _post_photos(body):
+    """+ Add photos (hers, v27): the page asks, every few seconds while its line is showing, whether photos have joined
+    the shoot's Photos folder. The folder is compared with the numbered list and, when it differs, the list is made
+    again by the one writer (kit.py sheet, through the reel page's relist_if_changed: Lane A's rule, at most once every
+    4 seconds a kit, a photo still being copied in waited for), so every photo keeps its number and new ones take the
+    next (A7). The answer is the list's stamp, how many joined and their numbers, and "kept": whether every photo on the
+    list before is still on it under the same number (a photo gone or renamed is not: the page then asks for a Reload,
+    as it always has). Nothing is drawn (no contact sheet: the chat's sheets are re-made by the next kit.py sheet).
+    No path, no file name in the answer."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return 404, {"ok": False, "words": CANT_FIND}
+    if kind_ok(body.get("kind")) is None:
+        return 400, {"ok": False, "why": "kind", "words": NOT_UNDERSTOOD}
+    before = {x["n"]: arrange.photo_name(x) for x in arrange.sheet_rows(kit)}
+    if not before:
+        return 404, {"ok": False, "words": NOT_READY}
+    relisted = False
+    try:
+        import reel_page
+        relisted = bool(reel_page.relist_if_changed(kit))
+    except (Exception, SystemExit) as e:  # noqa: BLE001
+        arrange.log(f"design photos: the Photos folder couldn't be compared with the list: {e.__class__.__name__}: {str(e)[:160]}")
+    after = {x["n"]: arrange.photo_name(x) for x in arrange.sheet_rows(kit)}
+    stamp = arrange.sheet_stamp(kit)
+    if not after or not stamp:
+        return 404, {"ok": False, "words": NOT_READY}
+    added = sorted(n for n in after if n not in before)
+    kept = all(after.get(n) == name for n, name in before.items())
+    out = {"ok": True, "stamp": stamp, "added": len(added), "kept": kept, "relisted": relisted}
+    if added:
+        out["first"], out["last"] = added[0], added[-1]
+    return 200, out
 
 
 def _post_asked(body):
@@ -2977,6 +3018,8 @@ def handle_post(handler, path, query):
             code, out = add_font(body.get("add"))
         elif path == "/design-asked":
             code, out = _post_asked(body)
+        elif path == "/design-photos":
+            code, out = _post_photos(body)
         else:
             code, out = _post_commit(body)
         arrange._send_json(handler, out, code)

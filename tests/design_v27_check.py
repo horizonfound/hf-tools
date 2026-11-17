@@ -38,6 +38,7 @@ Nothing here touches the real ~/.studio: every server and command gets a STUDIO_
 switch that keeps a test from opening a window (STUDIO_NO_WINDOWS_FOR_TESTS), so Finder is never opened.
 """
 import hashlib
+import html
 import json
 import os
 import re
@@ -111,6 +112,11 @@ HERS = {
     "samed": "Same size. Undo puts them back.",
     "lined": "Lined up. Undo puts them back.",
     "removed_them": "Removed. Undo brings them back.",
+    # + Add photos (B16): the button and its tooltip (her HTML line 352) and its three lines (her page 1094-1099)
+    "add_photos": "+ Add photos", "add_title": "Opens this shoot's Photos folder in Finder",
+    "add_opening": "Opening your Photos folder in Finder...",
+    "add_open": "Your Photos folder is open in Finder. Drag your finished photos in, and they show up here at the end.",
+    "add_cant": "Could not open the folder. Is the photo drive plugged in?",
     # Save just this slide (B17): the two buttons and their tooltips (her HTML lines 292 and 337), her stories' name (435)
     "save_one": "Save just this slide", "save_one_story": "Save just this story",
     "save_one_title": "Save only the slide this is on, as its own picture",
@@ -148,6 +154,11 @@ HERS_BUILT = {
     "click_first": ("`Click the ${UNIT.toLowerCase()} you want to save first, then press this.`", "Click the slide you want to save first, then press this.", "Click the story you want to save first, then press this."),
     "making_one": ("`Making ${u} ${si + 1}\u2026`", "Making slide 3\u2026", "Making story 3\u2026"),
     "stopped_one": ("'Stopped: ' + err.message + '. Nothing was overwritten.'", "Stopped: a thing. Nothing was overwritten.", "Stopped: a thing. Nothing was overwritten."),
+    # + Add photos (B16): her line when photos have joined (her page line 1086), for three and for one
+    "joined_3": ("`${k} new photo${k === 1 ? '' : 's'} in, at the end of your photos (#${now.length - k + 1}${k > 1 ? '\u2013' + now.length : ''}).`",
+                 "3 new photos in, at the end of your photos (#168\u2013170).", "3 new photos in, at the end of your photos (#168\u2013170)."),
+    "joined_1": ("`${k} new photo${k === 1 ? '' : 's'} in, at the end of your photos (#${now.length - k + 1}${k > 1 ? '\u2013' + now.length : ''}).`",
+                 "1 new photo in, at the end of your photos (#168).", "1 new photo in, at the end of your photos (#168)."),
 }
 # Her saved line for a single slide (her page line 1114), built on her page from the kind's word, the number, the file's name,
 # the shoot's short name and the folder; the Assistant says it with those filled in (design.SAVED_SINGLE).
@@ -156,8 +167,9 @@ HERS_SAVED_ONE = "`Saved ${u} ${si + 1} as \"${j.file}\", in the ${shoot.short} 
 HERS_NOT_OURS = {
     "Opened in Finder": "her saved line's own button changes its label; ours has one Open folder button right after the saved line, whose answer is her full sentence",
     "Could not open it": "the same button; ours says what the Assistant answered",
-    "in Finder": "said on a Mac; a PC's lines say File Explorer (this_computer.FILES_APP), hers run `open` and are Mac only",
 }
+# ("in Finder", her Open folder answers and her Add photos lines, is said on a Mac and File Explorer on a PC: this_computer.FILES_APP;
+# hers run `open` and are Mac only. Checked below as its own case rather than as a line left out.)
 # Our own words where hers has none (drafts for Nicole), each with its reason.
 OUR_WORDS = {
     "Your assistant’s pick is in your slides.": "the carousel's line for the moment the pick arrives on the open page (hers has none; the stories' line is from v26)",
@@ -282,6 +294,10 @@ out.where_before = DW.whereBefore(3); out.where_after = DW.whereAfter(3); out.to
 var s = SAVE.slice(SAVE.indexOf('var SW = D.WORDS.save = {'), SAVE.indexOf('D.storyWords(SW'));
 var SWt = (new Function('D', 'P', s + '; return SW;'))({WORDS: {}}, {list: function(a){ return a.join(', '); }});
 out.save_one_any = SWt.saveOneAny; out.save_one_n = SWt.saveOneN(3); out.click_first = SWt.clickFirst; out.making_one = SWt.makingOne(3); out.stopped_one = SWt.stoppedOne('a thing.');
+// + Add photos (B16): the ask part's joined line, run by itself (the other three lines come from the page as data)
+var a = ASK.slice(ASK.indexOf('joined: function(k, first, last)'), ASK.indexOf('};', ASK.indexOf('joined: function(k, first, last)')));
+var J = (new Function('return {' + a + '};'))();
+out.joined_3 = J.joined(3, 168, 170); out.joined_1 = J.joined(1, 168, 168);
 // a story's own: the most line names 40 stories (the stories' override in the core), and tooMany is given 40
 out.too_many_s = W.tooMany(4, 40, 18); out.too_many_1_s = W.tooMany(1, 40, 40);
 var m = /most: '((?:[^'\\]|\\.)*)'/g, ms = [], mm; while ((mm = m.exec(CORE))) ms.push(mm[1]);
@@ -289,7 +305,7 @@ out.most_s = ms.length > 1 ? (new Function("return '" + ms[1] + "';"))() : '';
 JSON.stringify(out);
 """
         f = Path(os.environ.get("TMPDIR", "/private/tmp")) / ("v27-said-%d.js" % os.getpid())
-        f.write_text("var CORE = " + json.dumps(core) + ";\nvar DZ = " + json.dumps(dz) + ";\nvar SAVE = " + json.dumps(_src()["DESIGN_SAVE_JS"]) + ";\n" + js, encoding="utf-8")
+        f.write_text("var CORE = " + json.dumps(core) + ";\nvar DZ = " + json.dumps(dz) + ";\nvar SAVE = " + json.dumps(_src()["DESIGN_SAVE_JS"]) + ";\nvar ASK = " + json.dumps(_src()["DESIGN_ASK_JS"]) + ";\n" + js, encoding="utf-8")
         r = osascript(f)
         try:
             _SAID.update(json.loads(r.stdout))
@@ -778,6 +794,34 @@ def check_v27_page(case, work):
     case("v27 page: Use says Put it in the selected frame with a frame selected, else Use this photo; and the window closes when the design changes under it",
          "D.label(useBtn, b && M.isFrame(b) ? WORDS.viewPut : WORDS.viewUse);" in view and "D.on('design', function(){ if (D.modals.isOpen(modal)) close(); });" in view)
 
+    # ---- B16: + Add photos: her button before "Let my assistant choose", her lines as data in this computer's words, the poll ----
+    askjs = src["DESIGN_ASK_JS"]
+    app = this_computer.FILES_APP
+    tb = re.search(r"<span class='tray-btns'><button class='tb add-photos' id='add-photos' type='button' title='([^']*)'>([^<]*)</button><button class='tb ask-btn' id='ask-pick'", car)
+    case("v27 page: \"+ Add photos\" sits right before \"Let my assistant choose the photos\" beside the photos' heading, with her tooltip in this computer's words, on both pages",
+         tb and tb.group(2) == HERS["add_photos"] and html.unescape(tb.group(1)) == HERS["add_title"].replace("Finder", app) and "id='add-photos' type='button'" in design_page.page_html("2026-11-01 Fake beach", "stories"), tb and tb.groups())
+    ln = re.search(r"<p class='hint' id='add-photos-line' role='status' hidden data-opening='([^']*)' data-open='([^']*)' data-cant='([^']*)'></p>", car)
+    case("v27 page: her three lines are on the page as data on the line under the heading, Finder on a Mac and File Explorer on a PC",
+         ln and [html.unescape(x) for x in ln.groups()] == [HERS["add_opening"].replace("Finder", app), HERS["add_open"].replace("Finder", app), HERS["add_cant"]]
+         and "Finder" not in design_page.ADD_PHOTOS_OPEN.format(app="File Explorer") and "Finder" not in design_page.ADD_PHOTOS_TITLE.format(app="File Explorer"), ln and ln.groups())
+    case("v27 page: \"in Finder\" is on our page only in those lines, written from this computer's own file manager (hers names Finder outright)",
+         car.count("in " + app) == 3 and car.count("in Finder") == (3 if app == "Finder" else 0) and "in Finder" not in allsrc)
+    case("v27 page: the button opens the Photos folder through the Assistant (GET /open, sub Photos, the same route as Open folder), says her line or her could-not line, and starts looking every 4 seconds",
+         "fetch('/open?' + D.Q + '&sub=Photos', {cache: 'no-store'})" in askjs and "addSay(APW.opening);" in askjs and "if (!(j && j.ok)) { addSay(APW.cant); return; }" in askjs
+         and "var ADD_EVERY = 4000" in askjs and "function watchPhotos(){ if (!addT) addT = setInterval(lookPhotos, ADD_EVERY); }" in askjs)
+    case("v27 page: the look asks POST /design-photos only while the line is showing and the page is in sight; a moved stamp with every number kept takes the new list (Designer.takePhotos); a photo gone or renamed asks for a Reload as always",
+         "if (addLine.hidden || document.hidden || addBusy || !D.S || !D.design || D.blocked) return;" in askjs and "fetch('/design-photos', {method: 'POST'" in askjs
+         and "if (j.kept === false) { addBusy = false; D.photosChanged(); return; }" in askjs and "var fresh = D.takePhotos(s);" in askjs
+         and "if (fresh && fresh.length) addSay(APW.joined(fresh.length, fresh[0].n, fresh[fresh.length - 1].n));" in askjs)
+    case("v27 page: takePhotos (the core) takes nothing while something is unsaved, when the design on the Assistant's side is not this layout, or when a photo this page knows is gone; it keeps the layout and gives the new photos to the tray, which puts each at the END",
+         "if (!D.st || !D.design || D.blocked || !D.save.idle() || !j || !j.ok || !j.design || j.design.id !== D.design.id) return null;" in core
+         and "if (JSON.stringify(M.tidy(j.design.state)) !== JSON.stringify(D.st)) return null;" in core and "for (var k = 0; k < D.S.photos.length; k++) { if (!now[D.S.photos[k].n]) return null; }" in core
+         and "D.emit('photos-added', fresh);" in core and "hist.clear()" not in core.split("D.takePhotos = function(j){")[1].split("function wanted()")[0]
+         and "D.on('photos-added', function(fresh){" in edit and "fresh.forEach(function(p){ if (!tiles[p.n]) frag.appendChild(tile(p)); });" in edit and "thumbs.appendChild(frag);" in edit.split("D.on('photos-added'")[1][:400])
+    case("v27 page: the Assistant re-lists through one writer (kit.py sheet, by the reel page's relist_if_changed: Lane A's rule), never from the request thread's own hands, and a design whose photos all kept their numbers keeps its counter",
+         "relisted = bool(reel_page.relist_if_changed(kit))" in (SCRIPTS / "design.py").read_text(encoding="utf-8") and '"/design-photos"' in (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8")
+         and 'if d["state"] != old["state"]:' in (SCRIPTS / "design.py").read_text(encoding="utf-8").split("def _sync(")[1].split("def seed_state")[0])
+
     # ---- B17: Save just this slide: her two buttons on both pages, the words, the road through the saving part ----
     save_js = src["DESIGN_SAVE_JS"]
     btn = re.search(r"<button class='tb' id='save-one' type='button' disabled title='([^']*)'>([^<]*)</button>", car)
@@ -847,6 +891,7 @@ def check_v27_page(case, work):
          her_open == ["Your ${sub} folder is open in Finder.", "There's no ${sub} folder yet. Press ${$('save').textContent} first and it's made for you."], her_open)
     for line, why in HERS_NOT_OURS.items():
         case(f"v27 page: left out on purpose, and her page has it: \"{line}\" ({why[:50]}...)", line in her and not on(car, line) and not on(story, line))
+    case("v27 page: her Add photos lines and her tooltip are built on her page as this file has them", all(v in her for k, v in HERS.items() if k.startswith("add_")))
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1012,8 +1057,71 @@ def check_v27_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         check_fill_commands(case, work, env, kit, kit_name, run, A, get_json, P, KQ, post, J)
         # ---- B17: Save just this slide, through the real routes and the commit as a process of its own ----
         check_save_one(case, work, env, kit, kit_name, studio, run, A, get_json, P, KQ, post, ask, jpeg, J, disk, save, S1, STAMP)
+        # ---- B16: + Add photos: two photos dropped into the Photos folder, numbered after the last ----
+        check_add_photos(case, work, kit, kit_name, A, get_json, P, KQ, post, ask, J, disk, save, S1)
     finally:
         srv.stop()
+
+
+def check_add_photos(case, work, kit, kit_name, A, get_json, P, KQ, post, ask, J, disk, save, S1):
+    """B16: POST /design-photos: nothing new answers so; two photos dropped in are numbered after the last by the one writer,
+    every other photo keeping its number and name, the designs' frames and counters untouched; a photo taken out is told as
+    not kept (the page's Reload path); another website refused; no path in any answer; the photos only ever read."""
+    import shutil
+    photos_dir = kit / "Photos"
+    sheet = kit / ".kit" / "sheet.json"
+
+    def rows():
+        return {x["n"]: Path(x["file"]).name for x in json.loads(sheet.read_text(encoding="utf-8"))["photos"]}
+
+    def stamp():
+        return hashlib.sha1(sheet.read_bytes()).hexdigest()[:12]
+
+    before, s0 = rows(), stamp()
+    originals = _tree(photos_dir)
+    code, out = J(post(P, "/design-photos", {"kit": kit_name}))
+    case("v27 server: POST /design-photos with nothing new: ok, nothing added, every number kept, the list's stamp as it is",
+         code == 200 and out == {"ok": True, "stamp": s0, "added": 0, "kept": True, "relisted": False}, (code, out))
+    code, _, data = ask(P, "POST", "/design-photos", body=json.dumps({"kit": kit_name}).encode(), headers={"Content-Type": "application/json", "Origin": "http://evil.example"})
+    case("v27 server: another website cannot ask it (403)", code == 403, (code, data[:80]))
+    code, out = J(post(P, "/design-photos", {"kit": kit_name, "kind": "reels"}))
+    case("v27 server: a kind that is not one is refused", code == 400 and out.get("why") == "kind", (code, out))
+    first_two = sorted(os.listdir(photos_dir))[:2]
+    new = ["zz new one.jpg", "zz new two.jpg"]
+    for src, dst in zip(first_two, new):
+        shutil.copyfile(photos_dir / src, photos_dir / dst)
+        t = time.time() - 30
+        os.utime(photos_dir / dst, (t, t))           # settled: not still being copied in
+    d0 = disk(A)
+    time.sleep(4.2)                                  # the folder is compared at most every 4 seconds a kit (Lane A's rule)
+    code, out = J(post(P, "/design-photos", {"kit": kit_name}))
+    after = rows()
+    case("v27 server: two photos dropped in: the list is made again, 2 added as the next two numbers, every photo before kept its number and name",
+         code == 200 and out.get("ok") and out.get("relisted") is True and out.get("added") == 2 and out.get("kept") is True and out.get("first") == len(before) + 1 and out.get("last") == len(before) + 2
+         and out.get("stamp") == stamp() != s0 and {n: f for n, f in after.items() if n <= len(before)} == before and [after[len(before) + 1], after[len(before) + 2]] == new, (code, out))
+    d1 = disk(A)
+    code, st = J(get_json(P, f"/design-state?kit={KQ}&design={A}"))
+    d2 = disk(A)
+    case("v27 server: the design's frames are untouched and its counter has not moved (the photos it uses kept their numbers), its stamp now the new list's; the page is given 16 photos and no path",
+         d1["state"] == d0["state"] and d2["state"] == d0["state"] and d2["rev"] == d0["rev"] and d2["stamp"] == stamp() and d2.get("names") == d0.get("names")
+         and code == 200 and len(st["photos"]) == len(before) + 2 and st["stamp"] == stamp() and st["design"]["rev"] == d0["rev"] and no_path(st, work)[0], (d0["rev"], d1["rev"], d2["rev"]))
+    code, out = J(post(P, "/design", {"kit": kit_name, "design": A, "stamp": stamp(), "base": d0["rev"], "page": "v27serverpage04", "state": dict(S1, bg="#eeeeee")}))
+    case("v27 server: a page that took the new list goes on saving from the counter it had", code == 200 and out.get("ok") and out.get("rev") == d0["rev"] + 1, (code, out))
+    code, out = J(post(P, "/design-photos", {"kit": kit_name}))
+    case("v27 server: asked again at once: nothing new, and the folder is not compared again within 4 seconds", code == 200 and out.get("added") == 0 and out.get("relisted") is False and out.get("kept") is True, out)
+    aside = kit / "Photos-aside"
+    aside.mkdir(exist_ok=True)
+    shutil.move(str(photos_dir / new[1]), str(aside / new[1]))
+    time.sleep(4.2)
+    code, out = J(post(P, "/design-photos", {"kit": kit_name}))
+    after2 = rows()
+    case("v27 server: a photo taken out: the list is made again, its number stays unused, and the answer says the numbers were NOT all kept (the page's Reload path)",
+         code == 200 and out.get("relisted") is True and out.get("kept") is False and out.get("added") == 0 and len(before) + 2 not in after2 and after2[len(before) + 1] == new[0]
+         and {n: f for n, f in after2.items() if n <= len(before)} == before, (code, out))
+    code, st = J(get_json(P, f"/design-state?kit={KQ}&design={A}"))
+    case("v27 server: the design is still whole after that (no frame used the photo that went)", code == 200 and disk(A)["state"] == dict(S1, bg="#eeeeee") and disk(A)["rev"] == d0["rev"] + 1, disk(A)["rev"])
+    case("v27 server: the photos that were there were only ever read", all(_tree(photos_dir).get(k) == v for k, v in originals.items()))
+    case("v27 server: no answer here names a folder on this computer", all(no_path(x, work)[0] for x in (out, st)))
 
 
 def check_save_one(case, work, env, kit, kit_name, studio, run, A, get_json, P, KQ, post, ask, jpeg, J, disk, save, S1, STAMP):
@@ -1984,6 +2092,48 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#undo")
             case("v27 browser: nothing went wrong on the page through Save just this slide", not c.page_errors(), c.page_errors()[:3])
 
+            # ================= + Add photos (B16) =================
+            import shutil
+            ab = Jx("(function(){ var b = document.getElementById('add-photos'); return {text: b.textContent, title: b.title, next: b.nextElementSibling.id, wrap: b.parentNode.className, line: document.getElementById('add-photos-line').hidden, watching: Designer.addPhotos.watching()}; })()")
+            case("v27 browser: \"+ Add photos\" sits right before \"Let my assistant choose the photos\" beside the photos' heading, her tooltip in this computer's words, its line not showing, nothing being asked yet",
+                 ab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick", "wrap": "tray-btns", "line": True, "watching": False}, ab)
+            c.js("document.getElementById('g-bg').querySelector('.sw[data-c=\"#f4efe6\"]').click()")       # a change first, so there is an Undo step to keep
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            total0, blocks0 = Jx("Designer.S.total"), len(st()["blocks"])
+            c.click("#add-photos")
+            c.wait_for("document.getElementById('add-photos-line').textContent.indexOf('is open in') >= 0", 8, tell="document.getElementById('add-photos-line').textContent")
+            case("v27 browser: pressed: her line under the heading (the folder opened through the Assistant; nothing opened: the no-windows switch), and the page now looks every 4 seconds",
+                 c.text("#add-photos-line") == HERS["add_open"].replace("Finder", app) and Jx("Designer.addPhotos.watching()") and Jx("Designer.addPhotos.EVERY") == 4000, c.text("#add-photos-line"))
+            two = sorted(os.listdir(kit / "Photos"))[:2]
+            for src, dst in zip(two, ("zz new a.jpg", "zz new b.jpg")):
+                shutil.copyfile(kit / "Photos" / src, kit / "Photos" / dst)
+                t = time.time() - 30
+                os.utime(kit / "Photos" / dst, (t, t))
+            c.wait_for("Designer.S.total === " + str(total0 + 2), 25, tell="document.getElementById('add-photos-line').textContent + ' | ' + Designer.S.total")
+            tray = Jx("(function(){ var t = Array.from(document.querySelectorAll('#thumbs .th')); return {n: t.length, last: t.slice(-2).map(function(x){ return Number(x.dataset.n); }), name: document.getElementById('trayname').textContent, "
+                      "line: document.getElementById('add-photos-line').textContent, undo: !document.getElementById('undo').disabled, blocks: Designer.st.blocks.length, blocked: Designer.blocked, status: document.getElementById('d-status').textContent, note: document.getElementById('d-note').hidden}; })()")
+            case("v27 browser: two photos dropped into the Photos folder join the END of the tray with the next two numbers, her line says so, the slides are untouched, Undo is still there, the page is not blocked and asks for no Reload",
+                 tray == {"n": total0 + 2, "last": [total0 + 1, total0 + 2], "name": f"All {total0 + 2} photos", "line": f"2 new photos in, at the end of your photos (#{total0 + 1}\u2013{total0 + 2}).",
+                          "undo": True, "blocks": blocks0, "blocked": False, "status": "Saved", "note": True}, tray)
+            c.wait_for("Designer.by[" + str(total0 + 2) + "] && Designer.by[" + str(total0 + 2) + "].have", 30)
+            c.js("Designer.select(null); window.scrollTo(0, document.documentElement.scrollHeight)")      # nothing selected (a click would swap it); the last tile in sight below the sticky stage
+            time.sleep(0.3)
+            c.click(f"#thumbs .th[data-n='{total0 + 2}']")
+            c.wait_for("Designer.st.blocks.length === " + str(blocks0 + 1), 5)
+            case("v27 browser: a new photo goes onto the slides like any other, and the design saves with the new list's stamp",
+                 settled() and st()["blocks"][-1]["n"] == total0 + 2 and disk()["stamp"] == hashlib.sha1((kit / ".kit" / "sheet.json").read_bytes()).hexdigest()[:12], st()["blocks"][-1])
+            c.click("#undo")
+            case("v27 browser: Undo still steps back through the changes made before the photos came", len(st()["blocks"]) == blocks0 and Jx("!document.getElementById('undo').disabled"))
+            c.wait_for("Designer.save.idle()", 10)
+            aside = kit / "Photos-aside"
+            aside.mkdir(exist_ok=True)
+            shutil.move(str(kit / "Photos" / "zz new b.jpg"), str(aside / "zz new b.jpg"))
+            c.wait_for("Designer.blocked === true", 25, tell="document.getElementById('d-note').textContent")
+            case("v27 browser: a photo taken out of the folder still stops the page until Reload, as it always has (only additions join without one)",
+                 Jx("Designer.blocked") and c.text("#d-note").startswith("The photos in this shoot changed since this page opened.") and Jx("!!document.getElementById('d-reload')"), c.text("#d-note"))
+            case("v27 browser: nothing went wrong on the page through + Add photos", not c.page_errors(), c.page_errors()[:3])
+            shutil.move(str(aside / "zz new b.jpg"), str(kit / "Photos" / "zz new b.jpg"))
+
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")
             ready()
@@ -2020,6 +2170,8 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#open-carousel")
             c.wait_for("document.getElementById('open-line').textContent !== ''", 5)
             case("v27 browser: Open folder on the stories before any Save stories: her not-yet line, naming Save stories", c.text("#open-line") == HERS["none_story"], c.text("#open-line"))
+            sab = Jx("(function(){ var b = document.getElementById('add-photos'); return {text: b.textContent, title: b.title, next: b.nextElementSibling.id}; })()")
+            case("v27 browser: the stories page has her + Add photos too, before Let my assistant choose", sab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick"}, sab)
             c.click("#strip .blk")
             sgrp = Jx("{top: document.getElementById('save-one').textContent, title: document.getElementById('save-one').title, sel: document.getElementById('save-one-sel').textContent, selTitle: document.getElementById('save-one-sel').title}")
             case("v27 browser: on the stories page the two buttons say story: \"Save just story 1\" and her \"Save just this story\" (the tooltips in story words, ours)",

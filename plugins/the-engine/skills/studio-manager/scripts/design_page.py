@@ -336,6 +336,14 @@ ASK_THEN_CAROUSEL = "Then copy this into the chat, and your assistant fills in y
 ASK_LINE_CAROUSEL = "Pick my carousel photos"
 SAVE_STORIES = "Save stories"
 OPEN_STORIES = "Open folder"           # hers, v27, the same button beside Save stories
+# + Add photos (hers, v27; Nicole, Nov 14: "Add my photos"), beside "Let my assistant choose the photos": opens the shoot's
+# Photos folder, and photos dragged in show up at the end of the tray by themselves, numbered after the last (the
+# numbers that are there stay). Her words name Finder; a PC's name File Explorer (this_computer.FILES_APP).
+ADD_PHOTOS = "+ Add photos"
+ADD_PHOTOS_TITLE = "Opens this shoot's Photos folder in {app}"
+ADD_PHOTOS_OPENING = "Opening your Photos folder in {app}..."
+ADD_PHOTOS_OPEN = "Your Photos folder is open in {app}. Drag your finished photos in, and they show up here at the end."
+ADD_PHOTOS_CANT = "Could not open the folder. Is the photo drive plugged in?"
 KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
 KIND_NAV = (("carousel", "Carousel"), ("stories", "Stories"))
 
@@ -417,10 +425,14 @@ def page_html(kit_name, kind="carousel"):
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
         "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span>"
-        # "Let my assistant choose the photos", beside the photos' heading: stories (hers, v26) and carousels (hers, v27),
-        # the same box worded for each
-        "<button class='tb ask-btn' id='ask-pick' type='button' aria-expanded='false' aria-controls='ask-box'>" + html.escape(ASK_BUTTON) + "</button>"
+        # "+ Add photos" (hers, v27) and "Let my assistant choose the photos", beside the photos' heading: stories (hers, v26)
+        # and carousels (hers, v27), the same box worded for each. Add photos' three lines go on the page as data, in this
+        # computer's own words (Finder or File Explorer), for the script that says them.
+        "<span class='tray-btns'><button class='tb add-photos' id='add-photos' type='button' title='" + html.escape(ADD_PHOTOS_TITLE.format(app=this_computer.FILES_APP), quote=True) + "'>" + html.escape(ADD_PHOTOS) + "</button>"
+        "<button class='tb ask-btn' id='ask-pick' type='button' aria-expanded='false' aria-controls='ask-box'>" + html.escape(ASK_BUTTON) + "</button></span>"
         "</div>"
+        "<p class='hint' id='add-photos-line' role='status' hidden data-opening='" + html.escape(ADD_PHOTOS_OPENING.format(app=this_computer.FILES_APP), quote=True)
+        + "' data-open='" + html.escape(ADD_PHOTOS_OPEN.format(app=this_computer.FILES_APP), quote=True) + "' data-cant='" + html.escape(ADD_PHOTOS_CANT, quote=True) + "'></p>"
         "<div class='ask-box' id='ask-box' hidden>"
         "<label for='ask-note'><b>" + html.escape(ASK_HEAD) + "</b> " + html.escape(ASK_SUB if story else ASK_SUB_CAROUSEL)
         + "<span class='ask-ex'>" + html.escape(ASK_EXAMPLE) + "</span></label>"

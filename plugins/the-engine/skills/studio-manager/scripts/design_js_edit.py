@@ -871,6 +871,13 @@ DESIGN_EDIT_JS = r"""
     }
   });
   D.on('photos', function(){ D.S.photos.forEach(function(p){ if (tiles[p.n]) tilePic(tiles[p.n], p); }); });
+  // photos that joined the shoot (her + Add photos, v27): each gets its tile at the END of the tray, built as every tile is
+  D.on('photos-added', function(fresh){
+    var frag = document.createDocumentFragment();
+    fresh.forEach(function(p){ if (!tiles[p.n]) frag.appendChild(tile(p)); });
+    thumbs.appendChild(frag);
+    $('trayname').textContent = WORDS.allPhotos(D.S.total);
+  });
 
   function clickPhoto(n){
     if (!D.st || D.blocked || !D.by[n]) return;
