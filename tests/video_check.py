@@ -587,6 +587,16 @@ def main():
           and abs(video.words_plan({"text": "a", "x": 0.2})["wrap"] - 0.36) < 1e-9 and video.words_plan({"text": "a", "x": 0.5})["wrap"] == 0.8
           and video.words_plan({"text": "a", "size": 1.5})["px"] == 99 and video.words_plan({"text": "a", "style": "blackbox"})["box"] == [1, 1, 1]
           and video.words_plan({"text": "a", "font": "helvetica"})["fontName"] == "Helvetica-Bold")
+    held = open(video.lock_path(), "a", encoding="utf-8")
+    got = this_computer.try_lock(held)
+    try:
+        r = video.render_broll(plan, reels / "held.mp4", song=m4a, words=words, work=work, wait=0.5)
+        check("the render takes its turn behind any other video program on this computer (her ffmpeg ran beside anything): with the lock held it says busy and makes nothing",
+              got and r == {"ok": False, "state": "busy", "words": video.BUSY} and not (reels / "held.mp4").exists() and not any(p.name.startswith(".held") for p in reels.iterdir()), (got, r))
+    finally:
+        if got:
+            this_computer.unlock(held)
+        held.close()
     os.environ[video.NO_AV] = "1"
     try:
         r = video.render_broll(plan, reels / "pc.mp4", song=m4a, words=words, work=work)

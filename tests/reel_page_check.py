@@ -368,6 +368,81 @@ def check_words():
              m and ours in m.group(1) and "--display" not in m.group(1) and "Fraunces" not in m.group(1) and ".viewer" not in m.group(1))
 
 
+# Her v27 page's lines that are not ours, on purpose (the whole-build check, A18): the hidden Top/Middle/Bottom and
+# "how long" selects for the B-roll words (taken out by her, not drawn), her test-home link, her v25 Trim panel (its
+# words are kept in reel_page.TRIM_WORDS behind TRIM_PANEL, off the page), her talking-reel words where her reel page
+# carries them, and the few lines her page builds from pieces at run time.
+HERS_NOT_OURS = {"Top", "Middle", "Bottom", "Where I put them", "On the first clip", "The whole reel", "Where on the screen", "How long it shows",
+                 "Back to the post kit", "Home", "Test home", "Where you are"}
+
+
+def check_v27_both_ways():
+    """A18: every word of every table of ours is in her v27 reel-maker.html, server.py, broll_video.py or bts_reel.py
+    word for word, and every line her v27 page's markup shows (its text, placeholders, titles and labels) is one of
+    ours, whole, but for HERS_NOT_OURS. The older tables (WORDS from her v19 page, TRIM_WORDS from v25) are held
+    by check_words and their own tests; this is the v27 page as a whole."""
+    import importlib
+    sys.path.insert(0, str(SCRIPTS))
+    rp = importlib.import_module("reel_page")
+    page = her_v27_page()
+    if page is None:
+        print("SKIP  her v27 page both ways: that handoff isn't on this computer", flush=True)
+        return
+    folder = None
+    for base in (ROOT, ROOT.parent / "hf-tools", Path("/Users/dustindamron/Projects/hf-tools")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v27-*")):
+            f = h / "Carousel designer and reel picker"
+            if (f / "pages" / "reel-maker.html").is_file():
+                folder = f
+    hers = page
+    for name in ("server.py", "broll_video.py", "bts_reel.py", "footage.py", "UPDATE-v27.md"):     # her "← All the reels..." line is in UPDATE-v27.md, section 2
+        if (folder / name).is_file():
+            hers += "\n" + (folder / name).read_text(encoding="utf-8")
+    hers = html.unescape(hers).replace("\\'", "'")
+    hers = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), hers)     # her script writes '\u2713 Added'
+    tables = {"KIND_WORDS": rp.KIND_WORDS, "REELS_WORDS": rp.REELS_WORDS, "PICK_WORDS": rp.PICK_WORDS, "SELECT_WORDS": rp.SELECT_WORDS,
+              "DIRECT_WORDS": rp.DIRECT_WORDS, "WATCH_WORDS": rp.WATCH_WORDS, "ONSCREEN_WORDS": rp.ONSCREEN_WORDS, "EDITOR_WORDS": rp.EDITOR_WORDS,
+              "VIDEO_WORDS": rp.VIDEO_WORDS}
+    pieced = {"new_photo": [" new photo", " in."], "new_photos": [" new photo", "s", " in."], "vids_one": [" video", " added"], "vids_n": [" video", "s", " added"],
+              "q_in": ["It's in your posting queue: ", ". Write its caption in your post kit whenever you're ready."], "q_going": [", going out "],
+              "q_already": ["It's already in your posting queue", "."], "q_set": [", set for "], "q_label": [" · "], "q_label_one": [" reel"],
+              "pv_words_b": [": ", " seconds"], "pv_words_tail": [", photos about ", " s each."], "pv_was": [" (", ": ", " s)"],
+              "pv_marks_quick": [" of your ", " photos are set to Quicker"], "pv_marks_long": [" to Longer"], "pv_mix_n": ["Mix "],
+              "sum_broll": [" clip", " · B-roll"], "file": [" B-roll"], "file_reel": [" B-roll", " - "], "vids_total": [" of footage"],
+              "sel_n": [" selected"], "sel_tag": [" photos"], "pv_broll_words": ["B-roll: ", " seconds, ", " clip", ", each cut on the beat."],
+              "pv_one_part": ["Your song is only ", " seconds and this reel is ", ", so there's only one part of it that fits. A longer song gives you more parts to try."],
+              "ed_clip_n": ["clip "], "ed_len": [" s"], "ed_videos_n": [" videos"]}
+    bad = []
+    for tname, table in tables.items():
+        for k, v in table.items():
+            frags = pieced.get(k) or re.split(r"\{\w+\}", v)
+            for frag in frags:
+                if len(frag.strip()) >= 2 and frag not in hers:
+                    bad.append((tname, k, frag))
+    case("every word of our v27 tables (%d lines in %d tables) is in her v27 reel-maker.html, server.py, broll_video.py or bts_reel.py, word for word"
+         % (sum(len(t) for t in tables.values()), len(tables)), not bad, bad[:6])
+    # the other way: every line her page shows is one of ours
+    ours = set()
+    for table in list(tables.values()) + [rp.WORDS, rp.TRIM_WORDS, rp.OUR_WORDS]:
+        for v in table.values():
+            if not isinstance(v, str):
+                continue
+            ours.add(re.sub(r"<[^>]+>", "", html.unescape(v)).strip())
+            for frag in re.split(r"<[^>]+>", v):
+                if frag.strip():
+                    ours.add(html.unescape(frag).strip())
+    body = page[page.index("<body"):page.index("<script>")] if "<script>" in page else page
+    body = re.sub(r"<style>.*?</style>", "", body, flags=re.S)
+    shown = [html.unescape(x).strip() for x in re.findall(r">([^<>]{3,})<", body)]
+    attrs = [html.unescape(v) for a in ("placeholder", "title", "aria-label") for v in re.findall(r'%s="([^"]+)"' % a, body)]
+    def ok(x):
+        if x in ours or x in HERS_NOT_OURS or re.fullmatch(r"[\s\d:.▶◀↶↷←→›·&#;%x]*", x):
+            return True
+        return any(x in o for o in ours if len(o) > len(x))     # a piece of one of our lines with a {name} in it
+    missing = sorted({x for x in shown + attrs if not ok(x)})
+    case("...and every line her v27 page's markup shows (%d) is one of ours, whole, but for HERS_NOT_OURS" % len(shown + attrs), not missing, missing[:8])
+
+
 # ---------- 2. the server, without a browser ----------
 
 def check_server(s):
@@ -1507,6 +1582,7 @@ def main():
     run = work / time.strftime("run-%H%M%S")
     run.mkdir(parents=True)
     group("her words", check_words)
+    group("her v27 page and server against every table of ours, both ways (A18)", check_v27_both_ways)
     group("the defaults, each in its one place", check_defaults)
     if not Path("/usr/bin/sips").exists():
         print("SKIP  the page: the pretend kit is drawn with the Mac's sips", flush=True)

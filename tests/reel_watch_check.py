@@ -520,7 +520,10 @@ def check_broll(s):
     rc, out = s.cmd("reel_page.py", "show", KIT)
     case("reel_page.py show: Videos saved from the page, the newest by name", rc == 0 and 'Videos saved from the page (Save my video, in this shoot\'s Reels folder): 1, the newest "%s"' % name in out, out[-400:])
     code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))
+    code_b, jb, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))      # a second press while the first is at work
     job2 = wait_job(s, (j or {}).get("job", {}).get("id")) if code == 200 and (j or {}).get("job") else None
+    case("her fault fixed: a second press while a video is being saved doesn't race it (hers wrote a .part beside the first with no lock): refused with our line, the first job followed",
+         code == 200 and code_b == 409 and jb["words"] == R.OUR_WORDS["video_making"] and jb.get("job", {}).get("id") == j["job"]["id"], (code_b, jb))
     name2 = "%s B-roll - Broll one 2.mp4" % short
     case("a second save never writes over the first: \"... 2.mp4\", both files there", job2 and job2.get("video") == name2 and (s.kit / "Reels" / name2).is_file() and vfile.is_file()
          and len([m for m in record(s).get("made") or [] if m.get("video")]) == 2, job2)

@@ -160,13 +160,16 @@ def check_wide_kit(s):
     rpc.tiny_jpeg(k / "Photos" / "0000 newly exported.jpg", 1080, 1350)
     code, out = s.cmd("kit.py", "sheet", str(k))
     sheet = json.loads((k / ".kit" / "sheet.json").read_text())["photos"]
-    case("(kit.py sheet numbered the new export 1)", code == 0 and Path(sheet[0]["file"]).name == "0000 newly exported.jpg", out[-200:])
+    # since Nicole's v27 (Lane A, stage 1) numbers stay fixed: the new export takes the next number, 1 and 2 still mean the photos they did
+    new_n = next((x["n"] for x in sheet if Path(x["file"]).name == "0000 newly exported.jpg"), None)
+    case("(kit.py sheet gave the new export the next number, and 1 still means the photo it did)", code == 0 and new_n == max(x["n"] for x in sheet)
+         and Path(next(x["file"] for x in sheet if x["n"] == 1)).name == "01.jpg", (new_n, out[-200:]))
     code, out = s.cmd(str(REEL / "reel.py"), "make", "--folder", str(k / "Photos"), "--shoot", "Wide shoot", "--kit", str(k),
                       "--picks", "1,2", "--song", "none", "--dry-run")
     plan = json.loads((k / ".kit" / "reels" / "reel.json").read_text())["plan"]
     got = [Path(p["path"]).name for p in plan["photos"]]
-    case("4. a chat reel with --kit puts in the photos the kit's numbers mean, not the stale list's", code == 0
-         and got == ["0000 newly exported.jpg", "01.jpg"], (got, out[-200:]))
+    case("4. a chat reel with --kit puts in the photos the kit's numbers mean (1 and 2 are still 01.jpg and 02.jpg; the stale list in .kit/reels is not read)", code == 0
+         and got == ["01.jpg", "02.jpg"], (got, out[-200:]))
     return k
 
 
@@ -362,10 +365,10 @@ def check_link_and_site(s):
     code, _, raw = s.http("GET", "/reel.html?kit=" + rpc.KIT.replace(" ", "%20"), headers={"Sec-Fetch-Site": "cross-site"})
     body = html.unescape(raw.decode("utf-8", "replace"))
     case("10. the reel page asked for by another website is the plain 'can't find' page",
-         CANT_FIND in body and "Put your photos in order" not in body, body[:200])
+         CANT_FIND in body and "Which reel do you want to create?" not in body and "Choose your photos" not in body, body[:200])
     case("10. ...and nothing in the kit's records was written", {f: (dot / f).stat().st_mtime_ns for f in os.listdir(dot)} == snap)
     code, _, raw = s.http("GET", "/reel.html?kit=" + rpc.KIT.replace(" ", "%20"), headers={"Sec-Fetch-Site": "same-origin"})
-    case("10. the page itself still opens for the pane", "Put your photos in order" in raw.decode("utf-8", "replace"))
+    case("10. the page itself still opens for the pane (her v27 chooser when no kind is in the address)", "Which reel do you want to create?" in raw.decode("utf-8", "replace"))
 
 
 # ---------- 1 (the server's own words) and 3: in the page ----------

@@ -147,6 +147,10 @@ name: Check it on a Windows PC
 #                                   page's own poll with every other number kept, the song drop-down with Listen and
 #                                   Remove this song, Add this reel to my posting queue. By request on Windows
 #                                   (--no-chrome) and in "mac-page" with the pages in a hidden Chrome.
+#   tests/reel_footage_check.py     Nicole's v27, Lane A stage 3 (Nov 17): the footage editor on the real page (the trim dragged
+#                                   on the timeline, Your clips) and clip naming from the chat, in "mac-page" under the guard.
+#                                   Since stage 5, tests/video_check.py (the Mac job) also renders the finished B-roll video
+#                                   (Save my video) and tests/reel_watch_check.py presses Save my video on the page.
 #   tests/reel_watch_check.py       Nicole's v27, Lane A stage 4 (Nov 17): Watch your reel before you make it (the preview's
 #                                   pieces from reel.py's dry run, Try another mix, Another part of this song, Undo and
 #                                   Redo, Make this one in CapCut carrying the watched mix), Would you like to direct this
@@ -213,11 +217,11 @@ on:
   workflow_dispatch:
   push:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
-            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
+            "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/kit_cards_check.py", "tools/check_pc.py", ".github/workflows/check-pc.yml"]
 permissions:
@@ -642,6 +646,9 @@ jobs:
       - name: Watch your reel before you make it, direct this edit, B-roll on the page (Nicole's v27, Lane A stage 4, on the real page - the preview's pieces and her line, Try another mix, Undo and Redo, Another part of this song, Make this one in CapCut with the watched mix; the direct box and reel_page.py direct; B-roll's words dragged on the preview and into the CapCut project)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 800 /tmp/v/bin/python tests/reel_watch_check.py --work /private/tmp/reel-watch-ci
+      - name: The footage editor and clip naming (Nicole's v27, Lane A stage 3, on the real page - one player, the Footage drop-down, Start here, End here and Add clip with the orange trim dragged on the timeline, Your clips in two columns, footage.py picks and describe; the PC's way with no stills)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 800 /tmp/v/bin/python tests/reel_footage_check.py --work /private/tmp/reel-footage-ci
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci
