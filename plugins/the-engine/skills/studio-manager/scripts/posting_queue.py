@@ -1861,6 +1861,11 @@ def thumb_wanted(path):
     return True                                             # a picture that isn't there: Python's own "not found"
 
 
+# Open folder's answer on the designer (hers, v27, with Finder read as this computer's file manager): one line each for
+# the two folders the designer saves into. Every other folder keeps "Opened <name> in <app>.".
+OPEN_WORDS = {"Carousel": "Your Carousel folder is open in {app}.", "Stories": "Your Stories folder is open in {app}."}
+
+
 class Handler(SimpleHTTPRequestHandler):
     def ours(self):
         """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)?
@@ -2163,8 +2168,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.answer({"url": u, "words": None if u else "Ask your assistant: show my editing queue"})
 
     def open_kit_folder(self, query):
-        """A kit page's "Open the ... folder" button: only a kit in Content, or one of its own folders
-        (Photos may live elsewhere when the kit points at a Lightroom export folder)."""
+        """A kit page's "Open the ... folder" button, and the designer's "Open folder": only a kit in Content, or one
+        of its own folders (Photos may live elsewhere when the kit points at a Lightroom export folder). The answer
+        for a Carousel or Stories folder is Nicole's line (OPEN_WORDS, v27); a folder that is not there yet says so
+        with why "none", and the designer's page then says her "There's no ... folder yet. Press ... first" line."""
         from urllib.parse import parse_qs
         import finder
         import posts
@@ -2203,20 +2210,23 @@ class Handler(SimpleHTTPRequestHandler):
                 target = kd / sub
             else:
                 target = None
+            none = False
             if target is None:
                 pass
             elif not target.is_dir():
-                ok, words = False, f"There's no {sub or 'kit'} folder yet." if sub != "Photos" else "The photos folder isn't there right now. Is the drive plugged in?"
+                none = sub != "Photos"
+                ok, words = False, f"There's no {sub or 'kit'} folder yet." if none else "The photos folder isn't there right now. Is the drive plugged in?"
             else:
                 ok, why = finder.open_folder(target)
                 name = target.name
                 app = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
-                words = (f"Opened {name} in {app}, behind this window. Click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
-                         else f"Opened {name} in {app}.") if ok else f"Couldn't open {app}. The folder is {target}. ({why})"
+                opened = OPEN_WORDS[sub].format(app=app) if sub in OPEN_WORDS else f"Opened {name} in {app}."
+                words = (opened + f" It's behind this window: click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
+                         else opened) if ok else f"Couldn't open {app}. The folder is {target}. ({why})"
         elif h is None or not content.is_dir():
             words = f"The {posts.HOME_NAME} folder isn't there right now. Is the drive plugged in?"
         say(f"open asked: {kit_name} / {sub or '(kit)'} -> {'ok' if ok else 'no'}: {words}")
-        out = json.dumps({"ok": ok, "words": words}).encode()
+        out = json.dumps(dict({"ok": ok, "words": words}, **({"why": "none"} if none else {}))).encode()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")

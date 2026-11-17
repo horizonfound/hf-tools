@@ -189,7 +189,7 @@ def check_stories_page(case, work):
     case("carousel page: the same switch, Carousel marked", "<a href='/design.html?kit=2026-11-01%20Fake%20beach' class='on' aria-current='page'>Carousel</a>" in car)
     case("both pages: \"← Back to the post kit\" (her words, with her arrow)", all("<span class='arr' aria-hidden='true'>&larr;</span>Back to the post kit</a>" in p for p in (story, car)))
     case("stories page: the bands' tick is on to start with (hers)", "id='gridcrop' checked aria-label=\"Show Instagram's guides\"" in story or "id='gridcrop' checked aria-label='Show Instagram&#x27;s guides'" in story, re.findall(r"id='gridcrop'[^>]*>", story))
-    case("stories page: the folder's button is Open the Stories folder", ">Open the Stories folder</button>" in story)
+    case("stories page: the folder's button is Open folder (hers, v27), there from the start", "id='open-carousel' type='button'>Open folder</button>" in story and "id='open-wrap' hidden" not in story)
     for her, ours in STORY_CHANGED.items():
         case(f"decision 20: \"{her}\" is \"{ours}\" on the stories page", ours in story or ours in allsrc, ours)
     for k in ("add", "remove", "removeTitle", "look", "plain", "box", "neon", "boxColor", "topBand", "bottomBand", "gallery", "subEmpty", "subMore",

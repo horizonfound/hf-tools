@@ -281,7 +281,7 @@ VIEW_LABEL = "How big the slides look"
 SAVE_SLIDES = "Save slides"
 SAVE_ANYWAY = "Save anyway"
 GO_BACK = "Go back"
-OPEN_CAROUSEL = "Open the Carousel folder"
+OPEN_CAROUSEL = "Open folder"          # hers, v27 (Nicole, Nov 14: "i dont see the folder"): there all the time, beside Save slides
 
 
 # The stories designer's own words (Nicole's v19 page, ?kind=stories). Its "slide" words become "story" ones
@@ -310,7 +310,7 @@ ASK_PLACE_CAROUSEL = "Optional: what you'd like in your carousel"
 ASK_THEN_CAROUSEL = "Then copy this into the chat, and your assistant fills in your slides:"
 ASK_LINE_CAROUSEL = "Pick my carousel photos"
 SAVE_STORIES = "Save stories"
-OPEN_STORIES = "Open the Stories folder"
+OPEN_STORIES = "Open folder"           # hers, v27, the same button beside Save stories
 KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
 KIND_NAV = (("carousel", "Carousel"), ("stories", "Stories"))
 
@@ -408,7 +408,7 @@ def page_html(kit_name, kind="carousel"):
         + "<p class='hint' id='trayhint'>" + html.escape(U(TRAY_HINT)) + "</p>"
         "<div class='thumbs' id='thumbs'></div></section>"
         # The bar at the bottom of the window. Every line Save slides says, its two questions' buttons, and
-        # "Open the Carousel folder" with the answer it brings, are here, beside the button that was pressed.
+        # "Open folder" with the answer it brings, are here, beside the button that was pressed.
         # The bar is pinned to the bottom and grows upward, so the three buttons that are always there never
         # move when a line arrives.
         # Above its buttons the bar also holds every line the page says by itself (#d-note: a save that was
@@ -430,8 +430,9 @@ def page_html(kit_name, kind="carousel"):
         "<button class='tb main sv-ans' id='save-yes' type='button' hidden>" + html.escape(SAVE_ANYWAY) + "</button>"
         "<button class='tb sv-ans' id='save-no' type='button' hidden>" + html.escape(GO_BACK) + "</button>"
         # the folder button and what pressing it brings: the answer is a small note right over the button,
-        # so its coming never moves the button from under the pointer
-        "<span class='sv-open sv-ans' id='open-wrap' hidden><button class='tb' id='open-carousel' type='button'>" + html.escape(OPEN_STORIES if story else OPEN_CAROUSEL) + "</button>"
+        # so its coming never moves the button from under the pointer. The button is there from the start (hers,
+        # v27); before the first save its answer is her "There's no Carousel folder yet..." line.
+        "<span class='sv-open sv-ans' id='open-wrap'><button class='tb' id='open-carousel' type='button'>" + html.escape(OPEN_STORIES if story else OPEN_CAROUSEL) + "</button>"
         "<span class='sv-bub' id='open-line' role='status'></span></span>"
         "</div></div>"
         "</div>"

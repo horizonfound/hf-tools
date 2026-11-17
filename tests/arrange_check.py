@@ -1963,7 +1963,7 @@ def check_carousel(work, port):
 
         # the folder button's own route, where it cannot open anything: this kit has no Carousel folder yet
         code, h, data = ask(P, "GET", f"/open?kit={KQ}&sub=Carousel")
-        case("carousel: the folder button's route says so in plain words when there is no Carousel folder yet", code == 200 and json.loads(data) == {"ok": False, "words": "There's no Carousel folder yet."}, data[:120])
+        case("carousel: the folder button's route says so in plain words when there is no Carousel folder yet", code == 200 and json.loads(data) == {"ok": False, "why": "none", "words": "There's no Carousel folder yet."}, data[:120])
 
         # ---- 2.1: the slides are written under a scratch name first ----
         code, out = run(env, "kit.py", "build", kit_name)

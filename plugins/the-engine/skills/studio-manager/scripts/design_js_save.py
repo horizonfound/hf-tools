@@ -88,6 +88,8 @@ DESIGN_SAVE_JS = r"""
     photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
     cantOpen: 'Couldn’t open the folder from here. Ask your assistant to open your Carousel folder.',
+    // Open folder pressed before the first Save slides (hers, v27): the Assistant says the folder is not there, the page says what to press
+    noneYet: "There's no Carousel folder yet. Press Save slides first and it's made for you.",
     // the preview
     previewLabel: 'Preview', count: function(i, n){ return i + ' of ' + n; },
     prev: 'Previous slide', next: 'Next slide', close: 'Close',
@@ -132,7 +134,8 @@ DESIGN_SAVE_JS = r"""
       .map(function(b){ return {slide: M.clamp(Math.floor((b.x + b.w / 2) / W), 0, st.slides - 1) + 1, text: String(b.text).trim(), x: b.x, y: b.y}; })
       .sort(function(a, b){ return a.slide - b.slide || a.y - b.y || a.x - b.x; });
   }
-  function showOpen(on){ openWrap.hidden = !on; openLine.textContent = ''; }
+  // The folder button is there all the time (hers, v27): a save, a change or another design only takes its answer away.
+  function showOpen(on){ openLine.textContent = ''; }
   function wait(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
   // A question, in the page, beside the button -> a promise of true (Save anyway) or false (Go back).
   function ask(text){
@@ -290,13 +293,15 @@ DESIGN_SAVE_JS = r"""
     var end = function(){ busy = false; saveBtn.disabled = !!D.blocked; stats.runs += 1; };
     run().then(end, function(){ say(SW.stopped(1)); end(); });
   });
-  // "Open the Carousel folder": the kit's own folder, through the Assistant; its answer shows right here
+  // "Open folder": the kit's own Carousel (Stories) folder, through the Assistant; its answer shows right here
   openBtn.addEventListener('click', function(){
     openLine.textContent = '';
     fetch('/open?' + D.Q + '&sub=' + (STORY ? 'Stories' : 'Carousel'), {cache: 'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(j){
         var words = (j && j.words) || D.WORDS.cantReach;
+        // no folder yet (nothing saved): her line, which also says what to press
+        if (j && !j.ok && j.why === 'none') words = SW.noneYet;
         // this page never shows where a folder is on the computer: an answer that spells a path out is
         // said in the page's own words instead
         if (!(j && j.ok) && /[\/\\]/.test(words)) words = SW.cantOpen;

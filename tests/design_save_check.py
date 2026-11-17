@@ -376,7 +376,7 @@ NO_FINDER_JS = r"""
   window.fetch = function(u, o){
     if (String(u).indexOf('/open') === 0) {
       window.__opens.push(String(u));
-      return Promise.resolve(new Response(JSON.stringify({ok: true, words: 'Opened Carousel in Finder.'}), {status: 200, headers: {'Content-Type': 'application/json'}}));
+      return Promise.resolve(new Response(JSON.stringify({ok: true, words: 'Your Carousel folder is open in Finder.'}), {status: 200, headers: {'Content-Type': 'application/json'}}));
     }
     if (window.__hold && window.__hold(String(u))) {
       // the test holds this one request back until it says go (to stop the server in the middle of a save)
@@ -563,8 +563,8 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                  and c.text("#fill-holes") == "Fill empty frames" and c.js("document.getElementById('fill-holes').disabled") is True and hidden("#fill-holes"))
             case("first visit: Preview swipe and Save slides are in the bar at the bottom of the window, which stays in sight",
                  c.rect("#save-slides")["bottom"] <= 900 and c.rect("#save-slides")["y"] > 780 and c.rect("#preview-btn")["y"] > 780 and c.js("document.getElementById('save-slides').disabled") is False)
-            case("first visit: nothing is said beside Save slides, and its question buttons and the folder button are not showing",
-                 c.text("#save-line") == "" and hidden("#save-yes") and hidden("#save-no") and hidden("#open-wrap"))
+            case("first visit: nothing is said beside Save slides, its question buttons are not showing, and the folder button is (there all the time since v27, named Open folder)",
+                 c.text("#save-line") == "" and hidden("#save-yes") and hidden("#save-no") and not hidden("#open-wrap") and c.text("#open-carousel") == "Open folder")
             case("first visit: the top row of buttons is one row at this width (1280)", c.rect("#tools-designs")["h"] < 60, c.rect("#tools-designs"))
             case("first visit: the page has no errors and asked nothing of any address but its own", c.page_errors() == [] and c.outside_requests() == [], (c.page_errors(), c.outside_requests()))
 
@@ -770,7 +770,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                  opens == [f"/open?kit={KQ}&sub=Carousel"], opens)
             ol = c.rect("#open-line")
             case("Open the Carousel folder: the answer shows in a small note right over the button, inside the window, and the button has not moved",
-                 c.text("#open-line") == "Opened Carousel in Finder." and 0 <= ob["y"] - ol["bottom"] < 14 and ol["x"] < ob["right"] and ol["right"] > ob["x"] and ol["x"] >= 0 and ol["right"] <= 1280 and ol["y"] >= 0
+                 c.text("#open-line") == "Your Carousel folder is open in Finder." and 0 <= ob["y"] - ol["bottom"] < 14 and ol["x"] < ob["right"] and ol["right"] > ob["x"] and ol["x"] >= 0 and ol["right"] <= 1280 and ol["y"] >= 0
                  and c.rect("#open-carousel") == ob and c.js("document.getElementById('open-wrap').contains(document.getElementById('open-line'))"), (ol, ob))
 
             # ---- saved again with nothing changed ----
@@ -783,7 +783,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             # ---- changed, then saved: a second set beside the first ----
             c.click("#fill-holes")
             settled()
-            case("a change takes away the line about the last save, and the folder button with it", c.text("#save-line") == "" and hidden("#open-wrap") and c.text("#open-line") == "")
+            case("a change takes away the line about the last save and the folder button's answer; the button stays (v27)", c.text("#save-line") == "" and not hidden("#open-wrap") and c.text("#open-line") == "")
             line = press_save()
             case("changed and saved again: a new set named '... (2)' beside the first, which is untouched",
                  line == f"Saved 4 slides in your Carousel folder, named \"{got_name} (2)\". Nothing was replaced."
@@ -1155,7 +1155,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             line = press_save(60)
             case(f"a photo that can't be read: the line says which one, and that nothing was added (photo {order[2]} was made unreadable)",
                  line == f"Photo {order[2]} can’t be read. Is the drive plugged in? Nothing was added to your Carousel folder." and car() == before
-                 and c.js("document.getElementById('save-slides').disabled") is False and hidden("#open-wrap"), line)
+                 and c.js("document.getElementById('save-slides').disabled") is False and c.text("#open-line") == "", line)
             c.block_urls([])
             c.clear_errors()            # the blocked picture is the one "error" that part was meant to make
             case("a photo that can't be read: the page had no error before it", errs_before == [], errs_before[:3])
@@ -1188,7 +1188,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
             line = done(40)
             case("cut off: the line says where it stopped and that nothing was added, and the button works again",
                  line == "Stopped at slide 4. Nothing was added to your Carousel folder. Press Save slides to try again."
-                 and car() == before and c.js("document.getElementById('save-slides').disabled") is False and hidden("#open-wrap"), line)
+                 and car() == before and c.js("document.getElementById('save-slides').disabled") is False and c.text("#open-line") == "", line)
             srv = Server(env, port)
             P2 = srv.start()
             if case("cut off: the Assistant came back at the same address", P2 == P, (P, P2)):
