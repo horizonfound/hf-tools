@@ -1072,22 +1072,35 @@ def check_photographer_picks():
 
 
 def check_trim_and_select():
-    """Trim a clip, and select several photos like Lightroom (Nicole's v25, sections 4 and 8; stage I of the v26
-    build). Both are the page's own: the instructions say what the page does, in the page's words, and that the
-    assistant has no command for either."""
+    """Select several photos like Lightroom (Nicole's v25, section 8), and the footage editor that replaced her v25
+    Trim panel (her v27, section 3; Lane A's stage 3). Both are the page's own: the instructions say what the page
+    does, in the page's words, and that the assistant has no command for either; naming their clips is the
+    assistant's (the reel skill's section "Name my clips")."""
     rp = read(SCRIPTS / "reel_page.py")
     arr, pc = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "on-a-pc.md").split())
-    words = dict(re.findall(r'^    "(trim_btn|trim_done|trim_cancel|sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|trim_stuck|trim_no_stills_pc)": "([^"]+)"', rp, re.M))
-    case("the page's words for Trim and for selecting several are in reel_page.py (11 of them)", len(words) == 11, sorted(words))
-    case("arrange.md names the Trim button as the card shows it, and what the panel has: the loop with sound, the stills, the handles, the middle, the quarter second",
-         ("**" + words.get("trim_btn", "?") + "**") in arr and all(x in arr for x in ("plays on a loop with its sound", "about 8 seconds either side", "the left handle for where it starts",
-                                                                                  "the right handle for where it ends", "the middle to slide the whole clip", "a quarter second")))
-    case("arrange.md gives the panel's readout as the page writes it, and its limits (1 to 15 seconds, never past the video's ends)",
-         '"Starts 0:31.6 · ends 0:34.0 · 2.4 s"' in arr and "A clip is 1 to 15 seconds and never runs past the ends of its video." in arr
-         and "MOMENT_MIN, MOMENT_MAX = 1.0, 15.0" in rp)
-    case("arrange.md: Done saves; Cancel, the x, Escape and a click outside change nothing; the assistant has no command that trims",
-         ("**" + words.get("trim_done", "?") + "** saves it") in arr and words.get("trim_cancel", "?") + ", the ×, Escape or a click outside the panel closes it and changes nothing" in arr
-         and "You have no command that trims a clip" in arr)
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|editor_no_stills_pc)": "([^"]+)"', rp, re.M))
+    ed = dict(re.findall(r'^    "(ed_h3|ed_footage|ed_make|ed_in|ed_out|ed_add|ed_clear|ed_zoom|ed_whole|clips_wl|use|in_reel|play_clip|not_named|desc_say|desc_line)": "([^"]+)"', rp, re.M))
+    case("the page's words for selecting several and for the editor are in reel_page.py (7 and 16 of them)", len(words) == 7 and len(ed) == 16, (sorted(words), sorted(ed)))
+    case("the v25 Trim panel is off the page (TRIM_PANEL = False), its code kept behind the switch", "TRIM_PANEL = False" in rp and "if TRIM_PANEL:" in rp)
+    case("arrange.md names the editor's parts as the page shows them: Your footage, Footage, Make a clip, Start here, End here, Add clip, Clear, Your clips, Zoom in, Show the whole video",
+         all(("**" + ed[k] + "**") in arr for k in ("ed_h3", "ed_footage", "ed_make", "ed_zoom", "ed_whole", "clips_wl", "use", "in_reel"))
+         and all(ed[k] in arr for k in ("ed_in", "ed_out", "ed_add", "ed_clear")) and "**Add clip**" in arr, [k for k in ed if ed[k] not in arr])
+    case("arrange.md says how a clip is made (the orange stretch that grows, End here, the ends and the middle, 1 to 15 seconds, Add clip) and what happens after Add clip",
+         all(x in arr for x in ("Start here turns orange and plays", "orange striped stretch grows", "End here makes it solid", "drag an end to trim it", "the middle to slide it",
+                                "a clip is 1 to 15 seconds", "dashed with \"✓ Added\"", "the clip just added is never changed")))
+    case("arrange.md: a click on a card opens the clip, a drag across a clip only scrubs, a trimmed clip keeps its name, the assistant has no command that trims, makes or removes a clip",
+         all(x in arr for x in ("A click on a card opens that clip in the editor", ed["play_clip"], "Dragging across a clip on the timeline only scrubs; a plain click picks it",
+                                "A trimmed clip keeps a name it was given", "You have no command that trims, makes or removes a clip", "Her v25 Trim panel")))
+    case("arrange.md names YOUR PICK, Not named yet and the Name my clips line, and sends the naming to the reel skill",
+         "**YOUR PICK**" in arr and ("**\"" + ed["not_named"] + "\"**") in arr and ("**\"" + ed["desc_say"] + "\"**") in arr and ("**\"" + ed["desc_line"].replace("{short}", "<shoot>") + "\"**") in arr
+         and 'the reel skill\'s section "Name my clips"' in arr)
+    case("the reel skill has the section Name my clips: picks, read each sheet once, a short plain name (never a name, a feeling), no about, describe, the page shows them",
+         '## Name my clips: "Name my clips for <shoot>"' in reel and "footage.py picks" in reel and "Read each sheet once" in reel and "Never a person's name, a feeling, an occasion" in reel
+         and 'refuses an "about"' in reel and "footage.py describe" in reel and "Never write a clip's name into the reel page's records any other way" in reel)
+    case("the reel skill's footage look names any unnamed picks at its end, and sends the moments to Your clips (not Select your clips)",
+         "Then name any clips of their own that aren't named yet" in reel and 'under "Your clips" in the footage editor' in reel and "Select your clips" not in reel)
+    case("the core table sends Name my clips to the reel skill", '| "Name my clips for <shoot>"' in core and 'the reel skill\'s "Name my clips"' in core)
     case("arrange.md: selecting several, key by key (click, Shift-click, Cmd-click or Ctrl-click on a PC, Escape), and a drag moves the whole selection in order",
          all(x in arr for x in ("a click on a photo in the order selects it", "Shift-click selects everything between it and the last one clicked",
                                 "Cmd-click (Ctrl-click on a PC) adds or drops one", "Escape lets them all go",
@@ -1096,8 +1109,9 @@ def check_trim_and_select():
     case("arrange.md names the bar's five buttons as the page has them, and Add them to the end below", bar in arr and ("**" + words.get("sel_add", "?") + "**") in arr, bar)
     case("arrange.md: in All your photos a plain click still adds or takes out; one press of Undo takes a whole batch back; a selection is the page's own",
          "a plain click still adds a photo or takes it out" in arr and "one press of Undo takes the whole batch back" in arr and "you can't see it and nothing saves it" in arr)
-    case("on-a-pc.md names the gap honestly, in the page's own two lines: no pictures along the timeline, and a video that can't be played there",
-         ('"' + words.get("trim_no_stills_pc", "?") + '"') in pc and ('"' + words.get("trim_stuck", "?") + '"') in pc and "a PC takes no stills from a video yet" in pc)
+    case("on-a-pc.md names the editor's gap honestly, in the page's own line (no pictures along the timeline), Start here and End here, and that clips can't be named on a PC",
+         ('"' + words.get("editor_no_stills_pc", "?") + '"') in pc and "**Start here**, **End here** and **Add clip** work on it" in pc and "Use this moment" not in pc
+         and "can't see your clips to name them" in pc and "Naming their clips" in pc)
 
 
 def check_songs_v25():

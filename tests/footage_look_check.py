@@ -3,7 +3,7 @@
 reel page showing its moments in a HIDDEN Chrome.
 
     python3 tests/guard.py 800 /usr/bin/python3 tests/footage_look_check.py --work /private/tmp/somewhere [--port 9340]
-        [--only scan|moments|page]
+        [--only scan|moments|page|names]
 
 It touches video, so it runs under the 800 MB memory guard and keeps itself small: a 12-photo pretend kit
 (tests/fake_kit.py) with capture times written into five of its photos, three clips made with the Mac's own
@@ -461,25 +461,124 @@ def check_page(c, s, run, ftool, keys, own):
     st = s.state()
     code, j, _ = s.http("POST", "/reel-save", rpc.save_body(st, {"footage": True}))
     c.open(s.page_url())
-    ok = rpc_wait(c, "document.querySelectorAll('#moments .mom').length === 3", 25)
-    labels = "Array.from(document.querySelectorAll('#moments .mom .tx > b')).map(function(b){ return b.textContent; })"
-    case("the page shows the moments: their own first, then Claude's", ok and c.js(labels) == [own["label"], "A laugh", "Walking back in"], c.js(labels))
-    case("their own card says Your pick", c.js("!!document.querySelector('#moments .mom .yours')") and
-         c.js("document.querySelector('#moments .mom').dataset.id") == own["id"])
+    ok = rpc_wait(c, "document.querySelectorAll('#clist .ci').length === 3", 25)
+    labels = "Array.from(document.querySelectorAll('#clist .ci b')).map(function(b){ var x = b.cloneNode(true); var n = x.querySelector('.num'); if (n) n.remove(); return x.textContent; })"
+    case("the page shows the moments (her v27 Your clips): their own first, as Not named yet, then Claude's", ok and c.js(labels) == ["Not named yet", "A laugh", "Walking back in"], c.js(labels))
+    case("their own card says YOUR PICK, and her Name my clips box shows", c.js("!!document.querySelector('#clist .ci .yours')") and
+         c.js("document.querySelector('#clist .ci').dataset.mid") == own["id"] and c.js("!document.getElementById('descBox').hidden"))
     w3 = {"moments": [{"video": keys["tall.mov"], "start": 0.5, "end": 4.0, "label": "Walking into the frame"},
                       {"video": keys["Wide é.mp4"], "start": 1.5, "end": 4.5, "label": "Showing the back of the camera"},
                       {"video": keys["tall.mov"], "start": 4.5, "end": 8.0, "label": "The laugh at the end"}]}
     t0 = time.time()
     code, out = ftool("moments", KIT, "--file", moments_file(run, "w3.json", w3))
-    ok = rpc_wait(c, "document.querySelectorAll('#moments .mom').length === 4", 15)
+    ok = rpc_wait(c, "document.querySelectorAll('#clist .ci').length === 4", 15)
     took = time.time() - t0
     case("a look saved while the page is open shows up by itself, no reload (%.1f s)" % took,
-         code == 0 and ok and c.js(labels) == [own["label"], "Walking into the frame", "Showing the back of the camera", "The laugh at the end"], c.js(labels))
-    case("the cards' still pictures load", rpc_wait(c, "Array.from(document.querySelectorAll('#moments .mom .th img')).filter(function(i){ return i.complete && i.naturalWidth > 0; }).length === 4", 15),
-         c.js("Array.from(document.querySelectorAll('#moments .mom .th img')).map(function(i){ return i.naturalWidth; })"))
-    case("their count line: 3 I found and 1 you picked", "3 I found and 1 you picked." in c.js("document.getElementById('momentsSay').textContent"),
+         code == 0 and ok and c.js(labels) == ["Not named yet", "Walking into the frame", "Showing the back of the camera", "The laugh at the end"], c.js(labels))
+    case("the cards' still pictures load", rpc_wait(c, "Array.from(document.querySelectorAll('#clist .ci img')).filter(function(i){ return i.complete && i.naturalWidth > 0; }).length === 4", 15),
+         c.js("Array.from(document.querySelectorAll('#clist .ci img')).map(function(i){ return i.naturalWidth; })"))
+    case("her line over the cards is the style's ask (v27: no count line)", c.js("document.getElementById('momentsSay').textContent") == "Select the clip that opens your reel.",
          c.js("document.getElementById('momentsSay').textContent"))
+    names = run / "page-names.json"
+    names.write_text(json.dumps({"clips": {own["id"]: {"label": "Lining up the first shot"}}}))
+    t0 = time.time()
+    code, out = ftool("describe", KIT, "--file", str(names))
+    ok = rpc_wait(c, "((document.querySelector('#clist .ci b') || {}).textContent || '').indexOf('Lining up the first shot') >= 0 && document.getElementById('descBox').hidden", 10)
+    case("a name saved from the chat (footage.py describe) shows on its card by itself, no reload (%.1f s), and the Name my clips box goes" % (time.time() - t0),
+         code == 0 and ok, (out[-200:], c.js(labels)))
     case("no path anywhere on the page", not re.search(r"/private/|/Users/|\.kit/", c.js("document.body.innerHTML")))
+
+
+# ---------- 4b. naming their own clips: picks and describe (her v27, section 3) ----------
+
+def check_names(s, run, ftool, keys, own):
+    """footage.py picks (one close-look sheet per unnamed clip of theirs, across every reel of the shoot, in a new
+    folder each run) and describe (the names, checked whole, written under the lock into every reel that holds
+    the clip; refused with nothing written when wrong; twice writes nothing the second time)."""
+    import reel_page as rp
+    T = keys["tall.mov"]
+    # a fresh clip of theirs, not named yet (the page part named the first one)
+    code, j, _ = s.http("POST", "/reel-moment", {"kit": KIT, "do": "add", "video": T, "start": 1.0, "seconds": 3})
+    own = next((m for m in (j or {}).get("moments", []) if m.get("by") == "you" and m.get("start") == 1.0 and m.get("key") == T), {})
+    case("(a clip of their own on the tall video, not named yet)", code == 200 and own.get("id") and own["label"] == "Your pick at 0:01", j)
+    code, out = ftool("picks", KIT)
+    looks = s.kit / ".kit" / "footage" / "looks"
+    pk = looks / "picks"
+    case("picks: one clip of theirs to name (the named one left out), its id, reel, label and span printed, and its sheet in a new folder (looks/picks)",
+         code == 0 and "1 clip of theirs to name (not named yet)" in out and own["id"] in out and 'reel "Reel 1"' in out and "Your pick at 0:01" in out
+         and pk.is_dir() and (pk / "picks.json").is_file(), out[-400:])
+    sheets = sorted(x.name for x in pk.iterdir() if x.name.endswith(".png"))
+    case("the sheet is a PNG named by the clip (\"NN <id> <video> - pick 01.png\"), drawn with nothing installed",
+         len(sheets) == 1 and own["id"] in sheets[0] and "- pick 01.png" in sheets[0] and (pk / sheets[0]).read_bytes()[:8] == b"\x89PNG\r\n\x1a\n", sheets)
+    pj = json.loads((pk / "picks.json").read_text())
+    case("picks.json names the clip, its reel, video, span and label (no path)", [c["id"] for c in pj["clips"]] == [own["id"]] and pj["clips"][0]["reel"] == "v1"
+         and pj["clips"][0]["video"] == own["name"] and not re.search(r"/private/|/Users/", json.dumps(pj)), pj)
+    case("no Pillow and no ffmpeg on the way to the sheet", not any("PIL" in x or "ffmpeg" in x or "ffprobe" in x for x in ftool.tools()), [x for x in ftool.tools() if "ffmpeg" in x or "PIL" in x][:3])
+    # a second reel with a clip of their own
+    code, out = s.cmd("reel_page.py", "reels", KIT, "--new", "--name", "Second")
+    case("(a second reel started from the chat)", code == 0, out[-200:])
+    code, j, _ = s.http("POST", "/reel-moment", {"kit": KIT, "do": "add", "video": T, "start": 2.0, "seconds": 3, "reel": "v2"})
+    own2 = next((m for m in (j or {}).get("moments", []) if m.get("by") == "you"), {})
+    case("(a clip of theirs on the second reel)", code == 200 and own2.get("id") and own2["id"] != own["id"], j)
+    code, out = ftool("picks", KIT)
+    case("picks again: both clips, each with its reel, in a new folder (picks 2); the first folder untouched",
+         code == 0 and "2 clips of theirs to name" in out and 'reel "Second"' in out and 'reel "Reel 1"' in out and (looks / "picks 2").is_dir()
+         and sorted(x.name for x in pk.iterdir() if x.name.endswith(".png")) == sheets, out[-400:])
+    # describe: refused whole, nothing written
+    before = (s.kit / ".kit" / "reel-page.json").read_bytes()
+    def refused(what, d, words):
+        f = run / ("names-%d.json" % abs(hash(what)))
+        f.write_text(json.dumps(d))
+        code, out = ftool("describe", KIT, "--file", str(f))
+        case("describe refuses %s, in plain words, nothing written" % what, code == 1 and "STOP:" in out and words in out and "Nothing was saved." in out
+             and (s.kit / ".kit" / "reel-page.json").read_bytes() == before, out[-300:])
+    refused("an unknown clip id", {"clips": {"u9-abcdef": {"label": "A laugh"}}}, "isn't in any reel of this shoot")
+    refused("an id not its shape", {"clips": {"../x": {"label": "A laugh"}}}, "isn't a clip id")
+    refused("a 90-character label", {"clips": {own["id"]: {"label": "x" * 90}}}, "longer than 80 characters")
+    refused("an \"about\" (the description she took out)", {"clips": {own["id"]: {"label": "A laugh", "about": "Two sentences."}}}, "the short name is enough")
+    refused("a label over two lines", {"clips": {own["id"]: {"label": "A laugh\nand a wave"}}}, "more than one line")
+    refused("a field it doesn't know", {"clips": {own["id"]: {"label": "A laugh", "photo": 3}}}, "a field I don't know")
+    refused("an empty label", {"clips": {own["id"]: {"label": "  "}}}, "needs a label")
+    refused("a file of the wrong shape", {"moments": []}, "the names file needs")
+    refused("a clip of Claude's (only their own clips are named this way)", {"clips": {"m1-000000": {"label": "A laugh"}}}, "isn't in any reel of this shoot")
+    # describe: both reels, the counter, the version before
+    rec0 = record(s)
+    f = run / "names-ok.json"
+    f.write_text(json.dumps({"clips": {own["id"]: {"label": "  Lining   up the\tshot  "}, own2["id"]: {"label": "Walking back in"}}}))
+    code, out = ftool("describe", KIT, "--file", str(f))
+    rec = record(s)
+
+    def where(rec, mid):
+        """(reel id, the moment) wherever it sits: the open reel's top fields, or a version's data."""
+        cur = rec.get("current") or "v1"
+        for m in rec.get("moments") or []:
+            if m.get("id") == mid:
+                return cur, m
+        for v in rec.get("versions") or []:
+            for m in (v.get("data") or {}).get("moments") or []:
+                if m.get("id") == mid:
+                    return v["id"], m
+        return None, None
+    r1, first = where(rec, own["id"])
+    r2, second = where(rec, own2["id"])
+    case("describe names both clips, each in its own reel (the new one is the open one), the label's spaces collapsed, named marked, the counter moved on once (an open page redraws), the version before kept",
+         code == 0 and "Named 2 clips" in out and (r1, r2) == ("v1", "v2") and rec.get("current") == "v2" and first and first["label"] == "Lining up the shot" and first.get("named") is True
+         and second and second["label"] == "Walking back in" and second.get("named") is True and rec.get("rev") == rec0.get("rev") + 1
+         and (s.kit / ".kit" / "reel-page.prev.json").is_file(), (out[-300:], (r1, first), (r2, second)))
+    after = (s.kit / ".kit" / "reel-page.json").read_bytes()
+    code, out = ftool("describe", KIT, "--file", str(f))
+    case("run twice: nothing is written the second time", code == 0 and "Nothing was written" in out and (s.kit / ".kit" / "reel-page.json").read_bytes() == after, out[-200:])
+    code, out = ftool("picks", KIT)
+    case("picks once every clip is named: her line, no sheet made", code == 0 and "Every clip they picked has a name." in out and not (looks / "picks 3").exists(), out[-200:])
+    code, out = ftool("picks", KIT, "--all")
+    case("picks --all: every clip of theirs, named or not, in a new folder", code == 0 and "3 clips of theirs to name." in out and (looks / "picks 3").is_dir(), out[-300:])
+    case("the page's state carries named, so a card knows", any(x["id"] == own2["id"] and x.get("named") is True for x in s.state().get("moments") or []), s.state().get("moments"))
+    code, out = s.cmd("reel_page.py", "reels", KIT, "--open", "Reel 1")
+    case("(back to the first reel)", code == 0, out[-200:])
+    code, j, _ = s.http("POST", "/reel-moment", {"kit": KIT, "do": "update", "id": own["id"], "start": 1.5, "end": 4.5})
+    m = next((x for x in (j or {}).get("moments", []) if x["id"] == own["id"]), {})
+    case("a trim keeps the name a clip was given (her Nov 16 rule); only a \"Your pick at\" label moves", code == 200 and m.get("label") == "Lining up the shot" and m.get("start") == 1.5, (j or {}).get("words", m))
+
 
 
 def rpc_wait(c, cond, seconds):
@@ -550,7 +649,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", required=True, help="a folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=9340)
-    ap.add_argument("--only", choices=("scan", "moments", "page"))
+    ap.add_argument("--only", choices=("scan", "moments", "page", "names"))
     a = ap.parse_args()
     work = Path(a.work).resolve()
     if Path("/private/tmp") not in work.parents:
@@ -609,6 +708,10 @@ def main():
             with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
                 group("the page shows them by itself", check_page, c, s, run, ftool, keys, own)
         if a.only == "page":
+            return rpc.summary()
+        if own:
+            group("naming their own clips: picks and describe", check_names, s, run, ftool, keys, own)
+        if a.only == "names":
             return rpc.summary()
         if first_look:
             group("a second look, and the PC route", check_again, s, ftool, first_look, first_tree)
