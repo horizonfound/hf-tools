@@ -1,7 +1,12 @@
 {
-  "number": 2,
-  "date": "Nov 17, 2026",
+  "number": 3,
+  "date": "Nov 18, 2026",
   "new": [
-    "A first try of the update reminder: this version is here so the reminder has something to announce."
+    "The reel page starts with a chooser of four kinds of reel, and B-roll can be saved as a finished video from the page.",
+    "The footage editor: one player, a trim that grows on the timeline, and name my clips from the chat.",
+    "The carousel and stories designer: slides as things you add and remove, Show the whole photo, Crop, several photos at once, Save just this slide.",
+    "The talking reel: fix a word, Open CapCut, and add more photos from the page.",
+    "Posted on the post itself, the path at the top of every post kit page, and Remove this song (to the Trash, never deleted).",
+    "Photo numbers stay fixed when photos are added to a shoot."
   ]
 }

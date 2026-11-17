@@ -106,7 +106,21 @@ The Assistant now has everything from our handoffs through v27 built in: the ree
 • If a page says it can't reach a shoot, the drive is unplugged. Plug it in and reload.
 
 *Where it differs from yours, on purpose* (the full list is in the notes Dustin has)
-(FILLED IN AFTER THE BUILD)
+• Photo numbers stay fixed when you add photos to a shoot: new ones take the next numbers, a removed photo's number is never reused, so a pick or a design never points at the wrong photo. A shoot's list can have gaps.
+• Save my video draws your words with the Mac's own text engine and nothing installed; on a PC it says plainly that it isn't there yet and offers Make this one in CapCut.
+• The path at the top of every post kit page is built by the Assistant itself, so Home works whatever port the page is on.
+• Remove this song goes to the Mac's Trash (the Recycle Bin on a PC) through one door; a drive with no Trash is refused in plain words, and a recording in the Photos folder stays.
+• Open folder on the designer is one button in the bottom bar, there all the time, serving both of yours.
+• Remove this slide is off with "It's your only slide, so it stays." when there is one slide; a dragged slide goes back on Escape.
+• Fixing a word on the talking reel keeps what was heard underneath and lays your fix over it, so captions and CapCut always see your word; a video turned into a script again keeps its fixes with the earlier cuts.
+• Open CapCut on the talking page starts CapCut the reel page's way, on a Mac or a PC, and says so when it takes a while.
+• A clip that is the whole of a short video plays a touch slower to fill its beat instead of stopping the reel.
+
+*Four rough edges we know about and haven't fixed yet* (all on the designer; say if any bites you)
+• Pressing + Add photos while you have an unsaved change can refuse the save with "The photos in this shoot changed since this page opened" and ask you to reload; save first, then add.
+• Remove this slide also takes a photo that stretches well across the slide's edge. Undo brings it back.
+• Your Open folder tooltip ("Open the folder your saved slides go in") isn't on ours yet.
+• Finishing a cut-off single-slide save from the chat can fail with an error instead of a sentence.
 
 *Still waiting on you and Dustin* (asked on Nov 14, still open)
 • The folder-naming question at setup: name then date (yours) or year first (Dustin's October call). Not changed until you two agree.
