@@ -1367,8 +1367,8 @@ def check_page_steps(c, s):
     case("her words, step 5: the heading and the line", t["h2v"] == HERS5["h2"] and t["sayv"] == HERS5["say"], (t["h2v"], t["sayv"]))
     case("her words, step 5: the four vibes, in her order", t["cards"] == HERS5["cards"], t["cards"])
     case("Recommended on On every beat only (decision 7)", t["rec"] == ["beat:Recommended"], t["rec"])
-    case("her renumbering on a just-photos page (v27): the order 1, the song 2, the vibe 3 (the footage and the style hidden)",
-         t["nums"] == ["step1=1", "step3=2", "step4=3"], t["nums"])
+    case("her renumbering on a just-photos page (v27): the order 1, the song 2, the direct note 3, the vibe 4, the watch step 5 (the footage and the style hidden)",
+         t["nums"] == ["step1=1", "step3=2", "stepDirect=3", "step4=4", "watch=5"], t["nums"])
     case("her song list in the drop-down: Music first, newest first, a recording says so (v27)",
          [x[0] for x in t["songs"]][:3] == ["Short beat", "New rec (screen recording)", "Beat one"] and "Photo song" in [x[0] for x in t["songs"]], t["songs"])
     case("no song picked yet: nothing is marked, and the step isn't done", not any(x[1] for x in t["songs"]) and not t["none_on"] and not t["done3"])

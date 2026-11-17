@@ -621,8 +621,8 @@ def run_page(c, s):
          and c.js("(function(){ var r = Array.from(document.querySelectorAll('.kind')).map(function(x){ return Math.round(x.getBoundingClientRect().top); }); return r.every(function(y){ return y === r[0]; }); })()"))
     c.click("#kPhotos")
     c.wait_for("window.Reel && window.Reel.state()", 20)
-    case("Just photos opens the just-photos page: her title, her steps numbered 1 to 3 (the photos, the song, the vibe)",
-         c.text("#title") == short + " reel." and nums(c) == ["step1=1", "step3=2", "step4=3"], nums(c))
+    case("Just photos opens the just-photos page: her title, her steps numbered 1 to 5 (the photos, the song, the direct note, the vibe, the watch step)",
+         c.text("#title") == short + " reel." and nums(c) == ["step1=1", "step3=2", "stepDirect=3", "step4=4", "watch=5"], nums(c))
     case("the footage step and the style are not on it", c.js("document.getElementById('step0').hidden && document.getElementById('stepStyle').hidden"))
     case("her link back to the chooser in the bar", c.text("#allReels") == rp.KIND_WORDS["all_reels"] and c.js("document.getElementById('allReels').getAttribute('href')") == "/reel.html?kit=" + quote(kit))
     time.sleep(1.2)
@@ -634,12 +634,12 @@ def run_page(c, s):
     c.click("#verNew")
     c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v2'", 20)
     case("+ Start a new reel from a just-photos page: the new reel is just photos, on the same kind of page",
-         reel_rec(s, kit)["saved"]["kind"] == "photos" and c.js("location.search").endswith("kind=photos") and nums(c) == ["step1=1", "step3=2", "step4=3"])
+         reel_rec(s, kit)["saved"]["kind"] == "photos" and c.js("location.search").endswith("kind=photos") and nums(c) == ["step1=1", "step3=2", "stepDirect=3", "step4=4", "watch=5"])
     ver(s, kit, op="new", kind="bts")
     c.js("window.Reel.followNow()")
     c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v3' && location.search.indexOf('kind=bts') > 0", 20)
-    case("a behind-the-scenes reel started in another window (or from the chat): this page reopens it as its own kind, her title, her five steps (ours)",
-         c.text("#title") == short + " behind the scenes." and nums(c) == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], (c.text("#title"), nums(c)))
+    case("a behind-the-scenes reel started in another window (or from the chat): this page reopens it as its own kind, her title, her seven steps (ours)",
+         c.text("#title") == short + " behind the scenes." and nums(c) == ["step0=1", "step1=2", "step3=3", "stepDirect=4", "stepStyle=5", "step4=6", "watch=7"], (c.text("#title"), nums(c)))
     case("step 1 on it: her heading, Add my footage, the ask box with her new label before the line to copy, no feel row, no yes/no cards",
          c.text("#step0 h2") == "1Choose your behind-the-scenes footage" and c.js("!document.getElementById('btsBox').hidden")
          and c.js("document.querySelector('#btsBox label b').textContent") == "Is there anything specific you'd like your assistant to look for?"
@@ -649,14 +649,14 @@ def run_page(c, s):
     c.set_value("#verSel", "v1")
     c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v1' && location.search.indexOf('kind=photos') > 0", 20)
     case("switching under Your reels back to the first (just photos) lands on its own kind (hers kept the address's kind), with no recommended tag",
-         nums(c) == ["step1=1", "step3=2", "step4=3"] and c.js("document.getElementById('claudeRec').hidden"))
+         nums(c) == ["step1=1", "step3=2", "stepDirect=3", "step4=4", "watch=5"] and c.js("document.getElementById('claudeRec').hidden"))
     # B-roll's page
     ver(s, kit, op="new", kind="broll")
     c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))
     c.wait_for("window.Reel && window.Reel.state()", 20)
-    case("a B-roll reel opened from a just-photos address shows as B-roll: her title, the footage then the song, nothing else",
-         c.text("#title") == short + " B-roll." and nums(c) == ["step0=1", "step3=2"], nums(c))
-    case("the bar at the bottom still works on it (no photos to count: Make my reel waits)", c.js("document.getElementById('makeBtn').disabled") is True)
+    case("a B-roll reel opened from a just-photos address shows as B-roll: her title, the footage then the song, then the watch step, nothing else",
+         c.text("#title") == short + " B-roll." and nums(c) == ["step0=1", "step3=2", "watch=3"], nums(c))
+    case("the bar at the bottom still works on it (no clips to count: Make my reel waits)", c.js("document.getElementById('makeBtn').disabled") is True)
     case("no fault on the page", not c.page_errors(), c.page_errors()[:3])
     # + Add photos and Show my new photos, on the just-photos reel
     c.set_value("#verSel", "v1")

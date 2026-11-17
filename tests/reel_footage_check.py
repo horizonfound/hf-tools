@@ -633,9 +633,9 @@ def check_page(c, s, clips):
     c.open(s.page_url("bts"))                 # v27: a behind-the-scenes page (the chooser decides the kind)
     c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songSel option').length > 1", 20)
     t = texts1(c)
-    case("a behind-the-scenes page (v27): no yes/no cards, the box and step 4 show at once, her renumbering 1 to 5, the recommended tag",
+    case("a behind-the-scenes page (v27): no yes/no cards, the box and step 4 show at once, her renumbering 1 to 7, the recommended tag",
          t["oldcards"] == 0 and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], {k: t[k] for k in ("oldcards", "box_hidden", "style_hidden", "rec_shown", "nums")})
+         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepDirect=4", "stepStyle=5", "step4=6", "watch=7"], {k: t[k] for k in ("oldcards", "box_hidden", "style_hidden", "rec_shown", "nums")})
     case("her words, step 1: h2 (v27)", t["h2"] == HERS1["h2"], (t["h2"], HERS1["h2"]))
     case("the ask box comes before the line to copy, and How should it feel? is hidden (hers, v27)", t["ask_first"] and t["feel_hidden"])
     # with no clips yet (the server part's moments set aside for a moment): her box
