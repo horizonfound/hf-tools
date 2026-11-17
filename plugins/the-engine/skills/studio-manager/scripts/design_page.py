@@ -138,8 +138,8 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
 .selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap .gline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
-/* from 900 px the four groups of a photo and the five of a text box fit three rows (measured: four at 768, three at 900 and up) */
-@media(min-width:900px){.selbar{min-height:calc(var(--row) * 3 + 36px)}}
+/* from 1024 px the four groups of a photo and the five of a text box fit three rows (measured: four at 768, three at 1024 and up;
+   v27: the slide's group gained Save just this slide, so 900 to 1023 holds four rows again, as 768 does) */
 @media(min-width:1024px){
 .selbar{min-height:calc(var(--row) * 3 + 36px)}
 }

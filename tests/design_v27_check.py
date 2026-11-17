@@ -698,8 +698,9 @@ def check_v27_page(case, work):
     case("v27 page: the Where row is built hidden and relies on the global [hidden] rule (its own class is display:flex with no [hidden] rule of its own, as the lesson says it need not)",
          "whereRow.hidden = true" in dz and ".dz-where{display:flex" in design_page.PART_CSS and ".dz-where[hidden]" not in design_page.PART_CSS)
     case("v27 page: the where row is filled from the slide clicked last each time the window opens (never a stale number)", "var si = D.oneSlideAt ? D.oneSlideAt() : null, show = adds" in dz and "D.on('design', function(){ last = null; });" in edit)
-    case("v27 page: the room held for the selected thing's buttons is the same for both kinds now: four rows from 768 px, three from 900 px",
-         ".selbar{min-height:calc(var(--row) * 4 + 40px)}" in design_page.DESIGN_CSS and "@media(min-width:900px){.selbar{min-height:calc(var(--row) * 3 + 36px)}}" in design_page.DESIGN_CSS and "body[data-kind=stories] .selbar" not in design_page.DESIGN_CSS)
+    case("v27 page: the room held for the selected thing's buttons is the same for both kinds now: four rows from 768 px (the slide's group has four buttons), three from 1024 px",
+         ".selbar{min-height:calc(var(--row) * 4 + 40px)}" in design_page.DESIGN_CSS and "@media(min-width:900px){.selbar{" not in design_page.DESIGN_CSS
+         and "@media(min-width:1024px){\n.selbar{min-height:calc(var(--row) * 3 + 36px)}" in design_page.DESIGN_CSS and "body[data-kind=stories] .selbar" not in design_page.DESIGN_CSS)
     case("v27 page: our one-slide line is in the core's table (hers says nothing at one slide), and is listed with its reason",
          "one: 'It\\u2019s your only slide, so it stays.'" in core and "It’s your only slide, so it stays." in OUR_WORDS)
     case("v27 page: the stories' tooltip of ours is her tooltip in story words, and is listed", SW_(HERS["before_title"]) == "Put a new blank story in front of the one this is on" and "Put a new blank story in front of the one this is on" in OUR_WORDS)

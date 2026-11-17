@@ -239,7 +239,8 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                                   ".map(function(t){ var was = h.textContent; h.textContent = t; var ok = h.scrollWidth <= h.clientWidth + 1; h.textContent = was; return ok; }); })()")
                     case(f"{tag}: every help line fits in the bar's first line beside Fill empty frames", all(fits), fits)
                 else:
-                    case(f"{tag}: the strip still starts no lower than it did (its top under 460 px with nothing selected)", m0["strip"]["top"] <= 460, m0["strip"]["top"])
+                    # (v27: from 768 to 1023 px the room under the bar holds four rows, since the slide's group gained Save just this slide: the strip starts one row (38 px) lower there, 473 at 900)
+                    case(f"{tag}: the strip still starts no lower than it did (its top under 480 px with nothing selected: the four-row room of v27)", m0["strip"]["top"] <= 480, m0["strip"]["top"])
                     # under 1024 the room is held too (three rows and the first line from 768 px up): clicking a photo moved the strip 123 px here before
                     case(f"{tag}: selecting a photo, then text, then nothing moves the strip's top by 0 px (room held under 1024 as well)",
                          m0["strip"]["top"] == m1["strip"]["top"] == m2["strip"]["top"] == m3["strip"]["top"], (m0["strip"]["top"], m1["strip"]["top"], m2["strip"]["top"], m3["strip"]["top"]))

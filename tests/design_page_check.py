@@ -290,10 +290,14 @@ def check_page(case, work):
     for word in ("draggable", "ondragstart", "dataTransfer", "dragover", "localStorage", "sessionStorage", "indexedDB", "document.cookie",
                  "navigator.clipboard", "innerHTML", "insertAdjacentHTML", "document.write", "eval(", "navigator.onLine"):
         case(f"designer page: no {word}", word not in page)
-    case("designer page: only the kit's folder name is put into it", "data-kit='A kit'" in page and page.count("A kit") == 1)
+    # (v27: the kit's name is also in her path at the top, as the post kit's crumb, "A kit post kit", and in that crumb's link, encoded)
+    case("designer page: only the kit's folder name is put into it (as data, and as the post kit's crumb in the path at the top)",
+         "data-kit='A kit'" in page and page.count("A kit") == 2 and ">A kit post kit</a>" in page and "href='/content/A%20kit/Post%20kit.html'" in page)
     case("designer page: a kit name is html-escaped on its way in", "data-kit='&lt;b&gt; &amp; &#x27;x&#x27;'" in dp.page_html("<b> & 'x'"))
     case("designer page: the plain page has the Back to home button and the words", "href='/home'" in plain and "Back to home" in plain and "I can&#x27;t find that shoot&#x27;s posts." in plain)
-    case("designer page: it has the Back to home button and the brand, like the pickers", "class='homelink' href='/home'" in page and "class='brand'" in page)
+    # (v27: Home is the first step of the path at the top; her Back to home pill stays in the markup, hidden)
+    case("designer page: it has the path at the top with Home first, the Back to home button hidden behind it, and the brand, like the pickers",
+         "class='homelink' hidden href='/home'" in page and "<nav class='crumbs' aria-label='Where you are'><a href='/home'>Home</a>" in page and "class='brand'" in page)
     case("designer styles: no backslash, fetch nothing (no url(...), no @font-face), light only",
          "\\" not in dp.DESIGN_CSS and "url(" not in dp.DESIGN_CSS and "@font-face" not in dp.DESIGN_CSS and "prefers-color-scheme" not in dp.DESIGN_CSS)
     case("designer styles: no web font for the page's own chrome (the system's own, as the pickers have it)",
@@ -436,7 +440,8 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             def tile(n):
                 """The middle of a tray photo, with the page scrolled so it shows under the strip. CALL IT
                 BEFORE measuring anything else for the same press: it may scroll the page."""
-                c.js("(function(){ var t = document.querySelector(\"#thumbs .th[data-n='%d']\").getBoundingClientRect(); if (t.bottom > innerHeight - 6) window.scrollBy(0, t.bottom - innerHeight + 30); })()" % n)
+                # (v27: the bar at the bottom of the window is a row taller on a phone, with Save just slide N in it: the tile is brought above the bar, not the window's edge)
+                c.js("(function(){ var t = document.querySelector(\"#thumbs .th[data-n='%d']\").getBoundingClientRect(), bar = document.getElementById('savebar'), edge = Math.min(innerHeight, bar ? bar.getBoundingClientRect().top : innerHeight); if (t.bottom > edge - 6) window.scrollBy(0, t.bottom - edge + 30); })()" % n)
                 r = c.rect(f"#thumbs .th[data-n='{n}']")
                 return (r["cx"], r["cy"])
 
