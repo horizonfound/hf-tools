@@ -12,7 +12,7 @@ Part of the Assistant's instructions. The first-thing checks, the rules and how 
 
 The plain singles `kit.py build` makes (the Singles folder) have no page of their own; they are changed by saying it, and you run `kit.py picks` again (a single post they lay out themselves is made in the designer, "A single post" below). The plain stories `kit.py build` makes (one photo each) are changed the same way; the stories they make themselves are in the stories designer. (The older reel picker, `arrange.py --piece reel`, still works if you run it by name, but nothing links to it and you don't open it: the reel page took its place, decision 3, `kit.REEL_DOOR`.)
 
-They can also get to the reel page without you: the kit page's Reel card ("Create my reel →", or "Make a new version →" once a reel is made) opens it. The kit page has no door to the carousel's picker any more (its Carousel card opens the designer); open the picker for them when they ask to change or reorder the carousel's photos. A post kit being made opens only the kit page (`parts/post-kit.md`): never a picker or the reel page in the same breath, and never a pick.
+They can also get to the reel page without you: the kit page's Reels card ("Create my reels →", or "Create another reel →" once any reel of the shoot is made) opens it. The kit page has no door to the carousel's picker any more (its Carousel card opens the designer); open the picker for them when they ask to change or reorder the carousel's photos. A post kit being made opens only the kit page (`parts/post-kit.md`): never a picker or the reel page in the same breath, and never a pick.
 
 ## The reel's page
 

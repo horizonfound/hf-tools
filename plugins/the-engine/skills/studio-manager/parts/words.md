@@ -13,6 +13,8 @@ A post isn't finished when the reel or the carousel is made; it is finished when
 - **"Polish my caption for the <shoot> reel"** (or carousel): they wrote their own. "Polishing", below.
 - **The same in their own words:** "write a caption for the beach reel", "I need hooks", "redo the captions", "make the caption shorter", "change the opening". Work out which of the three it is ("In their own words", below).
 
+**Where they are on the words page (Nicole's v27).** The path at the top of the page reads **Home › Beach post kit › Captions**: Home and the post kit are links, Captions is this page. Asked how to get back to the kit, say "Press Beach post kit at the top of the page" (the page's old Back to the post kit pill is gone from view).
+
 ## What gets words, and what doesn't
 
 - **A reel:** one caption and ten hooks (a hook is the line on the reel's first photo).

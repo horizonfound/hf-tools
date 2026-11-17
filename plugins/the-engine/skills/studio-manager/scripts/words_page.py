@@ -70,6 +70,7 @@ ANSWER_KEYS = ("about", "who", "who_text", "where", "purpose", "purpose_text", "
 # "carousel", {other} the other of the two.
 WORDS = {
     "back_kit": "Back to the post kit",
+    "crumb_captions": "Captions",       # v27: this page's own step on the path at the top (Home › Hannah post kit › Captions)
     "eyebrow": "Your words · ",
     "tab_reel": "Reel", "tab_carousel": "Carousel",
     "title": "{short} {piece} words",
@@ -857,8 +858,10 @@ def page_html(kit_name, piece):
         "<title>" + e(f("doc_title")) + "</title><style>" + look.head_css() + STYLE + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "' data-piece='" + piece + "'>"
         "<div class='wrap'>"
-        "<div class='bar'><a class='homelink' id='back' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
-        + e(w["back_kit"]) + "</a>" + brand.bar() + "</div>"
+        # her v27 bar: the path at the top (Home › Hannah post kit › Captions, built by look.crumbs, every link a path of
+        # this server); her Back to the post kit pill stays in the markup, hidden, as her page keeps it
+        "<div class='bar'><a class='homelink' id='back' style='display:none' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
+        + e(w["back_kit"]) + "</a>" + look.crumbs(look.kit_trail(kit_name) + [(w["crumb_captions"], None)]) + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow' id='eyebrow'>" + e(w["eyebrow"] + w["tab_" + piece]) + "</span>"
         "<h1 id='title'>" + e(f("title")) + "<em>.</em></h1>"
         "<p class='lede'>" + e(w["lede"]) + "</p>"
