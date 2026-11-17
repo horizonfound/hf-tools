@@ -604,6 +604,18 @@ def check_whole_build():
          len(cards) == 2 and not any(banned.search(c) for c in cards) and all("captions" in c for c in cards), cards)
     case("... and name what the kit makes, in her words (v26)",
          len(cards) == 2 and all(all(w in c for w in ("reels", "carousels", "stories")) for c in cards))
+    # (Nov 17, Nicole's v27 section 8) the Make posts screen says what a post kit is, and its third step happens inside the kit
+    wk = re.search(r'"m_what_h": "([^"]+)",\s*"m_what_p": "([^"]+)"', base)
+    case("the Make posts screen says what a post kit is, in her v27 words, and has a third step inside the post kit",
+         wk is not None and wk.group(1) == "What's a post kit?" and wk.group(2).startswith("It's one place for everything you'll post from a shoot.")
+         and wk.group(2).endswith("Nothing is ever posted for you.") and '"m_s3": "<b>Make your posts inside your post kit.</b>"' in base
+         and '"m_steps": "How to make a post kit from a shoot"' in base and "we'll build you a <b>post kit</b>" in base)
+    hello_flat = re.sub(r"\s+", " ", read(SM / "parts" / "hello.md"))
+    case("hello.md knows the screen's What's a post kit? box and its three steps, and answers \"what's a post kit?\" in her words",
+         "What's a post kit?" in hello_flat and "It's one place for everything you'll post from a shoot." in hello_flat and "three steps" in hello_flat
+         and "Make your posts inside your post kit" in hello_flat and "I'll bring your photos in and open your new post kit" in hello_flat)
+    case("photos-in.md: after \"make my posts\" the assistant does what the screen's step 2 promised, nothing more",
+         "I'll bring your photos in and open your new post kit." in re.sub(r"\s+", " ", read(SM / "parts" / "photos-in.md")))
     plug = json.loads(read(PLUGIN / ".claude-plugin" / "plugin.json"))["description"]
     market = json.loads(read(ROOT / ".claude-plugin" / "marketplace.json"))["plugins"][0]["description"]
     case("the plugin's one-line description promises no captions 'in your voice'", not banned.search(plug), plug)

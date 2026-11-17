@@ -1,6 +1,6 @@
 # Finished photos in, with no card
 
-Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. After the photos are sorted, read parts/post-kit.md for the kit. **"Make my posts" only brings the photos in and opens the post kit (Nicole, Nov 13: "I choose, not you."):** no reel order, no carousel and no captions are made in the chat, and nothing is asked about the shoot. They choose on the kit's pages.
+Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. After the photos are sorted, read parts/post-kit.md for the kit. **"Make my posts" only brings the photos in and opens the post kit (Nicole, Nov 13: "I choose, not you."):** no reel order, no carousel and no captions are made in the chat, and nothing is asked about the shoot. They choose on the kit's pages. It is what the Make posts screen's step 2 promised them ("I'll bring your photos in and open your new post kit. You'll find it below any time, too."), and its step 3, "Make your posts inside your post kit", is theirs.
 
 ## Finished photos in: "make my posts" / "I've got photos" / "I dropped something in" / "can you sort these"
 
