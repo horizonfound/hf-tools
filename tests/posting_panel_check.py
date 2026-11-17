@@ -459,6 +459,10 @@ def check_page(c, s, ids):
     row = c.js("Array.from(document.querySelectorAll('#pick .pw > *')).filter(function(e){ return e.textContent; }).map(function(e){ return [e.tagName, e.textContent]; })")
     case("the button row: Copy caption (dark), Copy my hook, Set a reminder to post, Open my words →", row == [["BUTTON", "Copy caption"], ["BUTTON", "Copy my hook"], ["SPAN", "Set a reminder to post"], ["A", "Open my words →"]]
          and c.js("getComputedStyle(document.querySelector('#pick .pw [data-c=cap]')).backgroundColor") == c.js("getComputedStyle(document.querySelector('.homelink')).backgroundColor"), row)
+    case("v27: the grey Not posted switch sits beside Done in the heading (role=switch, off), and the rest of the panel is as it was",
+         c.js("Array.from(document.querySelectorAll('#pick .ph .phr > *')).map(function(e){ return e.className.split(' ')[0] + ':' + e.textContent; })") == ["pswitch:Not posted", "x:Done"]
+         and c.js("document.querySelector('#pick .pswitch').getAttribute('aria-checked')") == "false" and c.js("document.querySelector('#pick .pswitch').getAttribute('role')") == "switch",
+         c.js("Array.from(document.querySelectorAll('#pick .ph .phr > *')).map(function(e){ return e.className + ':' + e.textContent; })"))
     case("...it sits right under the heading and above the photos, with the reminder's place in it between the hook and the link",
          c.js("(function(){ var k = Array.from(%s.children).map(function(e){ return e.className; }); return k.join(' '); })()" % PANEL) == "ph pw pr pn ps warn"
          and c.js("Array.from(document.querySelectorAll('#pick .pw > *')).map(function(e){ return e.className; }).join('|')") == "btn|btn o|rslot|pwl"

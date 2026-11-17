@@ -351,6 +351,23 @@ def check_routes(s):
     case("no calendar a reminder could go on: said plainly, never an empty question", code == 200 and j.get("ok") is False and "No calendar" in j.get("problem", ""), j)
     cfg(s)
     settle(s)
+
+    # v27 (Posted, on the post itself): a reminded post marked Posted, then switched back to Not posted, ends with ONE
+    # event on the calendar, the same one (its uid reused) moved to the post's new day, never a second one
+    uid = qpiece(s, rid).get("event_uid")
+    have = bool(uid) and until(lambda: len(events(s, rid)) == 1 and len(events(s, cid)) == 1)
+    press(s, {"action": "posted", "id": rid})
+    settle(s)
+    case("a reminded post marked Posted keeps its event and its uid (a posted post's event is left alone)",
+         have and len(events(s, rid)) == 1 and qpiece(s, rid).get("event_uid") == uid, (uid, events(s, rid), qpiece(s, rid)))
+    press(s, {"action": "unposted", "id": rid})
+    ok = until(lambda: events(s, rid) and events(s, rid)[0]["date"] == qpiece(s, rid).get("date")) and settle(s)
+    x = qpiece(s, rid)
+    case("...switched back to Not posted: its reminder is on again on its NEW day (the end of the line), the same event updated, its uid reused, not a second one",
+         ok and x.get("remind_on") is True and x.get("event_uid") == uid and uid in book(s) and len(events(s, rid)) == 1 and len(book(s)) == 2
+         and x.get("date") and x["date"] > qpiece(s, cid)["date"] and events(s, rid)[0]["time"] == "09:30", (x, book(s)))
+    press(s, {"action": "order", "ids": [rid, cid]})       # back to the front, as the groups after this expect
+    settle(s)
     return rid, cid
 
 
