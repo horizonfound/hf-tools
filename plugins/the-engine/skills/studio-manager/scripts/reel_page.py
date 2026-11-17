@@ -2964,7 +2964,18 @@ def job_for_page(kit):
     """The newest job as the page sees it: {id, state (queued, running, done, problem), dry, project, words,
     problem, short_song}. A job that says it is at work but is not (stopped, or the computer was turned off) is a
     problem, in plain words. No path, no file name, no process number."""
-    j = read_job(kit)
+    # The record and "is it running?" are two looks, and a job can end between them (it writes what happened, then
+    # lets go): the old record would say "running", the second look "nobody is", and a job that had just ended with
+    # its own line would be told as stopped. So the record is read again after the second look, and that look is
+    # only used for a record that did not change meanwhile (the same as talking_rec.make_for_page).
+    j, running = None, False
+    for _ in range(4):
+        j = read_job(kit)
+        if not j or j.get("state") not in ("queued", "running"):
+            break
+        running = job_running(kit)
+        if read_job(kit) == j:
+            break
     if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
         return None
     state, problem = j["state"], j.get("problem")
@@ -2974,7 +2985,7 @@ def job_for_page(kit):
         if began and time.time() - began > (VIDEO_LIMIT if video else MAKE_LIMIT) + JOB_GRACE:
             # past its time, whatever its lock says (v19 review: a hung job held its lock, and the page spun forever)
             state, problem = "problem", (OUR_WORDS["video_too_long"] if video else WORDS["too_long"])
-        elif not job_running(kit) and (state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT):
+        elif not running and (state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT):
             state, problem = "problem", (OUR_WORDS["video_interrupted"] if video else OUR_WORDS["interrupted"])
         if state == "problem" and not video:
             made = _made_by(kit, j["id"])

@@ -96,6 +96,38 @@ def ver(s, kit, **ask):
     return s.post("/reel-version", dict(ask, kit=kit))
 
 
+JOBS_OWN = ("pid", "t0", "until")     # what the job's own process adds once it picks the job up (talking_rec.job)
+
+
+def queued_job(jid, name, key, again=False, length=3.0):
+    """The job as talking_rec.start() writes it down, before its process has picked it up. ONE source for both
+    roads: a PC writes this by hand, and a Mac holds what the real start() wrote against it, so the hand-written
+    one can't drift from the real one unseen."""
+    return {"id": jid, "state": "queued", "t": time.time(), "video": name, "key": key, "again": again, "length": length}
+
+
+def same_job_fields(real, name, key):
+    """(the same?, what differs in plain words): the job the real start() wrote, held against queued_job()."""
+    if not isinstance(real, dict):
+        return False, "after Edit my video there was no job written down to read (.kit's talking job file)"
+    by_hand = queued_job(str(real.get("id", "")), name, key)
+    mine, theirs = set(by_hand), set(real) - set(JOBS_OWN)
+    said = []
+    if theirs - mine:
+        said.append("the real start() writes %s, which the PC road's hand-written job leaves out" % sorted(theirs - mine))
+    if mine - theirs:
+        said.append("the PC road's hand-written job has %s, which the real start() doesn't write" % sorted(mine - theirs))
+    num = (int, float)
+    for f in sorted(mine & theirs):
+        a, b = by_hand[f], real[f]
+        if isinstance(a, bool) != isinstance(b, bool) or not (isinstance(b, num) if isinstance(a, num) else isinstance(b, type(a))):
+            said.append("%r is a %s in the real job and a %s in the hand-written one" % (f, type(b).__name__, type(a).__name__))
+    for f in ("video", "key"):
+        if f in real and real[f] != by_hand[f]:
+            said.append("the real job's %r is %r, the hand-written one's is %r" % (f, real[f], by_hand[f]))
+    return not said, "; ".join(said) + ((" (the real job: %s)" % sorted(real)) if said else "")
+
+
 def edit_my_video(s, kit_name, key, name, words):
     """Edit my video pressed on `name`, with a job that takes a few seconds. Returns ((status, answer), land):
     `land()` is called where the test waits for the job to end.
@@ -107,15 +139,21 @@ def edit_my_video(s, kit_name, key, name, words):
     afconvert's; a PC answers Edit my video at once with its own line, which talking_page_check.py checks), so a
     job started there stops at once with a problem and there would be nothing to check. The two ends of the job
     are played by hand instead, each with the plugin's own code: the job written down as start() writes it (queued,
-    the record working on that video), and, at land(), the job's one save (put_words with switch=False, as
+    the record working on that video; queued_job() is that job, and the Mac road checks it against the real one), and, at land(), the job's one save (put_words with switch=False, as
     _save_words calls it) and the job written down as done. What is checked is the same on both: nothing opens
     or starts while a script is on its way, and the script lands in the reel it was started on."""
     TR, k = s.TR, s.kit(kit_name)
     if t.MAC:
         s.says(words=words, sleep=3.0)
-        return s.post("/talking-start", {"kit": kit_name, "video": key}), lambda: None
+        got = s.post("/talking-start", {"kit": kit_name, "video": key})
+        # The PC road below writes the job by hand. Here the real start() just wrote it: the two are held
+        # against each other, so a field added to (or dropped from) the real job can't pass unseen on a PC.
+        ok, differs = same_job_fields(TR.read_job(k), name, key)
+        case("the job a PC's road writes by hand has the same fields as the one the real Edit my video writes (the job's own process may add %s)"
+             % ", ".join(JOBS_OWN), ok, differs)
+        return got, lambda: None
     jid = os.urandom(6).hex()
-    TR.write_job(k, {"id": jid, "state": "queued", "t": time.time(), "video": name, "key": key, "again": False, "length": 3.0})
+    TR.write_job(k, queued_job(jid, name, key))
 
     def fn(rec):
         if rec.get("video") != name:

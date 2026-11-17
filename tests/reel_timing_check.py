@@ -26,8 +26,13 @@ The expected lines are copied from her acceptance/expected.json (v27's), unchang
     (test-beat-60s-as-a-mac-hears-it.wav: the samples afconvert makes of it, which every computer reads as
     they are). Where this computer hears the test beat as her Mac did, her lines are checked on the test beat
     itself, as always, and once more on the copy read the PC's way (plain Python, nothing else). Where it
-    hears it differently, her lines are checked on the copy, word for word, and the test beat itself, as this
-    computer hears it, is planned too and held to her rules.
+    hears it differently and is not a Mac hearing through afconvert (a PC, ffmpeg), her lines are checked on
+    the copy, word for word, and the test beat itself, as this computer hears it, is planned too and held to
+    her rules.
+  - A Mac that hears through afconvert is the computer her lines were recorded on, so there the fingerprint
+    is held: if afconvert stops making those samples of the test beat, that is a FAIL in plain words (a Mac
+    photographer's reels may have changed), and her lines are still checked on the test beat itself, never
+    quietly on the copy.
   - The two real songs are a client's and are never in this repository. They are read from her handoff when it
     is on this computer (reference-private/nicole-handoff-v19-*/, in this checkout or the main one); without
     them their 13 cases say SKIP, plainly.
@@ -517,15 +522,39 @@ def _main(work, songs):
     import sound
     import timing
 
+    if songs["song1"] and not AFCONVERT:
+        # Her two songs are .m4a. A computer with neither afconvert nor an ffmpeg (a PC with nothing installed,
+        # or a Mac with both switched off to try that road) can't read an .m4a at all, and reel.py says so in
+        # its own line. Those cases have nothing to hear here, exactly as where the songs are absent. A Mac
+        # with its afconvert never takes this road: a song it can't read there is a FAIL below.
+        cant = [x.name for x in (songs["song1"], songs["song2"]) if sound.decode(str(x), 11025)[0] is None]
+        if cant:
+            print("NOTE  her handoff's two songs are here, but this computer has no way to read an .m4a (no afconvert, no\n"
+                  f"      ffmpeg): {', '.join(cant)}. The cases that use them say SKIP; the ones on the test beat run.")
+            songs["song1"] = songs["song2"] = None
+
     print("-- the test beat, as this computer hears it and as her Mac did")
     copy_sha, copy_how = heard_sha(sound, BEAT60_AS_MAC)
     check("the test beat as her Mac heard it (tests/fixtures/test-beat-60s-as-a-mac-hears-it.wav) is read here "
           "sample for sample", copy_sha == BEAT60_AS_MAC_SHA, f"read by {copy_how}: {copy_sha}")
     own_sha, own_how = heard_sha(sound, BEAT60)
     as_mac = own_sha == BEAT60_AS_MAC_SHA
+    a_real_mac = own_how == "afconvert"       # sound.decode's name for the Mac's own route: what her lines were recorded through
+    if a_real_mac:
+        # A Mac is where her lines come from. A different fingerprint here is not "another computer's way": it
+        # is a change in what a Mac photographer gets, and swapping in the copy would hide it.
+        check("this Mac hears the test beat as her lines were recorded (afconvert makes the same samples of it)", as_mac,
+              "this Mac no longer hears the test beat as her lines were recorded: afconvert now makes different\n"
+              "      samples of tests/fixtures/test-beat-60s.wav, so a Mac photographer's reels may have changed.\n"
+              f"      recorded: {BEAT60_AS_MAC_SHA}\n      now:      {own_sha}\n"
+              "      Her lines are still checked on the test beat itself below, not on the copy.")
+    on_itself = as_mac or a_real_mac          # her lines are held against the test beat itself
     if as_mac:
         print(f"NOTE  this computer hears the test beat exactly as her Mac did ({own_how}): her lines are checked on\n"
               "      the test beat itself, and once more on the copy read the PC's way (plain Python).")
+    elif a_real_mac:
+        print("NOTE  her lines are checked on the test beat itself, as this Mac hears it now, and once more on the\n"
+              "      copy read the PC's way (plain Python).")
     else:
         print(f"NOTE  this computer hears the test beat its own way ({own_how}), a little differently from her Mac's\n"
               "      afconvert, so the mix can differ. Her lines are checked on the test beat as her Mac heard it;\n"
@@ -549,7 +578,7 @@ def _main(work, songs):
             rules(name, items, pieces, facts, grid.period)
         if song_key != "beat60":
             continue
-        if as_mac:
+        if on_itself:
             # The same samples, read as a PC with nothing installed reads them: the same line, word for word.
             with the_pc_way():
                 pieces, facts = reel.plan_reel(items, str(BEAT60_AS_MAC), vibe, start, False, None, variation)

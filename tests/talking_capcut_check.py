@@ -986,6 +986,24 @@ try:
           j["state"] == "done" and j["project"] == "Some reel 9" and j["words"] == ["Made \"Some reel 9\" in CapCut. Open CapCut and it's at the top of your projects."], j)
     arrange.write_whole(KIT / ".kit" / TR.MAKE_STATUS, {"for": "another0job0", "ok": True, "dry": False, "project": "Some reel 9"})
     check("...another job's status is never taken for this one's", TR.make_for_page(KIT)["state"] == "problem")
+    # the page looks at a job twice (its record, then its lock) and the job can finish between the two looks: it
+    # writes what happened, then lets go of its lock. The page must then tell what the job wrote, never "went wrong"
+    # (GitHub's Mac, Nov 17: the photo-gone make above was told as "Something went wrong making it." this way)
+    ended = {"id": "0123456789ab", "state": "problem", "t": time.time(), "t0": time.time() - 1, "pid": 2 ** 22 + 12345, "dry": False,
+             "problem": TR.OUR_MAKE_WORDS["photo_gone"][0]}
+    TR.write_make(KIT, ended)
+    real_read, looks = TR.read_make, []
+
+    def first_look_early(kit):
+        looks.append(1)
+        return {k: v for k, v in dict(ended, state="running").items() if k != "problem"} if len(looks) == 1 else real_read(kit)
+    TR.read_make = first_look_early
+    try:
+        j = TR.make_for_page(KIT)
+    finally:
+        TR.read_make = real_read
+    check("a job that ends between the page's look at its record and its look at its lock is told as it ended (its own plain line, never \"went wrong\")",
+          len(looks) >= 2 and j["state"] == "problem" and j["problem"] == TR.OUR_MAKE_WORDS["photo_gone"][0], (len(looks), j))
     code, ans = TR.start_make(KIT)
     check("after a dead job, the next Make it in CapCut goes ahead", code == 200 and ans["ok"] is True and wait_make(KIT)["state"] == "done", (code, ans))
 
