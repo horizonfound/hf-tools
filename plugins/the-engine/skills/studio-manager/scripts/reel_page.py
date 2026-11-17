@@ -3970,6 +3970,7 @@ V27_CSS = r"""
 @media(max-width:620px){.reelstick{position:static;max-height:none;overflow:visible;margin:0;padding:0;border-radius:0}}
 [data-kind-hidden]{display:none!important}
 .bar .homelink+.homelink{margin-left:-.4rem}
+.make{z-index:25}
 @media(max-width:620px){.bar{flex-wrap:wrap;padding:.6rem 0}.bar .homelink{white-space:normal}.bar .homelink+.homelink{margin-left:0}}
 """
 

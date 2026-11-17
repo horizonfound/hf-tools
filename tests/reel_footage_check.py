@@ -497,7 +497,7 @@ def texts1(c):
       function h(id){ var x = document.querySelector('#' + id + ' h2').cloneNode(true); x.querySelector('.num').remove(); return x.textContent; }
       var lab = document.querySelector('#btsBox label').cloneNode(true); lab.querySelectorAll('.ex').forEach(function(e){ e.remove(); });
       var b = lab.querySelector('b'); var bt = b.textContent; b.remove();
-      return {h2: h('step0'), cards: document.querySelectorAll('#step0 .choice, #modeBts, #modePhotos, #modeTalk').length,
+      return {h2: h('step0'), oldcards: document.querySelectorAll('#step0 .choice, #modeBts, #modePhotos, #modeTalk').length,
         say2: document.querySelector('#btsBox > p.say').innerHTML, add: document.getElementById('addFootage').textContent,
         insight_b: document.querySelector('.insight > b').textContent, insight: document.getElementById('insightWords').textContent,
         fix: document.querySelectorAll('.insight p')[1].innerHTML, paste_say: document.querySelector('#pasteBox > p').textContent,
@@ -517,7 +517,7 @@ def texts1(c):
         box_hidden: document.getElementById('btsBox').hidden, style_hidden: document.getElementById('stepStyle').hidden,
         rec_shown: !document.getElementById('claudeRec').hidden, done0: document.getElementById('step0').classList.contains('done'),
         waiting: document.getElementById('footWaiting').textContent, vlist: document.getElementById('vlist').textContent,
-        vsum: (document.querySelector('#vlist summary') || {}).innerText || '',
+        vsum: (function(){ var su = document.querySelector('#vlist summary'); return su ? su.querySelector('b').textContent + ' ' + su.querySelector('small').textContent.replace(/\s+/g, ' ').trim() : ''; })(),
         vcards: Array.from(document.querySelectorAll('#vlist .vcard')).map(function(v){ return v.querySelector('b').textContent + ' ' + v.querySelector('small').textContent.replace(/\s+/g, ' ').trim(); }),
         sum: document.getElementById('sum').textContent, result: document.getElementById('result').innerHTML};
     })()""")
@@ -559,14 +559,27 @@ def check_page(c, s, clips):
     c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songSel option').length > 1", 20)
     t = texts1(c)
     case("a behind-the-scenes page (v27): no yes/no cards, the box and step 4 show at once, her renumbering 1 to 5, the recommended tag",
-         t["cards"] == 0 and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], t["nums"])
+         t["oldcards"] == 0 and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
+         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], {k: t[k] for k in ("oldcards", "box_hidden", "style_hidden", "rec_shown", "nums")})
     case("her words, step 1: h2 (v27)", t["h2"] == HERS1["h2"], (t["h2"], HERS1["h2"]))
-    case("step 1 is not done until a video is in (nothing to choose from yet)", not t["done0"])
     case("the ask box comes before the line to copy, and How should it feel? is hidden (hers, v27)", t["ask_first"] and t["feel_hidden"])
+    # with no clips yet (the server part's moments set aside for a moment): her box
+    rec = record(s)
+    keep_m = rec.get("moments")
+    rec["moments"] = []
+    rec["rev"] = int(rec.get("rev") or 0) + 1
+    (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
+    c.js("window.Reel.followNow()")
+    wait(c, "document.querySelectorAll('#moments .mom').length === 0", 8)
     c.click("#makeBtn")
     case("Make my reel before any footage is in: her \"I haven't looked through your footage yet\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["not_looked"]), 5),
          texts1(c)["result"])
+    rec = record(s)
+    rec["moments"] = keep_m
+    rec["rev"] = int(rec.get("rev") or 0) + 1
+    (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
+    c.js("window.Reel.followNow()")
+    wait(c, "document.querySelectorAll('#moments .mom').length > 0", 8)
     c.click("#askIn")
     c.type_text("x")
     c.key("Backspace")
@@ -583,7 +596,7 @@ def check_page(c, s, clips):
          texts1(c)["insight"])
     case("the videos fold into one drop-down (v27): '3 videos added', '0:18 of footage · all ready to watch below' once their previews are made",
          wait(c, "document.querySelectorAll('#vlist .vcard').length === 3 && (document.querySelector('#vlist summary') || {}).innerText.indexOf('all ready to watch below') > 0", 30)
-         and texts1(c)["vsum"].replace("\n", " ").replace("  ", " ") == "3 videos added 0:18 of footage · all ready to watch below", texts1(c)["vsum"])
+         and texts1(c)["vsum"] == "3 videos added 0:18 of footage · all ready to watch below", texts1(c)["vsum"])
     case("...which opens to the cards, each with its length, size and that it is ready (hers)",
          texts1(c)["vcards"] == ["Not plain.mov 0:06 · 0 MB · ready to watch below", "Sideways é.mov 0:06 · 0 MB · ready to watch below", "clip.mov 0:06 · 0 MB · ready to watch below"], texts1(c)["vcards"])
     case("the drop-down is closed to begin with, and step 1 is done once videos are in", c.js("!document.querySelector('#vlist details').open") and texts1(c)["done0"])
@@ -827,7 +840,7 @@ def check_pc_page(c, s, clips):
          ok and got == {"strip": 0, "use": True, "w": 640, "d": 6}, got)
     t = c.js("""({paste: document.getElementById('pasteSay').textContent, line: document.querySelector('#pasteBox .line').hidden,
                  insight: document.querySelector('.insight').hidden, watch: document.querySelectorAll('#btsBox > p.say')[2].innerHTML,
-                 vlist: document.getElementById('vlist').innerText,
+                 vlist: document.getElementById('vlist').textContent,
                  coming: Array.from(document.querySelectorAll('.viewer:not([data-ready]) p')).map(function(p){ return p.textContent.trim(); })})""")
     case("its lines on a PC: no copy line and no Good to know (Claude can't look there), the PC's own words in their place",
          t["paste"] == this_computer.NO_LOOK_PC and t["line"] and t["insight"] and t["watch"] == this_computer.WATCH_PC_HTML, t)

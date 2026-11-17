@@ -50,8 +50,9 @@ CLAUDE = list(range(1, 45, 3))[:12]          # what fake_kit picks for 44 photos
 
 # Her words for step 2 and the top of the page, as her reel-maker.html shows them (handoff v19).
 HERS = {
-    "h2": "Put your photos in order",
-    "say": "Your assistant can choose the order for you, or you can drag and drop them into the order you'd like. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
+    # her v27 (Nov 17): step 2's heading and line, and the just-photos page's lede (tests/reel_v27_page_check.py holds them to her v27 page)
+    "h2": "Choose your photos",
+    "say": "What order would you like your photos in? Your assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
     "claude_b": "Let my assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
     "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
@@ -70,7 +71,7 @@ HERS = {
     "longer": "Longer", "quicker": "Quicker",
     "zoom": "See it bigger",
     "eyebrow": "Reel",
-    "lede": "A few quick steps, then press <b>Make my reel</b> and it's cut on the beat in CapCut, ready for your look.",
+    "lede": "Your finished photos, cut on the beat of your song. Put your photos in order, pick your song and the pace, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
     "title": "Fake beach reel.",
     "doc_title": "Fake beach reel",
     "brand": "The Assistant", "maker": "by Horizon Found",
@@ -132,7 +133,9 @@ V25_WORDS = {"vibe_mixed_s": "Some quick, some longer, and every change lands on
 # against it in tests/reel_v27_page_check.py); the rest still come from her v19 page and server
 V27_KEYS = {"foot_h2", "paste_say", "ask_label_html", "ask_ex1", "ask_placeholder", "vids_one", "vids_n", "vids_total", "vids_ready",
             "vids_getting", "vid_ready", "vid_added", "vid_getting_it", "order_h2", "order_say", "add_photos", "add_photos_say",
-            "new_photo", "new_photos", "show_new", "opening_photos", "photos_open", "cant_open_photos"}
+            "new_photo", "new_photos", "show_new", "opening_photos", "photos_open", "cant_open_photos",
+            "song_choose", "song_rec_tag", "song_none", "song_aria", "listen", "stop", "song_off_list",
+            "toq_btn", "toq_result", "q_adding", "q_how", "q_how_b", "q_in", "q_going", "q_already", "q_set", "q_open", "q_done", "q_cant", "q_label", "q_label_one"}
 
 
 def her_v25_page():
@@ -296,13 +299,15 @@ def check_words():
         else:
             t27 = html.unescape(v27).replace("\\'", "'")
             # four lines hers builds from pieces (`${k} new photo${k === 1 ? '' : 's'} in.`): their pieces are looked for
-            pieced = {"new_photo": [" new photo", " in."], "new_photos": [" new photo", "s", " in."], "vids_one": [" video", " added"], "vids_n": [" video", "s", " added"]}
+            pieced = {"new_photo": [" new photo", " in."], "new_photos": [" new photo", "s", " in."], "vids_one": [" video", " added"], "vids_n": [" video", "s", " added"],
+                      "q_in": ["It's in your posting queue: ", ". Write its caption in your post kit whenever you're ready."], "q_going": [", going out "],
+                      "q_already": ["It's already in your posting queue", "."], "q_set": [", set for "], "q_label": [" · "], "q_label_one": [" reel"]}
             bad = [(k, frag) for k in sorted(V27_KEYS) for frag in (pieced.get(k) or re.split(r"\{\w+\}", rp.WORDS[k])) if len(frag.strip()) >= 1 and frag not in t27]
             case("every word of hers from v27 in reel_page.WORDS (%d keys) is in her v27 reel-maker.html, word for word" % len(V27_KEYS), not bad, bad[:5])
             case("the old step-1 cards and their 'One more thing' box are gone from the page's words (her v27: the chooser decides the kind)",
                  not any(k in rp.WORDS for k in ("foot_say", "foot_bts_b", "foot_photos_b", "foot_talk_b", "foot_need_h3")))
         bad = [(k, v) for k, v in HERS.items() for x in (v if isinstance(v, list) else [v])
-               if k not in ("not_picked", "title", "doc_title", "take_out_label") and x not in t]
+               if k not in ("not_picked", "title", "doc_title", "take_out_label", "h2", "say", "lede") and x not in t]
         case("every word this test expects on step 2 is hers", not bad, bad[:5])
     v25 = her_v25_page()
     if v25 is None:
@@ -367,7 +372,9 @@ def check_server(s):
     raw = json.dumps(st)
     case("no path and no file name in the state", "/private" not in raw and "beach-0" not in raw and ".jpg" not in raw.lower(), raw[:200])
     code, _, page = s.http("GET", "/reel.html?kit=" + KIT.replace(" ", "%20"))
-    case("the page answers", code == 200 and b"Put your photos in order" in page)
+    case("the page answers with her chooser when no kind is in the address (v27)", code == 200 and b"Which reel do you want to create?" in page)
+    code, _, page = s.http("GET", "/reel.html?kit=" + KIT.replace(" ", "%20") + "&kind=photos")
+    case("the page answers (a kind's page: just photos)", code == 200 and b"Choose your photos" in page)
     case("no path in the page", str(s.kit).encode() not in page and b"/private/" not in page)
     code, _, body = s.http("GET", "/reel-font?f=DMSans-Medium")
     case("the plugin's own DM Sans Medium is served", code == 200 and len(body) > 20000)
@@ -520,7 +527,7 @@ def check_page(c, s):
     case("her words: not picked yet, and where to ask (her v25 line)", t["claude_html"] == HERS["not_picked"], t["claude_html"])
     case("her words: the empty reel", t["empty"] == '"%s"' % HERS["empty"], t["empty"])
     case("no pick yet: their own order is on, All your photos is open, the count says 0", t["mine_on"] and not t["claude_on"] and t["all_open"] and t["count"] == "0 photos", t)
-    case("the step is numbered 2, after the footage (her renumbering: only the steps that show)", t["num"] == "2")
+    case("the step is numbered 1 on a just-photos page (v27: no footage step there; her renumbering counts the steps that show)", t["num"] == "1")
     case("the recommended tag is not shown without footage (BUILD.md: with footage only)", t["claude_rec_hidden"] is True)
     c.click("#useClaude")
     t = texts(c)
@@ -727,7 +734,13 @@ def check_page(c, s):
     c.click("#all .pick[data-n='%d']" % extra, check=False)
     case("(40 again, with no line)", len(c.js(ORDER)) == 40 and texts(c)["limit"] == "")
     extra2 = [n for n in range(1, PHOTOS + 1) if n not in c.js(ORDER)][0]
-    drag_to(c, "#all .pick[data-n='%d']" % extra2, "#reel .tile:last-child .ph", fx=0.5, top="#reel .tile:last-child")
+    # v27: the order sticks to the top of the window (46vh of it, scrolling inside itself), so the photo to drag is
+    # brought to the bottom of the window, under the stuck box, and dropped on the first tile in the box
+    c.js("document.querySelector(%s).scrollIntoView({block: 'end'})" % json.dumps("#all .pick[data-n='%d']" % extra2))
+    time.sleep(0.2)
+    x0, y0 = c.point("#all .pick[data-n='%d']" % extra2, scroll=False, check=False)
+    x1, y1 = c.point("#reel .tile:first-child .ph", fx=0.2, scroll=False, check=False)
+    c.drag((x0, y0), (x1, y1), steps=14)
     case("a 41st dragged up is refused with the same line", len(c.js(ORDER)) == 40 and texts(c)["limit"] == OURS_TOO_MANY, (len(c.js(ORDER)), texts(c)["limit"]))
     on_disk(s, {"picks": picks(c.js(ORDER), c.js(MARKS))})
 
@@ -1350,8 +1363,8 @@ def check_page_steps(c, s):
     case("her words, step 5: the heading and the line", t["h2v"] == HERS5["h2"] and t["sayv"] == HERS5["say"], (t["h2v"], t["sayv"]))
     case("her words, step 5: the four vibes, in her order", t["cards"] == HERS5["cards"], t["cards"])
     case("Recommended on On every beat only (decision 7)", t["rec"] == ["beat:Recommended"], t["rec"])
-    case("her renumbering with Just photos: the footage 1, the order 2, the song 3, the vibe 4 (the style hidden)",
-         t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
+    case("her renumbering on a just-photos page (v27): the order 1, the song 2, the vibe 3 (the footage and the style hidden)",
+         t["nums"] == ["step1=1", "step3=2", "step4=3"], t["nums"])
     case("her song list in the drop-down: Music first, newest first, a recording says so (v27)",
          [x[0] for x in t["songs"]][:3] == ["Short beat", "New rec (screen recording)", "Beat one"] and "Photo song" in [x[0] for x in t["songs"]], t["songs"])
     case("no song picked yet: nothing is marked, and the step isn't done", not any(x[1] for x in t["songs"]) and not t["none_on"] and not t["done3"])
