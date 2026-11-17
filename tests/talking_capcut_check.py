@@ -35,6 +35,13 @@ CLIP = ROOT / "tests" / "fixtures" / "loud-tone-3s.mp4"
 HERS = ROOT.parent / "hf-tools" / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker"
 if not HERS.is_dir():
     HERS = ROOT / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker"
+if not HERS.is_dir():
+    try:                                                   # a worktree: the main checkout's reference-private too
+        _common = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], capture_output=True, text=True, timeout=20).stdout.strip()
+        if _common:
+            HERS = (ROOT / _common).resolve().parent / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker"
+    except (OSError, subprocess.SubprocessError):
+        pass
 fails = 0
 
 REAL = Path.home() / (".stu" + "dio")       # only ever listed, to prove this test leaves it alone
@@ -565,6 +572,28 @@ try:
     # theirs: (0.25, 0.9) -> x (0.25 - 0.5) x 2 = -0.5; y (0.5 - 0.9) x 2 = -0.8
     check("captions they dragged and resized: every one at CapCut's (-0.5, -0.8), 1.6 times as big",
           all(s["clip"]["transform"] == {"x": -0.5, "y": -0.8} and s["clip"]["scale"] == {"x": 1.6, "y": 1.6} for s in d3["tracks"][-1]["segments"]))
+    # words fixed on the page (her v27): the caption layer carries the fixed word, and no clip for a word typed away
+    TR.change(KIT, lambda r: r.update(fixes={"3": "want to", "4": "", "15": "Aurora"}))     # 3 and 4 are in the first piece, 15 in a punch
+    rec_f = TR.load(KIT)
+    TM._shown_size = lambda path, f=None: (1080, 1920, 60.0) if Path(path) == TALK else real_size(path, f)
+    plan_f = TM.plan_for(KIT)
+    TM._shown_size = real_size
+    want_f = [c["text"] for c in eng.captions(rec_f)]
+    check("the plan with fixed words: its captions are talking.py's on the joined record: the fixed words in, the typed-away word's clip gone (35, not 36)",
+          plan_f["captions"] == eng.captions(rec_f) and "want to" in want_f and "Aurora" in want_f and "w3" not in want_f and "w4" not in want_f and "w15" not in want_f
+          and len(want_f) == 35 and TM.plan_facts(plan_f)["captions"] == 35, (len(want_f), want_f[:6]))
+    check("... and everything else in the plan is byte for byte the plan without fixes", {k: v for k, v in plan_f.items() if k != "captions"} == {k: v for k, v in plan.items() if k != "captions"})
+    d_f, _ = capcut.build_talking(plan_f, parts, None)
+    K_f = d_f["tracks"][-1]["segments"]
+    texts_f = {x["id"]: json.loads(x["content"])["text"] for x in d_f["materials"]["texts"]}
+    check("the project's caption layer carries the fixed words and has no clip for the word typed away; the caption before it holds until the next",
+          [texts_f[s["material_id"]] for s in K_f] == want_f and len(K_f) == 35
+          and all(end(a["target_timerange"]) == b["target_timerange"]["start"] for a, b in zip(K_f, K_f[1:])), len(K_f))
+    def shape(t):           # a layer's clips without their ids (new each build): where, from where, and how they are drawn
+        return [(s["target_timerange"], s["source_timerange"], s["clip"], s.get("speed")) for s in t["segments"]]
+    check("... the other layers are exactly the ones made without fixes", [shape(t) for t in d_f["tracks"][:-1]] == [shape(t) for t in tracks[:-1]])
+    TR.change(KIT, lambda r: r.pop("fixes", None) and None)
+    check("... and with the fixes taken off the record the captions are the 36 they were", [c["text"] for c in eng.captions(TR.load(KIT))] == want)
     d4, _ = capcut.build_talking(dict(plan, captions=None), parts, None)
     check("captions off: no caption layer at all, and no text in the project", [t["type"] for t in d4["tracks"]] == ["video", "video", "video"] and not d4["materials"]["texts"])
     d5, m5 = capcut.build_talking(dict(plan, shots=[], captions=None, zooms=[]), parts, None)

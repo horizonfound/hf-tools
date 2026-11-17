@@ -128,10 +128,14 @@ LOG = fresh.LOGS / "talking.log"          # the real words of anything that went
 
 # What is kept beside the record, per video, and joined back on when the record is read (her shape for the page).
 WORD_FIELDS = ("words", "sentences", "info", "transcribed", "video_key", "how", "ondevice")
-# Everything that counts in word numbers: it belongs to one video's script and to no other.
+# Everything that counts in word numbers: it belongs to one video's script and to no other. "fixes" (her v27,
+# Nov 17: words they typed over on the page) is {"<word number>": "the right words"}, laid over the words when
+# the record is read (_join); the words file itself is never rewritten.
 EDIT_FIELDS = ("cut", "claude_cut", "claude_why", "splits", "speeds", "zooms", "shots", "moves", "photos", "claude_shots",
-               "claude_placed")
-KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds")
+               "claude_placed", "fixes")
+KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds", "fixes")
+FIX_MOST = 80                             # hers: the fix box's maxlength
+FIXED_COUNT = "  Words fixed on the page: {n}."   # ours, for the assistant (status): how many words they fixed, never which (rule 3)
 MADE_AGAIN = "made-again"                 # in "earlier": this video's words were made again while the record was on another
 REPLACED_KEPT = 12                        # as kit.py picks --reel keeps reel_earlier
 
@@ -315,13 +319,33 @@ def _stale_edit(rec, entry, why):
     return True
 
 
+def fixes_of(rec):
+    """The words fixed on the page, as the record holds them: {word number: the right words}, only the entries
+    that are a digit key and a text (a record changed by hand loses the rest). Keys as whole numbers."""
+    raw = rec.get("fixes") if isinstance(rec, dict) else None
+    out = {}
+    for k, v in (raw.items() if isinstance(raw, dict) else ()):
+        if isinstance(k, str) and re.fullmatch(r"[0-9]+", k) and isinstance(v, str):
+            out[int(k)] = v
+    return out
+
+
 def _join(rec, kept):
-    """The record with its video's words joined on, in her shape."""
+    """The record with its video's words joined on, in her shape. The words they fixed on the page (v27) are
+    laid over: a fixed word is {"w": the right words, "w0": what was heard, start, end, conf}, in a FRESH list,
+    so the words file's own list is never changed (only the fixed words' entries are copied)."""
     for k in WORD_FIELDS:
         rec.pop(k, None)
     rec["words"], rec["sentences"] = [], []
     if kept:
-        rec["words"] = kept.get("words") or []
+        words = kept.get("words") or []
+        fx = fixes_of(rec)
+        if fx and isinstance(words, list):
+            words = list(words)
+            for i, text in fx.items():
+                if i < len(words) and isinstance(words[i], dict) and isinstance(words[i].get("w"), str) and text != words[i]["w"]:
+                    words[i] = dict(words[i], w=text, w0=words[i]["w"])
+        rec["words"] = words
         rec["sentences"] = kept.get("sentences") or []
         for k in ("info", "transcribed", "how", "ondevice"):
             if k in kept:
@@ -434,11 +458,12 @@ def change(kit, fn, src=None, stale_why="its script was made again", quiet=False
 
 def keep_replaced(rec, why):
     """Before something of theirs is replaced (a cut --replace, a place --replace, Edit my video pressed again on
-    the same video): the current cuts, photo stretches, zooms, splits and speeds go into the record's "replaced",
-    dated, the last 12 kept. Nothing is added when there is nothing to keep."""
+    the same video): the current cuts, photo stretches, zooms, splits, speeds and fixed words go into the record's
+    "replaced", dated, the last 12 kept. Nothing is added when there is nothing to keep."""
     eng = _engine()
     now = {"cut": rec.get("cut") or [], "shots": eng.shots(rec), "zooms": eng.zooms(rec),
-           "splits": rec.get("splits") or [], "speeds": rec.get("speeds") or []}
+           "splits": rec.get("splits") or [], "speeds": rec.get("speeds") or [],
+           "fixes": {str(k): v for k, v in sorted(fixes_of(rec).items())}}
     if not any(now.values()):
         return False
     lst = [x for x in _lst(rec, "replaced") if isinstance(x, dict)]
@@ -1691,7 +1716,9 @@ def state_for_page(kit, rev=None, mark=None):
             out.pop(k)
     if "cap_pos" in out and not (isinstance(out["cap_pos"], dict) and all(eng._num(out["cap_pos"].get(k)) is not None for k in ("x", "y"))):
         out["cap_pos"] = None
-    out["words"] = [{"w": w["w"], "start": w["start"], "end": w["end"]} for w in eng._words(rec)]
+    # her page reads w0 on a fixed word only (W[i].w0 != null), so it rides along only there
+    out["words"] = [dict({"w": w["w"], "start": w["start"], "end": w["end"]}, **({"w0": w["w0"]} if eng.heard(w) is not None else {}))
+                    for w in eng._words(rec)]
     out["sentences"] = eng._sents(rec, out["words"]) if has else []
     out["cut"] = [list(p) for p in (eng._pair(x) for x in _lst(rec, "cut")) if p]
     out["claude_cut"] = rec["claude_cut"] if isinstance(rec.get("claude_cut"), list) else None    # a list, even empty: cut
@@ -1901,9 +1928,32 @@ def _f_cap_size(v, ctx):
     return round(min(3.0, max(0.4, _number(v, "cap_size"))), 2)
 
 
+def _f_fixes(v, ctx):
+    """Hers (v27): the WHOLE map of the words they fixed, {word number: the right words}; a word left out goes
+    back to what was heard. Ours: one bad entry refuses the whole save. A key is a string of digits naming a
+    word (0 to n-1), once; a value is text, its whitespace collapsed, at most 80 characters (her box's
+    maxlength; hers cuts longer text without a word), empty allowed (a word they typed away). A value equal to
+    the heard word is dropped (hers does the same). Hers takes any number of keys, str()s a list, and ignores
+    keys past the last word or not digits; ours refuses each of those."""
+    if not isinstance(v, dict) or len(v) > ctx["n"]:
+        _no("fixes")
+    out = {}
+    for k, text in v.items():
+        if not isinstance(k, str) or not re.fullmatch(r"[0-9]+", k) or not isinstance(text, str):
+            _no("fixes")
+        i = int(k)
+        if i >= ctx["n"] or i in out:
+            _no("fixes")
+        text = " ".join(text.split())
+        if len(text) > FIX_MOST:
+            _no("fixes")
+        out[i] = text
+    return {str(i): text for i, text in sorted(out.items()) if text != ctx["heard"][i]}
+
+
 SAVE_FIELDS = {
     "cut": _f_cut, "splits": _f_splits, "speeds": _f_speeds, "zooms": _f_zooms, "shots": _f_shots,
-    "cap_pos": _f_cap_pos, "cap_size": _f_cap_size,
+    "cap_pos": _f_cap_pos, "cap_size": _f_cap_size, "fixes": _f_fixes,
     "captions": lambda v, ctx: v if type(v) is bool else _no("captions"),
     "photo_mode": lambda v, ctx: v if isinstance(v, str) and v in ("me", "assistant", "") else _no("photo_mode"),
 }
@@ -1932,6 +1982,8 @@ def _stored(rec, k):
     if k == "cap_size":
         v = rec.get(k)
         return float(v) if type(v) in (int, float) and v else 1.0
+    if k == "fixes":
+        return {str(i): v for i, v in sorted(fixes_of(rec).items())}
     return rec.get(k) or []
 
 
@@ -1981,7 +2033,9 @@ def save_from_page(kit, body):
             return memo["f"]
 
         seen = {}
-        ctx = {"n": len(eng._words(rec)), "on_sheet": {x["n"] for x in arrange.sheet_rows(kit)}, "footage": footage,
+        words = eng._words(rec)                            # with the fixes laid over: the heard word is w0 there
+        ctx = {"n": len(words), "heard": [w["w0"] if eng.heard(w) is not None else w["w"] for w in words],
+               "on_sheet": {x["n"] for x in arrange.sheet_rows(kit)}, "footage": footage,
                "stored_ns": {k for x in had for k in x["ns"]}, "stored_v": stored_v, "known": known,
                "foot_names": foot_names, "seen": seen, "stored_overlap": overlapping(had)}
         clean = {k: SAVE_FIELDS[k](v, ctx) for k, v in sent.items()}
@@ -2245,6 +2299,9 @@ def cmd_status(kit, reel=None):
     say(f"  Photo stretches: {len(sh)}" + {"assistant": " (placed by you)",
                                           "changed": " (changed on the page since you placed them: ask before replacing them)"}.get(placed_by(rec, sh), "")
         + f"; who places them: {rec.get('photo_mode') or 'not chosen'}.")
+    fixed = sum(1 for w in words if eng.heard(w) is not None)
+    if fixed:                                              # ours: their fixes are theirs (rule 3); only the count is said
+        say(FIXED_COUNT.format(n=fixed))
     kept_for = sorted(k for k in (rec.get("earlier") if isinstance(rec.get("earlier"), dict) else {}) if isinstance(k, str))
     if kept_for:
         say("  Edits kept for other videos: " + ", ".join(kept_for))

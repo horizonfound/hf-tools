@@ -193,6 +193,37 @@ for name, rec, want_p, want_c in CASES:
         check("captions: " + name, near(got, want_c), got)
     check("  ... and the record is left as it was", rec == before)
 
+# ---------------------------------------------------------------- a word fixed on the page (her v27, Nov 17)
+# A fixed word is {"w": the right words, "w0": what was heard}; a typed-away word has w "" and a w0. Her
+# talking_core.py v27 differs from v24 by one line, `if text:` before out.append in captions(): a line whose text is
+# empty is not appended, and the "no gaps" loop then runs over the captions that were, so the caption before a
+# typed-away word stays up until the next kept one. Pieces never look at the text, so they are as before.
+FIXED = W(("a", 1.0, 1.25), ("b", 1.5, 1.75), ("c.", 2.0, 2.5))
+FIXED[1] = dict(FIXED[1], w="want to", w0="b")
+# One piece, 0.92 to 2.64 (as the first case). Captions: a 0.08 to 0.45; "want to" at b's times, 0.58 to 0.95;
+# c. 1.08 to 1.70. Then a ends 0.58 and "want to" ends 1.08.
+got = T.captions({"words": FIXED})
+check("captions: a fixed word is captioned as fixed, at the heard word's times", near(got, [C("a", 0.08, 0.58), C("want to", 0.58, 1.08), C("c.", 1.08, 1.70)]), got)
+check("pieces: ... and the pieces are exactly the unfixed ones", near(T.pieces({"words": FIXED}), [P(0.92, 2.64, [0, 1, 2], 0.0, 1.72)]))
+GONE = W(("a", 1.0, 1.25), ("b", 1.5, 1.75), ("c.", 2.0, 2.5))
+GONE[1] = dict(GONE[1], w="", w0="b")
+# b typed away: its line's text is "" and is not appended. a: 0.08 to 0.45, c.: 1.08 to 1.70; then a's end moves to
+# c.'s start, 1.08: the caption before the typed-away word holds until the next kept one.
+got = T.captions({"words": GONE})
+check("captions: a word typed away shows no caption, and the one before it holds until the next (her `if text:`)", near(got, [C("a", 0.08, 1.08), C("c.", 1.08, 1.70)]), got)
+check("pieces: ... the typed-away word still plays: the piece and its words are exactly as before", near(T.pieces({"words": GONE}), [P(0.92, 2.64, [0, 1, 2], 0.0, 1.72)]))
+check("kept and sentences: a typed-away word keeps its number", T.kept({"words": GONE, "cut": [[2, 2]]}) == [True, True, False] and T.sentences(GONE) == [[0, 2]])
+# the typed-away word is the LAST of its piece: nothing is appended for it, and the caption before it is left where it fell (the last caption)
+LAST = W(("a", 1.0, 1.25), ("b", 1.5, 1.75))
+LAST[1] = dict(LAST[1], w="", w0="b")
+got = T.captions({"words": LAST})
+check("captions: a typed-away word at the end of a piece: the caption before it ends where it did (0.45), as hers", near(got, [C("a", 0.08, 0.45)]), got)
+# fixed to several words: "want to" is one caption (one word's worth of time), as hers
+got = T.captions({"words": [dict(FIVE[0], w="so I was", w0="a")] + FIVE[1:]})
+check("captions: a word fixed to several words is one caption, in the heard word's time", got[0]["text"] == "so I was" and near(got[0]["start"], 0.0), got[:1])
+check("captions: every word typed away: no captions at all, and the record untouched",
+      T.captions({"words": [dict(w, w="", w0=w["w"]) for w in FIVE]}) == [] and len(T.pieces({"words": [dict(w, w="", w0=w["w"]) for w in FIVE]})) == 1)
+
 # the last caption's end is not snapped, and a lone comma closes up (hers)
 got = T.captions({"words": W(("well", 0.0, 0.25), (",", 0.25, 0.3), ("yes.", 0.5, 0.75))}, max_words=3)
 # One piece 0 to 0.89. With three words to a line: "well" then "," ends the line (a comma ends one): "well ," reads
@@ -316,6 +347,13 @@ check("clean: times to 3 places, sureness to 2 (1 when unsaid); anything without
       got == [{"w": "Hi", "start": 0.123, "end": 0.5, "conf": 0.99}, {"w": "there", "start": 1.0, "end": 1.5, "conf": 1.0}], got)
 check("clean: cleaning a clean list changes nothing", T.clean(got) == got)
 check("clean: nothing in, nothing out", T.clean(None) == [] and T.clean("words") == [])
+got = T.clean([{"w": "", "w0": "um", "start": 1, "end": 1.5}, {"w": "", "start": 2, "end": 2.5}, {"w": "want to", "w0": "so", "start": 3, "end": 3.5, "conf": 0.5},
+               {"w": "", "w0": "  ", "start": 4, "end": 4.5}, {"w": "x", "w0": 7, "start": 5, "end": 5.5}])
+check("clean: a word typed away (empty, with the heard word) is kept with its number; an empty word with no heard word is dropped; a fixed word keeps w0; a w0 that isn't text is dropped",
+      got == [{"w": "", "start": 1.0, "end": 1.5, "conf": 1.0, "w0": "um"}, {"w": "want to", "start": 3.0, "end": 3.5, "conf": 0.5, "w0": "so"},
+              {"w": "x", "start": 5.0, "end": 5.5, "conf": 1.0}], got)
+check("clean: ... and cleaning that again changes nothing", T.clean(got) == got)
+check("heard: the heard word of a fixed word, else None", T.heard({"w": "x", "w0": "y"}) == "y" and T.heard({"w": "x"}) is None and T.heard({"w": "x", "w0": ""}) is None and T.heard("x") is None)
 
 # ---------------------------------------------------------------- a record that holds anything: never a crash
 junk = {"words": FIVE + [{"w": "broken"}, 7],
