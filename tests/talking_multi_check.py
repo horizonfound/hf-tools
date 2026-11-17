@@ -739,9 +739,14 @@ def check_lines():
     # Nov 13, how much and how fast a zoom moves: ONE more of her lines changed, the one-clip Zoom's save, so that a
     # zoom keeps its amount and pace (every other zoom's too). With no amount or pace anywhere it sends what it did.
     zoom_set_lines = ["    return {zooms: T.setRange(T.ZL, a, b, kind ? {kind: kind} : null).map(function(r){ return {a: r.a, b: r.b, kind: r.kind}; })};"]
-    named = CHANGED_LINES + MENU_LINES + zoom_set_lines
+    # Nov 17, Open CapCut (Nicole's v27, Lane C's C4): four more of her lines changed, the result box's (its heading
+    # comment, box() taking the project to name, the say line built with the project in bold, showMake passing it).
+    capcut_lines = ["// ---- Make it in CapCut, and the result box ----", "function box(lines, bad){",
+                    "    var say = el('p', 'say', W.made_say); say.style.marginTop = '.6rem'; s.appendChild(say);",
+                    "  if (m.state === 'done') box((m.words || []).map(String), false);"]
+    named = CHANGED_LINES + MENU_LINES + zoom_set_lines + capcut_lines
     case("every line of the timeline's script as it was before several clips (%d lines) is still there, in order, but for the %d lines named in this test "
-         "(%d changed for several clips, %d for the two small menus that took the chips' place, 1 for a zoom's amount and pace)" % (len(old), len(named), len(CHANGED_LINES), len(MENU_LINES)),
+         "(%d changed for several clips, %d for the two small menus that took the chips' place, 1 for a zoom's amount and pace, 4 for Open CapCut)" % (len(old), len(named), len(CHANGED_LINES), len(MENU_LINES)),
          sorted(missing) == sorted(named), [x for x in missing if x not in named][:4] or [x for x in named if x not in missing][:4])
     src = "\n".join(new)
 
