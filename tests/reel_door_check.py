@@ -109,8 +109,8 @@ def check_links(s):
     links = [h for p_, h in found if p_ == "reel"]
     case("the kit page has her three cards, Reel, Carousel and Stories, each a link", code == 200 and [p_ for p_, _ in found] == ["reel", "carousel", "stories"], (code, found))
     reel_card = page[page.index("data-piece='reel'"):page.index("data-piece='carousel'")] if len(found) == 3 else ""
-    case("the Reel card says her words: 'Create my reel →' before a reel is made (v19 review: not 'Change the photos')",
-         "<span class='cta'>Create my reel &rarr;</span>" in reel_card and "Change the photos" not in page, reel_card[:300])
+    case("the Reels card says her words: 'Create my reels →' before a reel is made (v19 review: not 'Change the photos'; v27: Reels)",
+         "<span class='cta'>Create my reels &rarr;</span>" in reel_card and "Change the photos" not in page, reel_card[:300])
     case("...with her 'Not made yet' under it, and nothing pointing at the chat",
          "<span class='dot no'></span>Not made yet</div>" in reel_card and "Say “make the reel” to Claude" not in page)
     case("the Reel card goes to the reel page", links[:1] == ["/reel.html?kit=" + KQ], links)
@@ -119,7 +119,9 @@ def check_links(s):
     code_c, _, raw_c = s.http("GET", "/arrange.html?kit=%s&piece=carousel" % KQ)
     case("the carousel's picker still answers when asked for by name", code_c == 200 and b"data-piece='carousel'" in raw_c, code_c)
     code, _, raw = s.http("GET", html.unescape(links[0])) if links else (0, None, b"")
-    case("the reel page answers at that address with her step 2", code == 200 and "Put your photos in order" in raw.decode("utf-8", "replace"), code)
+    case("the reel page answers at that address with her chooser (v27: Which reel do you want to create?)", code == 200 and "Which reel do you want to create?" in raw.decode("utf-8", "replace"), code)
+    code, _, raw = s.http("GET", html.unescape(links[0]) + "&kind=photos") if links else (0, None, b"")
+    case("...and, as just photos, with her step for the photos", code == 200 and "Choose your photos" in raw.decode("utf-8", "replace"), code)
     code, _, raw = s.http("GET", "/arrange.html?kit=%s&piece=reel" % KQ)
     case("the old reel picker still works when asked for by name", code == 200 and b"data-piece='reel'" in raw, code)
     code, out = s.cmd("arrange.py", "open", KIT, "--piece", "reel")
@@ -134,17 +136,25 @@ def check_browser(c, s):
     c.open(s.url("/content/%s/Post%%20kit.html" % KQ))
     c.wait_for("document.body.classList.contains('live')", 10)
     sel = "a.piece[data-piece='reel']"
-    case("in a browser: the Reel card with her 'Create my reel →' is showing", c.count(sel) == 1 and c.text(sel + " .cta") == "Create my reel →"
+    case("in a browser: the Reels card with her 'Create my reels →' is showing", c.count(sel) == 1 and c.text(sel + " .cta") == "Create my reels →"
          and c.js("(function(){var a=document.querySelector(\"%s\"); return a.querySelector('h2').textContent.indexOf('Reel')===0 && a.getAttribute('href').indexOf('/reel.html')===0 && a.getBoundingClientRect().width>40})()" % sel) is True)
     c.click(sel + " .cta")
+    try:
+        c.wait_for("location.pathname === '/reel.html' && document.querySelectorAll('.kind').length === 4", 20)
+        went = True
+    except chrome_drive.Timeout:
+        went = False
+    case("pressing it opens the reel page's chooser (v27: Which reel do you want to create?), for this shoot", went and c.js("new URLSearchParams(location.search).get('kit')") == KIT
+         and "Fake beach reels" in c.text("h1"), (went, c.js("location.href")))
+    c.click("#kPhotos")
     try:
         c.wait_for("location.pathname === '/reel.html' && document.querySelector('h1') && document.querySelectorAll('#reel .tile').length > 0", 20)
         went = True
     except chrome_drive.Timeout:
         went = False
-    case("pressing it opens the reel page, with the assistant's pick in the row", went and c.js("new URLSearchParams(location.search).get('kit')") == KIT
+    case("Just photos opens the reel page, with the assistant's pick in the row", went and c.js("new URLSearchParams(location.search).get('kit')") == KIT
          and c.js(ORDER) == rpc.CLAUDE, (went, c.js("location.href")))
-    case("...and the page is her reel page: her title and her step 2", "Fake beach reel" in c.text("h1") and "Put your photos in order" in c.js("document.body.innerText"), c.text("h1"))
+    case("...and the page is her reel page: her title and her step for the photos", "Fake beach reel" in c.text("h1") and "Choose your photos" in c.js("document.body.innerText"), c.text("h1"))
     # the chat picks ("pick my reel photos for Fake beach"): the open page follows it by itself
     fresh = [7, 2, 11, 4, 9]
     code, out = s.cmd("kit.py", "picks", str(s.kit), "--reel", "7,2,11+,4,9-")

@@ -178,7 +178,7 @@ def check_server(work, port):
                                   "<body>OLD PAGE: Change the photos</body></html>", encoding="utf-8")
             code, page = kit_page()
             case("can't build, old saved copy: the old page is not sent; one line says something couldn't be read and to tell Claude",
-                 code == 500 and "OLD PAGE" not in page and "couldn't be read" in page and "Tell Claude" in page and "googleapis" not in page, (code, page[-300:]))
+                 code == 500 and "OLD PAGE" not in page and "couldn't be read" in page and "Tell your assistant" in page and "googleapis" not in page, (code, page[-300:]))
             rec_file.write_text(good, encoding="utf-8")
             c2, out2 = dc.run(env, "kit.py", "page", kit_name)
             rec_file.write_text(bad, encoding="utf-8")

@@ -19,7 +19,7 @@ The rule from the Mac's first install (`docs/install-issues-2026-11-05.md`) hold
 > - **iPhone photos (HEIC) [Dustin and Nicole to decide].** A PC needs a second add-on (pillow-heif) to read them. The PDF says: export them as JPEGs.
 > - **The firewall box.** The Assistant's page servers listen on 127.0.0.1 only (`fresh.Server`), never on the network. Whether that still brings up Windows' "allow access" box is not documented by Microsoft or Anthropic. The PDF has one conditional row for it in Step 6 ("Leave Private networks ticked and click Allow access. It's for the Assistant's own pages, which run on this PC only."). If the walk-through never shows the box, take the row out. [check on a PC, with an ordinary (non-admin) account too: Microsoft says a non-admin's answer makes block rules]
 > - **"Customize" is becoming "Plugins".** Claude's help says the sidebar's Customize becomes Plugins (rolling out from Oct 29, for everyone on Nov 9). Step 4 says "Customize ... (newer copies of Claude may call it Plugins)". Once Nicole's or the tester's screen shows the new name, both PDFs should be updated to it.
-> - **Footage on a PC (v19, Nov 7).** A PC lists videos on the reel page, plays the usual kind (H.264: most cameras, an iPhone set to Most Compatible) and makes clip reels from moments picked with Use this moment. It takes no stills, so "Look through my footage" and the strip of stills don't work there. The PDF says so in plain words under "Not on a PC yet".
+> - **Footage on a PC (v19, Nov 7).** A PC lists videos on the reel page, plays the usual kind (H.264: most cameras, an iPhone set to Most Compatible) and makes clip reels from the clips you make on the timeline with Start here, End here and Add clip (v27, Nov 17). It takes no stills, so "Look through my footage", naming your clips and the strip of stills don't work there, and Save my video (a B-roll reel's finished MP4) isn't on a PC yet: Make this one in CapCut works there, and the words go with it. The PDF says so in plain words under "Not on a PC yet".
 > - **A note for whoever owns `parts/on-a-pc.md`** (from the Python research, Nov 7; done in the in-app instructions since, `parts/on-a-pc.md`): python.org says Python's automatic first-run install "should not generally be relied on" and suggests an explicit `py install default`; the source code shows the automatic install asks no questions (the PATH question comes only from the setup helper you get by clicking Open), and that it works offline from a bundled copy. And on a PC that already has an older Python, `python3 --version` installs nothing. Pillow 13 needs Python 3.11 or later, so an older Python gets an older Pillow.
 
 ---
@@ -176,13 +176,13 @@ You don't need a memory card to begin. Talk to the Assistant in your own words.
 
 Edited and exported, sitting in a folder.
 
-1. On the home page, click **Make posts from a shoot**. **The first time only,** the box says **set up my Assistant folder**: click **Copy**, click in the chat's message box, press Ctrl + V, then Enter, and answer its one question about where to keep your posts. The box then changes (if not, click Make posts again). **[check on a PC: the home page reloads itself within seconds once the folder is made, as on the Mac (Oct 30); the "if not" covers a page that doesn't]**
+1. On the home page, click **Make posts from a shoot**. It opens a screen of its own: a short box that says what a post kit is (one place for everything you'll post from a shoot), then three steps, the third of which, **Make your posts inside your post kit**, happens in the kit itself. **The first time only,** there is no Assistant folder yet, and the screen says so when you press its folder button: type **set up my Assistant folder** in the chat, press Enter, and answer its one question about where to keep your posts. **[New Nov 14: the home page is now Nicole's home base, and Make posts is a screen of its own; the PDF still shows the older box under the button. check on a PC: the screen follows within seconds once the folder is made]**
 2. Click **Select the folder with your finished photos**. A small window with a list of folders opens: click the little arrows to open **This PC** and your drive, click the folder with your exports, then **OK**. **[check on a PC: that the window opens in front of Claude; it is Windows' classic "Browse For Folder" window, from `this_computer.pick_folder`]**
 3. Click **Copy** next to **make my posts**, paste it in the chat with Ctrl + V, and press Enter.
 
-You get a carousel (or a single post) and stories sized for Instagram, and a reel page where you pick the song and the pace, then finish the reel in CapCut (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed. **Reels in CapCut are new on a PC:** if yours doesn't show up in CapCut, tell the Assistant.
+The Assistant brings your photos in and opens the shoot's post kit beside the chat, and stops there: you choose the photos for each piece on its own page, and it picks only when you ask (the page gives you a line to copy). From the post kit you make a carousel (or a single post) and stories sized for Instagram, and a reel on a page where you pick the song and the pace, then finish the reel in CapCut (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed. **Reels in CapCut are new on a PC:** if yours doesn't show up in CapCut, tell the Assistant.
 
-What's behind that line since Nicole's v19 (Nov 7), for the walk-through: the post kit is three cards (Reel, Carousel, Stories); a carousel of one slide is a single post; the reel page has footage, photos ("Let my assistant choose" or drag), the song (a Music folder inside the shoot, or a screen recording's sound), the style and the vibe, then **Make my reel**, which writes a CapCut project; the stories designer saves 9:16 stories into the kit's Stories folder. **[check on a PC: all of it; CapCut for Windows has never opened a project the Assistant wrote]**
+What's behind that line since Nicole's v19 (Nov 7) and v25 (Nov 13), for the walk-through: the post kit is three cards (Reel, Carousel, Stories); a carousel of one slide is a single post; a shoot can have several reels; a caption is optional before Add to my queue; the reel page has footage, photos (drag them in, or "Let my assistant choose" with a note and a line to copy into the chat), the song (a Music folder inside the shoot, or a screen recording's sound), the style and the vibe, then **Make my reel**, which writes a CapCut project; the stories designer saves 9:16 stories into the kit's Stories folder. **[check on a PC: all of it; CapCut for Windows has never opened a project the Assistant wrote]**
 
 **Why not drag the folder in?** On a PC, dragging a folder into another folder on the same drive **moves** it rather than copying it, so the folder you dragged from ends up empty. Use the Select the folder button instead. Dragged one by mistake? Press **Ctrl + Z** in that File Explorer window right away and it comes back.
 
@@ -195,7 +195,7 @@ Straight out of the camera.
 3. The first time, the Assistant asks a few setup questions, one at a time, with buttons. Your drives show with their letters, like **Big Kahuna (E:)**. After that, it's one quick screen each time.
 4. When it says **You can walk away**, walk away. On a laptop, leave the lid open and the charger in.
 
-When you're back, click **Show the report** in the chat. Every photo is copied and checked, sorted into named shoots, with six sneak peeks picked to edit first.
+When you're back, click **Show the report** in the chat. Every photo is copied and checked, sorted into named shoots, each with its own **Open this folder** button and six sneak peeks picked to edit first. Later, the home page's **Back up a card** screen lists every backup, each shoot with **See the report** under it.
 
 **Rather say it than type it?** Click in the message box, press the **Windows key + H**, and talk. That's Windows' own voice typing, and it needs the internet. **[check on a PC: that it types into Claude's message box and its question boxes]**
 
@@ -213,11 +213,12 @@ Windows gives each drive and memory card a letter when it's plugged in, and a dr
 
 ### Not on a PC yet
 
-- **Looking through your videos for moments.** The reel page lists your videos and plays the usual kind (most cameras, or an iPhone set to Most Compatible), and you can pick a moment yourself with **Use this moment**. The Assistant can't pick moments for you yet.
+- **Looking through your videos for moments.** The reel page lists your videos and plays the usual kind (most cameras, or an iPhone set to Most Compatible), and you can make your own clips on its timeline with **Start here**, **End here** and **Add clip**. The Assistant can't pick moments for you, or name your clips, yet.
 - **iPhone videos in High Efficiency.** They can't play on the reel page on a PC yet. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, Formats).
 - **iPhone photos (HEIC).** Export them as JPEGs first, and the Assistant can use those. **[Dustin and Nicole to decide]**
 - **Posting-day reminders don't reach your calendar by themselves.** The Assistant makes a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert. **[New Nov 11: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Talking reels.** Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here. **[New Nov 12: not in the PDF yet; wording is Dustin and Nicole's]**
+- **Saving a B-roll reel as a finished video.** Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
 
 > **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >
@@ -291,7 +292,7 @@ What to look at, in order:
 7. **The phone:** the Settings switch, the two /config lines, a real tap with the tester away from the PC.
 8. **Part 2, posts:** a real export folder (the folder window from the home page and whether it comes up in front, a post kit built, the reel page with a song from the Music folder and Make my reel, the carousel and stories designers with real photos, one reel opened in CapCut for Windows (if it doesn't open, one CapCut project folder zipped and sent to us), a Canva carousel brought into a kit, reading the Instagram grid).
 9. **Part 2, a card:** a real card (the drive letter, the letters on a second day with the card put in before the drive, Windows' note when a card goes in, the setup questions, a full backup, the report, Show the report after an hour away).
-10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Use this moment, a clip reel.
+10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Start here, End here and Add clip on the timeline, a clip reel; Save my video on a B-roll reel says it isn't on a PC yet.
 11. How long each step took, and the whole setup.
 
 After the walk-through: replace the drawings that turned out wrong (or swap them for the tester's screenshots), take the marks out of this file, update both PDFs if Settings now says Plugins, and only then send the PDF to a student.

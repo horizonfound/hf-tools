@@ -9,7 +9,11 @@ STYLE is her stylesheet as she wrote it, with these changes:
     (Dustin, Nov 7: no serif; the lines to copy and the quoted words in the photo menu are DM Sans, still slanted);
   - the styles of what she turned down or left behind are NOT here (the plan, 2a): .shot, .shot .sw, .pthumb,
     .dragghost, .words span.hl, .words span.drop, .screen.behind, the tag on the screen, the photo strip above a
-    sentence (.strip, .grp, .addph) and the photo frame behind the video.
+    sentence (.strip, .grp, and her dashed .addph button, the plus on hover she took out) and the photo frame
+    behind the video. Her v27 .addph is another thing: the span in the photo pop-up's footer that holds "+ Add
+    more photos" and its line (her Add photos block, Nov 14); those two rules are here. In her own page the old
+    button rule still lands on that span too (a dashed box around the button and its line, 36 px tall): not
+    copied; noted for Nicole.
 Her pitfalls, kept as rules (tests/talking_page_check.py checks each):
   - the class names "bar" and "sel" belong to the top bar and the highlight bar and are used for nothing else
     (a photo's bar above its words is .seg);
@@ -139,6 +143,15 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .sel{position:fixed;z-index:50;display:none;gap:5px;align-items:center;background:var(--ink);padding:6px;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
 .sel button{border:0;border-radius:999px;padding:.4rem .75rem;font:600 13px/1 var(--sans);cursor:pointer;background:#fff;color:var(--ink);white-space:nowrap}
 .sel button:hover{background:var(--coral-l)}
+/* fixing a word the transcriber got wrong (Nicole, Nov 17) */
+.words span.fixed,.legend .fixed{text-decoration:underline dotted var(--coral-2) 1.5px;text-underline-offset:4px}
+.words span.gone{color:#b9b4b2;font-style:italic}
+.legend .lfix{margin-left:auto;font-style:italic}
+.fixbox{position:fixed;z-index:60;display:flex;gap:5px;align-items:center;background:var(--ink);padding:6px;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.fixbox[hidden]{display:none!important}
+.fixbox input{font:500 15px/1.2 var(--sans);border:0;border-radius:9px;padding:.45rem .6rem;min-width:180px;outline:2px solid var(--coral)}
+.fixbox button{border:0;border-radius:999px;padding:.42rem .8rem;font:600 13px/1 var(--sans);cursor:pointer;background:var(--coral);color:#fff}
+.fixbox button.fx{background:#fff;color:var(--ink)}
 .sel i{width:1px;height:20px;background:rgba(255,255,255,.3);margin:0 2px}
 .modal{position:fixed;inset:0;background:rgba(20,22,28,.5);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
 .modal.open{display:flex}
@@ -150,7 +163,9 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .pk.on img{box-shadow:0 0 0 3px var(--coral-2)}
 .pk b{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:var(--coral-2);color:#fff;font:700 12.5px/1 var(--sans);display:none;place-items:center}
 .pk.on b{display:grid}
+.pickfoot .addph{margin:0 auto 0 0}
 .pickfoot{position:sticky;bottom:-1.1rem;background:var(--cream);display:flex;gap:.8rem;align-items:center;justify-content:flex-end;padding:.8rem 0 .2rem;margin-top:.6rem}
+.addph{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.35rem 0 .2rem}   /* Add photos (Nicole, Nov 14) */
 /* the dock: the timeline, then the make bar, fixed across the bottom */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:40;box-shadow:0 -6px 20px -12px rgba(31,36,48,.25)}
 .tl{background:#F3F1EB;border-top:1px solid var(--line)}
@@ -200,6 +215,7 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .make{background:var(--paper);border-top:1px solid var(--line)}
 .make .in{max-width:1180px;margin:0 auto;padding:.7rem clamp(16px,4vw,40px);display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .make .sum{font-size:14px;color:var(--ink-2)}.make .sum b{color:var(--ink)}
+#openCC{margin-left:auto;margin-right:.55rem}#openCC[hidden]{display:none!important}
 .result{margin-top:1rem}
 .result p{margin:.2rem 0}
 .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6rem 1rem;border-radius:999px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:70;max-width:90vw;text-align:center}
@@ -230,6 +246,9 @@ h1,.status,.line span,.say,.opt b,.opt span{overflow-wrap:anywhere}
 .seg{user-select:none;-webkit-user-select:none;touch-action:none}
 .sthumbs{user-select:none;-webkit-user-select:none}
 .pmenu{max-width:calc(100vw - 16px)}
+/* the fix box on a phone: her 180 px box and its three buttons are wider than the window, so the box keeps to the
+   window and the input gives way (the page re-places the box as it does the highlight bar) */
+@media(max-width:520px){.fixbox{max-width:calc(100vw - 16px)}.fixbox input{min-width:0;width:120px;flex:1 1 100px}}
 .screen{user-select:none;-webkit-user-select:none}
 .screen .movable,.screen .knob,.screen .cap{touch-action:none}
 /* the line down the middle while a dragged thing is snapped to it (the designer's blue; drawn only, never pressed) */
@@ -274,6 +293,23 @@ html{scroll-padding-bottom:calc(var(--dock) + 12px)}
 """
 
 
+# Her rules for the "Your talking reels" bar (v25, pages/talking-reel.html), as she wrote them, in look.py's names.
+# The one line after hers is ours: the Rename box's three things sit on one line with the same gaps.
+REELS_CSS = r"""
+.reels{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin-top:.9rem;padding:.6rem .8rem;background:var(--paper);border:1px solid var(--line);border-radius:14px;max-width:52em}
+.reels label{font:600 12.5px/1 var(--sans);color:var(--ink-2);letter-spacing:.02em}
+.reels select,.reels input{font:600 13.5px/1.2 var(--sans);color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:999px;padding:.5rem 2rem .5rem .85rem;min-width:11em;max-width:100%}
+.reels select{appearance:none;-webkit-appearance:none;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);background-position:calc(100% - 16px) 52%,calc(100% - 11px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.reels input{padding-right:.85rem}
+.reels .btn{padding:.5rem .9rem;font-size:13px}
+.reels .btn.new{background:var(--ink);color:#fff;border-color:var(--ink)}
+.reels .msg{font-size:12.5px;color:var(--ink-2);flex-basis:100%}
+.reels .msg:empty{display:none}
+.reels [hidden]{display:none!important}
+.reels #verRenBox{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.55rem}
+"""
+
+
 def css():
     """Everything after look.head_css() in the page's <style>."""
-    return VARS + STYLE + OUR_CSS
+    return VARS + STYLE + REELS_CSS + OUR_CSS

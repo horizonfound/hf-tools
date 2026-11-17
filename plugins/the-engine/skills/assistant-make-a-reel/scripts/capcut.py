@@ -526,7 +526,15 @@ def build(plan, parts, platform):
         target = tr_f(ph["start_f"], ph["dur_f"], fps) if "start_f" in ph else tr(ph["start"], ph["dur"])
         seg = _segment(P, mats, mat["id"], target, {"start": 0, "duration": target["duration"]}, s)
         if is_clip:                                # from where the clip starts; muted under a song, its own sound with none
-            seg["source_timerange"] = {"start": int(round(float(ph["src"]) * US)), "duration": target["duration"]}
+            src_us = int(round(float(ph["src"]) * US))
+            have = int(round(float(ph["length"]) * US)) - src_us     # what the video has left from there
+            seg["source_timerange"] = {"start": src_us, "duration": target["duration"]}
+            if 0 < have < target["duration"] - 1000:
+                # A20 (Nicole's v27, "long clips work"): a clip that is the whole of a video a few frames shorter than
+                # its hold ends at the video's end and plays a touch slower to fill the hold (the speed on the clip
+                # and on its speed item, as the talking reel's speeds are written); never past the video's end.
+                seg["source_timerange"]["duration"] = have
+                _set_speed(seg, mats, have / target["duration"])
             seg["volume"] = 0.0 if plan.get("song") else 1.0
         vtrack["segments"].append(seg)
         end = max(end, ph["start"] + ph["dur"])

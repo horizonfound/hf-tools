@@ -63,34 +63,26 @@ LIGHT = ("--single-process", "--disable-component-extensions-with-background-pag
          "--disable-features=Translate,MediaRouter,OptimizationHints,DialMediaRouteProvider,SpareRendererForSitePerProcess,"
          "IsolateOrigins,site-per-process,WebUIOmniboxPopup,OmniboxWebUIPopup,WebUIOmniboxFullPopup,AimServerEligibility")
 
-# Her words for step 1 and step 4, as her reel-maker.html shows them (handoff v19).
+# Her words for step 1 and step 4, as her reel-maker.html shows them (handoff v19; since v27 the step's heading, the
+# ask box's words and the line to copy's are her v27 page's, and the yes/no cards are gone: the chooser decides).
 HERS1 = {
-    "h2": "Behind-the-scenes footage?",
-    "say": "Do you want this reel to include behind-the-scenes video from the shoot, or just your photos?",
-    "bts_b": "Add behind-the-scenes footage", "bts_s": "Clips from the shoot, mixed with your finished photos.",
-    "photos_b": "Just photos", "photos_s": "Your finished photos, cut on the beat.",
-    # the third card: her v23 reel-maker.html (Nov 11) is the source for these two (rpc.V23_WORDS, checked against her page there)
-    "talk_b": "Talking to camera", "talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page.",
+    "h2": "Choose your behind-the-scenes footage",
     "say2": "Press <b>Add my footage</b> and a Footage folder for this shoot opens in Finder. Drag your behind-the-scenes videos into it.",
     "add": "▶ Add my footage",
     "insight_b": "Good to know: longer footage takes longer",
     "insight": "Longer videos take me longer to look through and use more of your plan. A few minutes of footage takes a few minutes. A 20-minute video takes about 10 minutes or more.",
     "fix": "<b>Quick fix:</b> trim it first and keep just the parts you like. On your iPhone, open the video in Photos, tap Edit, and drag the ends of the timeline in. On a Mac, open it in QuickTime Player and choose Edit › Trim. A few short clips are quicker for me than one long video.",
-    "paste_say": "Once your footage is in, copy this into the chat so I can look through it:",
+    "paste_say": "Then, once your footage is in, copy this into the chat so I can look through it:",
     "copy": "Copy",
-    "ask_b": "Want to direct the reel?",
-    "ask": " Optional. Tell me the moments you want and how you'd like the reel to go, and I'll follow it through your footage.",
-    "ex1": "For example: “Find the first kiss. Start with getting ready in the morning, then the ceremony, and end with the sparkler exit.”",
+    "ask_b": "Is there anything specific you'd like your assistant to look for?",
+    "ask": " Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
+    "ex1": "For example: “Find the first kiss.” or “Find the part where the baby grabs the camera strap.”",
     "ex2": "Another example: “Find the footage of me walking into the frame with my camera.”",
-    "ask_ph": "Optional: the moments you want, and how you'd like it to go",
+    "ask_ph": "Optional: the moments you'd like me to look for",
     "feel_b": "How should it feel?",
     "feels": ["Heartwarming", "Nostalgic", "Fun", "Dreamy", "Something else"],
     "feel_ph": "Your words, like joyful or cozy",
     "feel_small": "Optional. Pick one, or tap <b>Something else</b> and type your own. I'll pick the photos and moments that bring out that feeling. Tap it again to clear it.",
-    "clips_h3": "Select your clips",
-    "moments_first": "The moments I find will show up here.",
-    "watch_h3": "Watch your footage and pick your own",
-    "watch": "Play it here, or tap a still to jump there. When you see a part you love, press <b>Use this moment</b>. It shows up first in your clips, 4 seconds long and selected. Use <b>−</b> and <b>+</b> on its card to make it shorter or longer.",
     "opened": "Your Footage folder is open in Finder. Drag your videos in, and they will show up here by themselves.",
 }
 HERS4 = {
@@ -102,11 +94,11 @@ HERS4 = {
               ["Bookends", "Footage opens and closes the reel, with your photos in the middle. Works with any footage."]],
 }
 HERS_MAKE = {
-    "foot_need": "<h3>One more thing: behind-the-scenes footage?</h3><p>Choose <b>Add behind-the-scenes footage</b> or <b>Just photos</b> in step 1.</p>",
     "clips_need": "<h3>One more thing: your clips</h3><p>Select the clip or clips to use under <b>Select your clips</b> in step 1, or choose <b>Just photos</b>.</p>",
     "not_looked": "<h3>I haven't looked through your footage yet</h3><p>Add your videos in step 1, then copy the line into the chat. The moments I find show up under <b>Select your clips</b> in step 1. Or choose <b>Just photos</b>.</p>",
 }
-TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, or Remove it."
+# Her v27 (Nov 17): the footage editor replaced "Select your clips", the moment cards' − / + / Trim / Remove row and
+# "Watch your footage and pick your own"; its words are reel_page.EDITOR_WORDS, held to her v27 page in check_editor_words
 
 
 def rp():
@@ -293,6 +285,37 @@ def check_server(s, clips):
         code, _, _ = s.http("GET", path)
         case("refused: %s (404)" % name, code == 404, code)
 
+    # the editor's clip (v27): up to 15 s, a start and an end together, a name from the chat that a trim keeps
+    # (a pretend 30-second video: a copy of the 6 s clip with its length faked in facts.json, since nothing longer is made here)
+    lp = s.kit / "Footage" / "Long pretend.mov"
+    shutil.copy(clips["clip.mov"], lp)
+    kl = R._video().key(lp)
+    facts = json.loads(fj.read_text())
+    facts[kl] = dict(facts[a["key"]], length=30.0)
+    fj.write_text(json.dumps(facts))
+    j = wait_ready(s)
+    code, j, _ = moment(s, {"do": "add", "video": kl, "start": 2.0, "seconds": 16})
+    lm = next((x for x in (j or {}).get("moments", []) if x.get("key") == kl), {})
+    case("Add clip asks for 16 s: cut to 15 (her v27 cap; v19's was 8)", code == 200 and lm.get("start") == 2.0 and lm.get("end") == 17.0 and R.ADD_MAX == 15.0, lm)
+    code, j, _ = moment(s, {"do": "update", "id": lm.get("id", "u9-abcdef"), "start": 5.0, "end": 4.0})
+    case("a trim with its start past its end is refused whole, in plain words", code == 400 and (j or {}).get("words") == R.OUR_WORDS["trim_length"], j)
+    code, j, _ = moment(s, {"do": "update", "id": lm.get("id", "u9-abcdef"), "start": 3.0, "end": 19.0})
+    case("a trim of 16 s is refused whole (the editor never sends one; hers would bend it quietly)", code == 400 and (j or {}).get("words") == R.OUR_WORDS["trim_length"], j)
+    code, j, _ = moment(s, {"do": "update", "id": lm.get("id", "u9-abcdef"), "start": 3.0, "end": 18.0})
+    lm2 = next((x for x in (j or {}).get("moments", []) if x.get("key") == kl), {})
+    case("a trim moves both ends (3.0 to 18.0, 15 s), and her \"Your pick at\" label follows the start", code == 200 and lm2.get("start") == 3.0 and lm2.get("end") == 18.0
+         and lm2.get("label") == "Your pick at 0:03", lm2)
+    nf = s.work / "names-server.json"
+    nf.write_text(json.dumps({"clips": {lm.get("id", "u9-abcdef"): {"label": "A long look round"}}}))
+    code, out = s.cmd("footage.py", "describe", KIT, "--file", str(nf))
+    code2, j, _ = moment(s, {"do": "update", "id": lm.get("id", "u9-abcdef"), "start": 4.0, "end": 9.0})
+    lm3 = next((x for x in (j or {}).get("moments", []) if x.get("key") == kl), {})
+    case("a name from the chat (footage.py describe) is kept by a later trim (her Nov 16 rule); the page is told it is named",
+         code == 0 and code2 == 200 and lm3.get("label") == "A long look round" and lm3.get("named") is True and lm3.get("start") == 4.0, (out[-200:], lm3))
+    moment(s, {"do": "remove", "id": lm.get("id", "u9-abcdef")})
+    lp.rename(s.work / "set aside" / "Long pretend.mov") if (s.work / "set aside").is_dir() else lp.rename(s.work / "Long pretend.mov")
+    case("(the pretend video taken out again: three videos)", wait_ready(s) and len(foot(s)[1]["videos"]) == 3)
+
     # a Footage folder that is a link: never listed, never opened
     real = s.kit / "Footage"
     real.rename(s.kit / "Footage-real")
@@ -369,6 +392,62 @@ def run_ours(moments, style, clips, picks, photos, videos):
     except R.NoFootage as e:
         return ("problem", str(e)), None
     return toks, [{"path": Path(e["path"]).name, "src": e["src"], "seconds": e["seconds"], "w": e["w"], "h": e["h"], "length": e["length"]} for e in entries]
+
+
+def check_editor_words():
+    """reel_page.EDITOR_WORDS against her v27 reel-maker.html, both ways: every word of ours is in her page, and
+    every line her editor's markup shows or names is one of ours, whole; her style rules for the editor are in
+    the page as she wrote them."""
+    import html as _html
+    R = rp()
+    W = R.EDITOR_WORDS
+    case("the editor's words are in their own table (reel_page.EDITOR_WORDS, %d lines), none says Claude, none has a long dash" % len(W),
+         len(W) >= 50 and not [v for v in W.values() if "Claude" in v or "—" in v or "–" in v])
+    case("the old players' words are not on the page any more: no Use this moment, no Watch your footage, no Trim on a card, no Select your clips",
+         not any(x in R.page_html("x", "x", True, "bts").split("id='reelData'")[0] for x in ("Use this moment", "Watch your footage and pick your own", "&#9986; Trim", "Select your clips", "id='viewers'")))
+    hers = rpc.her_v27_page()
+    if hers is None:
+        print("SKIP  her editor words against her v27 page: that handoff isn't on this computer", flush=True)
+        return
+    text = re.sub(r"\\u([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), _html.unescape(hers).replace("\\'", "'"))   # her '\u2713 Added'
+    bad = [(k, frag) for k, v in W.items() for frag in re.split(r"\{\w+\}", v) if len(frag.strip()) >= 2 and frag not in text]
+    case("every word of ours for the editor is in her v27 reel page, word for word", not bad, bad)
+    block = re.search(r"<!-- the footage editor \(Nicole, Nov 16.*?<div class=\"moments row\" id=\"moments\" hidden>", hers, re.S)
+    case("her editor's markup is in her page where ours is: under the line to copy in step 1", block is not None)
+    if block:
+        b = block.group(0)
+        her_bits = [_html.unescape(x).strip() for x in re.findall(r">([^<>]+)<", b) if x.strip()] + re.findall(r'(?:title|aria-label)="([^"]+)"', b)
+        her_bits = [x for x in her_bits if x not in ("0:00.0", "Name my clips", "▶")]      # the time, a line the page fills in, her glyph-only ▶ (ours carries the same glyph)
+        ours = [v.strip() for v in list(W.values()) + [R.WORDS["copy"]]]
+        case("every line her editor's markup shows or names (%d) is one of ours, whole" % len(her_bits), len(her_bits) >= 16 and not [x for x in her_bits if x not in ours],
+             [x for x in her_bits if x not in ours])
+        her_ids = re.findall(r'id="(ed\w*|vpBtn|clist|descBox|descWords|descCopy|momentsSay)"', b)
+        page = R.page_html("x", "x", True, "bts")
+        case("every part of her editor is in ours, by her name (%d of them)" % len(her_ids), len(her_ids) >= 20 and all(("id='%s'" % i) in page for i in her_ids if i not in ("edR0", "edR1")),
+             [i for i in her_ids if ("id='%s'" % i) not in page])
+    for line in ("'That\\'s 15 seconds, the longest a clip can be. Drag its ends to change it, or press Add clip.'",
+                 "'Added to your clips. <b>To make another</b>, drag the orange trim to a new moment (or drag its ends), then press <b>Add clip</b>. Or find a moment and press <b>Start here</b>.'",
+                 "'The end has to be at least a second after the start.'", "'Make it at least a second long first.'", "'Adding your clip…'",
+                 "'Show the whole video' : 'Zoom in'", "'Not named yet'", "'Name my clips for ' + short", "&#9654; Play this clip", "'Take it out of your reel' : 'Use it in your reel'",
+                 "'No photo' : on ? '&#10003; In reel' : 'Use'", "title=\"Remove this clip\"", "Your clips show up here: the moments I find, and the ones you add.</p>'",
+                 "Choose the clips you\\'d like in your B-roll reel. They play in the order shown, each cut on the beat."):
+        case("her line is in her page as ours has it: %s" % line[:50], line in hers, line)
+    case("her 15 s cap, her 4 px tap rule and her tenth-of-a-second rounding are ours",
+         "Math.min(edT(), ED.inT + 15" in hers and "Math.abs(ev.clientX - d.sx) > 4" in hers and "Math.round(ED.inT * 10) / 10" in hers or "Math.round(edT() * 10) / 10" in hers
+         and R.ADD_MAX == 15.0 and R.TAP_PX == 4)
+    sty = re.search(r"<style>(.*?)</style>", hers, re.S).group(1)
+    # left out: her first editor's tabs (.edtabs, .edmain, .edside, .edbin), the description she took out (.ci .about), her
+    # serif on the Name my clips line, and her first .tcut rule (white and dashed), which her orange one further down replaces
+    skip = (".edtabs", ".edmain", ".edside", ".edbin", ".ci .about", ".descline #descWords", ".edruler{", "@media (max-width:900px){.edmain",
+            ".tcut{position:absolute;top:0;bottom:0;border:2px dashed #fff")
+    her_css = [ln for ln in sty.splitlines() if ln.startswith((".ed", ".tm", ".tcut", "#edIn", ".vp", ".cl-head", ".clist", ".ci", ".descline", ".wl{", ".say.sm{", "@media (max-width:820px){.edgrid"))
+               and not ln.startswith(skip)]
+    missing = [ln[:70] for ln in her_css if ln not in R.EDITOR_CSS and (ln.split("}")[0] + "}") not in R.EDITOR_CSS]
+    case("her style rules for the editor are in the page as she wrote them (%d of them; her first editor's tabs and the description she took out left out)" % len(her_css),
+         len(her_css) >= 60 and not missing, missing)
+    case("her .edruler rule is ours too (the one line her file has twice)", any(ln in R.EDITOR_CSS for ln in sty.splitlines() if ln.startswith(".edruler{")))
+    case("the Name my clips line is DM Sans in ours (Dustin: no serif), where hers is Fraunces", ".descline #descWords{font:500 15.5px/1.3 var(--sans);color:var(--ink)}" in R.EDITOR_CSS
+         and "var(--display)" not in R.EDITOR_CSS)
 
 
 def check_order(run):
@@ -501,12 +580,7 @@ def texts1(c):
       function h(id){ var x = document.querySelector('#' + id + ' h2').cloneNode(true); x.querySelector('.num').remove(); return x.textContent; }
       var lab = document.querySelector('#btsBox label').cloneNode(true); lab.querySelectorAll('.ex').forEach(function(e){ e.remove(); });
       var b = lab.querySelector('b'); var bt = b.textContent; b.remove();
-      return {h2: h('step0'), say: document.querySelector('#step0 > p.say').textContent,
-        bts_b: document.querySelector('#modeBts b').textContent, bts_s: document.querySelector('#modeBts span').textContent,
-        photos_b: document.querySelector('#modePhotos b').textContent, photos_s: document.querySelector('#modePhotos span').textContent,
-        talk_b: document.querySelector('#modeTalk b').textContent, talk_s: document.querySelector('#modeTalk span').textContent,
-        talk_on: document.getElementById('modeTalk').classList.contains('on'), talk_href: document.getElementById('modeTalk').getAttribute('href'),
-        choices: Array.from(document.querySelectorAll('#step0 .choice > *')).map(function(x){ return x.id; }),
+      return {h2: h('step0'), oldcards: document.querySelectorAll('#step0 .choice, #modeBts, #modePhotos, #modeTalk').length,
         say2: document.querySelector('#btsBox > p.say').innerHTML, add: document.getElementById('addFootage').textContent,
         insight_b: document.querySelector('.insight > b').textContent, insight: document.getElementById('insightWords').textContent,
         fix: document.querySelectorAll('.insight p')[1].innerHTML, paste_say: document.querySelector('#pasteBox > p').textContent,
@@ -517,24 +591,18 @@ def texts1(c):
         feels: Array.from(document.querySelectorAll('#feelRow button')).map(function(x){ return x.textContent; }),
         feel_ph: document.getElementById('feelOwn').placeholder, feel_max: document.getElementById('feelOwn').maxLength,
         feel_small: document.querySelector('#feelRow small').innerHTML,
-        clips_h3: document.querySelectorAll('#btsBox h3.mh')[0].textContent, watch_h3: document.querySelectorAll('#btsBox h3.mh')[1].textContent,
-        watch: document.querySelectorAll('#btsBox > p.say')[2].innerHTML, moments_say: document.getElementById('momentsSay').textContent,
+        moments_say: document.getElementById('momentsSay').textContent,
         h2s: h('stepStyle'), says: document.querySelector('#stepStyle > p.say').textContent,
         cards: Array.from(document.querySelectorAll('#styles .opt')).map(function(x){ return [x.querySelector('b').textContent, x.querySelector('span').textContent]; }),
         nums: Array.from(document.querySelectorAll('section.step')).filter(function(s){ return !s.hidden; }).map(function(s){ return s.id + '=' + s.querySelector('.num').textContent; }),
-        bts_on: document.getElementById('modeBts').classList.contains('on'), photos_on: document.getElementById('modePhotos').classList.contains('on'),
+        feel_hidden: document.getElementById('feelRow').hidden, ask_first: document.getElementById('askIn').getBoundingClientRect().top < document.getElementById('pasteWords').getBoundingClientRect().top,
         box_hidden: document.getElementById('btsBox').hidden, style_hidden: document.getElementById('stepStyle').hidden,
         rec_shown: !document.getElementById('claudeRec').hidden, done0: document.getElementById('step0').classList.contains('done'),
-        waiting: document.getElementById('footWaiting').textContent, vlist: document.getElementById('vlist').innerText,
+        waiting: document.getElementById('footWaiting').textContent, vlist: document.getElementById('vlist').textContent,
+        vsum: (function(){ var su = document.querySelector('#vlist summary'); return su ? su.querySelector('b').textContent + ' ' + su.querySelector('small').textContent.replace(/\\s+/g, ' ').trim() : ''; })(),
+        vcards: Array.from(document.querySelectorAll('#vlist .vcard')).map(function(v){ return v.querySelector('b').textContent + ' ' + v.querySelector('small').textContent.replace(/\\s+/g, ' ').trim(); }),
         sum: document.getElementById('sum').textContent, result: document.getElementById('result').innerHTML};
     })()""")
-
-
-def cards(c):
-    return c.js("""Array.from(document.querySelectorAll('#moments .mom')).map(function(m){ return {id: m.dataset.id, sel: m.classList.contains('sel'),
-      badge: (m.querySelector('.badge') || {}).textContent || '', label: m.querySelector('.tx b').textContent, small: m.querySelector('.tx small').textContent,
-      len: m.querySelector('.len b').textContent, use: m.querySelector('.usebtn').textContent, off: m.querySelector('.usebtn').disabled,
-      yours: !!m.querySelector('.yours'), img: !!m.querySelector('.th img')}; })""")
 
 
 def on_disk(s, fn, seconds=6):
@@ -562,39 +630,38 @@ def check_page(c, s, clips):
     rec.pop("from", None)
     (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
     c.init_script("document.addEventListener('copy', function(){ window.__copied = String(window.getSelection()); }, true);")
-    c.open(s.page_url())
-    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songs .song').length > 1", 20)
+    c.open(s.page_url("bts"))                 # v27: a behind-the-scenes page (the chooser decides the kind)
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songSel option').length > 1", 20)
     t = texts1(c)
-    case("footage not chosen yet: both cards off, the box and step 4 hidden, steps 1 to 4 (hers)", not t["bts_on"] and not t["photos_on"]
-         and t["box_hidden"] and t["style_hidden"] and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
-    for k in ("h2", "say", "bts_b", "bts_s", "photos_b", "photos_s", "talk_b", "talk_s"):
-        case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
-    case("the third card's words are the ones taken from her v23 page", (HERS1["talk_b"], HERS1["talk_s"]) == (rpc.V23_WORDS["foot_talk_b"], rpc.V23_WORDS["foot_talk_s"]))
-    v23 = rpc.her_v23_page()
-    if v23 is None:
-        print("SKIP  the third card against her v23 page: that handoff (reference-private) isn't on this computer", flush=True)
-    else:
-        case("...and they are in her v23 reel-maker.html, on her third card", '<a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>'
-             % (HERS1["talk_b"], HERS1["talk_s"]) in v23)
-    case("step 1 has her three choices in her order, the third a link to this shoot's talking page, with no tick",
-         t["choices"] == ["modeBts", "modePhotos", "modeTalk"] and t["talk_href"] == "/talking.html?kit=" + KIT.replace(" ", "%20") and not t["talk_on"], (t["choices"], t["talk_href"]))
+    case("a behind-the-scenes page (v27): no yes/no cards, the box and step 4 show at once, her renumbering 1 to 7, the recommended tag",
+         t["oldcards"] == 0 and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
+         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepDirect=4", "stepStyle=5", "step4=6", "watch=7"], {k: t[k] for k in ("oldcards", "box_hidden", "style_hidden", "rec_shown", "nums")})
+    case("her words, step 1: h2 (v27)", t["h2"] == HERS1["h2"], (t["h2"], HERS1["h2"]))
+    case("the ask box comes before the line to copy, and How should it feel? is hidden (hers, v27)", t["ask_first"] and t["feel_hidden"])
+    # with no clips yet (the server part's moments set aside for a moment): her box
+    rec = record(s)
+    keep_m = rec.get("moments")
+    rec["moments"] = []
+    rec["rev"] = int(rec.get("rev") or 0) + 1
+    (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
+    c.js("window.Reel.followNow()")
+    wait(c, "document.querySelectorAll('#clist .ci').length === 0", 8)
     c.click("#makeBtn")
-    case("Make my reel before footage is chosen: her \"One more thing\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["foot_need"]), 5),
+    case("Make my reel before any footage is in: her \"I haven't looked through your footage yet\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["not_looked"]), 5),
          texts1(c)["result"])
-    c.click("#modePhotos")
-    t = texts1(c)
-    case("Just photos: the third card stays without the tick", not t["talk_on"])
-    case("Just photos: marked, step 1 done, the box and step 4 stay hidden", t["photos_on"] and t["done0"] and t["box_hidden"] and t["style_hidden"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t)
-    case("saved: footage false", on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is False))
-    c.click("#modeBts")
-    t = texts1(c)
-    case("Add behind-the-scenes footage: the box and step 4 show, her renumbering 1 to 5, the recommended tag",
-         t["bts_on"] and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], t)
-    case("saved: footage true", on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True))
+    rec = record(s)
+    rec["moments"] = keep_m
+    rec["rev"] = int(rec.get("rev") or 0) + 1
+    (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
+    c.js("window.Reel.followNow()")
+    wait(c, "document.querySelectorAll('#clist .ci').length > 0", 8)
+    c.click("#askIn")
+    c.type_text("x")
+    c.key("Backspace")
+    case("saved on the first change, with footage on and the kind (v27: nothing is written on a plain open)",
+         on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True and (r.get("saved") or {}).get("kind") == "bts"))
     for k in ("say2", "add", "insight_b", "fix", "paste_say", "copy", "ask_b", "ask", "ex1", "ex2", "ask_ph", "feel_b", "feels", "feel_ph",
-              "feel_small", "clips_h3", "watch_h3", "watch"):
+              "feel_small"):
         case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
     case("her words, step 4: the heading, the line, the four styles in her order",
          t["h2s"] == HERS4["h2"] and t["says"] == HERS4["say"] and t["cards"] == HERS4["cards"], (t["h2s"], t["cards"]))
@@ -602,25 +669,28 @@ def check_page(c, s, clips):
     case("Good to know with three 6-second videos: her line for up to 3 minutes", wait(c, "document.getElementById('insightWords').textContent === %s"
          % json.dumps("You've added 0:18 of footage. That takes me about a minute or two to look through, and longer footage uses more of your plan."), 8),
          texts1(c)["insight"])
-    case("the videos listed with their length and size (hers)", wait(c, "document.querySelectorAll('#vlist .vid').length === 3", 6)
-         and c.js("Array.from(document.querySelectorAll('#vlist .vid')).map(function(v){ return v.innerText.replace(/\\s+/g, ' '); })")
-         == ["▶ Not plain.mov 0:06 · 0 MB", "▶ Sideways é.mov 0:06 · 0 MB", "▶ clip.mov 0:06 · 0 MB"], c.js("document.getElementById('vlist').innerText"))
+    case("the videos fold into one drop-down (v27): '3 videos added', '0:18 of footage · all ready to watch below' once their previews are made",
+         wait(c, "document.querySelectorAll('#vlist .vcard').length === 3 && (document.querySelector('#vlist summary') || {}).innerText.indexOf('all ready to watch below') > 0", 30)
+         and texts1(c)["vsum"] == "3 videos added 0:18 of footage · all ready to watch below", texts1(c)["vsum"])
+    case("...which opens to the cards, each with its length, size and that it is ready (hers)",
+         texts1(c)["vcards"] == ["Not plain.mov 0:06 · 0 MB · ready to watch below", "Sideways é.mov 0:06 · 0 MB · ready to watch below", "clip.mov 0:06 · 0 MB · ready to watch below"], texts1(c)["vcards"])
+    case("the drop-down is closed to begin with, and step 1 is done once videos are in", c.js("!document.querySelector('#vlist details').open") and texts1(c)["done0"])
 
     # Add my footage, and the list following a new file
     c.click("#addFootage")
     case("Add my footage: her words once the folder is open", wait(c, "document.getElementById('footWaiting').textContent === %s" % json.dumps(HERS1["opened"]), 6),
          texts1(c)["waiting"])
     shutil.copy(clips["clip.mov"], s.kit / "Footage" / "Dropped in.mov")
-    case("a video dropped into the Footage folder shows up by itself (her 4 s look)",
-         wait(c, "Array.from(document.querySelectorAll('#vlist .vid span:not(.ic)')).some(function(x){ return x.textContent === 'Dropped in.mov'; })", 8),
-         texts1(c)["vlist"])
+    case("a video dropped into the Footage folder shows up by itself (her 4 s look): '4 videos added', its card",
+         wait(c, "Array.from(document.querySelectorAll('#vlist .vcard b')).some(function(x){ return x.textContent === 'Dropped in.mov'; }) && (document.querySelector('#vlist summary') || {}).innerText.indexOf('4 videos added') === 0", 8),
+         texts1(c)["vsum"])
     case("and Good to know adds it up: 0:24", wait(c, "document.getElementById('insightWords').textContent.indexOf('0:24 of footage') > 0", 4), texts1(c)["insight"])
     # taken back out (kept beside the kit): the list follows that too, and the page plays three videos, not four
     aside = s.work / "set aside"
     aside.mkdir(exist_ok=True)
     (s.kit / "Footage" / "Dropped in.mov").rename(aside / "Dropped in.mov")
     case("a video taken out of the folder goes from the list",
-         wait(c, "document.querySelectorAll('#vlist .vid').length === 3 && document.getElementById('insightWords').textContent.indexOf('0:18 of footage') > 0", 8),
+         wait(c, "document.querySelectorAll('#vlist .vcard').length === 3 && document.getElementById('insightWords').textContent.indexOf('0:18 of footage') > 0", 8),
          texts1(c)["vlist"])
 
     # the line to copy, the notes and the feel
@@ -638,8 +708,11 @@ def check_page(c, s, clips):
     c.set_value("#askIn", "")
     c.js("document.getElementById('askIn').dispatchEvent(new Event('input'))")
     case("notes cleared: the line goes back", texts1(c)["paste"] == "Look through my footage for " + SHORT and on_disk(s, lambda r: (r.get("saved") or {}).get("ask") == ""))
+    # her v27 hides "How should it feel?": the row is written hidden, its buttons still work underneath (a feel
+    # saved before v27 still counts, and the Assistant still reads it)
+    c.js("document.getElementById('feelRow').hidden = false")
     c.click("#feelRow button[data-f='fun']")
-    case("a feel: Fun marked, the line has the notes, saved as \"fun\"", c.js("document.querySelector(\"#feelRow button[data-f='fun']\").classList.contains('on')")
+    case("a feel (the row shown by hand): Fun marked, the line has the notes, saved as \"fun\"", c.js("document.querySelector(\"#feelRow button[data-f='fun']\").classList.contains('on')")
          and texts1(c)["paste"].endswith(" and follow my notes") and on_disk(s, lambda r: (r.get("saved") or {}).get("feel") == "fun"))
     c.click("#feelRow button[data-f='fun']")
     case("tapped again it clears (hers)", on_disk(s, lambda r: (r.get("saved") or {}).get("feel") == "") and texts1(c)["paste"] == "Look through my footage for " + SHORT)
@@ -659,131 +732,318 @@ def check_page(c, s, clips):
 
 
 
-def check_player(c, s):
-    """The player, the strip, Use this moment, the cards and the styles (a fresh Chrome: it fits the memory guard)."""
-    c.open(s.page_url())
-    c.wait_for("document.querySelectorAll('.viewer[data-ready]').length === 3", 20)
-    t = texts1(c)
-    case("after a reload: footage on, their feel in its own box, the notes empty", t["bts_on"] and c.js("document.getElementById('feelOwn').value") == "cozy and warm"
-         and c.js("document.getElementById('askIn').value") == "", t)
-    ok = wait(c, "Array.from(document.querySelectorAll('.viewer video')).every(function(v){ return v.readyState >= 1; })", 15)
-    dims = c.js("Array.from(document.querySelectorAll('.viewer')).map(function(e){ var v = e.querySelector('video'); return [e.querySelector('h4').textContent, v.videoWidth, v.videoHeight, Math.round(v.duration)]; })")
-    case("every video plays on the page (the one that doesn't play as it is, from its copy); the sideways one upright (360 x 640)",
-         ok and dims == [["Not plain.mov", 640, 360, 6], ["Sideways é.mov", 360, 640, 6], ["clip.mov", 640, 360, 6]], dims)
-    got = [(r["url"].split("key=")[-1], r["status"]) for r in c.requests if "/reel-video" in r["url"]]
-    case("the player asked for its video in pieces, answered 206", got and all(st_ == 206 for _, st_ in got), got)
-    strip = c.js("Array.from(document.querySelectorAll('.viewer')[2].querySelectorAll('.strip button')).map(function(b){ return [b.dataset.t, b.querySelector('span').textContent, b.querySelector('img').naturalWidth > 0]; })")
-    case("a strip of stills one every 2 s under the player", [x[:2] for x in strip] == [["0", "0:00"], ["2", "0:02"], ["4", "0:04"]], strip)
-    case("her line beside the player", c.js("document.querySelectorAll('.viewer')[2].querySelector('.vside p').textContent") == "0:06 · tap a still to jump there")
-    c.js("document.querySelectorAll('.viewer')[2].scrollIntoView({block: 'center'})")
-    c.click(".viewer[data-key] .strip button[data-t='2']", nth=2)
-    case("a still jumps the player there", wait(c, "Math.abs(document.querySelectorAll('.viewer video')[2].currentTime - 2) < 0.6", 5),
-         c.js("document.querySelectorAll('.viewer video')[2].currentTime"))
-    c.js("var v = document.querySelectorAll('.viewer video')[2]; v.pause(); v.currentTime = 0.5;")
-    case("her line under it: where it starts, 4 seconds", wait(c, "document.querySelectorAll('.viewer .at')[2].textContent === 'Starts at 0:00.5 · 4 seconds'", 5),
-         c.js("document.querySelectorAll('.viewer .at')[2].textContent"))
+def cards(c):
+    """Your clips, card by card (her .ci cards, v27)."""
+    return c.js("""Array.from(document.querySelectorAll('#clist .ci')).map(function(m){
+      var b = m.querySelector('b').cloneNode(true); var n = b.querySelector('.num'); var num = n ? n.textContent : ''; if (n) n.remove();
+      return {id: m.dataset.mid, sel: m.classList.contains('sel'), edit: m.classList.contains('edit'), num: num, label: b.textContent,
+        small: m.querySelector('small').textContent, use: m.querySelector('.cin').textContent, off: m.querySelector('.cin').disabled,
+        use_title: m.querySelector('.cin').title, yours: (m.querySelector('.yours') || {}).textContent || '',
+        img: !!(m.querySelector('img') && m.querySelector('img').getAttribute('src'))}; })""")
 
-    # Use this moment, − and +, Remove and Undo
-    before = cards(c)
-    c.click(".viewer .use", nth=2)
-    case("Use this moment: her line beside it", wait(c, "document.querySelectorAll('.viewer .at')[2].textContent === 'Added and selected: 0:00.5. Use − and + on its card above to change the length.'", 8),
-         c.js("document.querySelectorAll('.viewer .at')[2].textContent"))
-    now = cards(c)
-    theirs = sum(1 for x in before if x["yours"])
-    new = now[theirs] if len(now) > theirs else {}
-    case("a new card: after their earlier picks and before the ones found (her server: theirs first, in the order they add them), "
-         "4 seconds, \"Your pick\", selected to open (Moment first)", len(now) == len(before) + 1 and new.get("yours") and theirs == 1
-         and [x["id"] for x in now if x["id"] != new.get("id")] == [x["id"] for x in before]
-         and new.get("label") == "Your pick at 0:00.5" and new.get("len") == "4.0 s" and new.get("sel") and new.get("badge") == "Opens" and new.get("use") == "✓ Selected", now)
-    mid = new.get("id")
-    at = lambda r: next((m for m in r.get("moments") or [] if m["id"] == mid), {})     # noqa: E731
-    case("saved: the moment in that place, and selected for Moment first (saved.sel)", on_disk(s, lambda r: [m["id"] for m in r.get("moments") or []][theirs:theirs + 1] == [mid]
-         and (r.get("saved") or {}).get("sel", {}).get("first") == [mid]))
-    c.wait_for("document.querySelector('.mom .th img') && document.querySelector('.mom .th img').complete", 5)
-    case("its card shows its still", c.js("document.querySelector('.mom .th img').naturalWidth") > 0)
-    c.click(".mom[data-id='%s'] .lg" % mid)
-    case("+ : half a second longer, on the card and saved", wait(c, "document.querySelector(\".mom[data-id='%s'] .len b\").textContent === '4.5 s'" % mid, 5)
-         and on_disk(s, lambda r: at(r).get("end") == 5.0))
-    case("then it replays at its new length on the card (hers: after 450 ms)", wait(c, "!!document.querySelector(\".mom[data-id='%s'] .th video\")" % mid, 3))
-    c.click(".mom[data-id='%s'] .ls" % mid)
-    wait(c, "document.querySelector(\".mom[data-id='%s'] .len b\").textContent === '4.0 s'" % mid, 5)
-    c.click(".mom[data-id='%s'] .ls" % mid)
-    case("− twice (each after the last has landed, as hers needs): 3.5 s", wait(c, "document.querySelector(\".mom[data-id='%s'] .len b\").textContent === '3.5 s'" % mid, 5)
-         and on_disk(s, lambda r: at(r).get("end") == 4.0))
-    c.click(".mom[data-id='%s'] .rm" % mid)
-    case("Remove: the card goes, her Undo note shows", wait(c, "!document.querySelector(\".mom[data-id='%s']\") && !!document.querySelector('.undo-note')" % mid, 5)
-         and c.js("document.querySelector('.undo-note').firstChild.textContent") == "Removed “Your pick at 0:00.5”."
-         and c.js("document.querySelector('.undo-note button').textContent") == "Undo")
-    case("and the moment is gone from the record (kept as removed)", on_disk(s, lambda r: mid not in [m["id"] for m in r["moments"]]
-         and mid in [x["moment"]["id"] for x in r.get("removed", [])]))
-    c.click(".undo-note button")
-    case("Undo puts it back where it was, 3.5 s", wait(c, "document.querySelectorAll('#moments .mom')[%d].dataset.id === '%s'" % (theirs, mid), 5)
-         and cards(c)[theirs]["len"] == "3.5 s" and on_disk(s, lambda r: [m["id"] for m in r["moments"]][theirs] == mid))
-    c.click(".mom[data-id='%s'] .rm" % mid)
-    c.wait_for("!!document.querySelector('.undo-note')", 5)
-    t0 = time.time()
-    gone = wait(c, "!document.querySelector('.undo-note')", 13)
-    case("the Undo note goes by itself after 10 s (hers)", gone and 9 <= time.time() - t0 <= 12.5, time.time() - t0)
-    s.http("POST", "/reel-moment", {"kit": KIT, "do": "restore", "id": mid, "at": theirs})
-    case("(put back for the rest)", wait(c, "document.querySelectorAll('#moments .mom').length === 3", 8), len(cards(c)))
 
-    # Select / Selected, per style
-    ids = [x["id"] for x in cards(c)]
-    t = texts1(c)
-    case("her line over the cards: who found them, the style's ask, her tail",
-         t["moments_say"] == "1 I found and 2 you picked. Select the clip that opens your reel. " + TAIL, t["moments_say"])
-    case("(the cards: their two, then Claude's)", [x["yours"] for x in cards(c)] == [True, True, False] and ids[1] == mid, cards(c))
-    c.click(".mom[data-id='%s'] .usebtn" % ids[0])
+def ed(c):
+    """The editor's state as numbers (window.Reel.editor), with what the page shows round it."""
+    return c.js("""(function(){ var e = window.Reel.editor(); var cut = document.getElementById('edCut');
+      e.say = document.getElementById('edSay').innerHTML; e.cutClass = cut ? cut.className : null; e.cutTag = cut ? cut.querySelector('b').textContent : null;
+      e.addOff = document.getElementById('edAdd').disabled; e.addText = document.getElementById('edAdd').textContent;
+      e.rec = document.getElementById('edIn').classList.contains('rec'); e.clearHidden = document.getElementById('edClear').hidden;
+      e.win = document.getElementById('edWin').textContent; e.zoomText = document.getElementById('edZoom').textContent;
+      e.time = document.getElementById('edTime').textContent; e.paused = document.getElementById('edVid').paused;
+      e.marks = Array.from(document.querySelectorAll('#edMarks .tm')).map(function(t){ return [t.dataset.mid, t.className.trim(), (t.querySelector('i') || {}).textContent || '', !!t.querySelector('.hl')]; });
+      e.sel = document.getElementById('edSel').hidden ? null : document.getElementById('edSel').innerText;
+      e.desc = document.getElementById('descBox').hidden ? null : document.getElementById('descWords').textContent;
+      e.vp = document.getElementById('vpBtn').innerText.replace(/\\s+/g, ' ').replace(/ ▾$/, '').trim(); return e; })()""")
+
+
+def x_at(c, secs):
+    """The window x of a second on the timeline, as it is zoomed now."""
+    r = c.rect("#edTl")
+    e = c.js("window.Reel.editor()")
+    return r["x"] + (secs - e["w0"]) / (e["w1"] - e["w0"]) * r["w"]
+
+
+def tl_y(c):
+    return c.rect("#edTl")["cy"]
+
+
+def near(a, b, by=0.16):
+    return a is not None and b is not None and abs(float(a) - float(b)) <= by
+
+
+def check_editor(c, s):
+    """Her footage editor (v27, screenshots 13 to 16) on the page, driven with real pointer drags: the player and
+    the Footage drop-down, scrubbing, Start here and End here with the three states of the orange trim, Add clip
+    and the card with YOUR PICK and Not named yet, the trim that stays and moves to make the next clip, a clip
+    picked by a click and trimmed on the timeline, a name from the chat that a trim keeps, Zoom in, Use and
+    In reel, Remove and Undo, two columns at a desk and one on a phone."""
+    R = rp()
+    W = R.EDITOR_WORDS
+    code, j, _ = s.http("POST", "/reel-save", rpc.save_body(s.state(), {"style": "first", "footage": True, "kind": "bts"}, page="editor0"))
+    case("(set up: a behind-the-scenes reel, Moment first)", code == 200 and (j or {}).get("ok"), j)
+    c.open(s.page_url("bts"))
+    c.wait_for("window.Reel && window.Reel.state() && window.Reel.editor().key", 20)
+    ok = wait(c, "document.getElementById('edVid').readyState >= 1 && document.querySelectorAll('#clist .ci').length === 2", 15)
+    e = ed(c)
+    case("the editor opens on the first video that is ready to play, Not plain.mov (name order), its length under the Footage label and the three videos counted",
+         ok and e["vp"] == "Not plain.mov 0:06 · 3 videos" and e["win"] == "Not plain.mov · 0:06" and e["zoomText"] == W["ed_zoom"] and e["time"] == "0:00.0 / 0:06", e)
+    t = c.js("""({h3: Array.from(document.querySelectorAll('#btsBox h3.mh')).map(function(h){ return h.textContent; }),
+                 say: document.getElementById('edSayTop').textContent, wait_hidden: document.getElementById('edWait').hidden,
+                 wls: Array.from(document.querySelectorAll('#ed .wl')).map(function(x){ return x.textContent; }),
+                 btns: ['edIn', 'edOut', 'edAdd', 'edClear', 'edZoom', 'edBack', 'edFwd', 'descCopy'].map(function(i){ return document.getElementById(i).textContent; }),
+                 titles: ['edBack', 'edFwd'].map(function(i){ return document.getElementById(i).title; }),
+                 tip: document.querySelector('#ed .edtip:not(.pcnote)').textContent, find: document.getElementById('edSay').textContent,
+                 bigPlay: document.getElementById('edBig').getAttribute('aria-label'), desc: document.querySelector('#descBox > span').textContent,
+                 pcnote: !!document.querySelector('#ed .pcnote'), oldrow: document.querySelectorAll('#moments, #viewers, .mom, .viewer, .usebtn').length})""")
+    case("her words: the heading, the line under it, the three labels, the buttons, the tip, the first line of Make a clip, no PC note on a Mac",
+         t["h3"] == [W["ed_h3"]] and t["say"] == W["ed_say"] and t["wait_hidden"] and t["wls"] == [W["ed_footage"], W["ed_make"], W["clips_wl"]]
+         and t["btns"] == [W["ed_in"], W["ed_out"], W["ed_add"], W["ed_clear"], W["ed_zoom"], W["ed_back_b"], W["ed_fwd_b"], "Copy"]
+         and t["titles"] == [W["ed_back"], W["ed_fwd"]] and t["tip"] == W["ed_tip"] and t["find"] == W["ed_find"] and t["bigPlay"] == W["ed_play"]
+         and t["desc"] == W["desc_say"] and not t["pcnote"], t)
+    case("the old players, strips and moment cards are gone from the page (hers hides them; ours does not draw them)", t["oldrow"] == 0, t["oldrow"])
     cs = cards(c)
-    case("Moment first takes one: selecting another moves the selection (Opens)", [x["sel"] for x in cs] == [True, False, False] and cs[0]["badge"] == "Opens"
-         and on_disk(s, lambda r: r["saved"]["sel"]["first"] == [ids[0]]), cs)
+    case("Your clips: every clip at once, theirs first with her YOUR PICK tag and Not named yet, Claude's with its name; video, start to end and length under each; Use or In reel",
+         [x["yours"] for x in cs] == ["Your pick", ""] and cs[0]["label"] == W["not_named"] and cs[1]["label"] == "Walking in"
+         and cs[0]["small"] == "clip.mov · 0:01.0–0:05.0 · 4.0 s" and cs[1]["small"] == "Sideways é.mov · 0:00.5–0:04.0 · 3.5 s"
+         and [x["use"] for x in cs] == [W["in_reel"], W["use"]] and cs[0]["num"] == "1" and cs[0]["use_title"] == W["out_title"] and cs[1]["use_title"] == W["use_title"], cs)
+    case("her line over the cards is the style's ask only (Moment first)", c.js("document.getElementById('momentsSay').textContent") == R.WORDS["pick_first"])
+    case("the YOUR PICK tag is her purple, in capitals (her style rule)", c.js("(function(y){ var st = getComputedStyle(y); return [st.textTransform, st.color]; })(document.querySelector('#clist .yours'))") == ["uppercase", "rgb(90, 79, 168)"])
+    case("Name my clips: her box shows while a clip of theirs is unnamed, with the line for this shoot", e["desc"] == "Name my clips for " + SHORT, e["desc"])
+    c.click("#descCopy")
+    case("Copy on it copies the line", c.js("window.__copied") == "Name my clips for " + SHORT and wait(c, "document.getElementById('descCopy').textContent === 'Copy'", 4), c.js("window.__copied"))
+    own = cs[0]["id"]
+
+    # the Footage drop-down
+    c.click("#vpBtn")
+    menu = c.js("[!document.getElementById('edTabs').hidden, Array.from(document.querySelectorAll('#edTabs [data-ek]')).map(function(b){ return b.innerText.replace(/\\s+/g, ' ').trim(); })]")
+    case("Footage opens to the three videos, each with its length and clip count", menu[0] and menu[1] == ["Not plain.mov 0:06", "Sideways é.mov 0:06 · 1 clip", "clip.mov 0:06 · 1 clip"], menu)
+    c.click("#edTabs [data-ek]", nth=2)
+    ok = wait(c, "window.Reel.editor().key && document.getElementById('vpBtn').innerText.indexOf('clip.mov') === 0 && document.getElementById('edVid').readyState >= 1", 10)
+    e = ed(c)
+    case("clip.mov chosen: the player and the timeline are its; the menu closes", ok and e["win"] == "clip.mov · 0:06" and c.js("document.getElementById('edTabs').hidden")
+         and c.js("document.getElementById('edVid').src.indexOf('/reel-video?') > 0 && Math.round(document.getElementById('edVid').duration) === 6"), e)
+    case("their newest clip of this video is drawn on the timeline (1, selected) and, after a load, as the dashed ✓ Added trim with Add clip off (ours: nothing is added twice after a reload)",
+         e["marks"] == [[own, "tm sel", "1", False]] and e["added"] == own and e["cutClass"] == "tcut set added" and e["cutTag"] == W["ed_added"] and e["addOff"] and e["addText"] == W["ed_added"]
+         and e["say"] == W["ed_added_html"] and near(e["inT"], 1.0) and near(e["outT"], 5.0), e)
+    case("the strip of stills along the timeline, from the video's own strip", c.js("document.querySelectorAll('#edThumbs img').length") >= 6
+         and wait(c, "Array.from(document.querySelectorAll('#edThumbs img')).every(function(i){ return i.complete && i.naturalWidth > 0; })", 10))
+    case("the ruler: a mark every second for a 6 s video", c.js("Array.from(document.querySelectorAll('#edRuler span')).map(function(x){ return x.textContent; })") == ["0:00", "0:01", "0:02", "0:03", "0:04", "0:05"])
+    c.click("#edClear")
+    e = ed(c)
+    case("Clear: the trim goes, her first line is back, Clear is hidden", e["inT"] is None and e["cutClass"] is None and e["say"] == W["ed_find"] and e["clearHidden"] and e["addOff"], e)
+
+    # scrubbing: a drag along the timeline moves the video, nothing is saved
+    rev0 = record(s).get("rev")
+    y = tl_y(c)
+    c.drag((x_at(c, 1.0), y), (x_at(c, 3.0), y), steps=8)
+    e = ed(c)
+    case("dragging along the timeline scrubs: the video follows the hand (3.0 s), paused, the time says so, and nothing is saved",
+         near(e["t"], 3.0, 0.25) and e["paused"] and e["time"].startswith("0:0") and e["drag"] is None and record(s).get("rev") == rev0, (e["t"], e["time"], e["drag"]))
+
+    # Start here, the stretch grows, End here
+    c.js("document.getElementById('edVid').currentTime = 1.0")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 1) < 0.05", 3)
+    c.click("#edIn")
+    ok = wait(c, "!document.getElementById('edVid').paused && window.Reel.editor().inT === 1 && (document.getElementById('edCut') || {}).className === 'tcut live'", 6)
+    e = ed(c)
+    case("Start here at 1.0 s: the button turns orange, the video plays, a striped orange stretch starts there (her 'orange highlighted thing')",
+         ok and e["rec"] and e["cutClass"] == "tcut live" and e["outT"] is None and not e["clearHidden"], e)
+    ok = wait(c, "parseFloat((document.getElementById('edCut').querySelector('b').textContent || '0')) >= 1.0", 6)
+    e = ed(c)
+    case("...and grows to the playhead as it plays, its length on it (\"1.x s\") and her 'so far' line", ok and bool(re.fullmatch(r"\d+\.\d s", e["cutTag"] or ""))
+         and e["say"] == W["ed_sofar_html"].replace("{secs}", (e["cutTag"] or " ").split(" ")[0]), e)
+    c.js("var v = document.getElementById('edVid'); v.pause(); v.currentTime = 3.0;")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 3) < 0.05 && document.getElementById('edVid').paused", 3)
+    c.click("#edOut")
+    e = ed(c)
+    case("End here at 3.0 s: the trim is solid with an orange handle each end, 2.0 s, her line with the times, Add clip on",
+         e["cutClass"] == "tcut set" and near(e["inT"], 1.0) and near(e["outT"], 3.0) and e["cutTag"] == "2.0 s" and not e["rec"] and not e["addOff"]
+         and e["say"] == "Your clip: 0:01.0 to 0:03.0, <b>2.0 s</b>. Drag its orange ends on the timeline to fine-tune it, then press <b>Add clip</b>."
+         and c.js("[getComputedStyle(document.querySelector('#edCut .cl')).display, getComputedStyle(document.querySelector('#edCut .cr')).display]") == ["grid", "grid"], e)
+    # the ends and the middle
+    c.drag("#edCut .cr", (x_at(c, 4.5), y), steps=8)
+    e = ed(c)
+    case("dragging the end handle trims the end (to 4.5 s), the video jumps there, the start stays", near(e["outT"], 4.5) and near(e["inT"], 1.0) and near(e["t"], 4.5, 0.25) and e["cutTag"] == "3.5 s", e)
+    c.drag("#edCut .cl", (x_at(c, 0.5), y), steps=8)
+    e = ed(c)
+    case("dragging the start handle trims the start (to 0.5 s), the video jumps there", near(e["inT"], 0.5) and near(e["outT"], 4.5) and near(e["t"], 0.5, 0.25), e)
+    c.drag("#edCut .cr", (x_at(c, 0.2), y), steps=8)
+    e = ed(c)
+    case("an end dragged too close: a clip is never under a second (hers)", near(e["outT"], 1.5) and near(e["inT"], 0.5), e)
+    c.drag("#edCut .cr", (x_at(c, 2.5), y), steps=8)
+    c.drag((x_at(c, 1.5), y), (x_at(c, 2.5), y), steps=8)
+    e = ed(c)
+    case("dragging the middle slides the whole trim (by a second), its length kept", near(e["inT"], 1.5) and near(e["outT"], 3.5) and e["cutTag"] == "2.0 s", e)
+    case("a clip is kept 1 to 15 seconds: her 15 s line and the cap are the page's (a 6 s clip can't reach it here)",
+         c.js("window.Reel.data.addMax") == 15 and W["ed_fifteen"] == "That's 15 seconds, the longest a clip can be. Drag its ends to change it, or press Add clip.")
+
+    # Add clip
+    before = [x["id"] for x in cards(c)]
+    c.click("#edAdd")
+    ok = wait(c, "document.querySelectorAll('#clist .ci').length === 3 && typeof window.Reel.editor().added === 'string'", 12)
+    cs = cards(c)
+    new = [x for x in cs if x["id"] not in before]
+    e = ed(c)
+    case("Add clip: a new card of theirs after their first pick and before Claude's (hers: theirs first), YOUR PICK, Not named yet, 1.5 to 3.5, 2.0 s, selected to open",
+         ok and len(new) == 1 and [x["id"] for x in cs].index(new[0]["id"]) == 1 and new[0]["yours"] == "Your pick" and new[0]["label"] == W["not_named"]
+         and new[0]["small"] == "clip.mov · 0:01.5–0:03.5 · 2.0 s" and new[0]["sel"] and new[0]["num"] == "1" and new[0]["use"] == W["in_reel"], cs)
+    nid = new[0]["id"] if new else ""
+    case("(no error on the page after Add clip)", not c.page_errors(), c.page_errors()[:3])
+    case("saved: a 2.0 s clip of theirs on clip.mov, her label with its start, selected for Moment first",
+         on_disk(s, lambda r: any(m["id"] == nid and m["start"] == 1.5 and m["end"] == 3.5 and m["label"] == "Your pick at 0:01.5" and m.get("by") == "you" for m in r.get("moments") or [])
+                 and (r.get("saved") or {}).get("sel", {}).get("first") == [nid]))
+    case("the trim stays where it was, dashed, with ✓ Added on it; Add clip says ✓ Added and is off; her line about making another",
+         e["cutClass"] == "tcut set added" and e["cutTag"] == W["ed_added"] and e["addOff"] and e["addText"] == W["ed_added"] and e["say"] == W["ed_added_html"]
+         and e["added"] == nid and e["marks"] and [m[0] for m in e["marks"]] == [own, nid], e)
+    case("the Footage drop-down counts it: clip.mov · 0:06 · 2 clips", ed(c)["vp"] == "clip.mov 0:06 · 2 clips · 3 videos", ed(c)["vp"])
+    c.wait_for("document.querySelector('#clist .ci[data-mid=\"%s\"] img').complete" % nid, 8)
+    case("its card shows its still (a JPEG from its middle)", c.js("document.querySelector('#clist .ci[data-mid=\"%s\"] img').naturalWidth" % nid) > 0)
+    # moved after Add clip: a new clip, the one added untouched (the timeline moved down with the new card: y afresh)
+    y = tl_y(c)
+    c.drag((x_at(c, 2.5), y), (x_at(c, 3.5), y), steps=8)
+    e = ed(c)
+    case("the trim moved after Add clip (by a second): it is a new clip now, Add clip is back on, the stretch solid with its length (hers, Nov 17)",
+         e["added"] is False and not e["addOff"] and e["addText"] == W["ed_add"] and e["cutClass"] == "tcut set" and near(e["inT"], 2.5) and near(e["outT"], 4.5), e)
+    case("...and the clip just added is never changed by that", on_disk(s, lambda r: any(m["id"] == nid and m["start"] == 1.5 and m["end"] == 3.5 for m in r.get("moments") or []), 2))
+    c.click("#edClear")
+
+    # a drag across a clip only scrubs; a click picks it
+    rev0 = record(s).get("rev")
+    c.drag("#edMarks .tm[data-mid='%s']" % nid, (x_at(c, 5.5), y), steps=8, check=False)
+    e = ed(c)
+    case("a drag that starts on a clip only scrubs (her fix: it used to pick and slide the clip by accident); nothing picked, nothing saved",
+         e["edit"] is None and near(e["t"], 5.5, 0.3) and record(s).get("rev") == rev0 and e["sel"] is None, (e["edit"], e["t"]))
+    c.click("#edMarks .tm[data-mid='%s']" % nid, check=False)
+    e = ed(c)
+    cs = cards(c)
+    case("a plain click on a clip picks it: its handles show on the timeline, its card is outlined, her box says Play this clip and the clip's times",
+         e["edit"] == nid and [m for m in e["marks"] if m[0] == nid][0][3] is True and [x["edit"] for x in cs] == [False, True, False]
+         and e["sel"] and W["play_clip"] in e["sel"] and "0:01.5 to 0:03.5 · 2.0 s. On the timeline, drag its ends to trim it or its middle to slide it." in e["sel"]
+         and near(e["t"], 1.5, 0.25), (e["edit"], e["marks"], e["sel"]))
+    c.click("#edPlayClip")
+    case("Play this clip plays it from its start and stops by itself at its end (3.5 s)",
+         wait(c, "!document.getElementById('edVid').paused", 5) and wait(c, "document.getElementById('edVid').paused && Math.abs(document.getElementById('edVid').currentTime - 3.5) < 0.6", 8),
+         c.js("document.getElementById('edVid').currentTime"))
+    # the picked clip's end trimmed on the timeline
+    c.drag("#edMarks .tm[data-mid='%s'] .hr" % nid, (x_at(c, 4.0), y), steps=8, check=False)
+    case("dragging the picked clip's right handle trims its end (to 4.0 s), saved through the Assistant; the card follows; her label keeps its start",
+         on_disk(s, lambda r: any(m["id"] == nid and m["start"] == 1.5 and m["end"] == 4.0 and m["label"] == "Your pick at 0:01.5" for m in r.get("moments") or []))
+         and wait(c, "document.querySelector('#clist .ci[data-mid=\"%s\"] small').textContent === 'clip.mov · 0:01.5–0:04.0 · 2.5 s'" % nid, 6), cards(c))
+    # the picked clip's middle slides it
+    c.drag("#edMarks .tm[data-mid='%s']" % nid, (x_at(c, 3.75), y), steps=8, check=False)
+    case("dragging its middle slides it (to 2.5 to 5.0), saved; the label moves with the start (not named yet)",
+         on_disk(s, lambda r: any(m["id"] == nid and near(m["start"], 2.5, 0.11) and near(m["end"], 5.0, 0.11) and m["label"].startswith("Your pick at 0:02.") for m in r.get("moments") or [])), record(s).get("moments"))
+
+    # a name from the chat (footage.py describe), and a trim keeps it
+    names = s.work / "names.json"
+    names.write_text(json.dumps({"clips": {nid: {"label": "Walking down the kitchen to the stove"}, own: {"label": "Lining up the shot"}}}))
+    code, out = s.cmd("footage.py", "describe", KIT, "--file", str(names))
+    case("footage.py describe names their two clips (the chat's command, under the record's lock)", code == 0 and "Named 2 clips" in out, out[-300:])
+    case("the page shows the name within a few seconds, by itself; the YOUR PICK tag stays; the Name my clips box goes (every pick of theirs is named)",
+         wait(c, "((document.querySelector('#clist .ci[data-mid=\"%s\"] b') || {}).textContent || '').indexOf('Walking down the kitchen to the stove') >= 0" % nid, 8)
+         and cards(c)[1]["yours"] == "Your pick" and c.js("document.getElementById('descBox').hidden"), cards(c))
+    c.click("#edMarks .tm[data-mid='%s']" % nid, check=False)
+    c.drag("#edMarks .tm[data-mid='%s'] .hl" % nid, (x_at(c, 2.0), y), steps=8, check=False)
+    case("trimming a named clip keeps its name (her Nov 16 rule); its start moved to 2.0",
+         on_disk(s, lambda r: any(m["id"] == nid and near(m["start"], 2.0, 0.11) and m["label"] == "Walking down the kitchen to the stove" and m.get("named") is True for m in r.get("moments") or [])),
+         record(s).get("moments"))
+    case("and her box over the clip says its name", "Walking down the kitchen to the stove" in (ed(c)["sel"] or ""), ed(c)["sel"])
+
+    # Zoom in / Show the whole video (a 6 s video: the window is the whole video either way; the words switch)
+    c.click("#edZoom")
+    e = ed(c)
+    case("Zoom in: her 'zoomed in on' line and Show the whole video", e["zoom"] and e["win"] == "clip.mov · zoomed in on 0:00 to 0:06" and e["zoomText"] == W["ed_whole"], e)
+    c.click("#edZoom")
+    e = ed(c)
+    case("Show the whole video: back", not e["zoom"] and e["win"] == "clip.mov · 0:06" and e["zoomText"] == W["ed_zoom"], e)
+    case("one zoom threshold, 60 s, for Start here and for a picked clip (hers: 60 and 90), a 40 s window",
+         c.js("[window.Reel.data.zoomOver, window.Reel.data.zoomWindow]") == [60, 40] and R.ZOOM_OVER == 60.0 and R.ZOOM_WINDOW == 40.0)
+
+    # Use / In reel, per style; Remove and Undo
     c.click("#styles .opt[data-style='backforth']")
     cs = cards(c)
-    case("Back and forth starts with 2 clips selected (hers), badged Clip 1 and Clip 2", [x["sel"] for x in cs] == [True, True, False]
-         and [x["badge"] for x in cs] == ["Clip 1", "Clip 2", ""], cs)
-    c.click(".mom[data-id='%s'] .usebtn" % ids[2])
-    case("and takes more: a third, Clip 3, saved for this style only", [x["badge"] for x in cards(c)] == ["Clip 1", "Clip 2", "Clip 3"]
-         and on_disk(s, lambda r: r["saved"]["sel"].get("backforth") == ids and r["saved"]["sel"]["first"] == [ids[0]] and r["saved"]["style"] == "backforth"))
-    case("the bar: her summary with the clips and the style", texts1(c)["sum"] == "8 photos + 3 clips · Back and forth · Test beat · on every beat", texts1(c)["sum"])
-    c.click("#styles .opt[data-style='bookends']")
+    case("Back and forth: two clips In reel, numbered 1 and 2 on their cards and on the timeline; her ask over the cards",
+         [x["use"] for x in cs] == [W["in_reel"], W["in_reel"], W["use"]] and [x["num"] for x in cs] == ["1", "2", ""]
+         and c.js("document.getElementById('momentsSay').textContent") == R.WORDS["pick_backforth"], cs)
+    c.click("#clist .ci[data-mid='m1-0a0b0c'] .cin")
     cs = cards(c)
-    case("Bookends: the first and last selected, Opens and Closes", [x["badge"] for x in cs] == ["Opens", "", "Closes"], cs)
-    c.click(".mom[data-id='%s'] .usebtn" % ids[1])
-    case("a third for Bookends: her line, nothing changed", texts1(c)["moments_say"] == "This style uses 2 clips. Unselect one first, then select the one you want."
-         and [x["badge"] for x in cards(c)] == ["Opens", "", "Closes"], texts1(c)["moments_say"])
+    case("Use on Claude's clip: In reel, 3; saved for this style only", [x["num"] for x in cs] == ["1", "2", "3"]
+         and on_disk(s, lambda r: r["saved"]["sel"].get("backforth") == [own, nid, "m1-0a0b0c"] and r["saved"]["sel"]["first"] == [nid]), cs)
+    case("Use on a card does not open it in the editor (the card's click does)", ed(c)["edit"] == nid)
+    c.click("#clist .ci[data-mid='m1-0a0b0c'] .cin")
+    case("In reel pressed again takes it out", [x["use"] for x in cards(c)] == [W["in_reel"], W["in_reel"], W["use"]])
     c.click("#styles .opt[data-style='reveal']")
     cs = cards(c)
-    case("The reveal: only a moment matched to a photo can be selected; the rest say \"No matching photo\"",
-         [(x["use"], x["off"]) for x in cs if x["id"] != "m1-0a0b0c"] == [("No matching photo", True)] * 2
-         and [x["sel"] for x in cs if x["id"] == "m1-0a0b0c"] == [True], cs)
-    c.click("#styles .opt[data-style='backforth']")
-    for i in ids:
-        c.click(".mom[data-id='%s'] .usebtn" % i)
-    case("Back and forth with every clip unselected", [x["sel"] for x in cards(c)] == [False, False, False])
-    c.click("#makeBtn")
-    case("Make my reel with no clip selected: her \"One more thing: your clips\"", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["clips_need"]), 5),
-         texts1(c)["result"])
-    c.reload()
-    c.wait_for("document.querySelectorAll('#moments .mom').length === 3", 15)
-    case("after a reload: the style and every style's selection as left", c.js("document.querySelector('#styles .opt.on').dataset.style") == "backforth"
-         and [x["sel"] for x in cards(c)] == [False, False, False], cards(c))
+    case("The reveal: only a clip matched to a photo can go in; the rest say No photo", [(x["use"], x["off"]) for x in cs] == [(W["no_photo"], True), (W["no_photo"], True), (W["in_reel"], False)], cs)
     c.click("#styles .opt[data-style='first']")
-    case("Moment first's own selection is still there", [x["sel"] for x in cards(c)] == [True, False, False], cards(c))
+    c.click("#clist .ci[data-mid='m1-0a0b0c']")
+    e = ed(c)
+    case("a click on a card opens that clip in the editor: its video (Sideways é.mov) loads, the clip picked, the player at its start",
+         wait(c, "window.Reel.editor().key !== null && document.getElementById('vpBtn').innerText.indexOf('Sideways') === 0", 8) and ed(c)["edit"] == "m1-0a0b0c"
+         and near(ed(c)["t"], 0.5, 0.3) and ed(c)["win"] == "Sideways é.mov · 0:06", ed(c))
+    case("the sideways video plays upright in the player (360 x 640)", wait(c, "document.getElementById('edVid').videoWidth === 360 && document.getElementById('edVid').videoHeight === 640", 10))
+    c.click("#clist .ci[data-mid='%s'] .cx" % nid)
+    case("× on a card: Remove, with her Undo note", wait(c, "document.querySelectorAll('#clist .ci').length === 2 && !!document.querySelector('.undo-note')", 6)
+         and c.js("document.querySelector('.undo-note').firstChild.textContent") == "Removed “Walking down the kitchen to the stove”."
+         and on_disk(s, lambda r: nid not in [m["id"] for m in r["moments"]] and nid in [x["moment"]["id"] for x in r.get("removed", [])]))
+    c.click(".undo-note button")
+    case("Undo puts it back where it was, with its name", wait(c, "document.querySelectorAll('#clist .ci').length === 3", 6) and cards(c)[1]["id"] == nid
+         and cards(c)[1]["label"] == "Walking down the kitchen to the stove", cards(c))
+    c.click("#clist .ci[data-mid='%s']" % nid)
+    c.wait_for("window.Reel.editor().edit === '%s'" % nid, 5)
+    c.click("#clist .ci[data-mid='%s'] .cx" % nid)
+    e = ed(c)
+    case("× on the card whose clip is in the editor clears the editor's pick too (ours: hers left it)", wait(c, "document.querySelectorAll('#clist .ci').length === 2", 6) and ed(c)["edit"] is None and ed(c)["sel"] is None, ed(c))
+    s.http("POST", "/reel-moment", {"kit": KIT, "do": "restore", "id": nid, "at": 1})
+    c.wait_for("document.querySelectorAll('#clist .ci').length === 3", 8)
 
-    # a moment's clip on its card
-    c.js("document.querySelector('.mom[data-id=\"%s\"]').scrollIntoView({block: 'center'})" % ids[1])
-    c.click(".mom[data-id='%s'] .play" % ids[1])
-    case("▶ plays the moment on its card", wait(c, "(function(){ var v = document.querySelector(\".mom[data-id='%s'] .th video\"); return v && !v.paused && v.currentTime > 0; })()" % ids[1], 6))
-    case("and stops by itself at its end", wait(c, "!document.querySelector(\".mom[data-id='%s'] .th video\")" % ids[1], 10))
-    case("no errors on the page (the player and the cards)", not c.page_errors(), c.page_errors()[:3])
-    case("nothing asked of the internet (the player and the cards)", not c.outside_requests(), c.outside_requests()[:3])
+    # after a reload: the names and the selection as left; two columns at a desk, one on a phone
+    c.reload()
+    c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('#clist .ci').length === 3", 15)
+    cs = cards(c)
+    case("after a reload: the three cards, their names and the selection as left", cs[1]["label"] == "Walking down the kitchen to the stove" and cs[1]["sel"] and [x["sel"] for x in cs] == [False, True, False], cs)
+    c.desktop((1100, 900))
+    cols = c.js("(function(){ var r = Array.from(document.querySelectorAll('#clist .ci')).map(function(x){ return Math.round(x.getBoundingClientRect().left); }); return [new Set(r).size, document.documentElement.scrollWidth <= window.innerWidth, getComputedStyle(document.querySelector('.edgrid')).gridTemplateColumns.split(' ').length]; })()")
+    case("at a desk: Your clips in two columns (every clip at once, no scroll box), the player beside them", cols[0] == 2 and cols[1] and cols[2] == 2, cols)
+    c.phone(375, 800)
+    ph = c.js("(function(){ var r = Array.from(document.querySelectorAll('#clist .ci')).map(function(x){ return Math.round(x.getBoundingClientRect().left); }); return [new Set(r).size, document.documentElement.scrollWidth, window.innerWidth, Math.round(document.getElementById('edPlayer').getBoundingClientRect().right), Math.round(document.getElementById('edTl').getBoundingClientRect().right)]; })()")
+    case("on a phone: one column, the player and the timeline fit, and the page does not scroll sideways", ph[0] == 1 and ph[1] <= ph[2] and ph[3] <= 375 and ph[4] <= 375, ph)
+    c.desktop()
+    case("no errors on the page (the editor)", not c.page_errors(), c.page_errors()[:3])
+    case("nothing asked of the internet (the editor)", not c.outside_requests(), c.outside_requests()[:3])
+    case("no path anywhere on the page", not re.search(r"/private/|/Users/|\.kit/", c.js("document.body.innerHTML")))
 
+    # a B-roll page: the same editor, her B-roll line over the cards, four clips to start with
+    code, j, _ = s.http("POST", "/reel-version", {"kit": KIT, "op": "new", "name": "B-roll try", "kind": "broll"})
+    case("(a B-roll reel started beside the first)", code == 200 and (j or {}).get("ok") and (j or {}).get("kind") == "broll", j)
+    c.open(s.page_url("broll"))
+    c.wait_for("window.Reel && window.Reel.state() && window.Reel.editor().key && document.getElementById('edVid').readyState >= 1", 20)
+    cs = cards(c)
+    case("a B-roll page (a new reel of that kind): the same editor; it starts with the clip the assistant found (hers: a new reel keeps those), In reel, and her B-roll line over the cards",
+         [x["label"] for x in cs] == ["Walking in"] and cs[0]["use"] == W["in_reel"] and cs[0]["num"] == "1"
+         and c.js("document.getElementById('momentsSay').textContent") == W["pick_broll"], (cs, c.js("document.getElementById('momentsSay').textContent")))
+    c.js("document.getElementById('edVid').currentTime = 0.5")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 0.5) < 0.05", 3)
+    c.click("#edIn")
+    wait(c, "window.Reel.editor().inT === 0.5", 5)
+    c.js("var v = document.getElementById('edVid'); v.pause(); v.currentTime = 3.0;")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 3) < 0.05 && document.getElementById('edVid').paused", 3)
+    c.click("#edOut")
+    c.click("#edAdd")
+    ok = wait(c, "document.querySelectorAll('#clist .ci').length === 2 && typeof window.Reel.editor().added === 'string'", 12)
+    cs = cards(c)
+    case("a clip made on a B-roll page: first, In reel, numbered 1, the found clip 2", ok and len(cs) == 2 and cs[0]["yours"] == "Your pick" and cs[0]["use"] == W["in_reel"]
+         and [x["num"] for x in cs] == ["1", "2"], cs)
+    case("...saved for B-roll as its own style, in that reel only", on_disk(s, lambda r: (r.get("saved") or {}).get("style") == "broll" and (r.get("saved") or {}).get("kind") == "broll"
+         and (r["saved"].get("sel") or {}).get("broll") == [cs[0]["id"], "m1-0a0b0c"] and r.get("current") == "v2" and len(r.get("moments") or []) == 2))
+    code, out = s.cmd("reel_page.py", "reels", KIT, "--open", "Reel 1")
+    case("(back to the first reel, behind the scenes, for the tests after this one)", code == 0 and on_disk(s, lambda r: r.get("current", "v1") == "v1" and len(r.get("moments") or []) == 3), out[-200:])
 
 
 def check_test_make(c, s):
     """A test make on the page with footage, and the page with footage but no moments (a fresh Chrome)."""
-    c.open(s.page_url() + "&test=1")
-    c.wait_for("document.querySelectorAll('#moments .mom').length === 3", 15)
+    c.open(s.page_url("bts") + "&test=1")
+    c.wait_for("document.querySelectorAll('#clist .ci').length === 3", 15)
     c.click("#makeBtn")
     case("a test make with footage: her heading, her Plan line with the clip, the clip's line, the beats",
          wait(c, "document.getElementById('result').innerHTML.indexOf('Beats per piece') > 0", 60)
@@ -797,8 +1057,9 @@ def check_test_make(c, s):
     rec["moments"] = []
     (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
     c.reload()
-    c.wait_for("document.querySelectorAll('#songs .song').length > 1 && !document.getElementById('btsBox').hidden", 15)
-    case("no moments yet: her line over the empty cards", texts1(c)["moments_say"] == "The moments I find, and any you pick yourself below, show up here.", texts1(c)["moments_say"])
+    c.wait_for("document.querySelectorAll('#songSel option').length > 1 && !document.getElementById('btsBox').hidden", 15)
+    case("no clips yet: her line in the empty Your clips, and nothing over them", c.js("document.querySelector('#clist p').textContent") == rp().EDITOR_WORDS["clips_empty"]
+         and texts1(c)["moments_say"] == "", c.js("document.getElementById('clist').textContent"))
     c.click("#makeBtn")
     case("Make my reel with footage and nothing looked at yet: her \"I haven't looked through your footage yet\"",
          wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["not_looked"]), 5), texts1(c)["result"])
@@ -814,46 +1075,56 @@ def check_test_make(c, s):
 
 def check_pc_page(c, s, clips):
     """The PC's way on the real page (v19 review, Nov 7: on a PC no video could be played, so no moment could ever be
-    made, while the page said the moments still worked). The page server runs with ASSISTANT_NO_AVFOUNDATION=1, the
-    PC's route on a Mac: a video that plays as it is plays, with no strip; Use this moment adds a card (no still on
-    it); the line to copy for a footage look and Good to know are left out, the PC's own lines in their place;
-    a video still being copied in is listed by name with our line."""
+    made, while the page said the moments still worked; v27: the editor). The page server runs with
+    ASSISTANT_NO_AVFOUNDATION=1, the PC's route on a Mac: a video that plays as it is plays in the editor, with no
+    stills along the timeline and our line saying so; Start here, End here and Add clip make a clip (no still on
+    its card); the line to copy for a footage look and Good to know are left out, the PC's own lines in their
+    place; a video still being copied in is listed by name with our line."""
     import this_computer
-    import html as _html
     shutil.copy(clips["clip.mov"], s.kit / "Footage" / "PC plays.mov")
     whole = clips["clip.mov"].read_bytes()
     (s.kit / "Footage" / "Still copying.mov").write_bytes(whole[: len(whole) // 2])
-    c.open(s.page_url())
-    c.wait_for("!!document.querySelector('.viewer[data-ready] h4')", 20)
-    c.wait_for("Array.from(document.querySelectorAll('.viewer[data-ready] h4')).some(function(h){ return h.textContent === 'PC plays.mov'; })", 20)
-    v = "Array.from(document.querySelectorAll('.viewer[data-ready]')).filter(function(e){ return e.querySelector('h4').textContent === 'PC plays.mov'; })[0]"
-    ok = wait(c, v + ".querySelector('video').readyState >= 1", 15)
-    got = c.js("(function(){ var e = " + v + "; return {strip: e.querySelectorAll('.strip button').length, use: !!e.querySelector('.use'), "
-               "w: e.querySelector('video').videoWidth, d: Math.round(e.querySelector('video').duration)}; })()")
-    case("on a PC a video that plays as it is plays on the page, with no strip of stills, and Use this moment beside it",
-         ok and got == {"strip": 0, "use": True, "w": 640, "d": 6}, got)
+    c.open(s.page_url("bts"))
+    c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('#vlist .vcard').length >= 4", 20)
+    c.wait_for("document.querySelectorAll('#edTabs [data-ek]').length >= 4", 10)
+    c.wait_for("Array.from(document.querySelectorAll('#edTabs [data-ek]')).some(function(b){ return b.innerText.indexOf('PC plays.mov') === 0 && b.innerText.indexOf('getting ready') < 0; })", 30)
+    c.click("#vpBtn")
+    c.js("Array.from(document.querySelectorAll('#edTabs [data-ek]')).filter(function(b){ return b.innerText.indexOf('PC plays.mov') === 0; })[0].click()")
+    ok = wait(c, "document.getElementById('vpBtn').innerText.indexOf('PC plays.mov') === 0 && document.getElementById('edWait').hidden && document.getElementById('edVid').readyState >= 1 && Math.round(document.getElementById('edVid').duration) === 6", 20)
+    got = c.js("""(function(){ var v = document.getElementById('edVid'); return {thumbs: document.querySelectorAll('#edThumbs img').length, w: v.videoWidth, d: Math.round(v.duration),
+      vpimg: !!document.querySelector('#vpBtn img[src]'), note: (document.querySelector('#ed .pcnote') || {}).textContent, say: document.getElementById('edSayTop').innerHTML,
+      inOff: document.getElementById('edIn').disabled, wait: document.getElementById('edWait').hidden}; })()""")
+    case("on a PC a video that plays as it is plays in the editor, with no stills along the timeline and no picture in the Footage drop-down, our note under the timeline, and our line under Your footage",
+         ok and got["thumbs"] == 0 and got["w"] == 640 and got["d"] == 6 and not got["vpimg"] and got["note"] == R().OUR_WORDS["editor_no_stills_pc"]
+         and got["say"] == this_computer.WATCH_PC_HTML and not got["inOff"] and got["wait"], got)
     t = c.js("""({paste: document.getElementById('pasteSay').textContent, line: document.querySelector('#pasteBox .line').hidden,
-                 insight: document.querySelector('.insight').hidden, watch: document.querySelectorAll('#btsBox > p.say')[2].innerHTML,
-                 vlist: document.getElementById('vlist').innerText,
-                 coming: Array.from(document.querySelectorAll('.viewer:not([data-ready]) p')).map(function(p){ return p.textContent.trim(); })})""")
+                 insight: document.querySelector('.insight').hidden, vlist: document.getElementById('vlist').textContent})""")
     case("its lines on a PC: no copy line and no Good to know (Claude can't look there), the PC's own words in their place",
-         t["paste"] == this_computer.NO_LOOK_PC and t["line"] and t["insight"] and t["watch"] == this_computer.WATCH_PC_HTML, t)
-    case("a video still being copied in: listed by name as still copying in, and our line where its player will be",
-         "Still copying.mov" in t["vlist"] and "still copying in" in t["vlist"]
-         and R().OUR_WORDS["coming"].replace("{name}", "Still copying.mov") in t["coming"], t)
+         t["paste"] == this_computer.NO_LOOK_PC and t["line"] and t["insight"], t)
+    case("a video still being copied in: listed by name as still copying in",
+         "Still copying.mov" in t["vlist"] and "still copying in" in t["vlist"], t)
     before = len(cards(c))
-    c.js(v + ".querySelector('video').currentTime = 1.0;")
-    wait(c, "Math.abs(" + v + ".querySelector('video').currentTime - 1) < 0.2", 5)
-    c.js(v + ".querySelector('.use').click();")
-    ok = wait(c, "document.querySelectorAll('#moments .mom').length === %d" % (before + 1), 8)
+    c.js("document.getElementById('edVid').currentTime = 1.0;")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 1) < 0.2", 5)
+    c.click("#edIn")
+    wait(c, "window.Reel.editor().inT === 1", 5)
+    c.js("var v = document.getElementById('edVid'); v.pause(); v.currentTime = 3.5;")
+    wait(c, "Math.abs(document.getElementById('edVid').currentTime - 3.5) < 0.1", 5)
+    c.click("#edOut")
+    e = ed(c)
+    case("Start here and End here work off the video alone on a PC: a 2.5 s trim, solid, with its handles", e["cutClass"] == "tcut set" and e["cutTag"] == "2.5 s" and near(e["inT"], 1.0) and near(e["outT"], 3.5), e)
+    c.click("#edAdd")
+    ok = wait(c, "document.querySelectorAll('#clist .ci').length === %d" % (before + 1), 8)
     now = cards(c)
     new = next((x for x in now if x["small"].startswith("PC plays.mov")), {})
-    case("Use this moment on a PC adds a card of theirs, 4 seconds, with no still on it (none on a PC yet)",
-         ok and new.get("yours") and new.get("len") == "4.0 s" and new.get("img") is False
-         and on_disk(s, lambda r: any(m.get("id") == new.get("id") and m.get("video") == "PC plays.mov" for m in r.get("moments") or [])), now)
+    case("Add clip on a PC adds a card of theirs, 2.5 s, YOUR PICK and Not named yet, with no still on it (none on a PC yet), and the trim stays dashed with ✓ Added",
+         ok and new.get("yours") == "Your pick" and new.get("label") == "Not named yet" and new.get("small") == "PC plays.mov · 0:01.0–0:03.5 · 2.5 s"
+         and wait(c, "!document.querySelector('#clist .ci[data-mid=\"%s\"] img[src]')" % new.get("id", "x"), 5) and ed(c)["cutClass"] == "tcut set added"
+         and on_disk(s, lambda r: any(m.get("id") == new.get("id") and m.get("video") == "PC plays.mov" and m["end"] == 3.5 for m in r.get("moments") or [])), now)
+    case("Name my clips: her box shows on a PC too (the naming itself needs stills: footage.py picks says so there)", ed(c)["desc"] == "Name my clips for " + SHORT)
     (s.kit / "Footage" / "Still copying.mov").write_bytes(whole)
     case("once the copy is done it comes in by itself (the page looks every 4 s)",
-         wait(c, "Array.from(document.querySelectorAll('.viewer[data-ready] h4')).some(function(h){ return h.textContent === 'Still copying.mov'; })", 12))
+         wait(c, "Array.from(document.querySelectorAll('#edTabs [data-ek]')).some(function(b){ return b.innerText.indexOf('Still copying.mov') === 0; })", 12))
 
 
 def R():
@@ -896,7 +1167,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", required=True, help="a folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=9322)
-    ap.add_argument("--only", choices=("server", "order", "make", "page", "pc"))
+    ap.add_argument("--only", choices=("server", "order", "make", "page", "editor", "pc"))
     a = ap.parse_args()
     work = Path(a.work).resolve()
     if Path("/private/tmp") not in work.parents:
@@ -905,6 +1176,7 @@ def main():
     run = work / time.strftime("footage-%H%M%S")
     run.mkdir(parents=True)
     group("her clip order, style by style", check_order, run)
+    group("her words for the footage editor, both ways", check_editor_words)
     if a.only == "order":
         return rpc.summary()
     if not Path("/usr/bin/sips").exists():
@@ -952,10 +1224,14 @@ def main():
         else:
             # one hidden Chrome after another, each new, so the memory a long run builds up never adds up
             if a.only != "pc":
+                if a.only != "editor":
+                    with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
+                        group("steps 1 and 4 on the page", check_page, c, s, clips)
                 with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
-                    group("steps 1 and 4 on the page", check_page, c, s, clips)
-                with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
-                    group("the player, the moment cards and the styles", check_player, c, s)
+                    c.init_script("document.addEventListener('copy', function(){ window.__copied = String(window.getSelection()); }, true);")
+                    group("the footage editor on the page: the player, the timeline, the trim, Your clips", check_editor, c, s)
+                if a.only == "editor":
+                    return rpc.summary()
                 with chrome_drive.Chrome(work=str(run), size=(820, 900), extra_args=LIGHT) as c:
                     group("a test make with footage on the page", check_test_make, c, s)
             if a.only in (None, "pc"):

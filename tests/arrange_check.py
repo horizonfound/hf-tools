@@ -329,7 +329,7 @@ if (SCENARIO === 'preparing') {
 } else if (SCENARIO === 'carousel-made') {
   // the page opened with the slides already made for the order it shows (made earlier, or from the chat)
   check('opened with the slides already made for this order: the line and the folder button are there', text('doneline') === DONE5 && !byId('openfolder').hidden, text('doneline'));
-  check('and the Canva line, when the kit has Canva slides', !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('and the Canva line, when the kit has Canva slides', !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
   check('no asking beyond the slow watch', _timers.length === 1 && _timers[0].every, _timers.length);
   layout(10);
   clickButton(rowTile(16).querySelector('.x')); settle();
@@ -445,9 +445,9 @@ if (SCENARIO === 'preparing') {
   wait(179000); runIntervals();
   check('carousel: just under three minutes: still waiting', text('doneline') === 'Your slides are already being made. One moment.', text('doneline'));
   wait(2000); runIntervals();
-  check('carousel: after three minutes with no result it stops asking and says to tell Claude', text('doneline') === 'This is taking longer than it should. Tell Claude.' && byId('openfolder').hidden && _timers.length === 1, text('doneline') + ' timers ' + _timers.length);
+  check('carousel: after three minutes with no result it stops asking and says to tell Claude', text('doneline') === 'This is taking longer than it should. Tell your assistant.' && byId('openfolder').hidden && _timers.length === 1, text('doneline') + ' timers ' + _timers.length);
   runIntervals(); runIntervals();
-  check('carousel: having said that, the page does not go back to saying the slides are being made', text('doneline') === 'This is taking longer than it should. Tell Claude.' && _timers.length === 1, text('doneline'));
+  check('carousel: having said that, the page does not go back to saying the slides are being made', text('doneline') === 'This is taking longer than it should. Tell your assistant.' && _timers.length === 1, text('doneline'));
   // and if the result turns up later, the page shows it
   SERVER.st.job = {state: 'done', line: 'Done. 4 slides are in your Carousel folder.', rev: SERVER.st.rev, count: 4}; runIntervals();
   check('carousel: a result that turns up after that is still shown', text('doneline') === 'Done. 4 slides are in your Carousel folder.' && !byId('openfolder').hidden, text('doneline'));
@@ -459,7 +459,7 @@ if (SCENARIO === 'preparing') {
   dragTo(poolTile(14), 790, 100); release(790, 100); settle();
   clickButton(byId('happy')); settle();
   SERVER.st.job = {state: 'done', line: DONE5, rev: SERVER.st.rev, count: 5}; runIntervals();
-  check('carousel: with Canva slides in the kit, a line under the result says they show the old photos', text('doneline') === DONE5 && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('carousel: with Canva slides in the kit, a line under the result says they show the old photos', text('doneline') === DONE5 && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
 
   // under two photos, and a full carousel
   layout(10);
@@ -510,7 +510,7 @@ if (SCENARIO === 'preparing') {
 } else if (SCENARIO === 'carousel-same') {
   // the slides were already in this order (Claude's apply found nothing to change), and the kit's Canva
   // slides were made from another order: the Canva line belongs with this result too
-  check('slides already in this order, Canva slides from another order: the Canva line shows', text('doneline') === 'Your slides are already in this order.' && !byId('openfolder').hidden && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.', text('canvaline'));
+  check('slides already in this order, Canva slides from another order: the Canva line shows', text('doneline') === 'Your slides are already in this order.' && !byId('openfolder').hidden && !byId('canvaline').hidden && text('canvaline') === 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.', text('canvaline'));
   SERVER.st.canva = false; runIntervals();
   check('once Claude has filled the template again the Canva line goes by itself, and the result stays', byId('canvaline').hidden && text('canvaline') === '' && text('doneline') === 'Your slides are already in this order.', text('canvaline'));
 } else if (SCENARIO === 'carousel-long') {
@@ -527,7 +527,7 @@ if (SCENARIO === 'preparing') {
   clickButton(rowTile(21).querySelector('.x')); settle();
   check('another taken out (20): the button is on and the line is gone', !byId('happy').disabled && text('why') === '' && rowNums().length === 20, text('why'));
 } else if (SCENARIO === 'down') {
-  check('the Assistant not answering at the start: the page says so', text('l-reach') === 'Could not reach the Assistant. Tell Claude instead.' && !byId('l-reach').hidden, text('l-reach'));
+  check('the Assistant not answering at the start: the page says so', text('l-reach') === 'Could not reach the Assistant. Tell your assistant instead.' && !byId('l-reach').hidden, text('l-reach'));
   SERVER.mode = 'up'; runTimers();
   check('and it opens by itself once the Assistant is back', eq(rowNums(), [1, 6, 11, 16, 21]) && byId('l-reach').hidden && text('status') === 'Saved', rowNums());
 } else {
@@ -1637,16 +1637,16 @@ def check_server(work, port, photos):
 
         # ---- stage 1: the photos changing under an open page ----
         stamp = st["stamp"]
-        extra = photos_dir / "aaa-extra.jpg"                   # sorts first, so every number moves along by one
+        extra = photos_dir / "aaa-extra.jpg"                   # sorts first, and still takes the NEXT number (Nicole's v27: numbers stay fixed)
         shutil.copyfile(photos_dir / Path(plain["file"]).name, extra)
         code, out = run(env, "kit.py", "sheet", kit_name)
         code, j = post(dict(good, stamp=stamp, base=9, nums=[5, 7], marks=["", ""]))
         case("photos changed under an open page: a save is told so", code == 409 and j.get("why") == "photos", (code, j))
         code, h, data = ask(P, "GET", f"/arrange-state?kit={KQ}&page=reel")
         st = json.loads(data)
-        case("after a reload the same photos are in the row, found again by name though their numbers moved", st["now"] == {"nums": [8, 6, 7], "marks": ["+", "", ""]} and st["stamp"] != stamp and st["total"] == total + 1 and st["dropped"] == [], st["now"])
+        case("after a reload the same photos are in the row with the same numbers (v27: a photo added takes the next number, every other photo keeps its own)", st["now"] == {"nums": [7, 5, 6], "marks": ["+", "", ""]} and st["stamp"] != stamp and st["total"] == total + 1 and st["dropped"] == [], st["now"])
         rec_now = json.loads(arr.read_text())["reel"]
-        case("the record's names follow the new numbers", rec_now["names"].get("8") == Path(next(x for x in sheet if x["n"] == 7)["file"]).name, rec_now["names"])
+        case("the record's names keep the numbers (7 is still the photo it was; the new photo is not in the row, so not named)", rec_now["names"].get("7") == Path(next(x for x in sheet if x["n"] == 7)["file"]).name and str(total + 1) not in rec_now["names"], rec_now["names"])
         ask(P, "GET", f"/arrange.html?kit={KQ}&piece=reel")           # opening the page starts the copies being made
         made = 0
         for _ in range(100):
@@ -1656,27 +1656,27 @@ def check_server(work, port, photos):
                 break
             time.sleep(0.3)
         case("opening the page gets the missing copies made, off the request, and the count climbs to all", made == total + 1, made)
-        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n=1&size=s")
+        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n={total + 1}&size=s")
         case("the new photo's copy is served", code == 200 and data[:2] == b"\xff\xd8", code)
 
         # ---- stage 1: a photo that has gone missing ----
         stamp = st["stamp"]
         aside = work / "moved-aside"
         aside.mkdir(exist_ok=True)
-        gone_name = Path(next(x for x in sheet if x["n"] == 7)["file"]).name       # photo 8 now, and in the row
+        gone_name = Path(next(x for x in sheet if x["n"] == 7)["file"]).name       # photo 7 still (v27: its number never moved), and in the row
         shutil.move(str(photos_dir / gone_name), str(aside / gone_name))
         code, h, data = ask(P, "GET", f"/arrange-state?kit={KQ}&page=reel")
         st = json.loads(data)
-        p8 = next(p for p in st["photos"] if p["n"] == 8)
-        case("a photo moved out of the folder: the state marks it, and its copy still shows", p8["missing"] is True and p8["have"] is True and st["now"]["nums"] == [8, 6, 7], p8)
-        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n=8&size=s")
+        p8 = next(p for p in st["photos"] if p["n"] == 7)
+        case("a photo moved out of the folder: the state marks it, and its copy still shows", p8["missing"] is True and p8["have"] is True and st["now"]["nums"] == [7, 5, 6], p8)
+        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n=7&size=s")
         case("and its older copy is still served", code == 200 and data[:2] == b"\xff\xd8", code)
-        copies8 = [n for n in os.listdir(prev) if n.startswith("0008-")]
+        copies8 = [n for n in os.listdir(prev) if n.startswith("0007-")]
         for n in copies8:
             shutil.move(str(prev / n), str(aside / n))
         code, h, data = ask(P, "GET", f"/arrange-state?kit={KQ}&page=reel")
-        p8 = next(p for p in json.loads(data)["photos"] if p["n"] == 8)
-        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n=8&size=s")
+        p8 = next(p for p in json.loads(data)["photos"] if p["n"] == 7)
+        code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n=7&size=s")
         case("with no copy either: marked missing with nothing to show, and the picture answers 404", p8["missing"] is True and p8["have"] is False and code == 404, (p8, code))
         code, out = run(env, "arrange.py", "previews", "Fake beach")
         case("previews says how many can't be reached right now", "can't be reached right now: 1" in out, out)
@@ -1684,7 +1684,7 @@ def check_server(work, port, photos):
             shutil.move(str(aside / n), str(prev / n))
         shutil.move(str(aside / gone_name), str(photos_dir / gone_name))
         code, h, data = ask(P, "GET", f"/arrange-state?kit={KQ}&page=reel")
-        p8 = next(p for p in json.loads(data)["photos"] if p["n"] == 8)
+        p8 = next(p for p in json.loads(data)["photos"] if p["n"] == 7)
         case("put back: it is whole again", p8["missing"] is False and p8["have"] is True, p8)
 
         # ---- stage 1: a photo that has left the shoot ----
@@ -1692,10 +1692,10 @@ def check_server(work, port, photos):
         code, out = run(env, "kit.py", "sheet", kit_name)
         code, h, data = ask(P, "GET", f"/arrange-state?kit={KQ}&page=reel")
         st = json.loads(data)
-        case("a photo no longer in the shoot is taken out of the row and counted", st["now"] == {"nums": [6, 7], "marks": ["", ""]} and len(st["dropped"]) == 1 and st["total"] == total, (st["now"], st["dropped"]))
+        case("a photo no longer in the shoot is taken out of the row and counted (v27: the others keep their numbers; its number 7 stays unused)", st["now"] == {"nums": [5, 6], "marks": ["", ""]} and len(st["dropped"]) == 1 and st["total"] == total and 7 not in [p["n"] for p in st["photos"]], (st["now"], st["dropped"]))
         case("and the record names it", json.loads(arr.read_text())["reel"]["dropped"] == [gone_name])
         last = (json.loads(arr.read_text())["reel"].get("earlier") or [{}])[-1]
-        case("and the order as it was is kept, by file name, with its marks", last.get("why") == "photos left the shoot" and last.get("was", [None])[0] == gone_name + "+" and len(last.get("was", [])) == 3 and last.get("nums") == [6, 7], last)
+        case("and the order as it was is kept, by file name, with its marks", last.get("why") == "photos left the shoot" and last.get("was", [None])[0] == gone_name + "+" and len(last.get("was", [])) == 3 and last.get("nums") == [5, 6], last)
         code, out = run(env, "arrange.py", "earlier", "Fake beach", "--piece", "reel")
         case("arrange.py earlier prints it", code == 0 and "photos left the shoot; it was: " + gone_name + "+" in out, out[-300:])
         shutil.move(str(aside / gone_name), str(photos_dir / gone_name))
@@ -1963,7 +1963,7 @@ def check_carousel(work, port):
 
         # the folder button's own route, where it cannot open anything: this kit has no Carousel folder yet
         code, h, data = ask(P, "GET", f"/open?kit={KQ}&sub=Carousel")
-        case("carousel: the folder button's route says so in plain words when there is no Carousel folder yet", code == 200 and json.loads(data) == {"ok": False, "words": "There's no Carousel folder yet."}, data[:120])
+        case("carousel: the folder button's route says so in plain words when there is no Carousel folder yet", code == 200 and json.loads(data) == {"ok": False, "why": "none", "words": "There's no Carousel folder yet."}, data[:120])
 
         # ---- 2.1: the slides are written under a scratch name first ----
         code, out = run(env, "kit.py", "build", kit_name)
@@ -2077,7 +2077,10 @@ def check_carousel(work, port):
         code, h, data = ask(P, "GET", f"/arrange.html?kit={KQ}&piece=carousel")
         case("the carousel's picker still opens when asked for by name", code == 200 and b"data-piece='carousel'" in data, code)
         code, h, data = ask(P, "GET", html.unescape(links[0])) if len(links) == 2 else (0, {}, b"")
-        case("the Reel card opens the reel page (her reel maker)", code == 200 and "Put your photos in order".encode() in data, code)
+        case("the Reel card opens the reel page on her v27 chooser (Which reel do you want to create?), no step on it yet",
+             code == 200 and "Which reel do you want to create?".encode() in data and "Choose your photos".encode() not in data, code)
+        code, h, data = ask(P, "GET", html.unescape(links[0]) + "&kind=photos") if len(links) == 2 else (0, {}, b"")
+        case("...and a kind chosen (Just photos) is her reel maker, with its step Choose your photos", code == 200 and "Choose your photos".encode() in data, code)
         opened = tree_print(kit)
         case("opening the reel page added only its own lock to the kit (an empty file every writer of its record holds)",
              sorted(set(opened) - set(after)) == [".kit/reel-page.lock"] and all(opened[k] == v for k, v in after.items()), sorted(set(opened) ^ set(after)))
@@ -2263,19 +2266,19 @@ def check_carousel(work, port):
         log_text = (studio / "arrange.log").read_text() if (studio / "arrange.log").exists() else ""
         case("carousel: the log names each job and how it ended, and nothing failed inside a route or a job", "slide job for 2026-11-01 Fake beach: done" in log_text and " failed: " not in log_text, [x for x in log_text.splitlines() if " failed: " in x][:2])
 
-        # ---- the photos numbered again after the button was pressed: the numbers it was pressed on mean other photos now ----
+        # ---- a photo added after the button was pressed: since v27 the numbers it was pressed on still mean the same photos ----
         st, text = state()
         pressed = [fresh_pick[2], fresh_pick[0], fresh_pick[1]]
         code, j = post(dict(base, base=st["rev"], nums=pressed, done=True))
         job = wait_job(P, KQ, j.get("rev"))
         slides_then = sorted(n for n in os.listdir(car) if n not in EXTRA)
-        shutil.copyfile(photos_dir / name_of[1], photos_dir / "aaa-extra.jpg")       # this check's own extra photo: it sorts first, so every number moves along by one
+        shutil.copyfile(photos_dir / name_of[1], photos_dir / "aaa-extra.jpg")       # this check's own extra photo: it sorts first, and still takes the next number (v27)
         code, out = run(env, "kit.py", "sheet", kit_name)
         code, out = run(env, "arrange.py", "apply", str(kit), "--piece", "carousel", "--job")
         st, text = state()
-        case("photos numbered again after the button was pressed: a job makes the same photos' slides (found again by name), never the old numbers' photos",
-             job.get("state") == "done" and code == 0 and sorted(n for n in os.listdir(car) if n not in EXTRA) == slides_then and st["now"]["nums"] == [n + 1 for n in pressed]
-             and json.loads(rec_file.read_text())["picks"]["carousel"] == [n + 1 for n in pressed] and not nothing_lost(), (job, code, st["now"], sorted(os.listdir(car))))
+        case("a photo added after the button was pressed: a job makes the same photos' slides, and the numbers it was pressed on still mean the same photos (v27: numbers stay fixed)",
+             job.get("state") == "done" and code == 0 and sorted(n for n in os.listdir(car) if n not in EXTRA) == slides_then and st["now"]["nums"] == pressed
+             and json.loads(rec_file.read_text())["picks"]["carousel"] == pressed and not nothing_lost(), (job, code, st["now"], sorted(os.listdir(car))))
     finally:
         srv.stop()
         subprocess.run(["pkill", "-f", f"arrange.py apply {kit}"], capture_output=True)      # a job of this check's own, if one is somehow still at work
@@ -2582,7 +2585,7 @@ def check_carousel_fixes(work, port):
              folder_print(car) == car_mid and sorted(os.listdir(hid / "slides-older")) == older_mid and making() == [] and all(s_ == "done" for s_ in journals()), (plain(), journals(), making()))
         code, out = run(env, "arrange.py", "apply", str(kit), "--piece", "carousel", "--job")
         job = json.loads(job_file.read_text())
-        case("the page's own job says the same in plain words, with no file name", code == 1 and job.get("state") == "problem" and job.get("line") == arrange.IN_THE_WAY == "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. Your Carousel folder was left as it was. Tell Claude and it'll sort it out." and folder_print(car) == car_mid, job)
+        case("the page's own job says the same in plain words, with no file name", code == 1 and job.get("state") == "problem" and job.get("line") == arrange.IN_THE_WAY == "Couldn't make the slides: a file in your Carousel folder has a name one of the new slides needs. Your Carousel folder was left as it was. Tell your assistant and it'll sort it out." and folder_print(car) == car_mid, job)
 
         # ---- a move that cannot be finished is put back, never left half way for good ----
         shutil.move(str(car / stranger), str(aside_dir / stranger))

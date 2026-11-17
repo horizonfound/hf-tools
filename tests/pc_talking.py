@@ -124,6 +124,47 @@ try:
     r = subprocess.run([sys.executable, str(SCRIPTS / "talking_rec.py"), "status", SHOOT], capture_output=True, text=True, encoding="utf-8", env=env)
     check("the chat's status command still works here", r.returncode == 0 and "talk.mp4" in r.stdout, r.stdout + r.stderr)
 
+    # Open CapCut (v27) on a PC: the talking page's route goes through posting_queue.open_capcut, whose PC words
+    # name this PC and the Start menu; they pass through whole. Her "this Mac" line is a Mac's only.
+    import talking_page as tp
+    import posting_queue
+    TR.note_made(KIT, "Hannah talking reel")
+    real_open, real_mac, real_win = posting_queue.open_capcut, this_computer.MAC, this_computer.WINDOWS
+    answers = {}
+    try:
+        this_computer.MAC, this_computer.WINDOWS = False, True
+        for name, line in (("cant", "I couldn't open CapCut on this PC. Open it from the Start menu, then click “Hannah talking reel” in its project list (near the top, newest first). CapCut is free from capcut.com."),
+                           ("missing", "CapCut doesn't seem to be installed on this PC. It's free from capcut.com."),
+                           ("slow", "CapCut is taking a while to start on this PC. Give it a moment, then click “Hannah talking reel” in its project list (near the top, newest first).")):
+            posting_queue.open_capcut = (lambda l: lambda rec, ok_words=None, button="Open in CapCut": (False, l))(line)
+            answers[name] = (line, tp.open_capcut_for_page({"kit": SHOOT}))
+        posting_queue.open_capcut = lambda rec, ok_words=None, button="Open in CapCut": (True, ok_words)
+        answers["ok"] = tp.open_capcut_for_page({"kit": SHOOT})
+    finally:
+        posting_queue.open_capcut, this_computer.MAC, this_computer.WINDOWS = real_open, real_mac, real_win
+    check("Open CapCut on a PC: posting_queue's own words pass through whole (this PC, the Start menu), never her Mac line, never Finder or Applications",
+          all(ans == (200, {"ok": False, "words": line}) for line, ans in answers.values() if isinstance(ans, tuple) and line)
+          and all(not any(x in line for x in ("Mac", "Finder", "Applications")) for line, _a in (v for k, v in answers.items() if k != "ok")), answers)
+    check("...a PC with no CapCut keeps posting_queue's PC line (her \"this Mac\" line is said on a Mac only)",
+          answers["missing"][1][1]["words"] == "CapCut doesn't seem to be installed on this PC. It's free from capcut.com.", answers["missing"])
+    check("...and when it opened, her line is the one said", answers["ok"] == (200, {"ok": True, "words": tp.WORDS["capcut_opening_say"]}), answers["ok"])
+    check("the kit's record now notes the make, under the reel being worked on", TR.last_made(KIT) == "Hannah talking reel")
+
+    # + Add more photos (v27) on a PC: the button's title and her two Finder lines read File Explorer (reel_page.pc_words,
+    # as every Finder line of this page does); her "plugged in" line names no app. On a Mac the PC is pretended here
+    # (WINDOWS and the files app's name); a real PC runs it as it is.
+    real_win, real_app = this_computer.WINDOWS, this_computer.FILES_APP
+    try:
+        this_computer.WINDOWS, this_computer.FILES_APP = True, "File Explorer"
+        pw = tp.page_words()
+    finally:
+        this_computer.WINDOWS, this_computer.FILES_APP = real_win, real_app
+    pc_lines = {k: pw[k] for k in ("add_photos_title", "add_photos_opening", "add_photos_open")}
+    check("+ Add more photos on a PC: the title and her two Finder lines read File Explorer, never Finder (her words otherwise)",
+          all("File Explorer" in v and "Finder" not in v and v == tp.WORDS[k].replace("Finder", "File Explorer") for k, v in pc_lines.items())
+          and pw["add_photos_cant"] == tp.WORDS["add_photos_cant"] == "Could not open the folder. Is the photo drive plugged in?"
+          and pw["add_photos"] == "+ Add more photos", pc_lines)
+
     if not this_computer.MAC:
         got = sound.speech_wav(str(KIT / "Talking" / "talk.mp4"), TMP / "speech.wav")
         check("off a Mac the talking's sound file is not made, in plain words", got[0] is None and not (TMP / "speech.wav").exists() and "Mac" in got[1], got)

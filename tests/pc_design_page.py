@@ -245,6 +245,17 @@ def main():
         check("no path anywhere on the page's lines", "\\" not in line and str(work) not in c.js("document.body.innerText"))
         check("the folder's button shows beside the line (it is not pressed here: no window is ever opened)",
               c.js("!document.getElementById('open-wrap').hidden") is True)
+        # Nicole's v27 (Lane B): her buttons and the path at the top are on the page this computer serves, in this computer's words
+        v27 = json.loads(c.js("JSON.stringify({one: document.getElementById('save-one').textContent, oneTitle: document.getElementById('save-one').title, "
+                              "add: document.getElementById('add-photos').textContent, addTitle: document.getElementById('add-photos').title, "
+                              "crumbs: Array.from(document.querySelectorAll('.bar .crumbs > *')).filter(function(e){ return !e.classList.contains('sep'); }).map(function(e){ return e.textContent; }), "
+                              "pills: [getComputedStyle(document.querySelector('.bar .homelink')).display, getComputedStyle(document.getElementById('kitlink')).display], "
+                              "sel: !!document.getElementById('save-one-sel'), whole: !!document.getElementById('whole-photo'), crop: !!document.getElementById('crop-btn'), many: !!document.getElementById('multibar')})"))
+        app = "File Explorer" if WINDOWS else "Finder"
+        check("v27: Save just slide N, + Add photos (naming this computer's file manager), Save just this slide, Show the whole photo, Crop and the several-photos bar are on the page, and the path at the top ends in Carousel with both Back pills gone",
+              v27.get("one", "").startswith("Save just ") and v27.get("oneTitle") == "Save only the slide you clicked" and v27.get("add") == "+ Add photos"
+              and v27.get("addTitle") == f"Opens this shoot's Photos folder in {app}" and v27.get("crumbs", [])[-1:] == ["Carousel"] and v27.get("crumbs", [])[:1] == ["Home"]
+              and v27.get("pills") == ["none", "none"] and all(v27.get(k) for k in ("sel", "whole", "crop", "many")), v27)
         if HAVE_PIL and files:
             with Image.open(car / files[0]) as im:
                 px = im.convert("RGB").getpixel((540, 675))

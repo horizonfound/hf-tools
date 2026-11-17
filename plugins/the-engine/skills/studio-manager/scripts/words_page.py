@@ -51,6 +51,7 @@ import kit as kit_mod  # noqa: E402
 import brand  # noqa: E402
 import look  # noqa: E402
 import words as words_mod  # noqa: E402
+import reels as reels_mod  # noqa: E402
 
 GET_PATHS = ("/words.html", "/words-state")
 POST_PATHS = ("/words-save", "/words-carry", "/words-rhythm", "/words-queue", "/words-open")
@@ -69,6 +70,7 @@ ANSWER_KEYS = ("about", "who", "who_text", "where", "purpose", "purpose_text", "
 # "carousel", {other} the other of the two.
 WORDS = {
     "back_kit": "Back to the post kit",
+    "crumb_captions": "Captions",       # v27: this page's own step on the path at the top (Home › Hannah post kit › Captions)
     "eyebrow": "Your words · ",
     "tab_reel": "Reel", "tab_carousel": "Carousel",
     "title": "{short} {piece} words",
@@ -253,7 +255,8 @@ def piece_for_page(w):
 
 
 def kit_facts(kit):
-    """Is the reel made (its CapCut project's name), and the carousel's slides as the kit page shows them."""
+    """Is the reel made (its CapCut project's name, or a saved B-roll video's file name: a saved video counts as
+    made, her v27), and the carousel's slides as the kit page shows them."""
     import reel_page
     try:
         rec = kit_mod.load_rec(kit)
@@ -262,7 +265,7 @@ def kit_facts(kit):
     if not isinstance(rec, dict):
         rec = {}
     try:
-        project = reel_page.newest_project(kit, rec) or ""
+        project = (reel_page.newest_made(kit, rec) or {}).get("name") or ""
     except (OSError, ValueError, TypeError, AttributeError):
         project = ""
     try:
@@ -334,18 +337,34 @@ def _queue_file(pq):
     return p if isinstance(p, dict) and isinstance(p.get("pieces"), list) else None
 
 
-def queue_state(kit, piece, slides):
+def kit_reels(kit, rec=None):
+    """The shoot's reels when it has more than one ([{id, name, made, project, order}], reel_page.reels_for_kit),
+    else []: a shoot with one reel is asked nothing new anywhere."""
+    return _pq().kit_reels(kit, rec)
+
+
+def reel_open(kit):
+    """The id of the reel being worked on (the one open on the reel page)."""
+    import reel_page
+    try:
+        return reel_page.reel_names(kit)[1]
+    except (Exception, SystemExit):  # noqa: BLE001
+        return None
+
+
+def queue_state(kit, piece, slides, version=None):
     """This piece in the posting queue: {interval (is a rhythm set), status, date, cover, cover_slide, thumb}.
     "cover" is stage 3's (the photo they picked for the grid tile, kept on the piece): when a green piece
     carries one, a reel shows her "tap Edit cover" line with the queue's tile, and a carousel whose cover is
-    "Carousel/<file>" says which slide it is when that isn't the first."""
+    "Carousel/<file>" says which slide it is when that isn't the first. `version` (v25): which of the shoot's
+    reels; none is the shoot's first reel, the kit's own reel piece."""
     out = {"interval": False, "status": "", "date": "", "cover": False, "cover_slide": 0, "thumb": ""}
     pq = _pq()
     p = _queue_file(pq)
     if p is None:
         return out
     out["interval"] = bool(p.get("interval"))
-    x = pq.kit_piece(p, kit, piece)          # this kit's own piece, by the folder it was made from
+    x = pq.kit_piece(p, kit, piece, version=version if piece == "reel" else None)   # this kit's own piece, by the folder it was made from
     if x is None:
         return out
     out["status"] = x.get("status") if isinstance(x.get("status"), str) else ""
@@ -371,6 +390,13 @@ def state(kit, piece, facts=None):
     other = OTHER[piece]
     st = words_mod.status(kit)[other]
     strip, need = strip_for_page(kit, piece, rec_kit, slides)
+    # a shoot with several reels (v25): this page's reel is the one being worked on, so "is it made" and its
+    # place in the queue are that reel's (the queue step adds that one)
+    several = kit_reels(kit, rec_kit)
+    open_reel = reel_open(kit) if several else None
+    mine = next((r for r in several if r["id"] == open_reel), None)
+    if mine is not None:
+        project = mine["project"] or ""
     return {
         "ok": True, "piece": piece, "short": short_name(kit.name),
         "w": w,
@@ -379,7 +405,8 @@ def state(kit, piece, facts=None):
         "other": {"piece": other, "has": bool(project) if other == "reel" else bool(slides),
                   "answered": bool(st["answered"]), "caption": bool(st["caption"]), "hooks": int(st["hooks"])},
         "strip": strip, "strip_wait": need,
-        "queue": queue_state(kit, piece, slides),
+        # a shoot with several reels (v25): this page's queue step is about the reel being worked on
+        "queue": queue_state(kit, piece, slides, version=open_reel if piece == "reel" and mine is not None else None),
     }
 
 
@@ -486,18 +513,35 @@ def set_rhythm(body):
 
 
 def add_to_queue(body):
-    """POST /words-queue {kit, piece}: the piece is finished, so it goes in the posting queue, ready to post
-    (decision 7), and gets a date when a rhythm is set. Only a piece that is made and has its caption (hers);
-    asked of the posting queue here in the server, under the lock every press on the posting page takes."""
-    got, no = _kit_and_piece(body, {"kit", "piece"})
+    """POST /words-queue {kit, piece, reel?}: the piece is finished, so it goes in the posting queue, ready to
+    post (decision 7), and gets a date when a rhythm is set. Only a piece that is made; its caption is optional
+    (Nicole's v25: "Add to my queue works once the piece is made, caption or not"; the post kit's page asks
+    first when there is none, and the words page's own step still waits for one, as hers). Asked of the posting
+    queue here in the server, under the lock every press on the posting page takes.
+
+    `reel` (v25: a shoot with several reels): which reel goes in, by its id. Each reel gets its own spot in the
+    queue: the first keeps the kit's own reel piece, every other gets one of its own (posting_queue.add_for_kit).
+    With none named, the reel being worked on (hers). A reel that isn't made is never added."""
+    got, no = _kit_and_piece(body, {"kit", "piece", "reel"})
     if no:
         return no
     kit, piece = got
+    reel = body.get("reel")
+    if reel is not None and (piece != "reel" or not isinstance(reel, str) or not reels_mod.ID.fullmatch(reel)):
+        return _bad()
     facts = kit_facts(kit)
-    _, project, slides = facts
+    rec_kit, project, slides = facts
     made = bool(project) if piece == "reel" else bool(slides)
-    # the one rule both pages unlock on (words.status): a drafted caption, or one they typed themselves
-    if not made or not words_mod.status(kit)[piece]["caption"]:
+    several = kit_reels(kit, rec_kit) if piece == "reel" else []
+    if several:
+        reel = reel or reel_open(kit)
+        r = next((x for x in several if x["id"] == reel), None)
+        if r is None:
+            return _bad(reels_mod.GONE, 409)
+        made = bool(r["made"])
+    else:
+        reel = None                        # one reel: the kit's own reel piece, as ever (hers ignores the id too)
+    if not made:
         return 409, {"ok": False, "words": WORDS["q_locked"].replace("{piece}", piece)}
     pq = _pq()
     try:
@@ -505,8 +549,8 @@ def add_to_queue(body):
             p = pq.load()
             # another shoot whose name shortens to the same one keeps its own pieces: this kit's get a name of
             # their own (posting_queue.kit_sid), and each is found by the folder it was made from
-            pq.add_for_kit(p, kit)
-            x = pq.kit_piece(p, kit, piece)
+            pq.add_for_kit(p, kit, reel=reel)
+            x = pq.kit_piece(p, kit, piece, version=reel)
             if x is None:
                 return _bad(WORDS["cant_add"], 500)
             if x.get("status") not in ("green", "posted"):
@@ -517,7 +561,7 @@ def add_to_queue(body):
     except (OSError, SystemExit, ValueError, KeyError, TypeError) as e:
         arrange.log(f"words page: couldn't add {kit.name!r} {piece} to the posting queue ({e.__class__.__name__}: {str(e)[:160]})")
         return _bad(OUR_WORDS["queue_cant"], 503)
-    return 200, {"ok": True, "queue": queue_state(kit, piece, slides)}
+    return 200, {"ok": True, "queue": queue_state(kit, piece, slides, version=reel)}
 
 
 def open_carousel(body):
@@ -616,6 +660,11 @@ def handle_post(handler, path, query):
     body as one JSON object). Whatever goes wrong, the server answers and stays up."""
     try:
         import reel_page
+        if path == "/words-queue" and _cross_site(handler):
+            # a press that another website's page made (the browser says so itself): never into the queue. The
+            # body is read and dropped first, so the answer reaches whoever asked.
+            arrange._drain(handler)
+            return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
         body = reel_page._json_body(handler, path)
         if body is None:
             return
@@ -810,8 +859,10 @@ def page_html(kit_name, piece):
         "<title>" + e(f("doc_title")) + "</title><style>" + look.head_css() + STYLE + OUR_CSS + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "' data-piece='" + piece + "'>"
         "<div class='wrap'>"
-        "<div class='bar'><a class='homelink' id='back' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
-        + e(w["back_kit"]) + "</a>" + brand.bar() + "</div>"
+        # her v27 bar: the path at the top (Home › Hannah post kit › Captions, built by look.crumbs, every link a path of
+        # this server); her Back to the post kit pill stays in the markup, hidden, as her page keeps it
+        "<div class='bar'><a class='homelink' id='back' style='display:none' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
+        + e(w["back_kit"]) + "</a>" + look.crumbs(look.kit_trail(kit_name) + [(w["crumb_captions"], None)]) + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow' id='eyebrow'>" + e(w["eyebrow"] + w["tab_" + piece]) + "</span>"
         "<h1 id='title'>" + e(f("title")) + "<em>.</em></h1>"
         "<p class='lede'>" + e(w["lede"]) + "</p>"

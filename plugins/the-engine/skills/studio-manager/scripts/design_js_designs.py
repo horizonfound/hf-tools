@@ -19,6 +19,11 @@ DESIGN_DESIGNS_JS (put on the page by design_page.py after the drawing script) a
                       "+ Add stories"), up to 20 slides; every card's button reads Add; Start fresh is Blank slide (the
                       design's own background) and One photo per slide (the photos not used yet, up to five). On a
                       design with nothing on it, it is "+ New design".
+    Where should it go?  (hers, v27; both kinds) when a slide was clicked in this design and there is more than one, a
+                      row under the window's line: Before slide N / After slide N / At the end (After to start with), and
+                      the line reads "Pick what to add, and choose where it goes." What is added goes there and everything
+                      from there on moves along; at a spot a photo stretches across it goes at the end and the page says so.
+                      A template that would pass 20 slides (40 stories) is refused whole with her line, nothing trimmed.
     Single slides     her eight one-slide layouts, a section of small cards between Start fresh and Your templates
     Rename            beside the name of each of their own templates in the gallery: the name becomes a box; Return or
                       a press anywhere else saves (POST /design-template {kit, rename: id, name}; the Assistant keeps
@@ -33,12 +38,18 @@ was lost and is sent again never makes two. Names and words only ever go on the 
 
 For the saving part: Designer.post(path, body, tries), Designer.newToken(prefix), Designer.modals.
 
-STORIES (Designer.STORY; hers, v19): one stories design a shoot, so the name, My designs and Duplicate are not
-shown (only the save word is). "+ New design" is "+ Add stories": its window ("Add stories": Start with, Your
-templates, Layouts, each card's button Add) ADDS what is picked after the last story and never replaces anything
-(DesignPlan.addStories), in one Undo step, with no trip to the Assistant beyond the usual save. "Start with" is
-Blank story and One photo per story; the layouts are her seven grids. A shoot whose stories are still empty opens
-on that window. The shoot menu goes to each shoot's stories and counts its story designs.
+STORIES (Designer.STORY; hers, v19 and v26): stories come in SETS, like a carousel's designs (v26; before, one
+stories design a shoot): the name box, "My story sets" (this shoot's sets, newest first; click to open) and
+"+ New set of stories" (a new empty white set, made by the Assistant, opened at once; the open one is saved first
+and stays as it is) are shown; Duplicate is not (hers). "+ New design" is "+ Add stories": its window ("Add
+stories": Start with, Your templates, Layouts, each card's button Add) ADDS what is picked after the last story
+and never replaces anything (DesignPlan.addStories), in one Undo step, with no trip to the Assistant beyond the
+usual save. "Start with" is Blank story and One photo per story; the layouts are her four templates (Gallery
+delivered, My editing queue, The full story, Seamless swipe) and her seven grids. "My editing queue" is filled in
+as it is added: the page asks GET /design-queue for the waiting shoots' names and DesignPlan.fillQueue writes the
+list; when the queue can't be read the window stays, with the reason. A shoot whose stories are still empty opens
+on that window (a new empty set from "+ New set of stories" does not: hers). The shoot menu goes to each shoot's
+stories and counts its sets.
 """
 
 DESIGN_DESIGNS_JS = r"""
@@ -85,7 +96,11 @@ DESIGN_DESIGNS_JS = r"""
     // "+ Add slides" (hers, v22): the same window, adding after the last slide; nothing is replaced
     addSlides: '+ Add slides', addTitle: 'Add slides after your last one. Nothing you made is replaced.',
     addGalleryTitle: 'Add slides',
-    addGallerySub: 'Pick what to add. It goes after your last slide, and nothing you made is replaced: one slide at a time, or a whole template.',
+    addGallerySub: 'Pick what to add. It goes after your last slide. To put it somewhere else, close this, click the slide you want it next to, then press Add slides again.',
+    // "Where should it go?" (hers, v27): when a slide was clicked in this design, what is added can go before it, after
+    // it, or at the end; the line under the window's name then says so
+    where: 'Where should it go?', whereBefore: function(k){ return 'Before slide ' + k; }, whereAfter: function(k){ return 'After slide ' + k; }, whereEnd: 'At the end',
+    whereSub: 'Pick what to add, and choose where it goes. Nothing you made is replaced.',
     add: 'Add', secSingles: 'Single slides',
     blankSlide: 'Blank slide', blankSlideSub: 'One empty slide',
     rename: 'Rename', renameLabel: function(name){ return 'A new name for the template ' + name; }
@@ -100,6 +115,18 @@ DESIGN_DESIGNS_JS = r"""
     secFresh: 'Start with', secStarters: 'Layouts', use: 'Add',
     blank: 'Blank story', blankSub: function(){ return 'An empty white story'; },
     onePer: 'One photo per story', slidesSub: stories,
+    // sets of stories (hers, v26): the name box, My story sets and + New set of stories, like a carousel's designs
+    myDesigns: 'My story sets', designsHead: function(shoot){ return shoot + ' story sets'; },
+    designSub: function(slides, when, open){ return stories(slides) + (when ? ' · edited ' + when : '') + (open ? ' · open now' : ''); },
+    newSet: '+ New set of stories',
+    // ours, where hers has no words (a name for a screen reader, a tooltip, and the lines when a set can't be made)
+    nameLabel: 'The name of this set of stories. Type to change it.', designsLabel: 'This shoot’s sets of stories',
+    newSetTitle: 'Start another set of stories for this shoot. The set you have open stays as it is.',
+    makeLate: 'Can’t reach the Assistant right now, so no new set was made. Your open stories are still here. Try again in a moment.',
+    makeSlow: 'The Assistant is taking a long time. Look in My story sets in a moment: your new set may be there.',
+    fellBack: 'That set of stories isn’t here, so this is your newest one.',
+    // hers, when "My editing queue" can't be filled in
+    queueCant: 'I can\'t reach your editing queue right now.',
     // hers: "1 story · 3 photos", "1 story · 3 photos · from Beach"
     tplSub: function(slides, frames, from){ return stories(slides) + ' · ' + frames + (frames === 1 ? ' photo' : ' photos') + (from ? ' · from ' + from : ''); }
   });
@@ -292,7 +319,6 @@ DESIGN_DESIGNS_JS = r"""
   nameBox.disabled = true;            // until a design is open
   nameShow.hidden = true;
   nameShow.parentNode.insertBefore(nameBox, nameShow.nextSibling);
-  if (STORY) nameBox.hidden = true;   // one stories design a shoot: only the save word shows (hers)
   var nameAtFocus = null;
   // the name goes with every save of the design
   D.save.fields.push(function(body){ if (D.design && typeof D.design.name === 'string' && D.design.name) body.name = D.design.name; });
@@ -331,7 +357,13 @@ DESIGN_DESIGNS_JS = r"""
     dupBtn.appendChild(el('span', 'dz-wide', DW.dup.slice(i)));
   })();
   gDesign.appendChild(designsBtn); gDesign.appendChild(dupBtn);
-  if (STORY) { designsBtn.hidden = true; dupBtn.hidden = true; }
+  // stories (hers, v26): sets, like designs. "+ New set of stories" sits after My story sets; Duplicate is not shown.
+  var newSetBtn = null;
+  if (STORY) {
+    dupBtn.hidden = true;
+    newSetBtn = button(DW.newSet, 'new-set'); newSetBtn.title = DW.newSetTitle; D.label(newSetBtn, DW.newSet);
+    gDesign.insertBefore(newSetBtn, dupBtn);
+  }
   function when(t){
     if (!(t > 0)) return '';
     var a = P.ago(t, Date.now() / 1000);
@@ -354,7 +386,7 @@ DESIGN_DESIGNS_JS = r"""
     pop.appendChild(list);
   });
   var busy = false;         // a design is being opened or made
-  function setBusy(on){ busy = on; dupBtn.disabled = on; newBtn.disabled = on; }
+  function setBusy(on){ busy = on; dupBtn.disabled = on; newBtn.disabled = on; if (newSetBtn) newSetBtn.disabled = on; }
   pDesigns.pop.addEventListener('click', function(e){
     var bt = e.target.closest ? e.target.closest('button.dz-item') : null;
     if (!bt) return;
@@ -378,6 +410,7 @@ DESIGN_DESIGNS_JS = r"""
       if (gone()) return 'gone';
       if (!ok) return 'unsaved';        // the open design could not be saved: the line at the bottom of the window says why
       body.kit = D.KIT; body.token = newToken('n');
+      if (STORY) body.kind = 'stories';       // a set of stories is made among the stories, never among the carousel's designs
       sent = true;
       return post('/design-new', body, 3).then(function(res){
         if (gone()) return 'gone';
@@ -399,6 +432,15 @@ DESIGN_DESIGNS_JS = r"""
     setBusy(true);
     var done = function(){ setBusy(false); };
     makeDesign({copy: D.design.id}).then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
+  });
+
+  // "+ New set of stories": a new empty white set, made by the Assistant and opened; the open set is saved first
+  if (newSetBtn) newSetBtn.addEventListener('click', function(){
+    if (busy || !D.design || !D.S || D.blocked) return;
+    setBusy(true);
+    var done = function(){ setBusy(false); };
+    makeDesign({stamp: D.S.stamp, state: M.tidy(D.S.blank || {slides: 1, bg: '#ffffff', blocks: []})})
+      .then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
   });
 
   // ---------- + New design, Save as template (the top row); Fill empty frames (the selection bar's first line) ----------
@@ -430,7 +472,7 @@ DESIGN_DESIGNS_JS = r"""
     fillBtn.disabled = D.blocked || !k;
     fillBtn.hidden = !k;
     tplBtn.disabled = D.blocked;
-    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; if (addBtn) addBtn.disabled = D.blocked; }
+    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; if (addBtn) addBtn.disabled = D.blocked; if (newSetBtn) newSetBtn.disabled = D.blocked; }
   });
 
   // the gallery
@@ -440,6 +482,20 @@ DESIGN_DESIGNS_JS = r"""
   var gHead = el('h2', '', DW.galleryTitle);
   head.appendChild(gHead);
   var gSub = el('p', 'hint'); gSub.id = 'gallery-sub'; head.appendChild(gSub);
+  // "Where should it go?" (hers, v27): built once, hidden; filled in from the slide clicked last each time the window
+  // opens, so it can never show a slide from another design or an earlier time (her stale "slide 8"). Hidden it is
+  // really gone: the page's global [hidden] rule beats its display:flex (her lesson).
+  var whereRow = el('div', 'dz-where'); whereRow.id = 'tpl-where'; whereRow.hidden = true;
+  whereRow.appendChild(el('b', '', DW.where));
+  var whereIn = {};
+  [['before', ''], ['after', ''], ['end', DW.whereEnd]].forEach(function(x){
+    var lab = el('label'), r = el('input'); r.type = 'radio'; r.name = 'tplw'; r.value = x[0]; r.id = 'tplw-' + x[0];
+    var sp = el('span', '', x[1]); sp.id = 'tplw-' + x[0] + '-words';
+    lab.appendChild(r); lab.appendChild(document.createTextNode(' ')); lab.appendChild(sp);
+    whereRow.appendChild(lab); whereIn[x[0]] = {r: r, sp: sp};
+  });
+  head.appendChild(whereRow);
+  var addAt = null;         // the slide (from 0) the row is about, while it shows
   var acts = el('div', 'dz-acts'), tickLabel = el('label', 'hint'), tick = el('input');
   tick.type = 'checkbox'; tick.id = 'gallery-fill'; tick.checked = true; tick.setAttribute('aria-label', DW.fillTick);
   tickLabel.appendChild(tick); tickLabel.appendChild(document.createTextNode(' ' + DW.fillTick));
@@ -560,6 +616,15 @@ DESIGN_DESIGNS_JS = r"""
     var title = ADDING ? DW.addGalleryTitle : DW.galleryTitle;
     gHead.textContent = title; sheet.setAttribute('aria-label', title);
     gSub.textContent = ADDING ? DW.addGallerySub : DW.gallerySub(S.name || '');
+    // hers: the row shows only when adding, a slide was clicked in this design, and there is more than one slide;
+    // After is the one ticked to start with
+    var si = D.oneSlideAt ? D.oneSlideAt() : null, show = adds && D.st.blocks.length > 0 && si != null && D.st.slides > 1;
+    whereRow.hidden = !show; addAt = show ? si : null;
+    if (show) {
+      whereIn.before.sp.textContent = DW.whereBefore(si + 1); whereIn.after.sp.textContent = DW.whereAfter(si + 1);
+      whereIn.after.r.checked = true;
+      gSub.textContent = DW.whereSub;
+    }
     cards = [];
     if (cardShelf) D.paint.letGo(cardShelf, null);
     cardShelf = D.paint.shelf();
@@ -590,7 +655,8 @@ DESIGN_DESIGNS_JS = r"""
       // (hers: a card shows the layout on its own background even when adding, though a design has one background
       // and what is added sits on the design's)
       card(box, t.name || '', o && o.one ? '' : DW.tplSub(shown.slides, P.frames(shown), from), shown, adds ? function(){
-        return {add: P.fromTemplate(t.template, false), fill: tick.checked};
+        // (hers, v26: "My editing queue" names the text box its list goes in; it is filled in when it is added)
+        return {add: P.fromTemplate(t.template, false), fill: tick.checked, queue: t.fill === 'queue' && typeof t.list === 'number' ? t.list : 0};
       } : function(){
         return {stamp: S.stamp, state: P.fromTemplate(t.template, tick.checked, S.photos, S.carousel)};
       }, o);
@@ -637,11 +703,42 @@ DESIGN_DESIGNS_JS = r"""
       // stories, and "+ Add slides": what was picked goes after the last one, in one Undo step; nothing there is
       // replaced, and the design saves itself as always
       if (!D.st || D.blocked) return;
-      var pick = start(), r = P.addStories(D.st, M.tidy(pick.add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
-      if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
-      D.setState(r.st, {sel: null, adjust: false});
-      closeGallery();
-      D.revealSlide(r.first);
+      var pick = start();
+      // where it goes (hers, v27): before or after the slide clicked last, or at the end; at a spot a photo stretches
+      // across it goes at the end, and the line under the slides says so
+      var at = null;
+      if (!whereRow.hidden && addAt != null) {
+        var w = whereIn.before.r.checked ? 'before' : whereIn.after.r.checked ? 'after' : 'end';
+        at = w === 'before' ? addAt : w === 'after' ? addAt + 1 : null;
+      }
+      var put = function(add){
+        var r = P.addStories(D.st, M.tidy(add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel, at: at});
+        if (r.why) { gLine.textContent = r.why === 'tooMany' ? D.WORDS.tooMany(r.adds, r.max, r.have) : (D.WORDS[r.why] || ''); return; }
+        D.setState(r.st, {sel: null, adjust: false});
+        closeGallery();
+        D.revealSlide(r.first);
+        if (r.fell) D.say($('slides-line'), D.WORDS.acrossEnd);
+      };
+      if (pick.queue) {
+        // "My editing queue": the shoots waiting in the editing queue, in its order, as they named them. Asked for
+        // now, so the story says what the queue says today; when it can't be read the window stays, with the reason.
+        setBusy(true);
+        sheet.classList.add('dz-busy');
+        gLine.textContent = '';
+        var mine = making;
+        var over = function(){ setBusy(false); sheet.classList.remove('dz-busy'); };
+        fetch('/design-queue', {cache: 'no-store'})
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (mine !== making || !D.modals.isOpen(gallery)) return;        // the window was closed meanwhile
+            over();
+            if (!j || !j.ok || !Array.isArray(j.names)) { gLine.textContent = (j && j.words) || DW.queueCant; return; }
+            if (!D.st || D.blocked) return;
+            put(P.fillQueue(pick.add, j.names, pick.queue, j.count));
+          }, function(){ if (mine !== making || !D.modals.isOpen(gallery)) return; over(); gLine.textContent = DW.queueCant; });
+        return;
+      }
+      put(pick.add);
       return;
     }
     setBusy(true);
@@ -710,6 +807,8 @@ DESIGN_DESIGNS_JS = r"""
   // Stories: a shoot whose stories have nothing on them yet opens on the Add stories window (hers), once a page
   var asked = false;
   D.on('design', function(){
+    // ("+ New set of stories" and My story sets open a set while the page is busy making or opening it, so the window
+    // is not thrown open over a new empty set: hers does not open it there either)
     if (!STORY || asked || !D.st || D.st.blocks.length || D.st.slides > 1) return;
     asked = true;
     Promise.resolve().then(function(){ if (!D.modals.any() && !D.blocked) newBtn.click(); });
@@ -735,6 +834,8 @@ DESIGN_DESIGNS_CSS = """
 .dz-item.cur{background:var(--chip);box-shadow:inset 3px 0 0 var(--sel)}
 .dz-item b{display:block;font-weight:600;overflow-wrap:anywhere}
 .dz-item small{color:var(--soft);font-size:12.5px}
+.dz-where{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 4px;padding:9px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.dz-where label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .dz-modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;background:rgba(20,22,30,.72);display:flex;align-items:center;justify-content:center;padding:16px}
 .dz-modal[hidden]{display:none}
 .dz-sheet{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:1040px;max-width:100%;max-height:92vh;overflow:auto;overscroll-behavior:contain;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.4)}

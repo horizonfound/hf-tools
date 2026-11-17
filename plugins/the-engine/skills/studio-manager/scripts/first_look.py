@@ -23,6 +23,85 @@ import pictures  # noqa: E402  (every small picture, on a Mac or a PC)
 import clips  # noqa: E402  (which files are video, and how to say a count)
 this_computer.utf8_output()
 
+# The report's words from Nicole's notes of Nov 13 (section 2), whole where she gave a line. A {n} is a
+# count in words ("two", "six"). OUR_WORDS are ours, where hers has no line: drafts for Dustin and Nicole.
+WORDS = {
+    # why a card that held more than one shoot is in more than one folder, when each shoot was its own day
+    "why_days": "Since these were {n} days, I put them in {n} separate folders. You can name them in the boxes below.",
+    "look_right": "Does everything look right? If so, add it to your editing queue.",
+    "open_folder": "Open this folder",
+    "peeks": ("I picked {n} photos that could be great sneak peeks to send your client. "
+              "They're marked 'sneak peek' in Lightroom, if you want to do a quick edit on them."),
+    "start": "Open your folder to start editing.",
+    # the two lines the Back up a card screen already says in place of a dead button (her v26 home base)
+    "unplugged": "This one's on {drive}. Plug it in to open it.",
+    "moved": "I can't find this folder anymore. If you moved or renamed it in {files_app}, tell your assistant where it went.",
+}
+OUR_WORDS = {
+    # the same line when the shoots were not one a day (told apart by the breaks between them and one look
+    # at the pictures): never "days" when it was not days
+    "why_shoots": "Since these looked like {n} different shoots, I put them in {n} separate folders. You can name them in the boxes below.",
+    # sneak peeks that got no mark (a JPEG, HEIC, DNG, TIFF or PNG keeps its keywords inside the photo, which
+    # the Assistant never writes into), and a shoot where only some did
+    "peeks_picked": "I picked {n} photos that could be great sneak peeks to send your client.",
+    "peeks_none": ("They're the ones shown here. They aren't marked in Lightroom: to mark this kind of photo "
+                   "(a JPEG, for one) I'd have to write inside it, and I never change your photos."),
+    "peeks_some": ("{k} of them are marked 'sneak peek' in Lightroom, if you want to do a quick edit on them. "
+                   "The others are a kind of photo I'd have to write inside to mark, and I never change your photos."),
+    "peeks_change": "Not feeling them? Just say what you'd rather see.",   # Dustin's line of Nov 5, kept for the two buttons
+    "come_back": "When your edits are done, come back to your home base and click Make posts from a shoot.",
+    "opening": "Opening it...",
+    "not_live": "Ask your assistant to show the report, and this will work.",
+    "not_running": "The Assistant is not running right now. Ask your assistant to show the report, then try again.",
+    "no_shoot": "I couldn't find that shoot's folder.",
+}
+NUMBER_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
+
+
+def count_word(n):
+    """A small count in words, as a person writes it in a sentence ("two days"); past twelve, the number."""
+    return NUMBER_WORDS[n] if 0 <= n < len(NUMBER_WORDS) else f"{n:,}"
+
+
+def why_folders(shoots, groups):
+    """The line that says why a card is in several folders, or "" when it is one shoot or nothing is filed yet.
+    Nicole's line speaks of days, so it is used only when that is what happened: every shoot on one day of its
+    own. Any other split (two shoots in one day, a shoot across midnight) gets the line that claims no days."""
+    if len(shoots) < 2 or not all(s.get("folder") for s in shoots):
+        return ""
+    per = [sorted({groups[g]["start"][:10] for g in s.get("groups", []) if g in groups}) for s in shoots]
+    by_day = all(len(d) == 1 for d in per) and len({d[0] for d in per}) == len(shoots)
+    return (WORDS["why_days"] if by_day else OUR_WORDS["why_shoots"]).format(n=count_word(len(shoots)))
+
+
+def peeks_words(n, marked):
+    """What the sneak peeks are for, true to this shoot: n picks, of which `marked` are a kind of photo that gets
+    the 'sneak peek' keyword beside it. All of them: Nicole's line. None (JPEG shooters) or some: said so."""
+    if marked >= n:
+        return WORDS["peeks"].format(n=count_word(n))
+    first = OUR_WORDS["peeks_picked"].format(n=count_word(n))
+    if marked <= 0:
+        return first + " " + OUR_WORDS["peeks_none"]
+    return first + " " + OUR_WORDS["peeks_some"].format(k=count_word(marked).capitalize())
+
+
+def peeks_line(n, marked, tail=""):
+    """peeks_words as the page shows it: the first sentence in bold, the rest plain, then `tail` (the line that
+    leads into Pick again and Show me more, where those buttons are)."""
+    e = html.escape
+    first, _, rest = peeks_words(n, marked).partition(". ")
+    return f"<b>{e(first)}.</b>" + (" " + e(rest) if rest else "") + (" " + e(tail) if tail else "")
+
+
+def closing_html(photos=True, wrap=True):
+    """The next step, said once under the shoots: open the folder and start editing, and (when there are photos)
+    where to come back to when the edits are done. In place of the old chat line about a reel. wrap=False inside
+    the shoots section, which is already as wide as the page's column."""
+    e = html.escape
+    line = ("<p class='next-step'><b>" + e(WORDS["start"]) + "</b>" + (" " + e(OUR_WORDS["come_back"]) if photos else "") + "</p>")
+    return f"<div class='wrap'>{line}</div>" if wrap else line
+
+
 CSS = """
 .talk{display:grid;grid-template-columns:auto 1fr;gap:1.1rem;align-items:center;background:var(--sun-l);border-radius:var(--r);padding:1.3rem 1.5rem;margin:1.8rem 0 0}
 .talk .mic{width:54px;height:54px;border-radius:50%;background:var(--coral);color:#fff;display:grid;place-items:center;flex:none}
@@ -91,6 +170,11 @@ CSS = """
 .queue .add{font:600 14px/1 var(--sans);padding:.7rem 1.1rem;border-radius:999px;border:1.5px solid var(--coral);background:transparent;color:var(--coral-2);cursor:pointer;transition:background .2s,color .2s}
 .queue .add:hover{background:var(--coral);color:#fff}
 .queue .queued b{color:var(--ink)}
+.queue .q-ask{display:block;width:100%;font:500 14.5px/1.45 var(--sans);color:var(--ink)}
+.open-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin-top:.2rem}
+.open-row .open-shoot{font:600 14px/1 var(--sans);padding:.7rem 1.1rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
+.open-row .open-shoot:hover{background:var(--ink);color:var(--paper)}
+.open-row .open-state{flex-basis:100%;font-size:13px;color:var(--ink);min-height:1.2em;overflow-wrap:anywhere}
 .queue .change,.queue .never{font:500 13px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0}
 .queue .change:hover,.queue .never:hover{color:var(--coral-2)}
 .queue .queued{display:block;width:100%}
@@ -164,6 +248,12 @@ body.pk-drag,body.pk-drag *{cursor:grabbing!important}
 @media(max-width:900px){.shoot .top,.shoot:nth-child(even) .top{grid-template-columns:1fr}.shoot:nth-child(even) .pics{order:0}.talk{grid-template-columns:1fr}.more .row{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.more .row{grid-template-columns:repeat(2,1fr)}}
 """
+# the next-step line's look, on its own so the shoot's page (several cards) can wear it too
+NEXT_CSS = """
+.next-step{font:400 16.5px/1.55 var(--sans);color:var(--ink-2);background:var(--sun-l);border-radius:var(--r);padding:1.1rem 1.4rem;margin:.4rem 0 1.6rem;text-wrap:pretty}
+.next-step b{color:var(--ink);font-weight:600}
+"""
+CSS += NEXT_CSS
 
 PICKER = r"""<script>
 // "Show me more" (Dustin, Nov 5, third pass). Your six sit in numbered spots, in order. Drag one to move it,
@@ -252,13 +342,14 @@ window.peekPicker=function(more,id,d,say){
    closeBig();more.hidden=true;say('Saving your picks...','on');
    const t=setInterval(async()=>{try{const q=await fetch('picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
     if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
-  catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
+  catch(e){say('Could not reach the Assistant. Tell your assistant instead.','bad');}});
  draw();
 };
 </script>"""
 
 SCRIPT = """<script>
 (()=>{
+const OPEN_WORDS=__OPEN_WORDS__;
 const states={};
 const stateEl=id=>document.querySelector('.state[data-for="'+id+'"]');
 function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||'';el.className='state'+(st.state==='problem'?' bad':(st.state==='done'?' on':''));
@@ -266,15 +357,15 @@ function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||
 async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim()||(inp.dataset.was||'').trim();
  if(name){inp.value=name;inp.dataset.was=name;inp.placeholder=inp.dataset.hint||inp.placeholder;inp.classList.remove('hint');inp.blur();}
  if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
- if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell Claude the name.'});return;}
+ if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell your assistant the name.'});return;}
  try{const r=await fetch('rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
   if(!r.ok)throw 0;show(id,{state:'queued',line:'Renaming...'});poll();}
- catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell Claude the name instead.'});}}
+ catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell your assistant the name instead.'});}}
 let timer=null;
 async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
  for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
  if(!busy){clearInterval(timer);timer=null;}}catch(e){}},1500);}
-document.querySelectorAll('.go').forEach(b=>{b.addEventListener('mousedown',ev=>ev.preventDefault());b.addEventListener('click',()=>rename(b.dataset.shoot));});
+document.querySelectorAll('.name .go').forEach(b=>{b.addEventListener('mousedown',ev=>ev.preventDefault());b.addEventListener('click',()=>rename(b.dataset.shoot));});
 document.querySelectorAll('.name input').forEach(i=>{i.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();rename(i.id);}});
  // click in: the box clears and the current name waits underneath in grey; type to replace it, click away to keep it (Dustin, Oct 28)
  i.addEventListener('focus',()=>{if(i.value){i.dataset.was=i.value;if(i.dataset.hint===undefined)i.dataset.hint=i.placeholder;i.placeholder=i.value;i.value='';i.classList.add('hint');}});
@@ -286,9 +377,9 @@ if(location.protocol.startsWith('http'))poll();
 function niceDate(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
 // "Show my editing queue": ask the Assistant for the queue page's address (it starts the page if it isn't up) and open it
 async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>{ev.preventDefault();
-  if(!location.protocol.startsWith('http')){st.textContent='Ask Claude to show your editing queue.';st.className='qstate bad';return;}
+  if(!location.protocol.startsWith('http')){st.textContent='Ask your assistant to show your editing queue.';st.className='qstate bad';return;}
   try{const r=await fetch('queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;(window.top||window).location.href=d.url;}
-  catch(e){st.textContent='Could not open the queue page. Ask Claude to show your editing queue.';st.className='qstate bad';}});}
+  catch(e){st.textContent='Could not open the queue page. Ask your assistant to show your editing queue.';st.className='qstate bad';}});}
 document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
 // The sneak peeks are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
 document.querySelectorAll('.peeks-wrap').forEach(w=>{
@@ -298,17 +389,17 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
  w.querySelector('.again').addEventListener('click',()=>{more.hidden=true;ask.hidden=!ask.hidden;if(!ask.hidden)inp.focus()});
  ask.querySelector('.cancel').addEventListener('click',()=>{ask.hidden=true});
  ask.querySelector('.send').addEventListener('click',async()=>{
-  if(!live){say('Open this page through the Assistant for this, or just tell Claude: "pick different sneak peeks for the beach shoot."','bad');return;}
+  if(!live){say('Open this page through the Assistant for this, or just tell your assistant: "pick different sneak peeks for the beach shoot."','bad');return;}
   try{const r=await fetch('peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();ask.hidden=true;say(d.words||'Got it.','on');}
-  catch(e){say('Could not reach the Assistant. Tell Claude instead.','bad');}});
+  catch(e){say('Could not reach the Assistant. Tell your assistant instead.','bad');}});
  w.querySelector('.more').addEventListener('click',async()=>{
   ask.hidden=true;if(!more.hidden){more.hidden=true;return;}
-  if(!live){say('Open this page through the Assistant for this, or tell Claude "show me more from the beach shoot."','bad');return;}
+  if(!live){say('Open this page through the Assistant for this, or tell your assistant "show me more from the beach shoot."','bad');return;}
   say('');
   try{const r=await fetch('peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
    window.peekPicker(more,id,d,say);more.hidden=false;}
-  catch(e){say('Could not load more right now. Tell Claude "show me more from this shoot."','bad');}});
+  catch(e){say('Could not load more right now. Tell your assistant "show me more from this shoot."','bad');}});
 });
 document.querySelectorAll('.queue').forEach(q=>{
  const id=q.dataset.shoot,pick=q.querySelector('.pick'),inp=q.querySelector('input'),save=q.querySelector('.save'),st=q.querySelector('.qstate');
@@ -318,17 +409,26 @@ document.querySelectorAll('.queue').forEach(q=>{
  q.querySelector('.never').addEventListener('click',close);
  inp.addEventListener('input',()=>{save.disabled=!inp.value});
  save.addEventListener('click',async()=>{if(!inp.value)return;
-  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell Claude.';st.className='qstate bad';return;}
+  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell your assistant.';st.className='qstate bad';return;}
   save.disabled=true;
   try{const r=await fetch('queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();
-   const was=q.querySelector('.queued');if(was)was.remove();const a=q.querySelector('.add');if(a)a.remove();
+   const was=q.querySelector('.queued');if(was)was.remove();const a=q.querySelector('.add');if(a)a.remove();const k=q.querySelector('.q-ask');if(k)k.remove();
    pick.hidden=true;
    const span=document.createElement('span');span.className='queued';span.innerHTML='In your editing queue, due <b>'+niceDate(d.due)+'</b>. <button class="change" type="button">Change the date</button> <a class="show-queue" href="#">Show my editing queue <span aria-hidden="true">↗</span></a>';
    q.insertBefore(span,pick);span.querySelector('.change').addEventListener('click',open);wireShow(span.querySelector('.show-queue'),st);
    st.textContent=d.words||'';st.className='qstate';}
-  catch(e){st.textContent='Could not add it. Tell Claude instead.';st.className='qstate bad';save.disabled=false;}});
+  catch(e){st.textContent='Could not add it. Tell your assistant instead.';st.className='qstate bad';save.disabled=false;}});
 });
+// "Open this folder" on each shoot (Nicole, Nov 13): the report's server opens that shoot's own folder, worked out
+// from the backup's records by the shoot's id (the page never has a place on the drive), and what happened is
+// said right under the button.
+document.querySelectorAll('.open-row').forEach(row=>{const b=row.querySelector('.open-shoot'),st=row.querySelector('.open-state');
+ b.addEventListener('click',async()=>{
+  if(!location.protocol.startsWith('http')){st.textContent=OPEN_WORDS.not_live;return;}
+  st.textContent=OPEN_WORDS.opening;
+  try{const r=await fetch('open-shoot?shoot='+encodeURIComponent(row.dataset.shoot),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();st.textContent=j.words||(j.ok?'':OPEN_WORDS.no_shoot);}
+  catch(e){st.textContent=OPEN_WORDS.not_running;}});});
 })();
 </script>"""
 
@@ -451,9 +551,9 @@ CLIPS_SCRIPT = """<script>(()=>{
 const say=(row,m)=>{const t=row&&row.querySelector('.clips-state');if(t)t.textContent=m||''};
 const rowOf=id=>document.querySelector(".clips-row[data-shoot='"+id+"']");
 const ask=async(row,url)=>{
- if(!location.protocol.startsWith('http')){say(row,'Ask Claude to show the report, and this will work.');return}
+ if(!location.protocol.startsWith('http')){say(row,'Ask your assistant to show the report, and this will work.');return}
  try{const r=await fetch(url,{cache:'no-store'});const j=await r.json();say(row,j.words||(j.ok?'':'Could not open it.'))}
- catch(e){say(row,'The Assistant is not running right now. Ask Claude to show the report, then try again.')}};
+ catch(e){say(row,'The Assistant is not running right now. Ask your assistant to show the report, then try again.')}};
 document.querySelectorAll('.ph.clip[data-play]').forEach(p=>{
  const go=()=>{const row=rowOf(p.dataset.shoot);say(row,'Opening it...');ask(row,'play?file='+encodeURIComponent(p.dataset.play))};
  p.addEventListener('click',go);p.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}})});
@@ -478,10 +578,38 @@ def today_iso():
     return datetime.now().date().isoformat()
 
 
-def shoots_section(studio):
+def peek_marks(studio):
+    """{shoot id: how many of its sneak peeks (those with a preview) are a kind of photo that gets the 'sneak
+    peek' keyword in a small file beside it}. A JPEG, HEIC, DNG, TIFF or PNG gets none (sneak_peeks.py never
+    writes into a photo), so Lightroom shows no mark on it and the report must not say it does."""
+    try:
+        from sneak_peeks import NO_SIDECAR
+    except Exception:  # noqa: BLE001
+        NO_SIDECAR = {".jpg", ".jpeg", ".heic", ".heif", ".dng", ".tif", ".tiff", ".png"}
+    out = {}
+    pj = studio / "sneak-peeks.json"
+    if not pj.exists() and (studio / "picks.json").exists():
+        pj = studio / "picks.json"
+    try:
+        picks = json.loads(pj.read_text(encoding="utf-8")).get("picks", [])
+    except (OSError, ValueError):
+        return out
+    shown = {}
+    for pk in picks:
+        f, sid = Path(str(pk.get("file", ""))), pk.get("shoot", "")
+        if not (studio / "sneak-peeks" / (f.stem + ".jpg")).exists():
+            continue
+        shown[sid] = shown.get(sid, 0) + 1
+        if shown[sid] <= 6 and f.suffix.lower() not in NO_SIDECAR:   # the report shows the first six
+            out[sid] = out.get(sid, 0) + 1
+    return out
+
+
+def shoots_section(studio, closing=True):
     """(html, script) for the shoots, or None when the card has not been grouped and decided yet.
     Each shoot is one block that builds downward: three photos framing the recap and the name box, then the
-    rest of its sneak peeks in a row, then the note to the client (Dustin, Oct 28)."""
+    rest of its sneak peeks in a row, then the note to the client (Dustin, Oct 28). closing=False leaves out
+    the next-step line under the shoots (one card of a shoot: the shoot's page says it once for every card)."""
     if not (studio / "groups.json").exists() or not (studio / "shoots.json").exists():
         return None
     groups = {g["id"]: g for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]}
@@ -495,6 +623,8 @@ def shoots_section(studio):
     filed = all(s.get("folder") for s in shoots)
     n = len(shoots)
     peeks = peeks_by_shoot(studio)
+    marks = peek_marks(studio)
+    why = why_folders(shoots, groups)   # why there are several folders, true to how the card was split
     try:
         from client_note import all_notes
         notes = all_notes(studio)
@@ -511,7 +641,8 @@ def shoots_section(studio):
 
     out = ["<div class='wrap'><div class='shoots-head'><span class='eyebrow'>What's on the card</span>",
            f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total}</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
-           f"<p class='lede'>{'Each one is already in its own folder, named by date. Give it a better name and everything is renamed to match.' if filed else 'Give each one a name and it is filed, named and ready for you.'}</p>",
+           (f"<p class='lede why-folders'>{e(why)}</p>" if why else
+            f"<p class='lede'>{'Each one is already in its own folder, named by date. Give it a better name and everything is renamed to match.' if filed else 'Give each one a name and it is filed, named and ready for you.'}</p>"),
            f"<div class='talk'><span class='mic'>{MIC}</span><div><h3>Just tell me who's who.</h3>"
            "<p>Say it the way you'd say it to a person. I'll sort out which is which and fill the names in.</p>"
            "<p class='eg'>“The big one is the Lani swim shoot, the sunset one is for Kaia, and the yoga day is Marisol's.”</p></div></div>",
@@ -578,7 +709,7 @@ def shoots_section(studio):
             + "</div>")   # no "outfits or breaks" chip: a nice touch, not needed (Dustin, Oct 28)
         if len(pics) == 6:
             out.append(f"<div class='peeks-wrap' data-shoot='{e(s['id'])}'>"
-                       "<p class='peeks-line'><b>I pulled six to get things rolling.</b> Not feeling them? Just say what you'd rather see. They're marked “sneak peek” in Lightroom.</p>"
+                       f"<p class='peeks-line'>{peeks_line(6, marks.get(s['id'], 0), OUR_WORDS['peeks_change'])}</p>"
                        "<div class='peeks-act'><button class='pk again' type='button'>Pick again</button><button class='pk more' type='button'>Show me more</button></div>"
                        "<div class='peeks-ask' hidden><input type='text' maxlength='300' placeholder='What would you rather see? (more wide shots, more of the kids, nothing backlit...)'>"
                        "<button class='pk send' type='button'>Pick again</button><button class='pk cancel' type='button'>Never mind</button></div>"
@@ -601,7 +732,7 @@ def shoots_section(studio):
         out.append(f"<p class='recap'>{e(s.get('recap', ''))}</p>")
         out.append(f"<div class='name'><label for='{s['id']}'>What should I call this one?</label>"
                    f"<div class='field'><span class='pen'>&#9998;</span>"
-                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell Claude' autocomplete='off'>"
+                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell your assistant' autocomplete='off'>"
                    f"<button class='go' type='button' data-shoot='{e(s['id'])}'>Rename</button></div>"
                    f"<span class='state' data-for='{e(s['id'])}'></span>"
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match."
@@ -609,20 +740,24 @@ def shoots_section(studio):
                       + "</small></div>"
                       if s.get("folder") else
                       f"<small>Blank means it's filed as <b>{e(s.get('suggested', ''))}</b> until you say otherwise.</small></div>"))
+        # the shoot's own folder, right here with the shoot (Nicole, Nov 13), once it is filed in one
+        if s.get("folder"):
+            out.append(f"<div class='open-row' data-shoot='{e(s['id'])}'><button class='open-shoot' type='button' "
+                       f"title='Open this folder in {this_computer.FILES_APP}'>{e(WORDS['open_folder'])} <span aria-hidden='true'>↗</span></button>"
+                       "<span class='open-state' aria-live='polite'></span></div>")
         # the editing queue, one button: click, pick a date on the calendar, done (Dustin, Oct 28)
         due = queued.get(s["id"])
         out.append(f"<div class='queue' data-shoot='{e(s['id'])}'>"
                    + (f"<span class='queued'>In your editing queue, due <b>{e(nice_date(due))}</b>. <button class='change' type='button'>Change the date</button> <a class='show-queue' href='#'>Show my editing queue <span aria-hidden='true'>↗</span></a></span>" if due
-                      else "<button class='add' type='button'>Add to my editing queue</button>")
+                      else f"<span class='q-ask'>{e(WORDS['look_right'])}</span><button class='add' type='button'>Add to my editing queue</button>")
                    + f"<span class='pick' hidden><label>Due <input type='date' min='{e(today_iso())}'></label><button class='save' type='button' disabled>Save</button><button class='never' type='button'>Never mind</button></span>"
                    "<span class='qstate'></span></div>")
         out.append("</div></div>")   # copy, top
         if mine:
             out.append("<div class='more'>")
-            if rest:
+            if 3 <= len(mine) < 6:   # fewer than six (an older backup): what they are for is said here, with no buttons
                 out.append("<span class='eyebrow'>Sneak peeks</span>"
-                           f"<p class='line'><b>These {len(mine[:6])}, to edit first.</b> Picked for variety and flow, so they look good together. "
-                           "In Lightroom, filter by the keyword “sneak peek” to find them.</p>")
+                           f"<p class='line peeks-line'>{peeks_line(len(mine[:6]), min(marks.get(s['id'], 0), len(mine[:6])))}</p>")
             if rest:
                 out.append("<div class='row'>" + "".join(
                     f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[(j + 3) % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(p)}' alt=''></div>"
@@ -633,7 +768,10 @@ def shoots_section(studio):
             out.append(card)
         out.append("</article>")
     out.append("</div>")   # no how-to paragraph under the shoots: not needed (Dustin, Oct 28)
-    return "\n".join(out), PICKER + SCRIPT + CLIPS_SCRIPT
+    if closing:
+        out.append(closing_html(photos=any(a for a, _ in counts.values()), wrap=False))
+    open_words = json.dumps({k: OUR_WORDS[k] for k in ("opening", "not_live", "not_running", "no_shoot")}).replace("</", "<\\/")
+    return "\n".join(out), PICKER + SCRIPT.replace("__OPEN_WORDS__", open_words) + CLIPS_SCRIPT
 
 
 def write_page(session_dir):

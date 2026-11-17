@@ -100,8 +100,9 @@ def skip(line):
 
 
 def her_page():
+    """Her words page, the newest on this computer (v20: the page; v27: the path at the top in its bar, the pill hidden)."""
     for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v20-*")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*"), reverse=True):
             f = h / "Carousel designer and reel picker" / "pages" / "words.html"
             if f.is_file():
                 return f
@@ -178,19 +179,21 @@ def her_strings(page, everything=False):
     """What her page can show a photographer: the text between her tags, her placeholders, and the wording in
     her script's strings (tags inside them taken out). Each as (where, text). "everything" keeps the code's own
     names too (for asking whether a word of ours is one of hers, whole)."""
-    m = re.search(r"<script>(.*?)</script>", page, re.S)
-    script = m.group(1)
-    body = page[page.index("<body"):m.start()]
+    # every script written in the page (v27 puts a second one, the path at the top's call, in the bar); a script
+    # brought in by name (<script src=...>) has no words of its own here
+    scripts = re.findall(r"<script>(.*?)</script>", page, re.S)
+    body = re.sub(r"<script\b.*?</script>", "", page[page.index("<body"):], flags=re.S)
     got = []
     for t in re.split(r"<[^>]+>", body):
         got.append(("page", t))
     for t in re.findall(r'placeholder="([^"]*)"', body):
         got.append(("placeholder", t))
-    for lit in js_strings(script):
-        for t in re.split(r"<[^>]*>|<[^>]*$|^[^<]*>", lit) if "<" in lit or ">" in lit else [lit]:
-            got.append(("script", t))
-    for t in re.findall(r'alt="([^"$]+)"', script):
-        got.append(("alt", t))
+    for script in scripts:
+        for lit in js_strings(script):
+            for t in re.split(r"<[^>]*>|<[^>]*$|^[^<]*>", lit) if "<" in lit or ">" in lit else [lit]:
+                got.append(("script", t))
+        for t in re.findall(r'alt="([^"$]+)"', script):
+            got.append(("alt", t))
     out = []
     for where, t in got:
         t = " ".join(html.unescape(t).split())
@@ -420,6 +423,22 @@ def check_words(wp):
     if not WINDOWS:
         w = wp.page_words()
         case("on a Mac every word of hers is as she wrote it", all(w[k] == v for k, v in wp.WORDS.items()))
+    # v27: the path at the top, built on the server (look.crumbs), every link a path of this server; her pill kept, hidden
+    import look
+    nav = look.crumbs(look.kit_trail(KIT) + [("Captions", None)])
+    case("her v27 bar: the path Home › <short> post kit › Captions, Home and the kit linked, Captions where you are",
+         nav in page and nav in car and "<a href='/home'>Home</a>" in nav and "<a href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'>" + html.escape(SHORT) + " post kit</a>" in nav
+         and nav.endswith("<span class='here' aria-current='page'>Captions</span></nav>"), nav)
+    case("...her Back to the post kit pill is still in the markup, hidden, as her v27 page keeps it",
+         "<a class='homelink' id='back' style='display:none' href='/content/" + quote(KIT, safe="") + "/Post%20kit.html'>" in page
+         and html.escape(wp.WORDS["back_kit"]) in page and page.index("class='homelink'") < page.index("class='crumbs'") < page.index("class='brand'"))
+    case("...and 'Captions' is this page's own word, in WORDS (the rest of the path is look.py's)", wp.WORDS["crumb_captions"] == "Captions")
+    f = her_page()
+    if f is not None and "crumbs" in f.read_text(encoding="utf-8"):
+        hers = f.read_text(encoding="utf-8")
+        case("her v27 bar line: the pill hidden, the nav 'Where you are', and the call [[post kit, kit], ['Captions', null]]",
+             '<a class="homelink" style="display:none" id="back"' in hers and '<nav class="crumbs" id="crumbs" aria-label="Where you are"></nav>' in hers
+             and "C([[C.postKit, C.kit], ['Captions', null]])" in hers)
 
 
 # ---------- 2. the routes and the refusals, without a browser ----------
@@ -554,8 +573,10 @@ def check_queue(s, wp):
     s.save("reel", caption="")
     st = s.state()
     case("the reel is made: the page knows its CapCut project by name", st["kit"]["reel"] == PROJECT and st["kit"]["made"] is True, st["kit"])
-    code, j, _ = s.http("POST", "/words-queue", {"kit": KIT, "piece": "reel"})
-    case("a reel with no caption can't be added", code == 409 and not s.posting(), (code, j))
+    # v25: captions are optional on the post kit (the Assistant adds a made reel, caption or not: see
+    # tests/kit_reels_queue_check.py); this page's own step still waits for the caption, as hers does
+    case("a reel with no caption: this page's own queue step still waits for one (hers), its button disabled",
+         "if (!S.kit.made || !w.caption) {" in wp.SCRIPT and "b.disabled = true; b.id = 'addQueue';" in wp.SCRIPT)
     s.words("draft", "reel", {"caption": "MINI SESSIONS are coming to Laguna Beach on December 4th!!!", "hooks": HOOKS})
     for text in ("Hourly", "", "9 a week", ["3 a week"]):
         code, j, _ = s.http("POST", "/words-rhythm", {"text": text})
@@ -658,6 +679,22 @@ def check_page(c, s, wp):
          and c.text("#back").strip() == "← Back to the post kit" and c.js("document.title") == SHORT + " reel · your words",
          (c.text("#eyebrow"), c.text("#title"), c.text("#back")))
     case("the way back is this kit's own page", c.js("document.getElementById('back').getAttribute('href')") == "/content/" + quote(KIT, safe="") + "/Post%20kit.html")
+    # v27: the path at the top in the bar; the pill is kept but not drawn
+    steps = c.js("Array.from(document.querySelectorAll('.bar nav.crumbs > *')).map(function(n){ return [n.tagName, n.textContent, n.getAttribute('href'), n.getAttribute('aria-current')]; })")
+    case("her v27 path at the top: Home › %s post kit › Captions, Home and the kit links to this server, Captions where you are" % SHORT,
+         steps == [["A", "Home", "/home", None], ["SPAN", "›", None, None], ["A", SHORT + " post kit", "/content/" + quote(KIT, safe="") + "/Post%20kit.html", None],
+                   ["SPAN", "›", None, None], ["SPAN", "Captions", None, "page"]], steps)
+    case("...the pill is hidden and the path shows, in the bar before the brand",
+         c.js("getComputedStyle(document.getElementById('back')).display") == "none" and c.js("getComputedStyle(document.querySelector('.bar nav.crumbs')).display") == "flex"
+         and c.rect(".bar nav.crumbs")["x"] < c.rect(".bar .brand")["x"] and c.count(".bar nav.crumbs") == 1)
+    case("...the kit's crumb is a pill that can be pressed (her rule; this page is never a saved copy, so no rule makes its path plain words)",
+         c.js("getComputedStyle(document.querySelector('.bar nav.crumbs a')).borderRadius") == "999px"
+         and c.js("Array.from(document.querySelectorAll('.bar nav.crumbs a')).map(function(a){ return getComputedStyle(a).pointerEvents; })") == ["auto", "auto"]
+         and c.js("getComputedStyle(document.querySelector('.bar nav.crumbs')).flexWrap") == "wrap" and "not(.live)" not in c.js("document.querySelector('style').textContent"))
+    c.click(".bar nav.crumbs a:nth-of-type(2)")
+    c.wait_for("location.pathname.indexOf('/content/') === 0 && location.pathname.indexOf('Post%20kit.html') > 0", 10)
+    case("a press on the kit's crumb opens this kit's own page", c.js("decodeURIComponent(location.pathname)") == "/content/" + KIT + "/Post kit.html", c.js("location.href"))
+    open_page(c, s, "reel")
     case("two tabs, Reel and Carousel, and Reel is on", c.js("Array.from(document.querySelectorAll('#pieces a')).map(function(a){ return a.textContent + (a.classList.contains('on') ? '*' : ''); })") == ["Reel*", "Carousel"])
     case("the shoot's name shows as text, never as a tag", c.count("h1 b") == 0 and c.count(".line b") == 0 and c.js("window.pwned") is None)
     case("the strip holds the reel's photos", c.count("#strip img") == 4)

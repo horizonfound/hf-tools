@@ -25,10 +25,12 @@ and Delete, and Make it in CapCut with its result box).
 Routes (GET: our host, never another website's page; POST: the pickers' guard, then one JSON object; the kit by
 its folder name; everything wrapped so the server stays up):
     GET  /talking.html?kit=              the page
-    GET  /talking-state?kit=[&rev=&mark=]   talking_rec.state_for_page: everything the page draws from; with the
-                                         counter and the mark the page holds, only {ok, rev, mark, working, step,
-                                         make} while neither has moved (a long talk's whole state is about half a
-                                         megabyte, and the page asks every 3 seconds)
+    GET  /talking-state?kit=[&rev=&mark=][&photos=1]   talking_rec.state_for_page: everything the page draws
+                                         from; with the counter and the mark the page holds, only {ok, rev, mark,
+                                         working, step, make} while neither has moved (a long talk's whole state
+                                         is about half a megabyte, and the page asks every 3 seconds). photos=1,
+                                         sent only while the photo pop-up is open (her v27 "+ Add more photos"):
+                                         photos dropped into the Photos folder are numbered first, at the end
     GET  /talking-state?kit=&only=make   only {ok, make}: what the page asks once a second while a make is at work
     GET  /talking-video?kit=             the small copy of their talking video, in pieces when asked (Range)
     POST /talking-open  {kit}            makes <kit>/Talking if it isn't there and opens it
@@ -36,19 +38,31 @@ its folder name; everything wrapped so the server stays up):
                                          was made before comes back with its edit, nothing transcribed again;
                                          otherwise a job of its own turns it into words (talking_rec.start)
     POST /talking-save  {kit, base, page, saved}   talking_rec.save_from_page (up to SAVE_CAP bytes)
+    POST /talking-version {kit, op: new | switch | rename, id, name}   her "Your talking reels" bar (v25):
+                                         talking_rec.version_op
     POST /talking-make  {kit[, dry]}     Make it in CapCut, in a job of its own (talking_rec.start_make); the page
                                          then asks /talking-state how it stands ("make") and shows her result box.
                                          `dry: true` (hers too; her page never sends it) plans and writes nothing
+    POST /talking-capcut {kit}           Open CapCut (her v27: the bar's button once a reel was made, and the
+                                         result box's): the reel page's road, posting_queue.open_capcut, naming
+                                         the open reel's newest project; her "I couldn't open CapCut." when this
+                                         reel was never made (open_capcut_for_page)
 The video picker uses the reel page's own routes: /reel-footage?kit=&for=talking (the list only: no "not ready",
 the reel page's record never rewritten; asked ONLY when the picker opens, since asking gets every Footage video
 ready), /reel-video, /reel-strip, /reel-open {what: "footage"}. The photos are the pickers' small copies
 (/kit-photo, by number); which photos there are rides on every whole state ("photos", see _to_draw).
+
+The path at the top (her v27, section 7; her page line 252: C([[C.postKit, C.kit], ['Reels', C.reels], ['Talking to
+camera', null]])): Home › <shoot> post kit › Reels › Talking to camera, built by look.crumbs (Lane D's, with its
+CSS and her Home link), the two steps after the post kit this page's own (CRUMB_WORDS). Her Back pill stays in
+the bar, hidden, as on her page. Reels links to the reel page of the same shoot (the chooser, once that lands).
 
 A Mac and a PC: the page opens on both. On a PC Edit my video answers this_computer.NO_TALKING_PC at once (a named
 gap); "Finder" reads File Explorer and the two Undo tooltips name Ctrl.
 """
 import html
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -71,7 +85,7 @@ import talking_js_preview  # noqa: E402
 import talking_js_timeline  # noqa: E402
 
 GET_PATHS = ("/talking.html", "/talking-state", "/talking-video")
-POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make")
+POST_PATHS = ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version", "/talking-capcut")
 SAVE_CAP = 200000            # hers: a save may be this big (2000 cuts and 500 stretches)
 LOOK_EVERY_MS = 3000         # hers: the page looks for the assistant's cut, and a finished script, every 3 seconds
 TOAST_MS = 2600              # hers
@@ -187,6 +201,15 @@ WORDS = {
     "pick_use": "Use this photo",
     "pick_use_many": "Use these {n}",
     "pick_count": "{n} photos, flashing through in this order",
+    # her v27: + Add more photos in the photo pop-up's footer (her Add photos block, Nov 14 and 16). The two
+    # "in" lines are her one template, `${k} new photo${k === 1 ? '' : 's'} in, at the end.`, held whole
+    "add_photos": "+ Add more photos",
+    "add_photos_title": "Opens this shoot's Photos folder in Finder",
+    "add_photos_opening": "Opening your Photos folder in Finder...",
+    "add_photos_open": "The Photos folder is open in Finder. Drag photos in and they show up here.",
+    "add_photos_cant": "Could not open the folder. Is the photo drive plugged in?",
+    "photos_in": "{k} new photos in, at the end.",
+    "photo_in": "1 new photo in, at the end.",
     # the video picker
     "vp_head": "Add a video",
     "vp_for": "A video for “{words}”",
@@ -246,6 +269,20 @@ WORDS = {
     "brought_back": "Brought back “{words}”",
     "cut_said": "Cut “{words}”, sound and picture",
     "cut_clip": "Cut. Undo brings it back, or find it crossed out in your script.",
+    # fixing a word the transcriber got wrong (her v27, Nov 17): the legend, the highlight bar's fourth group, the
+    # small box, its hover line and its toasts
+    "legend_fixed": "Fixed word",
+    "legend_fix_hint": "Wrong word? Double-click it and type the right one.",
+    "sel_fix": "Fix the words",
+    "fix_ok": "Fix",
+    "fix_back": "Undo fix",
+    "fix_back_title": "Go back to what was heard",
+    "fix_in_label": "The right words",
+    "fix_cancel": "Cancel",
+    "fixed_title": "You fixed this. It was heard as \"{w0}\".",
+    "fix_empty": "Type the right word first. To take a word out, use Cut.",
+    "fix_back_toast": "Back to what was heard",
+    "fixed_toast": "Fixed. Your captions use it now.",
     "photo_deleted": "Photo deleted. Undo brings it back.",
     "nothing_undo": "Nothing to undo",
     "undone": "Undone",
@@ -262,7 +299,15 @@ WORDS = {
     "make": "Make it in CapCut",
     "making": "Making it…",
     "made_h2": "It's in CapCut",
-    "made_say": "Open CapCut, give your captions your look, and export.",
+    # v27: the say line names the project to click (her <b>${esc(r.project || 'your new project')}</b>)
+    "made_say": "Open CapCut, click {b}{project}{eb} at the top of your projects, give your captions your look, and export.",
+    "made_project_fallback": "your new project",
+    # v27: Open CapCut, in the bar once a reel was made and in the result box (her openCapCut and /capcut/open)
+    "open_capcut": "Open CapCut",
+    "capcut_opening_say": "CapCut is opening. Your newest project is at the top of the list.",     # the box's span
+    "capcut_opening_toast": "CapCut is opening. Your newest project is at the top.",             # the bar's toast
+    "capcut_cant": "I couldn't open CapCut.",
+    "capcut_missing": "CapCut doesn't seem to be on this Mac. It's free from capcut.com.",      # her server's; a Mac only
     # the one line her maker prints into the result box (talking_capcut.py; ours is talking_make.MADE_LISTED and
     # MADE_OPEN, the very same words: the test holds the two together)
     "made_listed": "Made \"{project}\" in CapCut. Open CapCut and it's at the top of your projects.",
@@ -273,7 +318,25 @@ WORDS.update({"job_" + k: v for k, v in TR.JOB_WORDS.items()})       # her engin
 WORDS.update({"make_" + k: v for k, v in TR.MAKE_WORDS.items()})     # her server's lines (server.py make_talking)
 
 # Every line of ours on this page, each with why it is ours. (line, reason.) All drafts for Nicole to reword.
+# Several talking reels from one shoot (her v25, Nov 12): the "Your talking reels" bar under the title. Hers,
+# word for word (pages/talking-reel.html and server.py, handoff v25; tests/reels_check.py compares them with her
+# page). The bar itself and its script are the reel page's (reel_page.reels_bar, REELS_JS): one bar, two pages.
+REELS_WORDS = dict({k: v for k, v in reel_page.REELS_WORDS.items() if k not in ("reels_reach", "reels_failed")},
+                   reels_label="Your talking reels",
+                   reels_which="Which talking reel you're working on",
+                   reels_new="+ Start a new talking reel",
+                   reels_first=TR.TALK_FIRST,
+                   reels_still_script=TR.STILL_SCRIPT)
+
+# The path at the top (her v27 crumbs.js, called on her page as [[post kit, kit], ['Reels', reels], ['Talking to
+# camera', null]]): her two steps after the post kit, word for word; Home and the kit's crumb are look.CRUMB_WORDS.
+CRUMB_WORDS = {"reels": "Reels", "here": "Talking to camera"}
+
 OUR_WORDS = {
+    # several talking reels (v25): see reels.py; and a reel being made in CapCut is not left half way
+    "reels_taken": (TR.reels.NAME_TAKEN, "hers lets two reels share a name; the chat tells them apart by name"),
+    "reels_most": (TR.reels.TOO_MANY, "nothing can ever be removed, so there is an end to how many a shoot keeps"),
+    "reels_still_making": (TR.STILL_MAKING, "hers makes a reel inside one request; ours is a job the page can ask about meanwhile"),
     "coming": ("{name} is still being copied into your Talking folder. It shows up here when it's done.",
                "hers lists a video while it is still copying in, and Edit my video then reads half a file; ours "
                "waits for it, as the reel page does for Footage"),
@@ -341,12 +404,12 @@ OUR_WORDS["made_only_note"] = (
     "the photo reel's page shows it")
 OUR_WORDS["not_ready"] = (
     "This shoot isn't ready for this yet. Tell your assistant: make posts from this shoot.",
-    "the pickers' own line says \"to Claude\", which no line on this page may; the same page, reworded")
+    "the pickers' own line said \"to Claude\" when this page was built, which no line on this page may; the same page, reworded")
 OUR_WORDS.update({"job_" + k: v for k, v in TR.OUR_JOB_WORDS.items()})
 OUR_WORDS.update({"make_" + k: v for k, v in TR.OUR_MAKE_WORDS.items()})
 
 CANT_FIND = arrange.CANT_FIND
-NOT_READY = OUR_WORDS["not_ready"][0]   # the pickers' own "not ready" page (arrange.NOT_READY), without its "to Claude"
+NOT_READY = OUR_WORDS["not_ready"][0]   # the pickers' own "not ready" page (arrange.NOT_READY), in this page's own words (theirs said "to Claude" when this page was built)
 NOT_UNDERSTOOD = arrange.NOT_UNDERSTOOD
 
 
@@ -358,8 +421,12 @@ def page_words():
     """Every word the page's script may show: hers, then ours (the line only). On a PC her "Finder" is this
     computer's word for it and the two Undo tooltips name Ctrl."""
     w = {k: reel_page.pc_words(v) for k, v in WORDS.items()}
+    for k, line in REELS_WORDS.items():
+        w.setdefault(k, reel_page.pc_words(line))
     for k, (line, _why) in OUR_WORDS.items():
         w.setdefault(k, line)
+    # the bar's two "it didn't go through" lines are this page's own (her talking page shows its own post's words)
+    w["reels_reach"], w["reels_failed"] = w["cant_reach"], w["didnt_work"]
     if this_computer.WINDOWS:
         w["undo_title"], w["redo_title"] = w["undo_title_pc"], w["redo_title_pc"]
         w["multi_hint"] = w["multi_hint_pc"]
@@ -510,9 +577,11 @@ def _to_draw(kit, st):
     st["photos"], st["stills"] = photos, stills
 
 
-def state(kit, rev=None, mark=None):
-    """What GET /talking-state answers (see the top of this file)."""
-    return _with_make(kit, TR.state_for_page(kit, rev, mark))
+def state(kit, rev=None, mark=None, photos=False):
+    """What GET /talking-state answers (see the top of this file). `photos` (the page's photos=1, sent only
+    while its photo pop-up is open): photos dropped into the Photos folder join the numbered list at the end
+    first (talking_rec.photos_landed), so the list's new mark comes back with the whole state."""
+    return _with_make(kit, TR.state_for_page(kit, rev, mark, photos=photos))
 
 
 def make_only(kit):
@@ -569,9 +638,10 @@ def _get_state(handler, q):
             return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 400)
         return arrange._send_json(handler, make_only(kit))
     rev, mark = _one(q, "rev"), _one(q, "mark")
+    photos = _one(q, "photos") == "1"             # the photo pop-up is open: new photos in the Photos folder are numbered first
     # the counter and the mark the page holds: only when both arrive whole is the short answer ever given
     held = REV.fullmatch(rev) and MARK.fullmatch(mark)
-    arrange._send_json(handler, state(kit, int(rev), mark) if held else state(kit))
+    arrange._send_json(handler, state(kit, int(rev), mark, photos) if held else state(kit, photos=photos))
 
 
 def _get_video(handler, q):
@@ -614,8 +684,57 @@ def handle_get(handler, path, query):
             pass
 
 
+def version_from_page(body):
+    """POST /talking-version {kit, op: new | switch | rename, id, name}: hers (/talking/version). Start a new
+    talking reel, work on another, or rename one (talking_rec.version_op checks every field)."""
+    if not isinstance(body, dict) or set(body) - {"kit", "op", "id", "name"}:
+        return _bad()
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    return TR.version_op(kit, {k: v for k, v in body.items() if k != "kit"})
+
+
+def open_capcut_for_page(body):
+    """POST /talking-capcut {kit}: Open CapCut (her v27 /capcut/open, which only runs `open -a CapCut`). Ours goes the
+    reel page's road (reel_page.open_capcut_for_page): posting_queue.open_capcut -> capcut.open_capcut, which starts
+    CapCut on a Mac or a PC, first adds a reel still waiting for CapCut's list when CapCut is surely closed, says
+    "taking a while" when the Mac's open was slow, and names the project to click. The project named is the open
+    talking reel's newest make (talking_rec.last_made); her "I couldn't open CapCut." when this reel was never
+    made (her route would open CapCut anyway; the page's button is hidden then, so only a crafted request gets
+    here). What worked reads her line (capcut_opening_say, with capcut.py's note after it when a reel was
+    waiting); a Mac with no CapCut reads her line too; everything else is posting_queue's own plain words (a PC,
+    a slow start, CapCut there but not starting). reel_page.TEST_CAPCUT: CapCut is never started from a test.
+    Answers {ok, words}."""
+    kit, bad = _kit_only(body)
+    if bad:
+        return bad
+    try:
+        project = TR.last_made(kit)
+    except TR.Unreadable:
+        return 200, {"ok": False, "words": TR.TROUBLE}
+    if not project:
+        return 200, {"ok": False, "words": WORDS["capcut_cant"]}
+    if os.environ.get(reel_page.TEST_CAPCUT):
+        arrange.log("talking page (test): would open CapCut")
+        return 200, {"ok": True, "words": WORDS["capcut_opening_say"]}
+    import posting_queue
+    ok, said = posting_queue.open_capcut({"reel": {"project": project}}, ok_words=WORDS["capcut_opening_say"],
+                                         button=WORDS["open_capcut"])
+    if ok:
+        return 200, {"ok": True, "words": said or WORDS["capcut_opening_say"]}
+    if this_computer.MAC and said.startswith(CAPCUT_NOT_INSTALLED):   # no CapCut on this Mac: her words for it
+        return 200, {"ok": False, "words": WORDS["capcut_missing"]}
+    return 200, {"ok": False, "words": said or WORDS["capcut_cant"]}
+
+
+# The start of posting_queue.open_capcut's line when no CapCut was found to start on a Mac ("CapCut doesn't seem to
+# be installed on this Mac. It's free from capcut.com."): on a Mac that answer is given in her words instead
+# (WORDS capcut_missing). tests/talking_page_check.py holds posting_queue to this start.
+CAPCUT_NOT_INSTALLED = "CapCut doesn't seem to be installed"
+
 ROUTES = {"/talking-open": open_talking, "/talking-start": start_from_page, "/talking-save": save_from_page,
-          "/talking-make": make_from_page}
+          "/talking-make": make_from_page, "/talking-version": version_from_page, "/talking-capcut": open_capcut_for_page}
 
 
 def handle_post(handler, path, query):
@@ -627,6 +746,8 @@ def handle_post(handler, path, query):
         body = reel_page._json_body(handler, path, SAVE_CAP if path == "/talking-save" else reel_page.POST_CAP)
         if body is None:
             return
+        if path == "/talking-version" and _cross_site(handler):      # a press from another website's page
+            return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
         if route is None:
             return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 404)
         code, out = route(body)
@@ -707,7 +828,9 @@ def _step2(w):
         "<p class='say'>" + rich(w["s2_say"]) + "</p>"
         "<div class='legend'><span class='z-punch'>" + e(w["punch"]) + "</span><span class='z-zoom'>" + e(w["slow_zoom"]) + "</span>"
         "<span class='fast'>" + e(w["sped_up"]) + "</span>"
-        "<span style='text-decoration:line-through;color:#a7a2a0;text-decoration-color:#d4643f'>" + e(w["cut"]) + "</span></div>"
+        "<span style='text-decoration:line-through;color:#a7a2a0;text-decoration-color:#d4643f'>" + e(w["cut"]) + "</span>"
+        # her v27: a fixed word, and the hint at the legend's right (her margin-left:auto; it wraps under at phone width)
+        "<span class='fixed'>" + e(w["legend_fixed"]) + "</span><span class='lfix'>" + e(w["legend_fix_hint"]) + "</span></div>"
         "<div class='edit'><div class='phone'>"
         "<div class='screen' id='screen' title='" + q(w["screen_title"]) + "'>"
         "<video id='vid' playsinline preload='auto'></video>"
@@ -735,20 +858,30 @@ def _step3(w):
 
 
 def _floating(w):
-    """The highlight bar, the photo picker, the video picker, the photo menu and the toast: all hidden until the
-    page's script opens them."""
+    """The highlight bar, the fix box (her v27), the photo picker, the video picker, the photo menu and the
+    toast: all hidden until the page's script opens them."""
     e = html.escape
+    q = lambda s: e(s, quote=True)  # noqa: E731
     head = "<div style='display:flex;justify-content:space-between;align-items:center;gap:1rem'>"
     return (
         "<div class='sel' id='selBar'><button id='selPhoto' type='button'>" + e(w["sel_photo"]) + "</button>"
         "<button id='selVideo' type='button'>" + e(w["sel_video"]) + "</button><i></i>"
         "<button id='selCut' type='button'>" + e(w["cut"]) + "</button><button id='selBack' type='button'>" + e(w["sel_back"]) + "</button><i></i>"
         "<button id='selPunch' type='button'>" + e(w["punch"]) + "</button><button id='selZoom' type='button'>" + e(w["slow_zoom"]) + "</button>"
-        "<button id='selNoZoom' type='button'>" + e(w["sel_nozoom"]) + "</button></div>"
+        "<button id='selNoZoom' type='button'>" + e(w["sel_nozoom"]) + "</button><i></i>"
+        "<button id='selFix' type='button'>" + e(w["sel_fix"]) + "</button></div>"
+        # the fix box (her v27, Nov 17): her markup, built from parts; the × is her &times;
+        "<div class='fixbox' id='fixBox' hidden><input id='fixIn' type='text' maxlength='80' aria-label='" + q(w["fix_in_label"]) + "'>"
+        "<button id='fixOk' type='button'>" + e(w["fix_ok"]) + "</button>"
+        "<button class='fx' id='fixBack' type='button' hidden title='" + q(w["fix_back_title"]) + "'>" + e(w["fix_back"]) + "</button>"
+        "<button class='fx' id='fixNo' type='button' aria-label='" + q(w["fix_cancel"]) + "'>×</button></div>"
         "<div class='modal' id='pick'><div class='sheet'>" + head +
         "<b id='pickHead'>" + e(w["pick_head"]) + "</b><button class='btn small' id='pickClose' type='button'>" + e(w["close"]) + "</button></div>"
         "<p class='say' style='margin:.3rem 0 0'>" + e(w["pick_say"]) + "</p><div class='grid' id='pickGrid'></div>"
-        "<div class='pickfoot'><span class='hintsm' id='pickCount'></span>"
+        # her v27 footer: + Add more photos and its line at the left (her .addph span), then the count and Use
+        "<div class='pickfoot'><span class='addph'><button class='btn small' id='addPhotos' type='button' title='" + q(w["add_photos_title"]) + "'>"
+        + e(w["add_photos"]) + "</button><span class='hintsm' id='addPhotosSay'></span></span>"
+        "<span class='hintsm' id='pickCount'></span>"
         "<button class='btn main' id='pickUse' type='button' disabled>" + e(w["pick_use"]) + "</button></div></div></div>"
         "<div class='modal' id='vpick'><div class='sheet'>" + head +
         "<b id='vpHead'>" + e(w["vp_head"]) + "</b><button class='btn small' id='vpClose' type='button'>" + e(w["close"]) + "</button></div>"
@@ -763,7 +896,8 @@ def _floating(w):
 
 def _dock(w):
     """The timeline, then the make bar, fixed across the bottom. The timeline is hidden until there is a script;
-    Make it in CapCut is off until there is something to make (talking_js_timeline.py)."""
+    Make it in CapCut is off until there is something to make, and her Open CapCut (v27) beside it is hidden
+    until this reel has been made (talking_js_timeline.py)."""
     e = html.escape
     q = lambda s: e(s, quote=True)  # noqa: E731
     return (
@@ -788,6 +922,7 @@ def _dock(w):
         "<div class='tl-hint' id='tlHint'>" + e(w["tl_hint"]) + "</div>"
         "<div class='tl-hint more' id='tlMulti' aria-live='polite'>" + e(w["multi_hint"]) + "</div></div></div>"
         "<div class='make'><div class='in'><span class='sum' id='sum'>" + e(w["sum_empty"]) + "</span>"
+        "<button class='btn' id='openCC' type='button' hidden>" + e(w["open_capcut"]) + "</button>"
         "<button class='btn main' id='makeBtn' type='button' disabled>" + e(w["make"]) + "</button></div></div></div>")
 
 
@@ -811,15 +946,20 @@ def page_html(kit_name):
         "<style>" + look.head_css() + talking_css.css() + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
-        "<div class='bar'><a class='homelink' id='back' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
-        + e(w["back_kit"]) + "</a>" + brand.bar() + "</div>"
+        # her v27 bar: her Back pill kept and hidden (style="display:none", as hers), then the path at the top
+        # (look.crumbs: every link a path of this server, the kit by its folder name, never a path on the disk)
+        "<div class='bar'><a class='homelink' id='back' style='display:none' href='/content/" + kq + "/Post%20kit.html'><span aria-hidden='true'>&larr;</span> "
+        + e(w["back_kit"]) + "</a>"
+        + look.crumbs(look.kit_trail(kit_name) + [(CRUMB_WORDS["reels"], "/reel.html?kit=" + kq), (CRUMB_WORDS["here"], None)])
+        + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
         "<h1 id='title'>" + e(w["title"].replace("{short}", short)) + "<em>.</em></h1>"
-        "<p class='lede'>" + e(w["lede"]) + "</p></header>"
+        "<p class='lede'>" + e(w["lede"]) + "</p>" + reel_page.reels_bar(w) + "</header>"
         + _step1(w, short) + _step2(w) + _step3(w) +
         "<div class='result' id='result'></div></div>"
         + _floating(w) + _dock(w) +
         "<script type='application/json' id='talkData'>" + _json_for_script(data) + "</script>"
+        "<script>" + reel_page.REELS_JS + "</script>"
         "<script>" + "\n".join(JS_PARTS) + "\n" + START_JS + "</script></body></html>")
 
 

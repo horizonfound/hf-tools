@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""The Studio's home page: the first thing a photographer sees, in the Claude app's browser pane.
+"""The Assistant's home page: the home base (Nicole's v26), in the Claude app's browser pane.
 
-A visual menu of everything the Studio does (Dustin, Oct 30), so they can see what's available
-and explore on their own, plus what matters today and their recent shoots. Served live by the
-posting server at /home (posting_queue.py serve), which also opens folders and pages for its
-buttons and records which button they pressed.
+What it is, what matters today, then the four steps in the order of the work: Back up a card (its own screen,
+/backups), My editing queue, Make posts from a shoot (its own screen, /make-posts), My posting queue; and Open my
+Assistant folder as a small card. Nothing else is on it, so it stays clean after years of shoots: every backup
+and every post kit is on its step's own screen (home_base.py). Served live by the posting server at /home
+(posting_queue.py serve), which also opens folders and pages for its buttons and records which card was pressed.
 
-A click in the pane cannot type into the chat for them, so a button that needs a conversation
-(Back up a card, Make posts from a shoot) shows a small card saying what to do and "Tell Claude: go".
-The click is kept in ~/.studio/journey.json, so whatever they say next, Claude already knows what
-they pressed, whether it is their first time there, and what they did last time in that category:
-first time, a short explanation and "want to dive in?"; later, pick up where they left off.
+A click in the pane cannot type into the chat for them, so the two steps that need a conversation show, on their
+own screens, what to paste ("backup now", "make my posts") with a Copy button. Every press of a card is kept in
+~/.studio/journey.json, so whatever they say next, the assistant already knows what they pressed, whether it is
+their first time there, and what they did last time in that category: first time, a short explanation and "want
+to dive in?"; later, pick up where they left off.
 
     python3 home.py page            write ~/.studio/home.html (a saved copy; the live page is /home)
     python3 home.py url             the live page's address (starts the posting server if needed)
@@ -37,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import look  # noqa: E402  (the font, the colours and the rules every page shares)
+import home_base  # noqa: E402  (the home base's words, look and two screens)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
 this_computer.utf8_output()
@@ -199,6 +201,10 @@ def hello(mark=False):
 
 def card_in():
     """A memory card mounted right now: a volume with a DCIM folder. Name and rough count, or None."""
+    pretend = os.environ.get("STUDIO_CARD_FOR_TESTS")      # the tests' own: "none", or "EOS_DIGITAL:1234" (no drive is looked at)
+    if pretend:
+        name, _, n = pretend.partition(":")
+        return {"name": name, "files": int(n)} if n.isdigit() else None
     for c in this_computer.cards():   # /Volumes on a Mac, drive letters on a PC
         n = 0
         for root, _, files in os.walk(Path(c["path"]) / "DCIM"):
@@ -218,7 +224,9 @@ def fingerprint():
         parts.append(str(fresh.code_stamp()))
     except Exception:
         parts.append("?")
-    for f in ("studio.json", "queue.json", "posting.json", "journey.json", "posting-url.txt"):
+    # (not the record of what was pressed: the page shows nothing from it since Nov 14, and reloading after a
+    # press wiped the line a press had just put under its button)
+    for f in ("studio.json", "queue.json", "posting.json", "kit-archive.json", "posting-url.txt"):
         try:
             parts.append(str(int((HOME / f).stat().st_mtime)))
         except OSError:
@@ -240,7 +248,7 @@ def fingerprint():
 def gather():
     """Everything the page shows, read from what the Studio already keeps. Each part fails soft."""
     g = {"today": date.today().strftime("%A, %B ") + str(date.today().day), "notes": [], "due": [], "tank": None,
-         "card": None, "recent": [], "kits": [], "home_folder": None, "setup": False, "done": load_journey()["done"]}
+         "card": None, "recent": [], "kits": [], "home_folder": None, "setup": False, "done": load_journey()["done"], "waiting": 0}
     try:
         import studio_file
         g["setup"] = bool(studio_file.load().get("drives", {}).get("session"))
@@ -251,6 +259,7 @@ def gather():
         q = edit_queue.load()
         for n, s in edit_queue.heads_up(q):
             g["notes"].append(("late" if n < 0 else "soon", f"{s['name']}: {edit_queue.due_words(s.get('due'))}"))
+        g["waiting"] = len(edit_queue.waiting(q))
         for s in edit_queue.waiting(q)[:4]:
             g["due"].append({"name": s["name"], "due": edit_queue.due_words(s.get("due")), "late": bool(s.get("due")) and s["due"] < date.today().isoformat()})
         shoots = sorted(q["shoots"], key=lambda s: (s.get("shot") or "", s.get("added", "")), reverse=True)
@@ -263,8 +272,9 @@ def gather():
         if backed:
             last = max(backed, key=lambda s: s.get("added", ""))
             same = [s for s in backed if same_place(s.get("studio"), last["studio"])]
-            g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same)}
-    except Exception:
+            g["last_backup"] = {"when": (last.get("added") or "")[:10], "shoots": len(same), "photos": sum(s.get("count") or 0 for s in same),
+                                "clips": sum(s.get("clips") or 0 for s in same)}
+    except (Exception, SystemExit):     # an unreadable queue.json ends edit_queue.load with SystemExit: the page still comes
         pass
     try:
         import posting_queue
@@ -280,7 +290,9 @@ def gather():
         h = posts.home()
         if h:
             g["home_folder"] = str(h)
-            g["kits"] = [k for k in posts.kits(h) if k.get("kit")][:6]
+            # every shoot folder in Your Content that holds a kit record, also one whose page was never written
+            # (Nicole, v25: her newest shoot didn't show until its hidden page was made)
+            g["kits"] = [k for k in posts.kits(h) if k.get("kit") or (Path(k["path"]) / ".kit" / "kit.json").is_file()][:6]
     except Exception:
         pass
     try:
@@ -291,98 +303,34 @@ def gather():
 
 
 # ---------- the page ----------
+#
+# The home base (Nicole's v26, Nov 13): what it is, Today, then the four steps in the order of the work, and the
+# folder as a small card. Nothing else, so it stays clean after years of shoots: every backup is on the Back up
+# a card screen and every post kit on the Make posts screen (home_base.py). Her words are home_base.WORDS.
 
-# The two buttons that start a conversation: what to paste in the chat, and the steps before it.
-SAY = {"backup": "backup now", "posts": "make my posts", "setup": "set up my Assistant folder"}
+# The words to paste in the chat for the two steps that start a conversation (shown on their own screens).
+SAY = {"backup": home_base.WORDS["b_say"], "posts": home_base.WORDS["m_say"], "setup": "set up my Assistant folder"}
 
-MENU = [
-    ("backup", "Back up a card",
-     "Copies your memory card to your hard drive and double-checks every photo. Then it sorts the photos into shoots, names them, and picks a few to edit first.",
-     ["Put your memory card in.", "Then paste this in the chat:"], "Nothing on your memory card is changed."),
-    ("posts", "Make posts from a shoot",
-     "Turns a folder of finished photos into Instagram posts: a reel, a carousel, stories, and help with your captions.",
-     ["<button class='btn open-inline pick' data-pick='1'>Select the folder with your finished photos</button> <span class='after'>{NAME} makes its own copies of the JPEGs in that folder. Your originals aren't moved or changed.</span>",
-      "Then paste this in the chat, and {the_name} sorts them and makes your posts:"],
-     "Nothing is posted. You post it when you're ready."),
-    ("queue", "My editing queue", "The shoots you still need to edit, and when each one is due.", None, None),
-    ("posting", "My posting queue", "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.", None, None),
-    ("folder", "Open my {HOME} folder", "The folder on your hard drive where your posts are kept.", None, None),
+# The four steps: (what a click is recorded as, where it goes, the three lines of words)
+STEPS = [
+    ("backup", "/backups", "c1_name", "c1_p", "c1_go"),
+    ("queue", None, "c2_name", "c2_p", "c2_go"),
+    ("posts", "/make-posts", "c3_name", "c3_p", "c3_go"),
+    ("posting", "/posting.html", "c4_name", "c4_p", "c4_go"),
 ]
 
-CSS_EXTRA = r"""
-.menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;padding:1rem 0 .4rem}
-.item{position:relative;display:grid;gap:.5rem;align-content:start;text-align:left;padding:22px 22px 20px;border:0;border-radius:var(--r);background:var(--paper);box-shadow:0 1px 0 var(--line);cursor:pointer;font:inherit;color:inherit;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
-.item:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
-.item .n{font:600 20px/1.15 var(--sans);letter-spacing:-.02em}.item .n em{font:inherit;font-style:normal;color:var(--coral-2)}
-.item p{margin:0;color:var(--ink-2);font-size:14.5px}
-.item.open{box-shadow:inset 0 0 0 2px var(--ink),var(--shadow)}.item.open .n em{color:var(--coral-2)}
-.howto{grid-column:1/-1;display:none;gap:.5rem;padding:22px 26px;border-radius:18px;background:var(--ink);color:#F4F1EA;box-shadow:var(--shadow)}
-.howto ol li::marker{color:var(--coral);font-weight:600}.howto b{color:#fff}
-.howto .open-inline{background:transparent;color:#F4F1EA;border-color:rgba(255,255,255,.35)}.howto .open-inline:hover{border-color:#fff}
-.howto .note{color:rgba(244,241,234,.7)}.howto small{color:rgba(244,241,234,.6)}
-.howto .paste .words{background:#2A3040;color:#fff;border-color:rgba(255,255,255,.12)}
-.howto .paste .copy{background:var(--coral);color:#1F2430}.howto .paste .copy:hover{background:#F79672}
-.howto.show{display:grid}.howto>p{margin:0;font-size:15.5px}.howto ol{margin:0;padding-left:1.2em;font-size:15.5px;display:grid;gap:.3rem}.howto ol li{padding-left:.2em}.howto .open-inline{margin-left:8px;vertical-align:middle;background:transparent;color:#F4F1EA;border-color:rgba(255,255,255,.4)}
-.howto .pick{margin-left:0;background:var(--coral);color:#1F2430;border-color:var(--coral);font-weight:600}.howto .alt{display:block;margin-top:8px;color:rgba(244,241,234,.6);font-size:13px}.howto .pick+.note{display:block;margin:6px 0 4px;color:var(--coral)}.howto .after{display:block;margin-top:6px}.howto .alt .open-inline{font-size:11.5px;padding:6px 9px}
-.paste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:.2rem 0 .1rem}.paste .words{font:500 17px/1 var(--sans);background:var(--cream);padding:11px 14px;border-radius:12px;border:1.5px solid var(--line)}
-.paste .copy{font:600 13px/1 var(--sans);padding:11px 16px;border-radius:999px;border:0;background:var(--ink);color:#fff;cursor:pointer}
-.howto small{color:var(--ink-2);font-size:13px}
-.todayl{display:grid;gap:.5rem;margin:.6rem 0 0;padding:0;list-style:none}
-.todayl li{display:flex;gap:.6rem;align-items:baseline;font-size:15px}.todayl li::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--ocean);flex:none;transform:translateY(-1px)}
-.todayl li.late::before{background:var(--red)}.todayl li.soon::before{background:var(--yellow)}.todayl li.card::before{background:var(--coral)}
-.recent{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:.8rem 0 2rem}
-.shoot{display:grid;gap:.5rem;padding:12px;border-radius:18px;background:var(--paper);box-shadow:0 1px 0 var(--line)}
-.shoot .ph{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}.shoot .ph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--sand-l);display:block}
-.shoot .ph i{display:block;aspect-ratio:1;border-radius:8px;background:var(--sand-l)}
-.shoot b{font:600 15px/1.2 var(--sans)}.shoot small{color:var(--ink-2);font-size:12.5px}
-.shoot .acts{display:flex;gap:6px;flex-wrap:wrap}.btn.inline{margin-left:6px;padding:5px 11px;font-size:12.5px;vertical-align:baseline}
-.btn{font:600 12.5px/1 var(--sans);padding:8px 11px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;text-decoration:none}
-.btn:hover{border-color:var(--ink)}.btn.solid{background:var(--ink);color:#fff;border-color:var(--ink)}
-.said{font-size:13px;color:var(--ink-2);min-height:1.2em;margin:0}.note{display:block;font-size:13px;color:var(--ink-2);margin-top:6px}.howto .note{display:inline;margin-left:8px}
-.empty{padding:1rem 0 2rem;color:var(--ink-2);font-size:15px}
-"""
+CSS_EXTRA = home_base.CSS
 
 SCRIPT = r"""
-const live=location.protocol.startsWith('http');
-const $=s=>document.querySelector(s);
-function say(t){const e=$('#said');e.textContent=t||'';}
-// The Claude app's browser pane refuses navigator.clipboard.writeText (tested on Dustin's Mac, Oct 30) but honors the
-// older execCommand('copy') from a click, so that goes first; the modern call is the fallback for other browsers.
-function copyText(t){try{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(a);a.focus();a.select();const ok=document.execCommand('copy');a.remove();if(ok)return true;}catch(e){}
-  if(navigator.clipboard){navigator.clipboard.writeText(t).catch(()=>{});return true;}return false;}
-async function clicked(item){if(!live)return;try{await fetch('/clicked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item})});}catch(e){}}
-function note(b,t){if(!b){say(t);return;}const row=b.closest('.acts');if(row)b=row;let n=b.nextElementSibling;if(!n||!n.classList.contains('note')){n=document.createElement('span');n.className='note';b.after(n);}n.textContent=t;}
-async function openPath(q,b){if(!live){note(b,'Ask Claude to open this.');return;}try{const r=await fetch(q);const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude to open it.');}}
-const items=[...document.querySelectorAll('.item')];
-function howtoFor(item){return document.querySelector('.howto[data-for="'+item+'"]');}
-function closeAll(){items.forEach(x=>x.classList.remove('open'));document.querySelectorAll('.howto').forEach(h=>h.classList.remove('show'));}
-// The explanation opens under the whole row its card sits in, so no card ever changes place (Dustin, Nov 5: it used to
-// open right after the card, which pushed the cards beside it down or left a hole, differently for each card).
-function place(b){const h=howtoFor(b.dataset.item);if(!h)return;h.classList.remove('show');const top=b.offsetTop;let last=b;items.forEach(x=>{if(x.offsetTop===top)last=x;});last.after(h);h.classList.add('show');}
-function openItem(b){closeAll();b.classList.add('open');place(b);}
-items.forEach(b=>{b.addEventListener('click',async()=>{
-  const item=b.dataset.item;
-  // A second click on the open card closes it (only cards that open an explanation; the others just act).
-  if(howtoFor(item)&&b.classList.contains('open')){closeAll();return;}
-  clicked(item);openItem(b);
-  if(item==='queue'){if(!live){say('Ask Claude: show my editing queue');return;}try{const r=await fetch('/queue-url');const d=await r.json();if(d.url){location.href=d.url;}else say(d.words||'Ask Claude: show my editing queue');}catch(e){say('Ask Claude: show my editing queue');}}
-  else if(item==='posting'){if(live)location.href='/posting.html';else say('Ask Claude: show my posting queue');}
-  else if(item==='folder'){if(!document.querySelector('.howto[data-for=folder]'))openPath('/open-home',b.querySelector('p'));}
-});});
-// A click anywhere else, or Escape, closes the open card.
-document.addEventListener('click',ev=>{if(!ev.target.closest('.item,.howto'))closeAll();});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeAll();});
-window.addEventListener('resize',()=>{const o=document.querySelector('.item.open');if(o)place(o);});
-document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPath(b.dataset.open,b)));
-// "See the report": the report of the backup this shoot came from, opened right here in the pane.
-document.querySelectorAll('[data-report]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude: show me the report');return;}note(b,'Opening the report...');try{const r=await fetch('/report-url?id='+encodeURIComponent(b.dataset.report));const d=await r.json();if(d.url){location.href=d.url;}else note(b,d.words||'Ask Claude: show me the report');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude: show me the report');}}));
-document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{if(!live){note(b,'Ask Claude to open this.');return;}note(b,'Pick the folder in the window that just opened...');try{const r=await fetch('/pick-folder');const d=await r.json();note(b,d.words||'');}catch(e){note(b,'The Assistant isn\'t running right now. Ask Claude.');}}));
-document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{if(copyText(b.dataset.copy)){b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);}else{b.textContent='Select it and copy';}}));
-if(!live){$('#offline').hidden=false;}
-// Reload when anything changes (the folder gets made, a shoot lands, a queue moves), keeping the open card open.
-const STAMP=document.body.dataset.stamp;
-try{const o=sessionStorage.getItem('studio-home-open');if(o){const b=document.querySelector('.item[data-item="'+o+'"]');if(b&&howtoFor(o)){openItem(b);}sessionStorage.removeItem('studio-home-open');}}catch(e){}
-if(live){setInterval(async()=>{try{const r=await fetch('/home-state',{cache:'no-store'});const t=(await r.text()).trim();if(t&&STAMP&&t!==STAMP){const o=document.querySelector('.item.open');try{if(o)sessionStorage.setItem('studio-home-open',o.dataset.item);}catch(e){}location.reload();}}catch(e){}},4000);}
+// every card records what was pressed, so the chat knows (journey.json); then it goes where it goes
+document.querySelectorAll('.item[data-item]').forEach(b => b.addEventListener('click', () => clicked(b.dataset.item)));
+$('editing').onclick = () => assistant('/queue-url', $('editingWords'), W.opening_queue);
+$('folder').onclick = () => assistant('/open-home', $('folder').querySelector('p'), W.opening);
+document.querySelectorAll('[data-report]').forEach(x => x.onclick = () => assistant('/report-url?id=' + encodeURIComponent(x.dataset.report), x, W.opening_report));
+if (!live) $('offline').hidden = false;
+// Reload when anything changes (a card goes in, a backup lands, a queue moves).
+const STAMP = document.body.dataset.stamp;
+if (live) setInterval(async () => { try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
 """
 
 
@@ -394,128 +342,70 @@ def _in_address(t):
     return str(t).replace("%", "%25").replace("#", "%23").replace("?", "%3F")
 
 
-def kit_thumbs(k):
-    """Three small previews of a kit's photos, in ~/.studio/home-thumbs/, made once."""
+def nice_day(iso):
+    """ "Nov 13, 2026", as the screens write a day."""
     try:
-        import kit as kit_mod
-        kd = Path(k["path"])
-        rec = kit_mod.load_rec(kd)
-        photos = kit_mod.photo_files(kit_mod.photos_dir(kd, rec))[:3]
-        out = []
-        (HOME / "home-thumbs").mkdir(parents=True, exist_ok=True)
-        for i, src in enumerate(photos, 1):
-            dst = HOME / "home-thumbs" / f"{k['folder']}-{i}.jpg"
-            if not dst.exists() and not kit_mod.fit(Path(src), dst, (240, 240)):
-                continue
-            out.append(dst.relative_to(HOME).as_posix())
-        return out
-    except Exception:
-        return []
+        d = date.fromisoformat(str(iso)[:10])
+        return d.strftime("%b ") + str(d.day) + d.strftime(", %Y")
+    except ValueError:
+        return ""
+
+
+def today_items(g):
+    """Today, in her order: a card that is in, what is late or due soon (and posts to make today), the last
+    backup with its report one click away, how many shoots are waiting, the posting queue's line."""
+    e = html.escape
+    Wd = home_base.W
+    items = []
+    if g["card"]:
+        items.append(("card", e(Wd("t_card").format(name=g["card"]["name"], files=f"{g['card']['files']:,}"))
+                      + f" <a class='btn' href='/backups'>{e(Wd('t_card_go'))}</a>"))
+    for kind, words in g["notes"][:5]:
+        items.append((kind, e(words)))
+    lb = g.get("last_backup")
+    if lb:
+        n = lb["shoots"]
+        try:
+            import clips
+            count = clips.words(lb["photos"], lb.get("clips") or 0)
+        except Exception:  # noqa: BLE001
+            count = f"{lb['photos']:,} photos"
+        items.append(("", e(Wd("t_last").format(day=nice_day(lb["when"]), n=n, s="" if n == 1 else "s", count=count))
+                      + f" <button class='btn' data-report='latest'>{e(Wd('see_report'))}</button>"))
+    if g.get("waiting"):
+        n = g["waiting"]
+        items.append(("soon", e(Wd("t_waiting").format(n=n, s="" if n == 1 else "s"))))
+    if g["tank"] and not g["tank"].startswith("Nothing ready"):
+        items.append(("", e(g["tank"])))
+    if not items:
+        items.append(("", e(Wd("t_nothing"))))
+    return items
 
 
 def page_html():
-    import posting_queue
     g = gather()
     e = html.escape
-    done = g["done"]
-
-    # today
-    known = g["setup"] or any(d.get("count") for d in g["done"].values()) or bool(g["kits"])
-    today_items = []
-    if g["card"]:
-        today_items.append(("card", f"A card is in: {g['card']['name']}, about {g['card']['files']:,} files. Ready when you are."))
-    for kind, words in g["notes"][:5]:
-        today_items.append((kind, e(words)))
-    lb = g.get("last_backup")
-    if lb:
-        try:
-            d = date.fromisoformat(lb["when"])
-            when = "today" if d == date.today() else ("yesterday" if (date.today() - d).days == 1 else d.strftime("%A, %b ") + str(d.day))
-        except ValueError:
-            when = ""
-        n = lb["shoots"]
-        today_items.append(("", f"Your last backup{', ' + when if when else ''}: {n} shoot{'s' if n != 1 else ''}, {lb['photos']:,} photos. "
-                                f"<button class='btn inline' data-report='latest'>See the report</button>"))
-    if g["tank"] and not g["tank"].startswith("Nothing ready") and not any(k == "post" for k, _ in today_items):
-        today_items.append(("post", e(g["tank"])))
-    if not today_items:
-        # never a list of what's empty for someone who hasn't started (Dustin, Nov 5)
-        today_items.append(("", "Nothing due and nothing waiting." if known else
-                            "Once you've backed up a shoot or made some posts, what's due and what's ready to post shows up here."))
-    today_html = "".join(f"<li class='{k}'>{w}</li>" for k, w in today_items)
-
-    # menu
-    menu = []
-    no_folder = not g["home_folder"]
-    import posts as posts_mod
-    fill = {"{NAME}": brand.name(), "{the_name}": brand.the_name(), "{HOME}": brand.short()}
-    def f_(t):
-        for k, v in fill.items():
-            t = t.replace(k, v)
-        return t
-    for key, name, blurb, steps, note in MENU:
-        name, blurb = f_(name), f_(blurb)
-        steps = [f_(t) for t in steps] if steps else steps
-        note = f_(note) if note else note
-        first, rest = name.split(" ", 1)
-        menu.append(f"<button class='item' data-item='{key}'><span class='n'>{e(first)} <em>{e(rest)}</em></span><p>{e(blurb)}</p></button>")
-        if no_folder and key in ("posts", "folder"):
-            # Nothing set up yet: the one step is to ask for the folder. The Studio makes it and says where.
-            steps = [f"{brand.name()} hasn't made your folder yet. It takes one question. Paste this in the chat:"]
-            words = SAY["setup"]
-            note = f"{brand.name()} asks where you'd like the folder, makes it, and tells you where it is."
-        elif steps:
-            words = SAY[key]
-        if steps:
-            step_html = (f"<p>{steps[0]}</p>" if len(steps) == 1 else "<ol>" + "".join(f"<li>{t}</li>" for t in steps) + "</ol>")
-            menu.append(f"<div class='howto' data-for='{key}'>{step_html}"
-                        f"<div class='paste'><span class='words'>{e(words)}</span><button class='copy' data-copy='{e(words)}'>Copy</button></div>"
-                        f"<small>{e(note)}</small></div>")
-    menu_html = "".join(menu)
-
-    # recent shoots and kits
-    kits_by_name = {k["name"].lower(): k for k in g["kits"]}
-    recent = []
-    for s in g["recent"]:
-        ph = "".join(f"<img src='{e(t)}' alt=''>" for t in s["thumbs"]) + "<i></i>" * (3 - len(s["thumbs"]))
-        when = ""
-        if s.get("shot"):
-            try:
-                when = date.fromisoformat(s["shot"][:10]).strftime("%b ") + str(int(s["shot"][8:10]))
-            except ValueError:
-                when = ""
-        meta = " · ".join(x for x in (when, f"{s['count']:,} photos" if s.get("count") else "", {"waiting": "to edit", "finished": "edited", "archived": "just for you"}.get(s.get("status"), "")) if x)
-        acts = f"<button class='btn' data-open='/open-shoot?id={e(s['id'])}'>Open photo folder</button>"
-        if s.get("report"):
-            acts += f"<button class='btn' data-report='{e(s['id'])}'>See the report</button>"
-        k = kits_by_name.get(s["name"].lower())
-        if k:
-            acts += f"<a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a>"
-        recent.append(f"<div class='shoot'><div class='ph'>{ph}</div><b>{e(s['name'])}</b><small>{e(meta)}</small><div class='acts'>{acts}</div></div>")
-    for k in g["kits"]:
-        if k["name"].lower() in {s["name"].lower() for s in g["recent"]}:
-            continue
-        th = "".join(f"<img src='{e(_in_address(t))}' alt=''>" for t in kit_thumbs(k))
-        th += "<i></i>" * (3 - th.count("<img"))
-        recent.append(f"<div class='shoot'><div class='ph'>{th}</div><b>{e(k['name'])}</b><small>{k['photos']} photos · post kit</small>"
-                      f"<div class='acts'><a class='btn solid' href='/content/{e(_in_address(k['folder']))}/Post%20kit.html'>Open the post kit</a></div></div>")
-    recent_html = "".join(recent[:8]) if recent else ""
-    recent_block = (f"<section class='sec'><h2>Your recent shoots</h2></section><div class='recent'>{recent_html}</div>" if recent_html
-                    else "<section class='sec'><h2>Your shoots</h2></section><p class='empty'>Nothing here yet. Your shoots show up here once you've backed up a memory card or made posts from a folder of photos.</p>")
-
-    head_h1 = "Welcome <em>back.</em>" if known else (f"Hi, I'm <em>{e(brand.own_name())}.</em>" if brand.own_name() else f"Welcome to <em>{e(brand.name())}.</em>")
-    lede = "Here's where things stand. Click anything below to see what it does." if known else \
-        "Click anything below to see what it does. Start with whatever you have today: photos you've already finished, or a memory card from a shoot."
+    Wd = home_base.W
+    today_html = "".join(f"<li class='{k}'><span>{w}</span></li>" for k, w in today_items(g))
+    cards = []
+    for n, (item, href, name, blurb, go) in enumerate(STEPS, 1):
+        go_id = "" if href else " id='editingWords'"
+        inner = (f"<span class='k'>{n}</span><span class='n'>{Wd(name)}</span><p>{e(Wd(blurb))}</p>"
+                 f"<span class='go'{go_id}>{e(Wd(go))}</span>")
+        cards.append(f"<a class='item' data-item='{item}' href='{href}'>{inner}</a>" if href
+                     else f"<button class='item' data-item='{item}' id='editing'>{inner}</button>")
+    cards.append(f"<button class='item minor' data-item='folder' id='folder'><span class='n'>{Wd('c5_name').format(short=e(brand.short()))}</span>"
+                 f"<p>{e(Wd('c5_p'))}</p></button>")
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{e(brand.title())}</title><style>{look.head_css()}{posting_queue.CSS}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
+            f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when'>{e(g['today'])}</span></div>"
-            f"<header class='head'><span class='eyebrow'>Home</span><h1>{head_h1}</h1><p class='lede'>{lede}</p>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show the Assistant” for the live one.</p></header>"
-            f"<section class='sec'><h2>Today</h2><ul class='todayl'>{today_html}</ul></section>"
-            f"<section class='sec'><h2>What {e(brand.the_name())} does</h2><p>Click one.</p></section><div class='menu'>{menu_html}</div><p class='said' id='said'></p>"
-            f"{recent_block}"
-            f"</div><script>{SCRIPT}</script></body></html>")
+            f"<header class='head'><span class='eyebrow'>{e(Wd('home_eyebrow'))}</span><h1>{Wd('home_h1')}</h1>"
+            f"<p class='lede wide'>{e(Wd('home_lede_1'))}</p><p class='lede wide'>{e(Wd('home_lede_2'))}</p>"
+            f"<p class='offline' id='offline' hidden>{e(Wd('offline'))}</p></header>"
+            f"<section class='sec'><h2>{e(Wd('today'))}</h2><ul class='todayl' id='today'>{today_html}</ul></section>"
+            f"<section class='sec'><h2>{e(Wd('flow'))}</h2><div class='flow'>{''.join(cards)}</div></section>"
+            f"</div><script>{home_base.words_js()}{home_base.JS_SHARED}{SCRIPT}</script></body></html>")
 
 
 def write_page():

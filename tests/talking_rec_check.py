@@ -7,7 +7,8 @@ and the assistant's commands in the chat (Nicole's handoffs v23 and v24, built o
 Runs in a throwaway folder with its own pretend Assistant (STUDIO_HOME is set to it, so nothing lands in the
 real one); starts no server and makes no video (the one video it uses is the tiny tests/fixtures/loud-tone-3s.mp4,
 copied in and only ever read by its header). Her rules are compared with her own file character for character
-when her v24 folder is beside the repo (SKIP when it is not).
+when her v24 folder is beside the repo, or beside the main checkout when this is a worktree (SKIP when it is
+not); her v25 and v27 packs leave talking.py unchanged, so v24 stays the file compared.
 
 Every line must say PASS (or SKIP). Python 3.9, standard library only, a Mac or a PC.
 """
@@ -189,9 +190,9 @@ try:
     check("state: her keys, and ours beside them",
           {"ok", "folder", "videos", "working", "rec", "pieces", "zooms", "shots", "captions"} <= set(st)
           and {"rev", "stamp", "short", "coming", "video_state"} <= set(st), sorted(st))
-    check("state: rec holds what her page reads, and nothing else of ours",
+    check("state: rec holds what her page reads (made, v27: whether this reel was made, never which project), and nothing else of ours",
           set(st["rec"]) == {"words", "sentences", "cut", "video", "status", "step", "problem", "info", "transcribed", "claude_cut",
-                             "photo_mode", "cap_size", "captions", "updated", "kept_for"}
+                             "photo_mode", "cap_size", "captions", "updated", "kept_for", "made"} and st["rec"]["made"] is False
           and set(st["rec"]["words"][0]) == {"w", "start", "end"} and st["rec"]["info"] == {"dur": 3.0}, sorted(st["rec"]))
     check("state: videos are {key, name}; the record's video is its name; it is the one the script was made from",
           st["videos"] == [{"key": KEY1, "name": "my talk.mp4"}, {"key": talks[1]["key"], "name": "second take.MOV"}]
@@ -958,10 +959,234 @@ try:
           not errors and set(codes) <= {200, 409} and end["cut"] == [[11, 12]] and end["rev"] >= rev0 + 12
           and not [f.name for f in (LONG / ".kit").iterdir() if f.name.endswith(".tmp")], (errors[:2], sorted(set(codes)), end.get("cut")))
 
+    # ------------------------------------------------------------ fix a word (her v27, Nov 17): the record, the save, the engine
+    # Hers rewrites the word inside the record and keeps the heard word beside it as w0. Ours keeps the words
+    # file as it was written and lays {"fixes": {"<word number>": "the right words"}} over the words when the
+    # record is read: every reader sees her shape (w the fixed word, w0 the heard one).
+    FK = make_kit("2026-10-05 Aurora fixes")
+    FSHORT = "Aurora fixes"
+    FREC, FWORDS = FK / ".kit" / "talking.json", FK / ".kit" / "talking-words.json"
+    (FK / "Talking").mkdir()
+    shutil.copyfile(CLIP, FK / "Talking" / "aurora.mp4")
+    shutil.copyfile(CLIP, FK / "Talking" / "take two.mp4")
+    ftalks = TR.list_talks(FK)
+    FKEY = ftalks[0]["key"]
+    TR.put_words(FK, "aurora.mp4", FKEY, WORDS, {"dur": 3.0, "w": 640, "h": 360}, {"how": "pretend", "ondevice": True})
+    fwords_bytes = FWORDS.read_bytes()
+    FPAGE = "pageFIX01"
+
+    def frec():
+        return json.loads(FREC.read_text(encoding="utf-8"))
+
+    def fsv(saved, base=None):
+        return TR.save_from_page(FK, {"kit": "2026-10-05 Aurora fixes", "base": TR.state_for_page(FK, rev=-1)["rev"] if base is None else base,
+                                      "page": FPAGE, "saved": saved})
+
+    def frefused(name, saved):
+        before, rev = FREC.read_bytes(), frec()["rev"]
+        code, ans = fsv(saved)
+        check("fixes refused: " + name + " (the whole save, nothing written)",
+              code == 400 and ans == {"ok": False, "words": TR.NOT_UNDERSTOOD} and FREC.read_bytes() == before and frec()["rev"] == rev, (code, ans))
+
+    # "so" (word 1) heard for "want to"; "um" (word 2) typed away; "beach." (word 7) fixed to "beach!"
+    code, ans = fsv({"fixes": {"1": "want to", "2": "", "7": "beach!"}})
+    st = ans.get("rec", {}) if code == 200 else {}
+    check("a save of fixes lands: the record holds the map by word number, nothing else of the words",
+          code == 200 and frec()["fixes"] == {"1": "want to", "2": "", "7": "beach!"} and "words" not in frec(), (code, frec().get("fixes")))
+    check("... the page's state is her shape: w is the fixed word and w0 the heard one, on the fixed words only",
+          st.get("words", [{}])[1] == {"w": "want to", "w0": "so", "start": 0.5, "end": 0.75}
+          and st["words"][2] == {"w": "", "w0": "um", "start": 1.0, "end": 1.25} and st["words"][7]["w"] == "beach!" and st["words"][7]["w0"] == "beach."
+          and all("w0" not in w for i, w in enumerate(st["words"]) if i not in (1, 2, 7)) and len(st["words"]) == NW, st.get("words", [])[:3])
+    check("... every word keeps its number: a typed-away word is still there (her captions skip it, her pieces play it)",
+          len(TR.load(FK)["words"]) == NW and TR.load(FK)["words"][2]["w"] == "" and TR.load(FK)["words"][3]["w"] == "we")
+    caps = TR.state_for_page(FK)["captions"]
+    # one piece from 0 (word 0 starts at 0.0; 0.08 before is clamped): a caption starts at its word's start, and the
+    # caption before the typed-away word ("want to", word 1, 0.5) stays up until the next kept one ("we", word 3, 1.5)
+    check("... the captions use the fixed words, at the heard word's times, and none for the word typed away",
+          [c["text"] for c in caps] == ["OK", "want to", "we", "were", "at", "the", "beach!"] + SAID[8:] and caps[1]["start"] == 0.5
+          and caps[1]["end"] == caps[2]["start"] == 1.5, [(c["text"], c["start"], c["end"]) for c in caps][:4])
+    check("... pieces, cuts and timing are untouched by a fix", TR.state_for_page(FK)["pieces"] == TR.state_for_page(FK)["pieces"]
+          and len(TR.state_for_page(FK)["pieces"]) == len(eng.pieces({"words": WORDS})) and TR.state_for_page(FK)["rec"]["cut"] == [])
+    check("... the words file is byte for byte as it was written", FWORDS.read_bytes() == fwords_bytes)
+    before, rev = FREC.read_bytes(), frec()["rev"]
+    code, ans = fsv({"fixes": {"1": "want to", "2": "", "7": "beach!"}})
+    check("the same map sent again writes nothing (the counter stays)", code == 200 and FREC.read_bytes() == before and ans["rev"] == rev)
+    code, ans = fsv({"fixes": {"1": " want   to ", "7": "beach!", "2": ""}})
+    check("... whitespace collapsed and in any order, it is still the same map: nothing written", code == 200 and FREC.read_bytes() == before)
+    code, ans = fsv({"fixes": {"1": "want to", "7": "beach!", "2": "", "3": "we"}})
+    check("a fix equal to the heard word is dropped (hers does the same), so that too writes nothing", code == 200 and FREC.read_bytes() == before)
+    code, ans = fsv({"fixes": {"1": "so", "2": "", "7": "beach!"}})
+    check("a fix put back to the heard word goes out of the map, and the word is simply the word again",
+          code == 200 and frec()["fixes"] == {"2": "", "7": "beach!"} and ans["rec"]["words"][1] == {"w": "so", "start": 0.5, "end": 0.75})
+    code, ans = fsv({"fixes": {}})
+    check("Undo: the earlier map (empty) brings every heard word back, and the record holds no fix",
+          code == 200 and frec().get("fixes") == {} and all("w0" not in w for w in ans["rec"]["words"]) and [c["text"] for c in ans["captions"]] == SAID)
+    fsv({"fixes": {"1": "want to", "2": ""}})
+    frefused("a map that is a list", {"fixes": [["1", "x"]]})
+    frefused("a key past the last word", {"fixes": {str(NW): "x"}})
+    frefused("a key that isn't digits", {"fixes": {"a": "x"}})
+    frefused("a key with a sign", {"fixes": {"-1": "x"}})
+    frefused("a key that is a number, not text (a hand-made request)", {"fixes": {1: "x"}})
+    frefused("a value that isn't text (hers would store \"['a']\")", {"fixes": {"1": ["a"]}})
+    frefused("a value that is a number", {"fixes": {"1": 5}})
+    frefused("81 characters (hers cuts to 80 without a word)", {"fixes": {"1": "x" * 81}})
+    frefused("two keys naming one word (\"01\" and \"1\")", {"fixes": {"01": "x", "1": "y"}})
+    frefused("more entries than words", {"fixes": {str(i): "x" for i in range(NW + 1)}})
+    frefused("one good field beside bad fixes", {"captions": False, "fixes": {"x": "y"}})
+    code, ans = fsv({"fixes": {"1": "x" * 80, "2": ""}})
+    check("80 characters is taken, and the key \"01\" is read as word 1", code == 200 and frec()["fixes"]["1"] == "x" * 80
+          and fsv({"fixes": {"01": "y", "2": ""}})[1]["rec"]["words"][1]["w"] == "y" and frec()["fixes"] == {"1": "y", "2": ""})
+    check("... and none of the refusals wrote anything to the words file", FWORDS.read_bytes() == fwords_bytes)
+    fsv({"fixes": {"1": "want to", "2": "", "7": "beach!"}})
+    # a stretch on a fixed word and on the word typed away: still on those numbers (nothing was renumbered)
+    fsv({"shots": [{"a": 2, "b": 3, "ns": [1], "spot": "pip", "pos": None, "me": None}], "cut": [[7, 7]]})
+    stf = TR.state_for_page(FK)
+    span = eng.shot_spans(TR.load(FK), stf["pieces"])[0]
+    piece2 = next((p for p in stf["pieces"] if p["words"][0] == 2), None)
+    check("a stretch on the typed-away word and a cut on a fixed word sit on those very words (no one-off from an empty word)",
+          stf["shots"][0]["a"] == 2 and stf["rec"]["cut"] == [[7, 7]] and "beach!" not in [c["text"] for c in stf["captions"]]
+          and piece2 is not None and piece2["from"] == round(1.0 - 0.08, 3) and span == {"at": piece2["at"], "dur": piece2["dur"]}, (stf["shots"], span, piece2))
+    # a fix on a cut word is kept (hers allows it: the word shows crossed out and fixed)
+    check("a fix on a cut word is kept", frec()["fixes"]["7"] == "beach!" and stf["rec"]["words"][7]["w0"] == "beach.")
+    # the assistant's side: show and photos print the fixed word as THE word; status counts the fixes
+    out = run("show", FSHORT).stdout
+    check("show: the fixed word is simply the word to the assistant (rule 3: it never touches a caption word); a typed-away word is empty",
+          "0:OK 1:want to 2: 3:we" in out and "7:beach!" in out and "w0" not in out and "1:so" not in out and "2:um" not in out, out[-300:])
+    out = run("photos", FSHORT).stdout
+    check("photos: the same (the cut word 7 left out, as any cut word)", "0:OK 1:want to 2: 3:we" in out and "7:beach" not in out and "w0" not in out, out[-200:])
+    out = run("status", FSHORT).stdout
+    check("status: one line of ours says how many words were fixed, and nothing else about them",
+          "  Words fixed on the page: 3." in out and "want to" not in out and "w0" not in out, out)
+    out = run("status", SHORT).stdout
+    check("... and no such line when nothing was fixed", "Words fixed" not in out, out)
+    # a fix is not "their own work" for cut --replace: fixes never touch cuts or stretches
+    TR.change(FK, lambda r: r.update(cut=[]) or r.pop("shots", None) and None)
+    r = run("cut", FSHORT, "--file", jfile({"cut": [[0, 0]], "why": ["the warm-up"]}))
+    check("the assistant may cut a script whose only edit is fixes (a fix is not their own cut)", r.returncode == 0 and frec()["cut"] == [[0, 0]]
+          and frec()["fixes"] == {"1": "want to", "2": "", "7": "beach!"}, (r.returncode, r.stdout[-200:]))
+    # another video, and back: the fixes move with the rest of the edit
+    TR.use_video(FK, "take two.mp4")
+    now = frec()
+    check("another video: the fixes go into \"earlier\" with the edit, and the new video starts with none",
+          "fixes" not in now and now["earlier"]["aurora.mp4"]["fixes"] == {"1": "want to", "2": "", "7": "beach!"}
+          and TR.state_for_page(FK)["rec"]["words"] == [], now.get("earlier"))
+    TR.use_video(FK, "aurora.mp4")
+    check("... and come back with it", frec()["fixes"] == {"1": "want to", "2": "", "7": "beach!"} and TR.state_for_page(FK)["rec"]["words"][1]["w"] == "want to")
+    # the script made again (Edit my video again): the fixes belong to the old word numbers; kept in replaced
+    WORDS_AGAIN = [dict(w, start=w["start"] + 0.1, end=w["end"] + 0.1) for w in WORDS[:10]]
+    TR.put_words(FK, "aurora.mp4", FKEY, WORDS_AGAIN, {"dur": 3.0})
+    now = frec()
+    check("Edit my video again: the fixes are kept in replaced with the cuts (hers loses them without a word), and the edit starts afresh",
+          "fixes" not in now and now["replaced"][-1]["fixes"] == {"1": "want to", "2": "", "7": "beach!"} and now["replaced"][-1]["cut"] == [[0, 0]]
+          and now["replaced"][-1]["why"] == "Edit my video again" and all("w0" not in w for w in TR.state_for_page(FK)["rec"]["words"]), now.get("replaced", [])[-1:])
+    TR.put_words(FK, "aurora.mp4", FKEY, WORDS, {"dur": 3.0})
+    fwords_bytes = FWORDS.read_bytes()                     # the words were made again (twice): written by put_words, as ever; never by a fix
+    fsv({"fixes": {"4": "WERE"}})
+    # several talking reels (v25): a reel's fixes are put away and brought back with its other fields
+    code, ans = TR.version_op(FK, {"op": "new"})
+    check("a new talking reel starts with no fixes, and the first reel's are put away with the rest of it",
+          code == 200 and ans["current"] == "v2" and "fixes" not in frec() and frec()["versions"][0]["data"]["fixes"] == {"4": "WERE"}
+          and TR.state_for_page(FK)["rec"]["words"] == [], (code, frec().get("versions")))
+    check("... load(kit, reel) shows the other reel's fixed word", TR.load(FK, "v1")["words"][4] == dict(WORDS[4], w="WERE", w0="were"))
+    code, ans = TR.version_op(FK, {"op": "switch", "id": "v1"})
+    check("... and switching back brings them up", code == 200 and frec()["fixes"] == {"4": "WERE"} and TR.state_for_page(FK)["rec"]["words"][4]["w"] == "WERE")
+    # Open CapCut (v27): the newest project made from the OPEN reel; each talking reel keeps its own made list
+    check("last_made: nothing made from this reel yet, and the page's state says so (rec.made, her REC.made.length)",
+          TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False)
+    rev_before = frec()["rev"]
+    TR.note_made(FK, "Aurora talking reel")
+    TR.note_made(FK, "Aurora talking reel 2")
+    stm = TR.state_for_page(FK)
+    check("last_made names the newest project made from the open reel; the state tells the page only THAT one was made, never a project's name; the counter did not move",
+          TR.last_made(FK) == "Aurora talking reel 2" and stm["rec"]["made"] is True and "Aurora talking reel" not in json.dumps(stm) and frec()["rev"] == rev_before,
+          (TR.last_made(FK), stm["rec"].get("made"), frec()["rev"], rev_before))
+    code, ans = TR.version_op(FK, {"op": "switch", "id": "v2"})
+    check("another talking reel of the shoot has its own made list (none yet): last_made is None there and the page shows no Open CapCut, while the first reel's list is put away whole",
+          code == 200 and TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False
+          and [m["project"] for m in frec()["versions"][0]["data"]["made"]] == ["Aurora talking reel", "Aurora talking reel 2"], frec().get("versions"))
+    TR.note_made(FK, "Aurora talking reel 3")
+    check("... a make noted while it is open goes to it alone", TR.last_made(FK) == "Aurora talking reel 3" and TR.state_for_page(FK)["rec"]["made"] is True)
+    code, ans = TR.version_op(FK, {"op": "switch", "id": "v1"})
+    check("... and back on the first reel, its own newest", code == 200 and TR.last_made(FK) == "Aurora talking reel 2"
+          and [m["project"] for m in frec()["versions"][1]["data"]["made"]] == ["Aurora talking reel 3"])
+    TR.change(FK, lambda r: r.update(made=[{"project": 3}, "x", {"when": 1}, {"project": ""}]))
+    check("a record changed by hand: entries of made that don't name a project don't count, and the page shows no Open CapCut",
+          TR.last_made(FK) is None and TR.state_for_page(FK)["rec"]["made"] is False)
+    TR.change(FK, lambda r: r.update(made="no"))
+    check("... made that isn't a list at all reads as none", TR.last_made(FK) is None and TR.state_for_page(FK)["ok"] and TR.state_for_page(FK)["rec"]["made"] is False)
+    TR.change(FK, lambda r: r.pop("made", None) and None)
+    # a record changed by hand: fixes that aren't a map, or an entry that isn't a digit key and text, are left out
+    TR.change(FK, lambda r: r.update(fixes={"4": "WERE", "x": "no", "5": 3, "99": "far"}))
+    stf = TR.state_for_page(FK)
+    check("a record changed by hand: only the entries that are a word number and text are laid over; a number past the words is ignored",
+          stf["rec"]["words"][4]["w"] == "WERE" and all("w0" not in w for i, w in enumerate(stf["rec"]["words"]) if i != 4), stf["rec"]["words"][4:6])
+    TR.change(FK, lambda r: r.update(fixes="not a map"))
+    check("... fixes that aren't a map at all read as none", all("w0" not in w for w in TR.state_for_page(FK)["rec"]["words"]) and TR.state_for_page(FK)["ok"])
+    check("... and the words file was never touched by any of it", FWORDS.read_bytes() == fwords_bytes)
+
+    # ------------------------------------------------------------ + Add more photos (her v27): photos dropped in while the pop-up is open
+    # The page's look sends photos=1 only while its photo pop-up is open; the state then has any photo dropped into
+    # the Photos folder numbered first (talking_rec.photos_landed -> reel_page.relist_if_changed -> kit.py sheet,
+    # the one writer, handed the list from last time), so the mark moves and the whole state comes back. Lane A's
+    # contract, proved from this side: every earlier number is kept, a new photo takes the next number after the
+    # highest ever given, a photo gone keeps its number unused.
+    sys.path.insert(0, str(ROOT / "tests"))
+    import words_page_check as wpc         # its tiny picture
+    MK = make_kit("2026-10-09 More photos", photos=2)          # the pretend list names IMG_0001 and IMG_0002: neither is in the folder
+    msheet = MK / ".kit" / "sheet.json"
+    st_a = TR.state_for_page(MK)
+
+    def drop(name, old=True):
+        f = MK / "Photos" / name
+        f.write_bytes(wpc.TINY)
+        if old:
+            os.utime(f, (time.time() - 30, time.time() - 30))
+        return f
+
+    def listed():
+        return [(x["n"], Path(x["file"]).name) for x in arrange.sheet_rows(MK)]
+
+    drop("sunset-001.jpg")
+    plain = TR.state_for_page(MK, rev=st_a["rev"], mark=st_a["mark"])
+    check("without photos=1 (the pop-up closed) a photo dropped into the Photos folder is not numbered: the short answer, the list as it was",
+          "rec" not in plain and listed() == [(1, "IMG_0001.jpg"), (2, "IMG_0002.jpg")], (sorted(plain), listed()))
+    got = TR.state_for_page(MK, rev=st_a["rev"], mark=st_a["mark"], photos=True)
+    check("with photos=1 the photo is numbered first, after the highest number ever given (3; the two gone keep theirs unused), and the whole state comes back with the mark moved",
+          "rec" in got and got["mark"] != st_a["mark"] and got["stamp"] != st_a["stamp"] and listed() == [(3, "sunset-001.jpg")], (sorted(got)[:4], listed()))
+    reel_page._RELIST.clear()                                   # the folder is compared at most every 4 s a kit: the next look, now
+    drop("sunset-000.jpg")                                      # sorts BEFORE the one listed: it still takes the next number, never 3
+    m_b = TR.state_for_page(MK)["mark"]
+    TR.state_for_page(MK, photos=True)
+    check("a second photo, though it sorts first by name, takes the next number (4) and the one before keeps 3",
+          listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg")] and TR.state_for_page(MK)["mark"] != m_b, listed())
+    reel_page._RELIST.clear()
+    drop("sunset-002.jpg", old=False)                           # changed just now: still being copied in
+    m_c = TR.state_for_page(MK)["mark"]
+    TR.state_for_page(MK, photos=True)
+    check("a photo still being copied in (changed this moment) is not numbered yet: the list and the mark as they were",
+          listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg")] and TR.state_for_page(MK)["mark"] == m_c, listed())
+    os.utime(MK / "Photos" / "sunset-002.jpg", (time.time() - 30, time.time() - 30))
+    reel_page._RELIST.clear()
+    TR.state_for_page(MK, photos=True)
+    check("...settled, it is numbered at the next look (5)", listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg"), (5, "sunset-002.jpg")], listed())
+    reel_page._RELIST.clear()
+    sb = msheet.read_bytes()
+    TR.state_for_page(MK, photos=True)
+    check("nothing landed: photos=1 writes nothing (the list byte for byte)", msheet.read_bytes() == sb)
+    check("no path of the Photos folder is in the state", str(MK) not in json.dumps(TR.state_for_page(MK)) and "sunset" not in json.dumps(TR.state_for_page(MK)))
+
     # ------------------------------------------------------------ her rules, character for character
-    HERS = ROOT.parent / "hf-tools" / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py"
-    if not HERS.is_file():
-        HERS = ROOT / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py"
+    # Her v24 talking.py: her v25 and v27 packs say it is unchanged since v24 and carry no copy (her v27
+    # talking_core.py differs from v24 by one captions line only, diffed Nov 17; its rule blocks are not in it).
+    roots = [ROOT.parent / "hf-tools" / "reference-private", ROOT / "reference-private"]
+    try:                                                   # a worktree: the main checkout's reference-private too
+        out = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], capture_output=True, text=True, timeout=20).stdout.strip()
+        if out:
+            roots.append((ROOT / out).resolve().parent / "reference-private")
+    except (OSError, subprocess.SubprocessError):
+        pass
+    HERS = next((r / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py" for r in roots
+                 if (r / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py").is_file()), roots[0] / "none")
     if HERS.is_file():
         her = HERS.read_text(encoding="utf-8")                 # read as text, never run
         hr = re.search(r'^RULES = """(.*?)"""', her, re.S | re.M)

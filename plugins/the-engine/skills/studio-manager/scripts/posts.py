@@ -937,12 +937,14 @@ def kits(h):
         if rec.exists():
             try:
                 info = json.loads(rec.read_text(encoding="utf-8"))
-            except ValueError:
+            except (OSError, ValueError):
                 pass
+            if not isinstance(info, dict):      # a record that is not a record: one odd kit never hides the others
+                info = {}
         photos = len([p for p in (d / "Photos").iterdir() if p.is_file() and not p.name.startswith(".")]) if (d / "Photos").is_dir() else 0
         out.append({"folder": d.name, "path": str(d), "name": info.get("name", d.name), "date": info.get("date"), "photos": photos,
                     "kit": (d / ".kit" / "Post kit.html").exists() or (d / "Post kit.html").exists()})
-    out.sort(key=lambda k: (k["date"] or "", k["folder"]), reverse=True)
+    out.sort(key=lambda k: (k["date"] if isinstance(k["date"], str) else "", k["folder"]), reverse=True)
     return out
 
 

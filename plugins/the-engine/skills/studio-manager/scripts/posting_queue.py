@@ -18,6 +18,7 @@ the green pieces cover. Nothing here posts anything, ever (rule 5): dates only.
     python3 posting_queue.py ready "beach reel"          -> green, next in line, gets a date
     python3 posting_queue.py unready "beach reel"        back to yellow
     python3 posting_queue.py posted "beach reel"         it went out
+    python3 posting_queue.py unposted "beach reel"       it didn't go out after all: back in line at the end, ready to post
     python3 posting_queue.py skip "beach carousel"       they don't want this one (red -> gone from the list)
     python3 posting_queue.py move "beach reel" --to 1    change its place in line (dates follow)
     python3 posting_queue.py list
@@ -58,6 +59,15 @@ words. All of it on this one server:
                                                       piece's own kit (cover_file); the piece keeps "cover" and a
                                                       new thumbnail (the earlier one is left where it is)
 A kit's pieces are told apart by the folder they were made from, never by its name made short (kit_sid, same_kit).
+
+Posted, on the post itself (Nicole's v27): the panel of an upcoming post has a Not posted / Posted switch beside
+Done. Posted takes the piece out of the queue and shows it in the grid at once as an ordinary feed post (no date,
+no "posted on" label: that day is only the day they said so) until the real grid is read again; a click on it
+opens a panel with her line and the switch only. Back to Not posted is the "unposted" action (POST /posting
+{action: "unposted", id}, or `unposted "<piece>"` in the chat): posted_at goes, the piece is back in line at the
+end with a new date, and a reminder that was on comes back on that date, the same event brought into step.
+state()["posted"] says which posted pieces the grid shows: those posted since the grid was last read, or in the
+last POSTED_DAYS days when it never was (the server decides; the page only draws them).
 """
 import argparse
 import base64
@@ -106,6 +116,7 @@ KIT_OWN_FILES = ("Post kit.html", "Reel.txt")   # what /content serves from a ki
 KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
+POSTED_DAYS = 30         # with the real grid never read, a post marked Posted stays in the grid this long (Nicole's v27)
 # The small pictures the pages show, and how deep each folder's go: a piece's ("posting-thumbs/<piece>.jpg"), a feed
 # tile's ("feed/<post>.jpg"), a queued shoot's ("queue-thumbs/<shoot>/0.jpg") and a kit's on the home page
 # ("home-thumbs/<kit>-1.jpg"). Nothing else in the Studio folder is served from these addresses.
@@ -233,7 +244,10 @@ def slug(text):
 
 
 def piece_name(p):
-    return f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
+    """A piece in the chat's words: "Beach reel", "Beach single 2", and a reel that knows which of the shoot's
+    reels it is with that reel's name after it (hers, v25): "Beach reel (Fun Maternity)"."""
+    return (f"{p['shoot_name']} {p['kind']}" + (f" {p['n']}" if p.get("n") else "")
+            + (f" ({p['reel_name']})" if isinstance(p.get("reel_name"), str) and p.get("reel_name") else ""))
 
 
 def thumb_file(pid, suffix=".jpg"):
@@ -284,7 +298,7 @@ def kit_role(x):
     pid = str(x.get("id") or "") if isinstance(x, dict) else ""
     if not (pid.startswith("kit:") or kit_folder(x)):
         return ""
-    if pid.endswith("-reel"):
+    if pid.endswith("-reel") or REEL_LATER.search(pid):
         return "reel"
     if pid.endswith("-carousel"):
         return "carousel"
@@ -293,12 +307,52 @@ def kit_role(x):
     return ""
 
 
-def kit_piece(p, kit_dir, role, n=None):
-    """This kit's reel or carousel (or its single post number n) in the queue, or None. role is kit_role's."""
+# One shoot, several reels (Nicole's v25: "It should know that it's Katie Austin's Fun Maternity, because I pressed
+# add to my queue"). Each reel has its own piece. The shoot's first reel keeps the kit's own reel piece, the one
+# every kit always had ("<the kit's name here>-reel"), so no piece already in a queue is ever renamed; every reel
+# started after it gets that name with the reel's own id after it ("...-reel-v2"). The kit's name here is already
+# one no other kit has (kit_sid), so a reel's piece can never be another shoot's. Which reel a piece is, is read
+# from its name (reel_version), never from a field the page could have sent.
+REEL_FIRST_ID = "v1"                                    # reels.FIRST_ID: the shoot's first reel
+REEL_LATER = re.compile(r"-reel-(v[1-9][0-9]{0,3})$")   # reels.ID, after the kit's own reel piece's name
+
+
+def reel_version(x):
+    """Which of its shoot's reels a kit's reel piece is: "v2" for "...-reel-v2", the first reel otherwise."""
+    m = REEL_LATER.search(str(x.get("id") or "")) if isinstance(x, dict) else None
+    return m.group(1) if m else REEL_FIRST_ID
+
+
+def kit_piece(p, kit_dir, role, n=None, version=None):
+    """This kit's reel or carousel (or its single post number n) in the queue, or None. role is kit_role's.
+    A reel: the shoot's first reel's piece, or with `version` that reel's own."""
+    want = version or REEL_FIRST_ID
     for x in p.get("pieces", []):
         if isinstance(x, dict) and kit_role(x) == role and same_kit(x, kit_dir) and (n is None or x.get("n") == n):
+            if role == "reel" and reel_version(x) != want:
+                continue
             return x
     return None
+
+
+def kit_reel_pieces(p, kit_dir):
+    """{reel id: its piece} for every reel of this kit that has a piece in the queue."""
+    out = {}
+    for x in p.get("pieces", []):
+        if isinstance(x, dict) and kit_role(x) == "reel" and same_kit(x, kit_dir):
+            out.setdefault(reel_version(x), x)
+    return out
+
+
+def kit_reels(kit_dir, rec=None):
+    """The shoot's reels when it has more than one (reel_page.reels_for_kit: [{id, name, made, project, order}]),
+    else []. A shoot with one reel is in the queue exactly as it always was. Anything that can't be read: []."""
+    try:
+        import reel_page
+        got = reel_page.reels_for_kit(Path(kit_dir), rec_kit=rec)
+    except (Exception, SystemExit):  # noqa: BLE001
+        return []
+    return got if isinstance(got, list) and len(got) > 1 else []
 
 
 def kit_sid(p, kit_dir):
@@ -313,7 +367,7 @@ def kit_sid(p, kit_dir):
     others = [x for x in pieces if kit_folder(x) and not same_kit(x, kit_dir)]
 
     def taken(sid):
-        own = re.compile(re.escape(sid) + r"-(reel|carousel|single-\d+)$")
+        own = re.compile(re.escape(sid) + r"-(reel(-v\d+)?|carousel|single-\d+)$")
         return any(x.get("shoot_id") == sid or own.match(str(x.get("id") or "")) for x in others)
     base = "kit:" + slug(name)
     if not taken(base):
@@ -353,22 +407,25 @@ def cover_file(kit_dir, role, rel, rec=None):
         return None
 
 
-def reel_first_photo(kit_dir, rec, photos):
+def reel_first_photo(kit_dir, rec, photos, reel=None):
     """The photo a reel's tile shows until they pick one: the reel's own first photo, in the order Make my reel
     would use (the reel page's record: reel_page.order_for_kit_page; Claude's pick when the page was never
     used). Nicole, Nov 10: "a reel's first tile should be the reel's first photo, not the kit's first photo".
-    Failing that, the first pick the kit record holds, then the kit's first photo, as before."""
+    Failing that, the first pick the kit record holds, then the kit's first photo, as before. `reel`: which of
+    the shoot's reels (v25); None is the reel being worked on, as before."""
     import arrange
     try:
         import reel_page
         rows = arrange.sheet_rows(kit_dir)
         by_n = {r["n"]: r for r in rows}
-        for x in reel_page.order_for_kit_page(kit_dir, rows, rec):
+        for x in reel_page.order_for_kit_page(kit_dir, rows, rec, reel=reel):
             f = arrange.photo_path(kit_dir, rec, by_n[x["n"]]) if x.get("n") in by_n else None
             if f is not None:
                 return f
     except (Exception, SystemExit):  # noqa: BLE001  (a tile only: the old way below still gives one)
         pass
+    if reel not in (None, REEL_FIRST_ID):
+        return photos[0] if photos else None       # the kit record's pick is the first reel's only
     try:
         pick = (rec.get("picks", {}).get("reel") or [None])[0]
         sheet_p = Path(kit_dir) / ".kit" / "sheet.json"
@@ -394,7 +451,8 @@ def find(p, text, statuses=None):
     rest = [w for w in words if w not in KINDS]
     hits = []
     for x in cands:
-        name = x["shoot_name"].lower()
+        # a reel that knows its name is found by it too: "beach reel white backdrop"
+        name = x["shoot_name"].lower() + (" " + x["reel_name"].lower() if isinstance(x.get("reel_name"), str) else "")
         if (not rest or all(w in name for w in rest)) and (not kind or x["kind"] == kind):
             hits.append(x)
     if len(hits) == 1:
@@ -403,6 +461,57 @@ def find(p, text, statuses=None):
         sys.exit(f"STOP: nothing in the posting queue matches \"{text}\".")
     names = ", ".join(piece_name(x) for x in hits)
     sys.exit(f"STOP: \"{text}\" could mean more than one: {names}. Say which.")
+
+
+def reel_pieces_by_words(p, text):
+    """(the kits' reel pieces a few words of a shoot's name fit, the folder names of the kits they are from)."""
+    t = str(text).strip().lower()
+    words = [w for w in re.split(r"[^a-z0-9]+", t) if w and w not in KINDS]
+    hits = [x for x in p["pieces"] if isinstance(x, dict) and kit_role(x) == "reel" and x.get("status") != "skipped"
+            and (x.get("id") == t or all(w in str(x.get("shoot_name") or "").lower() for w in words))]
+    return hits, sorted({_nfc(kit_folder(x)) for x in hits})
+
+
+def several_reels_kit(p, text):
+    """The kit a few words name, when it is one shoot with more than one reel (v25), else None. For `made`: the
+    reel maker says "<shoot> reel is made" without saying which reel, and with several reels that must never
+    change another reel's place in the queue (a reel already ready to post stays ready)."""
+    hits, names = reel_pieces_by_words(p, text)
+    if len(names) != 1:
+        return None
+    kit = piece_kit(hits[0])
+    return kit if kit is not None and kit_reels(kit) else None
+
+
+def reel_piece_for(p, text, reel_words):
+    """For the chat's `ready "<piece>" --reel "<reel name>"` (v25: one shoot, several reels): the piece of the
+    reel they named, made here when that reel has none yet, kept up to date either way. `text` finds the shoot
+    (any of its reel pieces will do: "beach reel"); `reel_words` is the reel's name, or a few words of it.
+    Stops in plain words, with nothing changed, when the shoot or the reel can't be told, or the reel isn't
+    made yet."""
+    hits, names = reel_pieces_by_words(p, text)
+    if not names:
+        sys.exit(f"STOP: no post kit's reel in the posting queue matches \"{text}\". Add the kit first (add --kit), then say which reel. Nothing changed.")
+    if len(names) > 1:
+        sys.exit(f"STOP: \"{text}\" could mean more than one shoot: {', '.join(names)}. Say which. Nothing changed.")
+    kit = piece_kit(hits[0])
+    if kit is None:
+        sys.exit(f"STOP: I can't reach the post kit of \"{names[0]}\" right now (is its drive plugged in?). Nothing changed.")
+    import reel_page
+    vid, why = reel_page.which_reel(kit, reel_words)
+    if vid is None:
+        sys.exit(f"STOP: {why} Nothing changed.")
+    info = reel_page.reels_for_kit(kit)
+    r = next((y for y in info if y["id"] == vid), None)
+    if r is None:
+        sys.exit("STOP: that reel isn't there anymore. Nothing changed.")
+    if not r["made"]:
+        sys.exit(f"STOP: \"{r['name']}\" isn't made in CapCut yet, so it can't go in the queue. They make it on the reel page (Make my reel). Nothing changed.")
+    add_for_kit(p, kit, reel=vid)
+    x = kit_piece(p, kit, "reel", version=vid)
+    if x is None:
+        sys.exit("STOP: that reel's place in the queue couldn't be made. Nothing changed.")
+    return x
 
 
 def queue_shoot(text):
@@ -445,12 +554,18 @@ def carousel_kind(shown):
     return "single" if shown.get("kind") == "laid-out" and len(shown.get("files") or []) == 1 else "carousel"
 
 
-def add_for_kit(p, kit_dir):
+def add_for_kit(p, kit_dir, reel=None):
     """The pieces of a post kit (kit.py): the reel and the carousel (in progress once made, waiting if not),
     and one piece per single post, each with its own thumbnail. Stories don't go on the grid, so they stay
     on the kit page only. Adding the same kit again updates what's there. The pieces are this kit's own by the
     folder they were made from (kit_sid, same_kit): another shoot whose name shortens alike is never touched.
-    A tile the photographer picked in the posting queue (the piece's "cover") is left as they picked it."""
+    A tile the photographer picked in the posting queue (the piece's "cover") is left as they picked it.
+
+    A shoot with several reels (v25): the kit's own reel piece is the first reel's, and every piece of a reel
+    carries which reel it is and that reel's name ("version", "reel_name": hers), kept up to date here (a reel
+    renamed since is shown by its new name). A reel started after the first gets a piece of its own only when it
+    is asked for by `reel` (its id: Add to my queue, or the chat's ready --reel), as hers; once it has one, it
+    is kept up to date like the rest. A shoot with one reel is in the queue exactly as it always was."""
     import kit as kit_mod
     kit_dir = Path(kit_dir)
     rec = kit_mod.load_rec(kit_dir)
@@ -485,9 +600,23 @@ def add_for_kit(p, kit_dir):
         return x
 
     out = []
-    reel = rec.get("reel")
-    out.append(upsert(f"{sid}-reel", "reel", "yellow" if reel else "red", reel_first_photo(kit_dir, rec, photos),
-                      where=reel["project"] if reel else None))
+    several = kit_reels(kit_dir, rec)
+    if several:
+        have = kit_reel_pieces(p, kit_dir)
+        first = next((r for r in several if r["id"] == REEL_FIRST_ID), several[0])
+        base_id = have[REEL_FIRST_ID]["id"] if REEL_FIRST_ID in have else f"{sid}-reel"
+        for r in several:
+            is_first = r is first
+            if not (is_first or r["id"] in have or r["id"] == reel):
+                continue
+            x = upsert(base_id if is_first else f"{base_id}-{r['id']}", "reel", "yellow" if r["made"] else "red",
+                       reel_first_photo(kit_dir, rec, photos, reel=r["id"]), where=r["project"])
+            x["version"], x["reel_name"] = r["id"], r["name"]
+            out.append(x)
+    else:
+        made = rec.get("reel")
+        out.append(upsert(f"{sid}-reel", "reel", "yellow" if made else "red", reel_first_photo(kit_dir, rec, photos),
+                          where=made["project"] if made else None))
     shown = kit_mod.carousel_shown(kit_dir, rec)     # the slides the kit page shows as the carousel (kit.py's one rule)
     slides = shown["files"]
     out.append(upsert(f"{sid}-carousel", carousel_kind(shown), "yellow" if slides else "red", slides[0] if slides else (photos[1] if len(photos) > 1 else None),
@@ -560,7 +689,9 @@ def schedule(p, reflow=False):
             x.pop("date", None)
         return
     gap = 7.0 / per_week
-    last_posted = max((x.get("posted_at", "")[:10] for x in p["pieces"] if x["status"] == "posted"), default=None)
+    # (a posted_at that is not a day written YYYY-MM-DD... is left out, never crashed on: one odd record never blanks the page)
+    last_posted = max((x["posted_at"][:10] for x in p["pieces"] if x["status"] == "posted"
+                       and isinstance(x.get("posted_at"), str) and re.match(r"\d{4}-\d\d-\d\d", x["posted_at"])), default=None)
     start = today() + timedelta(days=1)
     if last_posted:
         start = max(start, date.fromisoformat(last_posted) + timedelta(days=max(1, round(gap))))
@@ -844,6 +975,8 @@ def piece_kit(x):
 def panel_choices(x, kit):
     """The photos a post's tile can show, as the page draws them: [{src, rel, in_reel | first}].
     A reel: its own photos first, in the order Make my reel would use, then every other photo of the shoot.
+    With several reels in the shoot (v25), the photos of the reel this piece is, whichever reel is open on the
+    reel page (hers: /choices?kind=reel&version=vN; ours reads which reel from the piece itself).
     A carousel: the slides the kit page shows as the carousel, in order. (choices, are small copies still to make)"""
     import arrange
     import kit as kit_mod
@@ -860,7 +993,7 @@ def panel_choices(x, kit):
     if not rows:
         return [], False
     try:
-        order = [o["n"] for o in reel_page.order_for_kit_page(kit, rows, rec)]
+        order = [o["n"] for o in reel_page.order_for_kit_page(kit, rows, rec, reel=reel_version(x))]
     except (OSError, ValueError, TypeError, AttributeError, KeyError):
         order = []
     by_n = {r["n"]: r for r in rows}
@@ -1283,6 +1416,24 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .pick .warn{margin:.5rem 0 0;font-size:14px;color:#8a4a12;background:#FFF4EC;border-radius:10px;padding:.6rem .8rem;max-width:40em}
 .pick .warn:empty{display:none}
 .pick .sep{flex:none;align-self:center;font:600 10px/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);padding:0 .4rem;width:70px;text-align:center}
+/* a reel's cover (Nicole's v25): its own photos first, in the order they play; any other photo only when asked for */
+.pick .sub{margin:.8rem 0 0;font:600 11px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.pick .sub+.strip{padding-top:.45rem}
+.pick .more{margin:.5rem 0 .2rem}
+.pick .others[hidden]{display:none}
+/* Posted, on the post itself (Nicole's v27): a posted post in the grid as part of the feed (no date), and the
+   Not posted / Posted switch beside Done in a post's panel. Her rules, on the look's colour names; her two greys
+   (#F1F0F4, #C9C7D1) kept, since the look has no name for them. The focus rings are ours (hers are mouse-only). */
+.tile.justposted{cursor:pointer}.tile.justposted img{filter:saturate(.85)}.tile.justposted:hover{box-shadow:inset 0 0 0 3px var(--line)}
+.tile.justposted:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.tile .rk{position:absolute;top:8px;right:8px;color:#fff;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.pick .phr{display:flex;align-items:center;gap:.5rem;flex:none}
+.pswitch{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--line);background:#F1F0F4;color:var(--ink-2);border-radius:999px;padding:.35rem .8rem .35rem .4rem;font:600 13px/1 var(--sans);cursor:pointer;transition:background .25s,color .25s}
+.pswitch i{position:relative;width:34px;height:20px;border-radius:999px;background:#C9C7D1;transition:background .25s;flex:none}
+.pswitch i::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s var(--ease)}
+.pswitch.on{background:rgba(79,178,134,.14);color:#2f7d56;border-color:rgba(79,178,134,.4)}.pswitch.on i{background:var(--green)}.pswitch.on i::after{transform:translateX(14px)}
+.pswitch:hover{border-color:var(--ink-2)}
+.pswitch:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 """
 
 SCRIPT = r"""
@@ -1291,12 +1442,12 @@ const $=s=>document.querySelector(s);const toast=$('#toast');let tt;
 function say(m){toast.textContent=m;toast.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove('on'),2400)}
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}   // a shoot's name is theirs: only ever text
 function nice(iso){if(!iso)return'';const d=new Date(iso+'T12:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
-async function post(body){if(!live){say('This is a saved copy. Ask Claude to “show my posting queue” to change things.');return null}
- try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell Claude instead.');return null}}
+async function post(body){if(!live){say('This is a saved copy. Ask your assistant to “show my posting queue” to change things.');return null}
+ try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell your assistant instead.');return null}}
 function render(S){LAST=S;
  $('#tankh').innerHTML=S.tank_head;$('#tankp').textContent=S.tank_line;
  const bar=$('#tankbar');bar.className='tankbar'+(S.weeks===null?'':S.weeks<=1?' low':S.weeks<=2?' mid':'');bar.firstElementChild.style.width=(S.weeks===null?0:Math.min(100,S.weeks/4*100))+'%';
- $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell Claude to change it.`:`No posting rhythm yet. Tell Claude how often you like to post.`;
+ $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell your assistant to change it.`:`No posting rhythm yet. Tell your assistant how often you like to post.`;
  const g=$('#grid');if(PEL.parentNode===g)g.after(PEL);g.innerHTML='';   // the panel is kept (it lives under a row of the grid while open)
  const greens=S.greens.slice().reverse();  // Instagram shows the newest first: the last in line sits top-left
  const feed=S.feed&&S.feed.posts||[];const pinned=feed.filter(x=>x.pinned),rest=feed.filter(x=>!x.pinned);
@@ -1307,16 +1458,25 @@ function render(S){LAST=S;
  greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine'+(x.id===nextId?' next':'');t.dataset.id=x.id;
   if(live&&x.role){t.title='Click to change its photo or copy its caption · drag to move it';t.tabIndex=0}
   t.innerHTML=(x.thumb?`<img src="${esc(x.thumb)}" alt="">`:'')+`<span class="k">${x.kind==='reel'?'&#9654;&#xFE0E; Reel':x.kind==='single'?'&#9634;&#xFE0E; Single post':'&#10697; Carousel'}</span><span class="d">${x.id===nextId?'Next up · ':''}${nice(x.date)}</span>`;g.appendChild(t)});
+ // Posted, on the post itself (Nicole's v27): a post marked Posted shows here at once as an ordinary feed post, after the
+ // upcoming ones: no date, no "posted on" label (that day is only the day they said so), a small mark for what it is.
+ // The server says which (S.posted: posted since the grid was read, or lately when it never was); a click, Enter or
+ // Space opens its panel (the switch, to take it back). It is never dragged: the drag below is wired on .tile.mine only.
+ (S.posted||[]).forEach(x=>{const t=mkel('div','tile real justposted');t.dataset.id=x.id;t.title=PW.posted_tip;
+  if(x.thumb){const im=document.createElement('img');im.src=x.thumb;im.alt='';t.appendChild(im)}
+  const rk=mkel('span','rk',x.kind==='reel'?'▶︎':x.kind==='single'?'▢︎':'⧉');rk.setAttribute('aria-label',x.kind==='reel'?'Reel':x.kind==='single'?'Single post':'Carousel');t.appendChild(rk);
+  if(live){t.tabIndex=0;t.onclick=()=>openPick(x.id);t.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target===t){e.preventDefault();openPick(x.id)}})}
+  g.appendChild(t)});
  if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
- else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
- $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to Claude to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to Claude.`;
+ else for(let i=0,n=Math.max(0,9-g.children.length);i<n;i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}   // (the posted ones count too, so the rows stay whole)
+ $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to your assistant to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to your assistant.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
-  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
+  items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}${x.reel_name?' · '+esc(x.reel_name):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
- mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to Claude.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
- document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:'Posted. Nice.',ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
+ mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to your assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
+ document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:PW.posted_toast,ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);
  if(PICK)openPick(PICK,true);watchRemind();}   // an open panel survives every redraw: put back under its post's row, its photos and words read again
 function drag(S){if(!live)return;const g=$('#grid');drag.st={g,src:null,lift:null,over:null,sx:0,sy:0,ox:0,oy:0,on:false};
@@ -1348,17 +1508,23 @@ function drag(S){if(!live)return;const g=$('#grid');drag.st={g,src:null,lift:nul
 // It opens right under the row of the post that was clicked, across all three columns; the clicked tile is outlined.
 // The photos and the words come from this same server (GET /posting/panel?id=), never from another one; a photo is
 // named by "Photos/<file>" or "Carousel/<file>", a post by its id. Every word of theirs is set as text, never as HTML.
-var LAST=D,PICK=null,PSEQ=0;
+var LAST=D,PICK=null,PSEQ=0,MORE=null;   // MORE: "Any other photo from the shoot" opened (true) or hidden (false) by hand in the open panel; null: not touched
 const PEL=$('#pick');
 const PW={reel_line:'Pick the photo your reel shows in your grid. When you post it, tap Edit cover and choose the same photo so your feed matches.',
  carousel_line:'Instagram shows a carousel’s first slide in your grid, so pick the slide you want people to see first.',
  done:'Done',finding:'Finding the photos…',cant:'I can’t find this post’s photos right now. Open its post kit once, then try again.',
- more:'More from the shoot',slide:'Slide ',
+ slide:'Slide ',from_reel:'From your reel, in the order it plays',use_other:'+ Use a different photo',hide_other:'Hide the other photos',
+ any_other:'Any other photo from the shoot',photo_n:'Photo {n} in your reel',
  warn:'This isn’t your first slide, so your real grid will show slide 1 instead. To match, move this one to the front in the carousel designer.',
  changed_reel:'Changed. Pick this one as the cover when you post.',changed_carousel:'Changed. That’s its photo in your grid now.',
  copy_caption:'Copy caption',copy_hook:'Copy my hook',open_words:'Open my words',write_words:'Write my words',no_caption:'No caption yet.',
  no_hook:'Pick a hook on your words page first.',no_hook_tip:'Pick a hook on your words page first',
- copied:'Copied {what}. Paste it into Instagram.',your_caption:'your caption',your_hook:'your hook'};
+ copied:'Copied {what}. Paste it into Instagram.',your_caption:'your caption',your_hook:'your hook',
+ // Posted, on the post itself (Nicole's v27): the switch, the posted post's line and tooltip, the two toasts
+ not_posted:'Not posted',posted:'Posted',
+ in_feed:'It’s in your feed. If it didn’t actually go out, switch it back to Not posted and it goes back in your queue.',
+ posted_tip:'Click if this one didn’t go out after all',
+ back_in_queue:'Back in your queue, ready to post.',posted_toast:'Posted. Nice. It’s in your feed now.'};
 const KINDW={reel:'reel',carousel:'carousel',single:'single post'};
 function mkel(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function copyText(t,what){   // the old way first: the Claude app's pane refuses navigator.clipboard, and honors this from a click
@@ -1366,49 +1532,76 @@ function copyText(t,what){   // the old way first: the Claude app's pane refuses
  try{a.select();a.setSelectionRange(0,t.length);ok=document.execCommand('copy')}catch(e){ok=false}a.remove();
  const said=()=>say(PW.copied.replace('{what}',what));
  if(ok){said();return}
- try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell Claude instead.'))}catch(e){say('Could not copy that. Tell Claude instead.')}}
-function closePick(){PICK=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
+ try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell your assistant instead.'))}catch(e){say('Could not copy that. Tell your assistant instead.')}}
+function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;delete PEL.dataset.posted;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
+// Posted or not (Nicole's v27): a grey switch on the post itself, beside Done. Posted takes it out of the queue and into the
+// feed; back to Not posted puts it back in line, ready to post. Built as text (never her innerHTML), aria-checked said plainly.
+function postedSwitch(x){const on=x.status==='posted',b=mkel('button','pswitch'+(on?' on':''));b.type='button';b.setAttribute('role','switch');b.setAttribute('aria-checked',on?'true':'false');
+ b.appendChild(mkel('i'));b.appendChild(mkel('span',null,on?PW.posted:PW.not_posted));
+ b.onclick=async()=>{const S2=await post({action:on?'unposted':'posted',id:x.id});if(S2){render(S2);say(on?PW.back_in_queue:PW.posted_toast)}};
+ return b}
 function placePick(id){   // right under the row of the post that was clicked
  const g=$('#grid'),tiles=[...g.children].filter(c=>c!==PEL),t=tiles.find(c=>c.dataset&&c.dataset.id===id),i=tiles.indexOf(t);
  const end=tiles[Math.min(tiles.length-1,Math.floor(Math.max(0,i)/3)*3+2)];if(end)end.after(PEL);else g.appendChild(PEL);
  document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'));if(t)t.classList.add('picking')}
 function openPick(id,again){
- const x=(LAST.greens||[]).find(y=>y.id===id);
- if(!live||!x||!x.role){if(PICK===id||again)closePick();return}
+ const x=(LAST.greens||[]).find(y=>y.id===id)||(LAST.posted||[]).find(y=>y.id===id);   // an upcoming post, or one marked Posted (v27)
+ const posted=!!x&&x.status==='posted';
+ if(!live||!x||!(x.role||posted)){if(PICK===id||again)closePick();return}
  if(PICK===id&&!again){closePick();return}    // the same post clicked again closes it
- const fresh=PEL.dataset.id!==id;PICK=id;PEL.hidden=false;placePick(id);
- if(fresh){PEL.dataset.id=id;PEL.textContent='';
-  const ph=mkel('div','ph'),hd=mkel('div');hd.appendChild(mkel('b',null,'Your '+(x.shoot_name||'')+' '+(KINDW[x.kind]||x.kind)));
-  hd.appendChild(mkel('p',null,x.role==='reel'?PW.reel_line:PW.carousel_line));ph.appendChild(hd);
-  const done=mkel('button','x',PW.done);done.type='button';done.onclick=closePick;ph.appendChild(done);PEL.appendChild(ph);
+ const fresh=PEL.dataset.id!==id||(PEL.dataset.posted==='1')!==posted;PICK=id;PEL.hidden=false;placePick(id);   // (a flip of the switch redraws it whole)
+ if(fresh){PEL.dataset.id=id;PEL.dataset.posted=posted?'1':'';PEL.textContent='';MORE=null;
+  const ph=mkel('div','ph'),hd=mkel('div');hd.appendChild(mkel('b',null,'Your '+(x.shoot_name||'')+' '+(KINDW[x.kind]||x.kind)+(x.reel_name?' · '+x.reel_name:'')));
+  hd.appendChild(mkel('p',null,posted?PW.in_feed:x.role==='reel'?PW.reel_line:PW.carousel_line));ph.appendChild(hd);
+  const phr=mkel('div','phr');phr.appendChild(postedSwitch(x));   // the switch, then Done (v27)
+  const done=mkel('button','x',PW.done);done.type='button';done.onclick=closePick;phr.appendChild(done);ph.appendChild(phr);PEL.appendChild(ph);
+  if(!posted){   // a posted post's panel is the header, her line, the switch and Done only: no photos, words or reminder
   PEL.appendChild(mkel('div','pw'));      // the button row: Copy caption, Copy my hook, [stage 4's reminder button], Open my words
   PEL.appendChild(mkel('div','pr'));      // the reminder drop-down opens here (closed, it is empty and takes no room)
   PEL.appendChild(mkel('div','pn'));      // ours: one plain line when the calendar could not be updated (empty otherwise)
-  const strip=mkel('div','strip');strip.appendChild(mkel('p','empty',PW.finding));PEL.appendChild(strip);
-  PEL.appendChild(mkel('p','warn'));
+  const ps=mkel('div','ps'),strip=mkel('div','strip');strip.appendChild(mkel('p','empty',PW.finding));ps.appendChild(strip);PEL.appendChild(ps);
+  PEL.appendChild(mkel('p','warn'))}
   if(!again)PEL.scrollIntoView({block:'nearest',behavior:'smooth'})}
- else remindNow(x);      // a redraw: the reminder's button and drop-down follow at once (the photos and words follow the fetch below)
+ else if(!posted)remindNow(x);      // a redraw: the reminder's button and drop-down follow at once (the photos and words follow the fetch below)
+ if(posted)return;      // nothing to fetch for a posted post
  const seq=++PSEQ;
  fetch('/posting/panel?id='+encodeURIComponent(id),{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null).then(P=>{
   if(seq!==PSEQ||PICK!==id)return;      // closed, or another post's panel opened, while this was on its way
   drawPick(x,P&&P.ok?P:{choices:[],cover:null,words:null},fresh)})}
 function drawPick(x,P,fresh){const el=PEL,reel=x.role==='reel',C=P.choices||[];
  drawWords(el,x,P.words);
- const strip=el.querySelector('.strip'),warn=el.querySelector('.warn'),at=strip.scrollLeft;strip.textContent='';warn.textContent='';
- if(!C.length){strip.appendChild(mkel('p','empty',PW.cant));return}
- const cur=P.cover||C[0].rel;let sep=false,on=null;
- C.forEach((c,i)=>{if(reel&&!c.in_reel&&!sep&&i>0){sep=true;strip.appendChild(mkel('span','sep',PW.more))}
-  const b=mkel('button','c'+(c.rel===cur?' on':''));b.type='button';b.dataset.rel=c.rel;if(!reel)b.title=PW.slide+(i+1);
+ const ps=el.querySelector('.ps'),warn=el.querySelector('.warn'),was=ps.querySelector('.strip'),at=was?was.scrollLeft:0;ps.textContent='';warn.textContent='';
+ const newStrip=()=>{const st=mkel('div','strip');ps.appendChild(st);return st};
+ if(!C.length){newStrip().appendChild(mkel('p','empty',PW.cant));return}
+ const cur=P.cover||C[0].rel;let on=null;
+ // one photo to pick: n is its number (a carousel's slide, or its place in the reel), 0 for none
+ const tile=(c,n)=>{const b=mkel('button','c'+(c.rel===cur?' on':''));b.type='button';b.dataset.rel=c.rel;
+  if(n)b.title=reel?PW.photo_n.replace('{n}',n):PW.slide+n;
   b.setAttribute('aria-pressed',c.rel===cur?'true':'false');
   const im=document.createElement('img');im.alt='';im.loading='lazy';let tries=0;
   im.onerror=()=>{if(tries++<8)setTimeout(()=>{im.src=c.src+(c.src.indexOf('?')<0?'?':'&')+'again='+tries},1500)};   // a small copy still being made
-  im.src=c.src;b.appendChild(im);if(!reel)b.appendChild(mkel('span','n',String(i+1)));
+  im.src=c.src;b.appendChild(im);if(n)b.appendChild(mkel('span','n',String(n)));
   if(c.rel===cur)on=b;
   b.onclick=async()=>{if(c.rel===cur)return;const S2=await post({action:'cover',id:x.id,rel:c.rel});if(S2){render(S2);say(reel?PW.changed_reel:PW.changed_carousel)}};
-  strip.appendChild(b)});
- const first=C.find(c=>c.first);
- warn.textContent=(!reel&&first&&cur!==first.rel)?PW.warn:'';
- if(fresh&&on)strip.scrollLeft=Math.max(0,on.offsetLeft-strip.offsetLeft-(strip.clientWidth-on.offsetWidth)/2);else strip.scrollLeft=at}
+  return b};
+ // A reel's cover (Nicole's v25): the reel's own photos first, in the order they play, numbered, like scrubbing
+ // through it on Instagram; any other photo from the shoot only when they ask for one, like Instagram's "Add from
+ // camera roll" (already open when the cover in use is one of those). A carousel is as it was.
+ const inReel=reel?C.filter(c=>c.in_reel):[],others=reel?C.filter(c=>!c.in_reel):[];
+ let first=null;
+ if(reel&&inReel.length){
+  ps.appendChild(mkel('p','sub',PW.from_reel));first=newStrip();inReel.forEach((c,i)=>first.appendChild(tile(c,i+1)));
+  if(others.length){
+   const open=MORE!==null?MORE:others.some(c=>c.rel===cur);
+   const mb=mkel('button','btn o more',open?PW.hide_other:PW.use_other);mb.type='button';mb.setAttribute('aria-expanded',open?'true':'false');ps.appendChild(mb);
+   const o=mkel('div','others');o.hidden=!open;o.appendChild(mkel('p','sub',PW.any_other));ps.appendChild(o);
+   const st=mkel('div','strip');o.appendChild(st);others.forEach(c=>st.appendChild(tile(c,0)));
+   mb.onclick=()=>{o.hidden=!o.hidden;MORE=!o.hidden;mb.textContent=o.hidden?PW.use_other:PW.hide_other;mb.setAttribute('aria-expanded',o.hidden?'false':'true');
+    if(!o.hidden)o.scrollIntoView({block:'nearest',behavior:'smooth'})}}}
+ else{first=newStrip();C.forEach((c,i)=>first.appendChild(tile(c,reel?0:i+1)))}
+ const one=C.find(c=>c.first);
+ warn.textContent=(!reel&&one&&cur!==one.rel)?PW.warn:'';
+ if(fresh&&on&&on.offsetParent){const st=on.parentNode;st.scrollLeft=Math.max(0,on.offsetLeft-st.offsetLeft-(st.clientWidth-on.offsetWidth)/2)}else if(first)first.scrollLeft=at}
 function drawWords(el,x,W){const w=el.querySelector('.pw');w.textContent='';if(!W||!x.folder)return;   // no words record for this post: no row
  const page='/words.html?kit='+encodeURIComponent(x.folder)+'&piece='+encodeURIComponent(W.piece);
  const link=t=>{const a=mkel('a','pwl',t+' →');a.href=page;return a};
@@ -1451,7 +1644,7 @@ const RW={set:'Set a reminder to post',on:'🔔 Reminder: ',close:'Close',
  pc_new_one:'Set a new reminder',
  pc_set_toast:'Reminder ready: {when}. Add it to your calendar.',pc_off_toast:'Reminder off. Take it off your calendar too.',
  pc_opened:'Opened in your calendar app. Say yes to it there.',pc_opened_n:'Opened {n} reminders in your calendar app. Say yes to each one there.',
- pc_open_cant:'I couldn’t open that calendar file. Tell Claude instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
+ pc_open_cant:'I couldn’t open that calendar file. Tell your assistant instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
 function hm(t){if(!t)return'';let[h,m]=t.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return h===12&&m===0&&ap==='pm'?'noon':`${h}${m?':'+String(m).padStart(2,'0'):''} ${ap}`}
 function RM(){return LAST.reminding||{}}
 function remindButton(x){if(!live||!RM().way)return null;
@@ -1532,6 +1725,41 @@ if(!live)$('#offline').hidden=false;render(D);
 """
 
 
+def on_feed(p, f=None):
+    """The posted pieces the grid shows as part of the feed (Nicole's v27), newest first: a post marked Posted
+    stays in the grid until the real grid is read again. So: those posted since the grid was last read, or, when
+    it never was, in the last POSTED_DAYS days. A posted piece with no posted_at (from before Oct 28), or one
+    whose posted_at is not a string, is left out, never crashed on. The server decides this once; the page
+    never filters by read_at a second time (hers did)."""
+    f = f if f is not None else load_feed()
+    since = f.get("read_at") if isinstance(f.get("read_at"), str) and f.get("read_at") else None
+    floor = (today() - timedelta(days=POSTED_DAYS)).isoformat()
+    def shown(x):
+        at = x.get("posted_at")
+        if x.get("status") != "posted" or not isinstance(at, str) or not at:
+            return False
+        return at > since if since else at[:10] >= floor
+    return sorted((x for x in p["pieces"] if isinstance(x, dict) and shown(x)), key=lambda x: x["posted_at"], reverse=True)
+
+
+def unpost(p, x, by="claude"):
+    """Back to Not posted (Nicole's v27): "it didn't go out after all". The piece goes back in line at the end,
+    ready to post, with a new date (set_status's green branch: green_at, the last slot, then renumber and
+    schedule); posted_at goes, so the grid stops showing it as part of the feed. Its reminder, when it was on,
+    is left on and so comes back on the new date: reminders.py keeps a posted post's event (never removed), so
+    the round after the save brings THAT event into step, never a second one. The old date goes too: hers kept
+    it, so a post switched back came back down for a day that had already passed. A piece that is ready to post
+    already is left as it is (a second press is harmless); anything else is not a posted post."""
+    if x.get("status") == "green":
+        return x
+    if x.get("status") != "posted":
+        raise ValueError("not a posted post")
+    x.pop("posted_at", None)
+    x.pop("date", None)
+    set_status(p, x, "green", by=by)
+    return x
+
+
 def state(p):
     schedule(p)
     weeks, n = tank(p)
@@ -1546,6 +1774,8 @@ def state(p):
         d["cover"] = x.get("cover") if isinstance(x.get("cover"), str) else None
         d["folder"] = kit_folder(x) or None
         d["role"] = panel_role(x)
+        # v25: which of the shoot's reels this is, by name (text only; the page shows "<shoot> reel · <name>")
+        d["reel_name"] = x["reel_name"][:40] if isinstance(x.get("reel_name"), str) and x.get("reel_name") else None
         if x["status"] == "yellow" and x.get("made_at"):
             d["days"] = (today() - date.fromisoformat(x["made_at"][:10])).days
         return d
@@ -1568,6 +1798,7 @@ def state(p):
             "remind": remind, "reminding": remind_state(),
             "weeks": weeks, "tank_head": head, "tank_line": tank_words(p), "feed": feed,
             "greens": [pub(x) for x in greens(p)],
+            "posted": [dict(pub(x), posted_at=x["posted_at"]) for x in on_feed(p, f)],
             "yellows": [pub(x) for x in p["pieces"] if x["status"] == "yellow"],
             "reds": [pub(x) for x in p["pieces"] if x["status"] == "red"]}
 
@@ -1581,7 +1812,7 @@ def page_html(p):
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask Claude to “show my posting queue” to change things.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask your assistant to “show my posting queue” to change things.</p></header>"
             "<section class='sec'><h2>Your Instagram grid, with your new posts in it</h2><p>Newest at the top, like Instagram. The outlined ones are your upcoming posts. Click one to pick the photo it shows. Drag one to a different spot to change the order; the dates update to match.</p>"
             "<p class='pickhint' id='pickhint' hidden>Click on a post to change the photo it shows in your grid, or to copy its caption.</p>"
             "<div class='grid' id='grid'></div><div class='pick' id='pick' hidden></div><p class='gridnote' id='gridnote'></p></section>"
@@ -1608,9 +1839,11 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     (the reel page's is "Open CapCut")."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
-        return False, "The reel hasn't been made yet. Say “make the reel” to Claude."
+        return False, "The reel hasn't been made yet. Say “make the reel” to your assistant."
     if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
+    if this_computer.no_windows():      # inside a test: CapCut is never started
+        return True, ""
     capcut = _capcut()
     damaged = unsure = False
     with _CAPCUT_LOCK:                 # one press at a time: what capcut.py notes about a press is read before the next
@@ -1645,7 +1878,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
         words += " " + extra
     if damaged:                                  # pressing again would meet the same damaged list: Claude sorts it out
-        return True, words + " If it isn't in the list, tell Claude and it'll sort it out."
+        return True, words + " If it isn't in the list, tell your assistant and it'll sort it out."
     try:
         waiting = capcut.waiting()               # still not in CapCut's list: CapCut was open (or it couldn't be told)
     except Exception:  # noqa: BLE001  (a hint, never a reason for the button to fail)
@@ -1654,7 +1887,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
         if unsure:
             # pressing again would not help (this computer can't tell whether CapCut is open): Claude adds it with
             # `capcut.py open --closed` once they say CapCut is closed (parts/on-a-pc.md)
-            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell Claude “add my waiting reel”."
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell your assistant “add my waiting reel”."
         else:
             words += f" If it isn't in the list, {capcut.QUIT} CapCut and press {button} again, and I'll add it."
     return True, words
@@ -1712,6 +1945,11 @@ def thumb_wanted(path):
     except (OSError, ValueError):
         return False
     return True                                             # a picture that isn't there: Python's own "not found"
+
+
+# Open folder's answer on the designer (hers, v27, with Finder read as this computer's file manager): one line each for
+# the two folders the designer saves into. Every other folder keeps "Opened <name> in <app>.".
+OPEN_WORDS = {"Carousel": "Your Carousel folder is open in {app}.", "Stories": "Your Stories folder is open in {app}."}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -1812,7 +2050,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path in ("/design.html", "/design-state", "/design-font-file", "/design-preview"):
+        if path in ("/design.html", "/design-state", "/design-font-file", "/design-preview", "/design-queue"):
             # the carousel designer: every one of its requests is design.py's to answer
             import design
             return design.handle_get(self, path, urlsplit(self.path).query)
@@ -1821,7 +2059,7 @@ class Handler(SimpleHTTPRequestHandler):
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-                    "/reel-strip", "/reel-moment-still"):
+                    "/reel-strip", "/reel-moment-still", "/reel-song"):
             # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
             import reel_page
             return reel_page.handle_get(self, path, urlsplit(self.path).query)
@@ -1842,6 +2080,15 @@ class Handler(SimpleHTTPRequestHandler):
             # serve_content decodes the address and checks it part by part (never "." or ".."). The old check here,
             # for ".." anywhere in the address as sent, only kept out a kit named like "Beach... sunset" (Nov 6).
             return self.serve_content(path[len("/content/"):])
+        if path in ("/backups", "/make-posts", "/home-data", "/kit-thumb"):
+            # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
+            import home_base
+            return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/open", "/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
+                and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            # these open a folder window, a folder picker or another page server: for this server's own pages
+            # only, never for a page of another website (the Host was checked above)
+            return self.answer({"ok": False, "words": ""}, HTTPStatus.FORBIDDEN)
         if path == "/open":
             return self.open_kit_folder(urlsplit(self.path).query)
         if path == "/open-home":
@@ -1913,7 +2160,7 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up, or plug in the drive it lives on."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up, or plug in the drive it lives on."})
         if drop:
             h = h / posts.DROP_NAME
             h.mkdir(exist_ok=True)
@@ -1932,7 +2179,7 @@ class Handler(SimpleHTTPRequestHandler):
             s = next((x for x in edit_queue.load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
             ok, words = edit_queue.open_folder(s) if s else (False, "I don't know that shoot.")
         except Exception as e:  # noqa: BLE001
-            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask Claude."
+            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask your assistant."
         self.answer({"ok": ok, "words": words})
 
     def report_url(self, query):
@@ -1951,19 +2198,22 @@ class Handler(SimpleHTTPRequestHandler):
                 s = next((x for x in shoots if x["id"] == sid), None)
             if not s or not s.get("studio"):
                 return self.answer({"ok": False, "words": "There's no report for this one. It didn't come from a backup."})
-            studio = Path(s["studio"])
-            if not studio.is_dir():
-                drive = this_computer.drive_words(studio) or "the drive"   # "Big Kahuna"; on a PC "the drive that was E:"
+            # the backup's records wherever they are now (before or after it settled), as the queue's own
+            # Open photo folder finds a shoot's folder; a shoot on more than one card opens the shoot's one page
+            import home_base
+            studio = home_base.records_of(s["studio"])
+            if studio is None or not studio.is_dir():
+                drive = this_computer.drive_words(s["studio"]) or "the drive"   # "Big Kahuna"; on a PC "the drive that was E:"
                 return self.answer({"ok": False, "words": f"Plug in {drive} to see this report."})
             import serve_report
             url = serve_report.report_url(studio)
             if not url:
-                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and Claude will."})
+                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and your assistant will."})
             # always the top of the report (Dustin, Nov 5: jumping to the shoot's name box opened it "scrolled
             # half way down the page", which read as a glitch)
             return self.answer({"ok": True, "url": url})
         except Exception as e:  # noqa: BLE001
-            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and Claude will."})
+            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and your assistant will."})
 
     def pick_folder(self):
         """The home page's "Choose the folder your finished photos are in": the computer's own folder picker
@@ -1973,11 +2223,11 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask Claude to set one up."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up."})
         if not (this_computer.MAC or this_computer.WINDOWS):
             return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
         if this_computer.WINDOWS:
-            no_window = ("The folder window didn't open. Tell Claude which folder your finished photos are in (you can copy its "
+            no_window = ("The folder window didn't open. Tell your assistant which folder your finished photos are in (you can copy its "
                          f"address from the top of its {this_computer.FILES_APP} window), and it'll copy the photos for you.")
         else:
             no_window = f"The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the {this_computer.COPY_KEY} key so it copies)."
@@ -1986,7 +2236,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.answer({"ok": False, "words": "No folder chosen." if why == "cancelled" else no_window})
         got = posts.bring(h, folder)
         if not got:
-            return self.answer({"ok": False, "words": "Something stopped the copy. Tell Claude and it'll sort it out."})
+            return self.answer({"ok": False, "words": "Something stopped the copy. Tell your assistant and it'll sort it out."})
         copied, skipped, dest = got
         left = ", ".join(posts.plural(n, k) for k, n in sorted(skipped.items()))
         label = Path(folder).name
@@ -2001,11 +2251,13 @@ class Handler(SimpleHTTPRequestHandler):
         """The live editing-queue page's address, starting its server if needed (serve_report has the logic)."""
         import serve_report
         u = serve_report.queue_url()
-        self.answer({"url": u, "words": None if u else "Ask Claude: show my editing queue"})
+        self.answer({"url": u, "words": None if u else "Ask your assistant: show my editing queue"})
 
     def open_kit_folder(self, query):
-        """A kit page's "Open the ... folder" button: only a kit in Content, or one of its own folders
-        (Photos may live elsewhere when the kit points at a Lightroom export folder)."""
+        """A kit page's "Open the ... folder" button, and the designer's "Open folder": only a kit in Content, or one
+        of its own folders (Photos may live elsewhere when the kit points at a Lightroom export folder). The answer
+        for a Carousel or Stories folder is Nicole's line (OPEN_WORDS, v27); a folder that is not there yet says so
+        with why "none", and the designer's page then says her "There's no ... folder yet. Press ... first" line."""
         from urllib.parse import parse_qs
         import finder
         import posts
@@ -2044,20 +2296,23 @@ class Handler(SimpleHTTPRequestHandler):
                 target = kd / sub
             else:
                 target = None
+            none = False
             if target is None:
                 pass
             elif not target.is_dir():
-                ok, words = False, f"There's no {sub or 'kit'} folder yet." if sub != "Photos" else "The photos folder isn't there right now. Is the drive plugged in?"
+                none = sub != "Photos"
+                ok, words = False, f"There's no {sub or 'kit'} folder yet." if none else "The photos folder isn't there right now. Is the drive plugged in?"
             else:
                 ok, why = finder.open_folder(target)
                 name = target.name
                 app = this_computer.FILES_APP   # "Finder" on a Mac, "File Explorer" on a PC
-                words = (f"Opened {name} in {app}, behind this window. Click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
-                         else f"Opened {name} in {app}.") if ok else f"Couldn't open {app}. The folder is {target}. ({why})"
+                opened = OPEN_WORDS[sub].format(app=app) if sub in OPEN_WORDS else f"Opened {name} in {app}."
+                words = (opened + f" It's behind this window: click {app} in {this_computer.APP_BAR} to see it." if why == "behind"
+                         else opened) if ok else f"Couldn't open {app}. The folder is {target}. ({why})"
         elif h is None or not content.is_dir():
             words = f"The {posts.HOME_NAME} folder isn't there right now. Is the drive plugged in?"
         say(f"open asked: {kit_name} / {sub or '(kit)'} -> {'ok' if ok else 'no'}: {words}")
-        out = json.dumps({"ok": ok, "words": words}).encode()
+        out = json.dumps(dict({"ok": ok, "words": words}, **({"why": "none"} if none else {}))).encode()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
@@ -2126,7 +2381,7 @@ class Handler(SimpleHTTPRequestHandler):
         (the drive unplugged, or no such kit) her page says so, with her one line, and the answer is "not found".
         Should the page fail to build, the copy kit.py last saved is sent instead, but only one of today's page
         (kit.PAGE_MARK); a copy from before her three cards is never passed off as current, and the page says in one
-        line that something couldn't be read and to tell Claude."""
+        line that something couldn't be read and to tell your assistant."""
         import arrange
         import kit as kit_mod
         kit = arrange.kit_by_name(name)
@@ -2179,7 +2434,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         path = urlsplit(self.path).path
         if path in ("/design", "/design-new", "/design-template", "/design-brand", "/design-font", "/design-slide", "/design-commit",
-                    "/design-preview"):
+                    "/design-preview", "/design-asked", "/design-photos"):
             # the carousel designer: design.py checks each of these the way arrange.py does (below)
             import design
             return design.handle_post(self, path, urlsplit(self.path).query)
@@ -2188,7 +2443,7 @@ class Handler(SimpleHTTPRequestHandler):
             # size), reads a refused body away, and answers in the page's own words.
             import arrange
             return arrange.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment"):
+        if path in ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove", "/reel-preview", "/reel-video"):
             # the reel page: reel_page.py checks each of these the way arrange.py does (above)
             import reel_page
             return reel_page.handle_post(self, path, urlsplit(self.path).query)
@@ -2196,10 +2451,14 @@ class Handler(SimpleHTTPRequestHandler):
             # the words page: words_page.py checks each of these the way arrange.py does (above)
             import words_page
             return words_page.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make"):
+        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version", "/talking-capcut"):
             # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
             import talking_page
             return talking_page.handle_post(self, path, urlsplit(self.path).query)
+        if path == "/kit-archive":
+            # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
+            import home_base
+            return home_base.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":
@@ -2273,9 +2532,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if act in ("remind-open", "remind-sync"):
                     out = json.dumps(dict(state(p), **more)).encode()
                     p = None
-                elif act in ("ready", "unready", "posted", "skip"):
+                elif act in ("ready", "unready", "posted", "skip", "unposted"):
                     x = next(y for y in p["pieces"] if y["id"] == body.get("id"))
-                    set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
+                    if act == "unposted":      # the switch back to Not posted (Nicole's v27): back in line, ready to post
+                        unpost(p, x, by="page")
+                    else:
+                        set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
                 elif act == "cover":
                     # the photo this post shows in the grid (Nicole's v20). A reel's pick is the cover to choose when
                     # posting; a carousel's only matches the real grid when it is the first slide (the page says so).
@@ -2308,7 +2570,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
         except OSError as e:
             # the queue couldn't be saved (on a PC, another program held it longer than a few seconds; a full disk):
-            # an answer all the same, never a dropped connection. The page says to tell Claude.
+            # an answer all the same, never a dropped connection. The page says to tell your assistant.
             say(f"posting: couldn't save the posting queue ({e.__class__.__name__}: {str(e)[:160]})")
             self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, "The posting queue couldn't be saved just now")
             return
@@ -2422,7 +2684,12 @@ def main():
     a_ = sub.add_parser("add"); a_.add_argument("--shoot"); a_.add_argument("--kit"); a_.add_argument("--kinds", default="reel,carousel")
     m = sub.add_parser("made"); m.add_argument("piece"); m.add_argument("--where")
     for c in ("ready", "unready", "posted", "skip"):
-        sub.add_parser(c).add_argument("piece")
+        sp = sub.add_parser(c)
+        sp.add_argument("piece")
+        if c == "ready":
+            # v25: a shoot with several reels. Which reel goes in the queue, by its name on the reel page
+            sp.add_argument("--reel", help="which of the shoot's reels, by name (a shoot with more than one reel)")
+    up = sub.add_parser("unposted"); up.add_argument("piece")      # v27: it didn't go out after all
     mv = sub.add_parser("move"); mv.add_argument("piece"); mv.add_argument("--to", type=int, required=True)
     sub.add_parser("list"); sub.add_parser("tank"); sub.add_parser("page")
     r = sub.add_parser("reminders"); r.add_argument("--mark", action="store_true")
@@ -2503,7 +2770,7 @@ def main():
         kd = kit_mod.find_kit(a.kit)
         pieces = add_for_kit(p, kd)
         schedule(p); save(p); write_page(p)
-        say(f"{pieces[0]['shoot_name']}: {len(pieces)} pieces in the posting queue (" + ", ".join(f"{x['kind']}{' ' + str(x['n']) if x.get('n') else ''}: {x['status']}" for x in pieces) + ").")
+        say(f"{pieces[0]['shoot_name']}: {len(pieces)} pieces in the posting queue (" + ", ".join(f"{x['kind']}{' ' + str(x['n']) if x.get('n') else ''}{' (' + x['reel_name'] + ')' if x.get('reel_name') else ''}: {x['status']}" for x in pieces) + ").")
         calendar_in_step()
         return 0
     if a.cmd == "add":
@@ -2517,6 +2784,16 @@ def main():
         say(f"{shoot['name']}: {len(made)} piece{'s' if len(made) != 1 else ''} waiting to be made ({', '.join(kinds)})." if made else f"{shoot['name']} is already in the posting queue.")
         return 0
     if a.cmd == "made":
+        multi = several_reels_kit(p, a.piece) if "reel" in re.split(r"[^a-z0-9]+", a.piece.lower()) else None
+        if multi is not None:
+            # one shoot, several reels: which reel was made is in the reel page's record, so each reel's piece
+            # is brought up to date from there; none is put back from ready to post
+            got = add_for_kit(p, multi)
+            schedule(p); save(p); write_page(p)
+            say(f"{got[0]['shoot_name']} has more than one reel: each reel's place in the posting queue is up to date. "
+                "To put one in line, say which: ready \"<shoot> reel\" --reel \"<reel name>\".")
+            calendar_in_step()
+            return 0
         x = find(p, a.piece)
         set_status(p, x, "yellow", where=a.where)
         save(p); write_page(p)
@@ -2524,7 +2801,7 @@ def main():
         calendar_in_step()
         return 0
     if a.cmd in ("ready", "unready", "posted", "skip"):
-        x = find(p, a.piece)
+        x = reel_piece_for(p, a.piece, a.reel) if a.cmd == "ready" and getattr(a, "reel", None) else find(p, a.piece)
         set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[a.cmd])
         save(p); write_page(p)
         if a.cmd == "ready":
@@ -2533,6 +2810,15 @@ def main():
             say(f"{piece_name(x)}: posted. " + tank_words(p))
         else:
             say(f"{piece_name(x)}: {'back to in progress' if a.cmd == 'unready' else 'skipped'}.")
+        calendar_in_step()
+        return 0
+    if a.cmd == "unposted":
+        # v27: "that one didn't go out after all". Only a posted piece is looked for, so "beach reel" finds the
+        # posted one even when the shoot has another reel in line; a reel is found by its name too.
+        x = find(p, a.piece, statuses=("posted",))
+        unpost(p, x)
+        save(p); write_page(p)
+        say(f"{piece_name(x)}: back in your queue, ready to post" + (f", down for {nice_day(x['date'])}" if x.get("date") else "") + ". " + tank_words(p))
         calendar_in_step()
         return 0
     if a.cmd == "move":

@@ -354,11 +354,20 @@ def start_from_night(night, shoot_id):
 
 # ---------- the sheet and the picks ----------
 
-def sheet(kit):
+def sheet(kit, quick=False):
+    """The kit's numbered list, made by reel.py sheet (the one writer) and copied to .kit/sheet.json. `quick`
+    (the reel page's own re-list when photos were added, her v27): the list only, no contact sheet drawn."""
     rec = load_rec(kit)
     folder = photos_dir(kit, rec)
-    r = subprocess.run([sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)],
-                       capture_output=True, encoding="utf-8", errors="replace")
+    args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
+    if quick:
+        args.append("--no-sheets")
+    if (kit / ".kit" / "sheet.json").is_file():
+        # Numbers stay fixed when photos are added (Nicole's v27): reel.py is the one writer of the numbered list,
+        # and is handed the list from last time so every photo on it keeps its number, a new photo takes the next,
+        # and a photo gone keeps its number unused. Nothing else ever renumbers a kit's photos.
+        args += ["--before", str(kit / ".kit" / "sheet.json")]
+    r = subprocess.run(args, capture_output=True, encoding="utf-8", errors="replace")
     say(r.stdout.strip())
     if r.returncode != 0:
         say(r.stderr.strip())
@@ -375,8 +384,15 @@ def sheet(kit):
         except BaseException:
             _drop_scratch(tmp)      # the list stays as it was; no scratch copy is left behind (see save_rec)
             raise
-        rec["numbered"] = len(listing["photos"])
-        save_rec(kit, rec)
+        # The count goes into the record read AGAIN under its lock, with only `numbered` changed (update_rec): the
+        # list takes seconds on a big shoot, and since Nov 17 the reel page's own poll runs this by itself when a
+        # photo is dropped in, so a pick, a reel made or an archive mark that a chat command writes meanwhile must
+        # never be put back as it was by the record this read at its start (the review of Nov 17).
+        count = len(listing["photos"])
+
+        def note(r):
+            r["numbered"] = count
+        update_rec(kit, note)
     return 0
 
 
@@ -487,6 +503,76 @@ def set_picks(kit, singles, stories, carousel, reel, cover=None):
     rec["picks"] = picks
     save_rec(kit, rec)
     return picks
+
+
+def cmd_picks(kit, a):
+    """kit.py picks. A reel pick goes to the reel being worked on on the reel page (Nicole's v25: several reels
+    from one shoot, each with its own pick), or to the one --for-reel names. The shoot's first reel keeps its
+    pick here in kit.json, exactly as before there were several; a later reel keeps its own in the reel page's
+    record (reel_page.set_assistant_pick), so a pick for one reel never changes another's. Everything is checked
+    before anything is written."""
+    reel, later = a.reel, None
+    if a.for_reel and a.reel is None:
+        say("STOP: --for-reel goes with --reel (the pick it is for). Nothing was changed."); return 1
+    if a.reel is not None:
+        import reel_page
+        vid, why = reel_page.which_reel(kit, a.for_reel)
+        if vid is None:
+            say(f"STOP: {why} Nothing was changed."); return 1
+        vs, cur = reel_page.reel_names(kit)
+        if vid != "v1":
+            # a later reel: its numbers are checked here first, so a wrong one stops everything before kit.json moves
+            by_n = numbered(kit)
+            ns, _marks = parse_reel(a.reel)
+            bad = [n for n in ns if n not in by_n]
+            if bad:
+                say(f"STOP: no photo numbered {bad[0]} on the sheet."); return 1
+            if len(set(ns)) != len(ns):
+                say("STOP: a photo is in that pick twice. Nothing was changed."); return 1
+            if len(ns) > reel_page.MAX_PICKS:
+                say("STOP: " + reel_page.OUR_WORDS["too_many"] + " Nothing was changed."); return 1
+            reel, later = None, vid
+    p = set_picks(kit, a.singles, a.stories, a.carousel, reel, a.cover) if any(
+        v is not None for v in (a.singles, a.stories, a.carousel, reel, a.cover)) else load_rec(kit).get("picks", {})
+    shown = {k: len(v) for k, v in p.items() if v and not (later and k == "reel")}
+    line = ", ".join(f"{k} {n}" for k, n in shown.items())
+    if later:
+        import reel_page
+        try:
+            n, name = reel_page.set_assistant_pick(kit, later, a.reel)
+        except ValueError as e:
+            say(f"STOP: {e} The reel's pick was not changed."); return 1
+        except arrange_busy() as e:  # noqa: F841
+            say("STOP: this shoot's reel page is being written by something else right now. The reel's pick was not changed. Try again in a moment."); return 2
+        say("Picks: " + (line + ", " if line else "") + f"reel {n} (for \"{name}\", one of this shoot's {len(vs)} reels)")
+        _say_photo_note(kit, later)
+        return 0
+    if a.reel is not None and len(vs) > 1:
+        say("Picks: " + line + f" (the reel pick is for \"{next(v['name'] for v in vs if v['id'] == 'v1')}\", one of this shoot's {len(vs)} reels)")
+        _say_photo_note(kit, "v1")
+        return 0
+    say("Picks: " + line)
+    if a.reel is not None:
+        _say_photo_note(kit, "v1")
+    return 0
+
+
+def _say_photo_note(kit, vid):
+    """After a reel pick is saved: their note for that reel's photos, if they wrote one on the reel page (Nicole's
+    v25: the pick holds only what the note allows). Only said; the pick is saved either way."""
+    try:
+        import reel_page
+        note = reel_page.photo_note(reel_page.as_reel(reel_page.load(kit), vid).get("saved"))
+    except Exception:  # noqa: BLE001  (a reminder only)
+        return
+    if note:
+        say("Their note for this reel's photos: " + " / ".join(note.splitlines()))
+        say("The pick should hold only what that note allows (reel_page.py note prints it before you pick).")
+
+
+def arrange_busy():
+    import arrange
+    return arrange.Busy
 
 
 # ---------- building the pieces ----------
@@ -1597,7 +1683,7 @@ def words_status(kit):
 # Her page asks her server for the kit (/s/<shoot>/kit) and draws three cards you click into: Reel, Carousel and
 # Stories. Since v20 (Nov 10) the Reel and Carousel cards are each three numbered steps: 1 Make it (the card as it
 # was), 2 Your words (a dashed box that opens the words page for that piece: words_page.py), 3 Add to my queue (the
-# posting queue, unlocked once the piece is made and has its caption). Ours is the same page built here, on every
+# posting queue, unlocked once the piece is made; since v25 its caption is optional). Ours is the same page built here, on every
 # request of /content/<kit>/Post kit.html (posting_queue.py serve_content), from kit.json, the reel page's record,
 # the design records, the words page's record (words.py status), the posting queue and the folders; `kit.py page`
 # writes the same page as the saved copy in the kit's hidden folder. The page names no path: a kit by its folder
@@ -1621,8 +1707,8 @@ KIT_WORDS = {
     "open_photos": "Open the Photos folder",
     "my_queue": "My posting queue",
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
-    "reel": "Reel",
-    "reel_sub": "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut.",
+    "reel": "Reels",                 # v27: the Reels card (four kinds of reel behind its door)
+    "reel_sub": "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look.",
     "reel_none": "Your assistant hasn't picked the reel photos yet. Click to pick them yourself.",
     "in_capcut": "In CapCut:",
     "open_capcut": "Open in CapCut",
@@ -1653,11 +1739,27 @@ KIT_WORDS = {
     "open_words": "Open my words",
     "write_words": "Write my words",
     "step_queue": "Add to my queue",
-    "need_both": "Make your {piece} and write its caption",
     "need_made": "Make your {piece}",
-    "need_caption": "Write its caption",
     "locked": " first. Then add it to your posting queue to see it in your feed and give it a date.",
     "ready": "It's ready! Add it to your posting queue so you can see it in your feed and give it a date.",
+    # v25: captions are optional ("Add to my queue works once the piece is made, caption or not"); without one
+    # the button asks first, in a box on the page, never a browser pop-up
+    "ready_nocap": "Add it to your posting queue so you can see it in your feed and give it a date. Its caption can come later, or not at all.",
+    "nocap_title": "You haven't written a caption for your {piece} yet",
+    "nocap_text": "That's okay. Do you still want to add it to your posting queue, or write your caption first?",
+    "nocap_add": "Add it to my queue",
+    "nocap_write": "Write my caption",
+    "close": "Close",
+    # v25: a shoot with more than one reel. A preview of each reel by name on the Reel card, each reel's place in
+    # the queue in step 3, and which reel Add to my queue means
+    "reel_empty": "No photos picked yet.",
+    "which_title": "Which reel goes in your queue?",
+    "which_text": "You have more than one reel from this shoot. Pick the one you're adding; each reel gets its own spot in your queue.",
+    "r_posted": "posted ✓",
+    "r_down": "down for {day}",
+    "r_in": "in your posting queue",
+    "r_made": "made, not in your queue yet",
+    "r_not": "not made yet",
     "how_often": "How often do you want to post?",
     "how_often_b": " I'll give each post a date.",
     "down_for": "Down for {day}.",
@@ -1676,6 +1778,24 @@ KIT_WORDS = {
 # v24, her style line for that picture, as she wrote it (the whole strip of small slides is ONE picture, shown
 # whole, 120 px tall, with no tile behind it)
 PREVIEW_STYLE = ".strip img.dprev{width:auto;max-width:100%;height:120px;object-fit:contain;object-position:left;background:none;box-shadow:none;border-radius:6px}"
+# v25, her style lines as she wrote them: one reel's preview on the Reel card (.onereel), each reel's place in the
+# queue (.qreels), and the question box (.nocap: the no-caption question and "Which reel goes in your queue?")
+REELS_STYLE = """.onereel{margin:.7rem 0 0}.onereel .rn{font:600 12.5px/1.2 var(--sans);margin:0 0 .35rem;color:var(--ink)}.onereel .status{margin-top:.35rem}
+/* the no-caption question (Nicole, Nov 12) */
+.nocap{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(31,36,48,.35)}
+.nocap[hidden]{display:none}
+.nocap .box{background:var(--paper);border-radius:20px;max-width:420px;width:100%;padding:1.5rem 1.4rem 1.2rem;box-shadow:0 20px 60px rgba(31,36,48,.25)}
+.nocap h3{margin:0 0 .45rem;font:600 19px/1.25 var(--sans);letter-spacing:-.01em}
+.nocap p{margin:0 0 1.1rem;color:var(--ink-2);font-size:14.5px;line-height:1.5}
+.nocap .row{display:flex;gap:.5rem;flex-wrap:wrap}
+.nocap .row button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:.65rem 1.05rem;font:600 14px/1 var(--sans);cursor:pointer}
+.nocap .row button.main{background:var(--ink);color:#fff;border-color:var(--ink)}
+.nocap .row button.main:hover{background:var(--coral-2);border-color:var(--coral-2)}
+.qreels{margin:.35rem 0 0;padding:0;list-style:none;font-size:13.5px;color:var(--ink-2)}.qreels li{margin:.15rem 0}.qreels b{color:var(--ink);font-weight:600}
+.nocap .x{float:right;border:0;background:none;font-size:20px;line-height:1;color:var(--ink-2);cursor:pointer;margin:-.4rem -.3rem 0 0}"""
+# Ours, for her box: a long reel name in a button wraps inside the box, and the box never grows past a phone's width
+OUR_REELS_STYLE = """.nocap .row button{max-width:100%;overflow-wrap:anywhere}
+.nocap h3,.qreels li,.onereel .rn{overflow-wrap:anywhere}"""
 # Ours, with the reason for each: the quiet line under the cards is decision 12 of v19 (the Singles and Covers the
 # kit still makes); Canva's links had a place on the old page; a saved copy is a file, whose buttons can't reach
 # the Assistant; the folder buttons say what the Assistant's own folder opener answers (it knows when the window
@@ -1690,11 +1810,14 @@ OUR_KIT_WORDS = {
     "canva_cover": "the reel cover",
     "canva_story": "story {n}",
     "opening": "Opening...",
-    "unreached": "Could not reach the Assistant. Tell Claude instead.",
-    "saved_copy": "This is a saved copy. Say “show the {name} kit” to Claude and the buttons work.",
+    "unreached": "Could not reach the Assistant. Tell your assistant instead.",
+    "saved_copy": "This is a saved copy. Say “show the {name} kit” to your assistant and the buttons work.",
+    # ours (v27): a B-roll reel saved whole from the reel page (Save my video) is made, with no CapCut project to open;
+    # her v27 card has no line for it (hers says "In CapCut:" for every made reel)
+    "saved_video": "Saved as a video, in this shoot's Reels folder:",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
-    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell Claude, and it'll sort it out.",
+    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell your assistant, and it'll sort it out.",
 }
 # Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
 # three cards with their three steps, v20) and never sends one from before them in its place.
@@ -1702,9 +1825,10 @@ PAGE_MARK = "<meta name='assistant-page' content='post-kit-steps'>"
 STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
 STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
 
-# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow
-REEL_CREATE = "Create my reel"
-REEL_AGAIN = "Make a new version"
+# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow. v27: the Reels
+# card says "Create my reels", then "Create another reel" once any reel of the shoot is made (her kit.reel rule).
+REEL_CREATE = "Create my reels"
+REEL_AGAIN = "Create another reel"
 STORIES_MAKE = KIT_WORDS["stories_make"] + " →"
 STORIES_OPEN = KIT_WORDS["stories_open"] + " →"
 
@@ -1721,7 +1845,7 @@ def reel_door(kit_name):
 
 
 def reel_link_words(made):
-    """The Reel card's CTA, hers: "Create my reel →", or "Make a new version →" once a reel is made."""
+    """The Reels card's CTA, hers: "Create my reels →", or "Create another reel →" once a reel is made."""
     return (REEL_AGAIN if made else REEL_CREATE) + " →"
 
 
@@ -1828,6 +1952,7 @@ body:not(.live) #queueLink{display:none}
 .qchips button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:.45rem .8rem;font:600 13px/1 var(--sans);cursor:pointer}
 .qchips button:hover{border-color:var(--coral);color:var(--coral-2)}
 .qchips button[disabled]{opacity:.6;cursor:default}
+""" + REELS_STYLE + "\n" + OUR_REELS_STYLE + """
 .also{margin-top:1.6rem;font-size:13.5px;color:var(--ink-2)}
 .also p{margin:0}
 .also .line{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.1rem}
@@ -1867,10 +1992,61 @@ function redraw(){
 function box(piece){ return document.querySelector('[data-box="queue-' + piece + '"]'); }
 function say(piece, t){ const b = box(piece), w = b && b.querySelector('.went'); if (w) w.textContent = t; }
 let busy = false;
-function add(piece){
+// Her question box (v25), on the page, never a browser pop-up: a title, a line, and a button per answer. Every
+// word in it is set as text. Escape and the x close it with nothing done; the button that opened it gets the
+// keyboard back.
+const askEl = document.getElementById('nocap');
+let askFrom = null;
+function closeAsk(){ if (!askEl || askEl.hidden) return; askEl.hidden = true; if (askFrom && document.contains(askFrom)) askFrom.focus(); askFrom = null; }
+function askBox(title, text, buttons, from){
+  if (!askEl) return;
+  document.getElementById('nocapTitle').textContent = title;
+  document.getElementById('nocapText').textContent = text;
+  const row = document.getElementById('nocapRow'); row.textContent = '';
+  buttons.forEach(function(b){
+    const el = document.createElement('button'); el.type = 'button'; if (b.main) el.className = 'main';
+    el.textContent = b.label;
+    el.addEventListener('click', function(){ closeAsk(); b.fn(); });
+    row.appendChild(el);
+  });
+  askFrom = from || null;
+  askEl.hidden = false;
+  const first = row.querySelector('button'); if (first) first.focus();
+}
+if (askEl) {
+  document.getElementById('nocapClose').addEventListener('click', closeAsk);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !askEl.hidden) { e.preventDefault(); closeAsk(); } });
+}
+// No caption yet (Nicole, Nov 12): "you haven't written any captions yet. Is that okay? Do you still want to add
+// it to the queue, or do you want to do your captions?"
+function askNoCaption(piece, reel, from){
+  askBox(W.nocap_title.replace('{piece}', piece), W.nocap_text, [
+    {label: W.nocap_add, main: true, fn: function(){ add(piece, reel); }},
+    {label: W.nocap_write, fn: function(){ go('/words.html?kit=' + encodeURIComponent(KIT) + '&piece=' + encodeURIComponent(piece)); }}], from);
+}
+// Which reel goes in the queue, when the shoot has more than one (Nicole, Nov 12): a button for each reel that is
+// made and not in the queue yet (the button's own list, names as text); no question when only one is left
+function askWhichReel(a, then){
+  let can = [];
+  try { can = JSON.parse(a.dataset.reels || '[]'); } catch (e) { can = []; }
+  can = can.filter(function(r){ return r && typeof r.id === 'string' && typeof r.name === 'string'; });
+  if (!can.length) return;
+  if (can.length === 1) { then(can[0].id); return; }
+  askBox(W.which_title, W.which_text, can.map(function(r, i){ return {label: r.name, main: i === 0, fn: function(){ then(r.id); }}; }), a);
+}
+// A press on Add to my queue: which reel (a shoot with several), then the caption question (a piece with none),
+// then into the queue
+function press(a){
+  if (busy) return;
+  const piece = a.dataset.add;
+  if (!live) { say(piece, W.saved_copy); return; }
+  const then = function(reel){ if (a.dataset.nocap) askNoCaption(piece, reel, a); else add(piece, reel); };
+  if (a.dataset.multi) askWhichReel(a, then); else then();
+}
+function add(piece, reel){
   if (busy) return;
   if (!live) { say(piece, W.saved_copy); return; }
-  if (!document.body.dataset.rhythm) { askRhythm(piece); return; }      // asked once: how often they post, so each post gets a date
+  if (!document.body.dataset.rhythm) { askRhythm(piece, reel); return; }      // asked once: how often they post, so each post gets a date
   busy = true;
   // "Adding it…" shows in the button itself, so the press moves nothing (her rule: buttons change in place, the
   // layout never jumps); only something going wrong brings in a line under it. After the rhythm chips there is
@@ -1880,12 +2056,12 @@ function add(piece){
   say(piece, '');
   if (btn) { btn.textContent = W.adding; btn.disabled = true; } else say(piece, W.adding);
   const failed = function(t){ busy = false; if (btn) { btn.textContent = was; btn.disabled = false; } say(piece, t); };
-  post('/words-queue', {kit: KIT, piece: piece}).then(function(r){
+  post('/words-queue', reel ? {kit: KIT, piece: piece, reel: reel} : {kit: KIT, piece: piece}).then(function(r){
     if (!r || !r.ok) { failed((r && r.words) || W.cant_add); return; }
     return redraw().then(function(){ busy = false; }, function(){ busy = false; location.reload(); });
   }, function(){ failed(W.cant_add); });
 }
-function askRhythm(piece){
+function askRhythm(piece, reel){
   const qb = box(piece).querySelector('.qb');
   qb.textContent = '';
   const p = document.createElement('p'); p.className = 'ws'; p.style.margin = '.2rem 0 0';
@@ -1894,6 +2070,7 @@ function askRhythm(piece){
   const chips = document.createElement('div'); chips.className = 'qchips';
   W.rhythms.forEach(function(t){
     const c = document.createElement('button'); c.type = 'button'; c.dataset.iv = t; c.dataset.piece = piece; c.textContent = t;
+    if (reel) c.dataset.reel = reel;
     chips.appendChild(c);
   });
   qb.appendChild(p); qb.appendChild(chips);
@@ -1906,7 +2083,7 @@ function rhythm(chip){
     busy = false;
     if (!r || !r.ok) { say(piece, (r && r.words) || W.not_saved); return; }
     document.body.dataset.rhythm = '1';
-    add(piece);
+    add(piece, chip.dataset.reel || undefined);
   }, function(){ busy = false; say(piece, W.not_saved); });
 }
 // One handler, in the capture phase, for everything inside a card that is not the card's own link. Nothing in a
@@ -1916,7 +2093,7 @@ document.addEventListener('click', function(e){
   const t = e.target.closest ? e.target : e.target.parentElement;
   if (!t) return;
   const a = t.closest('[data-add]');
-  if (a) { stop(e); add(a.dataset.add); return; }
+  if (a) { stop(e); press(a); return; }
   const c = t.closest('[data-iv]');
   if (c) { stop(e); rhythm(c); return; }
   const l = t.closest('.qlink');
@@ -1971,6 +2148,16 @@ window.addEventListener('pageshow', function(e){ if (e.persisted) location.reloa
 """
 
 
+# Her question box (v25), once at the end of the page and outside every card: "You haven't written a caption for
+# your reel yet" and "Which reel goes in your queue?". An on-page box, never a browser pop-up. Its words are set
+# by the page's script as text; the ones written here are hers for the box before it is first used.
+ASK_BOX = ("<div class='nocap' id='nocap' hidden role='dialog' aria-modal='true' aria-labelledby='nocapTitle'><div class='box'>"
+           f"<button class='x' id='nocapClose' type='button' aria-label='{html.escape(KIT_WORDS['close'])}'>&times;</button>"
+           "<h3 id='nocapTitle'></h3>"
+           f"<p id='nocapText'>{html.escape(KIT_WORDS['nocap_text'])}</p>"
+           "<div class='row' id='nocapRow'></div></div></div>")
+
+
 def _font_css():
     """The fonts, the colour names and the rules every page shares (look.py): the plugin's own DM Sans, from the
     posting server's /look-font, nothing from the internet (decision 16)."""
@@ -1979,12 +2166,16 @@ def _font_css():
 
 def _head(title):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
+            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{look.CRUMBS_SAVED}\n{CSS}</style></head>")
 
 
-def _bar(when_words):
-    return (f"<div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
-            f"<span class='short'>Home</span></a>{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
+def _bar(when_words, shoot=None):
+    """Her bar (v27): the path at the top (Home › Hannah post kit, built by look.crumbs: the kit's crumb is where
+    you are, no link), the product's name, the date. Her Back to home pill stays in the markup, hidden, as her
+    page keeps it. shoot is the kit's folder name; None draws her plain 'Post kit' (the unreachable page)."""
+    here = look.CRUMB_WORDS["post_kit"].format(shoot=look.short_name(shoot)) if shoot else look.CRUMB_WORDS["post_kit_none"]
+    return (f"<div class='bar'><a class='homelink' style='display:none' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
+            f"<span class='short'>Home</span></a>{look.crumbs([(here, None)])}{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
 def unreachable_html(line=None):
@@ -2039,8 +2230,9 @@ def nice_day(iso):
 
 
 def queue_box(piece, made, has_caption, q):
-    """Step 3, hers: Add to my queue. Locked until the piece is made and has its caption (decision 7). q is
-    words_page.queue_state's for this piece ({status, date, ...}). Nothing in it is an <a>."""
+    """Step 3, hers: Add to my queue. Locked until the piece is made; its caption is optional (v25: without one
+    the button carries data-nocap, and the page asks first, in her box). q is words_page.queue_state's for this
+    piece ({status, date, ...}). Nothing in it is an <a>."""
     K = KIT_WORDS
     head = _step(3, K["step_queue"])
     open_ = f"<div class='w q{{cls}}' data-box='queue-{piece}'>"
@@ -2060,13 +2252,50 @@ def queue_box(piece, made, has_caption, q):
         if q.get("cover") and isinstance(q.get("thumb"), str) and q["thumb"].startswith("/posting-thumbs/"):
             pic = f"<img class='qpic' src='{html.escape(q['thumb'])}' alt=''>"
         return open_.format(cls="") + head + pic + f"<p class='ws'>{html.escape(said)}</p>" + button(K["added"]) + feed + "</div>"
-    if not made or not has_caption:
-        need = (K["need_both"] if not made and not has_caption else K["need_made"] if not made else K["need_caption"]).format(piece=piece)
-        return (open_.format(cls=" locked") + head + f"<p class='ws'>{html.escape(need + K['locked'])}</p>"
+    if not made:
+        return (open_.format(cls=" locked") + head + f"<p class='ws'>{html.escape(K['need_made'].format(piece=piece) + K['locked'])}</p>"
                 + button(K["step_queue"], done=False) + "</div>")
-    return (open_.format(cls="") + head + f"<p class='ws'>{html.escape(K['ready'])}</p>"
-            f"<div class='qb'><button class='qbtn' type='button' data-add='{piece}'>{html.escape(K['step_queue'])}</button></div>"
+    nocap = "" if has_caption else " data-nocap='1'"
+    return (open_.format(cls="") + head + f"<p class='ws'>{html.escape(K['ready'] if has_caption else K['ready_nocap'])}</p>"
+            f"<div class='qb'><button class='qbtn' type='button' data-add='{piece}'{nocap}>"
+            f"{html.escape(K['step_queue'])}</button></div>"
             "<p class='went'></p></div>")
+
+
+def reels_queue_box(reel_list, has_caption, queues):
+    """Step 3 of the Reel card when the shoot has more than one reel (hers, v25: reelsQueueBox): each reel's place
+    in the queue by name, and one Add to my queue that asks which reel. reel_list is reel_page.reels_for_kit's;
+    queues is {reel id: words_page.queue_state}. A reel that can go in is one that is made and is not in the
+    queue yet; the button names them (data-reels, ids and names as text only), so the page asks "Which reel goes
+    in your queue?" with a button each, or skips the question when one is left. Nothing in it is an <a>."""
+    K = KIT_WORDS
+    head = _step(3, K["step_queue"])
+
+    def in_q(r):
+        return (queues.get(r["id"]) or {}).get("status") in ("green", "posted")
+    rows = []
+    for r in reel_list:
+        q = queues.get(r["id"]) or {}
+        if q.get("status") == "posted":
+            st = K["r_posted"]
+        elif q.get("status") == "green":
+            day = nice_day(q.get("date"))
+            st = K["r_down"].format(day=day) if day else K["r_in"]
+        else:
+            st = K["r_made"] if r["made"] else K["r_not"]
+        rows.append(f"<li data-reel='{html.escape(r['id'])}'><b>{html.escape(r['name'])}</b>: {html.escape(st)}</li>")
+    can = [{"id": r["id"], "name": r["name"]} for r in reel_list if r["made"] and not in_q(r)]
+    any_in = any(in_q(r) for r in reel_list)
+    feed = (f"<span class='qlink' role='link' tabindex='0' data-href='/posting.html'>{html.escape(K['feed'])} &rarr;</span>" if any_in else "")
+    if can:
+        nocap = "" if has_caption else " data-nocap='1'"
+        btn = (f"<button class='qbtn' type='button' data-add='reel' data-multi='1'{nocap} "
+               f"data-reels='{html.escape(json.dumps(can, ensure_ascii=True))}'>{html.escape(K['step_queue'])}</button>")
+    else:
+        btn = (f"<button class='qbtn{' done' if any_in else ''}' type='button' disabled>"
+               f"{html.escape(K['added'] if any_in else K['step_queue'])}</button>")
+    return (f"<div class='w q' data-box='queue-reel'>{head}<ul class='qreels'>{''.join(rows)}</ul>"
+            f"<div class='qb'>{btn}</div><p class='went'></p>{feed}</div>")
 
 
 def _strip(srcs, most, tall=False, again=False):
@@ -2104,10 +2333,28 @@ def card_facts(kit, rec=None):
     shown_rows = [by_n[x["n"]] for x in order if x["n"] in by_n]
     photos, _ = arrange.page_photos(kit, rec, shown_rows[:STRIP_REEL]) if shown_rows else ([], 0)
     car, sto = carousel_shown(kit, rec), stories_shown(kit, rec)
+    # v25: a shoot with more than one reel shows a preview of each ([] for a shoot with one: its card is as ever)
+    several = []
+    try:
+        got = reel_page.reels_for_kit(kit, rows, rec)
+    except (OSError, ValueError, TypeError, AttributeError, KeyError):
+        got = []
+    if len(got) > 1:
+        for r in got:
+            mine = [by_n[x["n"]] for x in r["order"] if x["n"] in by_n]
+            pics, _ = arrange.page_photos(kit, rec, mine[:STRIP_REEL]) if mine else ([], 0)
+            several.append({"id": r["id"], "name": r["name"], "made": r["made"], "project": r["project"],
+                            "video": r.get("video"), "count": len(mine), "photos": pics})
+    # v27: the newest reel made, a CapCut project or a B-roll video saved whole from the page (Save my video): a
+    # saved video counts as made, on a shoot with one reel as with several
+    newest = reel_page.newest_made(kit, rec) or {}
     return {
+        "reels": several,
         "reel_order": [x["n"] for x in order],
         "reel_photos": photos,                                  # {n, v, have, missing} for the ones the strip shows
-        "reel": reel_page.newest_project(kit, rec),
+        "reel": newest.get("name"),
+        "reel_video": bool(newest.get("video")),                # the newest made is a saved video (its file name), not a CapCut project
+        "reel_project": reel_page.newest_project(kit, rec),     # the newest CapCut project, if any (what Open in CapCut opens)
         "slides": [p.name for p in car["files"]],
         "designs": design.count_worked_on(kit, design.CAROUSEL),
         "stories": [p.name for p in sto["files"]],
@@ -2143,6 +2390,16 @@ def steps_facts(kit, f):
                 q = {}
         out["queue"][piece] = q
         out["rhythm"] = out["rhythm"] or bool(q.get("interval"))
+    out["reels"] = {}
+    for r in f.get("reels") or []:           # v25: several reels, each with its own spot in the queue
+        q = {}
+        if words_page is not None:
+            try:
+                q = words_page.queue_state(kit, "reel", f["slides"], version=r["id"])
+            except (Exception, SystemExit):  # noqa: BLE001
+                q = {}
+        out["reels"][r["id"]] = q
+        out["rhythm"] = out["rhythm"] or bool(q.get("interval"))
     return out
 
 
@@ -2161,16 +2418,40 @@ def build_page(kit):
     steps = steps_facts(kit, f)
     kq = quote(kit.name)
 
-    # the Reel card
+    # the Reels card
     pics = [p for p in f["reel_photos"]]
     need_previews = any(not p["have"] and not p["missing"] for p in pics)
     srcs = [f"/kit-photo?kit={kq}&n={p['n']}&size=s&v={quote(p['v'] or '')}" for p in pics]
     srcs += [""] * max(0, len(f["reel_order"]) - len(srcs))         # for her "+N": only the first 7 are drawn
     reel_strip = (_strip(srcs, STRIP_REEL, tall=True, again=True) if f["reel_order"]
                   else f"<p class='empty'>{html.escape(KIT_WORDS['reel_none'])}</p>")
-    reel_status = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True,
-                           f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>")
+    capcut_button = f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>"
+    reel_status = (_status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(f['reel'])}</b>", True,
+                           capcut_button if f.get("reel_project") else "")
+                   if f["reel"] and f.get("reel_video")           # v27: a B-roll video saved from the page (ours: hers has no words for it on this card)
+                   else _status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True, capcut_button)
                    if f["reel"] else _status(html.escape(KIT_WORDS["not_made"]), False))
+    # v25: several reels from one shoot: a preview of each one, by name (hers: up to 7 photos, then "+N"; "In
+    # CapCut: <its newest project>" or "Not made yet"), and one Open in CapCut under them when any is made
+    several = f.get("reels") or []
+    if several:
+        parts = []
+        for r in several:
+            ps = [x for x in r["photos"]]
+            need_previews = need_previews or any(not x["have"] and not x["missing"] for x in ps)
+            rs = [f"/kit-photo?kit={kq}&n={x['n']}&size=s&v={quote(x['v'] or '')}" for x in ps]
+            rs += [""] * max(0, r["count"] - len(rs))
+            st = (_strip(rs, STRIP_REEL, tall=True, again=True) if r["count"]
+                  else f"<p class='empty'>{html.escape(KIT_WORDS['reel_empty'])}</p>")
+            # v27: a reel whose newest make is a saved B-roll video (reels_for_kit: its "project" is then the video's file name)
+            in_capcut = r["project"] and r["project"] != r.get("video")
+            made = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(r['project'])}</b>", True) if in_capcut
+                    else _status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(r['project'])}</b>", True) if r["project"]
+                    else _status(html.escape(KIT_WORDS["not_made"]), False))
+            parts.append(f"<div class='onereel' data-reel='{html.escape(r['id'])}'><div class='rn'>{html.escape(r['name'])}</div>{st}{made}</div>")
+        reel_strip = "".join(parts)
+        reel_status = (f"<div class='status'><button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button></div>"
+                       if any(r["project"] and r["project"] != r.get("video") for r in several) else "")
 
     # the Carousel card
     slides = f["slides"]
@@ -2196,8 +2477,11 @@ def build_page(kit):
     sto_cta = KIT_WORDS["stories_open"] if stories or f["story_designs"] or sto_pv else KIT_WORDS["stories_make"]
 
     def steps_col(piece, made):
-        """Steps 2 and 3, hers: the words box, then the queue box (locked until made and captioned)."""
+        """Steps 2 and 3, hers: the words box, then the queue box (locked until made; v25: the caption is
+        optional). A shoot with several reels has her list of reels in the Reel card's queue box."""
         w = steps["words"][piece]
+        if piece == "reel" and several:
+            return words_box(kit.name, piece, w) + reels_queue_box(several, bool(w.get("caption")), steps.get("reels") or {})
         return words_box(kit.name, piece, w) + queue_box(piece, made, bool(w.get("caption")), steps["queue"][piece])
 
     def card(piece, href, title, ratio, cta, sub, strip, status, wrds=None, went=False):
@@ -2247,15 +2531,17 @@ def build_page(kit):
                "<p class='went' id='folderWent'></p>")
 
     import words_page
-    page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached", "how_often", "how_often_b", "adding", "cant_add", "not_saved")}
+    page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached", "how_often", "how_often_b", "adding", "cant_add", "not_saved",
+                                            "nocap_title", "nocap_text", "nocap_add", "nocap_write", "which_title", "which_text")}
     page_words.update({k: OUR_KIT_WORDS[k] for k in ("opening", "unreached")})
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
     page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
     page = (_head(name + " · Post kit")
-            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words)
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words, kit.name)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p>{folders}</header>"
             f"<div id='pieces'>{cards}</div>{also}</div>"
+            + ASK_BOX +
             f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script>{SCRIPT}</script></body></html>")
     return page, need_previews
@@ -2317,6 +2603,8 @@ def main():
     pk = sub.add_parser("picks"); pk.add_argument("words")
     for k in ("singles", "stories", "carousel", "reel", "cover"):
         pk.add_argument(f"--{k}")
+    pk.add_argument("--for-reel", help="with --reel, when the shoot has several reels: the reel this pick is for, by "
+                                       "its name (without it: the reel being worked on on the reel page)")
     sub.add_parser("build").add_argument("words")
     rl = sub.add_parser("reel-made"); rl.add_argument("words"); rl.add_argument("--project", required=True)
     rl.add_argument("--picks", help="the order it was made in, as reel.py read it (19,4,10+,14-), when not Claude's pick")
@@ -2356,7 +2644,7 @@ def main():
             return 1
         rec = load_rec(kit)
         say(f"Kit: {kit}")
-        say(f"{len(rec.get('photos', []))} photos" + (f" at {rec['photos_dir']}" if rec.get("photos_dir") else "") + ". Next: the question, then kit.py sheet.")
+        say(f"{len(rec.get('photos', []))} photos" + (f" at {rec['photos_dir']}" if rec.get("photos_dir") else "") + ". Next: kit.py sheet (it numbers the photos for the pages), then show the post kit. Nothing is picked or made until they ask.")
         return 0
     kit = find_kit(a.words)
     if a.cmd == "told":
@@ -2371,8 +2659,7 @@ def main():
     if a.cmd == "sheet":
         return sheet(kit)
     if a.cmd == "picks":
-        p = set_picks(kit, a.singles, a.stories, a.carousel, a.reel, a.cover)
-        say("Picks: " + ", ".join(f"{k} {len(v)}" for k, v in p.items() if v)); return 0
+        return cmd_picks(kit, a)
     if a.cmd == "build":
         return build(kit)
     if a.cmd == "reel-made":

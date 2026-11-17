@@ -64,6 +64,8 @@ def open_folder(path):
     the app being used in front (it does that while someone is typing or clicking in another app, and
     nothing can force past it); not ok means it could not be opened, and note says why."""
     path = str(path)
+    if this_computer.no_windows():      # inside a test: nothing is opened
+        return True, ""
     if sys.platform == "darwin":
         cmd = ["osascript"]  # pc-ok: the Mac branch
         for line in _ACTIVATE:
@@ -110,6 +112,8 @@ def open_file(path):
     """(ok, note) after opening one file with whatever the computer opens it with: a video clip in the computer's
     own player (QuickTime Player on a Mac). The file is only opened, never changed. Not ok: note says why."""
     path = str(path)
+    if this_computer.no_windows():      # inside a test: nothing is opened
+        return True, ""
     if sys.platform == "win32":
         # unproven on a real PC
         import os

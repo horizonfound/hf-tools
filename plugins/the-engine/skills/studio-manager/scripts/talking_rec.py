@@ -72,6 +72,13 @@ Two small things of ours in the record: "words_of", the mark of the script its e
 never left on another script's word numbers when a job is cut off between its two saves), and "shot_keys",
 which Footage video each key the page has sent belongs to (a file's key changes when it is exported again).
 
+Several talking reels from one shoot (her v25; reels.py): the record keeps "versions": [{id, name, data}] and
+"current", her shape. Every key but those two and the record's own counter ("v", "rev", "updated", "from") belongs
+to the talking reel being worked on and sits at the top; the others wait in their "data". The words are the
+video's (talking-words.json), never put away with a reel, so two reels may cut the same video differently. A
+record with no "versions" is one talking reel, written byte for byte as before. show, cut, photos, place and
+status take --reel "<its name>" to act on another without opening it; version_op is the page's bar.
+
 The edit of each video is its own: choosing another video in the Talking folder keeps this one's cuts and
 photos in the record ("earlier") and brings them back when they come back to it. What a --replace replaces is
 kept too ("replaced", the last 12).
@@ -103,8 +110,16 @@ import fresh           # noqa: E402
 import kit as kitmod   # noqa: E402
 import posts           # noqa: E402
 import reel_page       # noqa: E402
+import reels           # noqa: E402
 
 TALKING = "Talking"                       # hers: <shoot>/Talking, beside Photos, Footage and Music
+# Several talking reels from one shoot (Nicole's v25, Nov 12; reels.py). Hers: TALK_FIRST, TALK_KEEP, TALK_LIVE:
+# "every key except versions and current belongs to the reel being worked on". Ours beside those two: the
+# record's own counter and what goes with it, which are the file's, not one reel's.
+TALK_FIRST = "Talking reel 1"
+TALK_WORD = "Talking reel"
+TALK_KEEP = ("versions", "current", "v", "rev", "updated", "from")
+TALK_LIVE = lambda rec: [k for k in rec if k not in TALK_KEEP]      # noqa: E731
 RECORD, PREV, LOCK = "talking.json", "talking.prev.json", "talking.lock"
 WORDS_FILE, WORDS_PREV = "talking-words.json", "talking-words.prev.json"
 JOB_LOCK = "talking-job.lock"             # held by the job that turns a video into words, for as long as it lives
@@ -113,10 +128,14 @@ LOG = fresh.LOGS / "talking.log"          # the real words of anything that went
 
 # What is kept beside the record, per video, and joined back on when the record is read (her shape for the page).
 WORD_FIELDS = ("words", "sentences", "info", "transcribed", "video_key", "how", "ondevice")
-# Everything that counts in word numbers: it belongs to one video's script and to no other.
+# Everything that counts in word numbers: it belongs to one video's script and to no other. "fixes" (her v27,
+# Nov 17: words they typed over on the page) is {"<word number>": "the right words"}, laid over the words when
+# the record is read (_join); the words file itself is never rewritten.
 EDIT_FIELDS = ("cut", "claude_cut", "claude_why", "splits", "speeds", "zooms", "shots", "moves", "photos", "claude_shots",
-               "claude_placed")
-KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds")
+               "claude_placed", "fixes")
+KEPT_WHEN_REPLACED = ("cut", "shots", "zooms", "splits", "speeds", "fixes")
+FIX_MOST = 80                             # hers: the fix box's maxlength
+FIXED_COUNT = "  Words fixed on the page: {n}."   # ours, for the assistant (status): how many words they fixed, never which (rule 3)
 MADE_AGAIN = "made-again"                 # in "earlier": this video's words were made again while the record was on another
 REPLACED_KEPT = 12                        # as kit.py picks --reel keeps reel_earlier
 
@@ -300,13 +319,33 @@ def _stale_edit(rec, entry, why):
     return True
 
 
+def fixes_of(rec):
+    """The words fixed on the page, as the record holds them: {word number: the right words}, only the entries
+    that are a digit key and a text (a record changed by hand loses the rest). Keys as whole numbers."""
+    raw = rec.get("fixes") if isinstance(rec, dict) else None
+    out = {}
+    for k, v in (raw.items() if isinstance(raw, dict) else ()):
+        if isinstance(k, str) and re.fullmatch(r"[0-9]+", k) and isinstance(v, str):
+            out[int(k)] = v
+    return out
+
+
 def _join(rec, kept):
-    """The record with its video's words joined on, in her shape."""
+    """The record with its video's words joined on, in her shape. The words they fixed on the page (v27) are
+    laid over: a fixed word is {"w": the right words, "w0": what was heard, start, end, conf}, in a FRESH list,
+    so the words file's own list is never changed (only the fixed words' entries are copied)."""
     for k in WORD_FIELDS:
         rec.pop(k, None)
     rec["words"], rec["sentences"] = [], []
     if kept:
-        rec["words"] = kept.get("words") or []
+        words = kept.get("words") or []
+        fx = fixes_of(rec)
+        if fx and isinstance(words, list):
+            words = list(words)
+            for i, text in fx.items():
+                if i < len(words) and isinstance(words[i], dict) and isinstance(words[i].get("w"), str) and text != words[i]["w"]:
+                    words[i] = dict(words[i], w=text, w0=words[i]["w"])
+        rec["words"] = words
         rec["sentences"] = kept.get("sentences") or []
         for k in ("info", "transcribed", "how", "ondevice"):
             if k in kept:
@@ -315,11 +354,17 @@ def _join(rec, kept):
     return rec
 
 
-def load(kit):
+def load(kit, reel=None):
     """The kit's talking record with the words of its video, as hers held it in one file. A new, empty one when
     there is none (or when what is in the file is not a record: the next change sets that damaged file aside,
-    never over it). Raises Unreadable when the file is there and would not be read just now."""
+    never over it). Raises Unreadable when the file is there and would not be read just now.
+    The reel being worked on; or, with `reel`, another of the shoot's talking reels (read only: a copy)."""
     rec = _slim(kit)
+    if reel is not None and reel != reels.current(rec, TALK_FIRST):
+        try:
+            reels.switch(rec, reel, TALK_LIVE, TALK_FIRST)
+        except reels.Wrong as e:
+            raise Stop(str(e))
     return _join(rec, words_for(kit, rec.get("video")))
 
 
@@ -343,7 +388,7 @@ def _same(a, b):
 QUIET_FIELDS = ("made",)                  # the Assistant's own notes: nothing the page edits or reads (see change)
 
 
-def change(kit, fn, src=None, stale_why="its script was made again", quiet=False):
+def change(kit, fn, src=None, stale_why="its script was made again", quiet=False, reel=None):
     """Read the record, change it (fn(record with its words); return False to leave it alone, raise to refuse),
     and save it as one step no other command or page can get in the middle of. The version before is kept
     beside it. Nothing is written when fn changed nothing. An accepted change moves the counter ("rev") on by
@@ -353,7 +398,10 @@ def change(kit, fn, src=None, stale_why="its script was made again", quiet=False
     never edits or reads those, so its next save is not refused as stale and its Undo list is not emptied by a
     press of Make it in CapCut (hers has no counter, so her note costs nothing either). A quiet change that
     turns out to touch anything else is an ordinary change.
-    Returns the record as it now is, words joined on."""
+    `reel` (a chat command naming another of the shoot's talking reels, v25): fn is handed THAT reel, with its own
+    video's words, and what it changes is kept in that reel; the reel being worked on, and which one that is, are
+    as they were. Stop(words) when there is no such reel.
+    Returns the record as it now is (the reel fn was handed), words joined on."""
     kit = Path(kit)
     kitmod.hidden(kit)
     with kitmod._held(kit / ".kit" / LOCK, LOCK_WAIT) as got:
@@ -367,19 +415,32 @@ def change(kit, fn, src=None, stale_why="its script was made again", quiet=False
         slim = d if d is not None else {"v": 1}
         before = json.loads(json.dumps(slim))
         wf = _words_file(kit)
+        back = None
+        if reel is not None and reel != reels.current(slim, TALK_FIRST):
+            back = reels.current(slim, TALK_FIRST)
+            try:
+                reels.switch(slim, reel, TALK_LIVE, TALK_FIRST)       # in memory: that reel's fields at the top
+            except reels.Wrong as e:
+                raise Stop(str(e))
         entry = words_for(kit, slim.get("video"), wf)
         full = _join(slim, entry)
         settled = _stale_edit(full, entry, stale_why)     # written even if fn then changes nothing
         if fn(full) is False and not settled:
+            if back is not None:
+                reels.switch(before, reel, TALK_LIVE, TALK_FIRST)     # what is handed back is the reel that was named
             return _join(before, words_for(kit, before.get("video"), wf))
         new = {k: v for k, v in full.items() if k not in WORD_FIELDS}
+        view = None
+        if back is not None:
+            view = _join(json.loads(json.dumps(new)), words_for(kit, new.get("video"), wf))
+            reels.switch(new, back, TALK_LIVE, TALK_FIRST)            # the reel being worked on comes back up
         if _same(new, before):
-            return full
+            return view if view is not None else full
         new["v"] = 1
         own = set(QUIET_FIELDS) | {"v"}
         if quiet and there and all(_same(new.get(k), before.get(k)) for k in (set(new) | set(before)) - own):
             arrange.write_whole(p, new)                    # rev, updated and from exactly as they were
-            return _join(dict(new), words_for(kit, new.get("video"), wf))
+            return view if view is not None else _join(dict(new), words_for(kit, new.get("video"), wf))
         new["rev"] = _rev(before) + 1
         new["updated"] = time.time()                       # hers: the page tells a change by this
         if src is not None:
@@ -392,16 +453,17 @@ def change(kit, fn, src=None, stale_why="its script was made again", quiet=False
             except OSError:
                 pass                                       # the earlier copy could not be read: the save still goes ahead
         arrange.write_whole(p, new)
-        return _join(dict(new), words_for(kit, new.get("video"), wf))
+        return view if view is not None else _join(dict(new), words_for(kit, new.get("video"), wf))
 
 
 def keep_replaced(rec, why):
     """Before something of theirs is replaced (a cut --replace, a place --replace, Edit my video pressed again on
-    the same video): the current cuts, photo stretches, zooms, splits and speeds go into the record's "replaced",
-    dated, the last 12 kept. Nothing is added when there is nothing to keep."""
+    the same video): the current cuts, photo stretches, zooms, splits, speeds and fixed words go into the record's
+    "replaced", dated, the last 12 kept. Nothing is added when there is nothing to keep."""
     eng = _engine()
     now = {"cut": rec.get("cut") or [], "shots": eng.shots(rec), "zooms": eng.zooms(rec),
-           "splits": rec.get("splits") or [], "speeds": rec.get("speeds") or []}
+           "splits": rec.get("splits") or [], "speeds": rec.get("speeds") or [],
+           "fixes": {str(k): v for k, v in sorted(fixes_of(rec).items())}}
     if not any(now.values()):
         return False
     lst = [x for x in _lst(rec, "replaced") if isinstance(x, dict)]
@@ -1015,6 +1077,94 @@ def facts_problem(f):
 
 
 _START = threading.Lock()
+# hers, word for word (server.py /talking/version): no new reel and no other reel while a video is becoming a script
+STILL_SCRIPT = "I'm still turning your video into a script. Give it a minute, then try again."
+# ours (hers makes a reel inside one request, so the page cannot ask meanwhile), a draft for Nicole
+STILL_MAKING = "I'm still making this reel in CapCut. Give it a minute, then try again."
+
+
+def talk_fresh(rec):
+    """Hers (talk_fresh): what a new talking reel starts with. Step 1, no video chosen."""
+    return {"captions": True, "photo_mode": ""}
+
+
+def reel_info(kit):
+    """{"versions": [{id, name}], "current": id} for this shoot's talking reels (hers: ver_info)."""
+    return reels.info(_slim(kit), TALK_FIRST)
+
+
+def which_reel(kit, words):
+    """For a chat command's --reel: the reel's id; no words, the reel being worked on. Stop(plain words) when the
+    words name none."""
+    slim = _slim(kit)
+    if not words:
+        return reels.current(slim, TALK_FIRST)
+    vid, why = reels.find(slim, words, TALK_FIRST, "talking reel")
+    if vid is None:
+        raise Stop(why + " Nothing was changed.")
+    return vid
+
+
+def reel_line(kit, vid):
+    """One line saying which of the shoot's talking reels a command is about, "" when there is only one."""
+    info = reel_info(kit)
+    if len(info["versions"]) < 2:
+        return ""
+    name = next((v["name"] for v in info["versions"] if v["id"] == vid), "")
+    names = ", ".join(f"\"{v['name']}\"" for v in info["versions"])
+    return (f"This shoot has {len(info['versions'])} talking reels ({names}). This is \"{name}\""
+            + (", the one open on the page." if vid == info["current"] else ", not the one open on the page.")
+            + " Each has its own video, cuts and photos; name another with --reel \"<its name>\".")
+
+
+def version_op(kit, ask):
+    """Hers (POST /talking/version {op: new | switch | rename, id, name}): start a new talking reel, work on
+    another, or rename one. (status, {ok, versions, current, rev} or {ok: False, words}). The reel being worked
+    on is kept exactly as it is; the record is saved whole with the version before kept and its counter moved
+    on. Refused (hers) while a video is being turned into a script, and (ours) while a reel is being made in
+    CapCut: both write to the reel being worked on, so it must not change under them. Rename is never refused
+    for that."""
+    kit = Path(kit)
+    if not isinstance(ask, dict):
+        return _bad()
+    with _START, _MAKE_ROUTE:
+        if ask.get("op") != "rename":
+            try:
+                settle(kit)                               # a job that is gone is told on ITS reel, before any other opens
+            except (Unreadable, OSError):
+                return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+            if job_running(kit) or _starting(read_job(kit)):
+                return 409, {"ok": False, "why": "working", "words": STILL_SCRIPT}
+            mj = read_make(kit) or {}
+            if make_running(kit) or (mj.get("state") == "queued" and not mj.get("pid") and time.time() - _fnum(mj.get("t")) < JOB_BOOT):
+                return 409, {"ok": False, "why": "making", "words": STILL_MAKING}
+        out = {}
+
+        def fn(rec):
+            for k in WORD_FIELDS:                         # the words are the video's, kept beside: never put away with a reel
+                rec.pop(k, None)
+            try:
+                changed = reels.op(rec, ask, TALK_LIVE, talk_fresh, TALK_FIRST, TALK_WORD)
+            except reels.Wrong as e:
+                raise Refused(str(e) or NOT_UNDERSTOOD)
+            out.update(reels.info(rec, TALK_FIRST))
+            if not changed:
+                return False
+            entry = words_for(kit, rec.get("video"))
+            _join(rec, entry)
+            _stale_edit(rec, entry, "its script was made again")      # the reel that came up may sit on older words
+            return None
+        try:
+            rec = change(kit, fn)
+        except Refused as e:
+            return 400, {"ok": False, "words": str(e)}
+        except Busy:
+            return 503, {"ok": False, "why": "busy", "words": BUSY}
+        except (Unreadable, OSError) as e:
+            log(f"{kit.name}: a talking reel could not be started, opened or renamed ({e.__class__.__name__}: {e})")
+            return 503, {"ok": False, "why": "trouble", "words": TROUBLE}
+        out.update(ok=True, rev=_rev(rec))
+        return 200, out
 
 
 def start(kit, video):
@@ -1507,7 +1657,21 @@ PAGE_REC = ("cut", "splits", "speeds", "video", "status", "step", "problem", "tr
             "cap_pos", "cap_size", "captions", "updated")
 
 
-def state_for_page(kit, rev=None, mark=None):
+def photos_landed(kit):
+    """Her v27 "+ Add more photos": photos dragged into the shoot's Photos folder while the photo pop-up is open
+    join the numbered list at the end, every other photo keeping its number. The list is compared with the folder
+    and, when they differ, made again through the one writer (kit.py sheet, handed the list from last time):
+    reel_page.relist_if_changed, the reel page's own (Lane A's), at most every 4 seconds a kit, and never while a
+    new photo is still being copied in. The page then sees the list's new stamp in the mark. True when the list
+    was re-made. Whatever goes wrong, the list stays as it is and the page goes on."""
+    try:
+        return bool(reel_page.relist_if_changed(Path(kit)))
+    except Exception as e:  # noqa: BLE001  (the page's look must always be answered)
+        arrange.log(f"talking page: the Photos folder couldn't be compared with the list ({e.__class__.__name__})")
+        return False
+
+
+def state_for_page(kit, rev=None, mark=None, photos=False):
     """Hers (GET /talking): {ok, folder, videos, working, rec, pieces, zooms, shots, captions}, with ours beside
     it: the counter ("rev"), the numbered list's mark ("stamp"), the shoot's short name, the videos still coming
     in, and where the record's video stands ("video_state"). `rec` holds only what her page reads. A video is
@@ -1516,10 +1680,14 @@ def state_for_page(kit, rev=None, mark=None):
     state is about half a megabyte, and the page asks every 3 seconds). "mark" moves when a video is added,
     taken away or exported again, or the photo list changes: the page sends back the mark it holds, and gets the
     whole state when either the counter or the mark has moved.
+    `photos` (the page's photos=1, sent only while its photo pop-up is open): photos dropped into the Photos
+    folder are given the next numbers first (photos_landed), so the mark moves and the whole state carries them.
     When the record can't be read just now: {ok: False, why: "trouble", words} and nothing else; never an empty
     edit that looks as if theirs had gone."""
     kit = Path(kit)
     settle(kit)                                            # a job that is gone is told as plain words, once
+    if photos:
+        photos_landed(kit)
     working = job_running(kit) or _starting(read_job(kit))
     try:
         slim = _slim(kit)
@@ -1558,6 +1726,9 @@ def state_for_page(kit, rev=None, mark=None):
     on_sheet = {x["n"] for x in arrange.sheet_rows(kit)}
     photos_gone = sorted({k for x in shots for k in x["ns"] if k not in on_sheet})
     out = {k: rec.get(k) for k in PAGE_REC if k in rec}
+    # her page shows Open CapCut in the bar once this reel was made (REC.made.length, v27): ours sends only whether
+    # it was, never the project names (the route names the one to click)
+    out["made"] = any(isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"] for m in _lst(rec, "made"))
     for k in ("video", "status", "step", "problem"):       # text or nothing, whatever the record holds
         if k in out and not isinstance(out[k], str):
             out[k] = None if k == "video" else ""
@@ -1566,7 +1737,9 @@ def state_for_page(kit, rev=None, mark=None):
             out.pop(k)
     if "cap_pos" in out and not (isinstance(out["cap_pos"], dict) and all(eng._num(out["cap_pos"].get(k)) is not None for k in ("x", "y"))):
         out["cap_pos"] = None
-    out["words"] = [{"w": w["w"], "start": w["start"], "end": w["end"]} for w in eng._words(rec)]
+    # her page reads w0 on a fixed word only (W[i].w0 != null), so it rides along only there
+    out["words"] = [dict({"w": w["w"], "start": w["start"], "end": w["end"]}, **({"w0": w["w0"]} if eng.heard(w) is not None else {}))
+                    for w in eng._words(rec)]
     out["sentences"] = eng._sents(rec, out["words"]) if has else []
     out["cut"] = [list(p) for p in (eng._pair(x) for x in _lst(rec, "cut")) if p]
     out["claude_cut"] = rec["claude_cut"] if isinstance(rec.get("claude_cut"), list) else None    # a list, even empty: cut
@@ -1577,7 +1750,9 @@ def state_for_page(kit, rev=None, mark=None):
     out["info"] = {"dur": info.get("dur") if info.get("dur") is not None else info.get("length")}
     earlier = rec.get("earlier") if isinstance(rec.get("earlier"), dict) else {}
     out["kept_for"] = sorted(k for k in earlier if isinstance(k, str))     # videos whose edit is kept
+    vers = reels.info(slim, TALK_FIRST)                    # hers: the shoot's talking reels, and which is open
     return {"ok": True, "short": short_name(kit), "rev": now, "mark": fmark, "stamp": arrange.sheet_stamp(kit),
+            "versions": vers["versions"], "current": vers["current"],
             "photos_gone": photos_gone,    # photo numbers on a stretch that are no longer in the numbered list
             "folder": talking_dir(kit).is_dir() and talking_ok(kit),
             "videos": [{"key": v["key"], "name": v["name"]} for v in talks],
@@ -1774,9 +1949,32 @@ def _f_cap_size(v, ctx):
     return round(min(3.0, max(0.4, _number(v, "cap_size"))), 2)
 
 
+def _f_fixes(v, ctx):
+    """Hers (v27): the WHOLE map of the words they fixed, {word number: the right words}; a word left out goes
+    back to what was heard. Ours: one bad entry refuses the whole save. A key is a string of digits naming a
+    word (0 to n-1), once; a value is text, its whitespace collapsed, at most 80 characters (her box's
+    maxlength; hers cuts longer text without a word), empty allowed (a word they typed away). A value equal to
+    the heard word is dropped (hers does the same). Hers takes any number of keys, str()s a list, and ignores
+    keys past the last word or not digits; ours refuses each of those."""
+    if not isinstance(v, dict) or len(v) > ctx["n"]:
+        _no("fixes")
+    out = {}
+    for k, text in v.items():
+        if not isinstance(k, str) or not re.fullmatch(r"[0-9]+", k) or not isinstance(text, str):
+            _no("fixes")
+        i = int(k)
+        if i >= ctx["n"] or i in out:
+            _no("fixes")
+        text = " ".join(text.split())
+        if len(text) > FIX_MOST:
+            _no("fixes")
+        out[i] = text
+    return {str(i): text for i, text in sorted(out.items()) if text != ctx["heard"][i]}
+
+
 SAVE_FIELDS = {
     "cut": _f_cut, "splits": _f_splits, "speeds": _f_speeds, "zooms": _f_zooms, "shots": _f_shots,
-    "cap_pos": _f_cap_pos, "cap_size": _f_cap_size,
+    "cap_pos": _f_cap_pos, "cap_size": _f_cap_size, "fixes": _f_fixes,
     "captions": lambda v, ctx: v if type(v) is bool else _no("captions"),
     "photo_mode": lambda v, ctx: v if isinstance(v, str) and v in ("me", "assistant", "") else _no("photo_mode"),
 }
@@ -1805,6 +2003,8 @@ def _stored(rec, k):
     if k == "cap_size":
         v = rec.get(k)
         return float(v) if type(v) in (int, float) and v else 1.0
+    if k == "fixes":
+        return {str(i): v for i, v in sorted(fixes_of(rec).items())}
     return rec.get(k) or []
 
 
@@ -1854,7 +2054,9 @@ def save_from_page(kit, body):
             return memo["f"]
 
         seen = {}
-        ctx = {"n": len(eng._words(rec)), "on_sheet": {x["n"] for x in arrange.sheet_rows(kit)}, "footage": footage,
+        words = eng._words(rec)                            # with the fixes laid over: the heard word is w0 there
+        ctx = {"n": len(words), "heard": [w["w0"] if eng.heard(w) is not None else w["w"] for w in words],
+               "on_sheet": {x["n"] for x in arrange.sheet_rows(kit)}, "footage": footage,
                "stored_ns": {k for x in had for k in x["ns"]}, "stored_v": stored_v, "known": known,
                "foot_names": foot_names, "seen": seen, "stored_overlap": overlapping(had)}
         clean = {k: SAVE_FIELDS[k](v, ctx) for k, v in sent.items()}
@@ -1922,7 +2124,7 @@ def _wnum(v):
     return None
 
 
-def save_cut(kit, given, replace=False):
+def save_cut(kit, given, replace=False, reel=None):
     """The assistant's cut. Returns (how many cuts, the reel's seconds). Stop when it can't be saved."""
     eng = _engine()
     out = {}
@@ -1953,11 +2155,11 @@ def save_cut(kit, given, replace=False):
             keep_replaced(rec, "cut --replace")
         rec["cut"], rec["claude_cut"], rec["claude_why"] = cuts, [list(c) for c in cuts], why
         out["n"], out["secs"] = len(cuts), eng.reel_seconds(eng.pieces(rec))
-    change(kit, fn)
+    change(kit, fn, reel=reel)
     return out["n"], out["secs"]
 
 
-def save_place(kit, given, replace=False):
+def save_place(kit, given, replace=False, reel=None):
     """The assistant's photo stretches. Returns (stretches, photos). Stop when they can't be saved."""
     eng = _engine()
     out = {}
@@ -1983,7 +2185,7 @@ def save_place(kit, given, replace=False):
         rec["shots"], rec["photos"], rec["claude_shots"] = shots, {}, True
         rec["claude_placed"] = shots_mark(shots)           # ours: which set it was, so status can tell if it still is
         out["n"], out["photos"] = len(shots), sum(len(x["ns"]) for x in shots)
-    change(kit, fn)
+    change(kit, fn, reel=reel)
     return out["n"], out["photos"]
 
 
@@ -2035,9 +2237,9 @@ def _stretches(kit, given, rec, n, eng):
     return shots
 
 
-def cmd_show(kit):
+def cmd_show(kit, reel=None):
     eng = _engine()
-    rec = load(kit)
+    rec = load(kit, reel)
     words = eng._words(rec)
     if not words:
         raise Stop(NO_SCRIPT_SHOW)
@@ -2062,9 +2264,9 @@ def sheet_line(kit):
     return f'python3 "{k}" sheet "{kit.name}"'
 
 
-def cmd_photos(kit):
+def cmd_photos(kit, reel=None):
     eng = _engine()
-    rec = load(kit)
+    rec = load(kit, reel)
     words = eng._words(rec)
     if not words:
         raise Stop(NO_SCRIPT_SHOW)
@@ -2085,12 +2287,13 @@ def cmd_photos(kit):
     return 0
 
 
-def cmd_status(kit):
+def cmd_status(kit, reel=None):
     """Where this shoot's talking reel stands, for the assistant (never read out as it is)."""
     eng = _engine()
-    rec = load(kit)
+    rec = load(kit, reel)
     words = eng._words(rec)
     talks = list_talks(kit)
+    open_reel = reel is None or reel == reel_info(kit)["current"]
     say(f"{kit.name}: talking reel")
     say(f"  Talking folder: {len(talks)} video{'s' if len(talks) != 1 else ''}" + (": " + ", ".join(v["name"] for v in talks) if talks else
         " (none yet: on the page, Add my video opens the folder)"))
@@ -2100,7 +2303,7 @@ def cmd_status(kit):
     vs = video_state(kit, rec)
     say(f"  Video: {rec['video']}" + {"gone": " (no longer in the Talking folder)",
                                      "changed": " (exported again since its script was made: Edit my video again)"}.get(vs, ""))
-    if job_running(kit):
+    if open_reel and job_running(kit):
         say("  Being turned into a script right now.")
     if rec.get("status") == "problem":
         say(f"  Stopped: {rec.get('problem')}")
@@ -2117,6 +2320,9 @@ def cmd_status(kit):
     say(f"  Photo stretches: {len(sh)}" + {"assistant": " (placed by you)",
                                           "changed": " (changed on the page since you placed them: ask before replacing them)"}.get(placed_by(rec, sh), "")
         + f"; who places them: {rec.get('photo_mode') or 'not chosen'}.")
+    fixed = sum(1 for w in words if eng.heard(w) is not None)
+    if fixed:                                              # ours: their fixes are theirs (rule 3); only the count is said
+        say(FIXED_COUNT.format(n=fixed))
     kept_for = sorted(k for k in (rec.get("earlier") if isinstance(rec.get("earlier"), dict) else {}) if isinstance(k, str))
     if kept_for:
         say("  Edits kept for other videos: " + ", ".join(kept_for))
@@ -2220,9 +2426,19 @@ def make_for_page(kit):
             "problem": (problem if isinstance(problem, str) and problem else MAKE_WORDS["went_wrong"]) if state == "problem" else None}
 
 
+def last_made(kit):
+    """The newest CapCut project made from the talking reel being worked on (its "made" list, note_made), by name;
+    None when this reel was never made. The list is one of the reel's own fields (TALK_LIVE), so with several
+    talking reels (v25) each keeps its own: the one at the top of the record is the open reel's. Names only, no
+    path. Raises Unreadable when the record will not be read just now."""
+    made = [m for m in _lst(_slim(Path(kit)), "made") if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]]
+    return made[-1]["project"] if made else None
+
+
 def note_made(kit, project):
     """Hers: the record keeps each reel that was made, and when ("made": [{"project", "when"}]). Saved quietly:
-    the record's counter does not move (see change), so the page's next save and its Undo are as they were."""
+    the record's counter does not move (see change), so the page's next save and its Undo are as they were.
+    The list belongs to the reel being worked on (TALK_LIVE): with several talking reels each keeps its own."""
     def fn(rec):
         made = [m for m in _lst(rec, "made") if isinstance(m, dict)]
         made.append({"project": str(project), "when": time.time()})
@@ -2416,6 +2632,8 @@ def main(argv=None):
         if with_file:
             s.add_argument("--file", required=True, help="a UTF-8 JSON file (in the scratchpad)")
             s.add_argument("--replace", action="store_true", help="only after they said yes to replacing theirs")
+        s.add_argument("--reel", help="when the shoot has several talking reels: the one this is for, by its name "
+                                      "(without it: the one being worked on on the page)")
     s = sub.add_parser("setup", help="where turning talking into words stands on this computer, and set it up")
     s.add_argument("--check", action="store_true", help="only say where it stands; set nothing up")
     s = sub.add_parser("job", help="(the Assistant's own) turn a video into words; started by Edit my video")
@@ -2434,19 +2652,31 @@ def main(argv=None):
         return cmd_setup(a.check)
     kit = find(a.shoot)
     try:
+        reel = which_reel(kit, a.reel)
+        which = reel_line(kit, reel)
+        if which:
+            say(which + "\n")
+        on_page = reel == reel_info(kit)["current"]
+        later = "The page shows {it} when they open that reel (Your talking reels, at the top of the page)."
         if a.cmd == "show":
-            return cmd_show(kit)
+            return cmd_show(kit, reel)
         if a.cmd == "photos":
-            return cmd_photos(kit)
+            return cmd_photos(kit, reel)
         if a.cmd == "status":
-            return cmd_status(kit)
+            return cmd_status(kit, reel)
         if a.cmd == "cut":
-            n, secs = save_cut(kit, read_json(a.file), a.replace)
-            say(f"Saved: {n} cuts. The reel is now {secs:.1f} seconds of talking. The page shows it in a few seconds.")
+            n, secs = save_cut(kit, read_json(a.file), a.replace, reel)
+            if on_page:
+                say(f"Saved: {n} cuts. The reel is now {secs:.1f} seconds of talking. The page shows it in a few seconds.")
+            else:
+                say(f"Saved: {n} cuts. The reel is now {secs:.1f} seconds of talking. " + later.format(it="it"))
             return 0
         if a.cmd == "place":
-            n, m = save_place(kit, read_json(a.file), a.replace)
-            say(f"Saved: {n} photo stretches, {m} photos. The page shows them in a few seconds.")
+            n, m = save_place(kit, read_json(a.file), a.replace, reel)
+            if on_page:
+                say(f"Saved: {n} photo stretches, {m} photos. The page shows them in a few seconds.")
+            else:
+                say(f"Saved: {n} photo stretches, {m} photos. " + later.format(it="them"))
             return 0
     except Stop as e:
         say(f"STOP: {e}")

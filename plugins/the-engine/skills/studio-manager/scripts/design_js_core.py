@@ -11,7 +11,11 @@ Undo, and the places later parts add themselves:
                                     of changes with the same key is one Undo step), fresh: true (start a new run),
                                     save: false, sel: an id or null, adjust: true | false}
     D.select(id), D.selected()      what is selected on the strip
+    D.multi, D.selectMore(id)       several things at once (hers, v27): their ids, and a Shift- or Cmd-click's toggle;
+                                    D.select(id, {multi: ids}) and D.setState(..., {multi: ids}) set them, a plain
+                                    D.select lets them go, and one that leaves the layout drops out by itself
     D.undo(), D.canUndo()
+    D.redo(), D.canRedo()           Redo (Nicole's v26): what Undo took back, put back; a new change empties it
     D.render()                      draws everything again from D.st; D.on('render', fn) adds a drawing step
     D.on(name, fn)                  'adopt' (a state arrived), 'design' (a design was opened), 'photos' (the
                                     small copies moved on), 'change' (the layout changed), 'render', 'saved'
@@ -53,7 +57,7 @@ DESIGN_CORE_JS = r"""
     // the short word beside the design's name while a change is not saved (the sentence that says why is in
     // the bar at the bottom of the window), and while the page has stopped until it is reloaded
     notSaved: 'Not saved', needsReload: 'Needs reload',
-    cantReach: 'Could not reach the Assistant. Tell Claude instead.',
+    cantReach: 'Could not reach the Assistant. Tell your assistant instead.',
     newer: 'This design was changed somewhere else. Here\'s the newest.',
     photosChanged: 'The photos in this shoot changed since this page opened.',
     reload: 'Reload',
@@ -78,13 +82,53 @@ DESIGN_CORE_JS = r"""
     hintHole: 'An empty frame. Click a photo below, or drag one onto it, to fill it.',
     hintOther: 'A text box. Drag to move it.',
     inside: 'Move photo inside', insideDone: 'Done moving',
+    // Show the whole photo (hers, v27): the button, its tooltip and its line
+    whole: 'Show the whole photo',
+    wholeTitle: 'Shrink the frame to the photo\'s own shape, so the whole photo shows with space around it',
+    wholeDone: 'The whole photo shows now, with space around it. Undo puts the crop back.',
     // why a press did nothing
     last: function(k){ return 'Slide ' + k + ' still has something on it. Move it or remove it first.'; },
     wide: 'Something is wider than the slides that would be left. Make it smaller first.',
     max: 'Instagram allows up to 20 slides.',
     small: 'This photo is too small for a border.',
     many: 'A design holds up to 80 photos and text boxes. Remove one first.',
-    full: 'Every slide has a photo, and 20 slides is as many as Instagram allows. Drag this photo onto a frame to put it there instead.'
+    full: 'Every slide has a photo, and 20 slides is as many as Instagram allows. Drag this photo onto a frame to put it there instead.',
+    // slides as things (hers, v27; stories since v26): the + and x on every label, the three buttons for the slide the
+    // selected thing is on, and the grip that drags a slide. The lines are hers; "one" is ours (hers says nothing at one slide).
+    dragSlide: 'Drag to move this slide',
+    addAfter: function(k){ return 'Add a slide after slide ' + k; },
+    removeSlide: function(k){ return 'Remove slide ' + k; },
+    before: 'Add a slide before', after: 'Add a slide after', removeThis: 'Remove this slide',
+    beforeTitle: 'Put a new blank slide in front of the one this is on',
+    afterTitle: 'Put a new blank slide right after the one this is on',
+    removeTitle: 'Take out the slide this is on, and everything on it',
+    added: function(k){ return 'Added a blank slide as slide ' + k + '. Drag a photo onto it. Undo takes it out.'; },
+    removed: function(k){ return 'Removed slide ' + k + '. Undo brings it back.'; },
+    most: 'That\'s the most Instagram allows (20 slides). Remove one first.',
+    across: 'A photo stretches across that spot. Move it first, or add the slide somewhere else.',
+    one: 'It\u2019s your only slide, so it stays.',
+    // Save just this slide (hers, v27): the button in the slide's group and its tooltip (a story's tooltip says story: ours)
+    saveOne: 'Save just this slide', saveOneTitle: 'Save only the slide this is on, as its own picture',
+    moved: function(n, k){ return 'Moved ' + (n > 1 ? n + ' slides (they share a photo)' : 'slide ' + k) + '. Undo moves it back.'; },
+    // "Where should it go?" (hers, v27): when a template lands at a spot something stretches across, and when it would pass the most slides
+    acrossEnd: 'A photo stretches across that spot, so I added it at the end instead.',
+    tooMany: function(adds, max, have){ return 'That adds ' + adds + (adds === 1 ? ' slide' : ' slides') + ', and Instagram allows ' + max + '. You have ' + have + '. Remove some first, or pick something smaller.'; },
+    // several photos at once (hers, v27): the bar inside the stage while two or more are selected, its buttons, their
+    // tooltips, its hint, and the line each press leaves
+    selN: function(n){ return n + ' selected'; },
+    even: 'Even them out', evenTitle: 'Lay them out tidily on their slide, every photo whole',
+    sameSize: 'Same size', sameTitle: 'Make them the same width as the last one you clicked',
+    tops: 'Line up tops', removeThem: 'Remove them', done: 'Done',
+    manyHint: 'Shift-click a photo to add it or take it out. Drag any of them to move them all.',
+    evened: 'Evened out, every photo whole. Undo puts them back.',
+    samed: 'Same size. Undo puts them back.',
+    lined: 'Lined up. Undo puts them back.',
+    removedThem: 'Removed. Undo brings them back.',
+    // See a photo big (hers, v27): the small button on every tray photo, the window's words, and the one button that puts the photo in
+    bigger: 'See it bigger', biggerN: function(n){ return 'See photo ' + n + ' bigger'; },
+    viewPrev: 'Previous photo', viewNext: 'Next photo', viewLabel: 'Photo, bigger',
+    viewNum: function(n){ return '#' + n; }, viewUsed: 'already in this design',
+    viewUse: 'Use this photo', viewPut: 'Put it in the selected frame', viewClose: 'Close'
   };
   // A part's words in a story's words: "slide" becomes "story", "slides" "stories", the Carousel folder the Stories
   // folder, "+ New design" "+ Add stories". Strings are changed in place; a function's answer is changed as it is
@@ -120,7 +164,7 @@ DESIGN_CORE_JS = r"""
   if (STORY) storyWords(WORDS, {
     max: 'A set holds up to 40 stories.',
     full: 'Every story has a photo, and 40 stories is as many as a set holds. Drag this photo onto a frame to put it there instead.',
-    one: 'It\u2019s your only story, so it stays.'
+    most: 'That\'s the most Instagram allows (40 stories). Remove one first.'
   });
   // a name this page gives itself, new on every load and kept nowhere: it lets the Assistant tell this
   // page's own save (whose answer never arrived) from a change made in another window
@@ -133,6 +177,8 @@ DESIGN_CORE_JS = r"""
     design: null,         // the open design: {id, name, set, unfinished, dropped}
     st: null,             // its layout now: {slides, bg, blocks}
     sel: null,            // the id of the selected block, or null
+    multi: [],            // several things selected at once (hers, v27): their ids in the order they were clicked, two or
+                          // more, else empty; D.sel is the one clicked last. The page's own, never saved.
     adjust: false,        // "Move photo inside" is on for the selected photo
     scale: 230 / M.W,     // screen pixels for one strip pixel
     blocked: false,       // the photos changed under the page: nothing more is saved until a reload
@@ -150,15 +196,40 @@ DESIGN_CORE_JS = r"""
 
   // ---- one way to change things ----
   var hist = M.history();
+  var fut = [];             // Redo (Nicole, Nov 13): the layouts Undo stepped back from, newest last
   function setSel(id){
     var b = id == null || !D.st ? null : M.find(D.st, id), nid = b ? b.id : null;
     if (nid !== D.sel) D.adjust = false;
     D.sel = nid;
   }
+  // The several selected, kept honest: one that is no longer in the layout drops out, and fewer than two is none.
+  function pruneMulti(){
+    if (!D.multi.length) return;
+    D.multi = D.st ? D.multi.filter(function(id){ return !!M.find(D.st, id); }) : [];
+    if (D.multi.length < 2) D.multi = [];
+  }
+  // A plain click selects one thing and lets the several go; o.multi (a list of ids) sets the several instead.
   D.select = function(id, o){
     if (!D.st) return;
     setSel(id);
+    D.multi = o && Array.isArray(o.multi) ? o.multi.slice() : [];
+    pruneMulti();
     if (o && 'adjust' in o) D.adjust = !!o.adjust && D.sel != null;
+    D.render();
+  };
+  // A Shift-, Cmd- or Ctrl-click on a thing on the strip (hers, v27): it joins the several, or leaves them. The one
+  // selected before joins too (so two clicks make a pair); the last clicked is D.sel; down to one, it is simply selected.
+  D.selectMore = function(id){
+    if (!D.st) return;
+    var b = M.find(D.st, id);
+    if (!b) return;
+    var list = D.multi.slice();
+    if (!list.length && D.sel != null && D.sel !== b.id && M.find(D.st, D.sel)) list.push(D.sel);
+    var at = list.indexOf(b.id);
+    if (at >= 0) list.splice(at, 1); else list.push(b.id);
+    if (list.length <= 1) { setSel(list.length ? list[0] : null); D.multi = []; }
+    else { setSel(at >= 0 ? list[list.length - 1] : b.id); D.multi = list; }
+    D.adjust = false;
     D.render();
   };
   D.setState = function(change, o){
@@ -169,10 +240,12 @@ DESIGN_CORE_JS = r"""
     if (did) {
       if (o.fresh) hist.mark();
       if (o.undo === false) hist.mark();
-      else hist.push({st: JSON.stringify(D.st), sel: D.sel}, typeof o.undo === 'string' ? o.undo : null);
+      else { hist.push({st: JSON.stringify(D.st), sel: D.sel}, typeof o.undo === 'string' ? o.undo : null); fut = []; }
       D.st = next;
     }
     if ('sel' in o) setSel(o.sel); else if (D.sel != null && !M.find(D.st, D.sel)) setSel(null);
+    if ('multi' in o) D.multi = Array.isArray(o.multi) ? o.multi.slice() : [];
+    pruneMulti();
     if ('adjust' in o) D.adjust = !!o.adjust && D.sel != null;
     if (did) D.emit('change');
     D.render();
@@ -183,15 +256,33 @@ DESIGN_CORE_JS = r"""
     if (!D.st || D.blocked) return false;
     var h = hist.pop();
     if (!h) return false;
+    fut.push({st: JSON.stringify(D.st), sel: D.sel});
     D.st = JSON.parse(h.st);
     D.adjust = false;
     D.sel = h.sel != null && M.find(D.st, h.sel) ? h.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
+    pruneMulti();
     D.emit('change');
     D.render();
     queue();
     return true;
   };
   D.canUndo = function(){ return hist.size() > 0; };
+  // Redo: the layout the last Undo stepped back from. It is one more Undo step, and it is saved like any change.
+  D.redo = function(){
+    if (!D.st || D.blocked) return false;
+    var f = fut.pop();
+    if (!f) return false;
+    hist.push({st: JSON.stringify(D.st), sel: D.sel}, null);
+    D.st = JSON.parse(f.st);
+    D.adjust = false;
+    D.sel = f.sel != null && M.find(D.st, f.sel) ? f.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
+    pruneMulti();
+    D.emit('change');
+    D.render();
+    queue();
+    return true;
+  };
+  D.canRedo = function(){ return fut.length > 0; };
 
   // ---- the lines at the top, and the line about a save ----
   // The place beside the design's name is one fixed size and only ever holds a short word, so no wording can
@@ -237,7 +328,7 @@ DESIGN_CORE_JS = r"""
   // ---- saving: one request at a time; the newest layout wins; retried until it lands ----
   var rev = 0;                  // the counter of the newest layout the Assistant has told this page about
   var saving = false, dirty = false, timer = null, retryT = null, waiters = [];
-  var SOFT = {many: 1, long: 1, font: 1, name: 1};      // refusals the photographer can put right on the page
+  var SOFT = {many: 1, long: 1, font: 1, name: 1, ask: 1};      // refusals the photographer can put right on the page
   function settle(ok){ if (ok === false || (!saving && !dirty)) { var w = waiters; waiters = []; w.forEach(function(f){ f(ok !== false); }); } }
   function body(){
     var b = {kit: KIT, design: D.design.id, stamp: D.S.stamp, base: rev, page: PAGE, state: D.st};
@@ -354,13 +445,14 @@ DESIGN_CORE_JS = r"""
   // ---- taking a state from the Assistant ----
   function takeDesign(d){
     D.design = {id: d.id, name: d.name, set: d.set || null, unfinished: !!d.unfinished, dropped: d.dropped || 0};
+    D.design.ask = typeof d.ask === 'string' ? d.ask : '';      // the note for the assistant, kept with the set or the design
     rev = d.rev;
     D.st = M.tidy(d.state);
-    hist.clear();
-    D.sel = null; D.adjust = false; dirty = false;
+    hist.clear(); fut = [];
+    D.sel = null; D.multi = []; D.adjust = false; dirty = false;
     clearTimeout(timer); clearTimeout(retryT);
     // which design is open lives in the address, so a reload opens the same one
-    try { window.history.replaceState(null, '', '/design.html?' + Q + (STORY ? KQ : '&design=' + encodeURIComponent(d.id))); } catch (e) {}
+    try { window.history.replaceState(null, '', '/design.html?' + Q + KQ + '&design=' + encodeURIComponent(d.id)); } catch (e) {}
     $('d-name').textContent = d.name;
     D.emit('design', d);
     D.render();
@@ -372,12 +464,37 @@ DESIGN_CORE_JS = r"""
     M.useLimits(j.limits);
     D.blocked = false;
     $('title').textContent = j.name;
+    // her Back to the post kit pill (v19) keeps its address but stays hidden (her v27: the path at the top is the way back)
     var kl = $('kitlink');
-    if (j.kit_page) { kl.href = '/content/' + encodeURIComponent(KIT) + '/Post%20kit.html'; kl.hidden = false; } else kl.hidden = true;
+    if (j.kit_page) kl.href = '/content/' + encodeURIComponent(KIT) + '/Post%20kit.html';
+    kl.hidden = true;
     D.emit('adopt', {rebuild: rebuild});
     takeDesign(j.design);
     if (topLines()) poll();
   }
+  // Photos that joined the shoot (her + Add photos, v27): a fresh answer from /design-state whose list has grown while every
+  // photo this page knows kept its number. The list, the stamp and the design's counter are taken (the Assistant has brought
+  // the design in line with the new list, which changes none of its frames), the layout stays as it is here, and the new
+  // photos are given to the tray ('photos-added'). Nothing is taken while something here is unsaved, when the design on the
+  // Assistant's side is not this layout, or when a photo this page knows is gone or has another number: then null, and the
+  // caller treats it as the photos having changed (Reload). Returns the new photos, in number order, or null.
+  D.takePhotos = function(j){
+    if (!D.st || !D.design || D.blocked || !D.save.idle() || !j || !j.ok || !j.design || j.design.id !== D.design.id) return null;
+    if (JSON.stringify(M.tidy(j.design.state)) !== JSON.stringify(D.st)) return null;
+    var now = {};
+    j.photos.forEach(function(p){ now[p.n] = p; });
+    for (var k = 0; k < D.S.photos.length; k++) { if (!now[D.S.photos[k].n]) return null; }
+    var had = {};
+    D.S.photos.forEach(function(p){ had[p.n] = true; });
+    var fresh = j.photos.filter(function(p){ return !had[p.n]; }).sort(function(a, b){ return a.n - b.n; });
+    D.S = j; D.by = now;
+    rev = j.design.rev;
+    D.design.dropped = j.design.dropped || 0;
+    D.emit('photos-added', fresh);
+    if (topLines()) poll();
+    D.render();
+    return fresh;
+  };
   function wanted(){ var m = /[?&]design=([a-z0-9]{1,40})(?:&|$)/.exec(location.search); return m ? m[1] : ''; }
   function getState(id){
     return fetch('/design-state?' + Q + KQ + (id ? '&design=' + encodeURIComponent(id) : ''), {cache: 'no-store'}).then(function(r){ return r.json(); });

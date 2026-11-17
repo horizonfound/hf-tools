@@ -27,8 +27,16 @@ Ours:
     ready says so in this page's own words (OUR_WORDS vp_cant, vp_lowspace), never the reel page's;
   - a photo whose small copy is not made yet: the page looks once more when the picker opens, and the script's
     part keeps looking every few seconds (T.on('photos')); each copy shows in its place when it is made;
+  - "+ Add more photos" in the pop-up's footer (her v27, Nov 14 and 16): opens the shoot's Photos folder
+    through the posting server's own /open route (the kit by its name, never a path; a PC says File Explorer),
+    and says her line. Photos dragged in are numbered at the end by the Assistant while the pop-up is open (the
+    3-second look asks with photos=1; hers polled /photos.json every 4 s for the life of the page), the grid is
+    built again with them at the end, what was picked stays picked, and her "{k} new photos in, at the end."
+    line says what the last look brought. Her "Could not open the folder" line is said only when the folder
+    truly isn't there; any other failure gets this page's own line;
   - T.pickerOpen() says whether either picker is open, so the keys (the spacebar, Delete) leave the page behind
-    it alone (hers plays the talking video behind the open video picker).
+    it alone (hers plays the talking video behind the open video picker); since her v27 the fix box counts as
+    one too (talking_js_script.py's T.fixOpen).
 """
 
 JS = r"""
@@ -43,7 +51,10 @@ var VIDS = [], looks = 0;
 function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function isOpen(id){ return $(id).classList.contains('open'); }
 function over(a, b){ for (var k = 0; k < T.SH.length; k++) if (T.SH[k].a <= b && T.SH[k].b >= a) return T.SH[k]; return null; }
-T.pickerOpen = function(){ return isOpen('pick') || isOpen('vpick'); };
+// ...and the fix box (her v27) counts as one: a key pressed while it is open never reaches the video or the timeline
+T.pickerOpen = function(){ return isOpen('pick') || isOpen('vpick') || !!(T.fixOpen && T.fixOpen()); };
+// the photo pop-up alone: the 3-second look asks for new photos while it is open (her v27 "+ Add more photos")
+T.photoPickOpen = function(){ return isOpen('pick'); };
 
 // ---------- the photo picker ----------
 function showable(p){ return p.have || !p.missing; }
@@ -66,12 +77,21 @@ function pickGrid(){
   pickMarks();
 }
 function photoMark(){ return T.PHOTOS.map(function(p){ return p.n + ':' + p.v + ':' + (p.have ? 1 : 0); }).join(','); }
-// small copies made since the grid was drawn: each shows in its place, nothing is redrawn under their hand
+function known(){ var k = {}; T.PHOTOS.filter(showable).forEach(function(p){ k[p.n] = true; }); return k; }
+// small copies made since the grid was drawn: each shows in its place, nothing is redrawn under their hand.
+// The list itself changed (her v27: photos dragged into the Photos folder while this is open): the grid is built
+// again, the new ones at the end with their new numbers, what is picked still picked, and her line says how many
 function pickFresh(){
   if (!PICK || !isOpen('pick')) return;
   var same = T.PHOTOS.filter(showable).map(function(p){ return p.n; }).join(',') ===
              Array.prototype.map.call($('pickGrid').querySelectorAll('.pk'), function(d){ return d.getAttribute('data-n'); }).join(',');
-  if (!same) { pickGrid(); return; }
+  if (!same) {
+    var k = T.PHOTOS.filter(showable).filter(function(p){ return !PICK.known[p.n]; }).length;
+    pickGrid();
+    PICK.known = known();
+    if (k) $('addPhotosSay').textContent = k === 1 ? W.photo_in : T.fill(W.photos_in, {k: k});
+    return;
+  }
   Array.prototype.forEach.call($('pickGrid').querySelectorAll('.pk'), function(d){
     var n = +d.getAttribute('data-n'), p = T.byN[n], i = d.querySelector('img'), src = p && p.have ? T.photoUrl(n, 's') : null;
     if (src && i.getAttribute('src') !== src) i.src = src;
@@ -92,8 +112,9 @@ function pickMarks(){
   $('pickUse').textContent = n > 1 ? T.fill(W.pick_use_many, {n: n}) : W.pick_use;
 }
 function openPick(a, b, old){
-  PICK = {a: a, b: b, old: old ? old.a : null, ns: old ? (old.ns || []).slice() : []};
+  PICK = {a: a, b: b, old: old ? old.a : null, ns: old ? (old.ns || []).slice() : [], known: known()};
   $('pickHead').textContent = T.fill(W.pick_for, {words: T.wordsOf(a, b, 70)});
+  $('addPhotosSay').textContent = '';
   pickGrid();
   $('pick').classList.add('open');
   // a small copy that was not made when the page last looked: one more look, now (the 3-second one waits while this is open)
@@ -116,6 +137,18 @@ $('pickUse').addEventListener('click', function(){
 });
 $('pickClose').addEventListener('click', closePick);
 $('pick').addEventListener('click', function(e){ if (e.target === $('pick')) closePick(); });
+// + Add more photos (her v27): the shoot's Photos folder, through the posting server's own route (the kit by its
+// name, never a path). Her line when it opened (ours after it when it opened behind this window); her "plugged
+// in" line only when the folder truly isn't there; this page's own line for anything else
+$('addPhotos').addEventListener('click', function(){
+  var say = $('addPhotosSay');
+  say.textContent = W.add_photos_opening;
+  T.ask('/open?' + Q + '&sub=Photos').then(function(res){
+    var j = res.j || {}, words = String(j.words || '');
+    if (j.ok) say.textContent = W.add_photos_open + (words.indexOf(W.behind) >= 0 ? W.behind : '');
+    else say.textContent = words.indexOf('plugged in') >= 0 ? W.add_photos_cant : W.cant_open;
+  }, function(){ say.textContent = W.cant_reach; });
+});
 
 // ---------- the video picker: the shoot's Footage folder ----------
 function mmss(t){ t = Math.max(0, +t || 0); var s = Math.floor(t % 60); return Math.floor(t / 60) + ':' + (s < 10 ? '0' : '') + s; }

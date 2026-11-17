@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026; the five
-On every beat cases as she re-recorded them in handoff v22, Nov 10, when On every beat got its rhythm) run through
+"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026; re-recorded
+by her in handoff v22, Nov 10, when On every beat got its rhythm, in handoff v25, Nov 13, when every vibe moved
+onto the song's real hits, and again in handoff v27, Nov 17, when the paces became clearly different) run through
 OUR code (timing.py, called by reel.py), and every "Beats per piece" line must match hers word for word.
+
+What v27 changed in her expected lines: 15 of the 22, every Calm, Build and A little of everything case but
+song1 photos 10 calm (on song2, song1 and the 60-second test beat alike). The five On every beat lines, her STOP
+line and song1 photos 10 calm are as they were in v25: "every On every beat case is unchanged". The three steps
+of v25 (the hits) are checked in tests/reel_hits_check.py; the paces' targets are checked below, by the rules.
 
     python3 tests/reel_timing_check.py
     ASSISTANT_HANDOFF=<folder>     where to look for her handoff's two songs, if not in reference-private/
@@ -9,7 +15,7 @@ OUR code (timing.py, called by reel.py), and every "Beats per piece" line must m
 Her cases: two songs from a real shoot and a 60-second test beat, in every vibe (On every beat, A little of
 everything, Calm, Build), as Moment first (one clip, then the photos), Back and forth (three clips, two photos
 after each) and photos only; one reel too long for its song (her plain STOP line); one second variation.
-The expected lines are copied from her acceptance/expected.json (v22's), unchanged.
+The expected lines are copied from her acceptance/expected.json (v27's), unchanged.
 
   - The 60-second test beat is synthetic (a drum pattern made for testing) and lives in tests/fixtures/
     (test-beat-60s.wav), so its 9 cases always run.
@@ -26,7 +32,9 @@ Then, beyond her 22:
     never longer than its card, an opening clip 3 seconds or more;
   - reel.py make --dry-run, the way Claude runs it (--clips, c1 in --picks, --pace and --vibe, the old names fast
     and steady), prints her lines exactly: Beats per piece, the kind note when the song is short, the STOP line
-    when it can't fit; the expected lines for these extra cases came from her own bts_reel.py (Nov 7);
+    when it can't fit; the expected lines for these extra cases came from her own bts_reel.py (Nov 7) and, since
+    v27, the Calm, Build and A little of everything ones are re-recorded from OUR engine (hers is never run) and
+    each is held to her rules (every piece in, the last photo two beats at least);
   - a reel with clips and no song (her bts_reel.py stopped there: a name used before it was set);
   - a clip in the CapCut project is a real video: type video, the whole video's length, its sound kept, the clip's
     start in the video, muted under a song and with its own sound when there is no song; its path written the
@@ -106,34 +114,35 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 
-EXPECTED = {   # her acceptance/expected.json, word for word (the five "beat" lines are v22's, the other 17 as in v19)
-    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 3",
-    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2",
+EXPECTED = {   # her acceptance/expected.json as she re-recorded it in v27 (Nov 17), word for word
+    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 1, 1, 2",
+    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 4, 2, 1, 1, 2",
     "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 3, 3, 1, 2, 3",
+    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 1, 2, 1, 2, 3",
     "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 4, 1, 1, 1, 4",
-    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 4, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3",
-    "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
-    "song1 photos 10 mixed": "Beats per piece: 2, 1, 1, 1, 2, 2, 2, 1, 1, 3",
-    "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 1, 1, clip 6, 2, 1, 2, 1, 2, 2, 2, 1, 1, 4",
-    "song2 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 2, 1, 2, 3",
-    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3",
-    "beat60 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 2, 1, 1, 2, 3",
-    "beat60 backforth 14 calm": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song2 first 14 build": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
-    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 4",
-    "beat60 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
-    "song1 photos 10 build": "Beats per piece: 2, 2, 2, 2, 1, 2, 2, 1, 1, 4",
-    "beat60 backforth 14 build": "Beats per piece: clip 6, 2, 2, clip 6, 1, 2, clip 5, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
+    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 3, 1, 1, 1, 4",
+    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 2, 1, 4, 1, 1, 1, 2, 1, 4, 1, 2, 1, 6, 2, 2, 1, 4",
+    "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 4, 1, 1, 1, 4",
+    "song1 photos 10 mixed": "Beats per piece: 2, 1, 1, 4, 2, 1, 2, 3, 1, 2",
+    "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 2, 4, clip 6, 2, 1, 3, 4, 2, 2, 2, 1, 1, 4",
+    "song2 first 14 calm": "Beats per piece: clip 6, 2, 4, 2, 2, 4, 2, 6, 2, 3, 2, 2, 2, 4, 4",
+    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2",
+    "beat60 first 14 calm": "Beats per piece: clip 6, 4, 4, 2, 4, 4, 4, 8, 4, 4, 6, 4, 2, 4, 4",
+    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 1, 2, 2, 2, 2",
+    "beat60 backforth 14 calm": "Beats per piece: clip 6, 4, 4, clip 6, 2, 4, clip 6, 4, 4, 4, 4, 4, 6, 4, 2, 4, 4",
+    "song2 first 14 build": "Beats per piece: clip 6, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 1, 1, 1, 3",
+    "song2 first 20 build": "Beats per piece: clip 6, 2, 3, 3, 3, 3, 4, 3, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 3",
+    "beat60 first 14 build": "Beats per piece: clip 6, 3, 3, 2, 3, 3, 2, 4, 2, 2, 3, 1, 1, 1, 4",
+    "song1 photos 10 build": "Beats per piece: 1, 3, 2, 2, 2, 3, 2, 1, 1, 2",
+    "beat60 backforth 14 build": "Beats per piece: clip 6, 3, 3, clip 6, 2, 4, clip 6, 3, 2, 3, 2, 2, 3, 1, 1, 1, 4",
     "song1 first 14 beat (too long for the song)": "STOP: Your song is only 15.4 seconds, and 1 clip and 14 photos need at least 14.2 seconds, even with every photo at one beat. Take a few photos out, or use a longer song.",
-    "beat60 first 14 mixed variation 2": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 1, 1, 4, 1, 1, 1, 3",
+    "beat60 first 14 mixed variation 2": "Beats per piece: clip 6, 1, 2, 1, 4, 1, 2, 3, 4, 1, 4, 1, 1, 1, 4",
 }
 
 # Beyond her 22: run through reel.py make --dry-run; the expected lines came from her own bts_reel.py (Nov 7,
-# a scratch run of her code, dry runs only). Each: (song, song start, vibe, the --picks text, clips, variation,
-# the lines her engine printed that ours must print too).
+# a scratch run of her code, dry runs only); the three mixed and build ones were re-recorded from OUR engine on
+# Nov 17 (v27's paces; her engine is never run) and are held to her rules below. Each: (song, song start, vibe,
+# the --picks text, clips, variation, the lines that must be printed).
 P60 = ",".join(str(n) for n in list(range(1, 53)) + list(range(1, 9)))
 P100 = ",".join(str(n) for n in list(range(1, 53)) + list(range(1, 49)))
 # Squeezed reels with two equally good mixes: without afconvert (a PC) either may come out (Nov 7, first
@@ -157,13 +166,13 @@ EXTRA = {
         ["STOP: Your song is only 60.0 seconds, and 2 clips and 100 photos need at least 69.0 seconds, even with every photo at one beat. Select fewer clips, take a few photos out, or use a longer song."]),
     "a 6-second card they made longer keeps its length, a beat less at most": (
         "beat60", None, "mixed", "c1," + PICK10, [(10.0, 16.0)], 0,
-        ["  1. clip from " + VIDEO_NAME + " at 10.0 s, 5.6 s long", "Beats per piece: clip 9, 1, 2, 1, 1, 1, 3, 4, 1, 1, 4"]),
+        ["  1. clip from " + VIDEO_NAME + " at 10.0 s, 5.6 s long", "Beats per piece: clip 9, 1, 2, 1, 3, 1, 3, 4, 4, 1, 3"]),
     "Bookends, Build: a clip to open and one to close": (
         "beat60", None, "build", "c1," + PICK10 + ",c2", [(2.5, 6.5), (188.0, 192.0)], 0,
-        ["  12. clip from " + VIDEO_NAME + " at 188.0 s, 3.8 s long", "Beats per piece: clip 6, 2, 2, 2, 2, 1, 3, 2, 1, 1, 2, clip 6"]),
+        ["  12. clip from " + VIDEO_NAME + " at 188.0 s, 3.7 s long", "Beats per piece: clip 6, 3, 3, 3, 3, 2, 3, 3, 1, 1, 2, clip 6"]),
     "photos only, A little of everything, the song started 30 seconds in": (
         "beat60", 30.0, "mixed", PICK10, [], 0,
-        ["Beats per piece: 3, 1, 1, 1, 2, 4, 2, 1, 1, 4"]),
+        ["Beats per piece: 2, 1, 1, 4, 2, 3, 3, 4, 1, 3"]),
 }
 
 
@@ -229,7 +238,8 @@ def rules(name, items, pieces, facts, period):
                 kmax = max(1, int((card + 0.02) / period))
                 if b * period < min(kmax * period, 2.95) - 1e-9:
                     bad.append(f"the opening clip {b * period:.2f} s, under 3 seconds")
-            if not p.get("clip") or p["src"] + p["dur"] > float(x["length"]) + 1e-9:
+            over = p.get("short_by") or 0          # v27 (A20): a clip that is the whole of a short video may run a touch past it
+            if not p.get("clip") or p["src"] + p["dur"] > float(x["length"]) + over + 1e-9 or over > 0.2 + 1e-9:
                 bad.append(f"clip {k + 1} is not a clip piece inside its video: {p}")
     check(f"{name}: her rules hold", not bad, "; ".join(bad))
 
@@ -360,6 +370,70 @@ def beat_rhythm(reel, timing, photos, songs):
     check("A little of everything, Calm and Build never read On every beat's rhythm", untouched)
 
 
+# ---------------------------------------------------------------- the paces are clearly different (her v27), by the rules
+
+def paces_differ(reel, timing, photos, songs):
+    """Her v27, section 9 (Nicole, Nov 16: changing the pace "does nothing change"): Calm, Build and A little of
+    everything now aim for clearly different holds. The aims are read straight from the candidates table (what each
+    photo would take with nothing else pulling), then the made reels on the steady test beat, where every tick is
+    heard, so the search has no hit to chase."""
+    print("\n-- the paces are clearly different (her handoff v27, Nov 16): the aims, then the reels")
+    grid, _ = timing.song_grid(str(BEAT60))
+
+    def aims(vibe, marks):
+        items = [dict(photo(str(k + 1), photos), mark=m) for k, m in enumerate(marks)]
+        cand = timing.candidates(items, grid, vibe, timing.seed_for(items, vibe))
+        return [c[0][0] // 2 for c in cand], cand                 # the cheapest length of each, in beats
+
+    plain12 = [""] * 12
+    calm, cand = aims("calm", plain12)
+    check("Calm: a plain photo aims for 4 beats (the last lands on 4)", calm == [4] * 12, str(calm))
+    costs = dict(cand[3])
+    check("Calm: 2 and 4 beats cost less than 3 (even counts preferred), and one beat costs the most of all",
+          costs[4] < costs[6] and costs[8] < costs[6] and costs[2] == max(costs.values()) and 2 in costs, str(sorted(costs.items())))
+    marked, _ = aims("calm", ["+", "-", "", "+", "-", ""])
+    check("Calm: Longer aims for 6 beats, Quicker for 2", marked[:5] == [6, 2, 4, 6, 2], str(marked))
+    build, cand = aims("build", plain12)
+    check("Build: three stages, 3 beats, then 2, then 1, then the last photo lands (4)",
+          build == [3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 4], str(build))
+    marked, _ = aims("build", ["+", "-", "", "", "", "", "", "", "", "", "-", ""])
+    check("Build: Longer one beat more, Quicker one beat less and never under one", marked[0] == 4 and marked[1] == 2 and marked[10] == 1, str(marked))
+    check("Build: it costs more to stray from its stage than in Calm (2.0 against 1.0 a beat)",
+          dict(cand[0])[8] > dict(aims("calm", plain12)[1][0])[12], str(cand[0]))
+    mixed, cand = aims("mixed", plain12)
+    check("A little of everything: every fourth photo holds 4 beats (the 4th, 8th and 12th; the last lands anyway)",
+          mixed[3] == 4 and mixed[7] == 4 and mixed[11] == 4, str(mixed))
+    marked, _ = aims("mixed", ["", "+", "-", "", "", "", "", "", "", "", "", ""])
+    check("A little of everything: Longer at least 3 beats, Quicker one", marked[1] >= 3 and marked[2] == 1, str(marked))
+
+    def beats(vibe, picks=",".join(str(k) for k in range(1, 15))):          # 14 plain photos, no marks
+        items = [photo(x, photos) for x in picks.split(",")]
+        pieces, facts = reel.plan_reel(items, str(BEAT60), vibe)
+        return None if pieces is None else facts["beats"]
+
+    b = {v: beats(v) for v in ("beat", "mixed", "calm", "build")}
+    check("14 plain photos on the test beat: the four paces give four different reels", len({tuple(x or []) for x in b.values()}) == 4, str(b))
+    check("... and Calm holds longest in all, Build next, then A little of everything, then On every beat",
+          all(b.values()) and sum(b["calm"]) > sum(b["build"]) > sum(b["mixed"]) > sum(b["beat"]), {k: sum(v or []) for k, v in b.items()})
+    check("... Calm, with room to spare: every hold an even count of beats", b["calm"] and all(h % 2 == 0 for h in b["calm"]), str(b["calm"]))
+    check("... Build, with room to spare: its first third holds 3 beats and it quickens toward the end",
+          b["build"] and b["build"][:4] == [3, 3, 3, 3] and b["build"][-2] == 1, str(b["build"]))
+    check("... A little of everything, with room to spare: a 4-beat hold in it, and one-beat photos too",
+          b["mixed"] and 4 in b["mixed"] and 1 in b["mixed"], str(b["mixed"]))
+    items = [photo(x, photos) for x in "1,2,3+,4,5,6,7,8".split(",")]
+    _, facts = reel.plan_reel(items, str(BEAT60), "calm")
+    bb = facts.get("beats") or []
+    check("Calm, a Longer photo with room to spare: it holds 6 beats or more (the bar can take it to 8), longer than the plain photos beside it",
+          len(bb) == 8 and bb[2] >= 6 and bb[2] > max(bb[1], bb[3]), str(bb))
+    if songs["song1"]:
+        items = [photo(x, photos) for x in PICK10.split(",")]
+        pieces, facts = reel.plan_reel(items, str(songs["song1"]), "calm", 0)
+        check("a 10-photo Calm on her 15-second song is made (one-beat holds when nothing else fits), not stopped with the wrong reason",
+              pieces is not None and len(pieces) == 10, str(facts)[:300])
+    else:
+        skip("a 10-photo Calm on her 15-second song is made", "that song is from her handoff, which isn't on this computer")
+
+
 # ---------------------------------------------------------------- reel.py make, the way Claude runs it
 
 def run_reel(env, *args):
@@ -477,6 +551,16 @@ def _main(work, songs):
                 missing = [w for w in missing if not w.startswith("Beats per piece")]
         check(f"reel.py, {label}", not missing and code == (2 if stop else 0),
               f"exit {code}; missing: {missing}\n      got: {out[-900:]}")
+        if not stop:
+            # Her rules on the printed line, whichever engine recorded it: one piece per pick, every hold a whole
+            # beat or more, and the last photo two beats at least.
+            got = beats_of(out)
+            toks = [t.strip() for t in got.split(":", 1)[-1].split(",")]
+            n_in = len([t for t in picks.split(",") if t])
+            holds = [int(re.sub(r"\D", "", t) or 0) for t in toks]
+            last_is_photo = toks and not toks[-1].startswith("clip")
+            check(f"reel.py, {label}: her rules on the line (every piece in, whole beats, the last photo two beats at least)",
+                  len(toks) == n_in and all(h >= 1 for h in holds) and (not last_is_photo or holds[-1] >= 2), got)
 
     code, out = make(None, "beat", "c1," + PICK10, [(2.5, 6.5)], tag="nosong")
     check("reel.py, a clip and no song: planned on an even 100 beats a minute, the footage keeping its sound",
@@ -487,6 +571,7 @@ def _main(work, songs):
           code == 0 and out.startswith("Plan: 10 photos") and beats_of(out).startswith("Beats per piece: "), out[-400:])
 
     beat_rhythm(reel, timing, photos, songs)
+    paces_differ(reel, timing, photos, songs)
 
     print("\n-- what the plan says (the timing reviewers' findings, Nov 7)")
     code, out = make(BEAT60, "mixed", "1,2,3,4,5,6,7,8,9", tag="roomy")
@@ -520,6 +605,31 @@ def _main(work, songs):
     check("plan_reel, a video shorter than one beat: STOP in plain words, nothing planned past its end",
           pieces is None and facts["problem"].startswith("STOP:")
           and "only 0.20 seconds of video" in facts["problem"], json.dumps(facts if pieces is None else pieces[0]))
+
+    print("\n-- a clip that is the whole of a short video (Nicole's v27 'long clips work'; A20): a hair short of a beat is held, not stopped")
+    grid, _ = timing.song_grid(str(BEAT60))
+    beat = grid.period                                      # about 0.63 s on the test beat
+    check("timing.CLIP_OVERSHOOT is a named number, about a fifth of a second", 0.1 <= getattr(timing, "CLIP_OVERSHOOT", 0) <= 0.3, str(getattr(timing, "CLIP_OVERSHOOT", None)))
+    whole = round(beat - 0.1, 3)                            # a video 0.1 s shorter than one beat, used whole as a clip
+    short = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 0.0, "seconds": whole, "w": 2160, "h": 3840,
+              "length": whole}] + [photo(x, photos) for x in ("1", "2")]
+    pieces, facts = reel.plan_reel(short, str(BEAT60), "beat")
+    p0 = pieces[0] if pieces else {}
+    check(f"a {whole} s video as a clip on a {beat:.3f} s beat: planned, one beat, from its very start, and the piece says how far short the video is",
+          pieces is not None and p0.get("clip") and p0["src"] == 0.0 and facts["beats"][0] == 1
+          and 0 < p0.get("short_by", 0) <= timing.CLIP_OVERSHOOT + 1e-9 and abs(p0["short_by"] - (p0["dur"] - whole)) < 1e-3, json.dumps(facts if pieces is None else p0))
+    far = round(beat - timing.CLIP_OVERSHOOT - 0.1, 3)        # too short to hold
+    short[0] = dict(short[0], seconds=far, length=far)
+    pieces, facts = reel.plan_reel(short, str(BEAT60), "beat")
+    check(f"a {far} s video, more than that short of a beat: STOP in plain words, with the video's length and the beat's",
+          pieces is None and facts["problem"].startswith("STOP:") and f"only {far:.2f} seconds of video" in facts["problem"]
+          and "less than one beat" in facts["problem"] and "slower" in facts["problem"], json.dumps(facts if pieces is None else pieces[0]))
+    long_video = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 5.0, "seconds": whole, "w": 2160, "h": 3840,
+                   "length": 20.0}] + [photo(x, photos) for x in ("1", "2")]
+    pieces, facts = reel.plan_reel(long_video, str(BEAT60), "beat")
+    p0 = pieces[0] if pieces else {}
+    check("the same short card cut from a LONG video: the clip simply runs one beat from where it starts, inside the video, nothing short",
+          pieces is not None and not p0.get("short_by") and p0["src"] == 5.0 and p0["src"] + p0["dur"] <= 20.0 + 1e-6 and facts["beats"][0] == 1, json.dumps(p0))
 
     page = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts" / "arrange_page.py").read_text(encoding="utf-8")
     part = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "parts" / "arrange.md").read_text(encoding="utf-8")
@@ -572,6 +682,33 @@ def _main(work, songs):
               ok, json.dumps({"type": mc["type"], "duration": mc["duration"], "has_audio": mc.get("has_audio"),
                               "path": mc["path"], "src": seg_c["source_timerange"], "volume": seg_c.get("volume"),
                               "meta": {k: clip_meta.get(k) for k in ("metetype", "duration")}}))
+
+    # A20: in the project, a clip's source never runs past its video's end: the few frames the video is short are
+    # made up by playing it a touch slower (the speed on the clip and on its speed item, as the talking reel's
+    # speeds are written); a clip with room is exactly as before.
+    plan = {"name": "Short clip reel", "hook": None, "song": None,
+            "photos": [{"path": str(work / VIDEO_NAME), "w": 2160, "h": 3840, "start_f": 0, "dur_f": 73, "start": 0.0,
+                        "dur": 2.4333, "fill": True, "clip": True, "src": 0.0, "length": 2.4, "short_by": 0.0333},
+                       {"path": str(photos / "41.jpg"), "w": 3647, "h": 5444, "start_f": 73, "dur_f": 19, "start": 2.4333,
+                        "dur": 0.6333, "fill": True}]}
+    d, m = capcut.build(plan, parts, None)
+    track = next(t for t in d["tracks"] if t["type"] == "video")
+    seg = track["segments"][0]
+    speeds = {x["id"]: x for x in d["materials"].get("speeds", [])}
+    own = [speeds[r] for r in seg.get("extra_material_refs", []) if r in speeds]
+    want_speed = 2400000 / seg["target_timerange"]["duration"]
+    check("capcut.build, a clip 0.03 s short of its hold: its source ends at the video's end (2.40 s), its hold is whole, and it plays a touch slower, said on the clip and its speed item",
+          seg["source_timerange"] == {"start": 0, "duration": 2400000} and seg["target_timerange"]["duration"] > 2400000
+          and abs(seg.get("speed", 1.0) - want_speed) < 1e-6 and own and all(abs(x.get("speed", 1.0) - want_speed) < 1e-6 for x in own),
+          json.dumps({"source": seg["source_timerange"], "target": seg["target_timerange"], "speed": seg.get("speed"), "items": [x.get("speed") for x in own]}))
+    plan["photos"][0].update(length=9.0, src=2.5)
+    plan["photos"][0].pop("short_by")
+    d, m = capcut.build(plan, parts, None)
+    seg = next(t for t in d["tracks"] if t["type"] == "video")["segments"][0]
+    own = [x for x in d["materials"].get("speeds", []) if x["id"] in seg.get("extra_material_refs", [])]
+    check("... and a clip with room: source as long as its hold, speed 1, as it always was",
+          seg["source_timerange"] == {"start": 2500000, "duration": seg["target_timerange"]["duration"]} and seg.get("speed", 1.0) == 1.0
+          and all(x.get("speed", 1.0) == 1.0 for x in own), json.dumps({"source": seg["source_timerange"], "speed": seg.get("speed")}))
 
     store = work / "CapCut projects"                     # a pretend CapCut projects folder: CapCut itself is never asked
     store.mkdir()

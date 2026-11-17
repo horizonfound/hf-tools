@@ -67,6 +67,7 @@ LEDE = ("Everything you need to post this shoot, in one place. Make your reel or
         "to your posting queue. Nothing gets posted for you.")
 LOCK_TAIL = " first. Then add it to your posting queue to see it in your feed and give it a date."
 READY = "It's ready! Add it to your posting queue so you can see it in your feed and give it a date."
+READY_NOCAP = "Add it to your posting queue so you can see it in your feed and give it a date. Its caption can come later, or not at all."
 RHYTHMS = ["Every day", "Every other day", "3 a week", "Twice a week", "Once a week"]
 OLD_WORDS = {"hooks": ["An older hook"], "caption": "An older caption", "short": "Old short one", "stories": ["An old story line"],
              "hashtags": "#oldtag #beachfamily", "leaned_on": "what you said"}
@@ -322,11 +323,13 @@ def check_states(s, k):
              w[3] == "/words.html?kit=%s&piece=%s" % (KQ, piece) and p.box("words-" + piece).tag == "div"
              and p.box("words-" + piece).attrs.get("role") == "link" and p.box("words-" + piece).attrs.get("tabindex") == "0", w[3])
     q = p.queue("reel")
-    case("step 3, a reel never made and not written: 'Make your reel and write its caption first. ...', locked, a grey disabled Add to my queue",
-         q == ("Make your reel and write its caption" + LOCK_TAIL, "Add to my queue", True, "qbtn", None, True), q)
+    case("step 3, a reel never made and not written: 'Make your reel first. ...' (v25: the caption is not asked for), locked, a grey disabled Add to my queue",
+         q == ("Make your reel" + LOCK_TAIL, "Add to my queue", True, "qbtn", None, True), q)
     q = p.queue("carousel")
-    case("step 3, no carousel: 'Make your carousel and write its caption first. ...', locked",
-         q == ("Make your carousel and write its caption" + LOCK_TAIL, "Add to my queue", True, "qbtn", None, True), q)
+    case("step 3, no carousel: 'Make your carousel first. ...', locked",
+         q == ("Make your carousel" + LOCK_TAIL, "Add to my queue", True, "qbtn", None, True), q)
+    code, j, _ = s.http("POST", "/words-queue", {"kit": KIT, "piece": "reel"})
+    case("...and a piece that is not made is refused by the Assistant too, whatever the page shows", code == 409 and not s.posting(), (code, j))
     case("no carousel: 'No slides yet.' and 'Not made yet'; no reel: 'Not made yet' and no Open in CapCut",
          "No slides yet." in p.card("carousel").text() and "Not made yet" in p.card("carousel").text()
          and "Not made yet" in p.card("reel").text() and not p.root.find(id="capcut"))
@@ -356,10 +359,14 @@ def check_states(s, k):
     s.reel_made()
     s.save("reel", caption="")
     p = look(s, "made, no caption")
-    case("step 3, made but no caption: 'Write its caption first. ...', locked", p.queue("reel") == ("Write its caption" + LOCK_TAIL, "Add to my queue", True, "qbtn", None, True), p.queue("reel"))
+    b = p.box("queue-reel")
+    btn = b.find("button")[0]
+    case("step 3, made but no caption (v25, captions are optional): her line 'Add it to your posting queue ... Its caption can come later, or not at all.' "
+         "with a live Add to my queue that asks first (data-nocap)",
+         b.find("p", class_="ws")[0].text() == READY_NOCAP and btn.text() == "Add to my queue" and "disabled" not in btn.attrs
+         and btn.attrs.get("data-add") == "reel" and btn.attrs.get("data-nocap") == "1" and "locked" not in b.attrs["class"], b.text())
     case("step 2, hooks but no caption: '10 hooks, 1 picked' (hers), 'Open my words →'", p.words("reel")[1:3] == ("10 hooks, 1 picked", "Open my words →"), p.words("reel"))
-    code, j, _ = s.http("POST", "/words-queue", {"kit": KIT, "piece": "reel"})
-    case("...and the Assistant refuses the add too, whatever the page shows", code == 409 and not s.posting(), (code, j))
+    case("...and showing that page added nothing", not s.posting())
     case("made: 'In CapCut: <project>' with Open in CapCut, a button", PROJECT in p.card("reel").text() and p.root.find("button", id="capcut")[0].text() == "Open in CapCut")
 
     # ready
@@ -369,7 +376,7 @@ def check_states(s, k):
     btn = b.find("button")[0]
     case("step 3, made and written: 'It's ready! Add it to your posting queue ...' with a live Add to my queue",
          b.find("p", class_="ws")[0].text() == READY and btn.text() == "Add to my queue" and "disabled" not in btn.attrs
-         and btn.attrs.get("data-add") == "reel" and "locked" not in b.attrs["class"] and not b.find(class_="qlink"), b.text())
+         and btn.attrs.get("data-add") == "reel" and "data-nocap" not in btn.attrs and "locked" not in b.attrs["class"] and not b.find(class_="qlink"), b.text())
     case("no rhythm yet: the page knows to ask (and shows no chips until Add is pressed)",
          p.root.find("body")[0].attrs.get("data-rhythm") == "" and not p.root.find(class_="qchips") and '"rhythms": ["Every day", "Every other day", "3 a week", "Twice a week", "Once a week"]' in p.raw)
     case("showing the kit page put nothing in the posting queue", not s.posting())
@@ -531,8 +538,7 @@ def check_states(s, k):
 # ---------- 3. the page in a hidden Chrome ----------
 
 def check_browser(c, s):
-    s.reel_made()
-    s.slides_made(3)
+    s.reel_made()                             # (the carousel is made further down: until then its queue box is locked)
     s.words("draft", "reel", {"caption": "MINI SESSIONS are coming to Laguna Beach on December 4th!!!", "hooks": HOOKS})
     c.init_script(PAGE_HOOKS)
     url = s.url(PAGE)
@@ -546,6 +552,11 @@ def check_browser(c, s):
               "return a.contains(document.querySelector('[data-box=words-'+p+']')) && a.contains(document.querySelector('[data-box=queue-'+p+']'))})") is True)
     case("in a browser: her lede, and the shoot's name only as text", c.text(".lede") == LEDE and c.text("h1") == SHORT + "."
          and c.js("document.querySelectorAll('h1 b').length === 0 && window.pwned === undefined") is True, c.text("h1"))
+    steps = c.js("Array.from(document.querySelectorAll('.bar nav.crumbs > *')).map(function(n){ return [n.tagName, n.textContent, n.getAttribute('href'), n.getAttribute('aria-current')]; })")
+    case("in a browser: her v27 path at the top, Home › %s post kit, in the bar (its one link is Home); the Back to home pill kept, hidden" % SHORT,
+         steps == [["A", "Home", "/home", None], ["SPAN", "›", None, None], ["SPAN", SHORT + " post kit", None, "page"]]
+         and c.js("getComputedStyle(document.querySelector('.bar .homelink')).display") == "none" and c.count(".bar a") == 2
+         and c.js("document.querySelectorAll('a.piece nav, a.piece .crumbs').length") == 0, steps)
     nums = c.js("Array.from(document.querySelectorAll('a.piece')).map(function(a){return Array.from(a.querySelectorAll('.stepno')).map(function(n){return n.textContent}).join('')})")
     case("in a browser: 1 2 3 on the Reel and Carousel cards, none on Stories", nums == ["123", "123", ""], nums)
     case("in a browser: two columns, the words box above the queue box, beside the photos",
@@ -561,9 +572,9 @@ def check_browser(c, s):
          json.loads(c.js("sessionStorage.getItem('__opens')")) == ["/open?kit=%s&sub=Photos" % JSQ, "/open?kit=%s&sub=" % JSQ]
          and c.text("#folderWent") == "Opened the folder in Finder." and c.js(here) is True, c.js("sessionStorage.getItem('__opens')"))
 
-    # the carousel has no caption: its queue box is locked, and no press there opens the designer
-    case("in a browser: the carousel's Add to my queue is grey and disabled", c.js("document.querySelector('[data-box=queue-carousel] .qbtn').disabled") is True
-         and c.text("[data-box=queue-carousel] .ws") == "Write its caption" + LOCK_TAIL)
+    # the carousel is not made: its queue box is locked, and no press there opens the designer
+    case("in a browser: the carousel's Add to my queue is grey and disabled until it is made", c.js("document.querySelector('[data-box=queue-carousel] .qbtn').disabled") is True
+         and c.text("[data-box=queue-carousel] .ws") == "Make your carousel" + LOCK_TAIL)
     c.click("[data-box=queue-carousel] .qbtn", check=False)
     c.click("[data-box=queue-carousel] .ws")
     c.click("[data-box=queue-carousel] .stepk")
@@ -616,6 +627,7 @@ def check_browser(c, s):
          and len([y for y in s.posting()["pieces"] if y["id"].endswith("-reel")]) == 1)
 
     # the second piece: no rhythm question
+    s.slides_made(3)
     s.words("draft", "carousel", {"caption": "Hannah's baby boy was just turning one..."})
     c.open(url)
     c.wait_for("!!document.querySelector('[data-box=queue-carousel] [data-add]')", 10)

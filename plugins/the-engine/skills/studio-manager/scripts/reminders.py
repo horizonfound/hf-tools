@@ -124,7 +124,7 @@ class CalendarProblem(Exception):
 # What a page or the photographer is told when something on this computer (a file that can't be saved, a
 # program fault) stopped the reminders: never Python's own wording, never a file's path. The real words go in
 # result["detail"] for the log and the chat's "(reminders not updated: ...)" line, which Claude reads.
-STOPPED_HERE = "Something on this computer got in the way. Tell Claude and it'll sort it out."
+STOPPED_HERE = "Something on this computer got in the way. Tell your assistant and it'll sort it out."
 PASSES = 3                         # run(): how many times one round looks again after it changed the calendar
 
 

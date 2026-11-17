@@ -36,7 +36,19 @@ Reads text only; nothing is run, started or written. What it checks:
     words in the reel skill's only; the reel skill no longer says "no zooms" without saying it is about a photo
     reel; the reel page's third card is named in parts/arrange.md; the PC gap is in parts/on-a-pc.md and the PC
     guide in the same words; and parts/where-things-live.md names every file the talking reel keeps, by the
-    scripts' own names. (For this last part the talking scripts are imported, only to read their words.)
+    scripts' own names. (For this last part the talking scripts are imported, only to read their words.);
+  * the photographer picks (Nicole's v25, stage H of the v26 build): nothing is picked until they ask; the pasted
+    line "Pick my reel photos for <shoot>" is answered with reel_page.py note first, the note followed exactly,
+    the pick saved for that reel only; "make my posts" and a new kit only number the photos and open the post
+    kit (no pick, no build, no question); the page's own lines are quoted word for word;
+  * Posted on the post itself, the Reels card and the path at the top (Nicole's v27, Lane D of the v27 build): the
+    Not posted / Posted switch, the posted post in the feed and "that one didn't go out after all" (unposted) are
+    in parts/posting-queue.md in the page's own words, the command exists and its printed line is quoted, the
+    core's row sends the new lines there; the Reels card's name and its two buttons are quoted from kit.py and no
+    part still says "Reel card"; the path (Home › Beach post kit, › Captions) is told in the kit part and the
+    words part from look.py's and words_page.py's own words, and the posting queue page still keeps Back to home;
+    "What's a post kit?" is answered with her Make posts paragraph, whole, when her pack is here to compare;
+    where-things-live.md says what posted_at, feed.json and read_at decide; no new line says "Claude".
 
 Every line says PASS or FAIL; exit 1 only when something FAILED.
 """
@@ -122,7 +134,8 @@ def check_search():
          line.startswith("Reel: the pick is saved; the reel is made on the reel page") and "not here" in line
          and not re.search(r'say\("Reel: run reel\.py make', kit) and kit.count("say(REEL_LINE + ") == 2, line[:200])
     home = read(SCRIPTS / "home.py")
-    case("the home page names no reel picker", not re.search(r"picker", home.split("# ---------- the page ----------", 1)[-1].split("CSS_EXTRA", 1)[0], re.I))
+    case("the home page names no reel picker", not re.search(r"\bpicker", home.split("# ---------- the page ----------", 1)[-1].split("def _in_address", 1)[0], re.I)
+         and not re.search(r"reel picker", read(SCRIPTS / "home_base.py"), re.I))
 
 
 # ---------- 2. the core table ----------
@@ -141,6 +154,7 @@ def check_table():
         '"look through my footage for <shoot>" (and "... and follow my notes")': ["../assistant-make-a-reel/SKILL.md"],
         '"lay out my stories"': ["parts/arrange.md"],
         '"make my stories"': ["parts/arrange.md"],
+        '"Pick my story photos for <shoot>"': ["parts/arrange.md"],
         '"make a single post"': ["parts/arrange.md"],
         '"show my post kit"': ["parts/post-kit.md"],
         '"lay out my carousel"': ["parts/arrange.md"],
@@ -258,15 +272,33 @@ def check_reel_skill():
     case("Step 4: On every beat has rhythm (her v22): Longer about three beats, Quicker one, plain one or two, never one beat each",
          "On every beat has rhythm (Nicole, Nov 10)" in step4 and "about three beats" in step4 and "never one beat each" in step4
          and "planned so that three one-beat plain photos don't come in a row" in step4)
+    case("Step 4: every vibe lands on beats you can hear (her v25, Nov 13), the chat's reel maker the same, her dry-run line, "
+         "and most cuts, never a promise of every one",
+         "Every vibe lands on beats you can hear in their song (Nicole, Nov 13)" in step4
+         and "for a reel made from the chat with `reel.py make` just the same" in step4
+         and "Real hits: 13 of 14 cuts land on a hit you can hear." in step4
+         and "**Most cuts, not a promise of every one:**" in step4 and "With no song there are no hits to find" in step4)
+    case("the reel skill: a CapCut song's beats stay on CapCut's own marks, and the half second is 'about', never a promise "
+         "(review, Nov 14)",
+         "those beats are never moved (CapCut shows the marks in the project)" in t
+         and "cuts still keep off the marks where the song doesn't hit" in t
+         and "never promise the half second to the frame" in t)
+    alike = "When the photos are much alike, keep it fast (Nicole, Nov 13)"
+    case("photos that are much alike (her v25 pacing note): the opener plain, few Longers, more Quickers, in the reel skill's "
+         "Step 2 and in curating.md's step 7, in her words",
+         all(alike in x and "the first photo should not be so long" in x and "leave the opener plain" in x
+             for x in (t.split("## Step 2", 1)[-1].split("\n## ", 1)[0], read(PLUGIN / "shared" / "curating.md"))))
+    case("parts/arrange.md: whichever vibe, the cuts land on beats you can hear",
+         "the cuts land on beats you can hear in their song" in read(PLUGIN / "skills" / "studio-manager" / "parts" / "arrange.md"))
     # The made reel does not always keep the plan (same in her engine: the song's hits and the bar can pull a plain
     # opener or a Longer photo to one beat), so the words say "aims" and never promise it (review, Nov 11).
     case("... and those lengths are aims, not promises: a Longer or the opener can land on one beat, one-beat photos can fall together",
          "**Those are aims, not promises.**" in step4 and "a Longer photo or a plain opener lands on one beat" in step4
          and "three or four one-beat photos fall together" in step4 and "never tell them it can't happen" in step4
          and "never three one-beat plain photos in a row" not in t and "(two to four, wherever the song hits)" not in t)
-    case("... a reel pick is fully marked wherever it is saved, the post kit's kit.py picks --reel included",
-         "**This holds wherever a reel pick is saved**, the post kit's `kit.py picks --reel` included" in step2
-         and "`--reel 7+,2,11-,4,9+`" in step2)
+    case("... a reel pick is fully marked whenever it is saved (and \"make my posts\" is no longer where one is saved: v25)",
+         "**This holds whenever a reel pick is saved** with `kit.py picks --reel`" in step2
+         and "`--reel 7+,2,11-,4,9+`" in step2 and "is where most reel picks are first saved" not in t)
     case("... their own order is kept on the page", "Their own order is always kept on the page; yours never replaces it." in step2)
     foot = t.split("## Behind-the-scenes footage", 1)[-1].split("\n## ", 1)[0]
     case("her footage rules 4 to 6: never a photo because of a clip, never limited to the footage's setting, the same picks with or without",
@@ -294,7 +326,7 @@ def check_doors():
          and "never that it can't happen" in arr and "a Longer photo holds about three beats" not in arr)
     kitp = read(SM / "parts" / "post-kit.md")
     case("post-kit.md: plain stories are the kit's, the stories designer is theirs from the Stories card",
-         "plain stories (one photo each)" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)
+         "plain stories (one photo each" in kitp and "they make in the stories designer, from the kit page's Stories card" in kitp)
     case("post-kit.md: 'show my post kit' loads the kit page in the pane through home.py url", '## "Show my post kit"' in kitp and "home.py url" in kitp.split('## "Show my post kit"', 1)[1])
     case("post-kit.md: the kit's reel and carousel counts are guides", "about 8 to 14, a guide, not a rule" in kitp and "about 5 to 8, a guide" in kitp)
     # the design preview on the kit's cards (Nicole's v24, section 7; the stage G fix round): the assistant is told
@@ -548,7 +580,7 @@ def check_posting():
          "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in flat
          and "waiting to be opened in your calendar app. Nothing changes on your calendar until then." in page
          and "Nothing is waiting to be opened." in flat and "Nothing is waiting to be opened." in rem)
-    case("ready to post normally comes from Add to my queue, which needs its caption; offer the words",
+    case("ready to post normally comes from Add to my queue; the chat's ready does not check for a caption, so the assistant asks first",
          "Add to my queue" in flat and "does not check for a caption" in flat and "don't mark it ready silently" in flat and "`parts/words.md`" in flat)
     case("the panel's words come from the words page; changes go through parts/words.md",
          "nothing is written or changed in the posting queue" in flat and "that is `parts/words.md`, every time" in flat)
@@ -572,12 +604,26 @@ def check_whole_build():
     import json
     # Nicole, v20: never say on a page that the words "sound like you". The Assistant shapes what they said like an editor would.
     banned = re.compile(r"sounds? like you|in your voice|the way you write", re.I)
-    home = read(SCRIPTS / "home.py")
-    card = re.search(r'\("posts", "Make posts from a shoot",\s*"([^"]+)"', home)
-    case("the home page's Make posts card promises no captions that 'sound like you' or are 'written the way you write'",
-         bool(card) and not banned.search(card.group(1)) and "captions" in card.group(1), card.group(1) if card else "card not found")
-    case("... and names the kit's three pieces (no 'single photos': a single post is a one-slide carousel)",
-         bool(card) and "single photos" not in card.group(1) and all(w in card.group(1) for w in ("a reel", "a carousel", "stories")))
+    # (Nov 14: the home base's words are Nicole's v26, whole, in home_base.WORDS. Her Make posts card names
+    # "reels, carousels, single photos, stories and captions"; a single post is made in the carousel designer.)
+    base = read(SCRIPTS / "home_base.py")
+    cards = re.findall(r'"(?:c3_p|m_lede)": "([^"]+)"', base)
+    case("the home base's Make posts card and screen promise no captions that 'sound like you' or are 'written the way you write'",
+         len(cards) == 2 and not any(banned.search(c) for c in cards) and all("captions" in c for c in cards), cards)
+    case("... and name what the kit makes, in her words (v26)",
+         len(cards) == 2 and all(all(w in c for w in ("reels", "carousels", "stories")) for c in cards))
+    # (Nov 17, Nicole's v27 section 8) the Make posts screen says what a post kit is, and its third step happens inside the kit
+    wk = re.search(r'"m_what_h": "([^"]+)",\s*"m_what_p": "([^"]+)"', base)
+    case("the Make posts screen says what a post kit is, in her v27 words, and has a third step inside the post kit",
+         wk is not None and wk.group(1) == "What's a post kit?" and wk.group(2).startswith("It's one place for everything you'll post from a shoot.")
+         and wk.group(2).endswith("Nothing is ever posted for you.") and '"m_s3": "<b>Make your posts inside your post kit.</b>"' in base
+         and '"m_steps": "How to make a post kit from a shoot"' in base and "we'll build you a <b>post kit</b>" in base)
+    hello_flat = re.sub(r"\s+", " ", read(SM / "parts" / "hello.md"))
+    case("hello.md knows the screen's What's a post kit? box and its three steps, and answers \"what's a post kit?\" in her words",
+         "What's a post kit?" in hello_flat and "It's one place for everything you'll post from a shoot." in hello_flat and "three steps" in hello_flat
+         and "Make your posts inside your post kit" in hello_flat and "I'll bring your photos in and open your new post kit" in hello_flat)
+    case("photos-in.md: after \"make my posts\" the assistant does what the screen's step 2 promised, nothing more",
+         "I'll bring your photos in and open your new post kit." in re.sub(r"\s+", " ", read(SM / "parts" / "photos-in.md")))
     plug = json.loads(read(PLUGIN / ".claude-plugin" / "plugin.json"))["description"]
     market = json.loads(read(ROOT / ".claude-plugin" / "marketplace.json"))["plugins"][0]["description"]
     case("the plugin's one-line description promises no captions 'in your voice'", not banned.search(plug), plug)
@@ -588,6 +634,16 @@ def check_whole_build():
          said == ["sound like you"], said)
     pages = [f.name for f in sorted(SCRIPTS.glob("*.py")) if re.search(r"captions? (?:that )?sounds? like you|captions in your voice|captions written the way you write", read(f))]
     case("no page script promises captions that sound like them", not pages, pages)
+    # (Nov 14, the home base's review round) the folder picker's button is on the Make posts screen, not the home page
+    flat = lambda p: re.sub(r"\s+", " ", read(SM / "parts" / p))  # noqa: E731
+    case("photos-in.md and on-a-pc.md send them to the Make posts screen for the Select the folder button, never to the home page",
+         "the Make posts screen's \"Select the folder with your finished photos\" button opens it" in flat("photos-in.md")
+         and "use the Select the folder button on the Make posts screen" in flat("on-a-pc.md")
+         and not re.search(r"home page's \"Select the folder|Select the folder button on the home page", flat("photos-in.md") + flat("on-a-pc.md")))
+    # a press on step 1 or 3 opens a screen that also lists backups and kits: it may be someone only looking
+    case("hello.md: a press on Back up a card or Make posts may only be someone looking; what they asked is answered, then home.py seen",
+         "may only be someone looking" in flat("hello.md") and "answer what they asked, say nothing about the press, and run `home.py seen`" in flat("hello.md")
+         and "may only be someone looking" in re.sub(r"\s+", " ", read(SM / "SKILL.md")))
     # the PC's "what can't you do" list names reminders, and the PC part points at the reminder section
     pc = re.sub(r"\s+", " ", read(SM / "parts" / "on-a-pc.md"))
     lst = pc.split('## "What can\'t you do on a PC?"', 1)[-1].split("## ", 1)[0]
@@ -792,9 +848,9 @@ def check_talking():
 
     # the door, in what Claude reads
     arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
-    case("parts/arrange.md names the reel page's third card in her words, as a link and not a choice",
-         ('"' + reel_page.WORDS["foot_talk_b"] + '"') in arr and ('"' + reel_page.WORDS["foot_talk_s"] + '"') in arr
-         and "it is a link, not a choice" in arr and "never gets the tick" in arr and "`parts/talking-reel.md`" in arr)
+    case("parts/arrange.md names the chooser's Talking to camera card (v27) in her words, as a link and not a choice",
+         ('"' + reel_page.KIND_WORDS["kind_talk_b"] + '"') in arr and ('"' + reel_page.KIND_WORDS["kind_talk_s"] + '"') in arr
+         and "is a link, not a choice" in arr and "changes nothing on the reel page" in arr and "`parts/talking-reel.md`" in arr)
 
     # the PC: a named gap, in the same words everywhere
     pc = read(SM / "parts" / "on-a-pc.md")
@@ -846,9 +902,612 @@ def check_talking():
     case("where-things-live says the small copies are kept, and how big they can get", "kept on purpose" in live and "1.3 GB" in live)
     case("where-things-live says the earlier edits and what a --replace replaced are kept", "`earlier`" in live and "`replaced`" in live and "the last 12" in live)
 
+    # Nicole's v27 (Nov 17, Lane C): Fix a word, Open CapCut and + Add more photos are the photographer's, on the page; the
+    # part tells the assistant what they are, in the page's own words, and that it never presses or fixes for them
+    case("the part tells Fix a word in the page's own words (double-click, Fix the words, Enter, Undo fix, the hover line) and that the assistant never fixes one (rule 3)",
+         all(x in flat for x in ("A word the Mac misheard they fix themselves", "**" + W["sel_fix"] + "**", "double-click it", "type the right words, Enter",
+                                 W["fix_back"] + " puts the heard word back", "You fixed this. It was heard as", "You never fix a word for them (rule 3)",
+                                 "Double-click the word on the page and type the right one."))
+         and W["sel_fix"] == "Fix the words" and W["fix_back"] == "Undo fix" and W["fixed_title"].startswith("You fixed this. It was heard as"))
+    case("rule 3 still says the assistant never touches a caption word, and that the photographer can, on the page",
+         "never touch a caption word" in flat and "never fix, tidy or reword one (they can, on the page" in flat)
+    case("the part says the fixed word is simply the word to show and photos, and that status counts the fixes and never names them, as the script does",
+         "`show` and `photos` print the fixed word as the word; `status` says how many they fixed, never which" in flat
+         and "how many words they fixed on the page (never which: rule 3)" in flat and talking_rec.FIXED_COUNT.strip().startswith("Words fixed on the page:"))
+    case("the part tells Open CapCut as the page has it (beside Make it in CapCut once made, and in the result box that names the project), with no command for it",
+         ("**" + W["open_capcut"] + "**") in flat and "beside Make it in CapCut once this talking reel has been made, and in the result box" in flat
+         and "You have no command for that either" in flat and "free from capcut.com" in flat and "free from capcut.com" in W["capcut_missing"]
+         and ('"' + W["made_h2"] + '", which names the project to click') in flat and W["open_capcut"] == "Open CapCut")
+    case("the part tells + Add more photos as the page has it (the photo pop-up's footer, the Photos folder, new photos at the end), and that every photo keeps its number",
+         ("**" + W["add_photos"] + "**") in flat and "sits in the photo pop-up's footer" in flat and "opens the shoot's Photos folder" in flat
+         and "show up in the grid at the end, with the next numbers" in flat and "**Every photo keeps its number**" in flat
+         and "run the sheet command again before you place" in flat and W["add_photos"] == "+ Add more photos")
+    case("...and the numbering the part promises is the one the code keeps (reel.py number_photos: the next after the highest ever given, a photo gone keeps its number unused)",
+         "a photo that is gone keeps its number unused" in flat and "after the highest ever given" in flat
+         and "nxt = max(before.values(), default=0) + 1" in read(REEL / "scripts" / "reel.py") and "def number_photos(photos, before):" in read(REEL / "scripts" / "reel.py"))
+    v27 = [ln for ln in part.splitlines() if ln.startswith(("  - **A word the Mac misheard", "  - **+ Add more photos**", "**Open CapCut**"))]
+    case("the three v27 paragraphs are there and say your assistant, never Claude (the app's own name stays where the part names the Claude app's pane)",
+         len(v27) == 3 and not any("Claude" in ln for ln in v27), [ln[:60] for ln in v27])
+
+
+# ---------- Nicole's v26: sets of stories, and the assistant choosing a story's photos ----------
+
+# ---------- Nicole's v27: the assistant choosing a carousel's photos (Lane B, stage 1) ----------
+
+def check_carousel_v27():
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("## Laying out the slides: the designer", 1)[1].split("\n## ", 1)[0]
+    flat = " ".join(part.split())
+    design = read(SCRIPTS / "design.py")
+    page = read(SCRIPTS / "design_page.py")
+    skill = read(SM / "SKILL.md")
+    where = read(SM / "parts" / "where-things-live.md")
+    case("carousel v27: SKILL.md has a row for the line pasted from the carousel designer, word for word, pointing at the designer's section",
+         '| a line pasted from the carousel designer: "Pick my carousel photos for <shoot>" (and "..., and follow my note") | `parts/arrange.md`, "Laying out the slides: the designer" |' in skill)
+    case("carousel v27: the two commands are in the designer's command block, as design.py has them",
+         'design.py note "<kit>" [--design <id>]' in part and 'design.py fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
+         and 'sub.add_parser("note"' in design and 'sub.add_parser("fill"' in design and 'sub.add_parser("story-note"' in design)
+    case("carousel v27: the page's line and its button are named as the page has them",
+         '**"Pick my carousel photos for <shoot>"** (and "..., and follow my note")' in part and '**"Let my assistant choose the photos"**' in part
+         and 'ASK_LINE_CAROUSEL = "Pick my carousel photos"' in page and 'ASK_BUTTON = "Let my assistant choose the photos"' in page)
+    case("carousel v27: the five steps mirror the stories' (note, one look at the sheet with curating.md, the shape each frame wants, fill in the frames' order, the page shows it by itself)",
+         "1. `design.py note \"<kit>\"`" in part and "2. `kit.py sheet \"<kit>\"`" in part and "shared/curating.md" in part and "3. Give each frame a photo of the shape it wants" in part
+         and "4. `design.py fill \"<kit>\" --photos N,N,N --design <id>`" in part and "5. The open page shows your pick by itself within a few seconds" in part)
+    case("carousel v27: choosing is the assistant's job, the note is theirs and comes first, an opener and a closer in an order that flows, never pretend",
+         "Choosing and ordering the photos is your job (rule 11); the note is theirs and outranks your taste" in flat and "an opener that stops the scroll, variety, no near-twins side by side, a closer" in flat
+         and "never pretend" in flat)
+    case("carousel v27: with no empty frame the assistant adds no slides and names what to press; --replace only when they asked; the words are theirs",
+         "**With no empty frame**" in part and "you add no slides and replace nothing by yourself" in flat and "Press Empty frame on a slide" in flat and "+ Add slides" in flat
+         and "that is `--replace`" in flat and "`fill` changes photos only: it never adds, changes or removes a text box" in flat)
+    case("carousel v27: a rerun is harmless and the design before is kept, as design.py has it",
+         "Running the very same command again is harmless: it answers `SAME:`" in flat and "The design as it was before your pick is kept beside it; nothing is deleted." in flat and "def _pick_there(" in design)
+    case("carousel v27: where-things-live names the three fields on a carousel design's record and the two commands",
+         "A carousel design's record (`designs/<id>.json`) may hold the same three since Nicole's v27 (`ask`, `asked`, `filled_by`; read with `design.py note`, filled with `design.py fill`)." in where)
+    case("carousel v27: the stories' section says its two commands are the same two with --kind stories",
+         "(`story-note` and `story-fill` are `design.py note` and `design.py fill` with `--kind stories`" in arr)
+    case("carousel v27: no leftover says the carousel's designer takes no note or has no such button",
+         not re.search(r"carousel[^.]*\b(no|never)\b[^.]*\bnote\b[^.]*assistant", flat, re.I) and "a carousel's page has neither" not in read(SCRIPTS / "design_js_ask.py"))
+    # Open folder (B15) and the three collages (B7c), as the part names them
+    case("carousel v27: the designer's folder button is \"Open folder\" in both sections, with her not-yet line, and no leftover \"Open the Carousel folder\" said of the designer",
+         'with an "Open folder" button on the same line' in part and "Press Save slides first and it's made for you." in part
+         and 'with "Open folder" on the same line' in arr and "Press Save stories first and it's made for you." in arr
+         and '"Open the Carousel folder" button on the same line' not in part and '"Open the Stories folder"' not in arr)
+    case("carousel v27: the three story collages are named among the stories' templates", "**Playful mosaic**, **Mood board** and **Overlapping collage**" in arr)
+    pc = read(SM / "parts" / "on-a-pc.md")
+    case("carousel v27: the PC part says the button's new name and its answer on a PC", '"Open folder" opens File Explorer' in pc and "Your Carousel folder is open in File Explorer." in pc and "Open the Carousel folder" not in pc)
+    # the page's v27 buttons (B8 to B17), named in the part as the page has them, so the assistant points at the button and does nothing from the chat
+    core_js = read(SCRIPTS / "design_js_core.py")
+    save_js = read(SCRIPTS / "design_js_save.py")
+    crop_js = read(SCRIPTS / "design_js_crop.py")
+    view_js = read(SCRIPTS / "design_js_view.py")
+    sect = part.split("**The photo inside its frame, several photos at once, one slide on its own, and more photos (Nicole's v27).**", 1)
+    case("carousel v27: the designer's section has the paragraph for her v27 page buttons, before Adding slides", len(sect) == 2 and "**Adding slides, and the templates" in sect[1])
+    para = " ".join(sect[1].split("**Adding slides, and the templates", 1)[0].split()) if len(sect) == 2 else ""
+    for words, src in (("Show the whole photo", "whole: 'Show the whole photo'"), ("Crop", "btn: 'Crop'"), ("Keep the frame's shape", "Keep the frame\\'s shape"), ("Done", "done: 'Done'"),
+                       ("Even them out", "even: 'Even them out'"), ("Same size", "sameSize: 'Same size'"), ("Line up tops", "tops: 'Line up tops'"), ("Remove them", "removeThem: 'Remove them'"),
+                       ("Use this photo", "viewUse: 'Use this photo'"), ("Put it in the selected frame", "viewPut: 'Put it in the selected frame'"),
+                       ("Save just this slide", "saveOne: 'Save just this slide'"), ("Save just one slide", "saveOneAny: 'Save just one slide'")):
+        case(f"carousel v27: the part names the page's button as the page has it: {words}", f"**{words}**" in para or f'"{words}"' in para, words)
+        case(f"carousel v27: ... and the page has it: {words}", src in core_js + save_js + crop_js + view_js, src)
+    case("carousel v27: the part says a single slide's name and that nothing else changes (not the kit page, the queue or the design), with no line to the assistant, as design.py has it",
+         '"Beach carousel 1 - slide 03 updated.jpg"' in para and '"... updated 2.jpg"' in para and "not which set the kit page and the posting queue show, not the design, and no line comes to you from it" in para
+         and 'ONE_NAME = "{base} - slide {i:02d} updated.jpg"' in design and "add_waiting" not in design.split("def _finish_one(")[1].split("def _one_words(")[0])
+    case("carousel v27: the part tells the assistant what to say for \"I just want to save number 3\" (Nicole, Nov 15), naming the button",
+         "then press Save just slide 3 beside Save slides" in para and "Slide 3 on its own" in para and "on its own:" in design)
+    case("carousel v27: the part says + Add photos opens the Photos folder, new photos join the end with the next numbers, every number stays, a removal still asks for Reload, and kit.py sheet keeps the numbers",
+         "**+ Add photos**" in para and "numbered after the last" in para and "every photo that was there keeps its number" in para and "still stops the page until Reload" in para
+         and "`kit.py sheet \"<kit>\"` keeps every number" in para and "never number a shoot's photos any other way" in para and "--before" in read(SCRIPTS / "kit.py"))
+    case("carousel v27: her line for photos that joined is quoted as the page says it", '"2 new photos in, at the end of your photos (#31\u201332)."' in para
+         and "' new photo' + (k === 1 ? '' : 's') + ' in, at the end of your photos (#'" in read(SCRIPTS / "design_js_ask.py"))
+    case("carousel v27: the stories' section carries the same in a story's words: Save just this story, the single story's name, + Add photos",
+         "**Save just this story** / **Save just story N**" in arr and '"Beach stories - 03 updated.jpg"' in arr and "Story 3 on its own" in arr and 'STORY_ONE_NAME = "{base} - {i:02d} updated.jpg"' in design)
+    case("carousel v27: where-things-live names the single slide's record (`one`, `again`), its file name beside the set, and that kit.json is untouched",
+         "A press of Save just this slide (Nicole's v27) leaves a record of the same shape with `one`, the slide's number, and `again`" in where
+         and "\"<the set's name> - slide 03 updated.jpg\"" in where and "nothing in `kit.json` changes for it" in where)
+    case("carousel v27: the PC part says + Add photos' lines name File Explorer and that a single slide's name is held to the 260 characters",
+         '"+ Add photos" opens the shoot\'s Photos folder in File Explorer too' in pc and "Your Photos folder is open in File Explorer. Drag your finished photos in, and they show up here at the end." in pc
+         and 'A slide saved on its own ("Save just slide 3") is held to the same 260 characters' in pc)
+
+
+def check_stories_v26():
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("## Making stories: the stories designer", 1)[1].split("\n## ", 1)[0]
+    flat = " ".join(part.split())
+    design = read(SCRIPTS / "design.py")
+    page = read(SCRIPTS / "design_page.py")
+    case("stories: a shoot's stories come in sets, and nothing says there is only one design any more",
+         "**A shoot's stories come in sets**" in part and "My story sets" in part and "+ New set of stories" in part and "has **one** stories design" not in arr
+         and "one stories design" not in read(SM / "parts" / "where-things-live.md"))
+    case("stories: the two commands of the assistant's pick are in the part, as design.py has them",
+         'design.py story-note "<kit>" [--design <id>]' in part and 'design.py story-fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
+         and 'sub.add_parser("story-note"' in design and 'sub.add_parser("story-fill"' in design and '"--replace"' in design)
+    case("stories: the part says which set a command takes (Copy pressed, or changed, last), that a rerun is harmless, and the record's name for it; design.py has all three",
+         "the set they pressed Copy on, or changed, last" in part and "Running the very same command again is harmless: it answers `SAME:`" in part
+         and "a photo that is already in the set" in part and "`asked`, the time they last pressed Copy there" in read(SM / "parts" / "where-things-live.md")
+         and "def _post_asked(" in design and "def _pick_there(" in design and '"/design-asked"' in design)
+    case("stories: the page's line and its button are named as the page has them",
+         '"Pick my story photos for <shoot>"' in part and '"..., and follow my note"' in part and '"Let my assistant choose the photos"' in part
+         and 'ASK_BUTTON = "Let my assistant choose the photos"' in page and 'ASK_LINE = "Pick my story photos"' in page)
+    case("stories: choosing is the assistant's job, the note is theirs and comes first, one look at the sheet",
+         "Choosing and ordering the photos is your job (rule 11); the note is theirs and outranks your taste" in flat and "One look at the sheet, never photo by photo" in flat
+         and "never pretend" in flat)
+    case("stories: --replace only when they asked; a refusal changes nothing; the set before is kept",
+         "use it only when they asked you to choose again" in flat and "changes nothing when it refuses" in flat and "The set as it was before your pick is kept beside it; nothing is deleted." in flat)
+    case("stories: the assistant never touches the words (rule 11), also when the note asks for words",
+         "**You never touch the words.**" in part and "it never adds, changes or removes a text box, and neither do you" in flat and "The words are yours" in flat
+         and "**The words on a story are theirs.**" in part)
+    case("stories: the template words are placeholders the assistant never fills in; My editing queue fills itself from their queue",
+         "are placeholders for them to change: you never fill them in" in flat and "**My editing queue** fills its list by itself from their editing queue" in flat
+         and "If your shoot is on here, your gallery is on its way." in flat and "I can't reach your editing queue right now." in flat
+         and 'QUEUE_CLOSING = "If your shoot is on here, your gallery is on its way."' in design and 'QUEUE_CANT = "I can\'t reach your editing queue right now."' in design)
+    case("stories: her four templates, the guides' new name, Redo and the x on a label are in the part; the old name of the tick is gone",
+         all(x in flat for x in ("**Gallery delivered**", "**My editing queue**", "**The full story**", "**Seamless swipe**", "\"Show Instagram's guides\"", "**Redo** sits beside Undo",
+                                 "has a small x that removes that story, even an empty one")) and "Show Instagram's buttons" not in arr)
+    case("stories: Save stories names a set after the set, and the kit shows the set saved last",
+         "named after the set" in flat and "shows the set that was saved last as the stories" in flat)
+    case("stories: an open page takes the pick by itself; otherwise open that set by its id", "The open page shows your pick by itself within a few seconds" in flat
+         and 'design.py open "<kit>" --kind stories --design <id>' in flat)
+    case("where-things-live.md: the note and who filled a set are named, and a saved set is named after the set",
+         "`ask`, the note they wrote for you" in read(SM / "parts" / "where-things-live.md") and "`filled_by`" in read(SM / "parts" / "where-things-live.md")
+         and '"<the set\'s name> - 01.jpg"' in read(SM / "parts" / "where-things-live.md"))
+
+
+def check_several_reels():
+    """Several reels from one shoot (Nicole's v25, stage G of the v26 build): the instructions say what the scripts do."""
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("**Several reels from one shoot", 1)[1].split('**"Look through my footage for <shoot>"**', 1)[0]
+    flat = " ".join(part.split())
+    rp, kit, foot, tr = read(SCRIPTS / "reel_page.py"), read(SCRIPTS / "kit.py"), read(SCRIPTS / "footage.py"), read(SCRIPTS / "talking_rec.py")
+    case("several reels: the bar is named as the page has it (Your reels, + Start a new reel, Rename), with her default names",
+         "**Your reels**" in part and "**+ Start a new reel**" in part and "**Rename**" in part and '"Reel 1", "Reel 2"' in part
+         and '"reels_label": "Your reels"' in rp and '"reels_new": "+ Start a new reel"' in rp and 'REEL_FIRST = "Reel 1"' in rp)
+    case("several reels: a new reel is blank on \"I'll drag them in myself\", with every clip found; every reel fully separate; the folders are the shoot's",
+         "\"I'll drag them in myself\" with nothing in it, no pick of yours, footage not chosen, no song, and every clip you have found for the shoot, as found" in flat
+         and "**Every reel is fully separate:**" in part and "Nothing done in one reel changes another." in flat and "shared by all its reels" in flat)
+    case("several reels: every command acts on the reel open on the page and says which; the part names each command's way to name another, as the scripts have them",
+         "**Every command acts on the reel that is open on the page**" in part and "each of them says first which reel it is about" in flat
+         and '--for-reel "Reel 2"' in part and 'footage.py scan "<kit>" --reel "Reel 2"' in part and 'footage.py moments "<kit>" --file <file> --reel "Reel 2"' in part
+         and 'reel_page.py show "<kit>" --reel "Reel 2"' in part and 'reel_page.py make "<kit>" --reel "Reel 2"' in part
+         and 'reel_page.py direct "<kit>" --reel "Reel 2"' in part
+         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 4)
+    case("several reels: the chat's reels command, as reel_page.py has it, in the part and in the part's command block",
+         'reel_page.py reels "<kit>" --new [--name "Kitchen"]' in flat and '--rename "Reel 2" --to "Kitchen"' in flat and '--open "Reel 1"' in flat
+         and 'python3 <scripts>/reel_page.py reels "<kit>" [--new [--name "<name>"] | --open "<reel\'s name>" | --rename "<reel\'s name>" --to "<name>"]' in arr
+         and 'sub.add_parser("reels"' in rp and all(('rl.add_argument("%s"' % a) in rp for a in ("--new", "--name", "--open", "--rename", "--to")))
+    case("several reels: a pasted line that names a reel is checked against the reel open on the page first",
+         "run `reel_page.py note \"<kit>\" --reel \"Kitchen\"` first: it checks that the reel named is the one open on the page" in flat
+         and "say which reel your pick went to" in flat and 'sub.add_parser("note"' in rp)
+    case("several reels: a new reel has no pick until they ask, and a pick waits under Let my assistant choose",
+         "Pick for it only when they ask." in flat and 'your pick waits under "Let my assistant choose": tell them to press it' in flat)
+    case("several reels: a reel is never removed, said plainly; two reels never share a name (the scripts refuse it)",
+         "**A reel can never be removed** (nothing is deleted)" in part and "Two reels of one shoot never share a name" in flat and "NAME_TAKEN" in read(SCRIPTS / "reels.py"))
+    case("several reels: CapCut's projects are named for the shoot, not the reel; each reel's mixes are its own",
+         'the first one made is "<shoot> reel", the next "<shoot> reel 2", whichever reel on the page it came from' in flat and "gives the next mix of that reel" in flat
+         and "def mix_number(" in rp)
+    reel = read(REEL / "SKILL.md")
+    case("several reels: the reel skill says so in a paragraph and sends to the part",
+         "**A shoot can have several reels (Nicole, Nov 12).**" in reel and '`--for-reel "<reel\'s name>"` saves it for another' in " ".join(reel.split())
+         and '"Several reels from one shoot"' in reel)
+    talk = " ".join(read(SM / "parts" / "talking-reel.md").split())
+    case("several talking reels: the bar, a new one at step 1, each its own, --reel on the five commands, her refusal line word for word, never removed",
+         "**Your talking reels**" in talk and "**+ Start a new talking reel**" in talk and "A new one starts at step 1 with no video chosen" in talk
+         and '"Talking reel 1", "Talking reel 2"' in talk and "`status`, `show`, `cut`, `photos` and `place` act on the one open on the page" in talk
+         and 'add `--reel "<its name>"`' in talk and "I'm still turning your video into a script. Give it a minute, then try again." in talk
+         and 'STILL_SCRIPT = "I\'m still turning your video into a script. Give it a minute, then try again."' in tr and "Rename always works" in talk
+         and "A talking reel can never be removed" in talk and 's.add_argument("--reel"' in tr)
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    case("where-things-live.md names the list of reels in both records, every clip found, and where the first reel's pick stays",
+         "the others wait in `versions`" in where and "`current` naming the open one" in where and "`moments_found` is every clip found for the shoot" in where
+         and "the first reel's pick of yours stays in `kit.json`" in where and where.count("wait in `versions`") == 2
+         and '"moments_found"' in foot and "REEL_KEYS" in rp)
+
+
+def check_photographer_picks():
+    """The photographer picks (Nicole's v25, sections 3 and 10; stage H of the v26 build): nothing is picked until
+    they ask, the photo note is read first and followed, and "make my posts" only brings the photos in and opens
+    the post kit. The instructions say what the page and the scripts do, in the page's own words."""
+    rp, kitsrc, foot = read(SCRIPTS / "reel_page.py"), read(SCRIPTS / "kit.py"), read(SCRIPTS / "footage.py")
+    arr, kitp, photos = read(SM / "parts" / "arrange.md"), read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "photos-in.md")
+    reel, cur, core = read(REEL / "SKILL.md"), read(PLUGIN / "shared" / "curating.md"), read(SM / "SKILL.md")
+    flat = lambda t: " ".join(t.split())  # noqa: E731
+    words = dict(re.findall(r'^    "(not_picked|photo_ask_b|photo_for|photo_note)": "([^"]+)"', rp, re.M))
+    case("the page's four lines are in reel_page.PICK_WORDS (the not-picked line, the box's title, the line to copy, its ending)", len(words) == 4, sorted(words))
+    not_picked, box = words.get("not_picked", "?"), words.get("photo_ask_b", "?")
+    case("arrange.md and post-kit.md quote the page's not-picked line word for word", ('"' + not_picked + '"') in flat(arr) and ('"' + not_picked + '"') in flat(kitp))
+    case("arrange.md and the reel skill name the note box by its title on the page", box in flat(arr) and box in flat(reel) and box in flat(cur))
+    case("arrange.md gives the line as the page builds it: the reel's name only with several reels, 'and follow my note' only with a note",
+         '**"Pick my reel photos for <shoot>"**' in arr and '**", and follow my note"**' in arr and '"Pick my reel photos for Beach, Kitchen, and follow my note"' in arr
+         and words.get("photo_for") == "Pick my reel photos for {short}" and words.get("photo_note") == ", and follow my note")
+    para = arr.split('**"Pick my reel photos for <shoot>"** (and', 1)[-1].split("\n\n", 1)[0]
+    case("arrange.md: the pasted line is answered in order: reel_page.py note first, the note decides, the pick saved for that reel only",
+         para.index('reel_page.py note "<kit>"') < para.index("**The note decides what may go in.**") < para.index("**for that reel only**")
+         and "It changes nothing." in para and '--for-reel "<name>"' in para and "A pick for one reel never changes another." in para)
+    case("... pick only what the note allows, never widen it, never fill in; ask when nothing fits",
+         "Pick only what it allows" in para and "never widen it" in para and "never fill in with photos it leaves out" in para and "ask one short question" in para)
+    case("... it is the only time a reel's photos are picked, and the marking rule still holds then",
+         "**It is the only time you pick a reel's photos**" in para and "about a third Longer, about a quarter Quicker" in para)
+    case("the command the instructions name is the script's: reel_page.py note, with --reel, and it prints the note word for word",
+         'sub.add_parser("note"' in rp and 'nt.add_argument("--reel"' in rp and "word for word" in rp.split("def cmd_note", 1)[1].split("\ndef ", 1)[0])
+    case("kit.py picks says the note again after a reel pick is saved (and the instructions lean on it)",
+         "_say_photo_note(kit, later)" in kitsrc and "prints their note again after" in flat(arr) and "prints their note again after it saves" in flat(reel))
+    case("arrange.md opens with who chooses: the photographer, and the assistant only when asked (her words)",
+         '**The photographer chooses; you pick only when they ask (Nicole, Nov 13: "I choose, not you.").**' in arr
+         and "Choosing and ordering the photos is your job and stays so. These pages are how the photographer moves things after you have picked" not in arr)
+    case("arrange.md: opening the reel page is not a reason to pick, and there is a line to say when nothing was picked",
+         "**Opening the page is not a reason to pick:**" in arr and "**When you have not picked** (the usual case):" in arr
+         and "put your photos in, add your song, and press Make my reel" in arr)
+    case("arrange.md: the carousel is picked only when they ask", "**Pick the carousel only when they ask you to**" in arr)
+    # the post kit: "make my posts" only brings the photos in and opens the post kit
+    steps = kitp.split("**Then, in order, without stopping:**", 1)[-1].split("**Only when they ask", 1)[0]
+    case("post-kit.md: making a kit only numbers the photos and opens the kit page: no pick, no build, no question",
+         "**This step is only the numbering: don't read the sheets and don't pick.**" in steps and "2. **Nothing is picked here.** No `kit.py picks`" in steps
+         and "no `kit.py build` as part of a kit" in steps and "**The reel is not made here**" in steps)
+    case("... none of the kit's steps runs kit.py picks or kit.py build as a command to do",
+         not re.search(r"^\d\. `kit\.py (picks|build)", steps, re.M))
+    case("post-kit.md: no question when a kit starts, about the shoot or how they write; what they say unasked is still kept through a file",
+         "**No question when a kit starts" in kitp and "Don't ask them to tell you about the shoot, and don't ask how they write." in kitp
+         and "tell me about this shoot. Who they are, what the day was like" not in kitp and "**If they tell you about the shoot anyway, unasked, keep it word for word.**" in kitp
+         and "kit.py told \"<kit>\" --text-file" in kitp)
+    case("post-kit.md: the voice question waits for the first caption they ask for, never a kit", "**The voice, asked once, the first time they ask you for a caption** (never when a kit is made" in kitp)
+    case("post-kit.md says it in her words, and what to say when the kit opens promises no pick",
+         "\"You're not supposed to do any of that. I choose, not you.\"" in kitp and "Nothing is picked yet" in kitp
+         and "Never add a pick, a caption or an offer to choose for them to that" in kitp)
+    case("post-kit.md: the picks and the plain pieces are still there, only when they ask",
+         "**Only when they ask: your pick for the carousel, and the plain singles, stories and cover.**" in kitp and "None of this is part of making a kit." in kitp
+         and "`kit.py build \"<kit>\"`" in kitp)
+    case("post-kit.md: \"I'm done with the shoot\" ends on the kit page too: nothing picked, no question",
+         "**Nothing is picked or made in the chat, and there is no question about the shoot**" in kitp.split("## The post kit", 1)[0])
+    case("photos-in.md: \"make my posts\" only brings the photos in and opens the post kit",
+         '**"Make my posts" only brings the photos in and opens the post kit' in photos and "Don't read the photos to pick, don't ask about the shoot, don't write anything." in photos
+         and "you pick them only if they ask" in photos)
+    case("kit.py start's own next-step line no longer sends the assistant to a question or a pick",
+         "Nothing is picked or made until they ask." in kitsrc and "Next: the question, then kit.py sheet." not in kitsrc)
+    case("the reel skill: they choose; Step 2 runs only when they ask, their note first",
+         '**They choose which photos go in (Nicole, Nov 13: "I choose, not you.")**' in reel and "## Step 2: when they ask for your pick, curate the set and put it on the page" in reel
+         and "**Nothing is picked until they ask (Nicole, Nov 13).**" in reel and "**Their note first.**" in reel and "**Pick only what the note allows**" in reel
+         and "**Stop here and open the page unless they asked for your pick:**" in reel and "(your main job)" not in reel)
+    case("the reel skill: a footage look is not a reason to pick photos, and footage.py says the same",
+         "don't pick photos because they asked for a footage look" in reel and "If the shoot has no reel pick yet, do Step 2 first." not in reel
+         and "Pick the photos first, exactly as for a reel with no footage" not in foot and "Find the moments only" in foot)
+    case("curating.md: you choose only when they ask; their photo note decides what may go in; the marking rule stays for when you do",
+         "**You choose only when they ask (Nicole, Nov 13:" in cur and "**Their photo note decides what may go in (Nicole, Nov 13).**" in cur
+         and "mark its rhythm: every reel, fully (Nicole, Nov 10)" in cur and "When the photos are much alike, keep it fast (Nicole, Nov 13)" in cur)
+    case("the core's rule: choosing is the assistant's when it is asked of it; the sneak peeks always",
+         "**Choosing and ordering photos is yours, when it is asked of you:**" in core and "**nothing is picked until they ask**" in core
+         and "you pick its photos only when they ask" in core)
+    case("hello.md's first-time explanation of Make posts no longer says the assistant picks the photos",
+         "you pick the photos; each piece's caption" not in read(SM / "parts" / "hello.md") and "you pick only when they ask" in read(SM / "parts" / "hello.md"))
+    case("canva.md: the Canva fill is never run by itself when a kit is made", "never by itself when a kit is made" in read(SM / "parts" / "canva.md"))
+    case("where-things-live.md names the note in the reel page's record", "`photo_ask`" in read(SM / "parts" / "where-things-live.md") and '"photo_ask"' in rp)
+    said = [ln[:140] for name, t in (("arrange", arr), ("post-kit", kitp), ("photos-in", photos), ("reel", reel))
+            for ln in t.splitlines() if re.search(r"\bClaude\b", ln) and re.search(r"hasn't picked|which photos you'd like", ln)]
+    case("the page's lines are quoted as the page has them: 'your assistant', never 'Claude'", not said, said)
+
+
+def check_trim_and_select():
+    """Select several photos like Lightroom (Nicole's v25, section 8), and the footage editor that replaced her v25
+    Trim panel (her v27, section 3; Lane A's stage 3). Both are the page's own: the instructions say what the page
+    does, in the page's words, and that the assistant has no command for either; naming their clips is the
+    assistant's (the reel skill's section "Name my clips")."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, pc = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "on-a-pc.md").split())
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(sel_longer|sel_quicker|sel_neither|sel_out|sel_clear|sel_add|editor_no_stills_pc)": "([^"]+)"', rp, re.M))
+    ed = dict(re.findall(r'^    "(ed_h3|ed_footage|ed_make|ed_in|ed_out|ed_add|ed_clear|ed_zoom|ed_whole|clips_wl|use|in_reel|play_clip|not_named|desc_say|desc_line)": "([^"]+)"', rp, re.M))
+    case("the page's words for selecting several and for the editor are in reel_page.py (7 and 16 of them)", len(words) == 7 and len(ed) == 16, (sorted(words), sorted(ed)))
+    case("the v25 Trim panel is off the page (TRIM_PANEL = False), its code kept behind the switch", "TRIM_PANEL = False" in rp and "if TRIM_PANEL:" in rp)
+    case("arrange.md names the editor's parts as the page shows them: Your footage, Footage, Make a clip, Start here, End here, Add clip, Clear, Your clips, Zoom in, Show the whole video",
+         all(("**" + ed[k] + "**") in arr for k in ("ed_h3", "ed_footage", "ed_make", "ed_zoom", "ed_whole", "clips_wl", "use", "in_reel"))
+         and all(ed[k] in arr for k in ("ed_in", "ed_out", "ed_add", "ed_clear")) and "**Add clip**" in arr, [k for k in ed if ed[k] not in arr])
+    case("arrange.md says how a clip is made (the orange stretch that grows, End here, the ends and the middle, 1 to 15 seconds, Add clip) and what happens after Add clip",
+         all(x in arr for x in ("Start here turns orange and plays", "orange striped stretch grows", "End here makes it solid", "drag an end to trim it", "the middle to slide it",
+                                "a clip is 1 to 15 seconds", "dashed with \"✓ Added\"", "the clip just added is never changed")))
+    case("arrange.md: a click on a card opens the clip, a drag across a clip only scrubs, a trimmed clip keeps its name, the assistant has no command that trims, makes or removes a clip",
+         all(x in arr for x in ("A click on a card opens that clip in the editor", ed["play_clip"], "Dragging across a clip on the timeline only scrubs; a plain click picks it",
+                                "A trimmed clip keeps a name it was given", "You have no command that trims, makes or removes a clip", "Her v25 Trim panel")))
+    case("arrange.md names YOUR PICK, Not named yet and the Name my clips line, and sends the naming to the reel skill",
+         "**YOUR PICK**" in arr and ("**\"" + ed["not_named"] + "\"**") in arr and ("**\"" + ed["desc_say"] + "\"**") in arr and ("**\"" + ed["desc_line"].replace("{short}", "<shoot>") + "\"**") in arr
+         and 'the reel skill\'s section "Name my clips"' in arr)
+    case("the reel skill has the section Name my clips: picks, read each sheet once, a short plain name (never a name, a feeling), no about, describe, the page shows them",
+         '## Name my clips: "Name my clips for <shoot>"' in reel and "footage.py picks" in reel and "Read each sheet once" in reel and "Never a person's name, a feeling, an occasion" in reel
+         and 'refuses an "about"' in reel and "footage.py describe" in reel and "Never write a clip's name into the reel page's records any other way" in reel)
+    case("the reel skill's footage look names any unnamed picks at its end, and sends the moments to Your clips (not Select your clips)",
+         "Then name any clips of their own that aren't named yet" in reel and 'under "Your clips" in the footage editor' in reel and "Select your clips" not in reel)
+    case("the core table sends Name my clips to the reel skill", '| "Name my clips for <shoot>"' in core and 'the reel skill\'s "Name my clips"' in core)
+    case("arrange.md: selecting several, key by key (click, Shift-click, Cmd-click or Ctrl-click on a PC, Escape), and a drag moves the whole selection in order",
+         all(x in arr for x in ("a click on a photo in the order selects it", "Shift-click selects everything between it and the last one clicked",
+                                "Cmd-click (Ctrl-click on a PC) adds or drops one", "Escape lets them all go",
+                                "Dragging any selected photo moves the whole selection to where it lands, in order", "a tag on it says how many photos are moving")))
+    bar = "**%s, %s, %s, %s** and **%s**" % tuple(words.get(k, "?") for k in ("sel_longer", "sel_quicker", "sel_neither", "sel_out", "sel_clear"))
+    case("arrange.md names the bar's five buttons as the page has them, and Add them to the end below", bar in arr and ("**" + words.get("sel_add", "?") + "**") in arr, bar)
+    case("arrange.md: in All your photos a plain click still adds or takes out; one press of Undo takes a whole batch back; a selection is the page's own",
+         "a plain click still adds a photo or takes it out" in arr and "one press of Undo takes the whole batch back" in arr and "you can't see it and nothing saves it" in arr)
+    case("on-a-pc.md names the editor's gap honestly, in the page's own line (no pictures along the timeline), Start here and End here, and that clips can't be named on a PC",
+         ('"' + words.get("editor_no_stills_pc", "?") + '"') in pc and "**Start here**, **End here** and **Add clip** work on it" in pc and "Use this moment" not in pc
+         and "can't see your clips to name them" in pc and "Naming their clips" in pc)
+
+
+def check_songs_v25():
+    """Songs (Nicole's v25, section 5; stage J of the v26 build): a short song starts after a glitchy opening, a
+    replaced recording gets its sound taken again, and Remove this song (her v27, built Nov 17, Lane E's E12):
+    the instructions say the page's button moves a song, and a recording's sounds, to the computer's own Trash,
+    never a delete, Put Back brings it back, a song in the Photos folder stays, and the assistant has no command
+    for it and never moves a song itself."""
+    rp = read(SCRIPTS / "reel_page.py")
+    tc = read(SCRIPTS / "this_computer.py")
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    reel = " ".join(read(REEL / "SKILL.md").split())
+    gone = re.search(r'^    "song_gone": "([^"]+)"', rp, re.M)
+    case("the short-song line is 40 seconds in reel_page.py, and the gap is hers (-50 dB, 0.3 s, the first 12 seconds) in sound.py",
+         "SHORT_SONG_FROM_TOP = 40 " in rp and all(x in read(REEL / "scripts" / "sound.py") for x in ("LEAD_NOISE_DB = -50.0", "LEAD_GAP = 0.3 ", "LEAD_WITHIN = 12.0")))
+    for name, t in (("arrange.md", arr), ("the reel skill", reel)):
+        case(f"{name}: a song under 40 seconds starts after the last silent gap in its first 12 seconds, on the first 1 of a bar; no gap, the top",
+             "For a song under 40 seconds" in t and "after the last silent gap in the song's first 12 seconds, on the first 1 of a bar after it" in t
+             and ("with no gap it starts at the top" in t or "with no gap, at the top" in t) and '"starting the song 4 seconds in"' in t)
+        case(f"{name}: a replaced recording's sound is taken again as \"<name> sound 2.m4a\", the first never written over, the recording listed once",
+             '"<name> sound 2.m4a"' in t and "never written over" in t and "shows the recording once" in t)
+        case(f"{name}: Remove this song is the page's button (two taps), to the computer's own Trash (the Recycle Bin on a PC), never a delete, and Put Back brings it back",
+             "**Remove this song**" in t and '"Move it to the Trash?"' in t and "the computer's own Trash (the Recycle Bin on a PC)" in t
+             and "never a delete" in t and "Put Back (Restore on a PC) brings it back" in t and "no button for that yet" not in t)
+        case(f"{name}: a recording's sounds go with it, the reel that had it picked goes back to no song, and another reel that picked it says her line when opened",
+             "every sound taken from a recording" in t and 'goes back to "no song picked yet"' in t and "another reel of the shoot that had it picked says" in t
+             and ('"' + (gone.group(1) if gone else "?") + '"') in t)
+        case(f"{name}: only a song in the shoot's own Music folder can go; one in the Photos folder stays and is theirs to take out",
+             "Only a song in the shoot's own Music folder can go" in t and "a recording in the Photos folder stays" in t and "theirs to take out of that folder themselves" in t)
+        case(f"{name}: the assistant has no command for it, never moves, renames or deletes a song itself, and points at the button",
+             "You have no command for it" in t and "never move, rename or delete a song or a recording yourself" in t and "point at the button" in t)
+    case("the route exists: POST /reel-song-remove in reel_page.py's list and remove_song goes through this_computer.trash_many, the one door",
+         '"/reel-song-remove"' in rp and "def remove_song(body):" in rp and "this_computer.trash_many(paths, music_dir(kit))" in rp and "def trash_many(paths, inside):" in tc)
+    case("her four page lines and her two server lines are in reel_page.WORDS, word for word",
+         all(x in rp for x in ('"song_remove": "Remove this song"', '"song_sure": "Move it to the Trash?"', '"song_removing": "Removing…"',
+                               '"song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back."',
+                               '"song_not_here": "That song isn\'t in this shoot\'s folder anymore."',
+                               '"song_cant_trash": "I couldn\'t move that song to the Trash. Drag it out of the shoot\'s Music folder in Finder instead."')))
+    case("where-things-live.md says a removed song is in the computer's own Trash with its sounds, its lines in reel-sounds.json dropped, nothing else written down",
+         "**Remove this song**" in where and "goes to the computer's own Trash with every sound taken from it" in where
+         and "its lines in `reel-sounds.json` are dropped, the version before kept" in where and "nothing else is written down about it" in where)
+    case("arrange.md gives the page's own line for a picked song that is gone", bool(gone) and ('"' + gone.group(1) + '"') in arr, gone and gone.group(1))
+    case("where-things-live.md names the note of which recording each sound came from, and what is in it",
+         "`reel-sounds.json`" in where and "`reel-sounds.prev.json`" in where and "`reel-sounds.lock`" in where and "a hash of its first megabyte, never a path" in where
+         and 'SOUNDS = "reel-sounds.json"' in rp and 'SOUNDS_PREV = "reel-sounds.prev.json"' in rp and 'SOUNDS_LOCK = "reel-sounds.lock"' in rp)
+    case("where-things-live.md: \"sound 2\" up to 99, none written over, and a sound with no line goes by the files' times",
+         'up to 99' in where and "SOUND_SPARES = 98 " in rp and "goes by the files' times" in where)
+
+
+def check_queue_v25():
+    """The post kit and the posting queue with several reels, captions optional (Nicole's v25, sections 6 and 7;
+    stage K of the v26 build): the instructions say what the pages say, and name commands that exist."""
+    sys.path.insert(0, str(SCRIPTS))
+    import kit
+    pq = read(SCRIPTS / "posting_queue.py")
+    rem = read(SCRIPTS / "reminders.py")
+    post = " ".join(read(SM / "parts" / "posting-queue.md").split())
+    kitp = " ".join(read(SM / "parts" / "post-kit.md").split())
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    K = kit.KIT_WORDS
+    question = K["nocap_title"].format(piece="reel") + ". " + K["nocap_text"]
+    for name, t in (("posting-queue.md", post), ("post-kit.md", kitp)):
+        case(f"{name}: a caption is optional, and the page's question is given in the page's own words, with its two buttons",
+             ('"' + question + '"') in t and f"**{K['nocap_add']}**" in t and f"**{K['nocap_write']}**" in t, question)
+        case(f"{name} no longer says Add to my queue needs a caption", "only works once the piece is made and has its caption" not in t
+             and "once it is made and has its caption" not in t and "write its caption first" not in t)
+    case("posting-queue.md: with no caption the assistant asks her question, never marks it ready silently, never presses them to write one",
+         "ask her question in her words" in post and "don't mark it ready silently" in post and "never press them to write one" in post)
+    case("post-kit.md: step 3 is locked only until the piece is made, in the page's own words", "Make your reel first..." in kitp
+         and '"Its caption can come later, or not at all."' in kitp and "Its caption can come later, or not at all." in K["ready_nocap"])
+    case("the chat's ready can name which reel, and the command takes it", '`posting_queue.py ready "beach reel" --reel "White Backdrop"`' in post
+         and 'sp.add_argument("--reel"' in pq and "def reel_piece_for(" in pq)
+    case("posting-queue.md: a reel that isn't made is refused, a name that fits none lists the reels, and never pick one for them",
+         "is refused with nothing changed" in post and "lists the shoot's reels" in post and "never pick one for them" in post
+         and "isn't made in CapCut yet" in pq)
+    case("posting-queue.md: the page's and the chat's name for a reel's post", '"<shoot> reel · <reel name>"' in post and '"<shoot> reel (<reel name>)"' in post
+         and "' · '+esc(x.reel_name)" in pq and "({p['reel_name']})" in pq)
+    case("posting-queue.md and post-kit.md: the kit page's question and each reel's place, in the page's own words",
+         all(('"' + K["which_title"] + '"') in t for t in (post, kitp)) and all(K[k] in post for k in ("r_made", "r_not", "r_in", "r_posted", "reel_empty")))
+    case("posting-queue.md: the reel cover picker in her words", all(x in post for x in ('"From your reel, in the order it plays"', "**+ Use a different photo**",
+                                                                                         '"Any other photo from the shoot"', "**Hide the other photos**"))
+         and all(("'" + x + "'") in pq for x in ("From your reel, in the order it plays", "+ Use a different photo", "Any other photo from the shoot", "Hide the other photos")))
+    note = re.search(r'^NO_CAPTION = "([^"]+)"', rem, re.M)
+    case("posting-queue.md says what a reminder's notes hold for a post with no caption, as reminders.py writes it",
+         bool(note) and ('"' + note.group(1) + '"') in post and "still gets its reminder" in post, note and note.group(1))
+    case("posting-queue.md: the first reel keeps its place, nothing is renamed; one caption for the shoot's reels",
+         "nothing already in the queue is renamed or moved" in post and "one caption and one set of hooks for the shoot's reels" in post)
+    case("arrange.md points a second reel at its own place in the queue", '`posting_queue.py ready "<shoot> reel" --reel "<name>"`' in arr)
+    case("where-things-live.md names what a reel's piece carries", "`version`" in where and "`reel_name`" in where and "`...-reel-v2`" in where
+         and 'x["version"], x["reel_name"] = ' in pq)
+
+
+def check_trash_helper():
+    """The Trash helper (Nicole's v27, Nov 17; Lane E's E11): parts/where-things-live.md says nothing of the
+    photographer's is ever deleted, that the one door out is the computer's own Trash (the Recycle Bin on a PC)
+    through this_computer.py, names the way back in Nicole's words, and gives the assistant no command for it."""
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    tc = read(SCRIPTS / "this_computer.py")
+    case("where-things-live.md says nothing of the photographer's is ever deleted, and the Assistant keeps no Trash of its own",
+         "never delete a file or a folder of the photographer's" in where and "keeps no Trash of its own" in where)
+    case("where-things-live.md names the computer's own Trash and the Recycle Bin as the one door out, through this_computer.py's trash",
+         "Finder's Trash on a Mac, the Recycle Bin on a PC" in where and "`this_computer.py`'s `trash`" in where and "the only door" in where
+         and "def trash(path, inside):" in tc)
+    case("where-things-live.md says what the door refuses, in the helper's own terms (a link, a path outside the one folder, a drive with no Trash, never a delete)",
+         "refuses a link, a path outside the one folder it is told to work in, and a drive with no Trash, and it is never a delete" in where)
+    case("the way back is Nicole's line on a Mac (TRASH_BACK) and ours on a PC, in where-things-live.md word for word",
+         "open the Trash in Finder and choose Put Back" in where and "open the Recycle Bin in File Explorer and choose Restore" in where
+         and '"open the Trash in Finder and choose Put Back"' in tc and '"open the Recycle Bin in File Explorer and choose Restore"' in tc)
+    case("the assistant has no chat command that moves anything to the Trash, and asked to delete says it never deletes",
+         "You have no chat command that moves anything to the Trash" in where and "say you never delete" in where)
+    case("this_computer.py's own words name no Claude and no path", "Claude" not in tc[tc.index("TRASH_WORD ="):tc.index("def trash_for_tests")])
+
+
+def check_watch_direct_broll():
+    """Nicole's v27, Lane A's stage 4: Watch your reel before you make it, Would you like to direct this edit? and
+    B-roll on the page. The reel skill has the section "Edit my reel" (read the direction, arrange within it, set
+    it up with reel_page.py direct, say what was arranged), the core table sends the line there, arrange.md says
+    the two steps in the page's words and that the watch step is the page's (not the assistant's), the make takes
+    --variation and --song-start, and where-things-live.md names direct, onscreen and the preview's folder."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(direct_h2|direct_b|direct_for|direct_note|watch_h2|pv_part|pv_mix|pv_undo|pv_redo|pv_make|os_wl|os_save|sum_broll)": "([^"]+)"', rp, re.M))
+    case("the page's words for the direct step, the watch step and B-roll are in reel_page.py (13 of them)", len(words) == 13, sorted(words))
+    case("the reel skill has the section Edit my reel: read the direction with note, follow it exactly, never widen it, the style that fits, a moment not on a card is a look for that moment only, reel_page.py direct, say what was arranged",
+         '## Edit my reel: "Edit my reel for <shoot>[, <reel>], and follow my direction"' in reel and "reel_page.py note" in reel and "follow it exactly, never widen it" in reel
+         and "a footage look for that moment only" in reel and "reel_page.py direct" in reel and "--style first|reveal|backforth|bookends --clips" in reel
+         and "Never write the style, the clips or the order into the reel page's records any other way" in reel and "Say in two lines what you arranged" in reel)
+    case("the reel skill says the watch step is the page's: press play on the page, Try another mix, Undo; never describe a cut you haven't seen the plan of",
+         "Watch your reel before you make it (Nicole, Nov 16)" in reel and "press play on the page to watch it" in reel and "Try another mix" in reel
+         and "never \"make it\"" in reel and "You never describe a cut you haven't seen the plan of" in reel)
+    case("the reel skill's make takes --variation and --song-start, and says what they are", "[--variation N] [--song-start S]" in reel and "`--variation N` is which mix" in reel and "`--song-start S` where the song starts" in reel)
+    case("the reel skill says what B-roll is (clips only, no photos, Words on screen, into CapCut as plain text) and what Save my video does (the finished MP4 in the shoot's Reels folder, never over the first, counts as made, no command of yours, the PC gap)",
+         "B-roll (Nicole's v27, Nov 17) is a kind of reel with no photos" in reel and "Words on screen" in reel and "plain text over the whole reel" in reel
+         and "**Save my video** (Nicole's v27) is the main button of a B-roll reel's watch step" in reel and "not built yet" not in reel and "isn't ready yet" not in reel
+         and "Saving your video, with your song and words. This takes about a minute." in reel and "in this shoot's Reels folder. It's ready to post." in reel
+         and "**Open the folder**" in reel and "never over the first" in reel and "A saved video counts as made" in reel and "You have no command for it" in reel
+         and "saving a finished video isn't on a PC yet" in reel and "Videos saved from the page" in reel)
+    case("the core table sends Edit my reel to the reel skill", '| "Edit my reel for <shoot>[, <reel>], and follow my direction"' in core and 'the reel skill\'s "Edit my reel"' in core)
+    case("arrange.md: the direct step in the page's words, its line's shapes, sent to the reel skill's Edit my reel, and told apart from the footage box",
+         ("**" + words["direct_h2"] + "**") in arr and ('"' + words["direct_b"] + '"') in arr and "**\"Edit my reel for <shoot>\"**" in arr and ", and follow my direction" in arr
+         and 'the reel skill\'s section "Edit my reel"' in arr and "reel_page.py direct" in arr and "This is a different note from the footage box in step 1" in arr)
+    case("arrange.md: the watch step in the page's words (Another part of this song, Try another mix, Undo and Redo, Make this one in CapCut), the last step, and the page's not the assistant's",
+         ("**" + words["watch_h2"] + "**") in arr and all(("**" + words[k] + "**") in arr for k in ("pv_part", "pv_mix", "pv_make")) and "**Undo** and **Redo**" in arr and "the last step, on every kind" in arr
+         and "Press play on the page beside us" in arr)
+    case("arrange.md: B-roll is clips only with Words on screen, Save my video built (the Reels folder, never over the first, Open the folder, counts as made, the PC gap, no command); make takes --variation and --song-start",
+         "A B-roll reel is clips only" in arr and ("**" + words["os_wl"] + "**") in arr and "**Save my video** (the finished MP4 made on the page, no CapCut needed) is the main button of its watch step" in arr
+         and "in the shoot's Reels folder" in arr and "never over the first" in arr and "**Open the folder**" in arr and "a saved video counts as made" in arr
+         and "saving a finished video isn't on a PC yet" in arr and "You have no command for it; asked for the file" in arr
+         and "`--variation N` and `--song-start S`" in arr and "[--variation N] [--song-start S]" in arr and "isn't ready yet" not in arr and "still being built" not in arr)
+    case("where-things-live.md names direct, onscreen, the made entries' variation and song_start, and the preview's own folder",
+         "`direct`, Nov 17" in where and "`onscreen`: the words, the font, the style" in where and "`variation`, which mix it was, and `song_start`" in where and "`reel-preview/`" in where)
+def check_instructions_v27_lane_a():
+    """Nicole's v27, Lane A's A17: the instructions say the reel page as it is. The chooser is the way in (the door
+    lines say "pick the kind"), the path at the top is the way back, the three chat lines of hers are in the reel
+    skill and the core table, nothing still says Use this moment, Watch your footage and pick your own, the Trim
+    panel as a thing on the page or "there's no Remove yet", the PC gaps (Save my video, the editor without stills,
+    naming) are named in the PC part and the PC guide in this_computer's own words, and the core's description
+    stays under 1,024 characters."""
+    sys.path.insert(0, str(SCRIPTS))
+    import this_computer
+    reel = " ".join(read(REEL / "SKILL.md").split())
+    core = read(SM / "SKILL.md")
+    arr = " ".join(read(SM / "parts" / "arrange.md").split())
+    pc = " ".join(read(SM / "parts" / "on-a-pc.md").split())
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    guide = " ".join(read(ROOT / "docs" / "SETUP-GUIDE-PC.md").split())
+    parts = {p.name: " ".join(read(p).split()) for p in sorted((SM / "parts").glob("*.md"))}
+    case("the reel skill and arrange.md open the page on the chooser: the door line says pick the kind of reel (Just photos, Behind the scenes, Talking to camera or B-roll)",
+         "Pick the kind of reel you want (Just photos, Behind the scenes, Talking to camera or B-roll)" in reel
+         and arr.count("Pick the kind of reel you want (Just photos, Behind the scenes, Talking to camera or B-roll)") == 1 and "Pick Just photos (or Behind the scenes, with your footage)" in arr
+         and "Choose Just photos (or add your footage)" not in reel + arr)
+    case("arrange.md says the path at the top is the way back (Reels is the chooser), not the old link",
+         "The path at the top of every reel page (Home › <shoot> post kit › Reels › B-roll) is the way back: Reels is the chooser" in arr and "goes back to the chooser" not in arr)
+    for line in ('"Name my clips for <shoot>"', '"Edit my reel for <shoot>[, <reel>], and follow my direction"', '"Pick my reel photos for <shoot>"', '"Look through my footage for <shoot>"'):
+        case("her line %s is in the reel skill and in the core's table (the core's rows say it in their own case)" % line, line in reel and line.lower() in core.lower())
+    case("the core's table sends \"save my video\" and \"where did my B-roll video go\" to the reel skill",
+         '"save my video", "where did my B-roll video go"' in core and "the reel skill, `../assistant-make-a-reel/SKILL.md`" in core.split('"save my video"')[1][:600])
+    stale = ("Use this moment", "Watch your footage and pick your own", "there's no Remove", "Remove a song isn't built", "not built yet", "still being built", "isn't ready yet")
+    found = [(name, w) for name, text in list(parts.items()) + [("reel SKILL.md", reel), ("core SKILL.md", " ".join(core.split()))] for w in stale if w in text]
+    case("no part, the reel skill or the core still says Use this moment, Watch your footage and pick your own, there's no Remove, not built yet, still being built or isn't ready yet", not found, found)
+    case("the Trim panel is only ever said to be gone from the page", "Trim panel" not in reel and arr.count("Trim panel") == 1 and "is gone from the page with v27" in arr
+         and all("Trim panel" not in t for n, t in parts.items() if n != "arrange.md"))
+    case("the PC part names Save my video's gap in this_computer.NO_VIDEO_PC's own words, with the clips' naming and the editor without stills",
+         this_computer.NO_VIDEO_PC in pc and "Save my video (a B-roll reel's finished MP4, Nicole's v27) isn't on a PC yet either" in pc
+         and "On a PC the timeline has no pictures along it yet. The trim, its ends and the times work the same." in pc
+         and "Naming their clips (\"Name my clips for <shoot>\") can't run on a PC either" in pc and "Don't offer to install anything for it" in pc)
+    case("the PC part's \"What can't you do on a PC?\" box and the PC guide's list both name it, in this_computer's words", ("> - Saving a B-roll reel as a finished video. " + this_computer.NO_VIDEO_PC) in read(SM / "parts" / "on-a-pc.md")
+         and ("- **Saving a B-roll reel as a finished video.** " + this_computer.NO_VIDEO_PC) in read(ROOT / "docs" / "SETUP-GUIDE-PC.md"))
+    case("the PC guide's footage lines say the editor's clips (Start here, End here, Add clip), not Use this moment, and the Save my video gap", "Use this moment" not in guide
+         and "Start here, End here and Add clip" in guide and "Save my video (a B-roll reel's finished MP4) isn't on a PC yet" in guide)
+    case("this_computer.NO_VIDEO_PC says what works instead (CapCut) and that the words go with it, no Finder or QuickTime",
+         "Make this one in CapCut works here, and your words go with it." in this_computer.NO_VIDEO_PC and not any(w in this_computer.NO_VIDEO_PC for w in ("Finder", "QuickTime")))
+    case("where-things-live.md: the Reels folder (theirs, beside Photos, Footage and Music, never written over), the made entry's video and seconds, reel-video/",
+         "`Reels`, inside the kit's folder beside Photos, Footage and Music" in where and "Nothing in it is ever written over" in where
+         and "with `video`, the file's name in the shoot's Reels folder, and `seconds`, and counts as made" in where and "`reel-video/` (Save my video's own" in where)
+    desc = re.search(r"^description:\s*(.*)$", core, re.M)
+    case("the core's description stays under 1,024 characters (the new lines live in the body)", desc and len(desc.group(1)) <= 1024, len(desc.group(1)) if desc else None)
+
+
+def check_posted_and_path_v27():
+    """Posted on the post itself, the Reels card and the path at the top (Nicole's v27, Lane D): the instructions
+    say what the pages say, in the pages' own words, and name commands that exist."""
+    import html as _html
+    sys.path.insert(0, str(SCRIPTS))
+    import kit
+    import look
+    import words_page
+    pq = read(SCRIPTS / "posting_queue.py").replace("\u2019", "'")
+    post = " ".join(read(SM / "parts" / "posting-queue.md").split()).replace("\u2019", "'")
+    kitp = " ".join(read(SM / "parts" / "post-kit.md").split())
+    wordsp = " ".join(read(SM / "parts" / "words.md").split())
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    arr = " ".join(read(SM / "parts" / "arrange.md").split())
+    rows = table_rows(read(SM / "SKILL.md"))
+    # --- the switch and the posted post, in the page's own words ---
+    said = {"Not posted": r"not_posted:'([^']+)'", "Posted": r"\bposted:'([^']+)'", "the posted post's line": r"in_feed:'([^']+)'",
+            "the posted tile's tip": r"posted_tip:'([^']+)'", "Back in your queue": r"back_in_queue:'([^']+)'", "the Posted toast": r"posted_toast:'([^']+)'"}
+    for what, pat in said.items():
+        m = re.search(pat, pq)
+        case(f"the posting page still says: {what}", bool(m))
+        if m:
+            case(f"... and posting-queue.md says it the same way: {m.group(1)[:50]}", m.group(1) in post, m.group(1))
+    sect = re.search(r"\*\*Posted, on the post itself.*?(?=- \*\*|## )", post)
+    case("posting-queue.md has the Posted-on-the-post section: the switch beside Done, no date and no posted-on label, read my Instagram grid, the switch only",
+         bool(sect) and all(x in sect.group(0) for x in ("**Not posted** switch beside **Done**", 'no "posted on" label', '"read my Instagram grid"', "the switch and Done only", "no photo strip, no words and no reminder")))
+    case("... and that section never says Claude (the pages say your assistant)", bool(sect) and "Claude" not in sect.group(0))
+    case("the page draws posted posts from the server's list, never filtering by read_at itself (so the part's rule is the server's)",
+         "S.posted" in pq and "def posted_in_grid" in pq or ("S.posted" in pq and "POSTED_DAYS" in pq))
+    # --- unposted: the command, its line, the row ---
+    have = set(re.findall(r'add_parser\("([a-z-]+)"\)', pq))
+    case("posting_queue.py has the unposted command and the part names it with its line", "unposted" in have
+         and '`posting_queue.py unposted "beach reel"`' in post and "That one didn\'t go out after all" in post)
+    case("the part quotes what unposted prints, as the script prints it", "back in your queue, ready to post" in post
+         and 'back in your queue, ready to post" + (f", down for' in pq)
+    case("the part says unposted looks only among the posted pieces (so the shoot's other reel in line is never taken)",
+         "looks only among the posted pieces" in post and 'find(p, a.piece, statuses=("posted",))' in pq)
+    case("the part says a reminder that was on comes back on the new date, the same event, never a second one",
+         "the same event, moved; never a second one" in post and "the same event moved, never a second one" in post)
+    hit = [r for r in rows if "\"that one didn't go out after all\"" in r.split(" | ")[0].replace("\u2019", "'")]
+    case("the core's row for the posting queue takes \"that one didn't go out after all\" and \"it's in my feed now\" to parts/posting-queue.md",
+         len(hit) == 1 and "`parts/posting-queue.md`" in hit[0] and "\"it's in my feed now\"" in hit[0].replace("\u2019", "'"), hit)
+    # --- the Reels card: its name and its two buttons, from kit.py ---
+    case("kit.py's card is Reels, and its buttons are Create my reels / Create another reel",
+         kit.KIT_WORDS["reel"] == "Reels" and kit.REEL_CREATE == "Create my reels" and kit.REEL_AGAIN == "Create another reel")
+    for name, t in (("post-kit.md", kitp), ("arrange.md", arr)):
+        case(f"{name} names the Reels card and quotes both buttons with their arrow", "Reels card" in t
+             and f'"{kit.REEL_CREATE} \u2192"' in t and f'"{kit.REEL_AGAIN} \u2192"' in t and "once any reel of the shoot is made" in t)
+    stale = [f"{rel(q)}:{i}" for q in instruction_files() for i, ln in enumerate(read(q).splitlines(), 1) if re.search(r"\bReel card\b|\(Reel, Carousel", ln)]
+    case("no instruction still calls it the Reel card", not stale, stale)
+    # --- the path at the top: look.py's words, told in the kit part and the words part ---
+    C = look.CRUMB_WORDS
+    kitcrumb = C["post_kit"].format(shoot="Beach")
+    path_kit = f"{C['home']} {C['sep']} {kitcrumb}"
+    path_words = f"{path_kit} {C['sep']} {words_page.WORDS['crumb_captions']}"
+    case("post-kit.md tells the path on the kit page and on the words page, in look.py's and words_page.py's own words",
+         f"**{path_kit}** on the kit page" in kitp and f"**{path_words}** on the words page" in kitp and "Press Home at the top of the page" in kitp)
+    case("post-kit.md says the kit's own crumb is not a link and Home is (as look.crumbs draws them)",
+         "it is where they are, so it is not a link here" in kitp and "Home is a link to the home base" in kitp
+         and "aria-current='page'" in read(SCRIPTS / "look.py") and look.HOME_PATH == "/home")
+    case("words.md tells the words page's path and how to get back", f"**{path_words}**" in wordsp and "Press Beach post kit at the top of the page" in wordsp)
+    case("the posting queue page still keeps Back to home, as the kit part says", "keeps its Back to home" in kitp and "Back to home</span>" in pq)
+    case("the kit page's and the words page's bars are built by look.crumbs (else the parts' path is a story)",
+         "look.crumbs([(here, None)])" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
+    # --- "What's a post kit?": her Make posts paragraph, whole ---
+    m = re.search(r'\*\*"What\'s a post kit\?"\*\* Answer in Nicole\'s words from the Make posts screen, whole: "([^"]+)"', kitp)
+    case("post-kit.md answers \"What's a post kit?\" with one quoted paragraph", bool(m))
+    hers = [f for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))     # a worktree looks beside the main checkout, as the kit tests do
+            for f in sorted((base / "reference-private").glob("nicole-handoff-v2[7-9]-*/Carousel designer and reel picker/pages/make-posts.html"), reverse=True)]
+    if m and hers:
+        page = " ".join(_html.unescape(re.sub(r"<[^>]+>", " ", read(hers[0]))).split())
+        case(f"... and it is her paragraph, word for word ({hers[0].parent.parent.parent.name})", m.group(1) in page, m.group(1))
+    else:
+        case("... (her v27 pack is not on this computer, so the paragraph is not compared)", True)
+    # --- where things live ---
+    case("where-things-live.md says what posted_at, feed.json and read_at decide, with the script's 30 days",
+         all(x in where for x in ("`posted_at`", "`feed.json`", "`read_at`", "last 30 days", "(`unposted`)")) and re.search(r"^POSTED_DAYS = 30\b", pq, re.M))
+
 
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking):
+    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
+               check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

@@ -3,6 +3,7 @@
 
     python3 sound.py <song> [<song> ...]            how long each is, and how this computer can hear it
     python3 sound.py --extract <video> <out.m4a>     the sound of a video or screen recording, as a song file
+    python3 sound.py --lead-in <song> [<song> ...]   where the music really starts (after a glitch and a silence)
 
 How long a song is: read from the file itself in plain Python, nothing installed, the same on both computers:
 M4A / MP4 / MOV, MP3 (its Xing or VBRI header, else its bit rate and size, else every frame counted), WAV,
@@ -788,6 +789,57 @@ def decode(path, rate=11025, video=False):
             pass
         if alias_dir:
             shutil.rmtree(alias_dir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- where a short song's music really starts
+
+# Nicole's v25, section 5 (Nov 12): "Screen recordings often open with a glitch and a moment of silence." Her
+# server asks ffmpeg (silencedetect, noise=-50dB, d=0.3, over the first 14 seconds) and starts the reel after the
+# last silence that ends in the first 12 seconds. Nothing is installed here, so the same thing is measured in plain
+# Python on the sound decode() already hears, the very samples the beat is found on, so the start and the beats
+# share one clock:
+#   * a sample is silent when it is quieter than -50 dB of full scale (ffmpeg: strictly inside +-noise);
+#   * a silence is LEAD_GAP seconds or more of silent samples in a row, and it ends at the first sample that is not;
+#   * only a silence that ends with a sound counts (one still going when the listening stops has no end).
+# One difference from ffmpeg, named: ffmpeg listens to each channel of a stereo song by itself and ours to the two
+# mixed to one, so a gap in one ear alone is not a silence here.
+LEAD_NOISE_DB = -50.0        # hers
+LEAD_GAP = 0.3               # hers: seconds of silence that make a gap
+LEAD_WITHIN = 12.0           # hers: the gap must end in the first 12 seconds
+LEAD_LISTEN = 14.0           # hers: ffmpeg is handed the first 14 seconds
+
+
+def silences(samples, rate, noise_db=LEAD_NOISE_DB, least=LEAD_GAP):
+    """The silent gaps in mono 16-bit samples, as ffmpeg's silencedetect counts them: [(start, end)] in seconds,
+    end None for a gap still going at the last sample."""
+    limit = (10.0 ** (noise_db / 20.0)) * 32767.0
+    need = max(1, int(least * rate))
+    out, run, i = [], 0, 0
+    for i, v in enumerate(samples):
+        if -limit < v < limit:
+            run += 1
+        else:
+            if run >= need:
+                out.append(((i - run) / float(rate), i / float(rate)))
+            run = 0
+    if run >= need:
+        out.append(((len(samples) - run) / float(rate), None))
+    return out
+
+
+def lead_in(path, rate=11025):
+    """Where the music really starts in a song: the end of the last silent gap that ends in the first 12 seconds,
+    to a hundredth of a second (hers), or 0.0 when there is none, or when the song can't be read (hers: 0 with no
+    ffmpeg). The song is only read."""
+    try:
+        a, _how = decode(path, rate)
+        if a is None:
+            return 0.0
+        a = a[:int(LEAD_LISTEN * rate)]
+        ends = [e for _s, e in silences(a, rate) if e is not None and e <= LEAD_WITHIN]
+        return round(ends[-1], 2) if ends else 0.0
+    except Exception:  # noqa: BLE001  (a start nobody can measure is the top, never a stopped reel)
+        return 0.0
 
 
 # ---------------------------------------------------------------- the sound of a video, as a song file
@@ -1657,6 +1709,10 @@ def main():
     if not args:
         print(__doc__)
         return 2
+    if args[0] == "--lead-in" and len(args) >= 2:
+        for a in args[1:]:
+            print(f"{Path(a).name}: the music starts {lead_in(a):.2f} s in")
+        return 0
     if args[0] == "--extract" and len(args) == 3:
         got, how = extract_audio(args[1], args[2])
         print(f"Made {got} ({how})" if got else how)

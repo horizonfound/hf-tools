@@ -459,19 +459,28 @@ def check_page(c, s, ids):
     row = c.js("Array.from(document.querySelectorAll('#pick .pw > *')).filter(function(e){ return e.textContent; }).map(function(e){ return [e.tagName, e.textContent]; })")
     case("the button row: Copy caption (dark), Copy my hook, Set a reminder to post, Open my words →", row == [["BUTTON", "Copy caption"], ["BUTTON", "Copy my hook"], ["SPAN", "Set a reminder to post"], ["A", "Open my words →"]]
          and c.js("getComputedStyle(document.querySelector('#pick .pw [data-c=cap]')).backgroundColor") == c.js("getComputedStyle(document.querySelector('.homelink')).backgroundColor"), row)
+    case("v27: the grey Not posted switch sits beside Done in the heading (role=switch, off), and the rest of the panel is as it was",
+         c.js("Array.from(document.querySelectorAll('#pick .ph .phr > *')).map(function(e){ return e.className.split(' ')[0] + ':' + e.textContent; })") == ["pswitch:Not posted", "x:Done"]
+         and c.js("document.querySelector('#pick .pswitch').getAttribute('aria-checked')") == "false" and c.js("document.querySelector('#pick .pswitch').getAttribute('role')") == "switch",
+         c.js("Array.from(document.querySelectorAll('#pick .ph .phr > *')).map(function(e){ return e.className + ':' + e.textContent; })"))
     case("...it sits right under the heading and above the photos, with the reminder's place in it between the hook and the link",
-         c.js("(function(){ var k = Array.from(%s.children).map(function(e){ return e.className; }); return k.join(' '); })()" % PANEL) == "ph pw pr pn strip warn"
+         c.js("(function(){ var k = Array.from(%s.children).map(function(e){ return e.className; }); return k.join(' '); })()" % PANEL) == "ph pw pr pn ps warn"
          and c.js("Array.from(document.querySelectorAll('#pick .pw > *')).map(function(e){ return e.className; }).join('|')") == "btn|btn o|rslot|pwl"
          and c.js("document.querySelector('#pick .rslot').dataset.remindSlot") == rid)
     href = c.js("document.querySelector('#pick .pwl').getAttribute('href')")
     case("Open my words leads to this post's words page on this same server", href == "/words.html?kit=%s&piece=reel" % quote(KIT, safe="~()*!.'"), href)
-    strip = c.js("Array.from(document.querySelectorAll('#pick .strip > *')).map(function(e){ return e.className === 'sep' ? 'SEP:' + e.textContent : e.dataset.rel + (e.classList.contains('on') ? ' ON' : ''); })")
-    case("the strip: the reel's photos in reel order, 'More from the shoot', then the rest; the one in use marked",
-         strip == ["Photos/beach-003.jpg", "Photos/beach-001.jpg", "Photos/beach-002.jpg", "Photos/beach-004.jpg", "SEP:More from the shoot", "Photos/beach-005.jpg ON", "Photos/beach-006.jpg"], strip)
+    # v25: the reel's own photos first under "From your reel, in the order it plays", numbered; the rest under
+    # "Any other photo from the shoot", open already here because the photo in use is one of those
+    strip = c.js("Array.from(document.querySelectorAll('#pick .ps .sub, #pick .ps .c, #pick .ps .more')).map(function(e){ return e.classList.contains('c') ? e.dataset.rel + (e.classList.contains('on') ? ' ON' : '') : e.className.split(' ').pop().toUpperCase() + ':' + e.textContent; })")
+    case("the photos: 'From your reel, in the order it plays' in reel order, then 'Any other photo from the shoot' (open: the one in use is there), the one in use marked",
+         strip == ["SUB:From your reel, in the order it plays", "Photos/beach-003.jpg", "Photos/beach-001.jpg", "Photos/beach-002.jpg", "Photos/beach-004.jpg",
+                   "MORE:Hide the other photos", "SUB:Any other photo from the shoot", "Photos/beach-005.jpg ON", "Photos/beach-006.jpg"]
+         and c.js("document.querySelector('#pick .others').hidden") is False and c.count("#pick .sep") == 0, strip)
     r = c.rect("#pick .c")
-    case("each photo is 96 px wide and 4:5, the one in use has its ✓, and a reel's photos carry no numbers",
+    case("each photo is 96 px wide and 4:5, the one in use has its ✓; the reel's own photos are numbered in play order (v25), the others are not",
          abs(r["w"] - 96) < 0.6 and abs(r["h"] - 120) < 0.6 and c.js("getComputedStyle(document.querySelector('#pick .c.on'), '::after').content") in ('"✓"', "'✓'")
-         and c.count("#pick .c .n") == 0, r)
+         and c.js("Array.from(document.querySelectorAll('#pick .ps > .strip .c .n')).map(function(n){ return n.textContent; }).join('')") == "1234"
+         and c.count("#pick .others .c .n") == 0, r)
     case("the strip scrolls sideways inside the panel, never the page", c.js("getComputedStyle(document.querySelector('#pick .strip')).overflowX") == "auto"
          and c.js("document.documentElement.scrollWidth <= window.innerWidth"))
     case("every photo in the strip loaded", c.js("Array.from(document.querySelectorAll('#pick .c img')).every(function(i){ return i.complete && i.naturalWidth > 0; })"))
