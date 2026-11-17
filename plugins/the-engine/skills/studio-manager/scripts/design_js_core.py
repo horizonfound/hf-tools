@@ -464,8 +464,10 @@ DESIGN_CORE_JS = r"""
     M.useLimits(j.limits);
     D.blocked = false;
     $('title').textContent = j.name;
+    // her Back to the post kit pill (v19) keeps its address but stays hidden (her v27: the path at the top is the way back)
     var kl = $('kitlink');
-    if (j.kit_page) { kl.href = '/content/' + encodeURIComponent(KIT) + '/Post%20kit.html'; kl.hidden = false; } else kl.hidden = true;
+    if (j.kit_page) kl.href = '/content/' + encodeURIComponent(KIT) + '/Post%20kit.html';
+    kl.hidden = true;
     D.emit('adopt', {rebuild: rebuild});
     takeDesign(j.design);
     if (topLines()) poll();

@@ -117,6 +117,8 @@ HERS = {
     "add_opening": "Opening your Photos folder in Finder...",
     "add_open": "Your Photos folder is open in Finder. Drag your finished photos in, and they show up here at the end.",
     "add_cant": "Could not open the folder. Is the photo drive plugged in?",
+    # the path at the top (B21): her crumbs.js words (Home, "<shoot> post kit", Carousel, Stories), through look.CRUMB_WORDS and this page's own two
+    "crumb_home": "Home", "crumb_carousel": "Carousel", "crumb_stories": "Stories",
     # Save just this slide (B17): the two buttons and their tooltips (her HTML lines 292 and 337), her stories' name (435)
     "save_one": "Save just this slide", "save_one_story": "Save just this story",
     "save_one_title": "Save only the slide this is on, as its own picture",
@@ -793,6 +795,25 @@ def check_v27_page(case, work):
          "D.photoUrl(n, 'l')" in view and "/full/" not in view and "D.clickPhoto(n)" in view and "step(e.key === 'ArrowLeft' ? -1 : 1)" in view and "((i + d * k) % list.length + list.length) % list.length" in view)
     case("v27 page: Use says Put it in the selected frame with a frame selected, else Use this photo; and the window closes when the design changes under it",
          "D.label(useBtn, b && M.isFrame(b) ? WORDS.viewPut : WORDS.viewUse);" in view and "D.on('design', function(){ if (D.modals.isOpen(modal)) close(); });" in view)
+
+    # ---- B21: the path at the top: Home › <shoot> post kit › Carousel | Stories, built by look.crumbs (Lane D); her Back pills hidden ----
+    import look
+    story_html = design_page.page_html("2026-11-01 Fake beach", "stories")
+    for name, page_, last in (("carousel", car, HERS["crumb_carousel"]), ("stories", story_html, HERS["crumb_stories"])):
+        nav = re.search(r"<nav class='crumbs' aria-label='Where you are'>(.*?)</nav>", page_)
+        bar = re.search(r"<div class='bar'>(.*?)</div>", page_)
+        case(f"v27 page: the {name} page's bar carries her path, Home › Fake beach post kit › {last}: Home and the post kit are links to paths of this server, the last step is where they are",
+             nav and bar and nav.group(0) in bar.group(1) and nav.group(1) == ("<a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span>"
+                                                                                "<a href='/content/2026-11-01%20Fake%20beach/Post%20kit.html'>Fake beach post kit</a><span class='sep' aria-hidden='true'>›</span>"
+                                                                                f"<span class='here' aria-current='page'>{last}</span>"), nav and nav.group(1))
+        case(f"v27 page: ... her two Back pills stay in the {name} page's markup, hidden (Back to home before the path, ← Back to the post kit after the brand mark)",
+             bar and bar.group(1).startswith("<a class='homelink' hidden href='/home'>") and "<a class='kitlink' id='kitlink' hidden>" in bar.group(1) and bar.group(1).count("<a ") == 4, bar and bar.group(1)[:120])
+        case(f"v27 page: ... the {name} page counts one bar, and no link in it names a folder on this computer", page_.count("<div class='bar'>") == 1 and no_path(re.findall(r"href='([^']*)'", bar.group(1)))[0] if bar else False)
+    case("v27 page: the path is built by look.crumbs from look.kit_trail (Lane D's one builder) with this page's own last step, and the page carries the path's rules with the one colour they need",
+         "look.crumbs(look.kit_trail(kit_name) + [(CRUMB_STORIES if story else CRUMB_CAROUSEL, None)])" in (SCRIPTS / "design_page.py").read_text(encoding="utf-8")
+         and look.CRUMBS in car and ":root{--coral-2:" + look.COLOR["coral-2"] + "}" in car and design_page.CRUMB_CAROUSEL == HERS["crumb_carousel"] and design_page.CRUMB_STORIES == HERS["crumb_stories"])
+    case("v27 page: the script no longer shows the Back to the post kit pill when the kit page is there (the path is the way back); the pill keeps its address",
+         "kl.hidden = true;" in core and "kl.hidden = false" not in core and "if (j.kit_page) kl.href = '/content/' + encodeURIComponent(KIT) + '/Post%20kit.html';" in core)
 
     # ---- B16: + Add photos: her button before "Let my assistant choose", her lines as data in this computer's words, the poll ----
     askjs = src["DESIGN_ASK_JS"]
@@ -1477,6 +1498,14 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.wait_for(f"Designer.st.blocks.filter(function(b){{ return b.type !== 'text'; }})[1].n === {free[0]}", 8)
             case("v27 browser: the open page takes the pick by itself: the two frames show the photos and the page says so",
                  [b.get("n") for b in frames(st())][1:3] == free and c.text("#ask-said") == "Your assistant’s pick is in your slides.", (frames(st())[1:3], c.text("#ask-said")))
+            # ---- the path at the top (B21): in sight, the pills gone, the kit step a link, the page one bar ----
+            crumbs = Jx("(function(){ var n = document.querySelector('.bar .crumbs'); if (!n) return null; var r = n.getBoundingClientRect(); "
+                        "return {steps: Array.from(n.children).filter(function(e){ return !e.classList.contains('sep'); }).map(function(e){ return [e.tagName, e.textContent, e.getAttribute('href'), e.getAttribute('aria-current')]; }), "
+                        "shown: getComputedStyle(n).display !== 'none' && r.height > 0, top: r.top, bars: document.querySelectorAll('.bar').length, "
+                        "home: getComputedStyle(document.querySelector('.bar .homelink')).display, kit: getComputedStyle(document.getElementById('kitlink')).display, hover: getComputedStyle(n.querySelector('a')).borderRadius}; })()")
+            case("v27 browser: her path at the top of the carousel page: Home › Beach post kit › Carousel, in sight at the top, Home and the post kit links, both Back pills really gone, one bar",
+                 crumbs and crumbs["steps"] == [["A", "Home", "/home", None], ["A", "Beach post kit", "/content/2026-11-01%20Beach/Post%20kit.html", None], ["SPAN", "Carousel", None, "page"]]
+                 and crumbs["shown"] and 0 <= crumbs["top"] < 60 and crumbs["bars"] == 1 and crumbs["home"] == "none" and crumbs["kit"] == "none" and crumbs["hover"] == "999px", crumbs)
             # ---- Open folder on the carousel page (B15), through the real route, Finder never opened ----
             c.click("#open-carousel")
             c.wait_for("document.getElementById('open-line').textContent !== ''", 5)
@@ -2170,6 +2199,8 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#open-carousel")
             c.wait_for("document.getElementById('open-line').textContent !== ''", 5)
             case("v27 browser: Open folder on the stories before any Save stories: her not-yet line, naming Save stories", c.text("#open-line") == HERS["none_story"], c.text("#open-line"))
+            scr = Jx("Array.from(document.querySelectorAll('.bar .crumbs > *')).filter(function(e){ return !e.classList.contains('sep'); }).map(function(e){ return e.textContent; })")
+            case("v27 browser: the stories page's path ends in Stories", scr == ["Home", "Beach post kit", "Stories"], scr)
             sab = Jx("(function(){ var b = document.getElementById('add-photos'); return {text: b.textContent, title: b.title, next: b.nextElementSibling.id}; })()")
             case("v27 browser: the stories page has her + Add photos too, before Let my assistant choose", sab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick"}, sab)
             c.click("#strip .blk")

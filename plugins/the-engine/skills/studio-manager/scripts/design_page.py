@@ -346,6 +346,11 @@ ADD_PHOTOS_OPEN = "Your Photos folder is open in {app}. Drag your finished photo
 ADD_PHOTOS_CANT = "Could not open the folder. Is the photo drive plugged in?"
 KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
 KIND_NAV = (("carousel", "Carousel"), ("stories", "Stories"))
+# The path at the top (hers, v27, crumbs.js: Home › <shoot> post kit › Carousel | Stories), built on the server by look.crumbs
+# (Lane D): the Home and the post kit steps are links to paths of this server; the last step is where they are. Her Back pills
+# (Back to home, ← Back to the post kit) stay in the markup, hidden, as her page keeps them.
+CRUMB_CAROUSEL = "Carousel"
+CRUMB_STORIES = "Stories"
 
 
 def _story(s):
@@ -358,12 +363,19 @@ def plain_page(words):
     return arrange_page.plain_page(words)
 
 
-def _shell(title, body_attrs, inner, scripts=""):
+# The path's rules (look.CRUMBS) with the one colour name they use that this page's own style does not define.
+CRUMBS_CSS = ":root{--coral-2:" + look.COLOR["coral-2"] + "}" + look.CRUMBS
+
+
+def _shell(title, body_attrs, inner, scripts="", crumbs=""):
+    """The page around a designer: the bar (her path at the top when the page is a shoot's, with Back to home kept
+    hidden in the markup as Lane D's rule has it), then the page's own markup."""
+    back = arrange_page.BACK_HOME.replace("<a class='homelink'", "<a class='homelink' hidden", 1) if crumbs else arrange_page.BACK_HOME
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>" + html.escape(title) + "</title><style>" + look.font_css() + arrange_page.CSS + DESIGN_CSS + PART_CSS + "</style></head>"
+            "<title>" + html.escape(title) + "</title><style>" + look.font_css() + arrange_page.CSS + CRUMBS_CSS + DESIGN_CSS + PART_CSS + "</style></head>"
             "<body class='designer'" + body_attrs + ">"
-            "<div class='wrap'><div class='bar'>" + arrange_page.BACK_HOME + brand.bar()
+            "<div class='wrap'><div class='bar'>" + back + crumbs + brand.bar()
             + inner + scripts + "</body></html>")
 
 
@@ -482,7 +494,8 @@ def page_html(kit_name, kind="carousel"):
     limits = json.dumps(design.limits_for(kind), separators=(",", ":")).replace("<", "\\u003c")
     scripts = ("<script>window.DESIGN_LIMITS=" + limits + ";</script>"
                + "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + "<script>" + DESIGN_START_JS + "</script>")
-    return _shell(brand.title(STORY_TAB if story else "Carousel designer"), attrs, inner, scripts)
+    crumbs = look.crumbs(look.kit_trail(kit_name) + [(CRUMB_STORIES if story else CRUMB_CAROUSEL, None)])
+    return _shell(brand.title(STORY_TAB if story else "Carousel designer"), attrs, inner, scripts, crumbs)
 
 
 if __name__ == "__main__":
