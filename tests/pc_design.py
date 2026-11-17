@@ -1340,6 +1340,53 @@ def v26_checks(kit):
           design.clean_ask("a\r\nb") == "a\nb" and design.clean_ask("x" * 601) is None and design.clean_ask("a\x07b") == "a b")
 
 
+def v27_checks(kit):
+    """Nicole's v27, as a PC runs it: the note for the assistant on a carousel design and the assistant's pick into
+    its frames, her three story collages, Open folder's words. Records only: an accent and an emoji in every name, no
+    path in anything a page is given."""
+    import posting_queue
+    st = design.state_for_page(kit)
+    A = st["design"]["id"]
+    check("v27: a carousel's design comes with its note for the assistant, empty to start with, and no path", st["design"].get("ask") == "" and no_path(st)[0])
+    d = design.load_design(kit, A)
+    state = {"slides": 2, "bg": "#ffffff", "blocks": [
+        {"id": 1, "n": 1, "x": 0, "y": 0, "w": 1080, "h": 1350, "ox": 0.5, "oy": 0.5, "zoom": 1},
+        {"id": 2, "n": None, "x": 1080, "y": 0, "w": 1080, "h": 600, "ox": 0.5, "oy": 0.5, "zoom": 1},
+        {"id": 3, "n": None, "x": 1080, "y": 650, "w": 1080, "h": 700, "ox": 0.5, "oy": 0.5, "zoom": 1}]}
+    note = "Open on Zoë’s laugh 🌊,\r\nend on the détails"
+    body = {"kit": kit.name, "design": A, "page": PAGE, "base": d["rev"], "stamp": arrange.sheet_stamp(kit), "state": state, "ask": note}
+    code, out = design.save_from_page(body)
+    d = design.load_design(kit, A)
+    raw = design.design_path(kit, A).read_bytes()
+    check("v27: the note is kept with the carousel design, accents and emoji and all, its line break one line break, as UTF-8, never in the layout",
+          code == 200 and d.get("ask") == "Open on Zoë’s laugh 🌊,\nend on the détails" and "ask" not in d["state"] and b"\r" not in raw, (code, out.get("words"), d.get("ask")))
+    check("v27: the page is given the note back as text, with no path beside it", design.state_for_page(kit, A)["design"]["ask"] == d["ask"] and no_path(design.state_for_page(kit, A))[0])
+    before = design.design_path(kit, A).read_bytes()
+    res, words, got = design.fill(kit, [2, 3], A, kind="carousel")
+    d2 = design.load_design(kit, A)
+    check("v27: the assistant's pick goes into the carousel's empty frames, in order; the note is as it was; the counter is one higher",
+          res == "done" and [b.get("n") for b in d2["state"]["blocks"]] == [1, 2, 3] and d2.get("ask") == d["ask"] and d2["rev"] == d["rev"] + 1 and no_path(words)[0], (res, words))
+    check("v27: the design as it was before the pick is kept beside it, byte for byte", design.prev_path(kit, A).read_bytes() == before)
+    kept = design.design_path(kit, A).read_bytes()
+    r1, _, _ = design.fill(kit, [2, 3], A, kind="carousel")
+    check("v27: the very same pick run again is \"same\", and the design is byte for byte as it was", r1 == "same" and design.design_path(kit, A).read_bytes() == kept)
+    for what, nums, rep_ in (("a photo that is not in the shoot", [999], True), ("more photos than frames", [1, 2, 3, 4], True), ("every frame full", [4], False)):
+        res, words, _ = design.fill(kit, nums, A, replace=rep_, kind="carousel")
+        check(f"v27: the pick is refused ({what}) in plain words, naming slides and never a story, and the design is as it was",
+              res == "problem" and bool(words) and "stor" not in words.lower() and design.design_path(kit, A).read_bytes() == kept, (res, words))
+    code, out = design._post_asked({"kit": kit.name, "kind": "carousel", "design": A})
+    da = json.loads(design.design_path(kit, A).read_text(encoding="utf-8"))
+    check("v27: Copy pressed on the carousel: only a time is noted with the design, and the chat's commands take it",
+          code == 200 and {k: v for k, v in da.items() if k != "asked"} == json.loads(kept.decode("utf-8")) and design._ask_design(kit, kind="carousel")[0]["id"] == A, (code, out))
+    sst = design.state_for_page(kit, kind="stories")
+    check("v27: the stories page is given fourteen layouts, her three collages between her four templates and her seven grids, each a layout a story may hold",
+          [t["id"] for t in sst["starters"]][4:7] == ["sg-mosaic", "sg-mood", "sg-overlap"] and len(sst["starters"]) == 14
+          and all(design.validate_state(t["template"], template=True, kind="stories")[0] == t["template"] for t in sst["starters"][4:7]) and no_path(sst)[0], [t["id"] for t in sst["starters"]])
+    app = tc.FILES_APP
+    check("v27: Open folder's answers name this computer's file manager (File Explorer on a PC), never Finder on a PC",
+          posting_queue.OPEN_WORDS["Carousel"].format(app=app) == f"Your Carousel folder is open in {app}." and (not WINDOWS or "Finder" not in posting_queue.OPEN_WORDS["Carousel"].format(app=app)))
+
+
 def v22_checks(kit):
     st = design.state_for_page(kit)
     check("v22: the page is given the eleven starters (her five first) and her eight single slides, no words in any, no path",
@@ -1407,6 +1454,7 @@ part("12: the real page server: refusals change nothing, a save goes through", s
 part("13: the stories designer", stories_checks, make_kit("2026-11-09 Zoë’s stories 🌊"))
 part("14: Nicole's v22: her starters and single slides, and Rename on a template", v22_checks, make_kit("2026-11-10 Rename"))
 part("15: Nicole's v26: sets of stories, the note for the assistant, the assistant's pick, the editing queue's names", v26_checks, make_kit("2026-11-13 Zoë’s sets 🌊"))
+part("16: Nicole's v27: the note and the pick on a carousel, her three story collages, Open folder's words", v27_checks, make_kit("2026-11-17 Zoë’s dunes 🌊"))
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))

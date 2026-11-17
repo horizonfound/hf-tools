@@ -55,6 +55,11 @@ commands on --port + 32 and its real page on --port + 34): Nicole's v26 for the 
 my assistant choose the photos" (the note, the line, story-note and story-fill), her four templates, Redo, the x on a
 story's label, Show Instagram's guides, and the stories staying in view.
 
+An eleventh part, tests/design_v27_check.py (--only v27 runs just it: its tables, words and rules, its routes and the chat's
+commands on --port + 36 and its real page on --port + 38): Nicole's v27 for both designers. The ask box on a carousel and
+design.py note / fill, her three story collages, Open folder always there with her answers, the [hidden] rule, the stage
+sticky on the carousel page.
+
 A ninth part, tests/design_preview_check.py (--only preview runs just it, on --port + 30): Nicole's v24, the small
 picture of a design that the page sends for the post kit, on the real page in the hidden Chrome. Its routes, with
 every refusal, are in the server part here ("the small picture of a design").
@@ -1312,7 +1317,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22", "preview", "v26"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22", "preview", "v26", "v27"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(every part below that drives it, one after another); strip: only the strip, the frames and the tray, in a hidden "
                          "Chrome (with --only text, designs, wire, fixes, screen, layout and stories it makes up browser, a part at a "
@@ -1342,7 +1347,7 @@ def main():
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
     if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout",
-                                         "stories", "stories-browser", "v22", "v22-browser", "v26", "v26-browser")):
+                                         "stories", "stories-browser", "v22", "v22-browser", "v26", "v26-browser", "v27", "v27-browser")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1370,6 +1375,7 @@ def main():
     import design_text_check
     import design_v22_check
     import design_v26_check
+    import design_v27_check
     import design_wire_check
     have_chrome = bool(chrome_drive.find_chrome())
     skipped = []            # the parts that drive the real page, when there is no Chrome to drive
@@ -1507,6 +1513,21 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of v26 ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "page", "v27"):
+        design_v27_check.check_v27_page(case, work)
+    if a.only in (None, "server", "v27"):
+        try:
+            design_v27_check.check_v27_server(case, work, a.port + 36, make_kit, Server, post, get_json, ask, run, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the checks of v27's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "v27"):
+        real_page("v27: the carousel's ask box and fill, the story collages, Open folder, the [hidden] rule")
+        try:
+            design_v27_check.check_v27_browser(case, work, a.port + 38, make_kit, Server, post, get_json, run)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of v27 ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     bad = [n for n, ok in results if not ok]
     print()
     missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")
