@@ -609,6 +609,7 @@ KIND_WORDS = {
     "lede_photos": "Your finished photos, cut on the beat of your song. Put your photos in order, pick your song and the pace, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
     "lede_broll": "Only video clips from your shoot, cut on the beat of your song, with no photos. Choose your footage and the clips you want, pick your song, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
     "all_reels": "← All the reels you can make for this shoot",
+    "crumb_reels": "Reels",             # her crumbs.js: the step after the post kit on the path at the top
 }
 
 # Several reels from one shoot (her v25, Nov 12): the "Your reels" bar under the title. Hers, word for word
@@ -4981,20 +4982,25 @@ def _json_for_script(obj):
     return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def _head(w, title, lede_html, back_href, back_words, kit_name, css, all_reels=None):
-    """The top of both pages: the bar, the eyebrow, the title and the lede. `all_reels`: the link back to the
-    chooser (a kind's page; the chooser has none)."""
+def _head(w, title, lede_html, back_href, back_words, kit_name, css, all_reels=None, kind=None):
+    """The top of both pages: the bar, the eyebrow, the title and the lede. Her v27 bar is the path at the top
+    (crumbs.js; built here by look.crumbs, every link a path of this server): Home › <shoot> post kit › Reels on the
+    chooser, › Behind the scenes, Just photos or B-roll on a kind's page (`kind`), the Reels step linking back to
+    the chooser. Her Back pill and her link back to the chooser stay in the markup, hidden, as her page keeps them
+    (the result box after Make my reel still reads the pill's words and link)."""
     e = html.escape
-    links = ("<a class='homelink' id='allReels' href='" + e(kind_address(kit_name), quote=True) + "'>"
+    links = ("<a class='homelink' id='allReels' hidden style='display:none!important' href='" + e(kind_address(kit_name), quote=True) + "'>"
              + e(all_reels) + "</a>" if all_reels else "")
+    trail = look.kit_trail(kit_name) + ([(w["crumb_reels"], kind_address(kit_name)), (w["kind_" + kind + "_b"], None)] if kind
+                                        else [(w["crumb_reels"], None)])
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<title>" + e(title) + "</title><style>" + css + "</style></head>"
         "<body data-kit='" + e(kit_name, quote=True) + "'>"
         "<div class='wrap'>"
-        "<div class='bar'>" + links + "<a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
-        "<span id='backWords'>" + e(back_words) + "</span></a>" + brand.bar() + "</div>"
+        "<div class='bar'>" + links + "<a class='homelink' id='back' style='display:none' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
+        "<span id='backWords'>" + e(back_words) + "</span></a>" + look.crumbs(trail) + brand.bar() + "</div>"
         "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
         "<h1 id='title'>" + e(title) + "<em>.</em></h1>"
         "<p class='lede'>" + lede_html + "</p>")
@@ -5056,7 +5062,7 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
     steps = "".join(fn(w, i, kind) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
     back_href, back_words = _back(kit_name, kit_page, w)
     css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + (TRIM_CSS if TRIM_PANEL else "") + OUR_CSS + V27_CSS + EDITOR_CSS + WATCH_CSS
-    head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"])
+    head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"], kind)
     if TRIM_PANEL:                     # her v25 panel sits above the page's scripts (hers), before the wrap: the head is split round it
         head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
     toq = ("<div class='toq' id='toqBar' hidden><button class='btn' id='toQueue2' type='button'>" + e(w["toq_btn"]) + "</button>"

@@ -66,6 +66,9 @@ HER_KINDS = [("kBts", "Behind the scenes", "Video clips from the shoot, mixed wi
              ("kTalk", "Talking to camera", "You talk about the shoot, and your photos go with what you say."),
              ("kBroll", "B-roll", "Only video clips from the shoot, cut on the beat. No photos.")]
 TITLES = {"bts": "behind the scenes", "photos": "reel", "broll": "B-roll"}
+TITLES_B = {"bts": "Behind the scenes", "photos": "Just photos", "broll": "B-roll"}   # her kind names on the path at the top (crumbs.js)
+sys.path.insert(0, str(SCRIPTS))
+import look  # noqa: E402   (the path at the top, as the page builds it)
 
 
 def her_v27(name="pages/reel-maker.html"):
@@ -144,7 +147,7 @@ def run_words(s):
     import reel_page as rp
     hers = her_v27()
     case("the chooser's words are in their own table (reel_page.KIND_WORDS), and the three kinds are hers", set(rp.KINDS) == set(KINDS)
-         and all(k in rp.KIND_WORDS for k in ("chooser_h2", "chooser_say", "chooser_lede", "all_reels")) and len(rp.KIND_WORDS) == 19)
+         and all(k in rp.KIND_WORDS for k in ("chooser_h2", "chooser_say", "chooser_lede", "all_reels", "crumb_reels")) and len(rp.KIND_WORDS) == 20)
     if hers is None:
         t.skip("her v27 words against her v27 reel page: her handoff (reference-private) isn't on this computer")
         return
@@ -234,8 +237,10 @@ def run_kinds(s):
         case("%s: her title and her lede, written on the server" % kind, code == 200 and title_of(pg) == short + " " + TITLES[kind] and lede_of(pg) == rp.KIND_WORDS["lede_" + kind], (title_of(pg), lede_of(pg)[:50]))
         case("%s: the steps a %s reel doesn't use are hidden (hers: just photos hides the footage; B-roll hides the photos, the style, the vibe)" % (kind, TITLES[kind]),
              shown_steps(pg) == want[kind], shown_steps(pg))
-        case("%s: her link back to the chooser in the bar, and the kit's link beside it" % kind,
-             "id='allReels' href='/reel.html?kit=%s'>%s</a>" % (quote(kit), html.escape(rp.KIND_WORDS["all_reels"])) in pg and "id='back' href='/content/" in pg)
+        case("%s: her path at the top in the bar (Home › <shoot> post kit › Reels › the kind, Reels linking back to the chooser), her Back pill and her link to the chooser kept hidden" % kind,
+             look.crumbs(look.kit_trail(kit) + [("Reels", "/reel.html?kit=" + quote(kit)), (TITLES_B[kind], None)]) in pg
+             and "id='allReels' hidden style='display:none!important' href='/reel.html?kit=%s'>%s</a>" % (quote(kit), html.escape(rp.KIND_WORDS["all_reels"])) in pg
+             and "id='back' style='display:none' href='/content/" in pg, pg[pg.find("<div class='bar'>"):pg.find("<div class='bar'>") + 700])
         case("%s: no old yes/no cards, no Talking card on a kind's page" % kind, "modeBts" not in pg and "modeTalk" not in pg and "kTalk" not in pg)
         case("%s: the page's data says its kind" % kind, "\"kind\": \"%s\"" % kind in pg)
         case("%s: a plain open wrote nothing (hers saved footage and style on every load)" % kind, kit_bytes(s, kit) == before)
@@ -624,7 +629,9 @@ def run_page(c, s):
     case("Just photos opens the just-photos page: her title, her steps numbered 1 to 5 (the photos, the song, the direct note, the vibe, the watch step)",
          c.text("#title") == short + " reel." and nums(c) == ["step1=1", "step3=2", "stepDirect=3", "step4=4", "watch=5"], nums(c))
     case("the footage step and the style are not on it", c.js("document.getElementById('step0').hidden && document.getElementById('stepStyle').hidden"))
-    case("her link back to the chooser in the bar", c.text("#allReels") == rp.KIND_WORDS["all_reels"] and c.js("document.getElementById('allReels').getAttribute('href')") == "/reel.html?kit=" + quote(kit))
+    case("her path at the top in the bar: Home › <shoot> post kit › Reels › Just photos, Reels a link back to the chooser; the Back pill and the chooser link hidden",
+         c.text(".crumbs") == "Home›%s post kit›Reels›Just photos" % short and c.js("document.querySelector('.crumbs a[href=\"/reel.html?kit=%s\"]').textContent" % quote(kit)) == "Reels"
+         and c.js("getComputedStyle(document.getElementById('back')).display === 'none' && getComputedStyle(document.getElementById('allReels')).display === 'none'"), c.text(".crumbs"))
     time.sleep(1.2)
     case("a plain open saved nothing", reel_rec(s, kit) is None)
     c.click("#all .pick")
