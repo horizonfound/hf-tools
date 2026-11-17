@@ -508,6 +508,23 @@ WORDS = {
     "went_wrong_make": "Something went wrong making the reel. Ask your assistant to make it instead.",
     "too_long": "That took too long. Ask your assistant to make the reel instead.",
 
+    # her v27 (Nov 14): straight into the posting queue from here, under Your reels once the reel is made, and in
+    # the box after Make my reel. The rhythm is asked once, with her five chips (words_page.RHYTHMS, one copy)
+    "toq_btn": "Add this reel to my posting queue",
+    "toq_result": "Add it to my posting queue",
+    "q_adding": "Adding it…",
+    "q_how": "How often do you want to post?",
+    "q_how_b": " I'll give each post a date.",
+    "q_in": "It's in your posting queue: {label}{going}. Write its caption in your post kit whenever you're ready.",
+    "q_going": ", going out {day}",
+    "q_already": "It's already in your posting queue{set}.",
+    "q_set": ", set for {day}",
+    "q_open": "Open my posting queue",
+    "q_done": "In your posting queue ✓",
+    "q_cant": "I couldn't add it. Try again in a moment.",
+    "q_label": "{short} · {name}",                     # hers: the shoot and the reel's name with several reels...
+    "q_label_one": "{short} reel",                     # ...the shoot's reel with one
+
     # her Plan line (bts_reel.py), decision 5: "Plan: 1 clip and 14 photos, 15.2 seconds, every cut on the beat at
     # about 85 beats a minute, starting the song at the top."
     "plan_start": "Plan: ",
@@ -1129,6 +1146,7 @@ def state(kit, reel=None):
     if not rows:
         return None
     open_reel = reels.current(rec, REEL_FIRST)
+    whole = rec
     rec = as_reel(rec, reel)
     rec_kit = kit_mod.load_rec(kit)
     photos, made = arrange.page_photos(kit, rec_kit, rows)
@@ -1159,6 +1177,9 @@ def state(kit, reel=None):
         "versions": [dict(v, kind=kinds.get(v["id"])) for v in reels.listed(rec, REEL_FIRST)],
         "current": reels.current(rec, REEL_FIRST), "on_page": open_reel,
         "kind": reel_kind(saved),
+        # her v27: Add this reel to my posting queue, once the reel is made; the queue's answer for each reel
+        "made": {k: bool(v) for k, v in made_projects(whole, rec_kit).items()},
+        "queue": queue_for_page(kit, whole),
     }
 
 
@@ -1244,6 +1265,55 @@ def _when_of(iso):
         return 0.0
 
 
+def made_projects(rec, rec_kit):
+    """{reel id: the newest CapCut project made of it, or None} for every reel of the shoot (the rule
+    reels_for_kit uses: a "made" entry says whose it is, made_for; a reel made from the chat the older way, in
+    kit.json with no entry here, is the first reel's). A made entry that carries a saved video (B-roll, Save my
+    video) counts as made too: its project is the video's file name."""
+    rec_kit = rec_kit if isinstance(rec_kit, dict) else {}
+    last, known = {}, set()
+    for m in rec.get("made") or []:
+        if not isinstance(m, dict):
+            continue
+        name = m.get("project") if isinstance(m.get("project"), str) and m.get("project") else None
+        name = name or (m.get("video") if isinstance(m.get("video"), str) and m.get("video") else None)
+        if name:
+            last[made_for(m)] = m
+            if m.get("project"):
+                known.add(m["project"])
+    chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
+    chat_project = chat.get("project") if isinstance(chat.get("project"), str) and chat.get("project") else None
+    out = {}
+    for v in reels.listed(rec, REEL_FIRST):
+        m = last.get(v["id"])
+        project = (m.get("project") or m.get("video")) if m else None
+        if v["id"] == reels.FIRST_ID and chat_project and chat_project not in known:
+            try:
+                page_when = float(m.get("when") or 0) if m else 0.0
+            except (TypeError, ValueError):
+                page_when = 0.0
+            if not m or _when_of(chat.get("made")) > page_when + 1:
+                project = chat_project
+        out[v["id"]] = project
+    return out
+
+
+def queue_for_page(kit, rec):
+    """Her v27 /queue, read in process (words_page.queue_state, one copy of the queue's rules): whether a
+    posting rhythm is set, and each reel's place in the posting queue, {interval, reels: {id: {status, date}},
+    url}. Whatever can't be read reads as not in the queue."""
+    out = {"interval": False, "reels": {}, "url": "/posting.html"}
+    try:
+        import words_page
+        for v in reels.listed(rec, REEL_FIRST):
+            q = words_page.queue_state(kit, "reel", [], version=v["id"])
+            out["interval"] = out["interval"] or bool(q.get("interval"))
+            out["reels"][v["id"]] = {"status": q.get("status") or "", "date": q.get("date") or ""}
+    except Exception as e:  # noqa: BLE001  (the queue's file, not the page's)
+        arrange.log(f"reel page: the posting queue couldn't be read for the page: {e.__class__.__name__}: {str(e)[:160]}")
+    return out
+
+
 def newest_project(kit, rec_kit=None):
     """The CapCut project of the newest reel of this kit, or None: the newest made from the reel page (its record's
     "made") or from the chat (kit.json "reel", which the page's own makes write too), whichever was made later.
@@ -1278,25 +1348,11 @@ def reels_for_kit(kit, rows=None, rec_kit=None):
         rec_kit = {}
     if not isinstance(rec_kit, dict):
         rec_kit = {}
-    last, known = {}, set()
-    for m in rec.get("made") or []:
-        if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]:
-            last[made_for(m)] = m
-            known.add(m["project"])
-    chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
-    chat_project = chat.get("project") if isinstance(chat.get("project"), str) and chat.get("project") else None
+    projects = made_projects(rec, rec_kit)
     kinds = kinds_of(rec)
     out = []
     for v in reels.listed(rec, REEL_FIRST):
-        m = last.get(v["id"])
-        project = m["project"] if m else None
-        if v["id"] == reels.FIRST_ID and chat_project and chat_project not in known:
-            try:
-                page_when = float(m.get("when") or 0) if m else 0.0
-            except (TypeError, ValueError):
-                page_when = 0.0
-            if not m or _when_of(chat.get("made")) > page_when + 1:
-                project = chat_project
+        project = projects.get(v["id"])
         try:
             order = order_for_kit_page(kit, rows, rec_kit, reel=v["id"], rec=rec) if rows else []
         except (OSError, ValueError, TypeError, AttributeError, KeyError):
@@ -4135,6 +4191,15 @@ SECTIONS = [
 ]
 
 
+def _rhythms():
+    """Her five chips for how often they post (words_page.RHYTHMS: one copy)."""
+    try:
+        import words_page
+        return words_page.RHYTHMS
+    except Exception:  # noqa: BLE001
+        return ("Every day", "Every other day", "3 a week", "Twice a week", "Once a week")
+
+
 def _json_for_script(obj):
     """JSON that is safe inside a <script> element (no "</script>", no "<!--")."""
     return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
@@ -4201,7 +4266,7 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
             "styles": list(STYLES), "styleMax": STYLE_MAX, "useSeconds": USE_SECONDS, "step": MOMENT_STEP,
             "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY,
             "trimMin": MOMENT_MIN, "trimMax": MOMENT_MAX, "trimWindow": TRIM_WINDOW, "trimSpanMin": TRIM_SPAN_MIN,
-            "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID}
+            "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID, "rhythms": list(_rhythms())}
     # her numbers as written (step 1 to 5; the steps a kind doesn't use are hidden); the page renumbers them (hers)
     steps = "".join(fn(w, i, kind) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
     back_href, back_words = _back(kit_name, kit_page, w)
@@ -4209,8 +4274,10 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
     head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"])
     # the trim panel sits above the page's scripts (hers), before the wrap: the head is split round it
     head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
+    toq = ("<div class='toq' id='toqBar' hidden><button class='btn' id='toQueue2' type='button'>" + e(w["toq_btn"]) + "</button>"
+           "<span class='went' id='went2' role='status'></span><div id='qAsk2'></div></div>")
     return (
-        head + reels_bar(w) + "</header>"
+        head + reels_bar(w) + toq + "</header>"
         + steps +
         "<div class='result' id='result'></div>"
         "</div>"
@@ -4220,7 +4287,7 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
         "<script>" + ORDER_JS + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
-        "<script>" + FOOTAGE_JS + "</script><script>" + TRIM_JS + "</script><script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
+        "<script>" + FOOTAGE_JS + "</script><script>" + TRIM_JS + "</script><script>" + MAKE_JS + "</script><script>" + QUEUE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
 
@@ -5556,10 +5623,13 @@ MAKE_JS = r"""
       out.className = 'result on';
       out.innerHTML = '<h3>' + esc(R.fill(W.in_capcut_h3, {project: job.project || W.new_reel})) + '</h3>' + lines(job.words) +
         '<p>' + esc(job.capcut_say || W.open_capcut_say) + '</p><div class="acts"><button class="btn main" id="capcut" type="button">' + esc(W.open_capcut) +
-        '</button><a class="btn" id="resultBack" href="' + esc(back.getAttribute('href')) + '">' + esc($('backWords').textContent) + '</a></div><p class="went" id="went"></p>';
+        '</button><button class="btn" id="toQueue" type="button">' + esc(W.toq_result) + '</button>' +
+        '<a class="btn" id="resultBack" href="' + esc(back.getAttribute('href')) + '">' + esc($('backWords').textContent) + '</a></div><p class="went" id="went"></p><div id="qAsk"></div>';
       $('capcut').onclick = function(){
         R.post('/reel-capcut', {kit: R.kit}).then(function(res){ $('went').textContent = (res.j && res.j.words) || ''; }).catch(function(){});
       };
+      // her v27: straight into the posting queue from here (the reel is made now, so the bar under Your reels shows too)
+      if (R.queue) { R.queue.made(); $('toQueue').onclick = function(){ R.queue.add($('toQueue'), $('went'), $('qAsk')); }; }
     }
     into_view();
   }
@@ -5609,6 +5679,72 @@ MAKE_JS = r"""
       summary();
     }
   });
+})();
+"""
+
+# Her v27: Add this reel to my posting queue (reelToQueue), from the bar under Your reels once the open reel is
+# made and from the box after Make my reel: the rhythm asked once with her five chips (POST /words-rhythm), then
+# the add (POST /words-queue {kit, piece: 'reel', reel}), on the routes the post kit's page uses. Ours underneath:
+# the queue is asked afresh at the press (its answer by version, so a piece queued without a date still reads as
+# queued), it is asked once and added once (hers re-entered itself after the rhythm was set).
+QUEUE_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc, D = R.data;
+  var bar = $('toqBar'), adding = false;
+  function niceDate(d){ try { return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {weekday: 'long', month: 'short', day: 'numeric'}); } catch (e) { return d; } }
+  function cur(){ return R.reels ? R.reels.current() : 'v1'; }
+  function label(st){
+    var vs = (st && st.versions) || [], me = vs.filter(function(v){ return v.id === cur(); })[0];
+    return vs.length > 1 && me ? R.fill(W.q_label, {short: st.short, name: me.name}) : R.fill(W.q_label_one, {short: st ? st.short : ''});
+  }
+  function queued(q){ var m = q && q.reels && q.reels[cur()]; return m && (m.status === 'green' || m.status === 'posted') ? m : null; }
+  function link(q){ return q && q.url ? ' <a href="' + esc(q.url) + '">' + esc(W.q_open) + '</a>' : ''; }
+  function done(btn){ btn.textContent = W.q_done; btn.disabled = false; }
+  function add(btn, went, ask){
+    if (adding) return;
+    adding = true; went.textContent = W.q_adding; ask.innerHTML = ''; btn.disabled = true;
+    R.fresh().then(function(st){
+      var q = (st && st.queue) || {};
+      var mine = queued(q);
+      if (mine) {                                        // hers: already in the queue, with its date
+        adding = false;
+        went.innerHTML = esc(R.fill(W.q_already, {set: mine.date ? R.fill(W.q_set, {day: niceDate(mine.date)}) : ''})) + link(q);
+        done(btn); return;
+      }
+      if (!q.interval) {                                 // the queue asks once how often they post
+        adding = false; went.textContent = '';
+        ask.innerHTML = '<p class="say" style="margin:.4rem 0 .3rem"><b>' + esc(W.q_how) + '</b>' + esc(W.q_how_b) + '</p><div class="acts">' +
+          D.rhythms.map(function(t){ return '<button class="btn small" type="button" data-iv="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>';
+        ask.querySelectorAll('[data-iv]').forEach(function(b){ b.onclick = function(){
+          ask.querySelectorAll('[data-iv]').forEach(function(x){ x.disabled = true; });
+          R.post('/words-rhythm', {text: b.dataset.iv}).then(function(res){
+            if (!res.j || !res.j.ok) { went.textContent = (res.j && res.j.words) || W.q_cant; ask.querySelectorAll('[data-iv]').forEach(function(x){ x.disabled = false; }); return; }
+            ask.innerHTML = ''; add(btn, went, ask);     // once: the rhythm is set now, so this goes straight to the add
+          }).catch(function(){ went.textContent = W.q_cant; ask.querySelectorAll('[data-iv]').forEach(function(x){ x.disabled = false; }); });
+        }; });
+        btn.disabled = false; return;
+      }
+      return R.flush().then(function(){ return R.post('/words-queue', {kit: R.kit, piece: 'reel', reel: cur()}); }).then(function(res){
+        adding = false;
+        var j = res.j || {};
+        if (!j.ok) { went.textContent = j.words || W.q_cant; btn.disabled = false; return; }
+        var got = j.queue || {};
+        went.innerHTML = esc(R.fill(W.q_in, {label: label(st), going: got.date ? R.fill(W.q_going, {day: niceDate(got.date)}) : ''})) + link(q);
+        done(btn);
+      });
+    }).catch(function(){ adding = false; went.textContent = W.q_cant; btn.disabled = false; });
+  }
+  function show(st){
+    if (!bar) return;
+    var made = st && st.made && st.made[cur()];
+    bar.hidden = !made;
+    var q = st && st.queue, mine = queued(q);
+    if (made && mine && !$('went2').textContent) $('toQueue2').textContent = W.q_done; else if (made && !mine && $('toQueue2').textContent === W.q_done) $('toQueue2').textContent = W.toq_btn;
+  }
+  if (bar) $('toQueue2').onclick = function(){ add($('toQueue2'), $('went2'), $('qAsk2')); };
+  R.queue = {add: add, made: function(){ if (bar) bar.hidden = false; }};
+  R.part({adopt: show, follow: show});
 })();
 """
 
@@ -5819,6 +5955,10 @@ def cmd_show(kit, reel=None):
         made = [m for m in made if made_for(m) == st["current"]]
     if made:
         say(f"  Reels made from the page: {len(made)}, the newest \"{made[-1].get('project')}\"")
+    q = st.get("queue") or {}
+    inq = [v["name"] for v in st["versions"] if (q.get("reels") or {}).get(v["id"], {}).get("status") in ("green", "posted")]
+    if inq:
+        say("  In the posting queue: " + ", ".join(f'"{n}"' for n in inq))
     say(f"  Saved {st['rev']} time{'s' if st['rev'] != 1 else ''}")
     return 0
 

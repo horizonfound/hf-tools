@@ -466,7 +466,142 @@ def run_songs_page(c, s):
     case("no fault on the page", not c.page_errors(), c.page_errors()[:3])
 
 
-# ---------- 7. the page, in a hidden Chrome ----------
+# ---------- 7. Add this reel to my posting queue (her v27) ----------
+
+HER_Q = {"toq_btn": "Add this reel to my posting queue", "toq_result": "Add it to my posting queue", "q_adding": "Adding it…",
+         "q_how": "How often do you want to post?", "q_how_b": " I'll give each post a date.", "q_open": "Open my posting queue",
+         "q_done": "In your posting queue ✓", "q_cant": "I couldn't add it. Try again in a moment."}
+RHYTHMS = ("Every day", "Every other day", "3 a week", "Twice a week", "Once a week")
+
+
+def mark_made(s, kit, vid, project):
+    """A reel made on the reel page: its "made" entry, marked with which reel (as reel_page.py writes it)."""
+    f = s.kit(kit) / ".kit" / "reel-page.json"
+    rec = reel_rec(s, kit) or {"v": 1, "rev": 0}
+    rec.setdefault("made", []).append({"project": project, "picks": "1,2", "vibe": "beat", "footage": None, "version": vid, "when": time.time()})
+    rec["rev"] = int(rec.get("rev") or 0) + 1
+    f.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+
+
+def run_queue(s):
+    import reel_page as rp
+    hers = her_v27()
+    if hers is not None:
+        text = html.unescape(hers).replace("\\'", "'")
+        case("her words for the queue button, both ways: the two buttons, Adding it…, the rhythm question, Open my posting queue, the done button, her sorry line",
+             all(v in text for v in HER_Q.values()) and all(rp.WORDS[k] == v for k, v in HER_Q.items())
+             and "It's in your posting queue: " in text and ", going out " in text and ". Write its caption in your post kit whenever you're ready." in text
+             and "It's already in your posting queue" in text and ", set for " in text
+             and rp.WORDS["q_in"] == "It's in your posting queue: {label}{going}. Write its caption in your post kit whenever you're ready." and rp.WORDS["q_going"] == ", going out {day}"
+             and rp.WORDS["q_already"] == "It's already in your posting queue{set}." and rp.WORDS["q_set"] == ", set for {day}")
+        case("her five chips are the words page's (one copy), and hers", tuple(rp._rhythms()) == RHYTHMS and all("'%s'" % r in hers for r in RHYTHMS))
+        case("her bar under Your reels and the button in the box after a make, as her page has them",
+             '<div class="toq" id="toqBar" hidden><button class="btn" id="toQueue2">Add this reel to my posting queue</button>' in hers
+             and '<button class="btn" id="toQueue">Add it to my posting queue</button>' in hers
+             and "<div class='toq' id='toqBar' hidden><button class='btn' id='toQueue2' type='button'>Add this reel to my posting queue</button>" in rp.page_html(KIT, "x", True, "photos"))
+    kit = "2026-10-08 Queue"
+    s.make_kit(kit, photos=6)
+    st = reel_state(s, kit)
+    case("the state carries each reel's place in the posting queue and whether it is made: nothing made, no rhythm set",
+         st["made"] == {"v1": False} and st["queue"] == {"interval": False, "reels": {"v1": {"status": "", "date": ""}}, "url": "/posting.html"}, (st.get("made"), st.get("queue")))
+    code, j, _, _ = s.http("POST", "/words-queue", {"kit": kit, "piece": "reel", "reel": "v1"})
+    case("a reel that isn't made can't be added (the words page's own rule)", code == 409 and not j.get("ok"), (code, j))
+    mark_made(s, kit, "v1", "Queue reel")
+    st = reel_state(s, kit)
+    case("once the reel is made (a 'made' entry of its own), the state says so", st["made"] == {"v1": True})
+    code, j, _, _ = s.http("POST", "/words-rhythm", {"text": "Twice a week"})
+    case("the rhythm set once with her chip (POST /words-rhythm, the words page's route)", code == 200 and j.get("ok"), (code, j))
+    code, j, _, _ = s.http("POST", "/words-queue", {"kit": kit, "piece": "reel", "reel": "v1"})
+    case("the add posts the version to the words page's queue route: ready, with a date", code == 200 and j.get("ok") and j["queue"]["status"] == "green" and j["queue"]["date"], (code, j))
+    st = reel_state(s, kit)
+    case("...and the state says it: in the queue, dated, the rhythm set", st["queue"]["interval"] is True and st["queue"]["reels"]["v1"]["status"] == "green" and st["queue"]["reels"]["v1"]["date"] == j["queue"]["date"])
+    case("refused: the add from another website", s.http("POST", "/words-queue", {"kit": kit, "piece": "reel", "reel": "v1"}, headers={"Sec-Fetch-Site": "cross-site"})[0] == 403)
+    # two reels: two pieces
+    ver(s, kit, op="new", kind="photos")
+    mark_made(s, kit, "v2", "Queue reel 2")
+    code, j, _, _ = s.http("POST", "/words-queue", {"kit": kit, "piece": "reel", "reel": "v2"})
+    import posting_queue as pq
+    pieces = pq.kit_reel_pieces(pq.load(), s.kit(kit))
+    case("a second reel, made and added, is its own piece in the queue (posting_queue.reel_version), the first's untouched",
+         code == 200 and set(pieces) == {"v1", "v2"} and pieces["v1"]["status"] == "green" and pieces["v2"]["status"] == "green", (code, sorted(pieces)))
+    st = reel_state(s, kit)
+    case("the state carries both", st["queue"]["reels"]["v1"]["status"] == "green" and st["queue"]["reels"]["v2"]["status"] == "green" and st["made"] == {"v1": True, "v2": True})
+    case("reel_page.py show says which reels are in the posting queue", 'In the posting queue: "Reel 1", "Reel 2"' in run(s, "reel_page.py", "show", kit)[1], run(s, "reel_page.py", "show", kit)[1][-400:])
+    case("reels_for_kit's 'made' goes by the same rule (made_projects): both made", [r["made"] for r in rp.reels_for_kit(s.kit(kit))] == [True, True])
+
+
+def run_queue_page(c, s):
+    import reel_page as rp
+    import posting_queue as pq
+    kit = "2026-10-09 Queue on the page"
+    s.make_kit(kit, photos=6)
+    # the rhythm is not set yet for this run: the queue file is this test's own, so take it out
+    p = pq.load()
+    p.pop("interval", None)
+    pq.save(p)
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))
+    c.wait_for("window.Reel && window.Reel.state()", 20)
+    case("the bar under Your reels is hidden until the reel is made (hers)", c.js("document.getElementById('toqBar').hidden") is True)
+    mark_made(s, kit, "v1", "Page queue reel")
+    c.js("window.Reel.followNow()")
+    c.wait_for("!document.getElementById('toqBar').hidden", 10)
+    case("once the reel is made it shows: her button, under Your reels", c.text("#toQueue2") == HER_Q["toq_btn"]
+         and c.js("document.getElementById('toqBar').previousElementSibling.id") == "reels")
+    c.click("#toQueue2")
+    c.wait_for("document.querySelectorAll('#qAsk2 [data-iv]').length === 5", 10)
+    case("no rhythm set yet: the page asks once, in her words, with her five chips", c.js("document.querySelector('#qAsk2 b').textContent") == HER_Q["q_how"]
+         and c.js("document.querySelector('#qAsk2 p').textContent") == HER_Q["q_how"] + HER_Q["q_how_b"]
+         and c.js("Array.from(document.querySelectorAll('#qAsk2 [data-iv]')).map(function(b){ return b.textContent; })") == list(RHYTHMS))
+    c.click("#qAsk2 [data-iv='3 a week']")
+    c.wait_for("document.getElementById('toQueue2').textContent === %s" % json.dumps(HER_Q["q_done"]), 15)
+    went = c.text("#went2")
+    piece = pq.kit_reel_pieces(pq.load(), s.kit(kit)).get("v1") or {}
+    case("a chip pressed: the rhythm is set and the reel goes straight in, once: her line with the shoot's reel and its day, and Open my posting queue",
+         went.startswith("It's in your posting queue: Queue on the page reel, going out ") and went.endswith(". Write its caption in your post kit whenever you're ready. Open my posting queue")
+         and piece.get("status") == "green" and bool(piece.get("date")) and c.js("document.querySelector('#went2 a').getAttribute('href')") == "/posting.html", (went, piece.get("status")))
+    case("...asked once and added once (one piece, no second ask)", c.js("document.querySelectorAll('#qAsk2 [data-iv]').length") == 0 and len(pq.kit_reel_pieces(pq.load(), s.kit(kit))) == 1)
+    c.click("#toQueue2")
+    c.wait_for("document.getElementById('went2').textContent.indexOf('already') > 0", 10)
+    case("a second press says her 'already' line, with its day, and writes nothing", c.text("#went2").startswith("It's already in your posting queue, set for ") and len(pq.kit_reel_pieces(pq.load(), s.kit(kit))) == 1)
+    # a second reel: the label names the reel, and it is its own piece
+    c.click("#verNew")
+    c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v2'", 20)
+    case("a new reel, not made: the bar is hidden again", c.js("document.getElementById('toqBar').hidden") is True)
+    mark_made(s, kit, "v2", "Page queue reel 2")
+    c.js("window.Reel.followNow()")
+    c.wait_for("!document.getElementById('toqBar').hidden", 10)
+    c.click("#toQueue2")
+    c.wait_for("document.getElementById('toQueue2').textContent === %s" % json.dumps(HER_Q["q_done"]), 15)
+    case("with several reels her line names the reel: '<shoot> · Reel 2', and it is a second piece in the queue",
+         c.text("#went2").startswith("It's in your posting queue: Queue on the page · Reel 2, going out ") and set(pq.kit_reel_pieces(pq.load(), s.kit(kit))) == {"v1", "v2"}, c.text("#went2"))
+    # the button in the box after a make: the page follows a job at work (reloaded while one runs, as
+    # reel_page_check does it) and draws her box when it is done, with Add it to my posting queue beside Open CapCut
+    import fcntl
+    ver(s, kit, op="new", kind="photos")
+    mark_made(s, kit, "v3", "Page queue reel 3")
+    jl = s.kit(kit) / ".kit" / "reel-job.json"
+    held = open(s.kit(kit) / ".kit" / "reel-job.lock", "a")
+    fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        jl.write_text(json.dumps({"id": "d" * 12, "state": "running", "t": time.time(), "pid": os.getpid(), "dry": False}), encoding="utf-8")
+        c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))
+        c.wait_for("!!document.querySelector('#makeBtn .spin')", 15)
+        jl.write_text(json.dumps({"id": "d" * 12, "state": "done", "t": time.time(), "dry": False, "project": "Page queue reel 3",
+                                  "words": ["Plan: 2 photos, 4.0 seconds, every cut on the beat"]}), encoding="utf-8")
+    finally:
+        fcntl.flock(held, fcntl.LOCK_UN)
+        held.close()
+    c.wait_for("!!document.getElementById('toQueue')", 15)
+    case("the box after a make: her Add it to my posting queue beside Open CapCut, and the bar under Your reels shows too",
+         c.text("#toQueue") == HER_Q["toq_result"] and c.text("#capcut") == "Open CapCut" and not c.js("document.getElementById('toqBar').hidden"))
+    c.click("#toQueue")
+    c.wait_for("document.getElementById('toQueue').textContent === %s" % json.dumps(HER_Q["q_done"]), 15)
+    case("pressed there, the reel goes in, her line under the box, three pieces now",
+         c.text("#went").startswith("It's in your posting queue: Queue on the page · Reel 3, going out ") and set(pq.kit_reel_pieces(pq.load(), s.kit(kit))) == {"v1", "v2", "v3"}, c.text("#went"))
+    case("no fault on the page", not c.page_errors(), c.page_errors()[:3])
+
+
+# ---------- 8. the page, in a hidden Chrome ----------
 
 def nums(c):
     return c.js("Array.from(document.querySelectorAll('section.step')).filter(function(s){ return !s.hidden; }).map(function(s){ return s.id + '=' + s.querySelector('.num').textContent; })")
@@ -598,12 +733,14 @@ def main():
         group("the reels: a new reel's kind, the switch, the chat", run_version, s)
         group("new photos on the server: numbers stay fixed", run_new_photos, s)
         group("the songs: the drop-down's words, Listen by request, Remove this song's wiring", run_songs, s)
+        group("Add this reel to my posting queue, by request", run_queue, s)
         if a.no_chrome or not chrome_drive.find_chrome():
             t.skip("the page in a browser: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
         else:
             with chrome_drive.Chrome(work=str(work / "chrome"), size=(1280, 1100)) as c:
                 group("the chooser, the kinds, + Add photos and Show my new photos, on the page", run_page, c, s)
                 group("the song drop-down, Listen and Remove this song, on the page", run_songs_page, c, s)
+                group("Add this reel to my posting queue, on the page", run_queue_page, c, s)
     finally:
         s.stop()
         chrome_drive.stop_all()
