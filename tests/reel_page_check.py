@@ -360,8 +360,12 @@ def check_words():
         ours = re.sub(r"h1 em\{font:italic 400 1\.1em/1 var\(--display\);color:var\(--coral-2\);letter-spacing:0\}\n", "", ours)
         ours = ours.replace("text-align:center;font:italic 400 16px/1.3 var(--display)}", "text-align:center;font:400 16px/1.3 var(--sans)}")
         ours = ours.replace(".paste .line span{font:italic 400 18px/1.3 var(--display)}", ".paste .line span{font:500 17px/1.35 var(--sans)}")
-        case("her stylesheet is in the page as she wrote it, but for the shared colours and no serif",
-             m and ours in m.group(1) and "--display" not in m.group(1) and "Fraunces" not in m.group(1))
+        # her v27 (Nov 17) replaced the per-video players, their strips and the moment cards with the footage editor
+        # (reel_page.EDITOR_CSS, held to her v27 page by tests/reel_footage_check.py), so her v19 rules for them are gone
+        gone = (".viewer", ".vside", ".strip", ".userow", ".mom", ".moments{", "@media(max-width:620px){.viewer")
+        ours = "\n".join(ln for ln in ours.split("\n") if not ln.startswith(gone))
+        case("her stylesheet is in the page as she wrote it, but for the shared colours, no serif, and the players and cards her v27 took out",
+             m and ours in m.group(1) and "--display" not in m.group(1) and "Fraunces" not in m.group(1) and ".viewer" not in m.group(1))
 
 
 # ---------- 2. the server, without a browser ----------
