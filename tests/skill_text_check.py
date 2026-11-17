@@ -956,7 +956,8 @@ def check_several_reels():
          "**Every command acts on the reel that is open on the page**" in part and "each of them says first which reel it is about" in flat
          and '--for-reel "Reel 2"' in part and 'footage.py scan "<kit>" --reel "Reel 2"' in part and 'footage.py moments "<kit>" --file <file> --reel "Reel 2"' in part
          and 'reel_page.py show "<kit>" --reel "Reel 2"' in part and 'reel_page.py make "<kit>" --reel "Reel 2"' in part
-         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 3)
+         and 'reel_page.py direct "<kit>" --reel "Reel 2"' in part
+         and '"--for-reel"' in kit and 'x.add_argument("--reel"' in foot and rp.count('.add_argument("--reel"') == 4)
     case("several reels: the chat's reels command, as reel_page.py has it, in the part and in the part's command block",
          'reel_page.py reels "<kit>" --new [--name "Kitchen"]' in flat and '--rename "Reel 2" --to "Kitchen"' in flat and '--open "Reel 1"' in flat
          and 'python3 <scripts>/reel_page.py reels "<kit>" [--new [--name "<name>"] | --open "<reel\'s name>" | --rename "<reel\'s name>" --to "<name>"]' in arr
@@ -1225,9 +1226,46 @@ def check_trash_helper():
     case("this_computer.py's own words name no Claude and no path", "Claude" not in tc[tc.index("TRASH_WORD ="):tc.index("def trash_for_tests")])
 
 
+def check_watch_direct_broll():
+    """Nicole's v27, Lane A's stage 4: Watch your reel before you make it, Would you like to direct this edit? and
+    B-roll on the page. The reel skill has the section "Edit my reel" (read the direction, arrange within it, set
+    it up with reel_page.py direct, say what was arranged), the core table sends the line there, arrange.md says
+    the two steps in the page's words and that the watch step is the page's (not the assistant's), the make takes
+    --variation and --song-start, and where-things-live.md names direct, onscreen and the preview's folder."""
+    rp = read(SCRIPTS / "reel_page.py")
+    arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
+    reel, core = " ".join(read(REEL / "SKILL.md").split()), read(SM / "SKILL.md")
+    words = dict(re.findall(r'^    "(direct_h2|direct_b|direct_for|direct_note|watch_h2|pv_part|pv_mix|pv_undo|pv_redo|pv_make|os_wl|os_save|sum_broll)": "([^"]+)"', rp, re.M))
+    case("the page's words for the direct step, the watch step and B-roll are in reel_page.py (13 of them)", len(words) == 13, sorted(words))
+    case("the reel skill has the section Edit my reel: read the direction with note, follow it exactly, never widen it, the style that fits, a moment not on a card is a look for that moment only, reel_page.py direct, say what was arranged",
+         '## Edit my reel: "Edit my reel for <shoot>[, <reel>], and follow my direction"' in reel and "reel_page.py note" in reel and "follow it exactly, never widen it" in reel
+         and "a footage look for that moment only" in reel and "reel_page.py direct" in reel and "--style first|reveal|backforth|bookends --clips" in reel
+         and "Never write the style, the clips or the order into the reel page's records any other way" in reel and "Say in two lines what you arranged" in reel)
+    case("the reel skill says the watch step is the page's: press play on the page, Try another mix, Undo; never describe a cut you haven't seen the plan of",
+         "Watch your reel before you make it (Nicole, Nov 16)" in reel and "press play on the page to watch it" in reel and "Try another mix" in reel
+         and "never \"make it\"" in reel and "You never describe a cut you haven't seen the plan of" in reel)
+    case("the reel skill's make takes --variation and --song-start, and says what they are", "[--variation N] [--song-start S]" in reel and "`--variation N` is which mix" in reel and "`--song-start S` where the song starts" in reel)
+    case("the reel skill says what B-roll is (clips only, no photos, Words on screen, into CapCut as plain text) and that Save my video is not built yet",
+         "B-roll (Nicole's v27, Nov 17) is a kind of reel with no photos" in reel and "Words on screen" in reel and "plain text over the whole reel" in reel
+         and "**Save my video**" in reel and "is not built yet" in reel)
+    case("the core table sends Edit my reel to the reel skill", '| "Edit my reel for <shoot>[, <reel>], and follow my direction"' in core and 'the reel skill\'s "Edit my reel"' in core)
+    case("arrange.md: the direct step in the page's words, its line's shapes, sent to the reel skill's Edit my reel, and told apart from the footage box",
+         ("**" + words["direct_h2"] + "**") in arr and ('"' + words["direct_b"] + '"') in arr and "**\"Edit my reel for <shoot>\"**" in arr and ", and follow my direction" in arr
+         and 'the reel skill\'s section "Edit my reel"' in arr and "reel_page.py direct" in arr and "This is a different note from the footage box in step 1" in arr)
+    case("arrange.md: the watch step in the page's words (Another part of this song, Try another mix, Undo and Redo, Make this one in CapCut), the last step, and the page's not the assistant's",
+         ("**" + words["watch_h2"] + "**") in arr and all(("**" + words[k] + "**") in arr for k in ("pv_part", "pv_mix", "pv_make")) and "**Undo** and **Redo**" in arr and "the last step, on every kind" in arr
+         and "Press play on the page beside us" in arr)
+    case("arrange.md: B-roll is clips only with Words on screen, Save my video still being built; make takes --variation and --song-start",
+         "A B-roll reel is clips only" in arr and ("**" + words["os_wl"] + "**") in arr and "Save my video (the finished MP4 made on the page) is still being built" in arr
+         and "`--variation N` and `--song-start S`" in arr and "isn't ready yet" not in arr)
+    case("where-things-live.md names direct, onscreen, the made entries' variation and song_start, and the preview's own folder",
+         "`direct`, Nov 17" in where and "`onscreen`: the words, the font, the style" in where and "`variation`, which mix it was, and `song_start`" in where and "`reel-preview/`" in where)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
+               check_watch_direct_broll):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
