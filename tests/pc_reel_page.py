@@ -339,12 +339,12 @@ def footage(kit):
               html.escape(this_computer.NO_LOOK_PC) in page and this_computer.WATCH_PC_HTML in page and "class='line' hidden" in page
               and "class='insight' hidden" in page and "tap a still" not in page.split("reelData")[0]
               and html.escape(reel_page.WORDS["paste_say"]) not in page.split("reelData")[0]
-              and '"moments_none": ' + json.dumps(this_computer.MOMENTS_PC) in page
+              and '"clips_empty": ' + json.dumps(this_computer.MOMENTS_PC) in page
               and '"not_looked_html": ' + json.dumps(this_computer.NOT_LOOKED_PC_HTML).replace("<", "\\u003c").replace(">", "\\u003e") in page,
               page[:200])
         key = vids["Phone é.MOV"]["key"]
         code, j = reel_page.change_moments({"kit": KIT, "do": "add", "video": key, "start": 1.0, "seconds": 4})
-        check("Use this moment still works (a moment of theirs, saved), with no still on its card", code == 200 and j["moments"][0]["end"] == 5.0
+        check("a clip made on the editor's timeline still works (a moment of theirs, saved), with no still on its card", code == 200 and j["moments"][0]["end"] == 5.0
               and reel_page.moment_still_file(kit, j["moments"][0]["id"]) is None, j)
         mid = j["moments"][0]["id"]
         code, j = reel_page.change_moments({"kit": KIT, "do": "update", "id": mid, "end": 5.5})

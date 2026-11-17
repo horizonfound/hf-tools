@@ -1086,17 +1086,21 @@ HEVC_HELP = ("This video is in the iPhone's High Efficiency format (HEVC), which
              "can't give you a clip here. For your next shoot, set the iPhone to Most Compatible (Settings, Camera, "
              "Formats) and its videos will play here.")
 # In place of the reel page's "copy this into the chat so I can look through it" line and its Copy button.
-NO_LOOK_PC = ("On this PC I can't look through your videos for you yet. Play each one below and press Use this "
-              "moment on the parts you love.")
-# In place of her "Play it here, or tap a still to jump there." (there is no strip of stills on a PC yet)
-WATCH_PC_HTML = ("Play it here. When you see a part you love, press <b>Use this moment</b>. It shows up first in "
-                 "your clips, 4 seconds long and selected. Use <b>−</b> and <b>+</b> on its card to make it "
-                 "shorter or longer.")
+# (Since her v27, Nov 17, the moments are made on the footage editor: Start here and End here on the timeline.)
+NO_LOOK_PC = ("On this PC I can't look through your videos for you yet. Find the moments yourself below: play a "
+              "video or drag along its timeline, then press Start here and End here.")
+# In place of her line under "Your footage" ("...use the ones your assistant found, or make your own with Start
+# here and End here."): nobody finds moments for them on a PC yet, and the timeline has no pictures along it
+WATCH_PC_HTML = ("Play your footage, or drag along the timeline to find a moment. Then make your clips with "
+                 "<b>Start here</b> and <b>End here</b>, and press <b>Add clip</b>.")
 # In place of her "I haven't looked through your footage yet" box when Make my reel is pressed with no moments
-NOT_LOOKED_PC_HTML = ("Play your videos in step 1 and press <b>Use this moment</b> on the parts you love. Or choose "
-                      "<b>Just photos</b>.")
-# In place of her "The moments I find will show up here." (nobody finds moments for them on a PC yet)
-MOMENTS_PC = "The moments you pick yourself below show up here."
+NOT_LOOKED_PC_HTML = ("Make your clips in step 1: play a video, press <b>Start here</b> and <b>End here</b>, then "
+                      "<b>Add clip</b>. Or choose <b>Just photos</b>.")
+# In place of her "Your clips show up here: the moments I find, and the ones you add." (nobody finds moments for
+# them on a PC yet)
+MOMENTS_PC = "Your clips show up here: the ones you add with Start here and End here."
+# The chat, asked to name their clips on a PC (footage.py picks needs stills)
+NO_NAMES_PC = "I can't take stills from a video on this PC yet, so I can't see your clips to name them here."
 # What the chat's footage look says on a PC, where it can't take stills
 NO_LOOK_CHAT = "I can't take stills from a video on this PC yet, so I can't look through footage here."
 

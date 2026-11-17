@@ -240,9 +240,17 @@ COMING_RECENT = 120                    # ours: a video cut off at its end and ch
                                        # copied into Footage: left alone until it is whole (v19 review, Nov 7)
 MOMENT_STEP = 0.5                      # hers: − and + change the end by half a second
 MOMENT_MIN, MOMENT_MAX = 1.0, 15.0     # hers: a moment's length is kept 1 to 15 seconds and inside its video
-ADD_MIN, ADD_MAX = 1.0, 8.0            # hers: Use this moment's length, 1 to 8 seconds
+ADD_MIN, ADD_MAX = 1.0, 15.0           # hers (v27): a clip made on the editor's timeline is 1 to 15 seconds (v19: 1 to 8)
+# The footage editor (her v27, section 3): one player, one timeline, the trim on it. Ours, where hers had two:
+ZOOM_OVER = 60.0                       # a video longer than this zooms the timeline in on Start here and on a picked clip
+ZOOM_WINDOW = 40.0                     # ...to about 40 seconds (hers: 40 s on Start here for a video over 60 s, and on a
+                                       # picked clip only over 90 s: one threshold here, for Nicole)
+TAP_PX = 4                             # hers: under 4 px of travel a press on a clip is a click (picks it); more only scrubs
+TRIM_PANEL = False                     # her v25 Trim panel (TRIM_WORDS, trim_panel, TRIM_JS): since her v27 the trim lives on
+                                       # the editor's timeline and nothing on her page opens the panel. True puts it back as
+                                       # a Trim button in a picked clip's box (a question for Nicole)
 MAX_CLIPS = 12                         # hers: a style uses at most 12 clips (Moment first 1, Bookends 2)
-STYLE_MAX = {"first": 1, "reveal": 12, "backforth": 12, "bookends": 2}     # hers: STYLE_PICK
+STYLE_MAX = {"first": 1, "reveal": 12, "backforth": 12, "bookends": 2, "broll": 12}     # hers: STYLE_PICK (broll since v27)
 FEELS = ("heartwarming", "nostalgic", "fun", "dreamy")                     # hers: FEEL_WORDS
 UNDO_NOTE_MS = 10000                   # hers: the Undo after Remove shows for 10 seconds
 KEY = re.compile(r"[0-9a-f]{12}")      # a video's key (video.key: from its name, size and time, never its place)
@@ -625,6 +633,64 @@ TRIM_WORDS = {
     # the line over the clip cards, as her v25 has it (her v19 line had no Trim in it; WORDS keeps that one)
     "moments_tail": "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it.",
 }
+# The footage editor (her v27, section 3, screenshots 13 to 16: "laid out like a video editor"): one player, the
+# Footage drop-down, Make a clip (Start here, End here, + Add clip, Clear), Your clips in two columns, and the
+# timeline of stills with the orange trim on it. Hers, word for word (pages/reel-maker.html, handoff v27);
+# tests/reel_footage_check.py compares them with her page both ways. The old per-video players, "+ Use this moment",
+# the − / + / ✂ Trim / Remove row and "Select your clips" are gone from her page, so they are gone from ours.
+EDITOR_WORDS = {
+    "ed_h3": "Your footage",
+    "ed_say": "Play your footage, or drag along the timeline to find a moment. Then choose the clip or clips you'd like in your reel: use the ones your assistant found, or make your own with Start here and End here.",
+    "ed_wait": "Your footage shows up here once it's added.",
+    "ed_play": "Play",
+    "ed_back": "Back 1 second",
+    "ed_back_b": "↶ 1s",
+    "ed_fwd": "Forward 1 second",
+    "ed_fwd_b": "1s ↷",
+    "ed_footage": "Footage",
+    "ed_none_b": "No footage yet",
+    "ed_none_s": "Press Add my footage above",
+    "ed_clip": " · {n} clip",
+    "ed_clips": " · {n} clips",
+    "ed_videos": " · {n} videos",
+    "ed_getting_ready": " · getting ready",
+    "ed_make": "Make a clip",
+    "ed_in": "⟦ Start here",
+    "ed_out": "End here ⟧",
+    "ed_add": "+ Add clip",
+    "ed_clear": "Clear",
+    "ed_find": "Drag along the timeline to find a moment, then press Start here.",
+    "ed_started_html": "Your clip starts here. Press play (or drag along the timeline), and press <b>End here</b> where you want it to stop.",
+    "ed_sofar_html": "Your clip: <b>{secs} s</b> so far. Press <b>End here</b> where you want it to stop.",
+    "ed_set_html": "Your clip: {a} to {b}, <b>{secs} s</b>. Drag its orange ends on the timeline to fine-tune it, then press <b>Add clip</b>.",
+    "ed_fifteen": "That's 15 seconds, the longest a clip can be. Drag its ends to change it, or press Add clip.",
+    "ed_added": "✓ Added",
+    "ed_added_html": "Added to your clips. <b>To make another</b>, drag the orange trim to a new moment (or drag its ends), then press <b>Add clip</b>. Or find a moment and press <b>Start here</b>.",
+    "ed_end_after": "The end has to be at least a second after the start.",
+    "ed_second": "Make it at least a second long first.",
+    "ed_adding": "Adding your clip…",
+    "ed_drag": "{a} to {b}, {secs} s",
+    "ed_zoom": "Zoom in",
+    "ed_whole": "Show the whole video",
+    "ed_win": "{video} · {length}",
+    "ed_zoomed": "{video} · zoomed in on {a} to {b}",
+    "ed_tip": "Drag along the timeline to scrub. Click a clip to pick it, drag its ends to trim it, or drag the middle to slide it.",
+    "clips_wl": "Your clips",
+    "clips_empty": "Your clips show up here: the moments I find, and the ones you add.",
+    "pick_broll": "Choose the clips you'd like in your B-roll reel. They play in the order shown, each cut on the beat.",
+    "use": "Use",
+    "in_reel": "✓ In reel",
+    "use_title": "Use it in your reel",
+    "out_title": "Take it out of your reel",
+    "no_photo": "No photo",
+    "remove_clip": "Remove this clip",
+    "play_clip": "▶ Play this clip",
+    "edsel": "{a} to {b} · {secs} s. On the timeline, drag its ends to trim it or its middle to slide it.",
+    # the photographer's own clips (her v27: a purple YOUR PICK tag and a short name from the chat, A12)
+    "not_named": "Not named yet",
+    "desc_say": "Want me to name the clips you made? Copy this into the chat:",
+    "desc_line": "Name my clips for {short}",
+}
 TRIM_WINDOW = 16.0      # hers: the filmstrip shows about 8 seconds either side of the clip...
 TRIM_SPAN_MIN = 20.0    # ...and never less than 20 seconds of the video (or all of a shorter one)
 TRIM_NUDGE = 0.25       # hers: the arrow buttons move an end a quarter second
@@ -693,6 +759,9 @@ OUR_WORDS = {
     "trim_no_stills_pc": "On a PC the timeline has no pictures along it yet. The handles, the arrows and the times work the same.",
     # the Assistant's own check of a trim (her page can't send one outside 1 to 15 seconds; hers would quietly bend it)
     "trim_length": "A clip is 1 to 15 seconds long.",
+    # the footage editor on a PC (v27): no stills are taken from a video there yet (video.py's named gap), so the
+    # timeline draws without pictures; the trim, its ends and the times work the same (a draft, for Nicole)
+    "editor_no_stills_pc": "On a PC the timeline has no pictures along it yet. The trim, its ends and the times work the same.",
     "coming_small": "still copying in",
     # Remove this song posts to /reel-song-remove (Lane E's route); a page served by an older server that has no
     # such route is told so in plain words, and nothing is moved
@@ -2203,8 +2272,17 @@ def moments_for_page(kit, rec, on_sheet, vids=None):
         out.append({"id": m["id"], "key": v["key"] if v else "", "name": re.sub(r"^Footage/", "", m["video"]),
                     "start": round(float(m["start"]), 2), "end": round(float(m["end"]), 2),
                     "label": str(m.get("label") or "")[:200], "photo": photo, "keep": m.get("keep") is not False,
-                    "by": "you" if m.get("by") == "you" else "", "set": bool(m.get("set"))})
+                    "by": "you" if m.get("by") == "you" else "", "set": bool(m.get("set")), "named": m.get("named") is True})
     return out
+
+
+PICK_AT = WORDS["your_pick_at"].split("{t}")[0]        # "Your pick at ": her label for a clip of theirs not named yet
+
+
+def unnamed_picks(ms):
+    """Their own clips that have no name from the chat yet (her v27: a label that is empty or her "Your pick at
+    1:09.6"), in card order."""
+    return [m for m in ms if m.get("by") == "you" and (not str(m.get("label") or "").strip() or str(m.get("label")).startswith(PICK_AT))]
 
 
 def _bts_of(rec, on_sheet):
@@ -2359,7 +2437,8 @@ def change_moments(body):
                     end = length                       # second past, when the start sat right at the end)
                     start = max(0.0, min(start, end - MOMENT_MIN))
             m.update(start=round(start, 2), end=round(end, 2), set=True)
-            if m.get("by") == "you":
+            # her v27 (Nov 16): trimming a clip keeps a name it was given; only a "Your pick at 1:09.6" label moves
+            if m.get("by") == "you" and m.get("named") is not True and (not str(m.get("label") or "").strip() or str(m.get("label")).startswith(PICK_AT)):
                 m["label"] = WORDS["your_pick_at"].replace("{t}", mmss(start))
         rec["moments"] = ms
         rec["moments_at"] = time.time()
@@ -2422,6 +2501,8 @@ def default_sel(style, ms):
         return [m["id"] for m in ([pool[0], pool[-1]] if len(pool) > 1 else pool[:1])]
     if style == "reveal":
         return [m["id"] for m in ms if m.get("photo")][:2]
+    if style == BROLL_STYLE:
+        return [m["id"] for m in pool[:4]]       # B-roll starts with 4 clips (hers, v27)
     return [m["id"] for m in pool[:2]]           # Back and forth starts with 2 clips (Nicole, Nov 6)
 
 
@@ -3666,33 +3747,6 @@ details.all summary{cursor:pointer;font-weight:600;font-size:15px}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .vlist{display:grid;gap:.4rem;margin:.8rem 0 0}
-.viewer .spin{border-color:rgba(0,0,0,.15);border-top-color:var(--coral-2);vertical-align:-2px}
-.viewer{display:flex;gap:1.1rem;align-items:flex-start;border:1px solid var(--line);border-radius:16px;padding:1rem;margin:.8rem 0 0;background:var(--paper)}
-.viewer video{width:250px;max-width:42vw;aspect-ratio:9/16;background:#111;border-radius:12px;display:block;flex:none;object-fit:contain}
-.viewer video.wide{aspect-ratio:16/9;width:420px}
-.vside{flex:1;min-width:0}
-.vside h4{margin:0 0 .2rem;font:600 15px/1.3 var(--sans)}
-.vside p{margin:0 0 .6rem;font-size:13.5px;color:var(--ink-2)}
-.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:5px;max-height:330px;overflow-y:auto;padding:2px;border-radius:10px}
-.strip button{position:relative;border:0;padding:0;border-radius:6px;overflow:hidden;cursor:pointer;background:var(--sand-l);aspect-ratio:9/16;outline-offset:-2px}
-.strip.wide button{aspect-ratio:16/9}
-.strip img{width:100%;height:100%;object-fit:cover;display:block}
-.strip span{position:absolute;left:0;right:0;bottom:0;font:600 9.5px/1.5 var(--sans);color:#fff;background:rgba(0,0,0,.45);text-align:center}
-.strip button.now{outline:3px solid var(--coral)}
-.strip button.inm::after{content:"";position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--coral-2);box-shadow:0 0 0 1.5px #fff}
-.userow{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-top:.8rem}
-.userow .at{font-size:13.5px;color:var(--ink-2)}
-.mom .play{position:absolute;left:8px;top:8px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:13px;cursor:pointer}
-.mom .play:hover{background:var(--coral-2)}
-.mom .len{display:flex;align-items:center;gap:.35rem;margin-top:.45rem;font-size:13px}
-.mom .len button{width:28px;height:26px;border-radius:8px;border:1px solid var(--line);background:#fff;font:600 15px/1 var(--sans);cursor:pointer;color:var(--ink)}
-.mom .len button:hover{border-color:var(--coral)}
-.mom .len b{min-width:3.6em;text-align:center;font-weight:600}
-.mom.editing{border-color:var(--coral-2);box-shadow:0 0 0 1px var(--coral-2) inset}
-.userow .btn.small[hidden]{display:none}
-.mom .rm{position:absolute;right:8px;bottom:8px;font:600 12px/1 var(--sans);color:var(--ink-2);text-decoration:underline;cursor:pointer}
-.mom .yours{display:inline-block;font:600 10px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--coral-2);background:var(--coral-l);border-radius:999px;padding:.3em .55em;margin-bottom:.3rem}
-@media(max-width:620px){.viewer{flex-direction:column}.viewer video{width:100%;max-width:none}}
 .vid{display:flex;align-items:center;gap:.7rem;border:1px solid var(--line);border-radius:12px;padding:.55rem .8rem;font-size:14.5px}
 .vid .ic{width:30px;height:30px;border-radius:9px;background:var(--coral-l);color:var(--coral-2);display:grid;place-items:center;font-size:13px;flex:none}
 .vid small{color:var(--ink-2);margin-left:auto;white-space:nowrap}
@@ -3702,34 +3756,8 @@ details.all summary{cursor:pointer;font-weight:600;font-size:15px}
 .paste .line{display:flex;align-items:center;gap:.7rem;justify-content:space-between;border:1.5px dashed var(--coral);border-radius:14px;padding:.6rem .7rem .6rem 1rem;max-width:520px;background:var(--paper)}
 .paste .line span{font:500 17px/1.35 var(--sans)}
 .mh{font:600 16px/1.2 var(--sans);margin:1.3rem 0 .2rem}
-.moments{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,190px));gap:.8rem}
-.mom{position:relative;border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper);cursor:default;text-align:left;padding:0;font:inherit;color:inherit}
-.mom .th{display:flex;aspect-ratio:9/16;background:#111;position:relative}
-.mom .th video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111}
-.mom .play{border:0;padding:0;z-index:2}
-.mom .play.on{background:var(--coral-2)}
-.mom .th{cursor:pointer}
-.mom .len{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-top:.55rem}
-.mom .len > span{display:flex;align-items:center;gap:.3rem}
-.mom .tx .len b{display:inline-block;min-width:3.4em;text-align:center;font-size:13.5px}
-.mom .len button.rm{width:auto;height:auto;border:0;background:none;padding:.2rem 0;font:600 12.5px/1 var(--sans);color:var(--ink-2);text-decoration:underline;cursor:pointer}
-.mom .len button.rm:hover{color:var(--coral-2)}
-.mom .usebtn{display:block;width:100%;margin-top:.55rem;padding:.55rem .6rem;border-radius:10px;border:1.5px solid var(--line);background:#fff;font:600 13.5px/1.1 var(--sans);color:var(--ink);cursor:pointer}
-.mom .usebtn:hover{border-color:var(--coral)}
-.mom .usebtn[disabled]{cursor:default;color:var(--ink-2);background:var(--sand-l);border-color:transparent;font-weight:500}
-.mom.sel{border-color:var(--coral-2);box-shadow:0 0 0 1.5px var(--coral-2) inset}
-.mom.sel .usebtn{background:var(--coral-2);border-color:var(--coral-2);color:#fff}
-.mom .badge{position:absolute;right:8px;top:8px;z-index:2;font:700 12px/1 var(--sans);background:var(--coral-2);color:#fff;border-radius:999px;padding:.45em .7em}
 .undo-note{display:flex;gap:.7rem;align-items:center;font-size:14px;background:var(--ink);color:#fff;border-radius:12px;padding:.55rem .9rem;margin:.6rem 0 0;width:max-content;max-width:100%}
 .undo-note button{background:none;border:0;color:#FFB59B;font:600 14px var(--sans);text-decoration:underline;cursor:pointer;padding:0}
-.mom .th img{height:100%;object-fit:cover;flex:1 1 0;min-width:0}
-.mom .th img.ph{flex:0 0 38%;border-left:3px solid #fff}
-.mom .tx{padding:.55rem .7rem .65rem;font-size:13.5px;line-height:1.35}
-.mom .tx b{display:block;font-weight:600;font-size:14px}
-.mom .tx small{color:var(--ink-2)}
-.mom .kp{position:absolute;top:8px;right:8px;font:600 11px/1 var(--sans);border-radius:999px;padding:.4em .7em;background:var(--long);color:#fff}
-.mom.off{opacity:.45}.mom.off .kp{background:var(--ink-2)}
-.mom.off .kp::after{content:""}
 .lb{position:fixed;inset:0;background:rgba(20,22,30,.92);display:none;place-items:center;z-index:50;cursor:zoom-out;padding:16px}
 .lb.on{display:grid}.lb img{max-width:92vw;max-height:92vh;border-radius:12px}
 @media(max-width:560px){#reel{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}.opt{min-width:0;max-width:none}}
@@ -3880,7 +3908,6 @@ SELECT_CSS = r"""
 # Her v25 style rules for the Trim button on a clip card and for the trim panel, each as she wrote it. Ours, after
 # them: the line a PC shows under the timeline.
 TRIM_CSS = r"""
-.mom .len button.tr{width:auto;padding:0 .55rem;font:600 12.5px/1 var(--sans);margin-left:.15rem}
 .trim{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(31,36,48,.45)}
 .trim[hidden]{display:none}
 .trim .box{background:var(--paper);border-radius:20px;width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:1.2rem 1.2rem 1rem;box-shadow:0 20px 60px rgba(31,36,48,.3)}
@@ -3914,7 +3941,6 @@ TRIM_CSS = r"""
 
 OUR_CSS = r"""
 [hidden]{display:none!important}
-@media(max-width:620px){.viewer video.wide{width:100%}}
 .reelwrap{position:relative}
 .ins{position:absolute;width:4px;border-radius:3px;background:var(--coral-2);pointer-events:none;display:none;box-shadow:0 0 0 2px rgba(212,100,63,.22);z-index:3}
 .ins.on{display:block}
@@ -3974,6 +4000,91 @@ V27_CSS = r"""
 @media(max-width:620px){.bar{flex-wrap:wrap;padding:.6rem 0}.bar .homelink{white-space:normal}.bar .homelink+.homelink{margin-left:0}}
 """
 
+# Her footage editor's style rules (reel-maker.html, handoff v27: the editor, "editor v2" and "see every clip at
+# once"), each as she wrote it: the player and its buttons, the Footage drop-down, Make a clip, Your clips in two
+# columns (one at a phone's width: her auto-fill), the picked clip's box, the ruler, the strip, the clips on it
+# and the orange trim (striped while it grows, solid with a handle each end after End here, dashed after Add
+# clip), the purple YOUR PICK tag and the Name my clips box. Her ".about" (the description she took out) and her
+# first editor's tabs (.edtabs, .edmain, .edside) are left out. Two of ours at the end: the Name my clips line in
+# DM Sans (Dustin: no serif), and the PC's note under the timeline.
+EDITOR_CSS = r"""
+.wl{font:600 12px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-top:.35rem}
+.ed{margin:.6rem 0 1.2rem;padding:1rem;border-radius:18px;background:var(--cream);border:1px solid var(--line)}
+.say.sm{font-size:13px}
+.edplayer{position:relative;background:#111;border-radius:14px;overflow:hidden;height:min(520px,70vh);aspect-ratio:9/16;max-width:100%;display:grid;place-items:center}
+.edplayer video{width:100%;height:100%;object-fit:contain;display:block}
+.edwait{position:absolute;inset:0;display:grid;place-items:center;padding:1rem;text-align:center;color:#ccc;font-size:14px}
+.edwait[hidden],.edsel[hidden],.linkbtn[hidden],.songs[hidden]{display:none!important}
+.edrow{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.edtime{font:600 14px/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--ink-2);margin-left:.3rem}
+.edsel{background:var(--paper);border:1.5px solid var(--coral-2);border-radius:14px;padding:.75rem .9rem;display:grid;gap:.45rem}
+.edsel b{font-size:15px}.edsel small{color:var(--ink-2);font-size:13px}
+.edtlbar{display:flex;justify-content:space-between;align-items:center;margin:.9rem 0 .35rem}
+.edtl{position:relative;height:74px;border-radius:10px;overflow:hidden;background:#222;cursor:ew-resize;touch-action:none;user-select:none;-webkit-user-select:none}
+.edthumbs{position:absolute;inset:0}.edthumbs img{position:absolute;top:0;height:100%;object-fit:cover;opacity:.9;pointer-events:none}
+.edmarks{position:absolute;inset:0}
+.tm{position:absolute;top:0;bottom:0;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.75);border-radius:6px;cursor:pointer}
+.tm.sel{background:rgba(240,127,90,.35);border-color:#F07F5A}
+.tm.edit{border-color:#fff;box-shadow:0 0 0 2px #D4643F}
+.tm i{position:absolute;left:4px;top:3px;font:700 10px/1 var(--sans);color:#fff;font-style:normal;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.tm .hl,.tm .hr{position:absolute;top:-2px;bottom:-2px;width:12px;background:#fff;border-radius:4px;cursor:ew-resize}.tm .hl{left:-7px}.tm .hr{right:-7px}
+.edph{position:absolute;top:0;bottom:0;width:2px;background:#F07F5A;box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none}
+.edruler{position:relative;height:20px;margin-bottom:3px;font:500 11.5px/1 var(--sans);color:var(--ink-2);font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line)}
+.edruler span{position:absolute;bottom:0;padding:0 0 5px 4px;border-left:1px solid var(--ink-2)}
+.edruler i{position:absolute;bottom:0;height:5px;border-left:1px solid var(--line)}
+.edgrid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.2rem;align-items:stretch}
+@media (max-width:820px){.edgrid{grid-template-columns:1fr}}
+.edleft{display:grid;gap:.5rem;justify-items:center;align-content:start}
+.edplayer{cursor:pointer}
+.edbig{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;border:0;background:rgba(255,255,255,.88);color:#1F2430;font-size:24px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.3);z-index:2}
+.edbig[hidden],.moments[hidden],.vpmenu[hidden]{display:none!important}
+.edunder{display:flex;align-items:center;gap:.4rem}
+.edunder .ic{border:1.5px solid var(--line);background:var(--paper);border-radius:999px;height:36px;min-width:36px;padding:0 .7rem;font:600 13px/1 var(--sans);cursor:pointer;color:var(--ink)}
+.edunder .ic.play{background:var(--ink);color:#fff;border-color:var(--ink);min-width:46px;font-size:15px}
+.edright{display:flex;flex-direction:column;gap:.5rem;min-width:0;max-height:min(600px,calc(70vh + 50px))}
+.vpick{position:relative}
+.vpbtn{width:100%;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:6px 10px 6px 6px;cursor:pointer;font:inherit;color:var(--ink)}
+.vpbtn img,.vpmenu img{width:44px;height:58px;object-fit:cover;border-radius:7px;background:#222;display:block}
+.vpbtn b,.vpmenu b{font:600 13.5px/1.25 var(--sans);overflow-wrap:anywhere}.vpbtn small,.vpmenu small{display:block;color:var(--ink-2);font-size:12px;margin-top:2px}
+.vpbtn .car{color:var(--ink-2);font-size:13px}
+.vpmenu{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 6px);background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(31,36,48,.18);padding:6px;display:grid;gap:4px;max-height:340px;overflow:auto}
+.vpmenu button{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;text-align:left;border:0;background:none;border-radius:10px;padding:5px;cursor:pointer;font:inherit;color:var(--ink)}
+.vpmenu button:hover,.vpmenu button.on{background:var(--coral-l)}
+.cl-head{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;margin-top:.3rem}
+.clist{display:grid;gap:6px;overflow:auto;min-height:120px;flex:1 1 auto;padding-right:2px}
+.ci{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;gap:9px;align-items:center;border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:5px 8px 5px 5px;cursor:pointer}
+.ci img{width:40px;height:56px;object-fit:cover;border-radius:6px;background:#222;display:block}
+.ci b{font:600 13px/1.25 var(--sans);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ci small{color:var(--ink-2);font-size:11.5px;font-variant-numeric:tabular-nums}
+.ci.edit{border-color:var(--coral-2);box-shadow:0 0 0 1px var(--coral-2)}
+.ci .cin{border:1.5px solid var(--line);background:var(--paper);border-radius:999px;padding:.35rem .65rem;font:600 12px/1 var(--sans);cursor:pointer;color:var(--ink);white-space:nowrap}
+.ci.sel .cin{background:var(--coral-2);border-color:var(--coral-2);color:#fff}
+.ci .cx{border:0;background:none;color:var(--ink-2);font-size:18px;line-height:1;cursor:pointer;padding:2px 4px;border-radius:6px}.ci .cx:hover{background:#F8E1DC;color:#C2412D}
+.ci .num{width:20px;height:20px;font-size:11px}
+.edsel{flex:none}
+.edtip{margin:.45rem 0 0}
+.tm{cursor:grab}.tm.edit .hl,.tm.edit .hr{display:block}
+.tcut{position:absolute;top:0;bottom:0;border:3px solid #F07F5A;background:rgba(240,127,90,.42);border-radius:6px;pointer-events:none;z-index:3;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.tcut.live{background:repeating-linear-gradient(135deg,rgba(240,127,90,.5) 0 10px,rgba(240,127,90,.32) 10px 20px)}
+.tcut .cl,.tcut .cr{position:absolute;top:-3px;bottom:-3px;width:14px;background:#F07F5A;pointer-events:auto;cursor:ew-resize;display:grid;place-items:center}
+.tcut .cl{left:-10px;border-radius:6px 0 0 6px}.tcut .cr{right:-10px;border-radius:0 6px 6px 0}
+.tcut .cl::after,.tcut .cr::after{content:'';width:2px;height:22px;border-radius:2px;background:#fff}
+.tcut.live .cr{display:none}
+.tcut.set{pointer-events:auto;cursor:grab}.tcut.added{background:rgba(240,127,90,.22);border-style:dashed}.tcut.set:active{cursor:grabbing}
+.tcut b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:700 12px/1 var(--sans);color:#fff;background:#D4643F;padding:4px 7px;border-radius:999px;white-space:nowrap}
+.tcut.tiny b{left:calc(100% + 14px);transform:translateY(-50%)}
+#edIn.rec{background:#F07F5A;border-color:#F07F5A;color:#fff}
+.edright{max-height:none}
+.clist{overflow:visible;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));align-content:start}
+.clist .ci{grid-template-columns:40px minmax(0,1fr) auto auto;gap:7px}.clist .ci small{display:block;white-space:normal;line-height:1.3}.clist .ci b{white-space:normal;line-height:1.25}.clist .ci .cin{padding:.32rem .55rem}
+.ci .yours{display:inline-block;font:700 10px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#5A4FA8;background:#ECE8FB;padding:3px 7px;border-radius:999px;margin-bottom:3px}
+.clist{align-items:start}.clist .ci.wide{grid-column:1/-1}
+.descline{display:grid;gap:.35rem;background:var(--paper);border:1.5px dashed rgba(212,100,63,.45);border-radius:12px;padding:.6rem .75rem;font-size:13.5px;color:var(--ink-2)}
+.descline[hidden]{display:none!important}
+.descline .line{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.descline #descWords{font:500 15.5px/1.3 var(--sans);color:var(--ink)}
+.edtip.pcnote{color:var(--coral-2)}
+"""
+
 # Her steps, in her order (BUILD.md section 5: "This order is final"). Each is (her section's id, the
 # function that writes it, or None while that step is not built yet). A step left out is simply not on the page.
 def pc_footage():
@@ -4022,14 +4133,54 @@ def _footage_section(w, num, kind="bts"):
         "<p id='pasteSay'>" + e(this_computer.NO_LOOK_PC if pc else w["paste_say"]) + "</p>"
         "<div class='line'" + (" hidden" if pc else "") + "><span id='pasteWords'>" + e(w["paste_plain"]) + "</span>"
         "<button class='btn' id='copyLine' type='button'>" + e(w["copy"]) + "</button></div></div>"
-        "<h3 class='mh'>" + e(w["clips_h3"]) + "</h3>"
-        "<p class='say' id='momentsSay'>" + e(w["moments_first"]) + "</p>"
-        "<div class='moments' id='moments'></div>"
+        + editor_html(w, pc) +
         "<div id='undoNote'></div>"
-        "<h3 class='mh'>" + e(w["watch_h3"]) + "</h3>"
-        "<p class='say'>" + (this_computer.WATCH_PC_HTML if pc else w["watch_say_html"]) + "</p>"
-        "<div id='viewers'></div>"
         "</div></section>")
+
+
+def editor_html(w, pc=False):
+    """Her footage editor (reel-maker.html, "the footage editor", v27; screenshots 13 to 16), under the line to
+    copy in step 1: the player on the left (a big ▶ when paused; ↶ 1s, ▶, 1s ↷ and the time under it), on the
+    right the Footage drop-down, Make a clip, Your clips and a picked clip's box, and below the ruler, the strip
+    of stills with the clips and the trim on it, Zoom in / Show the whole video and her tip. On a PC (no stills
+    from a video yet) the line under the heading is ours and says so. The scripts fill it on load."""
+    e = html.escape
+    return (
+        "<h3 class='mh'>" + e(w["ed_h3"]) + "</h3>"
+        "<p class='say' id='edSayTop'>" + (this_computer.WATCH_PC_HTML if pc else e(w["ed_say"])) + "</p>"
+        "<div class='ed' id='ed'>"
+        "<div class='edgrid'>"
+        "<div class='edleft'>"
+        "<div class='edplayer' id='edPlayer'><video id='edVid' playsinline preload='auto'></video>"
+        "<button class='edbig' id='edBig' type='button' aria-label='" + e(w["ed_play"], quote=True) + "'>&#9654;</button>"
+        "<div class='edwait' id='edWait'>" + e(w["ed_wait"]) + "</div></div>"
+        "<div class='edunder'><button class='ic' id='edBack' type='button' title='" + e(w["ed_back"], quote=True) + "' aria-label='" + e(w["ed_back"], quote=True) + "'>" + e(w["ed_back_b"]) + "</button>"
+        "<button class='ic play' id='edPlay' type='button' aria-label='" + e(w["ed_play"], quote=True) + "'>&#9654;</button>"
+        "<button class='ic' id='edFwd' type='button' title='" + e(w["ed_fwd"], quote=True) + "' aria-label='" + e(w["ed_fwd"], quote=True) + "'>" + e(w["ed_fwd_b"]) + "</button>"
+        "<span class='edtime' id='edTime'>0:00.0</span></div>"
+        "</div>"
+        "<div class='edright'>"
+        "<span class='wl'>" + e(w["ed_footage"]) + "</span>"
+        "<div class='vpick'><button class='vpbtn' id='vpBtn' type='button' aria-haspopup='listbox' aria-expanded='false'></button>"
+        "<div class='vpmenu' id='edTabs' role='listbox' hidden></div></div>"
+        "<span class='wl'>" + e(w["ed_make"]) + "</span>"
+        "<div class='edrow'><button class='btn small' id='edIn' type='button'>" + e(w["ed_in"]) + "</button>"
+        "<button class='btn small' id='edOut' type='button'>" + e(w["ed_out"]) + "</button>"
+        "<button class='btn main small' id='edAdd' type='button' disabled>" + e(w["ed_add"]) + "</button>"
+        "<button class='linkbtn' id='edClear' type='button' hidden>" + e(w["ed_clear"]) + "</button></div>"
+        "<p class='say sm' id='edSay'>" + e(w["ed_find"]) + "</p>"
+        "<div class='cl-head'><span class='wl'>" + e(w["clips_wl"]) + "</span><span class='say sm' id='momentsSay'></span></div>"
+        "<div class='descline' id='descBox' hidden><span>" + e(w["desc_say"]) + "</span>"
+        "<div class='line'><span id='descWords'></span><button class='btn small' id='descCopy' type='button'>" + e(w["copy"]) + "</button></div></div>"
+        "<div class='clist' id='clist'></div>"
+        "<div class='edsel' id='edSel' hidden></div>"
+        "</div></div>"
+        "<div class='edtlbar'><span class='say sm' id='edWin'></span><button class='linkbtn' id='edZoom' type='button'>" + e(w["ed_zoom"]) + "</button></div>"
+        "<div class='edruler' id='edRuler'></div>"
+        "<div class='edtl' id='edTl'><div class='edthumbs' id='edThumbs'></div><div class='edmarks' id='edMarks'></div><div class='edph' id='edPh'></div></div>"
+        + ("<p class='say sm edtip pcnote'>" + e(OUR_WORDS["editor_no_stills_pc"]) + "</p>" if pc else "") +
+        "<p class='say sm edtip'>" + e(w["ed_tip"]) + "</p>"
+        "</div>")
 
 
 def _style_section(w, num, kind="bts"):
@@ -4252,29 +4403,32 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
     if this_computer.WINDOWS:          # decision 26: her trim tip's Mac sentence, a PC's way
         w["quick_fix_html"] = w["quick_fix_html"].replace(
             "On a Mac, open it in QuickTime Player and choose Edit › Trim.", OUR_WORDS["trim_pc"])
-    if pc_footage():                   # decision 26 (v19 review, Nov 7): no footage look on a PC, so no "I find"
-        w["moments_first"] = w["moments_none"] = this_computer.MOMENTS_PC
-        w["not_looked_h3"] = w["clips_need_h3"]
-        w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
-    title = w["title_" + kind].replace("{short}", short)
     w.update(REELS_WORDS)
     w.update(PICK_WORDS)
     w.update(TRIM_WORDS)
     w.update(SELECT_WORDS)
+    w.update(EDITOR_WORDS)
+    if pc_footage():                   # decision 26 (v19 review, Nov 7): no footage look on a PC, so no "I find"
+        w["clips_empty"] = this_computer.MOMENTS_PC
+        w["not_looked_h3"] = w["clips_need_h3"]
+        w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
+    title = w["title_" + kind].replace("{short}", short)
     data = {"words": dict(w, **OUR_WORDS), "kind": kind, "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
             "styles": list(STYLES), "styleMax": STYLE_MAX, "useSeconds": USE_SECONDS, "step": MOMENT_STEP,
             "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY,
             "trimMin": MOMENT_MIN, "trimMax": MOMENT_MAX, "trimWindow": TRIM_WINDOW, "trimSpanMin": TRIM_SPAN_MIN,
-            "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID, "rhythms": list(_rhythms())}
+            "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID, "trimPanel": TRIM_PANEL, "rhythms": list(_rhythms()),
+            # the footage editor (v27): a clip up to 15 s, the zoom (one threshold, ours), her 4 px tap rule
+            "addMax": ADD_MAX, "zoomOver": ZOOM_OVER, "zoomWindow": ZOOM_WINDOW, "tapPx": TAP_PX}
     # her numbers as written (step 1 to 5; the steps a kind doesn't use are hidden); the page renumbers them (hers)
     steps = "".join(fn(w, i, kind) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
     back_href, back_words = _back(kit_name, kit_page, w)
-    css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + TRIM_CSS + OUR_CSS + V27_CSS
+    css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + (TRIM_CSS if TRIM_PANEL else "") + OUR_CSS + V27_CSS + EDITOR_CSS
     head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"])
-    # the trim panel sits above the page's scripts (hers), before the wrap: the head is split round it
-    head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
+    if TRIM_PANEL:                     # her v25 panel sits above the page's scripts (hers), before the wrap: the head is split round it
+        head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
     toq = ("<div class='toq' id='toqBar' hidden><button class='btn' id='toQueue2' type='button'>" + e(w["toq_btn"]) + "</button>"
            "<span class='went' id='went2' role='status'></span><div id='qAsk2'></div></div>")
     return (
@@ -4288,7 +4442,8 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
         "<script>" + ORDER_JS + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
-        "<script>" + FOOTAGE_JS + "</script><script>" + TRIM_JS + "</script><script>" + MAKE_JS + "</script><script>" + QUEUE_JS + "</script><script>" + START_JS + "</script>"
+        "<script>" + FOOTAGE_JS + "</script>" + ("<script>" + TRIM_JS + "</script>" if TRIM_PANEL else "")
+        + "<script>" + MAKE_JS + "</script><script>" + QUEUE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
 
@@ -5130,10 +5285,14 @@ FOOTAGE_JS = r"""
   var R = window.Reel, W = R.words, $ = R.$, esc = R.esc, fill = R.fill, D = R.data;
   var footage = null, style = 'first', sel = {}, ask = '', feel = '', moments = [], vids = [], short = '', vsig = null;
   var STYLE_PICK = {first: {max: D.styleMax.first, say: W.pick_first}, reveal: {max: D.styleMax.reveal, say: W.pick_reveal},
-    backforth: {max: D.styleMax.backforth, say: W.pick_backforth}, bookends: {max: D.styleMax.bookends, say: W.pick_bookends}};
-  var STYLE_WORDS = {first: W.style_first_b, reveal: W.style_reveal_b, backforth: W.style_backforth_b, bookends: W.style_bookends_b};
-  // hers: 0:04, 1:02.5
+    backforth: {max: D.styleMax.backforth, say: W.pick_backforth}, bookends: {max: D.styleMax.bookends, say: W.pick_bookends},
+    broll: {max: D.styleMax.broll, say: W.pick_broll}};
+  var STYLE_WORDS = {first: W.style_first_b, reveal: W.style_reveal_b, backforth: W.style_backforth_b, bookends: W.style_bookends_b, broll: W.kind_broll_b};
+  var PICK_AT = /^Your pick at /;           // her label for a clip of theirs that has no name from the chat yet
+  // hers: 0:04, 1:02.5; and fmt2, always with the tenth: 0:31.6
   function mmss(t){ t = Math.max(0, t); var m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + (s % 1 ? s.toFixed(1) : Math.round(s)); }
+  function fmt2(t){ t = Math.max(0, t); var m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); }
+  function tenth(t){ return Math.round(t * 10) / 10; }
   function videoUrl(key){ return '/reel-video?' + R.q + '&key=' + encodeURIComponent(key); }
   function stripUrl(key, n){ return '/reel-strip?' + R.q + '&key=' + encodeURIComponent(key) + '&n=' + n; }
   function stillUrl(id){ return '/reel-moment-still?' + R.q + '&id=' + encodeURIComponent(id); }
@@ -5177,17 +5336,19 @@ FOOTAGE_JS = r"""
   }; });
   $('feelOwn').oninput = function(){ feel = $('feelOwn').value.trim(); pasteLine(); R.save(); };
   // Copy: the page's own copy first (the Claude app's pane allows it from a press), the newer way only if that failed
-  $('copyLine').onclick = function(){
-    var t = $('pasteWords').textContent, ok = false;
+  function copyOf(span, btn){
+    var t = span.textContent, ok = false;
     try {
-      var r = document.createRange(); r.selectNodeContents($('pasteWords'));
+      var r = document.createRange(); r.selectNodeContents(span);
       var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
       ok = document.execCommand('copy');
       s.removeAllRanges();
     } catch (e) { ok = false; }
     if (!ok && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function(){});
-    $('copyLine').textContent = W.copied; setTimeout(function(){ $('copyLine').textContent = W.copy; }, 1600);
-  };
+    btn.textContent = W.copied; setTimeout(function(){ btn.textContent = W.copy; }, 1600);
+  }
+  $('copyLine').onclick = function(){ copyOf($('pasteWords'), $('copyLine')); };
+  $('descCopy').onclick = function(){ copyOf($('descWords'), $('descCopy')); };
 
   // ---- the videos and Good to know (hers: renderVideos; since v27 one drop-down that opens to the cards) ----
   var SETTLED = {ready: 1, failed: 1, lowspace: 1, pc: 1, hevc_pc: 1};
@@ -5209,7 +5370,6 @@ FOOTAGE_JS = r"""
         return '<div class="vid vcard">' + pic(v) + '<span><b>' + esc(v.name) + '</b><small>' + esc(mmss(v.length) + ' · ' + fill(W.mb, {n: v.mb})) + ' · ' + vidState(v) + '</small></span></div>';
       }).join('') + '</details>';
     $('step0').classList.toggle('done', footage === true && vids.length > 0);
-    renderViewers();
     var total = vids.reduce(function(a, v){ return a + v.length; }, 0);
     var w = W.insight_words;
     if (total > 0) {
@@ -5217,118 +5377,26 @@ FOOTAGE_JS = r"""
       w = fill(W.insight_added, {total: mmss(total), est: est}) + (total > 900 ? W.insight_trim : '');
     }
     $('insightWords').textContent = w;
+    edTabs();
   }
 
-  // ---- watching the footage, and picking moments yourself (hers: renderViewers) ----
-  function renderViewers(){
-    var box = $('viewers'); if (!box) return;
-    box.innerHTML = vids.map(function(v){
-      var wide = v.w > v.h;
-      if (v.preview !== 'ready') {
-        var pc = v.preview === 'pc' || v.preview === 'hevc_pc';
-        var stuck = v.preview === 'failed' || v.preview === 'lowspace' || pc;
-        var msg = v.preview === 'lowspace' ? W.vid_lowspace : v.preview === 'failed' ? W.vid_failed
-          : (pc || v.preview === 'coming') ? (v.words || W.vid_failed) : fill(W.vid_getting, {name: v.name});
-        return '<div class="viewer" data-key="' + esc(v.key) + '"><p class="waiting" style="margin:0">' + (stuck ? '' : '<span class="spin"></span> ') + esc(msg) + '</p></div>';
-      }
-      return '<div class="viewer" data-key="' + esc(v.key) + '" data-ready="1">' +
-        '<video class="' + (wide ? 'wide' : '') + '" src="' + esc(videoUrl(v.key)) + '" controls playsinline preload="metadata"></video>' +
-        '<div class="vside"><h4>' + esc(v.name) + '</h4><p>' + esc(fill(W.vid_tap, {length: mmss(v.length)})) + '</p>' +
-        '<div class="strip ' + (wide ? 'wide' : '') + '">' + (v.strip || []).map(function(s){
-          return '<button type="button" data-t="' + s.t + '" title="' + esc(mmss(s.t)) + '"><img src="' + esc(stripUrl(v.key, s.n)) + '" alt="" loading="lazy"><span>' + esc(mmss(s.t)) + '</span></button>';
-        }).join('') + '</div>' +
-        '<div class="userow"><button class="btn main use" type="button">' + esc(W.use_moment) + '</button><span class="at"></span></div></div></div>';
-    }).join('');
-    box.querySelectorAll('.viewer[data-ready]').forEach(function(el){
-      var vid = el.querySelector('video'), at = el.querySelector('.at'), key = el.dataset.key;
-      var btns = Array.prototype.slice.call(el.querySelectorAll('.strip button'));
-      var show = function(){
-        at.textContent = fill(W.starts_at, {t: mmss(vid.currentTime)});
-        var t = vid.currentTime;
-        btns.forEach(function(b){ b.classList.toggle('now', +b.dataset.t <= t && t < +b.dataset.t + D.stripEvery); });
-      };
-      vid.addEventListener('timeupdate', show); vid.addEventListener('seeked', show); vid.addEventListener('loadedmetadata', show);
-      btns.forEach(function(b){ b.onclick = function(){ vid.currentTime = +b.dataset.t; vid.play().catch(function(){}); }; });
-      el.querySelector('.use').onclick = function(){
-        var btn = el.querySelector('.use'), t = vid.currentTime; btn.disabled = true; vid.pause();
-        R.post('/reel-moment', {kit: R.kit, do: 'add', video: key, start: Math.round(t * 10) / 10, seconds: D.useSeconds}).then(function(res){
-          var r = res.j || {};
-          if (r.ok) {
-            var before = {}; moments.forEach(function(m){ before[m.id] = true; });
-            takeMoments(r.moments);
-            var added = moments.filter(function(m){ return !before[m.id]; })[0];
-            if (added && style !== 'reveal') {
-              var ids = chosen(), max = STYLE_PICK[style].max;
-              sel[style] = max === 1 ? [added.id] : [added.id].concat(ids.filter(function(x){ return x !== added.id; })).slice(0, max);
-              renderMoments(); R.save(); summary();
-            }
-            at.textContent = fill(W.added_at, {t: mmss(t)});
-            $('moments').scrollIntoView({behavior: 'smooth', block: 'center'});
-          } else at.textContent = r.words || W.didnt_work;
-          btn.disabled = false;
-        }).catch(function(){ at.textContent = W.no_server_short; btn.disabled = false; });
-      };
-    });
-    markStrips();
-  }
-  function markStrips(){          // a dot on the stills that are inside a moment you're using (hers)
-    var ids = chosen();
-    document.querySelectorAll('.viewer[data-ready]').forEach(function(el){
-      var ms = moments.filter(function(m){ return m.key === el.dataset.key && ids.indexOf(m.id) >= 0; });
-      el.querySelectorAll('.strip button').forEach(function(b){ var t = +b.dataset.t; b.classList.toggle('inm', ms.some(function(m){ return t + D.stripEvery > m.start && t < m.end; })); });
-    });
-  }
-
-  // ---- a moment's clip plays right on its card, from its start to its end (hers) ----
-  var cardPlaying = null, waiting = [];
-  function stopCard(){
-    if (!cardPlaying) return;
-    var v = cardPlaying.v, card = cardPlaying.card; cardPlaying = null;
-    try { v.pause(); } catch (e) {}
-    v.remove(); var pl = card.querySelector('.play'); if (pl) { pl.classList.remove('on'); pl.innerHTML = '&#9654;'; }
-  }
-  function previewCard(m){
-    stopCard();
-    document.querySelectorAll('.viewer video').forEach(function(v){ v.pause(); });
-    var card = document.querySelector('.mom[data-id="' + CSS.escape(m.id) + '"]');
-    var src = vids.filter(function(x){ return x.key === m.key; })[0];
-    if (!card || !src || src.preview !== 'ready') return;
-    var v = document.createElement('video');
-    v.playsInline = true; v.preload = 'auto'; v.muted = false; v.src = videoUrl(src.key) + '#t=' + m.start;
-    card.querySelector('.th').appendChild(v);
-    var pl = card.querySelector('.play'); pl.classList.add('on'); pl.innerHTML = '&#9632;';
-    cardPlaying = {v: v, card: card, id: m.id};
-    v.addEventListener('loadedmetadata', function(){ v.currentTime = m.start; v.play().catch(function(){}); }, {once: true});
-    v.addEventListener('timeupdate', function(){ if (v.currentTime >= m.end) stopCard(); });
-    v.addEventListener('ended', stopCard);
-  }
-  R.cardPlaying = function(){ return cardPlaying ? cardPlaying.id : null; };
-  // what the Trim panel needs from here: a clip's video as the page knows it, the addresses, and the one way a
-  // clip is changed
-  R.clips = {video: function(key){ return vids.filter(function(x){ return x.key === key; })[0] || null; },
-    videoUrl: videoUrl, stripUrl: stripUrl, mmss: mmss, stop: stopCard,
-    change: function(m, change){ changeMoment(m, change); },
-    // the list of videos, asked for now: then(fn) runs once it is here (a press on Trim before the first list arrived)
-    fresh: function(fn){ waiting.push(fn); loadFootage(); }};
-  var lenT = null;
+  // ---- the moments: changed only through the Assistant (hers: /moments/add, update, remove, restore) ----
+  var undoT = null;
   function changeMoment(m, change){
     var body = {kit: R.kit, do: 'update', id: m.id};
     for (var k in change) body[k] = change[k];
-    R.post('/reel-moment', body).then(function(res){
+    return R.post('/reel-moment', body).then(function(res){
       var r = res.j || {};
-      if (!r.ok) return;
-      stopCard(); takeMoments(r.moments);
-      clearTimeout(lenT);              // let a few quick taps land, then play the new length (hers: 450 ms)
-      lenT = setTimeout(function(){ var n = moments.filter(function(x){ return x.id === m.id; })[0]; if (n) previewCard(n); }, 450);
-    }).catch(function(){});
+      if (!r.ok) { if (r.words) $('edSay').textContent = r.words; edRender(); return; }
+      takeMoments(r.moments);
+    }).catch(function(){ edRender(); });
   }
-  var undoT = null;
   function removeMoment(m){
     var at = -1; moments.forEach(function(x, i){ if (x.id === m.id) at = i; });
     R.post('/reel-moment', {kit: R.kit, do: 'remove', id: m.id}).then(function(res){
       var r = res.j || {};
       if (!r.ok) return;
-      stopCard(); takeMoments(r.moments);
+      takeMoments(r.moments);
       var box = $('undoNote');
       box.innerHTML = '<div class="undo-note">' + esc(fill(W.removed, {label: m.label || W.that_moment})) + '<button type="button">' + esc(W.undo_b) + '</button></div>';
       box.querySelector('button').onclick = function(){
@@ -5345,18 +5413,19 @@ FOOTAGE_JS = r"""
     return (list || []).map(function(m){ var c = {}; for (var k in m) c[k] = m[k]; if (keep[m.id] !== undefined) c.keep = keep[m.id]; return c; });
   }
   function takeMoments(list){ moments = merge(list); renderMoments(); summary(); R.save(); }
-  function sig(list){ return JSON.stringify((list || []).map(function(m){ return [m.id, m.key, m.start, m.end, m.label, m.photo]; })); }
-  function fromServer(list){        // the moments as the Assistant has them now (Claude's look, or another window)
+  function sig(list){ return JSON.stringify((list || []).map(function(m){ return [m.id, m.key, m.start, m.end, m.label, m.photo, m.named]; })); }
+  function fromServer(list){        // the moments as the Assistant has them now (Claude's look, a name from the chat, or another window)
     if (!Array.isArray(list) || sig(list) === sig(moments)) return;
     moments = merge(list); renderMoments(); summary();
   }
 
-  // ---- which clips each style uses: they select them on the cards (hers) ----
+  // ---- which clips each style uses: they pick them on the cards (hers) ----
   function defaultSel(st){
     var ok = moments.filter(function(m){ return m.keep !== false; }), pool = ok.length ? ok : moments;
     if (st === 'first') return pool.slice(0, 1).map(function(m){ return m.id; });
     if (st === 'bookends') return (pool.length > 1 ? [pool[0], pool[pool.length - 1]] : pool.slice(0, 1)).map(function(m){ return m.id; });
     if (st === 'reveal') return moments.filter(function(m){ return m.photo; }).slice(0, 2).map(function(m){ return m.id; });
+    if (st === 'broll') return pool.slice(0, 4).map(function(m){ return m.id; });
     return pool.slice(0, 2).map(function(m){ return m.id; });        // Back and forth starts with 2 clips (Nicole)
   }
   function chosen(){
@@ -5365,50 +5434,291 @@ FOOTAGE_JS = r"""
   }
   R.chosen = chosen;
   function toggleClip(m){
-    var rule = STYLE_PICK[style], ids = chosen();
+    var rule = STYLE_PICK[style] || STYLE_PICK.first, ids = chosen();
     if (ids.indexOf(m.id) >= 0) ids = ids.filter(function(x){ return x !== m.id; });
     else if (rule.max === 1) ids = [m.id];
     else if (ids.length >= rule.max) { $('momentsSay').textContent = fill(W.style_full, {max: rule.max}); return; }
     else ids = ids.concat(m.id);
     sel[style] = ids;
-    renderMoments(); markStrips(); R.save(); summary();
+    renderMoments(); R.save(); summary();
   }
-  function renderMoments(){
-    var box = $('moments');
-    markStrips();
-    if (!moments.length) { box.innerHTML = ''; $('momentsSay').textContent = W.moments_none; return; }
-    var yours = moments.filter(function(m){ return m.by === 'you'; }).length, found = moments.length - yours;
-    var ids = chosen(), rule = STYLE_PICK[style] || STYLE_PICK.first;
-    $('momentsSay').textContent = [found ? fill(W.n_found, {n: found}) : '', yours ? fill(W.n_yours, {n: yours}) : ''].filter(Boolean).join(W.n_and) +
-      '. ' + rule.say + ' ' + W.moments_tail;
-    box.innerHTML = moments.map(function(m){
-      var on = ids.indexOf(m.id) >= 0, k = ids.indexOf(m.id), off = style === 'reveal' && !m.photo;
-      var badge = !on ? '' : style === 'bookends' ? (k === 0 ? W.badge_opens : W.badge_closes) : style === 'first' ? W.badge_opens : fill(W.badge_clip, {k: k + 1});
-      var pickW = off ? W.no_match : on ? W.selected : W.select;
-      return '<div class="mom ' + (on ? 'sel' : '') + '" data-id="' + esc(m.id) + '">' + (badge ? '<span class="badge">' + esc(badge) + '</span>' : '') +
-        '<span class="th"><img src="' + esc(stillUrl(m.id)) + '" alt=""></span>' +
-        '<button class="play" type="button" title="' + esc(W.preview_moment) + '" aria-label="' + esc(W.preview_moment) + '">&#9654;</button>' +
-        '<span class="tx">' + (m.by === 'you' ? '<span class="yours">' + esc(W.your_pick) + '</span>' : '') + '<b>' + esc(m.label || W.a_moment) + '</b>' +
-        '<small>' + esc(m.name) + ' · ' + esc(fill(W.span, {a: mmss(m.start), b: mmss(m.end)})) + '</small>' +
-        '<span class="len"><span><button class="ls" type="button" title="' + esc(W.shorter) + '" aria-label="' + esc(W.shorter_label) + '">&minus;</button><b>' + (m.end - m.start).toFixed(1) + ' s</b>' +
-        '<button class="lg" type="button" title="' + esc(W.longer) + '" aria-label="' + esc(W.longer_label) + '">+</button>' +
-        '<button class="tr" type="button" title="' + esc(W.trim_btn_title) + '">' + esc(W.trim_btn) + '</button></span><button class="rm" type="button">' + esc(W.remove) + '</button></span>' +
-        '<button class="usebtn" type="button"' + (off ? ' disabled' : '') + '>' + esc(pickW) + '</button></span></div>';
+  function renderMoments(){ edTabs(); }          // edTabs draws the clip counts and ends with edRender(), which draws the cards
+
+  /* ---------- the footage editor (hers, Nov 16 and 17: one player, one timeline, the trim on it) ----------
+     ED: the video in the player (v), the window shown (w0 to w1), the trim in hand (inT, outT; added once Add clip
+     took it, as the clip's id), the clip picked by a click (edit), the drag under way, where a played clip stops. */
+  var ED = {v: null, w0: 0, w1: 1, inT: null, outT: null, added: false, edit: null, drag: null, stopAt: null, zoom: false, srcKey: null};
+  var MAXC = D.addMax, ZOOM_OVER = D.zoomOver, ZOOM_W = D.zoomWindow, TAP = D.tapPx;
+  function edT(){ return $('edVid').currentTime || 0; }
+  function vidLen(){ return ED.v ? (ED.v.length || 0) : 0; }
+  function edPic(v){ return pic(v); }            // a frame a third of the way in, so you can tell what it is (the strip's)
+  function clipsOf(v){ return moments.filter(function(m){ return v && m.key === v.key; }); }
+  function edInfo(v){
+    var n = clipsOf(v).length;
+    return mmss(v.length) + (v.preview === 'ready' ? (n ? fill(n === 1 ? W.ed_clip : W.ed_clips, {n: n}) : '') : W.ed_getting_ready);
+  }
+  function edTabs(){
+    var ready = vids.filter(function(v){ return v.preview === 'ready'; }), menu = $('edTabs');
+    menu.innerHTML = vids.map(function(v){
+      return '<button type="button" role="option" data-ek="' + esc(v.key) + '" class="' + (ED.v && ED.v.key === v.key ? 'on' : '') + '">' + edPic(v) +
+        '<span><b>' + esc(v.name) + '</b><small>' + esc(edInfo(v)) + '</small></span></button>';
     }).join('');
-    box.querySelectorAll('.mom').forEach(function(b){
-      var m = moments.filter(function(x){ return x.id === b.dataset.id; })[0];
-      var img = b.querySelector('.th img'); img.onerror = function(){ img.remove(); };    // a PC: no still yet
-      b.querySelector('.play').onclick = function(){ if (cardPlaying && cardPlaying.id === m.id) stopCard(); else previewCard(m); };
-      b.querySelector('.th').onclick = function(){ previewCard(m); };
-      b.querySelector('.ls').onclick = function(){ changeMoment(m, {end: Math.round((m.end - D.step) * 100) / 100}); };
-      b.querySelector('.lg').onclick = function(){ changeMoment(m, {end: Math.round((m.end + D.step) * 100) / 100}); };
-      b.querySelector('.rm').onclick = function(){ removeMoment(m); };
-      b.querySelector('.tr').onclick = function(){ if (R.openTrim) R.openTrim(m); };
-      b.querySelector('.usebtn').onclick = function(){ toggleClip(m); };
-    });
+    menu.querySelectorAll('[data-ek]').forEach(function(b){ b.onclick = function(){
+      var v = vids.filter(function(x){ return x.key === b.dataset.ek; })[0];
+      menu.hidden = true; $('vpBtn').setAttribute('aria-expanded', 'false');
+      if (v) edLoad(v);
+    }; });
+    if (!ED.v || !vids.some(function(v){ return v.key === ED.v.key; })) {
+      if (ready[0]) { edLoad(ready[0]); return; }
+      ED.v = vids[0] || null; edWaiting();
+    } else {
+      var fresh = vids.filter(function(v){ return v.key === ED.v.key; })[0];
+      if (fresh && fresh.preview === 'ready' && ED.v.preview !== 'ready') { edLoad(fresh); return; }
+      ED.v = fresh;
+    }
+    var v = ED.v;
+    $('vpBtn').innerHTML = v ? edPic(v) + '<span><b>' + esc(v.name) + '</b><small>' + esc(edInfo(v) + (vids.length > 1 ? fill(W.ed_videos, {n: vids.length}) : '')) + '</small></span><span class="car">' + (vids.length > 1 ? '&#9662;' : '') + '</span>'
+      : '<span></span><span><b>' + esc(W.ed_none_b) + '</b><small>' + esc(W.ed_none_s) + '</small></span><span></span>';
+    edRender();
   }
+  $('vpBtn').onclick = function(){ if (vids.length < 2) return; var m = $('edTabs'); m.hidden = !m.hidden; $('vpBtn').setAttribute('aria-expanded', String(!m.hidden)); };
+  document.addEventListener('click', function(e){ if (!e.target.closest('.vpick')) { $('edTabs').hidden = true; $('vpBtn').setAttribute('aria-expanded', 'false'); } });
+  function edWaiting(){
+    var w = $('edWait'), v = ED.v || vids[0]; w.hidden = false;
+    w.textContent = !v ? W.ed_wait : (v.words && (v.preview === 'pc' || v.preview === 'hevc_pc' || v.preview === 'coming')) ? v.words
+      : v.preview === 'lowspace' ? W.vid_lowspace : v.preview === 'failed' ? W.vid_failed : fill(W.vid_getting, {name: v.name});
+  }
+  function newestOwn(v){            // their newest clip of this video (ours: after a reload the trim is drawn from it, dashed)
+    var own = clipsOf(v).filter(function(m){ return m.by === 'you'; });
+    return own.length ? own[own.length - 1] : null;
+  }
+  function edLoad(v){
+    ED.v = v; ED.inT = ED.outT = null; ED.added = false; ED.zoom = false; ED.w0 = 0; ED.w1 = Math.max(1, v.length || 1); ED.stopAt = null;
+    var vid = $('edVid');
+    if (v.preview !== 'ready') { edWaiting(); edTabs(); return; }
+    $('edWait').hidden = true;
+    if (ED.srcKey !== v.key) { ED.srcKey = v.key; vid.src = videoUrl(v.key); }       // by key, never by the address's spelling
+    var last = newestOwn(v);
+    if (last) { ED.inT = last.start; ED.outT = last.end; ED.added = last.id; }
+    edTabs();
+  }
+  function edThumbs(){
+    var box = $('edThumbs'), v = ED.v; if (!v || !v.strip || !v.strip.length) { box.innerHTML = ''; return; }
+    var w = $('edTl').clientWidth || 800, n = Math.max(6, Math.floor(w / 46)), span = ED.w1 - ED.w0, h = '';
+    for (var i = 0; i < n; i++) {
+      var t = ED.w0 + (i + .5) * span / n, best = v.strip[0];
+      v.strip.forEach(function(s){ if (Math.abs(s.t - t) < Math.abs(best.t - t)) best = s; });
+      h += '<img src="' + esc(stripUrl(v.key, best.n)) + '" style="left:' + (i * 100 / n) + '%;width:' + (100 / n + .2) + '%" alt="">';
+    }
+    box.innerHTML = h;
+  }
+  function edX(t){ return (t - ED.w0) / (ED.w1 - ED.w0) * 100; }
+  function edRender(){
+    var v = ED.v; edThumbs();
+    var marks = $('edMarks');
+    if (!v) { marks.innerHTML = ''; $('edRuler').innerHTML = ''; $('edWin').textContent = ''; edCutUi(); edSelUi(); edClips(); return; }
+    if (ED.added && ED.added !== true && !moments.some(function(m){ return m.id === ED.added; })) { ED.inT = ED.outT = null; ED.added = false; }   // the clip went
+    var ids = chosen();
+    marks.innerHTML = clipsOf(v).filter(function(m){ return m.end > ED.w0 && m.start < ED.w1; }).map(function(m){
+      var k = ids.indexOf(m.id), edit = ED.edit === m.id;
+      return '<div class="tm ' + (k >= 0 ? 'sel' : '') + ' ' + (edit ? 'edit' : '') + '" data-mid="' + esc(m.id) + '" style="left:' + edX(m.start) + '%;width:' + Math.max(.6, edX(m.end) - edX(m.start)) + '%">' +
+        (k >= 0 ? '<i>' + (k + 1) + '</i>' : '') + (edit ? '<span class="hl"></span><span class="hr"></span>' : '') + '</div>';
+    }).join('') + (ED.inT != null ? '<div class="tcut ' + (ED.outT != null ? 'set' : 'live') + '" id="edCut"><span class="cl"></span><span class="cr"></span><b></b></div>' : '');
+    var span = ED.w1 - ED.w0, steps = [1, 2, 5, 10, 15, 30, 60, 120, 300], step = steps.filter(function(x){ return span / x <= 9; })[0] || 600, minor = step / 5, h = '';
+    for (var t = Math.ceil(ED.w0 / minor) * minor; t <= ED.w1 + 1e-6; t = Math.round((t + minor) * 1000) / 1000) {   // (rounded: hers drifted to "0:01.0" on a short video)
+      var major = Math.abs(t / step - Math.round(t / step)) < 1e-6, x = edX(t);
+      if (x > 97) continue;
+      h += major ? '<span style="left:' + x + '%">' + esc(mmss(t)) + '</span>' : '<i style="left:' + x + '%"></i>';
+    }
+    $('edRuler').innerHTML = h;
+    $('edWin').textContent = ED.zoom ? fill(W.ed_zoomed, {video: v.name, a: mmss(ED.w0), b: mmss(ED.w1)}) : fill(W.ed_win, {video: v.name, length: mmss(v.length)});
+    $('edZoom').textContent = ED.zoom ? W.ed_whole : W.ed_zoom;
+    edHead(); edCutUi(); edSelUi(); edClips();
+  }
+  function edHead(){
+    $('edPh').style.left = Math.max(0, Math.min(100, edX(edT()))) + '%';
+    $('edTime').textContent = fmt2(edT()) + (ED.v ? ' / ' + mmss(ED.v.length) : '');
+    edCutDraw();
+  }
+  // Nicole, Nov 17: "Start here should create an orange highlighted thing so that it drags across". Until End here, the
+  // clip runs from the start to wherever the video is (playing or dragged), up to 15 seconds; then its ends can be dragged.
+  function edCutEnd(){ return ED.outT != null ? ED.outT : Math.max(ED.inT, Math.min(edT(), ED.inT + MAXC, vidLen() || 1e9)); }
+  function edCutDraw(){
+    var el = $('edCut'); if (!el || ED.inT == null) return;
+    if (ED.outT == null && edT() >= ED.inT + MAXC) { ED.outT = ED.inT + MAXC; $('edVid').pause(); edRender(); $('edSay').textContent = W.ed_fifteen; return; }
+    var a = ED.inT, b = edCutEnd();
+    el.style.left = edX(a) + '%'; el.style.width = Math.max(0, edX(b) - edX(a)) + '%';
+    el.querySelector('b').textContent = ED.added ? W.ed_added : (b - a).toFixed(1) + ' s'; el.classList.toggle('added', !!ED.added);
+    el.classList.toggle('tiny', edX(b) - edX(a) < 4); $('edAdd').disabled = !!ED.added || b - a < 1;
+    if (ED.outT == null) $('edSay').innerHTML = b - a < 0.05 ? W.ed_started_html : fill(W.ed_sofar_html, {secs: (b - a).toFixed(1)});
+  }
+  function edCutUi(){
+    var can = !!ED.v && ED.v.preview === 'ready';
+    $('edIn').disabled = $('edOut').disabled = !can;
+    $('edAdd').disabled = ED.inT == null || (ED.outT == null && edCutEnd() - ED.inT < 1); $('edClear').hidden = ED.inT == null;
+    $('edIn').classList.toggle('rec', ED.inT != null && ED.outT == null);
+    $('edAdd').textContent = ED.added ? W.ed_added : W.ed_add;
+    if (ED.added && ED.inT != null) { $('edAdd').disabled = true; $('edSay').innerHTML = W.ed_added_html; edCutDraw(); return; }
+    if (ED.inT != null && ED.outT == null) { edCutDraw(); return; }
+    if (ED.inT != null) { $('edSay').innerHTML = fill(W.ed_set_html, {a: fmt2(ED.inT), b: fmt2(ED.outT), secs: (ED.outT - ED.inT).toFixed(1)}); edCutDraw(); return; }
+    $('edSay').textContent = W.ed_find;
+  }
+  function edSelUi(){
+    var box = $('edSel'), m = moments.filter(function(x){ return x.id === ED.edit; })[0];
+    if (!m) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<b>' + esc(m.label || W.a_moment) + '</b><small>' + esc(fill(W.edsel, {a: fmt2(m.start), b: fmt2(m.end), secs: (m.end - m.start).toFixed(1)})) + '</small>' +
+      '<div class="edrow"><button class="btn small" id="edPlayClip" type="button">' + esc(W.play_clip) + '</button>' +
+      (D.trimPanel && R.openTrim ? '<button class="btn small" id="edTrimClip" type="button" title="' + esc(W.trim_btn_title) + '">' + esc(W.trim_btn) + '</button>' : '') + '</div>';
+    $('edPlayClip').onclick = function(){ var vid = $('edVid'); vid.currentTime = m.start; ED.stopAt = m.end; vid.play().catch(function(){}); };
+    if ($('edTrimClip')) $('edTrimClip').onclick = function(){ R.openTrim(m); };
+  }
+  function edClips(){
+    var box = $('clist'), ids = chosen(), rule = STYLE_PICK[style] || STYLE_PICK.first;
+    $('momentsSay').textContent = moments.length ? rule.say : '';           // e.g. Select the clip that opens your reel.
+    if (!moments.length) box.innerHTML = '<p class="say sm" style="margin:.2rem 0">' + esc(W.clips_empty) + '</p>';
+    else box.innerHTML = moments.map(function(m){
+      var k = ids.indexOf(m.id), on = k >= 0, off = style === 'reveal' && !m.photo;
+      var name = PICK_AT.test(m.label || '') ? W.not_named : (m.label || W.a_moment);
+      return '<div class="ci ' + (on ? 'sel' : '') + ' ' + (ED.edit === m.id ? 'edit' : '') + '" data-mid="' + esc(m.id) + '"><img src="' + esc(stillUrl(m.id)) + '" alt="">' +
+        '<span>' + (m.by === 'you' ? '<span class="yours">' + esc(W.your_pick) + '</span>' : '') + '<b>' + (on ? '<span class="num" style="display:inline-grid;margin-right:5px;background:var(--coral-2)">' + (k + 1) + '</span>' : '') +
+        esc(name) + '</b><small>' + esc(m.name + ' · ' + fmt2(m.start) + '–' + fmt2(m.end) + ' · ' + (m.end - m.start).toFixed(1) + ' s') + '</small></span>' +
+        '<button class="cin" type="button"' + (off ? ' disabled' : '') + ' title="' + esc(on ? W.out_title : W.use_title) + '">' + esc(off ? W.no_photo : on ? W.in_reel : W.use) + '</button>' +
+        '<button class="cx" type="button" title="' + esc(W.remove_clip) + '" aria-label="' + esc(W.remove_clip) + '">&times;</button></div>';
+    }).join('');
+    box.querySelectorAll('.ci').forEach(function(el){
+      var m = moments.filter(function(x){ return x.id === el.dataset.mid; })[0];
+      var img = el.querySelector('img'); img.onerror = function(){ img.removeAttribute('src'); };     // a PC: no still yet
+      el.onclick = function(){ edGo(m); };
+      el.querySelector('.cin').onclick = function(e){ e.stopPropagation(); toggleClip(m); };
+      el.querySelector('.cx').onclick = function(e){
+        e.stopPropagation();
+        if (ED.edit === m.id) { ED.edit = null; ED.inT = ED.outT = null; ED.added = false; }      // ours: the trim in hand goes with it
+        if (ED.added === m.id) { ED.inT = ED.outT = null; ED.added = false; }
+        removeMoment(m);
+      };
+    });
+    // their own clips: the Assistant gives them a short name from the chat (Nov 17)
+    var unnamed = moments.some(function(m){ return m.by === 'you' && (!m.label || PICK_AT.test(m.label)); });
+    $('descBox').hidden = !unnamed; $('descWords').textContent = fill(W.desc_line, {short: short});
+  }
+  function edGo(m){
+    var v = vids.filter(function(x){ return x.key === m.key; })[0]; if (!v) return;
+    if (!ED.v || ED.v.key !== v.key) edLoad(v);
+    ED.edit = m.id;
+    if (vidLen() > ZOOM_OVER) { ED.zoom = true; ED.w0 = Math.max(0, m.start - ZOOM_W / 2); ED.w1 = Math.min(vidLen(), m.end + ZOOM_W / 2); }
+    try { $('edVid').currentTime = m.start; } catch (e) {}
+    edRender();
+  }
+  function edAt(ev){ var r = $('edTl').getBoundingClientRect(); return ED.w0 + Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * (ED.w1 - ED.w0); }
+  var tl = $('edTl');
+  tl.addEventListener('pointerdown', function(ev){
+    if (!ED.v || ED.v.preview !== 'ready') return;
+    ev.preventDefault(); try { tl.setPointerCapture(ev.pointerId); } catch (e) {}
+    var vid = $('edVid'), ce = ev.target.closest('#edCut .cl, #edCut .cr');
+    if (ce) { vid.pause(); if (ED.outT == null) ED.outT = edCutEnd(); ED.drag = {mode: ce.classList.contains('cl') ? 'ia' : 'ib'}; return; }
+    if (ev.target.closest('#edCut') && ED.outT != null) { vid.pause(); var t0 = edAt(ev); ED.drag = {mode: 'imove', off: t0 - ED.inT, len: ED.outT - ED.inT, a0: ED.inT}; return; }   // slide the whole trim
+    var h = ev.target.closest('.hl,.hr'), tm = ev.target.closest('.tm');
+    if (h && tm) { var mh = moments.filter(function(x){ return x.id === tm.dataset.mid; })[0]; ED.drag = {mode: h.classList.contains('hl') ? 'a' : 'b', m: mh, a: mh.start, b: mh.end}; return; }
+    if (tm) {
+      var m = moments.filter(function(x){ return x.id === tm.dataset.mid; })[0];
+      if (ED.edit === m.id) { var t1 = edAt(ev); ED.drag = {mode: 'move', m: m, a: m.start, b: m.end, off: t1 - m.start}; return; }   // drag the middle: slide it
+      ED.drag = {mode: 'scrub', tap: m, sx: ev.clientX}; vid.pause(); vid.currentTime = edAt(ev); edHead(); return;   // a click picks it; a drag just scrubs (Nicole, Nov 17)
+    }
+    ED.drag = {mode: 'scrub'}; vid.pause(); vid.currentTime = edAt(ev); edHead();
+  });
+  tl.addEventListener('pointermove', function(ev){
+    var d = ED.drag; if (!d) return;
+    var t = edAt(ev), vid = $('edVid'), len = vidLen();
+    if (d.mode === 'scrub') { if (d.tap && Math.abs(ev.clientX - d.sx) > TAP) d.tap = null; vid.currentTime = t; edHead(); return; }
+    if (d.mode === 'imove') {
+      var a = tenth(Math.max(0, Math.min(len - d.len, t - d.off)));
+      if (Math.abs(a - d.a0) >= 0.1) ED.added = false;              // moved after Add clip: it's a new clip now (the one added is never changed)
+      ED.inT = a; ED.outT = tenth(a + d.len); vid.currentTime = ED.inT; edHead(); edCutUi(); return;
+    }
+    if (d.mode === 'ia' || d.mode === 'ib') {
+      ED.added = false;
+      if (d.mode === 'ia') ED.inT = tenth(Math.max(0, Math.max(ED.outT - MAXC, Math.min(t, ED.outT - 1))));
+      else ED.outT = tenth(Math.min(len, Math.min(ED.inT + MAXC, Math.max(t, ED.inT + 1))));
+      vid.currentTime = d.mode === 'ia' ? ED.inT : ED.outT; edHead(); edCutUi(); return;
+    }
+    if (d.mode === 'move') { var l = d.m.end - d.m.start; d.a = Math.max(0, Math.min(len - l, t - d.off)); d.b = d.a + l; }
+    else if (d.mode === 'a') d.a = Math.max(0, Math.min(t, d.b - 1)); else d.b = Math.min(len, Math.max(t, d.a + 1));
+    if (d.b - d.a > MAXC) { if (d.mode === 'a') d.a = d.b - MAXC; else d.b = d.a + MAXC; }
+    var el = $('edMarks').querySelector('.tm[data-mid="' + CSS.escape(d.m.id) + '"]');
+    if (el) { el.style.left = edX(d.a) + '%'; el.style.width = (edX(d.b) - edX(d.a)) + '%'; }
+    vid.currentTime = d.mode === 'b' ? d.b : d.a; edHead();
+    $('edSay').textContent = fill(W.ed_drag, {a: fmt2(d.a), b: fmt2(d.b), secs: (d.b - d.a).toFixed(1)});
+  });
+  function edUp(){
+    var d = ED.drag; ED.drag = null;
+    if (!d) return;
+    if (d.mode === 'scrub' && d.tap) { ED.edit = d.tap.id; ED.inT = ED.outT = null; ED.added = false; $('edVid').currentTime = d.tap.start; edRender(); return; }
+    if (d.mode === 'scrub' || d.mode === 'ia' || d.mode === 'ib' || d.mode === 'imove') return;
+    if (d.mode === 'move' && Math.abs(d.a - d.m.start) < 0.05) { edRender(); return; }      // a click on the picked clip, not a slide
+    changeMoment(d.m, {start: tenth(d.a), end: tenth(d.b)});
+  }
+  tl.addEventListener('pointerup', edUp); tl.addEventListener('pointercancel', edUp);
+  var vidEl = $('edVid');
+  vidEl.addEventListener('timeupdate', function(){ if (ED.stopAt != null && edT() >= ED.stopAt) { vidEl.pause(); ED.stopAt = null; } edHead(); });
+  vidEl.addEventListener('play', function(){ $('edPlay').innerHTML = '&#10074;&#10074;'; $('edBig').hidden = true; (function tick(){ if (vidEl.paused) return; edHead(); requestAnimationFrame(tick); })(); });
+  vidEl.addEventListener('pause', function(){ $('edPlay').innerHTML = '&#9654;'; $('edBig').hidden = false; });
+  function edToggle(){ if (!ED.v || ED.v.preview !== 'ready') return; ED.stopAt = null; if (vidEl.paused) vidEl.play().catch(function(){}); else vidEl.pause(); }
+  $('edPlay').onclick = edToggle; $('edBig').onclick = function(e){ e.stopPropagation(); edToggle(); };
+  $('edPlayer').addEventListener('click', edToggle);
+  $('edBack').onclick = function(){ vidEl.currentTime = Math.max(0, edT() - 1); edHead(); };
+  $('edFwd').onclick = function(){ vidEl.currentTime = Math.min(vidLen(), edT() + 1); edHead(); };
+  $('edIn').onclick = function(){
+    if (!ED.v || ED.v.preview !== 'ready') return;
+    ED.inT = tenth(edT()); ED.outT = null; ED.edit = null; ED.stopAt = null; ED.added = false;
+    if (vidLen() > ZOOM_OVER) { ED.zoom = true; ED.w0 = Math.max(0, ED.inT - 5); ED.w1 = Math.min(vidLen(), ED.w0 + ZOOM_W); }   // close enough to see it grow
+    edRender(); vidEl.play().catch(function(){});
+  };
+  $('edOut').onclick = function(){
+    if (!ED.v || ED.v.preview !== 'ready') return;
+    var t = tenth(edT());
+    if (ED.inT == null) ED.inT = Math.max(0, t - 4);
+    if (t <= ED.inT + 0.9) { $('edSay').textContent = W.ed_end_after; return; }
+    ED.outT = Math.min(t, ED.inT + MAXC); ED.added = false; ED.edit = null; vidEl.pause(); edRender();
+  };
+  $('edClear').onclick = function(){ ED.inT = ED.outT = null; ED.added = false; edRender(); };
+  $('edZoom').onclick = function(){
+    if (!ED.v) return;
+    if (ED.zoom) { ED.zoom = false; ED.w0 = 0; ED.w1 = vidLen(); }
+    else { ED.zoom = true; var c = edT(), half = Math.min(ZOOM_W / 2, vidLen() / 2); ED.w0 = Math.max(0, c - half); ED.w1 = Math.min(vidLen(), ED.w0 + 2 * half); }
+    edRender();
+  };
+  $('edAdd').onclick = function(){
+    if (!ED.v || ED.inT == null || ED.added) return;
+    var end = edCutEnd(), a = ED.inT; vidEl.pause();
+    if (end - a < 1) { $('edSay').textContent = W.ed_second; return; }
+    $('edAdd').disabled = true; $('edSay').textContent = W.ed_adding;
+    var before = {}; moments.forEach(function(m){ before[m.id] = true; });     // before the ask: the page's 4 s look may bring the new clip in first
+    R.post('/reel-moment', {kit: R.kit, do: 'add', video: ED.v.key, start: a, seconds: tenth(end - a)}).then(function(res){
+      var r = res.j || {};
+      if (!r.ok) { $('edSay').textContent = r.words || W.didnt_work; $('edAdd').disabled = false; return; }
+      moments = merge(r.moments);
+      var added = moments.filter(function(m){ return !before[m.id]; })[0];
+      if (added && style !== 'reveal') {
+        var ids = chosen(), max = (STYLE_PICK[style] || STYLE_PICK.first).max;
+        sel[style] = max === 1 ? [added.id] : [added.id].concat(ids.filter(function(x){ return x !== added.id; })).slice(0, max);
+      }
+      ED.inT = a; ED.outT = end; ED.added = added ? added.id : true; ED.edit = null;     // the trim stays; moving it makes the next clip (Nicole, Nov 17)
+      renderMoments(); summary(); R.save();
+    }).catch(function(){ $('edSay').textContent = W.no_server_short; $('edAdd').disabled = false; });
+  };
+  window.addEventListener('resize', edThumbs);
+  // what the Trim panel needs from here, when it is on the page (TRIM_PANEL): a clip's video as the page knows it,
+  // the addresses, and the one way a clip is changed
+  R.clips = {video: function(key){ return vids.filter(function(x){ return x.key === key; })[0] || null; },
+    videoUrl: videoUrl, stripUrl: stripUrl, mmss: mmss, stop: function(){ vidEl.pause(); },
+    change: function(m, change){ changeMoment(m, change); },
+    fresh: function(fn){ waiting.push(fn); loadFootage(); }};
+  // for the tests: the editor's state as numbers (no words, no path)
+  R.editor = function(){ return {key: ED.v ? ED.v.key : null, w0: ED.w0, w1: ED.w1, inT: ED.inT, outT: ED.outT, added: ED.added, edit: ED.edit, zoom: ED.zoom, drag: ED.drag ? ED.drag.mode : null, t: edT()}; };
 
   // ---- looking at the Footage folder (hers: loadFootage, every 4 s) ----
+  var waiting = [];
   function loadFootage(){
     if (footage !== true) return;
     fetch('/reel-footage?' + R.q, {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(f){
@@ -5457,7 +5767,7 @@ FOOTAGE_JS = r"""
       if (first || document.activeElement !== $('feelOwn')) feelOwnOpen = false;
       moments = merge(st.moments);
       showFeel(); pasteLine();
-      setFootage(footage); renderMoments();
+      setFootage(footage);
       if (footage) loadFootage();
     },
     follow: function(st){ fromServer(st.moments); }

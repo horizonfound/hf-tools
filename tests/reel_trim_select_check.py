@@ -19,12 +19,12 @@ What it holds:
                 a drag of any selected photo moves them all, in order, with the "N photos" tag and the others
                 faded; in All your photos a plain click still adds or takes out, Shift and Cmd select, then a
                 drag up or Add them to the end; more than a reel holds is refused whole; a phone's width
-  the panel     in a hidden Chrome, on a 40-second clip this test makes itself (a Mac only: the Mac's own
-                AVFoundation, as tests/video_check.py): the clip on a loop with sound, the filmstrip about 8
-                seconds either side, the kept part, both handles, the middle, the quarter-second buttons, the
-                readout, 1 to 15 seconds, never past the video's ends; Cancel, the x, Escape and a click
-                outside change nothing; Done saves; - and + still there; and a PC's way (no pictures along
-                the timeline, said so; a video that can't play there, said so)
+  the panel     RETIRED with Nicole's v27 (Nov 17): the trim lives on the footage editor's timeline
+                (tests/reel_footage_check.py --only editor drives it), and her v27 page leaves the v25 panel
+                unreachable. Its code stays in reel_page.py behind TRIM_PANEL (False) until Nicole says; this
+                test holds that the panel is NOT on the page, that its words and markup are still there to put
+                back, and that a trim by request behaves exactly as the editor's drags send it. --only trim and
+                --only pc run that part alone.
 
 Nothing here touches the real ~/.studio, a real kit, CapCut or a visible window: a scratch home and pretend kits.
 Python 3.9, standard library only.
@@ -56,7 +56,7 @@ BIG_KIT = "2026-09-29 A full reel"
 TRIM_KIT = "2026-09-30 Trim a clip"
 PAGE = "abcdefgh12"
 FIXTURE = HERE / "fixtures" / "loud-tone-3s.mp4"
-TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it."
+TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it."   # her v25 line; gone from the page since v27
 
 
 def her_v25():
@@ -124,16 +124,25 @@ def run_words(s):
     case("no page word of these says Claude, and none has a long dash",
          not [v for v in list(tw.values()) + list(sw.values()) + [rp.OUR_WORDS["trim_stuck"], rp.OUR_WORDS["trim_no_stills_pc"], rp.OUR_WORDS["trim_length"]]
               if "Claude" in v or "—" in v or "–" in v])
-    case("the line over the clip cards is her v25 one, with Trim in it", tw["moments_tail"] == TAIL and TAIL in page_ours)
+    body = page_ours.split("<div class='wrap'>", 1)[1].split("<script", 1)[0]          # the page's markup: no style, no script, no words table
+    case("her v25 line over the clip cards is kept in the table, and is NOT on the page since v27 (the editor has no such row)", tw["moments_tail"] == TAIL and TAIL not in body)
     case("a clip is kept 1 to 15 seconds, an arrow moves an end a quarter second, the strip shows about 8 seconds either side (hers)",
          (rp.MOMENT_MIN, rp.MOMENT_MAX, rp.TRIM_NUDGE, rp.TRIM_WINDOW, rp.TRIM_SPAN_MIN, rp.TRIM_GRID) == (1.0, 15.0, 0.25, 16.0, 20.0, 0.05))
-    case("the trim panel's markup is above every script of the page (her note: the script wires it up on load)",
-         0 < page_ours.index("id='trim'") < page_ours.index("<script"))
+    case("the trim panel is not on the page (TRIM_PANEL is False since v27: the trim lives on the editor's timeline)",
+         rp.TRIM_PANEL is False and "id='trim'" not in body and "id='trimDone'" not in body and "R.openTrim = open" not in page_ours and 'class="tr"' not in page_ours)
+    was = rp.TRIM_PANEL
+    try:
+        rp.TRIM_PANEL = True
+        back = rp.page_html(KIT, "x")
+        case("...and can be put back with one switch: the panel's markup above every script, its script, and a Trim button in a picked clip's box",
+             0 < back.index("id='trim'") < back.index("<script") and "R.openTrim = open" in back and "edTrimClip" in back)
+    finally:
+        rp.TRIM_PANEL = was
     case("the two bars sit where hers do: one over the order, one inside All your photos over the photos",
          page_ours.index("id='undoBtn'") < page_ours.index("id='reelSel'") < page_ours.index("id='reel'")
          and page_ours.index("<summary>") < page_ours.index("id='allSel'") < page_ours.index("id='all'"))
-    case("on a Mac the panel has no PC line; where no stills can be taken it has ours, under the timeline",
-         ("id='trimPcNote'" in page_ours) == rp.pc_footage())
+    case("on a Mac the editor has no PC line; where no stills can be taken it has ours, under the timeline",
+         ("class='say sm edtip pcnote'" in body) == rp.pc_footage() and (html.escape(rp.OUR_WORDS["editor_no_stills_pc"]) in body) == rp.pc_footage())
     hers = her_v25()
     if hers is None:
         t.skip("the trim and select words against her v25 reel page: her handoff (reference-private) isn't on this computer")
@@ -744,7 +753,7 @@ def main():
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--no-chrome", action="store_true", help="the checks that need no browser only")
-    ap.add_argument("--only", choices=("select", "trim", "pc"), help="one part of the page only: selecting, the trim panel, or the trim panel as a PC has it")
+    ap.add_argument("--only", choices=("select", "trim", "pc"), help="one part only: selecting; or (trim, pc) the retired panel's checks, which need no browser")
     a = ap.parse_args()
     if any(p in chrome_drive.NEVER_PORTS or p in (8791, 8792, 8799) for p in range(a.port, a.port + 10)):
         print("STOP: that port is one a person's own page server uses")
@@ -775,16 +784,8 @@ def main():
                 with chrome_drive.Chrome(work=str(work / "chrome"), size=(1280, 1000)) as c:
                     group("more than a reel holds", run_full, c, s)
             if a.only != "select":
-                if not (t.MAC and Path("/usr/bin/osascript").exists()):
-                    t.skip("the trim panel on the page: its 40-second clip is made with the Mac's own tools")
-                else:
-                    clip = make_long(work / "clips")
-                    if a.only != "pc":
-                        with chrome_drive.Chrome(work=str(work / "chrome"), size=(1280, 1000)) as c:
-                            group("the trim panel, on the page", run_trim, c, s, clip)
-                    if a.only != "trim":
-                        with chrome_drive.Chrome(work=str(work / "chrome"), size=(1280, 1000)) as c:
-                            group("the trim panel as a PC has it", run_trim_pc, c, s, clip)
+                t.skip("the trim panel on the page: retired with Nicole's v27 (the trim is on the editor's timeline: tests/reel_footage_check.py --only editor); "
+                       "run_trim and run_trim_pc stay below for the day it is put back (TRIM_PANEL)")
     finally:
         s.stop()
         chrome_drive.stop_all()

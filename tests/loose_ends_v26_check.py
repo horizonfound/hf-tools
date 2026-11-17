@@ -269,11 +269,10 @@ def check_guides():
 def check_player_css():
     group("A wide video's player in a narrow window")
     t = read(SCRIPTS / "reel_page.py")
-    hers = ".viewer video.wide{aspect-ratio:16/9;width:420px}"
-    ours = "@media(max-width:620px){.viewer video.wide{width:100%}}"
-    case("her rule is kept whole", t.count(hers) == 1)
-    case("ours narrows it only in a narrow window, and comes after hers so it wins there",
-         t.count(ours) == 1 and t.index(ours) > t.index(hers) and t.index(ours) > t.index('OUR_CSS = r"""'), (t.count(ours),))
+    # since Nicole's v27 (Nov 17) the per-video players are gone: one player in the footage editor, 9:16, at most
+    # the window's width (her rule), so there is no wide player to narrow any more
+    case("the per-video players and their rules are gone (v27: the footage editor's one player)", ".viewer video.wide" not in t and "id='viewers'" not in t)
+    case("the editor's player is hers: 9:16, never wider than the window", ".edplayer{position:relative;background:#111;border-radius:14px;overflow:hidden;height:min(520px,70vh);aspect-ratio:9/16;max-width:100%;display:grid;place-items:center}" in t)
 
 
 # ---------------------------------------------------------------- run
