@@ -54,7 +54,9 @@ import words_page_check as wpc  # noqa: E402   (the tiny JPEG)
 
 SCRIPTS = t.SCRIPTS
 PORT = 8812
-KIT = "2026-10-03 Kinds <b>& 'reels' 🎞"
+# A PC cannot make a folder with < or > in its name (and the Assistant never makes one: a shoot's name loses them when its
+# kit is made), so there the shoot's folder keeps the ampersand, the apostrophes and the emoji only. A Mac keeps the tag.
+KIT = "2026-10-03 Kinds & 'reels' 🎞" if t.WINDOWS else "2026-10-03 Kinds <b>& 'reels' 🎞"
 PAGE = "abcdefgh12"
 KINDS = ("bts", "photos", "broll")
 FIX = ROOT / "tests" / "fixtures"
@@ -70,6 +72,12 @@ TITLES_B = {"bts": "Behind the scenes", "photos": "Just photos", "broll": "B-rol
 sys.path.insert(0, str(SCRIPTS))
 import look  # noqa: E402   (the path at the top, as the page builds it)
 
+
+
+def her(key):
+    """Her line as this computer says it: word for word on a Mac; File Explorer, the Recycle Bin and Restore on a PC."""
+    import reel_page as rp
+    return rp.pc_words(rp.trash_words(rp.WORDS[key]))
 
 def her_v27(name="pages/reel-maker.html"):
     """A file of her v27 handoff (her reel page, or UPDATE-v27.md), or None when it isn't on this computer."""
@@ -179,7 +187,7 @@ def run_words(s):
          rp.WORDS["ask_label_html"] in hers and rp.WORDS["ask_ex1"] in text and 'placeholder="%s"' % rp.WORDS["ask_placeholder"] in hers)
     case("her v27 + Add photos row, word for word",
          '<button class="btn small" id="addPhotos">%s</button><span class="tools-say" id="addPhotosSay">%s</span>' % (rp.WORDS["add_photos"], rp.WORDS["add_photos_say"]) in text)
-    case("her lines for the Photos folder: opening, open, could not open", all(x in text for x in (rp.WORDS["opening_photos"], rp.WORDS["photos_open"], rp.WORDS["cant_open_photos"])))
+    case("her lines for the Photos folder: opening, open, could not open", all(x in text for x in (her("opening_photos"), her("photos_open"), her("cant_open_photos"))))
     case("her v27 hides 'How should it feel?' (#feelRow) on the page, so ours writes the row hidden",
          "#feelRow{display:none!important}" in hers and "id='feelRow' hidden" in rp.page_html(KIT, "x", True, "bts"))
     sty = re.search(r"<style>(.*?)</style>", hers, re.S).group(1)
@@ -325,7 +333,7 @@ def run_new_photos(s):
     st = reel_state(s, kit)
     case("(a kit of 6 photos, numbered 1 to 6)", st and st["total"] == 6 and [p["n"] for p in st["photos"]] == [1, 2, 3, 4, 5, 6])
     code, j, _, _ = s.http("POST", "/reel-open", {"kit": kit, "what": "photos"})
-    case("+ Add photos: the Photos folder is opened (the test switch) and her line said", code == 200 and j == {"ok": True, "words": rp.WORDS["photos_open"]}, (code, j))
+    case("+ Add photos: the Photos folder is opened (the test switch) and her line said", code == 200 and j == {"ok": True, "words": her("photos_open")}, (code, j))
     case("refused: a folder the page can't ask for", s.http("POST", "/reel-open", {"kit": kit, "what": "desktop"})[0] == 400)
     # two photos dropped in, one of them still being copied (changed just now, when the page looks)
     (k / "Photos" / "a-first.jpg").write_bytes(wpc.TINY)
@@ -414,7 +422,7 @@ def run_songs(s):
     case("(set up: Beat one picked for the reel)", code == 200, j)
     code, j, _, _ = s.http("POST", "/reel-song-remove", {"kit": kit, "song": songs["Beat one"]["id"]})
     case("Remove this song, by request as the page sends it: the song is in the (tests') Trash, her line, the list without it, the pick cleared",
-         code == 200 and j.get("ok") and j.get("words") == rp.WORDS["song_trashed"] and [x["name"] for x in j.get("songs", [])] == ["Rec"] and j.get("cleared") is True
+         code == 200 and j.get("ok") and j.get("words") == her("song_trashed") and [x["name"] for x in j.get("songs", [])] == ["Rec"] and j.get("cleared") is True
          and not (music / "Beat one.wav").exists() and (Path(s.env["STUDIO_TRASH_FOR_TESTS"]) / "Beat one.wav").exists()
          and (reel_rec(s, kit) or {}).get("saved", {}).get("song") is None, (code, j))
     case("the state says it: no song picked, one song left", reel_state(s, kit)["saved"]["song"] is None and [x["name"] for x in reel_state(s, kit)["songs"]] == ["Rec"])
@@ -461,9 +469,9 @@ def run_songs_page(c, s):
     case("...and left alone it goes back to Remove this song (hers: 4 s), with the song still there", (music / "Beat one.wav").exists())
     c.click("#songRm")
     c.click("#songRm")
-    c.wait_for("document.getElementById('waiting').textContent === %s" % json.dumps(rp.WORDS["song_trashed"]), 10)
+    c.wait_for("document.getElementById('waiting').textContent === %s" % json.dumps(her("song_trashed")), 10)
     case("the second tap moves it: her line on the page, the song out of the drop-down, Choose a song… back, Listen and Remove hidden",
-         c.text("#waiting") == rp.WORDS["song_trashed"] and "Beat one" not in c.js("Array.from(document.getElementById('songSel').options).map(function(o){ return o.textContent; }).join('|')")
+         c.text("#waiting") == her("song_trashed") and "Beat one" not in c.js("Array.from(document.getElementById('songSel').options).map(function(o){ return o.textContent; }).join('|')")
          and c.js("document.getElementById('songSel').options[0].value === '__'") and c.js("document.getElementById('songPlay').hidden && document.getElementById('songRm').hidden"))
     case("the song is in the (tests') Trash, not deleted, and the reel's pick is cleared", not (music / "Beat one.wav").exists() and (Path(s.env["STUDIO_TRASH_FOR_TESTS"]) / "Beat one.wav").exists()
          and (reel_rec(s, kit) or {}).get("saved", {}).get("song") is None)
@@ -669,8 +677,8 @@ def run_page(c, s):
     c.set_value("#verSel", "v1")
     c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v1' && document.querySelectorAll('#all .pick').length === 6", 20)
     c.click("#addPhotos")
-    c.wait_for("document.getElementById('addPhotosSay').textContent === %s" % json.dumps(rp.WORDS["photos_open"]), 8)
-    case("+ Add photos: her line once the folder is open", c.text("#addPhotosSay") == rp.WORDS["photos_open"])
+    c.wait_for("document.getElementById('addPhotosSay').textContent === %s" % json.dumps(her("photos_open")), 8)
+    case("+ Add photos: her line once the folder is open", c.text("#addPhotosSay") == her("photos_open"))
     c.js("document.getElementById('allBox').open = true")
     c.click("#all .pick", nth=4)
     chrome_drive.wait_until(lambda: [x["n"] for x in ((reel_rec(s, kit) or {}).get("saved") or {}).get("picks", [])] == [1, 5], 8, what="the order saved")
@@ -733,6 +741,10 @@ def main():
     (work / "trash").mkdir(exist_ok=True)
     sys.path.insert(0, str(SCRIPTS))
     try:
+        import posts  # noqa: E402   (the one place a shoot's name becomes its kit folder's name)
+        made = posts.clean_name("Kinds <b>& 'reels' 🎞 \\ / : * ? \" | .")
+        case("a shoot named with a tag and the other characters a PC refuses gets a kit folder a PC can make (they become a space; the rest is kept)",
+             made == "Kinds b & 'reels' 🎞", made)
         s.make_kit(KIT, photos=8)
         group("her words: the chooser, the kinds, step 1 and 2's new lines", run_words, s)
         s.start()

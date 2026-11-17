@@ -96,6 +96,40 @@ def ver(s, kit, **ask):
     return s.post("/reel-version", dict(ask, kit=kit))
 
 
+def edit_my_video(s, kit_name, key, name, words):
+    """Edit my video pressed on `name`, with a job that takes a few seconds. Returns ((status, answer), land):
+    `land()` is called where the test waits for the job to end.
+
+    A Mac: the real thing. The page's own /talking-start, and the job's own process with the pretend transcriber
+    taking three seconds; land() does nothing, the job lands by itself.
+
+    A PC: turning talking into words is a Mac's (the job's small copy and its sound are AVFoundation's and
+    afconvert's; a PC answers Edit my video at once with its own line, which talking_page_check.py checks), so a
+    job started there stops at once with a problem and there would be nothing to check. The two ends of the job
+    are played by hand instead, each with the plugin's own code: the job written down as start() writes it (queued,
+    the record working on that video), and, at land(), the job's one save (put_words with switch=False, as
+    _save_words calls it) and the job written down as done. What is checked is the same on both: nothing opens
+    or starts while a script is on its way, and the script lands in the reel it was started on."""
+    TR, k = s.TR, s.kit(kit_name)
+    if t.MAC:
+        s.says(words=words, sleep=3.0)
+        return s.post("/talking-start", {"kit": kit_name, "video": key}), lambda: None
+    jid = os.urandom(6).hex()
+    TR.write_job(k, {"id": jid, "state": "queued", "t": time.time(), "video": name, "key": key, "again": False, "length": 3.0})
+
+    def fn(rec):
+        if rec.get("video") != name:
+            TR.switch_video(rec, name)
+        rec["status"], rec["step"], rec["problem"] = "working", TR.JOB_WORDS["ready_video"], ""
+        rec.setdefault("captions", True)
+    TR.change(k, fn)
+
+    def land():
+        TR.put_words(k, name, key, words, info={"dur": 3.0, "w": 320, "h": 240}, more={"how": "pretend", "ondevice": True}, switch=False)
+        TR._job_over(k, jid, "done")
+    return (200, {"ok": True}), land
+
+
 def tver(s, kit, **ask):
     return s.post("/talking-version", dict(ask, kit=kit))
 
@@ -594,9 +628,10 @@ def run_talking(s):
     case("the route is the page's own (another website is refused)", code == 403 and s.rec_bytes(TALK_KIT) == b1, code)
     # while a video is being turned into a script
     key3 = s.add_talk(k, "third.mp4")
-    s.says(words=t.WORDS2, sleep=3.0)
-    code, j = s.post("/talking-start", {"kit": TALK_KIT, "video": key3})
-    case("Edit my video is pressed (the pretend transcriber takes three seconds)", code == 200 and j.get("ok"), j)
+    (code, j), land = edit_my_video(s, TALK_KIT, key3, "third.mp4", t.WORDS2)
+    case("Edit my video is pressed (the pretend transcriber takes three seconds)" if t.MAC else
+         "Edit my video's job is on its way (a PC can't turn talking into words: the job's two ends are played with the plugin's own code)",
+         code == 200 and j.get("ok") and s.rec(TALK_KIT)["status"] == "working" and s.rec(TALK_KIT)["video"] == "third.mp4", j)
     code, j = tver(s, TALK_KIT, op="new")
     code2, j2 = tver(s, TALK_KIT, op="switch", id="v2")
     case("while a video is being turned into a script: no new talking reel and no other one, in her words",
@@ -604,11 +639,13 @@ def run_talking(s):
          and s.rec(TALK_KIT)["current"] == "v1" and len(s.rec(TALK_KIT)["versions"]) == 2, (j, j2))
     code, j = tver(s, TALK_KIT, op="rename", id="v1", name="Sit-down")
     case("...Rename still works meanwhile (hers)", code == 200 and j["versions"][0]["name"] == "Sit-down", j)
+    land()
     st = s.settled(TALK_KIT, 60)
     rec = s.rec(TALK_KIT)
     case("the script lands in the reel it was started on, and the other reel is as it was",
          st and st["current"] == "v1" and st["rec"]["status"] == "ready" and st["rec"]["video"] == "third.mp4" and rec["versions"][1]["data"]["cut"] == [[1, 2]]
-         and rec["versions"][1]["data"]["video"] == t.V2, st and (st["rec"].get("status"), st["rec"].get("video")))
+         and rec["versions"][1]["data"]["video"] == t.V2 and len(st["rec"].get("words") or []) == len(t.WORDS2),
+         st and (st["rec"].get("status"), st["rec"].get("video"), st["rec"].get("problem")))
     code, j = tver(s, TALK_KIT, op="switch", id="v2")
     case("once it is done, the other reel opens", code == 200 and j["current"] == "v2", j)
     s.says(words=t.WORDS2)
@@ -800,12 +837,12 @@ def run_talking_page(c, s):
          c.js("document.getElementById('vid').paused && document.getElementById('verRenBox').hidden") and s.rec(kit).get("cut") in (None, []), s.rec(kit).get("cut"))
     # refused while a script is being made: her line shows in the bar
     key3 = s.add_talk(k, "third.mp4")
-    s.says(words=t.WORDS2, sleep=3.0)
-    code, j = s.post("/talking-start", {"kit": kit, "video": key3})
+    (code, j), land = edit_my_video(s, kit, key3, "third.mp4", t.WORDS2)
     c.click("#verNew")
     c.wait_for("document.getElementById('verMsg').textContent.indexOf('still turning') > 0", 8)
     case("while a video is being turned into a script, + Start a new talking reel says her line and nothing changes",
          c.text("#verMsg") == "I'm still turning your video into a script. Give it a minute, then try again." and len(s.rec(kit)["versions"]) == 2 and names_on(c)[0].endswith("*"), c.text("#verMsg"))
+    land()
     s.settled(kit, 60)
     s.says(words=t.WORDS2)
     case("no fault on the page", not [e for e in c.page_errors() if "favicon" not in e], c.page_errors())

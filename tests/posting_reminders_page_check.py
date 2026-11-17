@@ -87,7 +87,17 @@ def cfg(s, **kw):
     f.parent.mkdir(parents=True, exist_ok=True)
     tmp = f.with_name("pretend.json.test")
     tmp.write_text(json.dumps(dict({"calendars": CALENDARS}, **kw), ensure_ascii=False), encoding="utf-8")
-    os.replace(str(tmp), str(f))
+    # The page server and its helpers read pretend.json fresh on every call. A PC refuses to put a file in place
+    # while another program has it open right then (WinError 5), so wait a moment and try again, as the plugin's
+    # own saves do (this_computer.replace). A Mac never refuses. After about five seconds the refusal is passed on.
+    for i in range(100):
+        try:
+            os.replace(str(tmp), str(f))
+            return
+        except PermissionError:
+            if i == 99:
+                raise
+            time.sleep(0.05)
 
 
 def book(s):

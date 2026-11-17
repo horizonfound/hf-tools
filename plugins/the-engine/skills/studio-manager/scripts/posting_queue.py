@@ -2266,6 +2266,7 @@ class Handler(SimpleHTTPRequestHandler):
         kit_name, sub = q.get("kit", [""])[0], q.get("sub", [""])[0]
         h = posts.home()
         ok, words = False, "That isn't a folder this kit names."
+        none = False     # True only for a kit's own folder that isn't made yet; set here so a refused name still gets its answer
         content = (h / posts.CONTENT_NAME).resolve() if h else None
         # A kit is one folder's name inside Your Content, so it is checked as text before any path is made from it:
         # no slash (on a PC "//computer/share" would be another computer's shared folder, and asking Windows about
@@ -2296,7 +2297,6 @@ class Handler(SimpleHTTPRequestHandler):
                 target = kd / sub
             else:
                 target = None
-            none = False
             if target is None:
                 pass
             elif not target.is_dir():

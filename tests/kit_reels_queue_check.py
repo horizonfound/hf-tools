@@ -42,6 +42,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -62,6 +63,9 @@ KIT, SHORT, PROJECT, HOOKS = wpc.KIT, wpc.SHORT, wpc.PROJECT, wpc.HOOKS
 KQ = quote(KIT, safe="")
 PAGE = "/content/%s/Post%%20kit.html" % KQ
 SECOND = "White <b>Backdrop"                 # a reel's name is theirs: a tag in it must only ever show as letters
+# The same name where it is part of a FILE's name: a PC cannot make a file with < or > in its name, so there it is the
+# name the reel page itself gives a saved video (those characters become a space); a Mac keeps the tag, to show as letters.
+SECOND_FILE = "White b Backdrop" if wpc.WINDOWS else SECOND
 THIRD = "Zoë's 🌊 third"
 P1, P2, P3 = PROJECT, SHORT + " reel 4", SHORT + " reel 5"
 LOCK_TAIL = " first. Then add it to your posting queue to see it in your feed and give it a date."
@@ -161,6 +165,16 @@ def set_video(s, vid, name):
     wrec(s, rec)
     (s.kit / "Reels").mkdir(exist_ok=True)
     (s.kit / "Reels" / name).write_bytes(b"\x00" * 2000)
+
+
+def video_stem(s):
+    """The name reel_page.py itself would give the open reel's saved video (without ".mp4"), asked of it in its own process."""
+    ask = ("import sys; from pathlib import Path; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0, sys.argv[2]); "
+           "import reel_page as rp; k = Path(sys.argv[1]); sys.stdout.write(rp.video_stem(k, rp.load(k)))")
+    r = subprocess.run([sys.executable, "-c", ask, str(s.kit), str(SCRIPTS)], capture_output=True, text=True, encoding="utf-8", env=s.env, cwd=str(SCRIPTS))
+    if r.returncode != 0:
+        raise RuntimeError("reel_page.video_stem: " + (r.stdout + r.stderr)[-300:])
+    return r.stdout
 
 
 def two_reels(s, second_made=True):
@@ -453,7 +467,10 @@ def check_video(s):
     # a second reel, saved as a video too: each reel's own preview says so, and it can be added by its id
     new_reel(s, SECOND)
     set_picks(s, "v2", [6, 5])
-    video2 = SHORT + " B-roll - " + SECOND + ".mp4"
+    stem = video_stem(s)
+    case("the name the reel page itself gives that reel's saved video is one a PC can make: none of  \\ / : * ? \" < > |  in it, the rest kept",
+         not re.search(r'[\\/:*?"<>|]', stem) and stem.endswith(" B-roll - White b Backdrop") and "'boys' 🌊" in stem and "Zoë" in stem, stem)
+    video2 = SHORT + " B-roll - " + SECOND_FILE + ".mp4"
     set_video(s, "v2", video2)
     code, t = look(s)
     pv = previews(t)

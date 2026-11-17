@@ -1264,6 +1264,22 @@ def stories_checks(kit):
         check("stories: on a PC a long name is measured in the Stories folder, said in a story's words (or fits)", cant is None or ("stor" in cant[1] and "slide" not in cant[1]), cant)
 
 
+def note_kept(raw, want):
+    """The note as it lies in a design's own file, read here from the bytes and not through design.py (which cleans
+    a note again as it loads one, and so would hide a line end kept wrong): the file is UTF-8, the note in it is
+    exactly `want` (one line break, no carriage return), and its accent and its emoji are there as themselves, as
+    UTF-8, never as escapes. The record's OWN line ends are the computer's: a Mac writes none with a carriage
+    return, and there must be none at all in the file; a PC ends every line of a text file with one (the record
+    is written as text), so there each may only be half of a line end, never one on its own."""
+    try:
+        kept = json.loads(raw.decode("utf-8"))
+    except ValueError:
+        return False
+    lines = raw.replace(b"\r\n", b"\n") if WINDOWS else raw
+    return (isinstance(kept, dict) and kept.get("ask") == want and "\r" not in want and b"\r" not in lines
+            and all(c.encode("utf-8") in raw for c in want if ord(c) > 127))
+
+
 def v26_checks(kit):
     """Nicole's v26, as a PC runs it: sets of stories, the note for the assistant, the assistant's pick, the editing
     queue's names. Records only: an accent and an emoji in every name, no path in anything a page is given."""
@@ -1291,7 +1307,8 @@ def v26_checks(kit):
     d = design.load_design(kit, A, "stories")
     raw = design.design_path(kit, A, "stories").read_bytes()
     check("v26: the note for the assistant is kept with the set, accents and emoji and all, its line break one line break, as UTF-8, never in the layout",
-          code == 200 and d.get("ask") == "Start with Zoë’s laugh 🌊,\nthen the détails" and "ask" not in d["state"] and b"\r" not in raw, (code, out.get("words"), d.get("ask")))
+          code == 200 and d.get("ask") == "Start with Zoë’s laugh 🌊,\nthen the détails" and "ask" not in d["state"] and note_kept(raw, "Start with Zoë’s laugh 🌊,\nthen the détails"),
+          (code, out.get("words"), d.get("ask"), raw[:400]))
     check("v26: the page is given the note back as text, with no path beside it", design.state_for_page(kit, A, "stories")["design"]["ask"] == d["ask"] and no_path(design.state_for_page(kit, A, "stories"))[0])
     before = design.design_path(kit, A, "stories").read_bytes()
     res, words, got = design.story_fill(kit, [2, 3], A)
@@ -1359,7 +1376,8 @@ def v27_checks(kit):
     d = design.load_design(kit, A)
     raw = design.design_path(kit, A).read_bytes()
     check("v27: the note is kept with the carousel design, accents and emoji and all, its line break one line break, as UTF-8, never in the layout",
-          code == 200 and d.get("ask") == "Open on Zoë’s laugh 🌊,\nend on the détails" and "ask" not in d["state"] and b"\r" not in raw, (code, out.get("words"), d.get("ask")))
+          code == 200 and d.get("ask") == "Open on Zoë’s laugh 🌊,\nend on the détails" and "ask" not in d["state"] and note_kept(raw, "Open on Zoë’s laugh 🌊,\nend on the détails"),
+          (code, out.get("words"), d.get("ask"), raw[:400]))
     check("v27: the page is given the note back as text, with no path beside it", design.state_for_page(kit, A)["design"]["ask"] == d["ask"] and no_path(design.state_for_page(kit, A))[0])
     before = design.design_path(kit, A).read_bytes()
     res, words, got = design.fill(kit, [2, 3], A, kind="carousel")

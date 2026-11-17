@@ -598,7 +598,10 @@ def remove(kit):
     check("her two server lines are there too", W.get("song_not_here") == "That song isn't in this shoot's folder anymore."
           and W.get("song_cant_trash") == "I couldn't move that song to the Trash. Drag it out of the shoot's Music folder in Finder instead.")
     page = reel_page.page_html(KIT, "Songs shoot")
-    check("the page carries them for the drop-down's button (the button itself is Lane A's)", "Remove this song" in page and "Move it to the Trash?" in page)
+    # the page says them as this computer does: a Mac her words exactly, a PC the Recycle Bin (trash_words, checked below)
+    sure_here = "Move it to the Recycle Bin?" if this_computer.WINDOWS else "Move it to the Trash?"
+    check("the page carries them for the drop-down's button (the button itself is Lane A's)", "Remove this song" in page and sure_here in page
+          and ("Move it to the Trash?" in page) == (not this_computer.WINDOWS))
     check("the route is in the reel page's list and on the posting server's reel line", "/reel-song-remove" in reel_page.POST_PATHS
           and '"/reel-song-remove"' in (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8"))
     tc = this_computer
@@ -606,11 +609,14 @@ def remove(kit):
     try:                             # a Mac pretending to be a PC: the words a PC sets at import, set by hand
         tc.WINDOWS, tc.TRASH_WORD, tc.TRASH_BACK, tc.FILES_APP = True, "the Recycle Bin", "open the Recycle Bin in File Explorer and choose Restore", "File Explorer"
         pc = (reel_page.trash_words(W["song_trashed"]), reel_page.trash_words(W["song_sure"]), reel_page.pc_words(reel_page.trash_words(W["song_cant_trash"])))
+        pc_page = reel_page.page_html(KIT, "Songs shoot")
     finally:
         tc.WINDOWS, tc.TRASH_WORD, tc.TRASH_BACK, tc.FILES_APP = keep
     check("a PC reads the Recycle Bin, File Explorer and Restore in her lines (trash_words)",
           pc == ("Moved to the Recycle Bin. To get it back, open the Recycle Bin in File Explorer and choose Restore.", "Move it to the Recycle Bin?",
                  "I couldn't move that song to the Recycle Bin. Drag it out of the shoot's Music folder in File Explorer instead."), pc)
+    check("...and a PC's page carries them that way: the Recycle Bin, never the Trash, in the drop-down's question",
+          "Remove this song" in pc_page and "Move it to the Recycle Bin?" in pc_page and "Move it to the Trash?" not in pc_page)
     here_trashed = reel_page.pc_words(reel_page.trash_words(W["song_trashed"]))      # what this computer says
 
     # ---- a recording with two sounds beside it (one noted, one by name only), a plain song, a link named like a sound
