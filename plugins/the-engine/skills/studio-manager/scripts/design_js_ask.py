@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""The stories designer's page: "Let my assistant choose the photos" (Nicole's v26, Nov 13). Stories only.
+"""The designer's page: "Let my assistant choose the photos" (Nicole's v26, Nov 13, on stories; her v27, Nov 14, on
+carousels too).
 
 DESIGN_ASK_JS (put on the page by design_page.py, last) works the button beside the photos' heading and the box it
-opens. The box and every word in it are written into the page by design_page.py (her words, whole); a carousel's
-page has neither, and this script then does nothing at all.
+opens. The box and every word in it are written into the page by design_page.py (her words, whole, worded for
+stories or for slides by the kind of page).
 
     the note      "Tell your assistant what you want", optional, up to 600 letters. It is kept with the open set of
-                  stories as "ask": it rides on the set's own save (Designer.save.fields), about 0.7 s after typing
-                  stops, and comes back with the set (Designer.design.ask). It is never part of the layout, so it
-                  changes no story, no Undo step and no "Already saved".
-    the line      "Pick my story photos for <shoot>", with ", and follow my note" only while there is a note (hers).
-                  The shoot's name goes on the page as text.
+                  stories, or the open carousel design, as "ask": it rides on the design's own save
+                  (Designer.save.fields), about 0.7 s after typing stops, and comes back with the design
+                  (Designer.design.ask). It is never part of the layout, so it changes no story, no slide, no Undo
+                  step and no "Already saved".
+    the line      "Pick my story photos for <shoot>" ("Pick my carousel photos for <shoot>"), with ", and follow my
+                  note" only while there is a note (hers). The shoot's name goes on the page as text.
     Copy          copies the line (the older copy call: the Claude app's pane refuses the newer one), says
                   "Copied" for a moment, tells the Assistant which set was asked about (POST /design-asked: a time
                   noted with the set, nothing else), and from then on, for ten minutes, the page looks every few seconds for the
@@ -26,14 +28,14 @@ DESIGN_ASK_JS = r"""
   'use strict';
   var D = window.Designer, $ = D.$;
   var btn = $('ask-pick'), box = $('ask-box');
-  if (!D.STORY || !btn || !box) return;
+  if (!btn || !box) return;
   var note = $('ask-note'), words = $('ask-words'), copyBtn = $('ask-copy'), said = $('ask-said');
   // Hers, but for the last one (ours: hers has no line for the moment the pick arrives).
   var AW = D.WORDS.ask = {
-    line: words.textContent,                // "Pick my story photos" (written into the page, hers)
+    line: words.textContent,                // "Pick my story photos" / "Pick my carousel photos" (written into the page, hers)
     forShoot: function(shoot){ return ' for ' + shoot; }, withNote: ', and follow my note',
     copy: copyBtn.textContent, copied: 'Copied',
-    arrived: 'Your assistant’s pick is in your stories.'
+    arrived: D.STORY ? 'Your assistant’s pick is in your stories.' : 'Your assistant’s pick is in your slides.'
   };
   var MAX = Number(note.getAttribute('maxlength')) || 600;
   var WATCH = 10 * 60 * 1000, EVERY = 4000;
@@ -43,7 +45,7 @@ DESIGN_ASK_JS = r"""
   function line(){ return AW.line + AW.forShoot(shoot()) + (ask().trim() ? AW.withNote : ''); }
   function show(){ words.textContent = line(); }
 
-  // the note rides on every save of the set
+  // the note rides on every save of the set or the design
   D.save.fields.push(function(body){ if (D.design && typeof D.design.ask === 'string') body.ask = D.design.ask; });
 
   btn.addEventListener('click', function(){
@@ -62,7 +64,7 @@ DESIGN_ASK_JS = r"""
     show();
     D.save.queue();
   });
-  // a set was opened (or the newest came from the Assistant): its own note, unless they are typing one right now
+  // a set or a design was opened (or the newest came from the Assistant): its own note, unless they are typing one right now
   D.on('design', function(){
     if (document.activeElement !== note) note.value = ask();
     else if (D.design && !D.blocked && note.value.trim().slice(0, MAX) !== ask()) {
@@ -91,12 +93,12 @@ DESIGN_ASK_JS = r"""
     clearTimeout(backT);
     backT = setTimeout(function(){ copyBtn.textContent = AW.copy; }, 1500);
     said.textContent = '';
-    // which set they asked about: the line they paste names none, so the Assistant is told it is this one (only a
-    // time is noted with the set; nothing about its stories changes). No answer is waited for.
+    // which set or design they asked about: the line they paste names none, so the Assistant is told it is this one
+    // (only a time is noted with it; nothing about its stories or slides changes). No answer is waited for.
     if (D.design) {
       try {
         fetch('/design-asked', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({kit: D.KIT, kind: 'stories', design: D.design.id})}).then(null, function(){});
+                                body: JSON.stringify({kit: D.KIT, kind: D.STORY ? 'stories' : 'carousel', design: D.design.id})}).then(null, function(){});
       } catch (e) {}
     }
     watch();

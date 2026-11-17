@@ -23,7 +23,7 @@ files, so nothing Python does can change a character of it:
     design_js_designs.py DESIGN_DESIGNS_JS the shoot menu, the design's name, My designs, Duplicate, + New
                                            design (the gallery), Save as template, Fill empty frames
     design_js_save.py    DESIGN_SAVE_JS    Preview swipe, the profile grid's crop, and Save slides
-    design_js_ask.py     DESIGN_ASK_JS     stories: "Let my assistant choose the photos" (the note, the line to copy)
+    design_js_ask.py     DESIGN_ASK_JS     "Let my assistant choose the photos" (the note, the line to copy), both kinds
 
 SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
 (Designer.start()) only after every part is in place.
@@ -304,6 +304,11 @@ ASK_THEN = "Then copy this into the chat, and your assistant fills in your stori
 ASK_LINE = "Pick my story photos"           # the page adds " for <shoot>", and ", and follow my note" when there is one
 ASK_COPY = "Copy"
 ASK_MAX = 600
+# ... and on a carousel too (hers, v27, Nov 14: "carousels too"): the same button and box, worded for slides.
+ASK_SUB_CAROUSEL = "Optional. Your assistant fills your slides with a good mix from this shoot, in an order that flows, and follows your note."
+ASK_PLACE_CAROUSEL = "Optional: what you'd like in your carousel"
+ASK_THEN_CAROUSEL = "Then copy this into the chat, and your assistant fills in your slides:"
+ASK_LINE_CAROUSEL = "Pick my carousel photos"
 SAVE_STORIES = "Save stories"
 OPEN_STORIES = "Open the Stories folder"
 KIT_BACK = "Back to the post kit"           # hers: "← Back to the post kit"
@@ -387,18 +392,19 @@ def page_html(kit_name, kind="carousel"):
         "<div class='strip' id='strip'></div><div class='over' id='over'></div></div></section>"
         "<section class='tray' id='tray'><div class='trayhead'><h2 id='trayname'>Photos</h2>"
         "<span class='prep' id='prep' hidden></span><span class='gline' id='trayline' role='status'></span>"
-        # stories: "Let my assistant choose the photos", beside the photos' heading (hers, v26)
-        + ("<button class='tb ask-btn' id='ask-pick' type='button' aria-expanded='false' aria-controls='ask-box'>" + html.escape(ASK_BUTTON) + "</button>" if story else "")
-        + "</div>"
-        + ("<div class='ask-box' id='ask-box' hidden>"
-           "<label for='ask-note'><b>" + html.escape(ASK_HEAD) + "</b> " + html.escape(ASK_SUB)
-           + "<span class='ask-ex'>" + html.escape(ASK_EXAMPLE) + "</span></label>"
-           "<textarea id='ask-note' rows='2' maxlength='" + str(ASK_MAX) + "' placeholder='" + html.escape(ASK_PLACE, quote=True) + "'></textarea>"
-           "<p>" + html.escape(ASK_THEN) + "</p>"
-           "<div class='ask-line'><span id='ask-words'>" + html.escape(ASK_LINE) + "</span>"
-           "<button class='tb' type='button' id='ask-copy'>" + html.escape(ASK_COPY) + "</button></div>"
-           "<p class='gline' id='ask-said' role='status'></p>"
-           "</div>" if story else "")
+        # "Let my assistant choose the photos", beside the photos' heading: stories (hers, v26) and carousels (hers, v27),
+        # the same box worded for each
+        "<button class='tb ask-btn' id='ask-pick' type='button' aria-expanded='false' aria-controls='ask-box'>" + html.escape(ASK_BUTTON) + "</button>"
+        "</div>"
+        "<div class='ask-box' id='ask-box' hidden>"
+        "<label for='ask-note'><b>" + html.escape(ASK_HEAD) + "</b> " + html.escape(ASK_SUB if story else ASK_SUB_CAROUSEL)
+        + "<span class='ask-ex'>" + html.escape(ASK_EXAMPLE) + "</span></label>"
+        "<textarea id='ask-note' rows='2' maxlength='" + str(ASK_MAX) + "' placeholder='" + html.escape(ASK_PLACE if story else ASK_PLACE_CAROUSEL, quote=True) + "'></textarea>"
+        "<p>" + html.escape(ASK_THEN if story else ASK_THEN_CAROUSEL) + "</p>"
+        "<div class='ask-line'><span id='ask-words'>" + html.escape(ASK_LINE if story else ASK_LINE_CAROUSEL) + "</span>"
+        "<button class='tb' type='button' id='ask-copy'>" + html.escape(ASK_COPY) + "</button></div>"
+        "<p class='gline' id='ask-said' role='status'></p>"
+        "</div>"
         + "<p class='hint' id='trayhint'>" + html.escape(U(TRAY_HINT)) + "</p>"
         "<div class='thumbs' id='thumbs'></div></section>"
         # The bar at the bottom of the window. Every line Save slides says, its two questions' buttons, and

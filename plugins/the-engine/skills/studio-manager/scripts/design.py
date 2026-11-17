@@ -35,7 +35,8 @@ is opened by its id. The first visit still makes one empty white set ("<Shoot> s
 stories"; the next is "<Shoot> stories 2". A shoot that had its one stories design before v26 has it as its first
 set, in the same file, untouched. The kit's card shows the set SAVED last (kit.json "stories_set"), and, while no
 stories are saved, a small picture of the set CHANGED last, exactly as a carousel's designs do.
-  * "Let my assistant choose the photos": the note they write for the assistant is kept with the set, as "ask"
+  * "Let my assistant choose the photos": the note they write for the assistant is kept with the set of stories, or
+    the carousel design, as "ask" (hers: v26 on stories, v27 on carousels too)
     (text, up to 600 letters, never part of the layout, so it never changes a saved story). The chat's side is
     story-note (reads the note and the set's frames) and story-fill (puts the assistant's pick in the frames);
     with no set named they take the set Copy was pressed on, or that was changed, last (Copy notes a time with
@@ -1013,8 +1014,8 @@ def load_design(kit, did, kind=CAROUSEL):
     if state is None or name is None:
         return None
     d["state"], d["name"] = state, name
-    if "ask" in d:                      # the note for the assistant (stories): text only, or it is no note
-        ask = clean_ask(d.get("ask")) if kind == STORIES else None
+    if "ask" in d:                      # the note for the assistant (a set of stories, or a carousel design): text only, or it is no note
+        ask = clean_ask(d.get("ask"))
         if ask:
             d["ask"] = ask
         else:
@@ -1277,10 +1278,10 @@ def save_from_page(body):
         state, why = validate_state(body.get("state"), {x["n"] for x in rows}, kind=kind)
         if state is None:
             return 400, {"ok": False, "why": why, "words": WHY_WORDS.get(why, NOT_UNDERSTOOD)}
-        # Stories: the note for the assistant rides with the set ("ask"). It is never part of the layout, so it
-        # changes no saved story and no "Already saved". A carousel has none: the key is dropped like any unknown one.
+        # The note for the assistant rides with the set of stories or the carousel design ("ask"; hers, v26 and
+        # v27). It is never part of the layout, so it changes no saved story or slide and no "Already saved".
         ask = d.get("ask") or ""
-        if kind == STORIES and "ask" in body:
+        if "ask" in body:
             ask = clean_ask(body.get("ask"))
             if ask is None:
                 # too long is theirs to put right; anything else (not text at all) was never a note
@@ -2190,8 +2191,7 @@ def _design_for_page(kit, d, kind=CAROUSEL):
     out = {"id": d["id"], "name": d["name"], "rev": d["rev"], "updated": d.get("updated"), "t": d.get("t"),
            "state": d["state"], "dropped": int(d.get("dropped") or 0), "set": set_info(kit, d, kind),
            "unfinished": _unfinished(kit, d["id"], kind), "untouched": untouched(kit, d, kind)}
-    if kind == STORIES:
-        out["ask"] = d.get("ask") or ""         # the note for the assistant; text, shown in a box only as text
+    out["ask"] = d.get("ask") or ""         # the note for the assistant (both kinds); text, shown in a box only as text
     return out
 
 
@@ -2503,27 +2503,28 @@ def _post_new(body):
 
 
 def _post_asked(body):
-    """Copy was pressed in "Let my assistant choose" on a set of stories: note WHICH set they asked about, so the
-    chat's commands take that one and not merely the set changed last (the line they paste names no set). Only a
-    time is written into the set's own record ("asked"): the layout, the counter, the name, the note, "t" and the
-    version kept beside it are all as they were. Safe to press any number of times."""
+    """Copy was pressed in "Let my assistant choose" on a set of stories or a carousel design: note WHICH one they
+    asked about, so the chat's commands take that one and not merely the one changed last (the line they paste names
+    no set or design). Only a time is written into its own record ("asked"): the layout, the counter, the name, the
+    note, "t" and the version kept beside it are all as they were. Safe to press any number of times."""
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return 404, {"ok": False, "words": CANT_FIND}
-    if kind_ok(body.get("kind")) != STORIES:
+    kind = kind_ok(body.get("kind"))
+    if kind is None:
         return 400, {"ok": False, "why": "kind", "words": NOT_UNDERSTOOD}
     did = body.get("design")
     if not isinstance(did, str) or not ID.fullmatch(did):
         return 400, {"ok": False, "why": "design", "words": NOT_UNDERSTOOD}
-    deep = too_deep(kit, STORIES)            # a PC only
+    deep = too_deep(kit, kind)               # a PC only
     if deep:
         return 409, {"ok": False, "why": "deep", "words": deep}
     with arrange.locked(design_lock(kit)):
-        d = _read_json(design_path(kit, did, STORIES))
-        if load_design(kit, did, STORIES) is None or not isinstance(d, dict):
+        d = _read_json(design_path(kit, did, kind))
+        if load_design(kit, did, kind) is None or not isinstance(d, dict):
             return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
         d["asked"] = round(time.time(), 3)
-        arrange.write_whole(design_path(kit, did, STORIES), d)
+        arrange.write_whole(design_path(kit, did, kind), d)
     return 200, {"ok": True}
 
 

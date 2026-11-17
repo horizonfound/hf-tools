@@ -375,7 +375,7 @@ DESIGN_CORE_JS = r"""
   // ---- taking a state from the Assistant ----
   function takeDesign(d){
     D.design = {id: d.id, name: d.name, set: d.set || null, unfinished: !!d.unfinished, dropped: d.dropped || 0};
-    if (STORY) D.design.ask = typeof d.ask === 'string' ? d.ask : '';      // the note for the assistant, kept with the set
+    D.design.ask = typeof d.ask === 'string' ? d.ask : '';      // the note for the assistant, kept with the set or the design
     rev = d.rev;
     D.st = M.tidy(d.state);
     hist.clear(); fut = [];

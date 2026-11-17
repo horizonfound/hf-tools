@@ -40,7 +40,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
 HER_REL = Path("reference-private") / "nicole-handoff-v26-2026-11-13" / "Carousel designer and reel picker" / "pages" / "carousel-designer.html"
-HER_PAGES = [ROOT / HER_REL, ROOT.parent / "hf-tools" / HER_REL]      # beside this checkout, or beside the main one
+HER_PAGES = [ROOT / HER_REL, ROOT.parent / "hf-tools" / HER_REL, Path.home() / "Projects" / "hf-tools" / HER_REL]      # beside this checkout, beside the main one, or in it
 APPLE = "/usr/bin/python3" if Path("/usr/bin/python3").exists() else sys.executable
 W, H = 1080, 1920
 
@@ -272,8 +272,8 @@ def check_v26_page(case, work):
         names = re.findall(r"\{ id: '(sg-[a-z0-9]+)', name: '([^']+)', slides: (\d+), bg: '(#[0-9a-f]{6})'", her)
         case("v26 page: her page's story layouts, in her order, are this file's table and then her seven grids",
              [(i, n, int(s), b) for i, n, s, b in names][:4] == [(t[0], t[1], t[2], t[3]) for t in HERS_TEMPLATES] and [n for _, n, _, _ in names][4:] == GRID_NAMES, names)
-    # ---- the carousel's page is as it was, but for Redo ----
-    for w in ("id='ask-pick'", "id='ask-box'", "id='ask-note'", "Let my assistant choose", "Show Instagram's", "Show Instagram&#x27;s"):
+    # ---- the carousel's page is as it was, but for Redo (and, since v27, the ask box: tests/design_v27_check.py) ----
+    for w in ("Show Instagram's", "Show Instagram&#x27;s"):
         case(f"v26 page: the carousel's page has nothing of it ({w})", w not in car)
     case("v26 page: Redo is beside Undo on both pages, off to start with",
          all("<button class='tb' id='undo' type='button' disabled>Undo</button><button class='tb' id='redo' type='button' disabled>Redo</button>" in p for p in (story, car)))
@@ -376,7 +376,7 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         case("v26 server: My editing queue says it is filled from the queue, and which text box", st["starters"][1].get("fill") == "queue" and isinstance(st["starters"][1].get("list"), int))
         case("v26 server: the set comes with its note for the assistant, empty to start with", st["design"].get("ask") == "")
         code, cst = J(get_json(P, f"/design-state?kit={KQ}"))
-        case("v26 server: a carousel's design has no note, and its starters are the carousel's", "ask" not in cst["design"] and not any(x["id"].startswith("sg-") for x in cst["starters"]))
+        case("v26 server: a carousel's design has its own (empty) note since v27, and its starters are the carousel's", cst["design"].get("ask") == "" and not any(x["id"].startswith("sg-") for x in cst["starters"]))
         CID = cst["design"]["id"]
 
         # ---------- the note, saved with the set ----------
@@ -421,7 +421,8 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         cbefore = (cdesigns / f"{CID}.json").read_bytes()
         crow = json.loads(cbefore)
         code, out = J(post(P, "/design", {"kit": kit_name, "design": CID, "stamp": STAMP, "base": crow["rev"], "page": "v26serverpage02", "state": crow["state"], "ask": "sneaky"}))
-        case("v26 server: a carousel takes no note: the key is dropped and nothing is written", code == 200 and (cdesigns / f"{CID}.json").read_bytes() == cbefore, (code, out))
+        case("v26 server: a carousel takes a note of its own since v27, kept beside its layout and never in it (the rest is tests/design_v27_check.py)",
+             code == 200 and json.loads((cdesigns / f"{CID}.json").read_text(encoding="utf-8")).get("ask") == "sneaky" and json.loads((cdesigns / f"{CID}.json").read_text(encoding="utf-8"))["state"] == crow["state"], (code, out))
 
         # ---------- a saved set, and the note never changing what is saved ----------
         JH = {"Content-Type": "image/jpeg"}
@@ -627,8 +628,10 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         case("v26 server: ... story-fill with no set named goes to that same set", code == 0 and "\"Set beach stories 2\"" in o and disk(A)["rev"] == r0 + 2, o[-300:])
         code, out = J(post(P, "/design-asked", {"kit": kit_name, "kind": "stories", "design": B}))
         case("v26 server: Copy pressed again is harmless", code == 200 and {k: v for k, v in disk(B).items() if k != "asked"} == bb)
+        code, out = J(post(P, "/design-asked", {"kit": kit_name, "design": CID}))
+        case("v26 server: Copy on a carousel's design is taken since v27 (the carousel has the box too; tests/design_v27_check.py)", code == 200 and out.get("ok") is True, (code, out))
         cwas = (cdesigns / f"{CID}.json").read_bytes()
-        for what, b, want in (("a carousel's design", {"kit": kit_name, "design": CID}, 400), ("a carousel named as stories", {"kit": kit_name, "kind": "stories", "design": CID}, 404),
+        for what, b, want in (("a carousel named as stories", {"kit": kit_name, "kind": "stories", "design": CID}, 404),
                               ("an id that is not one", {"kit": kit_name, "kind": "stories", "design": "../etc"}, 400),
                               ("a set that is not there", {"kit": kit_name, "kind": "stories", "design": "dnosuchset0001"}, 404),
                               ("a shoot that is not there", {"kit": "../studio", "kind": "stories", "design": B}, 404)):
@@ -1035,7 +1038,7 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.wait_for(f"Designer.design && Designer.design.id !== '{OLD}' && Designer.save.idle()", 15)
             case("v26 browser: ... a second set beside it leaves it exactly as it was", ofile.read_bytes() == old_bytes and c.js("document.getElementById('d-name-box').value") == "Old way stories 2")
 
-        # ---- the carousel's designer: Redo, and nothing else of v26 ----
+        # ---- the carousel's designer: Redo, and nothing else of v26 (the ask box there is v27's: tests/design_v27_check.py) ----
         with cd.Chrome(work=work / "chrome-v26-car", size=(1400, 1000)) as c:
             c.init_script(NO_FINDER_JS)
             c.open(f"{base}/design.html?kit={KQ}")
@@ -1045,8 +1048,8 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
                                   "newSet: !!document.getElementById('new-set'), labels: Array.from(document.querySelectorAll('#labels span')).map(function(s){ return s.textContent; }).slice(0, 2), "
                                   "redo: document.getElementById('redo').disabled, dup: !document.getElementById('dup-design').hidden, mine: document.getElementById('designs-btn').textContent, "
                                   "asked: !!Designer.ask})"))
-            case("v26 browser: the carousel's designer has no assistant button, no note, no x on a label and no sets; its labels and buttons read as before",
-                 car == {"ask": False, "box": False, "x": 0, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": False}, car)
+            case("v26 browser: the carousel's designer has no x on a label and no sets; its labels and buttons read as before (its ask box and note are v27's)",
+                 car == {"ask": True, "box": True, "x": 0, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": True}, car)
             c0 = json.loads(c.js("JSON.stringify(Designer.st)"))
             c.click("#g-bg .sw[data-c='#111111']")
             c1 = json.loads(c.js("JSON.stringify(Designer.st)"))
