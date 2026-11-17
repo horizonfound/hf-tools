@@ -18,6 +18,7 @@ the green pieces cover. Nothing here posts anything, ever (rule 5): dates only.
     python3 posting_queue.py ready "beach reel"          -> green, next in line, gets a date
     python3 posting_queue.py unready "beach reel"        back to yellow
     python3 posting_queue.py posted "beach reel"         it went out
+    python3 posting_queue.py unposted "beach reel"       it didn't go out after all: back in line at the end, ready to post
     python3 posting_queue.py skip "beach carousel"       they don't want this one (red -> gone from the list)
     python3 posting_queue.py move "beach reel" --to 1    change its place in line (dates follow)
     python3 posting_queue.py list
@@ -58,6 +59,15 @@ words. All of it on this one server:
                                                       piece's own kit (cover_file); the piece keeps "cover" and a
                                                       new thumbnail (the earlier one is left where it is)
 A kit's pieces are told apart by the folder they were made from, never by its name made short (kit_sid, same_kit).
+
+Posted, on the post itself (Nicole's v27): the panel of an upcoming post has a Not posted / Posted switch beside
+Done. Posted takes the piece out of the queue and shows it in the grid at once as an ordinary feed post (no date,
+no "posted on" label: that day is only the day they said so) until the real grid is read again; a click on it
+opens a panel with her line and the switch only. Back to Not posted is the "unposted" action (POST /posting
+{action: "unposted", id}, or `unposted "<piece>"` in the chat): posted_at goes, the piece is back in line at the
+end with a new date, and a reminder that was on comes back on that date, the same event brought into step.
+state()["posted"] says which posted pieces the grid shows: those posted since the grid was last read, or in the
+last POSTED_DAYS days when it never was (the server decides; the page only draws them).
 """
 import argparse
 import base64
@@ -106,6 +116,7 @@ KIT_OWN_FILES = ("Post kit.html", "Reel.txt")   # what /content serves from a ki
 KIT_PIECE_FOLDERS = ("Singles", "Carousel", "Stories", "Covers")          # the folders it serves pictures from
 LOW_WEEKS = 1.0          # the running-low tap
 STALE_DAYS = 7           # a yellow piece sitting this long gets a nudge
+POSTED_DAYS = 30         # with the real grid never read, a post marked Posted stays in the grid this long (Nicole's v27)
 # The small pictures the pages show, and how deep each folder's go: a piece's ("posting-thumbs/<piece>.jpg"), a feed
 # tile's ("feed/<post>.jpg"), a queued shoot's ("queue-thumbs/<shoot>/0.jpg") and a kit's on the home page
 # ("home-thumbs/<kit>-1.jpg"). Nothing else in the Studio folder is served from these addresses.
@@ -678,7 +689,9 @@ def schedule(p, reflow=False):
             x.pop("date", None)
         return
     gap = 7.0 / per_week
-    last_posted = max((x.get("posted_at", "")[:10] for x in p["pieces"] if x["status"] == "posted"), default=None)
+    # (a posted_at that is not a day written YYYY-MM-DD... is left out, never crashed on: one odd record never blanks the page)
+    last_posted = max((x["posted_at"][:10] for x in p["pieces"] if x["status"] == "posted"
+                       and isinstance(x.get("posted_at"), str) and re.match(r"\d{4}-\d\d-\d\d", x["posted_at"])), default=None)
     start = today() + timedelta(days=1)
     if last_posted:
         start = max(start, date.fromisoformat(last_posted) + timedelta(days=max(1, round(gap))))
@@ -1408,6 +1421,19 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .pick .sub+.strip{padding-top:.45rem}
 .pick .more{margin:.5rem 0 .2rem}
 .pick .others[hidden]{display:none}
+/* Posted, on the post itself (Nicole's v27): a posted post in the grid as part of the feed (no date), and the
+   Not posted / Posted switch beside Done in a post's panel. Her rules, on the look's colour names; her two greys
+   (#F1F0F4, #C9C7D1) kept, since the look has no name for them. The focus rings are ours (hers are mouse-only). */
+.tile.justposted{cursor:pointer}.tile.justposted img{filter:saturate(.85)}.tile.justposted:hover{box-shadow:inset 0 0 0 3px var(--line)}
+.tile.justposted:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.tile .rk{position:absolute;top:8px;right:8px;color:#fff;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.pick .phr{display:flex;align-items:center;gap:.5rem;flex:none}
+.pswitch{display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--line);background:#F1F0F4;color:var(--ink-2);border-radius:999px;padding:.35rem .8rem .35rem .4rem;font:600 13px/1 var(--sans);cursor:pointer;transition:background .25s,color .25s}
+.pswitch i{position:relative;width:34px;height:20px;border-radius:999px;background:#C9C7D1;transition:background .25s;flex:none}
+.pswitch i::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s var(--ease)}
+.pswitch.on{background:rgba(79,178,134,.14);color:#2f7d56;border-color:rgba(79,178,134,.4)}.pswitch.on i{background:var(--green)}.pswitch.on i::after{transform:translateX(14px)}
+.pswitch:hover{border-color:var(--ink-2)}
+.pswitch:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 """
 
 SCRIPT = r"""
@@ -1432,16 +1458,25 @@ function render(S){LAST=S;
  greens.forEach(x=>{const t=document.createElement('div');t.className='tile mine'+(x.id===nextId?' next':'');t.dataset.id=x.id;
   if(live&&x.role){t.title='Click to change its photo or copy its caption · drag to move it';t.tabIndex=0}
   t.innerHTML=(x.thumb?`<img src="${esc(x.thumb)}" alt="">`:'')+`<span class="k">${x.kind==='reel'?'&#9654;&#xFE0E; Reel':x.kind==='single'?'&#9634;&#xFE0E; Single post':'&#10697; Carousel'}</span><span class="d">${x.id===nextId?'Next up · ':''}${nice(x.date)}</span>`;g.appendChild(t)});
+ // Posted, on the post itself (Nicole's v27): a post marked Posted shows here at once as an ordinary feed post, after the
+ // upcoming ones: no date, no "posted on" label (that day is only the day they said so), a small mark for what it is.
+ // The server says which (S.posted: posted since the grid was read, or lately when it never was); a click, Enter or
+ // Space opens its panel (the switch, to take it back). It is never dragged: the drag below is wired on .tile.mine only.
+ (S.posted||[]).forEach(x=>{const t=mkel('div','tile real justposted');t.dataset.id=x.id;t.title=PW.posted_tip;
+  if(x.thumb){const im=document.createElement('img');im.src=x.thumb;im.alt='';t.appendChild(im)}
+  const rk=mkel('span','rk',x.kind==='reel'?'▶︎':x.kind==='single'?'▢︎':'⧉');rk.setAttribute('aria-label',x.kind==='reel'?'Reel':x.kind==='single'?'Single post':'Carousel');t.appendChild(rk);
+  if(live){t.tabIndex=0;t.onclick=()=>openPick(x.id);t.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target===t){e.preventDefault();openPick(x.id)}})}
+  g.appendChild(t)});
  if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
- else for(let i=0;i<Math.max(0,9-greens.length);i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}
+ else for(let i=0,n=Math.max(0,9-g.children.length);i<n;i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}   // (the posted ones count too, so the rows stay whole)
  $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to your assistant to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to your assistant.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
   items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}${x.reel_name?' · '+esc(x.reel_name):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
  mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to your assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
- document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:'Posted. Nice.',ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
+ document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:PW.posted_toast,ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);
  if(PICK)openPick(PICK,true);watchRemind();}   // an open panel survives every redraw: put back under its post's row, its photos and words read again
 function drag(S){if(!live)return;const g=$('#grid');drag.st={g,src:null,lift:null,over:null,sx:0,sy:0,ox:0,oy:0,on:false};
@@ -1484,7 +1519,12 @@ const PW={reel_line:'Pick the photo your reel shows in your grid. When you post 
  changed_reel:'Changed. Pick this one as the cover when you post.',changed_carousel:'Changed. That’s its photo in your grid now.',
  copy_caption:'Copy caption',copy_hook:'Copy my hook',open_words:'Open my words',write_words:'Write my words',no_caption:'No caption yet.',
  no_hook:'Pick a hook on your words page first.',no_hook_tip:'Pick a hook on your words page first',
- copied:'Copied {what}. Paste it into Instagram.',your_caption:'your caption',your_hook:'your hook'};
+ copied:'Copied {what}. Paste it into Instagram.',your_caption:'your caption',your_hook:'your hook',
+ // Posted, on the post itself (Nicole's v27): the switch, the posted post's line and tooltip, the two toasts
+ not_posted:'Not posted',posted:'Posted',
+ in_feed:'It’s in your feed. If it didn’t actually go out, switch it back to Not posted and it goes back in your queue.',
+ posted_tip:'Click if this one didn’t go out after all',
+ back_in_queue:'Back in your queue, ready to post.',posted_toast:'Posted. Nice. It’s in your feed now.'};
 const KINDW={reel:'reel',carousel:'carousel',single:'single post'};
 function mkel(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function copyText(t,what){   // the old way first: the Claude app's pane refuses navigator.clipboard, and honors this from a click
@@ -1493,27 +1533,37 @@ function copyText(t,what){   // the old way first: the Claude app's pane refuses
  const said=()=>say(PW.copied.replace('{what}',what));
  if(ok){said();return}
  try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell your assistant instead.'))}catch(e){say('Could not copy that. Tell your assistant instead.')}}
-function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
+function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;delete PEL.dataset.posted;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
+// Posted or not (Nicole's v27): a grey switch on the post itself, beside Done. Posted takes it out of the queue and into the
+// feed; back to Not posted puts it back in line, ready to post. Built as text (never her innerHTML), aria-checked said plainly.
+function postedSwitch(x){const on=x.status==='posted',b=mkel('button','pswitch'+(on?' on':''));b.type='button';b.setAttribute('role','switch');b.setAttribute('aria-checked',on?'true':'false');
+ b.appendChild(mkel('i'));b.appendChild(mkel('span',null,on?PW.posted:PW.not_posted));
+ b.onclick=async()=>{const S2=await post({action:on?'unposted':'posted',id:x.id});if(S2){render(S2);say(on?PW.back_in_queue:PW.posted_toast)}};
+ return b}
 function placePick(id){   // right under the row of the post that was clicked
  const g=$('#grid'),tiles=[...g.children].filter(c=>c!==PEL),t=tiles.find(c=>c.dataset&&c.dataset.id===id),i=tiles.indexOf(t);
  const end=tiles[Math.min(tiles.length-1,Math.floor(Math.max(0,i)/3)*3+2)];if(end)end.after(PEL);else g.appendChild(PEL);
  document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'));if(t)t.classList.add('picking')}
 function openPick(id,again){
- const x=(LAST.greens||[]).find(y=>y.id===id);
- if(!live||!x||!x.role){if(PICK===id||again)closePick();return}
+ const x=(LAST.greens||[]).find(y=>y.id===id)||(LAST.posted||[]).find(y=>y.id===id);   // an upcoming post, or one marked Posted (v27)
+ const posted=!!x&&x.status==='posted';
+ if(!live||!x||!(x.role||posted)){if(PICK===id||again)closePick();return}
  if(PICK===id&&!again){closePick();return}    // the same post clicked again closes it
- const fresh=PEL.dataset.id!==id;PICK=id;PEL.hidden=false;placePick(id);
- if(fresh){PEL.dataset.id=id;PEL.textContent='';MORE=null;
+ const fresh=PEL.dataset.id!==id||(PEL.dataset.posted==='1')!==posted;PICK=id;PEL.hidden=false;placePick(id);   // (a flip of the switch redraws it whole)
+ if(fresh){PEL.dataset.id=id;PEL.dataset.posted=posted?'1':'';PEL.textContent='';MORE=null;
   const ph=mkel('div','ph'),hd=mkel('div');hd.appendChild(mkel('b',null,'Your '+(x.shoot_name||'')+' '+(KINDW[x.kind]||x.kind)+(x.reel_name?' · '+x.reel_name:'')));
-  hd.appendChild(mkel('p',null,x.role==='reel'?PW.reel_line:PW.carousel_line));ph.appendChild(hd);
-  const done=mkel('button','x',PW.done);done.type='button';done.onclick=closePick;ph.appendChild(done);PEL.appendChild(ph);
+  hd.appendChild(mkel('p',null,posted?PW.in_feed:x.role==='reel'?PW.reel_line:PW.carousel_line));ph.appendChild(hd);
+  const phr=mkel('div','phr');phr.appendChild(postedSwitch(x));   // the switch, then Done (v27)
+  const done=mkel('button','x',PW.done);done.type='button';done.onclick=closePick;phr.appendChild(done);ph.appendChild(phr);PEL.appendChild(ph);
+  if(!posted){   // a posted post's panel is the header, her line, the switch and Done only: no photos, words or reminder
   PEL.appendChild(mkel('div','pw'));      // the button row: Copy caption, Copy my hook, [stage 4's reminder button], Open my words
   PEL.appendChild(mkel('div','pr'));      // the reminder drop-down opens here (closed, it is empty and takes no room)
   PEL.appendChild(mkel('div','pn'));      // ours: one plain line when the calendar could not be updated (empty otherwise)
   const ps=mkel('div','ps'),strip=mkel('div','strip');strip.appendChild(mkel('p','empty',PW.finding));ps.appendChild(strip);PEL.appendChild(ps);
-  PEL.appendChild(mkel('p','warn'));
+  PEL.appendChild(mkel('p','warn'))}
   if(!again)PEL.scrollIntoView({block:'nearest',behavior:'smooth'})}
- else remindNow(x);      // a redraw: the reminder's button and drop-down follow at once (the photos and words follow the fetch below)
+ else if(!posted)remindNow(x);      // a redraw: the reminder's button and drop-down follow at once (the photos and words follow the fetch below)
+ if(posted)return;      // nothing to fetch for a posted post
  const seq=++PSEQ;
  fetch('/posting/panel?id='+encodeURIComponent(id),{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null).then(P=>{
   if(seq!==PSEQ||PICK!==id)return;      // closed, or another post's panel opened, while this was on its way
@@ -1675,6 +1725,41 @@ if(!live)$('#offline').hidden=false;render(D);
 """
 
 
+def on_feed(p, f=None):
+    """The posted pieces the grid shows as part of the feed (Nicole's v27), newest first: a post marked Posted
+    stays in the grid until the real grid is read again. So: those posted since the grid was last read, or, when
+    it never was, in the last POSTED_DAYS days. A posted piece with no posted_at (from before Oct 28), or one
+    whose posted_at is not a string, is left out, never crashed on. The server decides this once; the page
+    never filters by read_at a second time (hers did)."""
+    f = f if f is not None else load_feed()
+    since = f.get("read_at") if isinstance(f.get("read_at"), str) and f.get("read_at") else None
+    floor = (today() - timedelta(days=POSTED_DAYS)).isoformat()
+    def shown(x):
+        at = x.get("posted_at")
+        if x.get("status") != "posted" or not isinstance(at, str) or not at:
+            return False
+        return at > since if since else at[:10] >= floor
+    return sorted((x for x in p["pieces"] if isinstance(x, dict) and shown(x)), key=lambda x: x["posted_at"], reverse=True)
+
+
+def unpost(p, x, by="claude"):
+    """Back to Not posted (Nicole's v27): "it didn't go out after all". The piece goes back in line at the end,
+    ready to post, with a new date (set_status's green branch: green_at, the last slot, then renumber and
+    schedule); posted_at goes, so the grid stops showing it as part of the feed. Its reminder, when it was on,
+    is left on and so comes back on the new date: reminders.py keeps a posted post's event (never removed), so
+    the round after the save brings THAT event into step, never a second one. The old date goes too: hers kept
+    it, so a post switched back came back down for a day that had already passed. A piece that is ready to post
+    already is left as it is (a second press is harmless); anything else is not a posted post."""
+    if x.get("status") == "green":
+        return x
+    if x.get("status") != "posted":
+        raise ValueError("not a posted post")
+    x.pop("posted_at", None)
+    x.pop("date", None)
+    set_status(p, x, "green", by=by)
+    return x
+
+
 def state(p):
     schedule(p)
     weeks, n = tank(p)
@@ -1713,6 +1798,7 @@ def state(p):
             "remind": remind, "reminding": remind_state(),
             "weeks": weeks, "tank_head": head, "tank_line": tank_words(p), "feed": feed,
             "greens": [pub(x) for x in greens(p)],
+            "posted": [dict(pub(x), posted_at=x["posted_at"]) for x in on_feed(p, f)],
             "yellows": [pub(x) for x in p["pieces"] if x["status"] == "yellow"],
             "reds": [pub(x) for x in p["pieces"] if x["status"] == "red"]}
 
@@ -2436,9 +2522,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if act in ("remind-open", "remind-sync"):
                     out = json.dumps(dict(state(p), **more)).encode()
                     p = None
-                elif act in ("ready", "unready", "posted", "skip"):
+                elif act in ("ready", "unready", "posted", "skip", "unposted"):
                     x = next(y for y in p["pieces"] if y["id"] == body.get("id"))
-                    set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
+                    if act == "unposted":      # the switch back to Not posted (Nicole's v27): back in line, ready to post
+                        unpost(p, x, by="page")
+                    else:
+                        set_status(p, x, {"ready": "green", "unready": "yellow", "posted": "posted", "skip": "skipped"}[act], by="page")
                 elif act == "cover":
                     # the photo this post shows in the grid (Nicole's v20). A reel's pick is the cover to choose when
                     # posting; a carousel's only matches the real grid when it is the first slide (the page says so).
@@ -2590,6 +2679,7 @@ def main():
         if c == "ready":
             # v25: a shoot with several reels. Which reel goes in the queue, by its name on the reel page
             sp.add_argument("--reel", help="which of the shoot's reels, by name (a shoot with more than one reel)")
+    up = sub.add_parser("unposted"); up.add_argument("piece")      # v27: it didn't go out after all
     mv = sub.add_parser("move"); mv.add_argument("piece"); mv.add_argument("--to", type=int, required=True)
     sub.add_parser("list"); sub.add_parser("tank"); sub.add_parser("page")
     r = sub.add_parser("reminders"); r.add_argument("--mark", action="store_true")
@@ -2710,6 +2800,15 @@ def main():
             say(f"{piece_name(x)}: posted. " + tank_words(p))
         else:
             say(f"{piece_name(x)}: {'back to in progress' if a.cmd == 'unready' else 'skipped'}.")
+        calendar_in_step()
+        return 0
+    if a.cmd == "unposted":
+        # v27: "that one didn't go out after all". Only a posted piece is looked for, so "beach reel" finds the
+        # posted one even when the shoot has another reel in line; a reel is found by its name too.
+        x = find(p, a.piece, statuses=("posted",))
+        unpost(p, x)
+        save(p); write_page(p)
+        say(f"{piece_name(x)}: back in your queue, ready to post" + (f", down for {nice_day(x['date'])}" if x.get("date") else "") + ". " + tank_words(p))
         calendar_in_step()
         return 0
     if a.cmd == "move":

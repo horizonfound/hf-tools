@@ -173,7 +173,7 @@ Talking reels aren't on a PC yet. The chooser's card and the page open there, an
 
 **Make it in CapCut** is on the page, and only there: it makes a new CapCut project ("<shoot> talking reel"; a second one is "talking reel 2") and the page says so in its result box. You have no command to press it for them. A project already in CapCut is never changed. If the page says a photo or a video in the reel isn't in the shoot anymore, they take it off its words or put the file back, then press again.
 
-A talking reel is not in the posting queue and does not show on the post kit's Reel card; if they ask, say so and that they post it from CapCut's export like any reel. When they tell you it's made, record it once: `python3 <scripts>/home.py did reel --note "made the Hannah talking reel"`.
+A talking reel is not in the posting queue and does not show on the post kit's Reels card; if they ask, say so and that they post it from CapCut's export like any reel. When they tell you it's made, record it once: `python3 <scripts>/home.py did reel --note "made the Hannah talking reel"`.
 
 ## Not proven yet, honestly
 

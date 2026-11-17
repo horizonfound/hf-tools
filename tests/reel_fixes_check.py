@@ -11,7 +11,7 @@ written into this run's folder and put first on the page server's PATH) passes e
 except while a part of this test asks it to hang or to be stopped part way.
 
   1. the result box never shows reel.py's "Wide photos..." line (it counts by photo number; hers has none)
-  2. the kit page's reel link says her "Create my reel" / "Make a new version", shows before Claude has picked,
+  2. the kit page's reel link says her "Create my reels" / "Create another reel" (v27), shows before Claude has picked,
      and the line beside it points at it, not at the chat; "The cover is in the Covers folder" only when it is
   3. a plain click (no pointer before it: VoiceOver, Switch Control) on All your photos adds and takes out
   4. a chat reel with --kit uses the kit's numbered list, never a list the page left behind that went stale
@@ -149,7 +149,7 @@ def check_wide_kit(s):
     page = (k / ".kit" / "Post kit.html").read_text(encoding="utf-8") if (k / ".kit" / "Post kit.html").is_file() else ""
     case("2. the kit page's Reel card (her post kit) links to the reel page before Claude has picked, in her words", code == 0
          and "<a class='piece' data-piece='reel' href='/reel.html?kit=%s'>" % WIDE_KIT.replace(" ", "%20") in page
-         and "<span class='cta'>Create my reel &rarr;</span>" in page, out[-200:])
+         and "<span class='cta'>Create my reels &rarr;</span>" in page, out[-200:])
     case("2. with her line for a shoot not picked yet, and nothing pointing at the chat",
          "Your assistant hasn&#x27;t picked the reel photos yet. Click to pick them yourself." in page and "Say “make the reel” to Claude" not in page)
     case("2. no Covers folder named on a kit with no Covers folder",
