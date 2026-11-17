@@ -11,6 +11,9 @@ Undo, and the places later parts add themselves:
                                     of changes with the same key is one Undo step), fresh: true (start a new run),
                                     save: false, sel: an id or null, adjust: true | false}
     D.select(id), D.selected()      what is selected on the strip
+    D.multi, D.selectMore(id)       several things at once (hers, v27): their ids, and a Shift- or Cmd-click's toggle;
+                                    D.select(id, {multi: ids}) and D.setState(..., {multi: ids}) set them, a plain
+                                    D.select lets them go, and one that leaves the layout drops out by itself
     D.undo(), D.canUndo()
     D.redo(), D.canRedo()           Redo (Nicole's v26): what Undo took back, put back; a new change empties it
     D.render()                      draws everything again from D.st; D.on('render', fn) adds a drawing step
@@ -107,7 +110,23 @@ DESIGN_CORE_JS = r"""
     moved: function(n, k){ return 'Moved ' + (n > 1 ? n + ' slides (they share a photo)' : 'slide ' + k) + '. Undo moves it back.'; },
     // "Where should it go?" (hers, v27): when a template lands at a spot something stretches across, and when it would pass the most slides
     acrossEnd: 'A photo stretches across that spot, so I added it at the end instead.',
-    tooMany: function(adds, max, have){ return 'That adds ' + adds + (adds === 1 ? ' slide' : ' slides') + ', and Instagram allows ' + max + '. You have ' + have + '. Remove some first, or pick something smaller.'; }
+    tooMany: function(adds, max, have){ return 'That adds ' + adds + (adds === 1 ? ' slide' : ' slides') + ', and Instagram allows ' + max + '. You have ' + have + '. Remove some first, or pick something smaller.'; },
+    // several photos at once (hers, v27): the bar inside the stage while two or more are selected, its buttons, their
+    // tooltips, its hint, and the line each press leaves
+    selN: function(n){ return n + ' selected'; },
+    even: 'Even them out', evenTitle: 'Lay them out tidily on their slide, every photo whole',
+    sameSize: 'Same size', sameTitle: 'Make them the same width as the last one you clicked',
+    tops: 'Line up tops', removeThem: 'Remove them', done: 'Done',
+    manyHint: 'Shift-click a photo to add it or take it out. Drag any of them to move them all.',
+    evened: 'Evened out, every photo whole. Undo puts them back.',
+    samed: 'Same size. Undo puts them back.',
+    lined: 'Lined up. Undo puts them back.',
+    removedThem: 'Removed. Undo brings them back.',
+    // See a photo big (hers, v27): the small button on every tray photo, the window's words, and the one button that puts the photo in
+    bigger: 'See it bigger', biggerN: function(n){ return 'See photo ' + n + ' bigger'; },
+    viewPrev: 'Previous photo', viewNext: 'Next photo', viewLabel: 'Photo, bigger',
+    viewNum: function(n){ return '#' + n; }, viewUsed: 'already in this design',
+    viewUse: 'Use this photo', viewPut: 'Put it in the selected frame', viewClose: 'Close'
   };
   // A part's words in a story's words: "slide" becomes "story", "slides" "stories", the Carousel folder the Stories
   // folder, "+ New design" "+ Add stories". Strings are changed in place; a function's answer is changed as it is
@@ -156,6 +175,8 @@ DESIGN_CORE_JS = r"""
     design: null,         // the open design: {id, name, set, unfinished, dropped}
     st: null,             // its layout now: {slides, bg, blocks}
     sel: null,            // the id of the selected block, or null
+    multi: [],            // several things selected at once (hers, v27): their ids in the order they were clicked, two or
+                          // more, else empty; D.sel is the one clicked last. The page's own, never saved.
     adjust: false,        // "Move photo inside" is on for the selected photo
     scale: 230 / M.W,     // screen pixels for one strip pixel
     blocked: false,       // the photos changed under the page: nothing more is saved until a reload
@@ -179,10 +200,34 @@ DESIGN_CORE_JS = r"""
     if (nid !== D.sel) D.adjust = false;
     D.sel = nid;
   }
+  // The several selected, kept honest: one that is no longer in the layout drops out, and fewer than two is none.
+  function pruneMulti(){
+    if (!D.multi.length) return;
+    D.multi = D.st ? D.multi.filter(function(id){ return !!M.find(D.st, id); }) : [];
+    if (D.multi.length < 2) D.multi = [];
+  }
+  // A plain click selects one thing and lets the several go; o.multi (a list of ids) sets the several instead.
   D.select = function(id, o){
     if (!D.st) return;
     setSel(id);
+    D.multi = o && Array.isArray(o.multi) ? o.multi.slice() : [];
+    pruneMulti();
     if (o && 'adjust' in o) D.adjust = !!o.adjust && D.sel != null;
+    D.render();
+  };
+  // A Shift-, Cmd- or Ctrl-click on a thing on the strip (hers, v27): it joins the several, or leaves them. The one
+  // selected before joins too (so two clicks make a pair); the last clicked is D.sel; down to one, it is simply selected.
+  D.selectMore = function(id){
+    if (!D.st) return;
+    var b = M.find(D.st, id);
+    if (!b) return;
+    var list = D.multi.slice();
+    if (!list.length && D.sel != null && D.sel !== b.id && M.find(D.st, D.sel)) list.push(D.sel);
+    var at = list.indexOf(b.id);
+    if (at >= 0) list.splice(at, 1); else list.push(b.id);
+    if (list.length <= 1) { setSel(list.length ? list[0] : null); D.multi = []; }
+    else { setSel(at >= 0 ? list[list.length - 1] : b.id); D.multi = list; }
+    D.adjust = false;
     D.render();
   };
   D.setState = function(change, o){
@@ -197,6 +242,8 @@ DESIGN_CORE_JS = r"""
       D.st = next;
     }
     if ('sel' in o) setSel(o.sel); else if (D.sel != null && !M.find(D.st, D.sel)) setSel(null);
+    if ('multi' in o) D.multi = Array.isArray(o.multi) ? o.multi.slice() : [];
+    pruneMulti();
     if ('adjust' in o) D.adjust = !!o.adjust && D.sel != null;
     if (did) D.emit('change');
     D.render();
@@ -211,6 +258,7 @@ DESIGN_CORE_JS = r"""
     D.st = JSON.parse(h.st);
     D.adjust = false;
     D.sel = h.sel != null && M.find(D.st, h.sel) ? h.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
+    pruneMulti();
     D.emit('change');
     D.render();
     queue();
@@ -226,6 +274,7 @@ DESIGN_CORE_JS = r"""
     D.st = JSON.parse(f.st);
     D.adjust = false;
     D.sel = f.sel != null && M.find(D.st, f.sel) ? f.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
+    pruneMulti();
     D.emit('change');
     D.render();
     queue();
@@ -398,7 +447,7 @@ DESIGN_CORE_JS = r"""
     rev = d.rev;
     D.st = M.tidy(d.state);
     hist.clear(); fut = [];
-    D.sel = null; D.adjust = false; dirty = false;
+    D.sel = null; D.multi = []; D.adjust = false; dirty = false;
     clearTimeout(timer); clearTimeout(retryT);
     // which design is open lives in the address, so a reload opens the same one
     try { window.history.replaceState(null, '', '/design.html?' + Q + KQ + '&design=' + encodeURIComponent(d.id)); } catch (e) {}

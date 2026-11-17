@@ -19,6 +19,12 @@
     the photo inside its frame Show the whole photo (B12): the frame shrinks to the photo's own shape inside its space, never under 60 px;
                                Crop (B11): the window with the whole photo and a box, the corners keeping the frame's shape, eight
                                handles when unticked and the frame taking the box's shape, Done mapped onto zoom and crop up to 25
+    several photos at once     (B13) Shift-, Cmd- or Ctrl-click to select several, the bar inside the stage ("3 selected", Even them
+                               out, Same size, Line up tops, Remove them, Done, her hint), a drag of any moving them all (kept on the
+                               strip), Backspace and Escape; the rules by themselves (evenOut's columns, sameSize's reference, ...)
+    see a photo big            (B14) a tray tile's ⤢ or a double-click opens the dark window, ‹ › and the arrow keys browse round,
+                               Use this photo / Put it in the selected frame, Close, Escape; a single click puts the photo in only
+                               after 230 ms; the picture by number, never a path
 
 Three parts, as the other parts have: the tables, the words and the rules by themselves (check_v27_page), the routes
 and the commands by request (check_v27_server, a pretend kit and a page server on the port it is given), and the real
@@ -96,6 +102,18 @@ HERS = {
     "crop_cancel": "Cancel", "crop_done": "Done",
     "crop_lock_hint": "Untick Keep the frame's shape to crop each side on its own. The frame on your slide changes shape to match.",
     "cropped": "Cropped. Undo takes it back.",
+    # several photos at once (B13): her bar (her HTML line 343) and its lines (her page line 1064)
+    "even": "Even them out", "even_title": "Lay them out tidily on their slide, every photo whole",
+    "same": "Same size", "same_title": "Make them the same width as the last one you clicked",
+    "tops": "Line up tops", "remove_them": "Remove them", "done": "Done",
+    "many_hint": "Shift-click a photo to add it or take it out. Drag any of them to move them all.",
+    "evened": "Evened out, every photo whole. Undo puts them back.",
+    "samed": "Same size. Undo puts them back.",
+    "lined": "Lined up. Undo puts them back.",
+    "removed_them": "Removed. Undo brings them back.",
+    # See a photo big (B14): the tile's button (her page line 1783) and her window (her HTML 395-401, her page 1757-1759)
+    "bigger": "See it bigger", "view_prev": "Previous photo", "view_next": "Next photo", "view_label": "Photo, bigger",
+    "view_used": "already in this design", "view_use": "Use this photo", "view_put": "Put it in the selected frame", "view_close": "Close",
 }
 # Her lines that her page builds from pieces (a kind's word, a number): the piece in her page, and the line ours says for a slide
 # and for a story, with the number 3 where she puts one. Each is looked for in her page, and ours are checked against both kinds.
@@ -136,6 +154,7 @@ OUR_WORDS = {
     "Only what's inside the box shows on your story.": "the end of her Crop hint in the stories designer: her one page says slide for both kinds; ours says story there, as every story word does (decision 20)",
     "The frame on your story changes shape to match.": "the end of her Keep the frame's shape hint in the stories designer, the same way",
     "Crop the photo": "the Crop window's name for a screen reader (hers: its aria-label, the same words)",
+    "Lay them out tidily on their story, every photo whole": "Even them out's tooltip in the stories designer: her one page says slide for both kinds; ours says story there (decision 20)",
 }
 
 
@@ -421,6 +440,94 @@ JSON.stringify(out);
 """
 
 
+# B13 under the Mac's own JavaScript engine: several things at once, with no page.
+MANY_JS = r"""
+var out = [];
+function t(name, ok, detail){ out.push([name, !!ok, detail === undefined ? '' : JSON.stringify(detail)]); }
+function eq(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+function near(a, b, e){ return Math.abs(a - b) <= (e || 0.01); }
+var window = this;
+window.DESIGN_LIMITS = CAROUSEL_LIMITS;
+eval(MODEL_SRC);
+var M = window.DesignModel, W = 1080, H = 1350;
+function F(id, n, x, y, w, h, more){ var b = {id: id, n: n, x: x, y: y, w: w, h: h, ox: 0.5, oy: 0.5, zoom: 1}; for (var k in (more || {})) b[k] = more[k]; return b; }
+function TX(id, x, y){ return {id: id, type: 'text', text: 'Their words', font: 'Figtree', size: 72, weight: 700, italic: false, upper: false, al: 'center', ls: 0, lh: 1.3, color: '#111111', x: x, y: y, w: 800, h: 94}; }
+function by(st, id){ return M.find(st, id); }
+function whole(b, a){ return near(b.w / b.h, a, 0.002) && b.ox === 0.5 && b.oy === 0.5 && b.zoom === 1; }
+function inside(b, slide){ var m = M.EVEN.margin; return b.x >= slide * W + m - 0.01 && b.x + b.w <= (slide + 1) * W - m + 0.01 && b.y >= m - 0.01 && b.y + b.h <= H - m + 0.01; }
+// two slides: three photos of mixed shapes and a text box on slide 1 (one photo held at a zoom), one photo on slide 2
+var st = {slides: 2, bg: '#ffffff', blocks: [F(1, 1, 100, 100, 500, 400, {ox: 0.2, oy: 0.8, zoom: 2}), F(2, 2, 700, 50, 300, 600), F(3, 3, 150, 700, 600, 300), TX(4, 0, 1200), F(5, 5, W + 50, 50, 600, 600)]};
+var A = {1: 1.5, 2: 2 / 3, 3: 1.5, 5: 1}, was = JSON.stringify(st);
+t('many: the margin is 40 and the gap 24 (hers), and members() gives the things that are there, once each, in the order asked', M.EVEN.margin === 40 && M.EVEN.gap === 24 && eq(M.members(st, [3, 1, 3, 9, 1]).map(function(b){ return b.id; }), [3, 1]));
+// ---- Even them out ----
+var r = M.evenOut(st, [1, 2, 3], A);
+t('evenOut: three photos (wide, tall, wide): one column comes out biggest (her search), the tall one first (it is highest), each photo whole at its own shape, the crop back to the middle',
+  by(r, 2).y < by(r, 1).y && by(r, 1).y < by(r, 3).y && whole(by(r, 1), 1.5) && whole(by(r, 2), 2 / 3) && whole(by(r, 3), 1.5) && near(by(r, 1).x, by(r, 2).x + (by(r, 2).w - by(r, 1).w) / 2, 0.02), r.blocks.slice(0, 3));
+t('evenOut: ... the three sit inside the slide\'s margins, the rows 24 apart and the stack centred up and down, the same height each (one column: the row is as tall as its photo)',
+  [1, 2, 3].every(function(i){ return inside(by(r, i), 0); }) && near(by(r, 1).y - (by(r, 2).y + by(r, 2).h), 24, 0.02) && near(by(r, 3).y - (by(r, 1).y + by(r, 1).h), 24, 0.02)
+  && near(by(r, 2).y, H - (by(r, 3).y + by(r, 3).h), 0.02), r.blocks.slice(0, 3));
+t('evenOut: ... it is the largest total area of the column counts: one column beats two and three here', (function(){
+  var best = 0, which = 0;
+  for (var c = 1; c <= 3; c++) { var rr = Math.ceil(3 / c), cw = (W - 80 - (c - 1) * 24) / c, ch = (H - 80 - (rr - 1) * 24) / rr, area = 0;
+    [1.5, 2 / 3, 1.5].forEach(function(a){ var w = Math.min(cw, ch * a); area += w * w / a; }); if (area > best) { best = area; which = c; } }
+  return which === 1 && near(by(r, 1).w * by(r, 1).h + by(r, 2).w * by(r, 2).h + by(r, 3).w * by(r, 3).h, best, 5); })());
+t('evenOut: the text box in the set is left exactly where it is, and the photo on slide 2 is untouched', eq(by(r, 4), by(st, 4)) && eq(by(r, 5), by(st, 5)));
+t('evenOut: the layout it was given is untouched', JSON.stringify(st) === was);
+r = M.evenOut(st, [1], A);
+t('evenOut: one photo: as large as the margins allow, centred, whole', whole(by(r, 1), 1.5) && by(r, 1).w === 1000 && near(by(r, 1).x, 40) && near(by(r, 1).y, (H - 1000 / 1.5) / 2), by(r, 1));
+r = M.evenOut(st, [4, 1], A);
+t('evenOut: with a text box among them, only the photos are laid out (one here), the text box stays', eq(by(r, 4), by(st, 4)) && by(r, 1).w === 1000);
+t('evenOut: only text boxes, or nothing that is there: the very same layout', M.evenOut(st, [4], A) === st && M.evenOut(st, [99], A) === st && M.evenOut(st, [], A) === st);
+r = M.evenOut(st, [5, 1], A);
+t('evenOut: photos from two slides land on the first one\'s slide (by slide, then top to bottom): both on slide 1 here, slide 1\'s photo first (one column comes out biggest: the wide one over the square one)',
+  inside(by(r, 1), 0) && inside(by(r, 5), 0) && by(r, 1).y < by(r, 5).y && near(by(r, 1).x + by(r, 1).w / 2, W / 2, 0.02) && near(by(r, 5).x + by(r, 5).w / 2, W / 2, 0.02) && whole(by(r, 5), 1), [by(r, 1), by(r, 5)]);
+r = M.evenOut(st, [2, 3], null);
+t('evenOut: with no shapes given, a photo\'s frame\'s own shape stands in', whole(by(r, 2), 0.5) && whole(by(r, 3), 2));
+var many = {slides: 1, bg: '#fff', blocks: []};
+for (var i = 1; i <= 60; i++) many.blocks.push(F(i, i, 10 * i, 10 * i, 100, 100));
+var ids60 = many.blocks.map(function(b){ return b.id; });
+r = M.evenOut(many, ids60, null);
+var cols60 = (function(){ var best = 0, which = 0; for (var c = 1; c <= 60; c++) { var rr = Math.ceil(60 / c), cw = (W - 80 - (c - 1) * 24) / c, ch = (H - 80 - (rr - 1) * 24) / rr; if (cw < 60 || ch < 60) continue; var w = Math.min(cw, ch), area = 60 * w * w; if (area > best) { best = area; which = c; } } return which; })();
+t('evenOut: sixty squares: laid out in the count of columns where they come out biggest with every cell at least 60 px (' + cols60 + ' columns by her search), all inside the margins, none under 60',
+  r !== many && cols60 === 7 && many.blocks.every(function(b){ var q = by(r, b.id); return inside(q, 0) && q.w >= 60 && q.h >= 60; })
+  && (function(){ var top = Math.min.apply(null, r.blocks.map(function(b){ return b.y; })), xs = {}; r.blocks.forEach(function(b){ if (b.y === top) xs[Math.round(b.x)] = 1; }); return Object.keys(xs).length === cols60; })()
+  && (function(){ var last = Math.max.apply(null, r.blocks.map(function(b){ return b.y; })), row = r.blocks.filter(function(b){ return b.y === last; }); return row.length === 4 && near(Math.min.apply(null, row.map(function(b){ return b.x; })) + Math.max.apply(null, row.map(function(b){ return b.x + b.w; })), W, 0.05); })(), [cols60, r.blocks.length]);
+t('evenOut: a layout where no column count fits (frames under 60 either way: 400 squares) is left as it is', (function(){ var s = {slides: 1, bg: '#fff', blocks: []}; for (var i = 1; i <= 400; i++) s.blocks.push(F(i, 1, 0, 0, 100, 100)); return M.evenOut(s, s.blocks.map(function(b){ return b.id; }), null) === s; })());
+t('evenOut: the same again changes nothing (the very same layout back)', (function(){ var a = M.evenOut(st, [1, 2, 3], A); return M.evenOut(a, [1, 2, 3], A) === a; })());
+// ---- Same size ----
+r = M.sameSize(st, [1, 2, 3, 4], 2, {textMin: 80});
+t('sameSize: the last clicked (photo 2, 300 wide) is the reference: the others become 300 wide, each photo keeping its own shape with its crop back to the middle, the text box only its width', by(r, 2) === by(st, 2) && by(r, 1).w === 300 && by(r, 1).h === 240 && by(r, 1).ox === 0.5 && by(r, 1).zoom === 1 && by(r, 3).w === 300 && by(r, 3).h === 150 && by(r, 4).w === 300 && by(r, 4).h === 94 && eq([by(r, 1).x, by(r, 1).y, by(r, 3).x, by(r, 3).y], [100, 100, 150, 700]), r.blocks);
+r = M.sameSize(st, [1, 4], 4, {textMin: 80});
+t('sameSize: a text box as the last clicked is skipped as the reference (ours: hers gave the photos its width): the first photo among them is the reference, so the text box takes the photo\'s width and the photo is untouched', by(r, 1) === by(st, 1) && by(r, 4).w === 500, r.blocks);
+t('sameSize: only text boxes, or nothing that is there: the very same layout', M.sameSize(st, [4], 4, null) === st && M.sameSize(st, [99], 99, null) === st);
+t('sameSize: a text box is never narrower than the narrowest it may be', by(M.sameSize({slides: 1, bg: '#fff', blocks: [F(1, 1, 0, 0, 60, 60), TX(2, 0, 500)]}, [1, 2], 1, {textMin: 80}), 2).w === 80);
+t('sameSize: a photo is never under 60 tall (a very wide one made 60 wide)', by(M.sameSize({slides: 1, bg: '#fff', blocks: [F(1, 1, 0, 0, 60, 60), F(2, 2, 0, 500, 600, 100)]}, [1, 2], 1, null), 2).h === 60);
+r = M.sameSize({slides: 1, bg: '#fff', blocks: [F(1, 1, 0, 0, 1000, 1000), F(2, 2, 1000, 1200, 200, 100)]}, [1, 2], 1, null);
+t('sameSize: a photo near the strip\'s edge made 1000 wide is kept on the strip (at least 40 px on it)', M.onStrip(by(r, 2), 1) && by(r, 2).w === 1000 && by(r, 2).h === 500, by(r, 2));
+t('sameSize: the same again changes nothing', (function(){ var a = M.sameSize(st, [1, 2, 3], 2, null); return M.sameSize(a, [1, 2, 3], 2, null) === a; })());
+t('sameSize: the layout it was given is untouched', JSON.stringify(st) === was);
+// ---- Line up tops ----
+r = M.lineTops(st, [1, 2, 3, 4]);
+t('lineTops: every one moves to the highest top among them (50), the text box too; nothing else changes', [1, 2, 3, 4].every(function(i){ return by(r, i).y === 50 && by(r, i).x === by(st, i).x && by(r, i).w === by(st, i).w; }) && eq(by(r, 5), by(st, 5)), r.blocks.map(function(b){ return b.y; }));
+t('lineTops: one thing, or things already level, or nothing there: the very same layout', M.lineTops(st, [1]) === st && M.lineTops(r, [1, 2, 3]) === r && M.lineTops(st, [99, 98]) === st);
+// ---- Remove them ----
+r = M.removeMany(st, [1, 3, 4]);
+t('removeMany: the three go, the two left are as they were, in their order', eq(r.blocks, [by(st, 2), by(st, 5)]));
+t('removeMany: nothing that is there: the very same layout', M.removeMany(st, [99]) === st && M.removeMany(st, []) === st);
+// ---- Drag any of them and they all move ----
+r = M.moveMany(st, [1, 2], 10, 20);
+t('moveMany: the two move by the same 10, 20; the rest stay', eq([by(r, 1).x, by(r, 1).y, by(r, 2).x, by(r, 2).y], [110, 120, 710, 70]) && eq(by(r, 3), by(st, 3)) && eq(by(r, 4), by(st, 4)));
+r = M.moveMany(st, [1, 2], -5000, -5000);
+t('moveMany: pushed far off to the top left: the group stops where the first of them would leave the strip (40 px kept), and stays rigid (the two as far apart as they were); hers let them go off altogether',
+  M.onStrip(by(r, 1), 2) && M.onStrip(by(r, 2), 2) && by(r, 1).x === 40 - 500 && by(r, 2).x - by(r, 1).x === 600 && by(r, 2).y - by(r, 1).y === -50 && by(r, 1).y === 40 - 400, [by(r, 1), by(r, 2)]);
+r = M.moveMany(st, [1, 2, 5], 5000, 5000);
+t('moveMany: ... and to the bottom right: the one nearest the strip\'s end stops it (photo 5 keeps 40 px on the strip)', M.onStrip(by(r, 5), 2) && by(r, 5).x === 2 * W - 40 && by(r, 1).x - by(st, 1).x === by(r, 5).x - by(st, 5).x && by(r, 1).y === H - 40, [by(r, 1), by(r, 5)]);
+t('moveMany: no move, or nothing there: the very same layout', M.moveMany(st, [1, 2], 0, 0) === st && M.moveMany(st, [99], 10, 10) === st);
+t('moveMany: the layout it was given is untouched', JSON.stringify(st) === was);
+JSON.stringify(out);
+"""
+
+
 def check_v27_page(case, work):
     sys.path.insert(0, str(SCRIPTS))
     import arrange_page
@@ -566,8 +673,9 @@ def check_v27_page(case, work):
     crop = src["DESIGN_CROP_JS"]
     for k in ("crop_title", "crop_hint", "crop_lock", "crop_cancel", "crop_done", "crop_lock_hint", "cropped"):
         case(f"v27 page: her words in the crop part: {HERS[k][:60]}", "'" + HERS[k].replace("'", "\\'") + "'" in crop, HERS[k])
-    case("v27 page: the crop part is the last script on the page (after the designs part, whose windows it uses), and its styles are in the parts' CSS",
-         [n for n, _ in design_page.SCRIPTS][-1] == "DESIGN_CROP_JS" and ".cr-box{" in design_page.PART_CSS and ".dz-sheet.cr-sheet{" in design_page.PART_CSS)
+    names_ = [n for n, _ in design_page.SCRIPTS]
+    case("v27 page: the crop part comes after the designs part (whose windows it uses) and before the view part, and its styles are in the parts' CSS",
+         names_.index("DESIGN_CROP_JS") > names_.index("DESIGN_DESIGNS_JS") and names_[-2:] == ["DESIGN_CROP_JS", "DESIGN_VIEW_JS"] and ".cr-box{" in design_page.PART_CSS and ".dz-sheet.cr-sheet{" in design_page.PART_CSS)
     case("v27 page: the Crop button is put between Show the whole photo and Move photo inside (her order), and the strip's press is handed to the crop part",
          "group.insertBefore(cropBtn, adj)" in crop and "if (a === 'crop') { if (D.crop) D.crop.open(); return; }" in edit)
     case("v27 page: the window's picture is the Assistant's made copy by number (never a path), and the box's maths are the model's",
@@ -588,6 +696,57 @@ def check_v27_page(case, work):
     if case("v27 page: the photo-in-its-frame rules ran by themselves (no page)", isinstance(rows, list) and len(rows) >= 10, (r.stdout[-300:], r.stderr[-300:])):
         for name, ok, detail in rows:
             case("v27 rules: " + name, ok, detail)
+
+    # ---- B13: several photos at once: her words in the core's table, the bar built inside the stage, the keys, the rules by themselves ----
+    for k in ("even", "even_title", "same", "same_title", "tops", "remove_them", "done", "many_hint", "evened", "samed", "lined", "removed_them"):
+        case(f"v27 page: her words in the core's table: {HERS[k][:60]}", "'" + HERS[k].replace("'", "\\'") + "'" in core, HERS[k])
+    case("v27 page: \"3 selected\" is built from the count as hers is, and the bar is built from the words table inside the stage, as its first child, with her five buttons and her hint",
+         "selN: function(n){ return n + ' selected'; }" in core and "stage.insertBefore(mbar, stage.firstChild)" in edit
+         and all(x in edit for x in ("mbtn(WORDS.even, 'even', WORDS.evenTitle)", "mbtn(WORDS.sameSize, 'size', WORDS.sameTitle)", "mbtn(WORDS.tops, 'tops')", "mbtn(WORDS.removeThem, 'del')", "mbtn(WORDS.done, 'done')", "el('span', 'hint', WORDS.manyHint)")))
+    case("v27 page: a Shift-, Cmd- or Ctrl-click joins or leaves the several before any drag starts, and a press on one of several drags them all through the model's moveMany, with no snapping",
+         "if (bd && !hd && (e.shiftKey || e.metaKey || e.ctrlKey)) { D.selectMore(id); return; }" in edit and "next = M.moveMany(D.st, ids, p.x - q0.x, p.y - q0.y)" in edit
+         and edit.index("D.selectMore(id); return;") < edit.index("if (D.sel !== id || D.multi.length) D.select(id);"))
+    case("v27 page: the five presses go through the model's own operations, Same size with the last clicked as its reference and the text box's narrowest width, each one change (one Undo step, one save)",
+         all(x in edit for x in ("M.evenOut(D.st, ids, aspects(ids))", "M.sameSize(D.st, ids, D.sel, {textMin: D.blockTypes.text ? D.blockTypes.text.minW : 0})", "M.lineTops(D.st, ids)", "M.removeMany(D.st, ids)"))
+         and "D.setState(next, a === 'del' ? {sel: null, multi: []} : {multi: ids, adjust: false})" in edit)
+    case("v27 page: Backspace or Delete with several selected removes them all; Escape lets the several go (the last clicked stays selected)",
+         "if (D.multi.length > 1) doMany('del'); else doAct('del');" in edit and "if (D.multi.length > 1) D.select(D.sel); else D.select(null);" in edit)
+    case("v27 page: the several are the page's own: never in what a save sends, let go when another design opens, and one that leaves the layout drops out by itself",
+         "multi" not in core[core.index("function body(){"):core.index("function queue(){")] and "D.sel = null; D.multi = []; D.adjust = false; dirty = false;" in core and "function pruneMulti(){" in core)
+    case("v27 page: the bar's styles are in the page's CSS, in her coral, sticky at the stage's left edge, and the global [hidden] rule covers it (no rule of its own needed)",
+         ".multibar{position:sticky;left:0;display:flex;" in design_page.DESIGN_CSS and "background:#fbeee8;border:1px solid #f0cdbf" in design_page.DESIGN_CSS and ".blk.many{outline:2px solid var(--sel)" in design_page.DESIGN_CSS
+         and "[hidden]{display:none!important}" in arrange_page.CSS)
+    case("v27 page: Even them out's tooltip in a story's words is listed under our words", "Lay them out tidily on their story, every photo whole" in OUR_WORDS
+         and design.story_words(HERS["even_title"]) == "Lay them out tidily on their story, every photo whole")
+    js = work / "v27-many.js"
+    js.write_text("var MODEL_SRC = " + json.dumps(src["DESIGN_MODEL_JS"]) + ";\nvar CAROUSEL_LIMITS = " + json.dumps(design.limits_for("carousel")) + ";\n" + MANY_JS, encoding="utf-8")
+    r = osascript(js)
+    try:
+        rows = json.loads(r.stdout)
+    except ValueError:
+        rows = None
+    if case("v27 page: the several-at-once rules ran by themselves (no page)", isinstance(rows, list) and len(rows) >= 20, (r.stdout[-300:], r.stderr[-300:])):
+        for name, ok, detail in rows:
+            case("v27 rules: " + name, ok, detail)
+
+    # ---- B14: See a photo big: her words, the tile's button, the wait, the view part on the page last ----
+    view = src["DESIGN_VIEW_JS"]
+    for k in ("bigger", "view_prev", "view_next", "view_label", "view_used", "view_use", "view_put", "view_close"):
+        case(f"v27 page: her words in the core's table: {HERS[k][:60]}", "'" + HERS[k].replace("'", "\\'") + "'" in core, HERS[k])
+    case("v27 page: \"See photo 12 bigger\" and \"#12\" are built from the number as hers are", "biggerN: function(n){ return 'See photo ' + n + ' bigger'; }" in core and "viewNum: function(n){ return '#' + n; }" in core)
+    case("v27 page: every tray tile is built by one function, with her small button (her tooltip, its name for a screen reader with the number)",
+         "function tile(p){" in edit and "D.S.photos.forEach(function(p){ frag.appendChild(tile(p)); });" in edit and "D.tile = tile;" in edit
+         and "big.title = WORDS.bigger; big.setAttribute('aria-label', WORDS.biggerN(p.n));" in edit)
+    case("v27 page: a single click on a tile puts the photo in after 230 ms (hers), a double-click or the button shows it big and cancels that wait; Return on a tile puts it in at once",
+         "var CLICK_WAIT = 230, clickT = null;" in edit and "click: function(){ clickLater(n); }" in edit and "function seeBig(n){ clearTimeout(clickT); clickT = null; if (D.big) D.big.open(n); }" in edit
+         and "thumbs.addEventListener('dblclick'" in edit and "if (e.target.closest && e.target.closest('.see')) return;" in edit
+         and "if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('th')) { e.preventDefault(); clickPhoto(Number(t.dataset.n)); return; }" in edit)
+    case("v27 page: the view part is the last script on the page, its styles in the parts' CSS, its window one of the page's sheets",
+         names_[-1] == "DESIGN_VIEW_JS" and "#view-img{" in design_page.PART_CSS and ".th .see{" in design_page.PART_CSS and "D.modals.make('view')" in view)
+    case("v27 page: the picture is the Assistant's made copy by number (never a path, nothing new fetched), Use is the tray's own click, and the arrow keys step round the tray's order",
+         "D.photoUrl(n, 'l')" in view and "/full/" not in view and "D.clickPhoto(n)" in view and "step(e.key === 'ArrowLeft' ? -1 : 1)" in view and "((i + d * k) % list.length + list.length) % list.length" in view)
+    case("v27 page: Use says Put it in the selected frame with a frame selected, else Use this photo; and the window closes when the design changes under it",
+         "D.label(useBtn, b && M.isFrame(b) ? WORDS.viewPut : WORDS.viewUse);" in view and "D.on('design', function(){ if (D.modals.isOpen(modal)) close(); });" in view)
 
     # ---- her page, when it is beside the project: every word of hers, and hers the other way round ----
     her = her_page()
@@ -1363,6 +1522,241 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
                  disk()["state"]["blocks"][0]["zoom"] == 25 and z == {"slider": "300", "zoom": 25} and all(abs(v) <= 1.5 for v in img_layout(1).values()), (z, img_layout(1)))
             case("v27 browser: nothing went wrong on the page through the Crop window", not c.page_errors(), c.page_errors()[:3])
 
+            # ================= several photos at once (B13) =================
+            def many_state():
+                return {"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 100, 100, 400, 500), _frame(2, 2, 600, 80, 380, 500), _frame(3, 3, 150, 700, 500, 380), _text(4, W + 100, 1100), _frame(5, 4, W + 50, 50, 600, 600)]}
+
+            def multi():
+                return Jx("Designer.multi")
+
+            def bar():
+                return Jx("(function(){ var m = document.getElementById('multibar'); return {shown: !m.hidden && getComputedStyle(m).display !== 'none', n: document.getElementById('multi-n').textContent, "
+                          "btns: Array.from(m.querySelectorAll('button')).map(function(b){ return [b.textContent, b.title, b.disabled]; }), hint: m.querySelector('.hint').textContent, line: document.getElementById('multi-line').textContent, "
+                          "parent: m.parentNode.id, first: m.parentNode.firstElementChild === m, many: Array.from(document.querySelectorAll('#strip .blk.many')).map(function(e){ return Number(e.dataset.id); })}; })()")
+
+            def pos(bid):
+                b = [x for x in st()["blocks"] if x["id"] == bid][0]
+                return [b["x"], b["y"]]
+
+            put(many_state())
+            rev4 = disk()["rev"]
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='2']", shift=True)
+            b1 = bar()
+            case("v27 browser: a photo clicked, another Shift-clicked: both are selected, the bar appears inside the stage (its first child, above the labels) saying \"2 selected\", her five buttons with her two tooltips, her hint; the one clicked last has the handles",
+                 multi() == [1, 2] and b1["shown"] and b1["n"] == "2 selected" and b1["parent"] == "stage" and b1["first"] and b1["many"] == [1, 2] and b1["hint"] == HERS["many_hint"]
+                 and b1["btns"] == [[HERS["even"], HERS["even_title"], False], [HERS["same"], HERS["same_title"], False], [HERS["tops"], "", False], [HERS["remove_them"], "", False], [HERS["done"], "", False]]
+                 and c.js("Designer.sel") == 2 and c.js("document.querySelector('.selbox').classList.contains('on')"), (multi(), b1))
+            geo = Jx("(function(){ var m = document.getElementById('multibar').getBoundingClientRect(), s = document.getElementById('stage').getBoundingClientRect(), l = document.getElementById('labels').getBoundingClientRect(); return {bar: [m.top, m.bottom], stage: s.top, labels: l.top}; })()")
+            case("v27 browser: ... the bar sits inside the stage's top and wholly above the slide labels", geo["bar"][0] > geo["stage"] and geo["bar"][1] <= geo["labels"], geo)
+            c.click("#strip .blk[data-id='3']", meta=True)
+            case("v27 browser: a Cmd-click adds a third: \"3 selected\" (her screenshot 11), the last clicked selected, the selected-photo buttons are its own",
+                 multi() == [1, 2, 3] and bar()["n"] == "3 selected" and c.js("Designer.sel") == 3 and not c.js("document.getElementById('sel-photo').hidden"), (multi(), bar()["n"]))
+            c.click("#strip .blk[data-id='3']", shift=True)
+            case("v27 browser: Shift-click on one of them takes it out: \"2 selected\", the one clicked last of the rest selected", multi() == [1, 2] and bar()["n"] == "2 selected" and c.js("Designer.sel") == 2, (multi(), c.js("Designer.sel")))
+            # the bar stays in sight while the tray scrolls under the sticky stage, and while the strip scrolls sideways
+            view0 = c.js("Designer.view()")
+            c.desktop((1400, 600))
+            time.sleep(0.3)
+            c.js("window.scrollTo(0, 900)")
+            time.sleep(0.3)
+            geo = Jx("(function(){ var m = document.getElementById('multibar').getBoundingClientRect(); return {top: m.top, bottom: m.bottom, y: scrollY, h: innerHeight}; })()")
+            case("v27 browser: with the photos scrolled far under the sticky stage, the bar is still on screen (inside the stage)", geo["y"] > 500 and geo["top"] >= 0 and geo["bottom"] <= geo["h"], geo)
+            c.js("window.scrollTo(0, 0)")
+            c.desktop()
+            time.sleep(0.3)
+            c.js("Designer.setView(480); document.getElementById('stage').style.width = '600px'; document.getElementById('stage').scrollLeft = 400")
+            time.sleep(0.2)
+            geo = Jx("(function(){ var m = document.getElementById('multibar').getBoundingClientRect(), s = document.getElementById('stage').getBoundingClientRect(); return {left: m.left - s.left, scrolled: document.getElementById('stage').scrollLeft, shown: !document.getElementById('multibar').hidden}; })()")
+            case("v27 browser: with the slides drawn large in a narrow stage and the strip scrolled sideways, the bar stays at the stage's left edge (sticky)", geo["scrolled"] > 300 and 0 <= geo["left"] < 40 and geo["shown"] and multi() == [1, 2], geo)
+            c.js("document.getElementById('stage').scrollLeft = 0; document.getElementById('stage').style.width = ''; Designer.setView(" + str(view0) + ")")
+            time.sleep(0.2)
+            # drag one of them: they all move, nothing else does, one step, one save
+            r1 = c.rect("#strip .blk[data-id='1']")
+            sc = c.js("Designer.scale")
+            c.drag("#strip .blk[data-id='1']", (r1["cx"] + 60, r1["cy"] + 40), steps=10)
+            m1 = many_state()
+            case("v27 browser: a drag on one of the two moves both by the same amount (no snapping), the third photo and the text box stay, both still selected and the dragged one is the one with the handles",
+                 abs(pos(1)[0] - (100 + 60 / sc)) < 1.5 and abs(pos(1)[1] - (100 + 40 / sc)) < 1.5 and abs(pos(2)[0] - (600 + 60 / sc)) < 1.5 and abs(pos(2)[1] - (80 + 40 / sc)) < 1.5
+                 and pos(3) == [150, 700] and pos(4) == [W + 100, 1100] and multi() == [1, 2] and c.js("Designer.sel") == 1, (pos(1), pos(2), sc))
+            case("v27 browser: ... saved as one change (rev + 1)", settled() and disk()["rev"] == rev4 + 1, disk()["rev"])
+            c.click("#undo")
+            case("v27 browser: Undo puts both back in one step, and the two stay selected", st() == m1 and multi() == [1, 2], (xs(), multi()))
+            c.drag("#strip .blk[data-id='1']", (max(5, r1["cx"] - 400), max(5, r1["cy"] - 300)), steps=12)
+            got = st()
+            case("v27 browser: dragged far off the top left: the pair stops where the first would leave the strip (40 px kept), as far apart as they were (hers let them go off)",
+                 all(Jx("DesignModel.onStrip(" + json.dumps(b) + ", 2)") for b in got["blocks"][:2]) and abs((pos(2)[0] - pos(1)[0]) - 500) < 0.02 and abs((pos(2)[1] - pos(1)[1]) - (-20)) < 0.02 and pos(1)[0] <= -300, (pos(1), pos(2)))
+            c.click("#undo")
+            c.drag("#strip .blk[data-id='2']", (r1["cx"] + 200, r1["cy"] + 100), steps=10, release=False)
+            c.key("Escape")
+            c.mouse_release()
+            case("v27 browser: Escape in the middle of a group drag: the layout as it was", st() == m1 and multi() == [1, 2], xs())
+            # the five buttons
+            asp = Jx("(function(){ var o = {}; [1, 2].forEach(function(i){ var n = Designer.blockTypes.photo.natural(document.querySelector('#strip .blk[data-id=\"' + i + '\"]'), DesignModel.find(Designer.st, i)); o[i] = n.w / n.h; }); return o; })()")
+            want = Jx("DesignModel.evenOut(Designer.st, [1, 2], " + json.dumps(asp) + ")")
+            settled()
+            rev_e = disk()["rev"]
+            c.click("#multibar [data-m=even]")
+            case("v27 browser: Even them out: the two laid out by the model's evenOut from the loaded pictures' own shapes (whole, inside the margins), her line in the bar, both still selected",
+                 st() == want and st() != m1 and all(abs(b["w"] / b["h"] - asp[str(b["id"])]) < 0.01 and b["zoom"] == 1 and b["y"] >= 40 for b in st()["blocks"][:2]) and bar()["line"] == HERS["evened"] and multi() == [1, 2], (st()["blocks"][:2], bar()["line"]))
+            case("v27 browser: ... saved as one change", settled() and disk()["rev"] == rev_e + 1, disk()["rev"])
+            c.click("#undo")
+            case("v27 browser: Undo puts them back, and the line is gone", st() == m1 and bar()["line"] == "", bar()["line"])
+            c.click("#multibar [data-m=size]")
+            s2 = st()
+            case("v27 browser: Same size: as wide as the one clicked last (photo 2, 380 wide), photo 1 keeping its shape, her line",
+                 s2["blocks"][0]["w"] == 380 and abs(s2["blocks"][0]["h"] - 380 * 500 / 400) < 0.02 and s2["blocks"][1] == m1["blocks"][1] and bar()["line"] == HERS["samed"], (s2["blocks"][:2], bar()["line"]))
+            c.click("#undo")
+            c.click("#multibar [data-m=tops]")
+            case("v27 browser: Line up tops: both tops at 80 (the higher), her line", pos(1)[1] == 80 and pos(2)[1] == 80 and pos(1)[0] == 100 and bar()["line"] == HERS["lined"], (pos(1), pos(2), bar()["line"]))
+            c.click("#undo")
+            # Shift on a corner handle still keeps the shape (a handle press works on the one with the handles and lets the several go, hers)
+            hr = c.rect(".selbox .h.br")
+            c.drag(".selbox .h.br", (hr["cx"] + 60, hr["cy"] + 10), steps=8, shift=True)
+            b2 = st()["blocks"][1]
+            case("v27 browser: Shift on a corner handle still resizes the one with the handles alone, keeping its shape; the several are let go", abs(b2["w"] / b2["h"] - 380 / 500) < 0.01 and b2["w"] > 380 and st()["blocks"][0] == m1["blocks"][0] and multi() == [] and bar()["shown"] is False, (b2, multi()))
+            c.click("#undo")
+            # Backspace, Escape, Done, Remove them
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='2']", shift=True)
+            c.click("#strip .blk[data-id='3']", ctrl=True)
+            case("v27 browser: (three selected again, Ctrl-click for the third)", multi() == [1, 2, 3] and bar()["n"] == "3 selected", multi())
+            c.key("Backspace")
+            case("v27 browser: Backspace removes all three in one step: the text box and slide 2's photo stay, nothing selected, the bar gone, her line beside the selected-thing bar",
+                 [b["id"] for b in st()["blocks"]] == [4, 5] and c.js("Designer.sel") is None and multi() == [] and bar()["shown"] is False and sel_line() == HERS["removed_them"], ([b["id"] for b in st()["blocks"]], sel_line()))
+            c.click("#undo")
+            case("v27 browser: Undo brings the three back", st() == m1)
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='2']", shift=True)
+            c.key("Escape")
+            case("v27 browser: Escape lets the several go: the one clicked last stays selected, the bar is gone", multi() == [] and c.js("Designer.sel") == 2 and bar()["shown"] is False, (multi(), c.js("Designer.sel")))
+            c.key("Escape")
+            case("v27 browser: ... and a second Escape lets that go too", c.js("Designer.sel") is None)
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='3']", shift=True)
+            settled()
+            rev_d = disk()["rev"]
+            c.click("#multibar [data-m=done]")
+            time.sleep(1.0)
+            case("v27 browser: Done: the same, by the button; nothing changed, nothing saved", multi() == [] and c.js("Designer.sel") == 3 and st() == m1 and bar()["shown"] is False and disk()["rev"] == rev_d, (multi(), disk()["rev"]))
+            weak = Jx("Array.from(document.querySelectorAll('[hidden]')).filter(function(e){ return getComputedStyle(e).display !== 'none'; }).map(function(e){ return e.id || e.className; })")
+            case("v27 browser: the hidden bar really disappears (the global [hidden] rule beats its display:flex)", not weak and c.js("getComputedStyle(document.getElementById('multibar')).display") == "none", weak)
+            c.click("#strip .blk[data-id='1']", shift=True)
+            c.click("#multibar [data-m=del]")
+            case("v27 browser: Remove them takes both out, her line, the two others stay", [b["id"] for b in st()["blocks"]] == [2, 4, 5] and sel_line() == HERS["removed_them"] and multi() == [], ([b["id"] for b in st()["blocks"]], sel_line()))
+            c.click("#undo")
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='2']", shift=True)
+            c.click("#strip .blk[data-id='4']", shift=True)
+            case("v27 browser: a text box can be among them (hers)", multi() == [1, 2, 4] and bar()["n"] == "3 selected", multi())
+            c.click("#multibar [data-m=even]")
+            e3 = st()
+            case("v27 browser: Even them out with a text box among them lays out the two photos and leaves the text box where it was", e3["blocks"][3] == m1["blocks"][3] and e3["blocks"][0] != m1["blocks"][0] and e3["blocks"][1] != m1["blocks"][1] and multi() == [1, 2, 4], e3["blocks"][3])
+            c.click("#undo")
+            c.click("#strip .blk[data-id='5']")
+            case("v27 browser: a plain click on another photo lets the several go", multi() == [] and c.js("Designer.sel") == 5 and bar()["shown"] is False, multi())
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='2']", shift=True)
+            c.click("#strip .blk[data-id='3']", shift=True)
+            c.js("Designer.setState(function(st){ return DesignModel.act(st, 2, 'del').st; })")
+            case("v27 browser: one of three leaving the layout (removed another way) drops out by itself: \"2 selected\"", multi() == [1, 3] and bar()["n"] == "2 selected", multi())
+            c.js("Designer.setState(function(st){ return DesignModel.act(st, 3, 'del').st; })")
+            case("v27 browser: ... and down to one there are no several: the bar is gone (the one clicked last went with the change, so nothing is selected; hers the same)", multi() == [] and bar()["shown"] is False and c.js("Designer.sel") is None, multi())
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            case("v27 browser: nothing of the several is in the saved record", "multi" not in json.dumps(disk()))
+            case("v27 browser: nothing went wrong on the page through several photos at once", not c.page_errors(), c.page_errors()[:3])
+
+            # ================= See a photo big (B14) =================
+            def view():
+                return Jx("(function(){ var m = document.getElementById('view'); if (!m || m.hidden) return {open: false}; var i = document.getElementById('view-img'); return {open: true, n: Designer.big.n(), src: i.getAttribute('src'), num: document.getElementById('view-num').textContent, "
+                          "used: document.getElementById('view-used').textContent, use: document.getElementById('view-use').textContent, close: document.getElementById('view-close').textContent, label: m.querySelector('[role=dialog]').getAttribute('aria-label'), "
+                          "prev: document.getElementById('view-prev').getAttribute('aria-label'), next: document.getElementById('view-next').getAttribute('aria-label'), focus: document.activeElement.id, dark: getComputedStyle(m).backgroundColor, loaded: i.naturalWidth > 0}; })()")
+
+            put({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, 2, W + 100, 100, 800, 800)]})
+            rev5 = disk()["rev"]
+            tl = Jx("(function(){ var t = document.querySelector('#thumbs .th[data-n=\"5\"]'), b = t.querySelector('button.see'); return {text: b.textContent, title: b.title, label: b.getAttribute('aria-label'), opacity: getComputedStyle(b).opacity, inTile: b.parentNode === t}; })()")
+            case("v27 browser: every tray tile has her small ⤢ button (her tooltip, named with the number), out of sight until the pointer is over the tile",
+                 tl == {"text": "⤢", "title": HERS["bigger"], "label": "See photo 5 bigger", "opacity": "0", "inTile": True} and c.count("#thumbs .th button.see") == 30, tl)
+            c.click("#thumbs .th[data-n='5'] button.see", check=False)
+            c.wait_for("Designer.big.isOpen() && document.getElementById('view-img').naturalWidth > 0", 8)
+            v = view()
+            case("v27 browser: the button opens her dark window: photo 5 big, its number, no \"already\" line (it is not in the design), Use this photo (nothing selected), Close, the arrows named, the window named, Use has the keyboard",
+                 v["open"] and v["n"] == 5 and v["num"] == "#5" and v["used"] == "" and v["use"] == HERS["view_use"] and v["close"] == HERS["view_close"] and v["label"] == HERS["view_label"] and v["prev"] == HERS["view_prev"] and v["next"] == HERS["view_next"]
+                 and v["focus"] == "view-use" and v["loaded"] and v["dark"].startswith("rgba(12, 12, 14"), v)
+            case("v27 browser: the picture is the Assistant's 1600 copy by number, with no path in its address", v["src"].startswith("/kit-photo?") and "n=5&size=l" in v["src"] and no_path(v["src"], target)[0], v["src"])
+            time.sleep(0.4)
+            case("v27 browser: the tray's single-click wait did not also put photo 5 in (the window's button cancels it)", st()["blocks"][0]["n"] == 1 and len(st()["blocks"]) == 2)
+            c.key("ArrowRight")
+            c.wait_for("Designer.big.n() === 6", 5)
+            c.key("ArrowLeft")
+            c.key("ArrowLeft")
+            c.wait_for("Designer.big.n() === 4", 5)
+            case("v27 browser: the arrow keys browse: right to 6, left twice to 4", view()["num"] == "#4", view())
+            c.click("#view-next", check=False)
+            c.wait_for("Designer.big.n() === 5", 5)
+            c.click("#view-prev", check=False)
+            c.wait_for("Designer.big.n() === 4", 5)
+            case("v27 browser: ‹ and › do the same", view()["n"] == 4)
+            c.key("Escape")
+            c.wait_for("!Designer.big.isOpen()", 5)
+            case("v27 browser: Escape closes the window; nothing changed, nothing saved", not view()["open"] and st()["blocks"][0]["n"] == 1 and disk()["rev"] == rev5)
+            c.double_click("#thumbs .th[data-n='1']")
+            c.wait_for("Designer.big.isOpen()", 5)
+            v = view()
+            case("v27 browser: a double-click on a tile opens it too: photo 1, which says it is already in this design", v["open"] and v["n"] == 1 and v["used"] == HERS["view_used"], v)
+            time.sleep(0.5)
+            case("v27 browser: ... and the single-click wait did not put photo 1 in as well (nothing added, nothing swapped)", st()["blocks"][0]["n"] == 1 and len(st()["blocks"]) == 2 and c.js("Designer.sel") is None)
+            c.key("ArrowLeft")
+            c.wait_for("Designer.big.n() === 30", 5)
+            c.key("ArrowRight")
+            c.wait_for("Designer.big.n() === 1", 5)
+            case("v27 browser: the browsing wraps round: left from the first is the last (30), right from there the first", view()["n"] == 1)
+            c.click("#view-close", check=False)
+            c.wait_for("!Designer.big.isOpen()", 5)
+            case("v27 browser: Close closes it", not view()["open"])
+            # the strip's selection does not move while the window is open
+            c.click("#strip .blk[data-id='2']")
+            c.click("#thumbs .th[data-n='7'] button.see", check=False)
+            c.wait_for("Designer.big.isOpen()", 5)
+            v = view()
+            case("v27 browser: with a frame selected the button says Put it in the selected frame", v["use"] == HERS["view_put"] and v["n"] == 7, v)
+            c.key("ArrowRight")
+            c.wait_for("Designer.big.n() === 8", 5)
+            c.key("ArrowLeft")
+            c.wait_for("Designer.big.n() === 7", 5)
+            case("v27 browser: the arrow keys in the window never move the selected frame", st()["blocks"][1]["x"] == W + 100 and c.js("Designer.sel") == 2, st()["blocks"][1])
+            c.click("#view-use", check=False)
+            c.wait_for("!Designer.big.isOpen()", 5)
+            case("v27 browser: Put it in the selected frame: photo 7 is now in frame 2 (its crop back to the middle), the window closed, the frame still selected",
+                 st()["blocks"][1]["n"] == 7 and st()["blocks"][1]["zoom"] == 1 and len(st()["blocks"]) == 2 and c.js("Designer.sel") == 2, st()["blocks"][1])
+            case("v27 browser: ... saved as one change", settled() and disk()["rev"] == rev5 + 1, disk()["rev"])
+            c.js("Designer.select(null)")
+            c.click("#thumbs .th[data-n='9'] button.see", check=False)
+            c.wait_for("Designer.big.isOpen()", 5)
+            c.click("#view-use", check=False)
+            c.wait_for("!Designer.big.isOpen()", 5)
+            case("v27 browser: Use this photo with nothing selected adds it as a new slide (as a click in the tray does), and it is the selected one",
+                 len(st()["blocks"]) == 3 and st()["blocks"][2]["n"] == 9 and st()["slides"] == 3 and c.js("Designer.sel") == 3, (st()["slides"], [b["n"] for b in st()["blocks"]]))
+            c.click("#undo")
+            c.js("Designer.select(null)")
+            c.click("#thumbs .th[data-n='11'] button.see", check=False)
+            c.wait_for("Designer.big.isOpen()", 5)
+            c.click((6, 6))
+            c.wait_for("!Designer.big.isOpen()", 5)
+            case("v27 browser: a press beside the window closes it and changes nothing", len(st()["blocks"]) == 2 and st()["blocks"][1]["n"] == 7)
+            # a single click still puts the photo in, a moment later
+            before = len(st()["blocks"])
+            c.click("#thumbs .th[data-n='12']")
+            case("v27 browser: a single click on a tile has not put the photo in at once", len(st()["blocks"]) == before)
+            c.wait_for("Designer.st.blocks.length === " + str(before + 1), 5)
+            case("v27 browser: ... but after the 230 ms wait it is in (a new slide, as before), and the window is not open", st()["blocks"][before]["n"] == 12 and not view()["open"], [b["n"] for b in st()["blocks"]])
+            c.click("#undo")
+            c.js("document.querySelector('#thumbs .th[data-n=\"13\"]').focus()")
+            c.key("Enter")
+            case("v27 browser: Return on a tile reached with the Tab key puts the photo in at once", len(st()["blocks"]) == before + 1 and st()["blocks"][before]["n"] == 13, [b["n"] for b in st()["blocks"]])
+            c.click("#undo")
+            case("v27 browser: nothing went wrong on the page through See a photo big", not c.page_errors(), c.page_errors()[:3])
+
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")
             ready()
@@ -1408,6 +1802,15 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
             lab = Jx("Array.from(document.querySelectorAll('#labels .lab')).map(function(l){ var g = l.querySelector('.slab'), p = l.querySelector('.labp'), x = l.querySelector('.labx'); return [g.textContent, g.title, p.title, x.title]; })")
             case("v27 browser: a story's labels say story: the grip, the + and the x", lab == [[f"Story {k}", "Drag to move this story", f"Add a story after story {k}", f"Remove story {k}"] for k in (1, 2, 3, 4)], lab)
+            c.click("#strip .blk[data-id='1']")
+            c.click("#strip .blk[data-id='3']", shift=True)
+            mb = Jx("(function(){ var m = document.getElementById('multibar'); return {shown: !m.hidden, n: document.getElementById('multi-n').textContent, titles: Array.from(m.querySelectorAll('button')).map(function(b){ return b.title; }), hint: m.querySelector('.hint').textContent}; })()")
+            case("v27 browser: several photos at once on the stories page: the same bar, Even them out's tooltip in story words (ours), the rest hers",
+                 mb == {"shown": True, "n": "2 selected", "titles": ["Lay them out tidily on their story, every photo whole", HERS["same_title"], "", "", ""], "hint": HERS["many_hint"]}, mb)
+            c.click("#multibar [data-m=even]")
+            ev = [b for b in st()["blocks"] if b["id"] in (1, 3)]
+            case("v27 browser: Even them out on a story lays the two out on story 1, inside the story's own height and width", all(b["y"] >= 40 and b["y"] + b["h"] <= SH - 40 + 0.01 and b["x"] >= 40 and b["x"] + b["w"] <= SW - 40 + 0.01 for b in ev) and ev[0] != sfour()["blocks"][0], ev)
+            c.click("#undo")
             c.click("#strip .blk[data-id='1']")
             grp = Jx("Array.from(document.querySelectorAll('#sel-slides button')).map(function(b){ return [b.textContent, b.title]; })")
             case("v27 browser: the three buttons in her story names, with the tooltips in story words (ours: hers still say slide)",

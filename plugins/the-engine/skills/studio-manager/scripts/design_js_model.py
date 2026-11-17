@@ -3,7 +3,7 @@
 
 DESIGN_MODEL_JS makes window.DesignModel: where a photo sits inside its frame, what a move, a resize or a
 nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts (Show the whole photo among them: act 'whole', given the photo's own size), the Crop window's box and what Done makes of it (cropFromBlock, cropResize, cropApply), which slide a thing is on, adding and swapping photos, the
-undo list, slides as things (insert, remove, the pieces a strip comes in and moving one), which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
+undo list, slides as things (insert, remove, the pieces a strip comes in and moving one), several things at once (evenOut, sameSize, lineTops, removeMany, moveMany), which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
 
@@ -467,6 +467,111 @@ DESIGN_MODEL_JS = r"""
     return merge(st, {bg: color});
   }
 
+  // ---- several things at once (hers, v27, Nov 14: "I can't even it out because I can't select them all") ----
+  // ids: the selected things, in the order they were selected. Each returns a new layout, or the very same one when
+  // nothing changes; none touches what it is given.
+  var EVEN = {margin: 40, gap: 24};         // Even them out: the room left around the edge of the slide, and between photos (hers)
+  function members(st, ids){
+    var out = [], seen = {};
+    (ids || []).forEach(function(id){ var b = find(st, id); if (b && !seen[b.id]) { seen[b.id] = true; out.push(b); } });
+    return out;
+  }
+  function manyPatch(st, changes){
+    var blocks = st.blocks, did = false;
+    Object.keys(changes).forEach(function(id){
+      var i = indexOf(st, Number(id));
+      if (i < 0) return;
+      var nb = merge(blocks[i], changes[id]);
+      if (same(nb, blocks[i])) return;
+      if (!did) { blocks = blocks.slice(); did = true; }
+      blocks[i] = nb;
+    });
+    return did ? withBlocks(st, blocks) : st;
+  }
+  // A photo's own shape (w / h): aspects[id] when the page knows the loaded picture's, else the frame's own shape.
+  function aspectOf(b, aspects){ var a = aspects && aspects[b.id]; return a > 0 ? a : b.w / b.h; }
+  // Even them out: the photos among ids laid out tidily on the slide the first of them (by slide, then top to bottom,
+  // then left to right) is on, in the number of columns that makes them come out biggest, every photo whole at its own
+  // shape, the rows centred up and down and each row centred side to side; the crop back to the middle at zoom 1. Text
+  // boxes are left where they are (hers). No column count that leaves a cell under frameMin is tried.
+  function evenOut(st, ids, aspects){
+    var ph = members(st, ids).filter(isFrame);
+    if (!ph.length) return st;
+    ph = ph.slice().sort(function(a, b){ return slideOf(a, st.slides) - slideOf(b, st.slides) || a.y - b.y || a.x - b.x; });
+    var slide = slideOf(ph[0], st.slides), n = ph.length, m = EVEN.margin, g = EVEN.gap, best = null, c;
+    for (c = 1; c <= n; c++) {
+      var r = Math.ceil(n / c), cw = (W - 2 * m - (c - 1) * g) / c, ch = (H - 2 * m - (r - 1) * g) / r;
+      if (cw < RULES.frameMin || ch < RULES.frameMin) continue;
+      var sizes = ph.map(function(b){ var a = aspectOf(b, aspects), w = Math.min(cw, ch * a); return [w, w / a]; });
+      var area = sizes.reduce(function(t, s){ return t + s[0] * s[1]; }, 0);
+      if (!best || area > best.area) best = {c: c, cw: cw, sizes: sizes, area: area};
+    }
+    if (!best) return st;
+    var cols = best.c, cw2 = best.cw, rows = [], i;
+    for (i = 0; i < n; i += cols) rows.push(ph.slice(i, i + cols).map(function(b, k){ return [b, best.sizes[i + k]]; }));
+    var rowH = rows.map(function(row){ return Math.max.apply(null, row.map(function(x){ return x[1][1]; })); });
+    var y = (H - (rowH.reduce(function(t, h){ return t + h; }, 0) + (rows.length - 1) * g)) / 2, changes = {};
+    rows.forEach(function(row, ri){
+      var off = (cols - row.length) * (cw2 + g) / 2;
+      row.forEach(function(x, k){
+        var b = x[0], w = x[1][0], h = x[1][1];
+        changes[b.id] = {x: r2(slide * W + m + off + k * (cw2 + g) + (cw2 - w) / 2), y: r2(y + (rowH[ri] - h) / 2), w: r2(w), h: r2(h), ox: 0.5, oy: 0.5, zoom: 1};
+      });
+      y += rowH[ri] + g;
+    });
+    return manyPatch(st, changes);
+  }
+  // Same size: every one among ids as wide as the reference, a photo keeping its own shape (its crop back to the middle),
+  // a text box only its width (its height follows its lines). The reference is refId when that is a photo among them,
+  // else the first photo among them (ours: hers took a text box as the reference and gave photos its width). o: {textMin:
+  // the narrowest a text box may be}. Each stays on the strip.
+  function sameSize(st, ids, refId, o){
+    var list = members(st, ids), ref = null, i;
+    for (i = 0; i < list.length; i++) { if (list[i].id === refId && isFrame(list[i])) ref = list[i]; }
+    if (!ref) { for (i = 0; i < list.length && !ref; i++) { if (isFrame(list[i])) ref = list[i]; } }
+    if (!ref) return st;
+    var tmin = o && o.textMin > 0 ? o.textMin : RULES.frameMin, changes = {};
+    list.forEach(function(b){
+      if (b === ref) return;
+      var w = ref.w, h = isText(b) ? b.h : Math.max(RULES.frameMin, ref.w / (b.w / b.h)), p;
+      if (isText(b)) w = Math.max(tmin, w);
+      var c = clampXY(b.x, b.y, w, h, st.slides);
+      p = {x: r2(c.x), y: r2(c.y), w: r2(w)};
+      if (!isText(b)) { p.h = r2(h); p.ox = 0.5; p.oy = 0.5; p.zoom = 1; }
+      changes[b.id] = p;
+    });
+    return manyPatch(st, changes);
+  }
+  // Line up tops: every one among ids (text boxes too) moved up or down to the highest of them (hers).
+  function lineTops(st, ids){
+    var list = members(st, ids);
+    if (list.length < 2) return st;
+    var top = Math.min.apply(null, list.map(function(b){ return b.y; })), changes = {};
+    list.forEach(function(b){ changes[b.id] = {y: r2(top)}; });
+    return manyPatch(st, changes);
+  }
+  // Remove them: every one among ids taken out.
+  function removeMany(st, ids){
+    var gone = {};
+    members(st, ids).forEach(function(b){ gone[b.id] = true; });
+    var blocks = st.blocks.filter(function(b){ return !gone[b.id]; });
+    return blocks.length === st.blocks.length ? st : withBlocks(st, blocks);
+  }
+  // Drag any of them and they all move (hers): every one among ids by the same dx, dy, as far as every one of them
+  // stays on the strip (ours: hers let a group be dragged off the strip altogether). No snapping (hers).
+  function moveMany(st, ids, dx, dy){
+    var list = members(st, ids);
+    if (!list.length) return st;
+    var S = RULES.onStrip, sw = st.slides * W;
+    list.forEach(function(b){
+      dx = clamp(dx, (S - b.w) - b.x, (sw - S) - b.x);
+      dy = clamp(dy, (S - b.h) - b.y, (H - S) - b.y);
+    });
+    var changes = {};
+    list.forEach(function(b){ changes[b.id] = {x: r2(b.x + dx), y: r2(b.y + dy)}; });
+    return manyPatch(st, changes);
+  }
+
   // ---- photos from the tray ----
   function used(st){
     var out = {};
@@ -592,6 +697,7 @@ DESIGN_MODEL_JS = r"""
     slideOf: slideOf, clampXY: clampXY, onStrip: onStrip,
     lines: lines, nearest: nearest, move: move, centered: centered, midWords: midWords, onSlides: onSlides, resize: resize, nudge: nudge,
     act: act, fitFrame: fitFrame, onSlide: onSlide, fewerSlides: fewerSlides, moreSlides: moreSlides, setBg: setBg,
+    EVEN: EVEN, members: members, evenOut: evenOut, sameSize: sameSize, lineTops: lineTops, removeMany: removeMany, moveMany: moveMany,
     used: used, firstEmptySlide: firstEmptySlide, nextHole: nextHole, swapPhoto: swapPhoto, addPhoto: addPhoto,
     clickPhoto: clickPhoto, dropAt: dropAt, pickSize: pickSize, screenCopy: screenCopy,
     history: history, viewStart: viewStart, viewLow: viewLow, viewStep: viewStep

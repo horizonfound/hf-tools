@@ -28,6 +28,17 @@ Where later parts attach:
     Designer.viewSlide()       the slide in the middle of what is showing (where + Add text puts a text box)
     Designer.reveal(id)        scroll the strip so a block shows
 
+Several photos at once (hers, v27): Shift-, Cmd- or Ctrl-click photos on the strip to select several (Designer.multi);
+a bar inside the stage above the labels says "3 selected" and offers Even them out, Same size, Line up tops, Remove them
+and Done, each one Undo step and one save through DesignModel's evenOut, sameSize, lineTops and removeMany; a press on
+any of them drags them all (moveMany, every one kept on the strip, no snapping); Backspace removes them all, Escape lets
+them go. The last clicked keeps the handles and the selected-thing bar's buttons, which act on it alone (hers).
+
+See a photo big (hers, v27): every tray tile has a small button (⤢) that opens the photo in the view part's window
+(design_js_view.py, Designer.big.open); a double-click on the tile does the same, and a single click puts the photo in
+only after 230 ms, so a double-click does not also put it in. Designer.tile(p) builds one tile; Designer.clickPhoto(n)
+is what a click does.
+
 Slides as things (hers, v27; stories since v26): every slide's label has + (a blank slide after it) and x (remove
 it); "Add a slide before", "Add a slide after" and "Remove this slide" work on the slide the selected thing is on
 (off at one slide, with a line saying why); the label is a grip that drags the slide along the strip, slides that
@@ -233,6 +244,7 @@ DESIGN_EDIT_JS = r"""
       place(node, b, s);
       T.draw(node, b, s, false);
       node.classList.toggle('sel', b.id === D.sel);
+      node.classList.toggle('many', D.multi.indexOf(b.id) >= 0);       // one of several (hers, v27): the blue outline on each
       node.classList.toggle('adj', b.id === D.sel && D.adjust);
       seen[b.id] = true;
     });
@@ -362,10 +374,54 @@ DESIGN_EDIT_JS = r"""
   var oneLine = el('span', 'st-only-line', WORDS.one); oneLine.id = 'only-slide'; oneLine.hidden = true;
   g4.appendChild(oneLine);
 
+  // ---------- several photos at once (hers, v27, Nov 14: "I can't even it out because I can't select them all") ----------
+  // Shift-, Cmd- or Ctrl-click photos on the strip to select several (D.multi); a bar inside the stage, above the
+  // labels, says how many and offers Even them out, Same size, Line up tops, Remove them and Done, each one Undo step
+  // and one save through the model's own operations. The last clicked keeps the handles and the selected-thing bar's
+  // buttons, which act on it alone (hers). The line a press leaves sits in the bar, beside the button pressed.
+  var mbar = el('div', 'multibar'); mbar.id = 'multibar'; mbar.hidden = true;
+  var mN = el('b', '', ''); mN.id = 'multi-n'; mbar.appendChild(mN);
+  function mbtn(text, act, title){ var b = el('button', 'tb', text); b.type = 'button'; b.dataset.m = act; if (title) { b.title = title; b.setAttribute('aria-label', text); } mbar.appendChild(b); return b; }
+  mbtn(WORDS.even, 'even', WORDS.evenTitle); mbtn(WORDS.sameSize, 'size', WORDS.sameTitle); mbtn(WORDS.tops, 'tops'); mbtn(WORDS.removeThem, 'del'); mbtn(WORDS.done, 'done');
+  mbar.appendChild(el('span', 'hint', WORDS.manyHint));
+  var mLine = el('span', 'gline', ''); mLine.id = 'multi-line'; mLine.setAttribute('role', 'status'); mbar.appendChild(mLine);
+  stage.insertBefore(mbar, stage.firstChild);
+  // the loaded pictures' own shapes, for Even them out (the list's numbers until a picture has loaded)
+  function aspects(ids){
+    var out = {};
+    ids.forEach(function(id){ var b = M.find(D.st, id); if (b && D.typeOf(b) === 'photo' && !M.isHole(b)) { var n = D.blockTypes.photo.natural(nodes[id], b); out[id] = n.w / n.h; } });
+    return out;
+  }
+  function doMany(a){
+    var ids = D.multi.slice();
+    if (ids.length < 2 || !D.st || D.blocked) return;
+    if (a === 'done') { D.select(D.sel); return; }                 // the several let go; the last clicked stays selected (hers)
+    var next, said;
+    if (a === 'even') { next = M.evenOut(D.st, ids, aspects(ids)); said = WORDS.evened; }
+    else if (a === 'size') { next = M.sameSize(D.st, ids, D.sel, {textMin: D.blockTypes.text ? D.blockTypes.text.minW : 0}); said = WORDS.samed; }
+    else if (a === 'tops') { next = M.lineTops(D.st, ids); said = WORDS.lined; }
+    else if (a === 'del') { next = M.removeMany(D.st, ids); said = WORDS.removedThem; }
+    else return;
+    if (!D.setState(next, a === 'del' ? {sel: null, multi: []} : {multi: ids, adjust: false})) return;
+    if (a === 'del') lines('sel', said); else D.say(mLine, said);
+  }
+  mbar.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button[data-m]') : null;
+    if (b) doMany(b.dataset.m);
+  });
+  D.on('render', function(){
+    var n = D.multi.length;
+    mbar.hidden = n < 2;
+    if (n >= 2) mN.textContent = WORDS.selN(n);
+    Array.prototype.forEach.call(mbar.querySelectorAll('button'), function(b){ b.disabled = !!D.blocked; });
+  });
+  D.doMany = doMany;
+
   function lines(which, text){
     D.say($('slides-line'), which === 'slides' ? text : '');
     D.selbar.line(which === 'sel' ? text : '');
     $('trayline').textContent = which === 'tray' ? text : '';
+    D.say(mLine, '');
   }
   D.on('change', function(){ lines('', ''); });
   D.on('design', function(){ lines('', ''); });
@@ -594,7 +650,7 @@ DESIGN_EDIT_JS = r"""
   // ---------- the strip: select, move, resize, move the photo inside ----------
   stage.addEventListener('pointerdown', function(e){
     if (G || e.isPrimary === false || e.button !== 0 || !D.st || D.blocked) return;
-    if (e.target.closest && e.target.closest('#labels')) return;
+    if (e.target.closest && (e.target.closest('#labels') || e.target.closest('#multibar'))) return;      // the labels' and the bar's own presses
     var hd = e.target.closest ? e.target.closest('.h') : null, bd = e.target.closest ? e.target.closest('.blk') : null;
     if (!hd && !bd) {
       // the bare strip, or the space around it: nothing is selected any more (the scroll bar is left alone)
@@ -607,7 +663,28 @@ DESIGN_EDIT_JS = r"""
     if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
     var id = hd ? D.sel : Number(bd.dataset.id), b = M.find(D.st, id);
     if (!b) return;
-    if (D.sel !== id) D.select(id);
+    // Shift-, Cmd- or Ctrl-click (hers, v27): the thing joins the several selected, or leaves them; no drag starts
+    if (bd && !hd && (e.shiftKey || e.metaKey || e.ctrlKey)) { D.selectMore(id); return; }
+    // a press on one of several: they all move together (hers), by the model's moveMany, every one kept on the strip;
+    // no snapping and no guide lines; one Undo step and one save when the button is let go
+    if (bd && !hd && D.multi.length > 1 && D.multi.indexOf(id) >= 0) {
+      var ids = D.multi.slice(), q0 = stripPoint(e.clientX, e.clientY), next = null;
+      if (D.sel !== id) D.select(id, {multi: ids});
+      var showMany = function(){
+        if (!next) return;
+        ids.forEach(function(i){ var nb = M.find(next, i); if (nb && nodes[i]) place(nodes[i], nb, D.scale); });
+        var sb = M.find(next, D.sel);
+        if (sb) placeSel(sb, D.scale);
+      };
+      begin(e, {
+        start: MOVE_START, node: null,
+        move: function(){ var p = stripPoint(G.cx, G.cy); next = M.moveMany(D.st, ids, p.x - q0.x, p.y - q0.y); showMany(); },
+        redo: showMany,
+        drop: function(){ if (!next || !D.setState(next, {sel: id, multi: ids})) D.render(); }
+      });
+      return;
+    }
+    if (D.sel !== id || D.multi.length) D.select(id);         // a plain click, or a handle: one thing, the several let go
     var kind = D.typeOf(b), T = D.blockTypes[kind], node = nodes[id];
     var mode = hd ? 'resize' : (D.adjust && T.pan && !M.isHole(b) ? 'pan' : 'move');
     var corner = hd ? hd.dataset.h : '', b0 = M.merge(b, {}), p0 = stripPoint(e.clientX, e.clientY), res = null;
@@ -733,9 +810,11 @@ DESIGN_EDIT_JS = r"""
     if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('th')) { e.preventDefault(); clickPhoto(Number(t.dataset.n)); return; }
     var b = D.selected();
     if (!b || D.blocked) return;
-    if (e.key === 'Escape') { D.select(null); return; }
+    // several selected (hers, v27): Escape lets the several go (the last clicked stays selected; a second Escape lets
+    // that go too), Backspace or Delete removes them all in one step
+    if (e.key === 'Escape') { if (D.multi.length > 1) D.select(D.sel); else D.select(null); return; }
     if (range) return;                                  // the slider's own keys
-    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); doAct('del'); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); if (D.multi.length > 1) doMany('del'); else doAct('del'); return; }
     var step = e.shiftKey ? M.RULES.nudgeBig : M.RULES.nudge;
     var mv = {ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]}[e.key];
     if (!mv) return;
@@ -754,20 +833,28 @@ DESIGN_EDIT_JS = r"""
     }
     t.classList.toggle('cantread', !p.have && !!p.missing);
   }
+  // One photo's tile in the tray: its number as in the pickers, its small copy, the tick when it is in the design, and
+  // (hers, v27) a small button that shows it big. The one function for every tile, so a photo that joins later is built
+  // the same way.
+  function tile(p){
+    var t = el('div', 'th' + (p.way === 'wide' ? ' wide' : ''));
+    t.dataset.n = p.n; t.tabIndex = 0;
+    t.setAttribute('role', 'button'); t.setAttribute('aria-label', 'Photo ' + p.n);
+    t.appendChild(el('span', 'num', '#' + p.n));          // the photo's own number, as in the pickers
+    t.appendChild(el('span', 'cant', WORDS.cantRead));
+    t.appendChild(el('span', 'tick', '✓'));
+    var big = el('button', 'see', '⤢'); big.type = 'button';
+    big.title = WORDS.bigger; big.setAttribute('aria-label', WORDS.biggerN(p.n));
+    t.appendChild(big);
+    tilePic(t, p);
+    tiles[p.n] = t;
+    return t;
+  }
+  D.tile = tile;
   function buildTray(){
     thumbs.textContent = ''; tiles = {};
     var frag = document.createDocumentFragment();
-    D.S.photos.forEach(function(p){
-      var t = el('div', 'th' + (p.way === 'wide' ? ' wide' : ''));
-      t.dataset.n = p.n; t.tabIndex = 0;
-      t.setAttribute('role', 'button'); t.setAttribute('aria-label', 'Photo ' + p.n);
-      t.appendChild(el('span', 'num', '#' + p.n));          // the photo's own number, as in the pickers
-      t.appendChild(el('span', 'cant', WORDS.cantRead));
-      t.appendChild(el('span', 'tick', '✓'));
-      tilePic(t, p);
-      tiles[p.n] = t;
-      frag.appendChild(t);
-    });
+    D.S.photos.forEach(function(p){ frag.appendChild(tile(p)); });
     thumbs.appendChild(frag);
     $('trayname').textContent = WORDS.allPhotos(D.S.total);
   }
@@ -790,8 +877,29 @@ DESIGN_EDIT_JS = r"""
     if (!D.setState(r.st, {sel: added && !CLICK_ADD_SELECTS ? null : r.sel})) lines('', '');
     reveal(r.sel);
   }
+  D.clickPhoto = clickPhoto;
+  // A click on a tray photo puts it in a moment later (hers, v27: 230 ms), so that a double-click, which shows the photo
+  // big, does not also put it in. The second click of a double-click cancels the first's wait. Return on a tile reached
+  // with the Tab key puts the photo in at once, as it did.
+  var CLICK_WAIT = 230, clickT = null;
+  function clickLater(n){
+    clearTimeout(clickT);
+    clickT = setTimeout(function(){ clickT = null; clickPhoto(n); }, CLICK_WAIT);
+  }
+  function seeBig(n){ clearTimeout(clickT); clickT = null; if (D.big) D.big.open(n); }
+  thumbs.addEventListener('dblclick', function(e){
+    var t = e.target.closest ? e.target.closest('.th') : null;
+    if (!t) return;
+    e.preventDefault();
+    seeBig(Number(t.dataset.n));
+  });
+  thumbs.addEventListener('click', function(e){
+    var big = e.target.closest ? e.target.closest('.see') : null, t = big ? big.closest('.th') : null;
+    if (t) seeBig(Number(t.dataset.n));
+  });
   thumbs.addEventListener('pointerdown', function(e){
     if (G || e.isPrimary === false || e.button !== 0 || !D.st) return;
+    if (e.target.closest && e.target.closest('.see')) return;         // the small button: its own click shows the photo big
     var t = e.target.closest ? e.target.closest('.th') : null;
     if (!t) return;
     var n = Number(t.dataset.n), touch = e.pointerType === 'touch', lift = null, say = null, target = null, ox = 0, oy = 0;
@@ -830,7 +938,7 @@ DESIGN_EDIT_JS = r"""
       },
       move: show, redo: show,
       clean: function(){ if (lift) lift.remove(); t.classList.remove('dragging'); clearDropMarks(); },
-      click: function(){ clickPhoto(n); },
+      click: function(){ clickLater(n); },
       drop: function(){
         if (!target || D.blocked) { D.render(); return; }
         if (target.kind === 'frame') {

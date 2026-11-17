@@ -1393,6 +1393,15 @@ def v27_checks(kit):
     check("v27: a frame at zoom 25 (the Crop window's most) is a layout the Assistant takes, zoom 26 is brought to 25, and the page is told the range 1 to 25",
           ok25 and ok25["blocks"][0]["zoom"] == 25 and ok26 and ok26["blocks"][0]["zoom"] == 25 and design.limits_for()["zoom"] == [1, 25] and design.limits_for("stories")["zoom"] == [1, 25],
           (ok25 and ok25["blocks"][0].get("zoom"), ok26 and ok26["blocks"][0].get("zoom")))
+    # several photos at once (B13) and See a photo big (B14) are the page's own: a PC serves the same page, with her words in
+    # its scripts, the bar's styles, the view part last, and the picture by number (the page is driven only on a Mac, in design_v27_check)
+    import design_page
+    page = design_page.page_html("A shoot")
+    scripts = [n for n, _ in design_page.SCRIPTS]
+    check("v27: the page a PC serves carries her words for several photos at once and for seeing a photo big, the bar's styles, and the view part as its last script",
+          all(w in page for w in ("'Even them out'", "'Same size'", "'Line up tops'", "'Remove them'", "'Shift-click a photo to add it or take it out. Drag any of them to move them all.'",
+                                  "'See it bigger'", "'Put it in the selected frame'", "'already in this design'", ".multibar{position:sticky;left:0;", "#view-img{"))
+          and scripts[-1] == "DESIGN_VIEW_JS" and "D.photoUrl(n, 'l')" in page and "/full/" not in page and not any(s in page for s in ("/Users/", "C:\\")), scripts[-2:])
 
 
 def v22_checks(kit):

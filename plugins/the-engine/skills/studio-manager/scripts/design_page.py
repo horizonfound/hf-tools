@@ -25,6 +25,7 @@ files, so nothing Python does can change a character of it:
     design_js_save.py    DESIGN_SAVE_JS    Preview swipe, the profile grid's crop, and Save slides
     design_js_ask.py     DESIGN_ASK_JS     "Let my assistant choose the photos" (the note, the line to copy), both kinds
     design_js_crop.py    DESIGN_CROP_JS    the Crop window (hers, v27): the whole photo with a box, Done maps it onto the frame
+    design_js_view.py    DESIGN_VIEW_JS    See a photo big (hers, v27): any tray photo in a dark window, ‹ › to browse, one button puts it in
 
 SCRIPTS below is the order they go on the page. Each part finds window.Designer ready, and the page starts
 (Designer.start()) only after every part is in place.
@@ -59,6 +60,7 @@ from design_js_plan import DESIGN_PLAN_JS  # noqa: E402
 from design_js_save import DESIGN_SAVE_CSS, DESIGN_SAVE_JS  # noqa: E402
 from design_js_text import DESIGN_TEXT_CSS, DESIGN_TEXT_JS  # noqa: E402
 from design_js_type import DESIGN_TYPE_JS  # noqa: E402
+from design_js_view import DESIGN_VIEW_CSS, DESIGN_VIEW_JS  # noqa: E402
 
 DESIGN_CSS = """
 :root{--sel:#2f7cf6;--wide:1320px;--row:34px}
@@ -171,6 +173,13 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .over.moveover{z-index:9600;overflow:visible}
 .slidedim{position:absolute;background:rgba(212,100,63,.18);outline:2px solid var(--accent);pointer-events:none}
 .dropline{position:absolute;width:4px;margin-left:-2px;background:var(--accent);border-radius:2px;pointer-events:none;box-shadow:0 0 0 3px rgba(212,100,63,.25)}
+/* several photos at once (hers, v27): the bar inside the stage, above the labels, in her coral; it stays in sight while the
+   strip is scrolled sideways (sticky at the stage's left edge). The global [hidden] rule hides it, flex and all. */
+.multibar{position:sticky;left:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-10px 0 26px;padding:8px 10px;border-radius:10px;background:#fbeee8;border:1px solid #f0cdbf}
+.multibar b{color:var(--accent);font-size:13px;font-weight:600;margin-right:4px}
+.multibar .hint{margin:0}
+.multibar .gline{min-width:0}
+.blk.many{outline:2px solid var(--sel);outline-offset:-2px}
 .strip{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 0 0 1px var(--line)}
 .over{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:5}
 .seam{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(47,124,246,.75);pointer-events:none;z-index:9000}
@@ -264,10 +273,11 @@ SCRIPTS = [
     ("DESIGN_SAVE_JS", DESIGN_SAVE_JS),
     ("DESIGN_ASK_JS", DESIGN_ASK_JS),
     ("DESIGN_CROP_JS", DESIGN_CROP_JS),
+    ("DESIGN_VIEW_JS", DESIGN_VIEW_JS),
 ]
 
 # The styles of the parts added after the strip, in the order their scripts go on the page.
-PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS + DESIGN_ASK_CSS + DESIGN_CROP_CSS
+PART_CSS = DESIGN_TEXT_CSS + DESIGN_BRAND_CSS + DESIGN_DESIGNS_CSS + DESIGN_SAVE_CSS + DESIGN_ASK_CSS + DESIGN_CROP_CSS + DESIGN_VIEW_CSS
 
 # The four background swatches (the prototype's): name, colour.
 SWATCHES = (("White", "#ffffff"), ("Cream", "#f4efe6"), ("Sand", "#e9e1d6"), ("Black", "#111111"))

@@ -352,6 +352,12 @@ def check_page(case, work):
 def check_browser(case, work, port, make_kit, Server, post, get_json):
     sys.path.insert(0, str(ROOT / "tests"))
     import chrome_drive as cd
+    # every photo the strip draws larger than its small copy has its sharper copy showing (the page fetches that copy off the
+    # page with an Image of its own, so document.images cannot see it on its way)
+    SHARPER_LANDED = ("Array.from(document.querySelectorAll('#strip .blk img')).every(function(i){ var b = DesignModel.find(Designer.st, Number(i.parentNode.dataset.id)); "
+                      "if (!b || b.n == null) return true; var p = Designer.by[b.n]; if (!p) return true; var nat = {w: i.naturalWidth || p.w, h: i.naturalHeight || p.h}; "
+                      "var L = DesignModel.layoutImg(b, nat.w, nat.h), dpr = Math.min(2, window.devicePixelRatio || 1); "
+                      "return i.dataset.size === 'l' || DesignModel.screenCopy(Math.max(L.iw, L.ih) * Designer.scale * dpr, Math.max(p.w, p.h), Designer.S.sizes) === 's'; })")
     if not cd.find_chrome():
         print("SKIP  the real-browser checks: no Chrome on this computer", flush=True)
         return
@@ -825,6 +831,7 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             # clicks
             c.click(centre(ids3[2]))
             c.click(tile(free[3]))
+            c.wait_for(f"DesignModel.find(Designer.st, {ids3[2]}).n === {free[3]}", 3)      # (her 230 ms wait, since v27)
             case("tray click with a frame selected: the clicked photo goes into that frame", blk(st(), ids3[2])["n"] == free[3] and c.js("Designer.sel") == ids3[2] and len(st()["blocks"]) == 7)
             press("empty")
             case("Take the photo out: an empty frame, drawn as a striped box that says Drop a photo",
@@ -835,9 +842,12 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             case("...and saved as an empty frame", settled() and blk(disk()["state"], ids3[2])["n"] is None)
             c.key("Escape")
             c.click(tile(free[4]))
-            case("tray click with nothing selected: the clicked photo fills the next empty frame", blk(st(), ids3[2])["n"] == free[4] and len(st()["blocks"]) == 7 and c.count("#strip .blk.hole") == 0)
+            # (since v27 a single click in the tray puts the photo in after her 230 ms wait, so a double-click can show it big instead)
+            c.wait_for(f"DesignModel.find(Designer.st, {ids3[2]}).n === {free[4]}", 3)
+            case("tray click with nothing selected: the clicked photo fills the next empty frame (after the 230 ms wait, since v27)", blk(st(), ids3[2])["n"] == free[4] and len(st()["blocks"]) == 7 and c.count("#strip .blk.hole") == 0)
             c.key("Escape")
             c.click(tile(free[5]))
+            c.wait_for("Designer.st.slides === 8", 3)
             last = st()["blocks"][-1]
             case("tray click with no empty frame and every slide full: a slide is added for it",
                  st()["slides"] == 8 and last["n"] == free[5] and last["x"] == 7 * W and c.count("#labels span") == 8, (st()["slides"], last))
@@ -1046,8 +1056,18 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                 c.drag(tile(1), centre(ids7[1]), steps=4)
                 c.click(tile(3))
                 now = st()
-                case("timers held: a tray click straight after a tray drag is not lost",
-                     blk(now, ids7[1])["n"] == 1 and now["slides"] == 8 and now["blocks"][-1]["n"] == 3, (blk(now, ids7[1]), now["slides"]))
+                # (since v27 a tray click puts the photo in after a 230 ms wait: with timers held it waits, and lands when they run;
+                # the save the drop queued runs in the same round, and the click's own change goes straight after it, as a save
+                # always sends what came in while it was out)
+                case("timers held: a tray click straight after a tray drag is not lost: the drop landed, and the click waits its 230 ms as a held timer",
+                     blk(now, ids7[1])["n"] == 1 and now["slides"] == 7 and c.timers_waiting(), (blk(now, ids7[1]), now["slides"], c.timers_waiting()))
+                c.run_timers()
+                now = st()
+                case("timers let run once: the click's photo is in, on a slide of its own", now["slides"] == 8 and now["blocks"][-1]["n"] == 3, (now["slides"], now["blocks"][-1]))
+                deadline = time.time() + 8
+                while time.time() < deadline and disk(D7)["rev"] < 2:
+                    time.sleep(0.1)
+                case("timers let run once: the drop's save went, and the click's change straight after it (rev 2), so the page says Saved", disk(D7)["rev"] == 2 and disk(D7)["state"] == st() and c.text("#d-status") == "Saved", (disk(D7)["rev"], c.text("#d-status")))
                 c.js("document.getElementById('stage').scrollLeft = 0")
                 # the strip scrolls under a drag held near its end, moved by the pointer's own moves
                 tx, ty = tile(5)
@@ -1061,13 +1081,13 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                 c.key("Escape")
                 c.mouse_release()
                 case("timers held: a photo held near the right end of the strip scrolls it, with every move of the pointer", scrolled > 20, scrolled)
-                case("timers held: nothing was saved yet (the save waits its 0.7 s), and the line says Saving...", c.text("#d-status") == "Saving..." and disk(D7)["rev"] == 0, c.text("#d-status"))
+                case("timers held: a drag let go with Escape changed nothing, so nothing new waits to be saved", c.text("#d-status") == "Saved" and disk(D7)["rev"] == 2, (c.text("#d-status"), disk(D7)["rev"]))
                 c.run_timers()
                 try:
                     c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 8)
                 except cd.Timeout:
                     pass
-                case("timers let run: everything done meanwhile is saved in one go", disk(D7)["state"] == st() and disk(D7)["rev"] == 1, disk(D7)["rev"])
+                case("timers let run: nothing more comes, and what is on the drive is what the page shows", disk(D7)["state"] == st() and disk(D7)["rev"] == 2, disk(D7)["rev"])
             finally:
                 c.free_timers()
 
@@ -1082,9 +1102,12 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                 case("phone width: the strip's box is narrower than the strip and scrolls by itself", c.js("(function(){ var s = document.getElementById('stage'); return s.scrollWidth > s.clientWidth + 50 && s.clientWidth <= 390; })()"))
                 n_before = len(st()["blocks"])
                 c.tap(tile(2))
-                case("phone width: a finger's tap on a tray photo adds it (a finger never lifts one: it scrolls the page)",
+                c.wait_for("Designer.st.blocks.length === " + str(n_before + 1), 3)
+                case("phone width: a finger's tap on a tray photo adds it, after the 230 ms wait (a finger never lifts one: it scrolls the page)",
                      len(st()["blocks"]) == n_before + 1 and st()["blocks"][-1]["n"] == 2, st()["blocks"][-1])
                 c.wait_for("Designer.save.idle()", 8)
+                # (the new slide's picture is still arriving: let it land before the page is left, so no request is cut off)
+                c.wait_for("Array.from(document.querySelectorAll('#strip .blk img')).every(function(i){ return i.complete; })", 10)
             finally:
                 c.desktop()
 
@@ -1094,6 +1117,15 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             code, out = post(srv.port, "/design-new", {"kit": kit_name, "state": one_state, "name": "Single post", "token": f"browsercheck{tokens[0]:03d}"})
             if case("a single post: a design of one slide is made", code == 200 and out and out["design"]["state"]["slides"] == 1, (code, out)):
                 D8 = out["design"]["id"]
+                # (back at desktop width the tray shows more tiles, and the strip draws its photos larger, so the page fetches
+                # their sharper copies ahead, off the page: let every picture land before the page is left, so no request is
+                # cut off half way)
+                c.js("new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ setTimeout(r, 50); }); }); })")
+                try:
+                    c.wait_for("Array.from(document.images).every(function(i){ return i.complete; })", 15)
+                    c.wait_for(SHARPER_LANDED, 15)
+                except cd.Timeout:
+                    pass
                 c.open(f"http://127.0.0.1:{srv.port}/design.html?kit={KQ}&design={D8}")
                 ready()
                 c.wait_for("document.querySelectorAll('#strip .blk img').length === 1", 15)
@@ -1115,6 +1147,11 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
                      now["slides"] == 1 and {k: blk(now, 1)[k] for k in "xywh"} == {"x": 0, "y": 0, "w": W, "h": H} and settled() and disk(D8)["state"]["slides"] == 1, now)
 
             # ================= the whole run =================
+            # (every picture the page is still fetching lands before the browser is closed, so no request is cut off at the end)
+            try:
+                c.wait_for("Array.from(document.images).every(function(i){ return i.complete; })", 15)
+            except cd.Timeout:
+                pass
             case("the page threw no error and logged none, in the whole run", c.page_errors() == [], c.page_errors()[:4])
             # (a text box's font is asked of Google Fonts, by a stylesheet link: the one thing this page may load from outside)
             outside = [u for u in c.outside_requests() if not u.startswith(("https://fonts.googleapis.com/css2?family=", "https://fonts.gstatic.com/"))]
