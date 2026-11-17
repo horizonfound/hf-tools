@@ -1691,8 +1691,8 @@ KIT_WORDS = {
     "open_photos": "Open the Photos folder",
     "my_queue": "My posting queue",
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
-    "reel": "Reel",
-    "reel_sub": "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut.",
+    "reel": "Reels",                 # v27: the Reels card (four kinds of reel behind its door)
+    "reel_sub": "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look.",
     "reel_none": "Your assistant hasn't picked the reel photos yet. Click to pick them yourself.",
     "in_capcut": "In CapCut:",
     "open_capcut": "Open in CapCut",
@@ -1806,9 +1806,10 @@ PAGE_MARK = "<meta name='assistant-page' content='post-kit-steps'>"
 STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
 STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
 
-# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow
-REEL_CREATE = "Create my reel"
-REEL_AGAIN = "Make a new version"
+# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow. v27: the Reels
+# card says "Create my reels", then "Create another reel" once any reel of the shoot is made (her kit.reel rule).
+REEL_CREATE = "Create my reels"
+REEL_AGAIN = "Create another reel"
 STORIES_MAKE = KIT_WORDS["stories_make"] + " →"
 STORIES_OPEN = KIT_WORDS["stories_open"] + " →"
 
@@ -1825,7 +1826,7 @@ def reel_door(kit_name):
 
 
 def reel_link_words(made):
-    """The Reel card's CTA, hers: "Create my reel →", or "Make a new version →" once a reel is made."""
+    """The Reels card's CTA, hers: "Create my reels →", or "Create another reel →" once a reel is made."""
     return (REEL_AGAIN if made else REEL_CREATE) + " →"
 
 
@@ -2389,7 +2390,7 @@ def build_page(kit):
     steps = steps_facts(kit, f)
     kq = quote(kit.name)
 
-    # the Reel card
+    # the Reels card
     pics = [p for p in f["reel_photos"]]
     need_previews = any(not p["have"] and not p["missing"] for p in pics)
     srcs = [f"/kit-photo?kit={kq}&n={p['n']}&size=s&v={quote(p['v'] or '')}" for p in pics]

@@ -113,7 +113,7 @@ def check_words(s):
                and any(frag.strip() and frag not in t for frag in re.split(r"\{\w+\}", v))]
     case("every word in kit.KIT_WORDS is in her pages/post-kit.html, word for word", not missing, missing)
     for frag in ("slides saved in the Carousel folder", "saved design", "no slides saved yet", "saved in the Stories folder", "'story' : 'stories'",
-                 "no stories saved yet", "Make a new version", "Create my reel", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
+                 "no stories saved yet", "Create another reel", "Create my reels", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
         case("her page has %r (our status lines and strips follow it)" % frag, frag in t)
     case("our status lines say her words", k.carousel_status(7, 2) == "7 slides saved in the Carousel folder · 2 saved designs"
          and k.stories_status(3, 1) == "3 stories saved in the Stories folder · 1 saved design"
@@ -210,8 +210,8 @@ def check_empty_kit(s):
     case("nothing made: three cards, Reel, Carousel and Stories, in her order", all((r, c, t)) and text.index("data-piece='reel'") < text.index("data-piece='carousel'") < text.index("data-piece='stories'"))
     case("nothing made: the Reel card says her 'Your assistant hasn't picked the reel photos yet. Click to pick them yourself.' and 'Not made yet'",
          "Your assistant hasn't picked the reel photos yet. Click to pick them yourself." in plain(r) and status_of(r) == "Not made yet", status_of(r))
-    case("nothing made: the CTAs are hers: Create my reel →, Design my carousel →, Make my stories →",
-         "Create my reel →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
+    case("nothing made: the CTAs are hers: Create my reels →, Design my carousel →, Make my stories →",
+         "Create my reels →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
     case("nothing made: 'No slides yet.' and 'No stories yet.', each 'Not made yet'",
          "No slides yet." in plain(c) and "No stories yet." in plain(t) and status_of(c) == "Not made yet" and status_of(t) == "Not made yet")
     case("nothing made: the Reel and Carousel cards have her three steps (Make it, Your words, Add to my queue); the Stories card has none",
@@ -252,9 +252,9 @@ def check_page_fresh(s):
     case("the Reel card: the first 7 of the 12 photos, in the assistant's order, then her '+5'",
          [int(re.search(r"&n=(\d+)", x).group(1)) for x in srcs] == rpc.CLAUDE[:7] and "<span class='more'>+5</span>" in r, srcs[:3])
     case("...each named only by the kit and its number (/kit-photo)", all(x.startswith("/kit-photo?kit=%s&n=" % KQ) and "&size=s" in x for x in srcs))
-    case("the Reel card: 'Not made yet', her CTA 'Create my reel →', her line under the heading",
-         status_of(r) == "Not made yet" and "Create my reel →" in plain(r)
-         and "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut." in plain(r))
+    case("the Reels card: 'Not made yet', her CTA 'Create my reels →', her v27 line under the heading",
+         status_of(r) == "Not made yet" and "Create my reels →" in plain(r)
+         and "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look." in plain(r))
     c_href, c = card(text, "carousel")
     t_href, t = card(text, "stories")
     case("the Carousel card goes to the designer, the Stories card to the stories designer",
@@ -265,9 +265,9 @@ def check_page_fresh(s):
     code, out = s.cmd("kit.py", "reel-made", KIT, "--project", "Fake beach reel")
     code, text = page(s)
     _, r = card(text, "reel")
-    case("a reel made: 'In CapCut: Fake beach reel' with her Open in CapCut, and her 'Make a new version →'",
+    case("a reel made: 'In CapCut: Fake beach reel' with her Open in CapCut, and her 'Create another reel →'",
          status_of(r) == "In CapCut: Fake beach reel Open in CapCut" and "<button class='go' id='capcut' type='button'>Open in CapCut</button>" in r
-         and "Make a new version →" in plain(r), status_of(r))
+         and "Create another reel →" in plain(r), status_of(r))
     # a newer one from the reel page (this check's own record, as the page's Make my reel leaves it)
     rec_file = k / ".kit" / "reel-page.json"
     rp = json.loads(rec_file.read_text(encoding="utf-8")) if rec_file.exists() else {"v": 1}
@@ -644,7 +644,7 @@ def check_browser(c, s):
     c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
     cards = c.js("Array.from(document.querySelectorAll('a.piece')).map(function(a){return [a.dataset.piece, a.querySelector('h2').firstChild.textContent, a.querySelector('.cta').textContent, a.getAttribute('href')]})")
     case("in a browser: the three cards, her headings and CTAs, each a link to its page", cards == [
-        ["reel", "Reel", "Make a new version →", "/reel.html?kit=" + KQ],
+        ["reel", "Reels", "Create another reel →", "/reel.html?kit=" + KQ],
         ["carousel", "Carousel", "Open my carousel →", "/design.html?kit=" + KQ],
         ["stories", "Stories", "Open my stories →", "/design.html?kit=%s&kind=stories" % KQ]], cards)
     case("in a browser: her lede, word for word", c.text(".lede") == LEDE)

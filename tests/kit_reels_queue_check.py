@@ -88,9 +88,10 @@ def want(name):
 
 
 def her(*parts):
-    """A file of her v25 handoff, or None when it is not on this computer."""
+    """A file of her newest handoff from v25 on (v25 brought these pages; v27 changed only the bar and the Reels card), or
+    None when it is not on this computer."""
     for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v25-*")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[5-9]-*"), reverse=True):
             f = h.joinpath("Carousel designer and reel picker", *parts)
             if f.is_file():
                 return f
@@ -225,13 +226,13 @@ def check_words(s):
     case("the older 'More from the shoot' divider is gone from the picker", "More from the shoot" not in src)
     f = her("pages", "post-kit.html")
     if f is None:
-        skip("her words against her own v25 page: her handoff (reference-private) isn't on this computer")
+        skip("her words against her own page (v25 or newer): her handoff (reference-private) isn't on this computer")
     else:
         t = html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
         new = ("ready_nocap", "nocap_title", "nocap_text", "nocap_add", "nocap_write", "which_title", "which_text", "reel_empty",
                "r_posted", "r_down", "r_in", "r_made", "r_not")
         bad = [(key, frag) for key in new for frag in re.split(r"\{\w+\}", K[key]) if frag.strip() and frag not in t]
-        case("each of those %d lines is in her v25 pages/post-kit.html" % len(new), not bad, bad)
+        case("each of those %d lines is in her newest pages/post-kit.html (v25 or later)" % len(new), not bad, bad)
         raw = f.read_text(encoding="utf-8")
         rules = [ln for ln in k.REELS_STYLE.splitlines() if ln.strip()]
         missing = [ln for ln in rules if ln not in raw]
