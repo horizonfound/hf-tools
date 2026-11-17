@@ -552,6 +552,11 @@ def check_browser(c, s):
               "return a.contains(document.querySelector('[data-box=words-'+p+']')) && a.contains(document.querySelector('[data-box=queue-'+p+']'))})") is True)
     case("in a browser: her lede, and the shoot's name only as text", c.text(".lede") == LEDE and c.text("h1") == SHORT + "."
          and c.js("document.querySelectorAll('h1 b').length === 0 && window.pwned === undefined") is True, c.text("h1"))
+    steps = c.js("Array.from(document.querySelectorAll('.bar nav.crumbs > *')).map(function(n){ return [n.tagName, n.textContent, n.getAttribute('href'), n.getAttribute('aria-current')]; })")
+    case("in a browser: her v27 path at the top, Home › %s post kit, in the bar (its one link is Home); the Back to home pill kept, hidden" % SHORT,
+         steps == [["A", "Home", "/home", None], ["SPAN", "›", None, None], ["SPAN", SHORT + " post kit", None, "page"]]
+         and c.js("getComputedStyle(document.querySelector('.bar .homelink')).display") == "none" and c.count(".bar a") == 2
+         and c.js("document.querySelectorAll('a.piece nav, a.piece .crumbs').length") == 0, steps)
     nums = c.js("Array.from(document.querySelectorAll('a.piece')).map(function(a){return Array.from(a.querySelectorAll('.stepno')).map(function(n){return n.textContent}).join('')})")
     case("in a browser: 1 2 3 on the Reel and Carousel cards, none on Stories", nums == ["123", "123", ""], nums)
     case("in a browser: two columns, the words box above the queue box, beside the photos",

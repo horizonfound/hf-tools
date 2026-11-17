@@ -2147,12 +2147,16 @@ def _font_css():
 
 def _head(title):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
+            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{look.CRUMBS_SAVED}\n{CSS}</style></head>")
 
 
-def _bar(when_words):
-    return (f"<div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
-            f"<span class='short'>Home</span></a>{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
+def _bar(when_words, shoot=None):
+    """Her bar (v27): the path at the top (Home › Hannah post kit, built by look.crumbs: the kit's crumb is where
+    you are, no link), the product's name, the date. Her Back to home pill stays in the markup, hidden, as her
+    page keeps it. shoot is the kit's folder name; None draws her plain 'Post kit' (the unreachable page)."""
+    here = look.CRUMB_WORDS["post_kit"].format(shoot=look.short_name(shoot)) if shoot else look.CRUMB_WORDS["post_kit_none"]
+    return (f"<div class='bar'><a class='homelink' style='display:none' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
+            f"<span class='short'>Home</span></a>{look.crumbs([(here, None)])}{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
 def unreachable_html(line=None):
@@ -2503,7 +2507,7 @@ def build_page(kit):
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
     page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
     page = (_head(name + " · Post kit")
-            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words)
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words, kit.name)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p>{folders}</header>"
             f"<div id='pieces'>{cards}</div>{also}</div>"

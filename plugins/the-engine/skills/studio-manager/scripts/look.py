@@ -87,18 +87,22 @@ h1 em,.swap,.accent{font:inherit;font-style:normal;color:var(--coral-2);letter-s
 
 # The path at the top of every post kit page (Nicole's v27, crumbs.js: "so you don't have to just keep clicking
 # back"): Home › Hannah post kit › Reels › B-roll. Her five rules, with her hover colour and her font named by the
-# look's own names instead of #D4643F and 'DM Sans'. The last rule is ours: a saved copy of a page (body without
-# .live, the kit page kept in the kit's hidden folder) has no server behind its links, so its path is drawn as
-# plain words, the way the saved copy hides its Back to home.
+# look's own names instead of #D4643F and 'DM Sans'. The last rule is ours: a shoot named in one long unbroken
+# piece (an export folder's name) may break inside its crumb, so a phone's screen never scrolls sideways.
 CRUMBS = r"""
 .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;font:600 13.5px/1.3 var(--sans);min-width:0}
 .crumbs a{color:inherit;text-decoration:none;padding:.42rem .75rem;border-radius:999px;background:rgba(128,128,128,.12)}
 .crumbs a:hover{background:var(--coral-2);color:#fff}
 .crumbs .sep{opacity:.45}
 .crumbs .here{padding:.42rem .2rem;opacity:.75}
-body:not(.live) .crumbs a{pointer-events:none;background:none;padding:.42rem .2rem;opacity:.75}
+.crumbs a,.crumbs .here{overflow-wrap:anywhere}
 """
 BASE = BASE + CRUMBS
+# A page that keeps a saved copy of itself (the kit page, in the kit's hidden folder) marks its body .live when a
+# server is behind it; the saved copy has none, so its path is drawn as plain words, the way it hides its Back to
+# home. Only such a page adds this rule to its own style (kit.py): a page that never marks itself .live (the words
+# page, the reel page) keeps its links, so it is NOT in BASE.
+CRUMBS_SAVED = "body:not(.live) .crumbs a{pointer-events:none;background:none;padding:.42rem .2rem;opacity:.75}"
 
 # Her words on the path (crumbs.js), whole. The steps after the post kit (Reels, Behind the scenes, Just photos,
 # B-roll, Talking to camera, Carousel, Stories, Captions) are each page's own and are passed in by that page.

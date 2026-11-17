@@ -241,8 +241,11 @@ def main():
     case("the path's rules name the look's own colour and font, never #D4643F or 'DM Sans' by name, no serif",
          "var(--coral-2)" in look.CRUMBS and "font:600 13.5px/1.3 var(--sans)" in look.CRUMBS and "#D4643F" not in look.CRUMBS.upper()
          and "DM Sans" not in look.CRUMBS and "Helvetica" not in look.CRUMBS and not SERIF.search(sans_only(look.CRUMBS)))
-    case("a saved copy of a page (no .live) draws the path as plain words: no link to press",
-         "body:not(.live) .crumbs a{pointer-events:none" in look.CRUMBS)
+    case("a saved copy of a page (no .live) draws the path as plain words: no link to press; the rule is the kit page's own, not in every page's look",
+         look.CRUMBS_SAVED.startswith("body:not(.live) .crumbs a{pointer-events:none") and look.CRUMBS_SAVED not in look.BASE and look.CRUMBS_SAVED not in look.head_css()
+         and "not(.live)" not in look.CRUMBS and "look.CRUMBS_SAVED" in (SCRIPTS / "kit.py").read_text(encoding="utf-8"))
+    case("a shoot named in one long unbroken piece may break inside its crumb (ours, so a phone never scrolls sideways)",
+         ".crumbs a,.crumbs .here{overflow-wrap:anywhere}" in look.CRUMBS)
     src = (SCRIPTS / "look.py").read_text(encoding="utf-8")
     case("look.py has none of her test-only wiring: no localStorage, no assistantHomeTest, no home-test.html, no 8790",
          not re.search(r"localStorage|assistantHomeTest|home-test|8790/", src))
@@ -261,7 +264,7 @@ def main():
         her_rules = [swap(x.strip()) for x in her_css.strip().splitlines()]
         our_rules = [x.strip() for x in look.CRUMBS.strip().splitlines()]
         case("her five rules are ours, line for line (her colour and font by the look's names)", all(r in our_rules for r in her_rules), [r for r in her_rules if r not in our_rules])
-        case("ours are her five and one of our own (the saved copy's)", our_rules[:5] == her_rules and len(our_rules) == 6 and our_rules[5].startswith("body:not(.live)"), our_rules)
+        case("ours are her five and one of our own (long names break)", our_rules[:5] == her_rules and len(our_rules) == 6 and our_rules[5].startswith(".crumbs a,.crumbs .here{overflow-wrap"), our_rules)
         words = {k: v.replace("{shoot}", "") for k, v in look.CRUMB_WORDS.items()}
         case("her words on the path are ours: Home, ' post kit', 'Post kit', 'Where you are' (from her post-kit.html's nav), ›",
              all(w in hers for k, w in words.items() if k != "where") and "<span class=\"sep\" aria-hidden=\"true\">›</span>" in hers

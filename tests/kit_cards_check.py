@@ -244,6 +244,17 @@ def check_page_fresh(s):
          and "Fraunces" not in text and "--display" not in text and "/reel-font" not in text)
     case("no path in the page", not re.search(r"/private/|/Users/|\.kit/|kit\.json", text), re.findall(r".{20}(?:/private/|/Users/|\.kit/).{20}", text)[:2])
     case("her bar: Back to home, the product's name, the date in words", "Back to home" in text and "<span class='when'>November 1, 2026</span>" in text)
+    # v27: the path at the top (Home › Fake beach post kit), built on the server; her Back to home pill kept, hidden
+    import look
+    nav = look.crumbs([("Fake beach post kit", None)])
+    case("her v27 bar: the path Home › Fake beach post kit, Home a link to /home, the kit's crumb where you are (no link)",
+         nav in text and nav == "<nav class='crumbs' aria-label='Where you are'><a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span>"
+         "<span class='here' aria-current='page'>Fake beach post kit</span></nav>", nav)
+    case("...the Back to home pill is still in the markup, hidden, as her v27 page keeps it; the path follows it, before the brand",
+         "<a class='homelink' style='display:none' href='/home'>" in text and text.index("class='homelink'") < text.index("class='crumbs'") < text.index("class='brand'")
+         and text.count("class='crumbs'") == 1)
+    case("...her path's rules are on the page (look.py's): the hover in the look's own name, not her number; no address with a port",
+         look.CRUMBS.strip() in text and ".crumbs a:hover{background:var(--coral-2)" in text and "D4643F" not in look.CRUMBS and "8790" not in text)
     case("her heading: the eyebrow 'Post kit', the shoot's name with her coral full stop, her lede",
          "<span class='eyebrow'>Post kit</span><h1>Fake beach<em>.</em></h1>" in text and html.escape(LEDE) in text)
     r_href, r = card(text, "reel")
@@ -623,6 +634,9 @@ def check_unplugged(s):
         case("the drive unplugged: her line 'I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.'",
              "<div class='problem'>%s</div>" % html.escape(REACH) in text and code == 404, code)
         case("...under her heading 'Post kit.' and her lede, with no card", "<h1>Post kit<em>.</em></h1>" in text and "class='piece'" not in text)
+        case("...and its path is Home › Post kit (no shoot to name, no dead link)",
+             "<a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span><span class='here' aria-current='page'>Post kit</span></nav>" in text
+             and text.count("class='crumbs'") == 1)
         code, text = page(s, "No such kit")
         case("a kit that isn't there: the same line, not found", code == 404 and REACH in html.unescape(text), code)
     finally:
@@ -648,6 +662,33 @@ def check_browser(c, s):
         ["carousel", "Carousel", "Open my carousel →", "/design.html?kit=" + KQ],
         ["stories", "Stories", "Open my stories →", "/design.html?kit=%s&kind=stories" % KQ]], cards)
     case("in a browser: her lede, word for word", c.text(".lede") == LEDE)
+    steps = c.js("Array.from(document.querySelectorAll('.bar nav.crumbs > *')).map(function(n){ return [n.tagName, n.textContent, n.getAttribute('href'), n.getAttribute('aria-current')]; })")
+    case("in a browser: her v27 path at the top, Home › Fake beach post kit; Home a pill (her rule), the kit's crumb where you are",
+         steps == [["A", "Home", "/home", None], ["SPAN", "›", None, None], ["SPAN", "Fake beach post kit", None, "page"]]
+         and c.js("getComputedStyle(document.querySelector('.bar nav.crumbs a')).borderRadius") == "999px", steps)
+    case("in a browser: the path's links can be pressed on the live page; on a saved copy (no .live on the body) they are plain words",
+         c.js("getComputedStyle(document.querySelector('.bar nav.crumbs a')).pointerEvents") == "auto"
+         and c.js("(function(){ document.body.classList.remove('live'); var a = document.querySelector('.bar nav.crumbs a'), s = getComputedStyle(a);"
+                  " var out = [s.pointerEvents, s.backgroundColor, getComputedStyle(document.querySelector('.bar .homelink')).display]; document.body.classList.add('live'); return out; })()")
+         == ["none", "rgba(0, 0, 0, 0)", "none"] and "body:not(.live) .crumbs a{pointer-events:none" in c.js("document.querySelector('style').textContent"))
+    case("in a browser: the Back to home pill is not drawn, the path sits before the brand and the date stays at the right",
+         c.js("getComputedStyle(document.querySelector('.bar .homelink')).display") == "none"
+         and c.rect(".bar nav.crumbs")["x"] < c.rect(".bar .brand")["x"] < c.rect(".bar .when")["x"] and c.rect(".bar .when")["right"] > c.rect(".bar .brand")["right"] + 100)
+    c.phone(375, 812)
+    try:
+        c.open(url)
+        c.wait_for("document.querySelectorAll('a.piece').length === 3", 10)
+        wide = c.js("[document.documentElement.scrollWidth - document.documentElement.clientWidth, window.innerWidth, document.querySelector('.bar').getBoundingClientRect().right <= window.innerWidth + 0.5]")
+        case("at 375 px (a small phone) the bar with its path fits: no sideways scroll, the bar inside the screen", wide[0] <= 0 and wide[1] == 375 and wide[2] is True, wide)
+    finally:
+        c.desktop()
+    c.open(url)
+    c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
+    c.click(".bar nav.crumbs a")
+    c.wait_for("location.pathname === '/home'", 10)
+    case("a press on Home opens the home page on this server", c.js("location.pathname") == "/home", c.js("location.href"))
+    c.open(url)
+    c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
     try:
         c.wait_for("Array.from(document.querySelectorAll('[data-piece=reel] .strip img')).every(function(i){return i.complete && i.naturalWidth > 0})", 60)
         loaded = True
