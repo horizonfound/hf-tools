@@ -106,7 +106,8 @@ HERS_MAKE = {
     "clips_need": "<h3>One more thing: your clips</h3><p>Select the clip or clips to use under <b>Select your clips</b> in step 1, or choose <b>Just photos</b>.</p>",
     "not_looked": "<h3>I haven't looked through your footage yet</h3><p>Add your videos in step 1, then copy the line into the chat. The moments I find show up under <b>Select your clips</b> in step 1. Or choose <b>Just photos</b>.</p>",
 }
-TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, or Remove it."
+# her v25 line (Nov 13): Trim is named in it (reel_page.TRIM_WORDS; tests/reel_trim_select_check.py holds it to her page)
+TAIL = "Press ▶ to preview one, use − and + to make it shorter or longer, Trim to pick exactly where it starts and ends, or Remove it."
 
 
 def rp():
@@ -671,6 +672,14 @@ def check_player(c, s):
     case("every video plays on the page (the one that doesn't play as it is, from its copy); the sideways one upright (360 x 640)",
          ok and dims == [["Not plain.mov", 640, 360, 6], ["Sideways é.mov", 360, 640, 6], ["clip.mov", 640, 360, 6]], dims)
     got = [(r["url"].split("key=")[-1], r["status"]) for r in c.requests if "/reel-video" in r["url"]]
+    # a phone's width: a wide video's player fits the window (her rule kept it 420 px wide whatever the window, so the
+    # whole reel page scrolled sideways on a phone; ours narrows it there and leaves her size everywhere else)
+    desk = c.js("[Math.round(Math.min(420, window.innerWidth * 0.42)), Array.from(document.querySelectorAll('.viewer video.wide')).map(function(v){ return Math.round(v.getBoundingClientRect().width); })]")
+    c.phone(375, 800)
+    narrow = c.js("[document.documentElement.scrollWidth, Array.from(document.querySelectorAll('.viewer video.wide')).map(function(v){ return Math.round(v.getBoundingClientRect().right); })]")
+    c.desktop()
+    case("a wide video's player is her size in a full window (420 px, or 42% of a narrower one), and at a phone's width it fits and the page does not scroll sideways",
+         desk[1] == [desk[0], desk[0]] and desk[0] > 300 and narrow[0] <= 375 and all(r <= 375 for r in narrow[1]), (desk, narrow))
     case("the player asked for its video in pieces, answered 206", got and all(st_ == 206 for _, st_ in got), got)
     strip = c.js("Array.from(document.querySelectorAll('.viewer')[2].querySelectorAll('.strip button')).map(function(b){ return [b.dataset.t, b.querySelector('span').textContent, b.querySelector('img').naturalWidth > 0]; })")
     case("a strip of stills one every 2 s under the player", [x[:2] for x in strip] == [["0", "0:00"], ["2", "0:02"], ["4", "0:04"]], strip)

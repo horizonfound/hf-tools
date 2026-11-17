@@ -462,7 +462,7 @@ def check_pc(s):
 
 # ---------------------------------------------------------------- the fix round (Nov 11)
 
-STOPPED_HERE = "Something on this computer got in the way. Tell Claude and it'll sort it out."
+STOPPED_HERE = "Something on this computer got in the way. Tell your assistant and it'll sort it out."
 WAITING = "🔔 Your reminder at 9 am is waiting until this post has a posting day."
 
 
@@ -697,7 +697,7 @@ def check_page(c, s):
     row = c.js("Array.from(document.querySelectorAll('#pick .pw > *')).filter(function(e){ return e.textContent; }).map(function(e){ return e.textContent; })")
     case("the button row: Copy caption, Copy my hook, Set a reminder to post, Open my words →", row == ["Copy caption", "Copy my hook", SET, "Open my words →"], row)
     case("the drop-down is closed until they press the button, and takes no room", c.js(LINE) is None and c.js("document.querySelector('#pick .pr').getBoundingClientRect().height") == 0
-         and c.js("Array.from(%s.children).map(function(e){ return e.className; }).join(' ')" % ppc.PANEL) == "ph pw pr pn strip warn")
+         and c.js("Array.from(%s.children).map(function(e){ return e.className; }).join(' ')" % ppc.PANEL) == "ph pw pr pn ps warn")
     c.click("#pick [data-r]")
     case("pressed: 'Want a reminder on its posting day? ...' [Remind me] [I'll post it myself] and a small ×, hers",
          line_is(c, ASK) is True and c.js(BUTTONS) == ["Remind me", "I'll post it myself", "×"], (c.js(LINE), c.js(BUTTONS)))
@@ -901,7 +901,7 @@ def check_page_pc(c, s):
     line_is(c, "🔔 Your reminder for %s at 6 pm has changed. Add it to your calendar again." % d1)
     cfg(s, opener="fail")
     c.click("#pick .pr [data-m=add]")
-    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell Claude instead.")
+    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell your assistant instead.")
     case("a file that can't be opened: said plainly, and it is still waiting", toast is True and reminding(s).get("waiting") == {rid: "again"}, toast)
 
 

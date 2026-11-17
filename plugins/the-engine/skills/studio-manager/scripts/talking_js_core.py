@@ -255,6 +255,7 @@ function apply(st, how){
   var moved = T.rev !== st.rev || T.mark !== st.mark;
   var outside = T.loaded && how !== 'save' && T.rev !== st.rev;      // a change this page's own save did not make
   T.ST = st; T.REC = st.rec || {}; T.rev = st.rev; T.mark = st.mark; T.ZL = st.zooms || []; T.SH = st.shots || [];
+  if (T.reelsBar && st.versions) T.reelsBar.set(st.versions, st.current);     // the shoot's talking reels (v25)
   if (outside) forget();
   T.loaded = true;
   var ready = T.ready();
@@ -318,6 +319,15 @@ T.ZS = ZS; T.zoomAt = zoomAt; T.zoomOut = zoomOut; T.zoomAmountName = zoomAmount
 T.ease = ease; T.zoomMove = zoomMove; T.zoomValue = zoomValue;
 T.snap = snap; T.save = save; T.undo = undo; T.redo = redo; T.forget = forget; T.undoButtons = undoButtons;
 T.summary = summary; T.sizeDock = sizeDock; T.apply = apply; T.poll = poll; T.quiet = quiet;
+// Several talking reels from one shoot (her v25): the bar under the title (reel_page.REELS_JS). Before a new one
+// is started or another opened, every save of this page has had its answer ("this reel is saved first", hers).
+T.reelsBar = !window.ReelsBar || !$('reels') ? null : window.ReelsBar({
+  words: W,
+  flush: function(){ return chain.then(function(){ return true; }, function(){ return true; }); },
+  post: function(b){ b.kit = KIT; return post('/talking-version', b); },
+  reload: function(){ location.reload(); },
+  renamed: function(j){ if (typeof j.rev === 'number') { T.rev = j.rev; T.ST.rev = j.rev; } T.ST.versions = j.versions; T.ST.current = j.current; }
+});
 T.start = function(){
   sizeDock();
   poll(true);

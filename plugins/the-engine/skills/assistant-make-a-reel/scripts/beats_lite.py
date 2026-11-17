@@ -300,7 +300,8 @@ def capcut_beats(beat_file):
 
 def analyze(path, beat_file=None, keep_onset=False):
     """The song's beats, where each bar starts, and how loud each beat is. With CapCut's own beat list
-    (beat_file), its beats and bars are used, so the cuts match the beat marks CapCut shows.
+    (beat_file), its beats and bars are used, so the cuts match the beat marks CapCut shows (timing.py marks
+    which of them have a hit you can hear and keeps cuts off the others, and never moves one: ON_CAPCUT_MARKS).
     keep_onset: also hand back "onset", how much the sound jumps at every moment (FPS a second), worked out
     here anyway; timing.py reads how hard the song hits at each cut from it."""
     a, how = decode(path)

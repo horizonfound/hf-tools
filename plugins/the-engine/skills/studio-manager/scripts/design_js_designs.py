@@ -33,12 +33,18 @@ was lost and is sent again never makes two. Names and words only ever go on the 
 
 For the saving part: Designer.post(path, body, tries), Designer.newToken(prefix), Designer.modals.
 
-STORIES (Designer.STORY; hers, v19): one stories design a shoot, so the name, My designs and Duplicate are not
-shown (only the save word is). "+ New design" is "+ Add stories": its window ("Add stories": Start with, Your
-templates, Layouts, each card's button Add) ADDS what is picked after the last story and never replaces anything
-(DesignPlan.addStories), in one Undo step, with no trip to the Assistant beyond the usual save. "Start with" is
-Blank story and One photo per story; the layouts are her seven grids. A shoot whose stories are still empty opens
-on that window. The shoot menu goes to each shoot's stories and counts its story designs.
+STORIES (Designer.STORY; hers, v19 and v26): stories come in SETS, like a carousel's designs (v26; before, one
+stories design a shoot): the name box, "My story sets" (this shoot's sets, newest first; click to open) and
+"+ New set of stories" (a new empty white set, made by the Assistant, opened at once; the open one is saved first
+and stays as it is) are shown; Duplicate is not (hers). "+ New design" is "+ Add stories": its window ("Add
+stories": Start with, Your templates, Layouts, each card's button Add) ADDS what is picked after the last story
+and never replaces anything (DesignPlan.addStories), in one Undo step, with no trip to the Assistant beyond the
+usual save. "Start with" is Blank story and One photo per story; the layouts are her four templates (Gallery
+delivered, My editing queue, The full story, Seamless swipe) and her seven grids. "My editing queue" is filled in
+as it is added: the page asks GET /design-queue for the waiting shoots' names and DesignPlan.fillQueue writes the
+list; when the queue can't be read the window stays, with the reason. A shoot whose stories are still empty opens
+on that window (a new empty set from "+ New set of stories" does not: hers). The shoot menu goes to each shoot's
+stories and counts its sets.
 """
 
 DESIGN_DESIGNS_JS = r"""
@@ -100,6 +106,18 @@ DESIGN_DESIGNS_JS = r"""
     secFresh: 'Start with', secStarters: 'Layouts', use: 'Add',
     blank: 'Blank story', blankSub: function(){ return 'An empty white story'; },
     onePer: 'One photo per story', slidesSub: stories,
+    // sets of stories (hers, v26): the name box, My story sets and + New set of stories, like a carousel's designs
+    myDesigns: 'My story sets', designsHead: function(shoot){ return shoot + ' story sets'; },
+    designSub: function(slides, when, open){ return stories(slides) + (when ? ' · edited ' + when : '') + (open ? ' · open now' : ''); },
+    newSet: '+ New set of stories',
+    // ours, where hers has no words (a name for a screen reader, a tooltip, and the lines when a set can't be made)
+    nameLabel: 'The name of this set of stories. Type to change it.', designsLabel: 'This shoot’s sets of stories',
+    newSetTitle: 'Start another set of stories for this shoot. The set you have open stays as it is.',
+    makeLate: 'Can’t reach the Assistant right now, so no new set was made. Your open stories are still here. Try again in a moment.',
+    makeSlow: 'The Assistant is taking a long time. Look in My story sets in a moment: your new set may be there.',
+    fellBack: 'That set of stories isn’t here, so this is your newest one.',
+    // hers, when "My editing queue" can't be filled in
+    queueCant: 'I can\'t reach your editing queue right now.',
     // hers: "1 story · 3 photos", "1 story · 3 photos · from Beach"
     tplSub: function(slides, frames, from){ return stories(slides) + ' · ' + frames + (frames === 1 ? ' photo' : ' photos') + (from ? ' · from ' + from : ''); }
   });
@@ -292,7 +310,6 @@ DESIGN_DESIGNS_JS = r"""
   nameBox.disabled = true;            // until a design is open
   nameShow.hidden = true;
   nameShow.parentNode.insertBefore(nameBox, nameShow.nextSibling);
-  if (STORY) nameBox.hidden = true;   // one stories design a shoot: only the save word shows (hers)
   var nameAtFocus = null;
   // the name goes with every save of the design
   D.save.fields.push(function(body){ if (D.design && typeof D.design.name === 'string' && D.design.name) body.name = D.design.name; });
@@ -331,7 +348,13 @@ DESIGN_DESIGNS_JS = r"""
     dupBtn.appendChild(el('span', 'dz-wide', DW.dup.slice(i)));
   })();
   gDesign.appendChild(designsBtn); gDesign.appendChild(dupBtn);
-  if (STORY) { designsBtn.hidden = true; dupBtn.hidden = true; }
+  // stories (hers, v26): sets, like designs. "+ New set of stories" sits after My story sets; Duplicate is not shown.
+  var newSetBtn = null;
+  if (STORY) {
+    dupBtn.hidden = true;
+    newSetBtn = button(DW.newSet, 'new-set'); newSetBtn.title = DW.newSetTitle; D.label(newSetBtn, DW.newSet);
+    gDesign.insertBefore(newSetBtn, dupBtn);
+  }
   function when(t){
     if (!(t > 0)) return '';
     var a = P.ago(t, Date.now() / 1000);
@@ -354,7 +377,7 @@ DESIGN_DESIGNS_JS = r"""
     pop.appendChild(list);
   });
   var busy = false;         // a design is being opened or made
-  function setBusy(on){ busy = on; dupBtn.disabled = on; newBtn.disabled = on; }
+  function setBusy(on){ busy = on; dupBtn.disabled = on; newBtn.disabled = on; if (newSetBtn) newSetBtn.disabled = on; }
   pDesigns.pop.addEventListener('click', function(e){
     var bt = e.target.closest ? e.target.closest('button.dz-item') : null;
     if (!bt) return;
@@ -378,6 +401,7 @@ DESIGN_DESIGNS_JS = r"""
       if (gone()) return 'gone';
       if (!ok) return 'unsaved';        // the open design could not be saved: the line at the bottom of the window says why
       body.kit = D.KIT; body.token = newToken('n');
+      if (STORY) body.kind = 'stories';       // a set of stories is made among the stories, never among the carousel's designs
       sent = true;
       return post('/design-new', body, 3).then(function(res){
         if (gone()) return 'gone';
@@ -399,6 +423,15 @@ DESIGN_DESIGNS_JS = r"""
     setBusy(true);
     var done = function(){ setBusy(false); };
     makeDesign({copy: D.design.id}).then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
+  });
+
+  // "+ New set of stories": a new empty white set, made by the Assistant and opened; the open set is saved first
+  if (newSetBtn) newSetBtn.addEventListener('click', function(){
+    if (busy || !D.design || !D.S || D.blocked) return;
+    setBusy(true);
+    var done = function(){ setBusy(false); };
+    makeDesign({stamp: D.S.stamp, state: M.tidy(D.S.blank || {slides: 1, bg: '#ffffff', blocks: []})})
+      .then(function(words){ if (words && words !== 'unsaved' && words !== 'gone') D.note(words, false); }).then(done, done);
   });
 
   // ---------- + New design, Save as template (the top row); Fill empty frames (the selection bar's first line) ----------
@@ -430,7 +463,7 @@ DESIGN_DESIGNS_JS = r"""
     fillBtn.disabled = D.blocked || !k;
     fillBtn.hidden = !k;
     tplBtn.disabled = D.blocked;
-    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; if (addBtn) addBtn.disabled = D.blocked; }
+    if (!busy) { newBtn.disabled = D.blocked; dupBtn.disabled = D.blocked; if (addBtn) addBtn.disabled = D.blocked; if (newSetBtn) newSetBtn.disabled = D.blocked; }
   });
 
   // the gallery
@@ -590,7 +623,8 @@ DESIGN_DESIGNS_JS = r"""
       // (hers: a card shows the layout on its own background even when adding, though a design has one background
       // and what is added sits on the design's)
       card(box, t.name || '', o && o.one ? '' : DW.tplSub(shown.slides, P.frames(shown), from), shown, adds ? function(){
-        return {add: P.fromTemplate(t.template, false), fill: tick.checked};
+        // (hers, v26: "My editing queue" names the text box its list goes in; it is filled in when it is added)
+        return {add: P.fromTemplate(t.template, false), fill: tick.checked, queue: t.fill === 'queue' && typeof t.list === 'number' ? t.list : 0};
       } : function(){
         return {stamp: S.stamp, state: P.fromTemplate(t.template, tick.checked, S.photos, S.carousel)};
       }, o);
@@ -637,11 +671,34 @@ DESIGN_DESIGNS_JS = r"""
       // stories, and "+ Add slides": what was picked goes after the last one, in one Undo step; nothing there is
       // replaced, and the design saves itself as always
       if (!D.st || D.blocked) return;
-      var pick = start(), r = P.addStories(D.st, M.tidy(pick.add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
-      if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
-      D.setState(r.st, {sel: null, adjust: false});
-      closeGallery();
-      D.revealSlide(r.first);
+      var pick = start();
+      var put = function(add){
+        var r = P.addStories(D.st, M.tidy(add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
+        if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
+        D.setState(r.st, {sel: null, adjust: false});
+        closeGallery();
+        D.revealSlide(r.first);
+      };
+      if (pick.queue) {
+        // "My editing queue": the shoots waiting in the editing queue, in its order, as they named them. Asked for
+        // now, so the story says what the queue says today; when it can't be read the window stays, with the reason.
+        setBusy(true);
+        sheet.classList.add('dz-busy');
+        gLine.textContent = '';
+        var mine = making;
+        var over = function(){ setBusy(false); sheet.classList.remove('dz-busy'); };
+        fetch('/design-queue', {cache: 'no-store'})
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (mine !== making || !D.modals.isOpen(gallery)) return;        // the window was closed meanwhile
+            over();
+            if (!j || !j.ok || !Array.isArray(j.names)) { gLine.textContent = (j && j.words) || DW.queueCant; return; }
+            if (!D.st || D.blocked) return;
+            put(P.fillQueue(pick.add, j.names, pick.queue, j.count));
+          }, function(){ if (mine !== making || !D.modals.isOpen(gallery)) return; over(); gLine.textContent = DW.queueCant; });
+        return;
+      }
+      put(pick.add);
       return;
     }
     setBusy(true);
@@ -710,6 +767,8 @@ DESIGN_DESIGNS_JS = r"""
   // Stories: a shoot whose stories have nothing on them yet opens on the Add stories window (hers), once a page
   var asked = false;
   D.on('design', function(){
+    // ("+ New set of stories" and My story sets open a set while the page is busy making or opening it, so the window
+    // is not thrown open over a new empty set: hers does not open it there either)
     if (!STORY || asked || !D.st || D.st.blocks.length || D.st.slides > 1) return;
     asked = true;
     Promise.resolve().then(function(){ if (!D.modals.any() && !D.blocked) newBtn.click(); });

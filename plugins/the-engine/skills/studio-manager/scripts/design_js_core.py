@@ -12,6 +12,7 @@ Undo, and the places later parts add themselves:
                                     save: false, sel: an id or null, adjust: true | false}
     D.select(id), D.selected()      what is selected on the strip
     D.undo(), D.canUndo()
+    D.redo(), D.canRedo()           Redo (Nicole's v26): what Undo took back, put back; a new change empties it
     D.render()                      draws everything again from D.st; D.on('render', fn) adds a drawing step
     D.on(name, fn)                  'adopt' (a state arrived), 'design' (a design was opened), 'photos' (the
                                     small copies moved on), 'change' (the layout changed), 'render', 'saved'
@@ -53,7 +54,7 @@ DESIGN_CORE_JS = r"""
     // the short word beside the design's name while a change is not saved (the sentence that says why is in
     // the bar at the bottom of the window), and while the page has stopped until it is reloaded
     notSaved: 'Not saved', needsReload: 'Needs reload',
-    cantReach: 'Could not reach the Assistant. Tell Claude instead.',
+    cantReach: 'Could not reach the Assistant. Tell your assistant instead.',
     newer: 'This design was changed somewhere else. Here\'s the newest.',
     photosChanged: 'The photos in this shoot changed since this page opened.',
     reload: 'Reload',
@@ -120,7 +121,10 @@ DESIGN_CORE_JS = r"""
   if (STORY) storyWords(WORDS, {
     max: 'A set holds up to 40 stories.',
     full: 'Every story has a photo, and 40 stories is as many as a set holds. Drag this photo onto a frame to put it there instead.',
-    one: 'It\u2019s your only story, so it stays.'
+    one: 'It\u2019s your only story, so it stays.',
+    // the small x on a story's label (hers, v26): its name, and the line a press brings
+    removeStory: function(k){ return 'Remove story ' + k; },
+    removed: function(k){ return 'Removed story ' + k + '. Undo brings it back.'; }
   });
   // a name this page gives itself, new on every load and kept nowhere: it lets the Assistant tell this
   // page's own save (whose answer never arrived) from a change made in another window
@@ -150,6 +154,7 @@ DESIGN_CORE_JS = r"""
 
   // ---- one way to change things ----
   var hist = M.history();
+  var fut = [];             // Redo (Nicole, Nov 13): the layouts Undo stepped back from, newest last
   function setSel(id){
     var b = id == null || !D.st ? null : M.find(D.st, id), nid = b ? b.id : null;
     if (nid !== D.sel) D.adjust = false;
@@ -169,7 +174,7 @@ DESIGN_CORE_JS = r"""
     if (did) {
       if (o.fresh) hist.mark();
       if (o.undo === false) hist.mark();
-      else hist.push({st: JSON.stringify(D.st), sel: D.sel}, typeof o.undo === 'string' ? o.undo : null);
+      else { hist.push({st: JSON.stringify(D.st), sel: D.sel}, typeof o.undo === 'string' ? o.undo : null); fut = []; }
       D.st = next;
     }
     if ('sel' in o) setSel(o.sel); else if (D.sel != null && !M.find(D.st, D.sel)) setSel(null);
@@ -183,6 +188,7 @@ DESIGN_CORE_JS = r"""
     if (!D.st || D.blocked) return false;
     var h = hist.pop();
     if (!h) return false;
+    fut.push({st: JSON.stringify(D.st), sel: D.sel});
     D.st = JSON.parse(h.st);
     D.adjust = false;
     D.sel = h.sel != null && M.find(D.st, h.sel) ? h.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
@@ -192,6 +198,21 @@ DESIGN_CORE_JS = r"""
     return true;
   };
   D.canUndo = function(){ return hist.size() > 0; };
+  // Redo: the layout the last Undo stepped back from. It is one more Undo step, and it is saved like any change.
+  D.redo = function(){
+    if (!D.st || D.blocked) return false;
+    var f = fut.pop();
+    if (!f) return false;
+    hist.push({st: JSON.stringify(D.st), sel: D.sel}, null);
+    D.st = JSON.parse(f.st);
+    D.adjust = false;
+    D.sel = f.sel != null && M.find(D.st, f.sel) ? f.sel : (D.sel != null && M.find(D.st, D.sel) ? D.sel : null);
+    D.emit('change');
+    D.render();
+    queue();
+    return true;
+  };
+  D.canRedo = function(){ return fut.length > 0; };
 
   // ---- the lines at the top, and the line about a save ----
   // The place beside the design's name is one fixed size and only ever holds a short word, so no wording can
@@ -237,7 +258,7 @@ DESIGN_CORE_JS = r"""
   // ---- saving: one request at a time; the newest layout wins; retried until it lands ----
   var rev = 0;                  // the counter of the newest layout the Assistant has told this page about
   var saving = false, dirty = false, timer = null, retryT = null, waiters = [];
-  var SOFT = {many: 1, long: 1, font: 1, name: 1};      // refusals the photographer can put right on the page
+  var SOFT = {many: 1, long: 1, font: 1, name: 1, ask: 1};      // refusals the photographer can put right on the page
   function settle(ok){ if (ok === false || (!saving && !dirty)) { var w = waiters; waiters = []; w.forEach(function(f){ f(ok !== false); }); } }
   function body(){
     var b = {kit: KIT, design: D.design.id, stamp: D.S.stamp, base: rev, page: PAGE, state: D.st};
@@ -354,13 +375,14 @@ DESIGN_CORE_JS = r"""
   // ---- taking a state from the Assistant ----
   function takeDesign(d){
     D.design = {id: d.id, name: d.name, set: d.set || null, unfinished: !!d.unfinished, dropped: d.dropped || 0};
+    if (STORY) D.design.ask = typeof d.ask === 'string' ? d.ask : '';      // the note for the assistant, kept with the set
     rev = d.rev;
     D.st = M.tidy(d.state);
-    hist.clear();
+    hist.clear(); fut = [];
     D.sel = null; D.adjust = false; dirty = false;
     clearTimeout(timer); clearTimeout(retryT);
     // which design is open lives in the address, so a reload opens the same one
-    try { window.history.replaceState(null, '', '/design.html?' + Q + (STORY ? KQ : '&design=' + encodeURIComponent(d.id))); } catch (e) {}
+    try { window.history.replaceState(null, '', '/design.html?' + Q + KQ + '&design=' + encodeURIComponent(d.id)); } catch (e) {}
     $('d-name').textContent = d.name;
     D.emit('design', d);
     D.render();

@@ -413,14 +413,14 @@ PICKER_JS = r"""
       few: 'A carousel needs at least 2', full: 'Instagram allows up to 20. Take one out first.',
       done: 'Saved.', doneAgain: 'Saved.',
       making: 'Making your slides...', same: 'Your slides are already in this order.',
-      slow: 'This is taking longer than it should. Tell Claude.',
-      canva: 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to Claude.'
+      slow: 'This is taking longer than it should. Tell your assistant.',
+      canva: 'Your Canva slides still show the old photos. Say “redo the Canva carousel” to your assistant.'
     }
   };
   var T = WORDS[PIECE] || WORDS.reel;
   var MARK = {'': 'Normal', '+': 'Longer', '-': 'Quicker'};
   var SAVED = 'Saved', SAVING = 'Saving...', RETRY = 'Not saved yet. Trying again...';
-  var CANT_REACH = 'Could not reach the Assistant. Tell Claude instead.';
+  var CANT_REACH = 'Could not reach the Assistant. Tell your assistant instead.';
   var CANT_READ = 'Can’t read this photo right now';
   var SINCE = 'You’ve changed it since. Press the button again when it’s right.';
   var NEWER = 'This order was changed somewhere else. Here’s the newest.';

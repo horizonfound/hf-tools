@@ -145,8 +145,8 @@ def stale():
 
 def page_path(path):
     """Only a request for a page restarts the server; the small background questions a page asks do not."""
-    # /update is a page too (Dustin, Nov 17: a change to the update page was not picked up until the home page was asked for)
-    return path in ("", "/", "/home", "/phone-setup", "/update") or path.endswith(".html")
+    # /update, /backups and /make-posts are pages too (Nov 17: a change to the update page was not picked up until the home page was asked for)
+    return path in ("", "/", "/home", "/phone-setup", "/update", "/backups", "/make-posts") or path.endswith(".html")
 
 
 def code_ok(folder=None):

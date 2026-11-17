@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026; the five
-On every beat cases as she re-recorded them in handoff v22, Nov 10, when On every beat got its rhythm) run through
-OUR code (timing.py, called by reel.py), and every "Beats per piece" line must match hers word for word.
+"""The reel's timing, checked against Nicole's own: her 22 acceptance cases (handoff v19, Nov 6, 2026; re-recorded
+by her in handoff v22, Nov 10, when On every beat got its rhythm, and again in handoff v25, Nov 13, when every vibe
+moved onto the song's real hits) run through OUR code (timing.py, called by reel.py), and every "Beats per piece"
+line must match hers word for word.
+
+What v25 changed in her expected lines: 10 of the 22, every one on her two real songs (song2 first 14 in beat,
+mixed and build; song2 first 20 in all four vibes; song1 photos 10 in beat, mixed and calm). The 9 lines on the
+steady 60-second test beat, her STOP line, and song2 first 14 calm and song1 photos 10 build are as they were:
+"the change only moves cuts onto real hits". The three steps themselves are checked in tests/reel_hits_check.py.
 
     python3 tests/reel_timing_check.py
     ASSISTANT_HANDOFF=<folder>     where to look for her handoff's two songs, if not in reference-private/
@@ -9,7 +15,7 @@ OUR code (timing.py, called by reel.py), and every "Beats per piece" line must m
 Her cases: two songs from a real shoot and a 60-second test beat, in every vibe (On every beat, A little of
 everything, Calm, Build), as Moment first (one clip, then the photos), Back and forth (three clips, two photos
 after each) and photos only; one reel too long for its song (her plain STOP line); one second variation.
-The expected lines are copied from her acceptance/expected.json (v22's), unchanged.
+The expected lines are copied from her acceptance/expected.json (v25's), unchanged.
 
   - The 60-second test beat is synthetic (a drum pattern made for testing) and lives in tests/fixtures/
     (test-beat-60s.wav), so its 9 cases always run.
@@ -106,24 +112,24 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 
-EXPECTED = {   # her acceptance/expected.json, word for word (the five "beat" lines are v22's, the other 17 as in v19)
-    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 3",
-    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2",
+EXPECTED = {   # her acceptance/expected.json as she re-recorded it in v25 (Nov 13), word for word
+    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 1, 1, 2",
+    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 4, 2, 1, 1, 2",
     "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 3, 3, 1, 2, 3",
+    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 1, 2, 1, 2, 3",
     "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 4, 1, 1, 1, 4",
-    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 4, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3",
+    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 3, 1, 1, 1, 3",
+    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 3, 2, 1, 4",
     "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
-    "song1 photos 10 mixed": "Beats per piece: 2, 1, 1, 1, 2, 2, 2, 1, 1, 3",
+    "song1 photos 10 mixed": "Beats per piece: 1, 1, 1, 1, 2, 2, 2, 1, 1, 4",
     "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 1, 1, clip 6, 2, 1, 2, 1, 2, 2, 2, 1, 1, 4",
     "song2 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 2, 1, 2, 3",
-    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3",
+    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 3, 2, 2, 2, 2, 4, 2, 2, 2, 4",
     "beat60 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 2, 1, 1, 2, 3",
+    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 1, 2, 2, 2, 2",
     "beat60 backforth 14 calm": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song2 first 14 build": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
-    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 4",
+    "song2 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
+    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 3",
     "beat60 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
     "song1 photos 10 build": "Beats per piece: 2, 2, 2, 2, 1, 2, 2, 1, 1, 4",
     "beat60 backforth 14 build": "Beats per piece: clip 6, 2, 2, clip 6, 1, 2, clip 5, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",

@@ -151,6 +151,25 @@ DESIGN_PLAN_JS = r"""
             blocks: nums.map(function(n, i){ return {id: i + 1, n: n, x: i * W, y: 0, w: W, h: H, ox: 0.5, oy: 0.5, zoom: 1, slot: i + 1}; })};
   }
 
+  // "My editing queue" (Nicole, Nov 13): the template's list filled in from the editing queue, in its order, each
+  // shoot as the photographer named it ("1   Garcia wedding"), up to twelve, then "+ n more". names = the shoots'
+  // names as text; listId = the id of the text box the list goes in; count = how many shoots are waiting (more than
+  // names when the Assistant sent only the first of a long queue). The words are ordinary text from then on.
+  var QUEUE = {most: 12, empty: 'Nothing in your editing queue right now'};
+  function fillQueue(tpl, names, listId, count){
+    var all = (names || []).filter(function(n){ return typeof n === 'string' && n; });
+    var total = count > all.length ? Math.floor(count) : all.length;
+    var rows = all.slice(0, QUEUE.most).map(function(n, i){ return (i + 1) + '   ' + n; });
+    if (total > QUEUE.most) rows.push('+ ' + (total - QUEUE.most) + ' more');
+    var out = copy(tpl);
+    (out.blocks || []).forEach(function(b){
+      if (!isText(b) || b.id !== listId) return;
+      b.text = rows.join('\n') || QUEUE.empty;
+      b.h = Math.round(Math.max(1, rows.length) * b.size * b.lh);       // the page sets it right from the real lines
+    });
+    return out;
+  }
+
   // ---- what is on each slide ----
   // What saved slide k (from 0) is drawn from: everything that reaches into it, in list order (the last on top).
   function slideBlocks(st, k){
@@ -225,7 +244,7 @@ DESIGN_PLAN_JS = r"""
   }
 
   root.DesignPlan = {
-    W: W, H: H, RULES: RULES, addStories: addStories, onePerStory: onePerStory,
+    W: W, H: H, RULES: RULES, addStories: addStories, onePerStory: onePerStory, fillQueue: fillQueue, QUEUE: QUEUE,
     holes: holes, frames: frames, wants: wants, fillOrder: fillOrder, fill: fill, fromTemplate: fromTemplate, onePerSlide: onePerSlide,
     slideBlocks: slideBlocks, bareSlides: bareSlides, holeSlides: holeSlides, copyFor: copyFor, gridTrim: gridTrim,
     ago: ago, token: token, swipe: swipe, phoneWidth: phoneWidth, cardScale: cardScale, list: list

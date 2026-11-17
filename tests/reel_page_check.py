@@ -55,7 +55,8 @@ HERS = {
     "claude_b": "Let my assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
     "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
-    "not_picked": "Your assistant hasn't picked for this shoot yet. In the chat, say <b>“pick my reel photos for Fake beach”</b> and they'll show up here.",
+    # her v25 line (the photographer picks: tests/picks_ask_check.py has the rest of that stage)
+    "not_picked": "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Drag any photo to move it, or drag one up from all your photos below. Tap × to take one out.",
     "tip": "If there's a photo you really want on screen a little longer, tap <b>Longer</b> under it. If there are ones you'd like to flash by quicker, tap <b>Quicker</b>. Leave the rest alone.",
@@ -107,6 +108,21 @@ def her_v23_page():
     """Her v23 reel-maker.html (the reel page with the third card), or None when that handoff isn't here."""
     for base in (ROOT, ROOT.parent / "hf-tools"):          # the folder beside this one, never a home path written out
         for h in sorted((base / "reference-private").glob("nicole-handoff-v23-*")):
+            f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
+            if f.is_file():
+                return f.read_text(encoding="utf-8")
+    return None
+
+
+# A little of everything's line (her v25, Nov 13, when every vibe moved onto the song's real hits). Her v25 page is
+# the source for it; the rest of her v25 page (several reels, trim, the photo note) is for later stages.
+V25_WORDS = {"vibe_mixed_s": "Some quick, some longer, and every change lands on a beat you can hear in your song."}
+
+
+def her_v25_page():
+    """Her v25 reel-maker.html, or None when that handoff isn't here."""
+    for base in (ROOT, ROOT.parent / "hf-tools"):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v25-*")):
             f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
             if f.is_file():
                 return f.read_text(encoding="utf-8")
@@ -242,7 +258,7 @@ def check_words():
                  == [V23_RULE.strip(), '      <a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>' % (V23_WORDS["foot_talk_b"], V23_WORDS["foot_talk_s"]),
                      "$('modeTalk').href = 'talking-reel.html?shoot=' + encodeURIComponent(SHOOT);   // a talking-to-camera reel (Nicole, Nov 11)"])
         for k, v in rp.WORDS.items():
-            if v23 is None and k in V23_WORDS:
+            if (v23 is None and k in V23_WORDS) or k in V25_WORDS:
                 continue
             for frag in re.split(r"\{\w+\}", v):
                 if len(frag.strip()) >= 2 and frag not in t:
@@ -251,6 +267,15 @@ def check_words():
         bad = [(k, v) for k, v in HERS.items() for x in (v if isinstance(v, list) else [v])
                if k not in ("not_picked", "title", "doc_title", "take_out_label") and x not in t]
         case("every word this test expects on step 2 is hers", not bad, bad[:5])
+    v25 = her_v25_page()
+    if v25 is None:
+        print("SKIP  A little of everything's line against her v25 page: that handoff isn't on this computer", flush=True)
+    else:
+        case("A little of everything's line is on her v25 page, word for word, and the line it replaced is gone from it",
+             all(">%s<" % v in v25 for v in V25_WORDS.values()) and "changing where the music turns over" not in v25)
+    case("A little of everything's line is in reel_page.WORDS as she wrote it (v25), and the old line is nowhere in the page's words",
+         {k: rp.WORDS.get(k) for k in V25_WORDS} == V25_WORDS
+         and not any("changing where the music turns over" in str(v) for v in rp.WORDS.values()))
     case("the third card's two lines are in reel_page.WORDS as she wrote them (v23)", {k: rp.WORDS.get(k) for k in V23_WORDS} == V23_WORDS)
     case("the limit line is the plan's (decision 23)", rp.OUR_WORDS["too_many"] == OURS_TOO_MANY, rp.OUR_WORDS["too_many"])
     case("the defaults sit where the plan says: 40, no drag out, the two-window check on",
@@ -448,14 +473,14 @@ def check_page(c, s):
     for k in ("h2", "say", "claude_b", "claude_rec", "mine_b", "mine_words", "tip", "legend", "undo", "summary", "eyebrow", "lede",
               "title", "doc_title", "brand", "maker"):
         case("her words: %s" % k, t[k] == HERS[k], (t[k], HERS[k]))
-    case("her words: not picked yet, with the line to say in the chat", t["claude_html"] == HERS["not_picked"], t["claude_html"])
+    case("her words: not picked yet, and where to ask (her v25 line)", t["claude_html"] == HERS["not_picked"], t["claude_html"])
     case("her words: the empty reel", t["empty"] == '"%s"' % HERS["empty"], t["empty"])
     case("no pick yet: their own order is on, All your photos is open, the count says 0", t["mine_on"] and not t["claude_on"] and t["all_open"] and t["count"] == "0 photos", t)
     case("the step is numbered 2, after the footage (her renumbering: only the steps that show)", t["num"] == "2")
     case("the recommended tag is not shown without footage (BUILD.md: with footage only)", t["claude_rec_hidden"] is True)
     c.click("#useClaude")
     t = texts(c)
-    case("Let my assistant choose with no pick: the chat line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
+    case("Let my assistant choose with no pick: the same line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
 
     # Claude picks; on their own (empty) order the page doesn't follow, but the words change
     code, out = s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))
@@ -753,24 +778,25 @@ PICK14 = "41,10,14-,6,16,34,19+,27,38,42+,45,46-,49,51+"
 PICK20 = "41,40,1,2,3,4+,10,14-,6-,16,34,38,19,27,42,21+,45,46,49,51"
 PICK10 = "41,10,6,16,34,19+,42+,45,49,51+"
 EXPECTED = {   # her acceptance/expected.json, word for word (the same 22 lines tests/reel_timing_check.py holds)
-    # the five On every beat lines as she re-recorded them in handoff v22 (Nov 10: On every beat has rhythm)
-    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 3",
-    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2",
+    # as she re-recorded them in handoff v25 (Nov 13: every vibe lands on the song's real hits; ten lines on her
+    # two real songs changed, the nine on the steady test beat did not)
+    "song2 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 3, 1, 2, 3, 2, 1, 1, 2",
+    "song2 first 20 beat": "Beats per piece: clip 6, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 2, 1, 1, 2, 1, 4, 2, 1, 1, 2",
     "beat60 first 14 beat": "Beats per piece: clip 6, 2, 2, 1, 1, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 3, 3, 1, 2, 3",
+    "song1 photos 10 beat": "Beats per piece: 2, 1, 1, 2, 1, 1, 2, 1, 2, 3",
     "beat60 backforth 14 beat": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 1, 2, 3, 2, 1, 1, 2",
-    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 4, 1, 1, 1, 4",
-    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 4, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 3",
+    "song2 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 3, 1, 1, 1, 3",
+    "song2 first 20 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 3, 2, 1, 4",
     "beat60 first 14 mixed": "Beats per piece: clip 6, 1, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 4",
-    "song1 photos 10 mixed": "Beats per piece: 2, 1, 1, 1, 2, 2, 2, 1, 1, 3",
+    "song1 photos 10 mixed": "Beats per piece: 1, 1, 1, 1, 2, 2, 2, 1, 1, 4",
     "beat60 backforth 14 mixed": "Beats per piece: clip 6, 1, 1, clip 6, 1, 1, clip 6, 2, 1, 2, 1, 2, 2, 2, 1, 1, 4",
     "song2 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 2, 1, 2, 3",
-    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3",
+    "song2 first 20 calm": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 3, 2, 2, 2, 2, 4, 2, 2, 2, 4",
     "beat60 first 14 calm": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 2, 1, 1, 2, 3",
+    "song1 photos 10 calm": "Beats per piece: 2, 2, 2, 2, 2, 1, 2, 2, 2, 2",
     "beat60 backforth 14 calm": "Beats per piece: clip 6, 2, 2, clip 6, 1, 1, clip 6, 2, 2, 4, 2, 2, 4, 1, 1, 2, 4",
-    "song2 first 14 build": "Beats per piece: clip 6, 2, 1, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
-    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 4",
+    "song2 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
+    "song2 first 20 build": "Beats per piece: clip 6, 2, 2, 2, 2, 2, 4, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 3",
     "beat60 first 14 build": "Beats per piece: clip 6, 2, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 1, 1, 3",
     "song1 photos 10 build": "Beats per piece: 2, 2, 2, 2, 1, 2, 2, 1, 1, 4",
     "beat60 backforth 14 build": "Beats per piece: clip 6, 2, 2, clip 6, 1, 2, clip 5, 2, 1, 2, 1, 1, 2, 1, 1, 1, 4",
@@ -796,7 +822,7 @@ HERS5 = {
     "h2": "Pick the vibe",
     "say": "How should it move? Every cut lands on the beat, whichever you pick. None of these is a fixed template: the timing is worked out for your song, your photos and your clips, so every reel comes out its own way.",
     "cards": [["On every beat", "Quick and punchy, a new photo on the beat, with a longer hold where the song hits."],
-              ["A little of everything", "Some quick, some long, changing where the music turns over."],
+              ["A little of everything", "Some quick, some longer, and every change lands on a beat you can hear in your song."],
               ["Calm", "Longer looks, room to breathe. Best with fewer photos or a longer song."],
               ["Build", "Starts calm, speeds up toward the end, then lands on the last photo."]],
 }

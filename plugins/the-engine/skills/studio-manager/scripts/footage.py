@@ -24,6 +24,10 @@ Times are seconds (42.0) or minutes and seconds ("0:42"). Each moment is the cli
 4 seconds (MOMENT_SECONDS), the first never under 3; at most MAX_MOMENTS. A video shorter than 3 seconds may be
 used whole, never as the first moment. Anything wrong is refused in plain words and NOTHING is written.
 
+Several reels from one shoot (her v25): scan and moments are for the reel being worked on on the reel page, or
+the one --reel "<its name>" names; each reel has its own notes, photo pick and clips. moments also keeps every
+clip found for the shoot ("moments_found" in the record, hers), which a new reel starts with.
+
 Where Nicole's differs, on purpose (the Assistant's rules):
   * Nothing installed: the stills come from the Mac's own AVFoundation (video.py, through this_computer), the
     sheets are drawn with sheet.py's pure-Python canvas and written as PNG (her Pillow and Arial are not needed),
@@ -300,18 +304,35 @@ def during_words(x, length):
     return "photo %d at %s" % (x["photo"], mmss(x["at"]))
 
 
-def their_notes(kit):
-    """(their notes, their feel) as saved on the reel page."""
-    saved = reel_page.load(kit).get("saved")
+def their_notes(kit, reel=None):
+    """(their notes, their feel) as saved on the reel page, for the reel being worked on or the one named."""
+    saved = reel_page.as_reel(reel_page.load(kit), reel).get("saved")
     saved = saved if isinstance(saved, dict) else {}
     ask = saved.get("ask") if isinstance(saved.get("ask"), str) else ""
     feel = saved.get("feel") if isinstance(saved.get("feel"), str) else ""
     return ask.strip(), feel.strip()
 
 
-def reel_pick(kit):
-    nums, marks = arrange.kit_pick(kit_mod.load_rec(kit), "reel")
-    return nums, marks
+def reel_pick(kit, reel=None):
+    """The Assistant's photo pick for the reel being worked on (or the one named): each of a shoot's reels has
+    its own (Nicole's v25; reel_page.assistant_pick). The first reel's is the kit's own, as it always was."""
+    order = reel_page.assistant_pick(kit, reel_page.as_reel(reel_page.load(kit), reel), kit_mod.load_rec(kit))
+    return [x["n"] for x in order], [x["h"] for x in order]
+
+
+def reel_words(kit, reel):
+    """A command's --reel: (the reel's id, a line saying which reel this is for when the shoot has several, else
+    ""). (None, plain words) when --reel names none. No --reel: the reel being worked on on the reel page."""
+    vid, why = reel_page.which_reel(kit, reel)
+    if vid is None:
+        return None, why
+    vs, cur = reel_page.reel_names(kit)
+    if len(vs) < 2:
+        return vid, ""
+    name = next(v["name"] for v in vs if v["id"] == vid)
+    return vid, (f"This shoot has {len(vs)} reels ({reel_page.reels_line(vs, cur)}). This is for \"{name}\""
+                 + (", the one open on the reel page." if vid == cur else ", not the one open on the reel page.")
+                 + " Each reel has its own notes, photos and clips; name another with --reel \"<its name>\".")
 
 
 def _sheet_name(i, v, k, what="sheet"):
@@ -357,8 +378,13 @@ def write_sheets(cells, look, i, v, shape, per, what="sheet", first=None):
 
 # ---------- scan ----------
 
-def cmd_scan(kit, every=None):
+def cmd_scan(kit, every=None, reel=None):
     vm = reel_page._video()
+    reel, which = reel_words(kit, reel)
+    if reel is None:
+        return stop(which + " Nothing was changed.")
+    if which:
+        say(which)
     if not reel_page.footage_ok(kit):
         return stop("this shoot's Footage folder is a link or not a folder, so I don't look in it.")
     coming = []
@@ -368,7 +394,7 @@ def cmd_scan(kit, every=None):
     if not vids:
         return stop(f"there's no footage yet. Videos go in the Footage folder inside {reel_page.short_name(kit.name)}: "
                     "on the reel page, Add my footage opens it.")
-    ask, feel = their_notes(kit)
+    ask, feel = their_notes(kit, reel)
     # their notes and their feel first, then the rules (SELECTS.md: "the photographer's notes and feel, then the rules")
     if ask:
         say("Their notes for this reel (follow them: find these moments first, keep them in the order they describe): " + ask)
@@ -381,15 +407,16 @@ def cmd_scan(kit, every=None):
         say("How it should feel: not picked.")
     say("")
     say(RULES)
-    nums, marks = reel_pick(kit)
+    nums, marks = reel_pick(kit, reel)
     if nums:
         say("The reel's photo pick (the same with footage or without): "
             + ",".join(f"{n}{m}" for n, m in zip(nums, marks)) + ". Leave \"order\" out of the moments file and the page uses it.")
     else:
-        say("NOTE: there is no photo pick for this reel yet. Pick the photos first, exactly as for a reel with no footage "
-            "(the reel skill's Step 2, saved with kit.py picks --reel), never to match the footage.")
+        say("NOTE: there is no photo pick of yours for this reel, and that is as it should be: they choose the photos, "
+            "and you pick only when they ask (\"Pick my reel photos for <shoot>\"). Find the moments only: don't pick "
+            "photos for this look, and leave \"order\" out of the moments file.")
     with arrange.locked(reel_page.lock_path(kit)):
-        rec = reel_page.load(kit)
+        rec = reel_page.as_reel(reel_page.load(kit), reel)
     own = [m for m in reel_page.moments_of(rec) if m.get("by") == "you"]
     if own:
         say("Their own moments, already on the page (they stay first; don't save the same ones again): "
@@ -670,7 +697,29 @@ def carry_sel(saved, old_ms, new_ms, keep_ids):
     return None if out == sel else out
 
 
-def cmd_moments(kit, file):
+def note_found(rec, new):
+    """Hers (moments_found): every clip the Assistant has found for the shoot, as found, for each new reel to
+    start with. The ones just saved replace any earlier one of the same video, start and end. A record from
+    before this list starts it from the clips every reel still has (reel_page.found_moments), so nothing found
+    earlier is left out."""
+    def tag(m):
+        try:
+            return (arrange._nfc(str(m.get("video") or "")).casefold(), round(float(m["start"]), 2), round(float(m["end"]), 2))
+        except (KeyError, TypeError, ValueError):
+            return None
+    have = {tag(m) for m in new}
+    ids = {m["id"] for m in new}
+    before = rec.get("moments_found") if isinstance(rec.get("moments_found"), list) and rec.get("moments_found") else None
+    if before is None:
+        before = [m for m in reel_page.found_moments(rec) if not m.get("set")]    # a length they set is not "as found"
+    kept = [m for m in before if isinstance(m, dict) and tag(m) not in have and m.get("id") not in ids]
+    rec["moments_found"] = kept + [dict(m) for m in new]
+
+
+def cmd_moments(kit, file, reel=None):
+    reel, which = reel_words(kit, reel)
+    if reel is None:
+        return stop(which + " Nothing was saved.")
     try:
         d = json.loads(Path(file).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as e:
@@ -680,7 +729,7 @@ def cmd_moments(kit, file):
         return stop("there's no footage in this shoot's Footage folder. Nothing was saved.")
     rows = arrange.sheet_rows(kit)
     on_sheet = {x["n"] for x in rows}
-    pick, _marks = reel_pick(kit)
+    pick, _marks = reel_pick(kit, reel)
     try:
         new, bts = check_moments(d, vids, on_sheet, pick)
     except Wrong as e:
@@ -692,26 +741,38 @@ def cmd_moments(kit, file):
             return stop("couldn't read this shoot's numbered list. Nothing was saved.")
         if {x["n"] for x in rows} != on_sheet:
             return stop("the shoot's numbered list changed while I checked. Run this again. Nothing was saved.")
-        theirs = [m for m in reel_page.moments_of(rec) if m.get("by") == "you"]
-        raw = rec.get("moments") if isinstance(rec.get("moments"), list) else []
-        earlier = [m for m in raw if not any(m is t for t in theirs)]   # every other entry is kept, never lost
-        if earlier:
-            rec.setdefault("earlier_looks", []).append({"when": time.time(), "moments": earlier})
-        rec["moments"] = theirs + new                     # the ones they picked themselves stay, first (hers)
-        rec["moments_at"] = time.time()
-        if bts is not None:
-            rec["claude_bts"] = bts
-        saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
-        moved = False
-        if saved is not None:
-            sel = carry_sel(saved, [m for m in earlier if isinstance(m, dict) and "start" in m and "end" in m and "id" in m],
-                            new, {m["id"] for m in rec["moments"]})
-            if sel is not None:
-                saved["sel"] = sel
-                saved["updated"] = time.time()
-                rec["rev"] = int(rec.get("rev") or 0) + 1  # an open page takes the new selection as it is
-                rec.pop("from", None)
-                moved = True
+        found_before = [m for m in reel_page.found_moments(rec) if not m.get("set")]   # before this look replaces any
+        try:
+            turned = reel_page.reels.turned(rec, reel, reel_page.REEL_LIVE, reel_page.REEL_FIRST)
+            turned.__enter__()
+        except reel_page.reels.Wrong as e:
+            return stop(str(e) + " Nothing was saved.")
+        try:                                              # the record reads as the reel these moments are for
+            theirs = [m for m in reel_page.moments_of(rec) if m.get("by") == "you"]
+            raw = rec.get("moments") if isinstance(rec.get("moments"), list) else []
+            earlier = [m for m in raw if not any(m is t for t in theirs)]   # every other entry is kept, never lost
+            if earlier:
+                rec.setdefault("earlier_looks", []).append({"when": time.time(), "moments": earlier})
+            rec["moments"] = theirs + new                     # the ones they picked themselves stay, first (hers)
+            rec["moments_at"] = time.time()
+            if bts is not None:
+                rec["claude_bts"] = bts
+            saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
+            moved = False
+            if saved is not None:
+                sel = carry_sel(saved, [m for m in earlier if isinstance(m, dict) and "start" in m and "end" in m and "id" in m],
+                                new, {m["id"] for m in rec["moments"]})
+                if sel is not None:
+                    saved["sel"] = sel
+                    saved["updated"] = time.time()
+                    rec["rev"] = int(rec.get("rev") or 0) + 1  # an open page takes the new selection as it is
+                    rec.pop("from", None)
+                    moved = True
+        finally:
+            turned.__exit__(None, None, None)
+        if not (isinstance(rec.get("moments_found"), list) and rec.get("moments_found")):
+            rec["moments_found"] = found_before
+        note_found(rec, new)                              # the shoot's, not one reel's
         reel_page._stamp_names(rec, rows, stamp)
         reel_page.save(kit, rec)
         for m in new:
@@ -726,6 +787,8 @@ def cmd_moments(kit, file):
                 continue                                 # the same moment from an earlier look: its still is there
             reel_page._moment_still(kit, mid, v, at)
             made += 1
+    if which:
+        say(which)
     say(f"Saved {len(new)} moment{'s' if len(new) != 1 else ''} for the reel page"
         + (f", after their own {len(theirs)}" if theirs else "") + (" and the photos for the reel with footage" if bts is not None else "") + ".")
     for k, m in enumerate(new, 1):
@@ -758,6 +821,9 @@ def main():
     m = sub.add_parser("moments")
     m.add_argument("words")
     m.add_argument("--file", required=True)
+    for x in (s, m):
+        x.add_argument("--reel", help="when the shoot has several reels: the reel this is for, by its name "
+                                      "(without it: the reel being worked on on the reel page)")
     a = ap.parse_args()
     import fresh
     fresh.announce()
@@ -777,10 +843,10 @@ def main():
                 return stop("another video was still being got ready on this computer after " + str(vm.TURN_WAIT // 60)
                             + " minutes, so I didn't look. Nothing was changed. Run the same command again.", 2)
             if a.cmd == "scan":
-                return cmd_scan(kit, a.every)
+                return cmd_scan(kit, a.every, a.reel)
             if a.cmd == "close":
                 return cmd_close(kit, a.video, a.start, a.end, a.every, a.photo)
-            return cmd_moments(kit, a.file)
+            return cmd_moments(kit, a.file, a.reel)
     except arrange.Busy:
         return stop("this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.", 2)
 

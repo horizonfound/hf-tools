@@ -39,7 +39,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -219,7 +219,8 @@ def check_empty_kit(s):
          and steps(t) == [] and "class='w" not in t, (steps(r), steps(c), steps(t)))
     case("nothing made: 'Not written yet. Tell me about it ...' in both words boxes, and both queue steps locked",
          "Not written yet. Tell me about it and I'll help with your caption and hooks." in plain(r) and "Not written yet. Tell me about it and I'll help with your caption." in plain(c)
-         and "Make your reel and write its caption first." in plain(r) and "Make your carousel and write its caption first." in plain(c))
+         and "Make your reel first. Then add it" in plain(r) and "Make your carousel first. Then add it" in plain(c)       # v25: the caption is not asked for
+         and "write its caption" not in plain(r) + plain(c))
     case("nothing made: no Open in CapCut on a kit with no reel", "id='capcut'" not in text)
     also = text[text.index("<div class='also'>"):]
     head = text[text.index("<header class='head'>"):text.index("</header>")]
@@ -453,7 +454,7 @@ def check_preview(s):
     case("...the button beside a preview is her 'Open my carousel →' (hers never says 'Design my carousel' beside a picture of one), though the assistant's own design is still not counted",
          "Open my carousel →" in plain(c) and "Design my carousel" not in plain(c) and "saved design" not in plain(c), plain(c)[-200:])
     case("...the piece is still not made: its queue step is locked",
-         "Make your carousel and write its caption first." in plain(c) and "data-add=" not in c, plain(c)[-200:])
+         "Make your carousel first. Then add it" in plain(c) and "data-add=" not in c, plain(c)[-200:])
     case("...the Stories card is as it was ('No stories yet.', 'Not made yet')", "No stories yet." in plain(t) and status_of(t) == "Not made yet" and "class='dprev'" not in t, status_of(t))
     case("...no path in the page, and nothing from the internet", not re.search(r"/private/|/Users/|\.kit/|kit\.json|https?://", text))
 
@@ -696,7 +697,12 @@ def check_browser(c, s):
     case("a press on the Reel card opens the reel page", went, c.js("location.href"))
     c.open(url)
     c.wait_for("document.querySelectorAll('a.piece').length === 3", 10)
-    outside = [u for u in c.outside_requests() if not u.startswith(("data:", "blob:", "about:", "chrome"))]
+    # Only what the kit page itself asked for: the presses above went to the stories designer and the reel page and
+    # back, and the designer asks Google for a story font, which could land in this list just as the kit page came back
+    # (it did, on and off). Each ask carries the page that made it.
+    outside = [r["url"] for r in list(c.requests) if not chrome_drive.is_this_computer(r["url"])
+               and not r["url"].startswith(("data:", "blob:", "about:", "chrome"))
+               and "/content/" in urlparse(r.get("doc") or "").path]
     case("nothing was asked of the internet by the kit page", not outside, outside[:3])
     case("no error on the page", c.page_errors() == [], c.page_errors()[:3])
 

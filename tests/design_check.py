@@ -50,6 +50,11 @@ and its real page on --port + 28): Nicole's v22. "+ Add slides" (adding never re
 single slides and her five templates frame for frame, the starters she removed, Rename on their own templates, the
 centered lines while dragging and after an arrow key, and Save slides on an untouched design.
 
+A tenth part, tests/design_v26_check.py (--only v26 runs just it: its tables, words and rules, its routes and the chat's
+commands on --port + 32 and its real page on --port + 34): Nicole's v26 for the stories designer. Sets of stories, "Let
+my assistant choose the photos" (the note, the line, story-note and story-fill), her four templates, Redo, the x on a
+story's label, Show Instagram's guides, and the stories staying in view.
+
 A ninth part, tests/design_preview_check.py (--only preview runs just it, on --port + 30): Nicole's v24, the small
 picture of a design that the page sends for the post kit, on the real page in the hidden Chrome. Its routes, with
 every refusal, are in the server part here ("the small picture of a design").
@@ -1307,7 +1312,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--work", help="a new folder under /private/tmp for this run (made if missing)")
     ap.add_argument("--port", type=int, default=8920)
-    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22", "preview"],
+    ap.add_argument("--only", choices=["server", "page", "browser", "strip", "text", "designs", "wire", "fixes", "screen", "layout", "stories", "v22", "preview", "v26"],
                     help="server: the routes and records; page: the page's scripts by themselves; browser: the real page in a hidden Chrome "
                          "(every part below that drives it, one after another); strip: only the strip, the frames and the tray, in a hidden "
                          "Chrome (with --only text, designs, wire, fixes, screen, layout and stories it makes up browser, a part at a "
@@ -1337,7 +1342,7 @@ def main():
     else:
         work = Path(tempfile.mkdtemp(prefix="hf-design-check-", dir=str(SAFE)))
     if any((work / n).exists() for n in ("fake", "browser", "text", "designs", "designs-photos", "wire", "wire-browser", "fix", "fix-browser", "screen", "layout",
-                                         "stories", "stories-browser", "v22", "v22-browser")):
+                                         "stories", "stories-browser", "v22", "v22-browser", "v26", "v26-browser")):
         print(f"STOP: {work} already holds a pretend kit from an earlier run. Give a new --work folder.")
         return 2
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
@@ -1346,7 +1351,7 @@ def main():
     r = subprocess.run([PY, str(ROOT / "tools" / "check_plugin.py")], capture_output=True, text=True)
     case("tools/check_plugin.py prints CLEAN", r.returncode == 0 and "CLEAN" in r.stdout, r.stdout[-300:])
     for f in ("design.py", "design_page.py", "design_js_model.py", "design_js_core.py", "design_js_edit.py", "design_js_type.py", "design_js_text.py",
-              "design_js_brand.py", "design_js_plan.py", "design_js_paint.py", "design_js_designs.py", "design_js_save.py", "arrange.py", "arrange_page.py",
+              "design_js_brand.py", "design_js_plan.py", "design_js_paint.py", "design_js_designs.py", "design_js_save.py", "design_js_ask.py", "arrange.py", "arrange_page.py",
               "kit.py", "posting_queue.py", "home.py"):
         r = subprocess.run([APPLE, "-c", "import sys; compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1], 'exec')", str(SCRIPTS / f)], capture_output=True, text=True)
         case(f"{f} compiles under the Mac's own /usr/bin/python3", r.returncode == 0, r.stderr[-200:])
@@ -1364,6 +1369,7 @@ def main():
     import design_stories_check
     import design_text_check
     import design_v22_check
+    import design_v26_check
     import design_wire_check
     have_chrome = bool(chrome_drive.find_chrome())
     skipped = []            # the parts that drive the real page, when there is no Chrome to drive
@@ -1486,6 +1492,21 @@ def main():
         except Exception as e:  # noqa: BLE001
             import traceback
             case("the real-browser checks of the design preview ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "page", "v26"):
+        design_v26_check.check_v26_page(case, work)
+    if a.only in (None, "server", "v26"):
+        try:
+            design_v26_check.check_v26_server(case, work, a.port + 32, make_kit, Server, post, get_json, ask, run, jpeg)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the checks of v26's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
+    if a.only in (None, "browser", "v26"):
+        real_page("v26: sets of stories, Let my assistant choose, her templates, Redo, the x on a label")
+        try:
+            design_v26_check.check_v26_browser(case, work, a.port + 34, make_kit, Server, post, get_json, run)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            case("the real-browser checks of v26 ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     bad = [n for n, ok in results if not ok]
     print()
     missed = (f"  {len(skipped)} PART{'S' if len(skipped) != 1 else ''} SKIPPED (no Chrome on this computer): the real page was NOT checked ({'; '.join(skipped)})." if skipped else "")

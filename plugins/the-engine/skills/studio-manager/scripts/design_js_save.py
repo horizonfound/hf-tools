@@ -87,7 +87,7 @@ DESIGN_SAVE_JS = r"""
     changed: 'The design changed while its slides were being made. Nothing was added to your Carousel folder. Press Save slides again.',
     photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
-    cantOpen: 'Couldn’t open the folder from here. Ask Claude to open your Carousel folder.',
+    cantOpen: 'Couldn’t open the folder from here. Ask your assistant to open your Carousel folder.',
     // the preview
     previewLabel: 'Preview', count: function(i, n){ return i + ' of ' + n; },
     prev: 'Previous slide', next: 'Next slide', close: 'Close',

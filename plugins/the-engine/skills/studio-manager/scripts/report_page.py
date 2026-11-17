@@ -46,6 +46,7 @@ img{max-width:100%;display:block}h1,h2,h3,p{margin:0}
 .lede{font-size:clamp(16px,1.4vw,19px);color:var(--ink-2);max-width:36em;text-wrap:pretty}
 .hero{display:grid;gap:1.2rem;padding:clamp(2.2rem,5vw,4rem) 0 clamp(1.6rem,3vw,2.4rem)}
 .pill{display:inline-flex;align-items:center;gap:.7rem;padding:.4rem 1.2rem .4rem .45rem;border-radius:999px;font:500 14px/1 var(--sans);background:var(--paper);border:1.5px solid var(--ink);white-space:nowrap;width:max-content}
+@media(max-width:420px){.pill{white-space:normal;width:auto;max-width:100%;line-height:1.3;justify-self:start}.pill .dot{flex:none}}
 .pill .dot{width:30px;height:30px;border-radius:50%;background:var(--lime);display:grid;place-items:center;flex:none;color:var(--ink)}
 .pill.bad{background:var(--coral);border-color:var(--coral);color:#fff}.pill.bad .dot{background:var(--paper);color:var(--coral)}
 .pill.wait{background:var(--sun-l);border-color:var(--sun)}.pill.wait .dot{background:var(--sun)}
@@ -118,6 +119,7 @@ a.go:hover .arr{transform:translate(2px,-2px)}
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from first_look import CSS as SHOOTS_CSS, shoots_section  # noqa: E402
+import first_look  # noqa: E402
 import brand  # noqa: E402
 import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -439,7 +441,8 @@ def build(manifest, studio, card=None):
                "</div></div>")
 
     # the shoots, with their previews, recaps and name boxes (one page, not two)
-    shoots_html, shoots_script = (shoots_section(studio) or (None, ""))
+    # (one card of a shoot leaves the next-step line to the shoot's page, which says it once for every card)
+    shoots_html, shoots_script = (shoots_section(studio, closing=not card) or (None, ""))
     if shoots_html:
         out.append(shoots_html)
     # with no shoots decided yet (and no sneak peeks), a few teasers from the card instead
@@ -543,7 +546,7 @@ def build(manifest, studio, card=None):
                "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=" + ("a.dataset.path||" if this_computer.WINDOWS else "") + "decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "try{const r=await fetch('open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
-               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask Claude to show the report, or open the folder yourself: '+p);}});}}</script>")
+               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask your assistant to show the report, or open the folder yourself: '+p);}});}}</script>")
     out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT
                + (CARD_SCRIPT if card else "") + "</body></html>")
     return "\n".join(out)

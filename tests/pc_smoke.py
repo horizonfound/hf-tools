@@ -1593,8 +1593,15 @@ def server_checks(work, home, kit, env, built):
                 return None, str(e).encode()
         code, body = get("/home")
         text = body.decode("utf-8", "replace")
-        check("it serves the home page (UTF-8, the shoot's name on it)",
-              code == 200 and "/home-state" in text and shows(text, POSTS_SHOOT), f"{code} {text[:200]}")
+        check("it serves the home page (UTF-8; the home base, which lists no shoots)",
+              code == 200 and "/home-state" in text and "home base" in text, f"{code} {text[:200]}")
+        code, body = get("/home-data")
+        text = body.decode("utf-8", "replace")
+        check("and what the Make posts screen draws from (UTF-8, the kit's name in it)",
+              code == 200 and shows(text, KIT_NAME),
+              f"{code} {text[:200]}")
+        code, body = get("/make-posts")
+        check("and the Make posts screen itself, and the Back up a card screen", code == 200 and get("/backups")[0] == 200, code)
         code, body = get("/posting.html")
         text = body.decode("utf-8", "replace")
         check("and the posting page", code == 200 and "Back to home" in text and shows(text, POSTS_SHOOT),
