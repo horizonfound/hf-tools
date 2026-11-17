@@ -1062,8 +1062,23 @@ def check_edit(c, s, kit, k1, k2):
     s.says(words=WORDS1, needs_setup=True, setup_sleep=1.5, sleep=1.5)
     c.js("window.__hist = []; new MutationObserver(function(){ window.__hist.push(document.getElementById('status').innerHTML); })"
          ".observe(document.getElementById('status'), {childList: true, subtree: true, characterData: true})")
+    # the Assistant held for a moment (her v27 note: "could say 'working on it' right after a video is added")
+    c.js("(function(){ var real = window.fetch; window.__fetch0 = real; window.fetch = function(u){ var a = arguments, me = this;"
+         " if (String(u).indexOf('/talking-start') >= 0) return new Promise(function(r){ setTimeout(r, 900); }).then(function(){ return real.apply(me, a); });"
+         " return real.apply(me, a); }; })()")
     c.click("#startBtn")
+    at_once = [status(c), c.js("document.getElementById('status').classList.contains('bad')"), c.js("document.querySelectorAll('#status b').length"),
+               c.js("document.getElementById('startBtn').disabled")]
+    poll(c)                                                # a look that lands before the Assistant has answered
+    held = [status(c), c.js("window.Talk.ST.working")]
+    c.js("window.fetch = window.__fetch0; 1")
     c.wait_for("document.querySelector('#status b') && window.Talk.ST.working", 10, tell="document.getElementById('status').textContent")
+    case("her v27 note: the moment Edit my video is pressed the status line says her \"Working on it…\", plain, before the Assistant has answered, and the button is off",
+         at_once == [W["working"], False, 0, True], at_once)
+    case("...a look that lands in that moment leaves the line alone (nothing is working yet on the Assistant's side)", held == [W["working"], False], held)
+    hist = c.js("window.__hist")
+    case("...and her \"Getting your video ready…\" takes over when it answers, after it",
+         W["working"] in hist and W["job_ready_video"] in hist and hist.index(W["working"]) < hist.index(W["job_ready_video"]), hist[:4])
     seen = set()
 
     def watch():
