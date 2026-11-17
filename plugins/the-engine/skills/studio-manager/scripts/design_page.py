@@ -303,6 +303,10 @@ SAVE_SLIDES = "Save slides"
 SAVE_ANYWAY = "Save anyway"
 GO_BACK = "Go back"
 OPEN_CAROUSEL = "Open folder"          # hers, v27 (Nicole, Nov 14: "i dont see the folder"): there all the time, beside Save slides
+# Save just this slide (hers, v27; Nicole, Nov 15: "I just want to save number 3"): the button beside Save slides, whose
+# label becomes "Save just slide N" once a slide is clicked (the saving script); its tooltip is hers
+SAVE_ONE = "Save just one slide"
+SAVE_ONE_TITLE = "Save only the slide you clicked"
 
 
 # The stories designer's own words (Nicole's v19 page, ?kind=stories). Its "slide" words become "story" ones
@@ -447,6 +451,8 @@ def page_html(kit_name, kind="carousel"):
            if story else
            "<label class='hint'><input type='checkbox' id='gridcrop' aria-label='" + html.escape(GRID_CROP, quote=True) + "'> " + html.escape(GRID_CROP) + "</label>")
         + "<button class='tb main' id='save-slides' type='button' disabled>" + html.escape(SAVE_STORIES if story else SAVE_SLIDES) + "</button>"
+        # Save just slide N (hers, v27), right after Save slides, as on her page
+        "<button class='tb' id='save-one' type='button' disabled title='" + html.escape(U(SAVE_ONE_TITLE), quote=True) + "'>" + html.escape(U(SAVE_ONE)) + "</button>"
         "<span class='gline' id='save-line' role='status'></span>"
         "<button class='tb main sv-ans' id='save-yes' type='button' hidden>" + html.escape(SAVE_ANYWAY) + "</button>"
         "<button class='tb sv-ans' id='save-no' type='button' hidden>" + html.escape(GO_BACK) + "</button>"

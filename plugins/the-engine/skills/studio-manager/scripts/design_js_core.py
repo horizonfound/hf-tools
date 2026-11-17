@@ -107,6 +107,8 @@ DESIGN_CORE_JS = r"""
     most: 'That\'s the most Instagram allows (20 slides). Remove one first.',
     across: 'A photo stretches across that spot. Move it first, or add the slide somewhere else.',
     one: 'It\u2019s your only slide, so it stays.',
+    // Save just this slide (hers, v27): the button in the slide's group and its tooltip (a story's tooltip says story: ours)
+    saveOne: 'Save just this slide', saveOneTitle: 'Save only the slide this is on, as its own picture',
     moved: function(n, k){ return 'Moved ' + (n > 1 ? n + ' slides (they share a photo)' : 'slide ' + k) + '. Undo moves it back.'; },
     // "Where should it go?" (hers, v27): when a template lands at a spot something stretches across, and when it would pass the most slides
     acrossEnd: 'A photo stretches across that spot, so I added it at the end instead.',

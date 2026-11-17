@@ -373,6 +373,8 @@ DESIGN_EDIT_JS = r"""
   var delStory = D.selbar.button(g4, WORDS.removeThis, 'delstory', WORDS.removeTitle);
   var oneLine = el('span', 'st-only-line', WORDS.one); oneLine.id = 'only-slide'; oneLine.hidden = true;
   g4.appendChild(oneLine);
+  // Save just this slide (hers, v27): the slide the selected thing is on, saved on its own by the saving part (D.saveOne)
+  D.selbar.button(g4, WORDS.saveOne, 'saveone', WORDS.saveOneTitle).id = 'save-one-sel';
 
   // ---------- several photos at once (hers, v27, Nov 14: "I can't even it out because I can't select them all") ----------
   // Shift-, Cmd- or Ctrl-click photos on the strip to select several (D.multi); a bar inside the stage, above the
@@ -436,6 +438,7 @@ DESIGN_EDIT_JS = r"""
     }
     if (a === 'delstory') { removeSlide(slideOf(b), 'sel'); return; }
     if (a === 'slidebefore' || a === 'slideafter') { insertSlide(a === 'slidebefore' ? slideOf(b) - 1 : slideOf(b), 'sel'); return; }
+    if (a === 'saveone') { if (D.saveOne) D.saveOne(slideOf(b) - 1); return; }
     if (a === 'crop') { if (D.crop) D.crop.open(); return; }          // the crop part (design_js_crop.py) owns the window
     // Show the whole photo needs the photo's own shape: the loaded picture's, as the strip draws it
     var nat = a === 'whole' && D.typeOf(b) === 'photo' ? D.blockTypes.photo.natural(nodes[b.id], b) : null;

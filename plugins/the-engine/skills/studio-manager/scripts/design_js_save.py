@@ -10,6 +10,13 @@ DESIGN_SAVE_JS (put on the page last, by design_page.py) works the bar at the bo
                         DesignPlan.gridTrim: 33.75 px a side). Only a way of looking; nothing is saved of it.
     Save slides         every slide drawn at 1080 by 1350 and handed to the Assistant, which puts the whole set
                         into the Carousel folder under a name of its own. Nothing is ever replaced.
+    Save just slide N   (hers, v27; Nicole, Nov 15: "I just want to save number 3") the slide the selected thing is
+                        on, or the one clicked last, drawn the same way and handed to the Assistant on its own, which
+                        puts it BESIDE the design's newest set as "<set> - slide 03 updated.jpg" ("updated 2"...),
+                        never over anything, and changes nothing else: not which set the post kit shows, and no line
+                        to the chat (hers tells nobody; the page says it). The same button is "Save just this slide"
+                        in the selected thing's bar. With no slide to mean, her "Click the slide you want to save
+                        first, then press this." Fonts that fell back ask the same Save anyway / Go back question.
 
 SAVE SLIDES, IN ORDER (every line it says is beside the button):
     1. every font is waited for, the design itself is saved, and the Assistant says what is already saved
@@ -88,6 +95,12 @@ DESIGN_SAVE_JS = r"""
     photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
     cantOpen: 'Couldn’t open the folder from here. Ask your assistant to open your Carousel folder.',
+    // Save just this slide (hers, v27): the top button's two labels, the line with no slide to mean, the making line and
+    // her "Stopped" line; the saved line is the Assistant's (her words, with the file's name filled in)
+    saveOneAny: 'Save just one slide', saveOneN: function(k){ return 'Save just slide ' + k; },
+    clickFirst: 'Click the slide you want to save first, then press this.',
+    makingOne: function(k){ return 'Making slide ' + k + '\u2026'; },
+    stoppedOne: function(why){ return 'Stopped: ' + String(why || '').replace(/[.\s]+$/, '') + '. Nothing was overwritten.'; },
     // Open folder pressed before the first Save slides (hers, v27): the Assistant says the folder is not there, the page says what to press
     noneYet: "There's no Carousel folder yet. Press Save slides first and it's made for you.",
     // the preview
@@ -101,7 +114,7 @@ DESIGN_SAVE_JS = r"""
   D.storyWords(SW, {previewLabel: 'Preview'});
   var TRIES = 3, WAIT = 2000, FLUSH_WAIT = 20000, COMMIT_WAIT = 75000, QUALITY = 0.93;
 
-  var saveBtn = $('save-slides'), prevBtn = $('preview-btn'), line = $('save-line'), yes = $('save-yes'), no = $('save-no');
+  var saveBtn = $('save-slides'), oneBtn = $('save-one'), prevBtn = $('preview-btn'), line = $('save-line'), yes = $('save-yes'), no = $('save-no');
   var openBtn = $('open-carousel'), openWrap = $('open-wrap'), openLine = $('open-line'), grid = $('gridcrop');
   var busy = false, asking = null, changed = false;
   var marks = null;       // each photo in use -> its mark on the drive now, from the Assistant's answer to the last save of the design
@@ -182,10 +195,11 @@ DESIGN_SAVE_JS = r"""
   }
   // The whole set into the Carousel folder. Asked again under the SAME name while the Assistant is still at
   // it, or does not answer, so one press ends as one set under one name.
-  async function commit(id, token, rev, count, drawn){
+  async function commit(id, token, rev, count, drawn, one){
     var o = {kit: D.KIT, design: id, set: token, rev: rev, count: count};
     if (STORY) o.kind = 'stories';
     if (drawn) o.drawn = drawn;
+    if (one) o.one = one;                 // Save just this slide: that slide alone, beside the newest set
     var body = JSON.stringify(o);
     var until = Date.now() + COMMIT_WAIT, again = 0;
     for (;;) {
@@ -194,7 +208,7 @@ DESIGN_SAVE_JS = r"""
         var r = await fetch('/design-commit', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: body});
         j = await r.json();
       } catch (e) { j = null; }
-      if (j && j.ok) return {ok: true, already: !!j.already, base: j.base, count: j.count, words: j.words || ''};
+      if (j && j.ok) return {ok: true, already: !!j.already, base: j.base, count: j.count, words: j.words || '', file: typeof j.file === 'string' ? j.file : ''};
       var why = (j && j.why) || '';
       var named = why === 'clash' || why === 'redo';              // a name was in the way: the next try takes the next free one
       if (named) again += 1;
@@ -287,12 +301,78 @@ DESIGN_SAVE_JS = r"""
   saveBtn.addEventListener('click', function(){
     if (busy || !D.st || !D.design || D.blocked) return;
     busy = true; changed = false;
-    saveBtn.disabled = true;
+    saveBtn.disabled = true; oneBtn.disabled = true;
     showOpen(false);
     stats.held = 0; stats.peak = 0; stats.slides = 0; stats.ms = 0;
-    var end = function(){ busy = false; saveBtn.disabled = !!D.blocked; stats.runs += 1; };
+    var end = function(){ busy = false; saveBtn.disabled = !!D.blocked; oneBtn.disabled = !!D.blocked; stats.runs += 1; };
     run().then(end, function(){ say(SW.stopped(1)); end(); });
   });
+
+  // ---------- Save just this slide (hers, v27) ----------
+  // The same road as Save slides for ONE slide (from 0): the fonts, the design saved, the photo's edit checked, the
+  // slide drawn by the same painter, sent to staging under the same token rule, and one commit that names the slide.
+  // Nothing is asked about an empty frame or a bare slide (hers asks nothing); fonts fallen back are asked about.
+  async function runOne(si){
+    if (!D.st || !D.design || D.blocked) return;
+    var id = D.design.id, k = si + 1;
+    if (!(si >= 0 && si < D.st.slides)) return;
+    say(SW.makingOne(k));
+    var fonts = D.type ? await D.type.fonts.ready(D.st, {retry: true}) : {fellBack: []};
+    D.save.queue();
+    var ok = await late(D.save.flush(), FLUSH_WAIT);
+    if (ok !== true || !D.design || D.design.id !== id || D.blocked) { say(SW.stoppedOne(ok === 'late' ? SW.cantReach : SW.notSaved)); return; }
+    var st = M.copy(D.st), rev = D.save.rev(), n = st.slides, token = D.newToken('s');
+    var drawn = drawnFrom(st, fonts.fellBack);
+    changed = false;
+    if (si >= n) { say(''); return; }
+    if (stale(drawn)) { say(SW.stoppedOne(SW.photoNewer)); D.photosChanged(); return; }
+    if (fonts.fellBack && fonts.fellBack.length && !(await ask(SW.fellBack(fonts.fellBack)))) { say(''); return; }
+    if (changed) { say(''); return; }
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var ctx = cv.getContext('2d'), sh = D.paint.shelf(), sent;
+    try {
+      say(SW.makingOne(k));
+      await D.paint.slide(ctx, st, si, {out: 1, shelf: sh, fonts: false});
+      var blob = await toBlob(cv);
+      sent = await sendSlide(id, token, k, n, blob);
+      blob = null;
+    } catch (e) {
+      say(SW.stoppedOne(e && e.photo ? SW.photo(e.photo) : SW.stopped(k)));
+      return;
+    } finally {
+      D.paint.letGo(sh, null);
+      cv.width = 1; cv.height = 1;
+    }
+    if (!sent.ok) { say(SW.stoppedOne(sent.words || SW.stopped(k))); return; }
+    if (changed) { say(SW.stoppedOne(SW.changed)); return; }
+    var res = await commit(id, token, rev, n, drawn, k);
+    if (res.ok) { say(res.words); showOpen(true); }         // her saved line, from the Assistant; Open folder sits right after it
+    else { say(SW.stoppedOne(res.words)); if (res.why === 'photos') D.photosChanged(); }
+  }
+  // The slide the top button means: the one the selected thing is on, else the one clicked last in this design (hers).
+  function showSaveOne(){
+    var si = D.st && D.oneSlideAt ? D.oneSlideAt() : null;
+    D.label(oneBtn, si == null ? SW.saveOneAny : SW.saveOneN(si + 1));
+  }
+  D.saveOne = function(si){
+    if (busy || !D.st || !D.design || D.blocked) return false;
+    busy = true; changed = false;
+    saveBtn.disabled = true; oneBtn.disabled = true;
+    showOpen(false);
+    var end = function(){ busy = false; saveBtn.disabled = !!D.blocked; oneBtn.disabled = !!D.blocked; };
+    runOne(si).then(end, function(){ say(SW.stoppedOne(SW.stopped(si + 1))); end(); });
+    return true;
+  };
+  oneBtn.addEventListener('click', function(){
+    if (busy || !D.st || !D.design || D.blocked) return;
+    var si = D.oneSlideAt ? D.oneSlideAt() : null;
+    if (si == null) { say(SW.clickFirst); return; }
+    D.saveOne(si);
+  });
+  document.addEventListener('pointerup', showSaveOne);        // the slide clicked last is noted at pointerdown; a selection change draws anyway
+  D.on('render', showSaveOne);
+  D.on('design', showSaveOne);
   // "Open folder": the kit's own Carousel (Stories) folder, through the Assistant; its answer shows right here
   openBtn.addEventListener('click', function(){
     openLine.textContent = '';
@@ -311,7 +391,7 @@ DESIGN_SAVE_JS = r"""
   // the answer has been read by the next press or key anywhere else: it goes, so it never sits over anything
   document.addEventListener('pointerdown', function(e){ if (openLine.textContent && !(e.target && openWrap.contains(e.target))) openLine.textContent = ''; }, true);
   document.addEventListener('keydown', function(){ if (openLine.textContent) openLine.textContent = ''; }, true);
-  D.on('render', function(){ if (!busy) saveBtn.disabled = D.blocked; prevBtn.disabled = !D.st; });
+  D.on('render', function(){ if (!busy) { saveBtn.disabled = D.blocked; oneBtn.disabled = D.blocked; } prevBtn.disabled = !D.st; });
 
   // ---------- a small picture of the design, for the post kit (hers, v24) ----------
   // Never a word on the page, whatever happens here: the picture is the Assistant's own, and the next good save

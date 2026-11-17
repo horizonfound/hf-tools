@@ -220,7 +220,8 @@ def check_designs_page(case, work):
     # drawImage in the saving script copies a slide the painter has just drawn, canvas to canvas, and nothing else)
     case("drawing: the preview, the gallery, a saved slide and the post kit's small picture are all drawn by Designer.paint (no fillText, and no drawImage on the page's later parts but the one that sets the small slides side by side)",
          "drawImage" not in d and sv.count("drawImage(") == 1 and "cx.drawImage(one, i * (w + PV.gap), 0);" in sv and "fillText" not in d and "fillText" not in sv
-         and "D.paint.slide(" in sv and sv.count("D.paint.slide(") == 3 and "await D.paint.slide(ox, st, i, {out: PV.k, shelf: sh, cap: 's'});" in sv and "D.paint.strip(" in d)
+         and "D.paint.slide(" in sv and sv.count("D.paint.slide(") == 4 and "await D.paint.slide(ox, st, i, {out: PV.k, shelf: sh, cap: 's'});" in sv and "D.paint.strip(" in d
+         and "await D.paint.slide(ctx, st, si, {out: 1, shelf: sh, fonts: false});" in sv)      # (v27: the fourth is one slide saved on its own, by the same painter)
     case("the post kit's small picture: up to 6 slides (4 stories) at 20% (15%), 6 px apart on white, JPEG at 0.85, 1.5 s after a good save or a design opening, never beside Save slides",
          "PV = {wait: 1500, most: STORY ? 4 : 6, k: STORY ? 0.15 : 0.2, gap: 6, quality: 0.85" in sv and "'image/jpeg', PV.quality" in sv and "cx.fillStyle = '#ffffff'" in sv
          and "D.on('saved', previewSoon);" in sv and "D.on('design', previewSoon);" in sv and "if (pvBusy || busy) { schedulePreview(); return; }" in sv
@@ -230,8 +231,10 @@ def check_designs_page(case, work):
          not re.search(r"\bsay\(|textContent|\.hidden\b|\$\(|\bel\(|alert\(|confirm\(|prompt\(|console\.", pv_part), re.findall(r"\bsay\(|textContent|\$\(|console\.\w+", pv_part)[:3])
     case("saving: one canvas of 1080 by 1350 for every slide, JPEG at 0.93, and the pictures the next slide does not need are let go",
          "cv.width = W; cv.height = H;" in sv and "QUALITY = 0.93" in sv and "'image/jpeg', QUALITY" in sv and "D.paint.letGo(sh, i < n ? D.paint.keys(st, i, 1) : null)" in sv)
-    case("saving: the commit is asked again under the same name for the press (the token is made once, before the first slide)",
-         sv.count("D.newToken('s')") == 1 and sv.index("D.newToken('s')") < sv.index("for (i = 1; i <= n; i++)") and "set: token" in sv)
+    # (v27: a second press, Save just this slide, makes its own one token the same way, before its one slide is drawn)
+    case("saving: the commit is asked again under the same name for the press (the token is made once, before the first slide; the single-slide press the same)",
+         sv.count("D.newToken('s')") == 2 and sv.index("D.newToken('s')") < sv.index("for (i = 1; i <= n; i++)") and "set: token" in sv
+         and sv.rindex("D.newToken('s')") < sv.index("await D.paint.slide(ctx, st, si, {out: 1, shelf: sh, fonts: false});"))
     case("a shoot's link is its kit folder's name and nothing else (and, in the stories designer, the kind)", "a.href = '/design.html?kit=' + encodeURIComponent(s.kit) + D.KQ;" in d and d.count(".href") == 1 and ".href" not in sv)
     asked = sorted(set(re.findall(r"'(/[a-z][a-z.-]*)[?']", d + sv)))
     case("every address the later parts name is one of the Assistant's own routes (and the designer's own page, for another shoot)",
@@ -732,17 +735,18 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
 
             # ---- Save slides asks about an empty frame, in the page ----
             before = car()
-            always = [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")]
+            always = [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides", "#save-one")]
             line = press_save()
             case("save with an empty frame: the line beside the button asks first, with Save anyway and Go back, and nothing is drawn or sent yet",
                  line == "The frame on slide 1 is still empty. It will be left as plain background." and not hidden("#save-yes") and not hidden("#save-no")
                  and c.js("document.getElementById('save-slides').disabled") is True and car() == before and not (staging.is_dir() and os.listdir(staging)), line)
-            case("save with an empty frame: the question is right after the Save slides button and its two answers right after the question, on one line",
-                 abs(c.rect("#save-yes")["cy"] - c.rect("#save-slides")["cy"]) < 4 and 0 <= c.rect("#save-line")["x"] - c.rect("#save-slides")["right"] < 24
+            # (v27: "Save just slide N" sits between Save slides and the line, as on her page)
+            case("save with an empty frame: the question is right after the Save slides button (and Save just slide N beside it) and its two answers right after the question, on one line",
+                 abs(c.rect("#save-yes")["cy"] - c.rect("#save-slides")["cy"]) < 4 and 0 <= c.rect("#save-one")["x"] - c.rect("#save-slides")["right"] < 24 and 0 <= c.rect("#save-line")["x"] - c.rect("#save-one")["right"] < 24
                  and 0 <= c.rect("#save-yes")["x"] - c.rect("#save-line")["right"] < 24 and c.rect("#save-no")["x"] > c.rect("#save-yes")["right"]
                  and c.js("document.getElementById('savebar').contains(document.getElementById('save-yes'))"), (c.rect("#save-line"), c.rect("#save-yes")))
-            case("save with an empty frame: Preview swipe, the grid tick and Save slides are exactly where they were before the question came",
-                 [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")] == always)
+            case("save with an empty frame: Preview swipe, the grid tick, Save slides and Save just slide N are exactly where they were before the question came",
+                 [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides", "#save-one")] == always)
             c.click("#save-no")
             case("Go back: nothing is saved, the line is cleared, and the button works again",
                  done() == "" and hidden("#save-yes") and c.js("document.getElementById('save-slides').disabled") is False and car() == before)
@@ -754,7 +758,7 @@ def check_designs_browser(case, work, port, make_kit, Server, post, get_json):
                  line == f"Saved 4 slides in your Carousel folder, named \"{got_name}\". Nothing was replaced." and car() == [f"{got_name} - slide {i:02d}.jpg" for i in range(1, 5)], (line, car()))
             im = slide(f"{got_name} - slide 01.jpg")
             case("the buttons that are always in the bar are where they were, now that the long line about the save is showing",
-                 [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")] == always, ([c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides")], always))
+                 [c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides", "#save-one")] == always, ([c.rect(x) for x in ("#preview-btn", "#gridcrop", "#save-slides", "#save-one")], always))
             case("Save anyway: the empty frame's slide is plain background (white)", im.size == (W, H) and min(e[0] for e in ImageStat.Stat(im).extrema) > 245, ImageStat.Stat(im).extrema)
             note_files()
 

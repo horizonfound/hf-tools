@@ -111,6 +111,10 @@ HERS = {
     "samed": "Same size. Undo puts them back.",
     "lined": "Lined up. Undo puts them back.",
     "removed_them": "Removed. Undo brings them back.",
+    # Save just this slide (B17): the two buttons and their tooltips (her HTML lines 292 and 337), her stories' name (435)
+    "save_one": "Save just this slide", "save_one_story": "Save just this story",
+    "save_one_title": "Save only the slide this is on, as its own picture",
+    "save_one_top_title": "Save only the slide you clicked",
     # See a photo big (B14): the tile's button (her page line 1783) and her window (her HTML 395-401, her page 1757-1759)
     "bigger": "See it bigger", "view_prev": "Previous photo", "view_next": "Next photo", "view_label": "Photo, bigger",
     "view_used": "already in this design", "view_use": "Use this photo", "view_put": "Put it in the selected frame", "view_close": "Close",
@@ -138,7 +142,16 @@ HERS_BUILT = {
     "too_many_1": ("`That adds ${add.slides} ${add.slides === 1 ? UNIT.toLowerCase() : UNITS}, and Instagram allows ${max}. You have ${st.slides}. Remove some first, or pick something smaller.`",
                    "That adds 1 slide, and Instagram allows 20. You have 20. Remove some first, or pick something smaller.",
                    "That adds 1 story, and Instagram allows 40. You have 40. Remove some first, or pick something smaller."),
+    # Save just this slide (B17): the top button's two labels, the line with no slide to mean, the making line, her Stopped line
+    "save_one_any": ("`Save just one ${u}`", "Save just one slide", "Save just one story"),
+    "save_one_n": ("`Save just ${u} ${si + 1}`", "Save just slide 3", "Save just story 3"),
+    "click_first": ("`Click the ${UNIT.toLowerCase()} you want to save first, then press this.`", "Click the slide you want to save first, then press this.", "Click the story you want to save first, then press this."),
+    "making_one": ("`Making ${u} ${si + 1}\u2026`", "Making slide 3\u2026", "Making story 3\u2026"),
+    "stopped_one": ("'Stopped: ' + err.message + '. Nothing was overwritten.'", "Stopped: a thing. Nothing was overwritten.", "Stopped: a thing. Nothing was overwritten."),
 }
+# Her saved line for a single slide (her page line 1114), built on her page from the kind's word, the number, the file's name,
+# the shoot's short name and the folder; the Assistant says it with those filled in (design.SAVED_SINGLE).
+HERS_SAVED_ONE = "`Saved ${u} ${si + 1} as \"${j.file}\", in the ${shoot.short} folder under ${STORY ? 'Stories' : 'Carousel'}. Nothing else was changed. `"
 # Her lines in these parts that ours does not carry word for word, and why.
 HERS_NOT_OURS = {
     "Opened in Finder": "her saved line's own button changes its label; ours has one Open folder button right after the saved line, whose answer is her full sentence",
@@ -155,6 +168,8 @@ OUR_WORDS = {
     "The frame on your story changes shape to match.": "the end of her Keep the frame's shape hint in the stories designer, the same way",
     "Crop the photo": "the Crop window's name for a screen reader (hers: its aria-label, the same words)",
     "Lay them out tidily on their story, every photo whole": "Even them out's tooltip in the stories designer: her one page says slide for both kinds; ours says story there (decision 20)",
+    "Save only the story this is on, as its own picture": "Save just this story's tooltip in the stories designer: her page renames the button only; ours says story in its tooltip too (decision 20)",
+    "the slide didn't arrive whole, so press it again": "why a single slide was not saved, inside her \"Stopped: <why>. Nothing was overwritten.\" (hers shows the server's own error text there); one clause for each refusal, in design.ONE_WHY",
 }
 
 
@@ -180,6 +195,17 @@ def her_page():
         if p.is_file():
             return p.read_text(encoding="utf-8")
     return None
+
+
+def her_server():
+    """Her server.py beside her page (read as text, never run)."""
+    for p in HER_PAGES:
+        if p.is_file() and (p.parent.parent / "server.py").is_file():
+            return (p.parent.parent / "server.py").read_text(encoding="utf-8")
+    return ""
+
+
+HER_SERVER = her_server()
 
 
 def _src():
@@ -252,6 +278,10 @@ var D = {WORDS: {}}, DW = (new Function('D', d + '; return DW;'))(D);
 out.drag = W.dragSlide; out.add_after = W.addAfter(3); out.remove_k = W.removeSlide(3); out.most = W.most; out.across = W.across;
 out.added = W.added(3); out.removed = W.removed(3); out.moved = W.moved(1, 3); out.moved_n = W.moved(2, 1);
 out.where_before = DW.whereBefore(3); out.where_after = DW.whereAfter(3); out.too_many = W.tooMany(4, 20, 18); out.too_many_1 = W.tooMany(1, 20, 20);
+// Save just this slide (B17): the saving part's own words, run the same way
+var s = SAVE.slice(SAVE.indexOf('var SW = D.WORDS.save = {'), SAVE.indexOf('D.storyWords(SW'));
+var SWt = (new Function('D', 'P', s + '; return SW;'))({WORDS: {}}, {list: function(a){ return a.join(', '); }});
+out.save_one_any = SWt.saveOneAny; out.save_one_n = SWt.saveOneN(3); out.click_first = SWt.clickFirst; out.making_one = SWt.makingOne(3); out.stopped_one = SWt.stoppedOne('a thing.');
 // a story's own: the most line names 40 stories (the stories' override in the core), and tooMany is given 40
 out.too_many_s = W.tooMany(4, 40, 18); out.too_many_1_s = W.tooMany(1, 40, 40);
 var m = /most: '((?:[^'\\]|\\.)*)'/g, ms = [], mm; while ((mm = m.exec(CORE))) ms.push(mm[1]);
@@ -259,7 +289,7 @@ out.most_s = ms.length > 1 ? (new Function("return '" + ms[1] + "';"))() : '';
 JSON.stringify(out);
 """
         f = Path(os.environ.get("TMPDIR", "/private/tmp")) / ("v27-said-%d.js" % os.getpid())
-        f.write_text("var CORE = " + json.dumps(core) + ";\nvar DZ = " + json.dumps(dz) + ";\n" + js, encoding="utf-8")
+        f.write_text("var CORE = " + json.dumps(core) + ";\nvar DZ = " + json.dumps(dz) + ";\nvar SAVE = " + json.dumps(_src()["DESIGN_SAVE_JS"]) + ";\n" + js, encoding="utf-8")
         r = osascript(f)
         try:
             _SAID.update(json.loads(r.stdout))
@@ -748,6 +778,39 @@ def check_v27_page(case, work):
     case("v27 page: Use says Put it in the selected frame with a frame selected, else Use this photo; and the window closes when the design changes under it",
          "D.label(useBtn, b && M.isFrame(b) ? WORDS.viewPut : WORDS.viewUse);" in view and "D.on('design', function(){ if (D.modals.isOpen(modal)) close(); });" in view)
 
+    # ---- B17: Save just this slide: her two buttons on both pages, the words, the road through the saving part ----
+    save_js = src["DESIGN_SAVE_JS"]
+    btn = re.search(r"<button class='tb' id='save-one' type='button' disabled title='([^']*)'>([^<]*)</button>", car)
+    sbtn = re.search(r"<button class='tb' id='save-one' type='button' disabled title='([^']*)'>([^<]*)</button>", design_page.page_html("2026-11-01 Fake beach", "stories"))
+    case("v27 page: \"Save just one slide\" sits right after Save slides in the bar, with her tooltip; the stories page says story",
+         btn and sbtn and btn.group(2) == "Save just one slide" and btn.group(1) == HERS["save_one_top_title"] and sbtn.group(2) == "Save just one story"
+         and sbtn.group(1) == "Save only the story you clicked" and car.index("id='save-slides'") < car.index("id='save-one'") < car.index("id='save-line'"), (btn and btn.groups(), sbtn and sbtn.groups()))
+    case("v27 page: \"Save just this slide\" and its tooltip are in the core's table, and the slide group's last button (after the one-slide line) presses it",
+         "saveOne: 'Save just this slide', saveOneTitle: 'Save only the slide this is on, as its own picture'" in core
+         and "D.selbar.button(g4, WORDS.saveOne, 'saveone', WORDS.saveOneTitle).id = 'save-one-sel';" in edit and edit.index("g4.appendChild(oneLine);") < edit.index("'saveone'")
+         and "if (a === 'saveone') { if (D.saveOne) D.saveOne(slideOf(b) - 1); return; }" in edit)
+    case("v27 page: ... and in a story's words the button is her \"Save just this story\"", SW_(HERS["save_one"]) == HERS["save_one_story"])
+    case("v27 page: the top button means the slide the selected thing is on, else the one clicked last (D.oneSlideAt), and is relabelled after every press and draw",
+         "var si = D.st && D.oneSlideAt ? D.oneSlideAt() : null;" in save_js and "D.label(oneBtn, si == null ? SW.saveOneAny : SW.saveOneN(si + 1));" in save_js
+         and "document.addEventListener('pointerup', showSaveOne);" in save_js and "D.on('render', showSaveOne);" in save_js)
+    case("v27 page: one slide goes the same road as a set: the fonts waited for, the design saved first, the photo's edit checked, the same painter, the same staging route, one commit that names the slide",
+         "await D.type.fonts.ready(D.st, {retry: true})" in save_js.split("async function runOne")[1] and "await D.paint.slide(ctx, st, si, {out: 1, shelf: sh, fonts: false});" in save_js
+         and "sent = await sendSlide(id, token, k, n, blob);" in save_js and "var res = await commit(id, token, rev, n, drawn, k);" in save_js and "if (one) o.one = one;" in save_js
+         and "if (stale(drawn)) { say(SW.stoppedOne(SW.photoNewer)); D.photosChanged(); return; }" in save_js)
+    case("v27 page: a single save never touches what the page knows of the design's set (D.design.set), and the saved line is the Assistant's (her words) with Open folder right after it",
+         "if (res.ok) { say(res.words); showOpen(true); }" in save_js and "D.design.set = " not in save_js.split("async function runOne")[1].split("function showSaveOne")[0])
+    case("v27 page: Save just this slide asks only about fonts that fell back (hers asks nothing), and the Assistant's reasons are said inside her Stopped line",
+         "if (fonts.fellBack && fonts.fellBack.length && !(await ask(SW.fellBack(fonts.fellBack)))) { say(''); return; }" in save_js.split("async function runOne")[1]
+         and "P.holeSlides" not in save_js.split("async function runOne")[1].split("function showSaveOne")[0] and "else { say(SW.stoppedOne(res.words)); if (res.why === 'photos') D.photosChanged(); }" in save_js)
+    case("v27 page: the Assistant's single-slide names are hers (\"<set> - slide 03 updated.jpg\", \"updated 2\"; a story's \"<set> - 03 updated.jpg\"), and her saved line is its words",
+         design.ONE_NAME == "{base} - slide {i:02d} updated.jpg" and design.ONE_AGAIN == "{base} - slide {i:02d} updated {k}.jpg" and design.STORY_ONE_NAME == "{base} - {i:02d} updated.jpg"
+         and design.one_name("Beach carousel 1", 3, 1) == "Beach carousel 1 - slide 03 updated.jpg" and design.one_name("Beach carousel 1", 3, 2) == "Beach carousel 1 - slide 03 updated 2.jpg"
+         and design.one_name("Beach stories", 3, 1, "stories") == "Beach stories - 03 updated.jpg"
+         and design.KW("carousel", design.SAVED_SINGLE, i=3, file="F.jpg", shoot="Beach", folder="Carousel") == 'Saved slide 3 as "F.jpg", in the Beach folder under Carousel. Nothing else was changed.'
+         and design.KW("stories", design.SAVED_SINGLE, i=3, file="F.jpg", shoot="Beach", folder="Stories") == 'Saved story 3 as "F.jpg", in the Beach folder under Stories. Nothing else was changed.')
+    case("v27 page: every reason a single slide is refused is one clause with no full stop, so her Stopped line reads as one sentence",
+         all(isinstance(v, str) and v and not v.rstrip().endswith(".") for v in design.ONE_WHY.values()) and set(design.ONE_WHY) >= {"changed", "missing", "photos", "clash", "redo", "busy", "still", "design", "slide", "drive"})
+
     # ---- her page, when it is beside the project: every word of hers, and hers the other way round ----
     her = her_page()
     if her is None:
@@ -761,6 +824,8 @@ def check_v27_page(case, work):
     missing = [k for k, v in HERS.items() if k not in BUILT and v not in her and v.replace("'", "\\'") not in her]
     case("v27 page: every word in this file's table is in her v27 page, as she wrote it", not missing, missing)
     case("v27 page: every piece her page builds a slide line from is in her page, as this file has it", all(p_ in her for p_, _, _ in HERS_BUILT.values()), [k for k, (p_, _, _) in HERS_BUILT.items() if p_ not in her])
+    case("v27 page: her saved line for a single slide is built on her page from the pieces this file names, and her names are \"<set> - slide 0N updated\", then \"updated 2\"",
+         HERS_SAVED_ONE in her and 'stem = f"{base}{sep}{i:02d} updated"' in HER_SERVER and 'name, n = f"{stem} {n}.jpg", n + 1' in HER_SERVER, HERS_SAVED_ONE in her)
     case("v27 page: her stories' tooltips still say slide (ours say story: listed in OUR_WORDS)", "'Add a story before'" in her and "Put a new blank story" not in her)
     case("v27 page: ... and the five she builds on the page are built from the pieces this file names", all(v in her for v in BUILT.values()), [k for k, v in BUILT.items() if v not in her])
     m = re.search(r"function askKindWords\(\) \{(.*?)\}\n", her, re.S)
@@ -945,8 +1010,119 @@ def check_v27_server(case, work, port, make_kit, Server, post, get_json, ask, ru
 
         # ---- B4c: the chat's side for a carousel: design.py note and fill ----
         check_fill_commands(case, work, env, kit, kit_name, run, A, get_json, P, KQ, post, J)
+        # ---- B17: Save just this slide, through the real routes and the commit as a process of its own ----
+        check_save_one(case, work, env, kit, kit_name, studio, run, A, get_json, P, KQ, post, ask, jpeg, J, disk, save, S1, STAMP)
     finally:
         srv.stop()
+
+
+def check_save_one(case, work, env, kit, kit_name, studio, run, A, get_json, P, KQ, post, ask, jpeg, J, disk, save, S1, STAMP):
+    """B17: one slide saved beside the design's newest set as "<set> - slide 0N updated.jpg", then "updated 2"; a story's
+    "<set> - 0N updated.jpg"; with no set yet, from the design's own name; i out of range, a stale counter and nothing
+    staged refused in her Stopped clause; the file byte for byte the one sent; kit.json and the line for Claude untouched;
+    a save cut off after its record is finished by the next press; design.py show lists it."""
+    sys.path.insert(0, str(SCRIPTS))
+    import design
+    JH = {"Content-Type": "image/jpeg"}
+    car_dir, sto_dir, rec_file, waiting = kit / "Carousel", kit / "Stories", kit / ".kit" / "kit.json", studio / "arrange-waiting.json"
+    cdesigns, sdesigns = kit / ".kit" / "designs", kit / ".kit" / "story-designs"
+
+    def jrn(did, tok, folder=cdesigns):
+        p = folder / "sets" / f"{did}-{tok}.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
+
+    def held():
+        return (rec_file.read_bytes(), waiting.read_bytes() if waiting.is_file() else b"")
+
+    code, out = save(S1, base=disk(A)["rev"])      # the layout the design's whole set was saved from, back as it was
+    case("v27 server: (the design's layout is back as its set was saved from)", code == 200 and out.get("ok"), (code, out))
+    tree0, held0 = _tree(car_dir), held()
+    r = disk(A)["rev"]
+    one = jpeg(W, H, seed=21)
+    code0, _, _ = ask(P, "POST", f"/design-slide?kit={KQ}&design={A}&set=v27one0000001&i=2&of=3", body=one, headers=JH)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000001", "rev": r, "count": 3, "one": 2}))
+    want = "Dune day carousel 1 - slide 02 updated.jpg"
+    case("v27 server: Save just slide 2: the slide goes to staging as any slide does, and the commit with one: 2 puts it beside the design's newest set as her \"<set> - slide 02 updated.jpg\", byte for byte the one sent",
+         code0 == 200 and code == 200 and out.get("ok") is True and out.get("file") == want and out.get("slide") == 2 and (car_dir / want).is_file() and (car_dir / want).read_bytes() == one, (code0, code, out))
+    case("v27 server: ... her saved line, whole, with the shoot's short name and the folder", out.get("words") == f'Saved slide 2 as "{want}", in the Dune day folder under Carousel. Nothing else was changed.', out.get("words"))
+    case("v27 server: ... nothing else in the Carousel folder changed, kit.json is byte for byte as it was (the set the kit shows is unchanged), and no line for Claude was written",
+         {k: v for k, v in _tree(car_dir).items() if k != want} == tree0 and held() == held0)
+    j1 = jrn(A, "v27one0000001")
+    case("v27 server: ... the save's record says one: 2, the first time round, done, with the one file under that name and its hash",
+         j1 and j1.get("one") == 2 and j1.get("again") == 1 and j1["state"] == "done" and [f["final"] for f in j1["files"]] == [want] and j1["files"][0]["sha256"] == hashlib.sha256(one).hexdigest(), j1 and {k: j1.get(k) for k in ("one", "again", "state")})
+    code, out2 = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000001", "rev": r, "count": 3, "one": 2}))
+    case("v27 server: the same press again (its answer lost): the same answer, and nothing new in the folder", code == 200 and out2 == out and {k: v for k, v in _tree(car_dir).items() if k != want} == tree0, out2)
+    code, st = J(get_json(P, f"/design-state?kit={KQ}&design={A}"))
+    case("v27 server: the page is still told the design's newest SET is the whole one (a single slide is not a set), and nothing unfinished",
+         code == 200 and st["design"]["set"] and st["design"]["set"]["base"] == "Dune day carousel 1" and st["design"]["set"]["count"] == 3 and st["design"]["unfinished"] is False, st["design"].get("set"))
+    two = jpeg(W, H, seed=22)
+    ask(P, "POST", f"/design-slide?kit={KQ}&design={A}&set=v27one0000002&i=2&of=3", body=two, headers=JH)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000002", "rev": r, "count": 3, "one": 2}))
+    want2 = "Dune day carousel 1 - slide 02 updated 2.jpg"
+    case("v27 server: slide 2 saved on its own again: \"updated 2\", the first left as it was", code == 200 and out.get("file") == want2 and (car_dir / want2).read_bytes() == two and (car_dir / want).read_bytes() == one, out)
+    (car_dir / "DUNE DAY CAROUSEL 1 - SLIDE 02 UPDATED 3.JPG").write_bytes(b"theirs")
+    ask(P, "POST", f"/design-slide?kit={KQ}&design={A}&set=v27one0000003&i=2&of=3", body=two, headers=JH)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000003", "rev": r, "count": 3, "one": 2}))
+    case("v27 server: a file of theirs under that name in capitals (a drive that ignores capitals): the next name is \"updated 4\", theirs untouched",
+         code == 200 and out.get("file") == "Dune day carousel 1 - slide 02 updated 4.jpg" and (car_dir / "DUNE DAY CAROUSEL 1 - SLIDE 02 UPDATED 3.JPG").read_bytes() == b"theirs", out)
+    # refusals, in her Stopped clause (no full stop), nothing added
+    tree1 = _tree(car_dir)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000004", "rev": r, "count": 3, "one": 0}))
+    case("v27 server: one: 0 is refused as not understood", code == 400 and out.get("ok") is False and out.get("why") == "commit", (code, out))
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000004", "rev": r, "count": 3, "one": 4}))
+    case("v27 server: one: 4 on a three-slide design: refused (why slide), the clause for her Stopped line, nothing added",
+         code == 400 and out.get("why") == "slide" and out.get("words") == design.ONE_WHY["slide"] and _tree(car_dir) == tree1, (code, out))
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000004", "rev": r + 1, "count": 3, "one": 2}))
+    case("v27 server: a counter that is not the design's: refused (why changed) with the clause", code == 409 and out.get("why") == "changed" and out.get("words") == design.ONE_WHY["changed"], (code, out))
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000004", "rev": r, "count": 3, "one": 2}))
+    case("v27 server: nothing staged under that press: refused (why missing) with the clause", code == 400 and out.get("why") == "missing" and out.get("words") == design.ONE_WHY["missing"], (code, out))
+    ask(P, "POST", f"/design-slide?kit={KQ}&design={A}&set=v27one0000005&i=1&of=3", body=one, headers=JH)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000005", "rev": r, "count": 3, "one": 2}))
+    case("v27 server: slide 1 staged but slide 2 asked for: refused (why missing), nothing added", code == 400 and out.get("why") == "missing" and _tree(car_dir) == tree1, (code, out))
+    code, _, data = ask(P, "POST", "/design-commit", body=json.dumps({"kit": kit_name, "design": A, "set": "v27one0000005", "rev": r, "count": 3, "one": 1}).encode(),
+                        headers={"Content-Type": "application/json", "Origin": "http://evil.example"})
+    case("v27 server: another website cannot save a slide (403)", code == 403 and _tree(car_dir) == tree1, (code, data[:80]))
+    # a save cut off right after its record is written: finished under its name by the next commit (the route's)
+    env_stop = dict(env, DESIGN_TEST_STOP="after-journal")
+    code, o = run(env_stop, "design.py", "commit", kit_name, "--design", A, "--set", "v27one0000005", "--rev", str(r), "--one", "1")
+    j5 = jrn(A, "v27one0000005")
+    case("v27 server: the commit command stopped dead after writing the record: it says moving, names the file, and the Carousel folder has nothing new",
+         code == 9 and j5 and j5["state"] == "moving" and j5.get("one") == 1 and j5["files"][0]["final"] == "Dune day carousel 1 - slide 01 updated.jpg" and _tree(car_dir) == tree1, (code, o[-200:], j5 and j5.get("state")))
+    code, st = J(get_json(P, f"/design-state?kit={KQ}&design={A}"))
+    case("v27 server: ... the page is told the design has an unfinished save", code == 200 and st["design"]["unfinished"] is True)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27one0000005", "rev": r, "count": 3, "one": 1}))
+    case("v27 server: ... the next press finishes it under the name written down, and says so",
+         code == 200 and out.get("file") == "Dune day carousel 1 - slide 01 updated.jpg" and (car_dir / out.get("file", "x")).read_bytes() == one and jrn(A, "v27one0000005")["state"] == "done", out)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": A, "set": "v27set0000009", "rev": r, "count": 3}))
+    case("v27 server: Save slides after single saves, with the layout as the set was saved from: \"Already saved as ...\" still (a single slide is not a set and changes none)",
+         code == 200 and out.get("already") is True and out.get("base") == "Dune day carousel 1", out)
+    # with no whole set yet: the design's own name
+    code, nd = J(post(P, "/design-new", {"kit": kit_name, "token": "v27new0000001", "state": {"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 3, 0), _frame(2, 4, W)]}}))
+    B = nd.get("design", {}).get("id") if code == 200 else None
+    if case("v27 server: (a second design, never saved as a set)", code == 200 and B, (code, nd)):
+        rb = disk(B)["rev"]
+        ask(P, "POST", f"/design-slide?kit={KQ}&design={B}&set=v27one0000006&i=1&of=2", body=two, headers=JH)
+        code, out = J(post(P, "/design-commit", {"kit": kit_name, "design": B, "set": "v27one0000006", "rev": rb, "count": 2, "one": 1}))
+        case("v27 server: a single slide from a design with no set yet is named from the design's own name", code == 200 and out.get("file") == f"{nd['design']['name']} - slide 01 updated.jpg" and (car_dir / out["file"]).read_bytes() == two, out)
+    # a story on its own
+    code, ss = J(get_json(P, f"/design-state?kit={KQ}&kind=stories"))
+    SID = ss["design"]["id"]
+    sst = {"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, h=SH), _frame(2, 2, SW, h=SH)]}
+    code, out = J(post(P, "/design", {"kit": kit_name, "kind": "stories", "design": SID, "stamp": STAMP, "base": disk(SID, sdesigns)["rev"], "page": "v27serverpage03", "state": sst}))
+    story = jpeg(SW, SH, seed=23)
+    code0, _, _ = ask(P, "POST", f"/design-slide?kit={KQ}&kind=stories&design={SID}&set=v27one0000007&i=2&of=2", body=story, headers=JH)
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "kind": "stories", "design": SID, "set": "v27one0000007", "rev": disk(SID, sdesigns)["rev"], "count": 2, "one": 2}))
+    sname = disk(SID, sdesigns)["name"]
+    case("v27 server: Save just this story: \"<set> - 02 updated.jpg\" in the Stories folder, her line in story words",
+         code0 == 200 and code == 200 and out.get("file") == f"{sname} - 02 updated.jpg" and (sto_dir / out.get("file", "x")).read_bytes() == story
+         and out.get("words") == f'Saved story 2 as "{out.get("file")}", in the Dune day folder under Stories. Nothing else was changed.', (code0, code, out))
+    code, out = J(post(P, "/design-commit", {"kit": kit_name, "kind": "stories", "design": SID, "set": "v27one0000008", "rev": disk(SID, sdesigns)["rev"], "count": 2, "one": 2}))
+    case("v27 server: ... a story's refusal is in story words", code == 400 and out.get("words") == "the story didn't arrive whole, so press it again", out)
+    code, o = run(env, "design.py", "show", kit_name)
+    case("v27 server: design.py show lists each slide saved on its own, by its file", code == 0 and f'Slide 2 on its own: "{want}"' in o and f'Slide 2 on its own: "{want2}"' in o and "Slide 1 on its own:" in o, o[-600:])
+    code, o = run(env, "design.py", "show", kit_name, "--kind", "stories")
+    case("v27 server: ... and a story saved on its own", code == 0 and f'Story 2 on its own: "{sname} - 02 updated.jpg"' in o, o[-400:])
+    case("v27 server: nothing a page was given about single saves names a folder on this computer", all(no_path(x, work)[0] for x in (out, st, ss)))
 
 
 def check_fill_commands(case, work, env, kit, kit_name, run, A, get_json, P, KQ, post, J):
@@ -1239,8 +1415,9 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#strip .blk[data-id='1']")
             grp = Jx("(function(){ var g = document.getElementById('sel-slides'); return {shown: !g.hidden, btns: Array.from(g.querySelectorAll('button')).map(function(b){ return [b.textContent, b.title, b.disabled]; }), "
                      "line: document.getElementById('only-slide').hidden, after: g.nextElementSibling && g.nextElementSibling.id}; })()")
-            case("v27 browser: a photo selected: Add a slide before, Add a slide after, Remove this slide, with her tooltips, right before the group for anything (hers), after the text's groups",
-                 grp == {"shown": True, "btns": [[HERS["before"], HERS["before_title"], False], [HERS["after"], HERS["after_title"], False], [HERS["remove_this"], HERS["remove_title"], False]], "line": True, "after": "sel-all"}, grp)
+            case("v27 browser: a photo selected: Add a slide before, Add a slide after, Remove this slide, Save just this slide (B17), with her tooltips, right before the group for anything (hers), after the text's groups",
+                 grp == {"shown": True, "btns": [[HERS["before"], HERS["before_title"], False], [HERS["after"], HERS["after_title"], False], [HERS["remove_this"], HERS["remove_title"], False],
+                                                 [HERS["save_one"], HERS["save_one_title"], False]], "line": True, "after": "sel-all"}, grp)
             order = Jx("Array.from(document.getElementById('selrows').children).map(function(g){ return g.id; })")
             case("v27 browser: the bar's groups run Selected photo, Crop, Text, Color, style, the slide's, then the rest (so a text box gets the slide's buttons after its own)",
                  order == ["sel-photo", "sel-crop", "sel-text", "sel-color", "sel-style", "sel-slides", "sel-all"], order)
@@ -1757,6 +1934,43 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#undo")
             case("v27 browser: nothing went wrong on the page through See a photo big", not c.page_errors(), c.page_errors()[:3])
 
+            # ================= Save just this slide (B17) =================
+            c.open(f"{base}/design.html?kit={KQ}&design={A}")
+            ready()
+            c.wait_for("Designer.save.idle()", 10)
+            put({"slides": 2, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, 2, W + 100, 100, 800, 800)]})
+            c.js("Designer.load('" + A + "')")          # opened afresh: no slide clicked yet in this design
+            c.wait_for("Designer.save.idle()", 10)
+            top = Jx("{text: document.getElementById('save-one').textContent, title: document.getElementById('save-one').title, after: document.getElementById('save-slides').nextElementSibling.id, off: document.getElementById('save-one').disabled}")
+            case("v27 browser: the bar's button says \"Save just one slide\" with her tooltip, right after Save slides, on", top == {"text": "Save just one slide", "title": HERS["save_one_top_title"], "after": "save-one", "off": False}, top)
+            c.click("#save-one")
+            case("v27 browser: pressed with no slide to mean: her line, beside the button, nothing saved", c.text("#save-line") == "Click the slide you want to save first, then press this." and not (kit / "Carousel").is_dir() or not any("updated" in n for n in os.listdir(kit / "Carousel")), c.text("#save-line"))
+            c.click("#strip .blk[data-id='2']")
+            grp = Jx("(function(){ var b = document.getElementById('save-one-sel'); return {text: b.textContent, title: b.title, last: b.parentNode.lastElementChild === b, group: b.parentNode.id, top: document.getElementById('save-one').textContent}; })()")
+            case("v27 browser: a photo on slide 2 selected: the slide group ends with her \"Save just this slide\" (her tooltip), and the bar's button says \"Save just slide 2\"",
+                 grp == {"text": HERS["save_one"], "title": HERS["save_one_title"], "last": True, "group": "sel-slides", "top": "Save just slide 2"}, grp)
+            car_before = _tree(kit / "Carousel")
+            rec_before = (kit / ".kit" / "kit.json").read_bytes()
+            c.click("#save-one")
+            c.wait_for("/^Saved slide 2 as /.test(document.getElementById('save-line').textContent)", 40, tell="document.getElementById('save-line').textContent")
+            line1 = c.text("#save-line")
+            m1 = re.search(r'^Saved slide 2 as "(.+?)", in the Beach folder under Carousel\. Nothing else was changed\.$', line1)
+            f1 = m1.group(1) if m1 else ""
+            data1 = (kit / "Carousel" / f1).read_bytes() if f1 and (kit / "Carousel" / f1).is_file() else b""
+            case("v27 browser: Save just slide 2: her saved line, the file \"<the design's name> - slide 02 updated.jpg\" in the Carousel folder, a whole 1080 by 1350 slide, Open folder right after the line",
+                 bool(m1) and f1 == disk()["name"] + " - slide 02 updated.jpg" and design.slide_ok(data1) and Jx("document.getElementById('save-line').nextElementSibling.nextElementSibling.nextElementSibling.id") == "open-wrap", (line1, f1, len(data1)))
+            case("v27 browser: ... nothing else in the Carousel folder, kit.json byte for byte as it was, the page's design still has no set",
+                 {k: v for k, v in _tree(kit / "Carousel").items() if k != f1} == car_before and (kit / ".kit" / "kit.json").read_bytes() == rec_before and Jx("Designer.design.set") is None)
+            c.click("#save-one-sel")
+            c.wait_for("/updated 2/.test(document.getElementById('save-line').textContent)", 40, tell="document.getElementById('save-line').textContent")
+            f2 = disk()["name"] + " - slide 02 updated 2.jpg"
+            case("v27 browser: \"Save just this slide\" in the group saves the same slide again as \"updated 2\", the first left as it was",
+                 c.text("#save-line") == f'Saved slide 2 as "{f2}", in the Beach folder under Carousel. Nothing else was changed.' and (kit / "Carousel" / f2).is_file() and (kit / "Carousel" / f1).read_bytes() == data1, c.text("#save-line"))
+            c.js("document.getElementById('g-bg').querySelector('.sw[data-c=\"#111111\"]').click()")
+            case("v27 browser: a change takes the saved line away (it is no longer what is on the slide)", c.text("#save-line") == "", c.text("#save-line"))
+            c.click("#undo")
+            case("v27 browser: nothing went wrong on the page through Save just this slide", not c.page_errors(), c.page_errors()[:3])
+
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")
             ready()
@@ -1793,6 +2007,15 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#open-carousel")
             c.wait_for("document.getElementById('open-line').textContent !== ''", 5)
             case("v27 browser: Open folder on the stories before any Save stories: her not-yet line, naming Save stories", c.text("#open-line") == HERS["none_story"], c.text("#open-line"))
+            c.click("#strip .blk")
+            sgrp = Jx("{top: document.getElementById('save-one').textContent, title: document.getElementById('save-one').title, sel: document.getElementById('save-one-sel').textContent, selTitle: document.getElementById('save-one-sel').title}")
+            case("v27 browser: on the stories page the two buttons say story: \"Save just story 1\" and her \"Save just this story\" (the tooltips in story words, ours)",
+                 sgrp == {"top": "Save just story 1", "title": "Save only the story you clicked", "sel": HERS["save_one_story"], "selTitle": "Save only the story this is on, as its own picture"}, sgrp)
+            c.click("#save-one")
+            c.wait_for("/^Saved story 1 as /.test(document.getElementById('save-line').textContent)", 40, tell="document.getElementById('save-line').textContent")
+            ms = re.search(r'^Saved story 1 as "(.+?)", in the Beach folder under Stories\. Nothing else was changed\.$', c.text("#save-line"))
+            case("v27 browser: Save just story 1: \"<the set's name> - 01 updated.jpg\" in the Stories folder, a whole 1080 by 1920 story",
+                 bool(ms) and ms.group(1) == disk(folder=sdesigns)["name"] + " - 01 updated.jpg" and design.slide_ok((kit / "Stories" / ms.group(1)).read_bytes(), "stories"), c.text("#save-line"))
             weak = Jx("Array.from(document.querySelectorAll('[hidden]')).filter(function(e){ return getComputedStyle(e).display !== 'none'; }).map(function(e){ return e.id || e.className; })")
             case("v27 browser: on the stories page too, every hidden element is really gone", not weak, weak)
             # ---- slides as things, in a story's words (B8, B9, B10) ----
@@ -1813,8 +2036,9 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.click("#undo")
             c.click("#strip .blk[data-id='1']")
             grp = Jx("Array.from(document.querySelectorAll('#sel-slides button')).map(function(b){ return [b.textContent, b.title]; })")
-            case("v27 browser: the three buttons in her story names, with the tooltips in story words (ours: hers still say slide)",
-                 grp == [[HERS["before_story"], "Put a new blank story in front of the one this is on"], [HERS["after_story"], "Put a new blank story right after the one this is on"], [HERS["remove_story"], "Take out the story this is on, and everything on it"]], grp)
+            case("v27 browser: the four buttons in her story names, with the tooltips in story words (ours: hers still say slide)",
+                 grp == [[HERS["before_story"], "Put a new blank story in front of the one this is on"], [HERS["after_story"], "Put a new blank story right after the one this is on"], [HERS["remove_story"], "Take out the story this is on, and everything on it"],
+                         [HERS["save_one_story"], "Save only the story this is on, as its own picture"]], grp)
             c.click("#sel-slides [data-a=slideafter]")
             case("v27 browser: Add a story after story 1: a blank story 2, her line in story words", st()["slides"] == 5 and c.text("#selline") == "Added a blank story as story 2. Drag a photo onto it. Undo takes it out.", c.text("#selline"))
             c.click("#undo")

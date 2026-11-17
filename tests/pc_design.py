@@ -1402,6 +1402,36 @@ def v27_checks(kit):
           all(w in page for w in ("'Even them out'", "'Same size'", "'Line up tops'", "'Remove them'", "'Shift-click a photo to add it or take it out. Drag any of them to move them all.'",
                                   "'See it bigger'", "'Put it in the selected frame'", "'already in this design'", ".multibar{position:sticky;left:0;", "#view-img{"))
           and scripts[-1] == "DESIGN_VIEW_JS" and "D.photoUrl(n, 'l')" in page and "/full/" not in page and not any(s in page for s in ("/Users/", "C:\\")), scripts[-2:])
+    # Save just this slide (B17): one slide on its own, beside the design's newest set, through the same staging and commit
+    d = design.load_design(kit, A)
+    whole, slides = save_set(kit, d, "v27 set")
+    d = design.load_design(kit, A)
+    one = jpeg(W, H, level=11, note="v27 slide 2 again")
+    tok = token()
+    code = design.stage_slide(kit, A, tok, 2, d["state"]["slides"], one)[0]
+    res = design.commit(kit, A, tok, d["rev"], None, "carousel", 2)
+    want = design.ONE_NAME.format(base=whole.get("base", ""), i=2)
+    car = kit / "Carousel"
+    listed = {unicodedata.normalize("NFC", n) for n in os.listdir(car)} if car.is_dir() else set()
+    check("v27: Save just slide 2: beside the design's set as \"<set> - slide 02 updated.jpg\", byte for byte the slide sent, her line with the shoot's short name",
+          whole.get("state") == "done" and code == 200 and res["state"] == "done" and res.get("file") == want and unicodedata.normalize("NFC", want) in listed and file_sha(car / want) == sha(one)
+          and res["words"] == f'Saved slide 2 as "{want}", in the Zoë’s dunes 🌊 folder under Carousel. Nothing else was changed.', (code, res))
+    rec_before = (kit / ".kit" / "kit.json").read_bytes()
+    tok2 = token()
+    design.stage_slide(kit, A, tok2, 2, d["state"]["slides"], one)
+    res2 = design.commit(kit, A, tok2, d["rev"], None, "carousel", 2)
+    check("v27: ... again: \"updated 2\", the first as it was, kit.json untouched, the design's set still the whole one",
+          res2["state"] == "done" and res2.get("file") == design.ONE_AGAIN.format(base=whole.get("base", ""), i=2, k=2) and file_sha(car / want) == sha(one)
+          and (kit / ".kit" / "kit.json").read_bytes() == rec_before and design.set_info(kit, design.load_design(kit, A))["base"] == whole.get("base"), res2)
+    res3 = design.commit(kit, A, token(), d["rev"], None, "carousel", 9)
+    res4 = design.commit(kit, A, token(), d["rev"] + 1, None, "carousel", 2)
+    check("v27: a slide the design hasn't got, or a stale counter: refused in one clause each (her Stopped line), nothing added",
+          res3["state"] == "problem" and res3["why"] == "slide" and res4["state"] == "problem" and res4["why"] == "changed"
+          and all(not res[k].rstrip().endswith(".") for res in (res3, res4) for k in ("words",)) and len(os.listdir(car)) == len(listed) + 1, (res3, res4))
+    # a PC: the single slide's own name is the one measured against the 260-character limit (a Mac: never measured)
+    long_base = "x" * 70
+    check("v27: cant_save measures the single slide's own file name on a PC and never on a Mac",
+          (design.cant_save(kit, long_base, long_base, file=design.ONE_NAME.format(base=long_base, i=2)) is None) == (not WINDOWS or not tc.path_too_long(car / design.ONE_NAME.format(base=long_base, i=2))))
 
 
 def v22_checks(kit):

@@ -202,6 +202,14 @@ SET_AGAIN = "{base} ({k})"                      # the same design saved again: "
 # Stories (decision 17: the carousel's pattern): "<short> stories - 01.jpg", then "<short> stories (2) - 01.jpg"
 STORY_SET_NAME = "{base} - {i:02d}.jpg"
 STORY_SET_AGAIN = "{base} ({k})"
+# "Save just this slide" (hers, v27; Nicole, Nov 15: "I just want to save number 3"): one slide saved beside the
+# design's newest set, never over anything: "<the set's name> - slide 03 updated.jpg", then "updated 2", "updated 3"...
+# (a story's: "<the set's name> - 03 updated.jpg"). The set's name is the design's own last finished set (hers guessed
+# it from the folder's prefixes, which can pick another set after a rename by hand).
+ONE_NAME = "{base} - slide {i:02d} updated.jpg"
+ONE_AGAIN = "{base} - slide {i:02d} updated {k}.jpg"
+STORY_ONE_NAME = "{base} - {i:02d} updated.jpg"
+STORY_ONE_AGAIN = "{base} - {i:02d} updated {k}.jpg"
 STORY_HANDLE_FALLBACK = "yourname"      # decision 18: the name in the stories preview when their handle isn't known
 STORY_SAFE = (250, 340)                 # Instagram's name and buttons at the top of a story, its reply bar at the bottom
 LOOKS = ("plain", "box", "neon")        # a story's text: plain, on a box behind each line, or neon (stories only)
@@ -275,6 +283,20 @@ NOT_FINISHED = "Couldn't finish saving your slides. Nothing was lost. Press Save
 IN_THE_WAY = "Couldn't save the slides: a file in your Carousel folder has a name one of them needs. Nothing was replaced. Press Save slides again."
 DRIVE = "Couldn't save the slides: {why}. Nothing was lost. Press Save slides again once that is put right."
 CANT_SAVE = "Your changes can't be saved right now: {why}. They'll be saved by themselves once that is put right."
+# Save just this slide (hers, v27): her saved line, whole (the page puts its Open folder button after it), and why one
+# was not saved, said inside her "Stopped: <why>. Nothing was overwritten.": each a clause with no full stop (ours).
+SAVED_SINGLE = "Saved slide {i} as \"{file}\", in the {shoot} folder under {folder}. Nothing else was changed."
+ONE_WHY = {"changed": "the design changed while the slide was being made, so press it again",
+           "missing": "the slide didn't arrive whole, so press it again",
+           "photos": "a photo on it was exported again since this page opened, so press Reload first",
+           "clash": "a file in your Carousel folder took the name it needed, so press it again",
+           "redo": "the slide went missing on its way in, so press it again",
+           "busy": "your slides are being changed by something else right now, so try again in a moment",
+           "still": "it is still being saved, one moment",
+           "design": "that design isn't here any more, so reload the page",
+           "slide": "that slide isn't in this design any more",
+           "waiting": "too many unfinished saves are waiting, so tell your assistant and it'll sort it out",
+           "drive": "couldn't save it ({why}), and nothing was lost, so press it again once that is put right"}
 CANT_KEEP = "That couldn't be saved: {why}."
 PHOTO_NEWER = ("A photo on these slides was exported again since this page opened, so no slides were made. "
                "Nothing was added to your Carousel folder. Press Reload, then Save slides again.")
@@ -645,13 +667,13 @@ KINDS = {
     CAROUSEL: {"kind": CAROUSEL, "w": W, "h": H, "slides": (SLIDES_MIN, SLIDES_MAX), "folder": "Carousel",
                "designs": "designs", "staging": "design-staging", "older": "design-slides-older",
                "templates": TEMPLATES, "templates_lock": "design-templates.lock", "slides_lock": "slides.lock",
-               "set_name": SET_NAME, "set_again": SET_AGAIN, "fallback": "Carousel", "word": "carousel",
+               "set_name": SET_NAME, "set_again": SET_AGAIN, "one_name": ONE_NAME, "one_again": ONE_AGAIN, "fallback": "Carousel", "word": "carousel",
                "piece": "design", "rec_set": "carousel_set", "rec_all": "laid_out", "one_design": False,
                "safe": None, "looks": False, "blank_slides": DEFAULT_SLIDES},
     STORIES: {"kind": STORIES, "w": 1080, "h": 1920, "slides": (1, 40), "folder": "Stories",
               "designs": "story-designs", "staging": "story-staging", "older": "story-slides-older",
               "templates": HOME / "story-templates", "templates_lock": "story-templates.lock", "slides_lock": "stories.lock",
-              "set_name": STORY_SET_NAME, "set_again": STORY_SET_AGAIN, "fallback": "Stories", "word": "stories",
+              "set_name": STORY_SET_NAME, "set_again": STORY_SET_AGAIN, "one_name": STORY_ONE_NAME, "one_again": STORY_ONE_AGAIN, "fallback": "Stories", "word": "stories",
               "piece": "stories", "rec_set": "stories_set", "rec_all": "stories_laid_out", "one_design": False,
               "safe": STORY_SAFE, "looks": True, "blank_slides": 1},
 }
@@ -971,23 +993,24 @@ def too_deep(kit, kind=CAROUSEL):
     return KW(kind, TOO_DEEP, pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS, where=where)
 
 
-def name_too_long(kit, name, base=None, kind=CAROUSEL):
+def name_too_long(kit, name, base=None, kind=CAROUSEL, file=None):
     """A PC only: plain words when a slide saved from a design of this name could not be opened in File Explorer
     (its full address in the Carousel folder would pass 260 characters, long paths on or not), else None. base is
-    the set's name when it has been chosen already; otherwise it is worked out as a save would (free_base). When
-    even the shortest name would not fit, the words say it is the folder, not the name. A Mac: None."""
+    the set's name when it has been chosen already; otherwise it is worked out as a save would (free_base). file:
+    one slide's own file name (Save just this slide), measured instead of the set's first. When even the shortest
+    name would not fit, the words say it is the folder, not the name. A Mac: None."""
     if not this_computer.WINDOWS:
         return None
     k = K(kind)
     car = kit / k["folder"]                             # unproven on a real PC
     base = base if base is not None else free_base(kit, name, kind)
-    if not this_computer.path_too_long(car / k["set_name"].format(base=base, i=1)):
+    if not this_computer.path_too_long(car / (file if file else k["set_name"].format(base=base, i=1))):
         return None
     shortest = this_computer.path_too_long(car / k["set_name"].format(base="C", i=1))
     return KW(kind, LONG_FOLDER if shortest else LONG_NAME, pc=this_computer.COMPUTER, limit=kit_mod.LONG_WORDS)
 
 
-def cant_save(kit, name, base=None, kind=CAROUSEL):
+def cant_save(kit, name, base=None, kind=CAROUSEL, file=None):
     """(why, plain words) when a PC could not take this design's slides at all ("deep": the kit's own hidden
     files; "long": a slide's name in the Carousel folder), else None. A Mac: always None."""
     if not this_computer.WINDOWS:
@@ -995,7 +1018,7 @@ def cant_save(kit, name, base=None, kind=CAROUSEL):
     words = too_deep(kit, kind)
     if words:
         return "deep", words
-    words = name_too_long(kit, name, base, kind)
+    words = name_too_long(kit, name, base, kind, file)
     return ("long", words) if words else None
 
 
@@ -1616,9 +1639,17 @@ def _journal_ok(j, kind=CAROUSEL):
         if (not isinstance(base, str) or base != safe_base(base, kind) or not isinstance(files, list)
                 or not k["slides"][0] <= len(files) <= k["slides"][1]):
             return False
-        for i, f in enumerate(files, 1):
-            if f["staged"] != f"slide-{i:02d}.jpg" or f["final"] != k["set_name"].format(base=base, i=i):
+        if j.get("one") is not None:
+            # one slide on its own (Save just this slide): the slide's number, which time round, one file under its own name
+            one, again = j["one"], j.get("again")
+            if (type(one) is not int or not 1 <= one <= k["slides"][1] or type(again) is not int or again < 1 or len(files) != 1
+                    or files[0]["staged"] != f"slide-{one:02d}.jpg" or files[0]["final"] != one_name(base, one, again, kind)):
                 return False
+        else:
+            for i, f in enumerate(files, 1):
+                if f["staged"] != f"slide-{i:02d}.jpg" or f["final"] != k["set_name"].format(base=base, i=i):
+                    return False
+        for f in files:
             if not re.fullmatch(r"[0-9a-f]{64}", f["sha256"]):
                 return False
         return validate_state(j["layout"], kind=kind)[0] is not None
@@ -1668,8 +1699,8 @@ def _order(j):
 
 
 def last_done(kit, did, kind=CAROUSEL):
-    """The newest whole set saved from this design, or None."""
-    done = [j for j in _journals(kit, kind) if j["design"] == did and j["state"] == "done"]
+    """The newest whole set saved from this design, or None. A slide saved on its own is not a set."""
+    done = [j for j in _journals(kit, kind) if j["design"] == did and j["state"] == "done" and j.get("one") is None]
     return max(done, key=_order) if done else None
 
 
@@ -1890,6 +1921,24 @@ def free_base(kit, name, kind=CAROUSEL):
         k += 1
 
 
+def one_name(base, i, k, kind=CAROUSEL):
+    """A slide saved on its own: "<base> - slide 03 updated.jpg", and "updated 2", "updated 3"... for the kth time."""
+    kk = K(kind)
+    return kk["one_name"].format(base=base, i=i) if k == 1 else kk["one_again"].format(base=base, i=i, k=k)
+
+
+def free_one(kit, base, i, kind=CAROUSEL):
+    """(the file name, which time round) for slide i saved on its own beside the set named base: the first of
+    "... updated", "... updated 2", ... that the folder's own listing has no file for, compared as free_base compares."""
+    taken = {kit_mod._fold(n) for n in kit_mod._listing(kit / K(kind)["folder"])}
+    k = 1
+    while True:
+        name = one_name(base, i, k, kind)
+        if kit_mod._fold(name) not in taken:
+            return name, k
+        k += 1
+
+
 SET_FOLDER = re.compile(r"([a-z][a-z0-9]{5,23})-([a-z0-9]{8,24})")
 
 
@@ -2006,6 +2055,8 @@ def _finish(kit, j, kind=CAROUSEL):
     Carousel folder, never over another file, each checked by its hash; then the kit's record, the kit page,
     the posting queue's picture and the line for Claude. Safe to run any number of times. Trouble with the
     drive itself is raised (OSError) and leaves the record saying "moving", for the next run."""
+    if j.get("one") is not None:
+        return _finish_one(kit, j, kind)
     kk = K(kind)
     car = kit / kk["folder"]
     stag = staging_dir(kit, kind) / f"{j['design']}-{j['token']}"
@@ -2091,6 +2142,47 @@ def _finish(kit, j, kind=CAROUSEL):
     return _result("done", j, words=_saved_words(j, kind))
 
 
+def _finish_one(kit, j, kind=CAROUSEL):
+    """Carry out (or finish) a single slide's save (Save just this slide, hers, v27): the one staged slide to its own
+    name in the Carousel folder, never over another file, checked by its hash. Nothing else: not the kit's record
+    (which set the kit page shows is unchanged), not the posting queue's picture, no line for Claude (hers tells
+    nobody; the page says it). Safe to run any number of times; a cut-off save is finished by the next commit."""
+    kk = K(kind)
+    car = kit / kk["folder"]
+    stag = staging_dir(kit, kind) / f"{j['design']}-{j['token']}"
+    car.mkdir(exist_ok=True)
+    f = j["files"][0]
+    got = kit_mod._move_one(stag / f["staged"], car / f["final"])
+    if got in ("moved", "there"):
+        try:
+            if kit_mod._sha(car / f["final"]) != f["sha256"]:
+                got = "clash"           # a file has that name, and it is not the slide this save made
+        except OSError:
+            got = "gone"
+    if got == "clash":
+        res = _undo(kit, j, "clash", f["final"], kind)
+    elif got == "gone":
+        res = _undo(kit, j, "redo", kind=kind)
+    else:
+        j.update(state="done", finished=j.get("finished") if j.get("state") == "done" else now_iso())
+        arrange.write_whole(_journal_path(kit, j["design"], j["token"], kind), j)
+        _test_stop("after-done")
+        try:
+            os.rmdir(stag)              # our own staging folder, empty now (left alone if anything is still in it)
+        except OSError:
+            pass
+        arrange.log(f"design slide {j['one']} of {j['base']!r} for {kit.name} is in the {kk['folder']} folder as {f['final']!r} (on its own)")
+        return _result("done", j, words=_one_words(kit, j, kind), file=f["final"], slide=j["one"])
+    res["words"] = KW(kind, ONE_WHY[res["why"]])
+    res.update(slide=j["one"])
+    return res
+
+
+def _one_words(kit, j, kind=CAROUSEL):
+    """Her saved line for a single slide: the slide's number, its file name, the shoot's short name and the folder."""
+    return KW(kind, SAVED_SINGLE, i=j["one"], file=j["files"][0]["final"], shoot=kit_mod.short_name(kit.name), folder=K(kind)["folder"])
+
+
 def _is_shown(kit, j, rec=None, kind=CAROUSEL):
     """Is this saved set the one the kit page and the posting queue show as the carousel now (a story's: as the
     stories)? Reads only."""
@@ -2126,28 +2218,33 @@ def _show_again(kit, j, kind=CAROUSEL):
     return True
 
 
-def commit(kit, did, token, rev=None, drawn=None, kind=CAROUSEL):
-    """Put a staged set of slides into the Carousel folder. One run at a time for a kit's Carousel folder,
-    across processes (kit.py's slides lock, which the plain-slide maker holds too). Returns
-    {"state": "done" | "already" | "problem", "base", "count", "why", "words"}. Never raises for trouble
-    with the drive: that is a problem in plain words, and nothing is lost."""
+def commit(kit, did, token, rev=None, drawn=None, kind=CAROUSEL, one=None):
+    """Put a staged set of slides into the Carousel folder (one: that one slide on its own, Save just this slide).
+    One run at a time for a kit's Carousel folder, across processes (kit.py's slides lock, which the plain-slide
+    maker holds too). Returns {"state": "done" | "already" | "problem", "base", "count", "why", "words"}
+    (a single slide's "done" also names its "file"). Never raises for trouble with the drive: that is a problem
+    in plain words, and nothing is lost."""
+    def trouble(what, **fill):
+        words = KW(kind, ONE_WHY[what], **fill) if one is not None else KW(kind, DRIVE if what == "drive" else BUSY, **fill)
+        return _result("problem", why=what, words=words)
+
     try:
         lock_file = kit_mod.hidden(kit) / K(kind)["slides_lock"]
     except OSError as e:
-        return _result("problem", why="drive", words=KW(kind, DRIVE, why=kit_mod._plain_os(e)))
+        return trouble("drive", why=kit_mod._plain_os(e))
     with kit_mod._held(lock_file, kit_mod.SLIDES_WAIT) as mine:
         if not mine:
-            return _result("problem", why="busy", words=KW(kind, BUSY))
+            return trouble("busy")
         try:
-            return _commit(kit, did, token, rev, drawn, kind)
+            return _commit(kit, did, token, rev, drawn, kind, one)
         except arrange.Busy:
-            return _result("problem", why="busy", words=KW(kind, BUSY))
+            return trouble("busy")
         except OSError as e:
             arrange.log(f"design commit for {kit.name} stopped: {e.__class__.__name__}: {str(e)[:160]}")
-            return _result("problem", why="drive", words=KW(kind, DRIVE, why=kit_mod._plain_os(e)))
+            return trouble("drive", why=kit_mod._plain_os(e))
 
 
-def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
+def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL, one=None):
     """With the slides lock held. In order: finish any save an earlier run was cut off in (under the name it
     had written down); clear old scratch; if this very set is already in, say so again; refuse if the design
     has changed since the slides were drawn, or a photo on them was exported again since the page that drew
@@ -2163,8 +2260,10 @@ def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
     _sweep_staging(kit, kind=kind)
     d = load_design(kit, did, kind)
     if d is None:
-        return _result("problem", why="design", words=NO_DESIGN)
+        return _result("problem", why="design", words=KW(kind, ONE_WHY["design"]) if one is not None else NO_DESIGN)
     mine = _journal(kit, did, token, kind)
+    if one is not None:
+        return _commit_one(kit, d, token, rev, drawn, mine, one, kind)
     if mine and mine["state"] == "done":
         return _result("done", mine, words=_saved_words(mine, kind))
     if rev is not None and rev != d["rev"]:
@@ -2200,6 +2299,50 @@ def _commit(kit, did, token, rev, drawn=None, kind=CAROUSEL):
     arrange.write_whole(_journal_path(kit, did, token, kind), j)    # written down BEFORE the first file moves
     _test_stop("after-journal")
     return _finish(kit, j, kind)
+
+
+def _commit_one(kit, d, token, rev, drawn, mine, i, kind=CAROUSEL):
+    """With the slides lock held: one slide (the ith, from 1) of the design into the Carousel folder on its own,
+    beside the design's newest set, under "<the set's name> - slide 0i updated.jpg" ("updated 2"... when that is
+    taken), never over anything. The set's name is the design's own last finished set; with none yet, the design's
+    name made safe. Refused if the design has changed since the slide was drawn, a photo on it was exported again,
+    or the slide is not in staging whole. Everything is written down before the file moves; nothing in the kit's
+    record changes."""
+    did = d["id"]
+    if mine and mine["state"] == "done":
+        return _result("done", mine, words=_one_words(kit, mine, kind), file=mine["files"][0]["final"], slide=mine["one"])
+    if rev is not None and rev != d["rev"]:
+        return _result("problem", why="changed", words=KW(kind, ONE_WHY["changed"]))
+    if not 1 <= i <= d["state"]["slides"]:
+        return _result("problem", why="slide", words=KW(kind, ONE_WHY["slide"]))
+    marks = photo_marks(kit, d["state"])
+    if drawn is not None and drawn["photos"] != marks:
+        return _result("problem", why="photos", words=KW(kind, ONE_WHY["photos"]))
+    stag = staging_dir(kit, kind) / f"{did}-{token}"
+    p = stag / f"slide-{i:02d}.jpg"
+    try:
+        whole = kit_mod._has(stag, p.name) and slide_ok(p.read_bytes(), kind)
+    except OSError:
+        whole = False
+    if not whole:
+        return _result("problem", why="missing", words=KW(kind, ONE_WHY["missing"]))
+    last = last_done(kit, did, kind)
+    base = last["base"] if last else safe_base(d["name"], kind)
+    name, k = free_one(kit, base, i, kind)
+    cant = cant_save(kit, d["name"], base, kind, file=name)      # a PC only, before anything is written down or moved
+    if cant:
+        return _result("problem", why=cant[0], words=cant[1])
+    files = [{"staged": p.name, "final": name, "size": p.stat().st_size, "sha256": kit_mod._sha(p)}]
+    j = {"v": 1, "n": 1 + max([_order(x)[0] for x in _journals(kit, kind)] or [0]),
+         "design": did, "token": token, "name": d["name"], "rev": d["rev"], "stamp": d.get("stamp"), "base": base,
+         "one": i, "again": k, "state": "moving", "files": files, "layout": d["state"], "at": now_iso(),
+         "drawn": {"photos": marks, "fell": sorted((drawn or {}).get("fell") or [])},
+         "undone": list((mine or {}).get("undone") or [])}
+    if kind == STORIES:
+        j["kind"] = STORIES
+    arrange.write_whole(_journal_path(kit, did, token, kind), j)    # written down BEFORE the file moves
+    _test_stop("after-journal")
+    return _finish_one(kit, j, kind)
 
 
 # ---------- what the page is given ----------
@@ -2682,12 +2825,15 @@ def _drive_words(path, e, kind=CAROUSEL):
 
 
 _STATUS = {"changed": 409, "missing": 400, "busy": 503, "still": 503, "design": 404, "clash": 409, "redo": 409, "drive": 500,
-           "photos": 409, "long": 409, "deep": 409}
+           "photos": 409, "long": 409, "deep": 409, "slide": 400}
 
 
 def _answer_for(res, kind=CAROUSEL):
     if res["state"] in ("done", "already"):
-        return 200, {"ok": True, "already": res["state"] == "already", "base": res["base"], "count": res["count"], "words": res["words"]}
+        out = {"ok": True, "already": res["state"] == "already", "base": res["base"], "count": res["count"], "words": res["words"]}
+        if res.get("file"):
+            out["file"], out["slide"] = res["file"], res.get("slide")     # a single slide's own name (never a path)
+        return 200, out
     return _STATUS.get(res.get("why"), 500), {"ok": False, "why": res.get("why") or "problem", "words": res.get("words") or KW(kind, NOT_FINISHED)}
 
 
@@ -2703,9 +2849,10 @@ def _post_commit(body):
     if kind is None:
         return 400, {"ok": False, "why": "kind", "words": NOT_UNDERSTOOD}
     lo, hi = K(kind)["slides"]
-    did, token, rev, count = body.get("design"), body.get("set"), body.get("rev"), body.get("count")
+    did, token, rev, count, one = body.get("design"), body.get("set"), body.get("rev"), body.get("count"), body.get("one")
     if (not isinstance(did, str) or not ID.fullmatch(did) or not isinstance(token, str) or not TOKEN.fullmatch(token)
-            or type(rev) is not int or rev < 0 or (count is not None and (type(count) is not int or not lo <= count <= hi))):
+            or type(rev) is not int or rev < 0 or (count is not None and (type(count) is not int or not lo <= count <= hi))
+            or (one is not None and (type(one) is not int or not 1 <= one <= hi))):
         return 400, {"ok": False, "why": "commit", "words": NOT_UNDERSTOOD}
     drawn = None
     if "drawn" in body:                 # what the page drew the slides from: each photo's mark, and fonts that fell back
@@ -2716,7 +2863,28 @@ def _post_commit(body):
     if d is None:
         return 404, {"ok": False, "why": "design", "words": NO_DESIGN}
     moving = any(j["state"] == "moving" for j in _journals(kit, kind))
-    if not moving:
+    if not moving and one is not None:
+        # Save just this slide (hers, v27): the quick answers for one slide, then the same command with --one
+        mine = _journal(kit, did, token, kind)
+        if mine and mine["state"] == "done" and mine.get("one") == one:
+            return _answer_for(_result("done", mine, words=_one_words(kit, mine, kind), file=mine["files"][0]["final"], slide=one), kind)
+        if rev != d["rev"] or (count is not None and count != d["state"]["slides"]):
+            return _answer_for(_result("problem", why="changed", words=KW(kind, ONE_WHY["changed"])), kind)
+        if one > d["state"]["slides"]:
+            return _answer_for(_result("problem", why="slide", words=KW(kind, ONE_WHY["slide"])), kind)
+        if drawn is not None and drawn["photos"] != photo_marks(kit, d["state"]):
+            return _answer_for(_result("problem", why="photos", words=KW(kind, ONE_WHY["photos"])), kind)
+        stag = staging_dir(kit, kind) / f"{did}-{token}"
+        try:
+            whole = kit_mod._has(stag, f"slide-{one:02d}.jpg") and slide_ok((stag / f"slide-{one:02d}.jpg").read_bytes(), kind)
+        except OSError:
+            whole = False
+        if not whole:
+            return _answer_for(_result("problem", why="missing", words=KW(kind, ONE_WHY["missing"])), kind)
+        cant = cant_save(kit, d["name"], kind=kind)     # a PC only (the commit asks again, with the file's own name)
+        if cant:
+            return _answer_for(_result("problem", why=cant[0], words=cant[1]), kind)
+    elif not moving:
         mine = _journal(kit, did, token, kind)
         if mine and mine["state"] == "done":
             return _answer_for(_result("done", mine, words=_saved_words(mine, kind)), kind)
@@ -2739,6 +2907,8 @@ def _post_commit(body):
     cmd = [sys.executable, str(HERE / "design.py"), "commit", str(kit), "--design", did, "--set", token, "--rev", str(rev)]
     if kind != CAROUSEL:
         cmd += ["--kind", kind]
+    if one is not None:
+        cmd += ["--one", str(one)]
     if drawn is not None:
         cmd += ["--drawn", json.dumps(drawn)]       # plain ASCII, whatever the names in the design
     # Started the way arrange.py starts its slide job (this_computer.popen_detached). A Mac: start_new_session,
@@ -2767,8 +2937,12 @@ def _post_commit(body):
         # The command stopped without saying how it went. The record on the drive is what is true: if it says
         # this very set is in, it is in, and saying "couldn't finish" would not be true.
         mine = _journal(kit, did, token, kind)
-        if mine and mine["state"] == "done":
+        if mine and mine["state"] == "done" and mine.get("one") is not None:
+            res = _result("done", mine, words=_one_words(kit, mine, kind), file=mine["files"][0]["final"], slide=mine["one"])
+        elif mine and mine["state"] == "done":
             res = _result("done", mine, words=_saved_words(mine, kind))
+        elif one is not None:
+            res = _result("problem", why="redo", words=KW(kind, ONE_WHY["redo"]))
         else:
             res = _result("problem", why="drive", words=KW(kind, NOT_FINISHED))
     return _answer_for(res, kind)
@@ -3159,6 +3333,10 @@ def cmd_show(kit, kind=CAROUSEL):
             say(f"      note for the assistant: {d['ask'].replace(chr(10), ' / ')}")
     for j in sorted(_journals(kit, kind), key=lambda j: str(j.get("at") or "")):
         what = {"done": "saved", "moving": KW(kind, "NOT FINISHED (the next Save slides, or design.py commit, finishes it)"), "undone": "put back, not saved"}[j["state"]]
+        if j.get("one") is not None:
+            # Save just this slide (hers, v27): one slide beside the set, nothing of the kit's record changed by it
+            say(f"  {KW(kind, 'Slide')} {j['one']} on its own: \"{j['files'][0]['final']}\", from design {j['design']}, {j.get('finished') or j.get('at')}: {what}")
+            continue
         say(f"  {KW(kind, 'Slides')}: \"{j['base']}\", {len(j['files'])} {KW(kind, 'slides')}, from design {j['design']}, {j.get('finished') or j.get('at')}: {what}")
     cs = rec.get(kk["rec_set"])
     if isinstance(cs, dict) and cs.get("kind") == "laid-out":
@@ -3219,6 +3397,7 @@ def main():
     c = sub.add_parser("commit"); c.add_argument("words"); c.add_argument("--design", required=True); c.add_argument("--set", required=True)
     c.add_argument("--rev", type=int, help="the design's counter when the slides were drawn; a design changed since is refused")
     c.add_argument("--drawn", help="what the page drew the slides from, as it sent it (the page server passes this on)")
+    c.add_argument("--one", type=int, help="Save just this slide: only slide N (from 1), beside the design's newest set, under its own name")
     c.add_argument("--kind", **kinds)
     tk = sub.add_parser("took"); tk.add_argument("words"); tk.add_argument("--kind", **kinds)
     td = sub.add_parser("tidy"); td.add_argument("words"); td.add_argument("--kind", **kinds)
@@ -3271,8 +3450,13 @@ def main():
                 if drawn is None:
                     say("STOP: --drawn is not what a page sends.")
                     return 2
-            res = commit(kit, a.design, a.set, a.rev, drawn, a.kind)
-            if res["state"] == "done":
+            if a.one is not None and not 1 <= a.one <= K(a.kind)["slides"][1]:
+                say("STOP: --one is a slide's number, from 1.")
+                return 2
+            res = commit(kit, a.design, a.set, a.rev, drawn, a.kind, a.one)
+            if res["state"] == "done" and res.get("file"):
+                say(KW(a.kind, "Slide {i} on its own: \"{file}\" is in the Carousel folder. Nothing was replaced, and nothing else was changed.", i=res.get('slide'), file=res['file']))
+            elif res["state"] == "done":
                 say(KW(a.kind, "Slides: {n} slides are in the Carousel folder, named \"{base}\". Nothing was replaced.", n=res['count'], base=res['base']))
             elif res["state"] == "already":
                 say(KW(a.kind, "Slides: already saved as \"{base}\". Nothing was changed.", base=res['base']))
