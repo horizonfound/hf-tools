@@ -53,6 +53,7 @@ import subprocess
 import os
 import re
 import sys
+import unicodedata
 import time
 from pathlib import Path
 
@@ -187,22 +188,88 @@ def make_sheets(photos, out_dir, cell=200, per_row=6, labels=None, name="sheet")
     return paths
 
 
+def _photo_key(name):
+    """A file's name the way the numbered list tells photos apart: the name alone (never its folder), with its
+    letters composed one way (a Mac may store an accented name decomposed)."""
+    return unicodedata.normalize("NFC", Path(str(name)).name)
+
+
+def numbers_before(path):
+    """The numbered list from last time (a kit's .kit/sheet.json, or this folder's own photos.json), as
+    {file name: number}: what each photo was called then. Empty when there is no such list, or it can't be read.
+    A number that two rows share is kept for the first of them only."""
+    if not path:
+        return {}
+    try:
+        d = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+        rows = d.get("photos", []) if isinstance(d, dict) else []
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {}
+    out, taken = {}, set()
+    for x in sorted((x for x in rows if isinstance(x, dict) and type(x.get("n")) is int and x["n"] >= 1
+                     and isinstance(x.get("file"), str) and x["file"]), key=lambda x: x["n"]):
+        k = _photo_key(x["file"])
+        if k in out or x["n"] in taken:
+            continue
+        out[k] = x["n"]
+        taken.add(x["n"])
+    return out
+
+
+def number_photos(photos, before):
+    """Numbers that stay fixed when photos are added (Nicole's v27, Nov 14: "Add my photos"; her prepare()):
+    a photo on the list before keeps its number; a new photo takes the next number after the highest ever
+    given, in name order; a photo that is gone keeps its number unused, so no number ever means another photo
+    (hers numbered the kept ones again from 1, so a photo gone shifted the ones after it). A first list, with
+    nothing before, numbers by name from 1, as always. Returns (the photos in number order as [(n, path)],
+    the numbers added, the numbers gone)."""
+    by_key = {}
+    for p in photos:
+        by_key.setdefault(_photo_key(p.name), p)
+    kept = [(n, by_key[k]) for k, n in before.items() if k in by_key]
+    gone = sorted(n for k, n in before.items() if k not in by_key)
+    nxt = max(before.values(), default=0) + 1
+    seen = {k for k in before if k in by_key}
+    new = [p for p in photos if _photo_key(p.name) not in seen]     # photos is in name order already
+    added = []
+    for p in new:
+        kept.append((nxt, p))
+        added.append(nxt)
+        nxt += 1
+    kept.sort(key=lambda x: x[0])
+    return kept, added, gone
+
+
 def cmd_sheet(a):
     photos = edited_photos(a.folder)
     wd = workdir(a.shoot, a.folder, a.kit)
+    before = numbers_before(getattr(a, "before", None))
+    numbered, added, gone = number_photos(photos, before)
     listing = []
-    for i, p in enumerate(photos, 1):
+    for n, p in numbered:
         w, h = capcut.photo_size(p)
         way = "tall" if h > w * 1.05 else "wide" if w > h * 1.05 else "square"
-        listing.append({"n": i, "file": str(p), "w": w, "h": h, "way": way})
-    (wd / "photos.json").write_text(json.dumps({"folder": str(Path(a.folder)), "photos": listing}, indent=1), encoding="utf-8")
+        listing.append({"n": n, "file": str(p), "w": w, "h": h, "way": way})
+    out = {"folder": str(Path(a.folder)), "photos": listing}
+    if before:
+        out["added"], out["gone"] = added, gone      # for whoever asked: what the last list didn't have, and what it has lost
+    (wd / "photos.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
     try:
-        sheets = make_sheets(photos, wd)
+        sheets = make_sheets([p for _, p in numbered], wd, labels=[n for n, _ in numbered])
     except Exception as e:  # a sheet is a convenience; the numbered list still works
         sheets = []
         say(f"(could not draw the sheet: {e})")
     tall = sum(1 for x in listing if x["way"] == "tall")
     say(f"{len(photos)} edited photos ({tall} tall, {len(photos) - tall} wide or square).")
+    if before:
+        if added:
+            say(f"New since the last list: {len(added)} photo{'s' if len(added) != 1 else ''}, numbered "
+                + (f"{added[0]} to {added[-1]}" if len(added) > 1 else str(added[0])) + ". Every other photo keeps its number.")
+        if gone:
+            say(f"Gone since the last list: {len(gone)} photo{'s' if len(gone) != 1 else ''} (number{'s' if len(gone) != 1 else ''} "
+                + ", ".join(str(n) for n in gone) + "); " + ("those numbers stay" if len(gone) != 1 else "that number stays") + " unused.")
+        if not added and not gone:
+            say("The same photos as the last list, with the same numbers.")
     for s in sheets:
         say(f"Sheet: {s}")
     note = _pictures_note() if sheets else None
@@ -755,6 +822,8 @@ def main():
     m.add_argument("--kit", help="the post kit this reel is for: its working files go in the kit's hidden .kit/reels")
     m.add_argument("--status", help="write what happened here as a small JSON, for the reel page")
     s.add_argument("--kit", help="the post kit these photos are for: the sheet and photos.json go in its .kit/reels")
+    s.add_argument("--before", help="the numbered list from last time (a kit's .kit/sheet.json): every photo on it keeps "
+                                    "its number, new ones take the next, a photo gone keeps its number unused")
     t.add_argument("--kit")
     a = ap.parse_args()
     {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,

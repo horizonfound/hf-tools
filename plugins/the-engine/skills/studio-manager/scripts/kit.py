@@ -357,8 +357,13 @@ def start_from_night(night, shoot_id):
 def sheet(kit):
     rec = load_rec(kit)
     folder = photos_dir(kit, rec)
-    r = subprocess.run([sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)],
-                       capture_output=True, encoding="utf-8", errors="replace")
+    args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
+    if (kit / ".kit" / "sheet.json").is_file():
+        # Numbers stay fixed when photos are added (Nicole's v27): reel.py is the one writer of the numbered list,
+        # and is handed the list from last time so every photo on it keeps its number, a new photo takes the next,
+        # and a photo gone keeps its number unused. Nothing else ever renumbers a kit's photos.
+        args += ["--before", str(kit / ".kit" / "sheet.json")]
+    r = subprocess.run(args, capture_output=True, encoding="utf-8", errors="replace")
     say(r.stdout.strip())
     if r.returncode != 0:
         say(r.stderr.strip())
