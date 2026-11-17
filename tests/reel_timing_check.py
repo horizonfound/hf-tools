@@ -238,7 +238,8 @@ def rules(name, items, pieces, facts, period):
                 kmax = max(1, int((card + 0.02) / period))
                 if b * period < min(kmax * period, 2.95) - 1e-9:
                     bad.append(f"the opening clip {b * period:.2f} s, under 3 seconds")
-            if not p.get("clip") or p["src"] + p["dur"] > float(x["length"]) + 1e-9:
+            over = p.get("short_by") or 0          # v27 (A20): a clip that is the whole of a short video may run a touch past it
+            if not p.get("clip") or p["src"] + p["dur"] > float(x["length"]) + over + 1e-9 or over > 0.2 + 1e-9:
                 bad.append(f"clip {k + 1} is not a clip piece inside its video: {p}")
     check(f"{name}: her rules hold", not bad, "; ".join(bad))
 
@@ -605,6 +606,31 @@ def _main(work, songs):
           pieces is None and facts["problem"].startswith("STOP:")
           and "only 0.20 seconds of video" in facts["problem"], json.dumps(facts if pieces is None else pieces[0]))
 
+    print("\n-- a clip that is the whole of a short video (Nicole's v27 'long clips work'; A20): a hair short of a beat is held, not stopped")
+    grid, _ = timing.song_grid(str(BEAT60))
+    beat = grid.period                                      # about 0.63 s on the test beat
+    check("timing.CLIP_OVERSHOOT is a named number, about a fifth of a second", 0.1 <= getattr(timing, "CLIP_OVERSHOOT", 0) <= 0.3, str(getattr(timing, "CLIP_OVERSHOOT", None)))
+    whole = round(beat - 0.1, 3)                            # a video 0.1 s shorter than one beat, used whole as a clip
+    short = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 0.0, "seconds": whole, "w": 2160, "h": 3840,
+              "length": whole}] + [photo(x, photos) for x in ("1", "2")]
+    pieces, facts = reel.plan_reel(short, str(BEAT60), "beat")
+    p0 = pieces[0] if pieces else {}
+    check(f"a {whole} s video as a clip on a {beat:.3f} s beat: planned, one beat, from its very start, and the piece says how far short the video is",
+          pieces is not None and p0.get("clip") and p0["src"] == 0.0 and facts["beats"][0] == 1
+          and 0 < p0.get("short_by", 0) <= timing.CLIP_OVERSHOOT + 1e-9 and abs(p0["short_by"] - (p0["dur"] - whole)) < 1e-3, json.dumps(facts if pieces is None else p0))
+    far = round(beat - timing.CLIP_OVERSHOOT - 0.1, 3)        # too short to hold
+    short[0] = dict(short[0], seconds=far, length=far)
+    pieces, facts = reel.plan_reel(short, str(BEAT60), "beat")
+    check(f"a {far} s video, more than that short of a beat: STOP in plain words, with the video's length and the beat's",
+          pieces is None and facts["problem"].startswith("STOP:") and f"only {far:.2f} seconds of video" in facts["problem"]
+          and "less than one beat" in facts["problem"] and "slower" in facts["problem"], json.dumps(facts if pieces is None else pieces[0]))
+    long_video = [{"kind": "clip", "path": str(work / VIDEO_NAME), "src": 5.0, "seconds": whole, "w": 2160, "h": 3840,
+                   "length": 20.0}] + [photo(x, photos) for x in ("1", "2")]
+    pieces, facts = reel.plan_reel(long_video, str(BEAT60), "beat")
+    p0 = pieces[0] if pieces else {}
+    check("the same short card cut from a LONG video: the clip simply runs one beat from where it starts, inside the video, nothing short",
+          pieces is not None and not p0.get("short_by") and p0["src"] == 5.0 and p0["src"] + p0["dur"] <= 20.0 + 1e-6 and facts["beats"][0] == 1, json.dumps(p0))
+
     page = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts" / "arrange_page.py").read_text(encoding="utf-8")
     part = (ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "parts" / "arrange.md").read_text(encoding="utf-8")
     check("the reel picker's legend and parts/arrange.md: Longer and Quicker count in every vibe, in Nicole's words",
@@ -656,6 +682,33 @@ def _main(work, songs):
               ok, json.dumps({"type": mc["type"], "duration": mc["duration"], "has_audio": mc.get("has_audio"),
                               "path": mc["path"], "src": seg_c["source_timerange"], "volume": seg_c.get("volume"),
                               "meta": {k: clip_meta.get(k) for k in ("metetype", "duration")}}))
+
+    # A20: in the project, a clip's source never runs past its video's end: the few frames the video is short are
+    # made up by playing it a touch slower (the speed on the clip and on its speed item, as the talking reel's
+    # speeds are written); a clip with room is exactly as before.
+    plan = {"name": "Short clip reel", "hook": None, "song": None,
+            "photos": [{"path": str(work / VIDEO_NAME), "w": 2160, "h": 3840, "start_f": 0, "dur_f": 73, "start": 0.0,
+                        "dur": 2.4333, "fill": True, "clip": True, "src": 0.0, "length": 2.4, "short_by": 0.0333},
+                       {"path": str(photos / "41.jpg"), "w": 3647, "h": 5444, "start_f": 73, "dur_f": 19, "start": 2.4333,
+                        "dur": 0.6333, "fill": True}]}
+    d, m = capcut.build(plan, parts, None)
+    track = next(t for t in d["tracks"] if t["type"] == "video")
+    seg = track["segments"][0]
+    speeds = {x["id"]: x for x in d["materials"].get("speeds", [])}
+    own = [speeds[r] for r in seg.get("extra_material_refs", []) if r in speeds]
+    want_speed = 2400000 / seg["target_timerange"]["duration"]
+    check("capcut.build, a clip 0.03 s short of its hold: its source ends at the video's end (2.40 s), its hold is whole, and it plays a touch slower, said on the clip and its speed item",
+          seg["source_timerange"] == {"start": 0, "duration": 2400000} and seg["target_timerange"]["duration"] > 2400000
+          and abs(seg.get("speed", 1.0) - want_speed) < 1e-6 and own and all(abs(x.get("speed", 1.0) - want_speed) < 1e-6 for x in own),
+          json.dumps({"source": seg["source_timerange"], "target": seg["target_timerange"], "speed": seg.get("speed"), "items": [x.get("speed") for x in own]}))
+    plan["photos"][0].update(length=9.0, src=2.5)
+    plan["photos"][0].pop("short_by")
+    d, m = capcut.build(plan, parts, None)
+    seg = next(t for t in d["tracks"] if t["type"] == "video")["segments"][0]
+    own = [x for x in d["materials"].get("speeds", []) if x["id"] in seg.get("extra_material_refs", [])]
+    check("... and a clip with room: source as long as its hold, speed 1, as it always was",
+          seg["source_timerange"] == {"start": 2500000, "duration": seg["target_timerange"]["duration"]} and seg.get("speed", 1.0) == 1.0
+          and all(x.get("speed", 1.0) == 1.0 for x in own), json.dumps({"source": seg["source_timerange"], "speed": seg.get("speed")}))
 
     store = work / "CapCut projects"                     # a pretend CapCut projects folder: CapCut itself is never asked
     store.mkdir()

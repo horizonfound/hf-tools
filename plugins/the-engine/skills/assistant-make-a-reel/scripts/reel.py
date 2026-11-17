@@ -485,11 +485,18 @@ def plan_reel(photos, song, feel="beat", song_start=None, fit=False, hints=None,
             length = float(x["length"])
             src = float(x["src"])
             if piece["dur"] > length + 1e-6:               # the whole video is shorter than one beat of the reel
-                which = x.get("label") or "a clip"
-                return None, {"problem": f"STOP: {which} ({Path(x['path']).name}) is only {length:.2f} seconds of "
-                                         f"video, and nothing in a reel stays on screen for less than one beat "
-                                         f"({piece['dur']:.2f} s here). Pick a longer moment for it, or take it out."}
-            if src + piece["dur"] > length:                # near the end of the video: start a little earlier
+                over = piece["dur"] - length
+                if over > timing.CLIP_OVERSHOOT + 1e-6:
+                    which = x.get("label") or "a clip"
+                    return None, {"problem": f"STOP: {which} ({Path(x['path']).name}) is only {length:.2f} seconds of "
+                                             f"video, and nothing in a reel stays on screen for less than one beat "
+                                             f"({piece['dur']:.2f} s here), even played a touch slower. Use a longer "
+                                             f"video for it, or take it out."}
+                # a hair short (Nicole's v27, "long clips work"; A20): held for the beat from the video's very start;
+                # in the project it plays a touch slower rather than run past the video's end (capcut.py)
+                piece["short_by"] = round(over, 3)
+                src = 0.0
+            elif src + piece["dur"] > length:              # near the end of the video: start a little earlier
                 src = max(0.0, length - piece["dur"] - 0.05)
             piece.update(clip=True, src=round(src, 3), length=length)
         out.append(piece)
@@ -707,7 +714,8 @@ def cmd_make(a):
         say(facts["kind_note"])
     for k, p in enumerate(pieces, 1):
         if p.get("clip"):
-            say(f"  {k}. clip from {Path(p['path']).name} at {p['src']:.1f} s, {p['dur']:.1f} s long")
+            say(f"  {k}. clip from {Path(p['path']).name} at {p['src']:.1f} s, {p['dur']:.1f} s long"
+                + (f" (the whole video, {p['length']:.2f} s: it plays a touch slower to fill the beat)" if p.get("short_by") else ""))
     if facts["wide"] and not a.fit:
         if n_cl:                                     # count by place in the reel, as the clip lines above do
             say(f"Wide photos zoomed to fill the screen, by their place in the reel: "

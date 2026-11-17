@@ -42,7 +42,9 @@ Her rules, in her words where she gave them:
     made and they are told exactly why (the STOP line).
   - A clip runs whole beats, never longer than its card or what is left of its video. An opening clip is 3 to 4 seconds and never under 3;
     later clips may shrink to 2 seconds on a short song; a card they made longer than 4.2 s keeps its length,
-    give or take a beat.
+    give or take a beat. A clip that is the whole of a video a hair shorter than one beat (under CLIP_OVERSHOOT)
+    is held for the beat and plays a touch slower in the project (her v27: "long clips work"); shorter than that,
+    the reel stops and says so.
   - "A little of everything" is mixed differently for every reel: seeded by the file names, the vibe and how
     many reels were already made with the same choices (variation), so Make my reel again gives a fresh mix,
     and the same choices give the same reel on any computer.
@@ -75,6 +77,12 @@ WORDS = {"beat": "one photo on every beat", "mixed": "a little of everything", "
 EVEN_BPM = 100.0          # no song: an even 100 beats a minute (the footage keeps its own sound)
 MIN_SHOW = 0.45           # no photo on screen for less than about half a second (on a very fast song: two beats)
 W_HIT, W_DOWN = 0.6, 0.35  # landing on a hit; a long hold or a clip ending on the 1 of a bar
+# A clip that is the whole of a short video (a 2.4 s phone clip used whole; her v27 editor makes 1 to 15 s clips
+# from any video) can come out a hair shorter than the one beat it must hold. Up to CLIP_OVERSHOOT seconds short
+# it is held anyway: in the project it plays a touch slower (capcut.py), never past the video's end. Shorter than
+# that, the reel stops and says so (reel.plan_reel). Ours (Nov 17); Nicole's call whether a held last frame would
+# be better than a slightly slowed clip.
+CLIP_OVERSHOOT = 0.2
 W_EMPTY = 0.9             # a cut where the song doesn't hit at all (Nicole, Nov 12; her handoff v25)
 # A hit you can hear (hers, v25): a jump in the sound that stands out HIT_STANDS_OUT standard deviations above
 # the music HIT_AROUND seconds either side of it, never two closer than HIT_APART. A grid tick moves onto a hit
