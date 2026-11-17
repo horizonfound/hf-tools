@@ -1102,9 +1102,12 @@ def check_trim_and_select():
 
 def check_songs_v25():
     """Songs (Nicole's v25, section 5; stage J of the v26 build): a short song starts after a glitchy opening, a
-    replaced recording gets its sound taken again, and Remove a song is NOT built (it waits on Nicole): the
-    instructions say what the page does and never offer to remove a song."""
+    replaced recording gets its sound taken again, and Remove this song (her v27, built Nov 17, Lane E's E12):
+    the instructions say the page's button moves a song, and a recording's sounds, to the computer's own Trash,
+    never a delete, Put Back brings it back, a song in the Photos folder stays, and the assistant has no command
+    for it and never moves a song itself."""
     rp = read(SCRIPTS / "reel_page.py")
+    tc = read(SCRIPTS / "this_computer.py")
     arr, where = " ".join(read(SM / "parts" / "arrange.md").split()), " ".join(read(SM / "parts" / "where-things-live.md").split())
     reel = " ".join(read(REEL / "SKILL.md").split())
     gone = re.search(r'^    "song_gone": "([^"]+)"', rp, re.M)
@@ -1116,11 +1119,26 @@ def check_songs_v25():
              and ("with no gap it starts at the top" in t or "with no gap, at the top" in t) and '"starting the song 4 seconds in"' in t)
         case(f"{name}: a replaced recording's sound is taken again as \"<name> sound 2.m4a\", the first never written over, the recording listed once",
              '"<name> sound 2.m4a"' in t and "never written over" in t and "shows the recording once" in t)
-        case(f"{name}: there is no Remove on a song, the assistant has no command for one and never moves, renames or deletes a song",
-             "no button" in t and ("you have no command for it" in t or "you have no command for one" in t)
-             and ("never move, rename or delete a song or a recording" in t or "Never move, rename or delete a song or a recording" in t)
-             and "there's no button for that yet" in t)
-        case(f"{name} never tells the assistant to put a song in the Trash", "Trash" not in t and "Recycle Bin" not in t and "Put Back" not in t)
+        case(f"{name}: Remove this song is the page's button (two taps), to the computer's own Trash (the Recycle Bin on a PC), never a delete, and Put Back brings it back",
+             "**Remove this song**" in t and '"Move it to the Trash?"' in t and "the computer's own Trash (the Recycle Bin on a PC)" in t
+             and "never a delete" in t and "Put Back (Restore on a PC) brings it back" in t and "no button for that yet" not in t)
+        case(f"{name}: a recording's sounds go with it, the reel that had it picked goes back to no song, and another reel that picked it says her line when opened",
+             "every sound taken from a recording" in t and 'goes back to "no song picked yet"' in t and "another reel of the shoot that had it picked says" in t
+             and ('"' + (gone.group(1) if gone else "?") + '"') in t)
+        case(f"{name}: only a song in the shoot's own Music folder can go; one in the Photos folder stays and is theirs to take out",
+             "Only a song in the shoot's own Music folder can go" in t and "a recording in the Photos folder stays" in t and "theirs to take out of that folder themselves" in t)
+        case(f"{name}: the assistant has no command for it, never moves, renames or deletes a song itself, and points at the button",
+             "You have no command for it" in t and "never move, rename or delete a song or a recording yourself" in t and "point at the button" in t)
+    case("the route exists: POST /reel-song-remove in reel_page.py's list and remove_song goes through this_computer.trash_many, the one door",
+         '"/reel-song-remove"' in rp and "def remove_song(body):" in rp and "this_computer.trash_many(paths, music_dir(kit))" in rp and "def trash_many(paths, inside):" in tc)
+    case("her four page lines and her two server lines are in reel_page.WORDS, word for word",
+         all(x in rp for x in ('"song_remove": "Remove this song"', '"song_sure": "Move it to the Trash?"', '"song_removing": "Removing…"',
+                               '"song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back."',
+                               '"song_not_here": "That song isn\'t in this shoot\'s folder anymore."',
+                               '"song_cant_trash": "I couldn\'t move that song to the Trash. Drag it out of the shoot\'s Music folder in Finder instead."')))
+    case("where-things-live.md says a removed song is in the computer's own Trash with its sounds, its lines in reel-sounds.json dropped, nothing else written down",
+         "**Remove this song**" in where and "goes to the computer's own Trash with every sound taken from it" in where
+         and "its lines in `reel-sounds.json` are dropped, the version before kept" in where and "nothing else is written down about it" in where)
     case("arrange.md gives the page's own line for a picked song that is gone", bool(gone) and ('"' + gone.group(1) + '"') in arr, gone and gone.group(1))
     case("where-things-live.md names the note of which recording each sound came from, and what is in it",
          "`reel-sounds.json`" in where and "`reel-sounds.prev.json`" in where and "`reel-sounds.lock`" in where and "a hash of its first megabyte, never a path" in where

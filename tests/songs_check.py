@@ -2,10 +2,11 @@
 """Songs on the reel page, as Nicole's v25 has them (section 5; stage J of the v26 build). Runs on a Mac and on a
 PC, with nothing installed: no ffmpeg, no page server, no browser, no port.
 
-    python tests/songs_check.py [--work <a scratch folder>] [--only measure|start|replaced|make]
+    python tests/songs_check.py [--work <a scratch folder>] [--only measure|start|replaced|make|remove]
 
 In a scratch folder it makes itself (STUDIO_HOME and HOME point there; nothing else is touched, no CapCut, no
-folder opened). Every sound is made here: silence, a burst of noise for the glitch, the test beat for the song.
+folder opened, and "the Trash" is a folder of the run through STUDIO_TRASH_FOR_TESTS: the real Trash is never
+touched). Every sound is made here: silence, a burst of noise for the glitch, the test beat for the song.
 
   measure   sound.silences and sound.lead_in: what ffmpeg's silencedetect (-50 dB, 0.3 s) would call a silence,
             measured in plain Python. The last gap that ends in the first 12 seconds; none, the top; a gap still
@@ -19,12 +20,19 @@ folder opened). Every sound is made here: silence, a burst of noise for the glit
   make      through Make my reel's own job, for real: a short song that opens with a glitch and a silence starts
             after them, on a 1 of a bar and a whole frame; a recording replaced gets "sound 2" (SKIP where this
             computer can't take the sound out of a video).
-And, on every run: Remove a song is NOT built (it waits on Nicole): no word of it on the page, no route.
+  remove    Remove this song (her v27; Lane E's E12, Nov 17), through POST /reel-song-remove with a stand-in for
+            the page server's handler: a recording and every sound taken from it go to the Trash (the run's own
+            folder) byte for byte; the open reel's pick is cleared with the counter one higher, a second reel
+            that picked it is untouched and says her line when opened; pressed again, a song in the Photos
+            folder, an id of no song here, a bad id, another website, a cross-site press, another host, a body
+            over the cap: refused, nothing moved; the second of a recording's files failing names the one that
+            went; the route's own source has no delete in it; a PC's words.
 
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept.
 """
 import argparse
 import array
+import io
 import json
 import math
 import os
@@ -35,6 +43,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import wave
 from pathlib import Path
 
@@ -58,7 +67,7 @@ def skip(what, why):
 
 ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
 ap.add_argument("--work", help="a scratch folder for this run (made if missing); else a temporary one")
-ap.add_argument("--only", choices=("measure", "start", "replaced", "make"))
+ap.add_argument("--only", choices=("measure", "start", "replaced", "make", "remove"))
 A = ap.parse_args()
 if A.work:
     Path(A.work).mkdir(parents=True, exist_ok=True)
@@ -73,6 +82,8 @@ os.environ["STUDIO_HOME"] = str(STUDIO)           # before arrange is imported: 
 os.environ["HOME"] = str(work / "home")           # never their CapCut, never their ~/.studio
 os.environ["ASSISTANT_TEST_OPEN"] = "front"       # no folder is ever opened
 os.environ["ASSISTANT_TEST_CAPCUT"] = "1"         # CapCut is never started
+TRASH = work / "trash"
+os.environ["STUDIO_TRASH_FOR_TESTS"] = str(TRASH)  # the tests' switch: "the Trash" is this folder; the real one is never touched
 sys.path.insert(0, str(SCRIPTS))
 sys.path.append(str(REEL))
 import this_computer  # noqa: E402
@@ -516,14 +527,210 @@ def make(kit):
     check("no hidden half-file is left beside it", not [x for x in os.listdir(music) if x.startswith(".") and "part-" in x])
 
 
-# ---------- Remove a song is not built ----------
+# ---------- Remove this song (her v27, section 2, step 3; her v25 /music/remove; Lane E's E12, Nov 17) ----------
+# Through the route itself: reel_page.handle_post with a stand-in for the page server's request handler, so the
+# guard (the host, the Origin, the body's cap) and the cross-site check are tried too, with no port listening.
+# The tests' switch STUDIO_TRASH_FOR_TESTS points at a folder of this run (set at the top): the real Trash is
+# never touched, and what "went to the Trash" can be read back byte for byte.
 
-def no_remove(kit):
+PORT = 8850                      # the stand-in's own port (Lane E's range, 8850 to 8859); nothing listens on it
+PAGE = "songs12345"
+
+
+class Handler:
+    """A stand-in for the page server's request handler: exactly what reel_page.handle_post reads and writes."""
+
+    def __init__(self, body=None, raw=None, headers=None):
+        raw = json.dumps(body).encode("utf-8") if raw is None else raw
+        self.headers = {"Host": "127.0.0.1:%d" % PORT, "Content-Type": "application/json", "Content-Length": str(len(raw))}
+        self.headers.update(headers or {})
+        self.rfile, self.wfile = io.BytesIO(raw), io.BytesIO()
+        self.server = types.SimpleNamespace(server_address=("127.0.0.1", PORT))
+        self.code = None
+
+    def send_response(self, code):
+        self.code = code
+
+    def send_header(self, k, v):
+        pass
+
+    def end_headers(self):
+        pass
+
+
+def post(body=None, raw=None, headers=None, path="/reel-song-remove"):
+    h = Handler(body, raw, headers)
+    reel_page.handle_post(h, path, "")
+    try:
+        j = json.loads(h.wfile.getvalue().decode("utf-8"))
+    except ValueError:
+        j = None
+    return h.code, j
+
+
+def rm(kit, sid, **kw):
+    return post({"kit": KIT, "song": sid}, **kw)
+
+
+def rec_of(kit):
+    return json.loads((kit / ".kit" / "reel-page.json").read_text(encoding="utf-8"))
+
+
+def save_song(kit, sid):
+    st = reel_page.state(kit)
+    return reel_page.save_from_page({"kit": KIT, "stamp": st["stamp"], "base": st["rev"], "page": PAGE, "saved": {"song": sid}})
+
+
+def trashed():
+    return sorted(os.listdir(TRASH)) if TRASH.is_dir() else []
+
+
+def remove(kit):
+    import inspect
+    import reels
+    music = kit / "Music"
+    notes = kit / ".kit" / "reel-sounds.json"
+    prev = kit / ".kit" / "reel-sounds.prev.json"
+    W = reel_page.WORDS
+    # ---- the words
+    check("her four page lines are in WORDS, word for word", (W.get("song_remove"), W.get("song_sure"), W.get("song_removing"), W.get("song_trashed")) ==
+          ("Remove this song", "Move it to the Trash?", "Removing…", "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back."))
+    check("her two server lines are there too", W.get("song_not_here") == "That song isn't in this shoot's folder anymore."
+          and W.get("song_cant_trash") == "I couldn't move that song to the Trash. Drag it out of the shoot's Music folder in Finder instead.")
     page = reel_page.page_html(KIT, "Songs shoot")
-    src = (SCRIPTS / "reel_page.py").read_text(encoding="utf-8") + (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8")
-    check("Remove a song is NOT built (it waits on Nicole): no word of it on the page", "Move to Trash" not in page and "music/remove" not in page
-          and "Put Back" not in page)
-    check("and no route for it on the page server", "music/remove" not in src and "song-remove" not in src and "send2trash" not in src)
+    check("the page carries them for the drop-down's button (the button itself is Lane A's)", "Remove this song" in page and "Move it to the Trash?" in page)
+    check("the route is in the reel page's list and on the posting server's reel line", "/reel-song-remove" in reel_page.POST_PATHS
+          and '"/reel-song-remove"' in (SCRIPTS / "posting_queue.py").read_text(encoding="utf-8"))
+    tc = this_computer
+    keep = (tc.WINDOWS, tc.TRASH_WORD, tc.TRASH_BACK, tc.FILES_APP)
+    try:                             # a Mac pretending to be a PC: the words a PC sets at import, set by hand
+        tc.WINDOWS, tc.TRASH_WORD, tc.TRASH_BACK, tc.FILES_APP = True, "the Recycle Bin", "open the Recycle Bin in File Explorer and choose Restore", "File Explorer"
+        pc = (reel_page.trash_words(W["song_trashed"]), reel_page.trash_words(W["song_sure"]), reel_page.pc_words(reel_page.trash_words(W["song_cant_trash"])))
+    finally:
+        tc.WINDOWS, tc.TRASH_WORD, tc.TRASH_BACK, tc.FILES_APP = keep
+    check("a PC reads the Recycle Bin, File Explorer and Restore in her lines (trash_words)",
+          pc == ("Moved to the Recycle Bin. To get it back, open the Recycle Bin in File Explorer and choose Restore.", "Move it to the Recycle Bin?",
+                 "I couldn't move that song to the Recycle Bin. Drag it out of the shoot's Music folder in File Explorer instead."), pc)
+    here_trashed = reel_page.pc_words(reel_page.trash_words(W["song_trashed"]))      # what this computer says
+
+    # ---- a recording with two sounds beside it (one noted, one by name only), a plain song, a link named like a sound
+    rec = music / "Gone.mov"
+    fake_recording(rec, 11)
+    s1 = write_wav(music / "Gone sound.m4a", hum(1.0, 2500))
+    write_wav(music / "Gone sound 2.m4a", hum(1.0, 2600))
+    reel_page._note_sound(kit, s1, rec, "made")
+    other = write_wav(music / "Other.wav", hum(1.0, 2000))
+    link = music / "Gone sound 3.m4a"
+    try:
+        os.symlink(str(other), str(link))
+        linked = True
+    except (OSError, NotImplementedError, AttributeError):
+        linked = False
+    before = {f: sha(music / f) for f in os.listdir(music) if not (music / f).is_symlink()}
+    gid, oid = song_id(kit, "Gone"), song_id(kit, "Other")
+    check("(the recording is listed once, its sounds hidden, the link not listed)", gid and oid and names(kit).count("Gone") == 1
+          and not [n for n in names(kit) if n.startswith("Gone sound")], names(kit))
+    code, j = reel_page.version_from_page({"kit": KIT, "op": "new"})
+    check("(a second reel is started)", code == 200 and j.get("current") == "v2", (code, j))
+    code, j = save_song(kit, gid)
+    check("(reel 2 picks the recording)", code == 200, (code, j))
+    reel_page.version_from_page({"kit": KIT, "op": "switch", "id": "v1"})
+    code, j = save_song(kit, gid)
+    r0 = rec_of(kit)
+    check("(reel 1 picks it too, and is the open one)", code == 200 and r0.get("current") == "v1" and r0["saved"]["song"] == gid, (code, j, r0.get("saved")))
+    rev0, rec_before, notes_before = r0["rev"], (kit / ".kit" / "reel-page.json").read_bytes(), notes.read_bytes()
+
+    # ---- the press
+    code, j = rm(kit, gid)
+    check("Remove this song answers ok, her \"Moved to the Trash\" line, the list without it, and that the open reel's pick was cleared",
+          code == 200 and j and j.get("ok") is True and j.get("words") == here_trashed and j.get("cleared") is True
+          and "Gone" not in [x["name"] for x in j.get("songs") or []], (code, j))
+    went = {"Gone.mov", "Gone sound.m4a", "Gone sound 2.m4a"}
+    check("the recording and both its sounds are in the Trash, byte for byte, and gone from the Music folder",
+          set(trashed()) == went and all(sha(TRASH / f) == before[f] for f in went) and not any((music / f).exists() for f in went), trashed())
+    check("the other song is exactly where it was", other.is_file() and sha(other) == before["Other.wav"])
+    if linked:
+        check("a link named like one of its sounds stays where it is, and its target is untouched (nothing is followed)",
+              link.is_symlink() and other.is_file() and sha(other) == before["Other.wav"])
+    else:
+        skip("a link named like one of its sounds stays where it is", "this computer makes no links here")
+    r1 = rec_of(kit)
+    check("the open reel's pick is \"no song picked yet\", the counter one higher (a page a step behind is told), \"from\" dropped",
+          r1["saved"]["song"] is None and r1["rev"] == rev0 + 1 and "from" not in r1, (r1["saved"].get("song"), r1["rev"], rev0))
+    check("the record's version before is kept beside it", (kit / ".kit" / "reel-page.prev.json").read_bytes() == rec_before)
+    v2 = reels.data_of(r1, "v2", reel_page.REEL_LIVE, reel_page.REEL_FIRST)
+    check("reel 2, which picked the same song, is not touched", (v2.get("saved") or {}).get("song") == gid, v2.get("saved"))
+    d = json.loads(notes.read_text(encoding="utf-8"))["sounds"]
+    check("the sounds' lines are out of reel-sounds.json, the version before kept", "Music/Gone sound.m4a" not in d and prev.read_bytes() == notes_before, list(d))
+    reel_page.version_from_page({"kit": KIT, "op": "switch", "id": "v2"})
+    st = reel_page.state(kit)
+    code, j = reel_page.start_make(body(kit, gid))
+    check("reel 2 opened: its pick is the gone song, and Make my reel says her \"That song isn't there anymore\" line (as hers)",
+          st["current"] == "v2" and st["saved"]["song"] == gid and code == 400 and j.get("words") == W["song_gone"], (st["saved"], code, j))
+    reel_page.version_from_page({"kit": KIT, "op": "switch", "id": "v1"})
+
+    # ---- refused, nothing moved
+    t1 = trashed()
+    code, j = rm(kit, gid)
+    check("the same press again: her \"isn't in this shoot's folder anymore\" line, nothing moved",
+          code == 400 and j.get("ok") is False and j.get("words") == W["song_not_here"] and trashed() == t1, (code, j))
+    exp = write_wav(kit / "Photos" / "Export.wav", hum(1.0, 2100))
+    eid = song_id(kit, "Export")
+    code, j = rm(kit, eid)
+    check("a song in the Photos folder (a folder of theirs) is refused with our line and stays",
+          eid and code == 400 and j.get("words") == reel_page.OUR_WORDS["song_in_photos_stays"] and exp.is_file() and trashed() == t1, (code, j))
+    bad = [("an id that is none of this shoot's songs", rm(kit, reel_page.song_id("Music", "nothing.wav")), 400, W["song_not_here"]),
+           ("an id that isn't one", rm(kit, "../x"), 400, reel_page.NOT_UNDERSTOOD),
+           ("a field the route doesn't take (a path)", post({"kit": KIT, "song": oid, "path": "x"}), 400, reel_page.NOT_UNDERSTOOD),
+           ("a shoot that isn't in Your Content", post({"kit": "2026-01-01 Not here", "song": oid}), 404, reel_page.CANT_FIND),
+           ("another website (Origin)", rm(kit, oid, headers={"Origin": "https://example.com"}), 403, reel_page.NOT_UNDERSTOOD),
+           ("a cross-site press", rm(kit, oid, headers={"Sec-Fetch-Site": "cross-site", "Origin": "http://127.0.0.1:%d" % PORT}), 403, reel_page.NOT_UNDERSTOOD),
+           ("another host's name", rm(kit, oid, headers={"Host": "evil.example"}), 403, reel_page.NOT_UNDERSTOOD),
+           ("a body over the cap", post(raw=b"x" * 70000), 413, reel_page.NOT_UNDERSTOOD)]
+    for what, (code, j), want, words in bad:
+        check(f"refused ({want}): {what}; nothing moved", code == want and j and j.get("ok") is False and j.get("words") == words and trashed() == t1 and other.is_file(), (code, j))
+
+    # ---- the second of a recording's files can't be moved: her line, then which one went
+    half = music / "Half.mov"
+    fake_recording(half, 12)
+    hs = write_wav(music / "Half sound.m4a", hum(1.0, 2700))
+    hid = song_id(kit, "Half")
+    save_song(kit, hid)
+    real, calls = this_computer._into_test_trash, []
+
+    def second_fails(path, folder):
+        calls.append(path)
+        if len(calls) == 2:
+            raise OSError("pretend: the drive refused")
+        return real(path, folder)
+
+    this_computer._into_test_trash = second_fails
+    try:
+        code, j = rm(kit, hid)
+    finally:
+        this_computer._into_test_trash = real
+    want = reel_page.pc_words(reel_page.trash_words(W["song_cant_trash"])) + " " + reel_page.trash_words(reel_page.OUR_WORDS["song_part_moved"]).replace("{names}", "Half.mov")
+    check("when the second file can't be moved: her \"I couldn't move that song\" line, then which one went; the recording is in the Trash, its sound still in Music",
+          code == 400 and j.get("ok") is False and j.get("words") == want and j.get("why") == this_computer.CANT_TRASH
+          and (TRASH / "Half.mov").is_file() and hs.is_file() and not half.exists(), (code, j, trashed()))
+    check("the recording's pick is cleared all the same (it is gone from the list)", j.get("cleared") is True and rec_of(kit)["saved"]["song"] is None)
+    sid2 = song_id(kit, "Half sound")
+    check("the sound left behind is listed as a song of its own now (honestly: it is a file in Music)", sid2 is not None, names(kit))
+    code, j = rm(kit, sid2)
+    check("and can be removed on its own", code == 200 and j.get("ok") is True and (TRASH / "Half sound.m4a").is_file() and not hs.exists(), (code, j))
+    fake_recording(music / "Gone.mov", 13)
+    code, j = rm(kit, song_id(kit, "Gone"))
+    check("a second Gone.mov sent later sits beside the first in the Trash as \"Gone 2.mov\": nothing written over",
+          code == 200 and (TRASH / "Gone 2.mov").is_file() and sha(TRASH / "Gone.mov") == before["Gone.mov"], trashed())
+
+    # ---- the one door
+    src = "".join(inspect.getsource(f) for f in (reel_page.remove_song, reel_page.sounds_of_recording, reel_page._drop_sound_notes, reel_page._clear_song))
+    check("the route's own source names no os.remove, unlink, rmtree, osascript or send2trash: this_computer's trash_many is the one door",
+          not any(x in src for x in ("os.remove", "unlink(", "rmtree", "send2trash", "osascript")) and "trash_many" in src)
+    check("nothing but the removed files is in the test's Trash, and the kit's hidden folder is whole",
+          not [f for f in trashed() if f.startswith(".")] and (kit / ".kit" / "reel-page.json").is_file() and notes.is_file())
+    raw = json.dumps(post({"kit": KIT, "song": song_id(kit, "Other")})[1])
+    check("the answer names no path", str(work) not in raw and "/Users/" not in raw and "\\\\" not in raw, raw[:300])
 
 
 def part(name, fn, *args):
@@ -546,8 +753,8 @@ if A.only in (None, "replaced"):
     part("replaced: a recording replaced by a new one of the same name", replaced, kit)
 if A.only in (None, "make"):
     part("make: through Make my reel's own job", make, kit)
-if kit is not None:
-    part("Remove a song is not built", no_remove, kit)
+if A.only in (None, "remove"):
+    part("remove: Remove this song, to the computer's own Trash", remove, kit)
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {sum(results)} passed, {failed} failed." + (f"  Scratch folder, kept to look at: {work}" if failed else ""))
