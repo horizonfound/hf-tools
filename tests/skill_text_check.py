@@ -948,6 +948,38 @@ def check_carousel_v27():
     case("carousel v27: the three story collages are named among the stories' templates", "**Playful mosaic**, **Mood board** and **Overlapping collage**" in arr)
     pc = read(SM / "parts" / "on-a-pc.md")
     case("carousel v27: the PC part says the button's new name and its answer on a PC", '"Open folder" opens File Explorer' in pc and "Your Carousel folder is open in File Explorer." in pc and "Open the Carousel folder" not in pc)
+    # the page's v27 buttons (B8 to B17), named in the part as the page has them, so the assistant points at the button and does nothing from the chat
+    core_js = read(SCRIPTS / "design_js_core.py")
+    save_js = read(SCRIPTS / "design_js_save.py")
+    crop_js = read(SCRIPTS / "design_js_crop.py")
+    view_js = read(SCRIPTS / "design_js_view.py")
+    sect = part.split("**The photo inside its frame, several photos at once, one slide on its own, and more photos (Nicole's v27).**", 1)
+    case("carousel v27: the designer's section has the paragraph for her v27 page buttons, before Adding slides", len(sect) == 2 and "**Adding slides, and the templates" in sect[1])
+    para = " ".join(sect[1].split("**Adding slides, and the templates", 1)[0].split()) if len(sect) == 2 else ""
+    for words, src in (("Show the whole photo", "whole: 'Show the whole photo'"), ("Crop", "btn: 'Crop'"), ("Keep the frame's shape", "Keep the frame\\'s shape"), ("Done", "done: 'Done'"),
+                       ("Even them out", "even: 'Even them out'"), ("Same size", "sameSize: 'Same size'"), ("Line up tops", "tops: 'Line up tops'"), ("Remove them", "removeThem: 'Remove them'"),
+                       ("Use this photo", "viewUse: 'Use this photo'"), ("Put it in the selected frame", "viewPut: 'Put it in the selected frame'"),
+                       ("Save just this slide", "saveOne: 'Save just this slide'"), ("Save just one slide", "saveOneAny: 'Save just one slide'")):
+        case(f"carousel v27: the part names the page's button as the page has it: {words}", f"**{words}**" in para or f'"{words}"' in para, words)
+        case(f"carousel v27: ... and the page has it: {words}", src in core_js + save_js + crop_js + view_js, src)
+    case("carousel v27: the part says a single slide's name and that nothing else changes (not the kit page, the queue or the design), with no line to the assistant, as design.py has it",
+         '"Beach carousel 1 - slide 03 updated.jpg"' in para and '"... updated 2.jpg"' in para and "not which set the kit page and the posting queue show, not the design, and no line comes to you from it" in para
+         and 'ONE_NAME = "{base} - slide {i:02d} updated.jpg"' in design and "add_waiting" not in design.split("def _finish_one(")[1].split("def _one_words(")[0])
+    case("carousel v27: the part tells the assistant what to say for \"I just want to save number 3\" (Nicole, Nov 15), naming the button",
+         "then press Save just slide 3 beside Save slides" in para and "Slide 3 on its own" in para and "on its own:" in design)
+    case("carousel v27: the part says + Add photos opens the Photos folder, new photos join the end with the next numbers, every number stays, a removal still asks for Reload, and kit.py sheet keeps the numbers",
+         "**+ Add photos**" in para and "numbered after the last" in para and "every photo that was there keeps its number" in para and "still stops the page until Reload" in para
+         and "`kit.py sheet \"<kit>\"` keeps every number" in para and "never number a shoot's photos any other way" in para and "--before" in read(SCRIPTS / "kit.py"))
+    case("carousel v27: her line for photos that joined is quoted as the page says it", '"2 new photos in, at the end of your photos (#31\u201332)."' in para
+         and "' new photo' + (k === 1 ? '' : 's') + ' in, at the end of your photos (#'" in read(SCRIPTS / "design_js_ask.py"))
+    case("carousel v27: the stories' section carries the same in a story's words: Save just this story, the single story's name, + Add photos",
+         "**Save just this story** / **Save just story N**" in arr and '"Beach stories - 03 updated.jpg"' in arr and "Story 3 on its own" in arr and 'STORY_ONE_NAME = "{base} - {i:02d} updated.jpg"' in design)
+    case("carousel v27: where-things-live names the single slide's record (`one`, `again`), its file name beside the set, and that kit.json is untouched",
+         "A press of Save just this slide (Nicole's v27) leaves a record of the same shape with `one`, the slide's number, and `again`" in where
+         and "\"<the set's name> - slide 03 updated.jpg\"" in where and "nothing in `kit.json` changes for it" in where)
+    case("carousel v27: the PC part says + Add photos' lines name File Explorer and that a single slide's name is held to the 260 characters",
+         '"+ Add photos" opens the shoot\'s Photos folder in File Explorer too' in pc and "Your Photos folder is open in File Explorer. Drag your finished photos in, and they show up here at the end." in pc
+         and 'A slide saved on its own ("Save just slide 3") is held to the same 260 characters' in pc)
 
 
 def check_stories_v26():
