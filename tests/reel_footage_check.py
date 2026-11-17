@@ -659,7 +659,10 @@ def check_page(c, s, clips):
     c.type_text("x")
     c.key("Backspace")
     case("saved on the first change, with footage on and the kind (v27: nothing is written on a plain open)",
-         on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True and (r.get("saved") or {}).get("kind") == "bts"))
+         on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True and (r.get("saved") or {}).get("kind") == "bts", 15),
+         # what a slow computer left instead: the record's saved part, its rev, and what the page was saying
+         (record(s).get("saved"), record(s).get("rev"), c.js("(document.getElementById('notice') || {}).textContent || ''"),
+          c.js("document.querySelectorAll('#clist .ci').length")))
     for k in ("say2", "add", "insight_b", "fix", "paste_say", "copy", "ask_b", "ask", "ex1", "ex2", "ask_ph", "feel_b", "feels", "feel_ph",
               "feel_small"):
         case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
