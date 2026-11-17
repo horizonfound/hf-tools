@@ -208,15 +208,28 @@ def _photo_key(name):
 
 def numbers_before(path):
     """The numbered list from last time (a kit's .kit/sheet.json, or this folder's own photos.json), as
-    {file name: number}: what each photo was called then. Empty when there is no such list, or it can't be read.
-    A number that two rows share is kept for the first of them only."""
+    {file name: number}: what each photo was called then, the photos that were there AND the ones that had gone
+    by then (its "retired" rows: a photo gone keeps its number, so one that comes back takes it again). Empty when
+    there is no such list, or it can't be read. A number that two rows share is kept for the first of them only."""
+    there, retired = list_before(path)
+    out = dict(there)
+    for k, n in retired.items():
+        if k not in out and n not in set(out.values()):
+            out[k] = n
+    return out
+
+
+def list_before(path):
+    """The list from last time in two parts, ({file name: number} of the photos that were there, {file name: number}
+    of the photos that had gone, its "retired" rows); each empty when there is no such list, or it can't be read."""
     if not path:
-        return {}
+        return {}, {}
     try:
         d = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
         rows = d.get("photos", []) if isinstance(d, dict) else []
+        gone_rows = d.get("retired", []) if isinstance(d, dict) else []
     except (OSError, ValueError, AttributeError, TypeError):
-        return {}
+        return {}, {}
     out, taken = {}, set()
     for x in sorted((x for x in rows if isinstance(x, dict) and type(x.get("n")) is int and x["n"] >= 1
                      and isinstance(x.get("file"), str) and x["file"]), key=lambda x: x["n"]):
@@ -225,7 +238,15 @@ def numbers_before(path):
             continue
         out[k] = x["n"]
         taken.add(x["n"])
-    return out
+    retired = {}
+    for x in sorted((x for x in gone_rows if isinstance(gone_rows, list) and isinstance(x, dict) and type(x.get("n")) is int and x["n"] >= 1
+                     and isinstance(x.get("file"), str) and x["file"]), key=lambda x: x["n"]):
+        k = _photo_key(x["file"])
+        if k in out or k in retired or x["n"] in taken:
+            continue
+        retired[k] = x["n"]
+        taken.add(x["n"])
+    return out, retired
 
 
 def number_photos(photos, before):
@@ -255,16 +276,26 @@ def number_photos(photos, before):
 def cmd_sheet(a):
     photos = edited_photos(a.folder)
     wd = workdir(a.shoot, a.folder, a.kit)
+    there_before, retired_before = list_before(getattr(a, "before", None))
     before = numbers_before(getattr(a, "before", None))
-    numbered, added, gone = number_photos(photos, before)
+    numbered, added, gone_all = number_photos(photos, before)
     listing = []
     for n, p in numbered:
         w, h = capcut.photo_size(p)
         way = "tall" if h > w * 1.05 else "wide" if w > h * 1.05 else "square"
         listing.append({"n": n, "file": str(p), "w": w, "h": h, "way": way})
     out = {"folder": str(Path(a.folder)), "photos": listing}
+    # A photo that is gone keeps its row, under "retired" (its number and its name, never a path), for as long as
+    # it is gone: the same name coming back takes its old number again, so a pick, a design or a story that named
+    # it points at it once more (the review of Nov 17: a photo dragged out by mistake and put back, or a re-export
+    # that deletes and re-copies, came back as a NEW photo with the next number, and its old number was dead for
+    # good). "gone" is what the LAST list had and this one hasn't; "back" is what had gone and is here again.
+    here = {_photo_key(p.name) for p in photos}
+    out["retired"] = sorted(({"n": n, "file": k} for k, n in before.items() if k not in here), key=lambda x: x["n"])
+    gone = sorted(n for k, n in there_before.items() if k not in here)
+    back = sorted(n for k, n in retired_before.items() if k in here and n in {x[0] for x in numbered})
     if before:
-        out["added"], out["gone"] = added, gone      # for whoever asked: what the last list didn't have, and what it has lost
+        out["added"], out["gone"], out["back"] = added, gone, back   # for whoever asked: what the last list didn't have, what it has lost, what came back
     (wd / "photos.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
     sheets = []
     if not getattr(a, "no_sheets", False):        # --no-sheets: the list only (the reel page re-lists while it is open)
@@ -281,7 +312,10 @@ def cmd_sheet(a):
         if gone:
             say(f"Gone since the last list: {len(gone)} photo{'s' if len(gone) != 1 else ''} (number{'s' if len(gone) != 1 else ''} "
                 + ", ".join(str(n) for n in gone) + "); " + ("those numbers stay" if len(gone) != 1 else "that number stays") + " unused.")
-        if not added and not gone:
+        if back:
+            say(f"Back since the last list: {len(back)} photo{'s' if len(back) != 1 else ''} (number{'s' if len(back) != 1 else ''} "
+                + ", ".join(str(n) for n in back) + "), with the number" + ("s they" if len(back) != 1 else " it") + " had before.")
+        if not added and not gone and not back:
             say("The same photos as the last list, with the same numbers.")
     for s in sheets:
         say(f"Sheet: {s}")

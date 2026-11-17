@@ -150,6 +150,31 @@ def _main(work):
     code, out = run(env, S / "kit.py", "picks", kit, "--carousel", "1,9,4")
     check("kit.py picks with 1, 9 and 4: accepted", code == 0, out[-300:])
 
+    print("\n-- the same photo back again takes its old number (a photo dragged out by mistake, a re-export that deletes and re-copies)")
+    check("the list keeps the gone photo's row under \"retired\": its number and its name, never a path",
+          d.get("retired") == [{"n": 3, "file": names[2]}], str(d.get("retired")))
+    png(kit / "Photos" / names[2], 30, 40, 110)                      # photo 3 is back, under the same name
+    code, out = run(env, S / "kit.py", "sheet", kit)
+    d, by, ns = rows_of(kit)
+    check("the photo that came back is 3 again, not 10: every pick, design and story that named 3 points at it once more",
+          code == 0 and by.get(names[2]) == 3 and ns == [1, 2, 3, 4, 5, 6, 7, 8, 9], str(by))
+    check("the list says \"back\" [3], nothing added, nothing gone, and no retired row is left",
+          d.get("back") == [3] and d.get("added") == [] and d.get("gone") == [] and d.get("retired") == [], str({k: d.get(k) for k in ("added", "gone", "back", "retired")}))
+    check("the chat is told: \"Back since the last list: 1 photo (number 3), with the number it had before.\"",
+          "Back since the last list: 1 photo (number 3), with the number it had before." in out and "same photos" not in out, out[-400:])
+    code, out = run(env, S / "kit.py", "picks", kit, "--carousel", "3,1")
+    check("kit.py picks with 3: accepted again", code == 0, out[-300:])
+    (kit / "Photos" / names[2]).unlink()                             # and out again, for the rest of this check
+    code, out = run(env, S / "kit.py", "sheet", kit)
+    d, by, ns = rows_of(kit)
+    check("out again: 3 is retired once more, unused, and every other number is what it was",
+          code == 0 and ns == [1, 2, 4, 5, 6, 7, 8, 9] and d.get("gone") == [3] and d.get("retired") == [{"n": 3, "file": names[2]}], str(by))
+    code, out = run(env, S / "kit.py", "sheet", kit)
+    d, _, _ = rows_of(kit)
+    check("a list made again with it still gone keeps the retired row (it is not 'gone' twice)",
+          code == 0 and d.get("retired") == [{"n": 3, "file": names[2]}] and d.get("gone") == [] and "same photos as the last list" in out, str(d.get("retired")))
+    code, out = run(env, S / "kit.py", "picks", kit, "--carousel", "1,9,4")
+
     print("\n-- a chat command that writes the record while the list is being made is never written over")
     # The reel page's own poll runs kit.py sheet when photos are dropped in (Nov 17), and the list takes seconds on a
     # big shoot: a pick that kit.py picks writes in that window must still be there afterwards (the review of Nov 17:
