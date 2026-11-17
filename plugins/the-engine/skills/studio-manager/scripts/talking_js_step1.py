@@ -21,7 +21,11 @@ Ours:
   - a long refusal (a PC, the Mac's permission, no sound) stays in the status line until they do something,
     instead of a toast gone in 2.6 seconds; her two short ones are toasts, as hers;
   - choosing who places the photos is no Undo step;
-  - a video still being copied into the folder is named under the row and can't be picked until it is whole.
+  - a video still being copied into the folder is named under the row and can't be picked until it is whole;
+  - her v27 note ("could say 'working on it' right after a video is added"): the moment Edit my video is pressed
+    the status line says her "Working on it…", before the Assistant has answered (half a second of silence
+    otherwise); her "Getting your video ready…" takes over when it answers, and the job's steps after that. A
+    look that lands in between leaves the line alone.
 """
 
 JS = r"""
@@ -31,6 +35,7 @@ var T = window.Talk, W = T.W, $ = T.$;
 var chosen = null;       // the NAME of the video picked in the row
 var swapAsk = null;      // the name the "Edit ... instead?" question is about, while it shows
 var said = null;         // a refusal from Edit my video that stays in the status line
+var pressed = false;     // Edit my video pressed and not yet answered: the status line says Working on it…
 var troubled = null;     // the Assistant could not be reached, or the record not read, before anything was shown
 
 function hasWords(){ return !!(T.REC.words && T.REC.words.length); }
@@ -60,6 +65,7 @@ function showVideos(){
   var s = $('status');
   s.classList.remove('bad');
   if (swapAsk) T.rich(s, W.swap_ask, {'new': swapAsk, old: rec.video});       // never written over by a refresh
+  else if (pressed && !st.working) s.textContent = W.working;                   // the press, before the answer (v27)
   // ours: while the Mac is asking its question the line is that, in bold, and under it our note about the box's
   // "sent to Apple" sentence (her "a minute of video" would read oddly after it). Both filled in as text.
   else if ((st.working || rec.status === 'working') && rec.step === W.job_asking) T.rich(s, '{b}{step}{eb}{br}{note}', {step: rec.step, note: W.asking_note});
@@ -104,8 +110,10 @@ $('startBtn').addEventListener('click', function(){
   if (!key) return;
   swapAsk = null; said = null;
   $('startBtn').disabled = true;
+  pressed = true; $('status').classList.remove('bad'); $('status').textContent = W.working;     // at once, as her note asks
   T.post('/talking-start', {kit: T.KIT, video: key}).then(function(res){
     var j = res.j || {};
+    pressed = false;
     if (j.ok) {
       if (!j.already && !j.back) $('status').textContent = W.job_ready_video;      // plain, as hers; the look that follows draws the step line
       return T.poll(true).then(function(){ if (j.already || j.back) toEdit(); });
@@ -114,7 +122,7 @@ $('startBtn').addEventListener('click', function(){
     else said = j.words || W.didnt_work;
     showVideos();
     return T.poll(true);
-  }, function(){ T.toast(W.cant_reach); showVideos(); });
+  }, function(){ pressed = false; T.toast(W.cant_reach); showVideos(); });
 });
 
 $('whoMe').addEventListener('click', function(){

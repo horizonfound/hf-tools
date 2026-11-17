@@ -2441,7 +2441,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the words page: words_page.py checks each of these the way arrange.py does (above)
             import words_page
             return words_page.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version"):
+        if path in ("/talking-open", "/talking-start", "/talking-save", "/talking-make", "/talking-version", "/talking-capcut"):
             # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
             import talking_page
             return talking_page.handle_post(self, path, urlsplit(self.path).query)

@@ -10,7 +10,8 @@ playing the cut and the whole (her numbers: 0.02 s before a piece, to - 0.02, th
 outside a piece, the end of the reel, the speed put back on pause, a press that ended a drag, the spacebar, "Play
 the cut version" ticked and never remembered); every spot with her default numbers, the same ones CapCut gets;
 several photos flashing through a stretch; dragging and sizing a photo, themselves in the corner, the caption and
-its size, each held to her limits, under 3 px a click; the zooms; the captions; a Footage video kept in step; the
+its size, each held to her limits, under 3 px a click; the zooms; the captions (since her v27: a word fixed on the
+page is the caption at the heard word's time, and a word typed away shows none); a Footage video kept in step; the
 phone guides at her percentages, remembered by the browser; step 3's chips; and ours: a stretch is never held
 across a refresh (a drag let go over a change from the chat wipes nothing), a drag that is cancelled saves nothing,
 text as text, no path, no pop-up, nothing asked of the internet, phone width, and what is cut still skipped on a
@@ -414,6 +415,26 @@ def run_page(t, c, s):
     one = cap()["text"]
     at(WORDS[11]["start"] + 0.02)
     case("\"you\" and \"'re\" are one caption, \"you're\" (hers showed \"you 're\")", one == "you're" and cap()["text"] == "you're", one)
+    # her v27 (C3): a word fixed on the page is the caption, at the heard word's times; a word typed away shows no
+    # caption, and the one before stays up until the next kept word (her talking_core.py, `if text:`)
+    cl0 = s.state(KIT)["captions"]
+    save_js({"fixes": {"3": "wee", "4": ""}})
+    cl = s.state(KIT)["captions"]
+    case("by request, with word 3 fixed to \"wee\" and word 4 typed away: the caption list carries \"wee\" at word 3's own start, no caption at all for word 4, "
+         "and \"wee\" runs on until word 5 (one caption fewer; nothing else moved)",
+         [x["text"] for x in cl][2:5] == ["<b>bold</b>", "wee", "there."] and "" not in [x["text"] for x in cl] and len(cl) == len(cl0) - 1
+         and cl[3]["start"] == cl0[3]["start"] and cl[3]["end"] == cl0[5]["start"] and cl[4:] == cl0[5:] and cl[:3] == cl0[:3],
+         ([x["text"] for x in cl][:6], cl[3], cl0[3:6]))
+    at(WORDS[3]["start"] + 0.02)
+    fixed = cap()
+    at(WORDS[4]["start"] + 0.02)
+    held = cap()
+    at(WORDS[5]["start"] + 0.02)
+    case("on the preview: the fixed word shows at the moment the heard one showed, it stays up through the word typed away, and the next word takes over",
+         fixed["text"] == "wee" and fixed["shown"] and fixed["knob"] and held["text"] == "wee" and held["shown"] and cap()["text"] == "there.", (fixed["text"], held["text"], cap()["text"]))
+    save_js({"fixes": {}})
+    at(WORDS[3]["start"] + 0.02)
+    case("...and with the fixes taken off, the heard word is the caption again", cap()["text"] == "we" and s.state(KIT)["captions"] == cl0, cap()["text"])
     at(0.0)
     cp = cap()
     case("with no word showing (before the first is said) there is no caption and no handle", cp["text"] == "" and not cp["shown"] and not cp["knob"], cp)

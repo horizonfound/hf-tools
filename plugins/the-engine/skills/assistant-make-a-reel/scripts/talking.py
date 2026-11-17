@@ -175,22 +175,35 @@ def _pair(x):
     return None
 
 
+def heard(x):
+    """The word as it was heard, when this word was fixed on the page (her w0, v27): a non-empty string, else None."""
+    h = x.get("w0") if isinstance(x, dict) else None
+    return h if isinstance(h, str) and h.strip() != "" else None
+
+
 def _word_ok(x):
-    return (isinstance(x, dict) and isinstance(x.get("w"), str) and x["w"].strip() != ""
+    """A word the engine can use: text and two times. A word fixed on the page (her v27) carries the heard word
+    as "w0"; its text may then be empty (a word they typed away: it still plays, and shows no caption), so that
+    every word keeps its number."""
+    return (isinstance(x, dict) and isinstance(x.get("w"), str) and (x["w"].strip() != "" or heard(x) is not None)
             and _num(x.get("start")) is not None and _num(x.get("end")) is not None)
 
 
 def clean(words):
     """The words as they are kept: every entry with a word and two times, times rounded to 3 places and how sure
     the computer was ("conf", 1 when it didn't say) to 2 (hers, when a video has just been turned into words).
-    Anything else is left out. Cleaning a clean list changes nothing."""
+    A word fixed on the page keeps the heard word beside it ("w0"), so a typed-away word (empty text with a
+    heard word) is kept and numbered. Anything else is left out. Cleaning a clean list changes nothing."""
     out = []
     for x in words if isinstance(words, (list, tuple)) else []:
         if not _word_ok(x):
             continue
         conf = _num(x.get("conf"))
-        out.append({"w": x["w"], "start": round(float(x["start"]), 3), "end": round(float(x["end"]), 3),
-                    "conf": round(float(1 if conf is None else conf), 2)})
+        one = {"w": x["w"], "start": round(float(x["start"]), 3), "end": round(float(x["end"]), 3),
+               "conf": round(float(1 if conf is None else conf), 2)}
+        if heard(x) is not None:
+            one["w0"] = x["w0"]
+        out.append(one)
     return out
 
 
@@ -428,7 +441,9 @@ def _caption_text(ws):
 def captions(rec, max_words=1):
     """Hers: captions from the kept words, in reel time: [{"text", "start", "end"}]. One word at a time (Nicole,
     Nov 11), each on screen until the next one; a word that begins with an apostrophe stays with the word before
-    it, inside one piece only. The last caption's end is left where it falls."""
+    it, inside one piece only. The last caption's end is left where it falls. A word fixed on the page (v27) is
+    captioned as fixed, at the heard word's times; a word they typed away (empty text) shows no caption, and the
+    caption before it stays up until the next one (her one-line change of Nov 17, `if text:`)."""
     words = _words(rec)
     out = []
     for p in pieces(rec):
@@ -446,7 +461,9 @@ def captions(rec, max_words=1):
             if len(line) >= max_words or w.endswith((".", ",", "?", "!")) or k == len(p["words"]) - 1:
                 a = on(max(p["from"], words[line[0]]["start"]))
                 b = on(min(p["to"], words[line[-1]]["end"] + 0.12))
-                out.append({"text": _caption_text([words[j]["w"] for j in line]), "start": round(a, 3), "end": round(max(b, a + 0.3), 3)})
+                text = _caption_text([words[j]["w"] for j in line])
+                if text:                                    # a word they typed away (Nov 17) shows no caption
+                    out.append({"text": text, "start": round(a, 3), "end": round(max(b, a + 0.3), 3)})
                 line = []
     for k in range(len(out) - 1):                           # no gaps or overlaps between lines
         out[k]["end"] = out[k + 1]["start"]

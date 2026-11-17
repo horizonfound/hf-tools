@@ -25,6 +25,8 @@ Hers, kept number for number (each has its check in tests/talking_page_check.py 
     KEPT word by the reel's time; it only ever changes which words the photo covers;
   - Split: the gap between two words nearest the line, inside the clip under the line;
   - the keys: Cmd or Ctrl with Z is Undo, with Shift is Redo, with Y is Redo.
+  - Open CapCut (her v27): in the bar once this reel has been made (REC.made), and in the result box with a span
+    for the answer; her say line names the project to click, in bold.
 Her faults, fixed (the plan, 2c):
   - dragging a VIDEO block's end kept only its photos, spot and place: the video and its start point were lost.
     Ours carries them;
@@ -805,18 +807,43 @@ document.addEventListener('keydown', function(e){
   else if (e.key === 'Escape' && !mod && many() && !$('pmenu').classList.contains('open')) { SELW = null; TLSEL = null; letGo(); renderTimeline(); picked(); }
 }, true);
 
-// ---- Make it in CapCut, and the result box ----
-function box(lines, bad){
+// ---- Make it in CapCut, the result box, and Open CapCut (her v27) ----
+var madeHere = false;    // a make reached its end on this page: Open CapCut shows in the bar before the record says so
+// Her result box: "It's in CapCut", the maker's line, her say line naming the project to click (in bold, as text;
+// her fallback when the make named none), then her Open CapCut with a span beside it for the answer.
+function box(lines, bad, project){
   var r = $('result'), s = el('div', 'step');
   if (bad) { var p = el('p', 'status bad', lines[0]); p.setAttribute('role', 'alert'); s.appendChild(p); }
   else {
     s.appendChild(el('h2', '', W.made_h2));
     lines.forEach(function(t){ s.appendChild(el('p', '', t)); });
-    var say = el('p', 'say', W.made_say); say.style.marginTop = '.6rem'; s.appendChild(say);
+    var say = el('p', 'say', ''); say.style.marginTop = '.6rem';
+    T.rich(say, W.made_say, {project: project || W.made_project_fallback}); s.appendChild(say);
+    var row = el('p', '', ''), b = el('button', 'btn main', W.open_capcut), sp = el('span', 'say sm', '');
+    b.type = 'button'; b.id = 'openCC2'; sp.id = 'openCCsay';
+    b.addEventListener('click', function(){ openCapCut(sp); });
+    row.appendChild(b); row.appendChild(document.createTextNode(' ')); row.appendChild(sp); s.appendChild(row);
+    madeHere = true; ccButton();
   }
   r.textContent = ''; r.appendChild(s);
   try { r.scrollIntoView({behavior: 'smooth'}); } catch (e) {}
 }
+// The bar's Open CapCut: shown once this reel has been made (the record says so, REC.made, as hers; or a make
+// reached its end on this page), hidden otherwise. Another reel opened reloads the page, so the flag starts afresh.
+function ccButton(){ $('openCC').hidden = !(T.REC.made || madeHere); }
+// Open CapCut, from the bar (a toast) or from the result box (the span beside the button): /talking-capcut starts
+// CapCut the reel page's way and answers her line (or why not). The bar's toast is her shorter line; anything the
+// Assistant adds after the box's line (a reel that was waiting for CapCut's list) is kept after it.
+function openCapCut(say){
+  if (!T.loaded) return;
+  var tell = function(line){ if (say) say.textContent = line; else T.toast(line); };
+  T.post('/talking-capcut', {kit: T.KIT}).then(function(res){
+    var j = res.j || {}, line = j.words || (j.ok ? W.capcut_opening_say : W.capcut_cant);
+    if (!say && j.ok && line.indexOf(W.capcut_opening_say) === 0) line = W.capcut_opening_toast + line.slice(W.capcut_opening_say.length);
+    tell(line);
+  }, function(){ tell(W.cant_reach); });
+}
+$('openCC').addEventListener('click', function(){ openCapCut(null); });
 function setMaking(on){
   T.makeReady = !on;
   $('makeBtn').textContent = on ? W.making : W.make;
@@ -862,7 +889,7 @@ function showMake(m){
   }
   if (atWork) return;
   making = null; setMaking(false);
-  if (m.state === 'done') box((m.words || []).map(String), false);
+  if (m.state === 'done') box((m.words || []).map(String), false, m.project);
   else box([m.problem || W.make_went_wrong], true);
 }
 $('makeBtn').addEventListener('click', function(){
@@ -892,6 +919,7 @@ T.on('shot', function(){
 var dockWas = 0;
 T.on('apply', function(a){
   showMake(T.ST.make);
+  ccButton();
   if (!a.ready) { if (drag) endDrag(null, true); SELW = null; TLSEL = null; letGo(); return; }
   if (a.changed || !$('tlClips').firstChild) {
     if (TLSEL === 'photo' && !T.findShot(T.SELSHOT)) TLSEL = null;

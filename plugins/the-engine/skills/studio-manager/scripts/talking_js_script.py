@@ -22,7 +22,16 @@ Hers, kept (each has its check in tests/talking_page_check.py --only script):
     and last word; dropped onto another stretch it trims or splits that one (setRange); the toast says where;
   - the menu: the words in quotes (70 characters), the four spots, Change, Remove (this one / all N), and "Put it
     back" only when it was moved. It opens under the bar, or above it when it would go under the dock; it closes
-    on Escape, on a press anywhere outside it and outside a bar, and when a bar drag starts.
+    on Escape, on a press anywhere outside it and outside a bar, and when a bar drag starts;
+  - fixing a word the transcriber got wrong (her v27, Nov 17): double-click a word, or highlight a few and press
+    Fix the words (the bar's fourth group), and a small box opens above the word with the words in it; the video
+    pauses; Enter or Fix saves, Esc or × closes, Undo fix (shown only when one of them was fixed) goes back to
+    what was heard. The same number of words typed as highlighted: one each; otherwise all of it goes on the
+    first word and the rest show nothing (grey, slanted, showing the heard word). A fix is a save of the WHOLE
+    map ({fixes: {word number: the right words}}), one Undo step, through T.save like every edit; a word typed
+    equal to what was heard is no fix. A fixed word is underlined (dotted, coral) and its hover line says what
+    was heard; a single click still plays from it (the first click of the two plays, the box pauses). An empty
+    box gives her toast and saves nothing. A fix on a cut word is allowed (crossed out and fixed).
 Her pitfalls, kept as rules:
   - a stretch is always looked up by its START WORD at the moment of a press (findShot), never kept across a
     refresh: every save here is a function that builds what to save when its turn comes;
@@ -37,14 +46,22 @@ Ours:
   - a bar drag ends, saving nothing, when the button turns out to have been let go where the page did not see
     it (a move with no button held, the Mac's own menu, the window losing the keyboard); a Control-click starts
     none; and the menu opens beside the bar as it is at the release, even if the script was drawn again since
-    the press.
+    the press;
+  - the fix box: a fixed word's hover line is set as an attribute, never written into markup; the box is placed
+    with her arithmetic and is placed again when the page scrolls (hers stays where it was), and closes when its
+    word has scrolled out of the window; the script is never drawn again under the open box (the 3-second look
+    waits, T.fixOpen, and what arrives is drawn when it closes); a press inside the box or on the highlight bar
+    does not close it; a key typed in it never reaches the video or the timeline (T.pickerOpen counts the box),
+    and Escape in it closes the box and nothing else; the fix's map is built when its save's turn comes, on the
+    state the save before it left; her toast comes only once the save got through (a refusal keeps its own).
 
 What the later parts use from here: T.SELSHOT (the start word of the stretch picked, or null) and T.markShot()
 (it also says 'shot' to whoever listens: the timeline marks its block); T.pickedWords (a function the timeline
 may set: the words of the clip picked there) and T.markPicked(); T.jumpToWord(i); T.togglePlay() (the plain one
 here; the preview's part puts its own in its place) and T.frame (the preview's, called when there is one);
 T.selectedWords(), T.findShot(a), T.shotsOut(list), T.thumbs(x, box, max), T.photoUrl(n, size), T.stillUrl(key),
-T.renderScript(), T.closeMenu(), T.spotShort.
+T.renderScript(), T.closeMenu(), T.spotShort; and the fix box: T.openFix(a, b, el), T.closeFix(), T.fixOpen()
+(the pickers' T.pickerOpen and the core's quiet() read it).
 """
 
 JS = r"""
@@ -57,6 +74,7 @@ var MOVES = [['', W.move_none], ['punch', W.punch], ['zoom', W.slow_zoom]];
 var CLICK_PX = 5;              // hers: a press on a stretch that moves less than this is a click
 var stale = false;             // a new state came while words were highlighted: the script is drawn when they let go
 var gdrag = null;              // a stretch being dragged
+var FIX = null;                // the fix box is open on words a..b (her v27): {a, b}
 T.SELSHOT = null; T.PHOTOS = []; T.byN = {}; T.STILLS = {};
 
 function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -113,11 +131,14 @@ function renderScript(){
     var ws = el('div', 'words');
     for (i = a; i <= b; i++) {
       if (!words[i]) continue;
-      var z = T.zoomOf(i), x = shotAt[i], sp = el('span');
-      sp.className = [cs.has(i) ? 'cut' : '', z === 'punch' || z === 'zoom' ? 'z-' + z : '', T.speedOf(i) !== 1 ? 'fast' : ''].join(' ').trim();
+      var z = T.zoomOf(i), x = shotAt[i], sp = el('span'), fixd = words[i].w0 != null;
+      // hers: a fixed word is 'fixed', a word typed away 'gone' (and shows what was heard)
+      sp.className = [cs.has(i) ? 'cut' : '', z === 'punch' || z === 'zoom' ? 'z-' + z : '', T.speedOf(i) !== 1 ? 'fast' : '',
+                      fixd ? (words[i].w ? 'fixed' : 'gone') : ''].join(' ').trim();
       sp.setAttribute('data-i', i);
+      if (fixd) sp.setAttribute('title', T.fill(W.fixed_title, {w0: words[i].w0}));     // her hover line, as text
       if (x) { has = true; sp.appendChild(segFor(x, i, a, b)); }
-      sp.appendChild(document.createTextNode(words[i].w));
+      sp.appendChild(document.createTextNode(words[i].w || words[i].w0 || ''));
       if (ws.firstChild) ws.appendChild(document.createTextNode(' '));
       ws.appendChild(sp);
     }
@@ -189,7 +210,7 @@ function placeBar(){
   var r = selectedWords(), bar = $('selBar');
   if (!r) {
     bar.style.display = 'none';
-    if (stale && T.ready()) renderScript();          // what arrived while they were highlighting
+    if (stale && !FIX && T.ready()) renderScript();  // what arrived while they were highlighting (never under the open fix box)
     return;
   }
   var rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
@@ -199,7 +220,7 @@ function placeBar(){
   bar.style.top = Math.max(8, rect.top - 48) + 'px';
 }
 document.addEventListener('selectionchange', placeBar);
-addEventListener('scroll', function(){ if ($('selBar').style.display === 'flex') placeBar(); }, true);
+addEventListener('scroll', function(){ if ($('selBar').style.display === 'flex') placeBar(); if (FIX) placeFix(null); }, true);
 function doneSel(){ window.getSelection().removeAllRanges(); $('selBar').style.display = 'none'; }
 function changeCut(add){
   var r = selectedWords(); if (!r) return;
@@ -226,6 +247,7 @@ onBar('selBack', function(){ changeCut(false); });
 onBar('selPunch', function(){ zoomWords('punch'); });
 onBar('selZoom', function(){ zoomWords('zoom'); });
 onBar('selNoZoom', function(){ zoomWords(''); });
+onBar('selFix', function(){ var r = selectedWords(); if (r) openFix(r[0], r[1], null); });
 
 // ---- a click in the script: a Move chip, or a word ----
 $('script').addEventListener('click', function(e){
@@ -244,6 +266,82 @@ $('script').addEventListener('click', function(e){
   if (!s || t.closest('.seg') || String(window.getSelection()).trim()) return;
   jumpToWord(+s.getAttribute('data-i'));
   if ($('vid').paused) T.togglePlay();
+});
+// double-click a word: type the right one (her v27). The first click of the two played from it; the box pauses.
+$('script').addEventListener('dblclick', function(e){
+  var t = e.target, s = t && t.closest && t.closest('span[data-i]');
+  if (!s || t.closest('.seg')) return;
+  e.preventDefault();
+  openFix(+s.getAttribute('data-i'), +s.getAttribute('data-i'), s);
+});
+
+// ---- fix a word the transcriber got wrong (her v27, Nov 17: "if the word is wrong, I should be able to click it
+// and type the correct word"). Only the words change: the cut, the timing and the layout stay as they are ----
+function heardOf(w){ return w.w0 != null ? w.w0 : w.w; }
+function openFix(a, b, anchor){
+  var words = T.REC.words || [], i;
+  if (!words[a] || !words[b]) return;
+  try { if (!$('vid').paused) T.togglePlay(); } catch (e) {}
+  FIX = {a: a, b: b};
+  var typed = [], any = false;
+  for (i = a; i <= b; i++) { typed.push(words[i].w || ''); if (words[i].w0 != null) any = true; }
+  $('fixIn').value = typed.filter(Boolean).join(' ').replace(/ '/g, "'");
+  $('fixBack').hidden = !any;
+  $('fixBox').hidden = false;
+  placeFix(anchor);
+  if (!FIX) return;                                   // its word is not on the screen: never opened
+  doneSel();                                          // the fix box takes the highlight bar's place
+  $('fixIn').focus(); $('fixIn').select();
+}
+// above the word, centered on it, kept on the screen (her arithmetic); again on every scroll (ours), and closed
+// once its word has scrolled out of the window
+function placeFix(anchor){
+  if (!FIX) return;
+  var s = anchor || wordEl(FIX.a), box = $('fixBox');
+  if (!s) { closeFix(); return; }
+  var r = s.getBoundingClientRect();
+  if (!anchor && (r.bottom < 0 || r.top > innerHeight)) { closeFix(); return; }
+  var w = box.offsetWidth;
+  box.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)) + 'px';
+  box.style.top = Math.max(8, r.top - box.offsetHeight - 8) + 'px';
+}
+function closeFix(){
+  if (!FIX) return;
+  FIX = null; $('fixBox').hidden = true;
+  if (stale && !selectedWords() && T.ready()) renderScript();      // what arrived while the box was open
+}
+function doFix(back){
+  if (!FIX) return;
+  var a = FIX.a, b = FIX.b, n = b - a + 1, typed = null;
+  if (!back) {
+    typed = $('fixIn').value.trim().split(/\s+/).filter(Boolean);
+    if (!typed.length) { T.toast(W.fix_empty); return; }
+  }
+  closeFix(); doneSel();
+  // the whole map, built when this save's turn comes (on the state the save before it left): hers, word for word
+  T.save(function(){
+    var words = T.REC.words || [], fx = T.fixesNow(), i;
+    if (!words[a] || !words[b]) return null;
+    for (i = a; i <= b; i++) {
+      if (back) { delete fx[i]; continue; }
+      // the same number of words: one each; otherwise all of it on the first word, and the rest show nothing
+      var t = typed.length === n ? typed[i - a] : (i === a ? typed.join(' ') : '');
+      if (t === heardOf(words[i])) delete fx[i]; else fx[i] = t;
+    }
+    return {fixes: fx};
+  }).then(function(ok){ if (ok === true) T.toast(back ? W.fix_back_toast : W.fixed_toast); });
+}
+$('fixOk').addEventListener('click', function(){ doFix(false); });
+$('fixBack').addEventListener('click', function(){ doFix(true); });
+$('fixNo').addEventListener('click', function(){ closeFix(); });
+$('fixIn').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); doFix(false); }
+  else if (e.key === 'Escape') { e.stopPropagation(); closeFix(); }      // the box only: never the clips picked on the timeline
+});
+// a press anywhere outside the box closes it (a press on the highlight bar's button is what opened it)
+document.addEventListener('mousedown', function(e){
+  if (!FIX || !e.target.closest) return;
+  if (!e.target.closest('#fixBox') && !e.target.closest('#selBar')) closeFix();
 });
 // hover: the whole stretch lights up, in every sentence it runs through
 $('script').addEventListener('mouseover', function(e){
@@ -416,7 +514,7 @@ function wanting(){
 }
 var copyLooks = 0, copyAsking = false;
 function lookForCopies(){
-  var held = !!selectedWords() || !!gdrag || $('pmenu').classList.contains('open');
+  var held = !!selectedWords() || !!gdrag || !!FIX || $('pmenu').classList.contains('open');
   if (stale && !held && T.loaded && T.ready()) renderScript();          // what a look brought while their hand was on the script
   if (held) return;
   if (copyAsking || !T.loaded || !T.ready() || document.hidden || !wanting() || copyLooks >= (T.DATA.copiesTries || 90)) return;
@@ -428,7 +526,7 @@ function lookForCopies(){
     takePhotos(st.photos);
     if (was === haveMark()) return;
     copyLooks = 0;
-    if (selectedWords() || gdrag || $('pmenu').classList.contains('open')) stale = true;      // never under their hand: drawn at the next tick
+    if (selectedWords() || gdrag || FIX || $('pmenu').classList.contains('open')) stale = true;      // never under their hand: drawn at the next tick
     else if (T.ready()) renderScript();
     T.emit('photos');
   }, function(){ copyAsking = false; });
@@ -437,13 +535,16 @@ T.copiesTimer = setInterval(lookForCopies, T.DATA.copiesEvery || 4000);
 
 // ---- a new state ----
 T.on('apply', function(a){
-  var st = T.ST;
+  var st = T.ST, had = haveMark();
   if (Array.isArray(st.photos)) takePhotos(st.photos);
+  // the list itself changed (a photo dropped in while the photo pop-up was open, her v27; or one gone): the
+  // pop-up's grid, the bars and the timeline hear of it as they do of a small copy made
+  if (had !== haveMark() && T.loaded) T.emit('photos');
   if (st.stills && typeof st.stills === 'object') { for (var k in st.stills) T.STILLS[k] = st.stills[k]; }
-  if (!a.ready) { closeMenu(); $('selBar').style.display = 'none'; return; }
+  if (!a.ready) { closeMenu(); closeFix(); $('selBar').style.display = 'none'; return; }
   if (T.SELSHOT != null && !findShot(T.SELSHOT)) T.SELSHOT = null;
   if (!a.changed && !stale) return;
-  if (selectedWords()) { stale = true; return; }      // never under their cursor: drawn when the highlight is let go
+  if (selectedWords() || FIX) { stale = true; return; }      // never under their cursor or the open fix box: drawn when it is let go
   renderScript();
 });
 
@@ -451,5 +552,6 @@ T.findShot = findShot; T.shotsOut = shotsOut; T.photoUrl = photoUrl; T.stillUrl 
 T.renderScript = renderScript; T.markPicked = markPicked; T.markShot = markShot; T.jumpToWord = jumpToWord;
 T.selectedWords = selectedWords; T.doneSel = doneSel; T.openMenu = openMenu; T.closeMenu = closeMenu;
 T.spotShort = SPOT_SHORT; T.wordEl = wordEl; T.scriptStale = function(){ return stale; };
+T.openFix = openFix; T.closeFix = closeFix; T.fixOpen = function(){ return !!FIX; };
 })();
 """

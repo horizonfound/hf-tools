@@ -7,8 +7,11 @@ It makes window.Talk (T below), which holds:
                  T.rev and T.mark (the counter and the folders' mark the page holds), T.ready()
   the refresh    every 3 seconds (hers), asking only "has anything moved?" (the counter and the mark go with the
                  question; the whole state comes back only when one has). It runs only while the page is showing
-                 and the talking video is PAUSED, and never during a drag, with the photo menu open, or with
-                 either picker open (a later part says it is dragging with T.busy(fn)).
+                 and the talking video is PAUSED, and never during a drag, with the photo menu open, with the
+                 video picker open or with the fix box open (a later part says it is dragging with T.busy(fn)).
+                 With the PHOTO pop-up open it does run, and asks for new photos too (photos=1, her v27 "+ Add
+                 more photos"): a photo dropped into the Photos folder is numbered at the end and the pop-up's
+                 grid shows it (talking_js_pick.py pickFresh); hers had a second timer for that.
   T.on / T.emit  how the parts hear of a new state: 'apply' {changed, ready, how, outside} after every answer.
                  A stretch, a clip or a word is always looked up afresh from T.SH / T.ST at the moment of a
                  click, never kept across a refresh (her stale-object fault).
@@ -19,7 +22,8 @@ It makes window.Talk (T below), which holds:
                  keeps its step; a part that throws on 'apply' is told in T.faults and stops nothing; only the
                  newest look's answer is ever taken; a playing talking video is paused when its script goes away. T.UNDO / T.REDO (60 steps, hers) are filled here: a save that is
                  `quiet` (who places the photos) adds no step, and both lists are emptied whenever a refresh brings
-                 a change this page did not make (her Undo would wipe the assistant's cut with one press).
+                 a change this page did not make (her Undo would wipe the assistant's cut with one press). A step
+                 carries the words they fixed too (her v27: snap() includes the fixes, T.fixesNow()).
   the time sums  hers, number for number: P, total, pieceAt (0.02 s before a piece), reelAt, srcAt (ends at
                  to - 0.02), and the word ranges: cutSet, toRanges, setRange, zoomOf, speedOf, wordsOf
   a zoom's move  ours (Dustin, Nov 13): T.ZS (the engine's amounts, paces and seconds), T.zoomAt(i), T.zoomOut(z)
@@ -159,9 +163,12 @@ T.ready = function(){ return !!(T.REC.words && T.REC.words.length) && T.REC.stat
 
 // ---- saving, and Undo's two lists ----
 function clone(x){ return JSON.parse(JSON.stringify(x)); }
+// the words they fixed on the page (her v27), as a save sends them: {word number: the right words}, read off the
+// state (a fixed word carries what was heard as w0; a word typed away is '' with its w0)
+function fixesNow(){ var o = {}; (T.REC.words || []).forEach(function(w, i){ if (w.w0 != null) o[i] = w.w; }); return o; }
 function snap(){
   var r = T.REC;
-  return clone({cut: r.cut || [], splits: r.splits || [], speeds: r.speeds || [], zooms: T.ZL,
+  return clone({fixes: fixesNow(), cut: r.cut || [], splits: r.splits || [], speeds: r.speeds || [], zooms: T.ZL,
                 shots: T.SH.map(function(x){ return {a: x.a, b: x.b, ns: x.ns || [], v: x.v || null, from: x.from || 0, spot: x.spot, pos: x.pos || null, me: x.me || null}; }),
                 cap_pos: r.cap_pos || null, cap_size: r.cap_size || 1, captions: r.captions !== false});
 }
@@ -292,7 +299,9 @@ function poll(force){
   if (asking && !force) return Promise.resolve();
   var mine = seq, look = ++looks;                    // only the newest look's answer is ever taken
   asking = true;
-  return ask('/talking-state?' + Q + (!force && T.loaded ? '&rev=' + T.rev + '&mark=' + encodeURIComponent(T.mark) : '')).then(function(res){
+  // the photo pop-up open: the Assistant numbers any photo dropped into the Photos folder first (her v27)
+  var more = T.photoPickOpen && T.photoPickOpen() ? '&photos=1' : '';
+  return ask('/talking-state?' + Q + (!force && T.loaded ? '&rev=' + T.rev + '&mark=' + encodeURIComponent(T.mark) : '') + more).then(function(res){
     if (look !== looks) return;                      // a newer look went out since: this is the older picture
     asking = false;
     var st = res.j;
@@ -302,10 +311,12 @@ function poll(force){
   }, function(){ if (look !== looks) return; asking = false; T.emit('trouble', W.cant_reach); });
 }
 // May the 3-second look run now? Only while the page is showing and the talking video is paused; never with the
-// photo menu or a picker open, never during a drag.
+// photo menu or the video picker open, never during a drag. With the photo pop-up open it does run (her v27: new
+// photos in the Photos folder show up in the grid while it is open; the grid keeps what is picked).
 function quiet(){
   if (document.hidden || !$('vid').paused) return false;
-  if ($('pick').classList.contains('open') || $('vpick').classList.contains('open') || $('pmenu').classList.contains('open')) return false;
+  if ($('vpick').classList.contains('open') || $('pmenu').classList.contains('open')) return false;
+  if (T.fixOpen && T.fixOpen()) return false;        // the fix box is open (her v27): the script is not drawn again under it
   for (var i = 0; i < busy.length; i++) if (busy[i]()) return false;
   return true;
 }
@@ -317,7 +328,7 @@ T.P = P; T.total = total; T.secs = secs; T.pieceAt = pieceAt; T.reelAt = reelAt;
 T.cutSet = cutSet; T.toRanges = toRanges; T.setRange = setRange; T.zoomOf = zoomOf; T.speedOf = speedOf; T.wordsOf = wordsOf;
 T.ZS = ZS; T.zoomAt = zoomAt; T.zoomOut = zoomOut; T.zoomAmountName = zoomAmountName; T.zoomPace = zoomPace; T.zoomAmount = zoomAmount;
 T.ease = ease; T.zoomMove = zoomMove; T.zoomValue = zoomValue;
-T.snap = snap; T.save = save; T.undo = undo; T.redo = redo; T.forget = forget; T.undoButtons = undoButtons;
+T.snap = snap; T.fixesNow = fixesNow; T.save = save; T.undo = undo; T.redo = redo; T.forget = forget; T.undoButtons = undoButtons;
 T.summary = summary; T.sizeDock = sizeDock; T.apply = apply; T.poll = poll; T.quiet = quiet;
 // Several talking reels from one shoot (her v25): the bar under the title (reel_page.REELS_JS). Before a new one
 // is started or another opened, every save of this page has had its answer ("this reel is saved first", hers).
