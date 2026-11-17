@@ -16,11 +16,16 @@ here. This file holds no page code.
                                                        folder has been renamed since)
     python3 design.py tidy "beach"                     clear the waiting slides of saves that were never finished
     every command takes --kind stories for the stories designer (below); without it, the carousel's
+    python3 design.py note "beach" [--design <id>]     "Pick my carousel photos for <shoot>" (Nicole's v27): the note
+                                                       they wrote for the assistant, and the frames of the design
+                                                       that is to be filled
+    python3 design.py fill "beach" --photos 3,8,12 [--design <id>] [--replace]
+                                                       put the assistant's pick into that design's frames, in order
     python3 design.py story-note "beach" [--design <id>]
-                                                       "Pick my story photos for <shoot>": the note they wrote for
-                                                       the assistant, and the frames of the set that is to be filled
+                                                       "Pick my story photos for <shoot>": the same for a set of
+                                                       stories (note --kind stories)
     python3 design.py story-fill "beach" --photos 3,8,12 [--design <id>] [--replace]
-                                                       put the assistant's pick into that set's frames, in order
+                                                       put the assistant's pick into that set's frames (fill --kind stories)
 
 THE STORIES DESIGNER (?kind=stories on the page, --kind stories on a command; Nicole's v19). The same page and the
 same rules for Instagram stories: each box is one 9:16 story (1080 by 1920), a set holds 1 to 40, "+ Add stories"
@@ -2833,14 +2838,17 @@ OPEN_NEW_STORIES = "NEW: this shoot had no stories yet. The page opens on Add st
 OPEN_THEIRS_STORIES = "THEIRS: this shoot's stories were already here. They are as they left them."
 
 
-# ---------- "Pick my story photos for <shoot>": the chat's side of Let my assistant choose (Nicole's v26) ----------
-# The page saves the note they wrote with the set ("ask") and gives them a line to paste in the chat. story-note reads
-# the note and the set's frames; story-fill puts the assistant's pick into the frames. Choosing and ordering photos is
-# the assistant's job (rule 11); the words on a story stay the photographer's, so nothing here touches a text box.
+# ---------- "Pick my story photos for <shoot>" / "Pick my carousel photos for <shoot>": the chat's side of Let my
+# assistant choose (Nicole's v26 for stories, her v27 for carousels too) ----------
+# The page saves the note they wrote with the set of stories or the carousel design ("ask") and gives them a line to
+# paste in the chat. `note` reads the note and the frames; `fill` puts the assistant's pick into the frames. story-note
+# and story-fill are the same two commands spelled for stories (--kind stories), kept so the v26 instructions still
+# run as written. Choosing and ordering photos is the assistant's job (rule 11); the words on a story or a slide stay
+# the photographer's, so nothing here touches a text box.
 
 def _frames_in_order(state):
     """A layout's photo frames in the order they are filled: by slot, then left to right, then top to bottom (the
-    page's own order, DesignPlan.holes)."""
+    page's own order, DesignPlan.holes; on a carousel that is slide by slide, since the slides lie left to right)."""
     fr = [b for b in state["blocks"] if b.get("type") != "text"]
     return sorted(fr, key=lambda b: (b.get("slot") or 0, b["x"], b["y"], b["id"]))
 
@@ -2850,55 +2858,74 @@ def _shape_wanted(b):
     return "wide" if ar > 1.15 else "tall" if ar < 0.9 else "any"       # DesignPlan.RULES.wide and .tall
 
 
-def _where(b, slides, w):
-    """Which story a frame is on, in words: "story 2", or "stories 1 to 3" for a frame that lies across several
-    (the first and the last story it covers a real part of)."""
-    eps = w * 0.02                       # a frame that only just pokes into the next story is not "across" it
+def _where(b, slides, w, kind=STORIES):
+    """Which story (slide) a frame is on, in words: "story 2", or "stories 1 to 3" for a frame that lies across
+    several (the first and the last it covers a real part of)."""
+    one, many = ("story", "stories") if kind == STORIES else ("slide", "slides")
+    eps = w * 0.02                       # a frame that only just pokes into the next one is not "across" it
     first = max(0, min(slides - 1, int(math.floor((b["x"] + eps) / w))))
     last = max(first, min(slides - 1, int(math.ceil((b["x"] + b["w"] - eps) / w)) - 1))
-    return f"story {first + 1}" if last == first else f"stories {first + 1} to {last + 1}"
+    return f"{one} {first + 1}" if last == first else f"{many} {first + 1} to {last + 1}"
 
 
-def _story_set(kit, did=None):
-    """The set of stories a chat command is about: the one named, else the one they pressed Copy on, or changed,
-    last (the line they paste names no set). (design, every set)."""
+def _ask_design(kit, did=None, kind=STORIES):
+    """The set of stories, or the carousel design, a chat command is about: the one named, else the one they pressed
+    Copy on, or changed, last (the line they paste names none). (design, every design of that kind)."""
     rows, stamp = arrange.sheet_rows(kit), arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return None, []
     with arrange.locked(design_lock(kit)):
-        if ensure_design(kit, STORIES) is None:
+        if ensure_design(kit, kind) is None:
             return None, []
-        designs = [_sync(kit, d, rows, stamp, STORIES) for d in list_designs(kit, STORIES)]
+        designs = [_sync(kit, d, rows, stamp, kind) for d in list_designs(kit, kind)]
     designs.sort(key=lambda d: (_asked_or_changed(d), d["id"]), reverse=True)
     if did is not None:
         return next((d for d in designs if d["id"] == did), None), designs
     return designs[0], designs
 
 
-def cmd_story_note(kit, did=None):
-    """Print what the assistant picks from: their note, and the frames of the set that is to be filled. Changes
-    nothing but what opening the page would (a shoot with no stories yet gets its one empty set)."""
+def _story_set(kit, did=None):
+    return _ask_design(kit, did, STORIES)
+
+
+def _no_id(did, kind):
+    return (f"this shoot has no set of stories with the id {did}. (design.py show --kind stories lists them.)" if kind == STORIES
+            else f"this shoot has no design with the id {did}. (design.py show lists them.)")
+
+
+def _fill_cmd(kind):
+    return "story-fill" if kind == STORIES else "fill"
+
+
+def cmd_note(kit, did=None, kind=STORIES):
+    """Print what the assistant picks from: their note, and the frames of the set of stories (carousel design) that
+    is to be filled. Changes nothing but what opening the page would (a shoot with no stories yet gets its one empty
+    set; a shoot with no carousel design yet gets its first, one photo a slide)."""
     if not arrange.sheet_rows(kit):
         if kit_mod.sheet(kit) != 0 or not arrange.sheet_rows(kit):
             say("STOP: couldn't number this shoot's photos. Are they where the kit says they are?")
             return 1
-    deep = too_deep(kit, STORIES)
+    deep = too_deep(kit, kind)
     if deep:
         say(f"STOP: {deep}")
         return 1
-    d, designs = _story_set(kit, did)
+    d, designs = _ask_design(kit, did, kind)
     if d is None:
-        say(f"STOP: this shoot has no set of stories with the id {did}. (design.py show --kind stories lists them.)" if did and designs
-            else "STOP: couldn't read this shoot's numbered list. Nothing was changed.")
+        say(f"STOP: {_no_id(did, kind)}" if did and designs else "STOP: couldn't read this shoot's numbered list. Nothing was changed.")
         return 1
     rec = kit_mod.load_rec(kit)
     st = d["state"]
-    say(f"{rec.get('name') or kit.name}  ({kit.name})  stories")
+    k = KINDS[kind]
+    unit = KW(kind, "slide")
+    units = lambda n: KW(kind, "slides") if n != 1 else unit  # noqa: E731
+    what = "SET" if kind == STORIES else "DESIGN"
+    things = "sets of stories" if kind == STORIES else "designs"
+    say(f"{rec.get('name') or kit.name}  ({kit.name})" + ("  stories" if kind == STORIES else ""))
     if len(designs) > 1:
-        say(f"This shoot has {len(designs)} sets of stories. The one they asked about with Copy, or changed, last is used unless you name another with --design:")
+        say(f"This shoot has {len(designs)} {things}. The one they asked about with Copy, or changed, last is used unless you name another with --design:")
         for x in designs:
-            say(f"  {x['id']}  \"{x['name']}\"  {x['state']['slides']} stor{'ies' if x['state']['slides'] != 1 else 'y'}" + ("  <- this one" if x["id"] == d["id"] else ""))
-    say(f"SET: \"{d['name']}\"  (--design {d['id']})  {st['slides']} stor{'ies' if st['slides'] != 1 else 'y'}")
+            say(f"  {x['id']}  \"{x['name']}\"  {x['state']['slides']} {units(x['state']['slides'])}" + ("  <- this one" if x["id"] == d["id"] else ""))
+    say(f"{what}: \"{d['name']}\"  (--design {d['id']})  {st['slides']} {units(st['slides'])}")
     ask = d.get("ask") or ""
     if ask:
         say("THEIR NOTE (their words; follow it): " + ask.replace("\n", " / "))
@@ -2906,32 +2933,35 @@ def cmd_story_note(kit, did=None):
         say("THEIR NOTE: none. Pick a good mix from the shoot.")
     frames = _frames_in_order(st)
     empty = [b for b in frames if b.get("n") is None]
-    k = KINDS[STORIES]
     if not frames:
         room = k["slides"][1] - (0 if (not st["blocks"] and st["slides"] <= 1) else st["slides"])
-        say(f"FRAMES: none yet. story-fill makes one story for each photo you pick, each filling its story (room for {room}).")
+        say(f"FRAMES: none yet. {_fill_cmd(kind)} makes one {unit} for each photo you pick, each filling its {unit} (room for {room}).")
     else:
-        say(f"FRAMES: {len(frames)} ({len(empty)} empty). story-fill puts your photos into the EMPTY frames in this order"
+        say(f"FRAMES: {len(frames)} ({len(empty)} empty). {_fill_cmd(kind)} puts your photos into the EMPTY frames in this order"
             + (" (--replace: into every frame, in this order):" if len(empty) < len(frames) else ":"))
         for i, b in enumerate(frames, 1):
-            say(f"  {i:>2}  {_where(b, st['slides'], k['w'])}  " + ("takes any photo" if _shape_wanted(b) == "any" else f"wants a {_shape_wanted(b)} photo")
+            say(f"  {i:>2}  {_where(b, st['slides'], k['w'], kind)}  " + ("takes any photo" if _shape_wanted(b) == "any" else f"wants a {_shape_wanted(b)} photo")
                 + ("" if b.get("n") is None else f"  has photo {b['n']}"))
     texts = [b for b in st["blocks"] if b.get("type") == "text"]
     if texts:
-        say(f"WORDS: {len(texts)} text box{'es' if len(texts) != 1 else ''} on these stories. They are the photographer's: never change, add or suggest them.")
+        say(f"WORDS: {len(texts)} text box{'es' if len(texts) != 1 else ''} on these {KW(kind, 'slides')}. They are the photographer's: never change, add or suggest them.")
     say(f"PHOTOS: {len(arrange.sheet_rows(kit))} in this shoot, numbered as on the kit's sheet (kit.py sheet {_arg(kit.name)}).")
-    say(f"THEN: design.py story-fill {_arg(kit.name)} --photos N,N,N --design {d['id']}")
+    say(f"THEN: design.py {_fill_cmd(kind)} {_arg(kit.name)} --photos N,N,N --design {d['id']}")
     return 0
 
 
-def story_fill(kit, nums, did=None, replace=False):
-    """Put the assistant's pick into a set's frames, in order. Returns (status, words, design).
+def cmd_story_note(kit, did=None):
+    return cmd_note(kit, did, STORIES)
+
+
+def fill(kit, nums, did=None, replace=False, kind=STORIES):
+    """Put the assistant's pick into a set's (design's) frames, in order. Returns (status, words, design).
     Safe to run twice: photos that already sit in the frames in this order are "same" and nothing is written; a
-    photo that is already in the set is refused rather than put in a second time (unless replace).
-    Empty frames are filled in their own order (every frame, with replace); a set with no frame at all gets one
-    story for each photo, each filling its story (on an empty set they become its stories, otherwise they go after
-    the last one). Nothing is taken out, no text box is touched, the version before is kept beside the set, and the
-    counter goes up by one so an open page sees there is something newer. The same pick again changes nothing."""
+    photo that is already in the design is refused rather than put in a second time (unless replace).
+    Empty frames are filled in their own order (every frame, with replace); a design with no frame at all gets one
+    story (slide) for each photo, each filling it (on an empty design they become its stories, otherwise they go
+    after the last one). Nothing is taken out, no text box is touched, the version before is kept beside the design,
+    and the counter goes up by one so an open page sees there is something newer. The same pick again changes nothing."""
     rows, stamp = arrange.sheet_rows(kit), arrange.sheet_stamp(kit)
     if not rows or not stamp:
         return "problem", "couldn't read this shoot's numbered list. Nothing was changed.", None
@@ -2944,23 +2974,26 @@ def story_fill(kit, nums, did=None, replace=False):
     twice = sorted({n for n in nums if nums.count(n) > 1})
     if twice:
         return "problem", f"photo {', '.join(str(n) for n in twice)} is in your pick more than once. Give each photo once. Nothing was changed.", None
-    k = KINDS[STORIES]
+    k = KINDS[kind]
     w, h = k["w"], k["h"]
+    unit = KW(kind, "slide")
+    units = KW(kind, "slides")
     with arrange.locked(design_lock(kit)):
-        if ensure_design(kit, STORIES) is None:
+        if ensure_design(kit, kind) is None:
             return "problem", "couldn't read this shoot's numbered list. Nothing was changed.", None
-        designs = sorted(list_designs(kit, STORIES), key=lambda d: (_asked_or_changed(d), d["id"]), reverse=True)
+        designs = sorted(list_designs(kit, kind), key=lambda d: (_asked_or_changed(d), d["id"]), reverse=True)
         d = next((x for x in designs if x["id"] == did), None) if did is not None else designs[0]
         if d is None:
-            return "problem", f"this shoot has no set of stories with the id {did}. (design.py show --kind stories lists them.)", None
-        d = _sync(kit, d, rows, stamp, STORIES)
+            return "problem", _no_id(did, kind), None
+        d = _sync(kit, d, rows, stamp, kind)
         st = json.loads(json.dumps(d["state"]))
         frames = _frames_in_order(st)
         if not frames:
-            fresh_set = not st["blocks"] and st["slides"] <= 1
-            start = 0 if fresh_set else st["slides"]
+            fresh = not st["blocks"] and st["slides"] <= 1
+            start = 0 if fresh else st["slides"]
             if start + len(nums) > k["slides"][1]:
-                return "problem", (f"a set holds up to {k['slides'][1]} stories, and this one has {start}: there is room for "
+                holder = "a set holds" if kind == STORIES else "a carousel holds"
+                return "problem", (f"{holder} up to {k['slides'][1]} {units}, and this one has {start}: there is room for "
                                    f"{k['slides'][1] - start} more photos, and you gave {len(nums)}. Nothing was changed."), None
             if len(st["blocks"]) + len(nums) > MAX_BLOCKS:
                 return "problem", TOO_MANY_BLOCKS + " Nothing was changed.", None
@@ -2969,7 +3002,7 @@ def story_fill(kit, nums, did=None, replace=False):
                 st["blocks"].append({"id": top + i + 1, "n": n, "x": (start + i) * w, "y": 0, "w": w, "h": h, "ox": 0.5, "oy": 0.5,
                                      "zoom": 1, "slot": i + 1})
             st["slides"] = start + len(nums)
-            did_what = f"made {len(nums)} stor{'ies' if len(nums) != 1 else 'y'}, one photo each"
+            did_what = f"made {len(nums)} {units if len(nums) != 1 else unit}, one photo each"
             left = 0
         else:
             targets = frames if replace else [b for b in frames if b.get("n") is None]
@@ -2984,8 +3017,9 @@ def story_fill(kit, nums, did=None, replace=False):
                                        "Give only photos that are not in it yet, or add --replace to put your whole pick "
                                        "into the frames in order. Nothing was changed."), None
             if not targets:
+                more = "+ Add stories" if kind == STORIES else "+ Add slides, or Empty frame on a slide,"
                 return "problem", (f"every frame in \"{d['name']}\" already has a photo ({len(frames)}). Add --replace to put your "
-                                   "pick in their place, or have them press + Add stories for more room. Nothing was changed."), None
+                                   f"pick in their place, or have them press {more} for more room. Nothing was changed."), None
             if len(nums) > len(targets):
                 return "problem", (f"\"{d['name']}\" has {len(targets)} {'frames' if replace else 'empty frames'} and you gave "
                                    f"{len(nums)} photos. Give {len(targets)} at the most. Nothing was changed."), None
@@ -2994,9 +3028,9 @@ def story_fill(kit, nums, did=None, replace=False):
                     b.update(n=n, ox=0.5, oy=0.5, zoom=1)
             left = len(targets) - len(nums)
             did_what = f"put {len(nums)} photo{'s' if len(nums) != 1 else ''} into its frames"
-        clean, why = validate_state(st, on_sheet, kind=STORIES)
+        clean, why = validate_state(st, on_sheet, kind=kind)
         if clean is None:
-            return "problem", f"that pick does not fit this set ({why}). Nothing was changed.", None
+            return "problem", f"that pick does not fit this {'set' if kind == STORIES else 'design'} ({why}). Nothing was changed.", None
         if clean == d["state"]:
             return "same", f"\"{d['name']}\" already holds exactly that pick. Nothing was changed.", d
         old = json.loads(json.dumps(d))
@@ -3004,29 +3038,37 @@ def story_fill(kit, nums, did=None, replace=False):
         d.pop("from", None)             # no open page has seen this layout: its next save is told there is something newer
         d.pop("dropped", None)
         d["filled_by"] = "assistant"
-        _store(kit, d, old, STORIES)
+        _store(kit, d, old, kind)
     words = f"\"{d['name']}\": {did_what}." + (f" {left} frame{'s' if left != 1 else ''} left {'as ' + ('it was' if left == 1 else 'they were') if replace else 'empty'}." if left else "")
     return "done", words, d
 
 
-def cmd_story_fill(kit, photos, did=None, replace=False):
+def story_fill(kit, nums, did=None, replace=False):
+    return fill(kit, nums, did, replace, STORIES)
+
+
+def cmd_fill(kit, photos, did=None, replace=False, kind=STORIES):
     try:
         nums = [int(x) for x in re.split(r"[,\s]+", str(photos or "").strip()) if x]
     except ValueError:
         say("STOP: --photos takes the photos' numbers from the kit's sheet, like 3,8,12.")
         return 2
-    deep = too_deep(kit, STORIES)
+    deep = too_deep(kit, kind)
     if deep:
         say(f"STOP: {deep}")
         return 1
-    state, words, d = story_fill(kit, nums, did, replace)
+    state, words, d = fill(kit, nums, did, replace, kind)
     if state == "problem":
         say("STOP: " + words)
         return 1
     say(("FILLED: " if state == "done" else "SAME: ") + words)
-    say("The version before is kept beside the set. No words were added or changed.")
-    say(f"SHOW IT: design.py open {_arg(kit.name)} --kind stories --design {d['id']}   (an open page shows it by itself within a few seconds)")
+    say(f"The version before is kept beside the {'set' if kind == STORIES else 'design'}. No words were added or changed.")
+    say(f"SHOW IT: design.py open {_arg(kit.name)}{' --kind stories' if kind == STORIES else ''} --design {d['id']}   (an open page shows it by itself within a few seconds)")
     return 0
+
+
+def cmd_story_fill(kit, photos, did=None, replace=False):
+    return cmd_fill(kit, photos, did, replace, STORIES)
 
 
 def cmd_open(kit, did=None, kind=CAROUSEL):
@@ -3101,6 +3143,8 @@ def cmd_show(kit, kind=CAROUSEL):
         texts = len(d["state"]["blocks"]) - len(frames)
         say(f"  {d['id']}  \"{d['name']}\"  {d['state']['slides']} {KW(kind, 'slides')}, {len(frames)} photo frame{'s' if len(frames) != 1 else ''}"
             f" ({sum(1 for b in frames if b.get('n') is None)} empty), {texts} text box{'es' if texts != 1 else ''}; changed {d.get('updated')}, counter {d['rev']}")
+        if d.get("ask"):
+            say(f"      note for the assistant: {d['ask'].replace(chr(10), ' / ')}")
     for j in sorted(_journals(kit, kind), key=lambda j: str(j.get("at") or "")):
         what = {"done": "saved", "moving": KW(kind, "NOT FINISHED (the next Save slides, or design.py commit, finishes it)"), "undone": "put back, not saved"}[j["state"]]
         say(f"  {KW(kind, 'Slides')}: \"{j['base']}\", {len(j['files'])} {KW(kind, 'slides')}, from design {j['design']}, {j.get('finished') or j.get('at')}: {what}")
@@ -3166,8 +3210,13 @@ def main():
     c.add_argument("--kind", **kinds)
     tk = sub.add_parser("took"); tk.add_argument("words"); tk.add_argument("--kind", **kinds)
     td = sub.add_parser("tidy"); td.add_argument("words"); td.add_argument("--kind", **kinds)
-    sn = sub.add_parser("story-note"); sn.add_argument("words"); sn.add_argument("--design")
-    sf = sub.add_parser("story-fill"); sf.add_argument("words"); sf.add_argument("--photos", required=True); sf.add_argument("--design")
+    nt = sub.add_parser("note", help="their note and the frames to fill, for a carousel (the default) or stories"); nt.add_argument("words"); nt.add_argument("--design")
+    nt.add_argument("--kind", **kinds)
+    fl = sub.add_parser("fill", help="the assistant's pick into the empty frames, for a carousel (the default) or stories"); fl.add_argument("words")
+    fl.add_argument("--photos", required=True); fl.add_argument("--design"); fl.add_argument("--kind", **kinds)
+    fl.add_argument("--replace", action="store_true", help="put the pick into every frame, in order, not only the empty ones")
+    sn = sub.add_parser("story-note", help="note --kind stories"); sn.add_argument("words"); sn.add_argument("--design")
+    sf = sub.add_parser("story-fill", help="fill --kind stories"); sf.add_argument("words"); sf.add_argument("--photos", required=True); sf.add_argument("--design")
     sf.add_argument("--replace", action="store_true", help="put the pick into every frame, in order, not only the empty ones")
     a = ap.parse_args()
     # A design's or a shoot's name, in any alphabet, never stops a report on a PC. Belt and braces: importing
@@ -3187,11 +3236,12 @@ def main():
             return cmd_show(kit, a.kind)
         if a.cmd == "tidy":
             return cmd_tidy(kit, a.kind)
-        if a.cmd in ("story-note", "story-fill"):
+        if a.cmd in ("note", "fill", "story-note", "story-fill"):
+            kind = STORIES if a.cmd.startswith("story-") else a.kind
             if a.design is not None and not ID.fullmatch(a.design):
-                say("STOP: --design is the id design.py show --kind stories lists.")
+                say("STOP: --design is the id design.py show" + (" --kind stories" if kind == STORIES else "") + " lists.")
                 return 2
-            return cmd_story_note(kit, a.design) if a.cmd == "story-note" else cmd_story_fill(kit, a.photos, a.design, a.replace)
+            return cmd_note(kit, a.design, kind) if a.cmd in ("note", "story-note") else cmd_fill(kit, a.photos, a.design, a.replace, kind)
         if a.cmd == "took":
             n = took_for(kit, a.kind)
             say("Cleared." if n else "Nothing was waiting for that one.")

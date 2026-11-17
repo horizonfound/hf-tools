@@ -885,6 +885,51 @@ def check_talking():
 
 # ---------- Nicole's v26: sets of stories, and the assistant choosing a story's photos ----------
 
+# ---------- Nicole's v27: the assistant choosing a carousel's photos (Lane B, stage 1) ----------
+
+def check_carousel_v27():
+    arr = read(SM / "parts" / "arrange.md")
+    part = arr.split("## Laying out the slides: the designer", 1)[1].split("\n## ", 1)[0]
+    flat = " ".join(part.split())
+    design = read(SCRIPTS / "design.py")
+    page = read(SCRIPTS / "design_page.py")
+    skill = read(SM / "SKILL.md")
+    where = read(SM / "parts" / "where-things-live.md")
+    case("carousel v27: SKILL.md has a row for the line pasted from the carousel designer, word for word, pointing at the designer's section",
+         '| a line pasted from the carousel designer: "Pick my carousel photos for <shoot>" (and "..., and follow my note") | `parts/arrange.md`, "Laying out the slides: the designer" |' in skill)
+    case("carousel v27: the two commands are in the designer's command block, as design.py has them",
+         'design.py note "<kit>" [--design <id>]' in part and 'design.py fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
+         and 'sub.add_parser("note"' in design and 'sub.add_parser("fill"' in design and 'sub.add_parser("story-note"' in design)
+    case("carousel v27: the page's line and its button are named as the page has them",
+         '**"Pick my carousel photos for <shoot>"** (and "..., and follow my note")' in part and '**"Let my assistant choose the photos"**' in part
+         and 'ASK_LINE_CAROUSEL = "Pick my carousel photos"' in page and 'ASK_BUTTON = "Let my assistant choose the photos"' in page)
+    case("carousel v27: the five steps mirror the stories' (note, one look at the sheet with curating.md, the shape each frame wants, fill in the frames' order, the page shows it by itself)",
+         "1. `design.py note \"<kit>\"`" in part and "2. `kit.py sheet \"<kit>\"`" in part and "shared/curating.md" in part and "3. Give each frame a photo of the shape it wants" in part
+         and "4. `design.py fill \"<kit>\" --photos N,N,N --design <id>`" in part and "5. The open page shows your pick by itself within a few seconds" in part)
+    case("carousel v27: choosing is the assistant's job, the note is theirs and comes first, an opener and a closer in an order that flows, never pretend",
+         "Choosing and ordering the photos is your job (rule 11); the note is theirs and outranks your taste" in flat and "an opener that stops the scroll, variety, no near-twins side by side, a closer" in flat
+         and "never pretend" in flat)
+    case("carousel v27: with no empty frame the assistant adds no slides and names what to press; --replace only when they asked; the words are theirs",
+         "**With no empty frame**" in part and "you add no slides and replace nothing by yourself" in flat and "Press Empty frame on a slide" in flat and "+ Add slides" in flat
+         and "that is `--replace`" in flat and "`fill` changes photos only: it never adds, changes or removes a text box" in flat)
+    case("carousel v27: a rerun is harmless and the design before is kept, as design.py has it",
+         "Running the very same command again is harmless: it answers `SAME:`" in flat and "The design as it was before your pick is kept beside it; nothing is deleted." in flat and "def _pick_there(" in design)
+    case("carousel v27: where-things-live names the three fields on a carousel design's record and the two commands",
+         "A carousel design's record (`designs/<id>.json`) may hold the same three since Nicole's v27 (`ask`, `asked`, `filled_by`; read with `design.py note`, filled with `design.py fill`)." in where)
+    case("carousel v27: the stories' section says its two commands are the same two with --kind stories",
+         "(`story-note` and `story-fill` are `design.py note` and `design.py fill` with `--kind stories`" in arr)
+    case("carousel v27: no leftover says the carousel's designer takes no note or has no such button",
+         not re.search(r"carousel[^.]*\b(no|never)\b[^.]*\bnote\b[^.]*assistant", flat, re.I) and "a carousel's page has neither" not in read(SCRIPTS / "design_js_ask.py"))
+    # Open folder (B15) and the three collages (B7c), as the part names them
+    case("carousel v27: the designer's folder button is \"Open folder\" in both sections, with her not-yet line, and no leftover \"Open the Carousel folder\" said of the designer",
+         'with an "Open folder" button on the same line' in part and "Press Save slides first and it's made for you." in part
+         and 'with "Open folder" on the same line' in arr and "Press Save stories first and it's made for you." in arr
+         and '"Open the Carousel folder" button on the same line' not in part and '"Open the Stories folder"' not in arr)
+    case("carousel v27: the three story collages are named among the stories' templates", "**Playful mosaic**, **Mood board** and **Overlapping collage**" in arr)
+    pc = read(SM / "parts" / "on-a-pc.md")
+    case("carousel v27: the PC part says the button's new name and its answer on a PC", '"Open folder" opens File Explorer' in pc and "Your Carousel folder is open in File Explorer." in pc and "Open the Carousel folder" not in pc)
+
+
 def check_stories_v26():
     arr = read(SM / "parts" / "arrange.md")
     part = arr.split("## Making stories: the stories designer", 1)[1].split("\n## ", 1)[0]
@@ -896,7 +941,7 @@ def check_stories_v26():
          and "one stories design" not in read(SM / "parts" / "where-things-live.md"))
     case("stories: the two commands of the assistant's pick are in the part, as design.py has them",
          'design.py story-note "<kit>" [--design <id>]' in part and 'design.py story-fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
-         and 'sub.add_parser("story-note")' in design and 'sub.add_parser("story-fill")' in design and '"--replace"' in design)
+         and 'sub.add_parser("story-note"' in design and 'sub.add_parser("story-fill"' in design and '"--replace"' in design)
     case("stories: the part says which set a command takes (Copy pressed, or changed, last), that a rerun is harmless, and the record's name for it; design.py has all three",
          "the set they pressed Copy on, or changed, last" in part and "Running the very same command again is harmless: it answers `SAME:`" in part
          and "a photo that is already in the set" in part and "`asked`, the time they last pressed Copy there" in read(SM / "parts" / "where-things-live.md")
@@ -1162,7 +1207,7 @@ def check_queue_v25():
 
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
+               check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

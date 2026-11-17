@@ -43,6 +43,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | a line pasted from the talking reel page: "Cut my talking reel for <shoot>", "Place the photos in my talking reel for <shoot>", "Cut my talking reel and place the photos for <shoot>"; "set up talking reels"; and in their own words: "make a talking reel", "I want to talk to the camera about the beach shoot", "is my script ready" | `parts/talking-reel.md` |
 | "look through my footage for <shoot>" (and "... and follow my notes") | the reel skill's "Behind-the-scenes footage" (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md` for the page |
 | "change the carousel", "reorder the slides", "let me move those around"; "lay out my carousel", "design my carousel", "add text to my slides" | `parts/arrange.md` |
+| a line pasted from the carousel designer: "Pick my carousel photos for <shoot>" (and "..., and follow my note") | `parts/arrange.md`, "Laying out the slides: the designer" |
 | "make my stories", "lay out my stories", "design my stories", "add text to my stories"; a line pasted from the stories page: "Pick my story photos for <shoot>" (and "..., and follow my note") | `parts/arrange.md`, "Making stories: the stories designer" |
 | "make a single post", "a post with just one photo" (one slide on its own is a single post) | `parts/arrange.md`, "A single post" |
 | `home.py pending` prints a line starting ARRANGED | `parts/arrange.md` |
