@@ -1160,9 +1160,30 @@ def check_queue_v25():
          and 'x["version"], x["reel_name"] = ' in pq)
 
 
+def check_trash_helper():
+    """The Trash helper (Nicole's v27, Nov 17; Lane E's E11): parts/where-things-live.md says nothing of the
+    photographer's is ever deleted, that the one door out is the computer's own Trash (the Recycle Bin on a PC)
+    through this_computer.py, names the way back in Nicole's words, and gives the assistant no command for it."""
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    tc = read(SCRIPTS / "this_computer.py")
+    case("where-things-live.md says nothing of the photographer's is ever deleted, and the Assistant keeps no Trash of its own",
+         "never delete a file or a folder of the photographer's" in where and "keeps no Trash of its own" in where)
+    case("where-things-live.md names the computer's own Trash and the Recycle Bin as the one door out, through this_computer.py's trash",
+         "Finder's Trash on a Mac, the Recycle Bin on a PC" in where and "`this_computer.py`'s `trash`" in where and "the only door" in where
+         and "def trash(path, inside):" in tc)
+    case("where-things-live.md says what the door refuses, in the helper's own terms (a link, a path outside the one folder, a drive with no Trash, never a delete)",
+         "refuses a link, a path outside the one folder it is told to work in, and a drive with no Trash, and it is never a delete" in where)
+    case("the way back is Nicole's line on a Mac (TRASH_BACK) and ours on a PC, in where-things-live.md word for word",
+         "open the Trash in Finder and choose Put Back" in where and "open the Recycle Bin in File Explorer and choose Restore" in where
+         and '"open the Trash in Finder and choose Put Back"' in tc and '"open the Recycle Bin in File Explorer and choose Restore"' in tc)
+    case("the assistant has no chat command that moves anything to the Trash, and asked to delete says it never deletes",
+         "You have no chat command that moves anything to the Trash" in where and "say you never delete" in where)
+    case("this_computer.py's own words name no Claude and no path", "Claude" not in tc[tc.index("TRASH_WORD ="):tc.index("def trash_for_tests")])
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
