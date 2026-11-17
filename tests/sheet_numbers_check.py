@@ -150,6 +150,32 @@ def _main(work):
     code, out = run(env, S / "kit.py", "picks", kit, "--carousel", "1,9,4")
     check("kit.py picks with 1, 9 and 4: accepted", code == 0, out[-300:])
 
+    print("\n-- a chat command that writes the record while the list is being made is never written over")
+    # The reel page's own poll runs kit.py sheet when photos are dropped in (Nov 17), and the list takes seconds on a
+    # big shoot: a pick that kit.py picks writes in that window must still be there afterwards (the review of Nov 17:
+    # sheet() read the record first and wrote it back last, so the pick was silently lost).
+    os.environ.update(STUDIO_HOME=str(studio), HOME=str(work / "home"), USERPROFILE=str(work / "home"), STUDIO_NO_WINDOWS_FOR_TESTS="1")
+    import kit as kit_mod
+    real_run = kit_mod.subprocess.run
+    landed = []
+
+    def run_then_pick(*a, **k):
+        r = real_run(*a, **k)
+        # a chat command lands while the list is being made (through the real run: subprocess is one module)
+        got = real_run([sys.executable, str(S / "kit.py"), "picks", str(kit), "--carousel", "9,4,1"], capture_output=True,
+                       encoding="utf-8", errors="replace", env=env, timeout=300)
+        landed.append((got.returncode, (got.stdout or "") + (got.stderr or "")))
+        return r
+    kit_mod.subprocess.run = run_then_pick
+    try:
+        rc = kit_mod.sheet(kit, quick=True)
+    finally:
+        kit_mod.subprocess.run = real_run
+    rec = json.loads((kit / ".kit" / "kit.json").read_text(encoding="utf-8"))
+    check("kit.py sheet (the page's quick re-list) with a pick written while it ran: the list is made, the pick is still there, and the count is right",
+          rc == 0 and landed and landed[0][0] == 0 and rec.get("picks", {}).get("carousel") == [9, 4, 1] and rec.get("numbered") == 8,
+          (rc, landed[0][1][-200:] if landed else None, rec.get("picks"), rec.get("numbered")))
+
     print("\n-- the same photos again, a re-exported photo, and nothing changed")
     png(kit / "Photos" / names[3], 60, 40, 120)                     # photo 4 exported again, now wide
     code, out = run(env, S / "kit.py", "sheet", kit)

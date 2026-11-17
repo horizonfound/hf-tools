@@ -384,8 +384,15 @@ def sheet(kit, quick=False):
         except BaseException:
             _drop_scratch(tmp)      # the list stays as it was; no scratch copy is left behind (see save_rec)
             raise
-        rec["numbered"] = len(listing["photos"])
-        save_rec(kit, rec)
+        # The count goes into the record read AGAIN under its lock, with only `numbered` changed (update_rec): the
+        # list takes seconds on a big shoot, and since Nov 17 the reel page's own poll runs this by itself when a
+        # photo is dropped in, so a pick, a reel made or an archive mark that a chat command writes meanwhile must
+        # never be put back as it was by the record this read at its start (the review of Nov 17).
+        count = len(listing["photos"])
+
+        def note(r):
+            r["numbered"] = count
+        update_rec(kit, note)
     return 0
 
 
