@@ -4,8 +4,9 @@
     python3 tests/talking_engine_check.py
 
 We may not run her code, so every expected row below was worked by hand from her arithmetic (talking_core.py,
-v24) and is written out with its working beside it: a reviewer can redo each sum from her file without running
-anything. Her numbers: a pause OVER 0.45 s starts a new piece; a piece starts 0.08 s before its first word and
+v24; her v27 copy differs by one line, Nov 17: a caption whose text is empty, a word they typed away on the page,
+is skipped, `if text:` before out.append) and is written out with its working beside it: a reviewer can redo each
+sum from her file without running anything. Her numbers: a pause OVER 0.45 s starts a new piece; a piece starts 0.08 s before its first word and
 ends 0.14 s after its last, or half way to the next kept word when that follows within 0.45 s; a piece never
 starts before the one before it ended; a piece of 0.05 s or less is dropped; "at" adds up unrounded and each
 value shown is rounded to 3 places. A caption runs from its word's start to 0.12 s past its end (never past its

@@ -7,7 +7,8 @@ and the assistant's commands in the chat (Nicole's handoffs v23 and v24, built o
 Runs in a throwaway folder with its own pretend Assistant (STUDIO_HOME is set to it, so nothing lands in the
 real one); starts no server and makes no video (the one video it uses is the tiny tests/fixtures/loud-tone-3s.mp4,
 copied in and only ever read by its header). Her rules are compared with her own file character for character
-when her v24 folder is beside the repo (SKIP when it is not).
+when her v24 folder is beside the repo, or beside the main checkout when this is a worktree (SKIP when it is
+not); her v25 and v27 packs leave talking.py unchanged, so v24 stays the file compared.
 
 Every line must say PASS (or SKIP). Python 3.9, standard library only, a Mac or a PC.
 """
@@ -959,9 +960,17 @@ try:
           and not [f.name for f in (LONG / ".kit").iterdir() if f.name.endswith(".tmp")], (errors[:2], sorted(set(codes)), end.get("cut")))
 
     # ------------------------------------------------------------ her rules, character for character
-    HERS = ROOT.parent / "hf-tools" / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py"
-    if not HERS.is_file():
-        HERS = ROOT / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py"
+    # Her v24 talking.py: her v25 and v27 packs say it is unchanged since v24 and carry no copy (her v27
+    # talking_core.py differs from v24 by one captions line only, diffed Nov 17; its rule blocks are not in it).
+    roots = [ROOT.parent / "hf-tools" / "reference-private", ROOT / "reference-private"]
+    try:                                                   # a worktree: the main checkout's reference-private too
+        out = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], capture_output=True, text=True, timeout=20).stdout.strip()
+        if out:
+            roots.append((ROOT / out).resolve().parent / "reference-private")
+    except (OSError, subprocess.SubprocessError):
+        pass
+    HERS = next((r / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py" for r in roots
+                 if (r / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker" / "talking.py").is_file()), roots[0] / "none")
     if HERS.is_file():
         her = HERS.read_text(encoding="utf-8")                 # read as text, never run
         hr = re.search(r'^RULES = """(.*?)"""', her, re.S | re.M)

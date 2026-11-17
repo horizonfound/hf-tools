@@ -10,8 +10,12 @@ helper, so a hidden Chrome alone reads about 1 GB (--no-chrome stays under 800).
 
 Parts (one per sub-stage of the page; the later ones are added as they are built):
   words   her words, both ways: every line her page, her engine and her server can show a photographer is in
-          talking_page.WORDS (or named in HERS_NOT_OURS with why), and every line in WORDS is found in her files
-          (SKIP when her handoff is not on this computer; it is never in the repository). No "Claude" in any word.
+          talking_page.WORDS (or named in HERS_NOT_OURS with why, or in HERS_NOT_YET with the item of Nicole's v27
+          that brings it), and every line in WORDS is found in her files (SKIP when her handoff is not on this
+          computer; it is never in the repository). Since Nov 17 (her v27, Lane C's C10) her page, her engine
+          (talking_core.py) and her server's talking part are read from her v27 pack; her maker (talking_capcut.py)
+          from v24, which v27 says it has not changed. Her v25 page (the reels bar) is reels_check's: v27 carries
+          that block unchanged. No "Claude" in any word.
   s1      the page's structure, every route and every refusal by request, the state and its short answer, then
           step 1 on the real page: Add my video, the videos, Edit my video (the video already edited, another
           video with the question on the page, a video with no script yet), the status line in each state, who
@@ -98,12 +102,31 @@ SAID = ["OK", "so", "<b>bold</b>", "\"quoted\"", "🌊", "we", "were", "at", "th
 WORDS1 = [{"w": w, "start": round(0.1 + i * 0.2, 3), "end": round(0.25 + i * 0.2, 3), "conf": 0.9} for i, w in enumerate(SAID)]
 SAID2 = "And this is the second take of it.".split()
 WORDS2 = [{"w": w, "start": round(0.1 + i * 0.3, 3), "end": round(0.3 + i * 0.3, 3), "conf": 0.9} for i, w in enumerate(SAID2)]
-HERS24 = None
-for _base in (ROOT, ROOT.parent / "hf-tools"):
-    _h = _base / "reference-private" / "nicole-handoff-v24-2026-11-11" / "Carousel designer and reel picker"
-    if (_h / "pages" / "talking-reel.html").is_file():
-        HERS24 = _h
-        break
+
+
+def her_folder(version, *probes):
+    """Her handoff of one version beside the project (or beside the main checkout, when this is a worktree), when
+    every file named is in it; else None. Data only, never run, never in the repository."""
+    roots = [ROOT / "reference-private", ROOT.parent / "hf-tools" / "reference-private"]
+    try:                                                   # a worktree: the main checkout's reference-private too
+        out = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], capture_output=True, text=True, timeout=20).stdout.strip()
+        if out:
+            roots.append((ROOT / out).resolve().parent / "reference-private")
+    except (OSError, subprocess.SubprocessError):
+        pass
+    for r in roots:
+        for h in sorted(r.glob("nicole-handoff-%s-*" % version)):
+            f = h / "Carousel designer and reel picker"
+            if all((f / p).is_file() for p in probes):
+                return f
+    return None
+
+
+HERS24 = her_folder("v24", "pages/talking-reel.html", "talking_capcut.py")           # her maker: unchanged since v24 (her v27 says so)
+HERS27 = her_folder("v27", "pages/talking-reel.html", "talking_core.py", "server.py")   # her page, her engine, her server
+# Her crumbs line (v27 section 7, Lane D's): a script of its own at the top of her page that the page's own
+# script must not be mistaken for; taken out before her lines are read, and its two words named below.
+HER_CRUMBS = re.compile(r'<script src="crumbs.js"></script><script>[^<]*</script>')
 
 # In her page and, on purpose, not in ours; each with why, so that anything else of hers that goes missing shows.
 HERS_NOT_OURS = {
@@ -125,7 +148,39 @@ HERS_NOT_OURS = {
         "dead code in her maker (the \"behind\" spot she removed)",
     # names her code uses, not wording
     "Content-Type": "a name in her code", "Escape": "a key's name", "Space": "a key's name", "Delete": "a key's name",
-    "Backspace": "a key's name",
+    "Backspace": "a key's name", "Enter": "a key's name (the fix box, v27)",
+    "Photos": "a folder's name in her code (the Add photos block sends it to her /open, v27)",
+    # her v27 crumbs (section 7): the path at the top of every post kit page is Lane D's (look.crumbs); the
+    # talking page calls it in item C8. Her crumbs script (two steps, Reels and Talking to camera) is taken out
+    # before her lines are read (HER_CRUMBS); her nav's label stays and is named here.
+    "Where you are": "the crumbs nav's label: Lane D's crumbs, called from this page in C8",
+}
+# Hers in v27 and not built yet, each with the item of Lane C's plan that brings it. The words test lists them
+# every run; when an item lands its lines go into talking_page.WORDS (or BUILT_FROM_PARTS) and come OUT of here,
+# or the "nothing named as left out is ours" check fails.
+HERS_NOT_YET = {
+    # C2: Fix a word on the page
+    "Fixed word": "C2", "Wrong word? Double-click it and type the right one.": "C2", "Fix the words": "C2", "Fix": "C2",
+    "Undo fix": "C2", "The right words": "C2", "Go back to what was heard": "C2",
+    'title="You fixed this. It was heard as "': "C2 (her hover line, built from parts: fixed_title)",
+    "Type the right word first. To take a word out, use Cut.": "C2", "Back to what was heard": "C2",
+    "Fixed. Your captions use it now.": "C2",
+    # C4: Open CapCut in the bottom bar and in the result box
+    "Open CapCut": "C4", "Open CapCut, click": "C4 (built from parts: made_say)", "your new project": "C4 (made_say)",
+    "at the top of your projects, give your captions your look, and export.": "C4 (made_say)",
+    "CapCut is opening. Your newest project is at the top of the list.": "C4",
+    "CapCut is opening. Your newest project is at the top.": "C4", "I couldn't open CapCut.": "C4",
+    "CapCut doesn't seem to be on this Mac. It's free from capcut.com.": "C4 (her server's /capcut/open)",
+    # C5: + Add more photos in the photo pop-up's footer
+    "+ Add more photos": "C5", "Opens this shoot's Photos folder in Finder": "C5", "new photo": "C5 (built from parts: photos_in)",
+    "in, at the end.": "C5 (photos_in)", "Opening your Photos folder in Finder...": "C5",
+    "The Photos folder is open in Finder. Drag photos in and they show up here.": "C5",
+    "Could not open the folder. Is the photo drive plugged in?": "C5",
+}
+# Lines of ours that are still her v24 wording where v27 changed the line, each with the item that brings it
+# up to date: held to her v24 file, and the item must take the key out of here.
+STILL_V24 = {
+    "made_say": "C4: v27 names the project to click (Open CapCut, click <b>...</b> at the top of your projects, ...)",
 }
 # ...and one of hers that is the END of a line her engine builds (the Mac's own error words come first)
 HERS_NOT_OURS_ENDS = {
@@ -339,19 +394,40 @@ def worth(frag):
     return len(frag) >= 2 and re.search(r"[A-Za-z0-9]", frag)
 
 
+def her_page_raw():
+    """Her v27 page, with her crumbs script taken out (it sits before the page's own script)."""
+    raw = (HERS27 / "pages" / "talking-reel.html").read_text(encoding="utf-8")
+    return HER_CRUMBS.sub("", raw, count=1)
+
+
+def her_server_part(src):
+    """Her talking reel's own part of her server: make_talking, and the /capcut/open, /talking/save and
+    /talking/version handlers (v27), so her refusal lines there are seen."""
+    out = ""
+    a = src.find("def make_talking")
+    if a >= 0:
+        out += src[a:src.find("\ndef ", a + 10)]
+    for start, stop in (('if p == "/capcut/open"', 'if p == "/talking/make"'), ('if p == "/talking/version"', 'if p == "/reel/video"')):
+        a = src.find(start)
+        b = src.find(stop, a + 10) if a >= 0 else -1
+        if a >= 0 and b > a:
+            out += "\n" + src[a:b]
+    return out
+
+
 def her_lines():
-    """(everything she wrote as whole pieces, the lines a photographer can see, all her text as one string)."""
-    raw = (HERS24 / "pages" / "talking-reel.html").read_text(encoding="utf-8")
+    """(everything she wrote as whole pieces, the lines a photographer can see, all her text as one string).
+    Her page, engine and server from v27; her maker from v24 (unchanged since, by her v27)."""
+    raw = her_page_raw()
     attrs = [" ".join(html.unescape(t).split()) for t in re.findall(r'(?:title|aria-label)="([^"]*)"', raw)]
     whole = {x for _, x in wpc.her_strings(raw, everything=True)} | set(attrs)
     shown = [x for _, x in wpc.her_strings(raw)] + [a for a in attrs if "${" not in a]
     py = ""
     for name in ("talking_core.py", "server.py", "talking_capcut.py"):
-        src = (HERS24 / name).read_text(encoding="utf-8")
+        src = ((HERS24 if name == "talking_capcut.py" else HERS27) / name).read_text(encoding="utf-8")
         py += "\n" + src
         if name == "server.py":                      # only her talking reel's own part of the server
-            a = src.find("def make_talking")
-            src = src[a:src.find("\ndef ", a + 10)] if a >= 0 else ""
+            src = her_server_part(src)
         for m in re.finditer(r'(?:ValueError\(f?|"step": |\["step"\] = |"problem": )"((?:[^"\\]|\\.)+)"', src):
             t = " ".join(m.group(1).replace("\\'", "'").replace('\\"', '"').split())
             if re.search(r"[A-Za-z]{2,} [A-Za-z]", t):
@@ -397,42 +473,55 @@ def check_words(s):
              "File Explorer" in pw["talking_open"] and "Finder" not in pw["talking_open"] and pw["undo_title"] == "Undo (Ctrl+Z)" and pw["redo_title"] == "Redo (Ctrl+Shift+Z)", pw["talking_open"])
     else:
         case("on a Mac her words are exactly hers (Finder, ⌘Z, ⇧⌘Z)", all(pw[k] == v for k, v in w.items()))
-    if HERS24 is None:
-        skip("her words against her own files: her handoff (reference-private) isn't on this computer")
+    if HERS24 is None or HERS27 is None:
+        skip("her words against her own files: her handoff (reference-private, v24 and v27) isn't on this computer")
         return
     whole, shown, text = her_lines()
+    text24 = " ".join((html.unescape((HERS24 / "pages" / "talking-reel.html").read_text(encoding="utf-8"))).replace("\\'", "'").split())
     # ours in hers: each piece of each line of ours is a WHOLE piece of her wording (or, for a piece of 12
     # characters or more, is found word for word in her files; her script's pieces inside an attribute are not
     # pulled out whole)
     bad = []
     for k, v in w.items():
-        if k in BUILT_FROM_PARTS or k in HER_MAKER_LINES:
+        if k in BUILT_FROM_PARTS or k in HER_MAKER_LINES or k in STILL_V24:
             continue
         for frag in fragments(v):
             if worth(frag) and frag not in whole and not (len(frag) >= 12 and frag in text):
                 bad.append((k, frag))
-    case("every line in talking_page.WORDS (%d) is in her files, word for word" % len(w), not bad, bad[:6])
+    case("every line in talking_page.WORDS (%d) is in her v27 files, word for word" % len(w), not bad, bad[:6])
+    old = [k for k in STILL_V24 if k not in w or " ".join(w[k].split()) not in text24]
+    case("the lines of ours still in her v24 wording (%d, each with the item that brings it to v27) are truly her v24 lines" % len(STILL_V24), not old, old)
+    case("...and none of them is already v27's (then it comes out of STILL_V24)", not [k for k in STILL_V24 if k in w and " ".join(w[k].split()) in text],
+         [k for k in STILL_V24 if k in w and " ".join(w[k].split()) in text])
     maker = (HERS24 / "talking_capcut.py").read_text(encoding="utf-8")
     not_hers = [k for k in HER_MAKER_LINES if ('print(f"' + w[k].replace("{project}", "{dest.name}").replace('"', '\\"') + '")') not in maker]
     case("the two lines her maker prints into the result box are in talking_page.WORDS exactly as she wrote them", not not_hers and maker.count('print(f"Made ') == len(HER_MAKER_LINES), not_hers)
-    raw = (HERS24 / "pages" / "talking-reel.html").read_text(encoding="utf-8")
+    raw = her_page_raw()
     case("the lines ours holds in one piece are made of her parts", all(p in raw for parts in BUILT_FROM_PARTS.values() for p in parts),
          [p for parts in BUILT_FROM_PARTS.values() for p in parts if p not in raw])
-    # hers in ours: every line her page, engine and server can show is, whole, a line (or a piece) of ours
+    # hers in ours: every line her page, engine and server can show is, whole, a line (or a piece) of ours. The
+    # reels bar's lines (REELS_WORDS) count as ours here; reels_check holds them to her v25 page both ways.
     ours = set()
-    for v in w.values():
+    for v in list(w.values()) + list(tp.REELS_WORDS.values()):
         ours |= {" ".join(v.split())} | set(fragments(v))
     built = [" ".join(w[k].split()) for k in BUILT_FROM_PARTS]
 
     def named(x):
-        return x in HERS_NOT_OURS or any(x.endswith(n) for n in HERS_NOT_OURS_ENDS) or any(x.startswith(n) for n in HERS_NOT_OURS_STARTS)
+        return (x in HERS_NOT_OURS or x in HERS_NOT_YET or any(x.endswith(n) for n in HERS_NOT_OURS_ENDS)
+                or any(x.startswith(n) for n in HERS_NOT_OURS_STARTS))
     missing = [x for x in shown if x not in ours and not named(x) and not any(x in b for b in built)
                and not re.fullmatch(r"[.#][\w .#\[\]=\"-]+", x)]          # a selector in her code, not wording
-    case("every line her page, her engine and her server can show (%d) is in talking_page.WORDS, whole; the ones left out on purpose are named" % len(shown),
+    case("every line her page, her engine and her server can show (%d) is in talking_page.WORDS, whole; the ones left out on purpose or not built yet are named" % len(shown),
          len(shown) > 150 and not missing, missing[:6])
-    case("...and nothing is named as left out that is in fact ours", not [x for x in HERS_NOT_OURS if x in ours and x not in ("Delete",)],
-         [x for x in HERS_NOT_OURS if x in ours])
-    gone = [n for n in list(HERS_NOT_OURS) + list(HERS_NOT_OURS_ENDS) + list(HERS_NOT_OURS_STARTS) if n not in text]
+    not_yet = sorted({x for x in shown if x in HERS_NOT_YET})
+    for x in not_yet:
+        print("NOTE  hers, not ours yet (%s): %s" % (HERS_NOT_YET[x], x), flush=True)
+    case("her lines not built yet are listed above (%d), every one of them a line her v27 page or server can show, so a missed item of v27 shows every run" % len(not_yet),
+         set(not_yet) == set(HERS_NOT_YET), sorted(set(HERS_NOT_YET) - set(not_yet)))
+    case("...and nothing is named as left out, or as not built yet, that is in fact ours",
+         not [x for x in list(HERS_NOT_OURS) + list(HERS_NOT_YET) if x in ours and x not in ("Delete",)],
+         [x for x in list(HERS_NOT_OURS) + list(HERS_NOT_YET) if x in ours and x != "Delete"])
+    gone = [n for n in list(HERS_NOT_OURS) + list(HERS_NOT_YET) + list(HERS_NOT_OURS_ENDS) + list(HERS_NOT_OURS_STARTS) if n not in text]
     printed = [x for x in shown if x.startswith(("Made ", "Plan: ", "Dry run", "Behind you"))]
     case("her maker's printed lines are read too (her result box shows every line it prints): the two \"Made\" lines are ours whole, the two dry-run lines and her dead \"Behind you\" line are named",
          len(printed) == 5 and len([x for x in printed if x in ours]) == 2 and all(x in ours or named(x) for x in printed), printed)
