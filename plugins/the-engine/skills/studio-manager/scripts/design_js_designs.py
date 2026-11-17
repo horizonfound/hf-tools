@@ -19,6 +19,11 @@ DESIGN_DESIGNS_JS (put on the page by design_page.py after the drawing script) a
                       "+ Add stories"), up to 20 slides; every card's button reads Add; Start fresh is Blank slide (the
                       design's own background) and One photo per slide (the photos not used yet, up to five). On a
                       design with nothing on it, it is "+ New design".
+    Where should it go?  (hers, v27; both kinds) when a slide was clicked in this design and there is more than one, a
+                      row under the window's line: Before slide N / After slide N / At the end (After to start with), and
+                      the line reads "Pick what to add, and choose where it goes." What is added goes there and everything
+                      from there on moves along; at a spot a photo stretches across it goes at the end and the page says so.
+                      A template that would pass 20 slides (40 stories) is refused whole with her line, nothing trimmed.
     Single slides     her eight one-slide layouts, a section of small cards between Start fresh and Your templates
     Rename            beside the name of each of their own templates in the gallery: the name becomes a box; Return or
                       a press anywhere else saves (POST /design-template {kit, rename: id, name}; the Assistant keeps
@@ -91,7 +96,11 @@ DESIGN_DESIGNS_JS = r"""
     // "+ Add slides" (hers, v22): the same window, adding after the last slide; nothing is replaced
     addSlides: '+ Add slides', addTitle: 'Add slides after your last one. Nothing you made is replaced.',
     addGalleryTitle: 'Add slides',
-    addGallerySub: 'Pick what to add. It goes after your last slide, and nothing you made is replaced: one slide at a time, or a whole template.',
+    addGallerySub: 'Pick what to add. It goes after your last slide. To put it somewhere else, close this, click the slide you want it next to, then press Add slides again.',
+    // "Where should it go?" (hers, v27): when a slide was clicked in this design, what is added can go before it, after
+    // it, or at the end; the line under the window's name then says so
+    where: 'Where should it go?', whereBefore: function(k){ return 'Before slide ' + k; }, whereAfter: function(k){ return 'After slide ' + k; }, whereEnd: 'At the end',
+    whereSub: 'Pick what to add, and choose where it goes. Nothing you made is replaced.',
     add: 'Add', secSingles: 'Single slides',
     blankSlide: 'Blank slide', blankSlideSub: 'One empty slide',
     rename: 'Rename', renameLabel: function(name){ return 'A new name for the template ' + name; }
@@ -473,6 +482,20 @@ DESIGN_DESIGNS_JS = r"""
   var gHead = el('h2', '', DW.galleryTitle);
   head.appendChild(gHead);
   var gSub = el('p', 'hint'); gSub.id = 'gallery-sub'; head.appendChild(gSub);
+  // "Where should it go?" (hers, v27): built once, hidden; filled in from the slide clicked last each time the window
+  // opens, so it can never show a slide from another design or an earlier time (her stale "slide 8"). Hidden it is
+  // really gone: the page's global [hidden] rule beats its display:flex (her lesson).
+  var whereRow = el('div', 'dz-where'); whereRow.id = 'tpl-where'; whereRow.hidden = true;
+  whereRow.appendChild(el('b', '', DW.where));
+  var whereIn = {};
+  [['before', ''], ['after', ''], ['end', DW.whereEnd]].forEach(function(x){
+    var lab = el('label'), r = el('input'); r.type = 'radio'; r.name = 'tplw'; r.value = x[0]; r.id = 'tplw-' + x[0];
+    var sp = el('span', '', x[1]); sp.id = 'tplw-' + x[0] + '-words';
+    lab.appendChild(r); lab.appendChild(document.createTextNode(' ')); lab.appendChild(sp);
+    whereRow.appendChild(lab); whereIn[x[0]] = {r: r, sp: sp};
+  });
+  head.appendChild(whereRow);
+  var addAt = null;         // the slide (from 0) the row is about, while it shows
   var acts = el('div', 'dz-acts'), tickLabel = el('label', 'hint'), tick = el('input');
   tick.type = 'checkbox'; tick.id = 'gallery-fill'; tick.checked = true; tick.setAttribute('aria-label', DW.fillTick);
   tickLabel.appendChild(tick); tickLabel.appendChild(document.createTextNode(' ' + DW.fillTick));
@@ -593,6 +616,15 @@ DESIGN_DESIGNS_JS = r"""
     var title = ADDING ? DW.addGalleryTitle : DW.galleryTitle;
     gHead.textContent = title; sheet.setAttribute('aria-label', title);
     gSub.textContent = ADDING ? DW.addGallerySub : DW.gallerySub(S.name || '');
+    // hers: the row shows only when adding, a slide was clicked in this design, and there is more than one slide;
+    // After is the one ticked to start with
+    var si = D.oneSlideAt ? D.oneSlideAt() : null, show = adds && D.st.blocks.length > 0 && si != null && D.st.slides > 1;
+    whereRow.hidden = !show; addAt = show ? si : null;
+    if (show) {
+      whereIn.before.sp.textContent = DW.whereBefore(si + 1); whereIn.after.sp.textContent = DW.whereAfter(si + 1);
+      whereIn.after.r.checked = true;
+      gSub.textContent = DW.whereSub;
+    }
     cards = [];
     if (cardShelf) D.paint.letGo(cardShelf, null);
     cardShelf = D.paint.shelf();
@@ -672,12 +704,20 @@ DESIGN_DESIGNS_JS = r"""
       // replaced, and the design saves itself as always
       if (!D.st || D.blocked) return;
       var pick = start();
+      // where it goes (hers, v27): before or after the slide clicked last, or at the end; at a spot a photo stretches
+      // across it goes at the end, and the line under the slides says so
+      var at = null;
+      if (!whereRow.hidden && addAt != null) {
+        var w = whereIn.before.r.checked ? 'before' : whereIn.after.r.checked ? 'after' : 'end';
+        at = w === 'before' ? addAt : w === 'after' ? addAt + 1 : null;
+      }
       var put = function(add){
-        var r = P.addStories(D.st, M.tidy(add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel});
-        if (r.why) { gLine.textContent = D.WORDS[r.why] || ''; return; }
+        var r = P.addStories(D.st, M.tidy(add), {fill: pick.fill, photos: D.S.photos, carousel: D.S.carousel, at: at});
+        if (r.why) { gLine.textContent = r.why === 'tooMany' ? D.WORDS.tooMany(r.adds, r.max, r.have) : (D.WORDS[r.why] || ''); return; }
         D.setState(r.st, {sel: null, adjust: false});
         closeGallery();
         D.revealSlide(r.first);
+        if (r.fell) D.say($('slides-line'), D.WORDS.acrossEnd);
       };
       if (pick.queue) {
         // "My editing queue": the shoots waiting in the editing queue, in its order, as they named them. Asked for
@@ -794,6 +834,8 @@ DESIGN_DESIGNS_CSS = """
 .dz-item.cur{background:var(--chip);box-shadow:inset 3px 0 0 var(--sel)}
 .dz-item b{display:block;font-weight:600;overflow-wrap:anywhere}
 .dz-item small{color:var(--soft);font-size:12.5px}
+.dz-where{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 4px;padding:9px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.dz-where label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .dz-modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:20000;background:rgba(20,22,30,.72);display:flex;align-items:center;justify-content:center;padding:16px}
 .dz-modal[hidden]{display:none}
 .dz-sheet{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px;width:1040px;max-width:100%;max-height:92vh;overflow:auto;overscroll-behavior:contain;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.4)}

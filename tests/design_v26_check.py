@@ -40,7 +40,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
 HER_REL = Path("reference-private") / "nicole-handoff-v26-2026-11-13" / "Carousel designer and reel picker" / "pages" / "carousel-designer.html"
-HER_PAGES = [ROOT / HER_REL, ROOT.parent / "hf-tools" / HER_REL]      # beside this checkout, or beside the main one
+HER_PAGES = [ROOT / HER_REL, ROOT.parent / "hf-tools" / HER_REL, Path.home() / "Projects" / "hf-tools" / HER_REL]      # beside this checkout, beside the main one, or in it
 APPLE = "/usr/bin/python3" if Path("/usr/bin/python3").exists() else sys.executable
 W, H = 1080, 1920
 
@@ -270,17 +270,18 @@ def check_v26_page(case, work):
         missing = [k for k, v in HERS.items() if v not in her and v.replace("'", "\\'") not in her and v.replace("“", "“").replace("”", "”") not in her]
         case("v26 page: every word in this file's table is in her page, as she wrote it", not missing, missing)
         names = re.findall(r"\{ id: '(sg-[a-z0-9]+)', name: '([^']+)', slides: (\d+), bg: '(#[0-9a-f]{6})'", her)
-        case("v26 page: her page's story layouts, in her order, are this file's table and then her seven grids",
-             [(i, n, int(s), b) for i, n, s, b in names][:4] == [(t[0], t[1], t[2], t[3]) for t in HERS_TEMPLATES] and [n for _, n, _, _ in names][4:] == GRID_NAMES, names)
-    # ---- the carousel's page is as it was, but for Redo ----
-    for w in ("id='ask-pick'", "id='ask-box'", "id='ask-note'", "Let my assistant choose", "Show Instagram's", "Show Instagram&#x27;s"):
+        case("v26 page: her page's story layouts, in her order, start with this file's table and end with her seven grids",
+             [(i, n, int(s), b) for i, n, s, b in names][:4] == [(t[0], t[1], t[2], t[3]) for t in HERS_TEMPLATES] and [n for _, n, _, _ in names][-7:] == GRID_NAMES, names)
+    # ---- the carousel's page is as it was, but for Redo (and, since v27, the ask box: tests/design_v27_check.py) ----
+    for w in ("Show Instagram's", "Show Instagram&#x27;s"):
         case(f"v26 page: the carousel's page has nothing of it ({w})", w not in car)
     case("v26 page: Redo is beside Undo on both pages, off to start with",
          all("<button class='tb' id='undo' type='button' disabled>Undo</button><button class='tb' id='redo' type='button' disabled>Redo</button>" in p for p in (story, car)))
     # ---- her templates, in design.py's own table ----
     st = design.STORY_STARTERS
-    case("v26 page: eleven story layouts: her four templates, then her seven grids", [x["id"] for x in st] == [t[0] for t in HERS_TEMPLATES] + ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"]
-         and [x["name"] for x in st] == [t[1] for t in HERS_TEMPLATES] + GRID_NAMES, [x["id"] for x in st])
+    case("v26 page: her four templates first, then (since v27) her three collages, then her seven grids", [x["id"] for x in st][:4] == [t[0] for t in HERS_TEMPLATES]
+         and [x["id"] for x in st][-7:] == ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"] and len(st) == 14
+         and [x["name"] for x in st][:4] == [t[1] for t in HERS_TEMPLATES] and [x["name"] for x in st][-7:] == GRID_NAMES, [x["id"] for x in st])
     for mine, (tid, name, slides, bg, frames, texts) in zip(st, HERS_TEMPLATES):
         tp = mine["template"]
         fr = [b for b in tp["blocks"] if b.get("type") != "text"]
@@ -300,6 +301,7 @@ def check_v26_page(case, work):
          not [b for b in q["template"]["blocks"] if b.get("type") != "text"] and q["template"]["slides"] == 1
          and [b["text"] for b in q["template"]["blocks"] if b["id"] == q["list"]] == [HERS["queue_place"]], q.get("list"))
     case("v26 page: no other layout asks to be filled from anywhere", all("fill" not in x and "list" not in x for x in st if x is not q))
+    st = st[:4] + st[-7:]           # the collages are v27's (tests/design_v27_check.py); the rest of this part is about her four and her grids
     seam = next(x for x in st if x["id"] == "sg-seamless")["template"]["blocks"][0]
     case("v26 page: Seamless swipe: one photo across the first three stories", seam["x"] == 0 and seam["w"] == 3 * W and seam["h"] == H)
     case("v26 page: every one of them is a layout a story may hold (checked like any design)", all(design.validate_state(x["template"], template=True, kind="stories")[0] == x["template"] for x in st))
@@ -372,11 +374,12 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         if not case("v26 server: the first visit to the stories answers", code == 200 and st and st.get("ok") is True, (code, st and st.get("words"))):
             return
         A, STAMP = st["design"]["id"], st["stamp"]
-        case("v26 server: the page is given her four templates, then her seven grids", [x["id"] for x in st["starters"]][:4] == [t[0] for t in HERS_TEMPLATES] and len(st["starters"]) == 11)
+        case("v26 server: the page is given her four templates first, then her seven grids last (the three collages between them are v27's)",
+             [x["id"] for x in st["starters"]][:4] == [t[0] for t in HERS_TEMPLATES] and len(st["starters"]) == 14 and [x["id"] for x in st["starters"]][-7:] == ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"])
         case("v26 server: My editing queue says it is filled from the queue, and which text box", st["starters"][1].get("fill") == "queue" and isinstance(st["starters"][1].get("list"), int))
         case("v26 server: the set comes with its note for the assistant, empty to start with", st["design"].get("ask") == "")
         code, cst = J(get_json(P, f"/design-state?kit={KQ}"))
-        case("v26 server: a carousel's design has no note, and its starters are the carousel's", "ask" not in cst["design"] and not any(x["id"].startswith("sg-") for x in cst["starters"]))
+        case("v26 server: a carousel's design has its own (empty) note since v27, and its starters are the carousel's", cst["design"].get("ask") == "" and not any(x["id"].startswith("sg-") for x in cst["starters"]))
         CID = cst["design"]["id"]
 
         # ---------- the note, saved with the set ----------
@@ -421,7 +424,8 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         cbefore = (cdesigns / f"{CID}.json").read_bytes()
         crow = json.loads(cbefore)
         code, out = J(post(P, "/design", {"kit": kit_name, "design": CID, "stamp": STAMP, "base": crow["rev"], "page": "v26serverpage02", "state": crow["state"], "ask": "sneaky"}))
-        case("v26 server: a carousel takes no note: the key is dropped and nothing is written", code == 200 and (cdesigns / f"{CID}.json").read_bytes() == cbefore, (code, out))
+        case("v26 server: a carousel takes a note of its own since v27, kept beside its layout and never in it (the rest is tests/design_v27_check.py)",
+             code == 200 and json.loads((cdesigns / f"{CID}.json").read_text(encoding="utf-8")).get("ask") == "sneaky" and json.loads((cdesigns / f"{CID}.json").read_text(encoding="utf-8"))["state"] == crow["state"], (code, out))
 
         # ---------- a saved set, and the note never changing what is saved ----------
         JH = {"Content-Type": "image/jpeg"}
@@ -627,8 +631,10 @@ def check_v26_server(case, work, port, make_kit, Server, post, get_json, ask, ru
         case("v26 server: ... story-fill with no set named goes to that same set", code == 0 and "\"Set beach stories 2\"" in o and disk(A)["rev"] == r0 + 2, o[-300:])
         code, out = J(post(P, "/design-asked", {"kit": kit_name, "kind": "stories", "design": B}))
         case("v26 server: Copy pressed again is harmless", code == 200 and {k: v for k, v in disk(B).items() if k != "asked"} == bb)
+        code, out = J(post(P, "/design-asked", {"kit": kit_name, "design": CID}))
+        case("v26 server: Copy on a carousel's design is taken since v27 (the carousel has the box too; tests/design_v27_check.py)", code == 200 and out.get("ok") is True, (code, out))
         cwas = (cdesigns / f"{CID}.json").read_bytes()
-        for what, b, want in (("a carousel's design", {"kit": kit_name, "design": CID}, 400), ("a carousel named as stories", {"kit": kit_name, "kind": "stories", "design": CID}, 404),
+        for what, b, want in (("a carousel named as stories", {"kit": kit_name, "kind": "stories", "design": CID}, 404),
                               ("an id that is not one", {"kit": kit_name, "kind": "stories", "design": "../etc"}, 400),
                               ("a set that is not there", {"kit": kit_name, "kind": "stories", "design": "dnosuchset0001"}, 404),
                               ("a shoot that is not there", {"kit": "../studio", "kind": "stories", "design": B}, 404)):
@@ -777,8 +783,8 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             case("v26 browser: her intro ends by saying how to hide the bands", words["lede"].endswith(HERS["lede_end"]), words["lede"][-80:])
             names = Jx("Array.from(document.querySelectorAll('#gallery-starters .dz-cap b')).map(function(x){ return x.textContent; })")
             subs = Jx("Array.from(document.querySelectorAll('#gallery-starters .dz-cap small')).map(function(x){ return x.textContent; })")
-            case("v26 browser: the Add stories window: her four templates first, in her order, then her seven grids",
-                 names == ["Gallery delivered", "My editing queue", "The full story", "Seamless swipe"] + GRID_NAMES, names)
+            case("v26 browser: the Add stories window: her four templates first, in her order, then her seven grids last (her three v27 collages between: tests/design_v27_check.py)",
+                 names[:4] == ["Gallery delivered", "My editing queue", "The full story", "Seamless swipe"] and names[-7:] == GRID_NAMES and len(names) == 14, names)
             case("v26 browser: ... each says how many stories and photos it has", subs[:4] == ["4 stories · 7 photos", "1 story · 0 photos", "10 stories · 18 photos", "6 stories · 5 photos"], subs[:4])
             # ---- Gallery delivered ----
             add("starters", 1)
@@ -793,7 +799,7 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
                  all(b["font"] == "Figtree" and b["look"] == "box" for b in t1) and c.count("#strip .blk.words") + c.count("#strip .blk") >= 12)
             case("v26 browser: the set saves itself as always", settled())
             # ---- the x on each story's label ----
-            lab = Jx("Array.from(document.querySelectorAll('#labels > span')).map(function(s){ var x = s.querySelector('.labx'); return [s.firstChild.textContent, !!x && !x.hidden, x && x.title, x && x.getAttribute('aria-label')]; })")
+            lab = Jx("Array.from(document.querySelectorAll('#labels .lab')).map(function(s){ var x = s.querySelector('.labx'); return [s.querySelector('.slab').textContent, !!x && !x.hidden, x && x.title, x && x.getAttribute('aria-label')]; })")       # (v27: the label is a grip in a .lab with + and x)
             case("v26 browser: every story's label has a small x, named for the story it removes", lab == [[f"Story {k}", True, f"Remove story {k}", f"Remove story {k}"] for k in (1, 2, 3, 4)], lab)
             add("fresh", 1)
             s2 = st()
@@ -1035,18 +1041,18 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.wait_for(f"Designer.design && Designer.design.id !== '{OLD}' && Designer.save.idle()", 15)
             case("v26 browser: ... a second set beside it leaves it exactly as it was", ofile.read_bytes() == old_bytes and c.js("document.getElementById('d-name-box').value") == "Old way stories 2")
 
-        # ---- the carousel's designer: Redo, and nothing else of v26 ----
+        # ---- the carousel's designer: Redo, and nothing else of v26 (the ask box there is v27's: tests/design_v27_check.py) ----
         with cd.Chrome(work=work / "chrome-v26-car", size=(1400, 1000)) as c:
             c.init_script(NO_FINDER_JS)
             c.open(f"{base}/design.html?kit={KQ}")
             c.wait_for("window.Designer && Designer.saver && Designer.st && Designer.S && document.querySelectorAll('#thumbs .th').length === Designer.S.total", 40)
             c.wait_for("Designer.save.idle()", 10)
-            car = json.loads(c.js("JSON.stringify({ask: !!document.getElementById('ask-pick'), box: !!document.getElementById('ask-box'), x: document.querySelectorAll('#labels .labx').length, "
+            car = json.loads(c.js("JSON.stringify({ask: !!document.getElementById('ask-pick'), box: !!document.getElementById('ask-box'), x: document.querySelectorAll('#labels .labx').length === Designer.st.slides, "
                                   "newSet: !!document.getElementById('new-set'), labels: Array.from(document.querySelectorAll('#labels span')).map(function(s){ return s.textContent; }).slice(0, 2), "
                                   "redo: document.getElementById('redo').disabled, dup: !document.getElementById('dup-design').hidden, mine: document.getElementById('designs-btn').textContent, "
                                   "asked: !!Designer.ask})"))
-            case("v26 browser: the carousel's designer has no assistant button, no note, no x on a label and no sets; its labels and buttons read as before",
-                 car == {"ask": False, "box": False, "x": 0, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": False}, car)
+            case("v26 browser: the carousel's designer has no sets; its labels and buttons read as before (its ask box, note and the x on every label are v27's)",
+                 car == {"ask": True, "box": True, "x": True, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": True}, car)
             c0 = json.loads(c.js("JSON.stringify(Designer.st)"))
             c.click("#g-bg .sw[data-c='#111111']")
             c1 = json.loads(c.js("JSON.stringify(Designer.st)"))
