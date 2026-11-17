@@ -29,7 +29,13 @@ What it holds:
                 another mix says Mix 2, Undo and Redo, Another part of this song, a change in step 2 refreshes the
                 preview, Make this one in CapCut sends the watched mix and start; the direct box and its line's
                 four shapes; on B-roll: the words block drawn from the box, dragged to a new place and sized by
-                the dot (saved as x, y, size), the bar "N clips · B-roll", Save my video's line
+                the dot (saved as x, y, size), the bar "N clips · B-roll"; Save my video pressed on the page: her
+                saving line, then her Saved line with the file's name and Open the folder
+  Save my video POST /reel-video (A15): a job the page follows, the finished MP4 in <shoot>/Reels as
+                "<short> B-roll - <reel name>.mp4" (1080 x 1920, with sound, as long as the job says), a second save
+                " 2", the made entry with the video's name (Lane D's contract), reels_for_kit and reel_page.py show
+                saying so, Open the folder; no clips, bad words, an unknown field, a stale list and a reel of another
+                kind refused in plain words; on a PC the named gap and nothing started
 
 Nothing here touches the real ~/.studio, a real kit, CapCut, the real Trash or a visible window. Every line
 says PASS, FAIL or SKIP; exit 1 only when something FAILED.
@@ -66,6 +72,12 @@ def rp():
     sys.path.insert(0, str(SCRIPTS))
     import reel_page
     return reel_page
+
+
+def V():
+    sys.path.insert(0, str(REEL))
+    import video
+    return video
 
 
 def her_page():
@@ -479,6 +491,68 @@ def check_broll(s):
     r = subprocess.run([sys.executable, str(HERE / "capcut_even.py")], capture_output=True, text=True, timeout=300)
     case("tests/capcut_even.py: today's eight kept projects are byte for byte the same, and the short clip's", r.returncode == 0 and "the same (8 projects)" in r.stdout, r.stdout[-200:])
 
+    # Save my video (her v27, section 4; A15): the finished MP4 with the song and the words, in the shoot's Reels folder
+    short = R.short_name(KIT)
+    good2 = {"text": "Golden hour at the barn", "font": "georgia", "style": "whitebox", "pos": "custom", "x": 0.5, "y": 0.6, "size": 1.0, "hold": "all"}
+    st = s.state()
+    vbody = {"kit": KIT, "stamp": st["stamp"], "song": sid, "clips": ids, "variation": 0, "onscreen": good2}
+    code, j, _ = s.http("POST", "/reel-video", vbody)
+    job = wait_job(s, (j or {}).get("job", {}).get("id")) if code == 200 and (j or {}).get("job") else None
+    name = "%s B-roll - Broll one.mp4" % short
+    vfile = s.kit / "Reels" / name
+    case("POST /reel-video starts a job the page follows (kind video), and it finishes: Saved \"<short> B-roll - <reel name>.mp4\" (several reels), its length",
+         code == 200 and j["ok"] and j["job"]["kind"] == "video" and job and job["state"] == "done" and job.get("kind") == "video" and job.get("video") == name
+         and isinstance(job.get("seconds"), (int, float)) and job["seconds"] > 5, (code, j, job))
+    case("no path in the job's answer", no_path(job or {}), job)
+    f = V().facts(vfile) if vfile.is_file() else {}
+    case("the file is in <shoot>/Reels: 1080 x 1920, 30 a second, with sound, as long as the job says",
+         vfile.is_file() and (f.get("w"), f.get("h")) == (1080, 1920) and f.get("has_audio") and abs(f.get("length", 0) - (job or {}).get("seconds", -1)) < 0.001, f)
+    case("...and nothing else in the Reels folder (no half-made file, no plan file)", sorted(p.name for p in (s.kit / "Reels").iterdir()) == [name], sorted(p.name for p in (s.kit / "Reels").iterdir()))
+    rec = record(s)
+    vm = [m for m in rec.get("made") or [] if m.get("video")]
+    case("the made entry: video (the file name), footage broll, the clips, no picks, the reel's version, the song and its start, the mix (Lane D's contract)",
+         vm and vm[-1]["video"] == name and vm[-1]["footage"] == "broll" and vm[-1]["clips"] == ids and vm[-1]["picks"] == "" and vm[-1]["version"] == st["current"]
+         and vm[-1]["song_id"] == sid and isinstance(vm[-1].get("song_start"), (int, float)) and vm[-1]["variation"] == 0 and no_path(vm[-1]), vm[-1:])
+    ks = {v["id"]: v for v in R.reels_for_kit(s.kit)}
+    case("reels_for_kit: this reel is made, with its video's file name (the post kit and the queue show a saved video as made)",
+         ks.get(st["current"], {}).get("made") and ks[st["current"]].get("video") == name and ks[st["current"]].get("kind") == "broll", ks.get(st["current"]))
+    case("GET /reel-state says it is made too", s.state()["made"].get(st["current"]) is True, s.state()["made"])
+    rc, out = s.cmd("reel_page.py", "show", KIT)
+    case("reel_page.py show: Videos saved from the page, the newest by name", rc == 0 and 'Videos saved from the page (Save my video, in this shoot\'s Reels folder): 1, the newest "%s"' % name in out, out[-400:])
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))
+    job2 = wait_job(s, (j or {}).get("job", {}).get("id")) if code == 200 and (j or {}).get("job") else None
+    name2 = "%s B-roll - Broll one 2.mp4" % short
+    case("a second save never writes over the first: \"... 2.mp4\", both files there", job2 and job2.get("video") == name2 and (s.kit / "Reels" / name2).is_file() and vfile.is_file()
+         and len([m for m in record(s).get("made") or [] if m.get("video")]) == 2, job2)
+    code, j, _ = s.http("POST", "/reel-open", {"kit": KIT, "what": "reels"})
+    case("Open the folder (POST /reel-open what reels): opens the shoot's Reels folder and says so (nothing opened in a test)",
+         code == 200 and j["ok"] and j["words"].startswith(R.OUR_WORDS["reels_open"].rstrip(".")), (code, j))
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"], clips=[]))
+    case("no clips: her line, no job", code == 400 and j["words"] == R.VIDEO_WORDS["no_clips"], (code, j))
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"], onscreen=dict(good2, x="0.5")))
+    case("words on screen that fail the check (x as text): refused, no job", code == 400 and j["ok"] is False, (code, j))
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"], colour="red"))
+    case("a field it doesn't know: refused", code == 400, (code, j))
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp="old"))
+    case("a stale list (stamp): refused with our photos-changed line", code == 409 and j.get("why") == "photos", (code, j))
+    case("(the Reels folder still holds the two videos only)", sorted(p.name for p in (s.kit / "Reels").iterdir()) == sorted([name, name2]))
+    s.cmd("reel_page.py", "reels", KIT, "--open", "Reel 1")
+    s.http("POST", "/reel-save", rpc.save_body(s.state(), {"kind": "photos", "picks": rpc.pk(PICKS), "mine": True, "song": sid, "vibe": "beat", "footage": False}, page="broll9"))
+    code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))
+    case("a reel of another kind (Just photos) can't be saved as a video: our line, no job", code == 400 and j["words"] == R.OUR_WORDS["video_broll_only"], (code, j))
+    s.cmd("reel_page.py", "reels", KIT, "--open", "Broll one")
+    # a PC: the named gap, nothing started
+    s.stop()
+    s.start(ASSISTANT_NO_AVFOUNDATION="1")
+    try:
+        code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))
+        case("on a PC (ASSISTANT_NO_AVFOUNDATION=1): this_computer.NO_VIDEO_PC, no job started, nothing made",
+             code == 200 and j["ok"] is False and j.get("pc") is True and j["words"] == rp().this_computer.NO_VIDEO_PC and (s.state()["job"] or {}).get("id") == (job2 or {}).get("id")
+             and sorted(p.name for p in (s.kit / "Reels").iterdir()) == sorted([name, name2]), (code, j))
+    finally:
+        s.stop()
+        s.start()
+
 
 # ---------- 6. the page ----------
 
@@ -645,9 +719,21 @@ def check_broll_page(c, s):
     c.drag("#pvText", (10, 10), steps=6)
     ok = chrome_drive.wait_until(lambda: s.state()["saved"]["onscreen"].get("x") == R.OS_X[0] and s.state()["saved"]["onscreen"].get("y") == R.OS_Y[0], 8)
     case("dragged off the top left corner: held at her bounds (0.12, 0.05)", ok, s.state()["saved"]["onscreen"])
+    # Save my video (her v27, A15): the press, her saving line with the spinner, then her Saved line with Open the folder
+    n_before = len(list((s.kit / "Reels").iterdir())) if (s.kit / "Reels").is_dir() else 0
     c.click("#pvSaveVid")
-    case("Save my video (not built yet, the next stage's): our line, nothing made", wait(c, "document.getElementById('pvSaved').textContent === %s" % json.dumps(R.OUR_WORDS["save_video_soon"]), 4)
-         and not (s.kit / "Reels").exists(), c.js("document.getElementById('pvSaved').textContent"))
+    ok = wait(c, "document.getElementById('pvSaved').textContent.trim() === %s && document.getElementById('pvSaveVid').disabled" % json.dumps(W["os_saving"]), 6)
+    case("Save my video pressed: her saving line, the button off while it is saved", ok, c.js("document.getElementById('pvSaved').textContent"))
+    ok = wait(c, "document.getElementById('openReels') !== null && !document.getElementById('pvSaveVid').disabled", 120)
+    saved_line = c.js("document.getElementById('pvSaved').textContent")
+    vm = [m for m in record(s).get("made") or [] if m.get("video")]
+    case("...then her Saved line: the file's name, its length, in this shoot's Reels folder, with Open the folder; the file is there and the record notes it",
+         ok and vm and re.search(r'^Saved "%s B-roll - Broll one 3\.mp4" \(\d+\.\d seconds\) in this shoot\'s Reels folder\. It\'s ready to post\. Open the folder$' % re.escape(R.short_name(KIT)), saved_line.strip())
+         and (s.kit / "Reels" / vm[-1]["video"]).is_file() and len(list((s.kit / "Reels").iterdir())) == n_before + 1, (saved_line, vm[-1:]))
+    c.click("#openReels")
+    case("Open the folder: the Reels folder opened (nothing opened in a test) and our line said beside it",
+         wait(c, "document.getElementById('reelsWent').textContent.indexOf(%s) === 0" % json.dumps(R.OUR_WORDS["reels_open"].rstrip(".")), 6), c.js("document.getElementById('reelsWent').textContent"))
+    case("the queue's bar shows under Your reels: the reel counts as made", c.js("!document.getElementById('toqBar') || !document.getElementById('toqBar').hidden"))
     # no clips chosen: her line on the phone and under Save my video, Make my reel off
     c.js("Array.from(document.querySelectorAll('#clist .ci .cin')).forEach(function(b){ b.click(); })")
     ok = wait(c, "document.getElementById('makeBtn').disabled && document.getElementById('pvEmpty').textContent === %s" % json.dumps(W["os_clips_first"]), 10)

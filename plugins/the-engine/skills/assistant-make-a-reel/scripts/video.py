@@ -8,6 +8,9 @@ installed: its facts, stills at given times, a small copy to play on the page, a
                                                             new folder made inside <folder>
     python3 video.py copy <video> <out.mp4>                 the small copy for playing (made once)
     python3 video.py loudness <video>                       loudness every half second, and the loud moments
+    python3 video.py render <plan.json> <out.mp4>           a finished B-roll video (Nicole's v27, Save my video): the
+                                                            plan's clips cut and joined at 1080 x 1920, the song with a
+                                                            fade, the words drawn over the whole reel
 
 Nicole's footage.py and server.py did this with ffprobe, ffmpeg and Pillow (handoff v19). The Assistant installs
 nothing, so:
@@ -25,6 +28,22 @@ nothing, so:
     The copy is hers in size: 540 on its short side (never enlarged), H.264 8-bit 4:2:0 with AAC sound, made by
     AVFoundation's own export session (its 960x540 preset's rate, not her 1.3 Mbit/s: an export session can't be
     given a rate, and the reader-to-writer loop that could held every frame in memory: v19 review, Nov 7).
+  * The finished B-roll video (render_broll; Nicole's v27, "Save my video", built Nov 17): her broll_video.py did
+    it with ffmpeg and Pillow (scale and crop each clip to 1080 x 1920 at 30 a second, concat, the words drawn
+    once as a PNG and overlaid, the song with afade, h264_videotoolbox). Ours is AVFoundation's exact twin with
+    nothing installed: one composition (each clip's stretch inserted in order, a layer instruction a stretch
+    that scales it to fill the tall screen, the phone's turn applied; a clip that is the whole of a short video
+    is stretched a hair to fill its beat, as A20 does in CapCut), the song as its own track from where the plan
+    starts it with a half-second fade at the end (the clips' own sound is left out when there is a song, kept
+    when there is none), and the words drawn ONCE by the Mac's own text engine (CoreText) into a picture laid
+    over the whole reel through AVVideoCompositionCoreAnimationTool. Why a picture and not a CATextLayer: a
+    CATextLayer draws nothing when the program is osascript (tried Nov 17: the layer tree rendered, its text did
+    not), while a layer whose contents are a picture renders every time. The page and the video agree on the
+    words: the same font faces (Avenir Next Bold, Helvetica Bold, Georgia Bold, on every Mac), 66 px times her
+    size on a 1080 px reel, wrapped word by word at her width rule (min(80%, 2 min(x, 1 - x) - 4%) of the screen,
+    as the page wraps), a line 1.25 high, and the box styles as one box a line (her screenshot 18), padded .3 em
+    at the sides and .05 em above and below like the page's span. The export is AVFoundation's own HighestQuality
+    session (H.264 through the Mac's own encoder, AAC, the header at the front so it posts as it is).
   * Loudness (loudness): her measure (footage.py's loudness, an RMS level in dB every half second of the sound
     at 8,000 a second), on the sound sound.decode hears (afconvert on a Mac, Media Foundation on a PC), or, on
     a Mac when that can't, AVFoundation's reader. Her loud_moments picks the stretches that jump out of the
@@ -106,6 +125,15 @@ NEAR_FULL = 0.9                            # ours: a last half second this full 
 MOOV_MOST = 256 * 1024 * 1024              # a movie header bigger than this is not a video anyone shot
 PC_ADDON = None                            # decision 11: no add-on is asked for on a PC (nothing is installed)
 NO_AV = "ASSISTANT_NO_AVFOUNDATION"        # tests: a Mac answers the way a PC does
+REEL_W, REEL_H, REEL_FPS = 1080, 1920, 30   # hers: the finished B-roll video's size and rate
+REEL_PRESET = "AVAssetExportPresetHighestQuality"   # hers asked VideoToolbox for h264 at 12 Mbit/s; this is the Mac's own best
+WORDS_PX = 66                              # hers: the words are 66 px times her size on a 1080 px reel (the page's 6.1cqw)
+WORDS_LINE = 1.25                          # hers: a line is 1.25 times the size (the page's line-height)
+WORDS_FONTS = {"avenir": "AvenirNext-Bold", "helvetica": "Helvetica-Bold", "georgia": "Georgia-Bold"}   # hers, by face
+WORDS_STYLES = {"white": ((1, 1, 1), None), "black": ((0.08, 0.08, 0.08), None),            # text, box (none)
+                "whitebox": ((1, 1, 1), (0, 0, 0)), "blackbox": ((0.08, 0.08, 0.08), (1, 1, 1))}
+SONG_FADE = 0.5                            # hers: the song fades out over the last half second
+RENDER_LIMIT = 900                         # seconds a render may take (hers: ffmpeg's 900 s timeout)
 TURN_WAIT = 900                            # seconds a video program waits for its turn before saying it's busy
 BUSY = "another video is being got ready on this computer right now"
 _RUN = os.urandom(3).hex()                 # this process's own mark on its half-made copies (exec keeps the pid)
@@ -571,7 +599,7 @@ def fresh_folder(parent, name):
 
 VIDEO_JS = r"""
 ObjC.import('AVFoundation'); ObjC.import('CoreMedia'); ObjC.import('CoreGraphics'); ObjC.import('ImageIO');
-ObjC.import('Foundation'); ObjC.import('unistd');
+ObjC.import('Foundation'); ObjC.import('unistd'); ObjC.import('QuartzCore'); ObjC.import('CoreText'); ObjC.import('AppKit');
 // The Assistant's video helper (video.py). Every command only READS the video, and never writes over a file.
 function C(n) { return $.NSClassFromString(n); }
 function spin(flag, ms) { var t0 = Date.now(); while (!flag() && Date.now() - t0 < ms) $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.02)); }
@@ -676,6 +704,128 @@ function pcm(p, out, rate) {
   return {has_audio: true, rate: rate, bytes: Number(all.length)};
 }
 
+// render <plan.json> <out>: the finished B-roll video (Nicole's v27, Save my video). The plan: {clips: [{path, src,
+// dur}...] in play order, song: a path or null, song_from: seconds, words: {text, font, style, x, y, size} or null,
+// w, h, fps}. Every clip's stretch is cut, scaled to fill the tall screen (the phone's turn applied) and joined;
+// the song comes in from song_from for the reel's length and fades over its last half second; the words are drawn
+// once (CoreText, the Mac's own text engine) into a picture laid over the whole reel. Written to `out`, which must
+// not be there (video.py gives it its real name after, never over a file).
+function render(planPath, out) {
+  if (there(out)) return {error: 'already there'};
+  var plan = JSON.parse($.NSString.stringWithContentsOfFileEncodingError($(planPath), 4, null).js);
+  var W = plan.w || 1080, H = plan.h || 1920, FPS = plan.fps || 30, t0 = Date.now(), e = Ref();
+  var clips = plan.clips || [];
+  if (!clips.length) return {error: 'no clips'};
+  var comp = C('AVMutableComposition').composition;
+  var cv = comp.addMutableTrackWithMediaTypePreferredTrackID('vide', 0);
+  var ca = plan.song ? null : comp.addMutableTrackWithMediaTypePreferredTrackID('soun', 0);   // the clips' own sound only with no song
+  var at = $.kCMTimeZero, instrs = [], stretched = 0;
+  for (var i = 0; i < clips.length; i++) {
+    if (orphaned()) return {error: 'stopped: the program that asked for it is gone'};
+    var c = clips[i], a = asset(c.path), v = track(a, 'vide');
+    if (!v) return {error: 'no picture in clip ' + (i + 1)};
+    var want = $.CMTimeMakeWithSeconds(c.dur, 600), src = $.CMTimeMakeWithSeconds(c.src || 0, 600);
+    var left = $.CMTimeSubtract(v.timeRange.duration, src);
+    if (secs(left) <= 0.05) return {error: 'clip ' + (i + 1) + ' starts past the end of its video'};
+    var have = secs(left) < c.dur ? left : want;          // the whole of a short video: what there is, stretched to its beat (A20)
+    var range = $.CMTimeRangeMake(src, have);
+    if (!cv.insertTimeRangeOfTrackAtTimeError(range, v, at, e)) return {error: 'clip ' + (i + 1) + ' could not be cut: ' + why(e)};
+    var s = ca ? track(a, 'soun') : null;
+    if (ca) { if (s) ca.insertTimeRangeOfTrackAtTimeError(range, s, at, e); else ca.insertEmptyTimeRange($.CMTimeRangeMake(at, have)); }
+    if (secs(have) < c.dur) {
+      cv.scaleTimeRangeToDuration($.CMTimeRangeMake(at, have), want);
+      if (ca) ca.scaleTimeRangeToDuration($.CMTimeRangeMake(at, have), want);
+      stretched++;
+    }
+    var n = v.naturalSize, T = v.preferredTransform;
+    var box = $.CGRectApplyAffineTransform($.CGRectMake(0, 0, n.width, n.height), T);
+    var sw = Math.abs(box.size.width), sh = Math.abs(box.size.height);
+    if (!(sw > 0 && sh > 0)) return {error: 'no picture size in clip ' + (i + 1)};
+    var k = Math.max(W / sw, H / sh), dw = sw * k, dh = sh * k;        // fill the tall screen, the middle kept (her crop)
+    var M = $.CGAffineTransformConcat($.CGAffineTransformConcat(T, $.CGAffineTransformMakeTranslation(-box.origin.x, -box.origin.y)),
+            $.CGAffineTransformConcat($.CGAffineTransformMakeScale(k, k), $.CGAffineTransformMakeTranslation((W - dw) / 2, (H - dh) / 2)));
+    var li = C('AVMutableVideoCompositionLayerInstruction').videoCompositionLayerInstructionWithAssetTrack(cv);
+    li.setTransformAtTime(M, at);
+    var ins = C('AVMutableVideoCompositionInstruction').videoCompositionInstruction;
+    ins.timeRange = $.CMTimeRangeMake(at, want);
+    ins.layerInstructions = $.NSArray.arrayWithObject(li);
+    instrs.push(ins);
+    at = $.CMTimeAdd(at, want);
+  }
+  var total = secs(at), mix = null;
+  if (plan.song) {
+    var sa = asset(plan.song), st = track(sa, 'soun');
+    if (!st) return {error: 'no sound in the song'};
+    var cs = comp.addMutableTrackWithMediaTypePreferredTrackID('soun', 0);
+    var from = $.CMTimeMakeWithSeconds(plan.song_from || 0, 600), songLeft = $.CMTimeSubtract(st.timeRange.duration, from);
+    if (secs(songLeft) <= 0) return {error: 'the song starts past its end'};
+    var songLen = secs(songLeft) < total ? songLeft : at;
+    if (!cs.insertTimeRangeOfTrackAtTimeError($.CMTimeRangeMake(from, songLen), st, $.kCMTimeZero, e)) return {error: 'the song could not be added: ' + why(e)};
+    var p = C('AVMutableAudioMixInputParameters').audioMixInputParametersWithTrack(cs);
+    var plays = secs(songLen), fade = Math.min(plan.fade || 0.5, plays);   // the fade ends where the song does (a song shorter than the reel ends early)
+    p.setVolumeRampFromStartVolumeToEndVolumeTimeRange(1.0, 0.0, $.CMTimeRangeMake($.CMTimeMakeWithSeconds(plays - fade, 600), $.CMTimeMakeWithSeconds(fade, 600)));
+    mix = C('AVMutableAudioMix').audioMix; mix.inputParameters = $.NSArray.arrayWithObject(p);
+  }
+  var vc = C('AVMutableVideoComposition').videoComposition;
+  vc.renderSize = $.CGSizeMake(W, H); vc.frameDuration = $.CMTimeMake(1, FPS);
+  var arr = $.NSMutableArray.array; instrs.forEach(function (x) { arr.addObject(x); }); vc.instructions = arr;
+  var lines = [];
+  var wd = plan.words;
+  if (wd && wd.text) {
+    var nsf = $.NSFont.fontWithNameSize(wd.fontName || 'AvenirNext-Bold', Math.round(wd.px || 66));
+    if (!nsf || nsf.isNil()) return {error: 'this Mac has no font ' + (wd.fontName || '')};
+    var size = Number(nsf.pointSize), asc = Number(nsf.ascender), desc = -Number(nsf.descender);
+    function measure(text) {
+      var m = $.CFAttributedStringCreateMutable(null, 0);
+      $.CFAttributedStringReplaceString(m, $.CFRangeMake(0, 0), $(text));
+      $.CFAttributedStringSetAttribute(m, $.CFRangeMake(0, text.length), $('NSFont'), nsf);
+      var a1 = Ref(), d1 = Ref(), l1 = Ref();
+      return {w: $.CTLineGetTypographicBounds($.CTLineCreateWithAttributedString(m), a1, d1, l1), att: m};
+    }
+    var wrap = W * wd.wrap, words = String(wd.text).split(/\s+/).filter(function (x) { return x; }), line = '';
+    words.forEach(function (w) {                             // word by word, as the page wraps (greedy)
+      var t = (line + ' ' + w).trim();
+      if (!line || measure(t).w <= wrap) line = t; else { lines.push(line); line = w; }
+    });
+    if (line) lines.push(line);
+    var cs2 = $.CGColorSpaceCreateWithName($('kCGColorSpaceSRGB'));
+    var ctx = $.CGBitmapContextCreate(null, W, H, 8, W * 4, cs2, 2 | 8192);
+    if (!ctx || (ctx.isNil && ctx.isNil())) return {error: 'could not draw the words'};
+    var lh = size * (wd.line || 1.25), padX = size * 0.3, padY = size * 0.05, content = asc + desc;
+    var cx = W * wd.x, top = H * wd.y - lines.length * lh / 2;      // the block's middle at (x, y), as the page puts it
+    var fg = wd.color || [1, 1, 1], bg = wd.box || null;
+    $.CGContextSetTextMatrix(ctx, $.CGAffineTransformIdentity);
+    lines.forEach(function (ln, i) {
+      var m = measure(ln), y = top + i * lh, inner = y + (lh - content) / 2;   // the line's content area, centred in its line box
+      if (bg) {
+        $.CGContextSetRGBFillColor(ctx, bg[0], bg[1], bg[2], 1);
+        $.CGContextFillRect(ctx, $.CGRectMake(cx - m.w / 2 - padX, H - (inner + content + padY), m.w + 2 * padX, content + 2 * padY));
+      }
+      $.CFAttributedStringSetAttribute(m.att, $.CFRangeMake(0, ln.length), $('NSColor'), $.NSColor.colorWithSRGBRedGreenBlueAlpha(fg[0], fg[1], fg[2], 1));
+      $.CGContextSetTextPosition(ctx, cx - m.w / 2, H - (inner + asc));
+      $.CTLineDraw($.CTLineCreateWithAttributedString(m.att), ctx);
+    });
+    var img = $.CGBitmapContextCreateImage(ctx);
+    var parent = C('CALayer').layer, videoLayer = C('CALayer').layer, over = C('CALayer').layer;
+    parent.frame = $.CGRectMake(0, 0, W, H); videoLayer.frame = $.CGRectMake(0, 0, W, H); over.frame = $.CGRectMake(0, 0, W, H);
+    over.contents = $.NSImage.alloc.initWithCGImageSize(img, $.NSMakeSize(W, H)); over.contentsGravity = $('resize');
+    parent.addSublayer(videoLayer); parent.addSublayer(over);
+    vc.animationTool = C('AVVideoCompositionCoreAnimationTool').videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayerInLayer(videoLayer, parent);
+  }
+  var ex = C('AVAssetExportSession').alloc.initWithAssetPresetName(comp, plan.preset || 'AVAssetExportPresetHighestQuality');
+  if (!ex || ex.isNil()) return {error: 'this Mac has no ' + (plan.preset || 'AVAssetExportPresetHighestQuality')};
+  ex.outputURL = $.NSURL.fileURLWithPath(out); ex.outputFileType = 'public.mpeg-4';
+  ex.videoComposition = vc; if (mix) ex.audioMix = mix;
+  ex.shouldOptimizeForNetworkUse = true;                 // the header at the front: it posts as it is (her +faststart)
+  var done = false; ex.exportAsynchronouslyWithCompletionHandler(function () { done = true; });
+  while (!done) {
+    if (orphaned()) { ex.cancelExport; spin(function () { return done; }, 10000); return {error: 'stopped: the program that asked for it is gone'}; }
+    $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.05));
+  }
+  if (Number(ex.status) !== 3) return {error: 'the video could not be made' + (ex.error.isNil() ? '' : ': ' + ex.error.localizedDescription.js)};
+  return {length: Math.round(total * 1000) / 1000, clips: clips.length, lines: lines, stretched: stretched, took: (Date.now() - t0) / 1000};
+}
+
 function run(argv) {
   try {
     var c = argv[0], r;
@@ -683,6 +833,7 @@ function run(argv) {
     if (c === 'stills') r = stills(argv[1], argv[2], parseInt(argv[3]), parseFloat(argv[4]), parseInt(argv[5]), argv[6]);
     else if (c === 'copy') r = copy(argv[1], argv[2], parseInt(argv[3]), argv[4]);
     else if (c === 'pcm') r = pcm(argv[1], argv[2], parseInt(argv[3]));
+    else if (c === 'render') r = render(argv[1], argv[2]);
     else r = {error: 'no such command'};
     return JSON.stringify(r);
   } catch (e) { return JSON.stringify({error: String((e && e.message) || e)}); }
@@ -945,6 +1096,90 @@ def _remove_ours(path):
         pass
 
 
+# ---------------------------------------------------------------- the finished B-roll video (Nicole's v27, Save my video)
+
+def words_plan(words):
+    """Her onscreen record ({text, font, style, x, y, size}) as the render draws it: the face by name, the size in
+    pixels, her wrap width for where the words sit, the colours of the style; None when there are no words."""
+    if not isinstance(words, dict):
+        return None
+    text = " ".join(str(words.get("text") or "").split())
+    if not text:
+        return None
+    x = min(0.88, max(0.12, float(words.get("x") or 0.5)))
+    y = min(0.95, max(0.05, float(words.get("y") or 0.24)))
+    size = min(2.6, max(0.5, float(words.get("size") or 1)))
+    color, box = WORDS_STYLES.get(words.get("style"), WORDS_STYLES["white"])
+    return {"text": text, "fontName": WORDS_FONTS.get(words.get("font"), WORDS_FONTS["avenir"]), "px": WORDS_PX * size,
+            "x": x, "y": y, "wrap": max(0.3, min(0.8, 2 * min(x, 1 - x) - 0.04)),       # her rule, the page's too
+            "line": WORDS_LINE, "color": list(color), "box": list(box) if box else None}
+
+
+def render_broll(clips, out, song=None, song_from=0.0, words=None, timeout=None, wait=TURN_WAIT, work=None):
+    """The finished B-roll video (hers: broll_video.render): `clips` in play order, each {path, src, dur}; the
+    song (a path) from song_from with a half-second fade; the words (her onscreen record) over the whole reel.
+    Written at `out` (an .mp4), which must not be there: it is made under a hidden ".<name>.part-<number>.mp4"
+    beside it and only then given its real name, never over a file (the caller chooses a free name first; if
+    that name appeared meanwhile, "placed" is False and the part file is taken away). The plan goes to the
+    Mac's video program as a small JSON file in `work` (or beside the video). Made in its turn (turn()), held to
+    `timeout` seconds (RENDER_LIMIT, or three seconds a second of reel at least).
+    Answer: {"ok": True, "seconds", "w", "h", "clips", "lines", "took", "placed"} or
+    {"ok": False, "state": "pc" | "busy" | "exists" | "failed", "words": plain words}."""
+    out = Path(out)
+    if out.exists():
+        return {"ok": False, "state": "exists", "words": "A video with that name is already there."}
+    clips = [{"path": str(c["path"]), "src": round(float(c.get("src") or 0), 3), "dur": round(float(c["dur"]), 3)} for c in clips]
+    if not clips or any(c["dur"] <= 0 for c in clips):
+        return {"ok": False, "state": "failed", "words": "There are no clips in this reel yet."}
+    if not avfoundation_here():
+        return {"ok": False, "state": "pc", "words": this_computer.NO_VIDEO_PC}
+    total = sum(c["dur"] for c in clips)
+    plan = {"w": REEL_W, "h": REEL_H, "fps": REEL_FPS, "preset": REEL_PRESET, "fade": SONG_FADE, "clips": clips,
+            "song": str(song) if song else None, "song_from": round(float(song_from or 0), 3), "words": words_plan(words)}
+    if timeout is None:
+        timeout = max(RENDER_LIMIT, total * 3)
+    with turn(wait) as ok:
+        if not ok:
+            return {"ok": False, "state": "busy", "words": BUSY}
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if holding_turn():
+            for left in _left_parts(out):
+                _remove_ours(left)
+        part = copy_name(out)
+        plan_file = Path(work or out.parent) / (part.name + ".json")
+        try:
+            plan_file.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            fds = (_HELD.f.fileno(),) if getattr(_HELD, "f", None) is not None else ()
+            r = _av_now(["render", str(plan_file), str(part)], timeout, fds)
+        finally:
+            try:
+                plan_file.unlink()
+            except OSError:
+                pass
+        if "error" in r or not part.is_file() or part.stat().st_size < 1000:
+            _remove_ours(part)
+            return {"ok": False, "state": "failed", "detail": r.get("error", ""),
+                    "words": "I couldn't save the video. Make this one in CapCut still works, and your words go with it."}
+        try:
+            f = facts(part)
+        except NotAVideo as e:
+            _remove_ours(part)
+            return {"ok": False, "state": "failed", "detail": str(e), "words": "I couldn't save the video. Make this one in CapCut still works, and your words go with it."}
+        if abs(f["length"] - total) > 1.0 / REEL_FPS + 0.01 or (f["w"], f["h"]) != (REEL_W, REEL_H):
+            _remove_ours(part)
+            return {"ok": False, "state": "failed", "detail": "length %s for %s, %sx%s" % (f["length"], total, f["w"], f["h"]),
+                    "words": "I couldn't save the video. Make this one in CapCut still works, and your words go with it."}
+        try:
+            placed = this_computer.rename_new(str(part), str(out))
+        except OSError as e:
+            _remove_ours(part)
+            return {"ok": False, "state": "failed", "detail": str(e), "words": "I couldn't save the video. Make this one in CapCut still works, and your words go with it."}
+        if not placed:
+            _remove_ours(part)
+        return {"ok": True, "placed": bool(placed), "seconds": round(f["length"], 3), "w": f["w"], "h": f["h"],
+                "clips": r.get("clips"), "lines": r.get("lines") or [], "stretched": r.get("stretched", 0), "took": r.get("took")}
+
+
 # ---------------------------------------------------------------- how loud, every half second (hers)
 
 def levels(samples, rate=LOUD_RATE, step=LOUD_STEP):
@@ -1031,7 +1266,7 @@ def loud_moments(db, step=LOUD_STEP, k=10):
 def main():
     this_computer.utf8_output()
     a = sys.argv[1:]
-    if not a or a[0] not in ("facts", "stills", "copy", "loudness"):
+    if not a or a[0] not in ("facts", "stills", "copy", "loudness", "render"):
         print(__doc__)
         return 2
     if a[0] == "facts":
@@ -1056,6 +1291,15 @@ def main():
         db, how = loudness(a[1])
         print(json.dumps({"levels": db, "how": how, "loud": loud_moments(db or [])}, ensure_ascii=False))
         return 0 if db is not None else 1
+    if a[0] == "render" and len(a) == 3:
+        try:
+            plan = json.loads(Path(a[1]).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(json.dumps({"ok": False, "state": "failed", "words": "The plan could not be read: %s" % e}))
+            return 1
+        r = render_broll(plan.get("clips") or [], a[2], plan.get("song"), plan.get("song_from") or 0, plan.get("words"))
+        print(json.dumps(r, ensure_ascii=False))
+        return 0 if r.get("ok") else 1
     print(__doc__)
     return 2
 

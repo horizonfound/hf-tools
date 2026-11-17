@@ -48,7 +48,7 @@ Routes, all on the posting server (posting_queue.py hands them here):
   POST /reel-save                {kit, stamp, base, page, saved: {...}}: the page's choices, checked field by field
   GET  /reel-font?f=<name>       one of the plugin's own font files (FACES)
   GET  /reel-songs?kit=<folder>  step 3: the songs in the shoot's Music and Photos folders, {id, name, where, kind}
-  POST /reel-open                {kit, what: "music" | "footage" | "photos"}: makes <kit>/Music (or Footage) if it isn't
+  POST /reel-open                {kit, what: "music" | "footage" | "photos" | "reels"}: makes <kit>/Music (or Footage) if it isn't
                                  there and opens it (finder.py); "photos" (her v27 + Add photos) opens the shoot's Photos
                                  folder as it is. New photos there are numbered on the page's own poll (relist_if_changed)
   GET  /reel-song?kit=&id=       her v27 Listen: the song to play, by id (a recording's sound, made once), in pieces
@@ -64,6 +64,13 @@ Routes, all on the posting server (posting_queue.py hands them here):
                                  taken from a recording, go to the computer's own Trash (this_computer.trash_many;
                                  the Recycle Bin on a PC), never a delete; the open reel's pick is cleared. Only a
                                  song in the shoot's own Music folder can go (remove_song)
+  POST /reel-preview             the watch step (her v27): a dry run's pieces, nothing made (preview_from_page)
+  POST /reel-video               {kit, stamp, song, clips, variation, song_start, onscreen, reel}: her v27 Save my video
+                                 (B-roll only): a job, followed on /reel-job, that renders the finished MP4 with the
+                                 song and the words through video.render_broll into <shoot>/Reels under a free name,
+                                 never over a file ("<short> B-roll.mp4", " - <reel name>" with several reels, " 2"
+                                 and on); the made entry carries the file's name (save_video_from_page, _make_video).
+                                 /reel-open what "reels" is her Open the folder. A PC answers this_computer.NO_VIDEO_PC
 Small copies of the photos are arrange.py's (/kit-photo, .kit/previews), the same the pickers use.
 
 Records:
@@ -262,6 +269,12 @@ MAX_CLIPS = 12                         # hers: a style uses at most 12 clips (Mo
 PREVIEW_LIMIT = 30                     # ours: a dry run for the preview is held to this many seconds, then her "couldn't" line
 PREVIEW_WORK = "reel-preview"          # ours: <kit>/.kit/reel-preview, the preview's own working folder, never Make my reel's
 PREVIEW_AFTER_MS = 700                 # hers: every change on the page refreshes the preview after 700 ms
+VIDEO_WORK = "reel-video"              # hers (where="reel-video"): the video job's own working folder, <kit>/.kit/reel-video,
+                                       # never the preview's and never Make my reel's
+VIDEO_LIMIT = 900                      # ours: Save my video may take 15 minutes, then it is stopped and the page says so
+                                       # (hers waited on one request for up to 30)
+REELS = "Reels"                        # hers: <shoot>/Reels, where the finished video goes
+VIDEO_NAME_SPARES = 998                # "<short> B-roll 2" to "... 999": the most a shoot's Reels folder takes before it says so
 PV_UNDO = 40                           # hers: Undo and Redo in the watch step keep 40 steps
 PART_MIN = 8.0                         # hers: Another part of this song moves on by max(8 s, 0.6 of the reel's length)...
 PART_SHARE = 0.6
@@ -294,7 +307,7 @@ FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answer
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
              "/reel-strip", "/reel-moment-still", "/reel-song")
 POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove",
-              "/reel-preview")
+              "/reel-preview", "/reel-video")
 
 # ---------- the words: hers, word for word (reel-maker.html and server.py, handoff v19) ----------
 # Each is shown exactly as written here. "_html" words carry her own <b>; {short}, {n}, {k}, {max} are filled in.
@@ -705,7 +718,18 @@ ONSCREEN_WORDS = {
     "os_size": "Drag to make your words bigger or smaller",
     "os_clips_first": "Choose a clip or two first.",
     "os_save": "Save my video",
+    "os_saving": "Saving your video, with your song and words. This takes about a minute.",
+    "os_saved": "Saved \"{file}\" ({secs} seconds) in this shoot's Reels folder. It's ready to post.",
+    "os_open_folder": "Open the folder",
     "sum_broll": "{n} clip{s} · B-roll",
+}
+
+# Save my video, the server's side (her v27 server.py broll_video and broll_video.py): the video's name in the
+# shoot's Reels folder, and the one refusal. Hers, word for word; compared with her two files by the test.
+VIDEO_WORDS = {
+    "file": "{short} B-roll",                  # "<short> B-roll.mp4"
+    "file_reel": "{short} B-roll - {reel}",    # "... - <reel name>.mp4" when the shoot has several reels
+    "no_clips": "There are no clips in this reel yet.",
 }
 
 # Trim a clip (her v25, section 4: "I can't trim it from a specific end."): each clip card has Trim, which opens a
@@ -874,8 +898,19 @@ OUR_WORDS = {
     "song_part_moved": "Already in the Trash: {names}.",
     # Watch your reel (v27): hers took any number as the part of the song to start at; ours refuses one past its end
     "song_start_past": "That part of the song is past its end. Pick another part.",
-    # Save my video (B-roll, her v27 section 4) is the next stage's; until it is built the button says so (ours)
-    "save_video_soon": "Save my video isn't ready yet. Make this one in CapCut works now, and your words go with it.",
+    # Save my video (B-roll, her v27 section 4): hers makes the video inside one request and the page waits on it;
+    # ours runs it as a job the page follows, so a second press and a job that was stopped can be told apart
+    "video_making": "Your video is already being saved. One moment.",
+    "video_interrupted": "Saving your video stopped before it finished. Nothing was saved. Press Save my video again.",
+    "video_too_long": "Saving your video took too long and was stopped. Nothing was saved. Try again, or press Make this one in CapCut.",
+    # hers answers any reel; only a B-roll reel is clips only, so only it can be saved whole
+    "video_broll_only": "Save my video is for a B-roll reel. For this kind, press Make this one in CapCut.",
+    # a file with the chosen name appeared in the Reels folder while the video was being made (never written over)
+    "video_name_taken": "A file with that name appeared in the Reels folder just now, so the video was saved under the next number.",
+    "video_many": "This shoot's Reels folder already holds {n} B-roll videos. Tidy it, then save again.",
+    # her page opens the Reels folder after a save and says nothing; ours says what happened, as every folder button does
+    "reels_open": "Your Reels folder is open in Finder.",
+    "cant_open_reels": "I couldn't open the Reels folder. It's inside this shoot's post kit folder.",
 }
 
 def _behind():
@@ -1506,7 +1541,7 @@ def newest_project(kit, rec_kit=None):
 
 def reels_for_kit(kit, rows=None, rec_kit=None):
     """Every reel of the shoot, for the post kit and the posting queue (hers: reels_of, v25): [{id, name, made,
-    project, kind, order}] in the order they were started. `kind` (v27): bts, photos, broll, or None. `made`: a reel of it is in CapCut; `project`: the newest
+    project, kind, video, order}] in the order they were started. `kind` (v27): bts, photos, broll, or None. `made`: a reel of it is in CapCut; `project`: the newest
     one's name; `order`: its photos in the order Make my reel would use, as [{n, h}] (at most 40, hers).
     Whose a made reel is: its "made" entry says (made_for; one without a mark is the first reel's, hers). A reel
     made from the chat the older way (kit.json "reel", with no entry in this record) is the first reel's too.
@@ -1520,6 +1555,7 @@ def reels_for_kit(kit, rows=None, rec_kit=None):
     if not isinstance(rec_kit, dict):
         rec_kit = {}
     projects = made_projects(rec, rec_kit)
+    videos = made_videos(rec)
     kinds = kinds_of(rec)
     out = []
     for v in reels.listed(rec, REEL_FIRST):
@@ -1530,6 +1566,8 @@ def reels_for_kit(kit, rows=None, rec_kit=None):
             order = []
         out.append({"id": v["id"], "name": v["name"], "made": bool(project), "project": project,
                     "kind": kinds.get(v["id"]),
+                    # her v27 (Save my video): the newest video saved of this reel, its file name in <shoot>/Reels
+                    "video": videos.get(v["id"]),
                     "order": [{"n": x["n"], "h": x.get("h") or ""} for x in order][:40]})
     return out
 
@@ -2904,14 +2942,15 @@ def job_for_page(kit):
     if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
         return None
     state, problem = j["state"], j.get("problem")
+    video = bool(j.get("video"))             # Save my video's job (her v27): its own words, and the file it made
     if state in ("queued", "running"):
         began = float(j.get("t0") or 0)
-        if began and time.time() - began > MAKE_LIMIT + JOB_GRACE:
+        if began and time.time() - began > (VIDEO_LIMIT if video else MAKE_LIMIT) + JOB_GRACE:
             # past its time, whatever its lock says (v19 review: a hung job held its lock, and the page spun forever)
-            state, problem = "problem", WORDS["too_long"]
+            state, problem = "problem", (OUR_WORDS["video_too_long"] if video else WORDS["too_long"])
         elif not job_running(kit) and (state == "running" or j.get("pid") or time.time() - float(j.get("t") or 0) > JOB_BOOT):
-            state, problem = "problem", OUR_WORDS["interrupted"]
-        if state == "problem":
+            state, problem = "problem", (OUR_WORDS["video_interrupted"] if video else OUR_WORDS["interrupted"])
+        if state == "problem" and not video:
             made = _made_by(kit, j["id"])
             if made:              # CapCut has it: never say nothing was made (rule 7)
                 problem = OUR_WORDS["interrupted_made"].replace("{project}", made)
@@ -2919,6 +2958,11 @@ def job_for_page(kit):
     out = {"id": j["id"], "state": state, "dry": bool(j.get("dry")), "project": j.get("project") if state == "done" else None,
            "words": words if state == "done" else [], "problem": problem if state == "problem" else None,
            "short_song": bool(j.get("short_song")) and state == "problem"}
+    if video:
+        out["kind"] = "video"
+        if state == "done":
+            out["video"] = j.get("video") if isinstance(j.get("video"), str) else None
+            out["seconds"] = j.get("seconds")
     if state == "done" and not j.get("dry") and j.get("capcut_say"):
         out["capcut_say"] = j["capcut_say"]
     return out
@@ -3169,15 +3213,16 @@ def _run_bounded(cmd, timeout, **kw):
     return p.returncode, out, err
 
 
-def _make(kit, ask, jid, t0, preview=False):
+def _make(kit, ask, jid, t0, preview=False, work=None, limit=None):
     """The work of one job. Returns what goes in the job record: {state, words, project, problem, short_song}.
     Everything, from the recording's sound to reel.py, is held to one deadline: t0 + MAKE_LIMIT.
 
     preview (her v27, Watch your reel before you make it): the same run as a dry one, in the preview's own
     working folder (PREVIEW_WORK) and held to PREVIEW_LIMIT, answering the pieces as the page plays them (a
     photo by its number, a clip by its video's key and where it starts) and where the song starts; nothing is
-    written to the record."""
-    deadline = t0 + (PREVIEW_LIMIT if preview else MAKE_LIMIT)
+    written to the record. `work` and `limit`: a preview run in another folder of the kit's hidden one and held
+    to another number of seconds (Save my video's plan, VIDEO_WORK and VIDEO_LIMIT)."""
+    deadline = t0 + (limit if limit else (PREVIEW_LIMIT if preview else MAKE_LIMIT))
     rec_kit = kit_mod.load_rec(kit)
     photos = kit_mod.photos_dir(kit, rec_kit)
     short = short_name(kit.name)
@@ -3222,7 +3267,7 @@ def _make(kit, ask, jid, t0, preview=False):
         return {"state": "problem", "problem": OUR_WORDS["photos_changed"]}
     listing = [{"n": x["n"], "file": str(photos / arrange.photo_name(x)), "w": x.get("w") or 0, "h": x.get("h") or 0,
                 "way": x.get("way") or ""} for x in rows]
-    work = (kit / ".kit" / PREVIEW_WORK) if preview else (reel.kit_workdir(kit) or reel.workdir(rec_kit.get("name") or short, str(photos)))
+    work = (kit / ".kit" / (work or PREVIEW_WORK)) if preview else (reel.kit_workdir(kit) or reel.workdir(rec_kit.get("name") or short, str(photos)))
     work.mkdir(parents=True, exist_ok=True)
     arrange.write_whole(work / "photos.json", {"folder": str(photos), "photos": listing})
     tokens, clip_list = picks, None
@@ -3289,7 +3334,9 @@ def _make(kit, ask, jid, t0, preview=False):
         return {"state": "done", "words": words, "pieces": _preview_pieces(st.get("pieces"), clip_list),
                 "length": (st.get("plan") or {}).get("length"), "variation": variation,
                 "song": ({"id": ask.get("song") or "", "from": st["song"].get("from"), "length": st["song"].get("length")}
-                         if isinstance(st.get("song"), dict) else None)}
+                         if isinstance(st.get("song"), dict) else None),
+                # Save my video's render needs the clips themselves and the song's file: never sent to a page
+                "clip_list": clip_list, "song_file": song, "song_name": song_name}
     project = st.get("project")
     if not dry and project:
         with arrange.locked(lock_path(kit)):
@@ -3325,6 +3372,198 @@ def _preview_pieces(pieces, clip_list):
         else:
             one["n"] = p.get("n")
         out.append(one)
+    return out
+
+
+# ---------- Save my video (her v27, B-roll): the finished MP4 with the words on it, as a job ----------
+
+def reels_dir(kit):
+    """Her <shoot>/Reels, where a saved video goes (made when the first is saved; never a link)."""
+    return kit / REELS
+
+
+def reels_ok(kit):
+    d = reels_dir(kit)
+    return not d.is_symlink() and (d.is_dir() or not d.exists())
+
+
+def video_stem(kit, rec):
+    """Hers (server.py broll_video): "<short> B-roll", with " - <reel name>" when the shoot has several reels;
+    anything a file name can't carry becomes a space."""
+    short = short_name(kit.name)
+    if reels.several(rec):
+        stem = VIDEO_WORDS["file_reel"].replace("{short}", short).replace("{reel}", reels.name_of(rec, reels.current(rec, REEL_FIRST), REEL_FIRST))
+    else:
+        stem = VIDEO_WORDS["file"].replace("{short}", short)
+    return " ".join(re.sub(r'[/\\:*?"<>|]+', " ", stem).split())
+
+
+def free_video_name(kit, stem, after=0):
+    """Hers: never over an earlier one. "<stem>.mp4", then "<stem> 2.mp4", "<stem> 3.mp4"...; `after`: the number
+    to start past (a name that was taken while the video was being made). A name is taken whatever its case (a
+    Mac's drive keeps one of "B-roll.mp4" and "b-roll.mp4"). (name, number), or (None, number) when the folder
+    holds too many."""
+    d = reels_dir(kit)
+    try:
+        there = {p.name.lower() for p in d.iterdir()} if d.is_dir() else set()
+    except OSError:
+        there = set()
+    k = max(2, after + 1) if after else 1
+    while k <= VIDEO_NAME_SPARES + 1:
+        name = f"{stem}.mp4" if k == 1 else f"{stem} {k}.mp4"
+        if name.lower() not in there and not (d / name).exists():
+            return name, k
+        k += 1
+    return None, k
+
+
+def made_videos(rec):
+    """{reel id: the newest video saved of it (its file name)} for every reel of the shoot with one."""
+    out = {}
+    for m in rec.get("made") or []:
+        if isinstance(m, dict) and isinstance(m.get("video"), str) and m["video"]:
+            out[made_for(m)] = m["video"]
+    return out
+
+
+def save_video_from_page(body):
+    """POST /reel-video (her v27, Save my video): {kit, stamp, song, clips, variation, song_start, onscreen, reel}.
+    Checked the way Make my reel is (the same body, through _ask_from_page); only a B-roll reel (clips only) can be
+    saved whole; the words come with the press (checked field by field, as a save is) or from the record. On a PC
+    the plain words of the gap (this_computer.NO_VIDEO_PC) and nothing is started. Otherwise the job is written
+    down and its process started, and the page follows it on /reel-job. (status, answer)."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    ons = body.get("onscreen")
+    if ons is not None:
+        try:
+            ons = _onscreen(ons)
+        except Refused:
+            return _bad()
+    body = {k: v for k, v in body.items() if k != "onscreen"}
+    # hers sends the song, the clips, the mix, the song's start and the words: B-roll has no photos and no pace
+    # chips, so the pick is empty and the pace is the reel's saved one (the cut the watch step played)
+    with arrange.locked(lock_path(kit)):
+        rec0 = load(kit)
+    try:
+        saved0 = as_reel(rec0, body.get("reel") if isinstance(body.get("reel"), str) else None).get("saved")
+    except reels.Wrong:
+        saved0 = None
+    saved0 = saved0 if isinstance(saved0, dict) else {}
+    body.setdefault("picks", [])
+    if "vibe" not in body:
+        body["vibe"] = saved0.get("vibe") if saved0.get("vibe") in VIBES else default_vibe()
+    got = _ask_from_page(dict(body, footage=True, style=BROLL_STYLE), kit,
+                         {"kit", "stamp", "picks", "song", "vibe", "footage", "style", "clips", "reel", "variation", "song_start"})
+    if not isinstance(got[0], dict):
+        return got
+    ask, page_rec = got
+    saved = page_rec.get("saved") if isinstance(page_rec.get("saved"), dict) else {}
+    if reel_kind(saved) != BROLL_STYLE or (body.get("style") not in (None, BROLL_STYLE)) or body.get("footage") is False:
+        return _bad(OUR_WORDS["video_broll_only"], 400, why="kind")
+    if not ask.get("clips"):
+        return _bad(VIDEO_WORDS["no_clips"], 400, why="clips")
+    if not _video().avfoundation_here():
+        return 200, {"ok": False, "pc": True, "words": this_computer.NO_VIDEO_PC}
+    if not reels_ok(kit):
+        return _bad(OUR_WORDS["cant_open_reels"], 400, why="reels")
+    if ask.get("song") is None:
+        ask["song"] = ""                       # hers: no song picked plays the clips' own sound
+    ask["dry"] = True
+    ask["video"] = True
+    if ons is not None:
+        ask["onscreen"] = ons
+    with _JOB_ROUTE:
+        j = read_job(kit) or {}
+        if job_running(kit) or (j.get("state") == "queued" and not j.get("pid") and time.time() - float(j.get("t") or 0) < JOB_BOOT):
+            words = OUR_WORDS["video_making"] if j.get("video") else OUR_WORDS["already_making"]
+            return 409, {"ok": False, "words": words, "why": "making", "job": job_for_page(kit)}
+        jid = os.urandom(6).hex()
+        write_job(kit, {"id": jid, "state": "queued", "t": time.time(), "dry": True, "video": True, "ask": ask})
+        try:
+            arrange.HOME.mkdir(parents=True, exist_ok=True)
+            with open(arrange.LOG, "a", encoding="utf-8") as out:
+                this_computer.popen_detached([sys.executable, str(HERE / "reel_page.py"), "job", str(kit), "--id", jid],
+                                             stdout=out, stderr=subprocess.STDOUT, **arrange._child_env())
+        except OSError as e:
+            arrange.log(f"reel page: the video's job could not be started: {e}")
+            write_job(kit, {"id": jid, "state": "problem", "t": time.time(), "dry": True, "video": True, "problem": WORDS["went_wrong_make"]})
+        return 200, {"ok": True, "job": job_for_page(kit)}
+
+
+def _make_video(kit, ask, jid, t0):
+    """The work of a Save my video job: the reel's plan from a dry run of reel.py (the very cut the watch step
+    played: the mix and the part of the song), then video.render_broll into <shoot>/Reels under a free name
+    chosen first and never written over; the made entry carries the video's file name (Lane D's contract). What
+    goes in the job record: {state, video, seconds, words} or {state: problem, problem}."""
+    deadline = t0 + VIDEO_LIMIT
+    plan_ask = {k: v for k, v in ask.items() if k not in ("video", "onscreen")}
+    res = _make(kit, plan_ask, jid, t0, preview=True, work=VIDEO_WORK, limit=VIDEO_LIMIT)
+    if res.get("state") != "done":
+        return {"state": "problem", "problem": res.get("problem") or WATCH_WORDS["pv_cant"], "short_song": bool(res.get("short_song"))}
+    clip_list = res.get("clip_list") or []
+    pieces = [p for p in res.get("pieces") or [] if p.get("kind") == "clip"]
+    if not clip_list or len(pieces) != len(clip_list):
+        return {"state": "problem", "problem": VIDEO_WORDS["no_clips"]}
+    clips = [{"path": c["path"], "src": p.get("src") if p.get("src") is not None else c.get("src", 0), "dur": p["dur"]}
+             for c, p in zip(clip_list, pieces)]
+    song_file, song_from = res.get("song_file"), (res.get("song") or {}).get("from") or 0
+    with arrange.locked(lock_path(kit)):
+        rec = load(kit)
+    try:
+        page_rec = as_reel(rec, ask.get("reel") if isinstance(ask.get("reel"), str) else reels.current(rec, REEL_FIRST))
+    except reels.Wrong:
+        return {"state": "problem", "problem": reels.GONE}
+    saved = page_rec.get("saved") if isinstance(page_rec.get("saved"), dict) else {}
+    words = ask.get("onscreen") if isinstance(ask.get("onscreen"), dict) else (saved.get("onscreen") if isinstance(saved.get("onscreen"), dict) else None)
+    d = reels_dir(kit)
+    if not reels_ok(kit):
+        return {"state": "problem", "problem": OUR_WORDS["cant_open_reels"]}
+    try:
+        d.mkdir(exist_ok=True)
+    except OSError:
+        return {"state": "problem", "problem": OUR_WORDS["cant_open_reels"]}
+    stem = video_stem(kit, rec)
+    name, k = free_video_name(kit, stem)
+    if name is None:
+        return {"state": "problem", "problem": OUR_WORDS["video_many"].replace("{n}", str(VIDEO_NAME_SPARES + 1))}
+    note = ""
+    for _try in range(2):                   # the name was chosen first; if it was taken while rendering, the next one (once)
+        left = deadline - time.time()
+        if left <= 1:
+            return {"state": "problem", "problem": OUR_WORDS["video_too_long"]}
+        r = _video().render_broll(clips, d / name, song_file, song_from, words, timeout=left, work=kit / ".kit" / VIDEO_WORK)
+        if not r.get("ok"):
+            if r.get("state") == "exists":
+                name, k = free_video_name(kit, stem, after=k)
+                if name is None:
+                    return {"state": "problem", "problem": OUR_WORDS["video_many"].replace("{n}", str(VIDEO_NAME_SPARES + 1))}
+                continue
+            arrange.log(f"reel page: the video could not be made: {r.get('state')} {str(r.get('detail') or '')[:300]}")
+            return {"state": "problem", "problem": OUR_WORDS["video_too_long"] if r.get("state") == "busy" else r.get("words") or WORDS["went_wrong_make"]}
+        if r.get("placed"):
+            break
+        note = OUR_WORDS["video_name_taken"]
+        name, k = free_video_name(kit, stem, after=k)
+        if name is None:
+            return {"state": "problem", "problem": OUR_WORDS["video_many"].replace("{n}", str(VIDEO_NAME_SPARES + 1))}
+    else:
+        return {"state": "problem", "problem": WORDS["went_wrong_make"]}
+    which = ask.get("reel") if isinstance(ask.get("reel"), str) else None
+    with arrange.locked(lock_path(kit)):
+        rec = load(kit)
+        entry = {"video": name, "picks": "", "vibe": ask.get("vibe"), "footage": BROLL_STYLE,
+                 "clips": [c["moment"] for c in clip_list], "song": res.get("song_name") or "", "song_id": ask.get("song") or "",
+                 "when": time.time(), "variation": res.get("variation"), "song_start": song_from if song_file else None,
+                 "seconds": r.get("seconds")}
+        if reels.several(rec):
+            entry["version"] = which or reels.current(rec, REEL_FIRST)
+        rec.setdefault("made", []).append(entry)
+        save(kit, rec)
+    out = {"state": "done", "video": name, "seconds": r.get("seconds"), "words": list(res.get("words") or [])}
+    if note:
+        out["words"].append(note)
     return out
 
 
@@ -3382,8 +3621,8 @@ def _watchdog(kit, jid, deadline, finished):
             return
         j = read_job(kit) or {}
         if j.get("id") == jid and j.get("state") in ("queued", "running"):
-            j.update(state="problem", problem=WORDS["too_long"], t=time.time())
-            made = _made_by(kit, jid)
+            j.update(state="problem", problem=(OUR_WORDS["video_too_long"] if j.get("video") else WORDS["too_long"]), t=time.time())
+            made = None if j.get("video") else _made_by(kit, jid)
             if made:
                 j["problem"] = OUR_WORDS["interrupted_made"].replace("{project}", made)
             try:
@@ -3425,8 +3664,9 @@ def cmd_job(kit, jid):
         j.update(pid=os.getpid(), t0=t0, t=time.time())
         write_job(kit, j)
         finished = threading.Event()
-        threading.Thread(target=_watchdog, args=(kit, jid, t0 + MAKE_LIMIT, finished), daemon=True).start()
-        g = _hold_make_lock(t0 + MAKE_LIMIT)
+        limit = VIDEO_LIMIT if ask.get("video") else MAKE_LIMIT
+        threading.Thread(target=_watchdog, args=(kit, jid, t0 + limit, finished), daemon=True).start()
+        g = _hold_make_lock(t0 + limit)
         if g is None:
             j.update(state="problem", problem=WORDS["too_long"], t=time.time())
             write_job(kit, j)
@@ -3435,7 +3675,7 @@ def cmd_job(kit, jid):
             j.update(state="running", t=time.time())
             write_job(kit, j)
             try:
-                res = _make(kit, ask, jid, t0)
+                res = _make_video(kit, ask, jid, t0) if ask.get("video") else _make(kit, ask, jid, t0)
             except Exception as e:  # noqa: BLE001  (whatever happens, the page is told in plain words)
                 arrange.log(f"reel page: the reel's job failed: {e.__class__.__name__}: {str(e)[:300]}")
                 res = {"state": "problem", "problem": WORDS["went_wrong_make"]}
@@ -3488,19 +3728,37 @@ def open_photos(kit):
     return 200, {"ok": True, "words": w}
 
 
+def open_reels(kit):
+    """Her v27 Open the folder, after Save my video: opens the shoot's Reels folder (only once a video has been
+    saved into it; never made here, never a link) and says so in our words (hers says nothing)."""
+    d = reels_dir(kit)
+    if not (d.is_dir() and not d.is_symlink()):
+        return 200, {"ok": False, "words": pc_words(OUR_WORDS["cant_open_reels"])}
+    ok, note = _open_folder(d)
+    if not ok:
+        arrange.log(f"reel page: the Reels folder couldn't be opened: {str(note)[:200]}")
+        return 200, {"ok": False, "words": pc_words(OUR_WORDS["cant_open_reels"])}
+    w = pc_words(OUR_WORDS["reels_open"])
+    if note == "behind":
+        w = w.rstrip(".") + OUR_WORDS["behind"]
+    return 200, {"ok": True, "words": w}
+
+
 def open_music(body):
-    """POST /reel-open {kit, what: "music" | "footage" | "photos"}: makes <kit>/Music (or <kit>/Footage) if it
+    """POST /reel-open {kit, what: "music" | "footage" | "photos" | "reels"}: makes <kit>/Music (or <kit>/Footage) if it
     isn't there, and opens it (hers: /music/open and /footage/open); "photos" (her v27) opens the shoot's Photos
-    folder as it is."""
+    folder as it is; "reels" (her v27, Open the folder after Save my video) the shoot's Reels folder as it is."""
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
-    if set(body) - {"kit", "what"} or body.get("what") not in ("music", "footage", "photos"):
+    if set(body) - {"kit", "what"} or body.get("what") not in ("music", "footage", "photos", "reels"):
         return _bad()
     if body["what"] == "footage":
         return open_footage(kit)
     if body["what"] == "photos":
         return open_photos(kit)
+    if body["what"] == "reels":
+        return open_reels(kit)
     d = music_dir(kit)
     if not music_ok(kit):                    # a link, or not a folder: never opened, never written into (v19 review)
         arrange.log("reel page: the shoot's Music folder is a link or not a folder, so it isn't opened")
@@ -3871,7 +4129,7 @@ def handle_post(handler, path, query):
         route = {"/reel-save": save_from_page, "/reel-make": start_make, "/reel-open": open_music,
                  "/reel-capcut": open_capcut_for_page, "/reel-moment": change_moments,
                  "/reel-version": version_from_page, "/reel-song-remove": remove_song,
-                 "/reel-preview": preview_from_page}.get(path)
+                 "/reel-preview": preview_from_page, "/reel-video": save_video_from_page}.get(path)
         if route is None:
             return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
         code, out = route(body)
@@ -4584,8 +4842,8 @@ def _watch_section(w, num, kind="photos"):
     """Her last step, "Watch your reel before you make it" (reel-maker.html #watch, v27): the 9:16 player, the song,
     the pace chips (not on B-roll), the style chips (behind the scenes only), Try another mix, Undo and Redo, her
     line under it, B-roll's words on screen, and Make this one in CapCut. What a kind never shows is left out
-    here on the server (hers hid it after load). Save my video (B-roll) is drawn and says it isn't ready yet,
-    until its stage lands (OUR_WORDS["save_video_soon"])."""
+    here on the server (hers hid it after load). Save my video (B-roll, A15) is the main button there: the
+    finished MP4 with the song and the words, saved into the shoot's Reels folder (save_video_from_page)."""
     e = html.escape
     broll = kind == BROLL_STYLE
     chips = lambda attr, keys, word: "".join("<button type='button' data-" + attr + "='" + k + "'>" + e(w[word % k]) + "</button>" for k in keys)  # noqa: E731
@@ -6528,15 +6786,67 @@ WATCH_JS = r"""
     $('pvKnob').addEventListener('pointerdown', function(e){ osDown(e, 'size'); });
     ['pvText', 'pvKnob'].forEach(function(id){ $(id).addEventListener('pointermove', osMove); $(id).addEventListener('pointerup', osUp); $(id).addEventListener('click', function(e){ e.stopPropagation(); }); });
     window.addEventListener('resize', function(){ try { osKnob(); } catch (e) {} });
+    // Save my video (hers): the reel's plan, then the finished MP4 with the song and the words, into the shoot's Reels
+    // folder. Ours underneath: a job the page follows on /reel-job (hers waited on one request), so a reload while it
+    // is being saved picks it up again, and a job that was stopped says so.
+    var VID = {id: null, t: null, fails: 0};
+    function vidSay(html){ $('pvSaved').innerHTML = html; }
+    function vidDone(job){
+      clearTimeout(VID.t); VID.t = null; VID.id = null; $('pvSaveVid').disabled = false;
+      if (job.state === 'problem') { $('pvSaved').textContent = job.problem || W.went_wrong; return; }
+      var secs = (typeof job.seconds === 'number' ? job.seconds : 0).toFixed(1);
+      vidSay(esc(fill(W.os_saved, {file: job.video || '', secs: secs})) + ' <button class="btn small" id="openReels" type="button">' + esc(W.os_open_folder) + '</button><span class="say sm" id="reelsWent"></span>');
+      $('openReels').onclick = function(){
+        R.post('/reel-open', {kit: R.kit, what: 'reels'}).then(function(res){ $('reelsWent').textContent = (res.j && res.j.words) || ''; }).catch(function(){});
+      };
+      if (R.queue) R.queue.made();            // the reel counts as made now: Add this reel to my posting queue shows
+      if (R.refresh) R.refresh();
+    }
+    function vidPoll(){
+      VID.t = null;
+      if (!VID.id) return;
+      fetch('/reel-job?' + R.q + '&id=' + encodeURIComponent(VID.id), {cache: 'no-store'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          VID.fails = 0;
+          var job = j && j.job;
+          if (!job || job.id !== VID.id) { vidDone({state: 'problem', problem: W.video_interrupted}); return; }
+          if (job.state === 'done' || job.state === 'problem') { vidDone(job); return; }
+          VID.t = setTimeout(vidPoll, D.jobEvery);
+        })
+        .catch(function(){
+          if (++VID.fails > 40) { vidDone({state: 'problem', problem: W.no_server}); return; }
+          VID.t = setTimeout(vidPoll, D.jobEvery * 2);
+        });
+    }
+    function vidFollow(job){
+      if (job.state === 'done' || job.state === 'problem') { vidDone(job); return; }
+      VID.id = job.id; $('pvSaveVid').disabled = true;
+      vidSay('<span class="spin"></span> ' + esc(W.os_saving));
+      clearTimeout(VID.t); VID.t = setTimeout(vidPoll, D.jobEvery);
+    }
+    R.videoJob = function(job){ if (job && job.kind === 'video' && !VID.id) vidFollow(job); };
     if ($('pvSaveVid')) $('pvSaveVid').onclick = function(){
+      if (VID.id) return;
       if (!(R.chosen && R.chosen().length)) { $('pvSaved').textContent = W.os_clips_first; return; }
-      $('pvSaved').textContent = W.save_video_soon;    // ours, until Save my video is built
+      var st = R.state() || {};
+      $('pvSaveVid').disabled = true; pvStop();
+      vidSay('<span class="spin"></span> ' + esc(W.os_saving));
+      var body = {kit: R.kit, stamp: st.stamp, song: R.song(), clips: R.chosen(), variation: PV.variation, onscreen: onscreen};
+      if (PV.songStart != null) body.song_start = PV.songStart;
+      R.flush().then(function(){ return R.post('/reel-video', R.withReel(body)); }).then(function(res){
+        var j = res.j || {};
+        if (j.job) { vidFollow(j.job); return; }
+        $('pvSaveVid').disabled = false;
+        $('pvSaved').textContent = j.words || W.went_wrong;      // a PC's line, no clips, another kind: in plain words
+      }).catch(function(){ $('pvSaveVid').disabled = false; $('pvSaved').textContent = W.no_server; });
     };
   }
   R.part({
     fields: function(){ return BROLL ? {onscreen: onscreen} : {}; },
     adopt: function(st, first){
       byN = {}; (st.photos || []).forEach(function(p){ byN[p.n] = p; });
+      if (BROLL && first && R.videoJob && st.job && st.job.kind === 'video' && (st.job.state === 'queued' || st.job.state === 'running')) R.videoJob(st.job);   // reloaded while a video was being saved
       if (BROLL) {
         var o = (st.saved || {}).onscreen;
         if (o && typeof o === 'object') ['text', 'font', 'style', 'x', 'y', 'size'].forEach(function(k){ if (o[k] !== undefined && o[k] !== null) onscreen[k] = o[k]; });
@@ -6659,7 +6969,8 @@ MAKE_JS = r"""
   R.part({
     adopt: function(st, first){
       var job = st.job;
-      if (first && job && (job.state === 'queued' || job.state === 'running') && !making) follow(job);   // reloaded while one is at work
+      // reloaded while one is at work (a Save my video job is the watch step's own, not Make my reel's)
+      if (first && job && job.kind !== 'video' && (job.state === 'queued' || job.state === 'running') && !making) follow(job);
       summary();
     }
   });
@@ -6953,11 +7264,16 @@ def cmd_show(kit, reel=None):
     made = [m for m in (rec.get("made") or []) if isinstance(m, dict)]
     if len(st["versions"]) > 1:
         made = [m for m in made if made_for(m) == st["current"]]
-    if made:
-        last = made[-1]
+    projects = [m for m in made if m.get("project")]
+    videos = [m for m in made if isinstance(m.get("video"), str) and m["video"]]
+    if projects:
+        last = projects[-1]
         mix = (f" (mix {int(last['variation']) + 1}" + (f", the song from {float(last['song_start']):.1f} s" if isinstance(last.get("song_start"), (int, float)) else "") + ")"
                if isinstance(last.get("variation"), int) else "")
-        say(f"  Reels made from the page: {len(made)}, the newest \"{last.get('project')}\"{mix}")
+        say(f"  Reels made from the page: {len(projects)}, the newest \"{last.get('project')}\"{mix}")
+    if videos:                   # her v27, Save my video (B-roll): the finished file in the shoot's Reels folder
+        say(f"  Videos saved from the page (Save my video, in this shoot's Reels folder): {len(videos)}, the newest \"{videos[-1]['video']}\""
+            + (f" ({float(videos[-1]['seconds']):.1f} seconds)" if isinstance(videos[-1].get("seconds"), (int, float)) else ""))
     q = st.get("queue") or {}
     inq = [v["name"] for v in st["versions"] if (q.get("reels") or {}).get(v["id"], {}).get("status") in ("green", "posted")]
     if inq:

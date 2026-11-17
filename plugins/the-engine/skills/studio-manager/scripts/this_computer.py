@@ -1104,6 +1104,12 @@ NO_NAMES_PC = "I can't take stills from a video on this PC yet, so I can't see y
 # What the chat's footage look says on a PC, where it can't take stills
 NO_LOOK_CHAT = "I can't take stills from a video on this PC yet, so I can't look through footage here."
 
+# Save my video (Nicole's v27, B-roll): the finished video is made by the Mac's own AVFoundation; nothing on a PC
+# can cut and join video with nothing installed, so the button answers with this and makes nothing. Ours (hers
+# has no PC): a draft for Nicole to reword.
+NO_VIDEO_PC = ("Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in "
+               "CapCut works here, and your words go with it.")
+
 # Talking reels (v24). Nothing on a PC can turn talking into words with nothing installed, and a PC makes no small
 # copy of a video, so Edit my video answers with this at once and makes nothing. Ours (hers has no PC): a draft
 # for Nicole to reword.
