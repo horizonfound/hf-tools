@@ -115,8 +115,8 @@ def main():
         check("job %s: every steps.<id> in a condition is an id of that job (%s)" % (name, ", ".join(sorted(ids)) or "no ids"),
               not wrong, "line %d names steps.%s, which this job doesn't have" % wrong[0] if wrong else "")
     check("the two closing lines of the paths lists appear once each (the merge of Nov 17 left one twice)",
-          text.count('"tools/check_pc.py", ".github/workflows/check-pc.yml"]') == 2,
-          text.count('"tools/check_pc.py", ".github/workflows/check-pc.yml"]'))
+          text.count('"tests/workflow_check.py", ".github/workflows/check-pc.yml"]') == 2,
+          text.count('"tests/workflow_check.py", ".github/workflows/check-pc.yml"]'))
 
     print("\n%d passed, %d failed, %d skipped." % (RESULTS["PASS"], RESULTS["FAIL"], RESULTS["SKIP"]))
     return 1 if RESULTS["FAIL"] else 0
