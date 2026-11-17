@@ -40,7 +40,15 @@ Reads text only; nothing is run, started or written. What it checks:
   * the photographer picks (Nicole's v25, stage H of the v26 build): nothing is picked until they ask; the pasted
     line "Pick my reel photos for <shoot>" is answered with reel_page.py note first, the note followed exactly,
     the pick saved for that reel only; "make my posts" and a new kit only number the photos and open the post
-    kit (no pick, no build, no question); the page's own lines are quoted word for word.
+    kit (no pick, no build, no question); the page's own lines are quoted word for word;
+  * Posted on the post itself, the Reels card and the path at the top (Nicole's v27, Lane D of the v27 build): the
+    Not posted / Posted switch, the posted post in the feed and "that one didn't go out after all" (unposted) are
+    in parts/posting-queue.md in the page's own words, the command exists and its printed line is quoted, the
+    core's row sends the new lines there; the Reels card's name and its two buttons are quoted from kit.py and no
+    part still says "Reel card"; the path (Home › Beach post kit, › Captions) is told in the kit part and the
+    words part from look.py's and words_page.py's own words, and the posting queue page still keeps Back to home;
+    "What's a post kit?" is answered with her Make posts paragraph, whole, when her pack is here to compare;
+    where-things-live.md says what posted_at, feed.json and read_at decide; no new line says "Claude".
 
 Every line says PASS or FAIL; exit 1 only when something FAILED.
 """
@@ -1160,9 +1168,88 @@ def check_queue_v25():
          and 'x["version"], x["reel_name"] = ' in pq)
 
 
+def check_posted_and_path_v27():
+    """Posted on the post itself, the Reels card and the path at the top (Nicole's v27, Lane D): the instructions
+    say what the pages say, in the pages' own words, and name commands that exist."""
+    import html as _html
+    sys.path.insert(0, str(SCRIPTS))
+    import kit
+    import look
+    import words_page
+    pq = read(SCRIPTS / "posting_queue.py").replace("\u2019", "'")
+    post = " ".join(read(SM / "parts" / "posting-queue.md").split()).replace("\u2019", "'")
+    kitp = " ".join(read(SM / "parts" / "post-kit.md").split())
+    wordsp = " ".join(read(SM / "parts" / "words.md").split())
+    where = " ".join(read(SM / "parts" / "where-things-live.md").split())
+    arr = " ".join(read(SM / "parts" / "arrange.md").split())
+    rows = table_rows(read(SM / "SKILL.md"))
+    # --- the switch and the posted post, in the page's own words ---
+    said = {"Not posted": r"not_posted:'([^']+)'", "Posted": r"\bposted:'([^']+)'", "the posted post's line": r"in_feed:'([^']+)'",
+            "the posted tile's tip": r"posted_tip:'([^']+)'", "Back in your queue": r"back_in_queue:'([^']+)'", "the Posted toast": r"posted_toast:'([^']+)'"}
+    for what, pat in said.items():
+        m = re.search(pat, pq)
+        case(f"the posting page still says: {what}", bool(m))
+        if m:
+            case(f"... and posting-queue.md says it the same way: {m.group(1)[:50]}", m.group(1) in post, m.group(1))
+    sect = re.search(r"\*\*Posted, on the post itself.*?(?=- \*\*|## )", post)
+    case("posting-queue.md has the Posted-on-the-post section: the switch beside Done, no date and no posted-on label, read my Instagram grid, the switch only",
+         bool(sect) and all(x in sect.group(0) for x in ("**Not posted** switch beside **Done**", 'no "posted on" label', '"read my Instagram grid"', "the switch and Done only", "no photo strip, no words and no reminder")))
+    case("... and that section never says Claude (the pages say your assistant)", bool(sect) and "Claude" not in sect.group(0))
+    case("the page draws posted posts from the server's list, never filtering by read_at itself (so the part's rule is the server's)",
+         "S.posted" in pq and "def posted_in_grid" in pq or ("S.posted" in pq and "POSTED_DAYS" in pq))
+    # --- unposted: the command, its line, the row ---
+    have = set(re.findall(r'add_parser\("([a-z-]+)"\)', pq))
+    case("posting_queue.py has the unposted command and the part names it with its line", "unposted" in have
+         and '`posting_queue.py unposted "beach reel"`' in post and "That one didn\'t go out after all" in post)
+    case("the part quotes what unposted prints, as the script prints it", "back in your queue, ready to post" in post
+         and 'back in your queue, ready to post" + (f", down for' in pq)
+    case("the part says unposted looks only among the posted pieces (so the shoot's other reel in line is never taken)",
+         "looks only among the posted pieces" in post and 'find(p, a.piece, statuses=("posted",))' in pq)
+    case("the part says a reminder that was on comes back on the new date, the same event, never a second one",
+         "the same event, moved; never a second one" in post and "the same event moved, never a second one" in post)
+    hit = [r for r in rows if "\"that one didn't go out after all\"" in r.split(" | ")[0].replace("\u2019", "'")]
+    case("the core's row for the posting queue takes \"that one didn't go out after all\" and \"it's in my feed now\" to parts/posting-queue.md",
+         len(hit) == 1 and "`parts/posting-queue.md`" in hit[0] and "\"it's in my feed now\"" in hit[0].replace("\u2019", "'"), hit)
+    # --- the Reels card: its name and its two buttons, from kit.py ---
+    case("kit.py's card is Reels, and its buttons are Create my reels / Create another reel",
+         kit.KIT_WORDS["reel"] == "Reels" and kit.REEL_CREATE == "Create my reels" and kit.REEL_AGAIN == "Create another reel")
+    for name, t in (("post-kit.md", kitp), ("arrange.md", arr)):
+        case(f"{name} names the Reels card and quotes both buttons with their arrow", "Reels card" in t
+             and f'"{kit.REEL_CREATE} \u2192"' in t and f'"{kit.REEL_AGAIN} \u2192"' in t and "once any reel of the shoot is made" in t)
+    stale = [f"{rel(q)}:{i}" for q in instruction_files() for i, ln in enumerate(read(q).splitlines(), 1) if re.search(r"\bReel card\b|\(Reel, Carousel", ln)]
+    case("no instruction still calls it the Reel card", not stale, stale)
+    # --- the path at the top: look.py's words, told in the kit part and the words part ---
+    C = look.CRUMB_WORDS
+    kitcrumb = C["post_kit"].format(shoot="Beach")
+    path_kit = f"{C['home']} {C['sep']} {kitcrumb}"
+    path_words = f"{path_kit} {C['sep']} {words_page.WORDS['crumb_captions']}"
+    case("post-kit.md tells the path on the kit page and on the words page, in look.py's and words_page.py's own words",
+         f"**{path_kit}** on the kit page" in kitp and f"**{path_words}** on the words page" in kitp and "Press Home at the top of the page" in kitp)
+    case("post-kit.md says the kit's own crumb is not a link and Home is (as look.crumbs draws them)",
+         "it is where they are, so it is not a link here" in kitp and "Home is a link to the home base" in kitp
+         and "aria-current='page'" in read(SCRIPTS / "look.py") and look.HOME_PATH == "/home")
+    case("words.md tells the words page's path and how to get back", f"**{path_words}**" in wordsp and "Press Beach post kit at the top of the page" in wordsp)
+    case("the posting queue page still keeps Back to home, as the kit part says", "keeps its Back to home" in kitp and "Back to home</span>" in pq)
+    case("the kit page's and the words page's bars are built by look.crumbs (else the parts' path is a story)",
+         "look.crumbs([(here, None)])" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
+    # --- "What's a post kit?": her Make posts paragraph, whole ---
+    m = re.search(r'\*\*"What\'s a post kit\?"\*\* Answer in Nicole\'s words from the Make posts screen, whole: "([^"]+)"', kitp)
+    case("post-kit.md answers \"What's a post kit?\" with one quoted paragraph", bool(m))
+    hers = [f for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))     # a worktree looks beside the main checkout, as the kit tests do
+            for f in sorted((base / "reference-private").glob("nicole-handoff-v2[7-9]-*/Carousel designer and reel picker/pages/make-posts.html"), reverse=True)]
+    if m and hers:
+        page = " ".join(_html.unescape(re.sub(r"<[^>]+>", " ", read(hers[0]))).split())
+        case(f"... and it is her paragraph, word for word ({hers[0].parent.parent.parent.name})", m.group(1) in page, m.group(1))
+    else:
+        case("... (her v27 pack is not on this computer, so the paragraph is not compared)", True)
+    # --- where things live ---
+    case("where-things-live.md says what posted_at, feed.json and read_at decide, with the script's 30 days",
+         all(x in where for x in ("`posted_at`", "`feed.json`", "`read_at`", "last 30 days", "(`unposted`)")) and re.search(r"^POSTED_DAYS = 30\b", pq, re.M))
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
-               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25):
+               check_stories_v26, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_posted_and_path_v27):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
