@@ -19,7 +19,7 @@ itself, and checks:
      QuickTime header, a missing file;
   4. this computer's stills and copy where there is no AVFoundation (a PC, or a Mac told ASSISTANT_NO_AVFOUNDATION):
      the plain words of the named gap (this_computer.NO_PREVIEW; HEVC_HELP for an HEVC video on a PC), and nothing
-     made: no folder, no file;
+     made: no folder, no file; Save my video's render the same (this_computer.NO_VIDEO_PC, Nicole's v27);
   5. the small things: a fresh folder for every look (never one already there), a video's key, a recording time
      as local time, her loudness measure and loud moments on made-up levels, mac_javascript answering None on a PC.
 Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED; the scratch folder is then kept.
@@ -309,8 +309,15 @@ def main():
               and not (work / "looks").exists() and not (work / "previews").exists(), (r, r2))
         r = video.stills(work / "random bytes.mov", [1], work / "looks")
         check("stills of a non-video: plain words", r.get("state") == "failed" and "/" not in r.get("words", ""), r)
+        # Nicole's v27, Save my video (the finished B-roll video): a named gap on a PC, nothing made, no Mac call reached
+        r = video.render_broll([{"path": end, "src": 0, "dur": 1.0}], work / "Reels" / "B-roll.mp4", words={"text": "Hi"})
+        check("Save my video's render on this computer without AVFoundation: this_computer.NO_VIDEO_PC, and nothing made",
+              r == {"ok": False, "state": "pc", "words": this_computer.NO_VIDEO_PC} and not (work / "Reels").exists(), r)
     finally:
         os.environ.pop(video.NO_AV, None)
+    words = this_computer.NO_VIDEO_PC
+    check("this_computer.NO_VIDEO_PC names no Finder or QuickTime, says what works instead (CapCut), and promises nothing a PC can't do",
+          words and not any(w in words for w in ("Finder", "QuickTime", "still work")) and "CapCut" in words, words)
     for name in ("NO_PREVIEW", "HEVC_HELP", "NO_LOOK_PC", "WATCH_PC_HTML", "NOT_LOOKED_PC_HTML", "MOMENTS_PC", "NO_LOOK_CHAT"):
         words = getattr(this_computer, name, "")
         check(f"this_computer.{name} names nothing Mac-only (no Mac, Finder, QuickTime)",

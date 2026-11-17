@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """The pages' shared look (look.py), checked: the font route refuses everything but its three files, the shared
-styles have no serif and nothing from the internet, and the report and the editing queue are built on it.
+styles have no serif and nothing from the internet, the report and the editing queue are built on it, and the path
+at the top of every post kit page (Nicole's v27 crumbs.js, built here on the server) says her words, links only to
+paths of this server, and matches her rules line for line when her v27 handoff is on this computer.
 
     python3 tests/look_check.py
 
@@ -186,6 +188,92 @@ def main():
     case("the editing queue page: no link to the internet, the shared look first, no serif",
          "<link" not in q and "fonts.googleapis" not in q and "<style>" + look.head_css() in q and not SERIF.search(sans_only(q)),
          SERIF.findall(sans_only(q)))
+
+    # ---- 3b. the path at the top (Nicole's v27 crumbs.js, built on the server: look.crumbs, look.kit_trail)
+    beach = look.kit_trail("2026-06-24 Beach")
+    case("kit_trail: the kit's crumb is the folder name without its date, linked to the kit page by its folder name",
+         beach == [("Beach post kit", "/content/2026-06-24%20Beach/Post%20kit.html")], beach)
+    case("kit_trail: a name with no date, and one with an apostrophe and spaces, each quoted for the address only",
+         look.kit_trail("Beach") == [("Beach post kit", "/content/Beach/Post%20kit.html")]
+         and look.kit_trail("Mom's beach day") == [("Mom's beach day post kit", "/content/Mom%27s%20beach%20day/Post%20kit.html")])
+    case("look.short_name is kit.short_name's rule (look never imports the post kit)",
+         all(look.short_name(n) == kit.short_name(n) for n in ("2026-06-24 Beach", "Beach", "2026-06-24", "2026-06-24  Two spaces", "20260624 Nope", ""))
+         and "import kit" not in (SCRIPTS / "look.py").read_text(encoding="utf-8"))
+    nav = look.crumbs(beach + [("Captions", None)])
+    case("crumbs: Home › Beach post kit › Captions, Home and the kit as links, Captions as where you are",
+         nav == "<nav class='crumbs' aria-label='Where you are'><a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span>"
+                "<a href='/content/2026-06-24%20Beach/Post%20kit.html'>Beach post kit</a><span class='sep' aria-hidden='true'>›</span>"
+                "<span class='here' aria-current='page'>Captions</span></nav>", nav)
+    case("crumbs: a kit page's own crumb with no link (where you are), and the unreachable page's plain 'Post kit'",
+         look.crumbs([("Beach post kit", None)]).endswith("<span class='here' aria-current='page'>Beach post kit</span></nav>")
+         and look.crumbs([("Post kit", None)]).count("<a ") == 1)
+    nav = look.crumbs([("A <b>&\"x'", "/x?a=1&b=2"), ("Reels", None), ("B-roll", "/reel.html?kit=x")])
+    case("crumbs: a label with <, & and quotes is escaped; a link's & too", "<b>" not in nav and "&lt;b&gt;&amp;&quot;x&#x27;" in nav
+         and "href='/x?a=1&amp;b=2'" in nav, nav)
+    case("crumbs: the last step is never a link, even when given one; aria-current sits on it alone",
+         nav.count("<a ") == 2 and "/reel.html" not in nav and nav.count("aria-current='page'") == 1
+         and nav.endswith("<span class='here' aria-current='page'>B-roll</span></nav>"), nav)
+    case("crumbs: a step with no link before the last is plain words, never a dead link, and not where you are",
+         "<span class='sep' aria-hidden='true'>›</span><span class='here'>Reels</span><span class='sep'" in nav, nav)
+    case("crumbs: one separator between each pair, Home first, nothing to the internet",
+         nav.count("class='sep'") == 3 and nav.startswith("<nav class='crumbs' aria-label='Where you are'><a href='/home'>Home</a>")
+         and "http" not in nav and "://" not in nav)
+    refused = []
+    for bad in ("http://127.0.0.1:8790/home", "//evil.example/home", "home", "/x\n", "/x\r", 5, b"/home"):
+        try:
+            look.crumbs([("Reels", bad), ("B-roll", None)])
+            refused.append((bad, "accepted"))
+        except ValueError:
+            pass
+    case("crumbs refuses a link that is not a path of this server (her http://127.0.0.1:8790/home, //host, no slash, a line break, not a string)",
+         not refused, refused)
+    refused = []
+    for bad in ((None, None), ("", None), ("  ", "/x"), (5, None), ("a", "/x", "b"), "Reels", ("a",)):
+        try:
+            look.crumbs([bad, ("B-roll", None)])
+            refused.append((bad, "accepted"))
+        except (ValueError, TypeError):
+            pass
+    case("crumbs refuses a step that is not (a few words, a link)", not refused, refused)
+    case("crumbs on an empty trail is Home alone, where you are", look.crumbs([]) == "<nav class='crumbs' aria-label='Where you are'><span class='here' aria-current='page'>Home</span></nav>")
+    # her rules, with the look's own names where she wrote the colour and the font
+    case("the path's rules are in every page's shared look (BASE, head_css)", look.CRUMBS in look.BASE and look.CRUMBS in look.head_css())
+    case("the path's rules name the look's own colour and font, never #D4643F or 'DM Sans' by name, no serif",
+         "var(--coral-2)" in look.CRUMBS and "font:600 13.5px/1.3 var(--sans)" in look.CRUMBS and "#D4643F" not in look.CRUMBS.upper()
+         and "DM Sans" not in look.CRUMBS and "Helvetica" not in look.CRUMBS and not SERIF.search(sans_only(look.CRUMBS)))
+    case("a saved copy of a page (no .live) draws the path as plain words: no link to press; the rule is the kit page's own, not in every page's look",
+         look.CRUMBS_SAVED.startswith("body:not(.live) .crumbs a{pointer-events:none") and look.CRUMBS_SAVED not in look.BASE and look.CRUMBS_SAVED not in look.head_css()
+         and "not(.live)" not in look.CRUMBS and "look.CRUMBS_SAVED" in (SCRIPTS / "kit.py").read_text(encoding="utf-8"))
+    case("a shoot named in one long unbroken piece may break inside its crumb (ours, so a phone never scrolls sideways)",
+         ".crumbs a,.crumbs .here{overflow-wrap:anywhere}" in look.CRUMBS)
+    src = (SCRIPTS / "look.py").read_text(encoding="utf-8")
+    case("look.py has none of her test-only wiring: no localStorage, no assistantHomeTest, no home-test.html, no 8790",
+         not re.search(r"localStorage|assistantHomeTest|home-test|8790/", src))
+    hers = None
+    for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
+        for f in sorted((base / "reference-private").glob("nicole-handoff-v2[7-9]-*/Carousel designer and reel picker/pages/crumbs.js"), reverse=True):
+            hers = f.read_text(encoding="utf-8")
+            break
+        if hers:
+            break
+    if hers is None:
+        print("SKIP  her crumbs.js against ours: her handoff v27 is not on this computer", flush=True)
+    else:
+        her_css = re.search(r"css\.textContent = `(.*?)`", hers, re.S).group(1)
+        swap = lambda t: t.replace("'DM Sans','Helvetica Neue',Arial,sans-serif", "var(--sans)").replace("#D4643F", "var(--coral-2)")
+        her_rules = [swap(x.strip()) for x in her_css.strip().splitlines()]
+        our_rules = [x.strip() for x in look.CRUMBS.strip().splitlines()]
+        case("her five rules are ours, line for line (her colour and font by the look's names)", all(r in our_rules for r in her_rules), [r for r in her_rules if r not in our_rules])
+        case("ours are her five and one of our own (long names break)", our_rules[:5] == her_rules and len(our_rules) == 6 and our_rules[5].startswith(".crumbs a,.crumbs .here{overflow-wrap"), our_rules)
+        words = {k: v.replace("{shoot}", "") for k, v in look.CRUMB_WORDS.items()}
+        case("her words on the path are ours: Home, ' post kit', 'Post kit', 'Where you are' (from her post-kit.html's nav), ›",
+             all(w in hers for k, w in words.items() if k != "where") and "<span class=\"sep\" aria-hidden=\"true\">›</span>" in hers
+             and look.CRUMB_WORDS["where"] in next(f.read_text(encoding="utf-8") for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))
+                                                   for f in sorted((base / "reference-private").glob("nicole-handoff-v2[7-9]-*/Carousel designer and reel picker/pages/post-kit.html"), reverse=True)),
+             words)
+        case("and hers are ours: every word her script puts on the path is in CRUMB_WORDS",
+             all(w in words.values() for w in ("Home", " post kit", "Post kit", "›")) and "aria-current=\"page\"" in hers and "aria-hidden=\"true\"" in hers)
+        case("her hard-coded address is not copied: ours is the path /home", "http://127.0.0.1:8790/home" in hers and look.HOME_PATH == "/home")
 
     # ---- 4. the font from the two servers this part of the look puts it on
     procs = []

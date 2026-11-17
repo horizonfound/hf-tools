@@ -354,11 +354,20 @@ def start_from_night(night, shoot_id):
 
 # ---------- the sheet and the picks ----------
 
-def sheet(kit):
+def sheet(kit, quick=False):
+    """The kit's numbered list, made by reel.py sheet (the one writer) and copied to .kit/sheet.json. `quick`
+    (the reel page's own re-list when photos were added, her v27): the list only, no contact sheet drawn."""
     rec = load_rec(kit)
     folder = photos_dir(kit, rec)
-    r = subprocess.run([sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)],
-                       capture_output=True, encoding="utf-8", errors="replace")
+    args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
+    if quick:
+        args.append("--no-sheets")
+    if (kit / ".kit" / "sheet.json").is_file():
+        # Numbers stay fixed when photos are added (Nicole's v27): reel.py is the one writer of the numbered list,
+        # and is handed the list from last time so every photo on it keeps its number, a new photo takes the next,
+        # and a photo gone keeps its number unused. Nothing else ever renumbers a kit's photos.
+        args += ["--before", str(kit / ".kit" / "sheet.json")]
+    r = subprocess.run(args, capture_output=True, encoding="utf-8", errors="replace")
     say(r.stdout.strip())
     if r.returncode != 0:
         say(r.stderr.strip())
@@ -375,8 +384,15 @@ def sheet(kit):
         except BaseException:
             _drop_scratch(tmp)      # the list stays as it was; no scratch copy is left behind (see save_rec)
             raise
-        rec["numbered"] = len(listing["photos"])
-        save_rec(kit, rec)
+        # The count goes into the record read AGAIN under its lock, with only `numbered` changed (update_rec): the
+        # list takes seconds on a big shoot, and since Nov 17 the reel page's own poll runs this by itself when a
+        # photo is dropped in, so a pick, a reel made or an archive mark that a chat command writes meanwhile must
+        # never be put back as it was by the record this read at its start (the review of Nov 17).
+        count = len(listing["photos"])
+
+        def note(r):
+            r["numbered"] = count
+        update_rec(kit, note)
     return 0
 
 
@@ -1691,8 +1707,8 @@ KIT_WORDS = {
     "open_photos": "Open the Photos folder",
     "my_queue": "My posting queue",
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
-    "reel": "Reel",
-    "reel_sub": "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut.",
+    "reel": "Reels",                 # v27: the Reels card (four kinds of reel behind its door)
+    "reel_sub": "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look.",
     "reel_none": "Your assistant hasn't picked the reel photos yet. Click to pick them yourself.",
     "in_capcut": "In CapCut:",
     "open_capcut": "Open in CapCut",
@@ -1796,6 +1812,9 @@ OUR_KIT_WORDS = {
     "opening": "Opening...",
     "unreached": "Could not reach the Assistant. Tell your assistant instead.",
     "saved_copy": "This is a saved copy. Say “show the {name} kit” to your assistant and the buttons work.",
+    # ours (v27): a B-roll reel saved whole from the reel page (Save my video) is made, with no CapCut project to open;
+    # her v27 card has no line for it (hers says "In CapCut:" for every made reel)
+    "saved_video": "Saved as a video, in this shoot's Reels folder:",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
     "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell your assistant, and it'll sort it out.",
@@ -1806,9 +1825,10 @@ PAGE_MARK = "<meta name='assistant-page' content='post-kit-steps'>"
 STRIP_REEL = 7               # hers: the Reel card shows up to 7 photos, then "+N"
 STRIP_SLIDES = 6             # hers: the Carousel and Stories cards show up to 6, then "+N"
 
-# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow
-REEL_CREATE = "Create my reel"
-REEL_AGAIN = "Make a new version"
+# Her CTA words, kept where they were (the reel page's door, the stories designer's): with her arrow. v27: the Reels
+# card says "Create my reels", then "Create another reel" once any reel of the shoot is made (her kit.reel rule).
+REEL_CREATE = "Create my reels"
+REEL_AGAIN = "Create another reel"
 STORIES_MAKE = KIT_WORDS["stories_make"] + " →"
 STORIES_OPEN = KIT_WORDS["stories_open"] + " →"
 
@@ -1825,7 +1845,7 @@ def reel_door(kit_name):
 
 
 def reel_link_words(made):
-    """The Reel card's CTA, hers: "Create my reel →", or "Make a new version →" once a reel is made."""
+    """The Reels card's CTA, hers: "Create my reels →", or "Create another reel →" once a reel is made."""
     return (REEL_AGAIN if made else REEL_CREATE) + " →"
 
 
@@ -2146,12 +2166,16 @@ def _font_css():
 
 def _head(title):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{CSS}</style></head>")
+            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{look.CRUMBS_SAVED}\n{CSS}</style></head>")
 
 
-def _bar(when_words):
-    return (f"<div class='bar'><a class='homelink' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
-            f"<span class='short'>Home</span></a>{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
+def _bar(when_words, shoot=None):
+    """Her bar (v27): the path at the top (Home › Hannah post kit, built by look.crumbs: the kit's crumb is where
+    you are, no link), the product's name, the date. Her Back to home pill stays in the markup, hidden, as her
+    page keeps it. shoot is the kit's folder name; None draws her plain 'Post kit' (the unreachable page)."""
+    here = look.CRUMB_WORDS["post_kit"].format(shoot=look.short_name(shoot)) if shoot else look.CRUMB_WORDS["post_kit_none"]
+    return (f"<div class='bar'><a class='homelink' style='display:none' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
+            f"<span class='short'>Home</span></a>{look.crumbs([(here, None)])}{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
 def unreachable_html(line=None):
@@ -2320,12 +2344,17 @@ def card_facts(kit, rec=None):
             mine = [by_n[x["n"]] for x in r["order"] if x["n"] in by_n]
             pics, _ = arrange.page_photos(kit, rec, mine[:STRIP_REEL]) if mine else ([], 0)
             several.append({"id": r["id"], "name": r["name"], "made": r["made"], "project": r["project"],
-                            "count": len(mine), "photos": pics})
+                            "video": r.get("video"), "count": len(mine), "photos": pics})
+    # v27: the newest reel made, a CapCut project or a B-roll video saved whole from the page (Save my video): a
+    # saved video counts as made, on a shoot with one reel as with several
+    newest = reel_page.newest_made(kit, rec) or {}
     return {
         "reels": several,
         "reel_order": [x["n"] for x in order],
         "reel_photos": photos,                                  # {n, v, have, missing} for the ones the strip shows
-        "reel": reel_page.newest_project(kit, rec),
+        "reel": newest.get("name"),
+        "reel_video": bool(newest.get("video")),                # the newest made is a saved video (its file name), not a CapCut project
+        "reel_project": reel_page.newest_project(kit, rec),     # the newest CapCut project, if any (what Open in CapCut opens)
         "slides": [p.name for p in car["files"]],
         "designs": design.count_worked_on(kit, design.CAROUSEL),
         "stories": [p.name for p in sto["files"]],
@@ -2389,15 +2418,18 @@ def build_page(kit):
     steps = steps_facts(kit, f)
     kq = quote(kit.name)
 
-    # the Reel card
+    # the Reels card
     pics = [p for p in f["reel_photos"]]
     need_previews = any(not p["have"] and not p["missing"] for p in pics)
     srcs = [f"/kit-photo?kit={kq}&n={p['n']}&size=s&v={quote(p['v'] or '')}" for p in pics]
     srcs += [""] * max(0, len(f["reel_order"]) - len(srcs))         # for her "+N": only the first 7 are drawn
     reel_strip = (_strip(srcs, STRIP_REEL, tall=True, again=True) if f["reel_order"]
                   else f"<p class='empty'>{html.escape(KIT_WORDS['reel_none'])}</p>")
-    reel_status = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True,
-                           f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>")
+    capcut_button = f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>"
+    reel_status = (_status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(f['reel'])}</b>", True,
+                           capcut_button if f.get("reel_project") else "")
+                   if f["reel"] and f.get("reel_video")           # v27: a B-roll video saved from the page (ours: hers has no words for it on this card)
+                   else _status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True, capcut_button)
                    if f["reel"] else _status(html.escape(KIT_WORDS["not_made"]), False))
     # v25: several reels from one shoot: a preview of each one, by name (hers: up to 7 photos, then "+N"; "In
     # CapCut: <its newest project>" or "Not made yet"), and one Open in CapCut under them when any is made
@@ -2411,12 +2443,15 @@ def build_page(kit):
             rs += [""] * max(0, r["count"] - len(rs))
             st = (_strip(rs, STRIP_REEL, tall=True, again=True) if r["count"]
                   else f"<p class='empty'>{html.escape(KIT_WORDS['reel_empty'])}</p>")
-            made = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(r['project'])}</b>", True) if r["project"]
+            # v27: a reel whose newest make is a saved B-roll video (reels_for_kit: its "project" is then the video's file name)
+            in_capcut = r["project"] and r["project"] != r.get("video")
+            made = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(r['project'])}</b>", True) if in_capcut
+                    else _status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(r['project'])}</b>", True) if r["project"]
                     else _status(html.escape(KIT_WORDS["not_made"]), False))
             parts.append(f"<div class='onereel' data-reel='{html.escape(r['id'])}'><div class='rn'>{html.escape(r['name'])}</div>{st}{made}</div>")
         reel_strip = "".join(parts)
         reel_status = (f"<div class='status'><button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button></div>"
-                       if any(r["project"] for r in several) else "")
+                       if any(r["project"] and r["project"] != r.get("video") for r in several) else "")
 
     # the Carousel card
     slides = f["slides"]
@@ -2502,7 +2537,7 @@ def build_page(kit):
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
     page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
     page = (_head(name + " · Post kit")
-            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words)
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words, kit.name)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
             f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p>{folders}</header>"
             f"<div id='pieces'>{cards}</div>{also}</div>"

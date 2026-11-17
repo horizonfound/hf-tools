@@ -6,7 +6,8 @@ Two of the steps have a screen of their own, and this file is both of them:
 
     /backups       Back up a card: what a backup does, the two steps, and "Your backups": every card backed up,
                    newest first (the 10 newest, Show older by month, a search by shoot name)
-    /make-posts    Make posts from a shoot: the two steps, and "Your post kits" (the 20 newest, Show older, a
+    /make-posts    Make posts from a shoot: what a post kit is ("What's a post kit?", her v27), the three steps
+                   (the third happens inside the post kit), and "Your post kits" (the 20 newest, Show older, a
                    search, Archive by hand and Bring it back)
 
 What they show is read fresh, and only read, from what the Assistant already keeps: the editing queue's record
@@ -54,8 +55,9 @@ RECENT_KITS = 20
 POST_CAP = 2000                 # a press on Archive is a few dozen bytes
 
 # ---------- the words ----------
-# Nicole's, from her three pages (pages/home-test.html, backups.html, make-posts.html, v26), whole. <em> and <b>
-# are hers too (the accent word, the bold start of a step). {…} is filled in by the page.
+# Nicole's, from her three pages (pages/home-test.html and backups.html, v26; make-posts.html, v27, Nov 17), whole.
+# <em> and <b> are hers too (the accent word, the bold start of a step, "post kit" in the lede). {…} is filled in
+# by the page.
 WORDS = {
     # the home base
     "home_eyebrow": "Home",
@@ -133,15 +135,19 @@ WORDS = {
     # Make posts from a shoot
     "m_eyebrow": "Step 3 of your workflow",
     "m_h1": "Make posts <em>from a shoot.</em>",
-    "m_lede": "When your editing is done, start here and we'll create your social media content: reels, carousels, single photos, stories and captions. Whatever you need to support your social media.",
-    "m_steps": "How to make posts from a shoot",
+    "m_lede": "When your editing is done, start here. For each shoot you'd like to make posts from, we'll build you a <b>post kit</b>, and together we'll create your reels, carousels, single photos, stories and captions. Whatever you need to support your social media.",
+    "m_what_h": "What's a post kit?",
+    "m_what_p": "It's one place for everything you'll post from a shoot. Inside your post kit is where you make it all: build your reels, design your carousels and stories, and write your captions. When a piece is ready, it goes to your posting queue. Nothing is ever posted for you.",
+    "m_steps": "How to make a post kit from a shoot",
     "m_s1": "<b>Choose the folder with your finished photos.</b>",
     "m_pick": "Select the folder with your finished photos",
     "m_s1_small": "Your assistant makes its own copies of the JPEGs in that folder. Your originals aren't moved or changed.",
     "m_picking": "Pick the folder in the window that just opened…",
     "m_s2": "<b>Then paste this in the chat:</b>",
     "m_say": "make my posts",
-    "m_s2_small": "Your shoot's post kit opens, and it shows up below. Nothing is posted; you post it when you're ready.",
+    "m_s2_small": "I'll bring your photos in and open your new post kit. You'll find it below any time, too.",
+    "m_s3": "<b>Make your posts inside your post kit.</b>",
+    "m_s3_small": "Pick what you want to make: a reel, a carousel, stories or a caption. Each one walks you through it.",
     "m_h2": "Your post kits",
     "m_say_list": "Your most recent shoots, newest first. Click one to open its post kit. When a shoot's posts are done, archive it to tidy this list; nothing is deleted.",
     "m_find": "Find a post kit by shoot name",
@@ -206,6 +212,9 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .btn{display:inline-flex;align-items:center;gap:.4rem;font:600 13px/1 var(--sans);padding:9px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--ink)}.btn.solid{background:var(--ink);color:#fff;border-color:var(--ink)}.btn.solid:hover{background:var(--coral-2);border-color:var(--coral-2)}
 .btn.coral{background:var(--coral);color:var(--ink);border-color:var(--coral)}.btn[disabled]{opacity:.55;cursor:default}
+.whatkit{margin:.4rem 0 1.4rem;padding:1rem 1.2rem;border-radius:18px;background:var(--paper);box-shadow:0 1px 0 var(--line);max-width:52em;min-width:0}
+.whatkit .wk-h{margin:0 0 .25rem;font:600 15px/1.3 var(--sans)}
+.whatkit p{margin:0;color:var(--ink-2);font-size:15px;line-height:1.55;overflow-wrap:anywhere}
 .steps-title{margin:1.6rem 0 0;font:600 13px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
 .steps{border-radius:22px;padding:22px 26px;margin-top:1.2rem;display:grid;gap:1rem;background:var(--paper);color:var(--ink);box-shadow:0 1px 0 var(--line),0 0 0 2px var(--coral-l)}
 .steps .st{display:grid;grid-template-columns:32px minmax(0,1fr);gap:.8rem;align-items:start}
@@ -456,11 +465,13 @@ def backups_html():
 def make_posts_html():
     e = html.escape
     body = (f"<header class='head'><span class='eyebrow'>{e(W('m_eyebrow'))}</span><h1>{W('m_h1')}</h1>"
-            f"<p class='lede wide'>{e(W('m_lede'))}</p></header>"
+            f"<p class='lede wide'>{W('m_lede')}</p></header>"
+            f"<div class='whatkit'><p class='wk-h'>{e(W('m_what_h'))}</p><p>{e(W('m_what_p'))}</p></div>"
             f"<p class='steps-title'>{e(W('m_steps'))}</p><div class='steps light'>"
             f"<div class='st'><span class='num'>1</span><div><p>{W('m_s1')}</p>"
             f"<button class='btn coral' id='pick'>{e(W('m_pick'))}</button><small class='block'>{e(W('m_s1_small'))}</small></div></div>"
-            f"<div class='st'><span class='num'>2</span><div><p>{W('m_s2')}</p>{_paste(W('m_say'))}<small>{e(W('m_s2_small'))}</small></div></div></div>"
+            f"<div class='st'><span class='num'>2</span><div><p>{W('m_s2')}</p>{_paste(W('m_say'))}<small>{e(W('m_s2_small'))}</small></div></div>"
+            f"<div class='st'><span class='num'>3</span><div><p>{W('m_s3')}</p><small>{e(W('m_s3_small'))}</small></div></div></div>"
             f"<section class='sec' id='kits'><h2>{e(W('m_h2'))}</h2><p class='say'>{e(W('m_say_list'))}</p>"
             f"<div class='find'><input id='find' type='search' placeholder='{e(W('m_find'), quote=True)}' aria-label='{e(W('m_find'), quote=True)}'></div>"
             f"<div id='recent'><p class='empty'>{e(W('loading'))}</p></div><div id='olderBox'></div>"

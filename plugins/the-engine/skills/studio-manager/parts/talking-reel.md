@@ -48,7 +48,7 @@ python3 <scripts>/talking_rec.py setup                                       the
 
 ## The page
 
-`talking_page.py open "<shoot>"` prints the page's address on its last line. Load it in the Claude app's browser pane and bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`). Never Chrome. They also get there without you: step 1 of the reel page has a third card, **Talking to camera**, which opens this page for the same shoot (`parts/arrange.md`, "The reel's page"). A shoot with no post kit has no page: make the kit first (the reel skill's Step 1).
+`talking_page.py open "<shoot>"` prints the page's address on its last line. Load it in the Claude app's browser pane and bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`). Never Chrome. They also get there without you: the reel page's chooser ("Which reel do you want to create?") has a card, **Talking to camera**, which opens this page for the same shoot (`parts/arrange.md`, "The reel's page"). A shoot with no post kit has no page: make the kit first (the reel skill's Step 1).
 
 Then one or two lines, no more: "Your talking reel page is beside us. Press Add my video, drag in the video of you talking, and press Edit my video. When the script is there, copy the line under it into the chat and I'll cut it."
 
@@ -167,13 +167,13 @@ The video itself is read as a file. The microphone is never used. The Assistant 
 
 ## On a PC
 
-Talking reels aren't on a PC yet. The third card and the page open there, and Edit my video answers at once: "Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here." Say the same if they ask you, and never promise when it will come. `talking_rec.py setup` says "Not possible here" on a PC; don't try anything else.
+Talking reels aren't on a PC yet. The chooser's card and the page open there, and Edit my video answers at once: "Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here." Say the same if they ask you, and never promise when it will come. `talking_rec.py setup` says "Not possible here" on a PC; don't try anything else.
 
 ## Make it in CapCut, and afterwards
 
 **Make it in CapCut** is on the page, and only there: it makes a new CapCut project ("<shoot> talking reel"; a second one is "talking reel 2") and the page says so in its result box. You have no command to press it for them. A project already in CapCut is never changed. If the page says a photo or a video in the reel isn't in the shoot anymore, they take it off its words or put the file back, then press again.
 
-A talking reel is not in the posting queue and does not show on the post kit's Reel card; if they ask, say so and that they post it from CapCut's export like any reel. When they tell you it's made, record it once: `python3 <scripts>/home.py did reel --note "made the Hannah talking reel"`.
+A talking reel is not in the posting queue and does not show on the post kit's Reels card; if they ask, say so and that they post it from CapCut's export like any reel. When they tell you it's made, record it once: `python3 <scripts>/home.py did reel --note "made the Hannah talking reel"`.
 
 ## Not proven yet, honestly
 

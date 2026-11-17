@@ -3,7 +3,7 @@
 checked by request and on the real pages in a HIDDEN Chrome.
 
     python3 tests/kit_reels_queue_check.py [--port 9940] [--work <a folder to keep the run in>] [--no-chrome]
-                                           [--only words|optional|reels|names|cover|chat|reminders|guard|page|posting]
+                                           [--only words|optional|reels|video|names|cover|chat|reminders|guard|page|posting]
 
 What it does, on pretend Assistants it makes itself in a throwaway folder (the words page check's own: one kit, a
 few tiny pictures; nothing of a client's, nothing of the real ~/.studio, no drive, never the real Calendar):
@@ -88,9 +88,10 @@ def want(name):
 
 
 def her(*parts):
-    """A file of her v25 handoff, or None when it is not on this computer."""
+    """A file of her newest handoff from v25 on (v25 brought these pages; v27 changed only the bar and the Reels card), or
+    None when it is not on this computer."""
     for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools")):
-        for h in sorted((base / "reference-private").glob("nicole-handoff-v25-*")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v2[5-9]-*"), reverse=True):
             f = h.joinpath("Carousel designer and reel picker", *parts)
             if f.is_file():
                 return f
@@ -107,7 +108,8 @@ def fresh(work, name, port, backend="none"):
 
 
 def rrec(s):
-    return json.loads((s.kit / ".kit" / "reel-page.json").read_text(encoding="utf-8"))
+    f = s.kit / ".kit" / "reel-page.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}      # no record until the reel page is first opened
 
 
 def wrec(s, rec):
@@ -147,6 +149,18 @@ def set_made(s, vid, project):
     rec = rrec(s)
     rec.setdefault("made", []).append({"project": project, "picks": "1,2", "vibe": "beat", "footage": None, "version": vid, "when": time.time()})
     wrec(s, rec)
+
+
+def set_video(s, vid, name):
+    """A B-roll reel saved whole from the reel page (Save my video, Nicole's v27): its "made" entry carries the video's
+    file name and no CapCut project (reel_page.py writes it so), and the file is in the shoot's Reels folder."""
+    rec = rrec(s)
+    rec.setdefault("made", []).append({"video": name, "picks": "", "vibe": "beat", "footage": "broll", "clips": ["u1-aaaaaa"],
+                                       "song": "", "song_id": "", "version": vid, "when": time.time(), "variation": 0,
+                                       "song_start": None, "seconds": 4.5})
+    wrec(s, rec)
+    (s.kit / "Reels").mkdir(exist_ok=True)
+    (s.kit / "Reels" / name).write_bytes(b"\x00" * 2000)
 
 
 def two_reels(s, second_made=True):
@@ -225,13 +239,13 @@ def check_words(s):
     case("the older 'More from the shoot' divider is gone from the picker", "More from the shoot" not in src)
     f = her("pages", "post-kit.html")
     if f is None:
-        skip("her words against her own v25 page: her handoff (reference-private) isn't on this computer")
+        skip("her words against her own page (v25 or newer): her handoff (reference-private) isn't on this computer")
     else:
         t = html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
         new = ("ready_nocap", "nocap_title", "nocap_text", "nocap_add", "nocap_write", "which_title", "which_text", "reel_empty",
                "r_posted", "r_down", "r_in", "r_made", "r_not")
         bad = [(key, frag) for key in new for frag in re.split(r"\{\w+\}", K[key]) if frag.strip() and frag not in t]
-        case("each of those %d lines is in her v25 pages/post-kit.html" % len(new), not bad, bad)
+        case("each of those %d lines is in her newest pages/post-kit.html (v25 or later)" % len(new), not bad, bad)
         raw = f.read_text(encoding="utf-8")
         rules = [ln for ln in k.REELS_STYLE.splitlines() if ln.strip()]
         missing = [ln for ln in rules if ln not in raw]
@@ -407,6 +421,52 @@ def check_reels(s):
          code == 0 and code2 == 0 and reel_pieces(s)[was["id"] + "-v3"]["reel_name"] == "Golden hour" and "reel (Golden hour): green" in out2, (out[-200:], out2[-300:]))
     case("...and no piece was made for a reel nobody asked to queue; none was renamed", sorted(reel_pieces(s)) == [was["id"], was["id"] + "-v2", was["id"] + "-v3"])
     s.stop()
+
+
+SAVED_VIDEO = "Saved as a video, in this shoot's Reels folder:"       # ours: her v27 card has no line for a saved video
+
+
+def check_video(s):
+    """A B-roll video saved from the reel page counts as made (the stage-1 contract; the review of Nov 17 found a shoot
+    with ONE reel went by CapCut projects alone, so Add this reel to my posting queue showed and then failed)."""
+    s.start()
+    video = SHORT + " B-roll.mp4"
+    set_video(s, "v1", video)
+    code, t = look(s)
+    r = box(t, "queue-reel")
+    st = re.search(r"<div class='status'>(.*?)</div>", t.split("data-piece='carousel'", 1)[0], re.S)
+    status = re.sub(r"\s+", " ", text_of(st.group(1))).replace("\x1f", "").strip() if st else ""
+    case("one reel, a saved video, no CapCut project: the Reel card says our 'Saved as a video, in this shoot's Reels folder: <file>'",
+         code == 200 and status == SAVED_VIDEO + " " + video, status)
+    case("...never 'In CapCut' or 'Not made yet', and no Open in CapCut (there is no project to open)",
+         "In CapCut" not in text_of(t.split("data-piece='carousel'", 1)[0]) and "Not made yet" not in status and "id='capcut'" not in t)
+    case("...and her 'Create another reel' (the reel is made), with the queue step live: her no-caption line, the button marked to ask first",
+         "Create another reel" in text_of(t) and READY_NOCAP in text_of(r) and add_button(t) is not None and "disabled" not in add_button(t), text_of(r)[:300])
+    code, j = add(s)
+    x = s.queue_piece("reel") or {}
+    case("Add to my queue on that one reel: added, ready to post (hers refused it with the locked line)",
+         code == 200 and j.get("ok") and j["queue"]["status"] == "green" and x.get("status") == "green", (code, j))
+    case("a shoot with one reel keeps the queue's same fields as ever", "version" not in x and "reel_name" not in x, sorted(x))
+    code, t = look(s)
+    case("the page now says 'In your posting queue.' with her '✓ Added to my queue'", "In your posting queue." in text_of(box(t, "queue-reel"))
+         and "✓ Added to my queue" in text_of(box(t, "queue-reel")), text_of(box(t, "queue-reel"))[:300])
+    # a second reel, saved as a video too: each reel's own preview says so, and it can be added by its id
+    new_reel(s, SECOND)
+    set_picks(s, "v2", [6, 5])
+    video2 = SHORT + " B-roll - " + SECOND + ".mp4"
+    set_video(s, "v2", video2)
+    code, t = look(s)
+    pv = previews(t)
+    case("two reels, both saved as videos: each preview says 'Saved as a video, ...: <its file>', no Open in CapCut under them",
+         [(v, n, st) for v, n, _c, _m, st, _e in pv] == [("v1", "Reel 1", SAVED_VIDEO + " " + video), ("v2", SECOND, SAVED_VIDEO + " " + video2)]
+         and "id='capcut'" not in t, pv)
+    code, j = add(s, reel="v2")
+    case("the second reel, saved as a video, goes in the queue by its id", code == 200 and j.get("ok") and len(reel_pieces(s)) == 2, (code, j))
+    set_made(s, "v2", P2)
+    code, t = look(s)
+    pv = previews(t)
+    case("a reel made in CapCut after its video: 'In CapCut: <project>' again, and one Open in CapCut under the previews",
+         pv[1][4] == "In CapCut: " + P2 and t.count("id='capcut'") == 1, (pv, t.count("id='capcut'")))
 
 
 def check_twin(s):
@@ -837,7 +897,7 @@ def main():
     ap.add_argument("--work", help="a folder for this run, kept afterwards (default: a throwaway folder, removed at the end)")
     ap.add_argument("--port", type=int, default=9940)
     ap.add_argument("--no-chrome", action="store_true", help="the routes only")
-    ap.add_argument("--only", choices=("words", "optional", "reels", "names", "cover", "chat", "reminders", "guard", "page", "posting"))
+    ap.add_argument("--only", choices=("words", "optional", "reels", "video", "names", "cover", "chat", "reminders", "guard", "page", "posting"))
     a = ap.parse_args()
     ONLY = a.only
     if any(p in chrome_drive.NEVER_PORTS for p in range(a.port, a.port + 30)):
@@ -862,6 +922,8 @@ def main():
         if want("reels"):
             group("a shoot with more than one reel", check_reels, one("reels"))
             group("two shoots whose names shorten alike", check_twin, one("twin"))
+        if want("video"):
+            group("a B-roll video saved from the reel page counts as made (v27)", check_video, one("video"))
         if want("names") or want("cover"):
             group("the queue's names and the cover picker's photos", check_names, one("names"))
         if want("chat"):

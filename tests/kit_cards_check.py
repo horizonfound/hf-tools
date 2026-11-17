@@ -113,7 +113,7 @@ def check_words(s):
                and any(frag.strip() and frag not in t for frag in re.split(r"\{\w+\}", v))]
     case("every word in kit.KIT_WORDS is in her pages/post-kit.html, word for word", not missing, missing)
     for frag in ("slides saved in the Carousel folder", "saved design", "no slides saved yet", "saved in the Stories folder", "'story' : 'stories'",
-                 "no stories saved yet", "Make a new version", "Create my reel", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
+                 "no stories saved yet", "Create another reel", "Create my reels", "+${order.length - 7}", "slice(0, 7)", "slice(0, 6)"):
         case("her page has %r (our status lines and strips follow it)" % frag, frag in t)
     case("our status lines say her words", k.carousel_status(7, 2) == "7 slides saved in the Carousel folder · 2 saved designs"
          and k.stories_status(3, 1) == "3 stories saved in the Stories folder · 1 saved design"
@@ -210,8 +210,8 @@ def check_empty_kit(s):
     case("nothing made: three cards, Reel, Carousel and Stories, in her order", all((r, c, t)) and text.index("data-piece='reel'") < text.index("data-piece='carousel'") < text.index("data-piece='stories'"))
     case("nothing made: the Reel card says her 'Your assistant hasn't picked the reel photos yet. Click to pick them yourself.' and 'Not made yet'",
          "Your assistant hasn't picked the reel photos yet. Click to pick them yourself." in plain(r) and status_of(r) == "Not made yet", status_of(r))
-    case("nothing made: the CTAs are hers: Create my reel →, Design my carousel →, Make my stories →",
-         "Create my reel →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
+    case("nothing made: the CTAs are hers: Create my reels →, Design my carousel →, Make my stories →",
+         "Create my reels →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
     case("nothing made: 'No slides yet.' and 'No stories yet.', each 'Not made yet'",
          "No slides yet." in plain(c) and "No stories yet." in plain(t) and status_of(c) == "Not made yet" and status_of(t) == "Not made yet")
     case("nothing made: the Reel and Carousel cards have her three steps (Make it, Your words, Add to my queue); the Stories card has none",
@@ -244,6 +244,17 @@ def check_page_fresh(s):
          and "Fraunces" not in text and "--display" not in text and "/reel-font" not in text)
     case("no path in the page", not re.search(r"/private/|/Users/|\.kit/|kit\.json", text), re.findall(r".{20}(?:/private/|/Users/|\.kit/).{20}", text)[:2])
     case("her bar: Back to home, the product's name, the date in words", "Back to home" in text and "<span class='when'>November 1, 2026</span>" in text)
+    # v27: the path at the top (Home › Fake beach post kit), built on the server; her Back to home pill kept, hidden
+    import look
+    nav = look.crumbs([("Fake beach post kit", None)])
+    case("her v27 bar: the path Home › Fake beach post kit, Home a link to /home, the kit's crumb where you are (no link)",
+         nav in text and nav == "<nav class='crumbs' aria-label='Where you are'><a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span>"
+         "<span class='here' aria-current='page'>Fake beach post kit</span></nav>", nav)
+    case("...the Back to home pill is still in the markup, hidden, as her v27 page keeps it; the path follows it, before the brand",
+         "<a class='homelink' style='display:none' href='/home'>" in text and text.index("class='homelink'") < text.index("class='crumbs'") < text.index("class='brand'")
+         and text.count("class='crumbs'") == 1)
+    case("...her path's rules are on the page (look.py's): the hover in the look's own name, not her number; no address with a port",
+         look.CRUMBS.strip() in text and ".crumbs a:hover{background:var(--coral-2)" in text and "D4643F" not in look.CRUMBS and "8790" not in text)
     case("her heading: the eyebrow 'Post kit', the shoot's name with her coral full stop, her lede",
          "<span class='eyebrow'>Post kit</span><h1>Fake beach<em>.</em></h1>" in text and html.escape(LEDE) in text)
     r_href, r = card(text, "reel")
@@ -252,9 +263,9 @@ def check_page_fresh(s):
     case("the Reel card: the first 7 of the 12 photos, in the assistant's order, then her '+5'",
          [int(re.search(r"&n=(\d+)", x).group(1)) for x in srcs] == rpc.CLAUDE[:7] and "<span class='more'>+5</span>" in r, srcs[:3])
     case("...each named only by the kit and its number (/kit-photo)", all(x.startswith("/kit-photo?kit=%s&n=" % KQ) and "&size=s" in x for x in srcs))
-    case("the Reel card: 'Not made yet', her CTA 'Create my reel →', her line under the heading",
-         status_of(r) == "Not made yet" and "Create my reel →" in plain(r)
-         and "Put your photos in order, pick your song and the vibe, and it's cut on the beat in CapCut." in plain(r))
+    case("the Reels card: 'Not made yet', her CTA 'Create my reels →', her v27 line under the heading",
+         status_of(r) == "Not made yet" and "Create my reels →" in plain(r)
+         and "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look." in plain(r))
     c_href, c = card(text, "carousel")
     t_href, t = card(text, "stories")
     case("the Carousel card goes to the designer, the Stories card to the stories designer",
@@ -265,9 +276,9 @@ def check_page_fresh(s):
     code, out = s.cmd("kit.py", "reel-made", KIT, "--project", "Fake beach reel")
     code, text = page(s)
     _, r = card(text, "reel")
-    case("a reel made: 'In CapCut: Fake beach reel' with her Open in CapCut, and her 'Make a new version →'",
+    case("a reel made: 'In CapCut: Fake beach reel' with her Open in CapCut, and her 'Create another reel →'",
          status_of(r) == "In CapCut: Fake beach reel Open in CapCut" and "<button class='go' id='capcut' type='button'>Open in CapCut</button>" in r
-         and "Make a new version →" in plain(r), status_of(r))
+         and "Create another reel →" in plain(r), status_of(r))
     # a newer one from the reel page (this check's own record, as the page's Make my reel leaves it)
     rec_file = k / ".kit" / "reel-page.json"
     rp = json.loads(rec_file.read_text(encoding="utf-8")) if rec_file.exists() else {"v": 1}
@@ -623,6 +634,9 @@ def check_unplugged(s):
         case("the drive unplugged: her line 'I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.'",
              "<div class='problem'>%s</div>" % html.escape(REACH) in text and code == 404, code)
         case("...under her heading 'Post kit.' and her lede, with no card", "<h1>Post kit<em>.</em></h1>" in text and "class='piece'" not in text)
+        case("...and its path is Home › Post kit (no shoot to name, no dead link)",
+             "<a href='/home'>Home</a><span class='sep' aria-hidden='true'>›</span><span class='here' aria-current='page'>Post kit</span></nav>" in text
+             and text.count("class='crumbs'") == 1)
         code, text = page(s, "No such kit")
         case("a kit that isn't there: the same line, not found", code == 404 and REACH in html.unescape(text), code)
     finally:
@@ -644,10 +658,37 @@ def check_browser(c, s):
     c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
     cards = c.js("Array.from(document.querySelectorAll('a.piece')).map(function(a){return [a.dataset.piece, a.querySelector('h2').firstChild.textContent, a.querySelector('.cta').textContent, a.getAttribute('href')]})")
     case("in a browser: the three cards, her headings and CTAs, each a link to its page", cards == [
-        ["reel", "Reel", "Make a new version →", "/reel.html?kit=" + KQ],
+        ["reel", "Reels", "Create another reel →", "/reel.html?kit=" + KQ],
         ["carousel", "Carousel", "Open my carousel →", "/design.html?kit=" + KQ],
         ["stories", "Stories", "Open my stories →", "/design.html?kit=%s&kind=stories" % KQ]], cards)
     case("in a browser: her lede, word for word", c.text(".lede") == LEDE)
+    steps = c.js("Array.from(document.querySelectorAll('.bar nav.crumbs > *')).map(function(n){ return [n.tagName, n.textContent, n.getAttribute('href'), n.getAttribute('aria-current')]; })")
+    case("in a browser: her v27 path at the top, Home › Fake beach post kit; Home a pill (her rule), the kit's crumb where you are",
+         steps == [["A", "Home", "/home", None], ["SPAN", "›", None, None], ["SPAN", "Fake beach post kit", None, "page"]]
+         and c.js("getComputedStyle(document.querySelector('.bar nav.crumbs a')).borderRadius") == "999px", steps)
+    case("in a browser: the path's links can be pressed on the live page; on a saved copy (no .live on the body) they are plain words",
+         c.js("getComputedStyle(document.querySelector('.bar nav.crumbs a')).pointerEvents") == "auto"
+         and c.js("(function(){ document.body.classList.remove('live'); var a = document.querySelector('.bar nav.crumbs a'), s = getComputedStyle(a);"
+                  " var out = [s.pointerEvents, s.backgroundColor, getComputedStyle(document.querySelector('.bar .homelink')).display]; document.body.classList.add('live'); return out; })()")
+         == ["none", "rgba(0, 0, 0, 0)", "none"] and "body:not(.live) .crumbs a{pointer-events:none" in c.js("document.querySelector('style').textContent"))
+    case("in a browser: the Back to home pill is not drawn, the path sits before the brand and the date stays at the right",
+         c.js("getComputedStyle(document.querySelector('.bar .homelink')).display") == "none"
+         and c.rect(".bar nav.crumbs")["x"] < c.rect(".bar .brand")["x"] < c.rect(".bar .when")["x"] and c.rect(".bar .when")["right"] > c.rect(".bar .brand")["right"] + 100)
+    c.phone(375, 812)
+    try:
+        c.open(url)
+        c.wait_for("document.querySelectorAll('a.piece').length === 3", 10)
+        wide = c.js("[document.documentElement.scrollWidth - document.documentElement.clientWidth, window.innerWidth, document.querySelector('.bar').getBoundingClientRect().right <= window.innerWidth + 0.5]")
+        case("at 375 px (a small phone) the bar with its path fits: no sideways scroll, the bar inside the screen", wide[0] <= 0 and wide[1] == 375 and wide[2] is True, wide)
+    finally:
+        c.desktop()
+    c.open(url)
+    c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
+    c.click(".bar nav.crumbs a")
+    c.wait_for("location.pathname === '/home'", 10)
+    case("a press on Home opens the home page on this server", c.js("location.pathname") == "/home", c.js("location.href"))
+    c.open(url)
+    c.wait_for("document.body.classList.contains('live') && document.querySelectorAll('a.piece').length === 3", 10)
     try:
         c.wait_for("Array.from(document.querySelectorAll('[data-piece=reel] .strip img')).every(function(i){return i.complete && i.naturalWidth > 0})", 60)
         loaded = True

@@ -15,6 +15,17 @@ promising stretches, and saves the moments it found, which the reel page shows a
             finished photo N first, to compare (The reveal only)
     python3 footage.py moments "<kit>" --file <moments.json>
             save the moments Claude chose, as cards on the reel page
+    python3 footage.py picks    "<kit>" [--all]
+            the clips the photographer made themselves on the editor's timeline that have no name yet (every
+            reel of the shoot), each with a close-look sheet to read; --all: every clip of theirs
+    python3 footage.py describe "<kit>" --file <names.json>
+            save a short name for each: {"clips": {"u1-81563a": {"label": "Walking down the kitchen to the stove"}}}
+
+"Name my clips for <shoot>" (the line on the reel page's Your clips, her v27, Nov 17): run picks, read each sheet
+once, then describe. Just a short plain name of what happens, like the moments Claude finds ("Laughing with the
+cupcake tray"), only what can be seen: never a name, a feeling or a fact it can't see. No longer description (Nicole,
+Nov 17: "the short name is enough"; an "about" in the file is refused). The names are written under the record's
+lock, into every reel that holds the clip, the version before kept; the page shows them by itself.
 
 moments.json: {"moments": [{"video": "<the key scan printed, or the file name>", "start": 42.0, "end": 46.0,
                             "label": "Laughing at the wave", "photo": 12 or null}, ...],
@@ -805,6 +816,149 @@ def cmd_moments(kit, file, reel=None):
     return 0
 
 
+# ---------- the photographer's own clips: picks and describe (her v27, section 3: "Name my clips for <shoot>") ----------
+
+PICK_STILLS = 8                   # hers: a still every max(0.5, (end - start) / 8) s, so a clip's sheet has about 8
+NAMES_MOST = 200                  # ours: the most names one file may carry (a shoot keeps far fewer clips)
+
+
+def their_clips(rec):
+    """Every clip of their own in every reel of the shoot, as (reel id, reel name, the moment dict in the
+    record), the open reel first, each clip once (her all_picks, over every reel)."""
+    seen, out = set(), []
+    first = reel_page.REEL_FIRST
+    for vid, data in reel_page.reels.each(rec, reel_page.REEL_LIVE, first):
+        name = reel_page.reels.name_of(rec, vid, first)
+        for m in reel_page.moments_of(data):
+            if m.get("by") == "you" and m["id"] not in seen:
+                seen.add(m["id"])
+                out.append((vid, name, m))
+    return out
+
+
+def cmd_picks(kit, all_of_them=False):
+    vm = reel_page._video()
+    with arrange.locked(reel_page.lock_path(kit)):
+        rec = reel_page.load(kit)
+    clips = their_clips(rec)
+    todo = [c for c in clips if all_of_them or c[2] in reel_page.unnamed_picks([c[2]])]
+    if not clips:
+        say("They haven't made any clips of their own yet (Start here and End here on the reel page's timeline).")
+        return 0
+    if not todo:
+        say("Every clip they picked has a name.")
+        return 0
+    if not vm.avfoundation_here():
+        say("NOTE: " + this_computer.NO_NAMES_PC)
+        return EXIT_NO_SHEETS
+    vids = reel_page.list_videos(kit)
+    look = vm.fresh_folder(looks_dir(kit), "picks")            # every run in a new folder: nothing written over
+    say(f"{len(todo)} clip{'s' if len(todo) != 1 else ''} of theirs to name" + ("" if all_of_them else " (not named yet)")
+        + f". One sheet each, in {look}:")
+    made = 0
+    for k, (vid, reel_name, m) in enumerate(todo, 1):
+        v = reel_page.video_by_name(kit, m["video"], vids)
+        s, e = float(m["start"]), float(m["end"])
+        head = f"  {m['id']}  reel \"{reel_name}\"  {m.get('label') or '(no label)'}  {mmss(s)} to {mmss(e)} ({e - s:.1f} s)"
+        if v is None:
+            say(head + "  (its video isn't in the Footage folder now, so no sheet)")
+            continue
+        if v["facts"].get("refused"):
+            say(head + f"  ({v['name']}: {v['facts']['refused']})")
+            continue
+        every = max(0.5, round((e - s) / PICK_STILLS, 1))
+        times, t = [], s
+        while t <= e + 1e-6 and len(times) < CLOSE_MOST:
+            times.append(round(t, 3))
+            t += every
+        cols, cw, ch, per = layout(v["facts"].get("w") or 0, v["facts"].get("h") or 0)
+        cells, r = take_stills(vm, v, times, look, m["id"], (cols, cw, ch))
+        if cells is None:
+            say(head + f"  (no sheet: {r.get('words') or 'the stills could not be taken'})")
+            continue
+        i = next((n for n, x in enumerate(vids, 1) if x["key"] == v["key"]), 1)
+        sheets = write_sheets(cells, look, i, dict(v, name=m["id"] + " " + v["name"]), (cols, cw, ch), per, what="pick")
+        say(head + "  " + sheets[0]["path"] if sheets else head)
+        made += 1
+    (look / "picks.json").write_text(json.dumps({"kit": kit.name, "clips": [{"id": m["id"], "reel": vid, "video": m["video"], "start": m["start"],
+                                                                              "end": m["end"], "label": m.get("label") or ""} for vid, _n, m in todo]},
+                                                indent=1, ensure_ascii=False), encoding="utf-8")
+    say(f"Read each sheet once, then save the names with: python3 footage.py describe \"{kit.name}\" --file names.json")
+    return 0 if made else EXIT_NO_SHEETS
+
+
+class WrongNames(Exception):
+    pass
+
+
+def check_names(d, known):
+    """The names file, checked whole before a byte is written: {"clips": {id: {"label": "..."}}}, every id a clip
+    of theirs in some reel of the shoot, every label plain words on one line, at most LABEL_MAX characters, and
+    nothing else (her "about" was taken out; ours refuses it rather than storing it quietly). {id: label}."""
+    if not isinstance(d, dict) or not isinstance(d.get("clips"), dict) or not d["clips"] or set(d) - {"clips"}:
+        raise WrongNames('the names file needs {"clips": {"<clip id>": {"label": "..."}}}, one short name for each clip.')
+    if len(d["clips"]) > NAMES_MOST:
+        raise WrongNames(f"that's more than {NAMES_MOST} clips in one file.")
+    out = {}
+    for cid, w in d["clips"].items():
+        if not isinstance(cid, str) or not reel_page.MOMENT_ID.fullmatch(cid):
+            raise WrongNames(f"\"{str(cid)[:40]}\" isn't a clip id (they look like u1-81563a).")
+        if cid not in known:
+            raise WrongNames(f"clip {cid} isn't in any reel of this shoot. Run picks again and use the ids it prints.")
+        if not isinstance(w, dict):
+            raise WrongNames(f"{cid} needs {{\"label\": \"...\"}}.")
+        if "about" in w:
+            raise WrongNames(f"{cid} has an \"about\": the description was taken out (Nicole: the short name is enough). Give each clip its label only.")
+        if set(w) - {"label"}:
+            raise WrongNames(f"{cid} has a field I don't know ({', '.join(sorted(set(w) - {'label'}))[:60]}). Each clip takes \"label\" only.")
+        label = w.get("label")
+        if not isinstance(label, str) or not label.strip():
+            raise WrongNames(f"{cid} needs a label: a short plain name of what happens in it.")
+        if "\n" in label.strip() or "\r" in label.strip():
+            raise WrongNames(f"the label for {cid} runs over more than one line: one short line.")
+        label = " ".join(label.split())
+        if len(label) > LABEL_MAX:
+            raise WrongNames(f"the label for {cid} is longer than {LABEL_MAX} characters ({len(label)}): keep it short.")
+        out[cid] = label
+    return out
+
+
+def cmd_describe(kit, file):
+    try:
+        d = json.loads(Path(file).read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as e:
+        return stop(f"couldn't read the names file ({e.__class__.__name__}). Nothing was saved.")
+    with arrange.locked(reel_page.lock_path(kit)):
+        rec = reel_page.load(kit)
+        known = {m["id"] for _v, _n, m in their_clips(rec)}
+        try:
+            names = check_names(d, known)
+        except WrongNames as e:
+            return stop(str(e) + " Nothing was saved.")
+        changed, where = 0, {}
+        for vid, reel_name, data in ((vid, reel_page.reels.name_of(rec, vid, reel_page.REEL_FIRST), data)
+                                     for vid, data in reel_page.reels.each(rec, reel_page.REEL_LIVE, reel_page.REEL_FIRST)):
+            for m in data.get("moments") or []:
+                if isinstance(m, dict) and m.get("id") in names and m.get("by") == "you":
+                    where.setdefault(m["id"], []).append(reel_name)
+                    if m.get("label") != names[m["id"]] or m.get("named") is not True:
+                        m["label"] = names[m["id"]]
+                        m["named"] = True
+                        changed += 1
+        if changed:
+            rec["moments_at"] = time.time()
+            rec["rev"] = int(rec.get("rev") or 0) + 1          # an open page takes the names as they are now
+            rec.pop("from", None)
+            reel_page.save(kit, rec)
+    if not changed:
+        say(f"Those {len(names)} clip{'s' if len(names) != 1 else ''} already {'have' if len(names) != 1 else 'has'} these names. Nothing was written.")
+        return 0
+    say(f"Named {len(names)} clip{'s' if len(names) != 1 else ''} ({changed} card{'s' if changed != 1 else ''} changed). The page shows them by itself in a few seconds.")
+    for cid, label in names.items():
+        say(f"  {cid}: {label}" + (f"  (in {', '.join(where[cid])})" if len(where.get(cid, [])) > 1 else ""))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -824,6 +978,12 @@ def main():
     for x in (s, m):
         x.add_argument("--reel", help="when the shoot has several reels: the reel this is for, by its name "
                                       "(without it: the reel being worked on on the reel page)")
+    pk = sub.add_parser("picks", help="their own clips that have no name yet, each with a sheet to read")
+    pk.add_argument("words")
+    pk.add_argument("--all", action="store_true", help="every clip of theirs, named or not")
+    ds = sub.add_parser("describe", help="save a short name for each of their clips, from a file")
+    ds.add_argument("words")
+    ds.add_argument("--file", required=True)
     a = ap.parse_args()
     import fresh
     fresh.announce()
@@ -832,6 +992,11 @@ def main():
         return stop(f"\"{found.name}\" isn't in Your Content, so the reel page can't show it.")
     if a.cmd == "scan" and a.every is not None and (not math.isfinite(a.every) or a.every < 0.5):
         return stop("--every is how many seconds between stills: 0.5 or more.")
+    if a.cmd == "describe":                       # no video is touched: the record only, under its lock
+        try:
+            return cmd_describe(kit, a.file)
+        except arrange.Busy:
+            return stop("this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.", 2)
     try:
         # one video program at a time on this computer (video.turn, v19 review): the whole look takes its turn,
         # after any preview the reel page is making, and the page waits for it in turn
@@ -846,6 +1011,8 @@ def main():
                 return cmd_scan(kit, a.every, a.reel)
             if a.cmd == "close":
                 return cmd_close(kit, a.video, a.start, a.end, a.every, a.photo)
+            if a.cmd == "picks":
+                return cmd_picks(kit, a.all)
             return cmd_moments(kit, a.file, a.reel)
     except arrange.Busy:
         return stop("this shoot's reel page is being written by something else right now. Nothing was changed. Try again in a moment.", 2)

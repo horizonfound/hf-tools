@@ -20,8 +20,12 @@ clip.mov cut off half way.
 Checks: the facts against AVFoundation's own (length, size shown, turn, kind, frames a second, sound, recording
 time); stills checked by their colour at known times, upright, labelled with the time really returned, never
 enlarged, every look in a new folder; the loud stretch found within one half second; the copy made once, never
-over a file, never enlarged, upright, and read back by AVFoundation; the PC route (ASSISTANT_NO_AVFOUNDATION=1)
-saying its plain words and making nothing; a non-video refused in plain words.
+over a file, never enlarged, upright, and read back by AVFoundation; the finished B-roll video (render_broll,
+Nicole's v27 Save my video: four clips cut and joined at 1080 x 1920 and 30 a second, one of them sideways and
+one the whole of a short video stretched to its beat, the song from where it was asked with its fade and the
+clips' own sound left out, the words drawn on a still in the middle, never over a file, no half-made file left,
+the clips' own sound kept when there is no song); the PC route (ASSISTANT_NO_AVFOUNDATION=1) saying its plain
+words and making nothing; a non-video refused in plain words.
 STUDIO_HOME is set to the scratch folder, so the computer-wide video lock is the test's own and nothing is ever
 written in the real ~/.studio.
 
@@ -528,6 +532,78 @@ def main():
           not r["ok"] and r["state"] == "failed" and "couldn't make a preview" in r["words"] and left == [], (r, left))
     r = video.preview_copy(notes, work / "previews" / "notes" / "preview.mp4")
     check("a copy of a non-video: plain words, nothing made", not r["ok"] and r["state"] == "failed", r)
+
+    # ---- the finished B-roll video (Nicole's v27, Save my video: video.render_broll)
+    reels = work / "Reels"
+    plan = [{"path": clip, "src": 1.0, "dur": 2.0}, {"path": side, "src": 0.5, "dur": 1.5}, {"path": acc, "src": 4.0, "dur": 1.0},
+            {"path": clip, "src": 5.0, "dur": 1.2}]                # the last: 1.0 s left in its video, stretched to its 1.2 s beat (A20)
+    words = {"text": "Golden hour on the dunes with the whole family", "font": "georgia", "style": "whitebox", "x": 0.5, "y": 0.5, "size": 1.0}
+    out = reels / "Café B-roll.mp4"
+    r = video.render_broll(plan, out, song=m4a, song_from=2.5, words=words, work=work)
+    rf = video.facts(out) if out.is_file() else {}
+    check("render_broll: the video made and given its name, 1080 x 1920, 30 a second, H.264 with sound, as long as the plan within a frame (5.7 s), one clip stretched, the words wrapped to lines",
+          r.get("ok") and r.get("placed") and (rf.get("w"), rf.get("h")) == (1080, 1920) and abs(rf.get("fps", 0) - 30) < 0.01 and rf.get("codec") == "avc1"
+          and rf.get("has_audio") and abs(rf.get("length", 0) - 5.7) <= 1 / 30 + 0.01 and r.get("stretched") == 1 and len(r.get("lines") or []) >= 2
+          and abs(r.get("seconds", 0) - rf.get("length", -1)) < 0.001, (r, rf))
+    check("...with the header at the front (it posts as it is: shouldOptimizeForNetworkUse)", out.is_file() and [k for k, _, _, _ in top_boxes(out.read_bytes())][:2] == [b"ftyp", b"moov"],
+          [k for k, _, _, _ in top_boxes(out.read_bytes())][:3] if out.is_file() else None)
+    check("...and no half-made file left beside it (only the video is in the Reels folder)", sorted(p.name for p in reels.iterdir()) == ["Café B-roll.mp4"], sorted(p.name for p in reels.iterdir()))
+    looks = work / "render looks"
+    rs = video.stills(out, [0.1, 2.2, 2.75, 3.9, 5.6], looks, name="render", edge=1920) if out.is_file() else {"stills": []}
+    stills = {x["asked"]: Path(rs["folder"]) / x["file"] for x in rs.get("stills", []) if x.get("file")}
+    c1, _ = colour_at(stills[0.1], 0.5, 0.85, work) if 0.1 in stills else ((0, 0, 0), None)
+    c2, _ = colour_at(stills[2.2], 0.5, 0.85, work) if 2.2 in stills else ((0, 0, 0), None)
+    tr, _ = colour_at(stills[2.2], 0.95, 0.05, work) if 2.2 in stills else ((0, 0, 0), None)
+    c4, _ = colour_at(stills[3.9], 0.5, 0.85, work) if 3.9 in stills else ((0, 0, 0), None)
+    c5, _ = colour_at(stills[5.6], 0.5, 0.85, work) if 5.6 in stills else ((0, 0, 0), None)
+    check("the clips play at their places: green at 0.1 s (clip.mov from its second 1), red at 2.2 s (sideways.mov from 0.5 s, upright: the white block top right), "
+          "purple at 3.9 s (the MP4 from its second 4), cyan at 5.6 s (clip.mov's last second, stretched)",
+          near(c1, COLOURS[1]) and near(c2, COLOURS[0]) and near(tr, (255, 255, 255)) and near(c4, COLOURS[4]) and near(c5, COLOURS[5]), (c1, c2, tr, c4, c5))
+    row = [colour_at(stills[2.75], x / 20, 0.5, work)[0] for x in range(3, 18)] if 2.75 in stills else []
+    blacks = sum(1 for c in row if max(c) < 60)
+    whites = sum(1 for c in row if min(c) > 200)
+    greens = sum(1 for c in row if near(c, COLOURS[1]) or near(c, COLOURS[0]))
+    check("the words are on the video: along the middle of the screen at 2.75 s the pixels are the box's black and the letters' white, no clip colour (White text on black, x 0.5, y 0.5)",
+          row and blacks >= 2 and whites >= 1 and greens == 0, (row, blacks, whites, greens))
+    db, how = video.loudness(out) if out.is_file() else ([], "")
+    db = db or []
+    # the song from 2.5 s: its quiet half second, then loud from the reel's 0.5 s; it ends at 3.5 s with a fade over 3.0 to 3.5;
+    # after that the clips alone, whose own sound (a loud tone from 3 s into each) is left out when there is a song
+    # (the sound ends with the song, at 3.5 s, so the reader hears seven half seconds; any after that must be quiet)
+    check("the song plays from where it was asked (quiet for its first half second, loud from the reel's 0.5 s), fades over its last half second, "
+          "and the clips' own sound is left out: nothing is heard after the song ends (levels every half second: %s)" % [round(x) for x in db],
+          len(db) >= 7 and db[0] < db[1] - 20 and db[1] > -15 and db[5] > -15 and db[6] < db[5] - 3 and all(x < -30 for x in db[7:]), (how, db))
+    before = out.read_bytes() if out.is_file() else b""
+    r2 = video.render_broll(plan, out, song=m4a, song_from=2.5, words=words, work=work)
+    check("a second render to the same name is refused, nothing written (never over a file)", r2.get("ok") is False and r2.get("state") == "exists"
+          and out.read_bytes() == before and sorted(p.name for p in reels.iterdir()) == ["Café B-roll.mp4"], r2)
+    r3 = video.render_broll([{"path": acc, "src": 4.0, "dur": 1.0}, {"path": clip, "src": 3.5, "dur": 1.0}], reels / "no song.mp4", work=work)
+    db3, _ = video.loudness(reels / "no song.mp4") if (reels / "no song.mp4").is_file() else ([], "")
+    check("with no song the clips' own sound is kept (the loud tone from the MP4's second 4): no words, no song, two clips",
+          r3.get("ok") and video.facts(reels / "no song.mp4")["has_audio"] and (db3 or [-99])[0] > -15 and r3.get("lines") == [], (r3, db3))
+    check("render_broll with no clips: refused in plain words, nothing made", video.render_broll([], reels / "none.mp4", work=work).get("state") == "failed" and not (reels / "none.mp4").exists())
+    check("words_plan: none for no words; her wrap rule for where the words sit (x 0.2 wraps at 36% of the screen, x 0.5 at 80%); her size (66 px times size); the style's colours",
+          video.words_plan({"text": "  "}) is None and video.words_plan(None) is None
+          and abs(video.words_plan({"text": "a", "x": 0.2})["wrap"] - 0.36) < 1e-9 and video.words_plan({"text": "a", "x": 0.5})["wrap"] == 0.8
+          and video.words_plan({"text": "a", "size": 1.5})["px"] == 99 and video.words_plan({"text": "a", "style": "blackbox"})["box"] == [1, 1, 1]
+          and video.words_plan({"text": "a", "font": "helvetica"})["fontName"] == "Helvetica-Bold")
+    held = open(video.lock_path(), "a", encoding="utf-8")
+    got = this_computer.try_lock(held)
+    try:
+        r = video.render_broll(plan, reels / "held.mp4", song=m4a, words=words, work=work, wait=0.5)
+        check("the render takes its turn behind any other video program on this computer (her ffmpeg ran beside anything): with the lock held it says busy and makes nothing",
+              got and r == {"ok": False, "state": "busy", "words": video.BUSY} and not (reels / "held.mp4").exists() and not any(p.name.startswith(".held") for p in reels.iterdir()), (got, r))
+    finally:
+        if got:
+            this_computer.unlock(held)
+        held.close()
+    os.environ[video.NO_AV] = "1"
+    try:
+        r = video.render_broll(plan, reels / "pc.mp4", song=m4a, words=words, work=work)
+        check("the PC way: render_broll says this_computer.NO_VIDEO_PC and makes nothing",
+              r == {"ok": False, "state": "pc", "words": this_computer.NO_VIDEO_PC} and not (reels / "pc.mp4").exists(), r)
+    finally:
+        os.environ.pop(video.NO_AV, None)
 
     # ---- the PC's way, tried on this Mac
     os.environ[video.NO_AV] = "1"
