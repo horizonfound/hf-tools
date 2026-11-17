@@ -422,7 +422,7 @@ def run_select(c, s):
     c.click("#undoBtn")
     case("...one press of Undo takes all three back out", c.js(ORDER) == [5, 1, 4, 7, 8, 2, 6, 9], c.js(ORDER))
     r = rec(s, kit)
-    case("what is selected is the page's own: nothing of it is in the record", "picked" not in json.dumps(r) and set(r["saved"]) <= {"picks", "mine", "mine_picks", "song", "vibe", "footage", "style", "sel", "ask", "feel", "photo_ask", "kind", "updated"}, sorted(r["saved"]))
+    case("what is selected is the page's own: nothing of it is in the record", "picked" not in json.dumps(r) and set(r["saved"]) <= {"picks", "mine", "mine_picks", "song", "vibe", "footage", "style", "sel", "ask", "feel", "photo_ask", "kind", "updated", "direct", "onscreen"}, sorted(r["saved"]))
     many = c.js("(function(){ var M = window.ReelModel, l = [{n:1,h:''},{n:2,h:'+'},{n:3,h:''},{n:4,h:'-'}];"
                 " var f = function(x){ return x.map(function(r){ return r.n + r.h; }).join(' '); };"
                 " return [f(M.many(l, [2,4], 0)), f(M.many(l, [2,4], 4)), f(M.many(l, [2,4], 3)), M.many(l, [1,2], 0) === l, M.many(l, [2,3], 3) === l,"
