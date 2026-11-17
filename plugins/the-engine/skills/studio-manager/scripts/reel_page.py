@@ -49,6 +49,10 @@ Routes, all on the posting server (posting_queue.py hands them here):
                                  worked on, nothing is written and the page is given the newest
   POST /reel-capcut              {kit, from?}: Open CapCut (capcut.py's own open), in her words (capcut.OPEN_WORDS);
                                  "from": "kit" is the post kit's Reel card (her "Open in CapCut" button)
+  POST /reel-song-remove         {kit, song: id}: her Remove this song (v27, two taps): the song, and every sound
+                                 taken from a recording, go to the computer's own Trash (this_computer.trash_many;
+                                 the Recycle Bin on a PC), never a delete; the open reel's pick is cleared. Only a
+                                 song in the shoot's own Music folder can go (remove_song)
 Small copies of the photos are arrange.py's (/kit-photo, .kit/previews), the same the pickers use.
 
 Records:
@@ -88,7 +92,8 @@ an id made from where it is and its file name. A recording's sound is made once 
 Media Foundation on a PC) as "<name> sound.m4a" (".wav" on a PC) beside it, or in <kit>/Music when the recording
 sits in an export folder outside Your Content; a sound already there is used as it is, never written over.
 
-Her v25, section 5 (Nov 12; stage J of the v26 build). Remove a song is NOT built, in any form: it waits on Nicole.
+Her v25, section 5 (Nov 12; stage J of the v26 build). Remove a song, which waited on Nicole, is built from her
+v27 (Nov 17, Lane E's E12): POST /reel-song-remove, remove_song below.
   * A short song starts after a glitchy opening (short_song_start): for a song under 40 seconds the reel starts
     after the last silent gap that ends in its first 12 seconds, else at the top. Hers asks ffmpeg's silencedetect
     (-50 dB, 0.3 s); ours measures the same in plain Python on the samples the beat is found on (sound.lead_in).
@@ -253,7 +258,7 @@ FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answer
 
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
              "/reel-strip", "/reel-moment-still")
-POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version")
+POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove")
 
 # ---------- the words: hers, word for word (reel-maker.html and server.py, handoff v19) ----------
 # Each is shown exactly as written here. "_html" words carry her own <b>; {short}, {n}, {k}, {max} are filled in.
@@ -425,6 +430,17 @@ WORDS = {
     "opening_music": "Opening your Music folder in Finder...",
     "music_open": "Your Music folder is open in Finder. Drag your song in, and it will show up here by itself.",
     "cant_open": "Could not open the folder. Ask your assistant to open it.",
+    # Remove this song (her v27, section 2, step 3: "two taps, to the Trash"; reel-maker.html songRm, built Nov 17,
+    # Lane E's E12). The button sits in the song drop-down (Lane A's A8): one tap turns it into song_sure for 4 s,
+    # the second sends POST /reel-song-remove; the page then says song_trashed. A PC reads these through
+    # trash_words (the Recycle Bin, File Explorer, Restore).
+    "song_remove": "Remove this song",
+    "song_sure": "Move it to the Trash?",
+    "song_removing": "Removing…",
+    "song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back.",
+    # her server.py (/music/remove), when it can't
+    "song_not_here": "That song isn't in this shoot's folder anymore.",
+    "song_cant_trash": "I couldn't move that song to the Trash. Drag it out of the shoot's Music folder in Finder instead.",
 
     # step 4 (stage b2): the style
     "style_h2": "What style of behind the scenes is this?",
@@ -655,6 +671,13 @@ OUR_WORDS = {
     "trim_length": "A clip is 1 to 15 seconds long.",
     "coming_small": "still copying in",
     "coming": "{name} is still being copied into your Footage folder. It shows up here when it's done.",
+    # Remove this song (v27): hers would send a recording to the Trash from wherever list_songs found it; a
+    # recording in the Photos folder is in a folder of theirs (an export folder the kit only points to), so
+    # ours leaves it where it is (a draft, for Nicole)
+    "song_in_photos_stays": "That one's in your Photos folder, so it stays. Take it out of that folder yourself if you'd like it off the list.",
+    # hers stops at the first file that can't be moved, with the ones before it already gone and nothing said;
+    # ours says which went, after her line (a draft, for Nicole)
+    "song_part_moved": "Already in the Trash: {names}.",
 }
 
 def _behind():
@@ -681,6 +704,15 @@ def _capcut_words(key):
 def pc_words(s):
     """Her words name Finder; a PC says File Explorer (decision 26). A Mac: exactly hers."""
     return s.replace("Finder", this_computer.FILES_APP) if this_computer.WINDOWS else s
+
+
+def trash_words(s):
+    """Her Remove this song lines name the Trash and Put Back; a PC says the Recycle Bin and Restore
+    (this_computer.TRASH_WORD, TRASH_BACK), and File Explorer for Finder (pc_words). A Mac: exactly hers."""
+    if not this_computer.WINDOWS:
+        return s
+    s = s.replace("open the Trash in Finder and choose Put Back", this_computer.TRASH_BACK)
+    return pc_words(s.replace("the Trash", this_computer.TRASH_WORD))
 
 
 CANT_FIND = WORDS["reach"]
@@ -1619,6 +1651,139 @@ def sound_for(kit, s, deadline=None):
     if before is not None:
         _note_sound(kit, Path(got), video, "made", before)   # a recording swapped while it was read won't match this
     return Path(got), None                                   # note, so its sound is taken again next time
+
+
+# ---------- Remove this song (her v27, section 2, step 3: "two taps, to the Trash"; her v25 /music/remove) ----------
+# Built Nov 17 (Lane E's E12); the button in the song drop-down is Lane A's (A8). Hers takes a path from the page
+# and runs one osascript per file, stopping at the first failure with the earlier files already gone. Ours takes
+# the song's id (never a path, as every reel route does) and finds it here; only a song in the shoot's own Music
+# folder can go (a recording in the Photos folder is in a folder of theirs); a recording takes every sound made
+# from it with it; every path is checked before the first move (this_computer.trash_many), each goes to the
+# computer's own Trash (the Recycle Bin on a PC; Put Back and Restore bring it back), and nothing is ever deleted;
+# then the open reel's pick is cleared under the record's lock with the counter one higher, so a page that
+# never got the answer, or a page a step behind, is told. Other reels of the shoot that picked the song are not
+# rewritten: opened, they say her song_gone line (as hers).
+
+def sounds_of_recording(kit, s):
+    """Every sound taken from this recording that sits beside it in the Music folder, found two ways and merged:
+    the sounds noted for it in reel-sounds.json, and every "<name> sound", "<name> sound 2"... (SOUND_NAME, any
+    number; hers takes " sound" and " sound 2" to " sound 9") with that recording's name. Real files only, each
+    once: a link is left where it is (list_songs leaves it out too), and nothing is followed."""
+    music = music_dir(kit)
+    stem = arrange._nfc(s["path"].stem).casefold()
+    of = arrange._nfc(s["path"].name)
+    names = []
+    for key, note in _sounds(kit)["sounds"].items():
+        if isinstance(note, dict) and key.startswith("Music/") and arrange._nfc(str(note.get("of") or "")) == of:
+            names.append(key[len("Music/"):])
+    for f in _listing(music):
+        m = SOUND_NAME.fullmatch(Path(f).stem)
+        if f.lower().endswith((".m4a", ".wav")) and m and arrange._nfc(m.group(1)).casefold() == stem:
+            names.append(f)
+    out, seen = [], set()
+    for n in names:
+        p = _named(music, n)
+        if p is None or p == s["path"]:
+            continue
+        try:
+            if p.is_symlink() or not p.is_file():
+                continue
+        except OSError:
+            continue
+        k = arrange._nfc(p.name).casefold()
+        if k not in seen:
+            seen.add(k)
+            out.append(p)
+    return out
+
+
+def _drop_sound_notes(kit, sounds):
+    """The moved sounds' lines come out of reel-sounds.json (the version before kept beside it, one writer at a
+    time, written only when there is one to drop). A note that can't be written is logged and that is all: a
+    line for a sound that is gone does no harm (sound_for looks for the file first)."""
+    keys = {"Music/" + arrange._nfc(p.name) for p in sounds}
+    try:
+        with arrange.locked(kit / ".kit" / SOUNDS_LOCK):
+            d = _sounds(kit)
+            if not any(k in d["sounds"] for k in keys):
+                return
+            d["v"] = 1
+            d["sounds"] = {k: v for k, v in d["sounds"].items() if k not in keys}
+            p = sounds_path(kit)
+            try:
+                before = p.read_bytes()
+            except OSError:
+                before = None
+            if before is not None:
+                _write_bytes_whole(kit / ".kit" / SOUNDS_PREV, before)
+            arrange.write_whole(p, d)
+    except Exception as e:  # noqa: BLE001
+        arrange.log(f"reel page: a removed sound's note couldn't be dropped: {e.__class__.__name__}: {str(e)[:200]}")
+
+
+def _clear_song(kit, sid):
+    """Under the record's lock: when the open reel's picked song is this one it goes back to "no song picked yet"
+    (saved.song None; hers: the page does it on success, ours the server too, so a page that never gets the
+    answer sees it on reload), the counter moves on and the record is saved whole with the version before kept.
+    Other reels of the shoot are not touched. True when it was cleared."""
+    try:
+        with arrange.locked(lock_path(kit)):
+            rec, rows, stamp = sync(kit)
+            saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
+            if not saved or saved.get("song") != sid:
+                return False
+            saved["song"] = None
+            saved["updated"] = time.time()
+            rec["rev"] = int(rec.get("rev") or 0) + 1
+            rec.pop("from", None)
+            if rows:
+                _stamp_names(rec, rows, stamp)
+            save(kit, rec)
+            return True
+    except Exception as e:  # noqa: BLE001  (the song is in the Trash either way, and the page's next look drops it)
+        arrange.log(f"reel page: a removed song couldn't be cleared from the record: {e.__class__.__name__}: {str(e)[:200]}")
+        return False
+
+
+def remove_song(body):
+    """POST /reel-song-remove {kit, song: id} (hers: /music/remove {path}). (status, answer): on success
+    {ok, words (her song_trashed line), songs (the list without it), cleared (the open reel's pick was this song
+    and is now "not picked yet")}. Refused with her song_not_here line when the id is not one of this shoot's
+    songs right now, with ours when the song is in the Photos folder, and with her song_cant_trash line when
+    the computer's Trash would not take it (then "why" carries this_computer's plain reason, and, when some of
+    a recording's files had already gone, the names of those after her line). Nothing is deleted anywhere."""
+    kit = arrange.kit_by_name(body.get("kit"))
+    if kit is None:
+        return _bad(CANT_FIND, 404)
+    if set(body) - {"kit", "song"}:
+        return _bad()
+    sid = body.get("song")
+    if not isinstance(sid, str) or not SONG_ID.fullmatch(sid):
+        return _bad()
+    rec_kit = kit_mod.load_rec(kit)
+    s = song_by_id(kit, sid, rec_kit)
+    if s is None:
+        return _bad(WORDS["song_not_here"], 400, why="song", songs=songs_for_page(kit, rec_kit))
+    if s["where"] != "Music":
+        return _bad(OUR_WORDS["song_in_photos_stays"], 400, why="photos", songs=songs_for_page(kit, rec_kit))
+    paths = [s["path"]] + (sounds_of_recording(kit, s) if s["kind"] == "video" else [])
+    ok, why, moved, _left = this_computer.trash_many(paths, music_dir(kit))
+    moved = [Path(p) for p in moved]
+    cleared = False
+    if moved:
+        sounds = [p for p in moved if p != s["path"]]
+        if sounds:
+            _drop_sound_notes(kit, sounds)
+        if moved[0] == s["path"]:                      # the song itself is gone from the list
+            cleared = _clear_song(kit, sid)
+    songs = songs_for_page(kit, rec_kit)
+    if not ok:
+        arrange.log(f"reel page: Remove this song couldn't finish: {why} ({len(moved)} moved, {len(paths) - len(moved)} left)")
+        words = pc_words(trash_words(WORDS["song_cant_trash"]))
+        if moved:
+            words += " " + trash_words(OUR_WORDS["song_part_moved"]).replace("{names}", ", ".join(p.name for p in moved))
+        return _bad(words, 400, why=why, songs=songs, cleared=cleared)
+    return 200, {"ok": True, "words": pc_words(trash_words(WORDS["song_trashed"])), "songs": songs, "cleared": cleared}
 
 
 # ---------- step 1: the footage (hers: server.py footage_list, previews, moments) ----------
@@ -3273,11 +3438,11 @@ def handle_post(handler, path, query):
         body = _json_body(handler, path)
         if body is None:
             return
-        if path == "/reel-version" and _cross_site(handler):         # a press from another website's page
+        if path in ("/reel-version", "/reel-song-remove") and _cross_site(handler):   # a press from another website's page
             return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 403)
         route = {"/reel-save": save_from_page, "/reel-make": start_make, "/reel-open": open_music,
                  "/reel-capcut": open_capcut_for_page, "/reel-moment": change_moments,
-                 "/reel-version": version_from_page}.get(path)
+                 "/reel-version": version_from_page, "/reel-song-remove": remove_song}.get(path)
         if route is None:
             return arrange._send_json(handler, {"ok": False, "words": NOT_YET}, 404)
         code, out = route(body)
@@ -3976,7 +4141,7 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
     step-1 heading are written here on the server (hers decided them in applyKind() after the page loaded)."""
     e = html.escape
     kind = kind if kind in KINDS else "photos"
-    w = {k: pc_words(v) for k, v in WORDS.items()}
+    w = {k: pc_words(trash_words(v)) for k, v in WORDS.items()}
     w.update({k: pc_words(v) for k, v in KIND_WORDS.items()})
     if this_computer.WINDOWS:          # decision 26: her trim tip's Mac sentence, a PC's way
         w["quick_fix_html"] = w["quick_fix_html"].replace(

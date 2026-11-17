@@ -12,6 +12,12 @@ moved here unchanged. Every Windows branch is written from Microsoft's and Pytho
 fails quietly to a safe answer: an empty list, None, False. Never a guess.
 
     python3 this_computer.py          prints what it can see: a quick health check for a new computer
+    python3 this_computer.py trash <path>   by hand only: moves that one file or folder to the computer's own Trash
+
+The one rule on things of the photographer's (Nov 17): nothing of theirs is ever deleted. The only way anything of
+theirs leaves its place is trash() here, which puts it in the computer's own Trash (Finder's on a Mac, the Recycle
+Bin on a PC), where they can put it back themselves. No script calls os.remove, os.unlink, shutil.rmtree or rm on
+anything of theirs, and no script writes a Trash of its own.
 
 Not called platform.py on purpose: that name would hide Python's own module from every script here.
 """
@@ -668,6 +674,242 @@ def no_windows():
     return bool(os.environ.get("STUDIO_NO_WINDOWS_FOR_TESTS"))
 
 
+# ---------------------------------------------------------------- the computer's own Trash: the one door out
+
+# The one rule: nothing of the photographer's is ever deleted. The only way anything of theirs leaves its place
+# is trash() below, which puts it in the computer's own Trash (Finder's on a Mac, the Recycle Bin on a PC), where
+# they can put it back themselves. Never os.remove, os.unlink, shutil.rmtree or rm; never a hidden folder of ours
+# in place of the real Trash (Nicole's v27, "Remove this song (two taps, to the Trash)", settled Nov 17).
+#
+# Words a photographer sees. TRASH_BACK on a Mac is Nicole's own line (v25: "open the Trash in Finder and choose
+# Put Back"); the PC line and the rest are ours (drafts for Nicole).
+TRASH_WORD = "the Recycle Bin" if WINDOWS else "the Trash"
+TRASH_BACK = ("open the Recycle Bin in File Explorer and choose Restore" if WINDOWS
+              else "open the Trash in Finder and choose Put Back")
+CANT_TRASH = f"I couldn't move that to {TRASH_WORD}."
+TRASH_GONE = "That isn't where it was anymore."
+TRASH_LINK = "That's a link to somewhere else, so it stays where it is."
+TRASH_OUTSIDE = "That isn't in the folder it should be in, so it stays where it is."
+TRASH_NO_BIN = f"That drive has no {TRASH_WORD.split(' ', 1)[1]} to put it in, so it stays where it is."
+TRASH_LONG = f"That name is too long for Windows to move it to {TRASH_WORD}, so it stays where it is."
+
+_SEPS = "/\\" if WINDOWS else "/"
+
+
+def trash_for_tests():
+    """The tests' switch: the folder named in STUDIO_TRASH_FOR_TESTS, or "". With it set, trash() moves the item
+    into that folder instead of the computer's own Trash (a name already there gets " 2", " 3", ...), so a test
+    proves the whole behaviour and no test ever touches the real Trash. Honoured anywhere, like
+    STUDIO_NO_WINDOWS_FOR_TESTS: only a test sets it. Inside a test that set no_windows() but not this, trash()
+    refuses outright, so the real Trash is never reached from a test by mistake."""
+    return os.environ.get("STUDIO_TRASH_FOR_TESTS") or ""
+
+
+def _within(parent, folder):
+    """True when the real folder `parent` is `folder` or somewhere under it (case and slashes as same_place)."""
+    if WINDOWS:  # unproven on a real PC
+        parent, folder = os.path.normcase(parent), os.path.normcase(folder)
+    return parent == folder or parent.startswith(folder.rstrip(_SEPS) + os.sep)
+
+
+def _trash_place(path):
+    """"" when the drive this path is on has a Trash the item can go to; else the words why not. The computer's own
+    Trash call would otherwise, on a drive with none (a memory card, some network drives), either ask a question
+    in a box nobody sees or delete the item outright, and neither may ever happen.
+    A Mac: on the disk the home folder is on, ~/.Trash; on any other drive, .Trashes at the top of that drive
+    (macOS makes it when the drive is mounted). A PC: $Recycle.Bin at the top of the drive. Anything else: no."""
+    try:
+        if MAC:
+            here = os.stat(path).st_dev
+            if here == os.stat(Path.home()).st_dev:
+                return "" if os.path.isdir(Path.home() / ".Trash") else TRASH_NO_BIN
+            top = os.path.dirname(path)
+            while True:                                   # up to the top of this drive: the last folder on the same device
+                up = os.path.dirname(top)
+                if up == top or os.stat(up).st_dev != here:
+                    break
+                top = up
+            return "" if os.path.isdir(os.path.join(top, ".Trashes")) else TRASH_NO_BIN
+        if WINDOWS:
+            # unproven on a real PC [check on a PC: a shoot on the C: drive, one on an external NTFS drive, and a
+            # file on an exFAT card, which must be refused]
+            drive = os.path.splitdrive(os.path.abspath(path))[0]
+            if not drive:
+                return TRASH_NO_BIN
+            return "" if os.path.isdir(os.path.join(drive + os.sep, "$Recycle.Bin")) else TRASH_NO_BIN
+    except OSError:
+        return TRASH_NO_BIN
+    return CANT_TRASH
+
+
+def trash_check(path, inside):
+    """Only looks; moves nothing. (True, "") when `path` may go to the Trash, else (False, the plain words why not).
+    `inside` is the one folder the caller is allowed to take things from (a shoot's Music folder, the drop box):
+    the item must sit in it, or in a folder under it, by its real place on the disk. Refused: a path that is not
+    there, a link of any kind (nothing is ever followed to its target), `inside` itself or anything outside it, a
+    folder `inside` that is itself a link, a path with "." or ".." in it (never normalised into something else),
+    on a PC a path too long for Windows to move, and a drive with no Trash. Every caller that moves several
+    things runs this on every one of them before the first move (trash_many does)."""
+    path, inside = str(path), str(inside)
+    if not (os.path.isabs(path) and os.path.isabs(inside)) or path[-1] in _SEPS:
+        return False, TRASH_OUTSIDE
+    if any(part in (".", "..") for part in re.split(r"[\\/]" if WINDOWS else "/", path)):
+        return False, TRASH_OUTSIDE
+    if not os.path.lexists(path):
+        return False, TRASH_GONE
+    if os.path.islink(path):
+        return False, TRASH_LINK
+    if os.path.islink(inside.rstrip(_SEPS) or inside) or not os.path.isdir(inside):
+        return False, TRASH_OUTSIDE
+    try:
+        folder = os.path.realpath(inside)
+        parent = os.path.realpath(os.path.dirname(path))
+    except OSError:
+        return False, TRASH_OUTSIDE
+    if not _within(parent, folder):
+        return False, TRASH_OUTSIDE
+    if path_too_long(path, folder=os.path.isdir(path)):
+        return False, TRASH_LONG
+    if trash_for_tests():
+        return True, ""                                   # the tests' own folder: no drive to ask about
+    if no_windows():
+        return False, CANT_TRASH                          # a test that named no trash folder never reaches the real one
+    why = _trash_place(path)
+    if why:
+        return False, why
+    return True, ""
+
+
+def _trash_mac(path):
+    """Finder's own delete, through osascript (the same route finder.py opens folders by): the item goes to the
+    Trash with Put Back working. The path is handed in as an argument, never pasted into the script, so a quote
+    or an accent in a name cannot change the script. True when Finder says it is in the Trash: its answer is the
+    item's new place, which has to be inside a .Trash or .Trashes folder, so an item Finder removed outright (it
+    never should: _trash_place looked first) is never called ok."""
+    script = ["on run argv",
+              "set f to POSIX file (item 1 of argv) as alias",
+              'tell application "Finder"',
+              "set t to delete f",
+              "return POSIX path of (t as alias)",
+              "end tell",
+              "end run"]
+    cmd = ["osascript"]  # pc-ok: the Mac branch
+    for line in script:
+        cmd += ["-e", line]
+    r = subprocess.run(cmd + [path], capture_output=True, encoding="utf-8", errors="replace", timeout=30)
+    out = (r.stdout or "").strip()
+    return r.returncode == 0 and ("/.Trash/" in out or "/.Trashes/" in out)
+
+
+def _recycle(path):
+    """Windows' own move to the Recycle Bin (SHFileOperationW with FO_DELETE and FOF_ALLOWUNDO), with no box shown
+    and no question asked; Restore works in the Recycle Bin. 0 when Windows did it. Nothing is installed (her
+    suggestion of a downloaded helper for this would be an install). The path must be a full one without the \\\\?\\ long form,
+    which this call does not understand, and ends in two NULs as the call wants."""
+    # unproven on a real PC [check on a PC: a file and a folder each land in the Recycle Bin with Restore]
+    import ctypes
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        if ctypes.sizeof(ctypes.c_void_p) == 4:
+            _pack_ = 1                                    # Windows packs this struct on 32-bit, not on 64-bit
+        _fields_ = [("hwnd", wintypes.HWND), ("wFunc", wintypes.UINT), ("pFrom", wintypes.LPCWSTR),
+                    ("pTo", wintypes.LPCWSTR), ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", wintypes.BOOL),
+                    ("hNameMappings", ctypes.c_void_p), ("lpszProgressTitle", wintypes.LPCWSTR)]
+
+    FO_DELETE, FOF_SILENT, FOF_NOCONFIRMATION, FOF_ALLOWUNDO, FOF_NOERRORUI = 3, 0x4, 0x10, 0x40, 0x400
+    buf = ctypes.create_unicode_buffer(path + "\0")       # one NUL here, one more from the buffer: double-NUL-terminated
+    op = SHFILEOPSTRUCTW()
+    op.hwnd = None
+    op.wFunc = FO_DELETE
+    op.pFrom = ctypes.cast(buf, wintypes.LPCWSTR)
+    op.pTo = None
+    op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI
+    op.fAnyOperationsAborted = False
+    op.hNameMappings = None
+    op.lpszProgressTitle = None
+    sh = ctypes.windll.shell32.SHFileOperationW
+    sh.argtypes = [ctypes.POINTER(SHFILEOPSTRUCTW)]
+    sh.restype = ctypes.c_int
+    code = sh(ctypes.byref(op))
+    return code if code else (1 if op.fAnyOperationsAborted else 0)
+
+
+def _trash_pc(path):
+    return _recycle(os.path.abspath(path)) == 0
+
+
+def _into_test_trash(path, folder):
+    """The tests' Trash: the item is moved whole into `folder` under its own name, or "<name> 2", "<name> 3", ...
+    (before a file's extension) when that name is already there, with this_computer.rename, never a copy.
+    The new place is returned."""
+    folder = str(folder)
+    os.makedirs(folder, exist_ok=True)
+    name = os.path.basename(path)
+    stem, ext = os.path.splitext(name) if os.path.isfile(path) else (name, "")
+    dst, n = os.path.join(folder, name), 2
+    while os.path.lexists(dst):
+        dst = os.path.join(folder, f"{stem} {n}{ext}")
+        n += 1
+    rename(path, dst)
+    return dst
+
+
+def trash(path, inside):
+    """Move one file or folder of the photographer's to the computer's own Trash: Finder's on a Mac (through
+    Finder, so Put Back works), the Recycle Bin on a PC (Restore works). (True, "") when it is there; (False, the
+    plain words) when it was refused or could not be moved, and then it is exactly where it was. Never a delete.
+    `inside` is the folder it must be in (see trash_check): a path anywhere else is refused before anything runs.
+    One item at a time: a caller with several checks every one first, then moves (trash_many).
+    With the tests' switch (trash_for_tests) the item goes into that folder instead."""
+    ok, words = trash_check(path, inside)
+    if not ok:
+        return False, words
+    path = str(path)
+    try:
+        if trash_for_tests():
+            _into_test_trash(path, trash_for_tests())
+        elif no_windows():
+            return False, CANT_TRASH                      # a test that named no trash folder never reaches the real one
+        elif MAC:
+            if not _trash_mac(path):
+                return False, CANT_TRASH
+        elif WINDOWS:
+            if not _trash_pc(path):
+                return False, CANT_TRASH
+        else:
+            return False, CANT_TRASH
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        return False, CANT_TRASH
+    if os.path.lexists(path):                             # still there: never called done
+        return False, CANT_TRASH
+    return True, ""
+
+
+def trash_many(paths, inside):
+    """Several items to the Trash, together: every path is checked first, and one refusal means nothing moves.
+    Then each goes in turn; the first that cannot be moved stops the rest. (ok, words, moved, left): `moved` is
+    what is in the Trash now, `left` what is still where it was (all of them when ok is False and moved is
+    empty). The caller says which moved in its own words. A path given twice counts once."""
+    seen, todo = set(), []
+    for p in paths:
+        p = str(p)
+        if p not in seen:
+            seen.add(p)
+            todo.append(p)
+    for p in todo:
+        ok, words = trash_check(p, inside)
+        if not ok:
+            return False, words, [], todo
+    moved = []
+    for i, p in enumerate(todo):
+        ok, words = trash(p, inside)
+        if not ok:
+            return False, words, moved, todo[i:]
+        moved.append(p)
+    return True, "", moved, []
+
+
 # ---------------------------------------------------------------- the folder picker
 
 def pick_folder(prompt):
@@ -957,5 +1199,16 @@ def main():
     print("A name made safe:", safe_name('Card 10:30 / "aux". '), "|", safe_name("CON"))
 
 
+def main_trash(path):
+    """By hand only (the hand test of the Trash helper): one file or folder, from the folder it sits in."""
+    utf8_output()
+    path = os.path.abspath(path)
+    ok, words = trash(path, os.path.dirname(path))
+    print(f"In {TRASH_WORD} now. To get it back, {TRASH_BACK}." if ok else f"Not moved: {words}")
+    return 0 if ok else 1
+
+
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "trash":
+        sys.exit(main_trash(sys.argv[2]))
     main()

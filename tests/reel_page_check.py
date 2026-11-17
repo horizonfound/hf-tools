@@ -140,6 +140,28 @@ def her_v25_page():
     return her_page_of("v25")
 
 
+# Remove this song (her v27, Nov 17; Lane E's E12): her four page lines (reel-maker.html, songRm) and her two server
+# lines (server.py, /music/remove). Her v27 pack is the source for them; the v27 pack is checked both ways below.
+V27_WORDS = {"song_remove": "Remove this song",
+             "song_sure": "Move it to the Trash?",
+             "song_removing": "Removing…",
+             "song_trashed": "Moved to the Trash. To get it back, open the Trash in Finder and choose Put Back.",
+             "song_not_here": "That song isn't in this shoot's folder anymore.",
+             "song_cant_trash": "I couldn't move that song to the Trash. Drag it out of the shoot's Music folder in Finder instead."}
+
+
+def her_v27_text():
+    """Her v27 reel-maker.html and server.py as one text, or None when that handoff isn't here (looked for where
+    her_folder looks, so a worktree finds the main checkout's copy too)."""
+    for base in (ROOT, ROOT.parent / "hf-tools", Path("/Users/dustindamron/Projects/hf-tools")):
+        for h in sorted((base / "reference-private").glob("nicole-handoff-v27-*")):
+            f = h / "Carousel designer and reel picker"
+            if (f / "pages" / "reel-maker.html").is_file() and (f / "server.py").is_file():
+                t = (f / "pages" / "reel-maker.html").read_text(encoding="utf-8") + "\n" + (f / "server.py").read_text(encoding="utf-8")
+                return html.unescape(t).replace("\\'", "'")
+    return None
+
+
 def her_page():
     """Her reel page as text: v23's when it is on this computer (the newest she sent), else v19's."""
     t = her_v23_page()
@@ -263,7 +285,7 @@ def check_words():
         bad = []
         v27 = her_v27_page()
         for k, v in rp.WORDS.items():
-            if k in V25_WORDS or k in V27_KEYS:
+            if k in V25_WORDS or k in V27_KEYS or k in V27_WORDS:
                 continue
             for frag in re.split(r"\{\w+\}", v):
                 if len(frag.strip()) >= 2 and frag not in t:
@@ -291,6 +313,14 @@ def check_words():
     case("A little of everything's line is in reel_page.WORDS as she wrote it (v25), and the old line is nowhere in the page's words",
          {k: rp.WORDS.get(k) for k in V25_WORDS} == V25_WORDS
          and not any("changing where the music turns over" in str(v) for v in rp.WORDS.values()))
+    v27 = her_v27_text()
+    if v27 is None:
+        print("SKIP  Remove this song's lines against her v27 page and server: that handoff isn't on this computer", flush=True)
+    else:
+        case("Remove this song's six lines (v27) are on her v27 page and in her server.py, word for word",
+             all(v in v27 for v in V27_WORDS.values()), [v for v in V27_WORDS.values() if v not in v27])
+    case("Remove this song's six lines are in reel_page.WORDS as she wrote them (v27)", {k: rp.WORDS.get(k) for k in V27_WORDS} == V27_WORDS,
+         {k: rp.WORDS.get(k) for k in V27_WORDS})
     case("the limit line is the plan's (decision 23)", rp.OUR_WORDS["too_many"] == OURS_TOO_MANY, rp.OUR_WORDS["too_many"])
     case("the defaults sit where the plan says: 40, no drag out, the two-window check on",
          rp.MAX_PICKS == 40 and rp.DRAG_OUT is False and rp.REV_CHECK is True)

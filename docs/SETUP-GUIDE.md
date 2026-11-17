@@ -106,7 +106,7 @@ That's the setup. You never do it again.
 
 **Your first posts (no memory card needed).**
 
-1. On the home page, click **Make posts from a shoot**. It opens a screen of its own: two steps at the top, and under them your post kits, once you have some.
+1. On the home page, click **Make posts from a shoot**. It opens a screen of its own: a short box that says what a post kit is (one place for everything you'll post from a shoot), three steps, and under them your post kits, once you have some. The third step, **Make your posts inside your post kit**, happens in the kit itself, so the screen's own work is the first two.
 2. The first time, there is no Assistant folder yet, and the screen says so when you press its folder button. Type **set up my Assistant folder** in the chat. The Assistant asks where your posts should be kept (your photo drive is the usual answer) and makes one folder there, called The Assistant, with Your Content inside it.
 3. Back on the Make posts screen, click **Select the folder with your finished photos**. Pick the folder you exported from Lightroom. The Assistant makes its own copies of the JPEGs in it; your originals aren't moved or changed.
 4. Click **Copy** beside **make my posts** and paste it into the chat. The Assistant looks through what you brought, tells you what it will call the shoot (say so if it should be something else), and opens the shoot's post kit beside the chat. That is all it does by itself: it doesn't pick photos or write anything until you ask.
