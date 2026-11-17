@@ -236,6 +236,9 @@ ol.steps p{margin:0;color:#4a4f5c}
 .where{background:#fff;border-radius:14px;padding:.9rem 1rem;display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:center}
 .where p{margin:0;flex:1 1 16rem}
 .btn{display:inline-block;font:600 15px/1 var(--sans);color:#fff;background:var(--coral,#D4643F);text-decoration:none;padding:12px 18px;border-radius:999px}
+.btn{border:0;cursor:pointer}
+.where .note{flex-basis:100%;color:#4a4f5c;font:14px/1.4 var(--sans)}
+.where .note:empty{display:none}
 @media (prefers-reduced-motion:reduce){.cur{transition:none}}
 """
 
@@ -254,6 +257,22 @@ function run(){timers.forEach(clearTimeout);timers=[];
   plan.forEach(function(p){timers.push(setTimeout(function(){show(p[0],p[1]);},p[2]));});
   timers.push(setTimeout(run,13500));}
 if(still){show(7,3);}else{run();}
+})();
+"""
+
+# The button asks the Assistant's page server to open their own web browser (Dustin, Nov 17: as a plain link it opened
+# Claude inside the Claude app's pane, where they are not signed in, so they landed on a sign-in screen). A saved copy
+# of the page, with no server behind it, falls back to the link.
+OPEN_SCRIPT = """
+(function(){
+var b=document.getElementById('openplug'),n=document.getElementById('plugnote');if(!b)return;
+var live=location.protocol.indexOf('http')===0;
+b.addEventListener('click',function(){
+  if(!live){window.open(b.dataset.href,'_blank','noopener');return;}
+  n.textContent='Opening it in your web browser...';
+  fetch('/open-plugins').then(function(r){return r.json();}).then(function(d){n.textContent=d.words||'';})
+  .catch(function(){n.textContent='I couldn\\'t reach your web browser. The address is '+b.dataset.href;});
+});
 })();
 """
 
@@ -293,9 +312,24 @@ def page_html(home="/home", now=None):
     out.append(f"<p class='cap' id='cap' aria-hidden='true'><span>1</span>{e(STEPS[0][0])}</p>")
     out.append("<ol class='steps'>" + "".join(f"<li><span class='n'>{i}</span><b>{e(t)}</b><p>{e(w)}</p></li>" for i, (t, w) in enumerate(STEPS, 1)) + "</ol>")
     out.append("<div class='where'><p>Plugins is in the left column of Claude in a web browser. That is where this button works best.</p>"
-               f"<a class='btn' href='{PLUGINS_PAGE}' target='_blank' rel='noopener'>Open Plugins in my browser</a></div>")
-    out.append("<script>" + SCRIPT % (json.dumps([t for t, _ in STEPS]), "66.3") + "</script></div></body></html>")
+               f"<button class='btn' id='openplug' type='button' data-href='{PLUGINS_PAGE}'>Open Plugins in my browser</button>"
+               "<small class='note' id='plugnote' aria-live='polite'></small></div>")
+    out.append("<script>" + SCRIPT % (json.dumps([t for t, _ in STEPS]), "66.3") + OPEN_SCRIPT + "</script></div></body></html>")
     return "\n".join(out)
+
+
+def open_plugins():
+    """Open Claude's Plugins page in their own web browser (never the pane). Words for the page and a line for the log."""
+    import webbrowser
+    ok = False
+    try:
+        ok = webbrowser.open(PLUGINS_PAGE)
+    except Exception:  # noqa: BLE001
+        ok = False
+    if ok:
+        return {"ok": True, "words": "It's open in your web browser.", "log": f"Opened {PLUGINS_PAGE} in their web browser."}
+    return {"ok": False, "words": f"I couldn't open your web browser. The address is {PLUGINS_PAGE}",
+            "log": f"I couldn't open a web browser. The address is {PLUGINS_PAGE}"}
 
 
 def url():
@@ -341,13 +375,7 @@ def main(argv=None):
         say(u)
         return 0
     if cmd == "open":
-        import webbrowser
-        ok = False
-        try:
-            ok = webbrowser.open(PLUGINS_PAGE)
-        except Exception:  # noqa: BLE001
-            ok = False
-        say(f"Opened {PLUGINS_PAGE} in their web browser." if ok else f"I couldn't open a web browser. The address is {PLUGINS_PAGE}")
+        say(open_plugins()["log"])
         return 0
     if cmd == "page":
         say(page_html())
