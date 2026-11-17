@@ -20,11 +20,11 @@ the Mac's own JavaScript engine (as it does the other two rule scripts).
     P.token(prefix, now, rnd)         the name of one press, as the Assistant wants it
     P.swipe(i, dx, slides)            the slide showing after a drag of dx screen pixels in the preview
     P.list(numbers)                   '2', '2 and 4', '2, 4 and 5'
-    P.addStories(st, add, o)          stories: a layout put after the last story, never in place of anything
+    P.addStories(st, add, o)          a layout put after the last slide (story), or at o.at, never in place of anything
     P.onePerStory(st, photos)         stories: one story each for the next five photos not used yet
 
 The size of a slide (a story's, in the stories designer) and how many there may be come from window.DESIGN_LIMITS,
-as in DesignModel.
+as in DesignModel. addStories reads DesignModel's seam rule (crosses), so the model must be on the page or loaded first.
 """
 
 DESIGN_PLAN_JS = r"""
@@ -122,23 +122,34 @@ DESIGN_PLAN_JS = r"""
   // shoot's first, empty story it becomes that story. add = a layout {slides, bg, blocks}; o = {fill: true to put
   // photos not used yet in the new empty frames, photos, carousel}. -> {st, first: the first new story (from 0)}, or
   // {st, why: 'max'} (more stories than a set holds) or {st, why: 'many'} (more photos and words than a design holds).
+  // o.at (hers, v27: "Where should it go?"): the slide (from 0) the new ones go in front of; everything from there
+  // on moves along to make room. When something stretches across that spot they go at the end instead, and the
+  // answer says so (fell: true). Over the most slides nothing moves: {st, why: 'tooMany', adds, max, have}.
+  // The seam rule is DesignModel's (crosses), so the page and these rules agree on what stretches across an edge.
   function addStories(st, add, o){
     o = o || {};
-    var empty = !st.blocks.length && st.slides <= 1;
-    var off = empty ? 0 : st.slides * W, slides = (empty ? 0 : st.slides) + Math.max(1, Math.round(add.slides) || 1);
-    if (slides > RULES.slides[1]) return {st: st, why: 'max'};
+    var empty = !st.blocks.length && st.slides <= 1, adds = Math.max(1, Math.round(add.slides) || 1);
+    var slides = (empty ? 0 : st.slides) + adds;
+    if (slides > RULES.slides[1]) return {st: st, why: 'tooMany', adds: adds, max: RULES.slides[1], have: st.slides};
     var more = (add.blocks || []).length;
     if (st.blocks.length + more > RULES.blocks) return {st: st, why: 'many'};
-    var top = 0;
+    var at = !empty && typeof o.at === 'number' && o.at >= 0 && o.at < st.slides ? Math.floor(o.at) : null, fell = false;
+    if (at !== null && root.DesignModel.crosses(st, at)) { at = null; fell = true; }
+    var off = empty ? 0 : (at !== null ? at : st.slides) * W, top = 0;
     st.blocks.forEach(function(b){ if (b.id > top) top = b.id; });
     var mine = {}, nb = copy(add.blocks || []).map(function(b, i){
       b.x = Math.round((b.x + off) * 100) / 100; b.id = top + i + 1; mine[b.id] = true;
       if (isFrame(b) && b.n === undefined) b.n = null;
       return b;
     });
-    var out = {slides: slides, bg: st.bg, blocks: st.blocks.concat(nb)};
+    var was = st.blocks;
+    if (at !== null) {
+      var e = off - root.DesignModel.RULES.seam, by = adds * W;
+      was = was.map(function(b){ return b.x >= e ? (function(c){ c.x = Math.round((c.x + by) * 100) / 100; return c; })(copy(b)) : b; });
+    }
+    var out = {slides: slides, bg: st.bg, blocks: was.concat(nb)};
     if (o.fill) out = fill(out, o.photos, o.carousel, mine);
-    return {st: out, first: empty ? 0 : st.slides};
+    return {st: out, first: empty ? 0 : (at !== null ? at : st.slides), fell: fell};
   }
   // "One photo per story": one story each for the next five photos not in a story yet, filling it; with none left,
   // one story with an empty frame (hers).

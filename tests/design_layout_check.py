@@ -72,11 +72,11 @@ def check_layout_page(case, work):
          "view-smaller" not in page and "view-bigger" not in page
          and re.search(r"<div class='group' id='g-view'><span class='lbl'>Size</span><input type='range' id='view-size'[^>]*aria-label='How big the slides look'", page) is not None)
     case("layout: the two tick boxes carry their words as their names", "id='snap' checked aria-label='Snap into line'" in page and "id='gridcrop' aria-label='Profile grid crop'" in page)
-    case("layout: the room held for the selection bar is two rows and its first line, at 1024 px and up",
-         re.search(r"@media\(min-width:1024px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 2 \+ \d+px\)\}", css) is not None
+    case("layout: the room held for the selection bar is three rows and its first line, at 1024 px and up (v27: the slide's group shows for anything selected)",
+         re.search(r"@media\(min-width:1024px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 3 \+ \d+px\)\}", css) is not None
          and ".selbar.off .selrows{display:none}" in css)
-    case("layout: from 768 px up the room held is three rows and its first line, and the first line is one line (the help line cut at its end)",
-         re.search(r"@media\(min-width:768px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 3 \+ \d+px\)\}", css) is not None
+    case("layout: from 768 px up the room held is four rows and its first line, and the first line is one line (the help line cut at its end)",
+         re.search(r"@media\(min-width:768px\)\{[^@]*\.selbar\{min-height:calc\(var\(--row\) \* 4 \+ \d+px\)\}", css) is not None
          and re.search(r"@media\(min-width:768px\)\{[^@]*\.selbar:not\(\.off\) \.selcap\{flex-wrap:nowrap;height:24px\}", css) is not None)
     case("layout: no line a press brings is drawn over the page (nothing in the tool rows is absolute); the lines are in the bar's first line, "
          "where the help line has no claim of its own (flex-basis 0) and gives way first",
@@ -200,8 +200,8 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                 case(f"{tag}: no sideways scroll of the page", m0["scrollW"] <= w, m0["scrollW"])
                 if wide:
                     case(f"{tag}: two rows of tools, one row each (the design's, the slides')", m0["rows1"] == 1 and m0["rows2"] == 1, (m0["rows1"], m0["rows2"]))
-                    case(f"{tag}: the strip's top is at most about 300 px from the top of the page (stage under 300, strip under 320)",
-                         m0["stage"]["top"] <= 300 and m0["strip"]["top"] <= 320, (m0["stage"]["top"], m0["strip"]["top"]))
+                    case(f"{tag}: the strip's top is at most about 340 px from the top of the page (stage under 340, strip under 360; one row more held since v27's slide buttons)",
+                         m0["stage"]["top"] <= 340 and m0["strip"]["top"] <= 360, (m0["stage"]["top"], m0["strip"]["top"]))
                     case(f"{tag}: the photos' heading is in sight under the strip, above the bar at the bottom of the window",
                          m0["tray"]["top"] + m0["tray"]["h"] <= m0["savebar"]["top"] and m0["thumbs"]["top"] < m0["savebar"]["top"], (m0["tray"], m0["savebar"]))
                     tops[size] = m0["strip"]["top"]
@@ -216,12 +216,12 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                 c.js("Designer.select(1)")
                 m1 = measure(c)
                 c.screenshot(f"layout-{tag}-photo.png")
-                case(f"{tag}: a photo selected: its three groups show{', in at most two rows' if wide else ''}, and the help line names it",
-                     m1["shown"] == ["sel-photo", "sel-crop", "sel-all"] and (m1["selrows"] <= 2 or not wide) and m1["hint"].startswith("Photo 1."), (m1["shown"], m1["selrows"]))
+                case(f"{tag}: a photo selected: its four groups show (v27: the slide's too){', in at most three rows' if wide else ''}, and the help line names it",
+                     m1["shown"] == ["sel-photo", "sel-crop", "sel-slides", "sel-all"] and (m1["selrows"] <= 3 or not wide) and m1["hint"].startswith("Photo 1."), (m1["shown"], m1["selrows"]))
                 c.js("Designer.select(8)")
                 m2 = measure(c)
                 c.screenshot(f"layout-{tag}-text.png")
-                case(f"{tag}: text selected: its four groups show{', in at most two rows' if wide else ''}", m2["shown"] == ["sel-text", "sel-color", "sel-style", "sel-all"] and (m2["selrows"] <= 2 or not wide), (m2["shown"], m2["selrows"]))
+                case(f"{tag}: text selected: its five groups show (v27: the slide's too){', in at most three rows' if wide else ''}", m2["shown"] == ["sel-text", "sel-color", "sel-style", "sel-slides", "sel-all"] and (m2["selrows"] <= 3 or not wide), (m2["shown"], m2["selrows"]))
                 case(f"{tag}: the Brand colors label keeps its words and its place with text selected (the longer words are its tooltip and its name for a screen reader)",
                      m2["brand"] == "Brand colors" and m0["brand"] == "Brand colors" and m2["brandName"] == "Brand colors (for the text)" and m0["brandName"] == "Brand colors"
                      and m2["undo"] == m0["undo"] and m2["rows2"] == m0["rows2"], (m2["brand"], m2["brandName"], m0["undo"], m2["undo"]))
@@ -276,7 +276,7 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
                 case(f"{tag}: every control in the rows and the bar is inside the window sideways (a photo selected)", not reach and m1["scrollW"] <= w, (reach, m1["scrollW"]))
                 c.js("Designer.select(8)")
                 m2 = measure(c)
-                case(f"{tag}: text selected: its controls show and the page has no sideways scroll", m2["shown"] == ["sel-text", "sel-color", "sel-style", "sel-all"] and m2["scrollW"] <= w, (m2["shown"], m2["scrollW"]))
+                case(f"{tag}: text selected: its controls show and the page has no sideways scroll", m2["shown"] == ["sel-text", "sel-color", "sel-style", "sel-slides", "sel-all"] and m2["scrollW"] <= w, (m2["shown"], m2["scrollW"]))
                 pairs = J(c, "(function(){ return ['t-ls', 't-lh'].map(function(id){ var r = document.getElementById(id), l = r.parentNode.querySelector('.lbl'); var a = r.getBoundingClientRect(), b = l.getBoundingClientRect();"
                              " return [l.textContent, Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) <= 4, b.right <= a.left + 1, r.parentNode.classList.contains('pair')]; }); })()")
                 case(f"{tag}: Spacing and Lines each stay beside their slider when the style group wraps (a label never ends one line with its slider starting the next)",
@@ -374,7 +374,7 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
             after2 = measure(c)
             line2 = J(c, LINE + "('slides-line')")
             case("...and with a photo selected the line and the help line share the first line side by side: the help line starts after the line ends, and what is drawn over the help line's words is the help line (nothing lies over it)",
-                 after2["stage"] == before["stage"] and after2["selrows"] == 2 and line2["whole"] and line2["hintLeft"] >= line2["right"] and abs(line2["hintTop"] - line2["top"]) <= 2 and line2["hintW"] > 100 and line2["overHint"] == "selhint", (after2["stage"], line2))
+                 after2["stage"] == before["stage"] and after2["selrows"] == 3 and line2["whole"] and line2["hintLeft"] >= line2["right"] and abs(line2["hintTop"] - line2["top"]) <= 2 and line2["hintW"] > 100 and line2["overHint"] == "selhint", (after2["stage"], line2))
             undo_hit = J(c, "(function(){ var u = document.getElementById('undo').getBoundingClientRect(); var e = document.elementFromPoint(u.left + u.width / 2, u.top + u.height / 2); return e ? e.id : null; })()")
             case("...and the Undo button is not covered by it", undo_hit == "undo", undo_hit)
             # the help line has no claim of its own, so a long one is cut, with its whole words as its tooltip; the line a press brings is not
@@ -433,8 +433,8 @@ def check_layout_browser(case, work, port, make_kit, Server, post, get_json):
             c.screenshot("layout-1024x768-brand16-text.png")
             colour = J(c, "(function(){ var g = document.getElementById('sel-color'), s = document.getElementById('t-brand'); return {gH: g.getBoundingClientRect().height, swatches: s.querySelectorAll('.bc-sw').length, inRow: document.getElementById('g-undo').getBoundingClientRect().top === document.getElementById('g-slides').getBoundingClientRect().top}; })()")
             case("16 saved brand colors (as many as fit) at 1024 px: the slides' row is one row (the swatches wrap inside their group, Undo stays in the row), and selecting a photo, then text, moves the strip 0 px",
-                 m16["rows2"] == 1 and colour["inRow"] and m16["strip"]["top"] == m16p["strip"]["top"] == m16t["strip"]["top"] and m16t["selrows"] == 2, (m16["rows2"], colour, m16["strip"]["top"], m16p["strip"]["top"], m16t["strip"]["top"], m16t["selrows"]))
-            case("...the text's Color group holds all 16 on one line (its height one row), so the text's controls are still two rows",
+                 m16["rows2"] == 1 and colour["inRow"] and m16["strip"]["top"] == m16p["strip"]["top"] == m16t["strip"]["top"] and m16t["selrows"] == 3, (m16["rows2"], colour, m16["strip"]["top"], m16p["strip"]["top"], m16t["strip"]["top"], m16t["selrows"]))
+            case("...the text's Color group holds all 16 on one line (its height one row), so the text's controls are still three rows (v27)",
                  colour["swatches"] == 16 and colour["gH"] <= 36, colour)
             c.js("Designer.select(null)")
             c.click("#slides-minus")

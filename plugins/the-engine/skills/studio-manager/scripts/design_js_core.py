@@ -85,7 +85,25 @@ DESIGN_CORE_JS = r"""
     max: 'Instagram allows up to 20 slides.',
     small: 'This photo is too small for a border.',
     many: 'A design holds up to 80 photos and text boxes. Remove one first.',
-    full: 'Every slide has a photo, and 20 slides is as many as Instagram allows. Drag this photo onto a frame to put it there instead.'
+    full: 'Every slide has a photo, and 20 slides is as many as Instagram allows. Drag this photo onto a frame to put it there instead.',
+    // slides as things (hers, v27; stories since v26): the + and x on every label, the three buttons for the slide the
+    // selected thing is on, and the grip that drags a slide. The lines are hers; "one" is ours (hers says nothing at one slide).
+    dragSlide: 'Drag to move this slide',
+    addAfter: function(k){ return 'Add a slide after slide ' + k; },
+    removeSlide: function(k){ return 'Remove slide ' + k; },
+    before: 'Add a slide before', after: 'Add a slide after', removeThis: 'Remove this slide',
+    beforeTitle: 'Put a new blank slide in front of the one this is on',
+    afterTitle: 'Put a new blank slide right after the one this is on',
+    removeTitle: 'Take out the slide this is on, and everything on it',
+    added: function(k){ return 'Added a blank slide as slide ' + k + '. Drag a photo onto it. Undo takes it out.'; },
+    removed: function(k){ return 'Removed slide ' + k + '. Undo brings it back.'; },
+    most: 'That\'s the most Instagram allows (20 slides). Remove one first.',
+    across: 'A photo stretches across that spot. Move it first, or add the slide somewhere else.',
+    one: 'It\u2019s your only slide, so it stays.',
+    moved: function(n, k){ return 'Moved ' + (n > 1 ? n + ' slides (they share a photo)' : 'slide ' + k) + '. Undo moves it back.'; },
+    // "Where should it go?" (hers, v27): when a template lands at a spot something stretches across, and when it would pass the most slides
+    acrossEnd: 'A photo stretches across that spot, so I added it at the end instead.',
+    tooMany: function(adds, max, have){ return 'That adds ' + adds + (adds === 1 ? ' slide' : ' slides') + ', and Instagram allows ' + max + '. You have ' + have + '. Remove some first, or pick something smaller.'; }
   };
   // A part's words in a story's words: "slide" becomes "story", "slides" "stories", the Carousel folder the Stories
   // folder, "+ New design" "+ Add stories". Strings are changed in place; a function's answer is changed as it is
@@ -121,10 +139,7 @@ DESIGN_CORE_JS = r"""
   if (STORY) storyWords(WORDS, {
     max: 'A set holds up to 40 stories.',
     full: 'Every story has a photo, and 40 stories is as many as a set holds. Drag this photo onto a frame to put it there instead.',
-    one: 'It\u2019s your only story, so it stays.',
-    // the small x on a story's label (hers, v26): its name, and the line a press brings
-    removeStory: function(k){ return 'Remove story ' + k; },
-    removed: function(k){ return 'Removed story ' + k + '. Undo brings it back.'; }
+    most: 'That\'s the most Instagram allows (40 stories). Remove one first.'
   });
   // a name this page gives itself, new on every load and kept nowhere: it lets the Assistant tell this
   // page's own save (whose answer never arrived) from a change made in another window

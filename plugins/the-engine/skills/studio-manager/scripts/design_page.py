@@ -120,7 +120,7 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
    it for the selected thing's buttons: three rows between 768 and 1023 px, two from 1024 px up, where the rows
    are wide enough. So clicking a photo never moves the strip from under the pointer. */
 @media(min-width:768px){
-.selbar{min-height:calc(var(--row) * 3 + 36px)}
+.selbar{min-height:calc(var(--row) * 4 + 40px)}
 /* the Brand colors group takes whatever room is left in the slides' row and no more, so saving a fourth color
    never pushes Undo onto a row of its own: with more colors than fit, its swatches wrap inside the group (its
    row's own rule is in the brand colors' styles). The text's Color group does the same in its row. On a narrower
@@ -134,8 +134,10 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .selbar:not(.off) .selcap{flex-wrap:nowrap;height:24px}
 .selbar:not(.off) .selcap #selhint,.selbar:not(.off) .selcap .gline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+/* from 900 px the four groups of a photo and the five of a text box fit three rows (measured: four at 768, three at 900 and up) */
+@media(min-width:900px){.selbar{min-height:calc(var(--row) * 3 + 36px)}}
 @media(min-width:1024px){
-.selbar{min-height:calc(var(--row) * 2 + 32px)}
+.selbar{min-height:calc(var(--row) * 3 + 36px)}
 }
 /* between 1024 and 1180 the rows are tight: narrower boxes and sliders, a little less padding on a button and a
    group, the brand swatches the size of the background's, so six saved brand colors still sit on one line */
@@ -151,14 +153,22 @@ label.hint{display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-s
 .stage{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 18px 16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;box-shadow:0 -6px 0 0 var(--bg),var(--shadow),0 12px 20px -16px rgba(31,36,48,.45)}
 .stripwrap{position:relative;display:inline-block;vertical-align:top}
 .labels{position:absolute;left:0;top:-22px;height:20px;width:100%;pointer-events:none}
-.labels span{position:absolute;top:0;font-size:12px;color:var(--soft);transform:translateX(-50%);white-space:nowrap}
-body[data-kind=stories] .labels span{display:inline-flex;align-items:center;gap:5px}
-/* stories: the small x on a story's label removes that story (hers, v26). The labels let presses through; the x takes them. */
-.labels .labx{pointer-events:auto;position:relative;border:0;background:var(--chip);color:var(--ink);width:17px;height:17px;border-radius:50%;font:700 12px/1 var(--sans);cursor:pointer;padding:0;display:grid;place-items:center}
-.labels .labx::after{content:'';position:absolute;top:-5px;right:-5px;bottom:-5px;left:-5px}
-.labels .labx:hover{background:var(--accent);color:#fff}
+/* a slide's label (hers, v27; a story's since v26): the name on a grip that drags the slide, a small + that adds a blank
+   slide after it, a small x that removes it. The labels let presses through; the grip, the + and the x take them. */
+.labels .lab{position:absolute;top:0;font-size:12px;color:var(--soft);transform:translateX(-50%);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.labels span.slab{pointer-events:auto;cursor:grab;padding:1px 6px;border-radius:8px}
+.labels span.slab::before{content:'⠿' / '';opacity:.55;font-size:11px;margin-right:4px}
+.labels span.slab:hover{background:var(--chip);color:var(--ink)}
+.labels span.slab.dragging{background:var(--accent);color:#fff;cursor:grabbing}
+.labels .labx,.labels .labp{pointer-events:auto;position:relative;border:0;background:var(--chip);color:var(--ink);width:17px;height:17px;border-radius:50%;font:700 12px/1 var(--sans);cursor:pointer;padding:0;display:grid;place-items:center}
+.labels .labx::after,.labels .labp::after{content:'';position:absolute;top:-5px;right:-5px;bottom:-5px;left:-5px}
+.labels .labx:hover,.labels .labp:hover{background:var(--accent);color:#fff}
 .labels .labx[hidden]{display:none}
-.labels .labx:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+.labels .labx:focus-visible,.labels .labp:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+/* while a slide is dragged by its grip: the piece it is in dimmed, and a line where it lands (her coral) */
+.over.moveover{z-index:9600;overflow:visible}
+.slidedim{position:absolute;background:rgba(212,100,63,.18);outline:2px solid var(--accent);pointer-events:none}
+.dropline{position:absolute;width:4px;margin-left:-2px;background:var(--accent);border-radius:2px;pointer-events:none;box-shadow:0 0 0 3px rgba(212,100,63,.25)}
 .strip{position:relative;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 0 0 1px var(--line)}
 .over{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:5}
 .seam{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(47,124,246,.75);pointer-events:none;z-index:9000}
@@ -229,10 +239,8 @@ body.d-dragging,body.d-dragging *{user-select:none!important;-webkit-user-select
 .safe{position:absolute;left:0;background:rgba(220,60,60,.10);border-color:rgba(220,60,60,.55);border-style:dashed;border-width:0;pointer-events:none;z-index:9001;display:flex;align-items:center;justify-content:center;color:rgba(160,40,40,.85);font-weight:600;overflow:hidden;white-space:nowrap}
 .blk.words .bx2{position:absolute;pointer-events:none}
 .st-only-line{font-size:12.5px;color:var(--soft)}
-/* a story's text has two more groups (Look, Remove this story): one more row is held for them, so selecting text
-   never moves the strip there either */
-@media(min-width:768px){body[data-kind=stories] .selbar{min-height:calc(var(--row) * 4 + 40px)}}
-@media(min-width:1024px){body[data-kind=stories] .selbar{min-height:calc(var(--row) * 3 + 36px)}}
+/* (v27: the slide's own group, Add a slide before / after and Remove this slide, shows for anything selected on both
+   kinds, so a carousel now holds the rows a story's text needed: four from 768 px, three from 900 px) */
 """
 
 # The page starts only when every part is on it.

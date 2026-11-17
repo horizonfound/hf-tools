@@ -83,10 +83,14 @@ HERS_SINGLES = [
 REMOVED = [("st-grid", "Four-photo grid"), ("st-title", "Title slide"), ("st-film", "Film strip"), ("st-pairs", "Side by side"), ("st-bigsmall", "Big and small")]
 # her words, exactly
 ADD_TITLE = "Add slides"
-ADD_SUB = "Pick what to add. It goes after your last slide, and nothing you made is replaced: one slide at a time, or a whole template."
+# (her v27 line; v22's "...: one slide at a time, or a whole template." was replaced when Where should it go? came, so it is not looked for in her v22 page)
+ADD_SUB = "Pick what to add. It goes after your last slide. To put it somewhere else, close this, click the slide you want it next to, then press Add slides again."
 SECTIONS = ["Start fresh", "Single slides", "Your templates", "Starter templates"]
 LABELS = ["Centered", "Centered side to side", "Centered up and down", "Centered on the seam", "Centered on the seam, and up and down"]
-MAX_WORDS = "Instagram allows up to 20 slides."
+MAX_WORDS = "Instagram allows up to 20 slides."           # the Slides + button
+# adding past 20 from the window (her v27 line, which replaced the line above there): the numbers are the template's, 20, and the design's
+TOO_MANY_3 = "That adds 3 slides, and Instagram allows 20. You have 19. Remove some first, or pick something smaller."
+TOO_MANY_1 = "That adds 1 slide, and Instagram allows 20. You have 20. Remove some first, or pick something smaller."
 # Film strip as it was (one of the five she removed): a design made from it must open and save as before
 FILM = {"slides": 3, "bg": "#111111", "blocks": [{"id": i + 1, "n": None, "x": i * W + 40, "y": 275, "w": 1000, "h": 800, "ox": 0.5, "oy": 0.5, "zoom": 1, "slot": i + 1}
                                                    for i in range(3)]}
@@ -208,9 +212,9 @@ var nineteen = {slides: 19, bg: '#ffffff', blocks: [F(1, 1, 0, 0, W, H)]};
 r = P.addStories(nineteen, add, {});
 t('19 slides and one more: 20', r.st.slides === 20 && !r.why);
 r = P.addStories(nineteen, {slides: 3, bg: '#fff', blocks: [F(1, null, 0, 0, W, H)]}, {});
-t('19 slides and a three-slide template: refused (max), and nothing changes', r.why === 'max' && r.st === nineteen, r.why);
+t('19 slides and a three-slide template: refused (tooMany, with the numbers for her line), and nothing changes', r.why === 'tooMany' && r.adds === 3 && r.max === 20 && r.have === 19 && r.st === nineteen, r);
 r = P.addStories({slides: 20, bg: '#ffffff', blocks: [F(1, 1, 0, 0, W, H)]}, {slides: 1, bg: '#fff', blocks: []}, {});
-t('20 slides and a blank one: refused (max)', r.why === 'max');
+t('20 slides and a blank one: refused (tooMany)', r.why === 'tooMany' && r.adds === 1 && r.have === 20, r);
 JSON.stringify(out);
 """
 
@@ -259,7 +263,7 @@ def check_v22_page(case, work):
         case("v22: the order of the starters is her page's own", ids == [h[0] for h in HERS_STARTERS], ids)
         ids1 = re.findall(r"\{ id: '(cs-[a-z0-9-]+)'", her)
         case("v22: the order of the single slides is her page's own", ids1 == [h[0] for h in HERS_SINGLES], ids1)
-        for w in [ADD_TITLE, ADD_SUB, "Blank slide", "One empty slide", "Single slides", "+ Add slides", "Rename"] + LABELS:
+        for w in [ADD_TITLE, "Blank slide", "One empty slide", "Single slides", "+ Add slides", "Rename"] + LABELS:
             case(f"v22: her page says \"{w[:60]}\" and so do the page's scripts", w in her and w in allsrc, w)
     # ---- her words ----
     for w in [ADD_SUB, "addGalleryTitle: 'Add slides'", "addSlides: '+ Add slides'", "secSingles: 'Single slides'", "blankSlide: 'Blank slide'", "blankSlideSub: 'One empty slide'",
@@ -661,14 +665,14 @@ def check_v22_browser(case, work, port, make_kit, Server, post, get_json):
             open_window()
             add("starters", 1, wait_closed=False)   # Layered trio: 3 slides
             time.sleep(0.3)
-            case("v22 browser: 19 slides and a 3-slide template: refused with \"Instagram allows up to 20 slides.\", the window stays, nothing changed",
-                 is_open() and c.text("#gallery-line") == MAX_WORDS and st() == b0, (is_open(), c.text("#gallery-line")))
+            case("v22 browser: 19 slides and a 3-slide template: refused with her v27 line (That adds 3 slides...), the window stays, nothing changed",
+                 is_open() and c.text("#gallery-line") == TOO_MANY_3 and st() == b0, (is_open(), c.text("#gallery-line")))
             add("singles", 0)
             case("v22 browser: 19 slides and one single slide: 20", st()["slides"] == 20 and st()["blocks"][:2] == b0["blocks"], st()["slides"])
             open_window()
             add("fresh", 0, wait_closed=False)
             time.sleep(0.3)
-            case("v22 browser: 20 slides and a blank one: refused, 20 slides still", is_open() and c.text("#gallery-line") == MAX_WORDS and st()["slides"] == 20, c.text("#gallery-line"))
+            case("v22 browser: 20 slides and a blank one: refused, 20 slides still", is_open() and c.text("#gallery-line") == TOO_MANY_1 and st()["slides"] == 20, c.text("#gallery-line"))
             close_window()
             settled()
             case("v22 browser: the 20-slide design is saved as 20 slides", disk()["state"]["slides"] == 20)
@@ -877,8 +881,8 @@ def check_v22_browser(case, work, port, make_kit, Server, post, get_json):
                      "t = document.elementFromPoint(r.left + Math.min(40, r.width / 2), r.top + r.height / 2); return {text: l.textContent, y0: r.top, y1: r.bottom, s0: q.top, s1: q.bottom, top: s.scrollTop, hit: t === l}; })()")
             case("v22 browser: 19 slides, the window scrolled to its last card, Add on a 3-slide template: nothing is added and the window stays",
                  is_open() and st() == b0 and line["top"] > 200, (is_open(), line))
-            case("v22 browser: ... and \"Instagram allows up to 20 slides.\" is IN SIGHT in the window, on top of what scrolls under it",
-                 line["text"] == MAX_WORDS and line["y0"] >= line["s0"] and line["y1"] <= line["s1"] and line["hit"], line)
+            case("v22 browser: ... and her \"That adds 3 slides...\" line is IN SIGHT in the window, on top of what scrolls under it",
+                 line["text"] == TOO_MANY_3 and line["y0"] >= line["s0"] and line["y1"] <= line["s1"] and line["hit"], line)
             close_window()
             c.desktop()
             case("v22 browser: nothing went wrong on the page so far", not c.page_errors(), c.page_errors())

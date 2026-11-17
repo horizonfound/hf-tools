@@ -533,9 +533,6 @@ DESIGN_TEXT_JS = r"""
     boxLbl = el('span', 'lbl', TW.boxColor); boxLbl.id = 'box-lbl'; g4.appendChild(boxLbl);
     boxIn = el('input'); boxIn.type = 'color'; boxIn.id = 't-box'; boxIn.setAttribute('aria-label', TW.boxColor); boxIn.title = TW.boxColor;
     g4.appendChild(boxIn);
-    // the order of the bar is hers: the text's groups, Look, then Remove this story, then the buttons for anything
-    var rows = $('selrows'), story = $('sel-story'), all = $('sel-all');
-    if (story && all && story.parentNode === rows) rows.insertBefore(story, all);
     g4.addEventListener('click', function(e){
       var bt = e.target.closest ? e.target.closest('button[data-look]') : null;
       if (!bt || !selText()) return;
@@ -546,6 +543,12 @@ DESIGN_TEXT_JS = r"""
     boxIn.addEventListener('input', function(){ change('boxColor', boxIn.value, 'box'); });
     boxIn.addEventListener('change', function(){ if (!change('boxColor', boxIn.value, 'box')) D.render(); });
   }
+  // the order of the bar is hers (v27, both kinds): the text's groups, Look, then the slide's buttons (Add a slide
+  // before / after, Remove this slide), then the buttons for anything
+  (function(){
+    var rows = $('selrows'), slides = $('sel-slides'), all = $('sel-all');
+    if (slides && all && slides.parentNode === rows) rows.insertBefore(slides, all);
+  })();
 
   function setLimits(){
     ta.maxLength = T.RULES.textMax;

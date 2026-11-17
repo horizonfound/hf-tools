@@ -141,7 +141,7 @@ t('...an empty frame that was already there is left empty (only the new frames a
 var ids = n9.st.blocks.map(function(b){ return b.id; });
 t('...every block has its own id', ids.filter(function(x, k){ return ids.indexOf(x) === k; }).length === ids.length);
 var full = {slides: 40, bg: '#ffffff', blocks: [F(1, 1, 0, 0, W, H)]};
-t('+ Add stories at 40 stories: nothing is added, and the reason is "max"', P.addStories(full, one, {}).why === 'max' && P.addStories(full, one, {}).st === full);
+t('+ Add stories at 40 stories: nothing is added, and the reason is "tooMany" (v27: her line with the numbers)', P.addStories(full, one, {}).why === 'tooMany' && P.addStories(full, one, {}).st === full);
 var crowd = {slides: 2, bg: '#ffffff', blocks: []};
 for (var k = 1; k <= 75; k++) crowd.blocks.push(F(k, null, 0, 0, 100, 100));
 t('+ Add stories past 80 photos and words: nothing is added, and the reason is "many"', P.addStories(crowd, nine, {}).why === 'many');
@@ -192,9 +192,11 @@ def check_stories_page(case, work):
     case("stories page: the folder's button is Open folder (hers, v27), there from the start", "id='open-carousel' type='button'>Open folder</button>" in story and "id='open-wrap' hidden" not in story)
     for her, ours in STORY_CHANGED.items():
         case(f"decision 20: \"{her}\" is \"{ours}\" on the stories page", ours in story or ours in allsrc, ours)
+    import design
+    storied = design.story_words(allsrc)        # (v27: Remove this story and its tooltip are the carousel's words said in a story's, at run time)
     for k in ("add", "remove", "removeTitle", "look", "plain", "box", "neon", "boxColor", "topBand", "bottomBand", "gallery", "subEmpty", "subMore",
               "use", "blank", "blankSub", "onePer", "reply", "ago", "fill"):
-        case(f"page scripts: her words: {HERS[k][:70]}", ("'" + HERS[k] + "'") in allsrc or HERS[k] in allsrc, HERS[k])
+        case(f"page scripts: her words: {HERS[k][:70]}", ("'" + HERS[k] + "'") in allsrc or HERS[k] in allsrc or (k in ("remove", "removeTitle") and HERS[k] in storied), HERS[k])
     case("page scripts: her three section names in Add stories: Start with, Your templates, Layouts",
          "secFresh: 'Start with'" in allsrc and "secMine: 'Your templates'" in allsrc and "secStarters: 'Layouts'" in allsrc)
     case("page scripts: the preview's top bar and reply bar (♡ and ➤, her marks)", "'♡'" in allsrc and "'➤'" in allsrc and "'×'" in allsrc)
@@ -643,13 +645,13 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
             # ---- Remove this story ----
             target_id = next(b["id"] for b in s2b["blocks"] if b["x"] == SW)
             c.click(f"#strip .blk[data-id='{target_id}']")
-            sel = J("{shown: !document.getElementById('sel-story').hidden, words: document.querySelector('#sel-story [data-a=delstory]').textContent, "
-                    "title: document.querySelector('#sel-story [data-a=delstory]').title, off: document.querySelector('#sel-story [data-a=delstory]').disabled, "
+            sel = J("{shown: !document.getElementById('sel-slides').hidden, words: document.querySelector('#sel-slides [data-a=delstory]').textContent, "
+                    "title: document.querySelector('#sel-slides [data-a=delstory]').title, off: document.querySelector('#sel-slides [data-a=delstory]').disabled, "
                     "fill: document.querySelector('#sel-photo [data-a=full]').textContent, span: !!document.querySelector('#sel-photo [data-a=span2]'), "
                     "center: document.querySelector('#sel-all [data-a=center]').textContent}")
             case("a photo selected: Remove this story (her words and tooltip), Fill story, Center on story, and no Across 2 slides",
                  sel == {"shown": True, "words": HERS["remove"], "title": HERS["removeTitle"], "off": False, "fill": "Fill story", "span": False, "center": "Center on story"}, sel)
-            c.click("#sel-story [data-a=delstory]")
+            c.click("#sel-slides [data-a=delstory]")
             s4 = st()
             want = [dict(b, x=b["x"] - SW) if b["x"] >= 2 * SW else b for b in s2b["blocks"] if b["id"] != target_id]
             case("Remove this story: story 2 and its photo are gone, the stories after it move up, nothing else changes", s4["slides"] == 5 and s4["blocks"] == want, s4)
@@ -679,8 +681,8 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
                    "box: !document.getElementById('t-box').hidden, boxLbl: document.getElementById('box-lbl').textContent, shown: !document.getElementById('sel-look').hidden}")
             case("the Look group: Look, Plain / Box / Neon with Box on, and Box color showing", lk == {"label": "Look", "btns": [["Plain", False], ["Box", True], ["Neon", False]], "box": True, "boxLbl": "Box color", "shown": True}, lk)
             order = J("Array.from(document.getElementById('selrows').children).filter(function(g){ return !g.hidden; }).map(function(g){ return g.id; })")
-            case("the bar for a story's text, in her order: the text's groups, Look, Remove this story, then the rest",
-                 order[-3:] == ["sel-look", "sel-story", "sel-all"] and order.index("sel-text") < order.index("sel-look"), order)
+            case("the bar for a story's text, in her order: the text's groups, Look, the story's buttons (v27: sel-slides), then the rest",
+                 order[-3:] == ["sel-look", "sel-slides", "sel-all"] and order.index("sel-text") < order.index("sel-look"), order)
             c.wait_for("Designer.type.status(Designer.selected()) !== 'wait'", 15)
             c.click("#sel-look [data-look='neon']")
             t1 = J("Designer.selected()")
@@ -737,8 +739,8 @@ def check_stories_browser(case, work, port, make_kit, Server, post, get_json):
             c.click("#gallery-fresh .dz-card:nth-child(1) .dz-use")
             c.wait_for("document.getElementById('gallery').hidden", 5)
             c.click("#add-text")
-            one = json.loads(c.js("JSON.stringify({slides: Designer.st.slides, off: document.querySelector('#sel-story [data-a=delstory]').disabled, "
-                                  "line: document.getElementById('only-story').hidden ? '' : document.getElementById('only-story').textContent})"))
+            one = json.loads(c.js("JSON.stringify({slides: Designer.st.slides, off: document.querySelector('#sel-slides [data-a=delstory]').disabled, "
+                                  "line: document.getElementById('only-slide').hidden ? '' : document.getElementById('only-slide').textContent})"))
             case("one story: Remove this story is off, and a line beside it says why", one == {"slides": 1, "off": True, "line": "It\u2019s your only story, so it stays."}, one)
             case("no error of the page's own on the one-story shoot", not c.page_errors(), c.page_errors()[:3])
 

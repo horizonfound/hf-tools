@@ -3,7 +3,7 @@
 
 DESIGN_MODEL_JS makes window.DesignModel: where a photo sits inside its frame, what a move, a resize or a
 nudge may do, snapping (edges, and the centers: M.move's mid, M.centered, M.midWords), the one-click layouts, which slide a thing is on, adding and swapping photos, the
-undo list, which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
+undo list, slides as things (insert, remove, the pieces a strip comes in and moving one), which made copy of a photo to draw from. Every function takes a layout and returns a new one (or
 the very same one when nothing changes) and touches no document, so tests/design_check.py runs it by itself
 under the Mac's own JavaScript engine.
 
@@ -36,6 +36,7 @@ DESIGN_MODEL_JS = r"""
     centerFlash: 1400,      // after an arrow key: how long the centered lines show, in ms (hers)
     nudge: 5, nudgeBig: 50, // an arrow key, and with Shift
     undo: 60,               // steps of Undo kept
+    seam: 20,               // a thing within this many strip pixels of an edge does not stretch across it (hers)
     wheel: 1.05,            // one turn of the wheel zooms by this much
     // how wide one slide may be drawn on screen: the Size slider runs from "every slide fits across the window"
     // (never under min, and never over few when there are only a few slides) up to max; one keyboard step of the
@@ -318,15 +319,60 @@ DESIGN_MODEL_JS = r"""
     if (st.slides >= RULES.slides[1]) return {st: st, why: 'max'};
     return {st: merge(st, {slides: st.slides + 1})};
   }
-  // Stories: take out story k (from 0) and everything whose middle is on it; the stories after it move up (hers).
-  // At one story nothing changes: {st, why: 'one'}.
-  function removeStory(st, k){
+  // ---- slides as things (hers, v26 for stories, v27 for both kinds) ----
+  // The seam rule, in one place: does anything stretch across the edge before slide k (from 0; k = slides is the
+  // end)? A thing that only touches the edge (within seam strip pixels) does not count, so a photo that fills its
+  // slide to the pixel never blocks the edge beside it.
+  function crosses(st, k){
+    var e = k * W, s = RULES.seam;
+    return st.blocks.some(function(b){ return b.x < e - s && b.x + b.w > e + s; });
+  }
+  // Take out slide k (from 0) and everything on it: whatever has its middle there (a photo whose middle is there goes
+  // with it even when it stretches into the next slide: hers), and whatever stretches across either of its edges by
+  // the seam rule (ours: hers leaves such a photo lying where it was, and the slide that moves up lands under it).
+  // The slides after it move up. At one slide nothing changes: {st, why: 'one'}. (removeStory: the same, by its v26 name.)
+  function removeSlide(st, k){
     if (st.slides <= 1) return {st: st, why: 'one'};
     k = clamp(Math.floor(Number(k) || 0), 0, st.slides - 1);
-    var lo = k * W, hi = lo + W;
-    var blocks = st.blocks.filter(function(b){ return !(b.x + b.w / 2 >= lo && b.x + b.w / 2 < hi); })
-      .map(function(b){ return b.x >= hi ? merge(b, {x: r2(b.x - W)}) : b; });
+    var lo = k * W, hi = lo + W, s = RULES.seam;
+    var goes = function(b){ var m = b.x + b.w / 2; return (m >= lo && m < hi) || (b.x < lo - s && b.x + b.w > lo + s) || (b.x < hi - s && b.x + b.w > hi + s); };
+    var blocks = st.blocks.filter(function(b){ return !goes(b); })
+      .map(function(b){ return b.x >= hi - s ? merge(b, {x: r2(b.x - W)}) : b; });
     return {st: withBlocks(st, blocks, {slides: st.slides - 1}), sel: null};
+  }
+  // A new blank slide at position `at` (from 0; at = slides puts it at the end): everything from there on moves
+  // one slide along, ids and text boxes with it. Refused past the most slides ({st, why: 'most'}) and at a spot
+  // something stretches across ({st, why: 'across'}). -> {st, sel: null, at}
+  function insertSlide(st, at){
+    if (st.slides >= RULES.slides[1]) return {st: st, why: 'most'};
+    at = clamp(Math.floor(Number(at) || 0), 0, st.slides);
+    if (crosses(st, at)) return {st: st, why: 'across'};
+    var e = at * W - RULES.seam;
+    var blocks = st.blocks.map(function(b){ return b.x >= e ? merge(b, {x: r2(b.x + W)}) : b; });
+    return {st: withBlocks(st, blocks, {slides: st.slides + 1}), sel: null, at: at};
+  }
+  // The pieces a strip comes in: runs of slides cut wherever nothing stretches across the edge between them.
+  // -> [[first, last], ...] (slides from 0, both ends in). Slides that share a stretched photo are one piece.
+  function slideGroups(st){
+    var g = [], a = 0;
+    for (var k = 1; k <= st.slides; k++) { if (k === st.slides || !crosses(st, k)) { g.push([a, k - 1]); a = k; } }
+    return g;
+  }
+  // Move piece `from` (an index into slideGroups) so that it lands at `to` (where among the pieces it goes: 0 to
+  // the number of pieces; to = from or from + 1 is where it already is). Everything on each piece goes with it,
+  // by the slide its middle is on (text boxes too). -> the new layout, or null when nothing changes.
+  function moveGroup(st, from, to){
+    var g = slideGroups(st);
+    from = Math.floor(Number(from)); to = Math.floor(Number(to));
+    if (!(from >= 0 && from < g.length && to >= 0 && to <= g.length)) return null;
+    var order = g.map(function(x, i){ return i; }), m = order.splice(from, 1)[0];
+    order.splice(to > from ? to - 1 : to, 0, m);
+    if (order.every(function(x, i){ return x === i; })) return null;
+    var shift = {}, at = 0;
+    order.forEach(function(i){ shift[i] = (at - g[i][0]) * W; at += g[i][1] - g[i][0] + 1; });
+    var piece = function(b){ var k = slideOf(b, st.slides); for (var i = 0; i < g.length; i++) { if (k >= g[i][0] && k <= g[i][1]) return i; } return -1; };
+    var blocks = st.blocks.map(function(b){ var i = piece(b); return i >= 0 && shift[i] ? merge(b, {x: r2(b.x + shift[i])}) : b; });
+    return withBlocks(st, blocks);
   }
   function setBg(st, color){
     color = String(color || '').toLowerCase();
@@ -450,7 +496,8 @@ DESIGN_MODEL_JS = r"""
   }
 
   root.DesignModel = {
-    W: W, H: H, KIND: KIND, RULES: RULES, useLimits: useLimits, removeStory: removeStory,
+    W: W, H: H, KIND: KIND, RULES: RULES, useLimits: useLimits,
+    crosses: crosses, removeSlide: removeSlide, removeStory: removeSlide, insertSlide: insertSlide, slideGroups: slideGroups, moveGroup: moveGroup,
     clamp: clamp, r2: r2, isText: isText, isFrame: isFrame, isHole: isHole, typeOf: typeOf, same: same, copy: copy,
     indexOf: indexOf, find: find, merge: merge, tidy: tidy, patch: patch, nextId: nextId,
     layoutImg: layoutImg, pan: pan, zoomTo: zoomTo, zoomBy: zoomBy,

@@ -68,6 +68,42 @@ HERS = {
     "open_story": "Your Stories folder is open in Finder.",
     "none_car": "There's no Carousel folder yet. Press Save slides first and it's made for you.",
     "none_story": "There's no Stories folder yet. Press Save stories first and it's made for you.",
+    # slides as things (B8): the three buttons and their tooltips, in her HTML (line 337) and her stories' names (line 435)
+    "before": "Add a slide before", "after": "Add a slide after", "remove_this": "Remove this slide",
+    "before_story": "Add a story before", "after_story": "Add a story after", "remove_story": "Remove this story",
+    "before_title": "Put a new blank slide in front of the one this is on",
+    "after_title": "Put a new blank slide right after the one this is on",
+    "remove_title": "Take out the slide this is on, and everything on it",
+    # Where should it go? (B9)
+    "where": "Where should it go?", "where_end": "At the end",
+    "where_sub": "Pick what to add, and choose where it goes. Nothing you made is replaced.",
+    "add_sub": "Pick what to add. It goes after your last slide. To put it somewhere else, close this, click the slide you want it next to, then press Add slides again.",
+    "add_sub_story": "Pick what to add. It goes after your last story, and nothing you made is replaced.",
+    "across_end": "A photo stretches across that spot, so I added it at the end instead.",
+}
+# Her lines that her page builds from pieces (a kind's word, a number): the piece in her page, and the line ours says for a slide
+# and for a story, with the number 3 where she puts one. Each is looked for in her page, and ours are checked against both kinds.
+HERS_BUILT = {
+    "drag": ("'Drag to move this ' + UNIT.toLowerCase()", "Drag to move this slide", "Drag to move this story"),
+    "add_after": ("'Add a ' + UNIT.toLowerCase() + ' after ' + UNIT.toLowerCase() + ' ' + (i + 1)", "Add a slide after slide 3", "Add a story after story 3"),
+    "remove_k": ("'Remove ' + UNIT.toLowerCase() + ' ' + (i + 1)", "Remove slide 3", "Remove story 3"),
+    "most": ("`That's the most Instagram allows (${max} ${UNITS}). Remove one first.`", "That's the most Instagram allows (20 slides). Remove one first.", "That's the most Instagram allows (40 stories). Remove one first."),
+    "across": ("`A photo stretches across that spot. Move it first, or add the ${UNIT.toLowerCase()} somewhere else.`",
+               "A photo stretches across that spot. Move it first, or add the slide somewhere else.", "A photo stretches across that spot. Move it first, or add the story somewhere else."),
+    "added": ("`Added a blank ${UNIT.toLowerCase()} as ${UNIT.toLowerCase()} ${at + 1}. Drag a photo onto it. Undo takes it out.`",
+              "Added a blank slide as slide 3. Drag a photo onto it. Undo takes it out.", "Added a blank story as story 3. Drag a photo onto it. Undo takes it out."),
+    "removed": ("`Removed ${UNIT.toLowerCase()} ${si + 1}. Undo brings it back.`", "Removed slide 3. Undo brings it back.", "Removed story 3. Undo brings it back."),
+    "moved": ("`Moved ${n > 1 ? n + ' ' + u + ' (they share a photo)' : u + ' ' + (g[from][0] + 1)}. Undo moves it back.`", "Moved slide 3. Undo moves it back.", "Moved story 3. Undo moves it back."),
+    "moved_n": ("`Moved ${n > 1 ? n + ' ' + u + ' (they share a photo)' : u + ' ' + (g[from][0] + 1)}. Undo moves it back.`",
+                "Moved 2 slides (they share a photo). Undo moves it back.", "Moved 2 stories (they share a photo). Undo moves it back."),
+    "where_before": ("`Before ${u} ${si + 1}`", "Before slide 3", "Before story 3"),
+    "where_after": ("`After ${u} ${si + 1}`", "After slide 3", "After story 3"),
+    "too_many": ("`That adds ${add.slides} ${add.slides === 1 ? UNIT.toLowerCase() : UNITS}, and Instagram allows ${max}. You have ${st.slides}. Remove some first, or pick something smaller.`",
+                 "That adds 4 slides, and Instagram allows 20. You have 18. Remove some first, or pick something smaller.",
+                 "That adds 4 stories, and Instagram allows 40. You have 18. Remove some first, or pick something smaller."),
+    "too_many_1": ("`That adds ${add.slides} ${add.slides === 1 ? UNIT.toLowerCase() : UNITS}, and Instagram allows ${max}. You have ${st.slides}. Remove some first, or pick something smaller.`",
+                   "That adds 1 slide, and Instagram allows 20. You have 20. Remove some first, or pick something smaller.",
+                   "That adds 1 story, and Instagram allows 40. You have 40. Remove some first, or pick something smaller."),
 }
 # Her lines in these parts that ours does not carry word for word, and why.
 HERS_NOT_OURS = {
@@ -78,6 +114,8 @@ HERS_NOT_OURS = {
 # Our own words where hers has none (drafts for Nicole), each with its reason.
 OUR_WORDS = {
     "Your assistant’s pick is in your slides.": "the carousel's line for the moment the pick arrives on the open page (hers has none; the stories' line is from v26)",
+    "It’s your only slide, so it stays.": "beside Remove this slide at one slide, where hers does nothing and says nothing (the stories' line is from v26)",
+    "Put a new blank story in front of the one this is on": "her stories' tooltips still say slide (her page renames the three buttons only); ours say story, as every story word does (decision 20)",
     "It's behind this window: click <Finder> in <the Dock> to see it.": "added after her 'Your Carousel folder is open in Finder.' when macOS kept the browser in front (hers never knows); File Explorer and the taskbar on a PC",
 }
 
@@ -160,6 +198,132 @@ def osascript(js_file):
 # ---------------------------------------------------------------------------------------------------------------
 # Part 1: the tables, the words and the rules by themselves
 # ---------------------------------------------------------------------------------------------------------------
+
+# What our scripts say for one of her built lines (HERS_BUILT), with the number 3 (or 4 and 18, or 1 and 20) put in: the
+# core's and the designs script's words tables, run as JavaScript by itself with a slide's words and a story's.
+_SAID = {}
+
+
+def _said(core, dz, key):
+    if not _SAID:
+        js = r"""
+var out = {}, t = CORE.slice(CORE.indexOf('var WORDS = {'), CORE.indexOf('// A part\'s words in a story\'s words'));
+var W = (new Function(t + '; return WORDS;'))();
+var d = DZ.slice(DZ.indexOf('var DW = D.WORDS.designs = {'), DZ.indexOf('var STORY = D.STORY;'));
+var D = {WORDS: {}}, DW = (new Function('D', d + '; return DW;'))(D);
+out.drag = W.dragSlide; out.add_after = W.addAfter(3); out.remove_k = W.removeSlide(3); out.most = W.most; out.across = W.across;
+out.added = W.added(3); out.removed = W.removed(3); out.moved = W.moved(1, 3); out.moved_n = W.moved(2, 1);
+out.where_before = DW.whereBefore(3); out.where_after = DW.whereAfter(3); out.too_many = W.tooMany(4, 20, 18); out.too_many_1 = W.tooMany(1, 20, 20);
+// a story's own: the most line names 40 stories (the stories' override in the core), and tooMany is given 40
+out.too_many_s = W.tooMany(4, 40, 18); out.too_many_1_s = W.tooMany(1, 40, 40);
+var m = /most: '((?:[^'\\]|\\.)*)'/g, ms = [], mm; while ((mm = m.exec(CORE))) ms.push(mm[1]);
+out.most_s = ms.length > 1 ? (new Function("return '" + ms[1] + "';"))() : '';
+JSON.stringify(out);
+"""
+        f = Path(os.environ.get("TMPDIR", "/private/tmp")) / ("v27-said-%d.js" % os.getpid())
+        f.write_text("var CORE = " + json.dumps(core) + ";\nvar DZ = " + json.dumps(dz) + ";\n" + js, encoding="utf-8")
+        r = osascript(f)
+        try:
+            _SAID.update(json.loads(r.stdout))
+        except ValueError:
+            _SAID["_bad"] = r.stderr[-300:]
+    return _SAID.get(key, "")
+
+
+# B8, B9, B10 under the Mac's own JavaScript engine: the model's slides as things and the plan's spot, with no page.
+SLIDES_JS = r"""
+var out = [];
+function t(name, ok, detail){ out.push([name, !!ok, detail === undefined ? '' : JSON.stringify(detail)]); }
+function eq(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+var window = this;
+window.DESIGN_LIMITS = CAROUSEL_LIMITS;
+eval(MODEL_SRC); eval(PLAN_SRC);
+var M = window.DesignModel, P = window.DesignPlan, W = 1080, H = 1350;
+function F(id, n, x, y, w, h){ return {id: id, n: n, x: x, y: y, w: w, h: h, ox: 0.5, oy: 0.5, zoom: 1}; }
+function TX(id, x, y){ return {id: id, type: 'text', text: 'Their words', font: 'Figtree', size: 72, weight: 700, italic: false, upper: false, al: 'center', ls: 0, lh: 1.3, color: '#111111', x: x, y: y, w: 800, h: 94}; }
+function xs(st){ return st.blocks.map(function(b){ return [b.id, b.x]; }); }
+function frozen(st){ return JSON.stringify(st); }
+// four slides: a photo on 1, a photo across 2 and 3, a small one and a text box on 4
+var four = {slides: 4, bg: '#f4efe6', blocks: [F(1, 1, 0, 0, W, H), F(2, 2, W, 0, 2 * W, H), F(3, 3, 3 * W + 50, 50, 400, 400), TX(4, 3 * W + 100, 800)]};
+var was = frozen(four);
+// ---- the seam rule, in one place ----
+t('crosses: nothing stretches across the edge before slide 1, 2 or 4; the photo across 2 and 3 crosses the edge before 3', !M.crosses(four, 0) && !M.crosses(four, 1) && M.crosses(four, 2) && !M.crosses(four, 3) && !M.crosses(four, 4));
+t('crosses: a photo that reaches 20 px past an edge does not count as across it (hers: 20 px); 21 px does', !M.crosses({slides: 2, bg: '#fff', blocks: [F(1, 1, 0, 0, W + 20, H)]}, 1) && M.crosses({slides: 2, bg: '#fff', blocks: [F(1, 1, 0, 0, W + 21, H)]}, 1) && M.RULES.seam === 20);
+// ---- insertSlide (B8) ----
+var r = M.insertSlide(four, 0);
+t('insertSlide at 0: a blank slide first, everything one slide along, ids and the text box kept', r.st.slides === 5 && eq(xs(r.st), [[1, W], [2, 2 * W], [3, 4 * W + 50], [4, 4 * W + 100]]) && r.sel === null && r.at === 0 && r.st.blocks[3].text === 'Their words', xs(r.st));
+r = M.insertSlide(four, 1);
+t('insertSlide at 1 (before the stretched photo): slide 1 stays, the rest move along', r.st.slides === 5 && eq(xs(r.st), [[1, 0], [2, 2 * W], [3, 4 * W + 50], [4, 4 * W + 100]]), xs(r.st));
+r = M.insertSlide(four, 3);
+t('insertSlide at 3 (after the stretched photo): the photo across 2 and 3 stays whole, slide 4\'s things move along', r.st.slides === 5 && eq(xs(r.st), [[1, 0], [2, W], [3, 4 * W + 50], [4, 4 * W + 100]]), xs(r.st));
+r = M.insertSlide(four, 4);
+t('insertSlide at the end: nothing moves, one more slide', r.st.slides === 5 && eq(xs(r.st), xs(four)) && r.at === 4);
+r = M.insertSlide(four, 2);
+t('insertSlide at a spot the stretched photo crosses: refused (why across), nothing changes', r.why === 'across' && r.st === four);
+var twenty = {slides: 20, bg: '#fff', blocks: [F(1, 1, 0, 0, W, H)]};
+r = M.insertSlide(twenty, 20);
+t('insertSlide at 20 slides: refused (why most), nothing changes', r.why === 'most' && r.st === twenty);
+t('insertSlide: a blank slide added where a photo ends exactly on the edge is allowed (the photo is not across it)', !M.insertSlide({slides: 2, bg: '#fff', blocks: [F(1, 1, 0, 0, W, H), F(2, 2, W, 0, W, H)]}, 1).why);
+t('insertSlide: the layout it was given is untouched', frozen(four) === was);
+// ---- removeSlide (B8) ----
+r = M.removeSlide(four, 1);
+t('removeSlide 2: the photo across 2 and 3 goes with it (it stretches across the slide\'s far edge; hers left it lying under slide 4\'s things); slide 4\'s things move up one', r.st.slides === 3 && eq(xs(r.st), [[1, 0], [3, 2 * W + 50], [4, 2 * W + 100]]) && r.sel === null, xs(r.st));
+r = M.removeSlide(four, 2);
+t('removeSlide 3: the photo across 2 and 3 has its middle on slide 3, so it goes with it (hers); slide 4\'s things move up', r.st.slides === 3 && eq(xs(r.st), [[1, 0], [3, 2 * W + 50], [4, 2 * W + 100]]), xs(r.st));
+var wide1 = {slides: 3, bg: '#fff', blocks: [F(1, 1, 0, 0, 2 * W, H), F(2, 2, 2 * W, 0, W, H)]};
+r = M.removeSlide(wide1, 0);
+t('removeSlide 1 under the left half of a photo across 1 and 2 (its middle on the seam): the photo goes, slide 3\'s photo moves up to slide 2 (hers kept both, overlapping)', r.st.slides === 2 && eq(xs(r.st), [[2, W]]), xs(r.st));
+r = M.removeSlide({slides: 3, bg: '#fff', blocks: [F(1, 1, 0, 0, W, H), F(2, 2, W - 10, 0, W, H), F(3, 3, 2 * W + 15, 0, W - 15, H)]}, 0);
+t('removeSlide: a photo that starts 10 px before slide 2\'s edge is slide 2\'s (the seam rule), and moves up to slide 1 exactly as it sat; the third too', r.st.slides === 2 && eq(xs(r.st), [[2, -10], [3, W + 15]]), xs(r.st));
+r = M.removeSlide(four, 3);
+t('removeSlide 4: the small photo and the text box on it go; nothing else moves', r.st.slides === 3 && eq(xs(r.st), [[1, 0], [2, W]]), xs(r.st));
+t('removeSlide at one slide: nothing, why one; removeStory is the same function by its v26 name', M.removeSlide({slides: 1, bg: '#fff', blocks: []}, 0).why === 'one' && M.removeStory === M.removeSlide);
+// ---- slideGroups and moveGroup (B10) ----
+t('slideGroups: the pieces are slide 1, slides 2 and 3 together (they share a photo), slide 4', eq(M.slideGroups(four), [[0, 0], [1, 2], [3, 3]]));
+t('slideGroups: a one-slide design is one piece; an empty design of 3 slides is three', eq(M.slideGroups({slides: 1, bg: '#fff', blocks: []}), [[0, 0]]) && eq(M.slideGroups({slides: 3, bg: '#fff', blocks: []}), [[0, 0], [1, 1], [2, 2]]));
+var mv = M.moveGroup(four, 0, 3);
+t('moveGroup: slide 1 dropped after slide 4 (to = 3): the stretched piece and slide 4 move up, slide 1 lands last', mv && mv.slides === 4 && eq(xs(mv), [[1, 3 * W], [2, 0], [3, 2 * W + 50], [4, 2 * W + 100]]), mv && xs(mv));
+mv = M.moveGroup(four, 1, 0);
+t('moveGroup: the two-slide piece dropped first: both its slides move together, slide 1 goes after them', mv && eq(xs(mv), [[1, 2 * W], [2, 0], [3, 3 * W + 50], [4, 3 * W + 100]]), mv && xs(mv));
+mv = M.moveGroup(four, 2, 0);
+t('moveGroup: slide 4 dropped first: its photo AND its text box travel with it', mv && eq(xs(mv), [[1, W], [2, 2 * W], [3, 50], [4, 100]]), mv && xs(mv));
+t('moveGroup: dropped where it already is (to = from, or from + 1): null, nothing to do', M.moveGroup(four, 1, 1) === null && M.moveGroup(four, 1, 2) === null && M.moveGroup(four, 0, 0) === null && M.moveGroup(four, 2, 3) === null);
+t('moveGroup: a piece or a spot that is not there: null', M.moveGroup(four, 3, 0) === null && M.moveGroup(four, -1, 0) === null && M.moveGroup(four, 0, 4) === null);
+t('moveGroup: the layout it was given is untouched', frozen(four) === was);
+// ---- addStories with a spot (B9) ----
+var one = {slides: 1, bg: '#ffffff', blocks: [F(9, null, 0, 0, W, H)]};
+var a = P.addStories(four, one, {at: 1});
+t('addStories before slide 2: the new slide is slide 2, everything from there moves along, its frame is a new id', a.st.slides === 5 && a.first === 1 && !a.fell && eq(xs(a.st), [[1, 0], [2, 2 * W], [3, 4 * W + 50], [4, 4 * W + 100], [5, W]]) && a.st.blocks[4].n === null, xs(a.st));
+a = P.addStories(four, one, {at: 3});
+t('addStories after slide 3 (at 3): the stretched photo stays whole, slide 4 moves along', a.st.slides === 5 && a.first === 3 && eq(xs(a.st), [[1, 0], [2, W], [3, 4 * W + 50], [4, 4 * W + 100], [5, 3 * W]]), xs(a.st));
+a = P.addStories(four, one, {at: 2});
+t('addStories at the spot the photo stretches across: it goes at the end instead, and the answer says so (fell)', a.st.slides === 5 && a.fell === true && a.first === 4 && eq(xs(a.st), [[1, 0], [2, W], [3, 3 * W + 50], [4, 3 * W + 100], [5, 4 * W]]), a);
+a = P.addStories(four, one, {});
+t('addStories with no spot: at the end, as before', a.st.slides === 5 && a.first === 4 && !a.fell && a.st.blocks[4].x === 4 * W);
+a = P.addStories(four, one, {at: 4});
+t('addStories at = the number of slides: the end', a.first === 4 && !a.fell);
+var two = {slides: 2, bg: '#fff', blocks: [F(9, null, 0, 0, W, H), F(10, null, W, 0, W, H)]};
+a = P.addStories(four, two, {at: 0});
+t('addStories: a two-slide template before slide 1: everything moves two slides along', a.st.slides === 6 && a.first === 0 && eq(xs(a.st), [[1, 2 * W], [2, 3 * W], [3, 5 * W + 50], [4, 5 * W + 100], [5, 0], [6, W]]), xs(a.st));
+var eighteen = {slides: 18, bg: '#fff', blocks: [F(1, 1, 0, 0, W, H)]};
+a = P.addStories(eighteen, {slides: 4, bg: '#fff', blocks: []}, {at: 1});
+t('addStories: 18 slides and a four-slide template: refused whole (tooMany, with 4, 20 and 18 for her line), nothing moves', a.why === 'tooMany' && a.adds === 4 && a.max === 20 && a.have === 18 && a.st === eighteen, a);
+t('addStories: 18 and two: allowed (20)', P.addStories(eighteen, two, {}).st.slides === 20);
+t('addStories: the layout it was given is untouched', frozen(four) === was);
+// ---- a story's size: 40 at the most ----
+window.DESIGN_LIMITS = STORY_LIMITS;
+eval(MODEL_SRC); eval(PLAN_SRC);
+M = window.DesignModel; P = window.DesignPlan;
+var SH = 1920, forty = {slides: 40, bg: '#fff', blocks: [F(1, 1, 0, 0, W, SH)]};
+t('stories: insertSlide at 40 stories is refused (most); at 39 it is allowed', M.insertSlide(forty, 40).why === 'most' && M.insertSlide({slides: 39, bg: '#fff', blocks: []}, 0).st.slides === 40);
+a = P.addStories({slides: 38, bg: '#fff', blocks: [F(1, 1, 0, 0, W, SH)]}, {slides: 3, bg: '#fff', blocks: []}, {});
+t('stories: 38 stories and a three-story template: tooMany with 3, 40 and 38', a.why === 'tooMany' && a.adds === 3 && a.max === 40 && a.have === 38);
+var sfour = {slides: 4, bg: '#fff', blocks: [F(1, 1, 0, 0, W, SH), F(2, 2, W, 0, 3 * W, SH)]};
+t('stories: a photo across stories 2 to 4 (Seamless swipe) is one piece of three; moving story 1 after it moves it 3 stories', eq(M.slideGroups(sfour), [[0, 0], [1, 3]]) && eq(xs(M.moveGroup(sfour, 0, 2)), [[1, 3 * W], [2, 0]]));
+t('stories: removeStory by its v26 name still takes a story out', M.removeStory(sfour, 0).st.slides === 3);
+JSON.stringify(out);
+"""
+
 
 def check_v27_page(case, work):
     sys.path.insert(0, str(SCRIPTS))
@@ -251,6 +415,48 @@ def check_v27_page(case, work):
     weak = [sel for sel, body in rules if "[hidden]" in sel and sel.strip() != "[hidden]" and re.search(r"display\s*:\s*none", body) and "!important" not in body]
     case("v27 page: no class's own [hidden] rule is weaker than the global one (none needed; any that exist say !important or are plain display:none under the global one)", True, weak)
 
+    # ---- B8, B9, B10: slides as things: her words on our pages, for both kinds ----
+    core, dz, edit = src["DESIGN_CORE_JS"], src["DESIGN_DESIGNS_JS"], src["DESIGN_EDIT_JS"]
+    SW_ = design.story_words
+    for k in ("before", "after", "remove_this", "before_title", "after_title", "remove_title"):
+        case(f"v27 page: her words in the core's table, for a slide: {HERS[k][:50]}", "'" + HERS[k].replace("'", "\\'") + "'" in core, HERS[k])
+    for k, sk in (("before", "before_story"), ("after", "after_story"), ("remove_this", "remove_story")):
+        case(f"v27 page: ... and the story words of it are her story button: {HERS[sk]}", SW_(HERS[k]) == HERS[sk], SW_(HERS[k]))
+    for k, (piece, slide, story) in HERS_BUILT.items():
+        case(f"v27 page: her built line, for a slide: {slide[:60]}", slide in _said(core, dz, k), slide)
+        said_s = _said(core, dz, k + "_s") or _said(core, dz, k)
+        case(f"v27 page: ... and for a story: {story[:60]}", SW_(said_s) == story, (SW_(said_s), story))
+    for k in ("where", "where_end", "where_sub", "add_sub", "add_sub_story", "across_end"):
+        case(f"v27 page: her words in the page's scripts: {HERS[k][:60]}", HERS[k] in dz + core or HERS[k].replace("'", "\\'") in dz + core, HERS[k])
+    case("v27 page: the stories' most line is the stories' own (40 stories), not the carousel's with its number", "most: 'That\\'s the most Instagram allows (40 stories). Remove one first.'" in core)
+    case("v27 page: the slide group is one group for both kinds (sel-slides), with the one-slide line of ours beside Remove",
+         "D.selbar.group('sel-slides', '', function(){ return true; })" in edit and "oneLine.id = 'only-slide'" in edit and "sel-story" not in edit and "sel-story" not in src["DESIGN_TEXT_JS"])
+    case("v27 page: every label carries the grip, the + and the x, in both kinds (no `if (STORY)` around them)",
+         "el('span', 'slab', WORDS.slide(k))" in edit and "el('button', 'labp', '+')" in edit and "el('button', 'labx', '\\u00d7')" in edit and "if (STORY) {\n      var x = el('button', 'labx'" not in edit)
+    case("v27 page: the grip glyph is drawn by the page's styles with no words for a screen reader, and the drop line and the dimmed piece are her coral",
+         ".labels span.slab::before{content:'⠿' / ''" in design_page.DESIGN_CSS and ".dropline{" in design_page.DESIGN_CSS and ".slidedim{" in design_page.DESIGN_CSS
+         and "background:var(--accent)" in design_page.DESIGN_CSS.split(".dropline{")[1].split("}")[0] and "rgba(212,100,63,.18)" in design_page.DESIGN_CSS.split(".slidedim{")[1].split("}")[0])
+    case("v27 page: the Where row is built hidden and relies on the global [hidden] rule (its own class is display:flex with no [hidden] rule of its own, as the lesson says it need not)",
+         "whereRow.hidden = true" in dz and ".dz-where{display:flex" in design_page.PART_CSS and ".dz-where[hidden]" not in design_page.PART_CSS)
+    case("v27 page: the where row is filled from the slide clicked last each time the window opens (never a stale number)", "var si = D.oneSlideAt ? D.oneSlideAt() : null, show = adds" in dz and "D.on('design', function(){ last = null; });" in edit)
+    case("v27 page: the room held for the selected thing's buttons is the same for both kinds now: four rows from 768 px, three from 900 px",
+         ".selbar{min-height:calc(var(--row) * 4 + 40px)}" in design_page.DESIGN_CSS and "@media(min-width:900px){.selbar{min-height:calc(var(--row) * 3 + 36px)}}" in design_page.DESIGN_CSS and "body[data-kind=stories] .selbar" not in design_page.DESIGN_CSS)
+    case("v27 page: our one-slide line is in the core's table (hers says nothing at one slide), and is listed with its reason",
+         "one: 'It\\u2019s your only slide, so it stays.'" in core and "It’s your only slide, so it stays." in OUR_WORDS)
+    case("v27 page: the stories' tooltip of ours is her tooltip in story words, and is listed", SW_(HERS["before_title"]) == "Put a new blank story in front of the one this is on" and "Put a new blank story in front of the one this is on" in OUR_WORDS)
+    # the rules by themselves (osascript): a carousel's limits, then a story's
+    js = work / "v27-slides.js"
+    js.write_text("var MODEL_SRC = " + json.dumps(src["DESIGN_MODEL_JS"]) + ";\nvar PLAN_SRC = " + json.dumps(src["DESIGN_PLAN_JS"]) + ";\nvar CAROUSEL_LIMITS = "
+                  + json.dumps(design.limits_for("carousel")) + ";\nvar STORY_LIMITS = " + json.dumps(design.limits_for("stories")) + ";\n" + SLIDES_JS, encoding="utf-8")
+    r = osascript(js)
+    try:
+        rows = json.loads(r.stdout)
+    except ValueError:
+        rows = None
+    if case("v27 page: the slide rules ran by themselves (no page)", isinstance(rows, list) and len(rows) >= 30, (r.stdout[-300:], r.stderr[-300:])):
+        for name, ok, detail in rows:
+            case("v27 rules: " + name, ok, detail)
+
     # ---- her page, when it is beside the project: every word of hers, and hers the other way round ----
     her = her_page()
     if her is None:
@@ -263,6 +469,8 @@ def check_v27_page(case, work):
              "none_story": "`There's no ${sub} folder yet. Press ${$('save').textContent} first and it's made for you.`"}
     missing = [k for k, v in HERS.items() if k not in BUILT and v not in her and v.replace("'", "\\'") not in her]
     case("v27 page: every word in this file's table is in her v27 page, as she wrote it", not missing, missing)
+    case("v27 page: every piece her page builds a slide line from is in her page, as this file has it", all(p_ in her for p_, _, _ in HERS_BUILT.values()), [k for k, (p_, _, _) in HERS_BUILT.items() if p_ not in her])
+    case("v27 page: her stories' tooltips still say slide (ours say story: listed in OUR_WORDS)", "'Add a story before'" in her and "Put a new blank story" not in her)
     case("v27 page: ... and the five she builds on the page are built from the pieces this file names", all(v in her for v in BUILT.values()), [k for k, v in BUILT.items() if v not in her])
     m = re.search(r"function askKindWords\(\) \{(.*?)\}\n", her, re.S)
     found = re.findall(r"'([^']+)'|\"([^\"]+)\"", m.group(1)) if m else []
@@ -682,6 +890,187 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             case("v27 browser: with a Carousel folder there: her line, for this computer's file manager (nothing opened: the no-windows switch)",
                  c.text("#open-line") == HERS["open_car"].replace("Finder", app), c.text("#open-line"))
 
+            # ================= slides as things on the carousel (B8, B9, B10) =================
+            def four_state(top=0):
+                return {"slides": 4, "bg": "#ffffff", "blocks": [_frame(1, 1, 0), _frame(2, 2, W, w=2 * W), _frame(3, 3, 3 * W + 50, 50, 400, 400), _text(4, 3 * W + 100, 800)]}
+
+            def put(state):
+                c.js("Designer.select(null); Designer.setState(" + json.dumps(state) + ")")
+                c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+
+            def labels():
+                return Jx("Array.from(document.querySelectorAll('#labels .lab')).map(function(l){ var g = l.querySelector('.slab'), p = l.querySelector('.labp'), x = l.querySelector('.labx'); "
+                          "return [g.textContent, g.title, p.title, p.getAttribute('aria-label'), x.title, !x.hidden && getComputedStyle(x).display !== 'none']; })")
+
+            def xs():
+                return [[b["id"], b["x"]] for b in st()["blocks"]]
+
+            def slides_line():
+                return c.text("#slides-line")
+
+            def sel_line():
+                return c.text("#selline")
+
+            put(four_state())
+            rev0 = disk()["rev"]
+            lab = labels()
+            case("v27 browser: every slide's label is a grip with the slide's name, a + named for the slide it adds after, and an x named for the slide it removes, all shown (four slides)",
+                 lab == [[f"Slide {k}", "Drag to move this slide", f"Add a slide after slide {k}", f"Add a slide after slide {k}", f"Remove slide {k}", True] for k in (1, 2, 3, 4)], lab)
+            glyph = c.js("getComputedStyle(document.querySelector('#labels .slab'), '::before').content")
+            case("v27 browser: the grip glyph is drawn before the name by the page's styles (⠿), not as words", "\u283f" in glyph, glyph)
+            c.click("#labels .lab:nth-child(1) .labp")
+            case("v27 browser: + on slide 1's label: a blank slide 2, everything from there one slide along, and her line",
+                 st()["slides"] == 5 and xs() == [[1, 0], [2, 2 * W], [3, 4 * W + 50], [4, 4 * W + 100]] and slides_line() == "Added a blank slide as slide 2. Drag a photo onto it. Undo takes it out.", (xs(), slides_line()))
+            case("v27 browser: ... saved as one more change (rev + 1), nothing selected", settled() and disk()["rev"] == rev0 + 1 and c.js("Designer.sel") is None, disk()["rev"])
+            c.click("#undo")
+            case("v27 browser: Undo takes the blank slide out", st() == four_state(), st()["slides"])
+            c.click("#labels .lab:nth-child(2) .labp")
+            case("v27 browser: + on slide 2's label, where a photo stretches across the spot: refused with her line, nothing changed",
+                 st() == four_state() and slides_line() == "A photo stretches across that spot. Move it first, or add the slide somewhere else.", slides_line())
+            c.click("#labels .lab:nth-child(2) .labx")
+            case("v27 browser: x on slide 2's label: the slide and the photo across 2 and 3 go, slide 4's things move up, her line",
+                 st()["slides"] == 3 and xs() == [[1, 0], [3, 2 * W + 50], [4, 2 * W + 100]] and slides_line() == "Removed slide 2. Undo brings it back.", (xs(), slides_line()))
+            c.click("#undo")
+            case("v27 browser: Undo brings it back", st() == four_state())
+            # the three buttons for the slide the selected thing is on
+            c.click("#strip .blk[data-id='1']")
+            grp = Jx("(function(){ var g = document.getElementById('sel-slides'); return {shown: !g.hidden, btns: Array.from(g.querySelectorAll('button')).map(function(b){ return [b.textContent, b.title, b.disabled]; }), "
+                     "line: document.getElementById('only-slide').hidden, after: g.nextElementSibling && g.nextElementSibling.id}; })()")
+            case("v27 browser: a photo selected: Add a slide before, Add a slide after, Remove this slide, with her tooltips, right before the group for anything (hers), after the text's groups",
+                 grp == {"shown": True, "btns": [[HERS["before"], HERS["before_title"], False], [HERS["after"], HERS["after_title"], False], [HERS["remove_this"], HERS["remove_title"], False]], "line": True, "after": "sel-all"}, grp)
+            order = Jx("Array.from(document.getElementById('selrows').children).map(function(g){ return g.id; })")
+            case("v27 browser: the bar's groups run Selected photo, Crop, Text, Color, style, the slide's, then the rest (so a text box gets the slide's buttons after its own)",
+                 order == ["sel-photo", "sel-crop", "sel-text", "sel-color", "sel-style", "sel-slides", "sel-all"], order)
+            c.click("#sel-slides [data-a=slidebefore]")
+            case("v27 browser: Add a slide before (slide 1): a blank slide 1, and the line beside the buttons", st()["slides"] == 5 and xs() == [[1, W], [2, 2 * W], [3, 4 * W + 50], [4, 4 * W + 100]]
+                 and sel_line() == "Added a blank slide as slide 1. Drag a photo onto it. Undo takes it out.", (xs(), sel_line()))
+            c.click("#undo")
+            c.click("#strip .blk[data-id='3']")
+            c.click("#sel-slides [data-a=slideafter]")
+            case("v27 browser: Add a slide after (slide 4, the small photo's): a blank slide 5 at the end", st()["slides"] == 5 and xs() == [[1, 0], [2, W], [3, 3 * W + 50], [4, 3 * W + 100]]
+                 and sel_line() == "Added a blank slide as slide 5. Drag a photo onto it. Undo takes it out.", (xs(), sel_line()))
+            c.click("#undo")
+            c.click("#strip .blk[data-id='4']")
+            c.click("#sel-slides [data-a=delstory]")
+            case("v27 browser: Remove this slide with the text box selected (slide 4): the slide, its photo and the text go", st()["slides"] == 3 and xs() == [[1, 0], [2, W]]
+                 and sel_line() == "Removed slide 4. Undo brings it back.", (xs(), sel_line()))
+            c.click("#undo")
+            case("v27 browser: ... Undo, and the design is as it was and saved so", st() == four_state() and settled())
+            # the most, and the fewest
+            put({"slides": 20, "bg": "#ffffff", "blocks": [_frame(1, 1, 0)]})
+            c.click("#labels .lab:nth-child(20) .labp")
+            case("v27 browser: at 20 slides + is refused with her line", st()["slides"] == 20 and slides_line() == "That's the most Instagram allows (20 slides). Remove one first.", slides_line())
+            put({"slides": 1, "bg": "#ffffff", "blocks": [_frame(1, 1, 0)]})
+            c.click("#strip .blk[data-id='1']")
+            one = Jx("{x: Array.from(document.querySelectorAll('#labels .labx')).filter(function(x){ return !x.hidden; }).length, off: document.querySelector('#sel-slides [data-a=delstory]').disabled, "
+                     "line: document.getElementById('only-slide').hidden ? '' : document.getElementById('only-slide').textContent, plus: !document.querySelector('#labels .labp').disabled}")
+            case("v27 browser: at one slide: no x on the label, Remove this slide off with our line beside it, + still there", one == {"x": 0, "off": True, "line": "It’s your only slide, so it stays.", "plus": True}, one)
+            # ---- Where should it go? (B9) ----
+            c.js(f"Designer.load('{A}')")          # the design opened afresh: no slide clicked in it yet (a click earlier in this test would count, as hers)
+            c.wait_for("Designer.save.idle()", 10)
+            put(four_state())
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            row = Jx("{hidden: document.getElementById('tpl-where').hidden, display: getComputedStyle(document.getElementById('tpl-where')).display, sub: document.getElementById('gallery-sub').textContent}")
+            case("v27 browser: + Add slides with no slide clicked yet: the row is hidden (really: display none) and her v27 line says how to put it somewhere else",
+                 row == {"hidden": True, "display": "none", "sub": HERS["add_sub"]}, row)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            sr = c.rect("#strip")
+            c.click((sr["x"] + 3.5 * sr["w"] / 4, sr["y"] + sr["h"] * 0.5))      # a bare spot on slide 4
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            row = Jx("{hidden: document.getElementById('tpl-where').hidden, display: getComputedStyle(document.getElementById('tpl-where')).display, sub: document.getElementById('gallery-sub').textContent, "
+                     "head: document.querySelector('#tpl-where b').textContent, words: Array.from(document.querySelectorAll('#tpl-where label')).map(function(l){ return l.textContent.trim(); }), "
+                     "checked: document.querySelector('#tpl-where input:checked').value}")
+            case("v27 browser: slide 4 clicked, then + Add slides: Where should it go? Before slide 4 / After slide 4 / At the end, After ticked, and her line",
+                 row == {"hidden": False, "display": "flex", "sub": HERS["where_sub"], "head": HERS["where"], "words": ["Before slide 4", "After slide 4", "At the end"], "checked": "after"}, row)
+            c.click("#tplw-before")
+            add("fresh", 1)                      # Blank slide
+            case("v27 browser: Blank slide added Before slide 4: it is slide 4, the small photo and the text move to slide 5, and the page is scrolled to it",
+                 st()["slides"] == 5 and xs() == [[1, 0], [2, W], [3, 4 * W + 50], [4, 4 * W + 100]] and slides_line() == "", (xs(), slides_line()))
+            case("v27 browser: ... saved", settled())
+            c.click("#undo")
+            c.click("#strip .blk[data-id='2']")       # the photo across 2 and 3: its middle is on slide 3
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            words = Jx("Array.from(document.querySelectorAll('#tpl-where label')).map(function(l){ return l.textContent.trim(); })")
+            case("v27 browser: the photo across slides 2 and 3 selected: the row is about slide 3", words == ["Before slide 3", "After slide 3", "At the end"], words)
+            c.click("#tplw-before")
+            add("fresh", 1)
+            case("v27 browser: Blank slide Before slide 3, where the photo stretches across: it goes at the end instead, and her line says so",
+                 st()["slides"] == 5 and xs() == [[1, 0], [2, W], [3, 3 * W + 50], [4, 3 * W + 100]] and slides_line() == HERS["across_end"], (xs(), slides_line()))
+            c.click("#undo")
+            c.click("#new-design")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            row = Jx("{hidden: document.getElementById('tpl-where').hidden, display: getComputedStyle(document.getElementById('tpl-where')).display, h: document.querySelector('#gallery h2').textContent}")
+            case("v27 browser: + New design never shows the row (her bug, impossible here)", row == {"hidden": True, "display": "none", "h": "New design"}, row)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            put({"slides": 18, "bg": "#ffffff", "blocks": [_frame(1, 1, 0)]})
+            c.click((sr["x"] + 10, sr["y"] + 10))
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            add("fresh", 2, wait=False)          # One photo per slide: five slides
+            time.sleep(0.3)
+            case("v27 browser: 18 slides and a five-slide pick: refused whole with her numbers, the window stays, nothing changed",
+                 c.js("!document.getElementById('gallery').hidden") and c.text("#gallery-line") == "That adds 5 slides, and Instagram allows 20. You have 18. Remove some first, or pick something smaller." and st()["slides"] == 18, c.text("#gallery-line"))
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            put({"slides": 1, "bg": "#ffffff", "blocks": [_frame(1, 1, 0)]})
+            c.click((sr["x"] + 10, sr["y"] + 10))
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            case("v27 browser: on a one-slide design the row is not shown (hers)", c.js("document.getElementById('tpl-where').hidden") is True)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            # another design opened: no stale number
+            put(four_state())
+            c.click((sr["x"] + 3.5 * sr["w"] / 4, sr["y"] + sr["h"] * 0.5))
+            c.click("#dup-design")
+            c.wait_for(f"Designer.design && Designer.design.id !== '{A}' && Designer.save.idle()", 15)
+            A2 = did()
+            c.click("#add-slides")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            case("v27 browser: the copy opened (Duplicate design) with no slide clicked in it yet: the row is hidden, though slide 4 was clicked in the design before", st()["slides"] == 4 and c.js("document.getElementById('tpl-where').hidden") is True)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            # ---- drag a slide by its grip (B10) ----
+            put(four_state())
+            rev1 = disk()["rev"]
+            lr = c.rect("#labels .lab:nth-child(1) .slab")
+            sr = c.rect("#strip")
+            c.drag("#labels .lab:nth-child(1) .slab", (sr["right"] - 8, lr["cy"]), steps=16, release=False)
+            drag = Jx("(function(){ var d = document.querySelector('.slidedim'), l = document.querySelector('.dropline'), s = document.getElementById('strip').getBoundingClientRect(); "
+                      "return {dim: !!d, dimLeft: d && Math.round(d.getBoundingClientRect().left - s.left), dimW: d && Math.round(d.getBoundingClientRect().width), line: !!l && !l.hidden, "
+                      "lineAt: l && Math.round(l.getBoundingClientRect().left + 2 - s.left), stripW: Math.round(s.width), grabbing: document.querySelector('#labels .slab').classList.contains('dragging'), "
+                      "color: l && getComputedStyle(l).backgroundColor, same: JSON.stringify(Designer.st)}; })()")
+            case("v27 browser: while slide 1's grip is dragged to the end: slide 1 dimmed in coral, a coral line at the strip's end, the layout untouched so far",
+                 drag["dim"] and drag["dimLeft"] == 0 and abs(drag["dimW"] - drag["stripW"] / 4) <= 2 and drag["line"] and abs(drag["lineAt"] - drag["stripW"]) <= 3 and drag["grabbing"]
+                 and drag["color"] == "rgb(212, 100, 63)" and json.loads(drag["same"]) == four_state(), drag)
+            c.mouse_release()
+            case("v27 browser: let go: slide 1 is last, the other three moved up (the two that share a photo together), her line, nothing selected",
+                 st()["slides"] == 4 and xs() == [[1, 3 * W], [2, 0], [3, 2 * W + 50], [4, 2 * W + 100]] and slides_line() == "Moved slide 1. Undo moves it back." and c.js("Designer.sel") is None
+                 and c.count(".slidedim") == 0 and c.count(".dropline") == 0, (xs(), slides_line()))
+            case("v27 browser: ... saved as one change (rev + 1)", settled() and disk()["rev"] == rev1 + 1, disk()["rev"])
+            c.click("#undo")
+            case("v27 browser: Undo moves it back", st() == four_state())
+            lr2 = c.rect("#labels .lab:nth-child(2) .slab")
+            c.drag("#labels .lab:nth-child(2) .slab", (sr["x"] + 4, lr2["cy"]), steps=16)
+            case("v27 browser: slide 2's grip dragged to the start: slides 2 and 3 move together (they share a photo), slide 1 after them, her line",
+                 xs() == [[1, 2 * W], [2, 0], [3, 3 * W + 50], [4, 3 * W + 100]] and slides_line() == "Moved 2 slides (they share a photo). Undo moves it back.", (xs(), slides_line()))
+            c.click("#undo")
+            c.drag("#labels .lab:nth-child(1) .slab", (sr["right"] - 8, lr["cy"]), steps=16, release=False)
+            c.key("Escape")
+            c.mouse_release()
+            case("v27 browser: Escape in the middle of a drag: the layout as it was, nothing dimmed, no line, no words",
+                 st() == four_state() and c.count(".slidedim") == 0 and c.count(".dropline") == 0 and slides_line() == "" and not c.js("document.querySelector('#labels .slab').classList.contains('dragging')"), xs())
+            c.drag("#labels .lab:nth-child(1) .labp", (sr["right"] - 8, lr["cy"]), steps=10)
+            case("v27 browser: a press on a label's + that is dragged away starts no slide drag and adds no slide", st() == four_state() and c.count(".slidedim") == 0, xs())
+            c.drag("#labels .lab:nth-child(1) .slab", (lr["cx"] + 3, lr["cy"] + 1), steps=3)
+            case("v27 browser: a press on the grip that barely moves is not a drag: nothing changes", st() == four_state() and slides_line() == "")
+            case("v27 browser: nothing went wrong on the page through all of that", not c.page_errors(), c.page_errors()[:3])
+
             # ================= the stories page =================
             c.open(f"{base}/design.html?kit={KQ}&kind=stories")
             ready()
@@ -720,6 +1109,39 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             case("v27 browser: Open folder on the stories before any Save stories: her not-yet line, naming Save stories", c.text("#open-line") == HERS["none_story"], c.text("#open-line"))
             weak = Jx("Array.from(document.querySelectorAll('[hidden]')).filter(function(e){ return getComputedStyle(e).display !== 'none'; }).map(function(e){ return e.id || e.className; })")
             case("v27 browser: on the stories page too, every hidden element is really gone", not weak, weak)
+            # ---- slides as things, in a story's words (B8, B9, B10) ----
+            def sfour():
+                return {"slides": 4, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, h=SH), _frame(2, 2, SW, w=2 * SW, h=SH), _frame(3, 3, 3 * SW + 50, 50, 400, 400), _text(4, 3 * SW + 100, 800)]}
+            c.js("Designer.select(null); Designer.setState(" + json.dumps(sfour()) + ")")
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            lab = Jx("Array.from(document.querySelectorAll('#labels .lab')).map(function(l){ var g = l.querySelector('.slab'), p = l.querySelector('.labp'), x = l.querySelector('.labx'); return [g.textContent, g.title, p.title, x.title]; })")
+            case("v27 browser: a story's labels say story: the grip, the + and the x", lab == [[f"Story {k}", "Drag to move this story", f"Add a story after story {k}", f"Remove story {k}"] for k in (1, 2, 3, 4)], lab)
+            c.click("#strip .blk[data-id='1']")
+            grp = Jx("Array.from(document.querySelectorAll('#sel-slides button')).map(function(b){ return [b.textContent, b.title]; })")
+            case("v27 browser: the three buttons in her story names, with the tooltips in story words (ours: hers still say slide)",
+                 grp == [[HERS["before_story"], "Put a new blank story in front of the one this is on"], [HERS["after_story"], "Put a new blank story right after the one this is on"], [HERS["remove_story"], "Take out the story this is on, and everything on it"]], grp)
+            c.click("#sel-slides [data-a=slideafter]")
+            case("v27 browser: Add a story after story 1: a blank story 2, her line in story words", st()["slides"] == 5 and c.text("#selline") == "Added a blank story as story 2. Drag a photo onto it. Undo takes it out.", c.text("#selline"))
+            c.click("#undo")
+            c.click("#labels .lab:nth-child(2) .labp")
+            case("v27 browser: + where a photo stretches across, in story words", c.text("#slides-line") == "A photo stretches across that spot. Move it first, or add the story somewhere else.", c.text("#slides-line"))
+            c.click("#strip .blk[data-id='2']")
+            c.click("#new-design")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            row = Jx("{sub: document.getElementById('gallery-sub').textContent, words: Array.from(document.querySelectorAll('#tpl-where label')).map(function(l){ return l.textContent.trim(); }), hidden: document.getElementById('tpl-where').hidden}")
+            case("v27 browser: Add stories with the photo across 2 and 3 selected: Before story 3 / After story 3 / At the end, and her line", row == {"sub": HERS["where_sub"], "words": ["Before story 3", "After story 3", "At the end"], "hidden": False}, row)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            lr = c.rect("#labels .lab:nth-child(2) .slab")
+            sr = c.rect("#strip")
+            c.drag("#labels .lab:nth-child(2) .slab", (sr["x"] + 4, lr["cy"]), steps=16)
+            case("v27 browser: stories 2 and 3 dragged to the start together, in story words", [[b["id"], b["x"]] for b in st()["blocks"]] == [[1, 2 * SW], [2, 0], [3, 3 * SW + 50], [4, 3 * SW + 100]]
+                 and c.text("#slides-line") == "Moved 2 stories (they share a photo). Undo moves it back.", c.text("#slides-line"))
+            c.js("Designer.select(null); Designer.setState(" + json.dumps({"slides": 40, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, h=SH)]}) + ")")
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            c.click("#labels .lab:nth-child(40) .labp")
+            case("v27 browser: at 40 stories + is refused with the stories' number", c.text("#slides-line") == "That's the most Instagram allows (40 stories). Remove one first.", c.text("#slides-line"))
+            case("v27 browser: nothing went wrong on the stories page", not c.page_errors(), c.page_errors()[:3])
     finally:
         srv.stop()
 

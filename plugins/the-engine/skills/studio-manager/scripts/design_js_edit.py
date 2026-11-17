@@ -28,8 +28,14 @@ Where later parts attach:
     Designer.viewSlide()       the slide in the middle of what is showing (where + Add text puts a text box)
     Designer.reveal(id)        scroll the strip so a block shows
 
+Slides as things (hers, v27; stories since v26): every slide's label has + (a blank slide after it) and x (remove
+it); "Add a slide before", "Add a slide after" and "Remove this slide" work on the slide the selected thing is on
+(off at one slide, with a line saying why); the label is a grip that drags the slide along the strip, slides that
+share a stretched photo moving as one piece, with a coral line where it lands. Designer.oneSlideAt() is the slide the
+selected thing is on, else the one clicked last in this design.
+
 In the stories designer (Designer.STORY) the same strip is a row of 9:16 stories: a solid line between two stories,
-no "Across 2 slides", "Remove this story" for whatever is selected (off at one story, with a line saying why), and
+no "Across 2 slides", the slide buttons say story, and
 the bands where Instagram's own buttons sit, drawn over every story while "Show Instagram's buttons" is ticked.
 Those bands are part of the page only: a saved story is drawn by Designer.paint, which never draws them.
 """
@@ -237,9 +243,11 @@ DESIGN_EDIT_JS = r"""
     while (labels.children.length > st.slides) labels.lastChild.remove();
     while (labels.children.length < st.slides) labels.appendChild(label(labels.children.length + 1));
     for (var k = 0; k < st.slides; k++) {
-      labels.children[k].style.left = (k + 0.5) * W * s + 'px';
-      // the x that removes a story is there only while there is more than one (hers)
-      if (STORY) { var lx = labels.children[k].lastChild; lx.hidden = st.slides <= 1; lx.disabled = D.blocked; }
+      var lab = labels.children[k];
+      lab.style.left = (k + 0.5) * W * s + 'px';
+      // the x that removes a slide is there only while there is more than one (hers)
+      var lx = lab.querySelector('.labx'), lp = lab.querySelector('.labp');
+      lx.hidden = st.slides <= 1; lx.disabled = D.blocked; lp.disabled = D.blocked;
     }
     drawBands(st, s);
     var b = D.selected();
@@ -251,25 +259,61 @@ DESIGN_EDIT_JS = r"""
     else if (G.redo) G.redo();          // a drag is going on: what it shows is drawn again over the fresh strip
   }
   D.on('render', draw);
-  // A slide's label. A story's label also has a small x (Nicole, Nov 13): it removes that story, even an empty one;
-  // the stories after it move up, and Undo brings it back.
+  // A slide's label (hers, v27; a story's since v26): its name on a grip that drags the slide (below), a small +
+  // that puts a new blank slide right after it, and a small x that removes it, even an empty one; the slides after
+  // it move up, and Undo brings either back. The x is there only while there is more than one.
   function label(k){
-    var sp = el('span', '', WORDS.slide(k));
-    if (STORY) {
-      var x = el('button', 'labx', '\u00d7'); x.type = 'button'; x.dataset.k = String(k);
-      x.title = WORDS.removeStory(k); x.setAttribute('aria-label', WORDS.removeStory(k));
-      sp.appendChild(x);
-    }
-    return sp;
+    var lab = el('div', 'lab'), sp = el('span', 'slab', WORDS.slide(k));
+    lab.dataset.k = String(k); sp.dataset.k = String(k);
+    sp.title = WORDS.dragSlide;
+    lab.appendChild(sp);
+    var p = el('button', 'labp', '+'); p.type = 'button'; p.dataset.k = String(k);
+    p.title = WORDS.addAfter(k); p.setAttribute('aria-label', WORDS.addAfter(k));
+    lab.appendChild(p);
+    var x = el('button', 'labx', '\u00d7'); x.type = 'button'; x.dataset.k = String(k);
+    x.title = WORDS.removeSlide(k); x.setAttribute('aria-label', WORDS.removeSlide(k));
+    lab.appendChild(x);
+    return lab;
+  }
+  // A new blank slide at `at` (from 0), or slide k (from 1) taken out: one Undo step and one save each, and the
+  // line says what happened (after the change, which wipes the line before). which: where the line goes.
+  function insertSlide(at, which){
+    var r = M.insertSlide(D.st, at);
+    if (r.why) { lines(which, why(r)); return false; }
+    if (D.setState(r.st, {sel: null, adjust: false})) { lines(which, WORDS.added(r.at + 1)); D.revealSlide(r.at); }
+    return true;
+  }
+  function removeSlide(k, which){
+    var r = M.removeSlide(D.st, k - 1);
+    if (r.why) { lines(which, why(r)); return false; }
+    if (D.setState(r.st, {sel: null, adjust: false})) lines(which, WORDS.removed(k));
+    return true;
   }
   labels.addEventListener('click', function(e){
-    var x = e.target.closest ? e.target.closest('button.labx') : null;
+    var x = e.target.closest ? e.target.closest('button.labx, button.labp') : null;
     if (!x || !D.st || D.blocked) return;
     e.stopPropagation();
-    var k = Number(x.dataset.k), r = M.removeStory(D.st, k - 1);
-    if (r.why) { lines('slides', why(r)); return; }
-    if (D.setState(r.st, {sel: null, adjust: false})) lines('slides', WORDS.removed(k));       // said after the change, which wipes the line before
+    var k = Number(x.dataset.k);
+    if (x.classList.contains('labp')) insertSlide(k, 'slides'); else removeSlide(k, 'slides');
   });
+  // The slide clicked last in THIS design (hers, v27): where "Where should it go?" offers to put what is added, and
+  // the slide "Save just this slide" means when nothing is selected. A press on the strip or on a slide's label.
+  var last = null;
+  document.addEventListener('pointerdown', function(e){
+    if (!D.st || !D.design || !e.target.closest) return;
+    var lab = e.target.closest('#labels .lab'), k;
+    if (lab) k = Number(lab.dataset.k) - 1;
+    else if (e.target.closest('#strip')) { var r = strip.getBoundingClientRect(); k = Math.floor((e.clientX - r.left) / (W * D.scale)); }
+    else return;
+    last = {k: M.clamp(k, 0, D.st.slides - 1), design: D.design.id};
+  }, true);
+  D.on('design', function(){ last = null; });
+  // The slide (from 0) the selected thing is on, else the one clicked last in this design, else null.
+  D.oneSlideAt = function(){
+    var b = D.selected();
+    if (b) return slideOf(b) - 1;
+    return last && D.design && last.design === D.design.id && last.k < D.st.slides ? last.k : null;
+  };
   // Stories: Instagram's buttons cover these parts of every story, shaded while the tick at the bottom is on. On the
   // strip only; nothing here is ever in a saved story.
   function drawBands(st, s){
@@ -303,15 +347,16 @@ DESIGN_EDIT_JS = r"""
   // HOOK (stage C): the text controls are groups added here, before this last one, with Designer.selbar.group(...)
   var g3 = D.selbar.group('sel-all', '', function(){ return true; });
   [[STORY ? 'Center on story' : 'Center on slide', 'center'], ['Bring forward', 'front'], ['Send back', 'back'], ['Duplicate', 'dup'], ['Remove', 'del']].forEach(function(x){ D.selbar.button(g3, x[0], x[1]); });
-  // Stories: "Remove this story" takes out the story the selected thing is on, and everything on it; the stories
-  // after it move up, and Undo brings it back (hers). At one story it is off, and a line beside it says why.
-  var delStory = null, oneLine = null;
-  if (STORY) {
-    var g4 = D.selbar.group('sel-story', '', function(){ return true; });
-    delStory = D.selbar.button(g4, 'Remove this story', 'delstory', 'Take out the story this is on, and everything on it');
-    oneLine = el('span', 'st-only-line', WORDS.one); oneLine.id = 'only-story'; oneLine.hidden = true;
-    g4.appendChild(oneLine);
-  }
+  // The slide the selected thing is on, as a thing (hers, v27; stories since v26): "Add a slide before" and "Add a
+  // slide after" put a new blank slide beside it, "Remove this slide" takes it out with everything on it; the slides
+  // after move along, and Undo brings each back. Stories say story. At one slide Remove is off, and a line beside it
+  // says why (hers does nothing and says nothing). The group shows for anything selected, a text box too (hers).
+  var g4 = D.selbar.group('sel-slides', '', function(){ return true; });
+  D.selbar.button(g4, WORDS.before, 'slidebefore', WORDS.beforeTitle);
+  D.selbar.button(g4, WORDS.after, 'slideafter', WORDS.afterTitle);
+  var delStory = D.selbar.button(g4, WORDS.removeThis, 'delstory', WORDS.removeTitle);
+  var oneLine = el('span', 'st-only-line', WORDS.one); oneLine.id = 'only-slide'; oneLine.hidden = true;
+  g4.appendChild(oneLine);
 
   function lines(which, text){
     D.say($('slides-line'), which === 'slides' ? text : '');
@@ -329,7 +374,9 @@ DESIGN_EDIT_JS = r"""
       if (D.typeOf(b) === 'photo' && !M.isHole(b)) D.select(b.id, {adjust: !D.adjust});
       return;
     }
-    var r = a === 'delstory' ? M.removeStory(D.st, slideOf(b) - 1) : M.act(D.st, b.id, a);
+    if (a === 'delstory') { removeSlide(slideOf(b), 'sel'); return; }
+    if (a === 'slidebefore' || a === 'slideafter') { insertSlide(a === 'slidebefore' ? slideOf(b) - 1 : slideOf(b), 'sel'); return; }
+    var r = M.act(D.st, b.id, a);
     if (r.why) { lines('sel', why(r)); return; }
     var o = {};
     if ('sel' in r) o.sel = r.sel;
@@ -428,7 +475,7 @@ DESIGN_EDIT_JS = r"""
     if (document.activeElement !== bgc) bgc.value = st.bg;
     $('undo').disabled = off || !D.canUndo();
     $('redo').disabled = off || !D.canRedo();
-    if (delStory) { delStory.disabled = off || st.slides <= 1; oneLine.hidden = st.slides > 1; }
+    delStory.disabled = off || st.slides <= 1; oneLine.hidden = st.slides > 1;
     syncSize();
     D.label(adjBtn, D.adjust ? WORDS.insideDone : WORDS.inside);
     adjBtn.classList.toggle('on', D.adjust);
@@ -536,6 +583,7 @@ DESIGN_EDIT_JS = r"""
   // ---------- the strip: select, move, resize, move the photo inside ----------
   stage.addEventListener('pointerdown', function(e){
     if (G || e.isPrimary === false || e.button !== 0 || !D.st || D.blocked) return;
+    if (e.target.closest && e.target.closest('#labels')) return;
     var hd = e.target.closest ? e.target.closest('.h') : null, bd = e.target.closest ? e.target.closest('.blk') : null;
     if (!hd && !bd) {
       // the bare strip, or the space around it: nothing is selected any more (the scroll bar is left alone)
@@ -576,6 +624,50 @@ DESIGN_EDIT_JS = r"""
         if (!res) { D.render(); return; }
         var p = mode === 'pan' ? {ox: res.ox, oy: res.oy} : mode === 'move' ? {x: res.x, y: res.y} : {x: res.x, y: res.y, w: res.w, h: res.h};
         if (!D.setState(function(st){ return M.patch(st, b0.id, p); })) D.render();
+      }
+    });
+  });
+  // ---------- move a slide: drag its label along the strip (hers, v27) ----------
+  // Slides that share a stretched photo move as one piece (DesignModel.slideGroups). While the drag goes on, the piece
+  // is dimmed in her coral and a coral line stands at the edge it would land on (the nearest edge between pieces);
+  // nothing in the layout changes until the button is let go: then one Undo step, one save, and the line says so.
+  // Escape, a cancelled pointer or the window losing focus put it back (hers has no way out). The + and x on the
+  // label never start it. The strip scrolls sideways while the pointer rests near either end (edge(), as any drag).
+  var moveover = null;
+  labels.addEventListener('pointerdown', function(e){
+    if (G || e.isPrimary === false || e.button !== 0 || !D.st || D.blocked) return;
+    var sp = e.target.closest ? e.target.closest('span.slab') : null;
+    if (!sp || (e.target.closest && e.target.closest('button'))) return;
+    e.preventDefault();
+    if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
+    var si = Number(sp.dataset.k) - 1, g = M.slideGroups(D.st), from = -1, i;
+    for (i = 0; i < g.length; i++) { if (si >= g[i][0] && si <= g[i][1]) from = i; }
+    if (from < 0) return;
+    var edges = [0], to = from, dim = null, line = null;
+    g.forEach(function(x){ edges.push((x[1] + 1) * W); });
+    function show(){
+      var s = D.scale, x = stripPoint(G.cx, G.cy).x, best = 0;
+      edges.forEach(function(ex, k){ if (Math.abs(ex - x) < Math.abs(edges[best] - x)) best = k; });
+      to = best;
+      dim.style.left = g[from][0] * W * s + 'px'; dim.style.width = (g[from][1] - g[from][0] + 1) * W * s + 'px';
+      dim.style.top = strip.offsetTop + 'px'; dim.style.height = H * s + 'px';
+      line.hidden = to === from || to === from + 1;
+      line.style.left = edges[to] * s + 'px'; line.style.top = (strip.offsetTop - 6) + 'px'; line.style.height = (H * s + 12) + 'px';
+    }
+    begin(e, {
+      start: 6,
+      lift: function(){
+        if (!moveover) { moveover = el('div', 'over moveover'); over.parentNode.appendChild(moveover); }
+        dim = el('div', 'slidedim'); line = el('div', 'dropline'); line.hidden = true;
+        moveover.appendChild(dim); moveover.appendChild(line);
+        sp.classList.add('dragging');
+      },
+      move: show, redo: show,
+      clean: function(){ if (dim) dim.remove(); if (line) line.remove(); sp.classList.remove('dragging'); },
+      drop: function(){
+        var ns = M.moveGroup(D.st, from, to);
+        if (!ns) { D.render(); return; }
+        if (D.setState(ns, {sel: null, adjust: false})) lines('slides', WORDS.moved(g[from][1] - g[from][0] + 1, g[from][0] + 1));
       }
     });
   });

@@ -799,7 +799,7 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
                  all(b["font"] == "Figtree" and b["look"] == "box" for b in t1) and c.count("#strip .blk.words") + c.count("#strip .blk") >= 12)
             case("v26 browser: the set saves itself as always", settled())
             # ---- the x on each story's label ----
-            lab = Jx("Array.from(document.querySelectorAll('#labels > span')).map(function(s){ var x = s.querySelector('.labx'); return [s.firstChild.textContent, !!x && !x.hidden, x && x.title, x && x.getAttribute('aria-label')]; })")
+            lab = Jx("Array.from(document.querySelectorAll('#labels .lab')).map(function(s){ var x = s.querySelector('.labx'); return [s.querySelector('.slab').textContent, !!x && !x.hidden, x && x.title, x && x.getAttribute('aria-label')]; })")       # (v27: the label is a grip in a .lab with + and x)
             case("v26 browser: every story's label has a small x, named for the story it removes", lab == [[f"Story {k}", True, f"Remove story {k}", f"Remove story {k}"] for k in (1, 2, 3, 4)], lab)
             add("fresh", 1)
             s2 = st()
@@ -1047,12 +1047,12 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.open(f"{base}/design.html?kit={KQ}")
             c.wait_for("window.Designer && Designer.saver && Designer.st && Designer.S && document.querySelectorAll('#thumbs .th').length === Designer.S.total", 40)
             c.wait_for("Designer.save.idle()", 10)
-            car = json.loads(c.js("JSON.stringify({ask: !!document.getElementById('ask-pick'), box: !!document.getElementById('ask-box'), x: document.querySelectorAll('#labels .labx').length, "
+            car = json.loads(c.js("JSON.stringify({ask: !!document.getElementById('ask-pick'), box: !!document.getElementById('ask-box'), x: document.querySelectorAll('#labels .labx').length === Designer.st.slides, "
                                   "newSet: !!document.getElementById('new-set'), labels: Array.from(document.querySelectorAll('#labels span')).map(function(s){ return s.textContent; }).slice(0, 2), "
                                   "redo: document.getElementById('redo').disabled, dup: !document.getElementById('dup-design').hidden, mine: document.getElementById('designs-btn').textContent, "
                                   "asked: !!Designer.ask})"))
-            case("v26 browser: the carousel's designer has no x on a label and no sets; its labels and buttons read as before (its ask box and note are v27's)",
-                 car == {"ask": True, "box": True, "x": 0, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": True}, car)
+            case("v26 browser: the carousel's designer has no sets; its labels and buttons read as before (its ask box, note and the x on every label are v27's)",
+                 car == {"ask": True, "box": True, "x": True, "newSet": False, "labels": ["Slide 1", "Slide 2"], "redo": True, "dup": True, "mine": "My designs ▾", "asked": True}, car)
             c0 = json.loads(c.js("JSON.stringify(Designer.st)"))
             c.click("#g-bg .sw[data-c='#111111']")
             c1 = json.loads(c.js("JSON.stringify(Designer.st)"))
