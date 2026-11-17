@@ -13,7 +13,10 @@ stretch); the video picker (asked for only when it opens, a video going from "ge
 start point, Change video); her pitfalls and the layouts she turned down; text as text, no path, no pop-up,
 nothing asked of the internet, phone width. Since her v27 (Nov 17): fixing a word the transcriber got wrong (the
 bar's fourth group, the double-click, the small box and its keys, the same-number rule, the underline, the grey
-word typed away, the hover line, the captions, Undo and Redo, and ours around it: fix_words below).
+word typed away, the hover line, the captions, Undo and Redo, and ours around it: fix_words below), and "+ Add
+more photos" in the photo pop-up's footer (her button and her lines, the folder opened through the posting
+server's own route, a photo dropped into the Photos folder while the pop-up is open numbered at the END with
+every other number kept and the grid built again with nothing picked lost: add_more_photos below).
 
 The record is seeded here (TR.put_words), so nothing is transcribed. The talking video and the two Footage videos
 are tests/fixtures/loud-tone-3s.mp4 (3 seconds, self-made); the video picker has the Mac get those two ready (a
@@ -93,6 +96,19 @@ def run_requests(t, s):
     case("the Footage list is asked for in one place only: when the video picker is opened, pressed again, or a video is still being got ready",
          js.count("/reel-footage") == 1 and "for=talking" in js and "T.on('apply'" not in talking_js_pick.JS)
     case("no pop-up, no HTML from a string, in the new parts", not re.search(r"\b(confirm|alert|prompt)\s*\(|innerHTML|outerHTML|insertAdjacentHTML|document\.write", js))
+    # her v27 footer: + Add more photos and its line in her .addph span, before the count and Use this photo
+    page = s.tp.page_html(KIT)
+    foot = re.search(r"<div class='pickfoot'>(.*?)</div></div></div>", page, re.S)
+    case("the photo pop-up's footer (v27): her button with her title, then a line of its own, then the count and Use this photo, in her markup",
+         bool(foot) and foot.group(1) == ("<span class='addph'><button class='btn small' id='addPhotos' type='button' title='Opens this shoot&#x27;s Photos folder in Finder'>"
+                                          "+ Add more photos</button><span class='hintsm' id='addPhotosSay'></span></span><span class='hintsm' id='pickCount'></span>"
+                                          "<button class='btn main' id='pickUse' type='button' disabled>Use this photo</button>"), foot and foot.group(1))
+    case("the pop-up's button asks the posting server's own /open route for the Photos folder (the kit by its name, never a path), and the look asks for new photos only while the pop-up is open",
+         "T.ask('/open?' + Q + '&sub=Photos')" in talking_js_pick.JS and "T.photoPickOpen = function(){ return isOpen('pick'); }" in talking_js_pick.JS
+         and "T.photoPickOpen && T.photoPickOpen() ? '&photos=1' : ''" in s.tp.talking_js_core.JS and "setInterval" not in talking_js_pick.JS.split("// ---------- the video picker")[0])
+    # with photos=1 the state numbers a photo dropped into the Photos folder (the record test proves the numbers; here the route)
+    st = s.state(KIT, "&photos=1")
+    case("GET /talking-state?photos=1 answers the whole state as ever when nothing landed", st.get("ok") and [p["n"] for p in st["photos"]] == list(range(1, PHOTOS + 1)))
     return kit
 
 
@@ -309,7 +325,8 @@ def run_page(t, c, s):
     case("...its head quotes the words (her \"Photos for …\")",
          c.text("#pickHead") == "Photos for “was awesome and you”", c.text("#pickHead"))
     case("...nothing picked: \"Use this photo\" is off and there is no count", c.js("document.getElementById('pickUse').disabled") and c.text("#pickUse") == "Use this photo" and c.text("#pickCount") == "")
-    case("the 3-second look waits while the picker is open, and T.pickerOpen() says so (for the keys)", c.js("!window.Talk.quiet() && window.Talk.pickerOpen()"))
+    case("the 3-second look RUNS while the photo pop-up is open (her v27: it asks for new photos), T.photoPickOpen() says so, and T.pickerOpen() too (for the keys)",
+         c.js("window.Talk.quiet() && window.Talk.pickerOpen() && window.Talk.photoPickOpen()"))
     for n in (3, 5, 2):
         c.click("#pickGrid .pk[data-n='%d']" % n)
     marks = c.js("Array.from(document.querySelectorAll('#pickGrid .pk.on')).map(function(d){ return [+d.dataset.n, d.querySelector('b').textContent]; })")
@@ -651,6 +668,9 @@ def run_page(t, c, s):
     else:
         video_picker(t, c, s, kit, W, rev, moved, toast, full, shots, pick_words, bar_press, word)
 
+    # ---- + Add more photos (her v27): the pop-up's footer, the folder, and photos dropped in while it is open
+    add_more_photos(t, c, s, kit, W, pick_words, bar_press)
+
     # ---- every word on the page is hers, ours, or theirs
     ok = t.allowed_text(s, extra=set(SAID) | {SHORT, TALK, "bts.mp4", "second.mp4", "zz-broken.mov", "▶ bts", "▶ second", "0:03"})
     texts = c.js(t.READ_TEXT)
@@ -696,6 +716,15 @@ def run_page(t, c, s):
         case("at 375 px the box sits above its word and inside the window (her 180 px input gives way)",
              fb["x"] >= 8 and fb["r"] <= 375 - 8 + 0.5 and abs(fb["bottom"] + 8 - fb["wtop"]) < 1.5, fb)
         case("...and the legend's hint wraps under the legend at the left", fb["hint"], fb)
+        c.js("window.Talk.closeFix(); window.Talk.openPick(3, 4)")
+        c.wait_for("document.getElementById('pick').classList.contains('open')", 5)
+        c.js("document.getElementById('addPhotosSay').textContent = %s" % json.dumps(W["add_photos_open"]))      # her longest line beside the button
+        ft = c.js("(function(){ var a = document.getElementById('addPhotos').getBoundingClientRect(), u = document.getElementById('pickUse').getBoundingClientRect(), s = document.querySelector('.sheet').getBoundingClientRect(), y = document.getElementById('addPhotosSay').getBoundingClientRect();"
+                  " return {al: a.left, ar: a.right, ul: u.left, ur: u.right, abot: a.bottom, ytop: y.top, yl: y.left, yr: y.right, sl: s.left, sr: s.right, vw: innerWidth}; })()")
+        case("at 375 px the pop-up's footer: her line wraps under + Add more photos (her .addph wraps), and the button, the line and Use this photo all stay inside the sheet and the window",
+             ft["al"] >= ft["sl"] - 0.5 and ft["ytop"] >= ft["abot"] - 0.5 and ft["yl"] >= ft["sl"] - 0.5 and ft["yr"] <= ft["sr"] + 0.5
+             and ft["ul"] >= ft["sl"] - 0.5 and ft["ur"] <= ft["sr"] + 0.5 and ft["ur"] <= ft["vw"] + 0.5, ft)
+        c.js("window.Talk.closePick()")
         if fb["wide"] > 0 or fb["vw"] != 375:
             # not this item's: with this test's record (two-photo stretches over short words), the page is a few px wider
             # than 375 here (her .sthumbs are nowrap and sit absolutely over the word); the 390 check above is clean
@@ -703,6 +732,85 @@ def run_page(t, c, s):
         c.js("window.Talk.closeFix()")
     finally:
         c.desktop()
+
+
+def add_more_photos(t, c, s, kit, W, pick_words, bar_press):
+    """Her v27 "+ Add more photos" in the photo pop-up's footer: her button with her title, before the count and
+    Use; a press opens the shoot's Photos folder through the posting server's own /open route (no window from a
+    test: STUDIO_NO_WINDOWS_FOR_TESTS) and says her line; a photo dropped into the Photos folder while the pop-up
+    is open is numbered at the END by the Assistant (the look asks with photos=1; Lane A's numbers that stay
+    fixed), the grid is built again with it last, what was picked stays picked, every earlier number is unchanged,
+    and her "{k} new photo(s) in, at the end." line says what each look brought; the pop-up closed, the look no
+    longer asks for new photos."""
+    case, wait_for = t.case, t.wait_for
+    import os
+    import time as _time
+    photos = kit / "Photos"
+
+    def grid():
+        return c.js("Array.from(document.querySelectorAll('#pickGrid .pk')).map(function(d){ return [+d.dataset.n, d.querySelector('b').textContent, d.querySelector('img').getAttribute('src') ? 1 : 0]; })")
+
+    def numbers():
+        return [(x["n"], Path(x["file"]).name) for x in json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))["photos"]]
+
+    def drop(name, old=True):
+        f = photos / name
+        f.write_bytes(t.wpc.TINY)
+        if old:                                           # settled: not still being copied in (reel_page.RELIST_SETTLE)
+            os.utime(f, (_time.time() - 30, _time.time() - 30))
+        return f
+
+    before = numbers()
+    pick_words(0, 2)
+    bar_press("selPhoto")
+    c.wait_for("document.getElementById('pick').classList.contains('open')", 5)
+    foot = c.js("(function(){ var f = document.querySelector('#pick .pickfoot'); return {kids: Array.from(f.children).map(function(e){ return e.id || e.className; }),"
+                " span: Array.from(f.firstElementChild.children).map(function(e){ return [e.id, e.textContent, e.getAttribute('title')]; }), say: document.getElementById('addPhotosSay').textContent,"
+                " left: f.firstElementChild.getBoundingClientRect().left - f.getBoundingClientRect().left, use: document.getElementById('pickUse').getBoundingClientRect().left}; })()")
+    case("the pop-up's footer: her + Add more photos with her title and an empty line beside it, at the left (her margin: 0 auto 0 0), then the count and Use this photo",
+         foot["kids"] == ["addph", "pickCount", "pickUse"] and foot["span"] == [["addPhotos", W["add_photos"], W["add_photos_title"]], ["addPhotosSay", "", None]]
+         and foot["left"] < 2 and foot["use"] > foot["left"] + 200, foot)
+    n_req = len(list(c.requests))
+    c.click("#addPhotos")
+    c.wait_for("document.getElementById('addPhotosSay').textContent === %s" % json.dumps(W["add_photos_open"]), 10, tell="document.getElementById('addPhotosSay').textContent")
+    asked = [r_["url"] for r_ in list(c.requests)[n_req:] if "/open" in r_["url"]]
+    q = c.js("window.Talk.Q")
+    case("a press: her \"The Photos folder is open in Finder…\" line, after one ask of the posting server's own /open for this kit's Photos folder (the kit by its name)",
+         c.text("#addPhotosSay") == W["add_photos_open"] and asked == [s.url("/open" + s.q(KIT) + "&sub=Photos")], (c.text("#addPhotosSay"), asked))
+    for n in (3, 2):
+        c.click("#pickGrid .pk[data-n='%d']" % n)
+    case("two photos picked, to be kept across what comes", [g[:2] for g in grid() if g[1]] == [[2, "2"], [3, "1"]], grid())
+    was = c.js("window.Talk.mark")
+    drop("beach-011.jpg")
+    c.wait_for("document.querySelectorAll('#pickGrid .pk').length === %d" % (PHOTOS + 1), 25, tell="document.getElementById('addPhotosSay').textContent")
+    g = grid()
+    case("a photo dropped into the Photos folder while the pop-up is open: the grid is built again with it at the END, numbered %d, every earlier number as it was, and the two picked still picked in their order" % (PHOTOS + 1),
+         [x[0] for x in g] == list(range(1, PHOTOS + 2)) and [x[:2] for x in g if x[1]] == [[2, "2"], [3, "1"]], g)
+    case("...her line says what the look brought: \"1 new photo in, at the end.\"", c.text("#addPhotosSay") == W["photo_in"] == "1 new photo in, at the end.")
+    case("...the numbered list keeps every earlier photo at its number and the new one takes the next (never numbered again from the folder)",
+         numbers() == before + [(PHOTOS + 1, "beach-011.jpg")], numbers()[-3:])
+    # the 3-second look carries the counter and the mark; the copies look (talking_js_script.py lookForCopies) asks bare, and may run too
+    looks = [r_["url"] for r_ in list(c.requests)[n_req:] if "/talking-state" in r_["url"] and "&rev=" in r_["url"]]
+    case("...the page's own 3-second look asked for it, with photos=1 while the pop-up is open (no second timer), and the mark moved with the list",
+         looks and all("photos=1" in u for u in looks) and c.js("window.Talk.mark") != was, looks[-2:])
+    wait_for(lambda: all(p["have"] for p in s.state(KIT)["photos"]), 60)
+    c.wait_for("(function(){ var d = document.querySelector('#pickGrid .pk[data-n=\"%d\"] img'); return d && d.getAttribute('src'); })()" % (PHOTOS + 1), 15)
+    case("...and its small copy shows in its place once made, asked for by its number", c.js("document.querySelector('#pickGrid .pk[data-n=\"%d\"] img').getAttribute('src')" % (PHOTOS + 1)).startswith("/kit-photo?%s&n=%d&size=s" % (q, PHOTOS + 1)))
+    drop("beach-012.jpg")
+    drop("beach-013.jpg")
+    c.wait_for("document.querySelectorAll('#pickGrid .pk').length === %d" % (PHOTOS + 3), 25, tell="document.getElementById('addPhotosSay').textContent")
+    case("two more: \"2 new photos in, at the end.\", numbered on, the picks still there",
+         c.text("#addPhotosSay") == "2 new photos in, at the end." and [x[0] for x in grid()] == list(range(1, PHOTOS + 4)) and [x[:2] for x in grid() if x[1]] == [[2, "2"], [3, "1"]]
+         and numbers() == before + [(PHOTOS + 1, "beach-011.jpg"), (PHOTOS + 2, "beach-012.jpg"), (PHOTOS + 3, "beach-013.jpg")], (c.text("#addPhotosSay"), numbers()[-3:]))
+    c.click("#pickClose")
+    n_req = len(list(c.requests))
+    c.wait_for("true", 1)
+    wait_for(lambda: [r_ for r_ in list(c.requests)[n_req:] if "/talking-state" in r_["url"] and "&rev=" in r_["url"]], 12)
+    later = [r_["url"] for r_ in list(c.requests)[n_req:] if "/talking-state" in r_["url"] and "&rev=" in r_["url"]]
+    case("the pop-up closed: the look goes on without photos=1 (a 30-minute talk's page never lists the folder for nothing)", later and not any("photos=1" in u for u in later), later[-2:])
+    st = s.state(KIT)
+    case("the state's photo list carries the three new ones after the ten, by number, no path",
+         [p["n"] for p in st["photos"]] == list(range(1, PHOTOS + 4)) and "beach-01" not in json.dumps(st), [p["n"] for p in st["photos"]])
 
 
 def fix_words(t, c, s, kit, W, rev, moved, toast, pick_words, bar_press, word, cls):

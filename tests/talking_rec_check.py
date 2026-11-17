@@ -1124,6 +1124,57 @@ try:
     check("... fixes that aren't a map at all read as none", all("w0" not in w for w in TR.state_for_page(FK)["rec"]["words"]) and TR.state_for_page(FK)["ok"])
     check("... and the words file was never touched by any of it", FWORDS.read_bytes() == fwords_bytes)
 
+    # ------------------------------------------------------------ + Add more photos (her v27): photos dropped in while the pop-up is open
+    # The page's look sends photos=1 only while its photo pop-up is open; the state then has any photo dropped into
+    # the Photos folder numbered first (talking_rec.photos_landed -> reel_page.relist_if_changed -> kit.py sheet,
+    # the one writer, handed the list from last time), so the mark moves and the whole state comes back. Lane A's
+    # contract, proved from this side: every earlier number is kept, a new photo takes the next number after the
+    # highest ever given, a photo gone keeps its number unused.
+    sys.path.insert(0, str(ROOT / "tests"))
+    import words_page_check as wpc         # its tiny picture
+    MK = make_kit("2026-10-09 More photos", photos=2)          # the pretend list names IMG_0001 and IMG_0002: neither is in the folder
+    msheet = MK / ".kit" / "sheet.json"
+    st_a = TR.state_for_page(MK)
+
+    def drop(name, old=True):
+        f = MK / "Photos" / name
+        f.write_bytes(wpc.TINY)
+        if old:
+            os.utime(f, (time.time() - 30, time.time() - 30))
+        return f
+
+    def listed():
+        return [(x["n"], Path(x["file"]).name) for x in arrange.sheet_rows(MK)]
+
+    drop("sunset-001.jpg")
+    plain = TR.state_for_page(MK, rev=st_a["rev"], mark=st_a["mark"])
+    check("without photos=1 (the pop-up closed) a photo dropped into the Photos folder is not numbered: the short answer, the list as it was",
+          "rec" not in plain and listed() == [(1, "IMG_0001.jpg"), (2, "IMG_0002.jpg")], (sorted(plain), listed()))
+    got = TR.state_for_page(MK, rev=st_a["rev"], mark=st_a["mark"], photos=True)
+    check("with photos=1 the photo is numbered first, after the highest number ever given (3; the two gone keep theirs unused), and the whole state comes back with the mark moved",
+          "rec" in got and got["mark"] != st_a["mark"] and got["stamp"] != st_a["stamp"] and listed() == [(3, "sunset-001.jpg")], (sorted(got)[:4], listed()))
+    reel_page._RELIST.clear()                                   # the folder is compared at most every 4 s a kit: the next look, now
+    drop("sunset-000.jpg")                                      # sorts BEFORE the one listed: it still takes the next number, never 3
+    m_b = TR.state_for_page(MK)["mark"]
+    TR.state_for_page(MK, photos=True)
+    check("a second photo, though it sorts first by name, takes the next number (4) and the one before keeps 3",
+          listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg")] and TR.state_for_page(MK)["mark"] != m_b, listed())
+    reel_page._RELIST.clear()
+    drop("sunset-002.jpg", old=False)                           # changed just now: still being copied in
+    m_c = TR.state_for_page(MK)["mark"]
+    TR.state_for_page(MK, photos=True)
+    check("a photo still being copied in (changed this moment) is not numbered yet: the list and the mark as they were",
+          listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg")] and TR.state_for_page(MK)["mark"] == m_c, listed())
+    os.utime(MK / "Photos" / "sunset-002.jpg", (time.time() - 30, time.time() - 30))
+    reel_page._RELIST.clear()
+    TR.state_for_page(MK, photos=True)
+    check("...settled, it is numbered at the next look (5)", listed() == [(3, "sunset-001.jpg"), (4, "sunset-000.jpg"), (5, "sunset-002.jpg")], listed())
+    reel_page._RELIST.clear()
+    sb = msheet.read_bytes()
+    TR.state_for_page(MK, photos=True)
+    check("nothing landed: photos=1 writes nothing (the list byte for byte)", msheet.read_bytes() == sb)
+    check("no path of the Photos folder is in the state", str(MK) not in json.dumps(TR.state_for_page(MK)) and "sunset" not in json.dumps(TR.state_for_page(MK)))
+
     # ------------------------------------------------------------ her rules, character for character
     # Her v24 talking.py: her v25 and v27 packs say it is unchanged since v24 and carry no copy (her v27
     # talking_core.py differs from v24 by one captions line only, diffed Nov 17; its rule blocks are not in it).

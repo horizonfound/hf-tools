@@ -7,8 +7,11 @@ It makes window.Talk (T below), which holds:
                  T.rev and T.mark (the counter and the folders' mark the page holds), T.ready()
   the refresh    every 3 seconds (hers), asking only "has anything moved?" (the counter and the mark go with the
                  question; the whole state comes back only when one has). It runs only while the page is showing
-                 and the talking video is PAUSED, and never during a drag, with the photo menu open, or with
-                 either picker open (a later part says it is dragging with T.busy(fn)).
+                 and the talking video is PAUSED, and never during a drag, with the photo menu open, with the
+                 video picker open or with the fix box open (a later part says it is dragging with T.busy(fn)).
+                 With the PHOTO pop-up open it does run, and asks for new photos too (photos=1, her v27 "+ Add
+                 more photos"): a photo dropped into the Photos folder is numbered at the end and the pop-up's
+                 grid shows it (talking_js_pick.py pickFresh); hers had a second timer for that.
   T.on / T.emit  how the parts hear of a new state: 'apply' {changed, ready, how, outside} after every answer.
                  A stretch, a clip or a word is always looked up afresh from T.SH / T.ST at the moment of a
                  click, never kept across a refresh (her stale-object fault).
@@ -296,7 +299,9 @@ function poll(force){
   if (asking && !force) return Promise.resolve();
   var mine = seq, look = ++looks;                    // only the newest look's answer is ever taken
   asking = true;
-  return ask('/talking-state?' + Q + (!force && T.loaded ? '&rev=' + T.rev + '&mark=' + encodeURIComponent(T.mark) : '')).then(function(res){
+  // the photo pop-up open: the Assistant numbers any photo dropped into the Photos folder first (her v27)
+  var more = T.photoPickOpen && T.photoPickOpen() ? '&photos=1' : '';
+  return ask('/talking-state?' + Q + (!force && T.loaded ? '&rev=' + T.rev + '&mark=' + encodeURIComponent(T.mark) : '') + more).then(function(res){
     if (look !== looks) return;                      // a newer look went out since: this is the older picture
     asking = false;
     var st = res.j;
@@ -306,10 +311,11 @@ function poll(force){
   }, function(){ if (look !== looks) return; asking = false; T.emit('trouble', W.cant_reach); });
 }
 // May the 3-second look run now? Only while the page is showing and the talking video is paused; never with the
-// photo menu or a picker open, never during a drag.
+// photo menu or the video picker open, never during a drag. With the photo pop-up open it does run (her v27: new
+// photos in the Photos folder show up in the grid while it is open; the grid keeps what is picked).
 function quiet(){
   if (document.hidden || !$('vid').paused) return false;
-  if ($('pick').classList.contains('open') || $('vpick').classList.contains('open') || $('pmenu').classList.contains('open')) return false;
+  if ($('vpick').classList.contains('open') || $('pmenu').classList.contains('open')) return false;
   if (T.fixOpen && T.fixOpen()) return false;        // the fix box is open (her v27): the script is not drawn again under it
   for (var i = 0; i < busy.length; i++) if (busy[i]()) return false;
   return true;

@@ -25,10 +25,12 @@ and Delete, and Make it in CapCut with its result box).
 Routes (GET: our host, never another website's page; POST: the pickers' guard, then one JSON object; the kit by
 its folder name; everything wrapped so the server stays up):
     GET  /talking.html?kit=              the page
-    GET  /talking-state?kit=[&rev=&mark=]   talking_rec.state_for_page: everything the page draws from; with the
-                                         counter and the mark the page holds, only {ok, rev, mark, working, step,
-                                         make} while neither has moved (a long talk's whole state is about half a
-                                         megabyte, and the page asks every 3 seconds)
+    GET  /talking-state?kit=[&rev=&mark=][&photos=1]   talking_rec.state_for_page: everything the page draws
+                                         from; with the counter and the mark the page holds, only {ok, rev, mark,
+                                         working, step, make} while neither has moved (a long talk's whole state
+                                         is about half a megabyte, and the page asks every 3 seconds). photos=1,
+                                         sent only while the photo pop-up is open (her v27 "+ Add more photos"):
+                                         photos dropped into the Photos folder are numbered first, at the end
     GET  /talking-state?kit=&only=make   only {ok, make}: what the page asks once a second while a make is at work
     GET  /talking-video?kit=             the small copy of their talking video, in pieces when asked (Range)
     POST /talking-open  {kit}            makes <kit>/Talking if it isn't there and opens it
@@ -199,6 +201,15 @@ WORDS = {
     "pick_use": "Use this photo",
     "pick_use_many": "Use these {n}",
     "pick_count": "{n} photos, flashing through in this order",
+    # her v27: + Add more photos in the photo pop-up's footer (her Add photos block, Nov 14 and 16). The two
+    # "in" lines are her one template, `${k} new photo${k === 1 ? '' : 's'} in, at the end.`, held whole
+    "add_photos": "+ Add more photos",
+    "add_photos_title": "Opens this shoot's Photos folder in Finder",
+    "add_photos_opening": "Opening your Photos folder in Finder...",
+    "add_photos_open": "The Photos folder is open in Finder. Drag photos in and they show up here.",
+    "add_photos_cant": "Could not open the folder. Is the photo drive plugged in?",
+    "photos_in": "{k} new photos in, at the end.",
+    "photo_in": "1 new photo in, at the end.",
     # the video picker
     "vp_head": "Add a video",
     "vp_for": "A video for “{words}”",
@@ -566,9 +577,11 @@ def _to_draw(kit, st):
     st["photos"], st["stills"] = photos, stills
 
 
-def state(kit, rev=None, mark=None):
-    """What GET /talking-state answers (see the top of this file)."""
-    return _with_make(kit, TR.state_for_page(kit, rev, mark))
+def state(kit, rev=None, mark=None, photos=False):
+    """What GET /talking-state answers (see the top of this file). `photos` (the page's photos=1, sent only
+    while its photo pop-up is open): photos dropped into the Photos folder join the numbered list at the end
+    first (talking_rec.photos_landed), so the list's new mark comes back with the whole state."""
+    return _with_make(kit, TR.state_for_page(kit, rev, mark, photos=photos))
 
 
 def make_only(kit):
@@ -625,9 +638,10 @@ def _get_state(handler, q):
             return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 400)
         return arrange._send_json(handler, make_only(kit))
     rev, mark = _one(q, "rev"), _one(q, "mark")
+    photos = _one(q, "photos") == "1"             # the photo pop-up is open: new photos in the Photos folder are numbered first
     # the counter and the mark the page holds: only when both arrive whole is the short answer ever given
     held = REV.fullmatch(rev) and MARK.fullmatch(mark)
-    arrange._send_json(handler, state(kit, int(rev), mark) if held else state(kit))
+    arrange._send_json(handler, state(kit, int(rev), mark, photos) if held else state(kit, photos=photos))
 
 
 def _get_video(handler, q):
@@ -864,7 +878,10 @@ def _floating(w):
         "<div class='modal' id='pick'><div class='sheet'>" + head +
         "<b id='pickHead'>" + e(w["pick_head"]) + "</b><button class='btn small' id='pickClose' type='button'>" + e(w["close"]) + "</button></div>"
         "<p class='say' style='margin:.3rem 0 0'>" + e(w["pick_say"]) + "</p><div class='grid' id='pickGrid'></div>"
-        "<div class='pickfoot'><span class='hintsm' id='pickCount'></span>"
+        # her v27 footer: + Add more photos and its line at the left (her .addph span), then the count and Use
+        "<div class='pickfoot'><span class='addph'><button class='btn small' id='addPhotos' type='button' title='" + q(w["add_photos_title"]) + "'>"
+        + e(w["add_photos"]) + "</button><span class='hintsm' id='addPhotosSay'></span></span>"
+        "<span class='hintsm' id='pickCount'></span>"
         "<button class='btn main' id='pickUse' type='button' disabled>" + e(w["pick_use"]) + "</button></div></div></div>"
         "<div class='modal' id='vpick'><div class='sheet'>" + head +
         "<b id='vpHead'>" + e(w["vp_head"]) + "</b><button class='btn small' id='vpClose' type='button'>" + e(w["close"]) + "</button></div>"

@@ -1657,7 +1657,21 @@ PAGE_REC = ("cut", "splits", "speeds", "video", "status", "step", "problem", "tr
             "cap_pos", "cap_size", "captions", "updated")
 
 
-def state_for_page(kit, rev=None, mark=None):
+def photos_landed(kit):
+    """Her v27 "+ Add more photos": photos dragged into the shoot's Photos folder while the photo pop-up is open
+    join the numbered list at the end, every other photo keeping its number. The list is compared with the folder
+    and, when they differ, made again through the one writer (kit.py sheet, handed the list from last time):
+    reel_page.relist_if_changed, the reel page's own (Lane A's), at most every 4 seconds a kit, and never while a
+    new photo is still being copied in. The page then sees the list's new stamp in the mark. True when the list
+    was re-made. Whatever goes wrong, the list stays as it is and the page goes on."""
+    try:
+        return bool(reel_page.relist_if_changed(Path(kit)))
+    except Exception as e:  # noqa: BLE001  (the page's look must always be answered)
+        arrange.log(f"talking page: the Photos folder couldn't be compared with the list ({e.__class__.__name__})")
+        return False
+
+
+def state_for_page(kit, rev=None, mark=None, photos=False):
     """Hers (GET /talking): {ok, folder, videos, working, rec, pieces, zooms, shots, captions}, with ours beside
     it: the counter ("rev"), the numbered list's mark ("stamp"), the shoot's short name, the videos still coming
     in, and where the record's video stands ("video_state"). `rec` holds only what her page reads. A video is
@@ -1666,10 +1680,14 @@ def state_for_page(kit, rev=None, mark=None):
     state is about half a megabyte, and the page asks every 3 seconds). "mark" moves when a video is added,
     taken away or exported again, or the photo list changes: the page sends back the mark it holds, and gets the
     whole state when either the counter or the mark has moved.
+    `photos` (the page's photos=1, sent only while its photo pop-up is open): photos dropped into the Photos
+    folder are given the next numbers first (photos_landed), so the mark moves and the whole state carries them.
     When the record can't be read just now: {ok: False, why: "trouble", words} and nothing else; never an empty
     edit that looks as if theirs had gone."""
     kit = Path(kit)
     settle(kit)                                            # a job that is gone is told as plain words, once
+    if photos:
+        photos_landed(kit)
     working = job_running(kit) or _starting(read_job(kit))
     try:
         slim = _slim(kit)

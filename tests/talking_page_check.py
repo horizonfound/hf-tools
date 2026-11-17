@@ -164,11 +164,8 @@ HERS_NOT_OURS = {
 HERS_NOT_YET = {
     # (C2, Fix a word on the page, landed Nov 17: its twelve lines are talking_page.WORDS sel_fix .. fixed_toast)
     # (C4, Open CapCut, landed Nov 17: its seven lines are talking_page.WORDS made_say .. capcut_missing)
-    # C5: + Add more photos in the photo pop-up's footer
-    "+ Add more photos": "C5", "Opens this shoot's Photos folder in Finder": "C5", "new photo": "C5 (built from parts: photos_in)",
-    "in, at the end.": "C5 (photos_in)", "Opening your Photos folder in Finder...": "C5",
-    "The Photos folder is open in Finder. Drag photos in and they show up here.": "C5",
-    "Could not open the folder. Is the photo drive plugged in?": "C5",
+    # (C5, + Add more photos in the photo pop-up's footer, landed Nov 17: its five lines are talking_page.WORDS
+    #  add_photos .. add_photos_cant, and her "{k} new photo(s) in" template is photos_in / photo_in, built from parts)
 }
 # Lines of ours that are still her v24 wording where v27 changed the line, each with the item that brings it
 # up to date: held to her v24 file, and the item must take the key out of here.
@@ -192,6 +189,9 @@ BUILT_FROM_PARTS = {
     "sum_caps_off": (" · captions ${REC.captions === false ? 'off' : 'on'}",),
     "secs": ("+ ' s'",),
     "pick_alt": ('alt="Photo ${p.n}"',),
+    # her v27 Add photos block: one template for one photo and for several
+    "photos_in": ("${k} new photo${k === 1 ? '' : 's'} in, at the end.",),
+    "photo_in": ("${k} new photo${k === 1 ? '' : 's'} in, at the end.",),
 }
 # Hers, but from her maker (talking_capcut.py), which prints them with the project's name in the middle: compared
 # with that file whole, not piece by piece
@@ -236,6 +236,7 @@ class Setup:
         self.pretend = self.work / "pretend.json"
         self.env = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home), STUDIO_HOME=str(self.studio),
                         ASSISTANT_TEST_OPEN="front", ASSISTANT_TEST_CAPCUT="1", PYTHONIOENCODING="utf-8",
+                        STUDIO_NO_WINDOWS_FOR_TESTS="1",       # the posting server's own /open (+ Add more photos) opens no window from a test
                         ASSISTANT_TEST_TALKING_STORE=str(self.work / "capcut"), REMINDERS_BACKEND="none",
                         TALKING_TRANSCRIBER="pretend", TALKING_PRETEND=str(self.pretend), TALKING_NO_REAL="1")
         for k in ("ASSISTANT_NO_AVFOUNDATION", "ASSISTANT_NO_AFCONVERT", "ASSISTANT_TEST_TALK_LIMITS"):
@@ -247,7 +248,7 @@ class Setup:
         """talking_rec and talking_page in this process, on the scratch home (to seed records as the job would,
         and to cut as the chat would)."""
         for k in ("STUDIO_HOME", "TALKING_TRANSCRIBER", "TALKING_PRETEND", "TALKING_NO_REAL", "ASSISTANT_TEST_OPEN", "REMINDERS_BACKEND",
-                  "ASSISTANT_TEST_TALKING_STORE"):
+                  "ASSISTANT_TEST_TALKING_STORE", "STUDIO_NO_WINDOWS_FOR_TESTS"):
             os.environ[k] = self.env[k]
         sys.path.insert(0, str(SCRIPTS))
         sys.path.insert(0, str(REEL))
@@ -564,16 +565,22 @@ def check_built(s):
          bool(m) and re.findall(r"id='(\w+)'", m.group(1)) == ["guidesOn", "cutMode"] and m.group(1).count("<input") == 2 and "<button" not in m.group(1))
     case("turned down (c): the room above the words is only in a sentence that has a photo",
          ".sent.hasph .words span[data-i]{display:inline-block;position:relative;padding-top:44px" in css and css.count("padding-top:44px") == 1)
-    dead = (".shot", ".pthumb", ".dragghost", ".words span.hl", ".words span.drop", ".screen.behind", ".screen .tag", ".strip", ".grp", ".addph", ".phw.back")
+    dead = (".shot", ".pthumb", ".dragghost", ".words span.hl", ".words span.drop", ".screen.behind", ".screen .tag", ".strip", ".grp", ".phw.back")
     case("the styles of what she turned down or left behind are not carried", not [d for d in dead if re.search(re.escape(d) + r"[{ .:,]", css)],
          [d for d in dead if re.search(re.escape(d) + r"[{ .:,]", css)])
+    # her v27 .addph is the photo pop-up footer's span (her Add photos block, Nov 14): its two rules are hers, word for
+    # word; her old dashed .addph button (the plus on hover she took out, which in her own page still lands on that
+    # span) is not carried
+    case("the footer's .addph rules are her two (v27), and her old dashed .addph button is not carried",
+         ".pickfoot .addph{margin:0 auto 0 0}" in css and ".addph{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.35rem 0 .2rem}" in css
+         and css.count(".addph") == 2 and "dashed" not in css and ".strip .addph" not in css, [ln for ln in css.splitlines() if "addph" in ln])
     case("...nor their pieces in the page (no photo frame behind the video, no tag, no Photo row)",
          "phBack" not in page and "id='tag'" not in page and ">Photo<" not in page)
     ids = ("back", "title", "addVideo", "vids", "startBtn", "status", "askCut", "cutLine", "copyCut", "whoMe", "whoAsst", "placeAsk", "placeSay",
            "placeLine", "copyPlace", "editStep", "screen", "vid", "phFront", "bvid", "phKnob", "meKnob", "capKnob", "cap", "guides", "guidesOn",
            "cutMode", "script", "capStep", "capOn", "capOff", "capReset", "result", "selBar", "selPhoto", "selVideo", "selCut", "selBack", "selPunch",
            "selZoom", "selNoZoom", "selFix", "fixBox", "fixIn", "fixOk", "fixBack", "fixNo",
-           "pick", "pickHead", "pickClose", "pickGrid", "pickCount", "pickUse", "dock", "tl", "tlPlay", "tlTime", "tlSplit",
+           "pick", "pickHead", "pickClose", "pickGrid", "addPhotos", "addPhotosSay", "pickCount", "pickUse", "dock", "tl", "tlPlay", "tlTime", "tlSplit",
            "tlCut", "tlSpeed", "tlZoom", "tlUndo", "tlRedo", "tlOut", "tlScale", "tlIn", "tlTrack", "tlInner", "tlRuler", "tlPhotos", "tlClips",
            "tlWords", "tlHead", "tlHint", "sum", "openCC", "makeBtn", "vpick", "vpHead", "vpClose", "vpList", "vpPlayer", "vpVid", "vpAt", "vpUse", "vpOpen",
            "vpRefresh", "pmenu", "toast")

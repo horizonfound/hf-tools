@@ -150,6 +150,21 @@ try:
     check("...and when it opened, her line is the one said", answers["ok"] == (200, {"ok": True, "words": tp.WORDS["capcut_opening_say"]}), answers["ok"])
     check("the kit's record now notes the make, under the reel being worked on", TR.last_made(KIT) == "Hannah talking reel")
 
+    # + Add more photos (v27) on a PC: the button's title and her two Finder lines read File Explorer (reel_page.pc_words,
+    # as every Finder line of this page does); her "plugged in" line names no app. On a Mac the PC is pretended here
+    # (WINDOWS and the files app's name); a real PC runs it as it is.
+    real_win, real_app = this_computer.WINDOWS, this_computer.FILES_APP
+    try:
+        this_computer.WINDOWS, this_computer.FILES_APP = True, "File Explorer"
+        pw = tp.page_words()
+    finally:
+        this_computer.WINDOWS, this_computer.FILES_APP = real_win, real_app
+    pc_lines = {k: pw[k] for k in ("add_photos_title", "add_photos_opening", "add_photos_open")}
+    check("+ Add more photos on a PC: the title and her two Finder lines read File Explorer, never Finder (her words otherwise)",
+          all("File Explorer" in v and "Finder" not in v and v == tp.WORDS[k].replace("Finder", "File Explorer") for k, v in pc_lines.items())
+          and pw["add_photos_cant"] == tp.WORDS["add_photos_cant"] == "Could not open the folder. Is the photo drive plugged in?"
+          and pw["add_photos"] == "+ Add more photos", pc_lines)
+
     if not this_computer.MAC:
         got = sound.speech_wav(str(KIT / "Talking" / "talk.mp4"), TMP / "speech.wav")
         check("off a Mac the talking's sound file is not made, in plain words", got[0] is None and not (TMP / "speech.wav").exists() and "Mac" in got[1], got)

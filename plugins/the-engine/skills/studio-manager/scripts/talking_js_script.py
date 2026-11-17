@@ -535,8 +535,11 @@ T.copiesTimer = setInterval(lookForCopies, T.DATA.copiesEvery || 4000);
 
 // ---- a new state ----
 T.on('apply', function(a){
-  var st = T.ST;
+  var st = T.ST, had = haveMark();
   if (Array.isArray(st.photos)) takePhotos(st.photos);
+  // the list itself changed (a photo dropped in while the photo pop-up was open, her v27; or one gone): the
+  // pop-up's grid, the bars and the timeline hear of it as they do of a small copy made
+  if (had !== haveMark() && T.loaded) T.emit('photos');
   if (st.stills && typeof st.stills === 'object') { for (var k in st.stills) T.STILLS[k] = st.stills[k]; }
   if (!a.ready) { closeMenu(); closeFix(); $('selBar').style.display = 'none'; return; }
   if (T.SELSHOT != null && !findShot(T.SELSHOT)) T.SELSHOT = null;

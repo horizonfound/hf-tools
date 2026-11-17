@@ -9,7 +9,11 @@ STYLE is her stylesheet as she wrote it, with these changes:
     (Dustin, Nov 7: no serif; the lines to copy and the quoted words in the photo menu are DM Sans, still slanted);
   - the styles of what she turned down or left behind are NOT here (the plan, 2a): .shot, .shot .sw, .pthumb,
     .dragghost, .words span.hl, .words span.drop, .screen.behind, the tag on the screen, the photo strip above a
-    sentence (.strip, .grp, .addph) and the photo frame behind the video.
+    sentence (.strip, .grp, and her dashed .addph button, the plus on hover she took out) and the photo frame
+    behind the video. Her v27 .addph is another thing: the span in the photo pop-up's footer that holds "+ Add
+    more photos" and its line (her Add photos block, Nov 14); those two rules are here. In her own page the old
+    button rule still lands on that span too (a dashed box around the button and its line, 36 px tall): not
+    copied; noted for Nicole.
 Her pitfalls, kept as rules (tests/talking_page_check.py checks each):
   - the class names "bar" and "sel" belong to the top bar and the highlight bar and are used for nothing else
     (a photo's bar above its words is .seg);
@@ -159,7 +163,9 @@ h1{margin:0;font:600 clamp(22px,2.6vw,30px)/1.1 var(--sans);letter-spacing:-.03e
 .pk.on img{box-shadow:0 0 0 3px var(--coral-2)}
 .pk b{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:var(--coral-2);color:#fff;font:700 12.5px/1 var(--sans);display:none;place-items:center}
 .pk.on b{display:grid}
+.pickfoot .addph{margin:0 auto 0 0}
 .pickfoot{position:sticky;bottom:-1.1rem;background:var(--cream);display:flex;gap:.8rem;align-items:center;justify-content:flex-end;padding:.8rem 0 .2rem;margin-top:.6rem}
+.addph{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.35rem 0 .2rem}   /* Add photos (Nicole, Nov 14) */
 /* the dock: the timeline, then the make bar, fixed across the bottom */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:40;box-shadow:0 -6px 20px -12px rgba(31,36,48,.25)}
 .tl{background:#F3F1EB;border-top:1px solid var(--line)}
