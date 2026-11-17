@@ -1524,20 +1524,45 @@ def queue_for_page(kit, rec):
 def newest_project(kit, rec_kit=None):
     """The CapCut project of the newest reel of this kit, or None: the newest made from the reel page (its record's
     "made") or from the chat (kit.json "reel", which the page's own makes write too), whichever was made later.
-    Hers (server.py kit_summary) takes the page's first; the chat's is newer only when it was made after it."""
+    Hers (server.py kit_summary) takes the page's first; the chat's is newer only when it was made after it.
+    CapCut projects only (what Open in CapCut opens): a saved video is not one. What the post kit's Reels card
+    and the posting queue go by is newest_made."""
+    got = _newest(kit, rec_kit, videos=False)
+    return got["name"] if got else None
+
+
+def newest_made(kit, rec_kit=None):
+    """The newest reel made of this kit, or None: {name, video}. `name` is its CapCut project's name, or, for a
+    B-roll reel saved whole from the page (Save my video, her v27), the video's FILE NAME in <shoot>/Reels, with
+    `video` True. A saved video counts as made (the stage-1 contract): the post kit's Reels card and the posting
+    queue show it, and Add this reel to my posting queue works from it, on a shoot with one reel as with several
+    (the review of Nov 17: a shoot with ONE reel went by newest_project, which sees CapCut projects only, so a
+    saved video showed the bar and then failed with her locked line)."""
+    return _newest(kit, rec_kit, videos=True)
+
+
+def _newest(kit, rec_kit, videos):
     rec_kit = rec_kit if rec_kit is not None else kit_mod.load_rec(kit)
-    made = [m for m in (load(kit).get("made") or []) if isinstance(m, dict) and isinstance(m.get("project"), str) and m["project"]]
-    page = made[-1] if made else None
+    rec_kit = rec_kit if isinstance(rec_kit, dict) else {}
+    page = None
+    for m in load(kit).get("made") or []:
+        if not isinstance(m, dict):
+            continue
+        if isinstance(m.get("project"), str) and m["project"]:
+            page = {"name": m["project"], "video": False, "when": m.get("when")}
+        elif videos and isinstance(m.get("video"), str) and m["video"]:
+            page = {"name": m["video"], "video": True, "when": m.get("when")}
     chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
-    if not (isinstance(chat.get("project"), str) and chat["project"]):
-        return page["project"] if page else None
+    chat = {"name": chat["project"], "video": False} if isinstance(chat.get("project"), str) and chat["project"] else None
+    if not chat:
+        return {"name": page["name"], "video": page["video"]} if page else None
     if not page:
-        return chat["project"]
+        return chat
     try:
         page_when = float(page.get("when") or 0)
     except (TypeError, ValueError):
         page_when = 0.0
-    return chat["project"] if _when_of(chat.get("made")) > page_when + 1 else page["project"]
+    return chat if _when_of((rec_kit.get("reel") or {}).get("made")) > page_when + 1 else {"name": page["name"], "video": page["video"]}
 
 
 def reels_for_kit(kit, rows=None, rec_kit=None):

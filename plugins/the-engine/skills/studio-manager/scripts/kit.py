@@ -1805,6 +1805,9 @@ OUR_KIT_WORDS = {
     "opening": "Opening...",
     "unreached": "Could not reach the Assistant. Tell your assistant instead.",
     "saved_copy": "This is a saved copy. Say “show the {name} kit” to your assistant and the buttons work.",
+    # ours (v27): a B-roll reel saved whole from the reel page (Save my video) is made, with no CapCut project to open;
+    # her v27 card has no line for it (hers says "In CapCut:" for every made reel)
+    "saved_video": "Saved as a video, in this shoot's Reels folder:",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
     "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell your assistant, and it'll sort it out.",
@@ -2334,12 +2337,17 @@ def card_facts(kit, rec=None):
             mine = [by_n[x["n"]] for x in r["order"] if x["n"] in by_n]
             pics, _ = arrange.page_photos(kit, rec, mine[:STRIP_REEL]) if mine else ([], 0)
             several.append({"id": r["id"], "name": r["name"], "made": r["made"], "project": r["project"],
-                            "count": len(mine), "photos": pics})
+                            "video": r.get("video"), "count": len(mine), "photos": pics})
+    # v27: the newest reel made, a CapCut project or a B-roll video saved whole from the page (Save my video): a
+    # saved video counts as made, on a shoot with one reel as with several
+    newest = reel_page.newest_made(kit, rec) or {}
     return {
         "reels": several,
         "reel_order": [x["n"] for x in order],
         "reel_photos": photos,                                  # {n, v, have, missing} for the ones the strip shows
-        "reel": reel_page.newest_project(kit, rec),
+        "reel": newest.get("name"),
+        "reel_video": bool(newest.get("video")),                # the newest made is a saved video (its file name), not a CapCut project
+        "reel_project": reel_page.newest_project(kit, rec),     # the newest CapCut project, if any (what Open in CapCut opens)
         "slides": [p.name for p in car["files"]],
         "designs": design.count_worked_on(kit, design.CAROUSEL),
         "stories": [p.name for p in sto["files"]],
@@ -2410,8 +2418,11 @@ def build_page(kit):
     srcs += [""] * max(0, len(f["reel_order"]) - len(srcs))         # for her "+N": only the first 7 are drawn
     reel_strip = (_strip(srcs, STRIP_REEL, tall=True, again=True) if f["reel_order"]
                   else f"<p class='empty'>{html.escape(KIT_WORDS['reel_none'])}</p>")
-    reel_status = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True,
-                           f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>")
+    capcut_button = f" <button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button>"
+    reel_status = (_status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(f['reel'])}</b>", True,
+                           capcut_button if f.get("reel_project") else "")
+                   if f["reel"] and f.get("reel_video")           # v27: a B-roll video saved from the page (ours: hers has no words for it on this card)
+                   else _status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(f['reel'])}</b>", True, capcut_button)
                    if f["reel"] else _status(html.escape(KIT_WORDS["not_made"]), False))
     # v25: several reels from one shoot: a preview of each one, by name (hers: up to 7 photos, then "+N"; "In
     # CapCut: <its newest project>" or "Not made yet"), and one Open in CapCut under them when any is made
@@ -2425,12 +2436,15 @@ def build_page(kit):
             rs += [""] * max(0, r["count"] - len(rs))
             st = (_strip(rs, STRIP_REEL, tall=True, again=True) if r["count"]
                   else f"<p class='empty'>{html.escape(KIT_WORDS['reel_empty'])}</p>")
-            made = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(r['project'])}</b>", True) if r["project"]
+            # v27: a reel whose newest make is a saved B-roll video (reels_for_kit: its "project" is then the video's file name)
+            in_capcut = r["project"] and r["project"] != r.get("video")
+            made = (_status(f"{html.escape(KIT_WORDS['in_capcut'])} <b>{html.escape(r['project'])}</b>", True) if in_capcut
+                    else _status(f"{html.escape(OUR_KIT_WORDS['saved_video'])} <b>{html.escape(r['project'])}</b>", True) if r["project"]
                     else _status(html.escape(KIT_WORDS["not_made"]), False))
             parts.append(f"<div class='onereel' data-reel='{html.escape(r['id'])}'><div class='rn'>{html.escape(r['name'])}</div>{st}{made}</div>")
         reel_strip = "".join(parts)
         reel_status = (f"<div class='status'><button class='go' id='capcut' type='button'>{html.escape(KIT_WORDS['open_capcut'])}</button></div>"
-                       if any(r["project"] for r in several) else "")
+                       if any(r["project"] and r["project"] != r.get("video") for r in several) else "")
 
     # the Carousel card
     slides = f["slides"]

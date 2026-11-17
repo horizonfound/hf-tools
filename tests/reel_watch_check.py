@@ -517,6 +517,9 @@ def check_broll(s):
     case("reels_for_kit: this reel is made, with its video's file name (the post kit and the queue show a saved video as made)",
          ks.get(st["current"], {}).get("made") and ks[st["current"]].get("video") == name and ks[st["current"]].get("kind") == "broll", ks.get(st["current"]))
     case("GET /reel-state says it is made too", s.state()["made"].get(st["current"]) is True, s.state()["made"])
+    case("reel_page.newest_made (what the post kit's card and a one-reel shoot's queue go by): the saved video, by its file name; "
+         "newest_project (what Open in CapCut opens) still names no video",
+         R.newest_made(s.kit) == {"name": name, "video": True} and R.newest_project(s.kit) != name, (R.newest_made(s.kit), R.newest_project(s.kit)))
     rc, out = s.cmd("reel_page.py", "show", KIT)
     case("reel_page.py show: Videos saved from the page, the newest by name", rc == 0 and 'Videos saved from the page (Save my video, in this shoot\'s Reels folder): 1, the newest "%s"' % name in out, out[-400:])
     code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))

@@ -255,7 +255,8 @@ def piece_for_page(w):
 
 
 def kit_facts(kit):
-    """Is the reel made (its CapCut project's name), and the carousel's slides as the kit page shows them."""
+    """Is the reel made (its CapCut project's name, or a saved B-roll video's file name: a saved video counts as
+    made, her v27), and the carousel's slides as the kit page shows them."""
     import reel_page
     try:
         rec = kit_mod.load_rec(kit)
@@ -264,7 +265,7 @@ def kit_facts(kit):
     if not isinstance(rec, dict):
         rec = {}
     try:
-        project = reel_page.newest_project(kit, rec) or ""
+        project = (reel_page.newest_made(kit, rec) or {}).get("name") or ""
     except (OSError, ValueError, TypeError, AttributeError):
         project = ""
     try:
