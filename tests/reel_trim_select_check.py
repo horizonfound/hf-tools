@@ -265,7 +265,7 @@ def run_select(c, s):
     reel_state(s, kit)
     code, r = save(s, kit, {"picks": picks(8), "mine": True})
     case("(set up: their own order of 8 photos)", code == 200, r)
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))     # v27: a kind's page (the chooser has no photos)
     c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('#reel .tile').length === 8", 20)
     c.js("document.getElementById('reelwrap').scrollIntoView({block: 'center'})")
     case("nothing is selected to begin with, and neither bar shows", c.js(PICKED) == [] and c.js(BAR + "('reelSel')")["hidden"] and c.js(BAR + "('allSel')")["hidden"])
@@ -413,7 +413,7 @@ def run_select(c, s):
     c.click("#undoBtn")
     case("...one press of Undo takes all three back out", c.js(ORDER) == [5, 1, 4, 7, 8, 2, 6, 9], c.js(ORDER))
     r = rec(s, kit)
-    case("what is selected is the page's own: nothing of it is in the record", "picked" not in json.dumps(r) and set(r["saved"]) <= {"picks", "mine", "mine_picks", "song", "vibe", "footage", "style", "sel", "ask", "feel", "photo_ask", "updated"}, sorted(r["saved"]))
+    case("what is selected is the page's own: nothing of it is in the record", "picked" not in json.dumps(r) and set(r["saved"]) <= {"picks", "mine", "mine_picks", "song", "vibe", "footage", "style", "sel", "ask", "feel", "photo_ask", "kind", "updated"}, sorted(r["saved"]))
     many = c.js("(function(){ var M = window.ReelModel, l = [{n:1,h:''},{n:2,h:'+'},{n:3,h:''},{n:4,h:'-'}];"
                 " var f = function(x){ return x.map(function(r){ return r.n + r.h; }).join(' '); };"
                 " return [f(M.many(l, [2,4], 0)), f(M.many(l, [2,4], 4)), f(M.many(l, [2,4], 3)), M.many(l, [1,2], 0) === l, M.many(l, [2,3], 3) === l,"
@@ -447,7 +447,7 @@ def run_full(c, s):
     reel_state(s, kit)
     code, r = save(s, kit, {"picks": picks(38), "mine": True})
     case("(set up: an order of 38, the reel holds 40)", code == 200, r)
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))
     c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('#reel .tile').length === 38", 30)
     c.js("document.getElementById('allBox').open = true; document.getElementById('all').scrollIntoView({block: 'end'})")
     c.click(pick(41), meta=True, check=False)
@@ -520,7 +520,7 @@ def run_trim(c, s, clip):
     code, r = moment(s, {"kit": kit, "do": "add", "video": v.get("key"), "start": 20.0, "seconds": 4.0})
     mid = ((r or {}).get("moments") or [{}])[0].get("id")
     case("(set up: a clip of theirs, 0:20 to 0:24)", code == 200 and mid, r)
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=bts"))     # v27: the clips are on a behind-the-scenes page
     c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('.mom').length === 1", 20)
     case("the trim panel is there and hidden until asked for", c.js("document.getElementById('trim').hidden") is True)
     card = c.js("(function(){ var m = document.querySelector('.mom'), b = m.querySelector('.tr'); return {text: b.textContent, title: b.title,"
@@ -703,7 +703,7 @@ def run_trim_pc(c, s, clip):
     code2, r2 = moment(s, {"kit": kit, "do": "add", "video": pk, "start": 0.5, "seconds": 1.5})
     other = next((m["id"] for m in (r2 or {}).get("moments") or [] if m["id"] != mid), None)
     case("(set up: a clip from each)", code == 200 and code2 == 200 and mid and other, (r, r2))
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=bts"))
     c.wait_for("window.Reel && window.Reel.state() && document.querySelectorAll('.mom').length === 2", 20)
     note = c.js("(function(){ var n = document.getElementById('trimPcNote'); return n ? n.textContent : null; })()")
     case("a PC's panel has our line under the timeline: no pictures along it yet", note == rp.OUR_WORDS["trim_no_stills_pc"], note)

@@ -354,10 +354,14 @@ def start_from_night(night, shoot_id):
 
 # ---------- the sheet and the picks ----------
 
-def sheet(kit):
+def sheet(kit, quick=False):
+    """The kit's numbered list, made by reel.py sheet (the one writer) and copied to .kit/sheet.json. `quick`
+    (the reel page's own re-list when photos were added, her v27): the list only, no contact sheet drawn."""
     rec = load_rec(kit)
     folder = photos_dir(kit, rec)
     args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
+    if quick:
+        args.append("--no-sheets")
     if (kit / ".kit" / "sheet.json").is_file():
         # Numbers stay fixed when photos are added (Nicole's v27): reel.py is the one writer of the numbered list,
         # and is handed the list from last time so every photo on it keeps its number, a new photo takes the next,

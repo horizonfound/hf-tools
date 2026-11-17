@@ -26,9 +26,12 @@ her steps in her order, her buttons and what they do. Underneath it is built the
   * Nothing is kept in the browser: every choice is saved to the kit by POST /reel-save, retried until it lands.
   * kit.json is only ever read here (Claude's order is picks.reel there, with reel_marks); commands write it.
   * Nothing is deleted or written over: the record is written whole, with the version before kept beside it.
-  * Step 1's third card, Talking to camera (her v23, Nov 11), is a plain link written on the server to the
-    talking reel's own page for the same shoot (talk_card; talking_page.py). It is not a choice: it saves nothing
-    and never gets the tick, and this page's record does not know it was pressed.
+  * Which reel do you want to create? (her v27, Nov 16): with no kind in its address the page is a chooser of
+    four kinds (KIND_WORDS, chooser_html), and each kind is its own page (page_html with the kind): behind the
+    scenes (bts), just photos (photos), B-roll (broll), their titles, ledes and steps written on the server. The
+    Talking to camera card is a plain link to the talking reel's own page for the same shoot (talk_card;
+    talking_page.py): it saves nothing. A reel remembers its kind (saved.kind), so it reopens as its kind
+    whatever the address says; a reel from before v27 goes by its footage setting (reel_kind).
 
 Routes, all on the posting server (posting_queue.py hands them here):
   GET  /reel.html?kit=<folder>   the page
@@ -213,6 +216,7 @@ except ValueError:
 POST_CAP = 65536
 VIBES = ("beat", "mixed", "calm", "build")           # hers
 STYLES = ("first", "reveal", "backforth", "bookends")  # hers
+BROLL_STYLE = "broll"                                  # hers (v27): a B-roll reel's one style, clips only, no photos
 MOMENT_ID = re.compile(r"[mu][0-9]{1,4}-[0-9a-f]{6}")  # hers: m<k>-<6 hex> (Claude's), u<k>-<6 hex> (theirs)
 # step 1, the footage (stage b2 and b3)
 FOOTAGE = "Footage"                    # hers: <shoot>/Footage, the behind-the-scenes videos they drag in
@@ -258,23 +262,16 @@ POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-m
 WORDS = {
     # the top of the page
     "page_title": "Make my reel",
-    "reel_of": "{short} reel",
     "back_kit": "Back to the post kit",
     "eyebrow": "Reel",
     "h1": "Your reel",
     "lede_html": "A few quick steps, then press <b>Make my reel</b> and it's cut on the beat in CapCut, ready for your look.",
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
 
-    # step 1 (stage b): behind-the-scenes footage
-    "foot_h2": "Behind-the-scenes footage?",
-    "foot_say": "Do you want this reel to include behind-the-scenes video from the shoot, or just your photos?",
-    "foot_bts_b": "Add behind-the-scenes footage",
-    "foot_bts_s": "Clips from the shoot, mixed with your finished photos.",
-    "foot_photos_b": "Just photos",
-    "foot_photos_s": "Your finished photos, cut on the beat.",
-    # the third card (her v23, Nov 11): a plain link to the talking reel's own page. It chooses nothing here.
-    "foot_talk_b": "Talking to camera",
-    "foot_talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page.",
+    # step 1 (stage b): behind-the-scenes footage. Since her v27 (Nov 17) the kind of reel is chosen on the chooser
+    # (KIND_WORDS), so her old "Behind-the-scenes footage?" yes/no and its three cards are gone; the step's heading
+    # is her v27 one
+    "foot_h2": "Choose your behind-the-scenes footage",
     "foot_say2_html": "Press <b>Add my footage</b> and a Footage folder for this shoot opens in Finder. Drag your behind-the-scenes videos into it.",
     "add_footage": "▶ Add my footage",
     "opening_footage": "Opening your Footage folder in Finder...",
@@ -288,16 +285,18 @@ WORDS = {
     "est_3": "about 8 to 12 minutes",            # up to 25
     "est_4": "about 15 minutes or more",         # longer (and past 15 minutes, the trim line too)
     "quick_fix_html": "<b>Quick fix:</b> trim it first and keep just the parts you like. On your iPhone, open the video in Photos, tap Edit, and drag the ends of the timeline in. On a Mac, open it in QuickTime Player and choose Edit › Trim. A few short clips are quicker for me than one long video.",
-    "paste_say": "Once your footage is in, copy this into the chat so I can look through it:",
+    "paste_say": "Then, once your footage is in, copy this into the chat so I can look through it:",
     "paste_plain": "Look through my footage",
     "paste_for": "Look through my footage for {short}",
     "paste_notes": " and follow my notes",
     "copy": "Copy",
     "copied": "Copied",
-    "ask_label_html": "<b>Want to direct the reel?</b> Optional. Tell me the moments you want and how you'd like the reel to go, and I'll follow it through your footage.",
-    "ask_ex1": "For example: “Find the first kiss. Start with getting ready in the morning, then the ceremony, and end with the sparkler exit.”",
+    # her v27 (Nov 17): the box asks for moments to look for (how the reel should go is step 4's, "Would you like to
+    # direct this edit?"), and sits before the line to copy
+    "ask_label_html": "<b>Is there anything specific you'd like your assistant to look for?</b> Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
+    "ask_ex1": "For example: “Find the first kiss.” or “Find the part where the baby grabs the camera strap.”",
     "ask_ex2": "Another example: “Find the footage of me walking into the frame with my camera.”",
-    "ask_placeholder": "Optional: the moments you want, and how you'd like it to go",
+    "ask_placeholder": "Optional: the moments you'd like me to look for",
     "feel_b": "How should it feel?",
     "feel_heartwarming": "Heartwarming",
     "feel_nostalgic": "Nostalgic",
@@ -337,6 +336,15 @@ WORDS = {
     "undo_b": "Undo",
     "watch_h3": "Watch your footage and pick your own",
     "watch_say_html": "Play it here, or tap a still to jump there. When you see a part you love, press <b>Use this moment</b>. It shows up first in your clips, 4 seconds long and selected. Use <b>−</b> and <b>+</b> on its card to make it shorter or longer.",
+    # her v27 (Nov 17): the videos fold into one drop-down, which opens to the cards
+    "vids_one": "1 video added",
+    "vids_n": "{n} videos added",
+    "vids_total": "{total} of footage",
+    "vids_ready": " · all ready to watch below",
+    "vids_getting": " · getting {n} ready",
+    "vid_ready": "ready to watch below",
+    "vid_added": "added",
+    "vid_getting_it": "getting it ready",
     "vid_lowspace": "Your photo drive is nearly full, so I didn't make a preview of this one. The moments and your reel still work; you just can't watch it here.",
     "vid_failed": "I couldn't make a preview of this one. The moments and your reel still work; you just can't watch it here.",
     "vid_getting": "Getting {name} ready so you can watch it here. This happens once.",
@@ -348,8 +356,6 @@ WORDS = {
     "didnt_work": "That didn't work.",
     "no_server_short": "I couldn't reach the page server.",
     "sum_clip": " + {n} clip{s}",
-    "foot_need_h3": "One more thing: behind-the-scenes footage?",
-    "foot_need_html": "Choose <b>Add behind-the-scenes footage</b> or <b>Just photos</b> in step 1.",
     "clips_need_h3": "One more thing: your clips",
     "clips_need_html": "Select the clip or clips to use under <b>Select your clips</b> in step 1, or choose <b>Just photos</b>.",
     "not_looked_h3": "I haven't looked through your footage yet",
@@ -366,8 +372,17 @@ WORDS = {
     "photo_not_here": "Photo {n} isn't in this shoot.",
 
     # step 2: put your photos in order
-    "order_h2": "Put your photos in order",
-    "order_say": "Your assistant can choose the order for you, or you can drag and drop them into the order you'd like. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
+    "order_h2": "Choose your photos",                      # her v27 (Nov 17; v19: "Put your photos in order")
+    "order_say": "What order would you like your photos in? Your assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
+    # her v27: + Add photos opens the shoot's Photos folder; the page notices new photos and offers to show them
+    "add_photos": "+ Add photos",
+    "add_photos_say": "Opens this shoot's Photos folder in Finder. Drag in more finished photos and they show up here.",
+    "new_photo": "{k} new photo in.",
+    "new_photos": "{k} new photos in.",
+    "show_new": "Show my new photos",
+    "opening_photos": "Opening your Photos folder in Finder...",
+    "photos_open": "Your Photos folder is open in Finder. Drag your finished photos in, and I'll show them here.",
+    "cant_open_photos": "Could not open the folder. Is the photo drive plugged in?",
     "claude_b": "Let my assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
     "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
@@ -482,6 +497,32 @@ WORDS = {
     "plan_in": ", starting the song {s} seconds in",
     "plan_no_song": ", no song",
     "plan_own_sound": " (the footage keeps its own sound).",
+}
+
+# Which reel do you want to create? (her v27, Nov 16): with no kind in the address the reel page is a chooser of four
+# kinds, and each kind is its own page with its own title and words (her KIND_WORDS). Hers, word for word
+# (pages/reel-maker.html, handoff v27); tests/reel_v27_page_check.py compares them with her page both ways.
+KINDS = ("bts", "photos", "broll")          # hers: &kind=bts | photos | broll; Talking to camera is its own page
+KIND_WORDS = {
+    "chooser_h2": "Which reel do you want to create?",
+    "chooser_say": "This is where you create the reels for this shoot's post kit. You can make as many as you like, of any kind. Each one is cut on the beat of your song and made in CapCut, ready for your look.",
+    "kind_bts_b": "Behind the scenes",
+    "kind_bts_s": "Video clips from the shoot, mixed with your finished photos.",
+    "kind_photos_b": "Just photos",
+    "kind_photos_s": "Your finished photos, cut on the beat.",
+    "kind_talk_b": "Talking to camera",
+    "kind_talk_s": "You talk about the shoot, and your photos go with what you say.",
+    "kind_broll_b": "B-roll",
+    "kind_broll_s": "Only video clips from the shoot, cut on the beat. No photos.",
+    "chooser_lede": "Pick the kind of reel you want to make. You can come back here and make another one any time.",
+    "title_chooser": "{short} reels",
+    "title_bts": "{short} behind the scenes",
+    "title_photos": "{short} reel",
+    "title_broll": "{short} B-roll",
+    "lede_bts": "Video clips from your shoot, mixed with your finished photos. Choose your footage and the clips you want, put your photos in order, pick your song, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
+    "lede_photos": "Your finished photos, cut on the beat of your song. Put your photos in order, pick your song and the pace, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
+    "lede_broll": "Only video clips from your shoot, cut on the beat of your song, with no photos. Choose your footage and the clips you want, pick your song, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
+    "all_reels": "← All the reels you can make for this shoot",
 }
 
 # Several reels from one shoot (her v25, Nov 12): the "Your reels" bar under the title. Hers, word for word
@@ -919,6 +960,25 @@ def _stamp_names(rec, rows, stamp):
     rec["stamp"] = stamp
 
 
+def reel_kind(saved):
+    """Which kind of reel a saved record is (her v27: bts | photos | broll), or None when it was never chosen. A
+    reel from before v27 (no kind) is bts when footage was on, photos when it was off (the page's own rule)."""
+    saved = saved if isinstance(saved, dict) else {}
+    k = saved.get("kind")
+    if k in KINDS:
+        return k
+    if saved.get("footage") is True:
+        return "bts"
+    if saved.get("footage") is False:
+        return "photos"
+    return None
+
+
+def kinds_of(rec):
+    """{reel id: its kind or None} for every reel of the shoot."""
+    return {vid: reel_kind(d.get("saved")) for vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST)}
+
+
 def as_reel(rec, vid):
     """The record as it would read with reel `vid` open: a copy, to READ (nothing is saved, and which reel is
     being worked on does not change). The record itself when that reel is the open one, or `vid` is None."""
@@ -973,15 +1033,32 @@ def reel_fresh(rec):
                       "style": "first", "ask": "", "feel": "", "sel": {}, "updated": time.time()}}
 
 
+def start_as(saved, kind):
+    """What a reel of this kind starts with (her v27 applyKind, once, when the reel is started: ours never on a
+    plain open): its kind, footage on for behind the scenes and B-roll and off for just photos, and B-roll's one
+    style."""
+    saved["kind"] = kind
+    saved["footage"] = kind != "photos"
+    if kind == "broll":
+        saved["style"] = BROLL_STYLE
+    elif saved.get("style") == BROLL_STYLE:
+        saved["style"] = "first"
+
+
 def version_from_page(body):
-    """POST /reel-version {kit, op: new | switch | rename, id, name, base?}: hers (/reel/version). Start a new
+    """POST /reel-version {kit, op: new | switch | rename, id, name, kind?}: hers (/reel/version). Start a new
     reel, work on another, or rename one. Under the record's lock, written whole with the version before kept;
     the counter moves on, so a page that has not seen it can never save one reel's choices into another.
-    (status, {ok, versions, current, rev} or {ok: False, words})."""
+    `kind` (ours, v27), with "new" only: the new reel is of that kind from the start (the kind of the page it was
+    started from). (status, {ok, versions, current, rev, kind} or {ok: False, words}); `kind` is the reel now
+    being worked on's, so the page reopens it as its own kind (hers kept the address's)."""
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
     ask = {k: v for k, v in body.items() if k != "kit"}
+    kind = ask.pop("kind", None)
+    if kind is not None and (kind not in KINDS or ask.get("op") != "new"):
+        return _bad()
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
         if not rows:
@@ -990,12 +1067,14 @@ def version_from_page(body):
             changed = reels.op(rec, ask, REEL_LIVE, reel_fresh, REEL_FIRST, REEL_WORD)
         except reels.Wrong as e:
             return _bad(str(e) or NOT_UNDERSTOOD)
+        if changed and kind and isinstance(rec.get("saved"), dict):
+            start_as(rec["saved"], kind)
         if changed:
             rec["rev"] = int(rec.get("rev") or 0) + 1
             rec.pop("from", None)
             _stamp_names(rec, rows, stamp)
             save(kit, rec)
-        out = {"ok": True, "rev": int(rec.get("rev") or 0)}
+        out = {"ok": True, "rev": int(rec.get("rev") or 0), "kind": reel_kind(rec.get("saved"))}
         out.update(reels.info(rec, REEL_FIRST))
     return 200, out
 
@@ -1013,6 +1092,7 @@ def state(kit, reel=None):
     photos, made = arrange.page_photos(kit, rec_kit, rows)
     on_sheet = {x["n"] for x in rows}
     saved = rec.get("saved") if isinstance(rec.get("saved"), dict) else None
+    kinds = kinds_of(rec)
     return {
         "ok": True,
         "short": short_name(kit.name),
@@ -1032,8 +1112,11 @@ def state(kit, reel=None):
         "moments": moments_for_page(kit, rec, on_sheet),
         "claude_bts": _bts_of(rec, on_sheet),
         # hers (GET /reel): the shoot's reels and which one is being worked on ("on_page": the one the page has,
-        # also when a chat command reads another)
-        "versions": reels.listed(rec, REEL_FIRST), "current": reels.current(rec, REEL_FIRST), "on_page": open_reel,
+        # also when a chat command reads another); since v27 each reel's kind too (the page reopens a reel as its
+        # own kind), and the open reel's
+        "versions": [dict(v, kind=kinds.get(v["id"])) for v in reels.listed(rec, REEL_FIRST)],
+        "current": reels.current(rec, REEL_FIRST), "on_page": open_reel,
+        "kind": reel_kind(saved),
     }
 
 
@@ -1140,7 +1223,7 @@ def newest_project(kit, rec_kit=None):
 
 def reels_for_kit(kit, rows=None, rec_kit=None):
     """Every reel of the shoot, for the post kit and the posting queue (hers: reels_of, v25): [{id, name, made,
-    project, order}] in the order they were started. `made`: a reel of it is in CapCut; `project`: the newest
+    project, kind, order}] in the order they were started. `kind` (v27): bts, photos, broll, or None. `made`: a reel of it is in CapCut; `project`: the newest
     one's name; `order`: its photos in the order Make my reel would use, as [{n, h}] (at most 40, hers).
     Whose a made reel is: its "made" entry says (made_for; one without a mark is the first reel's, hers). A reel
     made from the chat the older way (kit.json "reel", with no entry in this record) is the first reel's too.
@@ -1160,6 +1243,7 @@ def reels_for_kit(kit, rows=None, rec_kit=None):
             known.add(m["project"])
     chat = rec_kit.get("reel") if isinstance(rec_kit.get("reel"), dict) else {}
     chat_project = chat.get("project") if isinstance(chat.get("project"), str) and chat.get("project") else None
+    kinds = kinds_of(rec)
     out = []
     for v in reels.listed(rec, REEL_FIRST):
         m = last.get(v["id"])
@@ -1176,6 +1260,7 @@ def reels_for_kit(kit, rows=None, rec_kit=None):
         except (OSError, ValueError, TypeError, AttributeError, KeyError):
             order = []
         out.append({"id": v["id"], "name": v["name"], "made": bool(project), "project": project,
+                    "kind": kinds.get(v["id"]),
                     "order": [{"n": x["n"], "h": x.get("h") or ""} for x in order][:40]})
     return out
 
@@ -2196,7 +2281,7 @@ def _sel(v):
         raise Refused("sel")
     out = {}
     for k, ids in v.items():
-        if k not in STYLES or not isinstance(ids, list) or len(ids) > 12:
+        if (k not in STYLES and k != BROLL_STYLE) or not isinstance(ids, list) or len(ids) > 12:
             raise Refused("sel")
         if any(not isinstance(x, str) or not MOMENT_ID.fullmatch(x) for x in ids):
             raise Refused("sel")
@@ -2220,12 +2305,14 @@ SAVE_FIELDS = {
     "song": lambda v, kit, ons: _song(v, kit),
     "vibe": lambda v, kit, ons: v if v in VIBES else _no("vibe"),
     "footage": lambda v, kit, ons: v if v is None or type(v) is bool else _no("footage"),
-    "style": lambda v, kit, ons: v if v in STYLES else _no("style"),
+    "style": lambda v, kit, ons: v if v in STYLES or v == BROLL_STYLE else _no("style"),
     "sel": lambda v, kit, ons: _sel(v),
     "ask": lambda v, kit, ons: _text(v, 600),
     "feel": lambda v, kit, ons: _feel(v),
     # her v25 photo note: which photos they'd like in this reel, for the Assistant's pick (this reel's own)
     "photo_ask": lambda v, kit, ons: _text(v, PHOTO_ASK_MAX),
+    # her v27: which kind of reel this is (bts | photos | broll), remembered per reel (ours; hers reads the address)
+    "kind": lambda v, kit, ons: v if v in KINDS else _no("kind"),
 }
 
 
@@ -2813,16 +2900,40 @@ def _open_folder(path):
     return finder.open_folder(path)
 
 
+def open_photos(kit):
+    """Her v27 + Add photos: opens the shoot's Photos folder (the one the kit's record names; read only, never
+    made here) and says her line. The page then notices the new photos by itself (relist_if_changed)."""
+    try:
+        folder = kit_mod.photos_dir(kit, kit_mod.load_rec(kit))
+        ok_folder = folder.is_dir() and not folder.is_symlink()
+    except (OSError, ValueError, TypeError, AttributeError):
+        ok_folder = False
+    if not ok_folder:
+        return 200, {"ok": False, "words": pc_words(WORDS["cant_open_photos"])}
+    ok, note = _open_folder(folder)
+    if not ok:
+        arrange.log(f"reel page: the Photos folder couldn't be opened: {str(note)[:200]}")
+        return 200, {"ok": False, "words": pc_words(WORDS["cant_open_photos"])}
+    w = pc_words(WORDS["photos_open"])
+    if note == "behind":
+        first, rest = w.split(". ", 1)
+        w = first + OUR_WORDS["behind"] + " " + rest
+    return 200, {"ok": True, "words": w}
+
+
 def open_music(body):
-    """POST /reel-open {kit, what: "music" | "footage"}: makes <kit>/Music (or <kit>/Footage) if it isn't there,
-    and opens it (hers: /music/open and /footage/open)."""
+    """POST /reel-open {kit, what: "music" | "footage" | "photos"}: makes <kit>/Music (or <kit>/Footage) if it
+    isn't there, and opens it (hers: /music/open and /footage/open); "photos" (her v27) opens the shoot's Photos
+    folder as it is."""
     kit = arrange.kit_by_name(body.get("kit"))
     if kit is None:
         return _bad(CANT_FIND, 404)
-    if set(body) - {"kit", "what"} or body.get("what") not in ("music", "footage"):
+    if set(body) - {"kit", "what"} or body.get("what") not in ("music", "footage", "photos"):
         return _bad()
     if body["what"] == "footage":
         return open_footage(kit)
+    if body["what"] == "photos":
+        return open_photos(kit)
     d = music_dir(kit)
     if not music_ok(kit):                    # a link, or not a folder: never opened, never written into (v19 review)
         arrange.log("reel page: the shoot's Music folder is a link or not a folder, so it isn't opened")
@@ -2892,7 +3003,60 @@ def _get_page(handler, q):
         if cant:
             return arrange._send_page(handler, arrange_page.plain_page(cant[1] + " Tell your assistant and it'll sort it out."))
         arrange.start_previews(kit)
-    arrange._send_page(handler, page_html(kit.name, st["short"], st["kit_page"]))
+    # her v27: no kind in the address is the chooser; with one, the reel's own kind wins over the address (a saved
+    # bts reel opened from a photos address shows as bts), and a reel never chosen takes the address's
+    asked = _one(q, "kind")
+    if asked not in KINDS:
+        return arrange._send_page(handler, chooser_html(kit.name, st["short"], st["kit_page"]))
+    arrange._send_page(handler, page_html(kit.name, st["short"], st["kit_page"], st.get("kind") or asked))
+
+
+_RELIST = {}                      # kit -> when its Photos folder was last compared with the numbered list
+_RELIST_LOCK = threading.Lock()
+RELIST_EVERY = 4.0                # hers: the page looks every 4 seconds; the folder is compared at most that often
+RELIST_SETTLE = 2.0               # a photo still being copied in (changed this recently) holds the list until it has settled
+
+
+def relist_if_changed(kit):
+    """Her v27: photos dragged into the shoot's Photos folder show up on an open page by themselves. The folder is
+    compared with the numbered list on the page's own poll (GET /reel-state; hers asked /photos.json every 4 s as
+    well): a photo there that the list hasn't got, or one on the list that is gone, and the list is made again
+    through `kit.py sheet`, the one writer, so every photo keeps its number (the stamp changes, and the page sees
+    it). Nothing is drawn (no contact sheet: quick=True) and nothing else is written. True when the list was
+    re-made. Whatever goes wrong, nothing is re-made and the page goes on with the list it has."""
+    now = time.time()
+    with _RELIST_LOCK:
+        if now - _RELIST.get(str(kit), 0.0) < RELIST_EVERY:
+            return False
+        _RELIST[str(kit)] = now
+    try:
+        rows = arrange.sheet_rows(kit)
+        if not rows:
+            return False
+        rec = kit_mod.load_rec(kit)
+        folder = kit_mod.photos_dir(kit, rec)
+        reel = _reel_module("reel")
+        listed = {reel._photo_key(arrange.photo_name(x)) for x in rows}
+        there, settled = set(), set()
+        for f in folder.iterdir():
+            if f.name.startswith(".") or f.suffix.lower() not in reel.PHOTOS or f.is_symlink() or not f.is_file():
+                continue
+            k = reel._photo_key(f.name)
+            there.add(k)
+            if now - f.stat().st_mtime >= RELIST_SETTLE:
+                settled.add(k)
+        new = there - listed
+        if not new and not (listed - there):
+            return False
+        if new - settled:
+            return False                      # a photo still being copied in: the list waits until every new one has settled
+        if kit_mod.sheet(kit, quick=True) != 0:
+            return False
+        arrange.start_previews(kit)
+        return True
+    except (OSError, ValueError, TypeError, AttributeError, ImportError) as e:
+        arrange.log(f"reel page: the Photos folder couldn't be compared with the list: {e.__class__.__name__}: {str(e)[:160]}")
+        return False
 
 
 def _get_state(handler, q):
@@ -2901,6 +3065,7 @@ def _get_state(handler, q):
     kit = arrange.kit_by_name(_one(q, "kit"))
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
+    relist_if_changed(kit)
     st = state(kit) if arrange.sheet_rows(kit) else None
     if st is None:
         return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
@@ -3354,7 +3519,9 @@ def reels_bar(w, label="reels_label", which="reels_which", new="reels_new"):
 
 # The bar's script, one for both pages (the reel page and the talking reel page): hers (verOp and its buttons),
 # with ours underneath. `host` is what the page hands it: post(body) -> a promise of {code, j}; flush() -> a
-# promise that this reel is saved exactly as it is (hers: "this reel is saved exactly as it is first"); words.
+# promise that this reel is saved exactly as it is (hers: "this reel is saved exactly as it is first"); reload(j)
+# after a new reel or a switch, given the route's answer (the reel page reopens the reel as its own kind, v27;
+# the talking page reloads); words.
 REELS_JS = r"""
 (function(){
   'use strict';
@@ -3396,9 +3563,9 @@ REELS_JS = r"""
     $('verSel').onchange = function(){
       var to = $('verSel').value;
       if (to === CUR) return;
-      op({op: 'switch', id: to}).then(function(j){ if (j) host.reload(); });
+      op({op: 'switch', id: to}).then(function(j){ if (j) host.reload(j); });    // the answer goes along (v27: the reel's own kind)
     };
-    $('verNew').onclick = function(){ op({op: 'new'}).then(function(j){ if (j) host.reload(); }); };
+    $('verNew').onclick = function(){ op({op: 'new'}).then(function(j){ if (j) host.reload(j); }); };
     $('verRen').onclick = function(){
       var v = VERS.filter(function(x){ return x.id === CUR; })[0] || {};
       $('verName').value = v.name || '';
@@ -3510,6 +3677,45 @@ body.arr-dragging,body.arr-dragging *{cursor:grabbing!important;user-select:none
 .arr-lift .say.on{display:block}
 """
 
+# Her v27 style rules (reel-maker.html, handoff v27), each as she wrote it: the chooser and the kinds of reel, the
+# videos' drop-down, the order that sticks to the top, + Add photos, the even spacing under the step headings
+# ("Press Add my footage..." on one line), and the song drop-down with its link-like Remove. Then three of ours:
+# on a phone the order does not stick (it would cover the page), a kind's hidden steps stay hidden, and the link
+# back to the chooser sits in the bar with the kit's link (hers hides it under the path at the top, crumbs.js).
+V27_CSS = r"""
+.kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:1rem}
+.kind{display:grid;gap:.35rem;padding:1.1rem 1.2rem;border:1.5px solid var(--line);border-radius:16px;background:var(--paper);text-decoration:none;color:var(--ink);cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.kind:hover{border-color:var(--coral-2);box-shadow:0 0 0 1px var(--coral-2)}
+.kind b{font:600 17px/1.2 var(--sans)}.kind span{color:var(--ink-2);font-size:14px}
+.chooser h2{margin-bottom:.3rem}
+.vdrop{border:1.5px solid var(--line);border-radius:14px;background:var(--paper);padding:0}
+.vdrop summary{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px 8px 8px;cursor:pointer}
+.vdrop summary::-webkit-details-marker{display:none}
+.vdrop .vthumbs{display:flex}.vdrop .vthumbs img{width:34px;height:46px;object-fit:cover;border-radius:6px;border:2px solid var(--paper);margin-left:-10px;background:#222}.vdrop .vthumbs img:first-child{margin-left:0}
+.vdrop summary b{font:600 14px/1.2 var(--sans)}.vdrop summary small{display:block;color:var(--ink-2);font-size:12.5px;margin-top:2px}
+.vdrop .car{color:var(--ink-2);transition:transform .2s}.vdrop[open] .car{transform:rotate(180deg)}
+.vdrop .vcard{margin:0 8px 8px;border-radius:10px}
+.vid.vcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;padding:6px 10px 6px 6px;background:var(--paper)}.vid.vcard img{width:44px;height:58px;object-fit:cover;border-radius:7px;background:#222;display:block}.vid.vcard b{font:600 13.5px/1.25 var(--sans)}.vid.vcard small{display:block;color:var(--ink-2);font-size:12px;margin-top:2px}
+.vid.vcard small{margin-left:0;white-space:normal}
+.vdrop .spin{border-color:rgba(0,0,0,.15);border-top-color:var(--coral-2);vertical-align:-2px}
+.reelstick{position:sticky;top:0;z-index:20;background:var(--paper);margin:0 -1.3rem;padding:.7rem 1.3rem .8rem;max-height:46vh;overflow-y:auto;border-radius:0 0 16px 16px}
+.reelstick.stuck{box-shadow:0 12px 24px -10px rgba(31,36,48,.28);border-bottom:1px solid var(--line)}
+.addph{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-top:1rem}
+.step h2{margin:0 0 .55rem}
+.say{max-width:64em;margin:.3rem 0 1rem;line-height:1.55}
+.linkbtn{border:0;background:none;padding:.3rem .2rem;font:600 13px/1 var(--sans);color:var(--ink-2);text-decoration:underline;cursor:pointer}
+.songpick{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:.6rem 0}
+.songpick select{font:500 15px/1.2 var(--sans);padding:.65rem .8rem;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);min-width:min(320px,100%);max-width:100%}
+.linkbtn.sure{color:#fff;background:var(--coral-2);text-decoration:none;border-radius:999px;padding:.45rem .75rem}
+.toq{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-top:.6rem}.toq #qAsk2{flex-basis:100%}
+.toq .went,.result .went{font-size:14px;color:var(--ink-2);margin:0}
+.toq[hidden],.linkbtn[hidden],.edwait[hidden]{display:none!important}
+@media(max-width:620px){.reelstick{position:static;max-height:none;overflow:visible;margin:0;padding:0;border-radius:0}}
+[data-kind-hidden]{display:none!important}
+.bar .homelink+.homelink{margin-left:-.4rem}
+@media(max-width:620px){.bar{flex-wrap:wrap;padding:.6rem 0}.bar .homelink{white-space:normal}.bar .homelink+.homelink{margin-left:0}}
+"""
+
 # Her steps, in her order (BUILD.md section 5: "This order is final"). Each is (her section's id, the
 # function that writes it, or None while that step is not built yet). A step left out is simply not on the page.
 def pc_footage():
@@ -3520,24 +3726,26 @@ def pc_footage():
         return this_computer.WINDOWS
 
 
-def _footage_section(w, num):
-    """Her step 1, "Behind-the-scenes footage?" (reel-maker.html #step0), with everything under it: Add my
-    footage, the videos, Good to know, the line to copy, Want to direct the reel?, How should it feel?, the moment
-    cards, and the player with its strip. On a PC (pc_footage()), where Claude can't look through footage and
-    there are no stills: Good to know (about how long the look takes) and the line to copy are left out, with
-    this_computer.NO_LOOK_PC in place of the line (decision 26; v19 review, Nov 7). A Mac: exactly hers."""
+def _hidden(kind, shown):
+    """The hidden mark on a step a kind of reel does not use (her v27: just photos hides the footage step, B-roll
+    hides the photos, the style and the vibe); the page keeps it hidden whatever else would show it."""
+    return "" if kind in shown else " hidden data-kind-hidden='1'"
+
+
+def _footage_section(w, num, kind="bts"):
+    """Her step 1, "Choose your behind-the-scenes footage" (reel-maker.html #step0, v27), with everything under
+    it: Add my footage, the videos (folded into one drop-down), Good to know, the ask box, the line to copy, the
+    moment cards, and the player with its strip. Since her v27 the kind of reel is chosen on the chooser, so the
+    old yes/no cards are gone and the step is hidden on a just-photos page. Her v27 hides "How should it feel?"
+    (its row is written, hidden: a feel saved before still counts). On a PC (pc_footage()), where Claude can't
+    look through footage and there are no stills: Good to know (about how long the look takes) and the line to
+    copy are left out, with this_computer.NO_LOOK_PC in place of the line (decision 26; v19 review, Nov 7)."""
     e = html.escape
     pc = pc_footage()
     feels = "".join("<button type='button' data-f='" + f + "'>" + e(w["feel_" + f]) + "</button>" for f in FEELS)
     return (
-        "<section class='step' id='step0'>"
+        "<section class='step' id='step0'" + _hidden(kind, ("bts", "broll")) + ">"
         "<h2><span class='num'>" + str(num) + "</span>" + e(w["foot_h2"]) + "</h2>"
-        "<p class='say'>" + e(w["foot_say"]) + "</p>"
-        "<div class='choice'>"
-        "<button class='opt' id='modeBts' type='button'><b>" + e(w["foot_bts_b"]) + "</b><span>" + e(w["foot_bts_s"]) + "</span></button>"
-        "<button class='opt' id='modePhotos' type='button'><b>" + e(w["foot_photos_b"]) + "</b><span>" + e(w["foot_photos_s"]) + "</span></button>"
-        + TALK_SPOT +
-        "</div>"
         "<div id='btsBox' hidden>"
         "<p class='say'>" + w["foot_say2_html"] + "</p>"
         "<button class='btn main' id='addFootage' type='button'>" + e(w["add_footage"]) + "</button>"
@@ -3545,16 +3753,17 @@ def _footage_section(w, num):
         "<div class='vlist' id='vlist'></div>"
         "<div class='insight'" + (" hidden" if pc else "") + "><b>" + e(w["insight_b"]) + "</b><p id='insightWords'>" + e(w["insight_words"]) + "</p>"
         "<p>" + w["quick_fix_html"] + "</p></div>"
-        "<div class='paste' id='pasteBox'><p id='pasteSay'>" + e(this_computer.NO_LOOK_PC if pc else w["paste_say"]) + "</p>"
-        "<div class='line'" + (" hidden" if pc else "") + "><span id='pasteWords'>" + e(w["paste_plain"]) + "</span>"
-        "<button class='btn' id='copyLine' type='button'>" + e(w["copy"]) + "</button></div>"
+        "<div class='paste' id='pasteBox'>"
         "<div class='ask'><label for='askIn'>" + w["ask_label_html"]
         + "<span class='ex'>" + e(w["ask_ex1"]) + "</span><span class='ex'>" + e(w["ask_ex2"]) + "</span></label>"
         "<textarea id='askIn' rows='3' maxlength='600' placeholder='" + e(w["ask_placeholder"], quote=True) + "'></textarea>"
-        "<div class='feel' id='feelRow'><b>" + e(w["feel_b"]) + "</b>" + feels
+        "<div class='feel' id='feelRow' hidden><b>" + e(w["feel_b"]) + "</b>" + feels
         + "<button type='button' data-f='own' id='feelOwnBtn'>" + e(w["feel_own"]) + "</button>"
         "<input id='feelOwn' maxlength='40' placeholder='" + e(w["feel_placeholder"], quote=True) + "' hidden>"
-        "<small>" + w["feel_small_html"] + "</small></div></div></div>"
+        "<small>" + w["feel_small_html"] + "</small></div></div>"
+        "<p id='pasteSay'>" + e(this_computer.NO_LOOK_PC if pc else w["paste_say"]) + "</p>"
+        "<div class='line'" + (" hidden" if pc else "") + "><span id='pasteWords'>" + e(w["paste_plain"]) + "</span>"
+        "<button class='btn' id='copyLine' type='button'>" + e(w["copy"]) + "</button></div></div>"
         "<h3 class='mh'>" + e(w["clips_h3"]) + "</h3>"
         "<p class='say' id='momentsSay'>" + e(w["moments_first"]) + "</p>"
         "<div class='moments' id='moments'></div>"
@@ -3565,23 +3774,24 @@ def _footage_section(w, num):
         "</div></section>")
 
 
-def _style_section(w, num):
-    """Her step 4, "What style of behind the scenes is this?" (#stepStyle), shown only with footage."""
+def _style_section(w, num, kind="bts"):
+    """Her step 4, "What style of behind the scenes is this?" (#stepStyle), shown only with footage (and since
+    her v27 only on a behind-the-scenes page: B-roll has its one style)."""
     e = html.escape
     cards = "".join("<button class='opt' type='button' data-style='" + st + "'><b>" + e(w["style_%s_b" % st]) + "</b>"
                     "<span>" + e(w["style_%s_s" % st]) + "</span></button>" for st in STYLES)
     return (
-        "<section class='step' id='stepStyle' hidden>"
+        "<section class='step' id='stepStyle' hidden" + ("" if kind == "bts" else " data-kind-hidden='1'") + ">"
         "<h2><span class='num'>" + str(num) + "</span>" + e(w["style_h2"]) + "</h2>"
         "<p class='say'>" + e(w["style_say"]) + "</p>"
         "<div class='vibes' id='styles'>" + cards + "</div>"
         "</section>")
 
 
-def _order_section(w, num):
+def _order_section(w, num, kind="photos"):
     e = html.escape
     return (
-        "<section class='step' id='step1'>"
+        "<section class='step' id='step1'" + _hidden(kind, ("bts", "photos")) + ">"
         "<h2><span class='num'>" + str(num) + "</span>" + e(w["order_h2"]) + "</h2>"
         "<p class='say'>" + e(w["order_say"]) + "</p>"
         "<div class='choice'>"
@@ -3606,15 +3816,19 @@ def _order_section(w, num):
         "<div class='tools'><button class='btn small' id='undoBtn' type='button' disabled>" + e(w["undo"]) + "</button>"
         "<span class='tools-say' id='undoSay'></span><span class='notice' id='notice'></span></div>"
         "<p class='selbar' id='reelSel' hidden></p>"
-        "<div class='reelwrap' id='reelwrap'><div id='reel'></div></div>"
+        # her v27: the order sticks to the top while All your photos scrolls under it (.reelstick)
+        "<div class='reelstick' id='reelStick'><div class='reelwrap' id='reelwrap'><div id='reel'></div></div>"
         "<div class='count' id='count'></div>"
-        "<div class='count warn limit' id='limit'>" + e(OUR_WORDS["too_many"]) + "</div>"
+        "<div class='count warn limit' id='limit'>" + e(OUR_WORDS["too_many"]) + "</div></div>"
+        # her v27: + Add photos opens the shoot's Photos folder; new photos keep every other photo's number
+        "<div class='addph'><button class='btn small' id='addPhotos' type='button'>" + e(w["add_photos"]) + "</button>"
+        "<span class='tools-say' id='addPhotosSay'>" + e(w["add_photos_say"]) + "</span></div>"
         "<details class='all' id='allBox'><summary>" + e(w["all_summary"]) + "</summary>"
         "<p class='selbar' id='allSel' hidden></p><div id='all'></div></details>"
         "</section>")
 
 
-def _song_section(w, num):
+def _song_section(w, num, kind="photos"):
     e = html.escape
     return (
         "<section class='step' id='step3'>"
@@ -3628,7 +3842,7 @@ def _song_section(w, num):
         "</section>")
 
 
-def _vibe_section(w, num):
+def _vibe_section(w, num, kind="photos"):
     e = html.escape
     rec = default_vibe()
     cards = "".join(
@@ -3636,7 +3850,7 @@ def _vibe_section(w, num):
         + ("<span class='rec'>" + e(w["vibe_rec"]) + "</span>" if v == rec else "") + "</b>"
         "<span>" + e(w["vibe_%s_s" % v]) + "</span></button>" for v in VIBES)
     return (
-        "<section class='step' id='step4'>"
+        "<section class='step' id='step4'" + _hidden(kind, ("bts", "photos")) + ">"
         "<h2><span class='num'>" + str(num) + "</span>" + e(w["vibe_h2"]) + "</h2>"
         "<p class='say'>" + e(w["vibe_say"]) + "</p>"
         "<div class='vibes' id='vibes'>" + cards + "</div>"
@@ -3675,26 +3889,44 @@ def trim_panel(w):
         "</div></div>")
 
 
-TALK_SPOT = "<!--talk-->"   # where step 1's third card goes; page_html writes it, since it alone knows the shoot
+def kind_address(kit_name, kind=None):
+    """The reel page's address for a shoot: the chooser, or one kind's page. The shoot goes in it by its folder
+    name (never a path), as every page's does."""
+    return "/reel.html?kit=" + quote(kit_name) + ("&kind=" + kind if kind in KINDS else "")
 
 
 def talk_card(w, kit_name):
-    """Step 1's third choice (her v23 reel-maker.html: <a class="opt" id="modeTalk">): a plain link to the talking
-    reel's page for the same shoot, written here on the server so it works before any script runs. It is a link and
-    nothing more: it saves nothing, never gets the tick, and leaves this page's record as it was. The shoot goes in
-    the address by its folder name (never a path), as every page's does. A PC gets the same card: the talking page
-    opens there and says in its own words what a PC can't do yet (this_computer.NO_TALKING_PC)."""
+    """The chooser's Talking to camera card (her v27 reel-maker.html: <a class="kind" id="kTalk">; her v23 had it as
+    step 1's third card): a plain link to the talking reel's page for the same shoot, written here on the server
+    so it works before any script runs. It is a link and nothing more: it saves nothing and leaves this page's
+    record as it was. A PC gets the same card: the talking page opens there and says in its own words what a PC
+    can't do yet (this_computer.NO_TALKING_PC)."""
     e = html.escape
-    return ("<a class='opt' id='modeTalk' href='" + e("/talking.html?kit=" + quote(kit_name), quote=True) + "'><b>"
-            + e(w["foot_talk_b"]) + "</b><span>" + e(w["foot_talk_s"]) + "</span></a>")
+    return ("<a class='kind' id='kTalk' href='" + e("/talking.html?kit=" + quote(kit_name), quote=True) + "'><b>"
+            + e(w["kind_talk_b"]) + "</b><span>" + e(w["kind_talk_s"]) + "</span></a>")
+
+
+def chooser_section(w, kit_name):
+    """Her chooser (v27, #chooser): the four kinds, each a plain link written on the server (hers decided the
+    links and the title in its script after the page loaded)."""
+    e = html.escape
+
+    def card(kid, kind):
+        return ("<a class='kind' id='" + kid + "' href='" + e(kind_address(kit_name, kind), quote=True) + "'><b>"
+                + e(w["kind_%s_b" % kind]) + "</b><span>" + e(w["kind_%s_s" % kind]) + "</span></a>")
+    return ("<section class='step chooser' id='chooser'>"
+            "<h2>" + e(w["chooser_h2"]) + "</h2>"
+            "<p class='say'>" + e(w["chooser_say"]) + "</p>"
+            "<div class='kinds'>" + card("kBts", "bts") + card("kPhotos", "photos") + talk_card(w, kit_name) + card("kBroll", "broll") + "</div>"
+            "</section>")
 
 
 SECTIONS = [
-    ("step0", _footage_section),  # 1. Behind-the-scenes footage?
-    ("step1", _order_section),    # 2. Put your photos in order
+    ("step0", _footage_section),  # 1. Choose your behind-the-scenes footage (not on a just-photos page)
+    ("step1", _order_section),    # 2. Choose your photos (not on a B-roll page)
     ("step3", _song_section),     # 3. Add your song
-    ("stepStyle", _style_section),  # 4. What style of behind the scenes is this? (shown only with footage)
-    ("step4", _vibe_section),     # 5. Pick the vibe
+    ("stepStyle", _style_section),  # 4. What style of behind the scenes is this? (behind the scenes only)
+    ("step4", _vibe_section),     # 5. Pick the vibe (not on a B-roll page)
 ]
 
 
@@ -3703,9 +3935,49 @@ def _json_for_script(obj):
     return json.dumps(obj, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def page_html(kit_name, short, kit_page=False):
+def _head(w, title, lede_html, back_href, back_words, kit_name, css, all_reels=None):
+    """The top of both pages: the bar, the eyebrow, the title and the lede. `all_reels`: the link back to the
+    chooser (a kind's page; the chooser has none)."""
     e = html.escape
+    links = ("<a class='homelink' id='allReels' href='" + e(kind_address(kit_name), quote=True) + "'>"
+             + e(all_reels) + "</a>" if all_reels else "")
+    return (
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>" + e(title) + "</title><style>" + css + "</style></head>"
+        "<body data-kit='" + e(kit_name, quote=True) + "'>"
+        "<div class='wrap'>"
+        "<div class='bar'>" + links + "<a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
+        "<span id='backWords'>" + e(back_words) + "</span></a>" + brand.bar() + "</div>"
+        "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
+        "<h1 id='title'>" + e(title) + "<em>.</em></h1>"
+        "<p class='lede'>" + lede_html + "</p>")
+
+
+def _back(kit_name, kit_page, w):
+    back_href = ("/content/" + quote(kit_name) + "/Post%20kit.html") if kit_page else "/home"
+    return back_href, (w["back_kit"] if kit_page else OUR_WORDS["back_home"])
+
+
+def chooser_html(kit_name, short, kit_page=False):
+    """Which reel do you want to create? (her v27): the page with no kind in its address. Her title and lede are
+    written here on the server; no script runs and nothing is saved by looking at it."""
+    e = html.escape
+    w = dict(WORDS)
+    w.update(KIND_WORDS)
+    title = w["title_chooser"].replace("{short}", short)
+    back_href, back_words = _back(kit_name, kit_page, w)
+    return (_head(w, title, e(w["chooser_lede"]), back_href, back_words, kit_name, look.head_css() + STYLE + V27_CSS)
+            + "</header>" + chooser_section(w, kit_name) + "</div></body></html>")
+
+
+def page_html(kit_name, short, kit_page=False, kind="photos"):
+    """One kind of reel's page (her v27: bts | photos | broll). Its title, its lede, which steps show and the
+    step-1 heading are written here on the server (hers decided them in applyKind() after the page loaded)."""
+    e = html.escape
+    kind = kind if kind in KINDS else "photos"
     w = {k: pc_words(v) for k, v in WORDS.items()}
+    w.update({k: pc_words(v) for k, v in KIND_WORDS.items()})
     if this_computer.WINDOWS:          # decision 26: her trim tip's Mac sentence, a PC's way
         w["quick_fix_html"] = w["quick_fix_html"].replace(
             "On a Mac, open it in QuickTime Player and choose Edit › Trim.", OUR_WORDS["trim_pc"])
@@ -3713,35 +3985,27 @@ def page_html(kit_name, short, kit_page=False):
         w["moments_first"] = w["moments_none"] = this_computer.MOMENTS_PC
         w["not_looked_h3"] = w["clips_need_h3"]
         w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
-    title = w["reel_of"].replace("{short}", short)
+    title = w["title_" + kind].replace("{short}", short)
     w.update(REELS_WORDS)
     w.update(PICK_WORDS)
     w.update(TRIM_WORDS)
     w.update(SELECT_WORDS)
-    data = {"words": dict(w, **OUR_WORDS), "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
+    data = {"words": dict(w, **OUR_WORDS), "kind": kind, "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
             "styles": list(STYLES), "styleMax": STYLE_MAX, "useSeconds": USE_SECONDS, "step": MOMENT_STEP,
             "undoNote": UNDO_NOTE_MS, "stripEvery": STRIP_EVERY,
             "trimMin": MOMENT_MIN, "trimMax": MOMENT_MAX, "trimWindow": TRIM_WINDOW, "trimSpanMin": TRIM_SPAN_MIN,
             "trimNudge": TRIM_NUDGE, "trimGrid": TRIM_GRID}
-    # her numbers as written (step 1 to 5, step 4 hidden until footage is chosen); the page renumbers them (hers)
-    steps = "".join(fn(w, i) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
-    steps = steps.replace(TALK_SPOT, talk_card(w, kit_name))
-    back_href = ("/content/" + quote(kit_name) + "/Post%20kit.html") if kit_page else "/home"
-    back_words = w["back_kit"] if kit_page else OUR_WORDS["back_home"]
+    # her numbers as written (step 1 to 5; the steps a kind doesn't use are hidden); the page renumbers them (hers)
+    steps = "".join(fn(w, i, kind) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
+    back_href, back_words = _back(kit_name, kit_page, w)
+    css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + TRIM_CSS + OUR_CSS + V27_CSS
+    head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"])
+    # the trim panel sits above the page's scripts (hers), before the wrap: the head is split round it
+    head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
     return (
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>" + e(title) + "</title><style>" + look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + TRIM_CSS + OUR_CSS + "</style></head>"
-        "<body data-kit='" + e(kit_name, quote=True) + "'>"
-        + trim_panel(w) +
-        "<div class='wrap'>"
-        "<div class='bar'><a class='homelink' id='back' href='" + e(back_href, quote=True) + "'><span aria-hidden='true'>&larr;</span> "
-        "<span id='backWords'>" + e(back_words) + "</span></a>" + brand.bar() + "</div>"
-        "<header class='head'><span class='eyebrow'>" + e(w["eyebrow"]) + "</span>"
-        "<h1 id='title'>" + e(title) + "<em>.</em></h1>"
-        "<p class='lede'>" + w["lede_html"] + "</p>" + reels_bar(w) + "</header>"
+        head + reels_bar(w) + "</header>"
         + steps +
         "<div class='result' id='result'></div>"
         "</div>"
@@ -3750,7 +4014,7 @@ def page_html(kit_name, short, kit_page=False):
         "<div class='lb' id='lb'><img id='lbimg' alt=''></div>"
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
-        "<script>" + ORDER_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
+        "<script>" + ORDER_JS + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
         "<script>" + FOOTAGE_JS + "</script><script>" + TRIM_JS + "</script><script>" + MAKE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
@@ -3821,7 +4085,7 @@ CORE_JS = r"""
 (function(){
   'use strict';
   var DATA = JSON.parse(document.getElementById('reelData').textContent);
-  var W = DATA.words, KIT = document.body.dataset.kit, Q = 'kit=' + encodeURIComponent(KIT);
+  var W = DATA.words, KIT = document.body.dataset.kit, Q = 'kit=' + encodeURIComponent(KIT), KIND = DATA.kind || '';
   var $ = function(id){ return document.getElementById(id); };
   var esc = function(t){ return String(t).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
   var fill = function(t, o){ return String(t).replace(/\{(\w+)\}/g, function(m, k){ return o && o[k] != null ? o[k] : m; }); };
@@ -3841,7 +4105,11 @@ CORE_JS = r"""
     notice(W.photos_changed, true);
   }
   function fields(){ var out = {}; parts.forEach(function(p){ if (p.fields) { var f = p.fields(); for (var k in f) out[k] = f[k]; } }); return out; }
+  function goKind(k){ var u = new URL(location.href); u.searchParams.set('kind', k); location.href = u.toString(); }
   function adopt(st, first){
+    // v27: the reel being worked on is of another kind (started or opened in another window, or from the chat):
+    // this page reopens it as its own kind rather than showing it in the wrong steps
+    if (!first && KIND && st.kind && st.kind !== KIND) { blocked = true; goKind(st.kind); return; }
     S = st; rev = st.rev; stamp = st.stamp;
     REEL = st.current || null;                       // which of the shoot's reels this page is showing (v25)
     if (BAR) BAR.set(st.versions, st.current);
@@ -3864,8 +4132,15 @@ CORE_JS = r"""
   }
   var BAR = !window.ReelsBar || !$('reels') ? null : window.ReelsBar({
     words: W, flush: flush,
-    post: function(b){ b.kit = KIT; return R_post('/reel-version', b); },
-    reload: function(){ location.reload(); },
+    // a new reel started from this page is this page's kind (v27); the Assistant notes it with the new reel
+    post: function(b){ b.kit = KIT; if (b.op === 'new' && KIND) b.kind = KIND; return R_post('/reel-version', b); },
+    // v27: the reel now being worked on opens as its own kind (hers kept this page's kind, so a B-roll reel opened
+    // from a photos page hid the wrong steps); a reel never chosen opens as this page's kind
+    reload: function(j){
+      var k = j && j.kind;
+      if (k && k !== KIND) { goKind(k); return; }
+      location.reload();
+    },
     renamed: function(j){ if (typeof j.rev === 'number') rev = j.rev; if (S) { S.versions = j.versions; S.current = j.current; S.rev = rev; } if (R.photoLine) R.photoLine(); }
   });
   function R_post(url, obj){
@@ -3917,12 +4192,25 @@ CORE_JS = r"""
   });
   function getState(){ return fetch('/reel-state?' + Q, {cache: 'no-store'}).then(function(r){ return r.json(); }); }
   function idle(){ return !!S && !blocked && !saving && !dirty && !(R.busy && R.busy()); }
+  // v27: the numbered list grew (photos added) and every photo this page knows kept its number: the page goes on
+  // against the new list and offers "Show my new photos" (hers reloads on that press); anything else that changed
+  // the list (a photo gone) still stops the page with the reload line
+  function onlyGrew(st){
+    if (!S || !Array.isArray(st.photos) || !Array.isArray(S.photos) || st.photos.length <= S.photos.length) return false;
+    var have = {}; st.photos.forEach(function(p){ have[p.n] = true; });
+    return S.photos.every(function(p){ return have[p.n]; });
+  }
   function follow(){
     if (document.hidden || !idle()) return;
     var asked = rev;
     getState().then(function(st){
       if (!st || !st.ok || !idle() || rev !== asked) return;
-      if (st.stamp !== stamp) { photosChanged(); return; }
+      if (st.stamp !== stamp) {
+        if (!onlyGrew(st)) { photosChanged(); return; }
+        var k = st.photos.length - S.photos.length;
+        stamp = st.stamp;
+        if (R.newPhotos) R.newPhotos(k);
+      }
       if (st.rev !== rev) { adopt(st, false); return; }          // saved in another window: shown as it is now
       S = st;
       if (BAR) BAR.set(st.versions, st.current);
@@ -3945,6 +4233,9 @@ CORE_JS = r"""
     // several reels (v25): which reel this page shows goes with every ask, so nothing of one reel is ever
     // written into another when a second window has opened a different one
     withReel: withReel, reels: BAR, flush: flush,
+    // v27: which kind of reel this page is, and the steps that kind never shows
+    kind: KIND, kindHides: function(id){ var el = $(id); return !!(el && el.hasAttribute('data-kind-hidden')); },
+    fresh: getState, newPhotos: null,
     // a POST of the page's own (arrange.guard checks it): {code, j}; a server that gave no answer throws
     post: function(url, obj){
       if (url === '/reel-moment' || url === '/reel-make') withReel(obj);
@@ -3952,8 +4243,10 @@ CORE_JS = r"""
         .then(function(r){ if (r.status >= 500) throw new Error('no answer'); return r.json().then(function(j){ return {code: r.status, j: j}; }); });
     },
     photoUrl: function(p, size){ return '/kit-photo?' + Q + '&n=' + p.n + '&size=' + size + '&v=' + encodeURIComponent(p.v || ''); },
-    // her renumbering: only the steps that show are counted
-    renumber: function(){ var k = 0; document.querySelectorAll('section.step').forEach(function(s){ if (!s.hidden) s.querySelector('.num').textContent = ++k; }); }};
+    // her renumbering: only the steps that show are counted (and a kind's hidden steps stay hidden, v27)
+    renumber: function(){ var k = 0; document.querySelectorAll('section.step').forEach(function(s){ if (s.hasAttribute('data-kind-hidden')) s.hidden = true; var n = s.querySelector('.num'); if (!s.hidden && n) n.textContent = ++k; }); }};
+  // v27: the kind goes with every save, so a reel reopens as its kind (nothing is written on a plain open)
+  if (KIND) R.part({fields: function(){ return {kind: KIND}; }});
 })();
 """
 
@@ -4356,9 +4649,7 @@ ORDER_JS = r"""
       return {picks: M.copy(reel), mine: mine, mine_picks: mineOrder ? M.copy(mineOrder) : null, photo_ask: photoAsk};
     },
     adopt: function(st, first){
-      short = st.short;
-      document.title = R.fill(W.reel_of, {short: short});
-      $('title').innerHTML = esc(R.fill(W.reel_of, {short: short})) + '<em>.</em>';
+      short = st.short;                // the title is the server's now (v27: it says the reel's kind)
       var back = $('back');
       if (st.kit_page) { back.href = '/content/' + encodeURIComponent(R.kit) + '/Post%20kit.html'; $('backWords').textContent = W.back_kit; }
       var rebuild = stampSeen !== st.stamp;
@@ -4414,6 +4705,33 @@ ORDER_JS = r"""
     }
   });
   R.part({adopt: function(){ var l = $('reachLine'); if (l) l.remove(); }});
+})();
+"""
+
+# Her v27, in step 2: + Add photos opens the shoot's Photos folder, the page notices new photos by itself (the
+# core's follow: the list grew and every photo kept its number) and offers "Show my new photos", which saves
+# what is waiting and reloads (hers). And her shadow under the order once it is stuck at the top.
+PHOTOS_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc;
+  var say = $('addPhotosSay'), btn = $('addPhotos');
+  if (!say || !btn) return;
+  var k0 = 0;
+  R.newPhotos = function(k){
+    k0 += k;
+    say.innerHTML = esc(R.fill(k0 === 1 ? W.new_photo : W.new_photos, {k: k0})) + ' <button class="btn small main" id="showNew" type="button">' + esc(W.show_new) + '</button>';
+    $('showNew').onclick = function(){ $('showNew').disabled = true; R.flush().then(function(){ location.reload(); }); };
+  };
+  btn.onclick = function(){
+    say.textContent = W.opening_photos;
+    R.post('/reel-open', {kit: R.kit, what: 'photos'}).then(function(res){
+      say.textContent = (res.j && res.j.words) || W.cant_open_photos;
+    }).catch(function(){ say.textContent = W.cant_open_photos; });
+  };
+  var stick = $('reelStick');
+  function shadow(){ if (stick) stick.classList.toggle('stuck', stick.getBoundingClientRect().top <= 1 && $('allBox').open); }
+  window.addEventListener('scroll', shadow, {passive: true}); window.addEventListener('resize', shadow);
 })();
 """
 
@@ -4511,19 +4829,15 @@ FOOTAGE_JS = r"""
   function summary(){ if (R.changed) R.changed(); }
   R.footage = function(){ return footage; };
 
-  // ---- the two cards (hers: setFootage) ----
+  // ---- footage on or off is the kind's (v27: the chooser decides; her setFootage, with no cards) ----
   function setFootage(v){
     footage = v;
-    $('modeBts').classList.toggle('on', v === true);
-    $('modePhotos').classList.toggle('on', v === false);
     $('btsBox').hidden = v !== true;
-    $('stepStyle').hidden = v !== true;
-    $('step0').classList.toggle('done', v !== null);
+    $('stepStyle').hidden = v !== true || R.kindHides('stepStyle');
+    $('step0').classList.toggle('done', v === true && vids.length > 0);
     R.setFootage(v);                 // step 2: the recommended tag, its words, the assistant's footage order; renumbers
     renderStyles();
   }
-  $('modeBts').onclick = function(){ setFootage(true); R.save(); summary(); loadFootage(); };
-  $('modePhotos').onclick = function(){ setFootage(false); R.save(); summary(); };
   $('addFootage').onclick = function(){
     $('footWaiting').textContent = W.opening_footage;
     R.post('/reel-open', {kit: R.kit, what: 'footage'}).then(function(res){
@@ -4564,12 +4878,26 @@ FOOTAGE_JS = r"""
     $('copyLine').textContent = W.copied; setTimeout(function(){ $('copyLine').textContent = W.copy; }, 1600);
   };
 
-  // ---- the videos and Good to know (hers: renderVideos) ----
+  // ---- the videos and Good to know (hers: renderVideos; since v27 one drop-down that opens to the cards) ----
+  var SETTLED = {ready: 1, failed: 1, lowspace: 1, pc: 1, hevc_pc: 1};
+  function pic(v){ var st = v.strip || []; return st.length ? '<img src="' + esc(stripUrl(v.key, st[Math.floor(st.length / 3)].n)) + '" alt="">' : '<img alt="">'; }
+  function vidState(v){
+    if (v.preview === 'coming') return esc(W.coming_small);
+    if (v.preview === 'ready') return esc(W.vid_ready);
+    if (SETTLED[v.preview]) return esc(W.vid_added);
+    return '<span class="spin"></span> ' + esc(W.vid_getting_it);
+  }
   function renderVideos(){
-    $('vlist').innerHTML = vids.map(function(v){
-      var small = v.preview === 'coming' ? W.coming_small + ' · ' + fill(W.mb, {n: v.mb}) : mmss(v.length) + ' · ' + fill(W.mb, {n: v.mb});
-      return '<div class="vid"><span class="ic">&#9654;</span><span>' + esc(v.name) + '</span><small>' + esc(small) + '</small></div>';
-    }).join('');
+    var box = $('vlist'), was = box.querySelector('details');
+    var busy = vids.filter(function(v){ return !SETTLED[v.preview]; }).length;
+    var tot = vids.reduce(function(a, v){ return a + (v.length || 0); }, 0);
+    box.innerHTML = !vids.length ? '' : '<details class="vdrop"' + (was && was.open ? ' open' : '') + '><summary><span class="vthumbs">' + vids.slice(0, 4).map(pic).join('') +
+      '</span><span><b>' + esc(fill(vids.length === 1 ? W.vids_one : W.vids_n, {n: vids.length})) + '</b><small>' + esc(fill(W.vids_total, {total: mmss(tot)})) +
+      (busy ? esc(fill(W.vids_getting, {n: busy})).replace(' · ', ' · <span class="spin"></span> ') : esc(W.vids_ready)) + '</small></span><span class="car">&#9662;</span></summary>' +
+      vids.map(function(v){
+        return '<div class="vid vcard">' + pic(v) + '<span><b>' + esc(v.name) + '</b><small>' + esc(mmss(v.length) + ' · ' + fill(W.mb, {n: v.mb})) + ' · ' + vidState(v) + '</small></span></div>';
+      }).join('') + '</details>';
+    $('step0').classList.toggle('done', footage === true && vids.length > 0);
     renderViewers();
     var total = vids.reduce(function(a, v){ return a + v.length; }, 0);
     var w = W.insight_words;
@@ -4799,7 +5127,6 @@ FOOTAGE_JS = r"""
     return esc(fill(W.sum_clip, {n: used, s: used === 1 ? '' : 's'})) + ' · ' + esc(STYLE_WORDS[style] || '');
   };
   R.beforeMake = function(){
-    if (footage === null) return {h3: W.foot_need_h3, html: W.foot_need_html};
     if (footage && !chosen().length) return moments.length ? {h3: W.clips_need_h3, html: W.clips_need_html} : {h3: W.not_looked_h3, html: W.not_looked_html};
     return null;
   };
@@ -4810,8 +5137,9 @@ FOOTAGE_JS = r"""
     adopt: function(st, first){
       short = st.short;
       var sv = st.saved || {};
-      footage = sv.footage === true ? true : sv.footage === false ? false : null;
-      style = D.styles.indexOf(sv.style) >= 0 ? sv.style : 'first';
+      // v27: footage on or off, and B-roll's one style, are the kind's, whatever an older record says
+      footage = R.kind === 'photos' ? false : true;
+      style = R.kind === 'broll' ? 'broll' : D.styles.indexOf(sv.style) >= 0 ? sv.style : 'first';
       sel = (sv.sel && typeof sv.sel === 'object' && !Array.isArray(sv.sel)) ? sv.sel : {};
       ask = typeof sv.ask === 'string' ? sv.ask : ''; feel = typeof sv.feel === 'string' ? sv.feel : '';
       if (first || document.activeElement !== $('askIn')) $('askIn').value = ask;
@@ -5071,6 +5399,11 @@ def cmd_open(kit):
         say("STOP: couldn't start the page server.")
         return 2
     say(f"{got['of']} photos in the shoot.")
+    kind = reel_kind((as_reel(load(kit), None).get("saved")))
+    if kind:
+        vs, cur = reel_names(kit)
+        say(f"The reel being worked on, \"{reels.name_of({'versions': vs}, cur, REEL_FIRST)}\", is a {KIND_NAMES[kind]} reel: "
+            f"{addr}&kind={kind} (the address below is the chooser of the four kinds).")
     say(addr)
     return 0
 
@@ -5083,18 +5416,24 @@ def _reel_or_stop(kit, words):
     return vid
 
 
-def reels_line(vs, cur, shown=None):
-    """One line naming the shoot's reels, the one being worked on marked (and the one a command is about)."""
-    return ", ".join(f"\"{v['name']}\"" + (" (the one open on the page)" if v["id"] == cur else "")
+def reels_line(vs, cur, shown=None, kinds=None):
+    """One line naming the shoot's reels, the one being worked on marked (and the one a command is about), each
+    with its kind when it has one (v27)."""
+    kinds = kinds or {}
+    return ", ".join(f"\"{v['name']}\"" + (f" ({KIND_NAMES[kinds[v['id']]]})" if kinds.get(v["id"]) in KIND_NAMES else "")
+                     + (" (the one open on the page)" if v["id"] == cur else "")
                      + (" (this one)" if shown and v["id"] == shown and shown != cur else "") for v in vs)
 
 
+KIND_NAMES = {"bts": "behind the scenes", "photos": "just photos", "broll": "B-roll"}    # the chat's words for a kind
+
+
 def cmd_reels(kit, a):
-    """reel_page.py reels "<kit>" [--new [--name N] | --open "<reel>" | --rename "<reel>" --to "<name>"]:
+    """reel_page.py reels "<kit>" [--new [--name N] [--kind bts|photos|broll] | --open "<reel>" | --rename "<reel>" --to "<name>"]:
     the shoot's reels, and the page's own three moves from the chat (the same checks, the same record)."""
     ask = None
     if a.new:
-        ask = {"op": "new", **({"name": a.name} if a.name else {})}
+        ask = {"op": "new", **({"name": a.name} if a.name else {}), **({"kind": a.kind} if getattr(a, "kind", None) else {})}
     elif a.open or a.rename:
         vid = _reel_or_stop(kit, a.open or a.rename)
         if vid is None:
@@ -5109,7 +5448,8 @@ def cmd_reels(kit, a):
             say(f"STOP: {out.get('words')} Nothing was changed.")
             return 1
     vs, cur = reel_names(kit)
-    say(f"{short_name(kit.name)}: {len(vs)} reel{'s' if len(vs) != 1 else ''}: {reels_line(vs, cur)}.")
+    kinds = kinds_of(load(kit))
+    say(f"{short_name(kit.name)}: {len(vs)} reel{'s' if len(vs) != 1 else ''}: {reels_line(vs, cur, kinds=kinds)}.")
     if ask is not None and ask["op"] != "rename":
         say("The page shows it after a reload (or \"show my reel page\").")
     return 0
@@ -5178,8 +5518,10 @@ def cmd_show(kit, reel=None):
         return 1
     saved = st["saved"] or {}
     say(f"{st['short']}  ({kit.name})")
+    kind = st.get("kind")
+    say(f"  Kind: {KIND_NAMES[kind] if kind else 'not chosen yet (the page opens on the chooser of the four kinds)'}")
     if len(st["versions"]) > 1:
-        say(f"  This shoot's reels: {reels_line(st['versions'], st['on_page'], st['current'])}. "
+        say(f"  This shoot's reels: {reels_line(st['versions'], st['on_page'], st['current'], kinds={v['id']: v.get('kind') for v in st['versions']})}. "
             f"What follows is \"{reels.name_of({'versions': st['versions']}, st['current'], REEL_FIRST)}\"."
             + ("" if st["current"] != st["on_page"] else " Name another with --reel \"<its name>\"."))
     say(f"  Claude's order: {','.join(str(x['n']) + x['h'] for x in st['claude']) or '(none yet)'}")
@@ -5319,6 +5661,7 @@ def main():
     rl.add_argument("words")
     rl.add_argument("--new", action="store_true", help="start a new reel (the one being worked on is kept as it is)")
     rl.add_argument("--name", help="with --new: its name (without it: Reel 2, Reel 3...)")
+    rl.add_argument("--kind", choices=KINDS, help="with --new: which kind of reel it is (bts: behind the scenes, photos, broll); without it, the page's chooser asks")
     rl.add_argument("--open", help="work on this reel (its name)")
     rl.add_argument("--rename", help="rename this reel (its name now)")
     rl.add_argument("--to", help="with --rename: the new name")

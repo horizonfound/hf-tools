@@ -254,11 +254,12 @@ def cmd_sheet(a):
     if before:
         out["added"], out["gone"] = added, gone      # for whoever asked: what the last list didn't have, and what it has lost
     (wd / "photos.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
-    try:
-        sheets = make_sheets([p for _, p in numbered], wd, labels=[n for n, _ in numbered])
-    except Exception as e:  # a sheet is a convenience; the numbered list still works
-        sheets = []
-        say(f"(could not draw the sheet: {e})")
+    sheets = []
+    if not getattr(a, "no_sheets", False):        # --no-sheets: the list only (the reel page re-lists while it is open)
+        try:
+            sheets = make_sheets([p for _, p in numbered], wd, labels=[n for n, _ in numbered])
+        except Exception as e:  # a sheet is a convenience; the numbered list still works
+            say(f"(could not draw the sheet: {e})")
     tall = sum(1 for x in listing if x["way"] == "tall")
     say(f"{len(photos)} edited photos ({tall} tall, {len(photos) - tall} wide or square).")
     if before:
@@ -832,6 +833,7 @@ def main():
     s.add_argument("--kit", help="the post kit these photos are for: the sheet and photos.json go in its .kit/reels")
     s.add_argument("--before", help="the numbered list from last time (a kit's .kit/sheet.json): every photo on it keeps "
                                     "its number, new ones take the next, a photo gone keeps its number unused")
+    s.add_argument("--no-sheets", action="store_true", help="the numbered list only, no contact sheet drawn (the reel page's own re-list)")
     t.add_argument("--kit")
     a = ap.parse_args()
     {"sheet": cmd_sheet, "strip": cmd_strip, "songs": cmd_songs, "make": cmd_make,

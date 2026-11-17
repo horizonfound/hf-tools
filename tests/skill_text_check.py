@@ -828,9 +828,9 @@ def check_talking():
 
     # the door, in what Claude reads
     arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
-    case("parts/arrange.md names the reel page's third card in her words, as a link and not a choice",
-         ('"' + reel_page.WORDS["foot_talk_b"] + '"') in arr and ('"' + reel_page.WORDS["foot_talk_s"] + '"') in arr
-         and "it is a link, not a choice" in arr and "never gets the tick" in arr and "`parts/talking-reel.md`" in arr)
+    case("parts/arrange.md names the chooser's Talking to camera card (v27) in her words, as a link and not a choice",
+         ('"' + reel_page.KIND_WORDS["kind_talk_b"] + '"') in arr and ('"' + reel_page.KIND_WORDS["kind_talk_s"] + '"') in arr
+         and "is a link, not a choice" in arr and "changes nothing on the reel page" in arr and "`parts/talking-reel.md`" in arr)
 
     # the PC: a named gap, in the same words everywhere
     pc = read(SM / "parts" / "on-a-pc.md")

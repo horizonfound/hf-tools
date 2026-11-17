@@ -251,7 +251,7 @@ def run_page(c, s):
     kit = "2026-09-27 Page <i>reel &amp; more" if not t.WINDOWS else "2026-09-27 Page reel"
     short = kit[11:]
     s.make_kit(kit, photos=8)
-    c.open(s.url("/reel.html" + s.q(kit)))
+    c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))     # v27: the note box is on a kind's page (the chooser has none)
     c.wait_for("window.Reel && window.Reel.state()", 20)
     case("a new shoot's reel: Let my assistant choose says her line, as plain words", c.text("#claudeWords") == NOT_PICKED and c.count("#claudeWords b") == 0, c.text("#claudeWords"))
     case("...and the page is on I'll drag them in myself, with nothing in the reel", c.js("document.getElementById('useMine').classList.contains('on')") and c.count("#reel .tile") == 0)

@@ -63,26 +63,22 @@ LIGHT = ("--single-process", "--disable-component-extensions-with-background-pag
          "--disable-features=Translate,MediaRouter,OptimizationHints,DialMediaRouteProvider,SpareRendererForSitePerProcess,"
          "IsolateOrigins,site-per-process,WebUIOmniboxPopup,OmniboxWebUIPopup,WebUIOmniboxFullPopup,AimServerEligibility")
 
-# Her words for step 1 and step 4, as her reel-maker.html shows them (handoff v19).
+# Her words for step 1 and step 4, as her reel-maker.html shows them (handoff v19; since v27 the step's heading, the
+# ask box's words and the line to copy's are her v27 page's, and the yes/no cards are gone: the chooser decides).
 HERS1 = {
-    "h2": "Behind-the-scenes footage?",
-    "say": "Do you want this reel to include behind-the-scenes video from the shoot, or just your photos?",
-    "bts_b": "Add behind-the-scenes footage", "bts_s": "Clips from the shoot, mixed with your finished photos.",
-    "photos_b": "Just photos", "photos_s": "Your finished photos, cut on the beat.",
-    # the third card: her v23 reel-maker.html (Nov 11) is the source for these two (rpc.V23_WORDS, checked against her page there)
-    "talk_b": "Talking to camera", "talk_s": "You talk about the shoot; your photos go with what you say. Opens its own page.",
+    "h2": "Choose your behind-the-scenes footage",
     "say2": "Press <b>Add my footage</b> and a Footage folder for this shoot opens in Finder. Drag your behind-the-scenes videos into it.",
     "add": "▶ Add my footage",
     "insight_b": "Good to know: longer footage takes longer",
     "insight": "Longer videos take me longer to look through and use more of your plan. A few minutes of footage takes a few minutes. A 20-minute video takes about 10 minutes or more.",
     "fix": "<b>Quick fix:</b> trim it first and keep just the parts you like. On your iPhone, open the video in Photos, tap Edit, and drag the ends of the timeline in. On a Mac, open it in QuickTime Player and choose Edit › Trim. A few short clips are quicker for me than one long video.",
-    "paste_say": "Once your footage is in, copy this into the chat so I can look through it:",
+    "paste_say": "Then, once your footage is in, copy this into the chat so I can look through it:",
     "copy": "Copy",
-    "ask_b": "Want to direct the reel?",
-    "ask": " Optional. Tell me the moments you want and how you'd like the reel to go, and I'll follow it through your footage.",
-    "ex1": "For example: “Find the first kiss. Start with getting ready in the morning, then the ceremony, and end with the sparkler exit.”",
+    "ask_b": "Is there anything specific you'd like your assistant to look for?",
+    "ask": " Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
+    "ex1": "For example: “Find the first kiss.” or “Find the part where the baby grabs the camera strap.”",
     "ex2": "Another example: “Find the footage of me walking into the frame with my camera.”",
-    "ask_ph": "Optional: the moments you want, and how you'd like it to go",
+    "ask_ph": "Optional: the moments you'd like me to look for",
     "feel_b": "How should it feel?",
     "feels": ["Heartwarming", "Nostalgic", "Fun", "Dreamy", "Something else"],
     "feel_ph": "Your words, like joyful or cozy",
@@ -102,7 +98,6 @@ HERS4 = {
               ["Bookends", "Footage opens and closes the reel, with your photos in the middle. Works with any footage."]],
 }
 HERS_MAKE = {
-    "foot_need": "<h3>One more thing: behind-the-scenes footage?</h3><p>Choose <b>Add behind-the-scenes footage</b> or <b>Just photos</b> in step 1.</p>",
     "clips_need": "<h3>One more thing: your clips</h3><p>Select the clip or clips to use under <b>Select your clips</b> in step 1, or choose <b>Just photos</b>.</p>",
     "not_looked": "<h3>I haven't looked through your footage yet</h3><p>Add your videos in step 1, then copy the line into the chat. The moments I find show up under <b>Select your clips</b> in step 1. Or choose <b>Just photos</b>.</p>",
 }
@@ -502,12 +497,7 @@ def texts1(c):
       function h(id){ var x = document.querySelector('#' + id + ' h2').cloneNode(true); x.querySelector('.num').remove(); return x.textContent; }
       var lab = document.querySelector('#btsBox label').cloneNode(true); lab.querySelectorAll('.ex').forEach(function(e){ e.remove(); });
       var b = lab.querySelector('b'); var bt = b.textContent; b.remove();
-      return {h2: h('step0'), say: document.querySelector('#step0 > p.say').textContent,
-        bts_b: document.querySelector('#modeBts b').textContent, bts_s: document.querySelector('#modeBts span').textContent,
-        photos_b: document.querySelector('#modePhotos b').textContent, photos_s: document.querySelector('#modePhotos span').textContent,
-        talk_b: document.querySelector('#modeTalk b').textContent, talk_s: document.querySelector('#modeTalk span').textContent,
-        talk_on: document.getElementById('modeTalk').classList.contains('on'), talk_href: document.getElementById('modeTalk').getAttribute('href'),
-        choices: Array.from(document.querySelectorAll('#step0 .choice > *')).map(function(x){ return x.id; }),
+      return {h2: h('step0'), cards: document.querySelectorAll('#step0 .choice, #modeBts, #modePhotos, #modeTalk').length,
         say2: document.querySelector('#btsBox > p.say').innerHTML, add: document.getElementById('addFootage').textContent,
         insight_b: document.querySelector('.insight > b').textContent, insight: document.getElementById('insightWords').textContent,
         fix: document.querySelectorAll('.insight p')[1].innerHTML, paste_say: document.querySelector('#pasteBox > p').textContent,
@@ -523,10 +513,12 @@ def texts1(c):
         h2s: h('stepStyle'), says: document.querySelector('#stepStyle > p.say').textContent,
         cards: Array.from(document.querySelectorAll('#styles .opt')).map(function(x){ return [x.querySelector('b').textContent, x.querySelector('span').textContent]; }),
         nums: Array.from(document.querySelectorAll('section.step')).filter(function(s){ return !s.hidden; }).map(function(s){ return s.id + '=' + s.querySelector('.num').textContent; }),
-        bts_on: document.getElementById('modeBts').classList.contains('on'), photos_on: document.getElementById('modePhotos').classList.contains('on'),
+        feel_hidden: document.getElementById('feelRow').hidden, ask_first: document.getElementById('askIn').getBoundingClientRect().top < document.getElementById('pasteWords').getBoundingClientRect().top,
         box_hidden: document.getElementById('btsBox').hidden, style_hidden: document.getElementById('stepStyle').hidden,
         rec_shown: !document.getElementById('claudeRec').hidden, done0: document.getElementById('step0').classList.contains('done'),
-        waiting: document.getElementById('footWaiting').textContent, vlist: document.getElementById('vlist').innerText,
+        waiting: document.getElementById('footWaiting').textContent, vlist: document.getElementById('vlist').textContent,
+        vsum: (document.querySelector('#vlist summary') || {}).innerText || '',
+        vcards: Array.from(document.querySelectorAll('#vlist .vcard')).map(function(v){ return v.querySelector('b').textContent + ' ' + v.querySelector('small').textContent.replace(/\s+/g, ' ').trim(); }),
         sum: document.getElementById('sum').textContent, result: document.getElementById('result').innerHTML};
     })()""")
 
@@ -563,37 +555,23 @@ def check_page(c, s, clips):
     rec.pop("from", None)
     (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
     c.init_script("document.addEventListener('copy', function(){ window.__copied = String(window.getSelection()); }, true);")
-    c.open(s.page_url())
-    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songs .song').length > 1", 20)
+    c.open(s.page_url("bts"))                 # v27: a behind-the-scenes page (the chooser decides the kind)
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 8 && document.querySelectorAll('#songSel option').length > 1", 20)
     t = texts1(c)
-    case("footage not chosen yet: both cards off, the box and step 4 hidden, steps 1 to 4 (hers)", not t["bts_on"] and not t["photos_on"]
-         and t["box_hidden"] and t["style_hidden"] and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t["nums"])
-    for k in ("h2", "say", "bts_b", "bts_s", "photos_b", "photos_s", "talk_b", "talk_s"):
-        case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
-    case("the third card's words are the ones taken from her v23 page", (HERS1["talk_b"], HERS1["talk_s"]) == (rpc.V23_WORDS["foot_talk_b"], rpc.V23_WORDS["foot_talk_s"]))
-    v23 = rpc.her_v23_page()
-    if v23 is None:
-        print("SKIP  the third card against her v23 page: that handoff (reference-private) isn't on this computer", flush=True)
-    else:
-        case("...and they are in her v23 reel-maker.html, on her third card", '<a class="opt" id="modeTalk" href="talking-reel.html"><b>%s</b><span>%s</span></a>'
-             % (HERS1["talk_b"], HERS1["talk_s"]) in v23)
-    case("step 1 has her three choices in her order, the third a link to this shoot's talking page, with no tick",
-         t["choices"] == ["modeBts", "modePhotos", "modeTalk"] and t["talk_href"] == "/talking.html?kit=" + KIT.replace(" ", "%20") and not t["talk_on"], (t["choices"], t["talk_href"]))
+    case("a behind-the-scenes page (v27): no yes/no cards, the box and step 4 show at once, her renumbering 1 to 5, the recommended tag",
+         t["cards"] == 0 and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
+         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], t["nums"])
+    case("her words, step 1: h2 (v27)", t["h2"] == HERS1["h2"], (t["h2"], HERS1["h2"]))
+    case("step 1 is not done until a video is in (nothing to choose from yet)", not t["done0"])
+    case("the ask box comes before the line to copy, and How should it feel? is hidden (hers, v27)", t["ask_first"] and t["feel_hidden"])
     c.click("#makeBtn")
-    case("Make my reel before footage is chosen: her \"One more thing\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["foot_need"]), 5),
+    case("Make my reel before any footage is in: her \"I haven't looked through your footage yet\" box", wait(c, "document.getElementById('result').innerHTML === %s" % json.dumps(HERS_MAKE["not_looked"]), 5),
          texts1(c)["result"])
-    c.click("#modePhotos")
-    t = texts1(c)
-    case("Just photos: the third card stays without the tick", not t["talk_on"])
-    case("Just photos: marked, step 1 done, the box and step 4 stay hidden", t["photos_on"] and t["done0"] and t["box_hidden"] and t["style_hidden"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "step4=4"], t)
-    case("saved: footage false", on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is False))
-    c.click("#modeBts")
-    t = texts1(c)
-    case("Add behind-the-scenes footage: the box and step 4 show, her renumbering 1 to 5, the recommended tag",
-         t["bts_on"] and not t["box_hidden"] and not t["style_hidden"] and t["rec_shown"]
-         and t["nums"] == ["step0=1", "step1=2", "step3=3", "stepStyle=4", "step4=5"], t)
-    case("saved: footage true", on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True))
+    c.click("#askIn")
+    c.type_text("x")
+    c.key("Backspace")
+    case("saved on the first change, with footage on and the kind (v27: nothing is written on a plain open)",
+         on_disk(s, lambda r: (r.get("saved") or {}).get("footage") is True and (r.get("saved") or {}).get("kind") == "bts"))
     for k in ("say2", "add", "insight_b", "fix", "paste_say", "copy", "ask_b", "ask", "ex1", "ex2", "ask_ph", "feel_b", "feels", "feel_ph",
               "feel_small", "clips_h3", "watch_h3", "watch"):
         case("her words, step 1: %s" % k, t[k] == HERS1[k], (t[k], HERS1[k]))
@@ -603,25 +581,28 @@ def check_page(c, s, clips):
     case("Good to know with three 6-second videos: her line for up to 3 minutes", wait(c, "document.getElementById('insightWords').textContent === %s"
          % json.dumps("You've added 0:18 of footage. That takes me about a minute or two to look through, and longer footage uses more of your plan."), 8),
          texts1(c)["insight"])
-    case("the videos listed with their length and size (hers)", wait(c, "document.querySelectorAll('#vlist .vid').length === 3", 6)
-         and c.js("Array.from(document.querySelectorAll('#vlist .vid')).map(function(v){ return v.innerText.replace(/\\s+/g, ' '); })")
-         == ["▶ Not plain.mov 0:06 · 0 MB", "▶ Sideways é.mov 0:06 · 0 MB", "▶ clip.mov 0:06 · 0 MB"], c.js("document.getElementById('vlist').innerText"))
+    case("the videos fold into one drop-down (v27): '3 videos added', '0:18 of footage · all ready to watch below' once their previews are made",
+         wait(c, "document.querySelectorAll('#vlist .vcard').length === 3 && (document.querySelector('#vlist summary') || {}).innerText.indexOf('all ready to watch below') > 0", 30)
+         and texts1(c)["vsum"].replace("\n", " ").replace("  ", " ") == "3 videos added 0:18 of footage · all ready to watch below", texts1(c)["vsum"])
+    case("...which opens to the cards, each with its length, size and that it is ready (hers)",
+         texts1(c)["vcards"] == ["Not plain.mov 0:06 · 0 MB · ready to watch below", "Sideways é.mov 0:06 · 0 MB · ready to watch below", "clip.mov 0:06 · 0 MB · ready to watch below"], texts1(c)["vcards"])
+    case("the drop-down is closed to begin with, and step 1 is done once videos are in", c.js("!document.querySelector('#vlist details').open") and texts1(c)["done0"])
 
     # Add my footage, and the list following a new file
     c.click("#addFootage")
     case("Add my footage: her words once the folder is open", wait(c, "document.getElementById('footWaiting').textContent === %s" % json.dumps(HERS1["opened"]), 6),
          texts1(c)["waiting"])
     shutil.copy(clips["clip.mov"], s.kit / "Footage" / "Dropped in.mov")
-    case("a video dropped into the Footage folder shows up by itself (her 4 s look)",
-         wait(c, "Array.from(document.querySelectorAll('#vlist .vid span:not(.ic)')).some(function(x){ return x.textContent === 'Dropped in.mov'; })", 8),
-         texts1(c)["vlist"])
+    case("a video dropped into the Footage folder shows up by itself (her 4 s look): '4 videos added', its card",
+         wait(c, "Array.from(document.querySelectorAll('#vlist .vcard b')).some(function(x){ return x.textContent === 'Dropped in.mov'; }) && (document.querySelector('#vlist summary') || {}).innerText.indexOf('4 videos added') === 0", 8),
+         texts1(c)["vsum"])
     case("and Good to know adds it up: 0:24", wait(c, "document.getElementById('insightWords').textContent.indexOf('0:24 of footage') > 0", 4), texts1(c)["insight"])
     # taken back out (kept beside the kit): the list follows that too, and the page plays three videos, not four
     aside = s.work / "set aside"
     aside.mkdir(exist_ok=True)
     (s.kit / "Footage" / "Dropped in.mov").rename(aside / "Dropped in.mov")
     case("a video taken out of the folder goes from the list",
-         wait(c, "document.querySelectorAll('#vlist .vid').length === 3 && document.getElementById('insightWords').textContent.indexOf('0:18 of footage') > 0", 8),
+         wait(c, "document.querySelectorAll('#vlist .vcard').length === 3 && document.getElementById('insightWords').textContent.indexOf('0:18 of footage') > 0", 8),
          texts1(c)["vlist"])
 
     # the line to copy, the notes and the feel
@@ -639,8 +620,11 @@ def check_page(c, s, clips):
     c.set_value("#askIn", "")
     c.js("document.getElementById('askIn').dispatchEvent(new Event('input'))")
     case("notes cleared: the line goes back", texts1(c)["paste"] == "Look through my footage for " + SHORT and on_disk(s, lambda r: (r.get("saved") or {}).get("ask") == ""))
+    # her v27 hides "How should it feel?": the row is written hidden, its buttons still work underneath (a feel
+    # saved before v27 still counts, and the Assistant still reads it)
+    c.js("document.getElementById('feelRow').hidden = false")
     c.click("#feelRow button[data-f='fun']")
-    case("a feel: Fun marked, the line has the notes, saved as \"fun\"", c.js("document.querySelector(\"#feelRow button[data-f='fun']\").classList.contains('on')")
+    case("a feel (the row shown by hand): Fun marked, the line has the notes, saved as \"fun\"", c.js("document.querySelector(\"#feelRow button[data-f='fun']\").classList.contains('on')")
          and texts1(c)["paste"].endswith(" and follow my notes") and on_disk(s, lambda r: (r.get("saved") or {}).get("feel") == "fun"))
     c.click("#feelRow button[data-f='fun']")
     case("tapped again it clears (hers)", on_disk(s, lambda r: (r.get("saved") or {}).get("feel") == "") and texts1(c)["paste"] == "Look through my footage for " + SHORT)
@@ -662,10 +646,10 @@ def check_page(c, s, clips):
 
 def check_player(c, s):
     """The player, the strip, Use this moment, the cards and the styles (a fresh Chrome: it fits the memory guard)."""
-    c.open(s.page_url())
+    c.open(s.page_url("bts"))
     c.wait_for("document.querySelectorAll('.viewer[data-ready]').length === 3", 20)
     t = texts1(c)
-    case("after a reload: footage on, their feel in its own box, the notes empty", t["bts_on"] and c.js("document.getElementById('feelOwn').value") == "cozy and warm"
+    case("after a reload: footage on, their feel in its own box, the notes empty", not t["box_hidden"] and c.js("document.getElementById('feelOwn').value") == "cozy and warm"
          and c.js("document.getElementById('askIn').value") == "", t)
     ok = wait(c, "Array.from(document.querySelectorAll('.viewer video')).every(function(v){ return v.readyState >= 1; })", 15)
     dims = c.js("Array.from(document.querySelectorAll('.viewer')).map(function(e){ var v = e.querySelector('video'); return [e.querySelector('h4').textContent, v.videoWidth, v.videoHeight, Math.round(v.duration)]; })")
@@ -791,7 +775,7 @@ def check_player(c, s):
 
 def check_test_make(c, s):
     """A test make on the page with footage, and the page with footage but no moments (a fresh Chrome)."""
-    c.open(s.page_url() + "&test=1")
+    c.open(s.page_url("bts") + "&test=1")
     c.wait_for("document.querySelectorAll('#moments .mom').length === 3", 15)
     c.click("#makeBtn")
     case("a test make with footage: her heading, her Plan line with the clip, the clip's line, the beats",
@@ -832,7 +816,7 @@ def check_pc_page(c, s, clips):
     shutil.copy(clips["clip.mov"], s.kit / "Footage" / "PC plays.mov")
     whole = clips["clip.mov"].read_bytes()
     (s.kit / "Footage" / "Still copying.mov").write_bytes(whole[: len(whole) // 2])
-    c.open(s.page_url())
+    c.open(s.page_url("bts"))
     c.wait_for("!!document.querySelector('.viewer[data-ready] h4')", 20)
     c.wait_for("Array.from(document.querySelectorAll('.viewer[data-ready] h4')).some(function(h){ return h.textContent === 'PC plays.mov'; })", 20)
     v = "Array.from(document.querySelectorAll('.viewer[data-ready]')).filter(function(e){ return e.querySelector('h4').textContent === 'PC plays.mov'; })[0]"
