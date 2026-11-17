@@ -902,6 +902,33 @@ def check_talking():
     case("where-things-live says the small copies are kept, and how big they can get", "kept on purpose" in live and "1.3 GB" in live)
     case("where-things-live says the earlier edits and what a --replace replaced are kept", "`earlier`" in live and "`replaced`" in live and "the last 12" in live)
 
+    # Nicole's v27 (Nov 17, Lane C): Fix a word, Open CapCut and + Add more photos are the photographer's, on the page; the
+    # part tells the assistant what they are, in the page's own words, and that it never presses or fixes for them
+    case("the part tells Fix a word in the page's own words (double-click, Fix the words, Enter, Undo fix, the hover line) and that the assistant never fixes one (rule 3)",
+         all(x in flat for x in ("A word the Mac misheard they fix themselves", "**" + W["sel_fix"] + "**", "double-click it", "type the right words, Enter",
+                                 W["fix_back"] + " puts the heard word back", "You fixed this. It was heard as", "You never fix a word for them (rule 3)",
+                                 "Double-click the word on the page and type the right one."))
+         and W["sel_fix"] == "Fix the words" and W["fix_back"] == "Undo fix" and W["fixed_title"].startswith("You fixed this. It was heard as"))
+    case("rule 3 still says the assistant never touches a caption word, and that the photographer can, on the page",
+         "never touch a caption word" in flat and "never fix, tidy or reword one (they can, on the page" in flat)
+    case("the part says the fixed word is simply the word to show and photos, and that status counts the fixes and never names them, as the script does",
+         "`show` and `photos` print the fixed word as the word; `status` says how many they fixed, never which" in flat
+         and "how many words they fixed on the page (never which: rule 3)" in flat and talking_rec.FIXED_COUNT.strip().startswith("Words fixed on the page:"))
+    case("the part tells Open CapCut as the page has it (beside Make it in CapCut once made, and in the result box that names the project), with no command for it",
+         ("**" + W["open_capcut"] + "**") in flat and "beside Make it in CapCut once this talking reel has been made, and in the result box" in flat
+         and "You have no command for that either" in flat and "free from capcut.com" in flat and "free from capcut.com" in W["capcut_missing"]
+         and ('"' + W["made_h2"] + '", which names the project to click') in flat and W["open_capcut"] == "Open CapCut")
+    case("the part tells + Add more photos as the page has it (the photo pop-up's footer, the Photos folder, new photos at the end), and that every photo keeps its number",
+         ("**" + W["add_photos"] + "**") in flat and "sits in the photo pop-up's footer" in flat and "opens the shoot's Photos folder" in flat
+         and "show up in the grid at the end, with the next numbers" in flat and "**Every photo keeps its number**" in flat
+         and "run the sheet command again before you place" in flat and W["add_photos"] == "+ Add more photos")
+    case("...and the numbering the part promises is the one the code keeps (reel.py number_photos: the next after the highest ever given, a photo gone keeps its number unused)",
+         "a photo that is gone keeps its number unused" in flat and "after the highest ever given" in flat
+         and "nxt = max(before.values(), default=0) + 1" in read(REEL / "scripts" / "reel.py") and "def number_photos(photos, before):" in read(REEL / "scripts" / "reel.py"))
+    v27 = [ln for ln in part.splitlines() if ln.startswith(("  - **A word the Mac misheard", "  - **+ Add more photos**", "**Open CapCut**"))]
+    case("the three v27 paragraphs are there and say your assistant, never Claude (the app's own name stays where the part names the Claude app's pane)",
+         len(v27) == 3 and not any("Claude" in ln for ln in v27), [ln[:60] for ln in v27])
+
 
 # ---------- Nicole's v26: sets of stories, and the assistant choosing a story's photos ----------
 
