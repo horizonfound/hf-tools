@@ -1,13 +1,10 @@
 {
-  "number": 4,
+  "number": 5,
   "date": "Nov 18, 2026",
   "new": [
-    "The reel page starts with a chooser of four kinds of reel, and B-roll can be saved as a finished video from the page.",
-    "The footage editor: one player, a trim that grows on the timeline, and name my clips from the chat.",
-    "The carousel and stories designer: slides as things you add and remove, Show the whole photo, Crop, several photos at once, Save just this slide.",
-    "The talking reel: fix a word, Open CapCut, and add more photos from the page.",
-    "Posted on the post itself, the path at the top of every post kit page, and Remove this song (to the Trash, never deleted).",
-    "Photo numbers stay fixed when photos are added to a shoot.",
-    "Fixes: the folder button on the posting queue, a lost press in the designer's Add window, Make this one in CapCut and Save my video pressed together, and a second Escape on the talking reel."
+    "A new home page: a hello with photos from your newest shoot, and your four steps each saying what is going on right now.",
+    "A monthly recap, and Your year in December: your numbers and your own photos as stories you can save as pictures to share. You can hide the recap.",
+    "The backup report plays your backup back: the numbers count up while your photos fall into place.",
+    "Small celebrations: Posted lifts the post into your grid, Delivered flips the shoot's card, and a new post kit fans its photos out into its cards."
   ]
 }
