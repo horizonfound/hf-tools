@@ -606,8 +606,9 @@ def check_whole_build():
     banned = re.compile(r"sounds? like you|in your voice|the way you write", re.I)
     # (Nov 14: the home base's words are Nicole's v26, whole, in home_base.WORDS. Her Make posts card names
     # "reels, carousels, single photos, stories and captions"; a single post is made in the carousel designer.)
+    # (Nov 17, her v28: the home page's own words moved to home.py; its step 3 says "reels, carousels, stories, and captions".)
     base = read(SCRIPTS / "home_base.py")
-    cards = re.findall(r'"(?:c3_p|m_lede)": "([^"]+)"', base)
+    cards = re.findall(r'"s3_p": "([^"]+)"', read(SCRIPTS / "home.py")) + re.findall(r'"m_lede": "([^"]+)"', base)
     case("the home base's Make posts card and screen promise no captions that 'sound like you' or are 'written the way you write'",
          len(cards) == 2 and not any(banned.search(c) for c in cards) and all("captions" in c for c in cards), cards)
     case("... and name what the kit makes, in her words (v26)",
