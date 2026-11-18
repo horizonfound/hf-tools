@@ -209,6 +209,9 @@ def num(s):
 def check_browser(c, base, written):
     case("(the page as written has the numbers this test expects)", written[0] == "22" and written[2] == "22" and written[3] == "7 min", written)
     REAL[:] = written
+    # The test says which it means, every time: a machine may itself ask for reduced motion (GitHub's Mac does),
+    # and then the page, rightly, plays nothing. Never left to the computer's own setting.
+    c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
     c.clear_errors()
     c.open(base + "/report.html")
     s = c.js(STATE)

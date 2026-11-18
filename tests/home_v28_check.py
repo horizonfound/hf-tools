@@ -622,6 +622,9 @@ def check_browser(c, w, table):
                   "if (String(u).startsWith('/queue-url')) return Promise.resolve(new Response(JSON.stringify({words: 'Pretend: the editing queue would open here.'}), {headers: {'Content-Type': 'application/json'}})); "
                   "if (String(u).startsWith('/open-home')) return Promise.resolve(new Response(JSON.stringify({words: 'Opened The Assistant in Finder.'}), {headers: {'Content-Type': 'application/json'}})); "
                   "return f.apply(this, arguments); }; })();")
+    # The test says which it means, every time: a machine may itself ask for reduced motion (GitHub's Mac does),
+    # and then the page, rightly, plays nothing. Never left to the computer's own setting.
+    c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
     c.open(w.url("/home"))
     c.wait_for("document.getElementById('hello').dataset.faces === '1' && document.querySelectorAll('.hello .tile img.on').length > 0", 20)
     h = c.js(HELLO)
@@ -764,7 +767,7 @@ def check_browser(c, w, table):
          c.js("STILL && getComputedStyle(document.querySelector('.hello .tile img')).animationName === 'none' && getComputedStyle(document.querySelector('.hello .tx h3')).animationName === 'none' "
               "&& getComputedStyle(document.querySelector('#s1 .now .dot')).animationName === 'none'") is True
          and c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',')") == before)
-    c.cdp("Emulation.setEmulatedMedia", {"features": []})
+    c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
     c.open(w.url("/home"))
     c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
     before = c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',')")

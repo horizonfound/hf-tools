@@ -82,7 +82,7 @@ def posts(c):
 
 
 def reduce(c, on):
-    c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "reduce" if on else ""}]})
+    c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "reduce" if on else "no-preference"}]})
 
 
 def queue_bytes(s):
@@ -120,6 +120,9 @@ def check_page(c, s):
     reel, car = posted.fresh_queue(s)
     rid, cid = reel["id"], car["id"]
     c.init_script(LOG)
+    # The test says which it means, every time: a machine may itself ask for reduced motion (GitHub's Mac does),
+    # and then the page, rightly, plays nothing. Never left to the computer's own setting.
+    reduce(c, False)
 
     # ?try=posted
     c.open(s.url("/posting.html?try=posted"))
