@@ -68,6 +68,12 @@ opens a panel with her line and the switch only. Back to Not posted is the "unpo
 end with a new date, and a reminder that was on comes back on that date, the same event brought into step.
 state()["posted"] says which posted pieces the grid shows: those posted since the grid was last read, or in the
 last POSTED_DAYS days when it never was (the server decides; the page only draws them).
+Posted lifts the post into the feed (Nicole's v28): on the page only, after the save is answered. lift() in the
+page's script plays each tile from where it was to where it is (the changed post on an arc, with a shine, a green
+check and 22 pieces of confetti when it was just posted; a row's Posted button slides its row out first), and
+does none of it under prefers-reduced-motion. /posting.html?try=posted plays it on the first ready post and puts
+everything back after 4.5 s ("That was a preview. Nothing changed."); nothing is sent while it plays, and the
+server does nothing with the word. No new route, no new command.
 """
 import argparse
 import base64
@@ -1434,6 +1440,13 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .pswitch.on{background:rgba(79,178,134,.14);color:#2f7d56;border-color:rgba(79,178,134,.4)}.pswitch.on i{background:var(--green)}.pswitch.on i::after{transform:translateX(14px)}
 .pswitch:hover{border-color:var(--ink-2)}
 .pswitch:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+/* Posted lifts the post into the feed (Nicole's v28): the shine that sweeps the tile once it has landed, the green
+   check, the confetti. Her rules; the check and the confetti are only ever added by lift() below, which adds none
+   of them under prefers-reduced-motion, and the last rule here makes sure of it. */
+.tile.shine{z-index:3}.tile.shine::before{content:'';position:absolute;inset:0;z-index:2;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.8) 50%,transparent 70%);transform:translateX(-120%);animation:pqshine 1s .55s ease forwards;pointer-events:none}@keyframes pqshine{to{transform:translateX(120%)}}
+.tile .yay{position:absolute;left:50%;top:50%;z-index:3;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font:700 20px/1 var(--sans);box-shadow:0 8px 20px rgba(0,0,0,.3);animation:pqyay 1.6s .5s var(--ease) both;pointer-events:none}@keyframes pqyay{0%{opacity:0;transform:scale(.3)}25%{opacity:1;transform:scale(1.1)}40%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1)}}
+.pqconf{position:fixed;border-radius:2px;z-index:9999;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.tile.shine::before,.tile .yay,.pqconf{display:none;animation:none}}
 """
 
 SCRIPT = r"""
@@ -1442,8 +1455,52 @@ const $=s=>document.querySelector(s);const toast=$('#toast');let tt;
 function say(m){toast.textContent=m;toast.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove('on'),2400)}
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}   // a shoot's name is theirs: only ever text
 function nice(iso){if(!iso)return'';const d=new Date(iso+'T12:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
-async function post(body){if(!live){say('This is a saved copy. Ask your assistant to “show my posting queue” to change things.');return null}
+async function post(body){if(TRYING){say(PW.preview);return null}   // ?try=posted is playing: nothing is sent, whatever is pressed
+ if(!live){say('This is a saved copy. Ask your assistant to “show my posting queue” to change things.');return null}
  try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell your assistant instead.');return null}}
+// ---------- Posted lifts the post into the feed (Nicole's v28) ----------
+// The save has already happened when this runs: lift() only draws. It notes where every tile is, draws the new
+// state, then plays each tile from where it was to where it is: the post that changed rides an arc (a little
+// bigger at the top of it) and, when it was just posted, gets a shine, a green check and 22 pieces of confetti;
+// the other tiles slide over. Under prefers-reduced-motion it draws the new state and nothing else.
+// played(): an animation's end, or its time plus a little, whichever comes first (a page that is not in front
+// can leave an animation unfinished; nothing here may wait on one for ever).
+let TRYING=false;
+const CONFETTI=22;
+const calm=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
+const played=(a,ms)=>Promise.race([a&&a.finished?a.finished.catch(()=>{}):Promise.resolve(),new Promise(r=>setTimeout(r,ms+250))]);
+function lift(id,S2,yay){
+ const g=$('#grid'),before=new Map();
+ if(calm()||!g.animate){render(S2);return}
+ g.querySelectorAll('.tile[data-id]').forEach(t=>before.set(t.dataset.id,t.getBoundingClientRect()));
+ const real0=[...g.querySelectorAll('.tile.real:not(.justposted)')].map(t=>t.getBoundingClientRect());
+ render(S2);
+ const slide=(t,b)=>{if(!b)return;const a=t.getBoundingClientRect(),dx=b.left-a.left,dy=b.top-a.top;
+  if(dx||dy)t.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration:650,easing:'cubic-bezier(.2,.7,.2,1)'})};
+ g.querySelectorAll('.tile[data-id]').forEach(t=>{const b=before.get(t.dataset.id);if(!b)return;
+  if(t.dataset.id!==id){slide(t,b);return}
+  const a=t.getBoundingClientRect(),dx=b.left-a.left,dy=b.top-a.top;t.style.zIndex=5;
+  played(t.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:`translate(${dx*.45}px,${dy*.45-34}px) scale(1.14)`,offset:.45},{transform:'none'}],{duration:950,easing:'cubic-bezier(.3,.7,.2,1)'}),950).then(()=>{t.style.zIndex=''});
+  if(!yay)return;
+  t.classList.add('shine');const y=mkel('span','yay','\u2713');y.setAttribute('aria-hidden','true');t.appendChild(y);
+  setTimeout(()=>{t.classList.remove('shine');y.remove()},2300);
+  setTimeout(()=>{if(!t.isConnected)return;const r=t.getBoundingClientRect(),cs=['#F07F5A','#F2CF72','#5EB5A9','#2f7d56','#D4643F'];   // a little burst of confetti
+   for(let k=0;k<CONFETTI;k++){const c=mkel('i','pqconf'),w=Math.random()*6.283,d=60+Math.random()*90,ms=900+Math.random()*500;c.setAttribute('aria-hidden','true');
+    c.style.cssText=`left:${r.left+r.width/2}px;top:${r.top+r.height/2}px;width:${6+Math.random()*5}px;height:${4+Math.random()*4}px;background:${cs[k%cs.length]}`;
+    document.body.appendChild(c);
+    played(c.animate([{transform:'translate(-50%,-50%) rotate(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(w)*d}px),calc(-50% + ${Math.sin(w)*d+40}px)) rotate(${Math.random()*540}deg)`,opacity:0}],{duration:ms,easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'}),ms).then(()=>c.remove())}},520)});
+ [...g.querySelectorAll('.tile.real:not(.justposted)')].forEach((t,i)=>slide(t,real0[i]));   // the feed's own tiles have no id: by their place
+}
+// ?try=posted (Nicole's v28): watch Posted on the first ready post without changing anything (for showing people).
+// Nothing is sent: the page draws a pretend "after", and post() refuses every press while it plays; then it draws
+// what is really there again and says so.
+function tryPosted(){
+ const keep=LAST;if(!keep.greens||!keep.greens.length)return;
+ const S=JSON.parse(JSON.stringify(keep)),x=S.greens.shift();x.status='posted';x.posted_at=new Date().toISOString().slice(0,19);S.posted=[x].concat(S.posted||[]);
+ $('#grid').scrollIntoView({block:'center',behavior:calm()?'auto':'smooth'});
+ setTimeout(()=>{if(LAST!==keep)return;   // a real press happened meanwhile: the page already shows what is saved
+  TRYING=true;lift(x.id,S,true);say(PW.posted_toast);
+  setTimeout(()=>{TRYING=false;if(LAST===S)render(keep);say(PW.preview)},4500)},700)}
 function render(S){LAST=S;
  $('#tankh').innerHTML=S.tank_head;$('#tankp').textContent=S.tank_line;
  const bar=$('#tankbar');bar.className='tankbar'+(S.weeks===null?'':S.weeks<=1?' low':S.weeks<=2?' mid':'');bar.firstElementChild.style.width=(S.weeks===null?0:Math.min(100,S.weeks/4*100))+'%';
@@ -1476,7 +1533,10 @@ function render(S){LAST=S;
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
  mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to your assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
- document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){render(S2);say({posted:PW.posted_toast,ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
+ document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){
+  // Posted (v28): the save is done; the row slides out first, then the post lifts into the feed
+  if(b.dataset.a==='posted'){const li=b.closest('li');if(li&&li.animate&&!calm())await played(li.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateX(40px)'}],{duration:260,easing:'ease-in',fill:'forwards'}),260);lift(b.dataset.id,S2,true)}else render(S2);
+  say({posted:PW.posted_toast,ready:'Green light. It has a date now.',unready:'Back to in progress.',skip:'Skipped.'}[b.dataset.a])}});
  drag(S);
  if(PICK)openPick(PICK,true);watchRemind();}   // an open panel survives every redraw: put back under its post's row, its photos and words read again
 function drag(S){if(!live)return;const g=$('#grid');drag.st={g,src:null,lift:null,over:null,sx:0,sy:0,ox:0,oy:0,on:false};
@@ -1524,7 +1584,8 @@ const PW={reel_line:'Pick the photo your reel shows in your grid. When you post 
  not_posted:'Not posted',posted:'Posted',
  in_feed:'It’s in your feed. If it didn’t actually go out, switch it back to Not posted and it goes back in your queue.',
  posted_tip:'Click if this one didn’t go out after all',
- back_in_queue:'Back in your queue, ready to post.',posted_toast:'Posted. Nice. It’s in your feed now.'};
+ back_in_queue:'Back in your queue, ready to post.',posted_toast:'Posted. Nice. It’s in your feed now.',
+ preview:'That was a preview. Nothing changed.'};   // ?try=posted (v28)
 const KINDW={reel:'reel',carousel:'carousel',single:'single post'};
 function mkel(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function copyText(t,what){   // the old way first: the Claude app's pane refuses navigator.clipboard, and honors this from a click
@@ -1538,7 +1599,7 @@ function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent=
 // feed; back to Not posted puts it back in line, ready to post. Built as text (never her innerHTML), aria-checked said plainly.
 function postedSwitch(x){const on=x.status==='posted',b=mkel('button','pswitch'+(on?' on':''));b.type='button';b.setAttribute('role','switch');b.setAttribute('aria-checked',on?'true':'false');
  b.appendChild(mkel('i'));b.appendChild(mkel('span',null,on?PW.posted:PW.not_posted));
- b.onclick=async()=>{const S2=await post({action:on?'unposted':'posted',id:x.id});if(S2){render(S2);say(on?PW.back_in_queue:PW.posted_toast)}};
+ b.onclick=async()=>{const S2=await post({action:on?'unposted':'posted',id:x.id});if(S2){lift(x.id,S2,!on);say(on?PW.back_in_queue:PW.posted_toast)}};   // (v28) the tile lifts into the feed, or back into line
  return b}
 function placePick(id){   // right under the row of the post that was clicked
  const g=$('#grid'),tiles=[...g.children].filter(c=>c!==PEL),t=tiles.find(c=>c.dataset&&c.dataset.id===id),i=tiles.indexOf(t);
@@ -1722,6 +1783,7 @@ function watchRemind(){if(!live||RPOLL||!RM().busy)return;
   catch(e){if(++RFAIL>20){LAST.reminding=Object.assign({},RM(),{busy:false});return}}
   watchRemind()},600)}
 if(!live)$('#offline').hidden=false;render(D);
+if(new URLSearchParams(location.search).get('try')==='posted'&&D.greens&&D.greens.length)setTimeout(tryPosted,1500);
 """
 
 
