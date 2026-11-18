@@ -3139,7 +3139,8 @@ def start_make(body):
     with _JOB_ROUTE:
         j = read_job(kit) or {}
         if job_running(kit) or (j.get("state") == "queued" and not j.get("pid") and time.time() - float(j.get("t") or 0) < JOB_BOOT):
-            return 409, {"ok": False, "words": OUR_WORDS["already_making"], "why": "making", "job": job_for_page(kit)}
+            words = OUR_WORDS["video_making"] if j.get("video") else OUR_WORDS["already_making"]     # as Save my video says it
+            return 409, {"ok": False, "words": words, "why": "making", "job": job_for_page(kit)}
         jid = os.urandom(6).hex()
         write_job(kit, {"id": jid, "state": "queued", "t": time.time(), "dry": test, "ask": ask})
         try:
@@ -6883,9 +6884,11 @@ WATCH_JS = r"""
       if (PV.songStart != null) body.song_start = PV.songStart;
       R.flush().then(function(){ return R.post('/reel-video', R.withReel(body)); }).then(function(res){
         var j = res.j || {};
-        if (j.job) { vidFollow(j.job); return; }
+        if (j.job && j.job.kind === 'video') { vidFollow(j.job); return; }
         $('pvSaveVid').disabled = false;
-        $('pvSaved').textContent = j.words || W.went_wrong;      // a PC's line, no clips, another kind: in plain words
+        // a PC's line, no clips, another kind, or a reel being made right now (that job is Make my reel's to follow:
+        // followed here, it ended as Saved "" with nothing saved): in plain words
+        $('pvSaved').textContent = j.words || W.went_wrong;
       }).catch(function(){ $('pvSaveVid').disabled = false; $('pvSaved').textContent = W.no_server; });
     };
   }
@@ -7009,7 +7012,9 @@ MAKE_JS = r"""
     // what is still waiting to be saved (B-roll's words, say) lands first: the make reads the record for them
     R.flush().then(function(){ return R.post('/reel-make', body); }).then(function(res){
       var j = res.j || {};
-      if (j.job) { follow(j.job); return; }             // started, or already being made: that one is followed
+      // started, or already being made: that one is followed. A video being saved is Save my video's to follow:
+      // followed here, it ended as "Test run: nothing was made" on a real page, so its line is said instead
+      if (j.job && j.job.kind !== 'video') { follow(j.job); return; }
       busy(false); bad(W.didnt_work_h3, esc(j.words || W.went_wrong));
     }).catch(function(){ busy(false); bad(W.didnt_work_h3, esc(W.no_server)); });
   };

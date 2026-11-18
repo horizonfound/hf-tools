@@ -621,6 +621,24 @@ def wait(c, cond, seconds=8):
         return False
 
 
+def click_into(c, sel, seconds=30):
+    """Press a box to type in, once the page has stopped moving, and be sure the keyboard is in it. Make my reel's
+    answer glides into view by itself (the page's own smooth scroll, hers); on a slow computer that glide is still
+    going when the next press is aimed, and carries the box out from under it, so what is typed goes nowhere
+    (GitHub's slow Mac, Nov 17: nothing was saved because nothing was typed). A person presses what they see."""
+    end = time.time() + seconds
+    while True:
+        y, still = c.js("window.scrollY"), time.time()
+        while time.time() - still < 0.5 and time.time() < end:      # still for half a second: the glide is over
+            time.sleep(0.05)
+            now = c.js("window.scrollY")
+            if now != y:
+                y, still = now, time.time()
+        c.click(sel)
+        if c.js("document.activeElement === document.querySelector(%s)" % json.dumps(sel)) or time.time() >= end:
+            return
+
+
 def check_page(c, s, clips):
     sid = rpc.song_of(s, KIT, "Test beat")
     # start from a record with no footage choice yet: their 8 photos, the song picked
@@ -655,7 +673,7 @@ def check_page(c, s, clips):
     (s.kit / ".kit" / "reel-page.json").write_text(json.dumps(rec))
     c.js("window.Reel.followNow()")
     wait(c, "document.querySelectorAll('#clist .ci').length > 0", 8)
-    c.click("#askIn")
+    click_into(c, "#askIn")
     c.type_text("x")
     c.key("Backspace")
     case("saved on the first change, with footage on and the kind (v27: nothing is written on a plain open)",

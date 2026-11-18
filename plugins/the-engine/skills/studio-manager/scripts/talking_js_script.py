@@ -308,6 +308,9 @@ function placeFix(anchor){
 function closeFix(){
   if (!FIX) return;
   FIX = null; $('fixBox').hidden = true;
+  // the keyboard leaves the box now, not at the browser's next drawn frame: until then a hidden box still had it,
+  // and a second Escape pressed before that frame went to the box and let go of nothing on the timeline
+  if (document.activeElement === $('fixIn')) $('fixIn').blur();
   if (stale && !selectedWords() && T.ready()) renderScript();      // what arrived while the box was open
 }
 function doFix(back){

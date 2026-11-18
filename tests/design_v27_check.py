@@ -1428,7 +1428,8 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
                     c.wait_for("!document.getElementById('gallery').hidden", 5)
                 c.click(f"#gallery-{section} .dz-card:nth-child({nth}) .dz-use")
                 if wait:
-                    c.wait_for("document.getElementById('gallery').hidden", 8)
+                    c.wait_for("document.getElementById('gallery').hidden", 8, tell="JSON.stringify({line: document.getElementById('gallery-line').textContent, blocked: Designer.blocked, note: document.getElementById('d-note').textContent, "
+                               "cards: document.querySelectorAll('#gallery .dz-use').length, busy: document.querySelector('#gallery .dz-sheet').className})")
 
             def frames(s):
                 return [b for b in s["blocks"] if b.get("type") != "text"]
@@ -2223,6 +2224,35 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
                  bool(ms) and ms.group(1) == disk(folder=sdesigns)["name"] + " - 01 updated.jpg" and design.slide_ok((kit / "Stories" / ms.group(1)).read_bytes(), "stories"), c.text("#save-line"))
             weak = Jx("Array.from(document.querySelectorAll('[hidden]')).filter(function(e){ return getComputedStyle(e).display !== 'none'; }).map(function(e){ return e.id || e.className; })")
             case("v27 browser: on the stories page too, every hidden element is really gone", not weak, weak)
+            # ---- an answer that comes late never makes the cards anew under a press ----
+            # (Opening the window asks the Assistant for the lists as they are now. On a slow computer the answer to an
+            # earlier opening came in after a later one, and the open set's own save landing changed its line in the
+            # list: either drew every card again, and a button made anew between a press and its release loses the
+            # press. Here the answers are held back until the test lets them go, so it is the same on any computer.)
+            c.js("(function(){ var f = window.fetch; window.__fetch = f; window.__held = []; window.__late = 0; window.fetch = function(u){ var p = f.apply(this, arguments); "
+                 "if (String(u).indexOf('/design-state') !== 0) return p; "
+                 "return p.then(function(r){ var j = r.json.bind(r); r.json = function(){ return j().then(function(v){ setTimeout(function(){ window.__late += 1; }, 0); return v; }); }; "
+                 "return new Promise(function(ok){ window.__held.push(function(){ ok(r); }); }); }); }; })()")
+            c.click("#new-design")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
+            before = st()
+            c.click("#undo")                # a change after the first asking: the set's own line in the list is different now
+            c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
+            c.click("#new-design")
+            c.wait_for("!document.getElementById('gallery').hidden", 5)
+            c.js("window.__use = document.querySelector('#gallery-starters .dz-card:nth-child(7) .dz-use'); true")
+            c.wait_for("window.__held.length >= 2", 20, tell="window.__held.length")
+            c.js("window.__held.splice(0).forEach(function(f){ f(); }); true")
+            c.wait_for("window.__late === 2", 20, tell="window.__late")
+            late = Jx("{same: window.__use.isConnected && window.__use === document.querySelector('#gallery-starters .dz-card:nth-child(7) .dz-use'), open: !document.getElementById('gallery').hidden, "
+                      "cards: document.querySelectorAll('#gallery-starters .dz-use').length}")
+            case("v27 browser: answers that come in late (asked by an earlier opening, and after the set's own save) leave the Add stories window's buttons as they are, so a press on one is never lost",
+                 st() != before and late == {"same": True, "open": True, "cards": 14}, late)
+            c.js("window.fetch = window.__fetch; window.__held.splice(0).forEach(function(f){ f(); }); true")
+            c.click("#gallery-close")
+            c.wait_for("document.getElementById('gallery').hidden", 5)
             # ---- slides as things, in a story's words (B8, B9, B10) ----
             def sfour():
                 return {"slides": 4, "bg": "#ffffff", "blocks": [_frame(1, 1, 0, h=SH), _frame(2, 2, SW, w=2 * SW, h=SH), _frame(3, 3, 3 * SW + 50, 50, 400, 400), _text(4, 3 * SW + 100, 800)]}

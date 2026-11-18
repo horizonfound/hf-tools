@@ -450,7 +450,21 @@ def run_songs_page(c, s):
     c.wait_for("document.getElementById('songAudio').getAttribute('src') !== null", 5)
     src = c.js("document.getElementById('songAudio').getAttribute('src')")
     case("Listen plays the song from GET /reel-song by its id, never a path", src == "/reel-song?kit=" + quote(kit, safe="") + "&id=" + songs["Beat one"]["id"], src)
-    got = [(r["url"].split("id=")[-1], r["status"]) for r in c.requests if "/reel-song?" in r["url"]]
+    # the player asks a moment after the tap and the answer comes a moment after that: wait for both (a slow
+    # computer shows the ask before its answer), then check every answer as before
+    def song_asks():
+        return [r for r in list(c.requests) if "/reel-song?" in r["url"]]
+
+    def song_answered():
+        gone = set(f["url"] for f in list(c.failed))
+        asks = song_asks()
+        return bool(asks) and all(r["status"] is not None or r["url"] in gone for r in asks)
+    try:
+        chrome_drive.wait_until(song_asks, 10, what="the player's request for the song")
+        chrome_drive.wait_until(song_answered, 30, what="the answer to the player's request for the song")
+    except chrome_drive.Timeout:
+        pass                                        # none seen is the SKIP below; one never answered fails the check below
+    got = [(r["url"].split("id=")[-1], r["status"]) for r in song_asks()]
     if got:
         case("...the player asked for it, in pieces (206) or whole (200)", all(st_ in (200, 206) for _, st_ in got), got)
     else:

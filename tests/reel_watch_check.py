@@ -412,6 +412,14 @@ def check_direct(s, clips):
 
 # ---------- 5. B-roll on the server ----------
 
+# Save my video on a slow computer: GitHub's virtual Mac (few cores, no graphics chip) took 133 s to save the 9.4 s
+# video this test asks for, where a Mac with its own video chip takes a few seconds (Nov 17, 2026). Nothing was
+# stuck: the test gave up at 120 s, went on while that first video was still being saved, and a dozen later checks
+# (a second save, Make this one in CapCut, the page's own save) met the job still at work. So a save is waited for
+# until it is done or says its problem, for up to ten minutes; the plugin itself stops one at VIDEO_LIMIT.
+VIDEO_WAIT = 600
+
+
 def wait_job(s, jid, seconds=120):
     end = time.time() + seconds
     while time.time() < end:
@@ -502,7 +510,7 @@ def check_broll(s):
     st = s.state()
     vbody = {"kit": KIT, "stamp": st["stamp"], "song": sid, "clips": ids, "variation": 0, "onscreen": good2}
     code, j, _ = s.http("POST", "/reel-video", vbody)
-    job = wait_job(s, (j or {}).get("job", {}).get("id")) if code == 200 and (j or {}).get("job") else None
+    job = wait_job(s, (j or {}).get("job", {}).get("id"), VIDEO_WAIT) if code == 200 and (j or {}).get("job") else None
     name = "%s B-roll - Broll one.mp4" % short
     vfile = s.kit / "Reels" / name
     case("POST /reel-video starts a job the page follows (kind video), and it finishes: Saved \"<short> B-roll - <reel name>.mp4\" (several reels), its length",
@@ -529,7 +537,7 @@ def check_broll(s):
     case("reel_page.py show: Videos saved from the page, the newest by name", rc == 0 and 'Videos saved from the page (Save my video, in this shoot\'s Reels folder): 1, the newest "%s"' % name in out, out[-400:])
     code, j, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))
     code_b, jb, _ = s.http("POST", "/reel-video", dict(vbody, stamp=s.state()["stamp"]))      # a second press while the first is at work
-    job2 = wait_job(s, (j or {}).get("job", {}).get("id")) if code == 200 and (j or {}).get("job") else None
+    job2 = wait_job(s, (j or {}).get("job", {}).get("id"), VIDEO_WAIT) if code == 200 and (j or {}).get("job") else None
     case("her fault fixed: a second press while a video is being saved doesn't race it (hers wrote a .part beside the first with no lock): refused with our line, the first job followed",
          code == 200 and code_b == 409 and jb["words"] == R.OUR_WORDS["video_making"] and jb.get("job", {}).get("id") == j["job"]["id"], (code_b, jb))
     name2 = "%s B-roll - Broll one 2.mp4" % short
@@ -656,7 +664,9 @@ def check_page(c, s):
          ok and jrec["ask"].get("variation") == 1 and isinstance(jrec["ask"].get("song_start"), (int, float)) and stj.get("variation") == 1
          and stj.get("song", {}).get("from") == jrec["ask"]["song_start"], (jrec.get("ask"), stj.get("variation"), stj.get("song")))
     # the direct box and its line
-    c.click("#directIn"); c.key("Mod+A")
+    # the answer above glides into view by itself; on a slow computer the glide is still going when the box is
+    # pressed, the press lands beside it and what is typed goes nowhere (GitHub's Mac, Nov 17): press it once still
+    rfc.click_into(c, "#directIn"); c.key("Mod+A")
     c.type_text("Stove first")
     ok = wait(c, "document.getElementById('directPaste').textContent === 'Edit my reel for Fake beach, Reel 1, and follow my direction'", 5)
     case("a direction typed: the line gains \", and follow my direction\"", ok, c.js("document.getElementById('directPaste').textContent"))
@@ -670,6 +680,29 @@ def check_page(c, s):
     errs = c.page_errors()
     case("no errors on the page", not errs, errs[:3])
     case("nothing asked of the internet", not c.outside_requests(), c.outside_requests()[:3])
+
+
+def job_at_work(s, video, seconds=15):
+    """True once the shoot's job is at work (queued or running) and is a Save my video job (video) or a make."""
+    end = time.time() + seconds
+    while time.time() < end:
+        j = s.state().get("job") or {}
+        if j.get("state") in ("queued", "running") and (j.get("kind") == "video") == video:
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def still(c, seconds=30):
+    """Wait until the page has stopped moving (half a second with no scroll): an answer glides into view by itself
+    (the page's own smooth scroll), and on a slow computer a press aimed during the glide lands beside its button."""
+    end = time.time() + seconds
+    y, since = c.js("window.scrollY"), time.time()
+    while time.time() - since < 0.5 and time.time() < end:
+        time.sleep(0.05)
+        now = c.js("window.scrollY")
+        if now != y:
+            y, since = now, time.time()
 
 
 def check_broll_page(c, s):
@@ -730,17 +763,52 @@ def check_broll_page(c, s):
     c.drag("#pvText", (10, 10), steps=6)
     ok = chrome_drive.wait_until(lambda: s.state()["saved"]["onscreen"].get("x") == R.OS_X[0] and s.state()["saved"]["onscreen"].get("y") == R.OS_Y[0], 8)
     case("dragged off the top left corner: held at her bounds (0.12, 0.05)", ok, s.state()["saved"]["onscreen"])
-    # Save my video (her v27, A15): the press, her saving line with the spinner, then her Saved line with Open the folder
+    # The two buttons side by side, one pressed while the other's job is at work (found Nov 17 on GitHub's slow Mac,
+    # where a save takes two minutes: the page followed the other button's job as its own). Each is held at its turn
+    # here (the computer's one reel lock, then its one video turn), so the second press always meets it at work.
+    import fcntl
     n_before = len(list((s.kit / "Reels").iterdir())) if (s.kit / "Reels").is_dir() else 0
-    c.click("#pvSaveVid")
-    ok = wait(c, "document.getElementById('pvSaved').textContent.trim() === %s && document.getElementById('pvSaveVid').disabled" % json.dumps(W["os_saving"]), 6)
-    case("Save my video pressed: her saving line, the button off while it is saved", ok, c.js("document.getElementById('pvSaved').textContent"))
-    ok = wait(c, "document.getElementById('openReels') !== null && !document.getElementById('pvSaveVid').disabled", 120)
+    turn = open(s.studio / "reel-make.lock", "a", encoding="utf-8")
+    fcntl.flock(turn, fcntl.LOCK_EX)
+    try:
+        c.click("#pvMake")
+        at_work = job_at_work(s, video=False)
+        c.click("#pvSaveVid")
+        ok = wait(c, "document.getElementById('pvSaved').textContent === %s && !document.getElementById('pvSaveVid').disabled" % json.dumps(R.OUR_WORDS["already_making"]), 10)
+    finally:
+        fcntl.flock(turn, fcntl.LOCK_UN)
+        turn.close()
+    ok2 = wait(c, "document.querySelector('#result h3') && document.querySelector('#result h3').textContent === 'Test run: nothing was made'", 60)
+    case("Save my video pressed while the reel is being made (Make this one in CapCut, held at its turn): our \"Your reel is already being made\" line, the button on again, "
+         "never a Saved line for a video that was not saved; the make goes on to its end",
+         at_work and ok and ok2 and not c.js("!!document.getElementById('openReels')") and len(list((s.kit / "Reels").iterdir())) == n_before,
+         (at_work, ok, ok2, c.js("document.getElementById('pvSaved').textContent")))
+    still(c)                                   # the make's answer glides into view: press Save my video once the page is still
+    # Save my video (her v27, A15): the press, her saving line with the spinner, then her Saved line with Open the folder
+    turn = open(s.studio / "video.lock", "a", encoding="utf-8")
+    fcntl.flock(turn, fcntl.LOCK_EX)
+    try:
+        c.click("#pvSaveVid")
+        ok = wait(c, "document.getElementById('pvSaved').textContent.trim() === %s && document.getElementById('pvSaveVid').disabled" % json.dumps(W["os_saving"]), 6)
+        case("Save my video pressed: her saving line, the button off while it is saved", ok, c.js("document.getElementById('pvSaved').textContent"))
+        at_work = job_at_work(s, video=True)
+        c.click("#pvMake")
+        ok = wait(c, "document.getElementById('result').classList.contains('bad') && document.querySelector('#result h3').textContent === %s && document.querySelector('#result p').textContent === %s"
+                  % (json.dumps(R.WORDS["didnt_work_h3"]), json.dumps(R.OUR_WORDS["video_making"])), 10)
+        case("Make this one in CapCut pressed while the video is being saved (held at its turn): our \"Your video is already being saved\" line under her heading, "
+             "the saving line still up; the video's job is not followed as a make (it ended as \"Test run: nothing was made\")",
+             at_work and ok and c.js("document.getElementById('pvSaved').textContent.trim()") == W["os_saving"] and c.js("document.getElementById('pvSaveVid').disabled"),
+             (at_work, c.js("document.getElementById('result').textContent")))
+    finally:
+        fcntl.flock(turn, fcntl.LOCK_UN)
+        turn.close()
+    ok = wait(c, "document.getElementById('pvSaved').textContent.trim() !== %s && !document.getElementById('pvSaveVid').disabled" % json.dumps(W["os_saving"]), VIDEO_WAIT)   # saved, or its problem said
     saved_line = c.js("document.getElementById('pvSaved').textContent")
     vm = [m for m in record(s).get("made") or [] if m.get("video")]
     case("...then her Saved line: the file's name, its length, in this shoot's Reels folder, with Open the folder; the file is there and the record notes it",
          ok and vm and re.search(r'^Saved "%s B-roll - Broll one 3\.mp4" \(\d+\.\d seconds\) in this shoot\'s Reels folder\. It\'s ready to post\. Open the folder$' % re.escape(R.short_name(KIT)), saved_line.strip())
          and (s.kit / "Reels" / vm[-1]["video"]).is_file() and len(list((s.kit / "Reels").iterdir())) == n_before + 1, (saved_line, vm[-1:]))
+    still(c)
     c.click("#openReels")
     case("Open the folder: the Reels folder opened (nothing opened in a test) and our line said beside it",
          wait(c, "document.getElementById('reelsWent').textContent.indexOf(%s) === 0" % json.dumps(R.OUR_WORDS["reels_open"].rstrip(".")), 6), c.js("document.getElementById('reelsWent').textContent"))
