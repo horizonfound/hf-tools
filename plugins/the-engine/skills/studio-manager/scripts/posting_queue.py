@@ -2071,6 +2071,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the talking reel page (Nicole's v24): every one of its requests is talking_page.py's to answer
             import talking_page
             return talking_page.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/wrapped.html", "/wrapped-data", "/wrapped-font"):
+            # Your year and the monthly recap (Nicole's v28): every one of its requests is wrapped.py's to answer
+            import wrapped
+            return wrapped.handle_get(self, path, urlsplit(self.path).query)
         if path.startswith(("/posting-thumbs/", "/feed/", "/queue-thumbs/", "/home-thumbs/")):
             if thumb_wanted(path):                     # one small picture a page shows, nothing else (see thumb_wanted)
                 return super().do_GET()
@@ -2455,6 +2459,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the talking reel page: talking_page.py checks each of these the way arrange.py does (above)
             import talking_page
             return talking_page.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/share-image", "/share-open"):
+            # a story of Your year or the monthly recap saved as a picture: wrapped.py checks it the way arrange.py does
+            import wrapped
+            return wrapped.handle_post(self, path, urlsplit(self.path).query)
         if path == "/kit-archive":
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
