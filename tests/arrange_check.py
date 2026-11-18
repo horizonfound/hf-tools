@@ -1149,6 +1149,34 @@ print(json.dumps(out))
 """
 
 
+# The photo route asked by a page that hangs up while the picture is being sent (a browser does this whenever a
+# tile is redrawn or the page moves on), and then the same route when the sending fails some other way.
+HUNG_UP = r"""
+import sys
+sys.path.insert(0, sys.argv[1])
+import arrange
+class Gone:
+    def __init__(self, err): self.err = err
+    def write(self, data): raise self.err
+    def flush(self): pass
+class Handler:
+    def __init__(self, port, err):
+        self.headers = {'Host': '127.0.0.1:%d' % port}
+        self.wfile = Gone(err)
+        self.errors = []
+        class S: server_address = ('127.0.0.1', port)
+        self.server = S()
+    def send_response(self, code): pass
+    def send_header(self, k, v): pass
+    def end_headers(self): pass
+    def send_error(self, code): self.errors.append(code)
+err = {'pipe': BrokenPipeError(32, 'Broken pipe'), 'reset': ConnectionResetError(54, 'reset'), 'other': ValueError('boom')}[sys.argv[4]]
+h = Handler(8000, err)
+arrange.handle_get(h, '/kit-photo', 'kit=' + sys.argv[2] + '&n=' + sys.argv[3] + '&size=s')
+print(h.errors)
+"""
+
+
 def jpeg_size(data):
     """(width, height) from a JPEG's own header, or None."""
     if data[:2] != b"\xff\xd8":
@@ -1244,6 +1272,25 @@ def check_server(work, port, photos):
         case("photo route: the larger copy, v ignored", code == 200 and max(jpeg_size(big) or (0, 0)) == min(1600, max(plain["w"], plain["h"])), (code, jpeg_size(big)))
         orig = (photos_dir / Path(plain["file"]).name).read_bytes()
         case("photo route: what is sent is a copy, never the photo itself", data != orig and big != orig)
+        # a page that hangs up mid-picture is not a route that failed (the designer's strip test met this:
+        # a hidden Chrome dropped three photo requests and the log called each one "failed")
+        def log_lines():
+            f = studio / "arrange.log"
+            return f.read_text(encoding="utf-8", errors="replace").splitlines() if f.is_file() else []
+        for kind in ("pipe", "reset"):
+            n0 = len(log_lines())
+            r = subprocess.run([PY, "-c", HUNG_UP, str(SCRIPTS), KQ, "3", kind], capture_output=True, text=True, env=env, timeout=120)
+            new_lines = log_lines()[n0:]
+            case(f"photo route: a page that hangs up while its picture is sent ({kind}) is noted as a hang-up, never as a route that failed",
+                 r.returncode == 0 and len(new_lines) == 1 and "hung up" in new_lines[0] and " failed: " not in new_lines[0] and r.stdout.strip() == "[]",
+                 (r.returncode, r.stdout[-200:], r.stderr[-300:], new_lines))
+        n0 = len(log_lines())
+        r = subprocess.run([PY, "-c", HUNG_UP, str(SCRIPTS), KQ, "3", "other"], capture_output=True, text=True, env=env, timeout=120)
+        new_lines = log_lines()[n0:]
+        case("photo route: any other trouble while sending is still logged as a route that failed, and answered",
+             r.returncode == 0 and any("GET /kit-photo failed: ValueError" in ln for ln in new_lines) and r.stdout.strip() == "[404]",
+             (r.returncode, r.stdout[-200:], r.stderr[-300:], new_lines))
+        provoked = [ln for ln in new_lines if "GET /kit-photo failed: ValueError: boom" in ln]   # ours, on purpose: left out of the end's "nothing failed" by these exact lines
         heic = by_name[next(n for n in by_name if n.endswith(".heic"))]
         code, h, data = ask(P, "GET", f"/kit-photo?kit={KQ}&n={heic['n']}&size=s")
         case("photo route: a HEIC photo arrives as a JPEG", code == 200 and data[:2] == b"\xff\xd8")
@@ -1725,7 +1772,8 @@ def check_server(work, port, photos):
         case("nothing was left in the Photos folder that is not a photo", all(not n.startswith(".") for n in os.listdir(photos_dir)), os.listdir(photos_dir)[:3])
         log_text = (studio / "arrange.log").read_text() if (studio / "arrange.log").exists() else ""
         case("the log wrote down what Origin each kind of request carried", "origin: POST /arrange Origin=None" in log_text and "Origin='http://127.0.0.1:" in log_text, log_text[-300:])
-        case("nothing went wrong inside a route (no 'failed' line in the log)", " failed: " not in log_text, [x for x in log_text.splitlines() if " failed: " in x][:2])
+        went_wrong = [x for x in log_text.splitlines() if " failed: " in x and x not in provoked]
+        case("nothing went wrong inside a route (no 'failed' line in the log but the one this test provoked on purpose)", len(provoked) == 1 and not went_wrong, (provoked, went_wrong[:2]))
     finally:
         srv.stop()
     check_cover(work)

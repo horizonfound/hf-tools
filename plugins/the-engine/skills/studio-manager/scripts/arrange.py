@@ -1215,13 +1215,20 @@ def _get_photo(handler, q):
         return handler.send_error(404)
     if data[:2] != b"\xff\xd8":
         return handler.send_error(404)
-    handler.send_response(200)
-    handler.send_header("Content-Type", "image/jpeg")
-    handler.send_header("Content-Length", str(len(data)))
-    handler.send_header("Cache-Control", "private, max-age=604800")
-    handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
-    handler.end_headers()
-    handler.wfile.write(data)
+    try:
+        handler.send_response(200)
+        handler.send_header("Content-Type", "image/jpeg")
+        handler.send_header("Content-Length", str(len(data)))
+        handler.send_header("Cache-Control", "private, max-age=604800")
+        handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        handler.end_headers()
+        handler.wfile.write(data)
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        # The page stopped listening while the picture was on its way (it was redrawn, scrolled on or closed,
+        # and the browser dropped the request). Nothing went wrong here and nothing is left to answer, so it
+        # is noted as what it was, never as a route that failed. Only the sending itself is covered: anything
+        # that goes wrong while the photo is found or read is still a failure, in handle_get's own words.
+        log(f"GET /kit-photo: the page hung up before photo {n} was sent")
 
 
 def _get_state(handler, q):

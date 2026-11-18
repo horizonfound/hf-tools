@@ -189,7 +189,7 @@ def check_parts():
          all(w in q for w in ("**Uploaded shoots**", "**Delivered (n)**", "**Archived (n)**", "Mark as delivered", "never \"finished\" or \"your shoots\"")))
     h = texts["hello.md"]
     case("the hello part describes the home base: four steps in the order of the work, and the two screens",
-         all(w in h for w in ("home base", "**1 Back up a card**", "**2 My editing queue**", "**3 Make posts from a shoot**", "**4 My posting queue**",
+         all(w in h for w in ("home base", "**1 Back up a card**", "**2 My editing queue**", "**3 Turn your shoots into posts**", "**Make posts from a shoot**", "**4 My posting queue**",
                               "Your backups", "Your post kits", "/backups", "/make-posts")))
     a = texts["arrange.md"]
     case("the stories part speaks of sets of stories", "set of stories" in a or "sets of stories" in a)

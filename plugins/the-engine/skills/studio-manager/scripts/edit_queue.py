@@ -625,6 +625,10 @@ h1{margin:0;font:600 clamp(34px,5vw,58px)/1.03 var(--sans);letter-spacing:-.035e
 .check{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--paper);cursor:pointer;transition:background .3s var(--ease),border-color .3s var(--ease),transform .3s var(--ease)}
 .check:hover{border-color:var(--ocean);transform:scale(1.06)}
 .check svg{width:22px;height:22px;stroke:#fff;stroke-width:3;fill:none;opacity:0;transition:opacity .2s}
+.card.flipped{display:block;background:#E8F5EE;box-shadow:0 0 0 2px rgba(47,125,86,.35),0 18px 40px -18px rgba(47,125,86,.5)}
+.dface{display:flex;align-items:center;gap:16px;padding:6px 4px 6px 10px}.dface .dcheck{width:46px;height:46px;border-radius:50%;background:#2f7d56;color:#fff;display:grid;place-items:center;font:700 22px/1 var(--sans);flex:none;box-shadow:0 8px 20px rgba(47,125,86,.35)}
+.dface .dwords{min-width:0}.dface b{display:block;font:600 24px/1.1 var(--sans);letter-spacing:-.02em;color:#2f7d56}.dface .w{display:block;color:var(--ink-2);font-size:14px;margin-top:2px;overflow-wrap:anywhere}.dface .dp{margin-left:auto;display:flex;flex:none;padding-left:14px}.dface .dp img{width:44px;height:56px;object-fit:cover;border-radius:7px;margin-left:-14px;box-shadow:0 4px 12px rgba(0,0,0,.18);border:2px solid #fff}
+.confetti{position:fixed;border-radius:2px;z-index:9999;pointer-events:none}
 .card.done{filter:grayscale(1);opacity:.55}.card.done .check{background:var(--ocean);border-color:var(--ocean)}.card.done .check svg{opacity:1}
 .card.done .name{text-decoration:line-through;text-decoration-color:var(--ink-2)}
 .card.leaving{opacity:0;transform:translateY(12px) scale(.97)}
@@ -752,7 +756,20 @@ function render(order){
     list.appendChild(li);
   });
   renderBelow();
+  // The first time the page opens, the shoots deal in like cards and their pictures fan in (Nicole, v28). Only
+  // drawn: nothing waits on it, a press lands on a card that is still arriving, and it is skipped when the
+  // computer is set to reduce motion. The stagger stops growing after the eighth card, so a long queue is all
+  // there within about a second and a half.
+  if(!render.dealt && !order){ render.dealt = true;
+    if(!calm()) [...list.querySelectorAll('.card')].forEach((c, i) => { const d = Math.min(i, DEAL_STEPS) * 90;
+      c.animate([{opacity:0, transform:'translateY(26px) scale(.97)'},{opacity:1, transform:'none'}],{duration:520, delay:120 + d, easing:'cubic-bezier(.2,.8,.2,1)', fill:'backwards'});
+      c.querySelectorAll('.pics span').forEach((p, j) => p.animate([{opacity:0, transform:`translateX(${-18 - j*10}px) rotate(${-6 + j*3}deg)`},{opacity:1}],{duration:480, delay:260 + d + j*60, easing:'cubic-bezier(.2,.8,.2,1)', fill:'backwards'})) }) }
 }
+const DEAL_STEPS = 8;
+function calm(){ return matchMedia('(prefers-reduced-motion: reduce)').matches }
+// an animation's end, or a little after it should have ended: a page that is not in front may never play it,
+// and nothing here may wait on one for ever
+function played(a, ms){ return Promise.race([a.finished.catch(() => {}), new Promise(r => setTimeout(r, ms + 500))]) }
 function renderBelow(){ renderArchive(); renderFolds(); searchAll() }
 let FILTER = '';
 function renderArchive(fresh){
@@ -827,12 +844,59 @@ async function openFolder(id){
   catch(e){toast('Could not open that folder.')}
 }
 function dueWords(iso){if(!iso) return 'no due date';const n = days(iso);if(n<0) return `${-n} day${n==-1?'':'s'} late`;if(n==0) return 'due today';if(n==1) return 'due tomorrow';if(n<=7) return `due in ${n} days`;return 'due ' + nice(iso)}
-async function finish(li, s){
-  if(li.classList.contains('done')) return;   // a second press while the first is on its way: one press, one toast
+async function finish(li, s, after){
+  // after: only for ?try=delivered. Nothing is sent and nothing is saved; `after` runs once the card has left.
+  if(li.classList.contains('done') || li.classList.contains('flipped')) return;   // a second press while the first is on its way: one press, one toast
   li.classList.add('done');
-  if(!(await send({action:'done', id:s.id}))){li.classList.remove('done');return}
+  // the save comes first, always: a save that fails shows its line (send's toast) and nothing flips
+  if(!after && !(await send({action:'done', id:s.id}))){li.classList.remove('done');return}
   toast(`${s.name}: delivered, moved to Delivered below`);
-  setTimeout(() => {li.classList.add('leaving'); setTimeout(() => render(), 600)}, 1400);
+  const leave = ms => setTimeout(() => {li.classList.add('leaving'); setTimeout(() => { if(after) after(); else if(li.isConnected) render() }, 600)}, ms);
+  if(calm() || !li.isConnected){ leave(1400); return }
+  // Delivered (Nicole, v28): the card flips over to its delivered side, with a little celebration
+  li.draggable = false; li.style.pointerEvents = 'none';
+  await played(li.animate([{transform:'perspective(900px) rotateX(0)'},{transform:'perspective(900px) rotateX(90deg)'}],{duration:260,easing:'ease-in',fill:'forwards'}), 260);
+  if(!li.isConnected) return;                 // the page was drawn again meanwhile (a press somewhere else): it already shows the newest
+  li.classList.remove('done'); li.classList.add('flipped');
+  li.replaceChildren(deliveredFace(s));
+  await played(li.animate([{transform:'perspective(900px) rotateX(-90deg)'},{transform:'perspective(900px) rotateX(0)'}],{duration:420,easing:'cubic-bezier(.2,.9,.3,1.25)',fill:'forwards'}), 420);
+  if(li.isConnected) confetti(li.querySelector('.dcheck'));
+  leave(2000);
+}
+// The delivered side of a card. The shoot's name is put in as text, never as markup.
+function deliveredFace(s){
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e };
+  const face = el('div', 'dface'), words = el('div', 'dwords'), pics = el('div', 'dp');
+  words.append(el('b', '', 'Delivered.'), el('span', 'w', `${s.name}: gallery sent. Make posts from it whenever you're ready.`));
+  (s.thumbs || []).slice(0, 3).forEach(t => { const im = el('img'); im.alt = ''; im.src = t; pics.append(im) });
+  face.append(el('span', 'dcheck', '\u2713'), words, pics);
+  return face;
+}
+const CONFETTI = 34;
+function confetti(from){
+  if(!from) return;
+  const r = from.getBoundingClientRect(), cs = ['#F07F5A','#F2CF72','#5EB5A9','#2f7d56','#B9A8F5'];
+  for(let k = 0; k < CONFETTI; k++){ const c = document.createElement('i'), a = Math.random()*6.283, d = 70 + Math.random()*150, ms = 1000 + Math.random()*600;
+    c.className = 'confetti'; c.setAttribute('aria-hidden', 'true');
+    c.style.cssText = `left:${r.left + r.width/2}px;top:${r.top + r.height/2}px;width:${6+Math.random()*5}px;height:${4+Math.random()*4}px;background:${cs[k%cs.length]}`;
+    document.body.appendChild(c);
+    played(c.animate([{transform:'translate(-50%,-50%) rotate(0)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(a)*d}px),calc(-50% + ${Math.sin(a)*d + 50}px)) rotate(${Math.random()*540}deg)`,opacity:0}],{duration:ms,easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'}), ms).then(() => c.remove()) }
+}
+// ?try=delivered (Nicole, v28): watch the Delivered flip on the first shoot without changing anything (for
+// showing people). Nothing is sent: the press here never reaches send(), so the record is exactly as it was;
+// the page only draws a pretend "after", then draws what is really there again and says so.
+function tryDelivered(){
+  const li = document.querySelector('#list .card'), s = Q.waiting[0];
+  if(!li || !s || li.dataset.id != s.id) return;
+  const real = Q;
+  finish(li, s, () => {
+    if(Q !== real) return;                    // a real press happened meanwhile: the page already shows what is saved
+    const pretend = JSON.parse(JSON.stringify(real));
+    pretend.waiting = pretend.waiting.filter(x => x.id != s.id);
+    pretend.delivered = [Object.assign({}, s, {status:'finished', finished_at:new Date().toISOString()})].concat(pretend.delivered || []);
+    Q = pretend; render();
+    setTimeout(() => { if(Q === pretend){ Q = real; render.dealt = false; render() } toast('That was a preview. Nothing changed.') }, 1900);
+  });
 }
 // drag to reorder
 let dragId = null;
@@ -911,12 +975,13 @@ $('#q').addEventListener('input', e => {FILTER = e.target.value; renderBelow()})
 function searchAll(){
   const f = FILTER.trim().toLowerCase();
   let n = 0;
-  document.querySelectorAll('#list .card').forEach(c => { const ok = !f || c.querySelector('.name').textContent.toLowerCase().includes(f); c.style.display = ok ? '' : 'none'; if(ok) n++; });
+  document.querySelectorAll('#list .card').forEach(c => { const ok = !f || (c.querySelector('.name') || c).textContent.toLowerCase().includes(f); c.style.display = ok ? '' : 'none'; if(ok) n++; });
   n += document.querySelectorAll('#alist .acard, #dlist .acard, #slist .acard').length;
   $('#nomatch').hidden = !(f && !n);
 }
 if(!LIVE) $('#offline').hidden = false;
 render();
+if(new URLSearchParams(location.search).get('try') === 'delivered' && Q.waiting.length) setTimeout(tryDelivered, 1800);
 if(location.hash == '#archive') setTimeout(() => document.getElementById('archive').scrollIntoView({behavior:'smooth'}), 200);
 // #delivered and #stored open that section and scroll to it ("show what I've delivered", "show my archived shoots")
 if(location.hash == '#delivered' || location.hash == '#stored') setTimeout(() => { const d = document.getElementById(location.hash.slice(1)); d.open = true; d.scrollIntoView({behavior:'smooth'}) }, 200);

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The home base's two screens, and what they read (Nicole's v26, Nov 13; built Nov 14).
 
-The home page (home.py, /home on the posting server) is the home base: the four steps in the order of the work.
-Two of the steps have a screen of their own, and this file is both of them:
+The home page (home.py, /home on the posting server; rebuilt after her v28) has the four steps in the order of the
+work. Two of the steps have a screen of their own, and this file is both of them:
 
     /backups       Back up a card: what a backup does, the two steps, and "Your backups": every card backed up,
                    newest first (the 10 newest, Show older by month, a search by shoot name)
@@ -59,33 +59,8 @@ POST_CAP = 2000                 # a press on Archive is a few dozen bytes
 # <em> and <b> are hers too (the accent word, the bold start of a step, "post kit" in the lede). {…} is filled in
 # by the page.
 WORDS = {
-    # the home base
-    "home_eyebrow": "Home",
-    "home_h1": "Welcome to your <em>home base.</em>",
-    "home_lede_1": "This is where everything your assistant does for you lives, laid out in the order you actually work: you back up your card, you edit, you make your posts, and you get them ready for Instagram.",
-    "home_lede_2": "Start wherever you are today. Just want to make posts from a shoot you finished months ago? Go straight to step 3. You don't need to back it up or add it to your editing queue first.",
-    "today": "Today",
-    "flow": "Your workflow, step by step",
-    "c1_name": "Back up <em>a card</em>",
-    "c1_p": "Copies your memory card to your hard drive and double-checks every photo. Then it sorts the photos into shoots, names them, and picks a few to edit first.",
-    "c1_go": "Back up, and see your backups →",
-    "c2_name": "My editing <em>queue</em>",
-    "c2_p": "The shoots you still need to edit, and when each one is due.",
-    "c2_go": "Open my editing queue →",
-    "c3_name": "Make posts <em>from a shoot</em>",
-    "c3_p": "When your editing is done, click here and we'll start creating your social media content: reels, carousels, single photos, stories and captions. Whatever you need to support your social media.",
-    "c3_go": "Make posts, see your post kits →",
-    "c4_name": "My posting <em>queue</em>",
-    "c4_p": "Your reels and posts that are ready, and what your Instagram grid will look like with them in it.",
-    "c4_go": "Open my posting queue →",
-    "c5_name": "Open my {short} <em>folder</em>",
-    "c5_p": "The folder on your hard drive where your posts are kept.",
-    "t_card": "A card is in: {name}, about {files} files.",
-    "t_card_go": "Back it up",
-    "t_last": "Your last backup, {day}: {n} shoot{s}, {count}.",
+    # the home page itself is home.py's (her v28 words are in home.WORDS); these are the lines its buttons share
     "see_report": "See the report",
-    "t_waiting": "{n} shoot{s} waiting to be edited.",
-    "t_nothing": "Nothing due and nothing waiting.",
     "opening_queue": "Opening your editing queue…",
     "opening": "Opening…",
     "opening_report": "Opening the report…",

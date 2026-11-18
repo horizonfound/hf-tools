@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""The home base and its two screens, after Nicole's v26 (stage B of the v26 build): the home page as the home
-base, Back up a card (/backups) and Make posts from a shoot (/make-posts; its words are her v27's since Nov 17:
-the What's a post kit? box and the third step).
+"""The home base's two screens, after Nicole's v26 (stage B of the v26 build): Back up a card (/backups) and Make
+posts from a shoot (/make-posts; its words are her v27's since Nov 17: the What's a post kit? box and the third
+step), and that the home page leads to them. The home page itself was rebuilt after her v28 (Nov 17) and is checked
+line by line in tests/home_v28_check.py.
 
     python3 tests/home_base_check.py [--port 9820] [--work <a folder to keep the run in>] [--no-chrome]
 
@@ -65,7 +66,6 @@ TINY_JPEG = base64.b64decode(
 # Lines of hers that are NOT on our pages, on purpose, and why.
 HERS_NOT_OURS = {
     # her test-only bits (UPDATE-v26 section 6: "drop these when it becomes the real home page")
-    "This is a test copy of your home page, for trying ideas. The Assistant's own home page isn't changed.": "test-only",
     "Test copy: a screen of its own for backing up, with every backup underneath.": "test-only",
     "Test copy: a screen of its own for making posts, with your post kits underneath.": "test-only",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
@@ -386,23 +386,26 @@ def check_words(w):
     everything = "\n".join(pages.values())
     ours_words = dict(home_base.WORDS)
     case("the pages say \"your assistant\", never \"Claude\"", "Claude" not in everything and "claude" not in everything.lower(), re.findall(r".{30}[Cc]laude.{20}", everything)[:3])
-    case("none of her test-only bits: no port 8799, no ?home=test, no test-copy line, nothing kept in the browser",
-         not re.search(r"(?<![\d.])8799(?![\d.])|home=test|assistantHome|localStorage|sessionStorage|test copy|Test copy|/hp/", everything))   # 8799 as a port, not four digits inside a record's time stamp
+    case("none of her test-only bits: no port 8799, no ?home=test, no test-copy line",
+         not re.search(r"(?<![\d.\w])8799(?![\d.\w])|home=test|assistantHomeTest|test copy|Test copy|/hp/", everything))   # 8799 as a port, not four digits inside a record's time stamp
+    # (the home page, her v28: what the hello said lately is kept in the browser, as hers; tests/home_v28_check.py holds it to that)
+    case("the two screens keep nothing in the browser", not re.search(r"localStorage|sessionStorage", pages["/backups"] + pages["/make-posts"]))
     case("no em dash in any line of words", "—" not in everything and not any("—" in v for v in list(ours_words.values()) + list(home_base.OUR_WORDS.values())))
     case("nothing from the internet, and the shared look first in each page's styles",
          "googleapis" not in everything and "<link" not in everything and all(("<style>" + home.look.head_css()) in p for p in pages.values()))
+    all_js = home_base.JS_SHARED + home_base.JS_BACKUPS + home_base.JS_MAKE + home.SCRIPT + home.HELLO_JS
+    known = set(ours_words) | set(home_base.OUR_WORDS) | set(home.OUR_WORDS)
     case("every line our scripts show is in the words (W.<name> names a line that exists)",
-         all(k in ours_words or k in home_base.OUR_WORDS for k in set(re.findall(r"\bW\.([a-z_0-9]+)", home_base.JS_SHARED + home_base.JS_BACKUPS + home_base.JS_MAKE + home.SCRIPT))),
-         sorted(k for k in set(re.findall(r"\bW\.([a-z_0-9]+)", home_base.JS_SHARED + home_base.JS_BACKUPS + home_base.JS_MAKE + home.SCRIPT)) if k not in ours_words and k not in home_base.OUR_WORDS))
-    # the home base, as her notes have it (section 7)
+         all(k in known for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js))), sorted(k for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js)) if k not in known))
+    # the home page itself is her v28's since Nov 17 (tests/home_v28_check.py checks it line by line); here only
+    # that it still leads to the two screens
     hp = pages["/home"]
-    order = [hp.find(x) for x in ("Back up <em>a card</em>", "My editing <em>queue</em>", "Make posts <em>from a shoot</em>", "My posting <em>queue</em>", "Open my Assistant <em>folder</em>")]
-    case("the home base: the four steps in the order of the work, then the folder as a small card", -1 not in order and order == sorted(order), order)
+    order = [hp.find(x) for x in ("Back up <em>a card</em>", "My editing <em>queue</em>", "Turn your shoots <em>into posts</em>", "My posting <em>queue</em>")]
+    case("the home page: the four steps in the order of the work (her v28 names)", -1 not in order and order == sorted(order), order)
     case("... each where her page sends it: its own screen, the editing queue, its own screen, the posting queue",
-         "href='/backups'" in hp and "href='/make-posts'" in hp and "href='/posting.html'" in hp and "id='editing'" in hp and "item minor" in hp)
+         "href='/backups'" in hp and "href='/make-posts'" in hp and "href='/posting.html'" in hp and "id='s2' data-item='queue'" in hp)
     case("... and nothing else: no recent-shoots list, no My post kits card, no drop-down steps",
-         not re.search(r"recent shoots|Your shoots|My post kits|class='howto'|class='recent'", hp.split("<script>", 1)[0], re.I))
-    case("the welcome words are hers", "Welcome to your <em>home base.</em>" in hp and "Go straight to step 3." in html_mod.unescape(hp))
+         not re.search(r"recent shoots|My post kits|class='howto'|class='recent'|class='shoot'", hp.split("<script", 1)[0], re.I))
 
     hers = her_folder()
     if not hers:
@@ -425,7 +428,7 @@ def check_words(w):
     # 2. hers -> ours: every piece of text her three pages show is on ours
     ours_shown = " ¦ ".join(shown_text(everything)) + " ¦ " + " ¦ ".join(untag(v) for v in ours_words.values())
     gone, left_out = [], set()
-    for n in ("home-test.html", "backups.html", "make-posts.html"):
+    for n in ("backups.html", "make-posts.html"):            # (her home page is her v28's now: tests/home_v28_check.py)
         for t in shown_text(raw[n]):
             if t in HERS_NOT_OURS:
                 left_out.add(t)
@@ -433,12 +436,12 @@ def check_words(w):
                 continue
             else:
                 gone.append((n, t))
-    case("every line her three pages show is on ours, but for the ones left out on purpose", not gone, gone[:6])
-    case("... and those are exactly her three test-copy lines (HERS_NOT_OURS)", left_out == set(HERS_NOT_OURS), sorted(set(HERS_NOT_OURS) - left_out))
+    case("every line her two screens show is on ours, but for the ones left out on purpose", not gone, gone[:6])
+    case("... and those are exactly her two test-copy lines (HERS_NOT_OURS)", left_out == set(HERS_NOT_OURS), sorted(set(HERS_NOT_OURS) - left_out))
     # 3. hers -> ours, the lines her scripts write
     ours_flat = " ¦ ".join(p for v in ours_words.values() for p in pieces(v)) + " ¦ " + " ¦ ".join(untag(v) for v in ours_words.values())
     lost = []
-    for n in ("home-test.html", "backups.html", "make-posts.html", "home-test.js"):
+    for n in ("backups.html", "make-posts.html", "home-test.js"):
         src = raw[n] if n.endswith(".js") else scripts_of(raw[n])
         for t in js_words(src):
             t2 = t.rstrip(".\u2026?!")
@@ -525,23 +528,19 @@ def check_data(w, hb):
     case("newest first, the undated one last", order[0] == "2026-11-30 With pictures" and order[-1] == "No date kit", order[:2] + order[-1:])
     case("each with its name, its day and how many photos (a text file in its Photos folder is not a photo)", kits["2026-11-30 With pictures"] == {"folder": "2026-11-30 With pictures", "name": "With pictures", "date": "2026-11-30", "photos": 3, "archived": False},
          kits["2026-11-30 With pictures"])
-    # in the program itself: the card line, and the manifest read once
+    # in the program itself: the card that is in (what the home page draws from it is tests/home_v28_check.py's)
     os.environ["STUDIO_CARD_FOR_TESTS"] = "EOS_DIGITAL:3931"
     import home
     try:
-        items = home.today_items(home.gather())
+        facts = home.facts()
         page = hb.data()
     finally:
         os.environ["STUDIO_CARD_FOR_TESTS"] = "none"
-    case("Today, with a card in: her line, with Back it up leading to the backups screen",
-         items[0][0] == "card" and "A card is in: EOS_DIGITAL, about 3,931 files." in items[0][1] and "href='/backups'" in items[0][1] and ">Back it up<" in items[0][1], items[0])
+    case("with a card in, the home page is told so", facts["card"] == {"name": "EOS_DIGITAL", "files": 3931})
     case("... and the screens are told the card is in", page["card"] == {"name": "EOS_DIGITAL", "files": 3931})
-    items = home.today_items(home.gather())
-    words = [html_mod.unescape(re.sub(r"<[^>]+>", "", x[1])) for x in items]
-    case("Today, in her order: what is late or due soon, the last backup with See the report, how many are waiting",
-         any(x.startswith("Lee wedding: ") for x in words[:2]) and any(x.startswith("Your last backup, Nov 13, 2026: 3 shoots, ") and x.endswith("See the report") for x in words)
-         and "3 shoots waiting to be edited." in words and words.index("3 shoots waiting to be edited.") > [i for i, x in enumerate(words) if x.startswith("Your last backup")][0], words)
-    case("... the last backup's report is one press away (data-report='latest')", any("data-report='latest'" in x[1] for x in items))
+    facts = home.facts()
+    case("the home page reads the queue as the screens do: the shoots waiting, soonest due first, and the newest backup",
+         len(facts["queue"]) == 3 and facts["queue"][0]["name"] == "Lee wedding" and facts["backup"]["when"] == "2026-11-13", (facts["queue"], facts["backup"]))
     rec = w.records["friday card"]
     a = hb.backup_status(rec)
     (rec / "manifest.json").write_text(json.dumps(manifest("friday card", problems=["x"])), encoding="utf-8")
@@ -628,9 +627,9 @@ def check_data_review(w, hb):
             page, why = home.page_html(), ""
         except BaseException as e:  # noqa: BLE001
             page, why = "", e.__class__.__name__
-        case("... and the home page still comes", "Your workflow, step by step" in page, why)
+        case("... and the home page still comes", "Your workflow" in page and "id='s4'" in page, why)
         code, raw = w.http("GET", "/home")
-        case("... from the page server too (it answers, it does not drop the line)", code == 200 and b"Your workflow, step by step" in raw, code)
+        case("... from the page server too (it answers, it does not drop the line)", code == 200 and b"Your workflow" in raw, code)
     finally:
         qf.write_bytes(kept)
 
@@ -872,35 +871,31 @@ def in_shoot(c, shoot, sel):
 
 
 def check_home_page(c, w):
+    # (the home page itself, her v28's, is tests/home_v28_check.py's; here: it leads to the two screens and back)
     c.open(w.url("/home"))
-    c.wait_for("document.querySelectorAll('.flow .item').length == 5", 10)
-    case("home: the heading and the two paragraphs", c.text("h1") == "Welcome to your home base." and len(texts(c, ".head .lede")) == 2)
-    case("home: Today, then Your workflow, step by step", texts(c, ".sec h2") == ["Today", "Your workflow, step by step"], texts(c, ".sec h2"))
-    case("home: the five cards by name, in order", texts(c, ".flow .item .n") == ["Back up a card", "My editing queue", "Make posts from a shoot", "My posting queue", "Open my Assistant folder"], texts(c, ".flow .item .n"))
-    case("home: the steps are numbered 1 to 4, the folder card has no number", texts(c, ".flow .item .k") == ["1", "2", "3", "4"])
-    case("home: what each card says it does next", texts(c, ".flow .item .go") == ["Back up, and see your backups →", "Open my editing queue →", "Make posts, see your post kits →", "Open my posting queue →"], texts(c, ".flow .item .go"))
-    case("home: no shoots and no kits on it", c.count(".shoot") == 0 and "Garcia wedding" not in c.js("document.querySelector('.flow').textContent"))
+    c.wait_for("document.querySelectorAll('.flow4 .step').length == 4", 10)
+    case("home: Your workflow, and the four steps by name, in order", c.text(".wf h2") == "Your workflow"
+         and texts(c, ".flow4 .step .n") == ["Back up a card", "My editing queue", "Turn your shoots into posts", "My posting queue"], texts(c, ".flow4 .step .n"))
+    case("home: the steps are numbered 1 to 4", texts(c, ".flow4 .step .k") == ["1", "2", "3", "4"])
+    case("home: what each card says it does next", texts(c, ".flow4 .step .go") == ["Back up →", "Open my editing queue →", "Make posts →", "Open my posting queue →"], texts(c, ".flow4 .step .go"))
+    case("home: no shoots and no kits listed on it", c.count(".shoot") == 0 and c.count(".backup") == 0)
     case("home: no page errors", not c.page_errors(), c.page_errors()[:2])
-    # the editing queue card and the folder card: what they ask, and where the answer shows
-    c.click("#editing")
+    # the editing queue card and the folder button: what they ask, and where the answer shows
+    c.click("#s2")
     asked(c, 1)
     case("home: My editing queue asks for the queue's address, and what comes back shows on the card itself",
-         c.js("window.__asked[0]") == "/queue-url" and c.js("document.querySelector('#editing .note').textContent") == "Pretend: the editing queue would open here.")
+         c.js("window.__asked[0]") == "/queue-url" and c.js("document.querySelector('#s2 .note').textContent") == "Pretend: the editing queue would open here.")
     c.click("#folder")
     asked(c, 2)
-    case("home: Open my Assistant folder asks to open it, and the line shows on that card",
-         c.js("window.__asked[1]") == "/open-home" and c.js("document.querySelector('#folder .note').textContent") == "Opened The Assistant in Finder.")
+    case("home: Open my Assistant folder asks to open it, and the line shows right under that button",
+         c.js("window.__asked[1]") == "/open-home" and c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder.")
     time.sleep(0.3)
     j = json.loads((w.home / "journey.json").read_text(encoding="utf-8"))
     case("home: both presses were recorded for the chat (journey.json)", [x["item"] for x in j["clicks"]][-2:] == ["queue", "folder"], j["clicks"][-3:])
     time.sleep(4.6)
     case("home: recording a press does not reload the page from under the line it just showed",
-         c.js("!!document.querySelector('#folder .note') && document.querySelector('#folder .note').textContent") == "Opened The Assistant in Finder.")
-    c.click("[data-report=latest]")
-    asked(c, 3)
-    case("home: See the report on the last backup asks for the newest report, the line next to the button",
-         c.js("window.__asked[2]") == "/report-url?id=latest" and c.js("document.querySelector('[data-report=latest]').nextElementSibling.textContent") == "Pretend: the report would open here.")
-    c.click(".flow a.item[href='/backups']")
+         c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder.")
+    c.click("#s1")
     c.wait_for("location.pathname === '/backups'", 10)
     case("home: Back up a card opens its own screen", c.js("location.pathname") == "/backups")
     time.sleep(0.3)
@@ -908,12 +903,12 @@ def check_home_page(c, w):
     case("... and the press is recorded as a backup press", j["clicks"][-1]["item"] == "backup", j["clicks"][-1])
     c.click(".homelink")
     c.wait_for("location.pathname === '/home'", 10)
-    c.click(".flow a.item[href='/make-posts']")
+    c.click("#s3")
     c.wait_for("location.pathname === '/make-posts'", 10)
-    case("home: Back to home comes back, and Make posts from a shoot opens its own screen", c.js("location.pathname") == "/make-posts")
+    case("home: Back to home comes back, and Turn your shoots into posts opens its own screen", c.js("location.pathname") == "/make-posts")
     c.click(".homelink")
     c.wait_for("location.pathname === '/home'", 10)
-    c.click(".flow a.item[href='/posting.html']")
+    c.click("#s4")
     c.wait_for("location.pathname === '/posting.html'", 10)
     case("home: My posting queue opens the posting queue", c.js("location.pathname") == "/posting.html")
 
@@ -1126,7 +1121,7 @@ def check_phone(c, w):
 def check_phone_pages(c, w, long_name):
     c.phone(width=375, height=800)
     try:
-        for path, ready in (("/home", "document.querySelectorAll('.flow .item').length == 5"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
+        for path, ready in (("/home", "document.querySelectorAll('.flow4 .step').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)
@@ -1134,7 +1129,7 @@ def check_phone_pages(c, w, long_name):
                 c.js("document.querySelector('#older').click()")
                 c.js("document.querySelector('#cardStatus').textContent = fill(W.b_card_in, {name: %s, files: '3,931'})" % json.dumps("CARD_" + "W" * 100))
             if path == "/home":
-                case("phone width: the long name is on Today", long_name in c.js("document.querySelector('#today').textContent"))
+                case("phone width: the long name is in the editing queue's box on the home page", long_name in c.js("document.querySelector('#n2').textContent"))
             if path == "/backups":
                 case("phone width: the long name is on a backup, and the long card name in the steps box", backup_of(c, long_name) >= 0 and "WWWWWWWW" in c.text("#cardStatus"))
             case("phone width: %s has no sideways scroll, with a 100-letter name that has no place to break" % path, no_sideways(c, 375), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
@@ -1145,7 +1140,7 @@ def check_phone_pages(c, w, long_name):
                 case("phone width: %s: the Back to home button reads Home" % path, c.js("getComputedStyle(document.querySelector('.homelink .long')).display") == "none"
                      and c.js("getComputedStyle(document.querySelector('.homelink .short')).display") != "none")
         c.phone(width=336, height=700)
-        for path, ready in (("/home", "document.querySelectorAll('.flow .item').length == 5"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
+        for path, ready in (("/home", "document.querySelectorAll('.flow4 .step').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)
