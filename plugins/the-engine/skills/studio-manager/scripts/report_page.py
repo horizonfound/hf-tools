@@ -130,6 +130,165 @@ PALETTE = ["#F07F5A", "#5EB5A9", "#F2CF72", "#9C8BD6", "#2F6F6B", "#CDE9D6"]
 ROTS = [-3, 2, -1.5, 2.5, -2, 1.5]
 
 
+
+# The backup, played back (Nicole, v28, Nov 17): on a report where everything is safe, photos "falling from the sky",
+# twinkling, fly "into where it says 233 files" while the numbers count up from zero. It only replays what already
+# happened: the numbers in the page as written are the real ones, a screen reader is given the real ones the whole
+# time, and they are put back exactly as written when it ends, is cut short, or cannot run. Nothing here loads
+# anything but the report's own small pictures, by the same relative addresses the rest of the page uses.
+FALL_WORDS = {"again": "Play it again"}   # hers
+FALL_MOST = 40                            # the most pictures handed to the page (hers flies 24 to 40 photos)
+FALL_CSS = """
+.fallp{position:fixed;left:0;top:0;height:92px;border-radius:6px;overflow:hidden;pointer-events:none;z-index:60;will-change:transform,opacity;box-shadow:0 0 0 2px rgba(255,255,255,.9),0 0 18px rgba(255,236,190,.75),0 10px 22px rgba(31,36,48,.25)}
+.fallp img{height:100%;width:auto;max-width:none;display:block}
+.twk{position:fixed;left:0;top:0;width:14px;height:14px;pointer-events:none;z-index:61;will-change:transform,opacity}
+.twk::before,.twk::after{content:'';position:absolute;left:50%;top:50%;background:#fff;border-radius:2px;box-shadow:0 0 8px 2px rgba(255,214,140,.9)}
+.twk::before{width:2px;height:14px;margin:-7px 0 0 -1px}.twk::after{width:14px;height:2px;margin:-1px 0 0 -7px}
+.stats.falls{position:relative}.stats.falls .stat{transition:background .4s}
+.stats.falls .stat.catch{animation:statpop .32s var(--ease)}@keyframes statpop{50%{transform:scale(1.06)}}
+.stats.falls .stat.glow{background:linear-gradient(180deg,rgba(242,207,114,.22),rgba(242,207,114,0))}
+.stats.falls .stat b span{display:inline;margin:0}
+.stats.falls .stat b .fall-real{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.fall-again{position:absolute;right:0;top:100%;margin-top:4px;font:600 12px/1 var(--sans);color:var(--ink-2);background:none;border:0;cursor:pointer;padding:8px 2px;visibility:hidden;opacity:0;transition:opacity .4s}
+.fall-again.on{visibility:visible;opacity:1}.fall-again:hover{color:var(--ink)}
+"""
+FALL_JS = r"""<script>
+(function(){
+  var D=__FALL__, box=document.querySelector('.stats');
+  if(!box||!D.pics.length||!window.IntersectionObserver||!Element.prototype.animate||!window.matchMedia) return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // the real numbers are already on the page
+  const bs=[...box.querySelectorAll('.stat b')], target=box.querySelector('.stat'), finals=bs.map(b=>b.textContent);
+  if(!target) return;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  let run=0, playing=false, ticks=null, good=[];
+  // the words stay, the numbers count, keeping their decimals ("7.8 GB" passes "2.4 GB", never "2 GB")
+  const at=(text,f)=>text.split(/(\d[\d,]*\.?\d*)/).map((x,i)=>{ if(i%2===0) return x;
+    const dec=(x.split('.')[1]||'').length, n=parseFloat(x.replace(/,/g,''))*f;
+    return dec?n.toFixed(dec):Math.round(n).toLocaleString('en-US'); }).join('');
+  // while a number counts, what is drawn is hidden from a screen reader and the real number sits beside it for one
+  function zero(){ box.style.minHeight=box.offsetHeight+'px';   // the row keeps its height while the numbers are short
+    ticks=bs.map((b,k)=>{ b.textContent='';
+    const t=document.createElement('span'); t.setAttribute('aria-hidden','true'); t.textContent=at(finals[k],0);
+    const r=document.createElement('span'); r.className='fall-real'; r.textContent=finals[k];
+    b.appendChild(t); b.appendChild(r); return t; }); }
+  function settle(){ ticks=null; bs.forEach((b,k)=>{ b.textContent=finals[k]; }); box.style.minHeight=''; }   // exactly as the page was written
+  function stop(){ run++; playing=false; document.querySelectorAll('.fallp,.twk').forEach(n=>n.remove());
+    target.classList.remove('catch','glow'); settle(); btn.classList.add('on'); }
+  box.classList.add('falls');
+  const btn=document.createElement('button'); btn.className='fall-again'; btn.type='button';
+  btn.textContent='↻ '+D.again; box.appendChild(btn);
+  function twinkle(x,y){ const s=document.createElement('i'); s.className='twk'; s.setAttribute('aria-hidden','true'); document.body.appendChild(s);
+    const a=s.animate([{transform:'translate('+x+'px,'+y+'px) scale(0) rotate(0)',opacity:0},
+      {transform:'translate('+x+'px,'+y+'px) scale(1) rotate(45deg)',opacity:1,offset:.4},
+      {transform:'translate('+x+'px,'+(y+30)+'px) scale(0) rotate(90deg)',opacity:0}],{duration:900,easing:'ease-out'});
+    a.onfinish=a.oncancel=()=>s.remove(); }
+  async function fly(i,N,dur,me){
+    await sleep(i*(dur*.62/N)+Math.random()*120); if(me!==run) return;
+    const W=innerWidth, H=innerHeight, tr=target.getBoundingClientRect(), tx=tr.left+tr.width*.35, ty=tr.top+tr.height*.4;
+    const el=document.createElement('div'); el.className='fallp'; el.setAttribute('aria-hidden','true');
+    const im=document.createElement('img'); im.alt=''; im.src=good[i%good.length]; el.appendChild(im); document.body.appendChild(el);
+    const x0=W*(.06+Math.random()*.88), y0=-120-Math.random()*80, yMid=H*(.18+Math.random()*.22), sw=24+Math.random()*40,
+      ph=Math.random()*6.28, spin=(Math.random()-.5)*50, flip=(Math.random()<.5?-1:1)*(18+Math.random()*28), f=[], Q=40;
+    for(let q=0;q<=Q;q++){ const t=q/Q; let x,y,rz,ry,sc,op;
+      if(t<.62){ const u=t/.62;                        // drifting down from above, with a sway and a gentle turn
+        x=x0+Math.sin(ph+u*5)*sw; y=y0+(yMid-y0)*u; rz=spin*Math.sin(ph+u*4); ry=flip*Math.sin(ph+u*3); sc=1; op=Math.min(1,u*3); }
+      else{ const u=(t-.62)/.38, g=u*u*(3-2*u), xs=x0+Math.sin(ph+5)*sw;   // then a curve into the files box, shrinking
+        x=xs+(tx-xs)*g; y=yMid+(ty-yMid)*g-Math.sin(u*Math.PI)*60; rz=spin*(1-u); ry=flip*Math.sin(ph+3)*(1-u); sc=1-.78*g; op=u>.92?(1-u)/.08:1; }
+      f.push({transform:'translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px) rotate('+rz.toFixed(1)+'deg) rotateY('+ry.toFixed(1)+'deg) scale('+sc.toFixed(3)+')',opacity:op,offset:t}); }
+    const d=2600+Math.random()*700, a=el.animate(f,{duration:d,easing:'linear',fill:'forwards'});
+    for(let k=1;k<=3;k++) setTimeout(()=>{ if(me!==run||!el.isConnected) return; const r=el.getBoundingClientRect();
+      if(r.width) twinkle(r.left+Math.random()*r.width,r.top+Math.random()*r.height); },d*(k*.18));
+    try{ await a.finished; }catch(e){}
+    el.remove(); if(me!==run) return;
+    target.classList.remove('catch'); void target.offsetWidth; target.classList.add('catch','glow');
+    clearTimeout(target._g); target._g=setTimeout(()=>target.classList.remove('glow'),500);
+    twinkle(tx+(Math.random()-.5)*40,ty-10);
+  }
+  async function play(){
+    if(playing||!good.length) return;
+    playing=true; const me=++run; btn.classList.remove('on'); if(!ticks) zero();
+    const N=Math.min(40,Math.max(24,good.length*2)), dur=4200, t0=performance.now();
+    (function tick(){ if(me!==run||!ticks) return;      // every number climbs from zero together, about 5 seconds
+      const f=Math.min(1,(performance.now()-t0)/(dur+900)), e=f<.5?2*f*f:1-Math.pow(-2*f+2,2)/2;
+      ticks.forEach((t,k)=>{ t.textContent=at(finals[k],e); });
+      if(f<1) requestAnimationFrame(tick); else settle(); })();
+    try{ await Promise.all(Array.from({length:N},(_,i)=>fly(i,N,dur,me))); if(me===run) await sleep(900); }catch(e){}
+    if(me===run) stop();
+  }
+  btn.addEventListener('click',play);
+  // a page put behind something, or printed, never sits on half-counted numbers
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden&&(playing||ticks)) stop(); });
+  window.addEventListener('beforeprint',()=>{ if(playing||ticks) stop(); });
+  // the report reloads itself when it is rebuilt (a rename, a note written): that is not a fresh look, so it does
+  // not play again by itself; the button is there
+  let nav='navigate'; try{ nav=(performance.getEntriesByType('navigation')[0]||{}).type||'navigate'; }catch(e){}
+  const load=()=>Promise.all(D.pics.map(u=>{ const i=new Image(); i.src=u; return i.decode().then(()=>{ if(i.naturalWidth) good.push(u); },()=>{}); }));
+  if(nav!=='navigate'||document.hidden){ load().then(()=>{ if(good.length) btn.classList.add('on'); }); return; }
+  zero();
+  Promise.race([load(),sleep(4000)]).then(()=>{
+    if(!good.length||document.hidden){ if(ticks&&!playing) settle(); if(good.length) btn.classList.add('on'); return; }   // no picture could be read: the numbers simply show
+    const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ io.disconnect(); setTimeout(()=>{ if(!document.hidden) play(); },350); } },{threshold:.6});
+    io.observe(box);
+  });
+})();
+</script>"""
+
+
+def fall_pictures(studio, most=FALL_MOST):
+    """The small pictures the backup animation flies, as addresses beside the report (the same folders the page
+    already shows pictures from, so the report's server already serves them and a report opened as a file finds
+    them too): each group's previews, then the sneak peeks, and only when neither gave any, the card's own
+    previews. No more than `most`, spread evenly. [] when there is no picture: then there is no animation."""
+    import urllib.parse as up
+    studio = Path(studio)
+    out, seen = [], set()
+
+    def take(folder, name):
+        name = str(name)
+        if "/" in name or "\\" in name or not name.lower().endswith((".jpg", ".jpeg")) or (folder, name) in seen:
+            return
+        if (studio / folder / name).is_file():
+            seen.add((folder, name))
+            out.append(folder + "/" + up.quote(name))
+
+    try:
+        groups = json.loads((studio / "groups.json").read_text(encoding="utf-8")).get("groups", [])
+    except (ValueError, OSError, AttributeError):
+        groups = []
+    for g in groups if isinstance(groups, list) else []:
+        if isinstance(g, dict):
+            for name in list(g.get("previews") or []) + list(g.get("clip_previews") or []):
+                take("groups", name)
+    if not out and (studio / "groups").is_dir():       # an older backup's stills, made but not listed
+        for f in sorted((studio / "groups").glob("g*.jpg")):
+            take("groups", f.name)
+    try:
+        for pv, _ in sneak_peeks(studio)[0]:
+            take("sneak-peeks", pv.name)
+    except (KeyError, TypeError, AttributeError):
+        pass
+    if not out and (studio / "previews").is_dir():
+        for f in sorted((studio / "previews").glob("*.jpg")):
+            take("previews", f.name)
+    if len(out) > most:
+        step = (len(out) - 1) / (most - 1)
+        out = [out[round(i * step)] for i in range(most)]
+    return out
+
+
+def fall_script(manifest, studio, all_good, card=None):
+    """The animation's script for this report, or "". Only a whole backup where everything is safe, with pictures:
+    never a sample, never a backup with a problem or not finished, never one card inside a shoot's page (each
+    card's report sits in a frame there; several playing at once inside frames would look broken)."""
+    if not all_good or manifest.get("sample") or card or not manifest.get("files"):
+        return ""
+    pics = fall_pictures(studio)
+    if not pics:
+        return ""
+    data = json.dumps({"pics": pics, "again": FALL_WORDS["again"]}).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return FALL_JS.replace("__FALL__", data)
+
+
 def human(n):
     for unit in ("bytes", "KB", "MB", "GB", "TB"):
         if n < 1024 or unit == "TB":
@@ -393,7 +552,7 @@ def build(manifest, studio, card=None):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}{CARD_CSS if card else ''}</style></head><body>"]
+           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}{CARD_CSS if card else FALL_CSS}</style></head><body>"]
     if not card:
         out.append(f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}"
                    f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
@@ -439,6 +598,11 @@ def build(manifest, studio, card=None):
                f"<div class='stat'><b>{ok_dest:,}</b><span class='eyebrow'>checked byte for byte</span></div>"
                f"<div class='stat'><b>{e(took) or '—'}</b><span class='eyebrow'>to finish</span></div>"
                "</div></div>")
+    # the backup played back (Nicole, v28): only when everything is safe and there are pictures; the numbers above
+    # are the real ones whether or not it plays
+    fall = fall_script(manifest, studio, all_good, card)
+    if fall:
+        out.append(fall)
 
     # the shoots, with their previews, recaps and name boxes (one page, not two)
     # (one card of a shoot leaves the next-step line to the shoot's page, which says it once for every card)
