@@ -685,7 +685,14 @@ DESIGN_DESIGNS_JS = r"""
     buildGallery();
     sheet.scrollTop = 0;
     D.focus(gClose);
-    refresh().then(function(changed){
+    // The cards are drawn again only when the templates themselves came back different (all this window shows of what
+    // is asked for). Not for the open design's own line in the list: its save lands a moment after a change, and an
+    // answer asked for by an earlier opening can come in after a later one. Either would make the buttons anew under
+    // a press, and a button made anew between a press and its release loses that press.
+    var had = JSON.stringify(D.S.templates || []);
+    refresh().then(function(any){
+      // (refresh says false when it gave up: then nothing is drawn again, as before)
+      var changed = !!any && !!D.S && JSON.stringify(D.S.templates || []) !== had;
       // (not while a name is being typed into a card: the card would be drawn again under the typing)
       if (changed && D.modals.isOpen(gallery) && !busy && !sheet.querySelector('.dz-rnin')) buildGallery();
     });

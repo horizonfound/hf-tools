@@ -174,7 +174,13 @@ def moves():
     ok, w = tc.trash(folder2, inside)
     check("a second folder of the same name goes in as '<name> 2'", ok and (TRASH / "Old takes 2").is_dir() and (TRASH / "Old takes 2" / "x.m4a").is_file(), (ok, w, listing(TRASH)))
 
-    odd = make_file(inside / "Nicole's \"café\" 🌊 song.mov")
+    # A PC cannot have a file with a double quote in its name (none of  \ / : * ? " < > |  can be made there), so there
+    # the nearest name a PC can hold is used: the one the Assistant's own safe_name() makes of it. A Mac keeps the quote.
+    nasty = "Nicole's \"café\" 🌊 song.mov"
+    legal = tc.safe_name(nasty)
+    check("safe_name() makes that name one a PC can hold: the double quotes gone, the apostrophe, the accent and the emoji kept",
+          legal == "Nicole's café 🌊 song.mov", legal)
+    odd = make_file(inside / (legal if PC else nasty))
     ho = sha(odd)
     ok, w = tc.trash(odd, inside)
     check("a name with a quote, an accent and an emoji works", ok and (TRASH / odd.name).is_file() and sha(TRASH / odd.name) == ho, (ok, w))

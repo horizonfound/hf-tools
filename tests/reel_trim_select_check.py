@@ -160,10 +160,10 @@ def run_words(s):
     case("every line her trim panel shows or names is one of ours, whole", len(her_bits) >= 14 and not [x for x in her_bits if x not in ours],
          [x for x in her_bits if x not in ours])
     her_ids = re.findall(r'id="(trim\w*)"', block)
-    case("every part of her panel is in ours, by her name (%d of them)" % len(her_ids), len(her_ids) >= 14 and all(("id='%s'" % i) in page_ours for i in her_ids),
-         [i for i in her_ids if ("id='%s'" % i) not in page_ours])
+    case("every part of her panel is in ours, by her name (%d of them)" % len(her_ids), len(her_ids) >= 14 and all(("id='%s'" % i) in back for i in her_ids),
+         [i for i in her_ids if ("id='%s'" % i) not in back])
     case("her four arrows are ours: a quarter second earlier or later, for the start and for the end",
-         sorted(re.findall(r'data-n="([^"]+)"', block)) == sorted(re.findall(r"data-n='([^']+)'", page_ours)) == ["a:-0.25", "a:0.25", "b:-0.25", "b:0.25"])
+         sorted(re.findall(r'data-n="([^"]+)"', block)) == sorted(re.findall(r"data-n='([^']+)'", back)) == ["a:-0.25", "a:0.25", "b:-0.25", "b:0.25"])
     case("her card's Trim button: the scissors, the word, the title",
          '<button class="tr" title="Trim the start and the end">&#9986; Trim</button>' in page and tw["trim_btn"] == "✂ Trim")
     case("her readout is ours: Starts, ends, the length",
@@ -175,7 +175,10 @@ def run_words(s):
     her_css = [ln for ln in page.splitlines() if ln.startswith((".trim", ".mom .len button.tr", ".tile.picked", ".pick.picked", ".tile.riding",
                                                                 "[data-count]", ".tile[data-count]", ".selbar"))]
     case("her style rules for the panel, the Trim button, a selected photo, the tag and the bars are ours, each as she wrote it (%d)" % len(her_css),
-         len(her_css) == 39 and all(ln in page_ours for ln in her_css), [ln[:60] for ln in her_css if ln not in page_ours])
+         # her v25 card's own Trim button rule (.mom .len button.tr) went with the card in her v27: with the switch
+         # on, the Trim button sits in a picked clip's box in the editor (edTrimClip), so that one rule is not ours
+         len(her_css) == 39 and all(ln in back for ln in her_css if not ln.startswith(".mom .len button.tr")),
+         [ln[:60] for ln in her_css if ln not in back and not ln.startswith(".mom .len button.tr")])
     case("her tag on the photos being moved says \"N photos\" (in her style rule, and so in ours)", "content:attr(data-count) ' photos'" in page_ours)
     case("her server keeps a clip 1 to 15 seconds, as ours does", "end = max(start + 1.0, min(end, start + 15.0, length))" in server)
     case("her numbers in her page: 1 and 15 seconds, twentieths, 8 seconds either side",

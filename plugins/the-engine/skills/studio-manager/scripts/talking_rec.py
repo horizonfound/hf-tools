@@ -2406,7 +2406,19 @@ def make_for_page(kit):
     its time) is a problem in plain words; unless its project did reach CapCut, and then it is done. No path, no
     file name, no process number."""
     kit = Path(kit)
-    j = read_make(kit)
+    # The job's record and "is it running?" are two looks, and a job can finish between them: it writes what
+    # happened, then lets go of its lock. The record read before that would still say "running", the lock would
+    # say nobody is, and a make that had just ended with its own plain line (a photo gone, say) would be told as
+    # "Something went wrong". So the record is read again after the lock is asked after, and the answer is only
+    # used for a record that did not change meanwhile (a few tries; a job changes its record a handful of times).
+    j, running = None, False
+    for _ in range(4):
+        j = read_make(kit)
+        if not j or j.get("state") not in ("queued", "running"):
+            break
+        running = make_running(kit)
+        if read_make(kit) == j:
+            break
     if not j or not isinstance(j.get("id"), str) or j.get("state") not in ("queued", "running", "done", "problem"):
         return None
     state, problem = j["state"], j.get("problem")
@@ -2414,7 +2426,7 @@ def make_for_page(kit):
     if state in ("queued", "running"):
         began = _fnum(j.get("t0"))
         late = bool(began) and time.time() - began > reel_page.MAKE_LIMIT + reel_page.JOB_GRACE
-        gone = not make_running(kit) and (state == "running" or j.get("pid") or time.time() - _fnum(j.get("t")) > JOB_BOOT)
+        gone = not running and (state == "running" or j.get("pid") or time.time() - _fnum(j.get("t")) > JOB_BOOT)
         if late or gone:
             made = _made_by(kit, j["id"])
             if made:

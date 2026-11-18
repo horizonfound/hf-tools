@@ -1049,14 +1049,22 @@ try:
     # a fix on a cut word is kept (hers allows it: the word shows crossed out and fixed)
     check("a fix on a cut word is kept", frec()["fixes"]["7"] == "beach!" and stf["rec"]["words"][7]["w0"] == "beach.")
     # the assistant's side: show and photos print the fixed word as THE word; status counts the fixes
+    # ("w0", the record's own name for the word as it was heard, must never be printed. It is looked for in what
+    # was said with this test's own folders taken out: photos prints where the photos are, and a computer's
+    # scratch folder may itself have "w0" in its name, as GitHub's Mac had: /var/folders/h5/..._w0000gn/T.)
+    def said(out):
+        for place in sorted({str(TMP), str(ROOT), tempfile.gettempdir(), str(Path(tempfile.gettempdir()).resolve())}, key=len, reverse=True):
+            out = out.replace(place, "")
+        return out
+
     out = run("show", FSHORT).stdout
     check("show: the fixed word is simply the word to the assistant (rule 3: it never touches a caption word); a typed-away word is empty",
-          "0:OK 1:want to 2: 3:we" in out and "7:beach!" in out and "w0" not in out and "1:so" not in out and "2:um" not in out, out[-300:])
+          "0:OK 1:want to 2: 3:we" in out and "7:beach!" in out and "w0" not in said(out) and "1:so" not in out and "2:um" not in out, out[-300:])
     out = run("photos", FSHORT).stdout
-    check("photos: the same (the cut word 7 left out, as any cut word)", "0:OK 1:want to 2: 3:we" in out and "7:beach" not in out and "w0" not in out, out[-200:])
+    check("photos: the same (the cut word 7 left out, as any cut word)", "0:OK 1:want to 2: 3:we" in out and "7:beach" not in out and "w0" not in said(out), said(out)[-600:])
     out = run("status", FSHORT).stdout
     check("status: one line of ours says how many words were fixed, and nothing else about them",
-          "  Words fixed on the page: 3." in out and "want to" not in out and "w0" not in out, out)
+          "  Words fixed on the page: 3." in out and "want to" not in out and "w0" not in said(out), out)
     out = run("status", SHORT).stdout
     check("... and no such line when nothing was fixed", "Words fixed" not in out, out)
     # a fix is not "their own work" for cut --replace: fixes never touch cuts or stretches

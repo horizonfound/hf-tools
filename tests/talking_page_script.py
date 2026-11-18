@@ -22,6 +22,7 @@ The record is seeded here (TR.put_words), so nothing is transcribed. The talking
 are tests/fixtures/loud-tone-3s.mp4 (3 seconds, self-made); the video picker has the Mac get those two ready (a
 few stills each), which is why this runs under the memory guard, one test at a time.
 """
+import html
 import json
 import re
 import shutil
@@ -99,10 +100,19 @@ def run_requests(t, s):
     # her v27 footer: + Add more photos and its line in her .addph span, before the count and Use this photo
     page = s.tp.page_html(KIT)
     foot = re.search(r"<div class='pickfoot'>(.*?)</div></div></div>", page, re.S)
+    # her markup, word for word, as a Mac shows it. Her title names Finder; on a PC the page says that computer's
+    # word for it (talking_page.page_words, decision 26), so there the title is the plugin's own PC line, quoted
+    # the same way, and everything around it is still hers to the letter. On a Mac the two are one and the same.
+    her_title = "Opens this shoot&#x27;s Photos folder in Finder"
+    hers = ("<span class='addph'><button class='btn small' id='addPhotos' type='button' title='" + her_title + "'>"
+            "+ Add more photos</button><span class='hintsm' id='addPhotosSay'></span></span><span class='hintsm' id='pickCount'></span>"
+            "<button class='btn main' id='pickUse' type='button' disabled>Use this photo</button>")
+    here_title = html.escape(s.tp.page_words()["add_photos_title"], quote=True)
+    want = hers.replace(her_title, here_title)
     case("the photo pop-up's footer (v27): her button with her title, then a line of its own, then the count and Use this photo, in her markup",
-         bool(foot) and foot.group(1) == ("<span class='addph'><button class='btn small' id='addPhotos' type='button' title='Opens this shoot&#x27;s Photos folder in Finder'>"
-                                          "+ Add more photos</button><span class='hintsm' id='addPhotosSay'></span></span><span class='hintsm' id='pickCount'></span>"
-                                          "<button class='btn main' id='pickUse' type='button' disabled>Use this photo</button>"), foot and foot.group(1))
+         bool(foot) and foot.group(1) == want and hers.count(her_title) == 1
+         and html.escape(s.tp.WORDS["add_photos_title"], quote=True) == her_title
+         and ((want != hers and "File Explorer" in here_title and "Finder" not in want) if t.WINDOWS else want == hers), foot and foot.group(1))
     case("the pop-up's button asks the posting server's own /open route for the Photos folder (the kit by its name, never a path), and the look asks for new photos only while the pop-up is open",
          "T.ask('/open?' + Q + '&sub=Photos')" in talking_js_pick.JS and "T.photoPickOpen = function(){ return isOpen('pick'); }" in talking_js_pick.JS
          and "T.photoPickOpen && T.photoPickOpen() ? '&photos=1' : ''" in s.tp.talking_js_core.JS and "setInterval" not in talking_js_pick.JS.split("// ---------- the video picker")[0])

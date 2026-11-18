@@ -1109,11 +1109,22 @@ def job_for_page(kit, piece):
     with what to do about it. No path, no file name, no process number."""
     if piece != "carousel":
         return None
-    j = read_job(kit)
+    # The record and "is it running?" are two looks, and a job can end between them (it writes what happened, then
+    # lets go): the old record would say "running", the second look "nobody is", and a job that had just ended with
+    # its own line would be told as stopped. So the record is read again after the second look, and that look is
+    # only used for a record that did not change meanwhile (the same as talking_rec.make_for_page).
+    j, running = None, False
+    for _ in range(4):
+        j = read_job(kit)
+        if not j or j.get("state") not in ("queued", "running"):
+            break
+        running = job_running(kit)
+        if read_job(kit) == j:
+            break
     if not j or j.get("state") not in ("queued", "running", "done", "same", "problem"):
         return None
     state, line = j["state"], j.get("line") or ""
-    if state in ("queued", "running") and not job_running(kit):
+    if state in ("queued", "running") and not running:
         if state == "running" or time.time() - float(j.get("t") or 0) > JOB_BOOT:
             state, line = "problem", JOB_STOPPED
     return {"state": state, "line": line, "rev": j.get("rev") if type(j.get("rev")) is int else -1, "count": j.get("count") or 0}

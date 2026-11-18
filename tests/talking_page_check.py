@@ -1009,8 +1009,10 @@ def check_page(c, s):
     case("the dock's room is measured into the page (the make bar never covers the last of it)",
          c.js("parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dock')) === document.getElementById('dock').offsetHeight && parseInt(document.body.style.paddingBottom) === document.getElementById('dock').offsetHeight + 24"))
     c.click("#addVideo")
-    c.wait_for("document.getElementById('toast').classList.contains('on')", 5)
-    case("Add my video: the Talking folder is made and her toast says it is open", toast(c) == W["talking_open"] and (kit / "Talking").is_dir(), toast(c))
+    # the toast's words are read in the same look that sees it up (it shows for 2.6 seconds: on a slow computer a
+    # second look, a moment later, could find it gone again)
+    said = c.wait_for("(function(){ var e = document.getElementById('toast'); return e.classList.contains('on') ? e.textContent : ''; })()", 30)
+    case("Add my video: the Talking folder is made and her toast says it is open", said == W["talking_open"] and (kit / "Talking").is_dir(), said)
 
     # ---- who places the photos, before there is a script
     c.click("#whoAsst")

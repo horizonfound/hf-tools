@@ -19,6 +19,20 @@ The expected lines are copied from her acceptance/expected.json (v27's), unchang
 
   - The 60-second test beat is synthetic (a drum pattern made for testing) and lives in tests/fixtures/
     (test-beat-60s.wav), so its 9 cases always run.
+  - Her lines were recorded on a Mac, and a Mac hears a song through its own afconvert. A computer without it
+    (a PC, or a Mac with ASSISTANT_NO_AFCONVERT=1) brings the same WAV down to 11,025 samples a second its own
+    way, the samples come out a little different, and so may the mix (the first Windows run after v27: 6 of
+    her lines differed, every rule still kept). So the test beat is also here exactly as her Mac heard it
+    (test-beat-60s-as-a-mac-hears-it.wav: the samples afconvert makes of it, which every computer reads as
+    they are). Where this computer hears the test beat as her Mac did, her lines are checked on the test beat
+    itself, as always, and once more on the copy read the PC's way (plain Python, nothing else). Where it
+    hears it differently and is not a Mac hearing through afconvert (a PC, ffmpeg), her lines are checked on
+    the copy, word for word, and the test beat itself, as this computer hears it, is planned too and held to
+    her rules.
+  - A Mac that hears through afconvert is the computer her lines were recorded on, so there the fingerprint
+    is held: if afconvert stops making those samples of the test beat, that is a FAIL in plain words (a Mac
+    photographer's reels may have changed), and her lines are still checked on the test beat itself, never
+    quietly on the copy.
   - The two real songs are a client's and are never in this repository. They are read from her handoff when it
     is on this computer (reference-private/nicole-handoff-v19-*/, in this checkout or the main one); without
     them their 13 cases say SKIP, plainly.
@@ -44,6 +58,7 @@ Then, beyond her 22:
 Nothing outside a scratch folder made here is touched; CapCut is never asked about or opened (a pretend projects
 folder, --ignore-open). Every line says PASS, FAIL or SKIP. Exit 1 only when something FAILED.
 """
+import hashlib
 import json
 import os
 import re
@@ -57,6 +72,11 @@ ROOT = Path(__file__).resolve().parent.parent
 FIX = ROOT / "tests" / "fixtures"
 REEL = ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "scripts"
 BEAT60 = FIX / "test-beat-60s.wav"
+# The same test beat as her Mac heard it: the 661,500 samples (mono, 16-bit, 11,025 a second) the Mac's afconvert
+# makes of BEAT60, written as a plain WAV. No computer has to change them to listen, so every one hears the same.
+BEAT60_AS_MAC = FIX / "test-beat-60s-as-a-mac-hears-it.wav"
+BEAT60_AS_MAC_SHA = "d44a0629d9babb4e8ab48bb8799dad597a4c651f5e0d106711756309b1df60ce"   # of those samples, low byte first
+PC_WAY = {"ASSISTANT_NO_AFCONVERT": "1", "ASSISTANT_NO_FFMPEG": "1"}   # sound.py's switches: plain Python only
 SIZES = {int(n): wh for n, wh in json.loads((FIX / "reel-photo-sizes.json").read_text(encoding="utf-8"))["sizes"].items()}
 VIDEO_NAME = "IMG_0278 4.MOV (not included: a dry run never opens it)"   # her clip's file name: it seeds the mix
 
@@ -76,6 +96,34 @@ def check(name, ok, detail=""):
 def skip(name, why):
     RESULTS["SKIP"] += 1
     print(f"SKIP  {name}: {why}")
+
+
+# ---------------------------------------------------------------- how this computer hears the test beat
+
+def heard_sha(sound, path):
+    """(the fingerprint of the samples this computer hears in a song, which way it heard them)."""
+    a, how = sound.decode(str(path), 11025)
+    if a is None:
+        return None, how
+    if sys.byteorder == "big":
+        a = a[:]
+        a.byteswap()
+    return hashlib.sha256(a.tobytes()).hexdigest(), how
+
+
+class the_pc_way:
+    """While inside: sound.py reads a WAV in plain Python, as a PC with nothing installed does."""
+
+    def __enter__(self):
+        self.saved = {k: os.environ.get(k) for k in PC_WAY}
+        os.environ.update(PC_WAY)
+
+    def __exit__(self, *a):
+        for k, v in self.saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 # ---------------------------------------------------------------- her two songs, when her handoff is here
@@ -471,9 +519,50 @@ def _main(work, songs):
     sys.path.insert(0, str(REEL))
     import capcut
     import reel
+    import sound
     import timing
 
-    print("-- her 22 cases, through reel.plan_reel and timing.py")
+    if songs["song1"] and not AFCONVERT:
+        # Her two songs are .m4a. A computer with neither afconvert nor an ffmpeg (a PC with nothing installed,
+        # or a Mac with both switched off to try that road) can't read an .m4a at all, and reel.py says so in
+        # its own line. Those cases have nothing to hear here, exactly as where the songs are absent. A Mac
+        # with its afconvert never takes this road: a song it can't read there is a FAIL below.
+        cant = [x.name for x in (songs["song1"], songs["song2"]) if sound.decode(str(x), 11025)[0] is None]
+        if cant:
+            print("NOTE  her handoff's two songs are here, but this computer has no way to read an .m4a (no afconvert, no\n"
+                  f"      ffmpeg): {', '.join(cant)}. The cases that use them say SKIP; the ones on the test beat run.")
+            songs["song1"] = songs["song2"] = None
+
+    print("-- the test beat, as this computer hears it and as her Mac did")
+    copy_sha, copy_how = heard_sha(sound, BEAT60_AS_MAC)
+    check("the test beat as her Mac heard it (tests/fixtures/test-beat-60s-as-a-mac-hears-it.wav) is read here "
+          "sample for sample", copy_sha == BEAT60_AS_MAC_SHA, f"read by {copy_how}: {copy_sha}")
+    own_sha, own_how = heard_sha(sound, BEAT60)
+    as_mac = own_sha == BEAT60_AS_MAC_SHA
+    a_real_mac = own_how == "afconvert"       # sound.decode's name for the Mac's own route: what her lines were recorded through
+    if a_real_mac:
+        # A Mac is where her lines come from. A different fingerprint here is not "another computer's way": it
+        # is a change in what a Mac photographer gets, and swapping in the copy would hide it.
+        check("this Mac hears the test beat as her lines were recorded (afconvert makes the same samples of it)", as_mac,
+              "this Mac no longer hears the test beat as her lines were recorded: afconvert now makes different\n"
+              "      samples of tests/fixtures/test-beat-60s.wav, so a Mac photographer's reels may have changed.\n"
+              f"      recorded: {BEAT60_AS_MAC_SHA}\n      now:      {own_sha}\n"
+              "      Her lines are still checked on the test beat itself below, not on the copy.")
+    on_itself = as_mac or a_real_mac          # her lines are held against the test beat itself
+    if as_mac:
+        print(f"NOTE  this computer hears the test beat exactly as her Mac did ({own_how}): her lines are checked on\n"
+              "      the test beat itself, and once more on the copy read the PC's way (plain Python).")
+    elif a_real_mac:
+        print("NOTE  her lines are checked on the test beat itself, as this Mac hears it now, and once more on the\n"
+              "      copy read the PC's way (plain Python).")
+    else:
+        print(f"NOTE  this computer hears the test beat its own way ({own_how}), a little differently from her Mac's\n"
+              "      afconvert, so the mix can differ. Her lines are checked on the test beat as her Mac heard it;\n"
+              "      the test beat itself, as heard here, is planned too and held to her rules.")
+        songs["beat60"] = BEAT60_AS_MAC
+    song60 = songs["beat60"]
+
+    print("\n-- her 22 cases, through reel.plan_reel and timing.py")
     for name, case in her_cases(work).items():
         song_key, start, vibe, items = case[:4]
         variation = case[4] if len(case) > 4 else 0
@@ -487,6 +576,23 @@ def _main(work, songs):
         if pieces is not None:
             grid, _ = timing.song_grid(str(song))
             rules(name, items, pieces, facts, grid.period)
+        if song_key != "beat60":
+            continue
+        if on_itself:
+            # The same samples, read as a PC with nothing installed reads them: the same line, word for word.
+            with the_pc_way():
+                pieces, facts = reel.plan_reel(items, str(BEAT60_AS_MAC), vibe, start, False, None, variation)
+            line = facts["problem"] if pieces is None else facts["beats_line"]
+            check(f"{name}, on the copy her Mac heard, read the PC's way: the same line", line == EXPECTED[name],
+                  f"expected: {EXPECTED[name]}\n      got:      {line}")
+        else:
+            # What a photographer on this computer gets from the test beat itself: maybe another mix, her rules kept.
+            pieces, facts = reel.plan_reel(items, str(BEAT60), vibe, start, False, None, variation)
+            check(f"{name}, on the test beat as this computer hears it: a reel is planned", pieces is not None,
+                  str(facts.get("problem")))
+            if pieces is not None:
+                grid, _ = timing.song_grid(str(BEAT60))
+                rules(f"{name}, on the test beat as this computer hears it", items, pieces, facts, grid.period)
 
     print("\n-- reel.py make --dry-run, with --clips and c1 in --picks")
     listing = [{"n": n, "file": str(photos / f"{n:02d}.jpg"), "w": w, "h": h} for n, (w, h) in sorted(SIZES.items())]
@@ -517,13 +623,13 @@ def _main(work, songs):
     backforth = ",".join(["c1"] + rest[0:2] + ["c2"] + rest[2:4] + ["c3"] + rest[4:])
     bf_clips = [(2.5, 6.5), (136.0, 140.0), (188.0, 192.0)]
     for label, args, want in (
-            ("Moment first, --pace fast (the old name for On every beat)", (BEAT60, "fast", first14, [(2.5, 6.5)]), "beat60 first 14 beat"),
-            ("Moment first, --vibe beat", (BEAT60, "beat", first14, [(2.5, 6.5)], 0, None, "--vibe"), "beat60 first 14 beat"),
-            ("Back and forth, --vibe calm", (BEAT60, "calm", backforth, bf_clips, 0, None, "--vibe"), "beat60 backforth 14 calm"),
-            ("Back and forth, --pace steady (the old name for Calm)", (BEAT60, "steady", backforth, bf_clips), "beat60 backforth 14 calm"),
-            ("Back and forth, --pace mixed", (BEAT60, "mixed", backforth, bf_clips), "beat60 backforth 14 mixed"),
-            ("Moment first, --pace build", (BEAT60, "build", first14, [(2.5, 6.5)]), "beat60 first 14 build"),
-            ("Moment first, --pace mixed --variation 2", (BEAT60, "mixed", first14, [(2.5, 6.5)], 2), "beat60 first 14 mixed variation 2")):
+            ("Moment first, --pace fast (the old name for On every beat)", (song60, "fast", first14, [(2.5, 6.5)]), "beat60 first 14 beat"),
+            ("Moment first, --vibe beat", (song60, "beat", first14, [(2.5, 6.5)], 0, None, "--vibe"), "beat60 first 14 beat"),
+            ("Back and forth, --vibe calm", (song60, "calm", backforth, bf_clips, 0, None, "--vibe"), "beat60 backforth 14 calm"),
+            ("Back and forth, --pace steady (the old name for Calm)", (song60, "steady", backforth, bf_clips), "beat60 backforth 14 calm"),
+            ("Back and forth, --pace mixed", (song60, "mixed", backforth, bf_clips), "beat60 backforth 14 mixed"),
+            ("Moment first, --pace build", (song60, "build", first14, [(2.5, 6.5)]), "beat60 first 14 build"),
+            ("Moment first, --pace mixed --variation 2", (song60, "mixed", first14, [(2.5, 6.5)], 2), "beat60 first 14 mixed variation 2")):
         code, out = make(*args)
         check(f"reel.py {label}: her line", code == 0 and beats_of(out) == EXPECTED[want],
               f"exit {code}; expected: {EXPECTED[want]}\n      got:      {beats_of(out)}")

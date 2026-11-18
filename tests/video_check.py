@@ -81,7 +81,15 @@ function wait(flag) { var t0 = Date.now(); while (!flag() && Date.now() - t0 < 1
 function picture(out, W, H, secs, fps, cols) {
   var err = Ref();
   var w = C('AVAssetWriter').assetWriterWithURLFileTypeError($.NSURL.fileURLWithPath(out), 'com.apple.quicktime-movie', err);
-  var inp = C('AVAssetWriterInput').assetWriterInputWithMediaTypeOutputSettings('vide', $.NSDictionary.dictionaryWithDictionary({AVVideoCodecKey: 'avc1', AVVideoWidthKey: W, AVVideoHeightKey: H}));
+  // The colours are said in the file (Rec. 709, as every phone and camera says its own): a video that doesn't say is
+  // guessed at, and the guess is not the same on every Mac (GitHub's Mac, with no graphics chip, washed the greens and
+  // cyans out past what the checks allow, Nov 17), so a clip that says nothing tests the guess, not the Assistant.
+  var said = $.NSMutableDictionary.dictionary;
+  [$.AVVideoColorPrimariesKey, $.AVVideoTransferFunctionKey, $.AVVideoYCbCrMatrixKey].forEach(function (k) { said.setObjectForKey($('ITU_R_709_2'), k); });
+  var how = $.NSMutableDictionary.dictionary;
+  how.setObjectForKey($('avc1'), $.AVVideoCodecKey); how.setObjectForKey($(W), $.AVVideoWidthKey); how.setObjectForKey($(H), $.AVVideoHeightKey);
+  how.setObjectForKey(said, $.AVVideoColorPropertiesKey);
+  var inp = C('AVAssetWriterInput').assetWriterInputWithMediaTypeOutputSettings('vide', how);
   inp.expectsMediaDataInRealTime = false;
   var attrs = $.NSDictionary.dictionaryWithDictionary({PixelFormatType: 0x42475241, Width: W, Height: H});
   var ad = C('AVAssetWriterInputPixelBufferAdaptor').assetWriterInputPixelBufferAdaptorWithAssetWriterInputSourcePixelBufferAttributes(inp, attrs);
@@ -270,11 +278,16 @@ WHITE = (255, 255, 255)
 
 
 def near(c, want):
-    """The colour seen is closest to the one wanted, of the six colours and white (a video's colour is a little
-    off what was drawn: it is stored as brightness and colour difference, then turned back)."""
+    """The colour seen is plainly the one wanted, of the six colours and white: the closest of the seven, well
+    clear of the next closest (under 0.6 of the way to it, so a mix of two clips, a grey or a black is none of
+    them), and never more than 80 from it. Why not one fixed distance: a video's colour is a little off what was
+    drawn (it is stored as brightness and colour difference, then turned back), and how far off is the Mac's
+    doing, more on a Mac with no graphics chip (GitHub's, Nov 17: the right clips, 63 off, under a limit of 60).
+    The seven are at least 120 apart, so the wrong clip is never the closest."""
     def dist(x):
-        return sum((a - b) ** 2 for a, b in zip(c, x))
-    return min(COLOURS + [WHITE], key=dist) == tuple(want) and dist(want) < 60 ** 2
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(c, x)))
+    first, second = sorted(COLOURS + [WHITE], key=dist)[:2]
+    return first == tuple(want) and dist(first) < 0.6 * dist(second) and dist(first) < 80
 
 
 def tree(folder):
