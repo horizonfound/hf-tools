@@ -2144,6 +2144,97 @@ document.querySelectorAll('img[data-again]').forEach(function(i){
 });
 // back to this page from the words page, the reel page or a designer: drawn again, so it shows what was just made
 window.addEventListener('pageshow', function(e){ if (e.persisted) location.reload(); });
+
+// The kit, made (Nicole, Nov 17): the first time a kit opens, its photos pile up, fan out and fly in an arc into
+// the Reels, Carousel and Stories cards, which pulse coral. Once per kit (her key, kitFan:<shoot>, kept in this
+// browser); ?fan=1 plays it again. Skipped when the computer is set to reduce motion. It is only a picture laid
+// over the page: presses pass through it, nothing waits for it, and it takes itself away when it ends.
+function kitFan(){
+  if (!live) return;
+  let srcs = [];
+  try { srcs = JSON.parse(document.getElementById('kit-fan').textContent) || []; } catch (e) { return; }
+  if (!srcs.length || !Element.prototype.animate) return;
+  const key = 'kitFan:' + KIT;
+  let again = false, seen = false;
+  try { again = new URLSearchParams(location.search).get('fan') === '1'; } catch (e) {}
+  try { seen = !!localStorage.getItem(key); } catch (e) {}          // storage blocked: it simply plays
+  if (seen && !again) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // each photo's small copy; one still being made is asked for again a few times, then left out
+  function fetchOne(src){
+    return new Promise(function(done){
+      let n = 0;
+      (function ask(){
+        const im = new Image();
+        im.onload = function(){ done(im.naturalWidth ? im : null); };
+        im.onerror = function(){ if (++n <= 6) setTimeout(ask, 1500); else done(null); };
+        im.src = src + (n ? '&try=' + n : '');
+      })();
+    });
+  }
+  Promise.all(srcs.slice(0, 9).map(fetchOne)).then(function(got){
+    const pics = got.filter(Boolean);
+    const cards = Array.prototype.slice.call(document.querySelectorAll('#pieces .piece'));
+    const title = document.querySelector('.head h1');
+    if (!pics.length || !cards.length || !title || document.getElementById('kitFan')) return;
+    try { localStorage.setItem(key, '1'); } catch (e) {}             // marked seen only when it really plays
+    fanOut(pics, cards, title);
+  });
+}
+function fanOut(els, cards, title){
+  const layer = document.createElement('div');
+  layer.id = 'kitFan'; layer.setAttribute('aria-hidden', 'true');
+  layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden';
+  document.body.appendChild(layer);
+  let gone = false;
+  function away(){ if (!gone) { gone = true; layer.remove(); } }
+  const n = els.length, mid = (n - 1) / 2, vw = window.innerWidth, vh = window.innerHeight;
+  const cx = vw / 2, cy = Math.min(vh * .42, title.getBoundingClientRect().bottom + 150);
+  const spread = Math.min(80, (vw - 160) / n);
+  function pile(k){ return 'rotate(' + (k - mid) * 3 + 'deg)'; }
+  function fanned(k){ return 'translate(' + (k - mid) * spread + 'px,' + (Math.abs(k - mid) * 6 - 20) + 'px) rotate(' + (k - mid) * 7 + 'deg)'; }
+  const total = 650 + 1050 + (n - 1) * 80 + 800;
+  setTimeout(away, total + 1500);                                    // whatever happens, it never stays on the page
+  try {
+    els.forEach(function(im, k){
+      im.alt = '';
+      im.style.cssText = 'position:absolute;left:' + (cx - 55) + 'px;top:' + (cy - 69) + 'px;width:110px;height:138px;object-fit:cover;'
+        + 'border-radius:8px;box-shadow:0 10px 26px rgba(31,36,48,.28);pointer-events:none;opacity:0;transform:' + pile(k) + ' scale(.6)';
+      layer.appendChild(im);
+      // 1. the pile appears
+      im.animate([{opacity: 0, transform: pile(k) + ' scale(.6)'}, {opacity: 1, transform: pile(k) + ' scale(1)'}],
+                 {duration: 420, delay: k * 35, easing: 'cubic-bezier(.2,.9,.3,1.2)', fill: 'forwards'});
+    });
+    // 2. it fans out
+    setTimeout(function(){
+      els.forEach(function(im, k){
+        im.animate([{opacity: 1, transform: pile(k)}, {opacity: 1, transform: fanned(k)}],
+                   {duration: 650, delay: k * 25, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards'});
+      });
+    }, 650);
+    // 3. each one flies in an arc into its card (Reels, Carousel, Stories), and the card pulses coral as it lands
+    setTimeout(function(){
+      els.forEach(function(im, k){
+        setTimeout(function(){
+          if (gone) return;
+          const card = cards[k % cards.length], h = (card.querySelector('h2') || card).getBoundingClientRect();
+          const tx = Math.max(20, Math.min(vw - 20, h.left + 60 + Math.floor(k / cards.length) * 34)) - cx;
+          const ty = Math.max(20, Math.min(vh - 30, h.top + h.height / 2)) - cy;
+          im.animate([{opacity: 1, transform: fanned(k)},
+                      {opacity: 1, transform: 'translate(' + ((k - mid) * spread + tx) / 2 + 'px,' + (ty / 2 - 70) + 'px) rotate(' + (k - mid) * 4 + 'deg) scale(.8)', offset: .5},
+                      {opacity: 0, transform: 'translate(' + tx + 'px,' + ty + 'px) rotate(0deg) scale(.28)'}],
+                     {duration: 800, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'forwards'});
+          setTimeout(function(){
+            card.animate([{boxShadow: '0 0 0 0 rgba(240,127,90,0)'}, {boxShadow: '0 0 0 3px rgba(240,127,90,.9), 0 0 34px rgba(240,127,90,.45)'},
+                          {boxShadow: '0 0 0 0 rgba(240,127,90,0)'}], {duration: 900, easing: 'ease-out'});
+            if (k === n - 1) away();
+          }, 800);
+        }, k * 80);
+      });
+    }, 650 + 1050);
+  } catch (e) { away(); }
+}
+kitFan();
 })();
 """
 
@@ -2365,6 +2456,38 @@ def card_facts(kit, rec=None):
     }
 
 
+FAN_MOST = 9          # hers: 9 photos pile up and fan out
+
+
+def fan_facts(kit, rec, reel_order):
+    """The photos the fan plays with the first time a kit opens (Nicole's v28): the reel's photos in their order
+    first, then photos spread evenly through the shoot, each once, 9 at most; a kit with fewer uses what it has,
+    a kit with none gets an empty list and nothing plays. Returns (their addresses, whether one still has no small
+    copy made). An address is the pickers' own /kit-photo with the photo's number: never a path or a file name.
+    Reads only."""
+    import arrange
+    try:
+        rows = arrange.sheet_rows(kit)
+    except (OSError, ValueError, TypeError, KeyError):
+        rows = []
+    if not rows:
+        return [], False
+    by_n = {r["n"]: r for r in rows}
+    nums = [n for n in reel_order if n in by_n]
+    step = max(1, len(rows) // FAN_MOST)
+    nums += [r["n"] for i, r in enumerate(rows) if i % step == 0]
+    chosen = []
+    for n in nums:
+        if n not in chosen:
+            chosen.append(n)
+    # a few more than 9 are looked at, so a photo that can't be shown doesn't leave the fan short
+    photos, _ = arrange.page_photos(kit, rec, [by_n[n] for n in chosen[:FAN_MOST * 2]])
+    shown = [ph for ph in photos if not ph["missing"]][:FAN_MOST]
+    kq = quote(kit.name)
+    return ([f"/kit-photo?kit={kq}&n={ph['n']}&size=s&v={quote(ph['v'] or '')}" for ph in shown],
+            any(not ph["have"] for ph in shown))
+
+
 def steps_facts(kit, f):
     """Steps 2 and 3 for the reel and the carousel: each piece's words (words.py status: the words page's record,
     nothing else) and its place in the posting queue (words_page.queue_state, the same one the words page shows),
@@ -2530,6 +2653,13 @@ def build_page(kit):
                f"<a class='go' id='queueLink' href='/posting.html'>{html.escape(KIT_WORDS['my_queue'])} &rarr;</a></p>"
                "<p class='went' id='folderWent'></p>")
 
+    # v28: the photos that fan out into the cards the first time this kit opens (the page's script decides whether)
+    try:
+        fan, fan_need = fan_facts(kit, rec, f["reel_order"])
+    except Exception:  # noqa: BLE001  (the fan is a flourish: it never stops the page from being built)
+        fan, fan_need = [], False
+    need_previews = need_previews or fan_need
+
     import words_page
     page_words = {k: KIT_WORDS[k] for k in ("opening_capcut", "capcut_unreached", "how_often", "how_often_b", "adding", "cant_add", "not_saved",
                                             "nocap_title", "nocap_text", "nocap_add", "nocap_write", "which_title", "which_text")}
@@ -2543,6 +2673,7 @@ def build_page(kit):
             f"<div id='pieces'>{cards}</div>{also}</div>"
             + ASK_BOX +
             f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
+            f"<script type='application/json' id='kit-fan'>{json.dumps(fan, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script>{SCRIPT}</script></body></html>")
     return page, need_previews
 
