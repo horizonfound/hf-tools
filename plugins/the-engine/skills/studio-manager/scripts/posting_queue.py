@@ -2043,7 +2043,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path in ("/home", "/home.html"):
             import home
-            body = home.page_html().encode()
+            body = home.page_html(urlsplit(self.path).query, start=True).encode()
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -2071,6 +2071,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the talking reel page (Nicole's v24): every one of its requests is talking_page.py's to answer
             import talking_page
             return talking_page.handle_get(self, path, urlsplit(self.path).query)
+        if path == "/kit-faces":
+            # where the faces are in a kit's photos, for the home page's hello (Nicole's v28): faces.py's to answer
+            import faces
+            return faces.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/wrapped.html", "/wrapped-data", "/wrapped-font"):
             # Your year and the monthly recap (Nicole's v28): every one of its requests is wrapped.py's to answer
             import wrapped
@@ -2463,6 +2467,10 @@ class Handler(SimpleHTTPRequestHandler):
             # a story of Your year or the monthly recap saved as a picture: wrapped.py checks it the way arrange.py does
             import wrapped
             return wrapped.handle_post(self, path, urlsplit(self.path).query)
+        if path == "/home-recap":
+            # the home page's monthly recap card, hidden or shown again: home.py checks it the way arrange.py does
+            import home
+            return home.handle_post(self, path, urlsplit(self.path).query)
         if path == "/kit-archive":
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
