@@ -16,11 +16,12 @@ assistant." So the numbers are the photographer's own work, counted from the rec
 NOTHING new is stored; everything here only reads, except a saved story picture.
 
 WHAT EACH NUMBER IS COUNTED FROM (every one a count of records; the only estimate is the time saved):
-  reels          every reel made in the period: each entry of a kit's .kit/reel-page.json "made" list that names a
+  reels          the reels made in the period, each reel ONCE, on the day it was first made: each entry of a kit's .kit/reel-page.json "made" list that names a
                  CapCut project or a saved video, by its "when"; a reel made from the chat the older way (kit.json
                  "reel", when the page's list does not know that project), by its "made"; and every talking reel
                  made (.kit/talking.json "made", the open reel's and each other reel's), by its "when".
-                 (COUNT_EACH_MAKE, below: hers counts every make, so making one reel again counts again.)
+                 A reel made again (another mix, a fix, a test) is still one reel, and stays in the month of
+                 its first make. (COUNT_EACH_MAKE, below, turns that round: every make counts.)
   carousels      the carousel designs slides were saved from (kit.json "laid_out" and "carousel_set": one per
                  design, however often it was saved again), by the day of the first save.
   stories        the same for sets of stories (kit.json "stories_laid_out" and "stories_set").
@@ -82,7 +83,10 @@ GET_PATHS = ("/wrapped.html", "/wrapped-data", "/wrapped-font")
 POST_PATHS = ("/share-image", "/share-open")
 
 MINUTES_SAVED = {"reel": 45, "carousel": 30, "stories": 20}     # hers: about how long each takes by hand. An estimate.
-COUNT_EACH_MAKE = True      # hers: every make of a reel counts. False: each reel counts once, on the day it was first made.
+# False (Nicole, v29 2.2, Nov 19): each reel counts once, on the day it was first made. Her November recap said
+# 79 reels because every make counted, test makes too; she wants what she actually made. The hours saved follow
+# (45 minutes a reel, counted once). True is her v28 way: every make of a reel counts.
+COUNT_EACH_MAKE = False
 REAL_SHOOT = 10             # hers: a shoot off a card counts when it has this many photos
 FAVS = 12                   # hers: up to this many of a shoot's photos are used for the pictures
 SHARE_FOLDER = "Stories to share"                               # hers: beside the content folder

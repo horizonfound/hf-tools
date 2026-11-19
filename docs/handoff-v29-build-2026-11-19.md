@@ -430,3 +430,21 @@ For whoever closes the build: a sweep of every test, one at a time under the gua
 ## Built
 
 (Each stage's builder adds its note here, under its own heading.)
+
+### Stage 1, `recap`, built (Nov 19)
+
+**What changed.**
+- `wrapped.py`: `COUNT_EACH_MAKE = False`. The recap and Your year count each reel once, on the day it was first made, however many times Make was pressed on it. The comment on the switch says who decided and why (Nicole, v29 2.2: 79 reels for November was every make counted). The notes at the top of the file say the same. No words on any page changed.
+- The hours saved, the recap card's chips on the home page, each shoot's own count, the top shoot and "shoots shared" all follow by themselves; they read the same count.
+- `parts/hello.md`: one sentence added where the assistant is told what a number counts ("A reel counts once, however many times they pressed Make on it, in the month it was first made."). `parts/where-things-live.md` never said every make counts; unchanged.
+- `tests/wrapped_check.py`: "once" is the expected way throughout, and a new group, "each reel once": three makes of one reel in a month with nothing else in it read 1 reel, 45 minutes saved, "1 reel" in the chips and on the recap card, and the same month with the switch turned back would read 3 reels and 135 minutes. The test now puts the switch back to what the file ships with after trying the other way (before, it forced a value, which would have hidden a switch turned back).
+- `tests/home_v28_check.py`: its pretend kit had the same reel made in October and again in November, which is now one October reel; the two makes are now two different reels of the shoot, so November still has something to recap. Test data only.
+
+**Checked,** this Mac, pretend kits, a scratch home, both Pythons (3.12 and Apple's 3.9), same counts on both: `wrapped_check.py` 132 of 132 (it was 121), `home_v28_check.py` 175 of 175, `skill_text_check.py` 640 of 640, `workflow_check.py` 14, `tools/check_pc.py` and `tools/check_plugin.py` clean. With the switch turned back by hand, `wrapped_check.py` fails 13 cases, the new ones among them. `wrapped_check.py` was already in `check-pc.yml`; no change there.
+
+**Not tried.** Nicole's real November (whether 79 becomes the number she expects is not known: her records are not here). Nobody has looked at the recap page or the card by eye since the change. Windows and GitHub: nothing pushed.
+
+**Choices for Dustin and Nicole.**
+1. **A reel made again in a later month stays in the month it was first made.** A reel first made in October and reworked in November counts for October only, so November's recap does not show it. The other way (count it once in every month it was made in) would let a year's months add up to more than the year.
+2. **"One reel" means one reel on the reel page's Your reels list** (or one talking reel on its list). Starting a new reel with + Start a new reel counts as another; Try another mix and Make again on the same reel do not. A reel made from the chat the older way counts as the shoot's first reel.
+3. **Reels made before v26 (no list of reels) all count as that shoot's first reel,** so an older shoot with several separately made reels reads as one.

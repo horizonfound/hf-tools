@@ -113,8 +113,10 @@ class World:
         rec["date"] = "2026-11-02"
         self.put(self.content / B / ".kit" / "kit.json", rec)
         a = self.content / A
-        # kit A: a reel made in November (so November has something to recap) and one in October
-        self.put(a / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")},
+        # kit A: a reel made in November (so November has something to recap) and one in October. They are two
+        # different reels of the shoot (v2 and the first): since v29 a reel counts once, in the month of its first
+        # make, so a second make of ONE reel in November would leave November with nothing to recap
+        self.put(a / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"},
                                                                    {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
         self.posting(interval=3.5)
         self.queue()
@@ -527,7 +529,7 @@ def check_recap(w, home):
     at("2026-12-03")
     case("... it was this month only: November recapped is hidden in December's first week (the same month's card)", " hidden>" in home.page_html().split("id='rc'", 1)[1][:40])
     at("2026-12-10")
-    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")}, {"project": "Dec", "when": ts("2026-12-09T10:00:00")}]})
+    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"}, {"project": "Dec", "when": ts("2026-12-09T10:00:00"), "version": "v3"}]})
     case("... and the next month's card shows again", "<div class='rc' id='rc' data-m='2026-12'>" in home.page_html())
     home.set_recap_hide("all")
     case("Stop showing monthly recaps: every month is hidden, and the choice before is kept beside it",
@@ -546,7 +548,7 @@ def check_recap(w, home):
     case("a choice file that can't be read hides nothing", home.recap_hide() == "" and "id='rc' data-m" in home.page_html())
     home.RECAP.unlink()
     home.RECAP_PREV.unlink()
-    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")}, {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
+    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"}, {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
     at(TODAY)
 
 
