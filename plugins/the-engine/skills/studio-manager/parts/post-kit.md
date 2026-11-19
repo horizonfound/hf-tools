@@ -43,3 +43,36 @@ Most of the time a photographer sits down with finished photos, not a card. The 
 ## "Show my post kit"
 
 "Show my post kit", "show me the beach kit", "open the post kit": the kit page, loaded fresh in the Claude app's browser pane every time they ask (never Chrome, never the file). Find the kit they mean (`posts.py list` names every kit in Your Content; the newest one if they don't say), then `python3 <scripts>/home.py url` (it starts the page server if it isn't running and prints `http://127.0.0.1:<port>/home`), load `http://127.0.0.1:<port>/content/<kit folder, URL-encoded>/Post kit.html` and bring the pane forward (`mcp__ccd_view__show_pane`, pane `preview`). Then one line: "There it is." If they want to do something on it, step 6 above says what each card opens.
+
+## "Bring my old reels over": reels made on the older pages
+
+Some photographers made reels and talking reels on an earlier version of these pages, which kept them in a hidden folder beside Your Content, not in each shoot's post kit. On today's pages those shoots show no reel. When they say "bring my old reels over", "my reels are gone", "my old reels aren't showing" or "where did my talking reel go", this is the way back. Never rebuild a reel by hand, and never copy or edit a record yourself.
+
+1. **Look first. It changes nothing.**
+
+```
+python3 <scripts>/bring_older.py look
+python3 <scripts>/bring_older.py look --shoot "Katie"
+```
+
+2. **Read it back in plain words, shoot by shoot:** which reels and talking reels can come over and what each holds (how many photos, the song, the pace), which will sit beside a reel they already have here and under what name, and what can't come and why. Say what is left out (a song that is no longer in the shoot's Music folder, a clip whose video is gone, a reel noted as made when CapCut has no such project). Read out every line that starts "Check:" (a post in their posting queue that may now point at a different reel, and what to do about it). No file names unless they ask, with one exception: when the output says the photo numbers are "NOT checked" (see below), the file names are the whole point. Then one question, with buttons: "Bring them over?" [Yes, bring them over] [Not now].
+
+3. **Only on their yes:**
+
+```
+python3 <scripts>/bring_older.py bring
+```
+
+Then say what came over, and show the shoot's reel page or talking reel page so they see it (`parts/arrange.md`, `parts/talking-reel.md`). When a reel was added beside one they already had, the page still opens on theirs: say "it's under Your reels, called <the name the output gave>", so they don't see the same page as before and think nothing happened.
+
+What it promises, so you can say so: the older records are only read, never changed. Nothing here is written over: a shoot with no reel yet (or a reel page that was only ever opened, with nothing chosen on it) gets the older ones as its reels; a shoot that already has a reel gets the older ones added beside it under their own names (a name that is taken gets "(older)" after it), and the reel that was open stays open. Every photo is matched by its file name, never by its old number, because the two pages numbered photos differently; a reel with even one photo it can't match for certain is left where it is, and the line says which photo. Running it again brings nothing twice.
+
+- **When the photo numbers can't be checked** (the output says the older page's own list of photos isn't there): nothing can prove which photo each number meant. Ask: "After you first opened this shoot on the older pages, did you ever add photos to it or take any out?" (Ever, not only since the reel was made: the older page put a photo added later at the end of its numbers, so the order of the names stopped matching.) If they did, or aren't sure, that reel stays where it is; say so plainly, and that it can be made again on the reel page. Only if they say no, never: run `look` again with `--photos-unchanged`. It lists, reel by reel, the file name it would take for each photo, marked "NOT checked". **Read those file names to them, reel by reel, and ask "Are those the photos that reel had?"** Only on a yes for that shoot, run `bring --shoot "<shoot>" --photos-unchanged --names-confirmed`. Never add `--names-confirmed` on your own judgment; without it `bring` brings nothing that leans on a photo number.
+- **"This shoot's own reel record here is there but can't be read":** the reel record in the post kit can't be read right now (the drive, or a file that was cut short). Nothing was brought for that shoot and nothing was written; that is on purpose, so a reel they have is never taken for an empty one. Check the drive is plugged in and run it again. If it says the same, stop there and say so plainly: don't open, mend or remove the record yourself.
+- **A line starting "Check:"** names a post in their posting queue. A queued post knows its reel by the reel's place in the shoot's list; an older reel keeps its place here whenever that place is free, and when it is not (the shoot already had a reel of its own there) the line says which post to look at. Tell them: if that post was added on the older page, take it out of the queue and add the reel again from the post kit.
+- **"An empty reel called ... stays in this shoot's list":** one of the older reels could not be brought, and an empty reel holds its place so the others keep theirs. It is harmless; they can use it for a new reel.
+- **Two older talking reels made from the same video** with different scripts: only one comes (the one that was open there). The line says which; the other is made again with Edit my video in a new talking reel.
+- **A talking reel whose video "was saved again after its script was made"** can't come over: the script's timing belongs to the earlier file. They press Edit my video on the talking reel page for a fresh script.
+- **A talking reel that came over may have an empty player** on the page when the small copy to play couldn't be made (always on a PC). The script, the cuts and the photos are there. Say so; don't tell them to press Edit my video to fix it, since that starts the script and the cuts afresh.
+- **If the older reels were kept somewhere else** (the output says there is no `.studio` folder beside Your Content): ask where, check the drive is plugged in, and name the folder with `--from "<that folder>"`.
+- Exit 0: done or nothing to do. 1: some could not be brought (the lines say which). 2: stopped before anything (no older folder, no such shoot).
