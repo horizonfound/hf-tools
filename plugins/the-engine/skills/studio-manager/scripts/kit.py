@@ -232,6 +232,30 @@ def photo_files(folder):
     return sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in PHOTO and not p.name.startswith("."))
 
 
+def is_vault(rec):
+    """The vault (v29): the one post kit whose numbered list points at every other kit's photos (vault.py)."""
+    return isinstance(rec, dict) and rec.get("vault") is True
+
+
+def photo_list(kit, rec=None):
+    """A kit's photos as plain files, for the few readers that want them so (a tile, the facts): the files in its
+    photos folder, exactly as before; for the vault, the photos its list points at that are there right now."""
+    rec = rec if rec is not None else load_rec(kit)
+    if is_vault(rec):
+        import vault
+        return vault.files(kit)
+    return photo_files(photos_dir(kit, rec))
+
+
+def _vault_rows(kit, rows):
+    """Rows of a numbered list as they are; for the vault's list (its rows name the post kit each photo is in),
+    with `file` as where each photo is today."""
+    if any(isinstance(x, dict) and isinstance(x.get("kit"), str) for x in rows):
+        import vault
+        return vault.with_files(kit, rows)
+    return rows
+
+
 # ---------- how long a path may be (a PC only) ----------
 #
 # On a PC a file whose full address (the drive, every folder on the way, its own name) passes 260 characters
@@ -358,6 +382,18 @@ def sheet(kit, quick=False):
     """The kit's numbered list, made by reel.py sheet (the one writer) and copied to .kit/sheet.json. `quick`
     (the reel page's own re-list when photos were added, her v27): the list only, no contact sheet drawn."""
     rec = load_rec(kit)
+    if is_vault(rec):
+        # The vault's list is references to every other kit's photos, and vault.py is its one writer: the same
+        # promise (no number ever moves), the same file, nothing copied, nothing written into another kit.
+        import vault
+        try:
+            res = vault.relist(kit, quick=quick)
+        except vault.Trouble as e:
+            say(f"STOP: {e}")
+            return 1
+        vault._say_relist(res)
+        say(f"List: {kit / '.kit' / 'sheet.json'}")
+        return 0
     folder = photos_dir(kit, rec)
     args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
     if quick:
@@ -401,7 +437,7 @@ def numbered(kit):
     if not p.exists():
         say("STOP: make the sheet first (kit.py sheet), so the picks have numbers.")
         sys.exit(2)
-    return {x["n"]: x for x in json.loads(p.read_text(encoding="utf-8"))["photos"]}
+    return {x["n"]: x for x in _vault_rows(kit, json.loads(p.read_text(encoding="utf-8"))["photos"])}
 
 
 def parse_nums(s):
@@ -870,7 +906,7 @@ def _sweep_parts(folder):
 def _sheet_or_none(kit):
     """The numbered photos by number, or None when the list is not there or cannot be read. Never exits."""
     try:
-        return {x["n"]: x for x in json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))["photos"]}
+        return {x["n"]: x for x in _vault_rows(kit, json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))["photos"])}
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -917,7 +953,10 @@ def carousel_plan(kit, rec=None, nums=None):
         name = f"Slide {i:02d} ({listed.stem}).jpg"
         here = folder / listed.name        # the folder the kit names now, the file name from the list
         wanted.append(name)
-        src[name] = here if here.is_file() else listed
+        if isinstance(by_n[n].get("kit"), str):
+            src[name] = listed             # the vault: the photo is in the kit its row names (_vault_rows), never looked for by name here
+        else:
+            src[name] = here if here.is_file() else listed
         n_of[name] = n
     have = _names(kit / "Carousel")
     wanted_nf = {_nf(n) for n in wanted}
@@ -1639,8 +1678,7 @@ def time_words(times):
 
 def facts(kit):
     rec = load_rec(kit)
-    folder = photos_dir(kit, rec)
-    files = photo_files(folder)
+    files = photo_list(kit, rec)           # the vault: the photos its list points at
     exifs = [exif_read.read(f) or {} for f in files[:120]]
     times = sorted(e["taken"] for e in exifs if e.get("taken"))
     lenses = sorted({e["lens"] for e in exifs if e.get("lens")})

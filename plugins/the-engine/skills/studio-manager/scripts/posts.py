@@ -924,7 +924,10 @@ def do_sort(h, mode, specs, one_name, undated_to, dry_run):
 
 # ---------- what's there ----------
 
-def kits(h):
+def kits(h, vault=False):
+    """Every shoot folder in Your Content, newest first. The vault (v29: the one post kit that draws from every
+    shoot; its record says "vault": true) is not a shoot, so it is left out of every list of shoots unless asked
+    for (vault=True; it then carries "vault": True)."""
     out = []
     c = h / CONTENT_NAME
     if not c.is_dir():
@@ -941,9 +944,14 @@ def kits(h):
                 pass
             if not isinstance(info, dict):      # a record that is not a record: one odd kit never hides the others
                 info = {}
+        is_vault = info.get("vault") is True
+        if is_vault and not vault:
+            continue
         photos = len([p for p in (d / "Photos").iterdir() if p.is_file() and not p.name.startswith(".")]) if (d / "Photos").is_dir() else 0
         out.append({"folder": d.name, "path": str(d), "name": info.get("name", d.name), "date": info.get("date"), "photos": photos,
                     "kit": (d / ".kit" / "Post kit.html").exists() or (d / "Post kit.html").exists()})
+        if is_vault:
+            out[-1]["vault"] = True
     out.sort(key=lambda k: (k["date"] if isinstance(k["date"], str) else "", k["folder"]), reverse=True)
     return out
 

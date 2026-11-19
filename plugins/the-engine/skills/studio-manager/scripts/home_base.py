@@ -775,7 +775,7 @@ def kit_thumb(name, i):
         if dst.is_file():
             return dst
         try:
-            photos = kit_mod.photo_files(kit_mod.photos_dir(kit, kit_mod.load_rec(kit)))[:3]
+            photos = kit_mod.photo_list(kit, kit_mod.load_rec(kit))[:3]     # the vault: its list's first three
             if i > len(photos):
                 return None
             dst.parent.mkdir(parents=True, exist_ok=True)

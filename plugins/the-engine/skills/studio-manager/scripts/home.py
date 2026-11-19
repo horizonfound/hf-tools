@@ -471,6 +471,12 @@ _NOT_A_NAME = ("The", "At", "A", "An", "My", "Our", "Test", "Home", "Family", "F
 
 def who(name):
     name = str(name or "").strip()
+    try:                                # the vault (v29) reads whole, "My vault reel is waiting": one helper says so
+        import vault
+        if vault.who(name) is not None:
+            return name
+    except Exception:  # noqa: BLE001
+        pass
     first = (name.split() or [""])[0]
     if len(first) > 1 and first[0].isupper() and first[1:].islower() and first.isalpha() and first.isascii() and first not in _NOT_A_NAME:
         return first + "’s"

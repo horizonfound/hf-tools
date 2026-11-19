@@ -1646,10 +1646,30 @@ def check_backup_zero():
          and "quick question" not in " ".join(home_base.WORDS.values()))
 
 
+def check_vault_core():
+    """The vault as a real post kit (Nicole's v29, 1.3; stage 6): where it lives, and the designer's blank first design."""
+    print("\nThe vault's folder and records (Nov 19)")
+    where = re.sub(r"\s+", " ", read(SM / "parts" / "where-things-live.md"))
+    src = read(SM / "scripts" / "vault.py")
+    for name in ("vault.json", "sheet.prev.json"):
+        case(f"where-things-live names {name}, and vault.py still uses that name", f"`{name}`" in where or f"`.kit/{name}`" in where and f'"{name}"' in src)
+    for key in ("numbers", "next", "out", "from"):
+        case(f"where-things-live names vault.json's `{key}`, and vault.py still writes it", f"`{key}`" in where and f'"{key}"' in src)
+    case("it says the vault is found by its mark, is made only by a command, and copies no photo",
+         '"vault": true' in where and "never by its name" in where and "`vault.py ensure`" in where and "no photo is copied to be in it" in where)
+    case("it says the vault only reads other post kits", "the vault only reads other post kits and never writes anything into one" in where)
+    for cmd in ("show", "ensure", "relist", "members"):
+        case(f"`vault.py {cmd}` is a command vault.py has", f"`vault.py {cmd}" in where and f'add_parser("{cmd}")' in src)
+    arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
+    des = read(SM / "scripts" / "design.py")
+    case("the designer's blank first design in the vault: the line design.py prints starts BLANK:, and arrange.md says what to say for it",
+         'OPEN_NEW_BLANK = "BLANK:' in des and "If it starts `BLANK:`" in arr and "blank slides to start" in arr)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

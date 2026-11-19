@@ -400,7 +400,13 @@ def cover_file(kit_dir, role, rel, rec=None):
         return None
     try:
         if role == "reel" and head == "Photos":
-            row = next((r for r in arrange.sheet_rows(kit_dir) if _nfc(arrange.photo_name(r)) == _nfc(name)), None)
+            if re.fullmatch(r"#[0-9]{1,6}", name):
+                # the vault (v29): two shoots may both hold IMG_0001.jpg, so its photos are picked by their number
+                # there ("Photos/#12"; no photo's own name looks like that), never by a name two of them share
+                row = next((r for r in arrange.sheet_rows(kit_dir) if isinstance(r.get("kit"), str) and r["n"] == int(name[1:])), None)
+            else:
+                row = next((r for r in arrange.sheet_rows(kit_dir) if not isinstance(r.get("kit"), str)
+                            and _nfc(arrange.photo_name(r)) == _nfc(name)), None)
             f = arrange.photo_path(kit_dir, rec if rec is not None else kit_mod.load_rec(kit_dir), row) if row else None
         elif role == "carousel" and head == "Carousel":
             f = next((x for x in kit_mod.carousel_shown(kit_dir, rec)["files"] if _nfc(x.name) == _nfc(name)), None)
@@ -578,7 +584,7 @@ def add_for_kit(p, kit_dir, reel=None):
     name = rec.get("name") or kit_dir.name
     sid = kit_sid(p, kit_dir)
     THUMBS.mkdir(parents=True, exist_ok=True)
-    photos = kit_mod.photo_files(kit_mod.photos_dir(kit_dir, rec))
+    photos = kit_mod.photo_list(kit_dir, rec)       # the vault: the photos its list points at
 
     def thumb_of(src, pid):
         if not src or not Path(src).exists():
@@ -1013,7 +1019,8 @@ def panel_choices(x, kit):
             continue                                   # can't be reached, or can't be read: not one to pick
         need = need or not ph["have"]
         out.append({"src": "/kit-photo?kit=%s&n=%d&size=s&v=%s" % (kq, ph["n"], quote(ph["v"] or "", safe="")),
-                    "rel": "Photos/" + arrange.photo_name(row), "in_reel": row["n"] in inside})
+                    "rel": "Photos/" + ("#%d" % row["n"] if isinstance(row.get("kit"), str) else arrange.photo_name(row)),
+                    "in_reel": row["n"] in inside})
     return out, need
 
 

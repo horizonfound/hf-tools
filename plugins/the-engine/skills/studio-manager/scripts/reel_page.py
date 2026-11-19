@@ -1189,7 +1189,7 @@ def sync(kit):
         # the list was re-made: find each photo again by its file name
         n_of = {}
         for x in rows:
-            n_of.setdefault(arrange.photo_name(x), x["n"])
+            n_of.setdefault(arrange.photo_key(x), x["n"])
         old = rec.get("names") or {}
         for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):      # every reel of the shoot, the open one first
             s = d.get("saved")
@@ -1218,7 +1218,7 @@ def _names(saved, name_of, rec=None):
 
 def _stamp_names(rec, rows, stamp):
     """The record's file name for every number it mentions, and the numbered list it is in line with."""
-    name_of = {x["n"]: arrange.photo_name(x) for x in rows}
+    name_of = {x["n"]: arrange.photo_key(x) for x in rows}
     names = {}
     for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):          # every reel of the shoot
         names.update(_names(d.get("saved") if isinstance(d.get("saved"), dict) else {}, name_of, d))
@@ -1452,7 +1452,7 @@ def order_for_kit_page(kit, rows=None, rec_kit=None, reel=None, rec=None):
     if rec.get("stamp") and stamp and rec.get("stamp") != stamp:
         n_of = {}
         for x in rows:
-            n_of.setdefault(arrange.photo_name(x), x["n"])
+            n_of.setdefault(arrange.photo_key(x), x["n"])
         if saved:
             saved = dict(saved)
             for key in ("picks", "mine_picks"):
@@ -3305,6 +3305,10 @@ def _make(kit, ask, jid, t0, preview=False, work=None, limit=None):
         return {"state": "problem", "problem": OUR_WORDS["photos_changed"]}
     listing = [{"n": x["n"], "file": str(photos / arrange.photo_name(x)), "w": x.get("w") or 0, "h": x.get("h") or 0,
                 "way": x.get("way") or ""} for x in rows]
+    if kit_mod.is_vault(rec_kit):                 # the vault: each photo is where its own post kit keeps it
+        import vault
+        for one, x in zip(listing, vault.with_files(kit, rows)):
+            one["file"] = x["file"]
     work = (kit / ".kit" / (work or PREVIEW_WORK)) if preview else (reel.kit_workdir(kit) or reel.workdir(rec_kit.get("name") or short, str(photos)))
     work.mkdir(parents=True, exist_ok=True)
     arrange.write_whole(work / "photos.json", {"folder": str(photos), "photos": listing})
@@ -3898,10 +3902,22 @@ def relist_if_changed(kit):
             return False
         _RELIST[str(kit)] = now
     try:
+        rec = kit_mod.load_rec(kit)
+        if kit_mod.is_vault(rec):
+            # the vault: its list follows every other kit's list and its own Photos folder (vault.py, its one
+            # writer). Also when the list is still empty: the first photos may have just arrived.
+            import vault
+            ch = vault.changed(kit)
+            if not ch["changed"] or not ch["settled"]:
+                return False
+            res = vault.relist(kit, quick=True)
+            if res.get("same"):
+                return False
+            arrange.start_previews(kit)
+            return True
         rows = arrange.sheet_rows(kit)
         if not rows:
             return False
-        rec = kit_mod.load_rec(kit)
         folder = kit_mod.photos_dir(kit, rec)
         reel = _reel_module("reel")
         listed = {reel._photo_key(arrange.photo_name(x)) for x in rows}
@@ -3922,7 +3938,7 @@ def relist_if_changed(kit):
             return False
         arrange.start_previews(kit)
         return True
-    except (OSError, ValueError, TypeError, AttributeError, ImportError) as e:
+    except (OSError, ValueError, TypeError, AttributeError, ImportError, RuntimeError) as e:
         arrange.log(f"reel page: the Photos folder couldn't be compared with the list: {e.__class__.__name__}: {str(e)[:160]}")
         return False
 
