@@ -1666,6 +1666,33 @@ def check_vault_core():
          'OPEN_NEW_BLANK = "BLANK:' in des and "If it starts `BLANK:`" in arr and "blank slides to start" in arr)
 
 
+def check_vault_everything():
+    """See everything in it (Nicole's v29, 1.6; stage 11): what the parts say, held to the code."""
+    print("\nSee everything in it, Remove from my vault, Put it back (Nov 19)")
+    kitp, core, where = read(SM / "parts" / "post-kit.md"), read(SM / "SKILL.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "vault_page.py")
+    sec = kitp.split("## My vault: one post kit for every shoot", 1)[-1].split("\n## ", 1)[0]
+    case("the switch is on, so the strip's link is drawn", "\nEVERYTHING = True" in src and "**See everything in it**" in sec)
+    case("See everything in it: the page's address, a route vault_page.py answers", "`/vault.html`" in sec and '"/vault.html"' in page)
+    case("her rule is there in her words, and Use it in a reel adds nothing", "**Nothing gets picked on this page; making happens in the post kit**" in sec
+         and "it adds nothing to any reel" in sec and '"use": "Use it in a reel"' in page)
+    case("take this out of my vault: `vault.py out`, a command vault.py has, by --photo or --clip", "`python3 <scripts>/vault.py out --photo <its vault number>`" in sec
+         and '`python3 <scripts>/vault.py out --clip "<shoot\'s folder>:<id>"`' in sec and '("out", "take one photo or clip out' in src and '"--photo"' in src and '"--clip"' in src)
+    case("it says nothing is deleted or moved, and to ask when more than one could be meant", "**Nothing is deleted and nothing is moved:**" in sec and "ask before taking anything out" in sec)
+    case("the lines it tells the assistant to say are the ones vault.py says", "Taken out of your vault. The photo itself is still in its shoot, and nothing was deleted." in sec
+         and '"photo_out": "Taken out of your vault. The photo itself is still in its shoot, and nothing was deleted."' in src
+         and "\"Back in your vault.\"" in sec and '"back": "Back in your vault."' in src)
+    case("put it back: `vault.py back`, a command vault.py has; the photo keeps its number and is not put back into a reel by itself",
+         "`python3 <scripts>/vault.py back --photo <number>`" in sec and '("back", "put a photo or clip that was taken out back' in src
+         and "comes back with the number it had" in sec and "not put back into a reel's order by itself" in sec)
+    case("the page's own names for it are the ones on the page", "**Put it back**" in sec and "**Taken out of my vault**" in sec and '"put_back": "Put it back"' in page
+         and '"out_fold": "Taken out of my vault ({n})"' in page and "**Remove from my vault**" in sec and '"remove": "Remove from my vault"' in page)
+    case("the core's table sends see everything, take this out and put it back to that section",
+         '| "see everything in it", "show me everything in my vault", "what\'s in my vault?", "take this out of my vault", "remove that clip from my vault", "put it back in my vault" | `parts/post-kit.md`, "My vault"' in core)
+    case("where-things-live says what the out list holds, that only vault.json is written, and names vault.prev.json", "`vault.prev.json`" in where and '"vault.prev.json"' in src
+         and "`<shoot's folder>:<the clip's id>`" in where and "writes only this file" in where and "`vault.py out`" in where and "`vault.py back`" in where)
+
+
 def check_vault_search():
     """Photo descriptions and the search rule (Nicole's v29, 1.4 and 1.5; stage 8): what the parts say, held to the code."""
     print("\nDescribing photos so they can be found, and search (Nov 19)")
@@ -1831,7 +1858,7 @@ def check_vault_reel_photos():
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

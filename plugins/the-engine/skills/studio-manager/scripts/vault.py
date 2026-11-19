@@ -34,6 +34,14 @@ This script is the one writer of the vault's list.
                                        them (photo_words.py) and their shoot's name, clips by their name and their
                                        shoot's name. Numbers and names only; reads only.
 
+    python3 vault.py out [--photo N | --clip "<shoot's folder>:<id>"]
+                                       Remove from my vault: take one photo (by its vault number) or one clip out.
+                                       ONLY the vault's own vault.json is written (the version before kept); no
+                                       photo, video or post kit is touched, and a photo's number stays its own.
+                                       With nothing after it: what was taken out. Twice changes nothing.
+    python3 vault.py back --photo N | --clip "<shoot's folder>:<id>"
+                                       Put it back, with the number it had.
+
 The search rule is hers and lives here, in one place (search_words, found): lower case, split on anything that is
 not a letter or a number, everyday words dropped, and every word left must be in the item's text.
 """
@@ -41,6 +49,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import unicodedata
 from datetime import datetime
@@ -57,7 +66,7 @@ MARK = "vault"                      # the field in kit.json (and in sheet.json) 
 OWN = ""                            # a row's "kit" for a photo in the vault's own Photos folder
 FOLDERS = ("Photos", "Footage", "Music", "Talking", "Carousel", "Stories", "Reels")
 WHATS = ("photos", "clips")         # what can be taken out of the vault (stage 11 uses it)
-EVERYTHING = False                  # "See everything in it" is drawn on the vault's page only once its page exists (stage 11 turns this on)
+EVERYTHING = True                   # "See everything in it" is drawn on the vault's page: its page is vault_page.py's /vault.html (stage 11)
 NAMES_MOST = 99                     # "My vault 99": past that something is badly wrong, and nothing is made
 
 
@@ -569,8 +578,11 @@ def rows_by_group(vault_kit):
     each post kit, newest first. [{"group": "added" | "kit", "kit", "name", "date", "rows"}]; a group with no
     rows is left out. Names and numbers only."""
     rows = _rows(Path(vault_kit) / ".kit" / "sheet.json")
-    by = {}
+    gone = (_state(vault_kit)["out"].get("photos") or {})          # taken out of the vault: left off at once (the
+    by = {}                                                         # list itself follows on the next look)
     for x in rows:
+        if gone and photo_out_key(x) in gone:
+            continue
         by.setdefault(x.get("kit") if isinstance(x.get("kit"), str) else OWN, []).append(x)
     out = []
     if by.get(OWN):
@@ -1002,7 +1014,7 @@ def _clips_of(kit_dir):
     return out
 
 
-def catalog(kit, photos=True, clips=True):
+def catalog(kit, photos=True, clips=True, with_out=False):
     """What a page needs to search a post kit, built once, with no place on this computer in it (`photos` False:
     the clips and the shoots only, for the reel page's clips panel, which asks often):
 
@@ -1017,7 +1029,10 @@ def catalog(kit, photos=True, clips=True):
     A page fetches a picture by number (/kit-photo?kit=<this kit>&n=<thumb>) and filters in the page with the
     same rule. Reads only. `clips` False (the reel page's photos step): the photos and the shoots only, no reel
     record read. With photos, each shoot also says "tagged": how many of its photos have been looked at for
-    search (so a page can say her "Getting your photos ready to search: 40 of 72." for that shoot)."""
+    search (so a page can say her "Getting your photos ready to search: 40 of 72." for that shoot).
+    A photo also carries "words": your assistant's own description of it ("" when it has none). A clip taken out
+    of the vault (Remove from my vault) is left out; `with_out` True lists it all the same, marked "out": True
+    (the page's "Taken out of my vault" fold)."""
     import photo_words
     kit = Path(kit)
     rec = _json(kit / ".kit" / "kit.json")
@@ -1038,7 +1053,7 @@ def catalog(kit, photos=True, clips=True):
             num = str(x["n"] if own else x.get("src"))
             tagged += 1 if (words.get(num) or {}).get("tags_at") else 0
             text = " ".join(t for t in (photo_words.text_of(words.get(num)), name) if t)
-            photo_list.append({"n": x["n"], "kit": g["kit"], "text": text})
+            photo_list.append({"n": x["n"], "kit": g["kit"], "text": text, "words": str((words.get(num) or {}).get("words") or "")})
         seen[g["kit"]] = {"kit": g["kit"], "group": g["group"], "name": name, "date": g["date"], "photos": len(g["rows"]),
                           "clips": 0, "thumb": g["rows"][0]["n"] if g["rows"] else None}
         if photos:
@@ -1046,6 +1061,7 @@ def catalog(kit, photos=True, clips=True):
     # the clips: the kit's own reels, and for the vault every shoot's reels too (a shoot with clips and no photos
     # on the list is still a shoot here)
     homes = [(OWN if is_v else kit.name, "added" if is_v else "kit", kit, "" if is_v else str(rec.get("name") or kit.name), "")]
+    clips_out = (_state(kit)["out"].get("clips") or {}) if is_v else {}
     if is_v:
         homes += [(m["folder"], "kit", m["path"], m["name"], m["date"]) for m in members(kit)]
     for folder, group, path, name, day in homes if want_clips else ():
@@ -1053,13 +1069,18 @@ def catalog(kit, photos=True, clips=True):
             got = _clips_of(path)
         except (Exception, SystemExit):  # noqa: BLE001  (a reel record that can't be read: that shoot has no clips to show)
             got = []
-        if not got:
+        gone = clips_out if is_v else {}
+        kept = [c for c in got if clip_out_key(folder, c["id"]) not in gone]
+        if not kept and not (with_out and got):
             continue
         if folder not in seen:
             seen[folder] = {"kit": folder, "group": group, "name": name, "date": day, "photos": 0, "clips": 0, "thumb": None}
-        seen[folder]["clips"] = len(got)
-        for c in got:
-            clips.append(dict(c, kit=folder, text=" ".join(t for t in (c["label"] if c["named"] else "", name) if t)))
+        seen[folder]["clips"] = len(kept)
+        for c in got if with_out else kept:
+            one = dict(c, kit=folder, text=" ".join(t for t in (c["label"] if c["named"] else "", name) if t))
+            if clip_out_key(folder, c["id"]) in gone:
+                one["out"] = True
+            clips.append(one)
     order = [g["kit"] for g in groups] + [h[0] for h in homes]
     for folder in order:
         if folder in seen and seen[folder] not in shoots:
@@ -1258,8 +1279,135 @@ def set_out(vault_kit, what, key, on=True):
         else:
             st["out"][what].pop(key, None)
         st["from"] = None                       # so the next look lists again
+        try:                                    # the version before, kept beside it
+            tmp = hid / f".vault.prev.json.{os.getpid()}.tmp"
+            tmp.write_bytes((hid / "vault.json").read_bytes())
+            this_computer.replace(tmp, hid / "vault.prev.json")
+        except OSError:
+            pass
         _write_whole(hid / "vault.json", st)
         return True
+
+
+CLIP_ID = re.compile(r"[mu][0-9]{1,4}-[0-9a-f]{6}")     # a clip's id, as the reel page gives them
+OUT_WORDS = {                           # ours, drafts: what the page and the commands say (Nicole's has no way back)
+    "photo_out": "Taken out of your vault. The photo itself is still in its shoot, and nothing was deleted.",
+    "clip_out": "Taken out of your vault. The clip itself is still in its shoot, and nothing was deleted.",
+    "own_photo_out": "Taken out of your vault. The photo itself is still in your vault's Photos folder, and nothing was deleted.",
+    "own_clip_out": "Taken out of your vault. The clip is still in the reel it was made in, and nothing was deleted.",
+    "back": "Back in your vault.",
+    "already_out": "That was already taken out of your vault. Nothing changed.",
+    "already_in": "That is already in your vault. Nothing changed.",
+    "no_photo": "That photo isn't in your vault.",
+    "no_clip": "That clip isn't in your vault.",
+    "a_photo": "A photo",
+    "added": "Added to my vault",       # hers, from the vault's reel page (reel_page.VAULT_CLIP_WORDS)
+}
+
+
+def clip_out_key(member, clip_id):
+    """The key a clip is taken out and put back by: "<its shoot's folder>:<its id>" (":<id>" for a clip made in
+    the vault itself). The same pair `vault.py clips` prints and `vault.py use-clips` takes."""
+    return f"{member}:{clip_id}"
+
+
+def _photo_key_of(vault_kit, n):
+    """The key of the photo with this vault number (on the list or taken out), or None."""
+    return next((k for k, num in _state(vault_kit)["numbers"].items() if num == n), None)
+
+
+def in_or_out(vault_kit, what, ident, on):
+    """Remove from my vault (on False) and Put it back (on True): the page's press and `vault.py out` / `back` are
+    this one function. `what` "photo": ident is its vault number. `what` "clip": ident is "<shoot's folder>:<id>".
+    ONLY the vault's own vault.json is written (set_out; the version before kept as vault.prev.json): no photo, no
+    video, no shoot's post kit. A photo's number stays its own and is unused until it is put back. Twice changes
+    nothing. Returns {"changed", "words", "own"}; raises Trouble (plain words) for something that is not in the
+    vault."""
+    cur = out(vault_kit)
+    if what == "photo":
+        if type(ident) is not int or not 1 <= ident <= 999999:
+            raise Trouble(OUT_WORDS["no_photo"])
+        key = _photo_key_of(vault_kit, ident)
+        if key is None:
+            raise Trouble(OUT_WORDS["no_photo"])
+        kind, own = "photos", key.startswith("own:")
+    elif what == "clip":
+        member, sep, cid = ident.rpartition(":") if isinstance(ident, str) else ("", "", "")
+        if not sep or not CLIP_ID.fullmatch(cid) or len(ident) > 400:
+            raise Trouble(OUT_WORDS["no_clip"])
+        key, kind, own = clip_out_key(member, cid), "clips", member == OWN
+        if key not in cur["clips"]:                 # it must be a clip the vault lists today
+            if not any(c["kit"] == member and c["id"] == cid for c in catalog(vault_kit, photos=False)["clips"]):
+                raise Trouble(OUT_WORDS["no_clip"])
+    else:
+        raise Trouble("That isn't something the vault can take out. Nothing was changed.")
+    is_out = key in cur[kind]
+    if on:
+        if not is_out:
+            return {"changed": False, "words": OUT_WORDS["already_in"], "own": own}
+        set_out(vault_kit, kind, key, on=False)
+        return {"changed": True, "words": OUT_WORDS["back"], "own": own}
+    if is_out:
+        return {"changed": False, "words": OUT_WORDS["already_out"], "own": own}
+    set_out(vault_kit, kind, key, on=True)
+    return {"changed": True, "words": OUT_WORDS[("own_" if own else "") + what + "_out"], "own": own}
+
+
+def out_list(vault_kit):
+    """What was taken out of the vault, newest first, for the page's fold and `vault.py out`: [{"what": "photo" |
+    "clip", "id": the photo's vault number or the clip's "<shoot's folder>:<id>", "kit", "shoot": its shoot's
+    name ("" for what was added to the vault itself), "label": a clip's name or a photo's description ("" when it
+    has none), "when"}]. Names and numbers only."""
+    import photo_words
+    vault_kit = Path(vault_kit)
+    st = _state(vault_kit)
+    names = {m["folder"]: m for m in members(vault_kit)}
+    got = []
+    words_of = {}
+    for key, when in (st["out"].get("photos") or {}).items():
+        n = st["numbers"].get(key)
+        if n is None:
+            continue
+        if key.startswith("own:"):
+            member, num = OWN, str(n)
+        else:
+            member, _, num = key.rpartition("#")
+        home = vault_kit if member == OWN else (names.get(member) or {}).get("path")
+        if home is not None and member not in words_of:
+            words_of[member] = photo_words.read(home)
+        label = str(((words_of.get(member) or {}).get(num) or {}).get("words") or "")
+        got.append({"what": "photo", "id": n, "kit": member, "shoot": (names.get(member) or {}).get("name") or member, "label": label, "when": str(when)})
+    outs = st["out"].get("clips") or {}
+    if outs:
+        for c in catalog(vault_kit, photos=False, with_out=True)["clips"]:
+            if c.get("out"):
+                got.append({"what": "clip", "id": clip_out_key(c["kit"], c["id"]), "kit": c["kit"],
+                            "shoot": (names.get(c["kit"]) or {}).get("name") or c["kit"], "label": c["label"],
+                            "when": str(outs.get(clip_out_key(c["kit"], c["id"])) or "")})
+    got.sort(key=lambda x: x["when"], reverse=True)
+    return got
+
+
+def _say_out(v, a, on):
+    if a.photo is None and a.clip is None:
+        if on:
+            say("STOP: say which one: --photo <its vault number> or --clip \"<shoot's folder>:<id>\" (`vault.py out` with nothing after it lists what was taken out).")
+            return 2
+        lst = out_list(v)
+        say(f"Taken out of the vault: {len(lst):,}." + ("" if lst else " Nothing has been taken out."))
+        for x in lst:
+            where = x["shoot"] or OUT_WORDS["added"]
+            if x["what"] == "photo":
+                say(f"  photo {x['id']} | {where}" + (f" | {x['label']}" if x["label"] else "") + f" | put back: vault.py back --photo {x['id']}")
+            else:
+                say(f"  clip {x['id']} | {where} | {x['label']} | put back: vault.py back --clip \"{x['id']}\"")
+        return 0
+    res = in_or_out(v, "photo" if a.photo is not None else "clip", a.photo if a.photo is not None else a.clip, on)
+    say(res["words"])
+    if res["changed"]:
+        say("Only the vault's own list of what was taken out was written. No photo, video or post kit was touched; "
+            + ("its number in the vault is the one it had." if on else "`vault.py back` puts it back, with the number it had."))
+    return 0
 
 
 # ---------- the commands ----------
@@ -1311,6 +1459,12 @@ def main():
     uc = sub.add_parser("use-clips", help="add the clips you chose to a vault reel")
     uc.add_argument("--reel", default=None)
     uc.add_argument("--clips", required=True, help="\"<shoot's folder>:<id>,...\" as `vault.py clips` prints them")
+    for name, hlp in (("out", "take one photo or clip out of the vault (nothing is deleted); with nothing after it, list what was taken out"),
+                      ("back", "put a photo or clip that was taken out back in the vault")):
+        ob = sub.add_parser(name, help=hlp)
+        which = ob.add_mutually_exclusive_group()
+        which.add_argument("--photo", type=int, default=None, help="the photo's vault number")
+        which.add_argument("--clip", default=None, help="\"<shoot's folder>:<id>\" as `vault.py clips` prints it")
     a = ap.parse_args()
     try:
         import fresh
@@ -1374,6 +1528,8 @@ def main():
             return _say_clips(v, a.reel)
         if a.cmd == "use-clips":
             return _use_clips(v, a.reel, a.clips)
+        if a.cmd in ("out", "back"):
+            return _say_out(v, a, a.cmd == "back")
         if a.cmd == "members":
             for m in members(v):
                 say(f"{m['folder']} | {m['name']} | {m['date'] or 'no date'} | "

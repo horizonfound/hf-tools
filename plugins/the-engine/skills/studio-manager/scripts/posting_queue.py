@@ -2165,8 +2165,8 @@ class Handler(SimpleHTTPRequestHandler):
             # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
             import photo_words
             return photo_words.handle_get(self, path, urlsplit(self.path).query)
-        if path == "/vault-add-status":
-            # what the vault's page follows while + Add a shoot copies (vault_page.py)
+        if path in ("/vault-add-status", "/vault.html", "/vault-data", "/vault-clip", "/vault-out-photo"):
+            # what the vault's page follows while + Add a shoot copies, and See everything in it (vault_page.py)
             import vault_page
             return vault_page.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/open", "/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
@@ -2554,7 +2554,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/vault-open", "/vault-add", "/vault-clips"):
+        if path in ("/vault-open", "/vault-add", "/vault-clips", "/vault-remove"):
             # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
             import vault_page
             return vault_page.handle_post(self, path, urlsplit(self.path).query)

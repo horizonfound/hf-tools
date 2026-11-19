@@ -13,7 +13,7 @@ the folder the test "chose" comes from STUDIO_PICK_FOLDER_FOR_TESTS).
   * Open the post kit is a guarded POST: another Origin is refused and makes nothing; the press makes the vault
     once and lands on its page; a second press makes no second vault;
   * the vault's page: her words, the path back to My post kits, the strip's chips and counts, See everything in
-    it only when vault.EVERYTHING is on, the three cards open the reel page, the designer and the stories
+    it (drawn by vault.EVERYTHING, on since stage 11), the three cards open the reel page, the designer and the stories
     designer for the vault; no path on either page;
   * her words both ways on both pages when her handoff is on this computer (her test-only lines on HERS_NOT_OURS);
   * `vault.py add` on a pretend folder: copies hash-identical, originals hashed before and after and unchanged,
@@ -267,8 +267,9 @@ def check_vault_page(s):
          [(unquote(a), b) for a, b in names] == sorted([(A, "Fake beach"), (B, "Other farm"), (C, "Third hill")], reverse=True), names)
     case("the strip's count: 27 photos · 0 clips", "<span class='ct' id='invCount'>27 photos · 0 clips</span>" in markup, re.findall(r"id='invCount'>[^<]*", markup))
     case("+ Add a shoot and + Add clips are buttons, with the line for what a press did right there in the strip",
-         re.search(r"<button class='go' type='button' id='vaultAdd'>\+ Add a shoot</button><button class='go' type='button' id='vaultClips'>\+ Add clips</button></span><p class='went' id='invWent' role='status'></p></div>", markup) is not None)
-    case("See everything in it is not drawn (its page is a later stage's)", "See everything in it" not in page and "vaultEverything" not in page)
+         re.search(r"<button class='go' type='button' id='vaultAdd'>\+ Add a shoot</button><button class='go' type='button' id='vaultClips'>\+ Add clips</button>(<a class='go' id='vaultEverything' href='/vault.html'>See everything in it &rarr;</a>)?</span><p class='went' id='invWent' role='status'></p></div>", markup) is not None)
+    case("See everything in it → is drawn after the two buttons, a link to its page (stage 11 switched it on)",
+         "<a class='go' id='vaultEverything' href='/vault.html'>See everything in it &rarr;</a></span>" in markup)
     case("her three card lines", all(html_mod.escape(W[k]) in markup for k in ("reel_sub", "carousel_sub", "stories_sub")))
     case("the shoot page's own card lines are not on the vault's", "Create as many reels as you like from this shoot" not in markup and "Lay out your slides in the carousel designer" not in markup)
     case("her box on the Reels card: Tell your assistant what this reel is, with her three examples",
@@ -299,17 +300,17 @@ def check_vault_page(s):
     shutil.rmtree(s.content / A / "Footage")                # ... and its folder, so the kit is as fake_kit made it
     case("one of a thing is singular", vault_page.count_words(1, 1) == "1 photo · 1 clip" and vault_page.count_words(295, 21) == "295 photos · 21 clips"
          and vault_page.count_words(1234, 1) == "1,234 photos · 1 clip")
-    # See everything in it: only when its page exists
+    # See everything in it: drawn by the one switch, which is on since stage 11
     os.environ.update(s.env)
     import kit as kit_mod
     import vault
     was = vault.EVERYTHING
     try:
-        vault.EVERYTHING = True
-        on = kit_mod.build_page(s.vault())[0]
+        vault.EVERYTHING = False
+        off = kit_mod.build_page(s.vault())[0]
     finally:
         vault.EVERYTHING = was
-    case("See everything in it → is drawn once vault.EVERYTHING is on, and it is off today", was is False and "id='vaultEverything'" in on and "See everything in it &rarr;</a>" in on)
+    case("See everything in it → follows vault.EVERYTHING, which is on today", was is True and "vaultEverything" not in off and "See everything in it" not in off)
 
 
 def check_her_words(s):
@@ -542,8 +543,8 @@ def check_browser_vault(c, s):
         btns: [...inv.querySelectorAll('button, a')].map(b => b.textContent.trim()), crumbs: document.querySelector('.crumbs').innerText.replace(/\\s+/g, ' '),
         cards: [...document.querySelectorAll('a.piece')].map(a => a.dataset.piece), ask: document.querySelector("a.piece[data-piece='reel'] .ask").innerText.replace(/\\s+/g, ' '),
         folders: document.querySelectorAll('.folders').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth}; })()""")
-    case("the strip shows the three shoots, the count, and its two buttons", len(q["chips"]) == 3 and set(q["chips"]) == {"Fake beach", "Other farm", "Third hill"}
-         and re.fullmatch(r"\d+ photos · 1 clip", q["count"]) and q["btns"] == ["+ Add a shoot", "+ Add clips"], q)
+    case("the strip shows the three shoots, the count, its two buttons and See everything in it", len(q["chips"]) == 3 and set(q["chips"]) == {"Fake beach", "Other farm", "Third hill"}
+         and re.fullmatch(r"\d+ photos · 1 clip", q["count"]) and q["btns"] == ["+ Add a shoot", "+ Add clips", "See everything in it →"], q)
     case("the path reads Home › My post kits › My vault, and the box on the Reels card is hers", q["crumbs"] == "Home › My post kits › My vault" and q["ask"].upper().startswith("TELL YOUR ASSISTANT WHAT THIS REEL IS") and "Moms laughing, from any shoot" in q["ask"], q)
     case("the three cards, and no sideways scroll", q["cards"] == ["reel", "carousel", "stories"] and q["sw"] <= q["cw"], q)
     before = int(q["count"].split(" ")[0])
