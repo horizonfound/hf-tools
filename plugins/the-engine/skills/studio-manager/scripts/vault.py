@@ -28,7 +28,9 @@ This script is the one writer of the vault's list.
     python3 vault.py members           the post kits in it
     python3 vault.py add "<folder>"    + Add a shoot: copy that folder's finished photos into the vault's own Photos
                                        folder, each copy checked; the originals are only read. Twice copies nothing.
-                                       Exit 0 done, 1 a copy stopped or did not match, 2 stop, 4 not a folder to add.
+                                       Exit 0 done, 1 a copy stopped, did not match or a file could not be read,
+                                       2 stop (also: another copy is running right now), 4 not a folder to add.
+                                       A photo the vault already has from a shoot's post kit is not copied again.
     python3 vault.py find "<words>" [--photos | --clips]
                                        what matches in the vault, by the search rule below: photos by what is in
                                        them (photo_words.py) and their shoot's name, clips by their name and their
@@ -156,6 +158,32 @@ def is_vault(kit_or_rec):
     return _json(Path(kit_or_rec) / ".kit" / "kit.json").get(MARK) is True
 
 
+CANT_READ_VAULT = ("I can't read your vault's own record right now, so nothing was made, copied or changed. "
+                   "Try again in a moment. If it keeps happening, tell your assistant.")      # ours, a draft
+CANT_READ_LIST = ("I can't read your vault's list of photo numbers right now, so nothing was changed. "
+                  "Try again in a moment. If it keeps happening, tell your assistant.")       # ours, a draft
+
+
+def _vault_unread(d):
+    """A folder that is the vault by everything but its record: kit.json is there and can't be read (or isn't a
+    record), and the vault's own vault.json or its marked list sits beside it. A plain post kit never has those."""
+    d = Path(d)
+    try:
+        rec = json.loads((d / ".kit" / "kit.json").read_text(encoding="utf-8"))
+        if isinstance(rec, dict):
+            return False
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        pass
+    try:
+        if (d / ".kit" / "vault.json").is_file():
+            return True
+    except OSError:
+        return True
+    return _json(d / ".kit" / "sheet.json").get(MARK) is True
+
+
 def find():
     """The vault's folder, or None. Found by the mark in its record; if two folders ever carry it, the first by
     name is the vault."""
@@ -203,6 +231,10 @@ def ensure():
         v = find()
         if v is not None:
             return v, False
+        for d in _kit_dirs(c):
+            if _vault_unread(d):
+                # the vault is there and its record can't be read this moment: never a second vault beside it
+                raise Trouble(CANT_READ_VAULT)
         v = c / _free_name(c)
         v.mkdir()
         for sub in FOLDERS:
@@ -332,8 +364,11 @@ def _own_key(name):
     return "own:" + _nfc(name)
 
 
-def _state(vault_kit):
-    d = _json(Path(vault_kit) / ".kit" / "vault.json")
+def _state(vault_kit, d=None):
+    """The vault's numbers and what was taken out, for a READER (a page, a count): a file that can't be read
+    reads as empty. Anything that WRITES asks _state_to_write, which never takes "can't read" for "empty"."""
+    if d is None:
+        d = _json(Path(vault_kit) / ".kit" / "vault.json")
     numbers = {k: n for k, n in (d.get("numbers") or {}).items() if isinstance(k, str) and type(n) is int and n >= 1} \
         if isinstance(d.get("numbers"), dict) else {}
     nxt = d.get("next") if type(d.get("next")) is int and d["next"] >= 1 else 1
@@ -341,6 +376,153 @@ def _state(vault_kit):
     out_ = d.get("out") if isinstance(d.get("out"), dict) else {}
     out_ = {w: dict(v) for w, v in out_.items() if w in WHATS and isinstance(v, dict)}
     return {"numbers": numbers, "next": nxt, "out": out_, "from": d.get("from")}
+
+
+def _keys_of_list(d):
+    """{key: n} from a vault list (sheet.json): its rows and its retired rows both carry n, kit and src."""
+    out = {}
+    if not isinstance(d, dict):
+        return out
+    for part in ("photos", "retired"):
+        for x in d.get(part) if isinstance(d.get(part), list) else []:
+            if not isinstance(x, dict) or type(x.get("n")) is not int or x["n"] < 1 or not isinstance(x.get("kit"), str):
+                continue
+            if x["kit"] == OWN:
+                name = Path(str(x.get("file") or "")).name
+                if not name or name == "?":
+                    continue
+                k = _own_key(name)
+            elif type(x.get("src")) is int:
+                k = _key(x["kit"], x["src"])
+            else:
+                continue
+            out.setdefault(k, x["n"])
+    return out
+
+
+def _state_to_write(vault_kit):
+    """The vault's numbers for whoever is about to WRITE them (relist, Remove, Put it back), under the vault's
+    lock: (state, recovered).
+
+    vault.json there and readable: as it is. There and NOT readable this moment (a drive hiccup, a refusal, on a
+    PC another program holding it): Trouble, and nothing is written; "can't read it" is never "it is empty", or
+    every photo would get a new number and saved reels and designs would show other photos.
+    Damaged, empty or gone: the numbers are put back from what is still on disk beside it (the list itself,
+    sheet.json, whose rows and retired rows carry every number; then vault.prev.json and sheet.prev.json), what
+    was taken out from vault.prev.json, and the damaged file is kept beside it under a dated name. Nothing is
+    deleted. `recovered` is True then."""
+    hid = Path(vault_kit) / ".kit"
+    f = hid / "vault.json"
+    raw = None
+    try:
+        raw = f.read_bytes()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        raise Trouble(CANT_READ_LIST)
+    if raw is not None:
+        try:
+            d = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            d = None
+        if isinstance(d, dict) and isinstance(d.get("numbers"), dict):
+            return _state(vault_kit, d), False
+    lists = []
+    for name in ("sheet.json", "sheet.prev.json"):
+        try:
+            lists.append(json.loads((hid / name).read_text(encoding="utf-8")))
+        except FileNotFoundError:
+            lists.append(None)
+        except ValueError:
+            lists.append(None)
+        except OSError:
+            if name == "sheet.json":
+                raise Trouble(CANT_READ_LIST)       # the one place the numbers still are can't be read either: wait
+            lists.append(None)
+    before = _json(hid / "vault.prev.json")
+    was = _state(vault_kit, before) if isinstance(before.get("numbers"), dict) else {"numbers": {}, "out": {}}
+    numbers, used = {}, set()
+    for src in (_keys_of_list(lists[0]), was["numbers"], _keys_of_list(lists[1])):
+        for k, n in sorted(src.items(), key=lambda kv: kv[1]):
+            if k not in numbers and n not in used:
+                numbers[k] = n
+                used.add(n)
+    if raw is None and not numbers:
+        return _state(vault_kit, {}), False         # a vault whose making was cut off before its numbers: a new one
+    if raw is not None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}"
+        try:
+            tmp = hid / f".vault.damaged-{stamp}.tmp"
+            tmp.write_bytes(raw)
+            for i in range(1, 100):                 # never over one already kept
+                if this_computer.rename_new(tmp, hid / f"vault.damaged-{stamp}{'' if i == 1 else f'-{i}'}.json"):
+                    break
+            else:
+                tmp.unlink()                        # our own scratch copy
+        except OSError:
+            pass
+    st = _state(vault_kit, {"numbers": numbers, "out": was["out"], "from": None})
+    return st, True
+
+
+def _keep_prev(hid):
+    """The vault.json before this write, kept beside it as vault.prev.json (only a file that reads as a record)."""
+    try:
+        was = (hid / "vault.json").read_bytes()
+        if not isinstance(json.loads(was.decode("utf-8")), dict):
+            return
+        tmp = hid / f".vault.prev.json.{os.getpid()}.tmp"
+        tmp.write_bytes(was)
+        this_computer.replace(tmp, hid / "vault.prev.json")
+    except (OSError, ValueError, UnicodeDecodeError):
+        pass
+
+
+def _follow_renames(vault_kit, mem, st, prev_rows):
+    """A post kit whose folder was renamed in Finder keeps its photos' vault numbers and what was taken out.
+
+    A kit's record keeps the folder name it was made under ("folder"); the vault never writes into a kit, so it
+    follows the rename in its OWN record: when a kit's folder is no longer called that, no post kit is called
+    that any more, exactly one kit says it was, and the vault holds numbers under the old name and none under
+    the new, every key moves from the old name to the new (numbers, photos taken out, clips taken out, and the
+    rows of the list before). Returns {old: new}; nothing is written here (relist writes vault.json after)."""
+    names = {m["folder"] for m in mem}
+    claims = {}
+    for m in mem:
+        old = _json(m["path"] / ".kit" / "kit.json").get("folder")
+        if isinstance(old, str) and old and old != m["folder"] and old not in names and "/" not in old and "\\" not in old:
+            claims.setdefault(old, []).append(m["folder"])
+    moved = {}
+    for old, news in claims.items():
+        if len(news) != 1:
+            continue                            # a copied kit folder: two say they were it, so neither is followed
+        new = news[0]
+        held = [k for k in st["numbers"] if not k.startswith("own:") and k.rpartition("#")[0] == old]
+        if not held or any(not k.startswith("own:") and k.rpartition("#")[0] == new for k in st["numbers"]):
+            continue
+        moved[old] = new
+    if not moved:
+        return moved
+
+    def photo_key(k):
+        if k.startswith("own:"):
+            return k
+        member, _, src = k.rpartition("#")
+        return _key(moved[member], src) if member in moved else k
+
+    def clip_key(k):
+        member, sep, cid = k.rpartition(":")
+        return clip_out_key(moved[member], cid) if sep and member in moved else k
+
+    st["numbers"] = {photo_key(k): n for k, n in st["numbers"].items()}
+    if isinstance(st["out"].get("photos"), dict):
+        st["out"]["photos"] = {photo_key(k): w for k, w in st["out"]["photos"].items()}
+    if isinstance(st["out"].get("clips"), dict):
+        st["out"]["clips"] = {clip_key(k): w for k, w in st["out"]["clips"].items()}
+    for n, x in list(prev_rows.items()):
+        if x.get("kit") in moved:
+            prev_rows[n] = dict(x, kit=moved[x["kit"]])
+    return moved
 
 
 def _own_photos(vault_kit):
@@ -408,13 +590,15 @@ def relist(vault_kit, quick=False):
         if got is False:
             raise Trouble("The vault's list is being made right now. Try again in a moment.")
         sig = _signature(vault_kit)             # read BEFORE the lists, so a change made meanwhile is seen next time
-        st = _state(vault_kit)
-        numbers, nxt = dict(st["numbers"]), st["next"]
-        out_photos = st["out"].get("photos") or {}
+        st, recovered = _state_to_write(vault_kit)      # can't be read: Trouble, nothing written, no number moves
         sheet_file = hid / "sheet.json"
         prev = _json(sheet_file)
         had = sheet_file.is_file()
         prev_rows = {x["n"]: x for x in _rows(sheet_file)}
+        mem = sorted(members(vault_kit), key=lambda m: (m["date"], m["folder"]))      # oldest first: numbers grow with time
+        renamed = _follow_renames(vault_kit, mem, st, prev_rows)
+        numbers, nxt = dict(st["numbers"]), st["next"]
+        out_photos = st["out"].get("photos") or {}
         prev_retired = {x["n"]: x for x in (prev.get("retired") or []) if isinstance(x, dict) and type(x.get("n")) is int} \
             if isinstance(prev.get("retired"), list) else {}
         prev_of = {}                            # a member's rows on the list before, to keep when its own list can't be read now
@@ -422,7 +606,6 @@ def relist(vault_kit, quick=False):
             prev_of.setdefault(x.get("kit"), []).append(x)
 
         found, waiting = [], []                 # (key, row without its number), in the order new numbers are given
-        mem = sorted(members(vault_kit), key=lambda m: (m["date"], m["folder"]))      # oldest first: numbers grow with time
         for m in mem:
             rows = _rows(m["path"] / ".kit" / "sheet.json")
             if not rows:
@@ -478,12 +661,15 @@ def relist(vault_kit, quick=False):
         back = sorted(set(prev_retired) & now_ns)
         same = had and prev.get("photos") == photos and (prev.get("retired") or []) == retired and prev.get(MARK) is True
         res = {"ok": True, "photos": len(photos), "added": added, "gone": gone, "back": back, "same": bool(same),
-               "waiting": waiting, "sheets": []}
+               "waiting": waiting, "sheets": [], "recovered": recovered, "renamed": renamed}
         new_state = {"numbers": numbers, "next": nxt, "out": st["out"], "from": sig}
+        kept = False
         if not same:
             if had:
                 new_list.update(added=added, gone=gone, back=back)
             # the numbers first: one given here is never given to another photo, even if the list's write is cut off
+            _keep_prev(hid)                     # the version before, kept beside it
+            kept = True
             _write_whole(hid / "vault.json", dict(new_state, **{"from": st["from"]}))
             if had:
                 try:
@@ -494,6 +680,8 @@ def relist(vault_kit, quick=False):
                     pass
             _write_whole(sheet_file, new_list)
         if _json(hid / "vault.json") != new_state:
+            if not kept:
+                _keep_prev(hid)
             _write_whole(hid / "vault.json", new_state)
         if not same:
             count = len(photos)
@@ -610,6 +798,7 @@ def rows_by_group(vault_kit):
 ADDS = "vault-adds.json"            # the log, in the vault's hidden folder
 ADD_JOB = "vault-add-job.json"      # what the page follows while a copy runs (state, done, of, words)
 ADD_NAMES_MOST = 500                # "IMG_0001 (500).jpg": past that, the file is a problem, not a copy
+ADD_ASIDE = "copies-set-aside"      # in the vault's hidden folder: a copy that did not match its original, kept, never a photo
 ADD_SAVE_EVERY = 10                 # the log is saved after this many copies (and at every stop)
 
 # Ours, every one a draft for Dustin and Nicole. What the page shows is `words`; never a path.
@@ -626,6 +815,7 @@ ADD_WORDS = {
     "busy": "Photos are being copied into your vault right now. Try again when that's done.",
     "held": "Something stopped the copy part way: {why}. {n} of {of} photos are in, each one checked. Nothing is lost and your originals weren't moved; add the same folder again to finish.",
     "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your vault. Your originals weren't moved. Tell your assistant.",
+    "unread": "{n} file{s} in that folder could not be read, so {they} not in your vault. Nothing was changed there. Tell your assistant.",
     "working": "Copying {n} of {of}…",
     "starting": "Looking at the photos in that folder…",
     "stopped": "The copy stopped before it finished. Nothing is lost; add the same folder again to finish.",
@@ -766,17 +956,55 @@ def _add_words(res):
     tail = w["left"].format(n=left, s=_s(left), they="it is" if left == 1 else "they are") if left else ""
     if not res["photos"]:
         return w["none"] + tail
-    bad = len(res["problems"])
+    unread = len(res.get("unread") or [])
+    bad = len(res["problems"]) - unread
     out = ""
     if res["copied"]:
         out = w["copied"].format(n=res["copied"], s=_s(res["copied"]))
         if res["there"]:
             out += w["already_some"].format(n=res["there"], were="was" if res["there"] == 1 else "were")
-    elif not bad:
+    elif not bad and not unread:
         out = w["already_all"]
     if bad:
         out = (out + " " if out else "") + w["mismatch"].format(n=bad, s=_s(bad), they="it is" if bad == 1 else "they are")
+    if unread:
+        out = (out + " " if out else "") + w["unread"].format(n=unread, s=_s(unread), they="it is" if unread == 1 else "they are")
     return out + tail
+
+
+def _shoot_index(vault_kit):
+    """Every photo the vault already has from a shoot's post kit, by (file name, size): {(name, size): [(kit
+    folder, where it is)]}. Names and sizes only (one stat each); a file is read only when a photo being added
+    has the same name and size. A kit whose photos can't be reached right now is not in it."""
+    idx = {}
+    for m in members(vault_kit):
+        folder = _member_photos(m["path"])
+        if folder is None:
+            continue
+        for x in _rows(m["path"] / ".kit" / "sheet.json"):
+            name = Path(x["file"]).name
+            f = folder / name
+            try:
+                size = f.stat().st_size
+            except OSError:
+                continue
+            idx.setdefault((_nfc(name).casefold(), size), []).append((m["folder"], f))
+    return idx
+
+
+def _in_a_shoot(idx, name, size, want, seen):
+    """The folder name of a post kit that already holds this very photo (same name, same size, same bytes), or
+    None. Such a photo is in the vault already, from its shoot, and is not copied a second time."""
+    for member, f in idx.get((_nfc(name).casefold(), size), ()):
+        key = str(f)
+        if key not in seen:
+            try:
+                seen[key] = _sha(f)
+            except OSError:
+                seen[key] = None
+        if seen[key] == want:
+            return member
+    return None
 
 
 def add(vault_kit, folder, progress=None):
@@ -789,7 +1017,8 @@ def add(vault_kit, folder, progress=None):
     vault_kit = Path(vault_kit)
     if not is_vault(vault_kit):
         raise Trouble("That folder isn't the vault. Nothing was changed.")
-    res = {"ok": False, "refused": None, "photos": 0, "copied": 0, "there": 0, "left": {}, "problems": [], "held": None}
+    res = {"ok": False, "refused": None, "photos": 0, "copied": 0, "there": 0, "left": {}, "problems": [], "held": None,
+           "unread": []}
     try:
         src = Path(folder).expanduser()
         src = src.resolve() if src.is_dir() else src
@@ -827,21 +1056,38 @@ def add(vault_kit, folder, progress=None):
             files.append(rel)
         res["photos"], res["left"] = len(files), left
         taken, seen, plan = _taken(photos_dir), {}, []
+        shoots, shoot_seen = _shoot_index(vault_kit), {}
         if progress:
             progress(0, len(files), False)
         for rel in files:
             p = src / rel
-            st = p.stat()
+            try:
+                st = p.stat()
+                want = None
+                was = earlier.get(rel)
+                if not (was and was.get("size") == st.st_size and was.get("mtime") == int(st.st_mtime)
+                        and isinstance(was.get("dst"), str) and _nfc(was["dst"]).casefold() in taken):
+                    want = _sha(p)
+            except OSError:
+                # one file that can't be read (a broken alias, a locked file, one that has gone) is named and left;
+                # it never stops the photos beside it
+                plan.append({"src": rel, "size": None, "mtime": None, "sha256": None, "dst": None, "done": False,
+                             "state": "could not read"})
+                continue
             line = {"src": rel, "size": st.st_size, "mtime": int(st.st_mtime), "sha256": None, "dst": None, "done": False}
-            was = earlier.get(rel)
             if (was and was.get("size") == st.st_size and was.get("mtime") == int(st.st_mtime) and isinstance(was.get("dst"), str)
                     and _nfc(was["dst"]).casefold() in taken):
                 # the same file as last time (name, size, time), and the copy made then is still there: already in
                 line.update(sha256=was.get("sha256"), dst=taken[_nfc(was["dst"]).casefold()], done=True, state="there")
                 plan.append(line)
                 continue
-            want = _sha(p)
             line["sha256"] = want
+            member = _in_a_shoot(shoots, Path(rel).name, st.st_size, want, shoot_seen)
+            if member is not None:
+                # the very same photo is in the vault already, from that shoot's post kit: never a second copy
+                line.update(done=True, state="there", **{"in": member})
+                plan.append(line)
+                continue
             spot = _place_for(photos_dir, Path(rel).name, want, taken, seen)
             if spot is None:
                 line["state"] = "no name free"
@@ -859,7 +1105,8 @@ def add(vault_kit, folder, progress=None):
         if not todo and run is None:
             # nothing to copy: nothing is logged for a look that changed nothing (a second add of the same folder)
             res["there"] = sum(1 for f in plan if f.get("state") == "there")
-            res["problems"] = [f["src"] for f in plan if f.get("state") == "no name free"]
+            res["unread"] = [f["src"] for f in plan if f.get("state") == "could not read"]
+            res["problems"] = [f["src"] for f in plan if f.get("state") in ("no name free", "could not read")]
             res["ok"] = not res["problems"]
             res["words"] = _add_words(res)
             return res
@@ -874,7 +1121,7 @@ def add(vault_kit, folder, progress=None):
         for f in todo:
             dst = photos_dir / f["dst"]
             try:
-                got_hash = posts.copy_checked(src / f["src"], dst)
+                got_hash = posts.copy_checked(src / f["src"], dst, aside=hid / ADD_ASIDE)
                 tries = 0
                 while got_hash is None and dst.exists() and tries < 5:
                     # the name was taken meanwhile by another picture: the next free name, never over it
@@ -884,12 +1131,21 @@ def add(vault_kit, folder, progress=None):
                         break
                     f["dst"] = spot[0]
                     dst = photos_dir / f["dst"]
-                    got_hash = f["sha256"] if spot[1] == "there" else posts.copy_checked(src / f["src"], dst)
+                    got_hash = f["sha256"] if spot[1] == "there" else posts.copy_checked(src / f["src"], dst, aside=hid / ADD_ASIDE)
             except OSError as ex:
                 res["held"] = posts.could_not(ex)
                 _write_whole(hid / ADDS, log)
                 break
-            if got_hash is not None and got_hash == f["sha256"]:
+            if got_hash is not None:
+                if got_hash != f["sha256"]:
+                    # the photo was saved over between the first look and its copy (an export still running): the
+                    # copy was checked against the file as it is now, so it IS in the vault; the log says which bytes
+                    f["sha256"] = got_hash
+                    try:
+                        now = (src / f["src"]).stat()
+                        f.update(size=now.st_size, mtime=int(now.st_mtime))
+                    except OSError:
+                        pass
                 f.update(done=True, state="copied")
                 res["copied"] += 1
             else:
@@ -903,7 +1159,8 @@ def add(vault_kit, folder, progress=None):
                 _write_whole(hid / ADDS, log)
                 os._exit(9)                     # the test's cut: no tidy-up, as if the power went
         res["there"] = sum(1 for f in plan if f.get("state") == "there")
-        res["problems"] = [f["src"] for f in plan if f.get("state") in ("did not match", "no name free")]
+        res["unread"] = [f["src"] for f in plan if f.get("state") == "could not read"]
+        res["problems"] = [f["src"] for f in plan if f.get("state") in ("did not match", "no name free", "could not read")]
         if res["held"] is None:
             run["status"] = "problems" if res["problems"] else "done"
             run["finished"] = datetime.now().isoformat(timespec="seconds")
@@ -1270,7 +1527,7 @@ def set_out(vault_kit, what, key, on=True):
     with kit_mod._held(hid / "vault.lock", 30.0) as got:
         if got is False:
             raise Trouble("The vault's list is being made right now. Try again in a moment.")
-        st = _state(vault_kit)
+        st, _recovered = _state_to_write(vault_kit)     # can't be read: Trouble, and nothing is written
         had = key in (st["out"].get(what) or {})
         if bool(on) == had:
             return False
@@ -1279,12 +1536,7 @@ def set_out(vault_kit, what, key, on=True):
         else:
             st["out"][what].pop(key, None)
         st["from"] = None                       # so the next look lists again
-        try:                                    # the version before, kept beside it
-            tmp = hid / f".vault.prev.json.{os.getpid()}.tmp"
-            tmp.write_bytes((hid / "vault.json").read_bytes())
-            this_computer.replace(tmp, hid / "vault.prev.json")
-        except OSError:
-            pass
+        _keep_prev(hid)                         # the version before, kept beside it
         _write_whole(hid / "vault.json", st)
         return True
 
@@ -1418,6 +1670,12 @@ def _count_words(n, one, many):
 
 def _say_relist(res):
     say(_count_words(res["photos"], "photo", "photos") + " in the vault.")
+    if res.get("recovered"):
+        say("The vault's own record of its numbers was damaged or missing, so the numbers were put back from its list. "
+            "The damaged file is kept beside it, and no photo was touched. If something was taken out of the vault just "
+            "before, check `vault.py out`: the last one may need taking out again.")
+    for old, new in sorted((res.get("renamed") or {}).items()):
+        say(f"The post kit \"{old}\" is now called \"{new}\": its photos keep their vault numbers.")
     if res["same"]:
         say("The same photos as the last list, with the same numbers. Nothing was written.")
     else:
@@ -1504,6 +1762,8 @@ def main():
                 say(f"Left where it is, not copied: {n} {label}{'' if n == 1 else 's'}.")
             for name in res["problems"]:
                 say(f"Not in the vault: {name}")
+            if res["refused"] == "busy":
+                return 2                        # another copy is running: a stop to try again, not "not a folder to add"
             if res["refused"]:
                 return 4
             return 0 if res["ok"] else 1

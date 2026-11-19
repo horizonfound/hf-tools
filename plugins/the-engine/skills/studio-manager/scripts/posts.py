@@ -618,9 +618,31 @@ def copy_move(m, src, dst, problems):
         problems.append(f"{m['dst']} did not match the original after copying")
 
 
-def copy_checked(src, dst):
+MISMATCH = ".studio-mismatch"       # the ending a copy gets when it did not read back as its original
+
+
+def set_bad_copy_aside(dst, aside=None):
+    """A copy that landed under its real name and did not read back as its original is not left there to be
+    taken for the photo: it is renamed (never deleted) to "<name>.studio-mismatch", in `aside` when one is given
+    (a hidden folder on the same drive) and beside itself otherwise. A name already taken gets a number. True
+    when it was moved."""
+    where = Path(aside) if aside else dst.parent
+    try:
+        where.mkdir(parents=True, exist_ok=True)
+        for i in range(1, 100):
+            cand = where / (dst.name + MISMATCH + ("" if i == 1 else f" {i}"))
+            if this_computer.rename_new(dst, cand):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def copy_checked(src, dst, aside=None):
     """Copy src to dst the way the backup does: hash while writing to a partial file, rename into place,
-    read the copy back and compare. Returns the hash, or None if the copy did not match (the partial is removed).
+    read the copy back and compare. Returns the hash, or None if the copy did not match (the partial is removed;
+    a copy that had its name already and then read back wrong is set aside by set_bad_copy_aside, so the name is
+    free and nothing takes the bad copy for the photo).
     dst already there: compared, never replaced; returns its hash if it matches src, else None."""
     import hashlib
     def sha(p):
@@ -662,6 +684,7 @@ def copy_checked(src, dst):
         part.unlink(missing_ok=True)
         return want if sha(dst) == want else None
     if sha(dst) != want:
+        set_bad_copy_aside(dst, aside)           # our own copy, made a moment ago, that did not read back right
         return None
     return want
 

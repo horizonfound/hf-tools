@@ -274,20 +274,29 @@ def _entry(e):
     return out
 
 
-def read(kit):
-    """A kit's own photo words: {"<number>": entry}. {} when there are none yet or the file can't be read."""
+def _entries(raw):
+    """The entries in a store's bytes: {"<number>": entry}, or None when the bytes are not a store."""
     try:
-        d = json.loads(store_path(kit).read_text(encoding="utf-8"))
-        photos = d.get("photos") if isinstance(d, dict) else None
-        if not isinstance(photos, dict):
-            return {}
-        out = {}
-        for k, e in photos.items():
-            e = _entry(e)
-            if isinstance(k, str) and k.isdigit() and e is not None:
-                out[k] = e
-        return out
-    except (OSError, ValueError):
+        d = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    photos = d.get("photos") if isinstance(d, dict) else None
+    if not isinstance(photos, dict):
+        return None
+    out = {}
+    for k, e in photos.items():
+        e = _entry(e)
+        if isinstance(k, str) and k.isdigit() and e is not None:
+            out[k] = e
+    return out
+
+
+def read(kit):
+    """A kit's own photo words: {"<number>": entry}. {} when there are none yet or the file can't be read.
+    For READERS (search, a page). A save never starts from this: see update."""
+    try:
+        return _entries(store_path(kit).read_bytes()) or {}
+    except OSError:
         return {}
 
 
@@ -295,22 +304,49 @@ def update(kit, change):
     """Read the kit's photo words, change them (change(photos) on a copy), and save them whole, as one step under
     the store's own lock. The version before is kept (photo-words.prev.json) first. When nothing is different,
     nothing is written. True when the file was written. Never makes a kit's hidden folder: a kit that is gone
-    (renamed, its drive away) raises OSError and gets nothing."""
+    (renamed, its drive away) raises OSError and gets nothing.
+
+    "Can't read it" is never "it is empty": a store that is there and can't be read this moment (a drive hiccup,
+    a refusal, on a PC another program holding it) raises OSError and nothing is written, or every earlier
+    description and tag of the shoot would be replaced by the new ones alone. A store that is damaged (it reads,
+    and is not a store) is kept beside itself under a dated name, never as the version before, and the save
+    starts from the version before (photo-words.prev.json) when that one reads."""
     arrange = _arrange()
     kit = Path(kit)
     with arrange.locked(kit / ".kit" / LOCK):
-        before = read(kit)
+        p = store_path(kit)
+        try:
+            was = p.read_bytes()                # an OSError other than "not there" goes to the caller: nothing is written
+        except FileNotFoundError:
+            was = None
+        before = _entries(was) if was is not None else {}
+        damaged = before is None
+        if damaged:
+            try:
+                before = _entries(p.with_name(PREV).read_bytes()) or {}
+            except FileNotFoundError:
+                before = {}
+            stamp = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
+            tmp = p.with_name(f".{p.stem}.damaged-{stamp}.tmp")
+            try:
+                tmp.write_bytes(was)
+                for i in range(1, 100):         # never over one already kept
+                    if this_computer.rename_new(tmp, p.with_name(f"{p.stem}.damaged-{stamp}{'' if i == 1 else f'-{i}'}{p.suffix}")):
+                        break
+                else:
+                    tmp.unlink()                # our own scratch copy
+            except BaseException:
+                try:
+                    tmp.unlink()                # our own scratch copy
+                except OSError:
+                    pass
+                raise
         after = json.loads(json.dumps(before))
         change(after)
         after = {k: e for k, e in ((k, _entry(e)) for k, e in after.items()) if e is not None}
-        if after == before:
+        if after == before and not damaged:
             return False
-        p = store_path(kit)
-        try:
-            was = p.read_bytes()
-        except OSError:
-            was = None
-        if was is not None:
+        if was is not None and not damaged:
             prev = p.with_name(PREV)
             tmp = prev.with_name(f".{prev.name}.{os.getpid()}.tmp")
             try:

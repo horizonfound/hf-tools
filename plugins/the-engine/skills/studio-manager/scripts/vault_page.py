@@ -160,11 +160,17 @@ def count_words(photos, clips):
 
 def strip_facts(vault_kit):
     """What the strip shows: the shoots that have photos in the vault (newest first; a folder's name and the
-    shoot's own name, never a path), how many photos are on the vault's list, how many videos it can draw from."""
+    shoot's own name, never a path), how many photos are on the vault's list, and how many clips are in it: the
+    same clips See everything in it lists (a stretch made on a reel page, not a video file; none that was taken
+    out), so the two pages never disagree."""
     groups = vault.rows_by_group(vault_kit)
     shoots = [{"folder": g["kit"], "name": g["name"]} for g in groups if g["group"] == "kit"]
     photos = sum(len(g["rows"]) for g in groups)
-    return {"shoots": shoots, "photos": photos, "clips": vault.clip_count(vault_kit)}
+    try:
+        clips = len(vault.catalog(vault_kit, photos=False)["clips"])
+    except (Exception, SystemExit):  # noqa: BLE001  (a reel record that can't be read: the strip still draws)
+        clips = 0
+    return {"shoots": shoots, "photos": photos, "clips": clips}
 
 
 def strip_html(vault_kit):
@@ -215,11 +221,12 @@ def card_facts():
     v = vault.find()
     mem = vault.members(v)
     if v is not None:
-        photos = len(vault._rows(Path(v) / ".kit" / "sheet.json"))
+        photos = sum(len(g["rows"]) for g in vault.rows_by_group(v))      # what was taken out is not counted
         try:
             if vault.changed(v)["changed"]:              # its list is behind: the count it will have once opened
                 own = len(vault._own_photos(v))
-                photos = max(photos, sum(m["photos"] for m in mem) + own)
+                gone = len(vault.out(v)["photos"])
+                photos = max(photos, sum(m["photos"] for m in mem) + own - gone)
         except (OSError, vault.Trouble):
             pass
     else:

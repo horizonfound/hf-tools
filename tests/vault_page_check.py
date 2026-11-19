@@ -295,7 +295,9 @@ def check_vault_page(s):
     (s.vault() / "Footage" / ".hidden.mp4").write_bytes(b"\0" * 64)
     (s.vault() / "Footage" / "notes.txt").write_bytes(b"x")
     code, page2 = s.page(s.vault_page())
-    case("the count follows the videos the vault can draw from: 27 photos · 2 clips", "id='invCount'>27 photos · 2 clips</span>" in page2, re.findall(r"id='invCount'>[^<]*", page2))
+    # (review fix, Nov 19: the strip counts the clips See everything in it lists, a stretch made on a reel page,
+    # never video files, so the two pages one click apart agree)
+    case("a video file is not a clip: the count stays 27 photos · 0 clips, as See everything in it lists", "id='invCount'>27 photos · 0 clips</span>" in page2, re.findall(r"id='invCount'>[^<]*", page2))
     (s.content / A / "Footage" / "walk.mov").unlink()       # the test's own pretend video, made a moment ago
     shutil.rmtree(s.content / A / "Footage")                # ... and its folder, so the kit is as fake_kit made it
     case("one of a thing is singular", vault_page.count_words(1, 1) == "1 photo · 1 clip" and vault_page.count_words(295, 21) == "295 photos · 21 clips"
@@ -544,7 +546,7 @@ def check_browser_vault(c, s):
         cards: [...document.querySelectorAll('a.piece')].map(a => a.dataset.piece), ask: document.querySelector("a.piece[data-piece='reel'] .ask").innerText.replace(/\\s+/g, ' '),
         folders: document.querySelectorAll('.folders').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth}; })()""")
     case("the strip shows the three shoots, the count, its two buttons and See everything in it", len(q["chips"]) == 3 and set(q["chips"]) == {"Fake beach", "Other farm", "Third hill"}
-         and re.fullmatch(r"\d+ photos · 1 clip", q["count"]) and q["btns"] == ["+ Add a shoot", "+ Add clips", "See everything in it →"], q)
+         and re.fullmatch(r"\d+ photos · 0 clips", q["count"]) and q["btns"] == ["+ Add a shoot", "+ Add clips", "See everything in it →"], q)
     case("the path reads Home › My post kits › My vault, and the box on the Reels card is hers", q["crumbs"] == "Home › My post kits › My vault" and q["ask"].upper().startswith("TELL YOUR ASSISTANT WHAT THIS REEL IS") and "Moms laughing, from any shoot" in q["ask"], q)
     case("the three cards, and no sideways scroll", q["cards"] == ["reel", "carousel", "stories"] and q["sw"] <= q["cw"], q)
     before = int(q["count"].split(" ")[0])
