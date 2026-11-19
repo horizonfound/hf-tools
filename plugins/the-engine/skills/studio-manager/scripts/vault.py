@@ -23,6 +23,8 @@ This script is the one writer of the vault's list.
     python3 vault.py show              where the vault is, how many shoots and photos (never makes it)
     python3 vault.py ensure            make the vault if there is none (twice makes one), then list its photos
     python3 vault.py relist [--sheets] bring the list up to date; --sheets also draws the numbered contact sheets
+    python3 vault.py relist --sheets --only "12, 15, 20 to 24"
+                                       sheets of those vault numbers only (a shortlist from `find`), 48 to a sheet
     python3 vault.py members           the post kits in it
     python3 vault.py add "<folder>"    + Add a shoot: copy that folder's finished photos into the vault's own Photos
                                        folder, each copy checked; the originals are only read. Twice copies nothing.
@@ -498,9 +500,11 @@ def relist(vault_kit, quick=False):
         return res
 
 
-def _draw_sheets(vault_kit, photos):
+def _draw_sheets(vault_kit, photos, shortlist=False):
     """The numbered contact sheets of the vault's photos, drawn by the reel script's own make_sheets into the
-    vault's hidden folder. A photo that can't be reached right now is an empty square with its number."""
+    vault's hidden folder. A photo that can't be reached right now is an empty square with its number.
+    `shortlist`: these rows only, into a folder of their own beside the whole vault's sheets (which stay as they
+    are); 48 to a sheet, each photo under its own vault number."""
     kit_mod = _kit()
     d = str(kit_mod.REEL_PY.parent)
     saved = list(sys.path)
@@ -512,8 +516,52 @@ def _draw_sheets(vault_kit, photos):
         sys.path[:] = saved + [x for x in sys.path if x not in saved]
     wd = Path(vault_kit) / ".kit" / "reels"
     wd.mkdir(exist_ok=True)
+    if shortlist:
+        wd = wd / "shortlist"
+        wd.mkdir(exist_ok=True)
     rows = with_files(vault_kit, photos)
     return reel.make_sheets([Path(x["file"]) for x in rows], wd, labels=[x["n"] for x in rows])
+
+
+ONLY_MOST = 480                     # a shortlist of more photos than this is not a shortlist: ten sheets at the most
+
+
+def parse_numbers(text):
+    """"12, 15, 20 to 24" or "12,15,20-24" as vault.py find prints them -> [12, 15, 20, 21, 22, 23, 24], in the
+    order given, each once. Raises Trouble on anything else."""
+    out = []
+    for part in str(text or "").replace(" to ", "-").replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        a, dash, b = part.partition("-")
+        a, b = a.strip(), b.strip()
+        if not a.isdigit() or (dash and not b.isdigit()):
+            raise Trouble(f"\"{part}\" is not a photo's number. Give the numbers as vault.py find prints them: 12, 15, 20 to 24.")
+        lo, hi = int(a), int(b) if dash else int(a)
+        if hi < lo or hi - lo > 5000:
+            raise Trouble(f"\"{part}\" is not a run of numbers.")
+        for n in range(lo, hi + 1):
+            if n not in out:
+                out.append(n)
+    if not out:
+        raise Trouble("No numbers given. Give the photos' numbers as vault.py find prints them: 12, 15, 20 to 24.")
+    return out
+
+
+def shortlist_sheets(vault_kit, numbers):
+    """Numbered contact sheets of these vault photos only (`vault.py relist --sheets --only`): the list is brought
+    up to date first (quick), then the sheets are drawn, each photo under its own vault number, in number order.
+    {"sheets": [paths], "drawn": [n], "unknown": [n not on the list]}. Nothing but the sheets is written."""
+    res = relist(vault_kit, quick=True)
+    by = {x["n"]: x for x in _rows(Path(vault_kit) / ".kit" / "sheet.json")}
+    drawn = sorted(n for n in numbers if n in by)
+    unknown = [n for n in numbers if n not in by]
+    if len(drawn) > ONLY_MOST:
+        raise Trouble(f"That is {len(drawn):,} photos, too many for a shortlist ({ONLY_MOST} at the most). Narrow the "
+                      "search, or draw the whole vault's sheets with `vault.py relist --sheets`.")
+    sheets = [str(p) for p in _draw_sheets(vault_kit, [by[n] for n in drawn], shortlist=True)] if drawn else []
+    return {"sheets": sheets, "drawn": drawn, "unknown": unknown, "photos": res["photos"]}
 
 
 def rows_by_group(vault_kit):
@@ -954,7 +1002,7 @@ def _clips_of(kit_dir):
     return out
 
 
-def catalog(kit, photos=True):
+def catalog(kit, photos=True, clips=True):
     """What a page needs to search a post kit, built once, with no place on this computer in it (`photos` False:
     the clips and the shoots only, for the reel page's clips panel, which asks often):
 
@@ -967,11 +1015,14 @@ def catalog(kit, photos=True):
 
     For the vault: every shoot in it, what was added to the vault first. For any other post kit: that one shoot.
     A page fetches a picture by number (/kit-photo?kit=<this kit>&n=<thumb>) and filters in the page with the
-    same rule. Reads only."""
+    same rule. Reads only. `clips` False (the reel page's photos step): the photos and the shoots only, no reel
+    record read. With photos, each shoot also says "tagged": how many of its photos have been looked at for
+    search (so a page can say her "Getting your photos ready to search: 40 of 72." for that shoot)."""
     import photo_words
     kit = Path(kit)
     rec = _json(kit / ".kit" / "kit.json")
     is_v = rec.get(MARK) is True
+    want_clips = clips
     shoots, photo_list, clips = [], [], []
     groups = rows_by_group(kit) if is_v else [{"group": "kit", "kit": kit.name, "name": str(rec.get("name") or kit.name),
                                                "date": rec.get("date") if isinstance(rec.get("date"), str) else "",
@@ -982,18 +1033,22 @@ def catalog(kit, photos=True):
         home = kit if own else kit.parent / g["kit"]
         words = photo_words.read(home) if photos else {}
         name = g["name"]
+        tagged = 0
         for x in g["rows"] if photos else ():
             num = str(x["n"] if own else x.get("src"))
+            tagged += 1 if (words.get(num) or {}).get("tags_at") else 0
             text = " ".join(t for t in (photo_words.text_of(words.get(num)), name) if t)
             photo_list.append({"n": x["n"], "kit": g["kit"], "text": text})
         seen[g["kit"]] = {"kit": g["kit"], "group": g["group"], "name": name, "date": g["date"], "photos": len(g["rows"]),
                           "clips": 0, "thumb": g["rows"][0]["n"] if g["rows"] else None}
+        if photos:
+            seen[g["kit"]]["tagged"] = tagged
     # the clips: the kit's own reels, and for the vault every shoot's reels too (a shoot with clips and no photos
     # on the list is still a shoot here)
     homes = [(OWN if is_v else kit.name, "added" if is_v else "kit", kit, "" if is_v else str(rec.get("name") or kit.name), "")]
     if is_v:
         homes += [(m["folder"], "kit", m["path"], m["name"], m["date"]) for m in members(kit)]
-    for folder, group, path, name, day in homes:
+    for folder, group, path, name, day in homes if want_clips else ():
         try:
             got = _clips_of(path)
         except (Exception, SystemExit):  # noqa: BLE001  (a reel record that can't be read: that shoot has no clips to show)
@@ -1241,6 +1296,7 @@ def main():
     sub.add_parser("ensure")
     rl = sub.add_parser("relist")
     rl.add_argument("--sheets", action="store_true", help="also draw the numbered contact sheets")
+    rl.add_argument("--only", default=None, help="with --sheets: sheets of these vault numbers only (\"12, 15, 20 to 24\"), 48 to a sheet")
     sub.add_parser("members")
     ad = sub.add_parser("add", help="copy a folder's finished photos into the vault's own Photos folder")
     ad.add_argument("folder")
@@ -1324,6 +1380,23 @@ def main():
                     + (_count_words(m["photos"], "photo", "photos") if m["listed"] else "no numbered list yet"))
             return 0
         if a.cmd == "relist":
+            if a.only is not None:
+                if not a.sheets:
+                    say("STOP: --only goes with --sheets (sheets of a shortlist). Nothing was changed.")
+                    return 2
+                got = shortlist_sheets(v, parse_numbers(a.only))
+                say(f"{_count_words(got['photos'], 'photo', 'photos')} in the vault; "
+                    f"{_count_words(len(got['drawn']), 'photo', 'photos')} on this shortlist"
+                    + (f", on {_count_words(len(got['sheets']), 'sheet', 'sheets')}" if got["sheets"] else "")
+                    + ". Each photo is under its own vault number: pick by those numbers.")
+                if got["unknown"]:
+                    say("Not on the vault's list (left off the sheets): " + _numbers(got["unknown"]) + ".")
+                for s in got["sheets"]:
+                    say(f"Sheet: {s}")
+                if not got["drawn"]:
+                    say("STOP: none of those numbers is a photo in the vault. `vault.py find \"<words>\" --photos` prints the numbers.")
+                    return 2
+                return 0
             _say_relist(relist(v, quick=not a.sheets))
             return 0
     except Trouble as e:

@@ -114,7 +114,10 @@ name: Check it on a Windows PC
 #                                   another Origin), vault.py clips and use-clips, a B-roll test make and Save my video
 #                                   from the shoots' own videos, the talking page for the vault, every other post kit
 #                                   byte for byte unchanged; the clip search in a hidden Chrome (a Mac's page job, under
-#                                   the guard, on self-made clips)
+#                                   the guard, on self-made clips). Part `photos` (stage 10): her Choose your photos
+#                                   step in the vault, the photos folded by shoot, the photo search (tags, words and
+#                                   the shoot's name), the line to copy, `vault.py relist --sheets --only`, a test make
+#                                   from each photo's own path (the same page job, a step of its own)
 #   tests/photo_words_check.py     Nicole's v29, what is in each photo kept beside the kit so search finds it, and
 #                                   her search rule (Nov 19): a pretend classifier, the store written whole with the
 #                                   version before kept, describe refusing a bad file whole, the job and her line
@@ -764,6 +767,9 @@ jobs:
       - name: The vault's reel page in a hidden Chrome (her four kinds, clips from every shoot listed apart, the clip search opening only the shoots with a match, + Add and the card's x, add-from's refusals, vault.py clips and use-clips, a B-roll test make and Save my video from the shoots' own videos, every other post kit unchanged)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py clips --work /private/tmp/vault-reel-ci
+      - name: The vault's photos step in a hidden Chrome (her Choose your photos words, Added to my vault on top and each shoot folded shut with its count, the photo search opening only the shoots with a match, a tap adding a photo under its vault number, the note and the line to copy, vault.py relist --sheets --only, a test make from each photo's own path, every other post kit unchanged)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py photos --work /private/tmp/vault-reel-photos-ci
       - name: Your year and the monthly recap in a hidden Chrome (the stories play, Next, Back, Pause and the arrow keys, Save this one and Save all of them as real pictures, the folder button, phone width)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/wrapped_check.py

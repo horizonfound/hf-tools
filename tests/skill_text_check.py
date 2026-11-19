@@ -1790,10 +1790,48 @@ def check_vault_reel_clips():
          and "`<vault>/.kit/footage/`" in where and "`vault_ask`" in where and '"vault_ask"' in page and '"from": {"kit": fk, "id": fid}' in page)
 
 
+def check_vault_reel_photos():
+    """The vault's photos step and "Pick my reel photos from my vault" (Nicole's v29, 1.5; stage 10): the instructions, held to the code."""
+    print("\nThe vault's reel page: photos folded by shoot, photo search, Pick my reel photos from my vault (Nov 19)")
+    core, reel, arr, where = read(SM / "SKILL.md"), read(REEL / "SKILL.md"), read(SM / "parts" / "arrange.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "reel_page.py")
+    step2 = reel.split("## Step 2: when they ask for your pick", 1)[-1].split("\n## ", 1)[0]
+    case("the reel skill's Step 2 has the vault's line, the one the page hands out", '**In My vault the line is "Pick my reel photos from my vault"**' in step2
+         and '"photo_for": "Pick my reel photos from my vault"' in page and '"photo_plain": "Pick my reel photos from my vault"' in page)
+    case("the note first, with the command as it is", '`python3 <assistant scripts>/reel_page.py note "My vault" [--reel "<the reel\'s name>"]`' in step2 and "This is the vault:" in page)
+    case("narrow before looking: vault.py find with the note's own words, then sheets of the shortlist only, commands vault.py has",
+         '`python3 <assistant scripts>/vault.py find "<the note\'s own words>" --photos`' in step2 and '`python3 <assistant scripts>/vault.py relist --sheets --only "<the numbers find printed>"`' in step2
+         and '"--only"' in src and "def shortlist_sheets(" in src and "never search for something the note did not say" in step2 and "it is a shortlist, not the answer" in step2)
+    case("48 to a sheet is the reel script's own number", "48 to a sheet" in step2 and "PER_SHEET = 48" in read(REEL / "scripts" / "reel.py"))
+    case("with no note: say how many photos first, then the whole vault's sheets", "**With no note, the whole vault:** say how many photos you are about to look through first" in step2
+         and "`python3 <assistant scripts>/vault.py relist --sheets` draws every photo" in step2)
+    case("saved with kit.py picks under the vault's numbers, for that reel; the note decides what may go in",
+         '`python3 <assistant scripts>/kit.py picks "My vault" --reel <vault numbers, in play order, marked> [--for-reel "<reel\'s name>"]`' in step2
+         and "**The note decides what may go in**" in step2 and "never widen it" in step2)
+    case("the strip in the vault names the vault as --kit and its own Photos folder", '`reel.py strip --kit "<the vault\'s folder>" --folder "<the vault\'s own Photos folder>" --picks ...`' in step2)
+    sec = arr.split("## The vault's reel page", 1)[-1].split("\n## ", 1)[0]
+    case("arrange.md's words for the photos step are the page's: the grid's heading, Added to my vault, + Add photos, From its post kit, found, her progress line",
+         all(x in sec for x in ('**"Choose your photos" in the vault**', "**All your photos, from every shoot in your vault**", "**Added to my vault** open on top", "**+ Add photos**",
+                                '"From its post kit · 72 photos"', '"3 found"', '"Getting your photos ready to search: 40 of 72."'))
+         and all(x in page for x in ('"all_summary": "All your photos, from every shoot in your vault"', '"vp_added": "Added to my vault"', '"vp_add_photos": "+ Add photos"',
+                                     '"vp_from": "From its post kit · {n} photos"'))
+         and '"getting": "Getting your photos ready to search: {done} of {total}."' in read(SM / "scripts" / "photo_words.py"))
+    case("it says search finds what is in a photo, and what to say while a shoot is still being looked at", "**The search finds what is in a photo**" in sec
+         and "tell them to give it a moment rather than that nothing matches" in sec and '"Describe the photos in my vault"' in sec)
+    case("it points the pasted line at the reel skill's Step 2 with the same commands", '**The line to copy there is "Pick my reel photos from my vault"**' in sec
+         and '`vault.py find "<the note\'s own words>" --photos`' in sec and '`vault.py relist --sheets --only "<those numbers>"`' in sec and "The note decides what may go in." in sec)
+    case("the stage 9 line that the photos step is the plain one is gone", "the photos step in the vault is still the plain one" not in arr)
+    case("the core's table has a row for the pasted line (the description is not touched)",
+         '| "Pick my reel photos from my vault" (the line on the vault\'s reel page; the reel\'s name and ", and follow my note" may follow), "pick photos from my vault for a reel", "moms laughing, from any shoot" | '
+         'the reel skill\'s Step 2, "In My vault the line is..." (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault\'s reel page" |' in core)
+    case("where-things-live says where the shortlist's sheets go", "**The vault's sheets (Nov 19).**" in where and "`.kit/reels/shortlist/`" in where and 'wd / "shortlist"' in src)
+    case("our search placeholder is in OUR words, a draft, and her mock-up's is nowhere", '"vp_search_ph": "laughing, a kiss, green backdrop, Hannah"' in page and "Search by shoot: maternity" not in page.split("VAULT_PICK_OUR_WORDS = {", 1)[1].split("}", 1)[0])
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

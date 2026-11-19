@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""The vault's reel page (Nicole's v29, 1.5): the four kinds, clips from every shoot, clip search. Stage 9, vault-reel-clips.
+"""The vault's reel page (Nicole's v29, 1.5): the four kinds, clips from every shoot, clip search (stage 9, part
+`clips`); the photos step folded by shoot, photo search, "Pick my reel photos from my vault" (stage 10, part `photos`).
+
+    python3 tests/guard.py 3000 python3 tests/vault_reel_check.py photos [--port 9985] [--no-chrome]
 
     python3 tests/guard.py 3000 python3 tests/vault_reel_check.py clips [--port 9985] [--work <folder under /private/tmp>]
     python3 tests/guard.py 800  python3 tests/vault_reel_check.py clips --no-chrome      (everything but the page in a browser)
@@ -28,6 +31,21 @@ Part `clips`:
   * in a hidden Chrome: "laughing" opens only the shoot with a match with "1 found", leaves the other shut and
     Added to my vault open; + Add puts the clip in the reel with its name and the tile says ✓ Added; x takes it
     out; a reload keeps it; the ask box is saved with the reel; her words both ways when her handoff is here.
+
+Part `photos` (three pretend shoots, one named for a person; pretend tags through PHOTO_WORDS_PRETEND and words
+through `photo_words.py describe`; the page server itself has no pretend classifier, so nothing starts by itself):
+  * her words on the vault's photos step, and both ways against her page when her handoff is here; our search
+    placeholder, never her mock-up's "Search by shoot";
+  * what the step searches (GET /reel-vault-photos: no path, no file name; only the vault; never cross-site);
+  * the chat: `reel_page.py note "My vault"`, `vault.py find --photos`, `vault.py relist --sheets --only`, the pick
+    saved with `kit.py picks --reel`, and the strip of vault numbers;
+  * in a hidden Chrome: Added to my vault open on top with her line and + Add photos, each shoot folded shut with
+    its picture, name and count; her progress line on the shoot still being looked at, gone once it is done;
+    "laugh" opens only the shoots with a match and says how many; "hannah laughing" finds across the name and the
+    words; nothing found says her line; a tap adds the photo to the order under its vault number, and a test make
+    hands the reel script that photo's own path; a note changes the line to copy; a photo put in the vault's own
+    Photos folder shows up under Added to my vault;
+  * a plain post kit's photos page has none of it; EVERY OTHER POST KIT IS BYTE FOR BYTE UNCHANGED.
 
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only. A Mac
 (the pretend photos are drawn with sips, the clips made with AVFoundation); anywhere else it says SKIP and exits 0.
@@ -73,24 +91,11 @@ HERS_NOT_OURS = {
     "My vault post kit": "her Back pill; ours is the path at the top, which says the same words as its own step",
     "The Assistant": "the bar's wordmark (brand.py)", "by Horizon Found": "the bar's wordmark (brand.py)",
     "Preview: the reel page inside your vault post kit. The same four reels as every post kit; the difference is you can search your whole vault for clips and photos.": "her preview banner (test-only)",
-    "Your talking video": "Talking to camera opens our talking page (stage 9 brief), which has its own steps",
-    "Record yourself talking to the camera, the same as a talking reel in any post kit. Your assistant places photos from your vault with what you say, from any shoot.": "her placeholder for the talking page",
     "In the real version, this is the talking reel page, using your vault's photos below.": "test-only",
     "The same as every reel.": "her placeholder for our real steps (song, vibe, watch)",
     "Add your song": "our real step's own heading", "Pick the vibe": "our real step's own heading",
     "Watch your reel before you make it": "our real step's own heading",
 }
-# The photos step of her page is stage 10's (vault-reel-photos): not looked for on ours yet.
-HERS_STAGE_10 = [
-    "Choose your photos", "Your assistant can choose the photos and their order for you, or you can drag them in yourself.",
-    "Let my assistant choose", "Your assistant picks the strongest photos from your vault and orders them so each one flows into the next.",
-    "I'll drag them in myself", "Search or browse all your photos below, and tap to add.",
-    "Tell your assistant which photos you'd like in this reel", "Optional, and only for this reel.",
-    "Tell your assistant which photos you'd like in this reel Optional, and only for this reel.",
-    "For example: “My favorite maternity photos from this year.” or “Moms laughing, from any shoot.”",
-    "Then copy this into the chat, and your assistant picks the photos for this reel:", "Pick my reel photos from my vault",
-    "Your photos for this reel", "All your photos, from every shoot in your vault",
-]
 # Her lines that her page builds in its script (so they are not in her markup): typed here, each checked to be in
 # her file as she wrote it and to be one of ours.
 HERS_IN_SCRIPT = ["Every shoot", "Added to my vault ", "Clips you add to your vault show up here, open and ready.", "From its post kit · ",
@@ -301,11 +306,14 @@ def check_her_words(s):
     ours_tables.update(R.KIND_WORDS)
     ours_tables.update(R.VAULT_KIND_WORDS)
     ours_tables.update(R.VAULT_CLIP_WORDS)
+    ours_tables.update(R.VAULT_PICK_WORDS)
     ours = set(html_mod.unescape(re.sub(r"<[^>]+>", "", v)) for v in ours_tables.values())
     ours.add("Make my reel.")
-    miss = [x for x in hers if x not in ours and x not in HERS_NOT_OURS and x not in HERS_STAGE_10 and x not in ("reel.", "Make my", "←")
+    ours.add(R.VAULT_PICK_WORDS["photo_ask_b"] + R.VAULT_PICK_WORDS["photo_ask_opt"])       # her label, one line once its <b> is gone
+    ours.add(R.VAULT_PICK_WORDS["photo_ask_opt"].strip())
+    miss = [x for x in hers if x not in ours and x not in HERS_NOT_OURS and x not in ("reel.", "Make my", "←")
             and not re.fullmatch(r"[1-9]", x)]
-    case("every line her vault reel page shows is one of ours, whole (her photos step is stage 10's; her test-only lines named)", not miss, miss)
+    case("every line her vault reel page shows is one of ours, whole (her test-only lines named)", not miss, miss)
     case("her title is ours: Make my reel.", "Make my <em>reel.</em>" in hers_raw and R.VAULT_KIND_WORDS["title_vault"] + "." == "Make my reel.")
     not_hers = [k for k, v in list(R.VAULT_KIND_WORDS.items()) + list(R.VAULT_CLIP_WORDS.items())
                 if k not in ("title_vault", "vc_add_clips") and v not in hers and html_mod.escape(v, quote=False) not in hers_raw
@@ -593,6 +601,8 @@ def check_page(c, s):
          len(f) == 3 and f[0]["mine"] and f[0]["open"] and f[0]["words"] == "Added to my vault" and c.text("#vcRes .addhere").replace("\n", " ").strip() == "Clips you add to your vault show up here, open and ready. + Add clips"
          and sorted(x["words"] for x in f[1:]) == ["Fake beach From its post kit · 2 clips", "Other farm From its post kit · 2 clips"] and not any(x["open"] or x["tiles"] for x in f[1:])
          and c.count("#vcRes details.vfold summary img") == 2, f)
+    got = c.wait_for("Array.prototype.every.call(document.querySelectorAll('#vcRes details.vfold summary img'), function(i){ return i.naturalWidth > 0; })", 40)
+    case("each shoot's small picture really loads", bool(got))
     case("the shoot chips: Every shoot, then each shoot", c.js("Array.prototype.map.call(document.querySelectorAll('#vcShoots button'), function(b){ return b.textContent; })")[0] == "Every shoot"
          and c.count("#vcShoots button") == 3 and c.count("#vcShoots button.on") == 1)
     case("the reel's own clips: Your clips for this reel, with her empty line", c.text(".cl-head .wl").strip().lower() == "your clips for this reel" and c.text("#clist").strip() == "Add clips from your search above.", c.text("#clist"))
@@ -656,9 +666,386 @@ def check_page(c, s):
     s.untouched("the vault's reel page in a browser")
 
 
+# ====================== part `photos` (stage 10): the photos step folded by shoot, photo search, the chat line ======================
+
+H, F, T = "2026-11-01 Hannah beach", "2026-11-01 Other farm", "2026-11-01 Third hill"
+PHOTO_TAGS = {"beach-002.jpg": ["green", "outdoor"], "beach-003.jpg": {"tags": ["sky"], "faces": 2}}
+# her lines for the photos step that her page builds in its script
+HERS_PHOTO_SCRIPT = ["Added to my vault ", "Photos you add to your vault show up here, open and ready.", "From its post kit · ", " found",
+                     "Your assistant will pick these, or tap photos below to add your own.", "+ Add ${noun}", "'photos'",
+                     "Nothing matches that yet. Try other words, or tell your assistant what to look for."]
+
+
+class PhotoWorld(World):
+    def __init__(self, work, port):
+        super().__init__(work, port)
+        self.table = self.work / "pretend-tags.json"
+        self.table.write_text(json.dumps(PHOTO_TAGS), encoding="utf-8")
+        self.tagging = dict(self.env, PHOTO_WORDS_PRETEND=str(self.table))     # only the test's own commands look at photos
+        self.env.pop("PHOTO_WORDS_PRETEND", None)
+
+    def file(self, name, obj):
+        f = self.work / name
+        f.write_text(json.dumps(obj), encoding="utf-8")
+        return str(f)
+
+    def n(self, kit, src):
+        return next(x["n"] for x in self.rows() if x["kit"] == kit and x["src"] == src)
+
+
+def make_photo_world(s):
+    """Three shoots, one named for a person. Two are looked at (pretend tags) and have a few descriptions; the
+    third has not been looked at yet. Nothing added to the vault itself, to begin with."""
+    s.store.mkdir(parents=True, exist_ok=True)
+    s.fake(s.target, "Hannah beach", 8)
+    s.fake(s.target, "Other farm", 9)
+    s.fake(s.target, "Third hill", 8)
+    for kit in (H, F):
+        code, out = s.cmd("photo_words.py", "tag", kit, env=s.tagging)
+        if code != 0:
+            raise RuntimeError("photo_words.py tag: " + out[-300:])
+    for kit, words in ((H, {"1": "Mom laughing with the kids at the water", "4": "A kiss on the forehead"}),
+                       (F, {"5": "Dad laughing by the barn door", "6": "Close-up of the ring"}),
+                       (T, {"2": "Zoë on the hill at sunset"})):
+        code, out = s.cmd("photo_words.py", "describe", kit, "--file", s.file("words-%s.json" % kit[-4:], {"photos": {k: {"words": v} for k, v in words.items()}}), env=s.tagging)
+        if code != 0:
+            raise RuntimeError("photo_words.py describe: " + out[-300:])
+    code, out = s.cmd("vault.py", "ensure")
+    if code != 0:
+        raise RuntimeError("vault.py ensure: " + out[-300:])
+    shutil.copyfile(BEAT60, s.vault() / "Music" / "Test beat.wav")
+    s.note()
+
+
+def check_photo_words(s):
+    R = rp(s)
+    code, _, raw = s.get("/reel.html?kit=" + VQ + "&kind=photos")
+    page = html_mod.unescape(raw.decode("utf-8", "replace"))
+    markup = re.sub(r"<script\b.*?</script>", "", page, flags=re.S)
+    drawn = [k for k in R.VAULT_PICK_WORDS if k not in ("vp_talk_h2", "vp_talk_say", "vp_added", "vp_added_say", "vp_add_photos", "vp_from", "photo_for")]
+    gone = [k for k in drawn if R.VAULT_PICK_WORDS[k].strip() not in markup]
+    case("the vault's Just photos page shows her photos step: her heading, her two choices and their lines, her note and example, her line to copy, her two headings",
+         code == 200 and not gone, gone)
+    case("the lines the page's script draws are handed to it as words (Added to my vault, her line under it, + Add photos, From its post kit)",
+         all(json.dumps(R.VAULT_PICK_WORDS[k], ensure_ascii=False)[1:-1] in page or R.VAULT_PICK_WORDS[k] in page for k in ("vp_added", "vp_added_say", "vp_add_photos", "vp_from")))
+    case("the search box says ours (what is in a photo), never her mock-up's \"Search by shoot\"",
+         "placeholder='laughing, a kiss, green backdrop, Hannah'" in page and "Search by shoot" not in page, re.findall(r"id='vpQ'[^>]*>", page))
+    case("the plain page's own lines for one shoot are not on the vault's (\"What order would you like\", \"this shoot's Photos folder\", \"Only the ones in front of the white backdrop\")",
+         not any(x in markup for x in ("What order would you like your photos in", "this shoot's Photos folder", "Only the ones in front of the white backdrop", "All your photos (drag one up")))
+    case("the line to copy starts as hers: Pick my reel photos from my vault", "<span id='photoPaste'>Pick my reel photos from my vault</span>" in page)
+    case("the step is there once, with the search, the chips and the grid inside All your photos", all(page.count(x) == 1 for x in ("id='vpQ'", "id='vpShoots'", "id='all'", "id='vpEmpty'", "id='photoAskIn'")))
+    bro = s.get("/reel.html?kit=" + VQ + "&kind=broll")[2].decode("utf-8", "replace")
+    case("a B-roll page in the vault still has no photos step showing", "step1" not in steps_of(bro), steps_of(bro))
+    bad = [k for k, v in list(R.VAULT_PICK_WORDS.items()) + list(R.VAULT_PICK_OUR_WORDS.items()) if "—" in v or "Claude" in v or re.search(r"\b(she|he|his)\b", v)]
+    case("no em dash, no Claude, no she or he in the photos step's words", not bad, bad)
+    f = her_page()
+    if f is None:
+        skip("her photos step both ways: her v29 handoff isn't on this computer")
+        return
+    hers_raw = f.read_text(encoding="utf-8")
+    body = hers_raw[hers_raw.index("<body"):]
+    a0 = body.index('id="stepPhotos"')
+    step = body[body.index(">", a0) + 1:body.rindex("<section", 0, body.index('id="stepSong"'))]
+    hers = [x for x in flat(step) if not re.fullmatch(r"[1-9]", x) and x != "Copy"]
+    ours = set(R.VAULT_PICK_WORDS.values()) | {R.VAULT_PICK_WORDS["photo_ask_b"] + R.VAULT_PICK_WORDS["photo_ask_opt"], R.VAULT_PICK_WORDS["photo_ask_opt"].strip()}
+    miss = [x for x in hers if x not in ours]
+    case("every line of her photos step is in VAULT_PICK_WORDS, whole", hers and not miss, miss)
+    not_hers = [k for k, v in R.VAULT_PICK_WORDS.items() if k != "vp_add_photos" and v.strip() not in hers_raw and html_mod.escape(v.strip(), quote=False) not in hers_raw
+                and not all(part in hers_raw for part in re.split(r"\{n\}", v) if part)]
+    case("every word in VAULT_PICK_WORDS is in her page, word for word", not not_hers, not_hers)
+    gone = [x for x in HERS_PHOTO_SCRIPT if x not in hers_raw]
+    case("the photo lines her page builds in its script are in her file as typed here (+ Add photos is her \"+ Add ${noun}\")", not gone and R.VAULT_PICK_WORDS["vp_add_photos"] == "+ Add photos", gone)
+    case("her mock-up's search placeholder is hers, and is not on ours on purpose", "Search by shoot: maternity, Hannah, Christmas" in hers_raw and "Search by shoot" not in json.dumps(dict(R.VAULT_PICK_WORDS, **R.VAULT_PICK_OUR_WORDS)))
+
+
+def check_photo_catalog(s):
+    sys.path.insert(0, str(SCRIPTS))
+    import vault
+    code, j, raw = s.get("/reel-vault-photos?kit=" + VQ)
+    j = j or {}
+    by = {x["kit"]: x for x in j.get("shoots", [])}
+    case("GET /reel-vault-photos: the three shoots with their names, counts and a picture's number; nothing added to the vault yet",
+         code == 200 and j.get("ok") and set(by) == {H, F, T} and (by[H]["name"], by[H]["photos"], by[F]["photos"], by[T]["photos"]) == ("Hannah beach", 8, 9, 8)
+         and all(type(x["thumb"]) is int for x in by.values()), j.get("shoots"))
+    case("...how many of each shoot's photos have been looked at: all of two shoots, none of the third", (by[H]["tagged"], by[F]["tagged"], by[T]["tagged"]) == (8, 9, 0) and j.get("can") is True
+         and j.get("getting") == "Getting your photos ready to search: {done} of {total}.", (by, j.get("can")))
+    case("...every photo by its vault number and its shoot's folder, 25 in all, and no path or file name in any of it",
+         len(j.get("photos", [])) == 25 and sorted(x["n"] for x in j["photos"]) == sorted(x["n"] for x in s.rows()) and no_path(raw.decode()) and "beach-0" not in raw.decode() and ".jpg" not in raw.decode(), raw[:200])
+    text = {x["n"]: x["text"] for x in j.get("photos", [])}
+
+    def find(q):
+        w = vault.search_words(q)
+        return sorted(n for n, t in text.items() if all(x in t for x in w))
+    n = s.n
+    case("her rule on it: \"laugh\" finds the two laughing photos, one in each of two shoots (a part of a word matches)", find("laugh") == sorted([n(H, 1), n(F, 5)]), find("laugh"))
+    case("\"hannah laughing\" finds across the shoot's name and the photo's words: the one photo", find("Hannah laughing") == [n(H, 1)], find("Hannah laughing"))
+    case("\"me with the kiss\": everyday words ignored", find("me with the kiss") == [n(H, 4)], find("me with the kiss"))
+    case("a tag finds too (\"green\": the photo the computer saw green in, in both looked-at shoots), and \"zoe\" finds Zoë", find("green") == sorted([n(H, 2), n(F, 2)]) and find("zoe") == [n(T, 2)], (find("green"), find("zoe")))
+    case("the page's answer and `vault.py find` agree", all(str(x) in s.cmd("vault.py", "find", "laugh", "--photos")[1] for x in find("laugh")), s.cmd("vault.py", "find", "laugh", "--photos")[1])
+    case("only the vault has it: a plain post kit gets 404", s.get("/reel-vault-photos?kit=" + quote(H))[0] == 404)
+    code, _, _ = s.get("/reel-vault-photos?kit=" + VQ, headers={"Sec-Fetch-Site": "cross-site"})
+    case("another website asking is refused", code == 403, code)
+    s.untouched("reading what the photos step searches")
+
+
+def check_photo_chat(s):
+    v = s.vault()
+    n = s.n
+    code, j = s.post("/reel-version", {"kit": "My vault", "op": "new", "kind": "photos", "name": "Moms"})
+    case("(set up: a second reel in the vault, a Just photos one called Moms)", code == 200 and (j or {}).get("ok"), (code, j))
+    st = s.state()
+    code, j = s.post("/reel-save", {"kit": "My vault", "stamp": st["stamp"], "base": st["rev"], "page": "vaultpage2", "reel": st["current"],
+                                    "saved": {"kind": "photos", "photo_ask": "Moms laughing, from any shoot."}})
+    case("(set up: their note for that reel, saved as the page saves it)", code == 200 and (j or {}).get("ok") and (s.state()["saved"] or {}).get("photo_ask") == "Moms laughing, from any shoot.", (code, j))
+    code, out = s.cmd("reel_page.py", "note", "My vault", "--reel", "Moms")
+    case("`reel_page.py note \"My vault\" --reel Moms` prints the note word for word and that the pick is for Moms", code == 0 and "Moms laughing, from any shoot." in out and "\"Moms\"" in out, out)
+    case("...says it is the vault with its 25 photos, and to narrow with vault.py find, then relist --sheets --only", "This is the vault: 25 photos" in out and "vault.py find" in out and "--photos" in out and "relist --sheets --only" in out, out)
+    case("...and prints the command that saves the pick for this reel", "kit.py picks \"My vault\" --reel" in out, out)
+    code, out = s.cmd("vault.py", "find", "moms laughing", "--photos")
+    case("`vault.py find \"moms laughing\" --photos`: nothing (no description says moms), said plainly", code == 0 and ": 0 " in out and "None." in out, out)
+    code, out = s.cmd("vault.py", "find", "laughing", "--photos")
+    want = [n(H, 1), n(F, 5)]
+    case("`vault.py find \"laughing\" --photos` prints the two photos' vault numbers, by shoot", code == 0 and all(re.search(r"\b%d\b" % x, out) for x in want) and "Hannah beach" in out and "Other farm" in out, out)
+    before = sha(v / ".kit" / "sheet.json")
+    code, out = s.cmd("vault.py", "relist", "--sheets", "--only", "%d, %d, 999" % (want[0], want[1]))
+    sheets = [ln.split("Sheet: ", 1)[1] for ln in out.splitlines() if ln.startswith("Sheet: ")]
+    case("`vault.py relist --sheets --only` draws one sheet of the two, in a shortlist folder of the vault's own, and says the number that is not a photo",
+         code == 0 and len(sheets) == 1 and Path(sheets[0]).is_file() and Path(sheets[0]).parent == v / ".kit" / "reels" / "shortlist" and "2 photos on this shortlist" in out
+         and "25 photos in the vault" in out and "999" in out, out)
+    case("...and changes nothing else: the vault's list is byte for byte what it was", sha(v / ".kit" / "sheet.json") == before)
+    code, out = s.cmd("vault.py", "relist", "--sheets", "--only", "1 to 3")
+    case("a run of numbers (\"1 to 3\") is three photos", code == 0 and "3 photos on this shortlist" in out, out)
+    for bad, why in (("abc", "not a number"), ("", "no numbers"), ("5-2", "a run backwards")):
+        code, out = s.cmd("vault.py", "relist", "--sheets", "--only", bad)
+        case("--only %r is refused (%s), nothing drawn" % (bad, why), code == 2 and "STOP" in out and "Sheet:" not in out, out)
+    code, out = s.cmd("vault.py", "relist", "--only", "1")
+    case("--only without --sheets is refused", code == 2 and "STOP" in out, out)
+    code, out = s.cmd("vault.py", "relist", "--sheets", "--only", "999")
+    case("only numbers that are no photo: STOP, said plainly", code == 2 and "none of those numbers" in out, out)
+    picks = "%d+,%d" % (want[0], want[1])
+    code, out = s.cmd(REEL / "reel.py", "strip", "--kit", str(v), "--folder", str(v / "Photos"), "--shoot", "My vault", "--picks", picks)
+    case("the strip draws the pick by vault numbers (--kit the vault, --folder its own Photos folder)", code == 0 and "Strip:" in out, out)
+    code, out = s.cmd("kit.py", "picks", "My vault", "--reel", picks, "--for-reel", "Moms")
+    st = s.state()
+    case("`kit.py picks \"My vault\" --reel ... --for-reel Moms` saves the pick under the vault's numbers, and the page's state has it",
+         code == 0 and [(x["n"], x["h"]) for x in st.get("claude") or []] == [(want[0], "+"), (want[1], "")], (out, st.get("claude")))
+    # a test make: each picked photo's own path
+    body = {"kit": "My vault", "stamp": st["stamp"], "picks": [{"n": want[0], "h": "+"}, {"n": want[1], "h": ""}, {"n": n(T, 2), "h": ""}], "song": "", "vibe": "beat", "test": True}
+    code, j = s.post("/reel-make", body)
+    job = wait_job(s, j["job"]["id"]) if code == 200 and (j or {}).get("job") else None
+    case("a test make of the Moms reel finishes, nothing made", job and job["state"] == "done" and job.get("dry") is True, (code, j, job))
+    try:
+        paths = [x["path"] for x in json.loads((v / ".kit" / "reels" / "reel.json").read_text())["plan"]["photos"]]
+    except (OSError, ValueError, KeyError):
+        paths = []
+    rows = {x["n"]: x for x in s.rows()}
+    want_paths = [str(s.content / k / "Photos" / Path(rows[x]["file"]).name) for k, x in ((H, want[0]), (F, want[1]), (T, n(T, 2)))]
+    case("...and the reel script was handed each photo's own path, in its own shoot's Photos folder", paths == want_paths, paths)
+    s.untouched("the chat's note, find, shortlist sheets, pick and test make")
+
+
+def pfolds(c):
+    return c.js("""Array.prototype.map.call(document.querySelectorAll('#all details.vfold'), function(d){
+      var s = d.querySelector('summary'); return {open: d.open, mine: d.classList.contains('mine'), nohit: d.classList.contains('nohit'),
+        name: (s.querySelector('span') || s).textContent.trim(), n: s.querySelector('.n').textContent, prog: (s.querySelector('.prog') || {}).textContent || '',
+        hit: (s.querySelector('.hit') && !s.querySelector('.hit').hidden) ? s.querySelector('.hit').textContent : '', img: !!s.querySelector('img'),
+        all: d.querySelectorAll('.pick').length,
+        seen: Array.prototype.filter.call(d.querySelectorAll('.pick'), function(t){ return d.open && !t.classList.contains('off') && t.getBoundingClientRect().width > 0; }).map(function(t){ return +t.dataset.n; })}; })""")
+
+
+def pfold(c, name):
+    return next(x for x in pfolds(c) if x["name"].startswith(name))
+
+
+def check_photo_page(c, s):
+    v = s.vault()
+    n = s.n
+    c.open(s.url("/reel.html?kit=" + VQ + "&kind=photos"))
+    c.wait_for("window.Reel && Reel.state() && Reel.vaultPhotos && Reel.vaultPhotos.look().ready", 40)
+    case("the page is the Moms reel's, a Just photos reel in the vault: Choose your photos is step 1", c.text("#step1 h2").replace("1", "").strip() == "Choose your photos", c.text("#step1 h2"))
+    case("a new reel starts on I'll drag them in myself, with her line where its photos will be: Your assistant will pick these, or tap photos below to add your own.",
+         c.count("#reel .tile") == 0 and c.js("document.querySelector('#vpEmpty').hidden") is False and c.text("#vpEmpty").strip() == "Your assistant will pick these, or tap photos below to add your own."
+         and c.text("#vpCnt").strip() == "", c.text("#vpEmpty"))
+    c.click("#useClaude")
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 2", 5)
+    case("Let my assistant choose shows the assistant's pick for this reel under Your photos for this reel, counted \"2 added\"",
+         c.js("Array.prototype.map.call(document.querySelectorAll('#reel .tile'), function(t){ return +t.dataset.n; })") == [n(H, 1), n(F, 5)]
+         and c.text(".vp-head .wl").strip().lower() == "your photos for this reel" and c.text("#vpCnt").strip() == "2 added" and c.js("document.querySelector('#vpEmpty').hidden") is True, c.text("#vpCnt"))
+    c.js("document.querySelector('#allBox').open = true")
+    f = pfolds(c)
+    case("Added to my vault is on top and open, with her line and + Add photos",
+         f[0]["mine"] and f[0]["open"] and f[0]["name"].startswith("Added to my vault") and f[0]["all"] == 0
+         and c.text("#all .vfold.mine .addhere").replace("\n", " ").strip() == "Photos you add to your vault show up here, open and ready. + Add photos", (f[0], c.text("#all .vfold.mine .addhere")))
+    case("under it each shoot is folded shut, with its small picture, its name and its count",
+         len(f) == 4 and sorted((x["name"], x["n"]) for x in f[1:]) == [("Hannah beach", "From its post kit · 8 photos"), ("Other farm", "From its post kit · 9 photos"), ("Third hill", "From its post kit · 8 photos")]
+         and all(x["img"] and not x["open"] and not x["seen"] and not x["mine"] for x in f[1:]), f)
+    got = c.wait_for("Array.prototype.every.call(document.querySelectorAll('#all details.vfold summary img'), function(i){ return i.naturalWidth > 0; })", 40)
+    case("each shoot's small picture really loads (the vault's own small copy of one of its photos)", bool(got) and c.count("#all details.vfold summary img") == 3)
+    case("every photo of every shoot is in its own shoot's fold (8, 9 and 8)", (pfold(c, "Hannah")["all"], pfold(c, "Other")["all"], pfold(c, "Third")["all"]) == (8, 9, 8))
+    case("the shoot that has not been looked at yet says her line; the two that have say nothing",
+         pfold(c, "Third")["prog"] == "Getting your photos ready to search: 0 of 8." and pfold(c, "Hannah")["prog"] == "" and pfold(c, "Other")["prog"] == "", pfold(c, "Third"))
+    case("the shoot chips: Every shoot, then each shoot", c.js("Array.prototype.map.call(document.querySelectorAll('#vpShoots button'), function(b){ return b.textContent; })")[0] == "Every shoot" and c.count("#vpShoots button") == 4)
+    c.click("#all details.vfold:not(.mine) summary", nth=0)
+    time.sleep(0.3)
+    first = pfolds(c)[1]
+    case("a tap on a shoot opens it and shows its photos", first["open"] and len(first["seen"]) == first["all"], first)
+    c.click("#all details.vfold:not(.mine) summary", nth=0)
+    time.sleep(0.3)
+    case("...and a tap again shuts it", not pfolds(c)[1]["open"])
+    # the search
+    type_in(c, "#vpQ", "laugh")
+    c.wait_for("document.querySelectorAll('#all .hit:not([hidden])').length === 2", 5)
+    hb, of, th = pfold(c, "Hannah"), pfold(c, "Other"), pfold(c, "Third")
+    case("\"laugh\" opens only the two shoots with a match, with \"1 found\" on each and only the matching photo showing",
+         hb["open"] and hb["hit"] == "1 found" and hb["seen"] == [n(H, 1)] and of["open"] and of["hit"] == "1 found" and of["seen"] == [n(F, 5)], (hb, of))
+    if os.environ.get("VAULT_REEL_SHOT"):         # a picture for a look by eye (never on by itself)
+        c.js("document.querySelector('#vpFind').scrollIntoView()")
+        time.sleep(1.0)
+        print("SHOT  " + str(c.screenshot("vault-photos-search.png")), flush=True)
+    case("...the shoot with nothing found stays shut and says nothing; Added to my vault stays open", not th["open"] and th["nohit"] and th["hit"] == "" and pfolds(c)[0]["open"], th)
+    c.click("#all details.vfold.nohit summary")
+    time.sleep(0.3)
+    case("a press on the shut shoot leaves it shut while the search has nothing in it", not pfold(c, "Third")["open"])
+    type_in(c, "#vpQ", "Hannah laughing")
+    c.wait_for("document.querySelectorAll('#all .hit:not([hidden])').length === 1", 5)
+    hb, of = pfold(c, "Hannah"), pfold(c, "Other")
+    case("\"Hannah laughing\" finds across the shoot's name and the photo's words: one shoot open, \"1 found\", the other shut", hb["open"] and hb["hit"] == "1 found" and hb["seen"] == [n(H, 1)] and not of["open"] and of["nohit"], (hb, of))
+    type_in(c, "#vpQ", "zebra")
+    time.sleep(0.3)
+    case("nothing found: her line, and every shoot shut", c.js("document.querySelector('#vpNone').hidden") is False and c.text("#vpNone").strip() == "Nothing matches that yet. Try other words, or tell your assistant what to look for."
+         and not any(x["open"] for x in pfolds(c)[1:]), pfolds(c))
+    type_in(c, "#vpQ", "kiss")
+    c.wait_for("document.querySelectorAll('#all .hit:not([hidden])').length === 1", 5)
+    case("(her line goes when something is found)", c.js("document.querySelector('#vpNone').hidden") is True)
+    # a tap adds the photo, under its vault number
+    kiss = n(H, 4)
+    c.click("#all .pick[data-n='%d']" % kiss, check=False)
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 3", 5)
+    order = c.js("Array.prototype.map.call(document.querySelectorAll('#reel .tile'), function(t){ return +t.dataset.n; })")
+    case("a tap on the found photo adds it to the order under its vault number, counted \"3 added\", and the photo is marked as in", order == [n(H, 1), n(F, 5), kiss] and c.text("#vpCnt").strip() == "3 added"
+         and c.js("document.querySelector('#all .pick[data-n=\"%d\"]').classList.contains('in')" % kiss), order)
+    ok = s.wait(lambda: [x["n"] for x in ((s.state() or {}).get("saved") or {}).get("picks") or []] == order, 8)
+    case("...saved with this reel as their own order", bool(ok) and (s.state()["saved"] or {}).get("mine") is True, (s.state() or {}).get("saved"))
+    st = s.state()
+    body = {"kit": "My vault", "stamp": st["stamp"], "picks": [{"n": x, "h": ""} for x in order], "song": "", "vibe": "beat", "test": True}
+    code, j = s.post("/reel-make", body)
+    job = wait_job(s, j["job"]["id"]) if code == 200 and (j or {}).get("job") else None
+    try:
+        paths = [x["path"] for x in json.loads((v / ".kit" / "reels" / "reel.json").read_text())["plan"]["photos"]]
+    except (OSError, ValueError, KeyError):
+        paths = []
+    rows = {x["n"]: x for x in s.rows()}
+    case("a test make of that order hands the reel script the tapped photo's own path, in its own shoot's Photos folder",
+         job and job["state"] == "done" and paths and paths[-1] == str(s.content / H / "Photos" / Path(rows[kiss]["file"]).name) and len(paths) == 3, (job, paths))
+    c.click("#all .pick[data-n='%d']" % kiss, check=False)
+    c.wait_for("document.querySelectorAll('#reel .tile').length === 2", 5)
+    case("a tap again takes it out", c.text("#vpCnt").strip() == "2 added")
+    # the chips
+    type_in(c, "#vpQ", "")
+    c.click("#vpShoots button", nth=c.js("Array.prototype.map.call(document.querySelectorAll('#vpShoots button'), function(b){ return b.textContent; }).indexOf('Other farm')"))
+    time.sleep(0.3)
+    case("a shoot's chip opens that shoot with all its photos, \"9 found\", and leaves the others shut", pfold(c, "Other")["hit"] == "9 found" and len(pfold(c, "Other")["seen"]) == 9 and not pfold(c, "Hannah")["open"], pfolds(c))
+    c.click("#vpShoots button", nth=0)
+    time.sleep(0.3)
+    case("Every shoot: the search is off, every shoot folded shut again", not any(x["open"] or x["hit"] for x in pfolds(c)[1:]), pfolds(c))
+    # the note and the line to copy
+    case("the line to copy: hers, the reel's name (the vault has two reels), and the note that is saved", c.text("#photoPaste").strip() == "Pick my reel photos from my vault, Moms, and follow my note"
+         and c.js("document.querySelector('#photoAskIn').value") == "Moms laughing, from any shoot.", c.text("#photoPaste"))
+    type_in(c, "#photoAskIn", "")
+    case("with no note the line is hers and the reel's name", c.text("#photoPaste").strip() == "Pick my reel photos from my vault, Moms", c.text("#photoPaste"))
+    type_in(c, "#photoAskIn", "My favorite maternity photos from this year.")
+    ok = s.wait(lambda: ((s.state() or {}).get("saved") or {}).get("photo_ask") == "My favorite maternity photos from this year.", 8)
+    case("a note typed changes the line (\", and follow my note\") and is saved with this reel", c.text("#photoPaste").strip() == "Pick my reel photos from my vault, Moms, and follow my note" and bool(ok), (c.text("#photoPaste"), (s.state() or {}).get("saved")))
+    # her progress line goes once the shoot has been looked at
+    code, out = s.cmd("photo_words.py", "tag", T, env=s.tagging)
+    gone = c.wait_for("(function(){ var p = null; document.querySelectorAll('#all details.vfold').forEach(function(d){ if ((d.querySelector('summary span') || {textContent: ''}).textContent.indexOf('Third') === 0) p = d.querySelector('.prog'); }); return p && p.textContent === ''; })()", 15)
+    case("once the third shoot has been looked at, her line goes by itself", code == 0 and bool(gone), (out[-200:], pfold(c, "Third")))
+    s.note()             # (the test's own command looked at that shoot's photos: its words file is new)
+    type_in(c, "#vpQ", "zoe sunset")
+    c.wait_for("document.querySelectorAll('#all .hit:not([hidden])').length === 1", 5)
+    case("\"zoe sunset\" finds Zoë's photo in it (accents folded)", pfold(c, "Third")["seen"] == [n(T, 2)], pfold(c, "Third"))
+    type_in(c, "#vpQ", "")
+    # + Add photos, and a photo put in the vault's own Photos folder
+    c.click("#vpAdd")
+    said = c.wait_for("document.querySelector('#vpAddSay').textContent.length > 0 && document.querySelector('#vpAddSay').textContent.indexOf('Opening') < 0", 10)
+    case("+ Add photos opens the vault's own Photos folder, and says so right beside the button (no window in a test)", bool(said) and no_path(c.text("#vpAddSay")), c.text("#vpAddSay"))
+    src = s.content / H / "Photos" / "beach-002.jpg"
+    shutil.copyfile(src, v / "Photos" / "dropped.jpg")
+    old = time.time() - 60
+    os.utime(v / "Photos" / "dropped.jpg", (old, old))
+    c.wait_for("!!document.querySelector('#showNew')", 30)
+    case("a photo put in the vault's own Photos folder is noticed by the page itself: 1 new photo in", "1 new photo in." in c.text("#addPhotosSay"), c.text("#addPhotosSay"))
+    c.click("#showNew")
+    c.wait_for("window.Reel && Reel.state() && Reel.vaultPhotos && Reel.vaultPhotos.look().ready && document.querySelectorAll('#all .vfold.mine .pick').length === 1", 40)
+    c.js("document.querySelector('#allBox').open = true")
+    mine = pfolds(c)[0]
+    own = next(x["n"] for x in s.rows() if x["kit"] == "")
+    case("...and after Show my new photos it is under Added to my vault, open, counted, with a new number; + Add photos is still there",
+         mine["open"] and mine["seen"] == [own] and mine["n"] == "1 photo" and own == max(x["n"] for x in s.rows()) and c.count("#vpAdd") == 1
+         and c.js("document.querySelector('#all .vfold.mine .line1').hidden") is True, mine)
+    case("the reel kept its order and its note through the reload", c.js("Array.prototype.map.call(document.querySelectorAll('#reel .tile'), function(t){ return +t.dataset.n; })") == [n(H, 1), n(F, 5)]
+         and c.js("document.querySelector('#photoAskIn').value") == "My favorite maternity photos from this year.")
+    body = c.js("document.body.innerText")
+    case("no path anywhere on the page", no_path(body) and no_path(c.js("document.documentElement.outerHTML.replace(/<script[^]*?<\\/script>/g, '')")))
+    errs = c.page_errors()
+    case("no script error on the page", not errs, errs)
+    c.open(s.url("/reel.html?kit=" + VQ))
+    time.sleep(1.5)
+    s.untouched("the vault's photos step in a browser")
+
+
+def check_photo_plain(s):
+    R = rp(s)
+    pa = s.get("/reel.html?kit=%s&kind=photos" % quote(H))[2].decode("utf-8", "replace")
+    case("a plain post kit's photos page has none of it: no search box, no folds, its own words, the order script as it was",
+         not any(x in pa for x in ("vpQ", "vpFind", "vaultPhotos", "reel-vault-photos", "vp-head", "from my vault")) and R.ORDER_JS in pa
+         and "<div id='all'></div>" in pa and html_mod.escape(R.WORDS["order_say"]) in pa and R.ORDER_JS != R.vault_order_js(), "")
+    case("...and built twice is the same page, with or without a vault page built in between", R.page_html("K", "K", True, "photos") == (R.page_html("K", "K", True, "photos", True) and R.page_html("K", "K", True, "photos")))
+
+
+def main_photos(a):
+    work = Path(a.work).resolve() if a.work else Path(tempfile.mkdtemp(prefix="hf-vault-reel-photos-", dir="/private/tmp"))
+    if Path("/private/tmp") not in work.parents:
+        print("STOP: --work must be under /private/tmp.")
+        return 2
+    run = work / time.strftime("run-%H%M%S")
+    (run / "home").mkdir(parents=True)
+    s = PhotoWorld(run, a.port)
+    try:
+        group("(making three shoots, two of them looked at and described, and the vault)")
+        make_photo_world(s)
+        s.start()
+        case("the page server is on a port of this test's own (%d)" % s.port, a.port <= s.port < a.port + 20 and s.port not in (8790, 8791, 8792, 8799))
+        group("her words: Choose your photos, in the vault")
+        check_photo_words(s)
+        group("what the photos step searches")
+        check_photo_catalog(s)
+        group("the chat: Pick my reel photos from my vault")
+        check_photo_chat(s)
+        if a.no_chrome:
+            skip("the photos step in a browser: --no-chrome")
+        elif not chrome_drive.find_chrome():
+            skip("the photos step in a browser: no Chrome on this computer")
+        else:
+            group("the vault's photos step in a hidden Chrome")
+            with chrome_drive.Chrome(work=str(run), size=(1100, 900), extra_args=LIGHT) as c:
+                check_photo_page(c, s)
+        group("a plain post kit, as it was")
+        check_photo_plain(s)
+    finally:
+        s.stop()
+        if not a.work:
+            shutil.rmtree(work, ignore_errors=True)     # this run's own scratch folder, made a moment ago
+    n, bad = core.COUNT[0], core.FAILED
+    print(f"\n{n - len(bad)} of {n} passed" + (f"; FAILED: {len(bad)}" if bad else ""))
+    for f in bad:
+        print("  FAILED: " + f)
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("part", nargs="?", default="clips", choices=("clips",))
+    ap.add_argument("part", nargs="?", default="clips", choices=("clips", "photos"))
     ap.add_argument("--port", type=int, default=9985)
     ap.add_argument("--work")
     ap.add_argument("--no-chrome", action="store_true")
@@ -669,6 +1056,8 @@ def main():
     if a.port in (8790, 8791, 8792, 8799):
         print("STOP: that port is the real Assistant's.")
         return 2
+    if a.part == "photos":
+        return main_photos(a)
     work = Path(a.work).resolve() if a.work else Path(tempfile.mkdtemp(prefix="hf-vault-reel-", dir="/private/tmp"))
     if Path("/private/tmp") not in work.parents:
         print("STOP: --work must be under /private/tmp.")

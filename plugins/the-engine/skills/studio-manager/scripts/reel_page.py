@@ -305,7 +305,7 @@ FACES = [
 FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answers to
 
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-             "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-clips", "/reel-vault-still")
+             "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-clips", "/reel-vault-photos", "/reel-vault-still")
 POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove",
               "/reel-preview", "/reel-video")
 
@@ -651,6 +651,48 @@ VAULT_CLIP_WORDS = {
     "vc_n_added": "{n} added",
     "clips_empty": "Add clips from your search above.",
     "vc_nothing": "Nothing matches that yet. Try other words, or tell your assistant what to look for.",
+}
+# Choose your photos, in the vault (her #stepPhotos, screenshot 07; stage 10). Hers, word for word, laid over WORDS
+# and PICK_WORDS only when the kit is the vault: the two choices and their lines, the note and its example, the
+# line to copy, the heading over the reel's own photos, the grid's heading, Added to my vault, and each shoot's
+# line. The keys that say the same on every post kit's page (order_h2, claude_b, mine_b, the note's bold line, its
+# placeholder, "Then copy this...") are here too, so this table is her whole photos step.
+VAULT_PICK_WORDS = {
+    "order_h2": "Choose your photos",
+    "order_say": "Your assistant can choose the photos and their order for you, or you can drag them in yourself.",
+    "claude_b": "Let my assistant choose",
+    "claude_words": "Your assistant picks the strongest photos from your vault and orders them so each one flows into the next.",
+    "mine_b": "I'll drag them in myself",
+    "mine_words": "Search or browse all your photos below, and tap to add.",
+    "photo_ask_b": "Tell your assistant which photos you'd like in this reel",
+    "photo_ask_opt": " Optional, and only for this reel.",
+    "photo_ask_ex": "For example: “My favorite maternity photos from this year.” or “Moms laughing, from any shoot.”",
+    "photo_ask_placeholder": "Optional: which photos to use, or leave out",
+    "photo_then": "Then copy this into the chat, and your assistant picks the photos for this reel:",
+    "photo_plain": "Pick my reel photos from my vault",
+    "photo_for": "Pick my reel photos from my vault",      # the vault's line names no shoot (the reel's name and the note follow as ever)
+    "vp_for_reel": "Your photos for this reel",
+    "vp_for_say": "Your assistant will pick these, or tap photos below to add your own.",
+    "all_summary": "All your photos, from every shoot in your vault",
+    "vp_added": "Added to my vault",
+    "vp_added_say": "Photos you add to your vault show up here, open and ready.",
+    "vp_add_photos": "+ Add photos",
+    "vp_from": "From its post kit · {n} photos",
+    # her talking kind's step. Talking to camera opens our talking page (stage 9), so these two are kept here, hers,
+    # and are not drawn on the reel page.
+    "vp_talk_h2": "Your talking video",
+    "vp_talk_say": "Record yourself talking to the camera, the same as a talking reel in any post kit. Your assistant places photos from your vault with what you say, from any shoot.",
+}
+# Ours, on the vault's photos step only, each a draft for Dustin and Nicole. Her search box says "Search by shoot:
+# maternity, Hannah, Christmas", which is her mock-up's limit (it could only search shoot names), not her wish
+# (her 1.5: "Photo search has to find what's in the photo"); she says "1 photos".
+VAULT_PICK_OUR_WORDS = {
+    "vp_search_ph": "laughing, a kiss, green backdrop, Hannah",
+    "vp_search_label": "Search your photos",
+    "vp_from_one": "From its post kit · 1 photo",
+    "vp_loading": "Finding your photos…",
+    "vp_opening": "Opening your vault's Photos folder in Finder...",
+    "vp_cant_open": "I couldn't open your vault's Photos folder just now. Try again in a moment.",
 }
 VAULT_ASK_MAX = 600                 # the ask box's length (as the footage ask and the photo note)
 # Ours, in the vault only, each a draft for Dustin and Nicole (her mock-up has no editor under the search, no
@@ -2913,6 +2955,37 @@ def vault_clips_for_page(kit):
     return {"ok": True, "shoots": shoots, "clips": clips, "everyday": sorted(vault.CLIP_EVERYDAY)}
 
 
+_VP_KICKED = {}                     # vault -> when its photo-words job was last asked to start from this route
+VP_KICK_EVERY = 30.0                # seconds: a job that can't finish (a photo out of reach) is not asked for on every look
+
+
+def vault_photos_for_page(kit):
+    """GET /reel-vault-photos?kit=: what the vault's photos step folds and searches (vault.catalog's photos; no
+    path, no file name): {"shoots": [{kit, name, photos, thumb, tagged}], "photos": [{n, kit, text}], "everyday",
+    "can", "getting"}. "kit" is a shoot's folder name ("" for what was added to the vault itself); "n" is the
+    vault's own number; "text" is already folded the way search compares it (vault.fold): the photo's tags, its
+    words and its shoot's name. "tagged" is how many of the shoot's photos have been looked at, so the page can
+    say her "Getting your photos ready to search: 40 of 72." on a shoot that is not done ("can" False: this
+    computer has nothing that looks, so nothing is said). While photos wait, the vault's own job is asked to
+    start (as opening the vault's post kit does). None when the kit is not the vault."""
+    import vault
+    import photo_words
+    if not is_vault_kit(kit):
+        return None
+    cat = vault.catalog(kit, clips=False)
+    shoots = [{"kit": s["kit"], "name": s["name"], "photos": s["photos"], "thumb": s["thumb"], "tagged": s.get("tagged", s["photos"])}
+              for s in cat["shoots"] if s["photos"]]
+    can = bool(photo_words.here())
+    if can and any(s["tagged"] < s["photos"] for s in shoots):
+        now = time.time()
+        if now - _VP_KICKED.get(str(kit), 0) > VP_KICK_EVERY:
+            _VP_KICKED[str(kit)] = now
+            photo_words.opened(kit)
+    return {"ok": True, "shoots": shoots, "can": can, "getting": photo_words.WORDS["getting"],
+            "photos": [{"n": x["n"], "kit": x["kit"], "text": vault.fold(x["text"])} for x in cat["photos"]],
+            "everyday": sorted(vault.EVERYDAY)}
+
+
 _VSTILL_ASKED = set()
 
 
@@ -4327,6 +4400,9 @@ def _get_footage(handler, path, q):
     if path == "/reel-vault-clips":             # the vault's clips panel: what it searches and draws
         got = vault_clips_for_page(kit)
         return arrange._send_json(handler, got if got else {"ok": False, "words": VAULT_OUR_WORDS["vault_only"]}, 200 if got else 404)
+    if path == "/reel-vault-photos":            # the vault's photos step: its shoots, and what its search reads
+        got = vault_photos_for_page(kit)
+        return arrange._send_json(handler, got if got else {"ok": False, "words": VAULT_OUR_WORDS["vault_only"]}, 200 if got else 404)
     if path == "/reel-vault-still":             # a tile's still: a shoot's clip by the shoot's folder name and the clip's id
         f = vault_still_file(kit, _one(q, "from"), _one(q, "id")) if is_vault_kit(kit) else None
         return _send_small(handler, f, "image/jpeg") if f else handler.send_error(404)
@@ -4478,7 +4554,7 @@ def handle_get(handler, path, query):
             return _get_font(handler, q)
         if path in ("/reel-job", "/reel-songs"):
             return _get_job_or_songs(handler, path, q)
-        if path in ("/reel-footage", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-vault-clips", "/reel-vault-still"):
+        if path in ("/reel-footage", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-vault-clips", "/reel-vault-photos", "/reel-vault-still"):
             return _get_footage(handler, path, q)
         if path == "/reel-song":
             return _get_song(handler, q)
@@ -5457,6 +5533,8 @@ def page_html(kit_name, short, kit_page=False, kind="photos", vault=False):
         w.update(VAULT_KIND_WORDS)
         w.update(VAULT_CLIP_WORDS)
         w.update(VAULT_OUR_WORDS)
+        w.update(VAULT_PICK_WORDS)                 # her photos step (stage 10)
+        w.update({k: pc_words(v) for k, v in VAULT_PICK_OUR_WORDS.items()})
     title = w["title_vault"] if vault else w["title_" + kind].replace("{short}", short)
     data = {"words": dict(w, **OUR_WORDS), "kind": kind, "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
@@ -5478,9 +5556,10 @@ def page_html(kit_name, short, kit_page=False, kind="photos", vault=False):
         steps = _once(steps, "<span class='say sm' id='momentsSay'></span></div>",
                       "<span class='cnt' id='vcCnt'></span><span class='say sm' id='momentsSay'></span></div>")
         foot_js = vault_footage_js()
+        steps = vault_photos_step(steps, w)        # her photos step: the heading over the order, the search, the folds
     back_href, back_words = _back(kit_name, kit_page, w)
     css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + (TRIM_CSS if TRIM_PANEL else "") + OUR_CSS + V27_CSS + EDITOR_CSS + WATCH_CSS \
-        + (VAULT_CSS if vault else "")
+        + (VAULT_CSS + VAULT_PHOTOS_CSS if vault else "")
     head = _head(w, title, e(w["lede_vault"] if vault else w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"], kind)
     if TRIM_PANEL:                     # her v25 panel sits above the page's scripts (hers), before the wrap: the head is split round it
         head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
@@ -5496,8 +5575,8 @@ def page_html(kit_name, short, kit_page=False, kind="photos", vault=False):
         "<div class='lb' id='lb'><img id='lbimg' alt=''></div>"
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
-        "<script>" + ORDER_JS + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
-        "<script>" + foot_js + "</script>" + ("<script>" + VAULT_JS + "</script>" if vault else "") + ("<script>" + TRIM_JS + "</script>" if TRIM_PANEL else "")
+        "<script>" + (vault_order_js() if vault else ORDER_JS) + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
+        "<script>" + foot_js + "</script>" + ("<script>" + VAULT_JS + "</script><script>" + VAULT_PHOTOS_JS + "</script>" if vault else "") + ("<script>" + TRIM_JS + "</script>" if TRIM_PANEL else "")
         + "<script>" + DIRECT_JS + "</script><script>" + MAKE_JS + "</script><script>" + WATCH_JS + "</script><script>" + QUEUE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
 
@@ -5529,6 +5608,212 @@ def vault_panel(w):
         "<div id='vcRes'><p class='say sm' id='vcWait'>" + e(w["vc_loading"]) + "</p></div>"
         "<p class='say sm' id='vcSay' role='status'></p>"
         "</div>")
+
+
+def vault_photos_step(steps, w):
+    """The photos step, for the vault (her #stepPhotos, screenshot 07): the plain step with three named pieces
+    swapped, each of which must be there exactly once. Her heading and line over the reel's own photos; her search
+    box and the shoot chips over the grid, which VAULT_PHOTOS_JS folds by shoot; and the plain "+ Add photos" row's
+    words emptied, since in the vault the button sits in Added to my vault (the row's button is hidden by the
+    vault's styles, its line still says "2 new photos in" when photos arrive). Words as text only."""
+    e = html.escape
+    steps = _once(steps, "<div class='reelstick' id='reelStick'>",
+                  "<div class='cl-head vp-head'><span class='wl'>" + e(w["vp_for_reel"]) + "</span><span class='cnt' id='vpCnt'></span></div>"
+                  "<p class='say sm' id='vpEmpty'>" + e(w["vp_for_say"]) + "</p>"
+                  "<div class='reelstick' id='reelStick'>")
+    steps = _once(steps, "<span class='tools-say' id='addPhotosSay'>" + e(w["add_photos_say"]) + "</span>",
+                  "<span class='tools-say' id='addPhotosSay'></span>")
+    steps = _once(steps, "<p class='selbar' id='allSel' hidden></p><div id='all'></div></details>",
+                  "<div class='find' id='vpFind'>"
+                  "<input type='search' id='vpQ' autocomplete='off' aria-label='" + e(w["vp_search_label"], quote=True) + "' placeholder='"
+                  + e(w["vp_search_ph"], quote=True) + "'>"
+                  "<div class='vchips' id='vpShoots'></div>"
+                  "<p class='selbar' id='allSel' hidden></p>"
+                  "<p class='say sm' id='vpWait'>" + e(w["vp_loading"]) + "</p>"
+                  "<div id='all' class='vpwait'></div>"
+                  "<p class='say' id='vpNone' hidden>" + e(w["vc_nothing"]) + "</p>"
+                  "</div></details>")
+    return steps
+
+
+# The order script, for the vault: ORDER_JS with two named pieces swapped (each must be there exactly once). When
+# the grid is built again its photos are folded by shoot (VAULT_PHOTOS_JS's layout), and a Shift-click's run is of
+# the photos the search shows, never one it has hidden.
+_VAULT_ORDER = []
+
+
+def vault_order_js():
+    if _VAULT_ORDER:
+        return _VAULT_ORDER[0]
+    js = ORDER_JS
+    js = _once(js, "      allEl.appendChild(b);\n    });\n  }\n  function renderAll(){",
+               "      allEl.appendChild(b);\n    });\n    if (R.vaultPhotos) R.vaultPhotos.layout();\n  }\n  function renderAll(){")
+    js = _once(js, "    var order = photos.map(function(p){ return p.n; });\n    if (m.shift && ALLANCHOR !== null",
+               "    var order = photos.filter(function(p){ return !R.vaultPhotos || R.vaultPhotos.shown(p.n); }).map(function(p){ return p.n; });\n"
+               "    if (m.shift && ALLANCHOR !== null")
+    _VAULT_ORDER.append(js)
+    return js
+
+
+# The vault's photos step (ours, to her picture: screenshot 07). The grid is the page's own tiles, moved into a
+# fold per shoot; .vfold, .vchips and .find are the clips panel's.
+VAULT_PHOTOS_CSS = r"""
+#reel:empty::before{content:none}
+#vpEmpty{margin:.2rem 0 .5rem;color:var(--ink-2)}
+.addph #addPhotos{display:none}.addph{margin-top:.4rem;min-height:0}
+#vpFind{margin-top:.8rem}
+#all.vp{display:block;margin-top:0}
+#all.vpwait{display:none}
+.vpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;padding:0 .8rem .8rem}
+.vpgrid .pick.off{display:none}
+.vfold>summary .prog{font:500 12.5px/1.3 var(--sans);color:var(--coral-2)}
+.vfold .addhere .tools-say{color:var(--ink-2)}
+#vpNone{margin:.6rem 0 0}
+#vpNone[hidden],#vpEmpty[hidden],#vpWait[hidden],.addhere .line1[hidden],.vfold .hit[hidden]{display:none}
+"""
+
+# The vault's photos step (her v29, 1.5; stage 10): the page's own photo tiles (the order script builds them, with
+# their tap, drag, select and big view) are moved into Added to my vault, open on top, and one fold per shoot, shut.
+# The search is her rule (everyday words ignored, every other word must be in the photo's text: its tags, its
+# words, its shoot's name; what was typed is folded here the way vault.fold folds the text): it opens only the
+# shoots with a match, with "{n} found" on each. A shoot whose photos are still being looked at says so.
+VAULT_PHOTOS_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc, fill = R.fill;
+  var all = $('all'), q = $('vpQ');
+  if (!all || !q) return;
+  var CAT = null, home = {}, text = {}, only = null, open = {}, off = {}, byN = {}, loading = false, failed = false, laid = '', pollT = null, restTries = 0;
+  function words(v){
+    var t = String(v || '').normalize('NFKD').toLowerCase().replace(/\p{M}+/gu, ''), out = [];
+    t.split(/[^\p{L}\p{N}]+/u).forEach(function(w){ if (w && CAT.everyday.indexOf(w) < 0 && out.indexOf(w) < 0) out.push(w); });
+    return out;
+  }
+  function nPhotos(n){ return n === 1 ? W.vp_from_one : fill(W.vp_from, {n: n}); }
+  function picks(){ return Array.prototype.slice.call(all.querySelectorAll('.pick')); }
+  function searching(){ return !!CAT && (words(q.value).length > 0 || only !== null); }
+  // ---- the folds: built whenever the order script builds its tiles again, and when the shoots change ----
+  function fold(key, cls){
+    var d = document.createElement('details'); d.className = 'vfold' + (cls || ''); d.dataset.g = key;
+    var s = document.createElement('summary'); d.appendChild(s);
+    return d;
+  }
+  function layout(){
+    var tiles = picks();
+    if (!CAT) {                                   // not read yet: the tiles wait, unseen; never read: the plain grid
+      all.classList.toggle('vpwait', !failed); all.classList.toggle('vp', false);
+      $('vpWait').hidden = failed;
+      return;
+    }
+    var frag = document.createDocumentFragment(), grids = {};
+    var mine = fold('', ' mine'); mine.open = true;
+    mine.querySelector('summary').innerHTML = esc(W.vp_added) + ' <small class="n"></small>';
+    mine.querySelector('summary').onclick = function(e){ e.preventDefault(); };            // always open
+    var here = document.createElement('div'); here.className = 'addhere';
+    here.innerHTML = '<span class="line1">' + esc(W.vp_added_say) + '</span> <button class="btn small" id="vpAdd" type="button">' + esc(W.vp_add_photos) + '</button> <span class="tools-say" id="vpAddSay" role="status"></span>';
+    mine.appendChild(here);
+    grids[''] = document.createElement('div'); grids[''].className = 'vpgrid'; mine.appendChild(grids['']);
+    frag.appendChild(mine);
+    CAT.shoots.forEach(function(s, i){
+      if (s.kit === '') return;
+      var d = fold(s.kit, '');
+      d.querySelector('summary').innerHTML = (s.thumb ? '<img src="/kit-photo?' + R.q + '&n=' + s.thumb + '&size=s" alt="">' : '') +
+        '<span>' + esc(s.name) + '</span> <small class="n">' + esc(nPhotos(s.photos)) + '</small> <small class="prog"></small><span class="hit" hidden></span>';
+      d.querySelector('summary').onclick = function(e){ if (d.classList.contains('nohit')) e.preventDefault(); };   // nothing found in it: it stays shut
+      d.addEventListener('toggle', function(){ if (!searching()) open[s.kit] = d.open; });
+      var img = d.querySelector('summary img'), tries = 0;
+      if (img) img.onerror = function(){ if (++tries > 8) { img.style.visibility = 'hidden'; return; } var src = img.getAttribute('src').split('&t=')[0]; setTimeout(function(){ if (document.body.contains(img)) img.src = src + '&t=' + tries; }, 1500); };
+      grids[s.kit] = document.createElement('div'); grids[s.kit].className = 'vpgrid'; d.appendChild(grids[s.kit]);
+      frag.appendChild(d);
+    });
+    var rest = document.createElement('div'); rest.className = 'vpgrid rest';     // a photo newer than what was read: shown, unfolded, until the next read
+    byN = {};
+    tiles.forEach(function(t){ var k = home[+t.dataset.n]; byN[+t.dataset.n] = t; (k !== undefined && grids[k] ? grids[k] : rest).appendChild(t); });
+    all.innerHTML = '';
+    all.appendChild(frag);
+    if (rest.firstChild) { all.appendChild(rest); if (++restTries <= 5) setTimeout(load, 800); } else restTries = 0;
+    all.classList.remove('vpwait'); all.classList.add('vp');
+    $('vpWait').hidden = true;
+    $('vpAdd').onclick = addPhotos;
+    laid = JSON.stringify(CAT.shoots.map(function(s){ return [s.kit, s.name, s.photos, s.thumb]; }));
+    filter();
+  }
+  // ---- the search, the chips, the counts, her progress line ----
+  function filter(){
+    if (!CAT || !all.classList.contains('vp')) return;
+    var qw = words(q.value), on = qw.length > 0 || only !== null, total = 0;
+    off = {};
+    var chips = '<button type="button" data-s="-1" class="' + (only === null ? 'on' : '') + '">' + esc(W.vc_every) + '</button>' +
+      CAT.shoots.map(function(s, i){ return s.kit === '' ? '' : '<button type="button" data-s="' + i + '" class="' + (only === s.kit ? 'on' : '') + '">' + esc(s.name) + '</button>'; }).join('');
+    if ($('vpShoots').dataset.was !== chips) {
+      $('vpShoots').dataset.was = chips; $('vpShoots').innerHTML = chips;
+      $('vpShoots').querySelectorAll('button').forEach(function(b){ b.onclick = function(){ var i = +b.dataset.s; only = i < 0 ? null : CAT.shoots[i].kit; filter(); }; });
+    }
+    all.querySelectorAll('details.vfold').forEach(function(d){
+      var key = d.dataset.g, s = CAT.shoots.filter(function(x){ return x.kit === key; })[0], n = 0, count = 0;
+      d.querySelectorAll('.pick').forEach(function(t){
+        var num = +t.dataset.n, hit = !on || ((only === null || key === only) && qw.every(function(w){ return (text[num] || '').indexOf(w) >= 0; }));
+        t.classList.toggle('off', !hit); if (!hit) off[num] = true; else n++;
+        count++;
+      });
+      total += n;
+      if (key === '') {
+        d.querySelector('summary .n').textContent = count ? fill(count === 1 ? W.one_photo : W.photos, {n: count}) : '';
+        d.querySelector('.addhere .line1').hidden = count > 0;
+        return;
+      }
+      var none = on && !n, hitEl = d.querySelector('.hit'), prog = d.querySelector('.prog');
+      d.classList.toggle('nohit', none);
+      hitEl.hidden = !on || !n; hitEl.textContent = on && n ? fill(W.vc_found, {n: n}) : '';
+      var want = on ? !none : !!open[key];
+      if (d.open !== want) d.open = want;
+      prog.textContent = (s && CAT.can && s.tagged < s.photos) ? fill(CAT.getting, {done: s.tagged, total: s.photos}) : '';
+    });
+    all.querySelectorAll('.vpgrid.rest .pick').forEach(function(t){ t.classList.toggle('off', on); if (on) off[+t.dataset.n] = true; });
+    $('vpNone').hidden = !(on && !total);
+  }
+  function behind(){ return !!CAT && CAT.can && CAT.shoots.some(function(s){ return s.tagged < s.photos; }); }
+  function load(){
+    if (loading || R.kind === 'broll') return;
+    loading = true;
+    fetch('/reel-vault-photos?' + R.q, {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(j){
+      loading = false;
+      if (!j || !j.ok) { failed = !CAT; layout(); return; }
+      failed = false; CAT = j; home = {}; text = {};
+      j.photos.forEach(function(p){ home[p.n] = p.kit; text[p.n] = p.text; });
+      var now = JSON.stringify(j.shoots.map(function(s){ return [s.kit, s.name, s.photos, s.thumb]; }));
+      if (now !== laid || !all.classList.contains('vp') || all.querySelector('.vpgrid.rest')) layout(); else filter();
+      clearTimeout(pollT);
+      if (behind()) pollT = setTimeout(load, 4000);          // her line counts up while the photos are looked at
+    }).catch(function(){ loading = false; failed = !CAT; layout(); });
+  }
+  function addPhotos(){
+    var say = $('vpAddSay');
+    say.textContent = W.vp_opening;
+    R.post('/reel-open', {kit: R.kit, what: 'photos'}).then(function(res){
+      say.textContent = (res.j && res.j.words) || W.vp_cant_open;
+    }).catch(function(){ say.textContent = W.vp_cant_open; });
+  }
+  q.oninput = filter;
+  // the heading over the order: how many are in it, and her line while it is empty
+  var reelEl = $('reel');
+  function head(){
+    var n = reelEl.querySelectorAll('.tile').length;
+    $('vpEmpty').hidden = n > 0;
+    $('vpCnt').textContent = n ? fill(W.vc_n_added, {n: n}) : '';
+  }
+  new MutationObserver(head).observe(reelEl, {childList: true});
+  head();
+  R.vaultPhotos = {
+    layout: function(){ layout(); if (CAT) load(); },        // the tiles were built again (new photos): fold them, and read again
+    shown: function(n){ var t = byN[n]; var d = t ? t.closest('details.vfold') : null; return !CAT || !t || (!off[n] && (!d || d.open)); },      // not hidden by the search, not in a shut shoot
+    // for the tests: what the step shows, as names and numbers
+    look: function(){ return {ready: !!CAT && all.classList.contains('vp'), only: only, photos: CAT ? CAT.photos.length : 0, shoots: CAT ? CAT.shoots.length : 0}; }
+  };
+  R.part({adopt: function(st, first){ if (first) load(); }});
+  setInterval(function(){ if (!document.hidden && R.state() && CAT && !behind()) load(); }, 20000);     // a description written from the chat is found without a reload
+})();
+"""
 
 
 # The vault's panel (ours, to her picture: screenshots 06 and 08). No web font, no serif; her colours by name.
@@ -5664,7 +5949,7 @@ VAULT_JS = r"""
       var inS = hit.filter(function(c){ return c.kit === s.kit; }), none = searching && !inS.length;
       var isOpen = !none && (searching || !!open[s.kit]);
       h += '<details class="vfold' + (none ? ' nohit' : '') + '"' + (isOpen ? ' open' : '') + ' data-g="' + i + '"><summary>' +
-        (s.thumb ? '<img src="/kit-photo?' + R.q + '&n=' + s.thumb + '&size=520" alt="">' : '') + '<span>' + esc(s.name) + '</span> <small>' + esc(nClips(s.clips, W.vc_from_one, W.vc_from)) + '</small>' +
+        (s.thumb ? '<img src="/kit-photo?' + R.q + '&n=' + s.thumb + '&size=s" alt="">' : '') + '<span>' + esc(s.name) + '</span> <small>' + esc(nClips(s.clips, W.vc_from_one, W.vc_from)) + '</small>' +
         (searching && inS.length ? '<span class="hit">' + esc(fill(W.vc_found, {n: inS.length})) + '</span>' : '') + '</summary>' + (isOpen ? tiles(inS, s.name) : '') + '</details>';
     });
     if (searching && !hit.length) h += '<p class="say">' + esc(W.vc_nothing) + '</p>';
@@ -7851,8 +8136,20 @@ def cmd_note(kit, reel=None):
             say("    " + ln)
         say("  Pick only what the note allows. It is theirs: follow it exactly, never widen it. If no photo in the "
             "shoot fits it, or you can't tell which photos it means, say so and ask; don't fill in with photos it leaves out.")
-    else:
+    elif not is_vault_kit(kit):
         say("  No note for this reel's photos: choose from the whole shoot, the way curating.md says.")
+    if is_vault_kit(kit):
+        # her v29 (stage 10): "Pick my reel photos from my vault". The vault holds every shoot, so narrow first.
+        n = len(st["photos"])
+        say(f"  This is the vault: {n:,} photo{'' if n == 1 else 's'} from every shoot, each under the vault's own number.")
+        if note:
+            say("  Narrow first. When the note names something that can be found (a person, a shoot, what is in the photo), run "
+                "vault.py find \"<the note's own words>\" --photos, then draw only those: "
+                "vault.py relist --sheets --only \"<the numbers find printed>\" (48 to a sheet). Look at those sheets and pick from them. "
+                "If find comes back with nothing, or the note names nothing findable, say so and ask, or look at the whole vault's sheets.")
+        else:
+            say(f"  No note for this reel's photos: choose from the whole vault, the way curating.md says. Tell them first how many "
+                f"photos you are about to look through ({n:,}), then vault.py relist --sheets draws them all, 48 to a sheet.")
     if direct_note(st["saved"]):
         say("  Their direction for how this reel should go (\"Edit my reel ... and follow my direction\" is reel_page.py direct):")
         for ln in direct_note(st["saved"]).splitlines():
