@@ -1666,6 +1666,53 @@ def check_vault_core():
          'OPEN_NEW_BLANK = "BLANK:' in des and "If it starts `BLANK:`" in arr and "blank slides to start" in arr)
 
 
+def check_vault_search():
+    """Photo descriptions and the search rule (Nicole's v29, 1.4 and 1.5; stage 8): what the parts say, held to the code."""
+    print("\nDescribing photos so they can be found, and search (Nov 19)")
+    kitp, where, core, pcp = read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "where-things-live.md"), read(SM / "SKILL.md"), read(SM / "parts" / "on-a-pc.md")
+    src, vsrc, tc = read(SM / "scripts" / "photo_words.py"), read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "this_computer.py")
+    guide = read(ROOT / "docs" / "SETUP-GUIDE-PC.md")
+    case("post-kit.md has the section", "\n## Describing photos so they can be found\n" in kitp)
+    sec = kitp.split("## Describing photos so they can be found", 1)[-1].split("\n## ", 1)[0]
+    case("it says no photo is ever renamed or changed, in her words", "**No photo is ever renamed or changed for this**" in sec and "I don't want the assistant to rename the photos" in sec)
+    case("her progress line is in the part and in the code, whole", "Getting your photos ready to search: 40 of 72." in sec and '"getting": "Getting your photos ready to search: {done} of {total}."' in src)
+    case("the quiet line and the line to copy are the page's own", 'Want search to find more, like "laughing" or "a kiss"? Copy this into the chat:' in sec
+         and '"more": "Want search to find more, like \\"laughing\\" or \\"a kiss\\"? Copy this into the chat:"' in src
+         and "**Describe my photos for <shoot>**" in sec and '"line": "Describe my photos for {shoot}"' in src and '"line_vault": "Describe the photos in my vault"' in src)
+    case("descriptions only when they ask, never because a kit was opened or made", "only when they ask" in sec and "Never describe photos because a kit was opened or made." in sec)
+    for cmd in ("status", "sheets", "describe"):
+        case(f"the part names `photo_words.py {cmd}`, a command the script has", f"python3 <scripts>/photo_words.py {cmd} " in sec and (f'"{cmd}"' in src))
+    case("the limits the part names are the script's: 140 letters, 2,000 photos a file, about 300 before asking, 48 to a sheet",
+         "up to 140 letters" in sec and "WORDS_MAX = 140" in src and "at most 2,000 photos a file" in sec and "FILE_MOST = 2000" in src
+         and "More than about 300" in sec and "ASK_ABOVE = 300" in src and "48 photos to a sheet" in sec)
+    case("from the sheets, never photo by photo (rule 6)", "Read the sheets, never photo by photo (rule 6)" in sec)
+    case("what a description may say, and never a person's name unless the photographer said it",
+         "**What a description may say.**" in sec and "**Never a person's name unless the photographer said it**" in sec and "never guess who someone is" in sec)
+    case("descriptions are for finding photos only, never a fact in a caption, a hook, a note or story words (rule 11)",
+         "**Descriptions are for finding photos only (rule 11).**" in sec and "as a fact in a caption, a hook, a note to a client or story words" in sec)
+    case("the vault: described in the post kit each photo came from; the total said first", "**\"Describe the photos in my vault\".**" in sec
+         and "described in the post kit each one came from" in sec and '`photo_words.py status "My vault"`' in sec and "Say the total first and ask before more than about 300" in sec)
+    case("find in my vault: `vault.py find`, a command vault.py has, with --photos and --clips", '`python3 <scripts>/vault.py find "<their words>"`' in sec
+         and 'add_parser("find"' in vsrc and '"--photos"' in vsrc and '"--clips"' in vsrc)
+    case("the search rule the part tells is the code's: everyday words ignored, every other word must match, tags, descriptions and the shoot's name",
+         "Everyday words (me, my, the, with, on...) are ignored and every other word has to match" in sec
+         and 'EVERYDAY = frozenset("me my on the a an of with at in and i to".split())' in vsrc and 'frozenset("find every clip clips from any".split())' in vsrc)
+    case("the core's table sends the two pasted lines and find in my vault to that section",
+         '"Describe my photos for <shoot>" (pasted from a post kit), "Describe the photos in my vault"' in core and '"find ... in my vault"' in core
+         and '| `parts/post-kit.md`, "Describing photos so they can be found" |' in core)
+    case("where-things-live names the store, the version before, its lock, its fields and its one writer",
+         all(x in where for x in ("`.kit/photo-words.json`", "`photo-words.prev.json`", "`photo-words.lock`", "`key`", "`tags`", "`words`", "`words_key`", "`unread`", "`photo_words.py` is its one writer"))
+         and all(x in src for x in ('STORE = "photo-words.json"', 'PREV = "photo-words.prev.json"', 'LOCK = "photo-words.lock"', '"words_key"', '"unread"')))
+    case("where-things-live says a shoot's photo keeps its words in the shoot's own file, and that the words are never a source for a caption",
+         "under the shoot's own number" in where and "never a source for a caption, a note or a hook" in where)
+    m = re.search(r'NO_TAGS_PC = \("([^"]+)"\s+"([^"]+)"\)', tc)
+    pc_line = (m.group(1) + m.group(2)) if m else ""
+    case("the PC line is in this_computer, and the PC part quotes it whole", pc_line == "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:"
+         and pc_line in pcp and "## Finding photos by what is in them" in pcp)
+    first = "On a PC, search finds your photos by shoot name and by anything your assistant has described."
+    case("the PC gap is on the PC part's list and the PC guide's list, in the same words", ("> - Photo tags for search. " + first) in pcp and ("- **Photo tags for search.** " + first) in guide)
+
+
 def check_vault_page():
     """My vault on the pages (Nicole's v29, 1.3; stage 7): what the parts say, held to the code."""
     print("\nMy vault: the card, its page and adding a folder (Nov 19)")
@@ -1709,7 +1756,7 @@ def check_vault_page():
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

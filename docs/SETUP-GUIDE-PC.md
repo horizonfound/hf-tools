@@ -219,6 +219,7 @@ Windows gives each drive and memory card a letter when it's plugged in, and a dr
 - **Posting-day reminders don't reach your calendar by themselves.** The Assistant makes a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert. **[New Nov 11: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Talking reels.** Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here. **[New Nov 12: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Saving a B-roll reel as a finished video.** Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
+- **Photo tags for search.** On a PC, search finds your photos by shoot name and by anything your assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask the Assistant to describe a shoot's photos and search will find them. **[New Nov 19: not in the PDF yet; wording is Dustin and Nicole's]**
 
 > **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >

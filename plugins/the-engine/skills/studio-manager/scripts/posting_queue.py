@@ -2161,6 +2161,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path == "/photo-words-state":
+            # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
+            import photo_words
+            return photo_words.handle_get(self, path, urlsplit(self.path).query)
         if path == "/vault-add-status":
             # what the vault's page follows while + Add a shoot copies (vault_page.py)
             import vault_page
@@ -2474,6 +2478,8 @@ class Handler(SimpleHTTPRequestHandler):
                 body, need = kit_mod.build_page(kit)
                 if need:
                     arrange.start_previews(kit)        # a reel photo on the card has no small copy yet: made in the background
+                import photo_words
+                photo_words.opened(kit)                # v29: photos with no tags yet are looked at in the background (never raises)
             except Exception as e:  # noqa: BLE001
                 try:
                     body = kit_mod.page_path(kit).read_text(encoding="utf-8")

@@ -393,6 +393,7 @@ def sheet(kit, quick=False):
             return 1
         vault._say_relist(res)
         say(f"List: {kit / '.kit' / 'sheet.json'}")
+        _photo_words_started(kit)
         return 0
     folder = photos_dir(kit, rec)
     args = [sys.executable, str(REEL_PY), "sheet", "--folder", str(folder), "--shoot", rec.get("name", kit.name)]
@@ -429,7 +430,18 @@ def sheet(kit, quick=False):
         def note(r):
             r["numbered"] = count
         update_rec(kit, note)
+    _photo_words_started(kit)
     return 0
+
+
+def _photo_words_started(kit):
+    """A kit's numbered list was just made (a kit made, photos added): the photos with no tags yet are looked at in
+    the background, so search finds what is in them (v29, photo_words.py). Never stops or slows the list."""
+    try:
+        import photo_words
+        photo_words.opened(kit)
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
 
 
 def numbered(kit):
@@ -2703,6 +2715,13 @@ def build_page(kit):
                "<p class='went' id='folderWent'></p>")
 
     lede, style, tail, trail = KIT_WORDS["lede"], "", "", None
+    # v29: "Getting your photos ready to search: 40 of 72." while this kit's photos are looked at, then the line to
+    # copy for fuller descriptions (photo_words.py). The page works the same without it.
+    try:
+        import photo_words
+        pw_html, pw_css, pw_tail = photo_words.page_parts(kit, rec)
+    except Exception:  # noqa: BLE001
+        pw_html, pw_css, pw_tail = "", "", ""
     if vp is not None:
         # her vault page has the strip where a shoot's page has its folder buttons (screenshot 03); the line
         # that says what a press did is inside the strip. #folderWent stays, empty, for the page's own script.
@@ -2725,16 +2744,16 @@ def build_page(kit):
     page_words.update({k: OUR_KIT_WORDS[k] for k in ("opening", "unreached")})
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
     page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
-    page = (_head(name + " · Post kit", style)
+    page = (_head(name + " · Post kit", style + pw_css)
             + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'"
             + (" data-vault='1'" if vp is not None else "") + "><div class='wrap'>" + _bar(when_words, kit.name, trail)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
-            f"<p class='lede'>{html.escape(lede)}</p>{folders}</header>"
+            f"<p class='lede'>{html.escape(lede)}</p>{folders}</header>{pw_html}"
             f"<div id='pieces'>{cards}</div>{also}</div>"
             + ASK_BOX +
             f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script type='application/json' id='kit-fan'>{json.dumps(fan, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
-            f"<script>{SCRIPT}</script>{tail}</body></html>")
+            f"<script>{SCRIPT}</script>{tail}{pw_tail}</body></html>")
     return page, need_previews
 
 

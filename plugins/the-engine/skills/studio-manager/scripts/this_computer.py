@@ -1149,6 +1149,12 @@ NO_VIDEO_PC = ("Saving a finished video isn't on a PC yet: it needs a part only 
 NO_TALKING_PC = ("Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. "
                  "Your photo reel, carousel and stories all work here.")
 
+# Photo tags (v29): a Mac's own Vision says what is in a photo ("outdoor", "people", "beach"), so search finds it.
+# A PC has no such part, so there are no tags there: search goes by the shoot's name and by what your assistant
+# has described. On the post kit page in place of the Mac's quiet line. Ours (hers has no PC): a draft for Nicole.
+NO_TAGS_PC = ("On a PC, search finds your photos by shoot name and by anything your assistant has described. "
+              "To have them described, copy this into the chat:")
+
 _SCRIPTS = set()                 # the JavaScript programs running now (so a server that starts over stops them)
 _SCRIPTS_LOCK = threading.Lock()
 

@@ -53,6 +53,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | `home.py pending` prints a line starting ARRANGED | `parts/arrange.md` |
 | "show my post kit", "show me the beach kit", "open the post kit" | `parts/post-kit.md`, "Show my post kit" |
 | "show my vault", "open my vault", "what's my vault?", "add this folder to my vault", "put these photos in my vault" | `parts/post-kit.md`, "My vault" |
+| "Describe my photos for <shoot>" (pasted from a post kit), "Describe the photos in my vault", "make my photos searchable", "find ... in my vault", "what's that Getting your photos ready line?" | `parts/post-kit.md`, "Describing photos so they can be found" |
 | "bring my old reels over", "my old reels aren't showing", "my reels are gone", "the reels I made before the update" (reels of any kind made on an earlier version of the pages) | `parts/post-kit.md`, "Bring my old reels over": `bring_older.py look` first, read it back, `bring` only on their yes |
 | "show my posting queue", "the beach reel's ready", "I posted it", "it's in my feed now", "that one didn't go out after all", "how much content do I have", "read my Instagram grid"; "remind me to post the beach reel", "is my reminder set", "I picked the wrong calendar", "pick the photo it shows in my grid", a line that says "reminders not updated" | `parts/posting-queue.md` |
 | "show my recap", "show my November recap", "show my year", "hide the monthly recap", "where did my recap pictures go" | `parts/hello.md`, "The monthly recap and Your year" |

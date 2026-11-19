@@ -27,6 +27,13 @@ This script is the one writer of the vault's list.
     python3 vault.py add "<folder>"    + Add a shoot: copy that folder's finished photos into the vault's own Photos
                                        folder, each copy checked; the originals are only read. Twice copies nothing.
                                        Exit 0 done, 1 a copy stopped or did not match, 2 stop, 4 not a folder to add.
+    python3 vault.py find "<words>" [--photos | --clips]
+                                       what matches in the vault, by the search rule below: photos by what is in
+                                       them (photo_words.py) and their shoot's name, clips by their name and their
+                                       shoot's name. Numbers and names only; reads only.
+
+The search rule is hers and lives here, in one place (search_words, found): lower case, split on anything that is
+not a letter or a number, everyday words dropped, and every word left must be in the item's text.
 """
 import argparse
 import hashlib
@@ -888,6 +895,171 @@ def clip_count(vault_kit):
     return n
 
 
+# ---------- search (Nicole's v29, 1.4 and 1.5): the one rule, and what a page needs to search with ----------
+#
+# Hers, from her mock-up: lower case; split on anything that is not a letter or a number; everyday words are
+# ignored (me, my, with, the, on...); every other word has to be found in the item's text ("laugh" finds
+# "laughing"). A photo's text is what is in it (this computer's tags and your assistant's words, photo_words.py)
+# plus its shoot's name, so "Hannah laughing" works. A clip's text is its name plus its shoot's name.
+# Ours beside hers: accents are folded ("zoe" finds "Zoë"), and letters of any alphabet count as letters.
+
+EVERYDAY = frozenset("me my on the a an of with at in and i to".split())
+CLIP_EVERYDAY = EVERYDAY | frozenset("find every clip clips from any".split())     # "Find every clip of me at the beach"
+SEARCH_WORDS = {"not_named": "Not named yet"}       # hers (the reel page's own words for a clip with no name)
+
+
+def fold(text):
+    """Text as search compares it: lower case, accents taken off, anything that is not a letter or a number a
+    space."""
+    t = unicodedata.normalize("NFKD", str(text or "")).casefold()
+    return "".join(c if c.isalnum() else " " for c in t if not unicodedata.combining(c))
+
+
+def search_words(query, clips=False):
+    """The words of a search that must be found: her rule. An empty list finds everything."""
+    drop = CLIP_EVERYDAY if clips else EVERYDAY
+    out = []
+    for w in fold(query).split():
+        if w not in drop and w not in out:
+            out.append(w)
+    return out
+
+
+def found(words, text):
+    """Is every word in this item's text? (words: from search_words.)"""
+    t = fold(text)
+    return all(w in t for w in words)
+
+
+def _clips_of(kit_dir):
+    """Every clip in every reel of one post kit, each once, read from its reel record with the calls the footage
+    look uses. Reads only; [] when there is no record."""
+    import reel_page
+    rec = reel_page.load(kit_dir)
+    out, seen = [], set()
+    first = reel_page.REEL_FIRST
+    for _vid, data in reel_page.reels.each(rec, reel_page.REEL_LIVE, first):
+        if not isinstance(data, dict):
+            continue
+        for m in reel_page.moments_of(data):
+            if m["id"] in seen:
+                continue
+            seen.add(m["id"])
+            label = " ".join(str(m.get("label") or "").split())
+            named = bool(label) and not label.startswith(reel_page.PICK_AT)
+            out.append({"id": m["id"], "label": label if named else SEARCH_WORDS["not_named"], "named": named,
+                        "by": "you" if m.get("by") == "you" else "assistant",
+                        "video": Path(str(m["video"]).replace("\\", "/")).name,
+                        "start": round(float(m["start"]), 2), "end": round(float(m["end"]), 2)})
+    return out
+
+
+def catalog(kit):
+    """What a page needs to search a post kit, built once, with no place on this computer in it:
+
+        {"vault": bool,
+         "shoots": [{"kit": folder name ("" for what was added to the vault itself), "group": "added" | "kit",
+                     "name", "date", "photos": count, "clips": count, "thumb": a photo's number or None}],
+         "photos": [{"n": its number on this kit's list, "kit": its shoot's folder, "text": tags + words + shoot name}],
+         "clips":  [{"id", "kit", "label" ("Not named yet" when it has none), "named", "by", "video": the video's
+                     file name, "start", "end", "text": its name + its shoot's name}]}
+
+    For the vault: every shoot in it, what was added to the vault first. For any other post kit: that one shoot.
+    A page fetches a picture by number (/kit-photo?kit=<this kit>&n=<thumb>) and filters in the page with the
+    same rule. Reads only."""
+    import photo_words
+    kit = Path(kit)
+    rec = _json(kit / ".kit" / "kit.json")
+    is_v = rec.get(MARK) is True
+    shoots, photos, clips = [], [], []
+    groups = rows_by_group(kit) if is_v else [{"group": "kit", "kit": kit.name, "name": str(rec.get("name") or kit.name),
+                                               "date": rec.get("date") if isinstance(rec.get("date"), str) else "",
+                                               "rows": _rows(kit / ".kit" / "sheet.json")}]
+    seen = {}
+    for g in groups:
+        own = g["group"] == "added" or not is_v
+        home = kit if own else kit.parent / g["kit"]
+        words = photo_words.read(home)
+        name = g["name"]
+        for x in g["rows"]:
+            num = str(x["n"] if own else x.get("src"))
+            text = " ".join(t for t in (photo_words.text_of(words.get(num)), name) if t)
+            photos.append({"n": x["n"], "kit": g["kit"], "text": text})
+        seen[g["kit"]] = {"kit": g["kit"], "group": g["group"], "name": name, "date": g["date"], "photos": len(g["rows"]),
+                          "clips": 0, "thumb": g["rows"][0]["n"] if g["rows"] else None}
+    # the clips: the kit's own reels, and for the vault every shoot's reels too (a shoot with clips and no photos
+    # on the list is still a shoot here)
+    homes = [(OWN if is_v else kit.name, "added" if is_v else "kit", kit, "" if is_v else str(rec.get("name") or kit.name), "")]
+    if is_v:
+        homes += [(m["folder"], "kit", m["path"], m["name"], m["date"]) for m in members(kit)]
+    for folder, group, path, name, day in homes:
+        try:
+            got = _clips_of(path)
+        except (Exception, SystemExit):  # noqa: BLE001  (a reel record that can't be read: that shoot has no clips to show)
+            got = []
+        if not got:
+            continue
+        if folder not in seen:
+            seen[folder] = {"kit": folder, "group": group, "name": name, "date": day, "photos": 0, "clips": 0, "thumb": None}
+        seen[folder]["clips"] = len(got)
+        for c in got:
+            clips.append(dict(c, kit=folder, text=" ".join(t for t in (c["label"] if c["named"] else "", name) if t)))
+    order = [g["kit"] for g in groups] + [h[0] for h in homes]
+    for folder in order:
+        if folder in seen and seen[folder] not in shoots:
+            shoots.append(seen[folder])
+    return {"vault": is_v, "shoots": shoots, "photos": photos, "clips": clips}
+
+
+def find_in(kit, query, photos=True, clips=True):
+    """What matches a search in this kit's catalog: {"words", "photos": [...], "clips": [...], "shoots": {folder:
+    name}}. Each kind is searched with its own everyday words."""
+    cat = catalog(kit)
+    pw, cw = search_words(query), search_words(query, clips=True)
+    return {"words": pw, "clip_words": cw,
+            "photos": [p for p in cat["photos"] if found(pw, p["text"])] if photos else [],
+            "clips": [c for c in cat["clips"] if found(cw, c["text"])] if clips else [],
+            "shoots": {s["kit"]: s["name"] for s in cat["shoots"]}}
+
+
+def _numbers(ns):
+    ns, out, i = sorted(set(ns)), [], 0
+    while i < len(ns):
+        j = i
+        while j + 1 < len(ns) and ns[j + 1] == ns[j] + 1:
+            j += 1
+        out.append(str(ns[i]) if j == i else f"{ns[i]} to {ns[j]}" if j > i + 1 else f"{ns[i]}, {ns[j]}")
+        i = j + 1
+    return ", ".join(out)
+
+
+def _say_find(v, query, photos, clips):
+    res = find_in(v, query, photos, clips)
+    added = "Added to my vault"
+    if photos:
+        if not res["words"]:
+            say("Photos: no word to search by (everyday words like \"me\" and \"the\" are ignored). Say what should be in the photo.")
+        else:
+            say(f"Photos matching \"{' '.join(res['words'])}\": {len(res['photos']):,} (the vault's own numbers).")
+            by = {}
+            for p in res["photos"]:
+                by.setdefault(p["kit"], []).append(p["n"])
+            for folder, ns in by.items():
+                say(f"  {res['shoots'].get(folder) or folder or added}: {_numbers(ns)}")
+            if not res["photos"]:
+                say("  None. Photos are found by what this computer saw in them, by your assistant's descriptions "
+                    "(photo_words.py status shows which shoots have none), and by the shoot's name.")
+    if clips:
+        if not res["clip_words"]:
+            say("Clips: no word to search by. Say what should be happening in the clip.")
+        else:
+            say(f"Clips matching \"{' '.join(res['clip_words'])}\": {len(res['clips']):,}.")
+            for c in res["clips"]:
+                say(f"  {c['id']} | {res['shoots'].get(c['kit']) or c['kit'] or added} | {c['label']} | {c['video']} "
+                    f"{c['start']:g} to {c['end']:g} s")
+    return 0
+
+
 # ---------- taken out of the vault (stage 11 uses these) ----------
 
 def out(vault_kit):
@@ -966,6 +1138,11 @@ def main():
     ad = sub.add_parser("add", help="copy a folder's finished photos into the vault's own Photos folder")
     ad.add_argument("folder")
     ad.add_argument("--job", action="store_true", help=argparse.SUPPRESS)      # the page's own: progress in a file
+    fi = sub.add_parser("find", help="what matches these words in the vault (photos and clips)")
+    fi.add_argument("words")
+    only = fi.add_mutually_exclusive_group()
+    only.add_argument("--photos", action="store_true", help="photos only")
+    only.add_argument("--clips", action="store_true", help="clips only")
     a = ap.parse_args()
     try:
         import fresh
@@ -1023,6 +1200,8 @@ def main():
             if ch["changed"]:
                 say("Its list is behind (photos were added or taken away since): `vault.py relist` brings it up to date.")
             return 0
+        if a.cmd == "find":
+            return _say_find(v, a.words, not a.clips, not a.photos)
         if a.cmd == "members":
             for m in members(v):
                 say(f"{m['folder']} | {m['name']} | {m['date'] or 'no date'} | "

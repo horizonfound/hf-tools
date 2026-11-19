@@ -169,10 +169,15 @@ When they ask what doesn't work on a PC (or "is there anything I'm missing?"), s
 > - Posting-day reminders don't reach your calendar by themselves. I make a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert.
 > - Talking reels. Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here.
 > - Saving a B-roll reel as a finished video. Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
+> - Photo tags for search. On a PC, search finds your photos by shoot name and by anything your assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask me to describe a shoot's photos and search will find them.
 >
 > And you're one of the first to use me on a PC, so the rest is new here too, CapCut for Windows most of all. If anything looks off, tell me.
 
 Say only what they asked about when they asked about one thing ("can you do my footage?": the first line only). Never promise when any of it will come. RAW files from cameras other than Canon and DJI (Nikon, Sony, Fuji and the rest) are written for and never tried on a real file; mention that only if they shoot one of those.
+
+## Finding photos by what is in them
+
+A Mac tags every photo in a post kit by itself (its own Vision), so search finds "beach" or "people" straight away. A PC has no such part, so there are no tags: the post kit page never shows "Getting your photos ready to search", and in its place says "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:" with the line to copy. Describing photos (`parts/post-kit.md`, "Describing photos so they can be found") works on a PC exactly as on a Mac, and so does `vault.py find`. Never tell a PC photographer their photos are being looked at by themselves.
 
 ## The words page and posting-day reminders
 

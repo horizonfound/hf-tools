@@ -56,6 +56,37 @@ Most of the time a photographer sits down with finished photos, not a card. The 
 
 **Videos for the vault (+ Add clips).** The Assistant copies no video. The button opens the vault's own Footage folder and says "Put your videos in the folder that just opened. They show up in your vault's reel page, where you make clips from them." From the chat, open that folder for them the same way a kit's folder is opened and say the same thing.
 
+## Describing photos so they can be found
+
+**What it is (Nicole, Nov 19).** Search has to find what is in a photo, not just its shoot's name: "laughing", "a kiss", "a green backdrop". So every photo in a post kit has a few words kept beside the kit. **No photo is ever renamed or changed for this** (Nicole: "I don't want the assistant to rename the photos"); the words live in the kit's hidden folder.
+
+**Two kinds of words.**
+- **Tags, by themselves.** On a Mac, the Mac's own Vision looks at each photo once (a small copy, never the original; nothing leaves the computer) when a post kit's page is opened or a kit is made, and keeps plain tags: "outdoor", "sky", "people", "one person". While it runs, the post kit page says "Getting your photos ready to search: 40 of 72." and everything else on the page works. You start nothing and say nothing; if they ask what the line is, say it is a one-time look at the photos already in this post kit so search can find them, and it takes about a second for a dozen photos. These tags are things and places. They will not know "laughing" or "a kiss".
+- **Descriptions, from you, only when they ask.** When the tags are done the page shows a quiet line, "Want search to find more, like "laughing" or "a kiss"? Copy this into the chat:", and **Describe my photos for <shoot>**. That pasted line (or "describe my photos", "make my photos searchable") is the ask. Never describe photos because a kit was opened or made.
+
+**"Describe my photos for <shoot>".**
+
+```
+python3 <scripts>/photo_words.py status "<kit words>"        how many photos have no description (draws nothing)
+python3 <scripts>/photo_words.py sheets "<kit words>"        the numbered contact sheets, and the numbers with none
+python3 <scripts>/photo_words.py describe "<kit words>" --file words.json
+```
+
+1. `status` first. Say how many photos there are. **More than about 300: say the number and ask before you start** ("That's 640 photos. Want me to describe them all, or just one shoot?"). It uses their plan.
+2. `sheets` prints the kit's numbered sheets (48 photos to a sheet). Read the sheets, never photo by photo (rule 6). Describe only the numbers it lists as having none, plus any it says were described before the photo was exported again.
+3. Write the file: `{"photos": {"12": {"words": "Mom laughing with the kids at the water"}, "13": {"words": "Close-up of the ring"}}}`. One plain line each, up to 140 letters, no other field, at most 2,000 photos a file. The whole file is checked before anything is saved; a wrong number, two lines, a slash or an extra field saves nothing and says why. Running it twice writes nothing.
+4. One line back: "Done. 72 photos described; search will find them now." Nothing about files.
+
+**What a description may say.** Who is in it in plain terms (a mom, two kids, a couple, a bride, a baby), what they are doing (laughing, a kiss, walking away, looking at the camera), the setting and the colours (at the water, a green backdrop, golden light, a close-up of the ring). Write what search would be asked for. **Never a person's name unless the photographer said it** in this conversation or it is the shoot's own name; never guess who someone is, their age, or how they are related beyond what is plain to see. Nothing unkind about anyone's looks.
+
+**Descriptions are for finding photos only (rule 11).** They are your reading of a small picture, not the photographer's story. Never use a description, or a tag, as a fact in a caption, a hook, a note to a client or story words, and never read one back as what happened that day. Those words come only from what the photographer says.
+
+**"Describe the photos in my vault".** The vault's photos are described in the post kit each one came from (one description serves the shoot and the vault). `photo_words.py status "My vault"` says how many have no description, shoot by shoot, with the `sheets` command for each. Say the total first and ask before more than about 300; then go one post kit at a time. The photos added to the vault itself are described with `sheets "My vault"` and their vault numbers; a shoot's photo given there is refused and the answer names the kit and number to use.
+
+**"Find ... in my vault"** ("find me on the computer", "every photo of someone laughing", "clips at the beach"): `python3 <scripts>/vault.py find "<their words>"` (add `--photos` or `--clips` for one kind). It prints the photos that match, by shoot and vault number, and the clips, by name and shoot; it never looks at a picture. Everyday words (me, my, the, with, on...) are ignored and every other word has to match what is in the photo (its tags, your description) or its shoot's name; a clip matches by its name and its shoot's name, and a clip with no name yet only by its shoot. Tell them what came up in plain words ("Six photos from Hannah's shoot and two clips"); never read out numbers unless they ask. Nothing found is usually photos with no description yet: say so, and offer to describe that shoot. Search on the vault's own pages comes with its reel page; until then this is the way to search.
+
+**On a PC** there are no tags (no Vision there), so search goes by shoot name and by your descriptions; the page says so and shows the same line to copy. Everything above about describing works the same.
+
 ## "Bring my old reels over": reels made on the older pages
 
 Some photographers made reels and talking reels on an earlier version of these pages, which kept them in a hidden folder beside Your Content, not in each shoot's post kit. On today's pages those shoots show no reel. When they say "bring my old reels over", "my reels are gone", "my old reels aren't showing" or "where did my talking reel go", this is the way back. Never rebuild a reel by hand, and never copy or edit a record yourself.
