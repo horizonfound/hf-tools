@@ -2293,18 +2293,19 @@ def _font_css():
     return look.head_css()
 
 
-def _head(title):
+def _head(title, more_css=""):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{look.CRUMBS_SAVED}\n{CSS}</style></head>")
+            f"{PAGE_MARK}<title>{html.escape(brand.title(title))}</title><style>{_font_css()}{look.CRUMBS_SAVED}\n{CSS}{more_css}</style></head>")
 
 
-def _bar(when_words, shoot=None):
+def _bar(when_words, shoot=None, trail=None):
     """Her bar (v27): the path at the top (Home › Hannah post kit, built by look.crumbs: the kit's crumb is where
     you are, no link), the product's name, the date. Her Back to home pill stays in the markup, hidden, as her
     page keeps it. shoot is the kit's folder name; None draws her plain 'Post kit' (the unreachable page)."""
     here = look.CRUMB_WORDS["post_kit"].format(shoot=look.short_name(shoot)) if shoot else look.CRUMB_WORDS["post_kit_none"]
+    trail = trail if trail is not None else [(here, None)]      # the vault's page gives its own (My post kits › My vault)
     return (f"<div class='bar'><a class='homelink' style='display:none' href='/home'><span aria-hidden='true'>&larr;</span><span class='long'>Back to home</span>"
-            f"<span class='short'>Home</span></a>{look.crumbs([(here, None)])}{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
+            f"<span class='short'>Home</span></a>{look.crumbs(trail)}{brand.bar()}<span class='when'>{html.escape(when_words)}</span></div>")
 
 
 def unreachable_html(line=None):
@@ -2568,6 +2569,11 @@ def build_page(kit):
     """The kit page, as her post kit's three cards. Returns (the page, whether a reel photo's small copy is still
     to be made: the server then starts making them)."""
     rec = load_rec(kit)
+    # v29: the vault's own post kit page is this same page with her lede, the strip of what is in it, her three
+    # card lines and her "Tell your assistant what this reel is" box (vault_page.py). Everything else is as ever.
+    vp = None
+    if is_vault(rec):
+        import vault_page as vp
     name = rec.get("name") or short_name(kit.name)
     when = rec.get("date") if isinstance(rec.get("date"), str) and rec.get("date") else ""   # a date changed by hand into a number is left out
     when = when or (kit.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", kit.name) else "")
@@ -2645,6 +2651,11 @@ def build_page(kit):
             return words_box(kit.name, piece, w) + reels_queue_box(several, bool(w.get("caption")), steps.get("reels") or {})
         return words_box(kit.name, piece, w) + queue_box(piece, made, bool(w.get("caption")), steps["queue"][piece])
 
+    reel_sub, car_sub, sto_sub = KIT_WORDS["reel_sub"], KIT_WORDS["carousel_sub"], KIT_WORDS["stories_sub"]
+    if vp is not None:
+        reel_sub, car_sub, sto_sub = vp.WORDS["reel_sub"], vp.WORDS["carousel_sub"], vp.WORDS["stories_sub"]
+        reel_strip = vp.ask_html() + reel_strip
+
     def card(piece, href, title, ratio, cta, sub, strip, status, wrds=None, went=False):
         # the card is a link, so nothing inside it is an <a> (see the note above KIT_WORDS)
         return (f"<a class='piece' data-piece='{piece}' href='{html.escape(href)}'><div>"
@@ -2655,11 +2666,11 @@ def build_page(kit):
 
     # the Stories card is as it was: no words box and no queue step (no words for stories; they aren't on the grid)
     cards = (card("reel", reel_door(kit.name), KIT_WORDS["reel"], "9:16", REEL_AGAIN if f["reel"] else REEL_CREATE,
-                  KIT_WORDS["reel_sub"], reel_strip, reel_status, steps_col("reel", bool(f["reel"])), went=True)
-             + card("carousel", design_door(kit.name), KIT_WORDS["carousel"], "4:5", car_cta, KIT_WORDS["carousel_sub"],
+                  reel_sub, reel_strip, reel_status, steps_col("reel", bool(f["reel"])), went=True)
+             + card("carousel", design_door(kit.name), KIT_WORDS["carousel"], "4:5", car_cta, car_sub,
                     car_strip, _status(html.escape(car_status), bool(slides)),
                     steps_col("carousel", bool(slides)))
-             + card("stories", design_door(kit.name, stories=True), KIT_WORDS["stories"], "9:16", sto_cta, KIT_WORDS["stories_sub"],
+             + card("stories", design_door(kit.name, stories=True), KIT_WORDS["stories"], "9:16", sto_cta, sto_sub,
                     sto_strip, _status(html.escape(sto_status), bool(stories))))
 
     # the quiet line under the cards (decision 12): what else the kit folder holds, each with its folder's button
@@ -2691,6 +2702,16 @@ def build_page(kit):
                f"<a class='go' id='queueLink' href='/posting.html'>{html.escape(KIT_WORDS['my_queue'])} &rarr;</a></p>"
                "<p class='went' id='folderWent'></p>")
 
+    lede, style, tail, trail = KIT_WORDS["lede"], "", "", None
+    if vp is not None:
+        # her vault page has the strip where a shoot's page has its folder buttons (screenshot 03); the line
+        # that says what a press did is inside the strip. #folderWent stays, empty, for the page's own script.
+        lede = vp.WORDS["lede"]
+        folders = vp.strip_html(kit) + "<p class='went' id='folderWent'></p>"
+        style = "\n" + vp.CSS
+        tail = (f"<script type='application/json' id='vault-words'>{vp.page_words()}</script><script>{vp.SCRIPT}</script>")
+        trail = [(vp.WORDS["back"], "/make-posts#kits"), (name, None)]
+
     # v28: the photos that fan out into the cards the first time this kit opens (the page's script decides whether)
     try:
         fan, fan_need = fan_facts(kit, rec, f["reel_order"])
@@ -2704,15 +2725,16 @@ def build_page(kit):
     page_words.update({k: OUR_KIT_WORDS[k] for k in ("opening", "unreached")})
     page_words["saved_copy"] = OUR_KIT_WORDS["saved_copy"].format(name=name)
     page_words["rhythms"] = list(words_page.RHYTHMS)          # her five chips, the words page's own list
-    page = (_head(name + " · Post kit")
-            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'><div class='wrap'>" + _bar(when_words, kit.name)
+    page = (_head(name + " · Post kit", style)
+            + f"<body data-kit='{html.escape(kit.name)}' data-name='{html.escape(name)}' data-rhythm='{'1' if steps['rhythm'] else ''}'"
+            + (" data-vault='1'" if vp is not None else "") + "><div class='wrap'>" + _bar(when_words, kit.name, trail)
             + f"<header class='head'><span class='eyebrow'>{html.escape(KIT_WORDS['eyebrow'])}</span><h1>{html.escape(name)}<em>.</em></h1>"
-            f"<p class='lede'>{html.escape(KIT_WORDS['lede'])}</p>{folders}</header>"
+            f"<p class='lede'>{html.escape(lede)}</p>{folders}</header>"
             f"<div id='pieces'>{cards}</div>{also}</div>"
             + ASK_BOX +
             f"<script type='application/json' id='kit-words'>{json.dumps(page_words, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
             f"<script type='application/json' id='kit-fan'>{json.dumps(fan, ensure_ascii=True).replace('<', chr(92) + 'u003c')}</script>"
-            f"<script>{SCRIPT}</script></body></html>")
+            f"<script>{SCRIPT}</script>{tail}</body></html>")
     return page, need_previews
 
 

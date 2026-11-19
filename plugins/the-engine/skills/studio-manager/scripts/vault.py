@@ -24,6 +24,9 @@ This script is the one writer of the vault's list.
     python3 vault.py ensure            make the vault if there is none (twice makes one), then list its photos
     python3 vault.py relist [--sheets] bring the list up to date; --sheets also draws the numbered contact sheets
     python3 vault.py members           the post kits in it
+    python3 vault.py add "<folder>"    + Add a shoot: copy that folder's finished photos into the vault's own Photos
+                                       folder, each copy checked; the originals are only read. Twice copies nothing.
+                                       Exit 0 done, 1 a copy stopped or did not match, 2 stop, 4 not a folder to add.
 """
 import argparse
 import hashlib
@@ -45,6 +48,7 @@ MARK = "vault"                      # the field in kit.json (and in sheet.json) 
 OWN = ""                            # a row's "kit" for a photo in the vault's own Photos folder
 FOLDERS = ("Photos", "Footage", "Music", "Talking", "Carousel", "Stories", "Reels")
 WHATS = ("photos", "clips")         # what can be taken out of the vault (stage 11 uses it)
+EVERYTHING = False                  # "See everything in it" is drawn on the vault's page only once its page exists (stage 11 turns this on)
 NAMES_MOST = 99                     # "My vault 99": past that something is badly wrong, and nothing is made
 
 
@@ -525,6 +529,365 @@ def rows_by_group(vault_kit):
     return out
 
 
+# ---------- + Add a shoot: a folder's finished photos, copied into the vault's own Photos folder ----------
+#
+# This is the one place the vault copies a photo, so it is built like posts.py bring (and the backup): only
+# finished photos (posts.PHOTO; everything else is named and left where it is), each copied with
+# posts.copy_checked (hashed while written to a partial file, given its name without ever replacing a file, read
+# back and compared). The originals are only ever read. The plan is written to .kit/vault-adds.json BEFORE the
+# first byte is copied (status "copying"; each file's name in its folder, size, time, hash and the name it gets),
+# and after every few copies. A run cut off is finished by the next add; a second add of the same folder copies
+# nothing. A name already in the vault's Photos: the same bytes means it is already there; different bytes means
+# the copy gets a number after its name ("IMG_0001 (2).jpg"). Nothing is ever written over.
+
+ADDS = "vault-adds.json"            # the log, in the vault's hidden folder
+ADD_JOB = "vault-add-job.json"      # what the page follows while a copy runs (state, done, of, words)
+ADD_NAMES_MOST = 500                # "IMG_0001 (500).jpg": past that, the file is a problem, not a copy
+ADD_SAVE_EVERY = 10                 # the log is saved after this many copies (and at every stop)
+
+# Ours, every one a draft for Dustin and Nicole. What the page shows is `words`; never a path.
+ADD_WORDS = {
+    "copied": "Copied {n} finished photo{s} into your vault. Your originals weren't moved.",
+    "already_some": " {n} {were} already in your vault.",
+    "already_all": "Those photos are already in your vault. Nothing was copied.",
+    "left": " {n} file{s} left where {they}: not finished photos.",
+    "none": "No finished photos (JPEGs) in that folder. Nothing was copied.",
+    "from_kit": "That shoot is already in your vault, from its post kit.",
+    "own": "That folder is your vault's own. Nothing was copied.",
+    "inside": "That folder is part of your Assistant folder. Pick the folder your finished photos were exported to.",
+    "no_folder": "I can't see that folder right now. Nothing was copied.",
+    "busy": "Photos are being copied into your vault right now. Try again when that's done.",
+    "held": "Something stopped the copy part way: {why}. {n} of {of} photos are in, each one checked. Nothing is lost and your originals weren't moved; add the same folder again to finish.",
+    "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your vault. Your originals weren't moved. Tell your assistant.",
+    "working": "Copying {n} of {of}…",
+    "starting": "Looking at the photos in that folder…",
+    "stopped": "The copy stopped before it finished. Nothing is lost; add the same folder again to finish.",
+}
+
+
+def _s(n):
+    return "" if n == 1 else "s"
+
+
+def _sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _adds(vault_kit):
+    d = _json(Path(vault_kit) / ".kit" / ADDS)
+    runs = d.get("adds") if isinstance(d.get("adds"), list) else []
+    return {"adds": [r for r in runs if isinstance(r, dict) and isinstance(r.get("files"), list)]}
+
+
+def _job_write(vault_kit, **facts):
+    try:
+        _write_whole(Path(vault_kit) / ".kit" / ADD_JOB, dict(facts, pid=os.getpid(), when=datetime.now().isoformat(timespec="seconds")))
+    except OSError:
+        pass                        # the page's progress line is a courtesy; the copy itself never waits on it
+
+
+def _job_write_pid(vault_kit, pid):
+    """The page server's own, right after it starts the job: the job's number, so a job that died before its
+    first line is seen as stopped and never as working for ever."""
+    f = Path(vault_kit) / ".kit" / ADD_JOB
+    d = _json(f)
+    if d.get("state") == "working" and d.get("of") in (0, None) and not d.get("done"):
+        try:
+            _write_whole(f, dict(d, pid=pid))
+        except OSError:
+            pass
+
+
+def add_job(vault_kit):
+    """What the page follows: {"state": "none" | "working" | "done" | "stopped", "words", "done", "of", "copied"}.
+    A job whose process is gone while its record still says working is "stopped" (the next add finishes it)."""
+    d = _json(Path(vault_kit) / ".kit" / ADD_JOB)
+    state = d.get("state") if d.get("state") in ("working", "done", "stopped") else "none"
+    if state == "working" and this_computer.still_running(d.get("pid")) is False:
+        return {"state": "stopped", "words": ADD_WORDS["stopped"], "done": d.get("done") or 0, "of": d.get("of") or 0, "copied": 0}
+    return {"state": state, "words": str(d.get("words") or ""), "done": d.get("done") or 0, "of": d.get("of") or 0,
+            "copied": d.get("copied") or 0}
+
+
+def _inside(child, parent):
+    try:
+        child, parent = Path(child).resolve(), Path(parent).resolve()
+    except OSError:
+        return False
+    return child == parent or parent in child.parents
+
+
+def add_refusal(vault_kit, folder):
+    """Why this folder can't be added, as a key of ADD_WORDS, or None when it can. Checked before anything is
+    read: a post kit's own photos (already in, by reference), the vault's own folders, anything else of the
+    Assistant's."""
+    vault_kit, src = Path(vault_kit), Path(folder)
+    try:
+        if not src.is_dir():
+            return "no_folder"
+    except OSError:
+        return "no_folder"
+    if _inside(src, vault_kit):
+        return "own"
+    c = vault_kit.parent
+    for d in _kit_dirs(c):
+        if d == vault_kit:
+            continue
+        photos = _member_photos(d)
+        try:
+            if _inside(src, d) or (photos is not None and src.resolve() == Path(photos).resolve()):
+                return "from_kit"
+        except OSError:
+            continue
+    try:
+        h = posts.home()
+    except (Exception, SystemExit):  # noqa: BLE001
+        h = None
+    if _inside(src, c) or _inside(c, src):
+        return "inside"
+    if h and _inside(src, h) and not _inside(src, Path(h) / posts.DROP_NAME):
+        return "inside"
+    return None
+
+
+def _numbered_name(name, i):
+    p = Path(name)
+    return name if i == 1 else f"{p.stem} ({i}){p.suffix}"
+
+
+def _taken(folder):
+    """The names in a folder by its own listing, folded (most drives ignore capitals): {folded: exact name}."""
+    try:
+        return {_nfc(e).casefold(): e for e in os.listdir(folder)}
+    except OSError:
+        return {}
+
+
+def _place_for(photos_dir, name, want, taken, seen):
+    """The name a copy of these bytes gets in the vault's Photos folder: (name, "there") when a file by that
+    name already holds the same bytes, (name, "new") for the first free name. `seen` keeps the hash of a file
+    already there, so it is read once. None when 500 numbered names are all taken by other pictures."""
+    for i in range(1, ADD_NAMES_MOST + 1):
+        cand = _numbered_name(name, i)
+        key = _nfc(cand).casefold()
+        if key not in taken:
+            return cand, "new"
+        exact = taken[key]
+        if exact.endswith(".studio-partial"):
+            continue
+        if exact not in seen:
+            try:
+                seen[exact] = _sha(photos_dir / exact)
+            except OSError:
+                seen[exact] = None
+        if seen[exact] == want:
+            return exact, "there"
+    return None
+
+
+def _add_words(res):
+    w = ADD_WORDS
+    if res.get("refused"):
+        return w[res["refused"]]
+    if res.get("held"):
+        return w["held"].format(why=res["held"], n=res["copied"] + res["there"], of=res["photos"])
+    left = sum(res["left"].values())
+    tail = w["left"].format(n=left, s=_s(left), they="it is" if left == 1 else "they are") if left else ""
+    if not res["photos"]:
+        return w["none"] + tail
+    bad = len(res["problems"])
+    out = ""
+    if res["copied"]:
+        out = w["copied"].format(n=res["copied"], s=_s(res["copied"]))
+        if res["there"]:
+            out += w["already_some"].format(n=res["there"], were="was" if res["there"] == 1 else "were")
+    elif not bad:
+        out = w["already_all"]
+    if bad:
+        out = (out + " " if out else "") + w["mismatch"].format(n=bad, s=_s(bad), they="it is" if bad == 1 else "they are")
+    return out + tail
+
+
+def add(vault_kit, folder, progress=None):
+    """Copy a folder's finished photos into the vault's own Photos folder. Returns
+        {"ok", "refused": key | None, "photos", "copied", "there", "left": {kind: n}, "problems": [names],
+         "held": why | None, "words"}
+    Safe to run twice (the second copies nothing), safe to cut off (the next run finishes it: what is in is
+    compared, never replaced). The originals are only read."""
+    kit_mod = _kit()
+    vault_kit = Path(vault_kit)
+    if not is_vault(vault_kit):
+        raise Trouble("That folder isn't the vault. Nothing was changed.")
+    res = {"ok": False, "refused": None, "photos": 0, "copied": 0, "there": 0, "left": {}, "problems": [], "held": None}
+    try:
+        src = Path(folder).expanduser()
+        src = src.resolve() if src.is_dir() else src
+    except OSError:
+        src = Path(folder)
+    why = add_refusal(vault_kit, src)
+    if why:
+        res["refused"] = why
+        res["words"] = _add_words(res)
+        return res
+    hid = vault_kit / ".kit"
+    photos_dir = vault_kit / "Photos"
+    with kit_mod._held(hid / "vault-add.lock", 2.0) as got:
+        if got is False:
+            res["refused"] = "busy"
+            res["words"] = _add_words(res)
+            return res
+        photos_dir.mkdir(exist_ok=True)
+        log = _adds(vault_kit)
+        where = str(src)
+        earlier = {}                # a file of this folder a run already put in: rel -> its log line
+        for r in log["adds"]:
+            if this_computer.same_place(r.get("from", ""), where):
+                for f in r["files"]:
+                    if isinstance(f, dict) and f.get("done") and isinstance(f.get("src"), str):
+                        earlier[f["src"]] = f
+        run = next((r for r in log["adds"] if r.get("status") == "copying" and this_computer.same_place(r.get("from", ""), where)), None)
+        files, left = [], {}
+        for rel in posts.walk(src):
+            k = posts.kind(rel)
+            if k != "photo":
+                label = {"raw": "RAW file", "video": "video", "working": posts.WORKING.get(Path(rel).suffix.lower(), "working file")}.get(k, "other file")
+                left[label] = left.get(label, 0) + 1
+                continue
+            files.append(rel)
+        res["photos"], res["left"] = len(files), left
+        taken, seen, plan = _taken(photos_dir), {}, []
+        if progress:
+            progress(0, len(files), False)
+        for rel in files:
+            p = src / rel
+            st = p.stat()
+            line = {"src": rel, "size": st.st_size, "mtime": int(st.st_mtime), "sha256": None, "dst": None, "done": False}
+            was = earlier.get(rel)
+            if (was and was.get("size") == st.st_size and was.get("mtime") == int(st.st_mtime) and isinstance(was.get("dst"), str)
+                    and _nfc(was["dst"]).casefold() in taken):
+                # the same file as last time (name, size, time), and the copy made then is still there: already in
+                line.update(sha256=was.get("sha256"), dst=taken[_nfc(was["dst"]).casefold()], done=True, state="there")
+                plan.append(line)
+                continue
+            want = _sha(p)
+            line["sha256"] = want
+            spot = _place_for(photos_dir, Path(rel).name, want, taken, seen)
+            if spot is None:
+                line["state"] = "no name free"
+                plan.append(line)
+                continue
+            line["dst"], state = spot
+            if state == "there":
+                line.update(done=True, state="there")
+            else:
+                line["state"] = "to copy"
+                taken[_nfc(line["dst"]).casefold()] = line["dst"]
+                seen[line["dst"]] = want          # two files of this folder with the same name and bytes: one copy
+            plan.append(line)
+        todo = [f for f in plan if f.get("state") == "to copy"]
+        if not todo and run is None:
+            # nothing to copy: nothing is logged for a look that changed nothing (a second add of the same folder)
+            res["there"] = sum(1 for f in plan if f.get("state") == "there")
+            res["problems"] = [f["src"] for f in plan if f.get("state") == "no name free"]
+            res["ok"] = not res["problems"]
+            res["words"] = _add_words(res)
+            return res
+        if run is None:
+            run = {"id": datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}", "from": where,
+                   "started": datetime.now().isoformat(timespec="seconds")}
+            log["adds"].append(run)
+        run.update({"status": "copying", "files": plan, "left": left})
+        _write_whole(hid / ADDS, log)           # the log first: not a byte is copied before the plan is on disk
+        stop_after = int(os.environ.get("STUDIO_VAULT_ADD_STOP_FOR_TESTS") or 0)     # only a test sets it: a run cut off
+        made = 0
+        for f in todo:
+            dst = photos_dir / f["dst"]
+            try:
+                got_hash = posts.copy_checked(src / f["src"], dst)
+                tries = 0
+                while got_hash is None and dst.exists() and tries < 5:
+                    # the name was taken meanwhile by another picture: the next free name, never over it
+                    tries += 1
+                    spot = _place_for(photos_dir, Path(f["src"]).name, f["sha256"], _taken(photos_dir), {})
+                    if spot is None:
+                        break
+                    f["dst"] = spot[0]
+                    dst = photos_dir / f["dst"]
+                    got_hash = f["sha256"] if spot[1] == "there" else posts.copy_checked(src / f["src"], dst)
+            except OSError as ex:
+                res["held"] = posts.could_not(ex)
+                _write_whole(hid / ADDS, log)
+                break
+            if got_hash is not None and got_hash == f["sha256"]:
+                f.update(done=True, state="copied")
+                res["copied"] += 1
+            else:
+                f["state"] = "did not match"
+            made += 1
+            if made % ADD_SAVE_EVERY == 0:
+                _write_whole(hid / ADDS, log)
+            if progress:
+                progress(made, len(todo), False)
+            if stop_after and made >= stop_after:
+                _write_whole(hid / ADDS, log)
+                os._exit(9)                     # the test's cut: no tidy-up, as if the power went
+        res["there"] = sum(1 for f in plan if f.get("state") == "there")
+        res["problems"] = [f["src"] for f in plan if f.get("state") in ("did not match", "no name free")]
+        if res["held"] is None:
+            run["status"] = "problems" if res["problems"] else "done"
+            run["finished"] = datetime.now().isoformat(timespec="seconds")
+        run["copied"] = sum(1 for f in plan if f.get("state") == "copied")
+        _write_whole(hid / ADDS, log)
+    res["ok"] = res["held"] is None and not res["problems"]
+    res["words"] = _add_words(res)
+    if res["copied"]:
+        try:
+            relist(vault_kit, quick=True)       # the new photos get their numbers (the list is the vault's own)
+        except Trouble:
+            pass                                # the next look at the vault lists them
+    return res
+
+
+def unfinished_adds(vault_kit):
+    """The folders of adds that were cut off (status still "copying"), for the next add to finish first."""
+    return [r["from"] for r in _adds(vault_kit)["adds"] if r.get("status") == "copying" and isinstance(r.get("from"), str)]
+
+
+def add_and_finish(vault_kit, folder, progress=None):
+    """What `vault.py add` and the page's job run: any add that was cut off is finished first (its folder is
+    looked at again; what is in is compared, never replaced), then this one."""
+    for old in unfinished_adds(vault_kit):
+        if not this_computer.same_place(old, str(Path(folder).expanduser().resolve() if Path(folder).expanduser().is_dir() else folder)):
+            try:
+                if Path(old).is_dir():
+                    add(vault_kit, old)
+            except (OSError, Trouble):
+                pass                            # it stays "copying" in the log, for the time its folder is back
+    return add(vault_kit, folder, progress)
+
+
+def clip_count(vault_kit):
+    """How many videos the vault can draw from: the ones in its own Footage folder and in every post kit's.
+    A plain count of video files by each folder's own listing (stage 9 lists them properly)."""
+    n = 0
+    vault_kit = Path(vault_kit)
+    for d in [vault_kit] + [m["path"] for m in members(vault_kit)]:
+        f = Path(d) / "Footage"
+        try:
+            if f.is_symlink() or not f.is_dir():
+                continue
+            for e in os.listdir(f):
+                if not e.startswith(".") and e.lower().endswith((".mov", ".mp4", ".m4v")) and not (f / e).is_symlink() and (f / e).is_file():
+                    n += 1
+        except OSError:
+            continue
+    return n
+
+
 # ---------- taken out of the vault (stage 11 uses these) ----------
 
 def out(vault_kit):
@@ -600,6 +963,9 @@ def main():
     rl = sub.add_parser("relist")
     rl.add_argument("--sheets", action="store_true", help="also draw the numbered contact sheets")
     sub.add_parser("members")
+    ad = sub.add_parser("add", help="copy a folder's finished photos into the vault's own Photos folder")
+    ad.add_argument("folder")
+    ad.add_argument("--job", action="store_true", help=argparse.SUPPRESS)      # the page's own: progress in a file
     a = ap.parse_args()
     try:
         import fresh
@@ -612,6 +978,36 @@ def main():
             say(f"{'Made the vault' if made else 'The vault is already there'}: \"{v.name}\" in {posts.CONTENT_NAME}.")
             _say_relist(relist(v, quick=True))
             return 0
+        if a.cmd == "add":
+            v, made = ensure()
+            if made:
+                say(f"Made the vault: \"{v.name}\" in {posts.CONTENT_NAME}.")
+            prog = None
+            if a.job:
+                _job_write(v, state="working", words=ADD_WORDS["starting"], done=0, of=0)
+
+                def prog(done, of, _end):
+                    _job_write(v, state="working", words=ADD_WORDS["working"].format(n=done, of=of) if of else ADD_WORDS["starting"], done=done, of=of)
+            try:
+                res = add_and_finish(v, a.folder, prog)
+            except BaseException as e:  # noqa: BLE001
+                if a.job:
+                    _job_write(v, state="stopped", words=ADD_WORDS["stopped"])
+                if isinstance(e, Trouble):
+                    raise
+                say(f"STOP: the copy stopped ({e.__class__.__name__}: {str(e)[:160]}). Nothing is lost and no original was "
+                    "changed; running the same command again finishes it.")
+                return 2
+            if a.job:
+                _job_write(v, state="done" if res["ok"] or res["refused"] else "stopped", words=res["words"], copied=res["copied"])
+            say(("" if res["ok"] else "STOP: " if (res["held"] or res["problems"]) else "") + res["words"])
+            for label, n in sorted(res["left"].items()):
+                say(f"Left where it is, not copied: {n} {label}{'' if n == 1 else 's'}.")
+            for name in res["problems"]:
+                say(f"Not in the vault: {name}")
+            if res["refused"]:
+                return 4
+            return 0 if res["ok"] else 1
         v = find()
         if v is None:
             say("NO VAULT: there is no vault yet. `vault.py ensure` makes it (an empty folder and its list; no photo is copied).")

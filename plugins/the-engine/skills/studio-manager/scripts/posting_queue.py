@@ -2161,6 +2161,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path == "/vault-add-status":
+            # what the vault's page follows while + Add a shoot copies (vault_page.py)
+            import vault_page
+            return vault_page.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/open", "/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
                 and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
             # these open a folder window, a folder picker or another page server: for this server's own pages
@@ -2544,6 +2548,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/vault-open", "/vault-add", "/vault-clips"):
+            # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
+            import vault_page
+            return vault_page.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":

@@ -1489,7 +1489,7 @@ def check_posted_and_path_v27():
     case("words.md tells the words page's path and how to get back", f"**{path_words}**" in wordsp and "Press Beach post kit at the top of the page" in wordsp)
     case("the posting queue page still keeps Back to home, as the kit part says", "keeps its Back to home" in kitp and "Back to home</span>" in pq)
     case("the kit page's and the words page's bars are built by look.crumbs (else the parts' path is a story)",
-         "look.crumbs([(here, None)])" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
+         "trail if trail is not None else [(here, None)]" in read(SCRIPTS / "kit.py") and "look.crumbs(trail)" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
     # --- "What's a post kit?": her Make posts paragraph, whole ---
     m = re.search(r'\*\*"What\'s a post kit\?"\*\* Answer in Nicole\'s words from the Make posts screen, whole: "([^"]+)"', kitp)
     case("post-kit.md answers \"What's a post kit?\" with one quoted paragraph", bool(m))
@@ -1666,10 +1666,50 @@ def check_vault_core():
          'OPEN_NEW_BLANK = "BLANK:' in des and "If it starts `BLANK:`" in arr and "blank slides to start" in arr)
 
 
+def check_vault_page():
+    """My vault on the pages (Nicole's v29, 1.3; stage 7): what the parts say, held to the code."""
+    print("\nMy vault: the card, its page and adding a folder (Nov 19)")
+    kitp, hello, where, core = read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "hello.md"), read(SM / "parts" / "where-things-live.md"), read(SM / "SKILL.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "vault_page.py")
+    case("post-kit.md has a My vault section", "\n## My vault: one post kit for every shoot\n" in kitp)
+    sec = kitp.split("## My vault: one post kit for every shoot", 1)[-1].split("\n## ", 1)[0]
+    case("it says what the vault is in her words: a post kit like any other, not a place to pick photos first, no photo copied to be in it",
+         "a post kit like any other" in sec and "not a place to pick photos first" in sec and "no photo is copied to be in it" in sec)
+    case("show my vault: `vault.py ensure`, then shown like any post kit", "`python3 <scripts>/vault.py ensure`" in sec and "Post kit.html" in sec and 'add_parser("ensure")' in src)
+    case("nothing is picked until they ask", "**Nothing is picked until they ask**" in sec and "Never pick, order or make anything in the vault because it was opened" in sec)
+    for line in ("My favorite maternity photos this year", "Behind the scenes at the beach", "Moms laughing, from any shoot"):
+        case(f"her example is in the part and on the page, whole: {line}", line in sec and line in page)
+    case("add this folder to my vault: `vault.py add`, a command vault.py has", '`python3 <scripts>/vault.py add "<the folder>"`' in sec and 'add_parser("add"' in src)
+    case("it says only finished photos are copied, each checked, and the originals are never moved, renamed or changed",
+         "finished photos (JPEG, HEIC, PNG, WebP)" in sec and "every copy checked against its original" in sec and "**the originals are never moved, renamed or changed.**" in sec)
+    case("it says twice copies nothing, a cut-off copy is finished by the next, and nothing is written over",
+         "the second time copies nothing" in sec and "finished by the next one" in sec and "nothing is written over" in sec and "IMG_0001 (2).jpg" in sec)
+    case("the lines it tells the assistant to say are the ones vault.py prints", "Copied 48 finished photos into your vault. Your originals weren't moved." in sec
+         and "Copied {n} finished photo{s} into your vault. Your originals weren't moved." in src and "That shoot is already in your vault, from its post kit." in sec
+         and '"from_kit": "That shoot is already in your vault, from its post kit."' in src)
+    case("the exit codes the part names are the ones vault.py gives (4 not a folder to add, 1 a copy stopped or did not match)",
+         "Exit 4 means" in sec and "Exit 1 means" in sec and "return 4" in src and "return 0 if res[\"ok\"] else 1" in src)
+    case("+ Add clips: no video is copied, and the line is the page's own", "The Assistant copies no video." in sec
+         and "Put your videos in the folder that just opened. They show up in your vault's reel page, where you make clips from them." in sec
+         and "Put your videos in the folder that just opened. They show up in your vault's reel page, where you make clips from them." in page)
+    case("the core's table sends show my vault, open my vault and add this folder to my vault to that section",
+         '| "show my vault", "open my vault", "what\'s my vault?", "add this folder to my vault", "put these photos in my vault" | `parts/post-kit.md`, "My vault" |' in core)
+    case("hello.md says My vault is first on the post kits list, with no Archive, and names the screen by its new title",
+         "**My vault** first, a dark card on a row of its own" in hello and "it has no Archive and the search never hides it" in hello and "**Turn your shoots into posts**; **Make posts from a shoot** before Nov 19" in hello)
+    hb = read(SM / "scripts" / "home_base.py")
+    case("... and the screen's title in the code is that one", '"m_h1": "Turn your shoots <em>into posts.</em>"' in hb and "m_eyebrow" not in hb.replace('"m_eyebrow" not', ""))
+    case("where-things-live names the add log and what the page follows, as vault.py names them",
+         "`.kit/vault-adds.json`" in where and 'ADDS = "vault-adds.json"' in src and "`.kit/vault-add-job.json`" in where and 'ADD_JOB = "vault-add-job.json"' in src)
+    for key in ("status", "size", "mtime", "sha256"):
+        case(f"where-things-live names the log's `{key}`, and vault.py writes it", f"`{key}`" in where and f'"{key}"' in src)
+    case("it says what makes the vault: ensure, add, or the card's press, never a page being opened",
+         "or `vault.py add`, or the press of Open the post kit on My vault's card" in where and "never because a page was opened" in where)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

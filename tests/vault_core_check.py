@@ -507,9 +507,12 @@ def check_server(s, nums):
 
         group("the pages that list shoots")
         code, _, raw = s.http("GET", "/home")
-        case("the home page never shows the vault as a shoot", code == 200 and b"My vault" not in raw, code)
-        code, _, raw = s.http("GET", "/make-posts")
-        case("the Make posts screen's list leaves the vault out (its own card is stage 7)", code == 200 and b"My vault" not in raw, code)
+        # (since stage 7 the pages' scripts carry the words of the My vault card, so only what is drawn is looked at)
+        case("the home page never shows the vault as a shoot", code == 200 and b"My vault" not in raw.split(b"<script", 1)[0], code)
+        code, j, raw = s.http("GET", "/home-data")
+        case("the post kits screen's list of shoots leaves the vault out (it has a card of its own, stage 7: tests/vault_page_check.py)",
+             code == 200 and "My vault" not in [k["folder"] for k in j["kits"]] and "My vault" not in [k["name"] for k in j["kits"]]
+             and isinstance(j.get("vault"), dict), code)
         code, j, _ = s.http("GET", "/home-data")
         case("/home-data's kits leave it out", code == 200 and "My vault" not in [k.get("folder") for k in (j or {}).get("kits") or []] and len(j["kits"]) == 4, (code, str(j)[:200]))
         code, _, raw = s.http("GET", "/content/" + quote("My vault") + "/" + quote("Post kit.html"))

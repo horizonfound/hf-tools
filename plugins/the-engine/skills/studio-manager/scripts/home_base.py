@@ -6,7 +6,7 @@ The home page (home.py, /home on the posting server; rebuilt after her v28) has 
 
     /backups       Back up a card: what a backup does, the two steps, and "Your backups": every card backed up,
                    newest first (the 10 newest, Show older by month, a search by shoot name)
-    /make-posts    Make posts from a shoot: what a post kit is ("What's a post kit?", her v27), the three steps
+    /make-posts    Turn your shoots into posts (Make posts from a shoot before v29; My vault first on its list): what a post kit is ("What's a post kit?", her v27), the three steps
                    (the third happens inside the post kit), and "Your post kits" (the 20 newest, Show older, a
                    search, Archive by hand and Bring it back)
 
@@ -106,9 +106,9 @@ WORDS = {
     "b_no_match": "No shoot called \"{q}\" yet.",
     "b_only": "Show only the 10 most recent",
     "b_older": "Show {n} older backup{s}",
-    # Make posts from a shoot
-    "m_eyebrow": "Step 3 of your workflow",
-    "m_h1": "Make posts <em>from a shoot.</em>",
+    # Turn your shoots into posts (her v29 title, pages/make-posts-preview.html; "Make posts from a shoot" and its
+    # "Step 3 of your workflow" eyebrow are gone: the home page no longer numbers steps)
+    "m_h1": "Turn your shoots <em>into posts.</em>",
     "m_lede": "When your editing is done, start here. For each shoot you'd like to make posts from, we'll build you a <b>post kit</b>, and together we'll create your reels, carousels, single photos, stories and captions. Whatever you need to support your social media.",
     "m_what_h": "What's a post kit?",
     "m_what_p": "It's one place for everything you'll post from a shoot. Inside your post kit is where you make it all: build your reels, design your carousels and stories, and write your captions. When a piece is ready, it goes to your posting queue. Nothing is ever posted for you.",
@@ -127,6 +127,9 @@ WORDS = {
     "m_find": "Find a post kit by shoot name",
     "m_cant": "I can't reach your shoots right now.",
     "open_kit": "Open the post kit",
+    # v29: My vault, always the first card, on a row of its own (her make-posts-preview.html)
+    "v_name": "My vault",
+    "v_small": "All your shoots in one post kit · {n} photos",
     "archive": "Archive",
     "bring_back": "Bring it back",
     "no_date": "No date",
@@ -151,6 +154,11 @@ OUR_WORDS = {
     "clips": "video clip",
     # the home page saved as a file (home.py page), which can't ask the Assistant anything
     "offline": "This is a saved copy. Ask your assistant to “show the Assistant” for the live one.",
+    # the My vault card (v29): one photo is "1 photo" (hers is a template that always says "photos"), and the
+    # lines its one press can end with
+    "v_small_one": "All your shoots in one post kit · 1 photo",
+    "v_opening": "Opening your vault…",
+    "v_cant": "Your vault couldn't be opened just now. Try again in a moment.",
     # the phone-width Back to home button, as on every other page
     "home_short": "Home",
 }
@@ -211,6 +219,10 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .shoot .ph img,.shoot .ph i{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--sand-l)}
 .shoot b{font:600 15px/1.25 var(--sans);overflow-wrap:anywhere}.shoot small{color:var(--ink-2);font-size:12.5px}
 .shoot .acts{display:flex;gap:6px;flex-wrap:wrap}
+.shoot.vk{background:var(--ink);color:#fff}.shoot.vk small{color:#c9ccd4}.shoot.vk .btn.solid{background:var(--coral);border-color:var(--coral);color:var(--ink)}
+.shoot.vk .btn.solid:hover{background:#fff;border-color:#fff}.shoot.vk .ph i{background:rgba(255,255,255,.12)}
+.shoot.vk .note{color:#fff;flex-basis:100%}
+#vaultRow:empty{display:none}
 .backup{background:var(--paper);border-radius:22px;padding:1.1rem 1.2rem 1rem;margin-top:1rem;box-shadow:0 1px 0 var(--line)}
 .backup .top{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
 .backup h3{margin:0;font:600 19px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}.backup .meta{color:var(--ink-2);font-size:13.5px;overflow-wrap:anywhere}
@@ -350,6 +362,29 @@ const card = k => {
     <div class="acts"><a class="btn solid" href="/content/${enc}/Post%%20kit.html">${esc(W.open_kit)}</a>
     <button class="btn" data-arch="${esc(k.folder)}" data-to="${k.archived ? '0' : '1'}">${esc(k.archived ? W.bring_back : W.archive)}</button></div></div>`;
 };
+// My vault: always first, on a row of its own, never filtered by the search and never archived (Nicole, v29).
+// Its press is a POST: the vault is made by a press, never because this page was loaded.
+function drawVault(v){
+  const row = $('vaultRow');
+  if (!v) { row.innerHTML = ''; row.dataset.sig = ''; return; }
+  const sig = JSON.stringify(v);
+  if (row.dataset.sig === sig) return;              // the same card: left alone, so a press in progress is never lost
+  row.dataset.sig = sig;
+  const th = [0, 1, 2].map(i => v.thumbs[i] ? `<img src="/kit-thumb?kit=${encodeURIComponent(v.thumbs[i])}&i=${i + 1}" alt="" loading="lazy" onerror="this.replaceWith(document.createElement('i'))">` : '<i></i>').join('');
+  row.innerHTML = `<div class="shoot vk" id="vaultCard"><div class="ph">${th}</div><b>${esc(W.v_name)}</b><small>${esc(v.photos === 1 ? W.v_small_one : fill(W.v_small, {n: many(v.photos)}))}</small>
+    <div class="acts"><button class="btn solid" id="vaultOpen" type="button">${esc(W.open_kit)}</button></div></div>`;
+  $('vaultOpen').onclick = async () => {
+    const b = $('vaultOpen');
+    if (!live) { note(b, W.not_running); return; }
+    b.disabled = true; note(b, W.v_opening);
+    try {
+      const r = await fetch('/vault-open', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}).then(r => r.json());
+      if (r.ok && typeof r.url === 'string' && r.url.charAt(0) === '/' && r.url.charAt(1) !== '/') { location.href = r.url; return; }
+      note(b, r.words || W.v_cant);
+    } catch (e) { note(b, W.v_cant); }
+    b.disabled = false;
+  };
+}
 function render(){
   const q = $('find').value.trim().toLowerCase();
   const match = k => !q || String(k.name).toLowerCase().includes(q) || String(k.folder).toLowerCase().includes(q);
@@ -381,6 +416,7 @@ function render(){
 async function load(){
   let g;
   try { g = await homeData(); } catch (e) { if (!got) $('recent').innerHTML = `<p class="empty">${esc(W.m_cant)}</p>`; return; }
+  drawVault(g.vault);
   if (g.problem_kits) { if (!got) { $('recent').innerHTML = `<p class="empty">${esc(W.m_cant)}</p>`; $('olderBox').innerHTML = ''; } return g; }
   got = true;
   KITS = g.kits || []; render();
@@ -442,7 +478,7 @@ def backups_html():
 
 def make_posts_html():
     e = html.escape
-    body = (f"<header class='head'><span class='eyebrow'>{e(W('m_eyebrow'))}</span><h1>{W('m_h1')}</h1>"
+    body = (f"<header class='head'><h1>{W('m_h1')}</h1>"
             f"<p class='lede wide'>{W('m_lede')}</p></header>"
             f"<div class='whatkit'><p class='wk-h'>{e(W('m_what_h'))}</p><p>{e(W('m_what_p'))}</p></div>"
             f"<p class='steps-title'>{e(W('m_steps'))}</p><div class='steps light'>"
@@ -452,6 +488,7 @@ def make_posts_html():
             f"<div class='st'><span class='num'>3</span><div><p>{W('m_s3')}</p><small>{e(W('m_s3_small'))}</small></div></div></div>"
             f"<section class='sec' id='kits'><h2>{e(W('m_h2'))}</h2><p class='say'>{e(W('m_say_list'))}</p>"
             f"<div class='find'><input id='find' type='search' placeholder='{e(W('m_find'), quote=True)}' aria-label='{e(W('m_find'), quote=True)}'></div>"
+            f"<div class='cards' id='vaultRow'></div>"
             f"<div id='recent'><p class='empty'>{e(W('loading'))}</p></div><div id='olderBox'></div>"
             f"<details class='arch' id='archBox' hidden><summary id='archSum'>{e(W('archived_n').format(n=0))}</summary><div class='cards' id='archived'></div></details></section>")
     return _page("Make posts", body, JS_MAKE % {"recent": RECENT_KITS})
@@ -670,7 +707,7 @@ def kits():
 def data():
     """What /home-data answers. Each part fails soft, like the home page."""
     import home
-    out = {"ok": True, "today": today_words(), "card": None, "groups": [], "kits": [], "stamp": ""}
+    out = {"ok": True, "today": today_words(), "card": None, "groups": [], "kits": [], "vault": None, "stamp": ""}
     try:
         out["card"] = home.card_in()
     except Exception:  # noqa: BLE001
@@ -683,6 +720,14 @@ def data():
         out["kits"] = kits()
     except (Exception, SystemExit) as e:  # noqa: BLE001
         out["problem_kits"] = e.__class__.__name__
+    try:                                                    # My vault's card (v29): reads only; nothing is made here
+        import posts
+        import vault_page
+        h = posts.home()
+        if h and (h / posts.CONTENT_NAME).is_dir():         # no content folder yet: no vault card, as no kits
+            out["vault"] = vault_page.card_facts()
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
     try:
         out["stamp"] = home.fingerprint()
     except Exception:  # noqa: BLE001

@@ -69,8 +69,9 @@ HERS_NOT_OURS = {
     "Test copy: a screen of its own for backing up, with every backup underneath.": "test-only",
     "Test copy: a screen of its own for making posts, with your post kits underneath.": "test-only",
     # gone since her v29 (Nov 19): the home page no longer numbers steps, so the Back up a card screen has no
-    # "Step 1" over its heading (the Make posts screen's "Step 3" waits for the stage that reworks that screen)
+    # "Step 1" over its heading, and the post kits screen (her v29 make-posts-preview.html) none either
     "Step 1 of your workflow": "gone with the numbered steps (v29)",
+    "Step 3 of your workflow": "gone with the numbered steps (v29; her make-posts-preview.html has no eyebrow)",
     # no longer true since Nov 19 (Dustin: nothing is asked before the copy); ours is OUR_WORDS["b_s2_small"]
     "Your assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
@@ -422,6 +423,15 @@ def check_words(w):
     case("her Make posts page is read from her newest pack that has it (v27 or later)", newest is not None and int(re.search(r"-v(\d+)-", newest.parents[2].name).group(1)) >= 27, newest)
     if newest:
         raw["make-posts.html"] = newest.read_text(encoding="utf-8")
+    # v29 (Nov 19): her preview of the same screen, with her new title and My vault first; its lines are hers too
+    # (tests/vault_page_check.py compares that page line by line)
+    for r in her_roots():
+        for f in sorted(r.glob("nicole-handoff-v29-*/unpacked/Carousel designer and reel picker/pages/make-posts-preview.html")) + \
+                sorted(r.glob("nicole-handoff-v29-*/Carousel designer and reel picker/pages/make-posts-preview.html")):
+            raw["make-posts-preview.html"] = f.read_text(encoding="utf-8")
+    if "make-posts-preview.html" not in raw:
+        skip("her v29 preview of the post kits screen is not on this computer: its title and the My vault card's lines are not compared here")
+        ours_words = {k: v for k, v in ours_words.items() if k not in ("m_h1", "v_name", "v_small")}
     hers_all = untag("\n".join(raw.values()).replace("\\'", "'"))
     # 1. ours -> hers: every line in WORDS, cut at its gaps, is in her files
     missing = []
@@ -1009,7 +1019,7 @@ def kit_names(c, sel="#recent .shoot b"):
 def check_make_page(c, w):
     c.open(w.url("/make-posts"))
     c.wait_for("document.querySelectorAll('#recent .shoot').length > 0", 15)
-    case("make posts: her heading, her paragraph, her steps box (v27: a post kit from a shoot, three steps)", c.text("h1") == "Make posts from a shoot." and len(texts(c, ".head .lede")) == 1
+    case("make posts: her heading, her paragraph, her steps box (v27: a post kit from a shoot, three steps)", c.text("h1") == "Turn your shoots into posts." and len(texts(c, ".head .lede")) == 1
          and c.text(".steps-title") == "How to make a post kit from a shoot" and c.text("#pick") == "Select the folder with your finished photos" and texts(c, ".steps .num") == ["1", "2", "3"],
          (c.text(".steps-title"), texts(c, ".steps .num")))
     case("make posts: the What's a post kit? box is drawn between the lede and the steps title, as her screenshot 08",

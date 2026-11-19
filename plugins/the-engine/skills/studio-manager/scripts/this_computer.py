@@ -946,7 +946,10 @@ def pick_folder(prompt):
     """The computer's own "choose a folder" window. (path, "") when they chose one, (None, "cancelled") when
     they closed it, (None, why) when the window could not be shown."""
     if no_windows():
-        return None, "cancelled"
+        # inside a test no window is ever shown. STUDIO_PICK_FOLDER_FOR_TESTS (only a test sets it) is the folder
+        # the test "chose"; without it the answer is as if the window was closed.
+        chosen = os.environ.get("STUDIO_PICK_FOLDER_FOR_TESTS")
+        return (chosen, "") if chosen else (None, "cancelled")
     try:
         if MAC:
             script = ('tell application "System Events" to activate\n'
