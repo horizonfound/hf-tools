@@ -71,6 +71,8 @@ HERS_NOT_OURS = {
     # gone since her v29 (Nov 19): the home page no longer numbers steps, so the Back up a card screen has no
     # "Step 1" over its heading (the Make posts screen's "Step 3" waits for the stage that reworks that screen)
     "Step 1 of your workflow": "gone with the numbered steps (v29)",
+    # no longer true since Nov 19 (Dustin: nothing is asked before the copy); ours is OUR_WORDS["b_s2_small"]
+    "Your assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
     # (the two screens keep her line for it)
 }

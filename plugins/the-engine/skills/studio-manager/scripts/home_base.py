@@ -79,7 +79,6 @@ WORDS = {
     "b_card_out": "No card in yet.",
     "b_s2": "<b>Paste this in the chat:</b>",
     "b_say": "backup now",
-    "b_s2_small": "Your assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.",
     "b_h2": "Your backups",
     "b_say_list": "Every card you've backed up, newest first. Open a shoot's folder to start editing, or see its report.",
     "b_find": "Find a shoot by name",
@@ -142,6 +141,10 @@ WORDS = {
 
 # Ours, where hers has none. Each is a draft for Dustin and Nicole.
 OUR_WORDS = {
+    # under step 2 of Back up a card. Hers read "Your assistant asks a quick question or two, then you can walk
+    # away. The report is ready when you're back, and it shows up below.", which stopped being true on Nov 19
+    # (Dustin: nothing is asked before the copy). A draft of ours, for Nicole to reword.
+    "b_s2_small": "Your assistant finds your card and starts copying. There's nothing to answer first, so you can walk away. The report is ready when you're back, and it shows up below.",
     # a sample backup (night.py --sample, for tests) is never called safe to format; the report's own words
     "sample_keep": "Keep the card: this was a sample",
     # a backed-up shoot that holds video clips: a clip is never called a photo (Dustin, Nov 11)

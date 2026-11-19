@@ -29,7 +29,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | When | Read first |
 |---|---|
 | "hi", "morning", "what can you do", /assistant or /studio, or `home.py pending` shows a button they pressed | `parts/hello.md` |
-| "backup now", "the card's in", "back up this folder" | `parts/backup.md`; and if `studio_file.py show` says no drive is set yet, `parts/first-backup-setup.md` before it |
+| "backup now", "the card's in", "back up this folder", "what are my settings?" | `parts/backup.md`; and if `studio_file.py show` says no drive is set yet, `parts/first-backup-setup.md` before it (a backup asks nothing before it copies, the first one included) |
 | the backup stops with exit 7; "Pick again" from the report; "pick different ones", "more of the kids" | `parts/sneak-peeks.md` |
 | a shoot needs its note to the client; "write a note for...", "make it shorter", "here's how I write to clients" | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |

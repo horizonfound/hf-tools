@@ -5,6 +5,8 @@ read) with a plain-words mirror in studio-file.md (what they can read).
 
     python3 studio_file.py show
     python3 studio_file.py drives                         the drives it can see, to pick from
+    python3 studio_file.py defaults [--drive "<path>"] [--computer] [--dry-run]
+                                                          the first backup's setup, chosen by itself (asks nothing)
     python3 studio_file.py set --drive "/Volumes/Big Kahuna" [--second "/path"] \
         [--example "2026-10-18 Smith Family" | --folder-pattern "{shoot}, {date}" --date-format "%b %-d %Y"] \
         [--file-names original|shoot]
@@ -269,6 +271,150 @@ def drive_moved(d, key):
             "where your photos are going.")
 
 
+def set_drive(d, key, path):
+    """Save a drive (or a folder on one) as drives[key]: the one way it is ever written, by `set --drive`,
+    `set --second` and the first backup's own choice alike, so a PC's drive facts are always kept beside it.
+    False, and nothing changed, when the folder is not there. drive_root: on a PC a bare "E:" means the top of
+    drive E (Python alone would read it as wherever it last was on E); on a Mac it is the path as given."""
+    root = this_computer.drive_root(path)
+    if not root.is_dir():
+        return False
+    d[key] = str(root.expanduser().resolve())
+    keep_drive_facts(d, key)   # a PC: which drive that letter is (its name and number); a Mac: nothing
+    return True
+
+
+# ---------------------------------------------------------------- the first backup chooses by itself
+
+# Dustin, Nov 19: nothing is asked before the copy. The one question that may be asked, once ever, is which
+# drive, and only when it cannot be told. These are that question's two shapes, for the assistant to ask.
+SHOOTS_ON_COMPUTER = "Shoots"     # the folder made inside Pictures when they choose the computer itself (a draft)
+
+
+def ask_words(state, found=()):
+    """What the assistant is told when the drive cannot be chosen: the one question, and the command that
+    saves the answer. `state` is "ask-which" (more than one drive) or "ask-none" (no external drive)."""
+    if state == "ask-which":
+        lines = ["ASK which-drive",
+                 "More than one drive is plugged in, so this is the one question, asked once ever:",
+                 '  "Which drive should your photos go on?"  One button per drive, by its name and free space, '
+                 "the recommended one first:"]
+        lines += drive_lines(found)
+        lines += ['Then save it:  studio_file.py defaults --drive "<that drive\'s path>"   and run the backup again. '
+                  "Ask nothing else."]
+        return lines
+    here = this_computer.COMPUTER
+    return ["ASK no-drive",
+            "No external drive is plugged in, so this is the one question, asked once ever:",
+            f'  "I don\'t see an external drive. Where should your photos go?"  [I\'ll plug one in]  [On this {here} for now]',
+            "Plug one in: wait for them to say it is in, then run the backup again.",
+            f"On this {here} for now:  studio_file.py defaults --computer   and run the backup again. "
+            "No speech about external drives now; the report says one quiet line afterwards."]
+
+
+def drive_lines(found):
+    """The drives as `studio_file.py drives` prints them."""
+    out = []
+    for d in found:
+        tag = "   (recommended: already has shoots on it)" if d["recommended"] and d["has_shoots"] else ("   (recommended)" if d["recommended"] else "")
+        out.append(f"{d['path']}   {d['name']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free{tag}")
+        for f in d["shoot_folders"]:
+            out.append(f"    shoot folder: {f['name']}   {f['shoots']} folders in there")
+    return out
+
+
+def _same(a, b):
+    try:
+        return Path(a).expanduser().resolve() == Path(b).expanduser().resolve()
+    except OSError:
+        return False
+
+
+def _inside(inner, outer):
+    """True when `inner` is `outer` or sits somewhere inside it."""
+    try:
+        i, o = Path(inner).expanduser().resolve(), Path(outer).expanduser().resolve()
+    except OSError:
+        return False
+    return i == o or o in i.parents
+
+
+def _where_words(place, found):
+    """(the drive's name, where on it in words) for a place: ("Big Kahuna", "in Photo Shoots") or
+    ("Big Kahuna", "right on the drive")."""
+    for d in found:
+        if _same(place, d["path"]):
+            return d["name"], "right on the drive"
+    for d in found:
+        if _inside(place, d["path"]):
+            return d["name"], f"in {Path(place).name}"
+    drive = this_computer.drive_words(place)
+    if drive:
+        return drive, ("right on the drive" if len(Path(place).parts) <= 3 else f"in {Path(place).name}")
+    return f"this {this_computer.COMPUTER}", f"in {Path(place).name}"
+
+
+def choose_defaults(drive=None, computer=False, write=True, source=None):
+    """The first backup's setup, done by the Assistant itself (Dustin, Nov 19: zero questions before the copy).
+    Returns a dict: state "set" (a drive is already on file: nothing is changed, ever), "chose" (chosen and
+    written), "would" (chosen, write=False: nothing written, nothing made), "ask-which" (more than one drive
+    and none named: `drives` holds them), "ask-none" (no external drive), or "stop" (`why`: a named folder that
+    is not there). With a choice: place (the folder shoots go in), drive (its name), where (in words).
+
+    drive: the answer to the one question, a drive's path (its top shoot folder is used when it has one) or a
+    folder inside a drive (taken as given). computer: they chose the computer itself; <Pictures>/Shoots, made
+    if missing. source: the card or folder about to be backed up; a drive that holds it is never the choice.
+    Run twice it writes once. It never touches drives.second, and leaves a naming that is on file alone."""
+    sf = load()
+    d = sf.get("drives") or {}
+    if d.get("session"):
+        name, where = _where_words(d["session"], drives())
+        return {"state": "set", "place": d["session"], "drive": name, "where": where}
+    found = drives()
+    if source:
+        found = [x for x in found if not _inside(source, x["path"])]
+        if found and not any(x["recommended"] for x in found):
+            found[0]["recommended"] = True
+    note = None
+    if computer:
+        place = this_computer.known_folder("Pictures") / SHOOTS_ON_COMPUTER
+        name, where = f"this {this_computer.COMPUTER}", f"in {SHOOTS_ON_COMPUTER}, inside Pictures"
+        note = (f"Shoots are kept on this {this_computer.COMPUTER}'s own disk, in {SHOOTS_ON_COMPUTER} inside Pictures; "
+                "said OK on the first backup.")
+    elif drive:
+        root = this_computer.drive_root(drive)
+        if not root.is_dir():
+            return {"state": "stop", "why": f"{drive} is not a folder I can see."}
+        place = root
+        top = next((x for x in drives() if _same(root, x["path"])), None)
+        if top and top["shoot_folders"]:
+            place = Path(top["shoot_folders"][0]["path"])
+        name, where = _where_words(place, drives())
+    elif len(found) == 1:
+        place = Path(found[0]["shoot_folders"][0]["path"] if found[0]["shoot_folders"] else found[0]["path"])
+        name, where = _where_words(place, found)
+    else:
+        return {"state": "ask-which" if found else "ask-none", "drives": found}
+    got = {"state": "chose" if write else "would", "place": str(place), "drive": name, "where": where}
+    if not write:
+        return got
+    if computer:
+        place.mkdir(parents=True, exist_ok=True)
+    d = sf.setdefault("drives", {})
+    if not set_drive(d, "session", place):
+        return {"state": "stop", "why": f"{place} is not a folder I can see."}
+    got["place"] = d["session"]
+    n = sf.setdefault("naming", {})
+    if not n.get("folder_pattern"):          # only when no naming is on file
+        n.update(OFFERED[0])
+        n.pop("example", None)
+        n.setdefault("file_names", "shoot")
+    sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note": note or
+                                       f"Photos go onto {name}, {where}: chosen by itself on the first backup."})
+    save(sf)
+    return got
+
+
 def learn_pattern(example):
     """From a folder name they pasted: where the date is, how it is written, what sits between."""
     ex = example.strip()
@@ -391,6 +537,11 @@ def main():
     s.add_argument("--file-names", choices=["original", "shoot"])
     s.add_argument("--note", help="a line to remember about their setup (e.g. shoots kept on the computer's own disk, said OK)")
     s.add_argument("--name", help='what they call their helper ("Sherman"); every page and message uses it. "" to go back to the product\'s name')
+    df = sub.add_parser("defaults", help="the first backup's setup, chosen by itself: the drive, where on it, the naming. Asks nothing")  # pc-ok: our own command's name, not the Mac's `defaults` tool
+    df.add_argument("--drive", help="the answer to the one question: the drive (or a folder on one) their photos go on")
+    df.add_argument("--computer", action="store_true", help="they chose the computer itself: a Shoots folder inside Pictures")
+    df.add_argument("--source", help="the card or folder about to be backed up; a drive that holds it is never chosen")
+    df.add_argument("--dry-run", action="store_true", help="say what would be chosen; write nothing")
     p = sub.add_parser("pattern")
     p.add_argument("example")
     r = sub.add_parser("render")
@@ -405,13 +556,28 @@ def main():
     if a.cmd == "glance":
         lines, one = glance()
         if not lines:
-            print("No setup yet. The first 'backup now' asks the setup questions instead.")
+            print("No setup yet. The first 'backup now' sets it up by itself.")
             return
         print("THE USUAL (say these to them, one short line each, exactly as written):")
         for ln in lines:
             print(ln)
         print("ONE LINE (put this in the question itself):")
         print(one)
+        return
+    if a.cmd == "defaults":
+        got = choose_defaults(drive=a.drive, computer=a.computer, write=not a.dry_run, source=a.source)
+        if got["state"] == "set":
+            print(f"SET: {got['place']} | {got['drive']}")
+            print("A drive is already on file. Nothing changed.")
+        elif got["state"] in ("chose", "would"):
+            print(f"{'CHOSE' if got['state'] == 'chose' else 'WOULD CHOOSE'}: {got['place']} | {got['drive']} | {got['where']}")
+            if got["state"] == "would":
+                print("Nothing written (dry run).")
+        elif got["state"] == "stop":
+            sys.exit(f"STOP: {got['why']}")
+        else:
+            print("\n".join(ask_words(got["state"], got.get("drives", ()))))
+            sys.exit(3 if got["state"] == "ask-which" else 4)
         return
     if a.cmd == "cards":
         found = this_computer.cards()
@@ -424,11 +590,8 @@ def main():
         found = drives()
         if not found:
             print(f"No drives plugged in besides the {this_computer.COMPUTER} itself.")
-        for d in found:
-            tag = "   (recommended: already has shoots on it)" if d["recommended"] and d["has_shoots"] else ("   (recommended)" if d["recommended"] else "")
-            print(f"{d['path']}   {d['name']}   {d['total_gb']:,} GB, {d['free_gb']:,} GB free{tag}")
-            for f in d["shoot_folders"]:
-                print(f"    shoot folder: {f['name']}   {f['shoots']} folders in there")
+        for ln in drive_lines(found):
+            print(ln)
         return
     if a.cmd == "internal":
         print("yes" if on_internal_disk(a.path) else "no")
@@ -453,16 +616,10 @@ def main():
         sf["name"] = " ".join(a.name.split())[:40]
     # drive_root: on a PC a bare "E:" means the top of drive E (Python alone would read it as wherever it last
     # was on E). On a Mac it is the path as given, exactly as before.
-    if a.drive:
-        if not this_computer.drive_root(a.drive).is_dir():
-            sys.exit(f"STOP: {a.drive} is not a folder I can see.")
-        d["session"] = str(this_computer.drive_root(a.drive).expanduser().resolve())
-        keep_drive_facts(d, "session")   # a PC: which drive that letter is (its name and number); a Mac: nothing
-    if a.second:
-        if not this_computer.drive_root(a.second).is_dir():
-            sys.exit(f"STOP: {a.second} is not a folder I can see.")
-        d["second"] = str(this_computer.drive_root(a.second).expanduser().resolve())
-        keep_drive_facts(d, "second")
+    if a.drive and not set_drive(d, "session", a.drive):
+        sys.exit(f"STOP: {a.drive} is not a folder I can see.")
+    if a.second and not set_drive(d, "second", a.second):
+        sys.exit(f"STOP: {a.second} is not a folder I can see.")
     if a.no_second:
         d["second"] = None
         keep_drive_facts(d, "second")

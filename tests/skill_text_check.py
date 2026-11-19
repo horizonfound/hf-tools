@@ -1505,10 +1505,72 @@ def check_posted_and_path_v27():
          all(x in where for x in ("`posted_at`", "`feed.json`", "`read_at`", "last 30 days", "(`unposted`)")) and re.search(r"^POSTED_DAYS = 30\b", pq, re.M))
 
 
+def check_backup_zero():
+    """A backup asks nothing before it copies (Dustin, Nov 19): the instructions as rewritten for it."""
+    print("\nNo questions before the copy (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    b, f, a, h, pc, c = (flat(n) for n in ("backup.md", "first-backup-setup.md", "after-the-report.md", "hello.md",
+                                            "on-a-pc.md", "client-note.md"))
+    gone = [w for w in ("Same as usual?", "How many memory cards for this shoot?", "What's on the card?",
+                        "Looks good (recommended)", "Change something", "one screen, every time") if w in b]
+    case("backup.md: the screen of questions before the copy is gone (Same as usual?, the cards question, What's on the card?, Change something)",
+         not gone, gone)
+    case("backup.md: the new starting line, and the walk-away line last and in bold",
+         "Found your card: 3,931 photos, 127 GB. Copying to Big Kahuna now. Nothing on your card will be changed." in b
+         and "**You can walk away. I'll have the report ready when you're back.**" in b)
+    case("backup.md: the one extra sentence on a first backup, word for word",
+         "This is our first backup together, so I'm doing it the usual way. You can change any of it on the report afterwards." in b
+         and "This is our first backup together, so I'm doing it the usual way. You can change any of it on the report afterwards." in f)
+    case("backup.md: the quiet check comes before the starting message and speaks only on a STOP; every STOP's words are still there",
+         b.index("night.py --source \"<the card's path>\" --check") < b.index("Copying to Big Kahuna now.")
+         and "It speaks only on a STOP" in b
+         and all(w in b for w in ("Your memory card has stopped answering", "already holds a backup made from a different memory card",
+                                  "would go onto the memory card itself", "onto the same drive the photos are coming from",
+                                  "Windows gave your drives different letters today", "the card is already safe")))
+    case("backup.md: the drive is chosen by `studio_file.py defaults`, and exit 5 is the one question",
+         "studio_file.py defaults --source" in b and "ONE QUESTION before the first backup" in b and "NEEDS SETUP" not in b)
+    case("backup.md: every card is its own backup now; the closing box has Show the report and Eject my card; --with only when they say the card continues the last one",
+         "every card is its own \"backup now\"" in b and "Never ask how many cards there are" in b
+         and "**Show the report** first and **Eject my card** second" in b and "--with" in b and "never guess that two cards belong together" in b)
+    case("backup.md: what they say unasked about the card is still used for the name and kept word for word",
+         "without being asked" in b and "client_note.py told --night" in b and "Never ask what is on the card" in b)
+    case("backup.md: the phone page only when they ask, and the pointer the PC part follows is really there",
+         "Phone taps: only when they ask" in b and "**Somewhere else this time.**" in b and "\"Somewhere else this time\"" in pc)
+    case("backup.md: the glance is only the answer to \"what are my settings?\"",
+         "studio_file.py glance" in b and "never shown before a backup" in b)
+    numbered = re.findall(r"\*\*Question \d", f)
+    case("first-backup-setup.md: no numbered questions and no conversation before the copy", not numbered and "asks nothing before it copies" in f
+         and "I need to ask you a few quick questions" not in f, numbered)
+    case("first-backup-setup.md: the defaults command and its three answers, and the one question in its two shapes",
+         all(w in f for w in ("studio_file.py defaults --source", "`CHOSE:", "`ASK which-drive`", "`ASK no-drive`",
+                              "\"Which drive should your photos go on?\"", "\"I don't see an external drive. Where should your photos go?\"",
+                              "\"I'll plug one in\"", "\"On this Mac for now\"", "\"On this PC for now\"",
+                              "studio_file.py defaults --drive", "studio_file.py defaults --computer")))
+    case("first-backup-setup.md: the computer's own disk is their call, with no speech",
+         "with no speech" in f and "Never refuse, never lecture" in f and "Quick note before we go on" not in f)
+    case("first-backup-setup.md: the table of where each old question lives now, and the client-voice question kept word for word for later",
+         "| Was asked before the copy | Where it lives now |" in f and "Asked later, only when it is needed" in f
+         and "How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone." in f
+         and "Never a \"Paste me a note\" choice" in f and "posting_queue.py interval" in f)
+    case("after-the-report.md: nothing is asked by itself when they come back",
+         "Ask nothing by yourself" in a and "Two one-time questions" not in a and "Ask them before anything else" not in a
+         and "Never ask whether there are any" in a and "Never offer it by yourself" in a)
+    case("client-note.md: a note is written only when they said who it is for, or ask; the voice question is asked then",
+         "Nothing about a note is asked before a backup" in c and "Asked later, only when it is needed" in c and "Question 5" not in c)
+    case("hello.md: a first backup is described with no questions first",
+         "I'll ask a few quick questions first" not in h and "There's nothing to answer first" in h)
+    case("on-a-pc.md: the drive-letter stops stay, and nothing points at the old check-in screen",
+         "Drive letters move, so check them before every backup" in pc and "one-screen check-in" not in pc and "never guess which letter is which" in pc)
+    import home_base
+    case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
+         "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]
+         and "quick question" not in " ".join(home_base.WORDS.values()))
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

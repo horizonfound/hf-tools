@@ -53,8 +53,9 @@ def main():
         text = (SCRIPTS.parent / "parts" / "backup.md").read_text(encoding="utf-8")
         # Since Nov 11, late: the Assistant cannot flip the switch itself in auto mode, so the instructions go straight
         # to the page and never try the call (this check still asked for the call, and had failed since then)
-        check("the backup instructions go straight to the picture page, never try to flip the switch themselves, and never for one card",
-              all(x in text for x in ("phone_setup.py url", "Never for one card", "so never try")) and "set_remote_control" not in text)
+        # Since Nov 19 (Dustin: nothing before the copy) the page is shown only when they ask, never before a backup.
+        check("the backup instructions show the picture page only when they ask, and never try to flip the switch themselves",
+              all(x in text for x in ("phone_setup.py url", "Phone taps: only when they ask", "so never try")) and "set_remote_control" not in text)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"\n{'ALL OK' if not FAILED else str(len(FAILED)) + ' FAILED'}")

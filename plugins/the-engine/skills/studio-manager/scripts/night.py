@@ -344,9 +344,24 @@ def main():
     if a.source and a.second is None and drives.get("second"):
         a.second = drives["second"]
     if a.source and not a.dest:
-        say("5. NEEDS SETUP. No Studio File yet: ask which drive their sessions go on (studio_file.py drives lists them), "
-            "whether they keep a second copy, and how they name shoot folders, then save it with studio_file.py set.")
-        sys.exit(5)
+        # No drive on file: the first backup. Nothing is asked before the copy (Dustin, Nov 19): the drive, where
+        # on it and the naming are chosen here and written to the Studio File, so every later backup is the same.
+        # With --check nothing is written. Only when the drive cannot be told (more than one, or none) does this
+        # still stop, with the one question to ask.
+        got = studio_file.choose_defaults(write=not a.check, source=a.source)
+        if got["state"] in ("chose", "would"):
+            a.dest = got["place"]
+            say(f"First backup: your photos {'would ' if a.check else ''}go to {got['drive']}, {got['where']}.")
+            drives = studio_file.load().get("drives", {})
+        elif got["state"] in ("ask-which", "ask-none"):
+            say("5. ONE QUESTION before the first backup: which drive. Nothing is copied and nothing is saved yet.")
+            for ln in studio_file.ask_words(got["state"], got.get("drives", ())):
+                say("  " + ln)
+            sys.exit(5)
+        else:
+            say("STOP, before anything is copied:")
+            say(f"  - {got.get('why') or 'I could not work out where your photos go.'}")
+            sys.exit(2)
     if a.source and not a.name:
         a.name = datetime.now().strftime("%A").lower() + " card"  # "saturday card"
     if this_computer.WINDOWS:

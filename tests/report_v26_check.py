@@ -247,10 +247,13 @@ def check_words():
     case("sneak-peeks.md: her line, and never 'marked in Lightroom' to someone who shoots JPEG",
          HERS["peeks"] in s and "never tell someone who shoots JPEG" in s)
     f = part("first-backup-setup.md")
-    case("first-backup-setup.md: the opening says what is about to happen, in the rules and in the example",
-         f.count("Here's what's about to happen.") == 2 and "each one goes in its own folder" in f)
-    case("first-backup-setup.md: the folder-naming question and its choices are as they were (waiting on the owners)",
-         '**Question 4, how they name a shoot folder.** "How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way".' in f)
+    # Since Nov 19 (Dustin: nothing is asked before the copy) the first backup has no opening speech and no
+    # folder-naming question: these two cases held the old run of questions, and now hold that it is gone. Why there
+    # are several folders is said on the report itself (WORDS["why_days"], checked above) and in backup.md's closing.
+    case("first-backup-setup.md: no questions before the copy; the starting message says the usual way can be changed on the report",
+         "**Question " not in f and "You can change any of it on the report afterwards." in f)
+    case("first-backup-setup.md: folder naming is not asked; year first is the usual way and the other ways are changed on ask",
+         '"2026-10-18 Smith Family"' in f and "studio_file.py set --offered 2" in f and "studio_file.py set --example" in f)
     reel = (ROOT / "plugins/the-engine/skills/assistant-make-a-reel/SKILL.md").read_text(encoding="utf-8")
     case("the reel skill: with only a backup, it says the new next step", "Open your folder to start editing. When your edits are done" in reel)
 

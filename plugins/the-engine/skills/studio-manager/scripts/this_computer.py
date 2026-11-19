@@ -584,11 +584,38 @@ def _windows_volumes():
     return out
 
 
+def _pretend_volumes():
+    """The tests' switch for the drives: STUDIO_DRIVES_FOR_TESTS names a JSON file holding a list of pretend
+    volumes in the shape volumes() returns. With it set, volumes() gives that list and nothing else, so a test
+    never looks at the drives really plugged in. Only a test sets it. A file that cannot be read is no drives at
+    all (never the real ones). None when the switch is not set."""
+    where = os.environ.get("STUDIO_DRIVES_FOR_TESTS")
+    if not where:
+        return None
+    import json
+    try:
+        rows = json.loads(Path(where).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for r in rows if isinstance(rows, list) else []:
+        if not isinstance(r, dict) or not r.get("path"):
+            continue
+        name = str(r.get("name") or Path(str(r["path"])).name)
+        out.append({"path": str(r["path"]), "name": name, "shown": str(r.get("shown") or name),
+                    "total": int(r.get("total") or 0), "free": int(r.get("free") or 0),
+                    "system": bool(r.get("system")), "removable": r.get("removable"), "id": r.get("id")})
+    return out
+
+
 def volumes():
     """Every drive plugged in right now. Each: path (where its files start), name (what they called it),
     shown (how to say it to them: "Big Kahuna" on a Mac, "Big Kahuna (E:)" on a PC), total and free
     bytes, system (the computer's own disk), removable (True, False, or None when the Mac cannot say),
     id (the volume's own number on a PC, which changes when a card is formatted)."""
+    pretend = _pretend_volumes()
+    if pretend is not None:
+        return pretend
     if WINDOWS:
         return _windows_volumes()
     if MAC:
@@ -649,6 +676,9 @@ _WINDOWS_FOLDERS = {"Pictures": "My Pictures", "Desktop": "Desktop", "Music": "M
 def known_folder(name):
     """Where Pictures, Desktop, Downloads, Music or Documents really is. On a PC, Windows often moves
     these into OneDrive, so they are asked for rather than assumed to sit in the home folder."""
+    pretend = os.environ.get("STUDIO_FOLDERS_FOR_TESTS")   # only a test sets it: Pictures and the rest live in there
+    if pretend:
+        return Path(pretend) / name
     if WINDOWS:
         try:
             import winreg
