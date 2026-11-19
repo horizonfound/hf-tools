@@ -2128,7 +2128,7 @@ class Handler(SimpleHTTPRequestHandler):
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-                    "/reel-strip", "/reel-moment-still", "/reel-song"):
+                    "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-clips", "/reel-vault-still"):
             # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
             import reel_page
             return reel_page.handle_get(self, path, urlsplit(self.path).query)

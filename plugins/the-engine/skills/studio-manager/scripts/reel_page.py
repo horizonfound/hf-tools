@@ -305,7 +305,7 @@ FACES = [
 FACE_FILES = tuple(f[3] for f in FACES)       # the only names /reel-font answers to
 
 GET_PATHS = ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-             "/reel-strip", "/reel-moment-still", "/reel-song")
+             "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-clips", "/reel-vault-still")
 POST_PATHS = ("/reel-save", "/reel-open", "/reel-make", "/reel-capcut", "/reel-moment", "/reel-version", "/reel-song-remove",
               "/reel-preview", "/reel-video")
 
@@ -610,6 +610,64 @@ KIND_WORDS = {
     "lede_broll": "Only video clips from your shoot, cut on the beat of your song, with no photos. Choose your footage and the clips you want, pick your song, then watch it and make it in CapCut. You can make several: each one keeps its own name under Your reels.",
     "all_reels": "← All the reels you can make for this shoot",
     "crumb_reels": "Reels",             # her crumbs.js: the step after the post kit on the path at the top
+}
+
+# The vault's reel page (her v29, 1.5; pages/vault-reel-preview.html, screenshots 05, 06 and 08). The Reels card in
+# the vault's post kit opens this same page for the vault; these are HER words for it, word for word, laid over
+# WORDS and KIND_WORDS only when the kit is the vault (a plain post kit's page never reads them).
+# tests/vault_reel_check.py compares them with her page both ways. Her title is "Make my <em>reel.</em>"; ours is
+# the title with the page's own coral full stop after it, as on every reel page.
+VAULT_KIND_WORDS = {
+    "eyebrow": "My vault · Reel",
+    "title_vault": "Make my reel",
+    "lede_vault": "From your vault: any clips and photos, from any of your shoots.",
+    "chooser_say": "The same four reels as every post kit. In your vault, each one can use clips and photos from any of your shoots.",
+    "kind_bts_s": "Video clips from your vault, mixed with your finished photos.",
+    "kind_photos_s": "Your finished photos from any shoot, cut on the beat.",
+    "kind_talk_s": "You talk about your work, and photos from your vault go with what you say.",
+    "kind_broll_s": "Only video clips from your vault, cut on the beat. No photos.",
+}
+# Your clips, in the vault (her #stepClips): the search, the ask box and its line to copy, Added to my vault on
+# top, each shoot folded shut, the tiles, and the heading over the reel's own clips. Hers, word for word.
+VAULT_CLIP_WORDS = {
+    "foot_h2": "Your clips",
+    "vc_search_b": "Search your clips",
+    "vc_search_s": "Type what you're looking for. Results show up right away.",
+    "vc_search_ph": "me with my camera, laughing, kitchen, beach",
+    "vc_ask_b": "Or tell your assistant what to look for",
+    "vc_ask_s": "For example: “Find me editing on the computer.” or “Every clip of me shooting at the beach.”",
+    "vc_ask_ph": "Optional: what you'd like your assistant to find",
+    "vc_line": "Find my clips in my vault",
+    "vc_every": "Every shoot",
+    "vc_added": "Added to my vault",
+    "vc_added_say": "Clips you add to your vault show up here, open and ready.",
+    "vc_add_clips": "+ Add clips",
+    "vc_n_clips": "{n} clips",
+    "vc_from": "From its post kit · {n} clips",
+    "vc_found": "{n} found",
+    "vc_add": "+ Add",
+    "vc_added_tile": "✓ Added",
+    "clips_wl": "Your clips for this reel",
+    "vc_n_added": "{n} added",
+    "clips_empty": "Add clips from your search above.",
+    "vc_nothing": "Nothing matches that yet. Try other words, or tell your assistant what to look for.",
+}
+VAULT_ASK_MAX = 600                 # the ask box's length (as the footage ask and the photo note)
+# Ours, in the vault only, each a draft for Dustin and Nicole (her mock-up has no editor under the search, no
+# refusals, and says "1 clips").
+VAULT_OUR_WORDS = {
+    # the one line that joins her search to our footage editor below it (in place of "Press Add my footage and a
+    # Footage folder for this shoot opens...", which speaks of one shoot)
+    "foot_say2_html": "Videos you add show up in Your footage below. Make clips from them there, or ask your assistant to look through them.",
+    "vc_from_one": "From its post kit · 1 clip",
+    "vc_one_clip": "1 clip",
+    "vc_loading": "Finding your clips…",
+    "vc_cant_load": "I couldn't read your clips just now. Reload the page.",
+    "vc_full": "This reel has all the clips it can use. Take one out of your clips for this reel first.",
+    # what the Assistant answers when an add is refused
+    "vault_only": "That only works in your vault.",
+    "vault_not_in": "That shoot isn't in your vault.",
+    "vc_video_gone": "That clip's video isn't where it was, so it can't be added. Tell your assistant and it'll sort it out.",
 }
 
 # Several reels from one shoot (her v25, Nov 12): the "Your reels" bar under the title. Hers, word for word
@@ -2189,17 +2247,60 @@ def _just_changed(p):
         return False
 
 
-def list_videos(kit, coming=None, folder=FOOTAGE):
-    """The videos in <kit>/Footage, in name order (hers): [{key, name, path, size, facts}]. Hidden files, links
+def is_vault_kit(kit):
+    """Is this post kit the vault (v29)? By the mark in its record, never its name."""
+    try:
+        return kit_mod.is_vault(kit_mod.load_rec(kit))
+    except (OSError, ValueError):
+        return False
+
+
+def vault_members(kit):
+    """The vault's shoots as [(folder name, folder)], by folder name: every other post kit (vault.members)."""
+    import vault
+    try:
+        return sorted((m["folder"], Path(m["path"])) for m in vault.members(kit))
+    except (Exception, SystemExit):  # noqa: BLE001  (Your Content can't be read right now: the vault's own videos only)
+        return []
+
+
+def member_key(member, p):
+    """The key of one of a SHOOT's videos as the VAULT lists it: video.key's recipe with the shoot's folder in
+    front of the name, so two shoots' IMG_1234.MOV of the same size and time (a copy of one file, say) are two
+    keys, and neither is the key of a video of the vault's own."""
+    st = Path(p).stat()
+    return hashlib.sha1(f"{member}/{Path(p).name}|{st.st_size}|{int(st.st_mtime)}".encode("utf-8")).hexdigest()[:12]
+
+
+def list_videos(kit, coming=None, folder=FOOTAGE, members=True):
+    """The videos of a kit's Footage folder (_videos_in). For the VAULT (v29, stage 9) its own Footage videos come
+    first, then every shoot's, each shoot's named "<shoot's folder>/<file name>" (a slash is never in a file
+    name, so two shoots' IMG_1234.MOV stay apart, and a moment names its video "Footage/<shoot's folder>/<file>"
+    with video_by_name unchanged), with "member": the shoot's folder name, and a key of its own (member_key).
+    The shoot's video is only ever READ where it is; its facts, stills and small copy are the vault's, under the
+    vault's own .kit/footage, made on first ask: nothing is written into the shoot's post kit. `members` False
+    (the footage look, the talking page's picker): the vault's own videos only. A plain post kit: exactly as
+    before."""
+    out = _videos_in(kit, kit, coming, folder, "")
+    if members and folder == FOOTAGE and is_vault_kit(kit):
+        for name, home in vault_members(kit):
+            out += _videos_in(kit, home, coming, FOOTAGE, name)
+    return out
+
+
+def _videos_in(kit, home, coming, folder, member):
+    """The videos in <home>/<folder>, in name order (hers): [{key, name, path, size, facts}]. Hidden files, links
     and anything not a .mov, .mp4 or .m4v are left out. The path never leaves this computer's own side.
     A video still being copied in (its boxes run past the end of the file, and it changed in the last
     COMING_RECENT seconds) is left out too, its facts never read and nothing made for it: it goes in `coming`
     (a list, when given) as {name, size}, and comes in whole on a later look (v19 review, Nov 7: a copy in
     progress left a record for every size it passed through).
     `folder` is another folder of the kit's own to list the same way (v24: "Talking"), with the same "is it the
-    kit's own folder" check and a facts file of its own; Footage, the default, is exactly as before."""
-    d = kit / folder
-    if not _own_folder(kit, folder) or not d.is_dir():
+    kit's own folder" check and a facts file of its own; Footage, the default, is exactly as before.
+    `home` is `kit` itself, or (the vault) one of its shoots' folders, `member` that shoot's folder name: the
+    listing is the shoot's, the facts are kept by `kit`."""
+    d = home / folder
+    if not _own_folder(home, folder) or not d.is_dir():
         return []
     out = []
     vm = _video()
@@ -2213,17 +2314,20 @@ def list_videos(kit, coming=None, folder=FOOTAGE):
             size = p.stat().st_size
             if vm.still_coming(p) and _just_changed(p):
                 if coming is not None:
-                    coming.append({"name": f, "size": size})
+                    coming.append({"name": (member + "/" + f) if member else f, "size": size})
                 continue
-            key = vm.key(p)
+            key = member_key(member, p) if member else vm.key(p)
         except OSError:
             continue
         fx = _facts(kit, p, key, folder)
         if fx.get("refused") and _just_changed(p):
             if coming is not None:            # its header isn't in yet (a phone writes it last): still coming in
-                coming.append({"name": f, "size": size})
+                coming.append({"name": (member + "/" + f) if member else f, "size": size})
             continue
-        out.append({"key": key, "name": f, "path": p, "size": size, "facts": fx})
+        if member:
+            out.append({"key": key, "name": member + "/" + f, "path": p, "size": size, "facts": fx, "member": member})
+        else:
+            out.append({"key": key, "name": f, "path": p, "size": size, "facts": fx})
     return out
 
 
@@ -2382,6 +2486,43 @@ def preview_state(kit, v):
     return "waiting", None
 
 
+_PREV_WANT = set()           # (vault, key): a shoot's video the page opened in the editor (GET /reel-footage?want=)
+
+
+def vault_wanted(kit):
+    """The names of the videos the vault's reels use (any reel's clips), folded for comparing: a shoot's video is
+    got ready (its stills, its small copy: the vault's own) only once a clip of it is in a vault reel, or the
+    page opened it in the editor. A vault of many shoots never makes stills of every video on a page load."""
+    out = set()
+    try:
+        rec = load(kit)
+        for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):
+            if isinstance(d, dict):
+                for m in moments_of(d):
+                    out.add(arrange._nfc(re.sub(r"^Footage/", "", m["video"])).casefold())
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
+    return out
+
+
+def _asleep(kit, v, wanted):
+    """A shoot's video in the vault that nothing has asked for yet: nothing is made for it."""
+    if not v.get("member") or (str(kit), v["key"]) in _PREV_WANT or arrange._nfc(v["name"]).casefold() in wanted:
+        return False
+    with _PREV_LOCK:
+        if (str(kit), v["key"]) in _PREV_TRIED:
+            return False
+    return not _prev_dir(kit, v["key"]).is_dir()
+
+
+def want_video(kit, key):
+    """The page opened one of the vault's shoots' videos in the editor: get it ready (its preview is the vault's)."""
+    v = video_by_key(kit, key)
+    if v is not None and v.get("member"):
+        _PREV_WANT.add((str(kit), v["key"]))
+        preview_state(kit, v)
+
+
 def strip_for_page(kit, key):
     rec = _prev_rec(kit, key)
     return [{"n": s["n"], "t": s["t"]} for s in rec.get("stills") or [] if isinstance(s, dict) and "n" in s and "t" in s]
@@ -2397,13 +2538,18 @@ def videos_for_page(kit, vids=None, coming=None):
     for c in coming or []:
         out.append({"key": "", "name": c["name"], "length": 0, "w": 0, "h": 0, "mb": int(round(c["size"] / 1e6)),
                     "preview": "coming", "words": OUR_WORDS["coming"].replace("{name}", c["name"]), "strip": []})
+    wanted = None
     for v in vids:
         f = v["facts"]
-        st, words = preview_state(kit, v)
+        if v.get("member"):                # the vault: a shoot's video is got ready only once it is wanted
+            wanted = vault_wanted(kit) if wanted is None else wanted
+            st, words = ("ask", None) if _asleep(kit, v, wanted) else preview_state(kit, v)
+        else:
+            st, words = preview_state(kit, v)
         out.append({"key": v["key"], "name": v["name"], "length": round(float(f.get("length") or 0), 1),
                     "w": int(f.get("w") or 0), "h": int(f.get("h") or 0), "mb": int(round(v["size"] / 1e6)),
                     "preview": st, "words": words, "strip": strip_for_page(kit, v["key"]) if st == "ready" else []})
-    out.sort(key=lambda x: x["name"])
+    out.sort(key=lambda x: ("/" in x["name"], x["name"]))      # the vault: its own videos first, then each shoot's
     return out
 
 
@@ -2439,7 +2585,18 @@ def moments_for_page(kit, rec, on_sheet, vids=None):
                     "start": round(float(m["start"]), 2), "end": round(float(m["end"]), 2),
                     "label": str(m.get("label") or "")[:200], "photo": photo, "keep": m.get("keep") is not False,
                     "by": "you" if m.get("by") == "you" else "", "set": bool(m.get("set")), "named": m.get("named") is True})
+        src = _from_of(m)
+        if src:                            # the vault: a clip added from a shoot (so its tile says "✓ Added")
+            out[-1]["from"] = src
     return out
+
+
+def _from_of(m):
+    """{kit, id} of the shoot's clip a vault moment was added from, or None. kit "" is the vault itself."""
+    f = m.get("from")
+    if isinstance(f, dict) and isinstance(f.get("kit"), str) and isinstance(f.get("id"), str) and MOMENT_ID.fullmatch(f["id"]):
+        return {"kit": f["kit"], "id": f["id"]}
+    return None
 
 
 PICK_AT = WORDS["your_pick_at"].split("{t}")[0]        # "Your pick at ": her label for a clip of theirs not named yet
@@ -2519,6 +2676,12 @@ def change_moments(body):
     if kit is None:
         return _bad(CANT_FIND, 404)
     do = body.get("do")
+    if do == "add-from":                      # the vault (v29): a clip of one of its shoots, into the open reel
+        if set(body) - {"kit", "do", "reel", "from_kit", "from_id"}:
+            return _bad()
+        if "reel" in body and not (isinstance(body["reel"], str) and reels.ID.fullmatch(body["reel"])):
+            return _bad()
+        return add_from(kit, [(body.get("from_kit"), body.get("from_id"))], page_reel=body.get("reel"), page=True)
     allowed = {"add": {"video", "start", "seconds"}, "update": {"id", "start", "end"}, "remove": {"id"},
                "restore": {"id", "at"}}.get(do)
     if allowed is None or set(body) - {"kit", "do", "reel"} - allowed:
@@ -2616,6 +2779,176 @@ def change_moments(body):
     return 200, {"ok": True, "moments": out}
 
 
+# ---- the vault (v29, stage 9): a clip of one of its shoots, added to a vault reel ----
+
+class NotThere(Exception):
+    """A shoot or a clip the vault can't find: str() is the plain words."""
+
+
+def vault_member(kit, name):
+    """The folder of one of the vault's shoots by its exact folder name, or None."""
+    if not isinstance(name, str) or not name:
+        return None
+    return next((home for folder, home in vault_members(kit) if folder == name), None)
+
+
+def source_clip(kit, from_kit, from_id):
+    """(the clip as its own post kit keeps it, its video's name as the vault lists it). from_kit is a shoot's
+    folder name, or "" for a clip of another reel of the vault itself. The Assistant reads the shoot's own reel
+    record here, itself (only read: no lock file, nothing written there); never anything a page sent but the two
+    names. Raises Refused for a name of the wrong shape, NotThere (plain words) for a shoot that is not in the
+    vault or a clip that is not there."""
+    if not isinstance(from_kit, str) or not isinstance(from_id, str) or not MOMENT_ID.fullmatch(from_id):
+        raise Refused("from")
+    if from_kit == "":
+        home, front = kit, ""
+    else:
+        home = vault_member(kit, from_kit)
+        if home is None:
+            raise NotThere(VAULT_OUR_WORDS["vault_not_in"])
+        front = from_kit + "/"
+    rec = load(home)
+    for _vid, d in reels.each(rec, REEL_LIVE, REEL_FIRST):
+        if not isinstance(d, dict):
+            continue
+        for m in moments_of(d):
+            if m["id"] == from_id and (from_kit or _from_of(m) is None):
+                return m, front + re.sub(r"^Footage/", "", m["video"])
+    raise NotThere(WORDS["moment_gone"])
+
+
+def add_from(kit, pairs, reel=None, page_reel=None, page=False):
+    """Add clips of the vault's shoots to one of the vault's reels: POST /reel-moment {do: "add-from", from_kit,
+    from_id} (one clip, the reel the page shows) and `vault.py use-clips` (several, the reel named) are this one
+    add. Each new moment has the shoot's start, end and name, is theirs ("by": "you"), is named when the shoot's
+    is, names its video "Footage/<shoot's folder>/<file>", and keeps where it came from ("from": {kit, id}).
+    Everything is checked before anything is written; one wrong pair refuses them all. A clip already in the
+    reel is left as it is (twice changes nothing). (status, {ok, moments, added, already} or {ok: False, words})."""
+    if not is_vault_kit(kit):
+        return _bad(VAULT_OUR_WORDS["vault_only"])
+    vids = list_videos(kit)
+    stills, added, already = [], [], []
+    with arrange.locked(lock_path(kit)):
+        rec, rows, stamp = sync(kit)
+        if not rows:
+            return _bad(NOT_READY, 404)
+        if page_reel is not None and page_reel != reels.current(rec, REEL_FIRST):
+            return _bad(OUR_WORDS["newer"], 409, why="newer")
+        on_sheet = {x["n"] for x in rows}
+        new = []
+        try:
+            sources = [(fk, fid) + source_clip(kit, fk, fid) for fk, fid in pairs]
+        except Refused:
+            return _bad()
+        except NotThere as e:
+            return _bad(str(e))
+        try:
+            turned = reels.turned(rec, reel or reels.current(rec, REEL_FIRST), REEL_LIVE, REEL_FIRST)
+            turned.__enter__()
+        except reels.Wrong as e:
+            return _bad(str(e))
+        try:                                      # the record reads as the reel these clips are for
+            ms = moments_of(rec)
+            for fk, fid, src, vname in sources:
+                if (fk == "" and any(m["id"] == fid for m in ms)) or \
+                        any(_from_of(m) == {"kit": fk, "id": fid} for m in ms):
+                    already.append((fk, fid))
+                    continue
+                v = video_by_name(kit, vname, vids)
+                if v is None or v["facts"].get("refused"):
+                    return _bad(VAULT_OUR_WORDS["vc_video_gone"])
+                length = float(v["facts"].get("length") or 0)
+                start, end = float(src["start"]), float(src["end"])
+                if length:
+                    end = min(end, length)
+                if end - start < 0.5:
+                    return _bad(VAULT_OUR_WORDS["vc_video_gone"])
+                label = " ".join(str(src.get("label") or "").split())[:200]
+                named = bool(label) and not label.startswith(PICK_AT)
+                mine_n = sum(1 for m in ms if m.get("by") == "you") + 1
+                mid = "u%d-%s" % (mine_n % 10000, hashlib.sha1(("%s|%s|%s|%s" % (fk, fid, v["name"], time.time())).encode("utf-8")).hexdigest()[:6])
+                while any(m["id"] == mid for m in ms):
+                    mid = "u%d-%s" % (mine_n % 10000, os.urandom(3).hex())
+                m = {"id": mid, "video": "Footage/" + v["name"], "start": round(start, 2), "end": round(end, 2),
+                     "label": label if named else WORDS["your_pick_at"].replace("{t}", mmss(start)), "photo": None,
+                     "keep": True, "by": "you", "from": {"kit": fk, "id": fid}}
+                if named:
+                    m["named"] = True
+                ms.insert(sum(1 for x in ms if x.get("by") == "you"), m)   # their picks first, in the order added
+                new.append(m)
+                stills.append((mid, v, (start + end) / 2))
+            if new:
+                rec["moments"] = ms
+                rec["moments_at"] = time.time()
+        finally:
+            turned.__exit__(None, None, None)
+        if new:
+            added = [m["id"] for m in new]
+            _stamp_names(rec, rows, stamp)
+            save(kit, rec)
+        out = moments_for_page(kit, rec, on_sheet, vids) if page else None
+    if page:                                   # the card's still, as Add clip makes it (the chat leaves it to the page)
+        for one in stills:
+            _moment_still(kit, *one)
+    res = {"ok": True, "added": added, "already": len(already)}
+    if page:
+        res["moments"] = out
+    return 200, res
+
+
+def vault_clips_for_page(kit):
+    """GET /reel-vault-clips?kit=: what the vault's clips panel searches and draws (vault.catalog's clips; no
+    photo, no path): {"shoots": [{kit, name, clips, thumb, own}], "clips": [{kit, id, label, named, len, text}]}.
+    "kit" is a shoot's folder name ("" for what was made in the vault itself); "text" is already folded the way
+    search compares it (vault.fold), so the page only folds what was typed; "everyday" is the clip search's
+    ignored words. None when the kit is not the vault."""
+    import vault
+    if not is_vault_kit(kit):
+        return None
+    cat = vault.catalog(kit, photos=False)
+    shoots = [{"kit": s["kit"], "name": s["name"], "clips": s["clips"], "thumb": s["thumb"], "own": s["group"] == "added"}
+              for s in cat["shoots"] if s["clips"] and s["group"] != "added"]
+    clips = [{"kit": c["kit"], "id": c["id"], "label": c["label"], "named": bool(c["named"]),
+              "len": round(float(c["end"]) - float(c["start"]), 1), "text": vault.fold(c["text"])} for c in cat["clips"]]
+    return {"ok": True, "shoots": shoots, "clips": clips, "everyday": sorted(vault.CLIP_EVERYDAY)}
+
+
+_VSTILL_ASKED = set()
+
+
+def vault_still_file(kit, from_kit, from_id):
+    """The still on a clip's tile in the vault's panel, or None (the page asks again in a moment). A shoot's own
+    still of that clip when it has one (only read); else one the vault makes for itself, in its own .kit, the
+    first time it is asked for (left to the preview worker: a page of tiles never waits on a video)."""
+    try:
+        src, vname = source_clip(kit, from_kit, from_id)
+    except (Refused, NotThere):
+        return None
+
+    def first_jpg(d):
+        try:
+            hit = sorted(f for f in _listing(d) if f.lower().endswith(".jpg") and not f.startswith(".")) if d.is_dir() else []
+        except OSError:
+            hit = []
+        return d / hit[0] if hit else None
+    home = vault_member(kit, from_kit) if from_kit else kit
+    if home is not None:
+        got = first_jpg(foot_work(home) / "moments" / from_id)
+        if got:
+            return got
+    name = "x-" + hashlib.sha1((from_kit + "|" + from_id).encode("utf-8")).hexdigest()[:12]
+    got = first_jpg(foot_work(kit) / "moments" / name)
+    if got:
+        return got
+    tag = (str(kit), name)
+    if tag not in _VSTILL_ASKED:
+        v = video_by_name(kit, vname)
+        if v is not None and not v["facts"].get("refused") and _video().avfoundation_here():
+            _VSTILL_ASKED.add(tag)
+            _queue(("still", kit, name, v, (float(src["start"]) + float(src["end"])) / 2))
+    return None
+
+
 def open_footage(kit):
     """Makes <kit>/Footage if it isn't there and opens it (hers: /footage/open)."""
     if not footage_ok(kit):
@@ -2644,7 +2977,7 @@ def footage_for_page(kit, read_only=False):
     reel page's own record is neither brought in line with the numbered list nor written, and no moments are
     read; the previews are still asked for, or a video never opened on the reel page would never be ready."""
     coming = []
-    vids = list_videos(kit, coming)
+    vids = list_videos(kit, coming, members=not read_only)     # (the vault: the talking page lists its own videos only)
     if read_only:
         return {"ok": True, "folder": footage_dir(kit).is_dir() and footage_ok(kit), "videos": videos_for_page(kit, vids, coming),
                 "moments": [], "claude_bts": []}
@@ -2816,6 +3149,8 @@ SAVE_FIELDS = {
     "sel": lambda v, kit, ons: _sel(v),
     "ask": lambda v, kit, ons: _text(v, 600),
     "feel": lambda v, kit, ons: _feel(v),
+    # her v29 (the vault): what they'd like the Assistant to find among their clips, for "Find my clips in my vault"
+    "vault_ask": lambda v, kit, ons: _text(v, VAULT_ASK_MAX),
     # her v25 photo note: which photos they'd like in this reel, for the Assistant's pick (this reel's own)
     "photo_ask": lambda v, kit, ons: _text(v, PHOTO_ASK_MAX),
     # her v27: which kind of reel this is (bts | photos | broll), remembered per reel (ours; hers reads the address)
@@ -3878,9 +4213,10 @@ def _get_page(handler, q):
     # her v27: no kind in the address is the chooser; with one, the reel's own kind wins over the address (a saved
     # bts reel opened from a photos address shows as bts), and a reel never chosen takes the address's
     asked = _one(q, "kind")
+    in_vault = is_vault_kit(kit)       # her v29: the vault's own words on top, and its clips panel in step 1
     if asked not in KINDS:
-        return arrange._send_page(handler, chooser_html(kit.name, st["short"], st["kit_page"]))
-    arrange._send_page(handler, page_html(kit.name, st["short"], st["kit_page"], st.get("kind") or asked))
+        return arrange._send_page(handler, chooser_html(kit.name, st["short"], st["kit_page"], in_vault))
+    arrange._send_page(handler, page_html(kit.name, st["short"], st["kit_page"], st.get("kind") or asked, in_vault))
 
 
 _RELIST = {}                      # kit -> when its Photos folder was last compared with the numbered list
@@ -3988,7 +4324,15 @@ def _get_footage(handler, path, q):
     kit = arrange.kit_by_name(_one(q, "kit"))
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
+    if path == "/reel-vault-clips":             # the vault's clips panel: what it searches and draws
+        got = vault_clips_for_page(kit)
+        return arrange._send_json(handler, got if got else {"ok": False, "words": VAULT_OUR_WORDS["vault_only"]}, 200 if got else 404)
+    if path == "/reel-vault-still":             # a tile's still: a shoot's clip by the shoot's folder name and the clip's id
+        f = vault_still_file(kit, _one(q, "from"), _one(q, "id")) if is_vault_kit(kit) else None
+        return _send_small(handler, f, "image/jpeg") if f else handler.send_error(404)
     if path == "/reel-footage":
+        if KEY.fullmatch(_one(q, "want")):      # the vault: the editor opened a shoot's video, so it is got ready
+            want_video(kit, _one(q, "want"))
         if _one(q, "for") == "talking":          # the talking reel page's video picker: the list, and nothing written
             return arrange._send_json(handler, footage_for_page(kit, read_only=True))
         if not arrange.sheet_rows(kit):
@@ -4134,7 +4478,7 @@ def handle_get(handler, path, query):
             return _get_font(handler, q)
         if path in ("/reel-job", "/reel-songs"):
             return _get_job_or_songs(handler, path, q)
-        if path in ("/reel-footage", "/reel-video", "/reel-strip", "/reel-moment-still"):
+        if path in ("/reel-footage", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-vault-clips", "/reel-vault-still"):
             return _get_footage(handler, path, q)
         if path == "/reel-song":
             return _get_song(handler, q)
@@ -4142,7 +4486,7 @@ def handle_get(handler, path, query):
     except (Exception, SystemExit) as e:  # noqa: BLE001
         arrange.log(f"GET {path} failed: {e.__class__.__name__}: {str(e)[:200]}")
         try:
-            if path in ("/reel-font", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-song"):
+            if path in ("/reel-font", "/reel-video", "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-still"):
                 handler.send_error(404)
             elif path.endswith(".html"):
                 import arrange_page
@@ -5069,21 +5413,27 @@ def _back(kit_name, kit_page, w):
     return back_href, (w["back_kit"] if kit_page else OUR_WORDS["back_home"])
 
 
-def chooser_html(kit_name, short, kit_page=False):
+def chooser_html(kit_name, short, kit_page=False, vault=False):
     """Which reel do you want to create? (her v27): the page with no kind in its address. Her title and lede are
-    written here on the server; no script runs and nothing is saved by looking at it."""
+    written here on the server; no script runs and nothing is saved by looking at it. `vault` (her v29): the
+    vault's own eyebrow, title, lede and card lines (VAULT_KIND_WORDS); a plain post kit's page is as it was."""
     e = html.escape
     w = dict(WORDS)
     w.update(KIND_WORDS)
-    title = w["title_chooser"].replace("{short}", short)
+    if vault:
+        w.update(VAULT_KIND_WORDS)
+    title = w["title_vault"] if vault else w["title_chooser"].replace("{short}", short)
     back_href, back_words = _back(kit_name, kit_page, w)
-    return (_head(w, title, e(w["chooser_lede"]), back_href, back_words, kit_name, look.head_css() + STYLE + V27_CSS)
+    return (_head(w, title, e(w["lede_vault"] if vault else w["chooser_lede"]), back_href, back_words, kit_name, look.head_css() + STYLE + V27_CSS)
             + "</header>" + chooser_section(w, kit_name) + "</div></body></html>")
 
 
-def page_html(kit_name, short, kit_page=False, kind="photos"):
+def page_html(kit_name, short, kit_page=False, kind="photos", vault=False):
     """One kind of reel's page (her v27: bts | photos | broll). Its title, its lede, which steps show and the
-    step-1 heading are written here on the server (hers decided them in applyKind() after the page loaded)."""
+    step-1 heading are written here on the server (hers decided them in applyKind() after the page loaded).
+    `vault` (her v29, stage 9): the same page for the vault, with her vault words on top, step 1 headed "Your
+    clips" with her search panel above the footage editor (vault_panel, VAULT_JS), and the reel's own clip cards
+    headed "Your clips for this reel". A plain post kit's page is byte for byte what it was."""
     e = html.escape
     kind = kind if kind in KINDS else "photos"
     w = {k: pc_words(trash_words(v)) for k, v in WORDS.items()}
@@ -5103,7 +5453,11 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
         w["clips_empty"] = this_computer.MOMENTS_PC
         w["not_looked_h3"] = w["clips_need_h3"]
         w["not_looked_html"] = this_computer.NOT_LOOKED_PC_HTML
-    title = w["title_" + kind].replace("{short}", short)
+    if vault:
+        w.update(VAULT_KIND_WORDS)
+        w.update(VAULT_CLIP_WORDS)
+        w.update(VAULT_OUR_WORDS)
+    title = w["title_vault"] if vault else w["title_" + kind].replace("{short}", short)
     data = {"words": dict(w, **OUR_WORDS), "kind": kind, "max": MAX_PICKS, "dragOut": DRAG_OUT, "undoSteps": UNDO_STEPS,
             "saveAfter": SAVE_AFTER_MS, "followEvery": FOLLOW_MS, "defaultVibe": default_vibe(),
             "songEvery": SONG_EVERY_MS, "jobEvery": JOB_EVERY_MS, "footEvery": FOOT_EVERY_MS, "feels": list(FEELS),
@@ -5118,9 +5472,16 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
             "osX": list(OS_X), "osY": list(OS_Y), "osSize": list(OS_SIZE), "vibes": list(VIBES)}
     # her numbers as written (step 1 to 5; the steps a kind doesn't use are hidden); the page renumbers them (hers)
     steps = "".join(fn(w, i, kind) for i, fn in enumerate((fn for _, fn in SECTIONS if fn), 1))
+    foot_js = FOOTAGE_JS
+    if vault:                          # her search panel on top of step 1, and a count beside the reel's own clips
+        steps = _once(steps, "<div id='btsBox' hidden>", "<div id='btsBox' hidden>" + vault_panel(w))
+        steps = _once(steps, "<span class='say sm' id='momentsSay'></span></div>",
+                      "<span class='cnt' id='vcCnt'></span><span class='say sm' id='momentsSay'></span></div>")
+        foot_js = vault_footage_js()
     back_href, back_words = _back(kit_name, kit_page, w)
-    css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + (TRIM_CSS if TRIM_PANEL else "") + OUR_CSS + V27_CSS + EDITOR_CSS + WATCH_CSS
-    head = _head(w, title, e(w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"], kind)
+    css = look.head_css() + STYLE + REELS_CSS + PICK_CSS + SELECT_CSS + (TRIM_CSS if TRIM_PANEL else "") + OUR_CSS + V27_CSS + EDITOR_CSS + WATCH_CSS \
+        + (VAULT_CSS if vault else "")
+    head = _head(w, title, e(w["lede_vault"] if vault else w["lede_" + kind]), back_href, back_words, kit_name, css, w["all_reels"], kind)
     if TRIM_PANEL:                     # her v25 panel sits above the page's scripts (hers), before the wrap: the head is split round it
         head = head.replace("<div class='wrap'>", trim_panel(w) + "<div class='wrap'>", 1)
     toq = ("<div class='toq' id='toqBar' hidden><button class='btn' id='toQueue2' type='button'>" + e(w["toq_btn"]) + "</button>"
@@ -5136,9 +5497,253 @@ def page_html(kit_name, short, kit_page=False, kind="photos"):
         "<script type='application/json' id='reelData'>" + _json_for_script(data) + "</script>"
         "<script>" + DRAG_JS + "</script><script>" + MODEL_JS + "</script><script>" + REELS_JS + "</script><script>" + CORE_JS + "</script>"
         "<script>" + ORDER_JS + "</script><script>" + PHOTOS_JS + "</script><script>" + SONG_JS + "</script><script>" + VIBE_JS + "</script>"
-        "<script>" + FOOTAGE_JS + "</script>" + ("<script>" + TRIM_JS + "</script>" if TRIM_PANEL else "")
+        "<script>" + foot_js + "</script>" + ("<script>" + VAULT_JS + "</script>" if vault else "") + ("<script>" + TRIM_JS + "</script>" if TRIM_PANEL else "")
         + "<script>" + DIRECT_JS + "</script><script>" + MAKE_JS + "</script><script>" + WATCH_JS + "</script><script>" + QUEUE_JS + "</script><script>" + START_JS + "</script>"
         "</body></html>")
+
+
+def _once(text, old, new):
+    """`text` with the one `old` in it replaced. Anything but exactly one is a fault of ours, said loudly (the
+    vault's page is the plain page with a few named pieces swapped, so a piece that moved must not pass quietly)."""
+    if text.count(old) != 1:
+        raise RuntimeError("the vault's reel page: expected one %r, found %d" % (old[:60], text.count(old)))
+    return text.replace(old, new)
+
+
+def vault_panel(w):
+    """Her "Your clips" panel for the vault (vault-reel-preview.html #stepClips, screenshots 06 and 08), written on
+    the server: the search box, "Or tell your assistant what to look for" with its box and the line to copy, the
+    shoot chips, and the place VAULT_JS draws Added to my vault and each shoot folded shut. Words as text only."""
+    e = html.escape
+    return (
+        "<div class='find' id='vcFind'>"
+        "<div class='row2'>"
+        "<div class='box'><label for='vcQ'><b>" + e(w["vc_search_b"]) + "</b></label><small>" + e(w["vc_search_s"]) + "</small>"
+        "<input type='search' id='vcQ' autocomplete='off' placeholder='" + e(w["vc_search_ph"], quote=True) + "'></div>"
+        "<div class='box'><label for='vcAsk'><b>" + e(w["vc_ask_b"]) + "</b></label><small>" + e(w["vc_ask_s"]) + "</small>"
+        "<textarea id='vcAsk' rows='2' maxlength='" + str(VAULT_ASK_MAX) + "' placeholder='" + e(w["vc_ask_ph"], quote=True) + "'></textarea>"
+        "<div class='line'><span id='vcLine'>" + e(w["vc_line"]) + "</span>"
+        "<button class='btn small' id='vcCopy' type='button'>" + e(w["copy"]) + "</button></div></div>"
+        "</div>"
+        "<div class='vchips' id='vcShoots'></div>"
+        "<div id='vcRes'><p class='say sm' id='vcWait'>" + e(w["vc_loading"]) + "</p></div>"
+        "<p class='say sm' id='vcSay' role='status'></p>"
+        "</div>")
+
+
+# The vault's panel (ours, to her picture: screenshots 06 and 08). No web font, no serif; her colours by name.
+VAULT_CSS = r"""
+.find{display:grid;gap:.7rem;margin:.6rem 0 1rem;padding:1rem;border:1px solid var(--line);border-radius:18px;background:var(--cream)}
+.find .row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.8rem}
+@media(max-width:760px){.find .row2{grid-template-columns:1fr}}
+.find .box{display:grid;gap:.35rem;align-content:start}
+.find .box b{font:600 14.5px/1.3 var(--sans)}.find .box small{color:var(--ink-2);font-size:13px}
+.find input[type=search],.find textarea{width:100%;box-sizing:border-box;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)}
+.find input[type=search]{font:500 15px/1.2 var(--sans);padding:12px 14px;border-radius:14px}
+.find textarea{font:500 14px/1.4 var(--sans);padding:10px 12px;border-radius:12px;resize:vertical}
+.find .line{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}.find .line span{font:500 16px/1.35 var(--sans)}
+.vchips{display:flex;gap:6px;flex-wrap:wrap}
+.vchips button{border:1.5px solid var(--line);background:var(--paper);border-radius:999px;padding:.45rem .8rem;font:600 12.5px/1 var(--sans);cursor:pointer;color:var(--ink-2)}
+.vchips button.on{border-color:var(--coral-2);background:var(--coral-l);color:var(--coral-2)}
+.vfold{border:1px solid var(--line);border-radius:14px;background:var(--paper);margin-top:8px}
+.vfold>summary{display:flex;align-items:center;gap:.6rem;cursor:pointer;list-style:none;padding:.6rem .8rem;font:600 14px/1.2 var(--sans)}
+.vfold>summary::-webkit-details-marker{display:none}
+.vfold>summary::before{content:'\203A';font-size:20px;line-height:1;color:var(--ink-2);width:12px;transition:transform .2s}
+.vfold[open]>summary::before{transform:rotate(90deg)}
+.vfold>summary img{width:30px;height:30px;border-radius:8px;object-fit:cover;background:var(--sand-l)}
+.vfold>summary small{font:500 12.5px/1.2 var(--sans);color:var(--ink-2)}
+.vfold>summary .hit{margin-left:auto;font:600 12px/1 var(--sans);color:var(--coral-2);background:var(--coral-l);border-radius:999px;padding:.3rem .55rem}
+.vfold.mine{border-color:var(--coral-l);background:#FFF9F6}
+.vfold.nohit{opacity:.6}
+.vfold .addhere{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:0 .8rem .8rem;color:var(--ink-2);font-size:13.5px}
+.vres{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;padding:0 .8rem .8rem}
+.vc{position:relative;border:0;padding:0;background:none;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.vc .im{display:block;position:relative;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:var(--sand-l)}
+.vc img{width:100%;height:100%;object-fit:cover;display:block}
+.vc .len{position:absolute;right:6px;bottom:6px;font:600 11px/1 var(--sans);color:#fff;background:rgba(20,22,30,.6);padding:4px 6px;border-radius:6px}
+.vc .add{position:absolute;left:6px;top:6px;font:600 11.5px/1 var(--sans);background:rgba(255,255,255,.92);color:var(--ink);padding:5px 8px;border-radius:999px}
+.vc.on .im{box-shadow:0 0 0 3px var(--coral-2)}.vc.on .add{background:var(--coral-2);color:#fff}
+.vc b{display:block;margin-top:5px;font:500 12.5px/1.3 var(--sans)}.vc small{display:block;color:var(--ink-2);font-size:11.5px}
+.cnt{font:600 12.5px/1 var(--sans);color:var(--ink-2)}
+#vcSay{margin:0;color:var(--coral-2)}#vcSay:empty{display:none}
+"""
+
+
+# The footage script, for the vault: FOOTAGE_JS with six named pieces swapped (each must be there exactly once).
+# A shoot's video that nothing has asked for yet ("ask") is not "getting ready"; opening it in the editor asks
+# for it; and the panel's script (VAULT_JS) is handed what it needs: the reel's clips as the page has them, the
+# one way they are taken in, taken out and selected, and the page's own Copy.
+_VAULT_FOOT = []
+
+
+def vault_footage_js():
+    if _VAULT_FOOT:
+        return _VAULT_FOOT[0]
+    js = FOOTAGE_JS
+    js = _once(js, "var SETTLED = {ready: 1,", "var SETTLED = {ask: 1, ready: 1,")
+    js = _once(js, "{n: n}) : '') : W.ed_getting_ready);", "{n: n}) : '') : v.preview === 'ask' ? '' : W.ed_getting_ready);")
+    js = _once(js, "if (v.preview !== 'ready') { edWaiting(); edTabs(); return; }",
+               "if (v.preview !== 'ready') { wantVideo(v); edWaiting(); edTabs(); return; }")
+    js = _once(js, "ED.v = vids[0] || null; edWaiting();", "ED.v = vids[0] || null; wantVideo(ED.v); edWaiting();")
+    # the list under Add my footage, and Good to know's "you've added 0:30", are of the vault's OWN videos (what the
+    # footage look looks through); the editor's drop-down below still lists every shoot's
+    a, b = js.index("  function renderVideos(){"), js.index("    edTabs();\n  }\n\n  // ---- the moments")
+    body = js[a:b]
+    if body.count("vids.") < 5 or "var box = $('vlist'), was = box.querySelector('details');" not in body:
+        raise RuntimeError("the vault's reel page: renderVideos is not as expected")
+    body = body.replace("vids.", "own.").replace("var box = $('vlist'), was = box.querySelector('details');",
+                                                 "var own = vids.filter(function(v){ return v.name.indexOf('/') < 0; }), box = $('vlist'), was = box.querySelector('details');")
+    js = js[:a] + body + js[b:]
+    js = _once(js, "function renderMoments(){ edTabs(); }", "function renderMoments(){ edTabs(); if (R.vaultDraw) R.vaultDraw(moments); }")
+    js = _once(js, "  R.editor = function(){", r"""  var asked = {};
+  function wantVideo(v){            // the vault: a shoot's video is got ready once it is opened here
+    if (!v || v.preview !== 'ask' || asked[v.key]) return;
+    asked[v.key] = 1;
+    fetch('/reel-footage?' + R.q + '&want=' + encodeURIComponent(v.key), {cache: 'no-store'}).then(function(){ loadFootage(); }).catch(function(){ delete asked[v.key]; });
+  }
+  R.vaultClips = {
+    moments: function(){ return moments; },
+    take: function(list){ takeMoments(list); },
+    remove: function(m){ removeMoment(m); },
+    copy: copyOf,
+    addFootage: function(){ $('addFootage').click(); },
+    // a clip just added plays in the reel when the style has room for it (Moment first: it becomes the one)
+    use: function(id){
+      if (style === 'reveal') return true;
+      var ids = chosen(), max = (STYLE_PICK[style] || STYLE_PICK.first).max;
+      if (ids.indexOf(id) >= 0) return true;
+      if (max === 1) sel[style] = [id];
+      else if (ids.length >= max) return false;
+      else sel[style] = ids.concat(id);
+      renderMoments(); R.save(); summary();
+      return true;
+    }
+  };
+  R.editor = function(){""")
+    _VAULT_FOOT.append(js)
+    return js
+
+
+# The vault's clips panel (her v29, 1.5): the search (her rule: everyday words ignored, every other word must be in
+# the clip's name or its shoot's name; what was typed is folded here the way vault.fold folds the text), Added to
+# my vault open on top, each shoot folded shut, a search opening only the shoots with a match. A tile's + Add is
+# POST /reel-moment {do: "add-from"}: the page sends the shoot's folder name and the clip's id, never its words.
+VAULT_JS = r"""
+(function(){
+  'use strict';
+  var R = window.Reel, W = R.words, $ = R.$, esc = R.esc, fill = R.fill, A = R.vaultClips;
+  var CAT = null, only = null, open = {}, ask = '', busy = {}, last = '', lastIds = '', loading = false;
+  function words(v){
+    var t = String(v || '').normalize('NFKD').toLowerCase().replace(/\p{M}+/gu, ''), out = [];
+    t.split(/[^\p{L}\p{N}]+/u).forEach(function(w){ if (w && CAT.everyday.indexOf(w) < 0 && out.indexOf(w) < 0) out.push(w); });
+    return out;
+  }
+  function moments(){ return A.moments() || []; }
+  function fromMoment(c){ return moments().filter(function(m){ return m.from && m.from.kit === c.kit && m.from.id === c.id; })[0] || null; }
+  function isAdded(c){ return !!fromMoment(c) || (c.kit === '' && moments().some(function(m){ return m.id === c.id; })); }
+  function still(c){ return '/reel-vault-still?' + R.q + '&from=' + encodeURIComponent(c.kit) + '&id=' + encodeURIComponent(c.id); }
+  function len(s){ s = Math.max(1, Math.round(s)); var m = Math.floor(s / 60); s -= m * 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+  function nClips(n, one, many){ return n === 1 ? one : fill(many, {n: n}); }
+  function tiles(list, name){
+    return '<div class="vres">' + list.map(function(c){
+      var on = isAdded(c);
+      return '<button type="button" class="vc' + (on ? ' on' : '') + '" data-k="' + esc(c.kit) + '" data-i="' + esc(c.id) + '"><span class="im"><img src="' + esc(still(c)) + '" alt="" loading="lazy">' +
+        '<span class="add">' + esc(on ? W.vc_added_tile : W.vc_add) + '</span><span class="len">' + esc(len(c.len)) + '</span></span><b>' + esc(c.label) + '</b>' + (name ? '<small>' + esc(name) + '</small>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  function draw(){
+    if (!CAT) return;
+    var q = words($('vcQ').value), searching = q.length > 0 || only !== null;
+    var hit = CAT.clips.filter(function(c){ return (only === null || c.kit === only) && q.every(function(w){ return c.text.indexOf(w) >= 0; }); });
+    var own = hit.filter(function(c){ return c.kit === ''; });
+    var chips = '<button type="button" data-s="-1" class="' + (only === null ? 'on' : '') + '">' + esc(W.vc_every) + '</button>' +
+      CAT.shoots.map(function(s, i){ return '<button type="button" data-s="' + i + '" class="' + (only === s.kit ? 'on' : '') + '">' + esc(s.name) + '</button>'; }).join('');
+    var h = '<details class="vfold mine" open data-g=""><summary>' + esc(W.vc_added) + ' <small>' + (own.length ? esc(nClips(own.length, W.vc_one_clip, W.vc_n_clips)) : '') + '</small></summary>' +
+      (own.length ? tiles(own, '') : '<div class="addhere"><span>' + esc(W.vc_added_say) + '</span> <button class="btn small" id="vcAddClips" type="button">' + esc(W.vc_add_clips) + '</button></div>') + '</details>';
+    CAT.shoots.forEach(function(s, i){
+      var inS = hit.filter(function(c){ return c.kit === s.kit; }), none = searching && !inS.length;
+      var isOpen = !none && (searching || !!open[s.kit]);
+      h += '<details class="vfold' + (none ? ' nohit' : '') + '"' + (isOpen ? ' open' : '') + ' data-g="' + i + '"><summary>' +
+        (s.thumb ? '<img src="/kit-photo?' + R.q + '&n=' + s.thumb + '&size=520" alt="">' : '') + '<span>' + esc(s.name) + '</span> <small>' + esc(nClips(s.clips, W.vc_from_one, W.vc_from)) + '</small>' +
+        (searching && inS.length ? '<span class="hit">' + esc(fill(W.vc_found, {n: inS.length})) + '</span>' : '') + '</summary>' + (isOpen ? tiles(inS, s.name) : '') + '</details>';
+    });
+    if (searching && !hit.length) h += '<p class="say">' + esc(W.vc_nothing) + '</p>';
+    var n = moments().length;
+    if ($('vcCnt')) $('vcCnt').textContent = n ? fill(W.vc_n_added, {n: n}) : '';
+    if (chips + h === last) return;
+    last = chips + h;
+    $('vcShoots').innerHTML = chips; $('vcRes').innerHTML = h;
+    $('vcShoots').querySelectorAll('button').forEach(function(b){ b.onclick = function(){ var i = +b.dataset.s; only = i < 0 ? null : CAT.shoots[i].kit; draw(); }; });
+    $('vcRes').querySelectorAll('details.vfold').forEach(function(d){
+      var g = d.dataset.g; if (g === '') { d.querySelector('summary').onclick = function(e){ e.preventDefault(); }; return; }     // Added to my vault is always open
+      var s = CAT.shoots[+g];
+      if (d.classList.contains('nohit')) { d.querySelector('summary').onclick = function(e){ e.preventDefault(); }; return; }      // nothing found in it: it stays shut
+      d.addEventListener('toggle', function(){ if (searching) return; if (d.open !== !!open[s.kit]) { open[s.kit] = d.open; draw(); } });
+    });
+    $('vcRes').querySelectorAll('.vc').forEach(function(b){
+      var c = CAT.clips.filter(function(x){ return x.kit === b.dataset.k && x.id === b.dataset.i; })[0];
+      b.onclick = function(){ if (c) press(c); };
+      var img = b.querySelector('img'), tries = 0;
+      img.onerror = function(){            // its still is being made (the vault's own, the first time): asked again in a moment
+        if (++tries > 8) { img.removeAttribute('src'); return; }
+        setTimeout(function(){ if (document.body.contains(img)) img.src = still(c) + '&t=' + tries; }, 1500);
+      };
+    });
+    $('vcRes').querySelectorAll('summary img').forEach(function(img){      // a shoot's small picture is still being made: asked again
+      var src = img.getAttribute('src'), tries = 0;
+      img.onerror = function(){ if (++tries > 8) { img.style.visibility = 'hidden'; return; } setTimeout(function(){ if (document.body.contains(img)) img.src = src + '&t=' + tries; }, 1500); };
+    });
+    if ($('vcAddClips')) $('vcAddClips').onclick = function(){ A.addFootage(); };
+  }
+  function say(t){ $('vcSay').textContent = t || ''; }
+  function press(c){
+    var key = c.kit + '|' + c.id; if (busy[key]) return;
+    var m = fromMoment(c);
+    say('');
+    if (m) { A.remove(m); return; }                       // ✓ Added, pressed again: out of this reel (with its Undo)
+    if (isAdded(c)) return;                               // a clip of this very reel: it is one of the cards below
+    busy[key] = 1;
+    R.post('/reel-moment', {kit: R.kit, do: 'add-from', from_kit: c.kit, from_id: c.id}).then(function(res){
+      delete busy[key];
+      var r = res.j || {};
+      if (!r.ok) { say(r.words || W.vc_cant_load); return; }
+      A.take(r.moments);
+      if (r.added && r.added[0] && !A.use(r.added[0])) say(W.vc_full);
+    }).catch(function(){ delete busy[key]; say(W.no_server_short || W.vc_cant_load); });
+  }
+  function load(){
+    if (loading || R.kind === 'photos') return;
+    loading = true;
+    fetch('/reel-vault-clips?' + R.q, {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(j){
+      loading = false;
+      if (!j || !j.ok) { if (!CAT) $('vcRes').innerHTML = '<p class="say sm">' + esc(W.vc_cant_load) + '</p>'; return; }
+      CAT = j; draw();
+    }).catch(function(){ loading = false; if (!CAT) $('vcRes').innerHTML = '<p class="say sm">' + esc(W.vc_cant_load) + '</p>'; });
+  }
+  $('vcQ').oninput = draw;
+  $('vcAsk').oninput = function(){ ask = $('vcAsk').value.trim(); R.save(); };
+  $('vcCopy').onclick = function(){ A.copy($('vcLine'), $('vcCopy')); };
+  // the reel's clips changed (added, taken out, made in the editor, named from the chat): the tiles follow, and a
+  // clip made here in the editor shows under Added to my vault
+  R.vaultDraw = function(list){
+    var ids = (list || []).map(function(m){ return m.id + (m.label || ''); }).join('|');
+    if (ids !== lastIds) { lastIds = ids; if (CAT) setTimeout(load, 300); }
+    draw();
+  };
+  setInterval(function(){ if (!document.hidden && R.state()) load(); }, 8000);
+  // for the tests: what the panel shows, as names and numbers
+  R.vaultPanel = function(){ return {ready: !!CAT, only: only, clips: CAT ? CAT.clips.length : 0, shoots: CAT ? CAT.shoots.length : 0}; };
+  R.part({
+    fields: function(){ return {vault_ask: ask}; },
+    adopt: function(st, first){
+      var sv = st.saved || {};
+      ask = typeof sv.vault_ask === 'string' ? sv.vault_ask : '';
+      if (first || document.activeElement !== $('vcAsk')) $('vcAsk').value = ask;
+      if (first) load(); else draw();
+    }
+  });
+})();
+"""
 
 
 def _drag_js():

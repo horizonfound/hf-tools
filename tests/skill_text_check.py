@@ -1753,10 +1753,47 @@ def check_vault_page():
          "or `vault.py add`, or the press of Open the post kit on My vault's card" in where and "never because a page was opened" in where)
 
 
+def check_vault_reel_clips():
+    """The vault's reel page and "Find my clips in my vault" (Nicole's v29, 1.5; stage 9): the instructions, held to the code."""
+    print("\nThe vault's reel page: clips from every shoot, and Find my clips in my vault (Nov 19)")
+    core, reel, arr, where = read(SM / "SKILL.md"), read(REEL / "SKILL.md"), read(SM / "parts" / "arrange.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "reel_page.py")
+    case("the reel skill has a Find my clips in my vault section", '\n## Find my clips in my vault: "Find my clips in my vault"\n' in reel)
+    sec = reel.split('## Find my clips in my vault: "Find my clips in my vault"', 1)[-1].split("\n## ", 1)[0]
+    case("the line it names is the one the page hands out", '"vc_line": "Find my clips in my vault"' in page and '**"Find my clips in my vault"**' in sec)
+    case("`vault.py clips` and `vault.py use-clips`, commands vault.py has, with --reel and --clips as the part writes them",
+         '`python3 <assistant scripts>/vault.py clips [--reel "<the vault reel\'s name>"]`' in sec and 'add_parser("clips"' in src
+         and '`python3 <assistant scripts>/vault.py use-clips [--reel "<name>"] --clips "<shoot\'s folder>:<id>,<shoot\'s folder>:<id>"`' in sec and 'add_parser("use-clips"' in src)
+    case("choose by the words, never by watching a video; what they typed is the whole brief; nothing typed, ask", "**Choose by the words, never by watching.**" in sec
+         and "never open a video to choose" in sec and "is the whole brief (rule 11)" in sec and "ask what the reel is about, one short question" in sec)
+    case("unnamed clips: offer Name my clips for <shoot>, never guess", '"Name my clips for <shoot>"' in sec and "Never guess what an unnamed clip shows." in sec and 'Offer: \\"Name my clips for' in src)
+    case("the same add as the page's, checked whole, twice changes nothing, never any other way and never a copied video", "the same add as the page's + Add" in sec
+         and "running it twice changes nothing" in sec and "**Never write a clip into the vault's records any other way,**" in sec and "never copy a video into the vault to use it" in sec
+         and "reel_page.add_from(" in src)
+    case("it says what is different in the vault: the look is of the vault's own videos, a photo is needed, the talking page's videos",
+         '**"Look through my footage for My vault" looks only through videos they added to the vault itself**' in sec and "needs at least one photo somewhere in the vault" in sec
+         and "the videos it can lay over the talk are the vault's own" in sec and "members=False" in read(SM / "scripts" / "footage.py"))
+    case("arrange.md has The vault's reel page", "\n## The vault's reel page\n" in arr)
+    sec = arr.split("## The vault's reel page", 1)[-1].split("\n## ", 1)[0]
+    case("its words are the page's: the top, Your clips, Added to my vault, From its post kit, + Add and ✓ Added, Your clips for this reel",
+         all(x in sec for x in ('"My vault · Reel"', '"Make my reel."', "From your vault: any clips and photos, from any of your shoots.", '**Step 1 is "Your clips".**', "**Added to my vault**",
+                                '"From its post kit · 10 clips"', "**+ Add**", "**✓ Added**", "**Your clips for this reel**", '"1 found"'))
+         and all(x in page for x in ('"My vault · Reel"', '"title_vault": "Make my reel"', '"vc_added": "Added to my vault"', '"vc_from": "From its post kit · {n} clips"', '"vc_add": "+ Add"',
+                                     '"vc_added_tile": "✓ Added"', '"clips_wl": "Your clips for this reel"', '"vc_found": "{n} found"')))
+    case("no video is copied, nothing is written into the shoot's post kit, and what is not there yet is said", "No video is copied and nothing is written into the shoot's post kit." in sec
+         and "**Not there yet, say so plainly if asked:**" in sec and "does not open while the vault has no photo at all" in sec)
+    case("the core's table sends the pasted line to the reel skill's section and to arrange.md's",
+         '| "Find my clips in my vault" (the line on the vault\'s reel page), "find me editing on the computer", "every clip of me at the beach", "make a B-roll from my vault" | '
+         'the reel skill\'s "Find my clips in my vault" (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault\'s reel page" |' in core)
+    case("where-things-live says where the vault's clips live: nothing copied, from {kit, id}, the vault's own .kit/footage, vault_ask",
+         "**The vault's clips (Nov 19).**" in where and "`Footage/<shoot's folder>/<file name>`" in where and "`from: {kit: <shoot's folder>, id: <that clip's id>}`" in where
+         and "`<vault>/.kit/footage/`" in where and "`vault_ask`" in where and '"vault_ask"' in page and '"from": {"kit": fk, "id": fid}' in page)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

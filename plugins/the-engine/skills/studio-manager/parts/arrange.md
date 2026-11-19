@@ -72,6 +72,16 @@ Then say one or two lines. **When you have not picked** (the usual case): "Your 
 
 **A line `ARRANGED: <kit folder> | reel | 12 photos`** from `home.py pending` comes only from the older reel picker, opened by name. Run `arrange.py apply "<kit folder>" --piece reel` (it puts their order into the kit as the reel's pick and clears the line), then `reel_page.py open "<kit folder>"`, load it in the pane, and say: "Your order is on the reel page beside us. Add your song, pick the vibe, and press Make my reel."
 
+## The vault's reel page
+
+The Reels card in My vault's post kit opens the same reel page for the vault (`reel_page.py open "My vault"`, or the card). On top it reads "My vault · Reel", "Make my reel.", "From your vault: any clips and photos, from any of your shoots."; the chooser has the same four kinds, and each kind shows the same steps as in any post kit. What is different:
+
+- **Step 1 is "Your clips".** A search box ("me with my camera, laughing, kitchen, beach") finds clips by their names and their shoot's name, right away; everyday words (me, my, the, with) are ignored and every other word has to match. **Added to my vault** is open on top (clips made in the vault itself, and **+ Add clips**, which opens the vault's Footage folder); under it each shoot is folded shut with its small picture, name and "From its post kit · 10 clips". A search opens only the shoots with a match and says "1 found" on each. A tile shows a still, the length and the clip's name; **+ Add** puts it in this reel and the tile says **✓ Added**; pressing it again, or the x on its card under **Your clips for this reel**, takes it out of the reel (never out of its shoot). No video is copied and nothing is written into the shoot's post kit.
+- **Under it is the footage editor,** as on any reel page, for making clips by hand. Its Footage drop-down lists the vault's own videos first, then every shoot's as "<shoot's folder>/<file name>". A shoot's video takes a moment to get ready the first time it is opened there.
+- **"Or tell your assistant what to look for"** is a box saved with the reel, and the line to copy is **"Find my clips in my vault"**: the reel skill's section of that name (`../assistant-make-a-reel/SKILL.md`) says what to do: `vault.py clips`, choose by the names only, `vault.py use-clips`.
+- **B-roll** (clips only) is the kind the vault is most for: search, + Add, pick a song, watch it, then **Save my video** (the finished video goes in the vault's own Reels folder) or Make this one in CapCut. Add this reel to my posting queue works as in any post kit.
+- **Not there yet, say so plainly if asked:** the photos step in the vault is still the plain one (every photo of every shoot in one grid, no folding or photo search on this page yet; `vault.py find "<words>" --photos` finds photos from the chat); the vault's reel page does not open while the vault has no photo at all (a clips-only vault: add a shoot's photos first, or make the reel in that shoot's post kit); "Look through my footage for My vault" looks only through the videos added to the vault itself.
+
 ## The carousel's page
 
 ```

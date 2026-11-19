@@ -942,8 +942,8 @@ def _clips_of(kit_dir):
         if not isinstance(data, dict):
             continue
         for m in reel_page.moments_of(data):
-            if m["id"] in seen:
-                continue
+            if m["id"] in seen or isinstance(m.get("from"), dict):
+                continue                        # (a clip a vault reel took from a shoot is that shoot's clip, listed there)
             seen.add(m["id"])
             label = " ".join(str(m.get("label") or "").split())
             named = bool(label) and not label.startswith(reel_page.PICK_AT)
@@ -954,8 +954,9 @@ def _clips_of(kit_dir):
     return out
 
 
-def catalog(kit):
-    """What a page needs to search a post kit, built once, with no place on this computer in it:
+def catalog(kit, photos=True):
+    """What a page needs to search a post kit, built once, with no place on this computer in it (`photos` False:
+    the clips and the shoots only, for the reel page's clips panel, which asks often):
 
         {"vault": bool,
          "shoots": [{"kit": folder name ("" for what was added to the vault itself), "group": "added" | "kit",
@@ -971,7 +972,7 @@ def catalog(kit):
     kit = Path(kit)
     rec = _json(kit / ".kit" / "kit.json")
     is_v = rec.get(MARK) is True
-    shoots, photos, clips = [], [], []
+    shoots, photo_list, clips = [], [], []
     groups = rows_by_group(kit) if is_v else [{"group": "kit", "kit": kit.name, "name": str(rec.get("name") or kit.name),
                                                "date": rec.get("date") if isinstance(rec.get("date"), str) else "",
                                                "rows": _rows(kit / ".kit" / "sheet.json")}]
@@ -979,12 +980,12 @@ def catalog(kit):
     for g in groups:
         own = g["group"] == "added" or not is_v
         home = kit if own else kit.parent / g["kit"]
-        words = photo_words.read(home)
+        words = photo_words.read(home) if photos else {}
         name = g["name"]
-        for x in g["rows"]:
+        for x in g["rows"] if photos else ():
             num = str(x["n"] if own else x.get("src"))
             text = " ".join(t for t in (photo_words.text_of(words.get(num)), name) if t)
-            photos.append({"n": x["n"], "kit": g["kit"], "text": text})
+            photo_list.append({"n": x["n"], "kit": g["kit"], "text": text})
         seen[g["kit"]] = {"kit": g["kit"], "group": g["group"], "name": name, "date": g["date"], "photos": len(g["rows"]),
                           "clips": 0, "thumb": g["rows"][0]["n"] if g["rows"] else None}
     # the clips: the kit's own reels, and for the vault every shoot's reels too (a shoot with clips and no photos
@@ -1008,7 +1009,7 @@ def catalog(kit):
     for folder in order:
         if folder in seen and seen[folder] not in shoots:
             shoots.append(seen[folder])
-    return {"vault": is_v, "shoots": shoots, "photos": photos, "clips": clips}
+    return {"vault": is_v, "shoots": shoots, "photos": photo_list, "clips": clips}
 
 
 def find_in(kit, query, photos=True, clips=True):
@@ -1057,6 +1058,112 @@ def _say_find(v, query, photos, clips):
             for c in res["clips"]:
                 say(f"  {c['id']} | {res['shoots'].get(c['kit']) or c['kit'] or added} | {c['label']} | {c['video']} "
                     f"{c['start']:g} to {c['end']:g} s")
+    return 0
+
+
+# ---------- "Find my clips in my vault" (stage 9): every clip, for the assistant to choose from by its words ----------
+
+def _mmss(t):
+    t = max(0.0, float(t))
+    return "%d:%02d" % (int(t // 60), int(round(t - int(t // 60) * 60)) % 60)
+
+
+def _reel_for(v, words):
+    """(the vault reel's id, its name, a line saying which reel when there are several) for --reel, or (None, why)."""
+    import reel_page
+    vid, why = reel_page.which_reel(v, words)
+    if vid is None:
+        return None, None, why
+    vs, cur = reel_page.reel_names(v)
+    name = next((x["name"] for x in vs if x["id"] == vid), reel_page.REEL_FIRST)
+    line = ""
+    if len(vs) > 1:
+        line = (f"Your vault has {len(vs)} reels ({reel_page.reels_line(vs, cur)}). This is for \"{name}\""
+                + (", the one open on the reel page." if vid == cur else ", not the one open on the reel page.")
+                + " Name another with --reel \"<its name>\".")
+    return vid, name, line
+
+
+def _say_clips(v, reel_words):
+    """vault.py clips: what they asked for, and every clip in the vault with the words to choose by."""
+    import reel_page
+    vid, name, line = _reel_for(v, reel_words)
+    if vid is None:
+        say("STOP: " + line + " Nothing was changed.")
+        return 2
+    if line:
+        say(line)
+    saved = reel_page.as_reel(reel_page.load(v), vid).get("saved")
+    saved = saved if isinstance(saved, dict) else {}
+    note = " ".join(str(saved.get("vault_ask") or "").split())
+    say("What they'd like you to find (their words, from the box on the reel page): " + (f"\"{note}\"" if note else "nothing typed. Ask them what the reel is about before choosing."))
+    kind = reel_page.reel_kind(saved)
+    most = reel_page.STYLE_MAX.get(reel_page.style_of(saved) if kind != "broll" else reel_page.BROLL_STYLE, reel_page.MAX_CLIPS)
+    say("This reel is " + (reel_page.KIND_NAMES.get(kind) or "not started yet (no kind chosen on the page)") + f"; it plays up to {most} clip{'s' if most != 1 else ''}.")
+    cat = catalog(v, photos=False)
+    names = {s["kit"]: s["name"] for s in cat["shoots"]}
+    have = set()
+    for m in reel_page.moments_of(reel_page.as_reel(reel_page.load(v), vid)):
+        f = m.get("from")
+        have.add((f.get("kit"), f.get("id")) if isinstance(f, dict) else (OWN, m["id"]))
+    if not cat["clips"]:
+        say("No clips in the vault yet. A clip is made on a reel page: in a shoot's post kit (the footage look, or their own "
+            "with Start here and End here), or in the vault from a video they added with + Add clips.")
+        return 0
+    named = [c for c in cat["clips"] if c["named"]]
+    unnamed = [c for c in cat["clips"] if not c["named"]]
+    say(f"{len(cat['clips'])} clip{'s' if len(cat['clips']) != 1 else ''} in the vault. Choose by these words only; never watch a video to choose.")
+    say("shoot's folder:id | shoot | what it is | length")
+    for c in named:
+        say(f"  {c['kit']}:{c['id']} | {names.get(c['kit']) or 'Added to my vault'} | {c['label']} | {_mmss(c['end'] - c['start'])}"
+            + ("   (in this reel already)" if (c["kit"], c["id"]) in have else ""))
+    if unnamed:
+        say(f"Not named yet ({len(unnamed)}): these can only be told apart by their shoot. Offer to name them first.")
+        by = {}
+        for c in unnamed:
+            by.setdefault(c["kit"], []).append(c)
+        for folder, cs in by.items():
+            who_ = names.get(folder) or "Added to my vault"
+            say(f"  {who_}: " + ", ".join(f"{c['kit']}:{c['id']} ({_mmss(c['end'] - c['start'])})" for c in cs)
+                + (f"   Offer: \"Name my clips for {who_}\"" if folder else "   Offer: \"Name my clips for My vault\""))
+    say("To add your choices to this reel, in play order:")
+    say(f"  python3 {Path(__file__).name} use-clips" + (f" --reel \"{name}\"" if line else "") + " --clips \"<shoot's folder>:<id>,<shoot's folder>:<id>\"")
+    return 0
+
+
+def _use_clips(v, reel_words, text):
+    """vault.py use-clips: the same add as the page's + Add (reel_page.add_from), for the clips the assistant chose."""
+    import reel_page
+    vid, name, line = _reel_for(v, reel_words)
+    if vid is None:
+        say("STOP: " + line + " Nothing was changed.")
+        return 2
+    pairs = []
+    for part in [p.strip() for p in str(text or "").split(",") if p.strip()]:
+        folder, sep, cid = part.rpartition(":")
+        if not sep or not cid.strip():
+            say(f"STOP: \"{part}\" is not <shoot's folder>:<clip id> (as `vault.py clips` prints them). Nothing was changed.")
+            return 2
+        pairs.append((folder.strip(), cid.strip()))
+    if not pairs:
+        say("STOP: no clips named. --clips \"<shoot's folder>:<id>,...\" as `vault.py clips` prints them. Nothing was changed.")
+        return 2
+    if len(set(pairs)) != len(pairs):
+        say("STOP: the same clip is named twice. Nothing was changed.")
+        return 2
+    code, res = reel_page.add_from(v, pairs, reel=vid)
+    if code != 200 or not res.get("ok"):
+        say("STOP: " + str(res.get("words") or "that could not be added.") + " Nothing was changed.")
+        return 2
+    n, had = len(res.get("added") or []), int(res.get("already") or 0)
+    if line:
+        say(line)
+    say(f"Added {n} clip{'s' if n != 1 else ''} to {name!r}." if n else f"Nothing to add to {name!r}.")
+    if had:
+        say(f"{had} {'was' if had == 1 else 'were'} in that reel already and left as {'it is' if had == 1 else 'they are'}.")
+    if n:
+        say("They show under Your clips for this reel on the vault's reel page within a few seconds; the page is where "
+            "they choose which ones play, and in what order.")
     return 0
 
 
@@ -1143,6 +1250,11 @@ def main():
     only = fi.add_mutually_exclusive_group()
     only.add_argument("--photos", action="store_true", help="photos only")
     only.add_argument("--clips", action="store_true", help="clips only")
+    cl = sub.add_parser("clips", help="every clip in the vault, and what they asked for (Find my clips in my vault)")
+    cl.add_argument("--reel", default=None, help="which of the vault's reels (default: the one open on the reel page)")
+    uc = sub.add_parser("use-clips", help="add the clips you chose to a vault reel")
+    uc.add_argument("--reel", default=None)
+    uc.add_argument("--clips", required=True, help="\"<shoot's folder>:<id>,...\" as `vault.py clips` prints them")
     a = ap.parse_args()
     try:
         import fresh
@@ -1202,6 +1314,10 @@ def main():
             return 0
         if a.cmd == "find":
             return _say_find(v, a.words, not a.clips, not a.photos)
+        if a.cmd == "clips":
+            return _say_clips(v, a.reel)
+        if a.cmd == "use-clips":
+            return _use_clips(v, a.reel, a.clips)
         if a.cmd == "members":
             for m in members(v):
                 say(f"{m['folder']} | {m['name']} | {m['date'] or 'no date'} | "
