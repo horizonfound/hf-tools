@@ -68,6 +68,7 @@ OUR_WORDS = {
     "sample": "That backup was a sample of the card, for a test, so it gets no second copy.",
     "no_place": "I can't see that drive right now. Is it plugged in?",
     "onto_card": "That is the memory card itself. A second copy belongs on a drive that never gets formatted.",
+    "a_card": "That is a memory card. A second copy belongs on a drive that never gets formatted.",
     "inside": "That is inside the backup's own folder. Pick a different drive for the second copy.",
     "same_drive": ("That is the drive your photos are already on ({drive}). A copy there is not a second place: "
                    "if that drive fails, both are gone. Pick a different drive."),
@@ -93,6 +94,13 @@ OUR_WORDS = {
     "stopped_killed": "The copy stopped before it finished, at {done} of {total}.",
     "differs": "{n} file{s} already on {drive} {are} different from your backup, so I left {them} alone.",
     "changed": "{n} photo{s} on your drive no longer match{es} what the backup recorded, so {they} {were} not copied.",
+    "edited": ("{n} photo{s} on your drive {have} been changed since the backup (saved over, by an editing program for "
+               "instance), so I can't make a checked copy of {them} from your drive. {They} {are} still on your drive. "
+               "If the card still has {them}, put it in and press Make a second copy."),
+    "edited_no_card": ("{n} photo{s} on {photos} {have} been changed since the backup (saved over, by an editing program "
+                       "for instance), and the card isn't in, so I can't make a checked second copy from the drive alone. "
+                       "Your photos on {photos} are still there. If the card still has them, put it in and press Make a "
+                       "second copy. If the card has been formatted, this backup can't get a checked second copy any more."),
     "missing": "{n} photo{s} could not be found on your drive, so {they} {were} not copied.",
     "not_all": "{done} of {total} files are copied and checked so far.",
     "eject_wait": "A second copy is still being made from this card. It won't be long.",
@@ -116,6 +124,7 @@ def plural(n, **forms):
     """The small words a count changes: s, are, them, they, were, es."""
     one = n == 1
     return {"n": f"{n:,}", "s": "" if one else "s", "s2": "" if one else "s", "are": "is" if one else "are",
+            "have": "has" if one else "have", "They": "It" if one else "They",
             "them": "it" if one else "them", "they": "it" if one else "they", "were": "was" if one else "were",
             "es": "es" if one else "", **forms}
 
@@ -277,6 +286,11 @@ def missed(studio):
     manifest = read_json(studio / "manifest.json", {}) or {}
     if manifest.get("second"):
         return None
+    note = read_json(studio / MISSED, {}) or {}
+    if note.get("there"):
+        # the drive was plugged in and the copy was refused before a byte was written (night.py kept the words:
+        # ours, from this file, never a path). A copy that started and stopped is said by status(), not here.
+        return str(note.get("words") or "") or None if not isinstance(read_json(studio / RECORD), dict) else None
     return OUR_WORDS["missed"]
 
 
@@ -325,7 +339,30 @@ def find_on_drive(key, size, root, studio, places):
     return None
 
 
+def there_but_changed(key, root, studio, places):
+    """True when the photo IS on their drive where the records say, at another size: it has been saved over
+    since the backup (Lightroom writing a rating into a JPEG, say). Said as changed, never as "could not be
+    found" (Nov 19 review: that read as lost photos, and they were there)."""
+    cands = [root / rel for rel in places.get(key, [])]
+    cands += [studio / "from-the-card" / key, root / key]
+    for c in cands:
+        try:
+            if c.is_file():
+                return True
+        except OSError:
+            continue
+    return False
+
+
 # ---------------------------------------------------------------- the questions asked before a byte is written
+
+def rec_ok(studio, second, key, entry):
+    """Is this file already on the second drive at its size, from an earlier run of this copy?"""
+    try:
+        return (second / Path(*key.split("/"))).stat().st_size == entry.get("size")
+    except OSError:
+        return False
+
 
 class Refused(Exception):
     def __init__(self, state, words):
@@ -399,6 +436,11 @@ def preflight(arg, to):
     if card_in and (within(second, card) or (backup.onto_itself(card, second, "the second copy")
                                               and (backup._top_of_drive(card.resolve()) / "DCIM").is_dir())):
         raise Refused("onto_card", OUR_WORDS["onto_card"])
+    # never onto a memory card: this backup's own or any other (one a camera has written to, wherever on it the
+    # folder is). A card gets formatted, and may hold photos not backed up yet.
+    import studio_file
+    if studio_file.card_above(place) is not None:
+        raise Refused("onto_card", OUR_WORDS["a_card"])
     shoots = [x.get("folder") for x in (read_json(studio / "shoots.json", {}) or {}).get("shoots", []) if x.get("folder")]
     if (within(second, studio) or (studio.name == "_studio" and within(second, root))
             or any(within(second, root / f) for f in shoots if isinstance(f, str))):
@@ -426,6 +468,17 @@ def preflight(arg, to):
             drive=name, need=backup.human(need), free=backup.human(free), short=backup.human(need * 1.05 + MARGIN - free)))
     if running():
         raise Refused("busy", OUR_WORDS["busy"])
+    if not card_in:
+        # The card is not in, so every file must come from their drive. A photo that has been saved over since
+        # the backup can never be copied and checked from there: said now, in words that say what happened,
+        # rather than after copying the rest and calling those photos "not found". (Sizes only, a moment.)
+        places = drive_places(root, studio)
+        edited = [k for k, e in files.items()
+                  if not (rec_ok(studio, second, k, e))
+                  and find_on_drive(k, e.get("size"), root, studio, places) is None
+                  and there_but_changed(k, root, studio, places)]
+        if edited:
+            raise Refused("edited", OUR_WORDS["edited_no_card"].format(photos=drive_name(root), **plural(len(edited))))
     return {"arg": str(arg), "root": root, "studio": studio, "manifest": manifest, "session": session, "place": place,
             "second": second, "name": name, "card": card if card_in else None,
             "bytes": sum(max(0, e.get("size") or 0) for e in files.values())}
@@ -539,7 +592,7 @@ def copy_all(plan, always=False):
         pause = float(os.environ.get("STUDIO_SECOND_COPY_PAUSE_FOR_TESTS") or 0)
     except ValueError:
         pass
-    differs, changed, missing = [], [], []
+    differs, changed, missing, edited = [], [], [], []
     t0 = time.time()
     stop = None
     for key in sorted(files):
@@ -579,6 +632,9 @@ def copy_all(plan, always=False):
                             raise Stop("stopped_photos")
                         if only_drive:
                             changed.append(key)      # the card's differs and the drive has none: said as changed
+                        elif there_but_changed(key, where["root"], where["studio"], where["places"]):
+                            rec["files"][key] = {"ok": False, "note": "changed on the drive since the backup", "left": backup.identity(dst)}
+                            edited.append(key)
                         else:
                             rec["files"][key] = {"ok": False, "note": "not found on the drive", "left": backup.identity(dst)}
                             missing.append(key)
@@ -637,17 +693,20 @@ def copy_all(plan, always=False):
     if stop:
         return finish_stopped(rec, save, stop, name, total)
     counts()
-    if differs or changed or missing or rec["done"] != total:
+    if differs or changed or missing or edited or rec["done"] != total:
         parts = []
         if differs:
             parts.append(OUR_WORDS["differs"].format(drive=name, **plural(len(differs))))
         if changed:
             parts.append(OUR_WORDS["changed"].format(**plural(len(changed))))
+        if edited:
+            parts.append(OUR_WORDS["edited"].format(**plural(len(edited))))
         if missing:
             parts.append(OUR_WORDS["missing"].format(**plural(len(missing))))
         parts.append(OUR_WORDS["not_all"].format(done=f"{rec['done']:,}", total=f"{total:,}"))
         rec["problems"] = ([f"{k} already exists on the second drive and is different. Not overwritten; check it by hand." for k in differs]
                            + [f"{k} no longer matches what the backup recorded. Not copied." for k in changed]
+                           + [f"{k} has been changed on the drive since the backup. Not copied." for k in edited]
                            + [f"{k} could not be found on the drive. Not copied." for k in missing])
         rec["state"] = "stopped"
         rec["finished"] = datetime.now().isoformat(timespec="seconds")

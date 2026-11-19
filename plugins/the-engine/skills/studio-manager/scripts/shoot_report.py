@@ -9,12 +9,17 @@ frame sized to its content, so every button on it keeps working. serve_report.py
 shows the shoot's page at /report.html and each card at /card/N/...
 
     python3 shoot_report.py link "<card 1's backup>" "<card 2's backup>" [...] [--shoot "Smith wedding"]
+    python3 shoot_report.py unlink "<the card's backup that does not belong>"
     python3 shoot_report.py build "<any card's backup>"
     python3 shoot_report.py show "<any card's backup>"
 
 link: writes shoot.json into every card's records ({"shoot": name, "cards": [{"card": 1, "records": ..., "name":
 ...}]}), keeps cards already linked to the first one, and rebuilds the pages of the cards that have a report.
 night.py --with "<card 1's backup>" does it for a card as it is backed up. Records only; no photo is read.
+unlink: takes one card back out of its shoot ("I picked the wrong card"). The others stay one shoot, numbered
+again in the order they had; when only one is left it is a backup on its own again. Each shoot.json that is
+changed or dropped is kept beside it first (shoot.before-unlink-<when>.json), the pages are written again, and
+no photo, folder or other record is touched. Run twice, the second run has nothing to do (exit 2).
 Exit codes: 0 done, 1 a problem, 2 nothing to do.
 """
 import argparse
@@ -157,6 +162,80 @@ def link(backups, shoot=None):
     for c in cards:
         if (Path(c["found"]) / "report.html").exists():
             report_page.write_page(c["found"])
+    return 0
+
+
+def unlink(backup):
+    """Take one card out of its shoot. Records and pages only. 0 done, 1 a problem, 2 nothing to do."""
+    from datetime import datetime
+    rec = records_of(backup)
+    if not rec:
+        say(f"STOP: no backup records found for {backup}")
+        return 1
+    data = read(rec, heal=False)
+    if not data:
+        say("Nothing to do: this backup is not one card of a shoot.")
+        return 2
+    me = next((c for c in data["cards"] if c.get("found") and same_place(c["found"], str(rec))), None)
+    if me is None:
+        say("STOP: this backup's own shoot record does not list it. Nothing changed.")
+        return 1
+    gone = [c for c in data["cards"] if not c.get("found")]
+    if gone:
+        say("STOP: I can't see " + ", ".join(f"card {c['card']}" for c in gone) + " of this shoot right now (is its drive "
+            "plugged in?), so I won't take the shoot apart half way. Nothing changed.")
+        return 1
+    rest = [c for c in data["cards"] if c is not me]
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    def keep(studio):
+        """The shoot.json as it was, kept beside it under a name of its own (never over one that is there)."""
+        f = Path(studio) / SHOOT
+        if not f.exists():
+            return
+        for n in range(100):
+            aside = f.with_name(f"shoot.before-unlink-{stamp}{'-' + str(n) if n else ''}.json")
+            if not aside.exists():
+                aside.write_bytes(f.read_bytes())
+                return
+        raise OSError("could not keep the record before")
+
+    def drop(studio):
+        """This card is a backup on its own again: its shoot.json (kept above) and the shoot's page go."""
+        for name in (SHOOT, PAGE):
+            try:
+                (Path(studio) / name).unlink()      # our own records, a copy of the first kept above; never a photo
+            except OSError:
+                pass
+
+    try:
+        for c in data["cards"]:
+            keep(c["found"])
+        if len(rest) >= 2:
+            for n, c in enumerate(rest, 1):
+                c["card"] = n
+            for c in rest:
+                save(Path(c["found"]), {"shoot": data["shoot"], "cards": rest})
+        else:
+            for c in rest:
+                drop(c["found"])
+        drop(me["found"])
+    except OSError as e:
+        say(f"STOP: could not finish taking the cards apart ({e.__class__.__name__}). Run it again.")
+        return 1
+    import report_page
+    for c in data["cards"]:
+        if (Path(c["found"]) / "report.html").exists():
+            try:
+                report_page.write_page(c["found"])
+            except Exception as e:  # noqa: BLE001  (the records are right; a page can be written again)
+                say(f"(could not write a report again: {e.__class__.__name__})")
+    say(f"Taken out of {data['shoot']}: {me.get('name') or 'that card'}.")
+    if len(rest) >= 2:
+        say(f"{data['shoot']} still has {len(rest)} cards on one report.")
+    else:
+        say("Each card is a backup with a report of its own again.")
+    say("No photo or folder was touched.")
     return 0
 
 
@@ -319,11 +398,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     lk = sub.add_parser("link"); lk.add_argument("backups", nargs="+"); lk.add_argument("--shoot", default=None)
+    sub.add_parser("unlink", help="take one card back out of its shoot (records and pages only)").add_argument("backup")
     sub.add_parser("build").add_argument("backup")
     sub.add_parser("show").add_argument("backup")
     a = ap.parse_args()
     if a.cmd == "link":
         return link(a.backups, a.shoot)
+    if a.cmd == "unlink":
+        return unlink(a.backup)
     rec = records_of(a.backup)
     if not rec:
         say(f"STOP: no backup records found for {a.backup}")

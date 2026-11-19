@@ -119,7 +119,19 @@ def as_markdown(sf):
 
 
 PHOTO_EXT = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".jpg", ".jpeg", ".heic", ".tif", ".tiff"}
-SHOOT_WORDS = ("shoot", "session", "client", "wedding", "photo", "raw", "job", "work")
+# Whole words only (Nov 19 review: as letters inside a word, "raw" made Drawings a shoot folder, "work" Homework
+# and "photo" an Apple Photos library).
+SHOOT_WORDS = re.compile(r"(?<![a-z])(photo ?shoots?|shoots?|sessions?|clients?|weddings?|photos?|photography|raws?|jobs?)(?![a-z])")
+# Never where shoots go, whatever is inside: a package (Finder shows it as one file, so nothing put inside it can
+# be browsed), and folders named for something else that often holds dated folders too.
+PACKAGES = (".photoslibrary", ".photolibrary", ".aplibrary", ".lrlibrary", ".lrdata", ".lrcat-data", ".cocatalog",
+            ".cosessiondb", ".fcpbundle", ".imovielibrary", ".tvlibrary", ".musiclibrary", ".app", ".sparsebundle",
+            ".backupbundle", ".bundle", ".pkg", ".framework", ".logicx", ".band", ".dvdmedia")
+NOT_SHOOTS = re.compile(r"(?<![a-z])(backups?|back ?ups?|time machine|exports?|exported|delivered|deliver(y|ies)|finals?|"
+                        r"edit(s|ed)?|librar(y|ies)|catalogs?|trash|downloads?|installers?|applications?)(?![a-z])")
+# A memory card is never a drive, whichever camera wrote it: these sit at the top of a card.
+CARD_FOLDERS = ("DCIM", "PRIVATE/M4ROOT", "PRIVATE/AVCHD", "PRIVATE/SONY", "AVCHD", "M4ROOT", "XDROOT", "CONTENTS/CLIPS001",
+                "MP_ROOT", "AVF_INFO")
 DATED = re.compile(r"(19|20)\d\d[-._ ]?\d\d[-._ ]?\d\d|\b(19|20)\d\d\b")
 
 
@@ -153,24 +165,112 @@ def shoot_folders(drive, limit=2):
     for p in tops[:60]:
         if p.name in ("Backups.backupdb", "System Volume Information", "$RECYCLE.BIN"):
             continue
+        low = p.name.lower()
+        if low.endswith(PACKAGES) or p.is_symlink():
+            continue   # a package or a link: never offered, never chosen
         score, subs = _looks_like_shoot(p)
-        if any(w in p.name.lower() for w in SHOOT_WORDS):
+        named = bool(SHOOT_WORDS.search(low))
+        if named:
             score += 2
         if score >= 3:
-            found.append({"path": str(p), "name": p.name, "shoots": subs, "score": score})
+            # sure: sure enough to be chosen with nobody asked (the first backup, and the report's next drive).
+            # It must be named for shoots, not named for something else, and have folders in it. Anything less
+            # is only ever a suggestion beside a question; unasked, photos go right on the drive, in plain sight.
+            found.append({"path": str(p), "name": p.name, "shoots": subs, "score": score,
+                          "sure": named and not NOT_SHOOTS.search(low) and subs >= 2})
     found.sort(key=lambda f: -f["score"])
     return found[:limit]
 
 
+def looks_like_card(top):
+    """True when this folder is the top of a memory card: one of the folders a camera makes sits there. A card
+    formatted on the computer and never put in a camera has none of them; see maybe_card in drives()."""
+    top = Path(top)
+    for rel in CARD_FOLDERS:
+        try:
+            if top.joinpath(*rel.split("/")).is_dir():
+                return True
+        except OSError:
+            return True    # it will not even say: never treated as a drive
+    return False
+
+
+def card_above(path):
+    """The top of the memory card a folder is on (the folder itself, or one above it, up to the top of its
+    drive), or None when it is not on a card."""
+    try:
+        p = Path(path).expanduser().resolve()
+    except OSError:
+        p = Path(path).expanduser()
+    for q in (p, *p.parents):
+        if q == q.parent:
+            break          # the very top of the computer's own disk is never a card
+        if looks_like_card(q):
+            return q
+        try:
+            if os.path.ismount(str(q)):
+                break
+        except OSError:
+            break
+    return None
+
+
+def can_write(folder):
+    """Can a file be made in this folder right now? (A drive a Mac can only read, such as one formatted for
+    Windows, or one that came back read-only after a bad eject, says no.) The test file is ours and is removed."""
+    probe = Path(folder) / ".studio-write-test"
+    try:
+        probe.write_text("ok", encoding="utf-8")
+    except OSError:
+        return False
+    try:
+        probe.unlink()
+    except OSError:
+        pass
+    return True
+
+
+def room_needed(source):
+    """Bytes a backup of this card or folder needs on a drive (its files, 5% and 2 GB to spare, as the backup's
+    own check asks), or None when it cannot be told."""
+    try:
+        import cards
+        return sum(s for _, s in cards.files_on(Path(source))) * 1.05 + 2 * 1024 ** 3
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def cannot_use(place, need=None, found=None):
+    """Plain words when photos cannot go here today (it cannot be written to, or has no room for this card);
+    None when they can. Asked BEFORE a drive is ever saved (Nov 19 review: the first backup saved its drive
+    first and checked afterwards, so a drive that could not be used stayed on file and stopped every backup)."""
+    place = Path(place)
+    found = drives() if found is None else found
+    row = next((x for x in found if _inside(place, x["path"])), None)
+    name = row["name"] if row else (this_computer.drive_words(place) or f"this {this_computer.COMPUTER}")
+    if not place.is_dir():
+        return f"{name} is not there right now."
+    if not can_write(place):
+        return f"I can't save photos to {name}: it can be read but not written to."
+    if need:
+        free = row["free"] if row and row.get("free") else this_computer.free_bytes(place)
+        if free is not None and free < need:
+            return (f"{name} does not have room for this card: about {need / 1e9:.0f} GB is needed and "
+                    f"{free / 1e9:.0f} GB is free.")
+    return None
+
+
 def drives():
     """Volumes they might mean; the computer's own disk, camera cards, Time Machine and tiny helper volumes left out.
-    Each carries its likely shoot folders; the one that already has shoots on it is `recommended`."""
+    Each carries its likely shoot folders; the one that already has shoots on it is `recommended`. maybe_card:
+    the computer says it is removable media (a card in a reader, or a USB stick), so it is never chosen with
+    nobody asked."""
     out = []
     for vol in this_computer.volumes():   # /Volumes on a Mac, drive letters on a PC
         v = Path(vol["path"])
         total, free = vol["total"], vol["free"]
         try:
-            if total < 8 * 1024 ** 3 or vol["system"] or (v / "DCIM").is_dir():
+            if total < 8 * 1024 ** 3 or vol["system"] or looks_like_card(v):
                 continue  # too small to be a session drive, the computer itself, or a camera card
             if (v / "Backups.backupdb").is_dir() or (v / ".com.apple.timemachine.supported").exists():
                 continue  # Time Machine
@@ -179,7 +279,8 @@ def drives():
         folders = shoot_folders(v)
         root_score, _ = _looks_like_shoot(v)
         out.append({"path": str(v), "name": vol["shown"], "total_gb": round(total / 1024 ** 3),
-                    "free_gb": round(free / 1024 ** 3), "shoot_folders": folders,
+                    "free_gb": round(free / 1024 ** 3), "free": free, "shoot_folders": folders,
+                    "maybe_card": this_computer.removable(vol) is True,
                     "has_shoots": bool(folders) or root_score >= 3, "recommended": False})
     out.sort(key=lambda d: (-int(d["has_shoots"]), -d["total_gb"]))
     if out:
@@ -294,7 +395,14 @@ def set_drive(d, key, path):
 SHOOTS_ON_COMPUTER = "Shoots"     # the folder made inside Pictures when they choose the computer itself (a draft)
 
 
-def ask_words(state, found=()):
+def skipped_lines(skipped):
+    out = []
+    for x in skipped or ():
+        out.append(f"NOT OFFERED: {x['name']}: {x['why']}  (say this in one plain line only if they ask about that drive)")
+    return out
+
+
+def ask_words(state, found=(), skipped=()):
     """What the assistant is told when the drive cannot be chosen: the one question, and the command that
     saves the answer. `state` is "ask-which" (more than one drive) or "ask-none" (no external drive)."""
     if state == "ask-which":
@@ -303,10 +411,27 @@ def ask_words(state, found=()):
                  '  "Which drive should your photos go on?"  One button per drive, by its name and free space, '
                  "the recommended one first:"]
         lines += drive_lines(found)
+        lines += skipped_lines(skipped)
         lines += ['Then save it:  studio_file.py defaults --drive "<that drive\'s path>"   and run the backup again. '
                   "Ask nothing else."]
         return lines
+    if state == "ask-sure":
+        d = found[0]
+        return ["ASK is-this-the-drive",
+                f"One thing is plugged in besides the card, {d['name']}, and it may be a memory card or a USB stick "
+                "rather than a photo drive, so it is not chosen by itself. This is the one question, asked once ever:",
+                f'  "Should your photos go on {d["name"]}?"  [Yes, on {d["name"]}]  [No, I\'ll plug my drive in]',
+                f'Yes:  studio_file.py defaults --drive "{d["path"]}"   and run the backup again.',
+                "No: wait for them to say it is in, then run the backup again. Ask nothing else."]
     here = this_computer.COMPUTER
+    if skipped:
+        x = skipped[0]
+        return ["ASK no-drive",
+                f"The only drive plugged in cannot be used today. Say this first, as it is: \"{x['why']}\"",
+                "Nothing was saved. Then the one question, asked once ever:",
+                f'  "Where should your photos go?"  [I\'ll plug another drive in]  [On this {here} for now]',
+                "Plug one in: wait for them to say it is in, then run the backup again.",
+                f"On this {here} for now:  studio_file.py defaults --computer   and run the backup again."]
     return ["ASK no-drive",
             "No external drive is plugged in, so this is the one question, asked once ever:",
             f'  "I don\'t see an external drive. Where should your photos go?"  [I\'ll plug one in]  [On this {here} for now]',
@@ -363,9 +488,14 @@ def place_on(drive):
     for the report's "Use a different drive next time" alike."""
     root = this_computer.drive_root(drive)
     top = next((x for x in drives() if _same(root, x["path"])), None)
-    if top and top["shoot_folders"]:
-        return Path(top["shoot_folders"][0]["path"])
-    return root
+    return sure_place(top) if top else root
+
+
+def sure_place(row):
+    """A drive (a row of drives()) -> the folder on it shoots go in with nobody asked: its one sure shoot folder
+    (shoot_folders: named for shoots, with folders in it), else the top of the drive, where they will see it."""
+    sure = [f for f in row["shoot_folders"] if f.get("sure")]
+    return Path(sure[0]["path"]) if sure else Path(row["path"])
 
 
 def use_next(drive=None, computer=False):
@@ -393,6 +523,9 @@ def use_next(drive=None, computer=False):
         name, where = _where_words(place, drives())
         if d.get("second") and (_inside(d["second"], root) or _inside(place, d["second"])):
             return {"state": "second", "place": str(place), "drive": name, "where": where}
+        why = cannot_use(place)
+        if why:
+            return {"state": "stop", "why": why, "cannot": True}
     if computer:
         place.mkdir(parents=True, exist_ok=True)
     if not set_drive(d, "session", place):
@@ -405,27 +538,42 @@ def use_next(drive=None, computer=False):
     return {"state": "saved", "place": d["session"], "drive": name, "where": where}
 
 
-def choose_defaults(drive=None, computer=False, write=True, source=None):
+def choose_defaults(drive=None, computer=False, write=True, source=None, need=None):
     """The first backup's setup, done by the Assistant itself (Dustin, Nov 19: zero questions before the copy).
-    Returns a dict: state "set" (a drive is already on file: nothing is changed, ever), "chose" (chosen and
-    written), "would" (chosen, write=False: nothing written, nothing made), "ask-which" (more than one drive
-    and none named: `drives` holds them), "ask-none" (no external drive), or "stop" (`why`: a named folder that
-    is not there). With a choice: place (the folder shoots go in), drive (its name), where (in words).
+    Returns a dict: state "set" (a drive is already on file: nothing is changed, ever), "set-other" (a drive is
+    on file and a DIFFERENT one was named here: nothing changed; changing it is `set --drive`), "chose" (chosen
+    and written), "would" (chosen, write=False: nothing written, nothing made), "ask-which" (more than one
+    drive and none named: `drives` holds them), "ask-sure" (one drive, and it may be a memory card or a stick),
+    "ask-none" (no external drive, or the only one cannot be used today: `skipped` says why), or "stop" (`why`:
+    a named place that is not there or cannot be used). With a choice: place (the folder shoots go in), drive
+    (its name), where (in words).
 
-    drive: the answer to the one question, a drive's path (its top shoot folder is used when it has one) or a
+    drive: the answer to the one question, a drive's path (its sure shoot folder is used when it has one) or a
     folder inside a drive (taken as given). computer: they chose the computer itself; <Pictures>/Shoots, made
     if missing. source: the card or folder about to be backed up; a drive that holds it is never the choice.
-    Run twice it writes once. It never touches drives.second, and leaves a naming that is on file alone."""
+    need: the room the backup needs, in bytes (worked out from source when not given).
+
+    A drive is only ever chosen, and only ever saved, when photos can go on it today: it can be written to and,
+    when the card is known, has room for it (cannot_use). Chosen with nobody asked only when it is the one drive
+    plugged in. Run twice it writes once. It never touches drives.second, and leaves a naming on file alone."""
     sf = load()
     d = sf.get("drives") or {}
     if d.get("session"):
         name, where = _where_words(d["session"], drives())
-        return {"state": "set", "place": d["session"], "drive": name, "where": where}
+        other = False
+        if computer:
+            other = not on_internal_disk(d["session"])
+        elif drive:
+            root = this_computer.drive_root(drive)
+            other = not (_inside(d["session"], root) or _inside(root, d["session"]))
+        return {"state": "set-other" if other else "set", "place": d["session"], "drive": name, "where": where}
     found = drives()
     if source:
         found = [x for x in found if not _inside(source, x["path"])]
         if found and not any(x["recommended"] for x in found):
             found[0]["recommended"] = True
+        if need is None and not computer:
+            need = room_needed(source)
     note = None
     if computer:
         place = this_computer.known_folder("Pictures") / SHOOTS_ON_COMPUTER
@@ -436,13 +584,31 @@ def choose_defaults(drive=None, computer=False, write=True, source=None):
         root = this_computer.drive_root(drive)
         if not root.is_dir():
             return {"state": "stop", "why": f"{drive} is not a folder I can see."}
+        if card_above(root) is not None:
+            return {"state": "stop", "why": "That is a memory card. Photos belong on a drive that never gets formatted."}
+        if source and (_inside(source, root) or _inside(root, source)):
+            return {"state": "stop", "why": "That is where the photos are coming from. Pick a different drive."}
         place = place_on(root)
         name, where = _where_words(place, drives())
+        why = cannot_use(place, need)
+        if why:
+            return {"state": "stop", "why": why}
     elif len(found) == 1:
-        place = Path(found[0]["shoot_folders"][0]["path"] if found[0]["shoot_folders"] else found[0]["path"])
+        only = found[0]
+        place = sure_place(only)
         name, where = _where_words(place, found)
+        why = cannot_use(place, need, found)
+        if why:
+            return {"state": "ask-none", "drives": [], "skipped": [{"name": only["name"], "why": why}]}
+        if only.get("maybe_card"):
+            return {"state": "ask-sure", "drives": found}
     else:
-        return {"state": "ask-which" if found else "ask-none", "drives": found}
+        skipped = []
+        for x in found:
+            why = cannot_use(sure_place(x), need, found)
+            if why:
+                skipped.append({"name": x["name"], "why": why})
+        return {"state": "ask-which" if found else "ask-none", "drives": found, "skipped": skipped}
     got = {"state": "chose" if write else "would", "place": str(place), "drive": name, "where": where}
     if not write:
         return got
@@ -613,10 +779,23 @@ def main():
         print(one)
         return
     if a.cmd == "defaults":
+        if a.source:
+            # the card is asked whether it answers before anything looks at it (as night.py does): a card that
+            # has gone quiet stops here in half a minute, never a silent wait
+            import cards
+            if not cards.answers(a.source):
+                sys.exit(f"STOP: {cards.QUIET_CARD}")
         got = choose_defaults(drive=a.drive, computer=a.computer, write=not a.dry_run, source=a.source)
         if got["state"] == "set":
             print(f"SET: {got['place']} | {got['drive']}")
             print("A drive is already on file. Nothing changed.")
+        elif got["state"] == "set-other":
+            print(f"SET-OTHER: {got['place']} | {got['drive']}")
+            print(f"A different place is already on file ({got['drive']}, {got['where']}), so NOTHING CHANGED and their photos "
+                  "would still go there. This command never changes a drive that is on file.")
+            print('If they mean this as where their photos go from now on:  studio_file.py set --drive "<path>"')
+            print('If it is for this one backup only:  night.py --source "<card>" --dest "<path>"')
+            sys.exit(6)
         elif got["state"] in ("chose", "would"):
             print(f"{'CHOSE' if got['state'] == 'chose' else 'WOULD CHOOSE'}: {got['place']} | {got['drive']} | {got['where']}")
             if got["state"] == "would":
@@ -624,8 +803,8 @@ def main():
         elif got["state"] == "stop":
             sys.exit(f"STOP: {got['why']}")
         else:
-            print("\n".join(ask_words(got["state"], got.get("drives", ()))))
-            sys.exit(3 if got["state"] == "ask-which" else 4)
+            print("\n".join(ask_words(got["state"], got.get("drives", ()), got.get("skipped", ()))))
+            sys.exit(4 if got["state"] == "ask-none" else 3)
         return
     if a.cmd == "cards":
         found = this_computer.cards()

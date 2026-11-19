@@ -254,6 +254,10 @@ def set_next_drive(studio, ask):
     row = rows[i]
     got = studio_file.use_next(computer=True) if row["path"] is None else studio_file.use_next(drive=row["path"])
     drive = row["name"] if row["path"] else f"this {this_computer.COMPUTER}"
+    if row["path"] and str(got.get("where") or "").startswith("in "):
+        drive += f", {got['where']}"      # where on the drive is said too, when it is a folder ("LaCie, in Photo Shoots")
+    if got["state"] == "stop" and got.get("cannot"):
+        return {"ok": False, "words": got["why"]}     # it cannot be written to: plain words, the drive by its name
     if got["state"] == "saved":
         return {"ok": True, "words": W["nd_saved"].format(drive=drive)}
     if got["state"] == "same":

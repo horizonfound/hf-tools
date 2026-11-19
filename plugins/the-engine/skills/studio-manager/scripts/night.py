@@ -296,6 +296,88 @@ def another_card(studio, source, name):
     return not_this_card(json.loads(mpath.read_text(encoding="utf-8")), source, files, name)
 
 
+def folder_for(source, dest, date, name, auto):
+    """Which folder this card's backup is: (session folder, the settled records of a finished backup of THIS
+    card or None, the name used, plain words to stop with or None).
+
+    A folder with this backup's name (the day plus the name) may already be taken by another card's backup,
+    still in its day folder or finished and settled, its records in .studio (Nov 19 review: with no name asked,
+    every card of a day is "<weekday> card"; once card 1 had settled, card 2 was told "this backup is finished",
+    was written into the card ledger as backed up, and not one file of it was copied). A backup is this card's
+    only when its own records say so (backup.not_this_card: every file it copied is still on the card at its
+    size, three of them read the same, and the card has nothing newer). When the name was not given (auto), the
+    card quietly gets the next free one ("thursday card 2"); a name they gave is never changed: it stops."""
+    from backup import inventory, not_this_card, not_copied
+    files = None
+    base = name.strip()
+    for n in range(1, 100):
+        cand = base if n == 1 else f"{base} {n}"
+        session = Path(dest).expanduser() / this_computer.safe_name(f"{date} {cand}", limit=120)
+        st = None
+        if session.exists():
+            mpath = session / "_studio" / "manifest.json"
+            if not mpath.exists():
+                return session, None, cand, None
+        else:
+            try:
+                _, st = locate(session)
+            except SystemExit:
+                return session, None, cand, None
+            mpath = st / "manifest.json"
+            if not (st / "settled.json").exists():
+                return session, None, cand, None
+        try:
+            manifest = json.loads(mpath.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            manifest = None
+        why = "unreadable"
+        if manifest is not None:
+            if files is None:
+                files, _ = inventory(Path(source))
+            why = not_this_card(manifest, Path(source), files, cand)
+            if why is None and st is not None and not_copied(manifest, Path(source), files):
+                why = (f"A finished backup called \"{cand}\" is already on the drive and does not hold everything on this "
+                       f"card. Give this card its own name, like \"{cand} 2\", and run it again.")
+        if why is None:
+            return session, st, cand, None
+        if not auto:
+            if why == "unreadable":
+                why = (f"A backup called \"{cand}\" is already on the drive and I can't read its records. "
+                       f"Give this card its own name, like \"{cand} 2\", and run it again.")
+            return session, None, cand, why
+    return session, None, cand, "Too many backups share this name today. Give this card a name of its own."
+
+
+def second_copy_after(session, second):
+    """The second copy onto the drive they saved, made AFTER the backup itself is whole (Nov 19 review: made
+    inside the copy, any trouble with that optional drive, read-only, full, a file in the way, stopped or
+    broke the whole backup, card never called safe). Now it is the report's own Make a second copy
+    (second_copy.py), run here: whatever goes wrong with it, the backup stands, the report says there is one
+    copy and why, and its button carries on. Run again it does nothing when the copy is made. Never fatal."""
+    try:
+        code = run("second_copy.py", session, "--to", second)
+        if code == 0:
+            return
+        words = None
+        if code == 2:    # refused before anything was written (no room, a memory card, the same drive...): why
+            r = subprocess.run([sys.executable, str(HERE / "second_copy.py"), str(session), "--to", str(second), "--check", "--json"],
+                               capture_output=True, encoding="utf-8", errors="replace", timeout=600)
+            try:
+                words = json.loads((r.stdout or "").strip().splitlines()[-1]).get("words")
+            except (ValueError, IndexError, AttributeError):
+                words = None
+            _, studio = locate(session)
+            note = {"when": datetime.now().isoformat(timespec="seconds"),
+                    "drive": this_computer.drive_words(second) or "your second drive", "there": True}
+            if words:
+                note["words"] = f"No second copy yet, so there's one copy for now. {words}"
+            (studio / "second-missed.json").write_text(json.dumps(note, indent=1), encoding="utf-8")
+        say("   (the second copy is not made: one copy for now. The backup itself is whole, and the report says so, "
+            "with its Make a second copy button)")
+    except Exception as e:  # noqa: BLE001  (an optional copy never stops the backup)
+        say(f"   (the second copy could not be tried: {e.__class__.__name__}. One copy for now)")
+
+
 def check_shoots(studio):
     """shoots.json must give every group to exactly one shoot, with a suggested name each."""
     groups = [g["id"] for g in json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]]
@@ -334,6 +416,17 @@ def main():
     ap.add_argument("--with", dest="with_", default=None, help="the first card's backup of this shoot: this card is linked to it, so the report shows every card on one page")
     a = ap.parse_args()
 
+    if this_computer.WINDOWS and a.source:
+        a.source = str(this_computer.drive_root(a.source))   # unproven on a real PC: a bare "E:" is the top of drive E
+    # Does the card answer at all? Asked first, before anything else looks at it (the first backup's own choice
+    # of a drive lists every drive plugged in, the card among them), by a small program of its own with a time
+    # limit, so a card that has gone quiet stops the backup in plain words within half a minute, instead of a
+    # silent wait with no end.
+    if a.source and not cards.answers(a.source):
+        say("STOP, before anything is copied:")
+        say(f"  - {cards.QUIET_CARD}")
+        sys.exit(2)
+
     # their drive and second copy come from the Studio File unless given here
     sf = studio_file.load()
     drives = sf.get("drives", {})
@@ -342,6 +435,7 @@ def main():
     if a.source and not a.dest:
         a.dest = drives.get("session")
     second_missed = None
+    first_choice = None
     if a.source and a.second is None and drives.get("second"):
         a.second = drives["second"]
         # The second drive they saved is not plugged in today (Dustin, Nov 19): the backup no longer stops for it.
@@ -355,40 +449,40 @@ def main():
         if not there and not studio_file.drive_moved(drives, "second"):
             second_missed = this_computer.drive_words(a.second) or drives.get("second_label") or "your second drive"
             a.second, second_from_file = None, False
+    # A second drive that IS plugged in never stops or breaks the backup either: everything on the card goes onto
+    # the photo drive and is checked first, and the second copy is made right after (second_copy_after).
+    second_after = None
+    if second_from_file and a.second and not studio_file.drive_moved(drives, "second"):
+        second_after, a.second, second_from_file = a.second, None, False
     if a.source and not a.dest:
         # No drive on file: the first backup. Nothing is asked before the copy (Dustin, Nov 19): the drive, where
         # on it and the naming are chosen here and written to the Studio File, so every later backup is the same.
         # With --check nothing is written. Only when the drive cannot be told (more than one, or none) does this
         # still stop, with the one question to ask.
-        got = studio_file.choose_defaults(write=not a.check, source=a.source)
-        if got["state"] in ("chose", "would"):
-            a.dest = got["place"]
+        # The choice is SAVED only after every check below has passed (Nov 19 review: saved first, a drive that
+        # could not be written to, or had no room, stayed on file and stopped every later backup).
+        got = studio_file.choose_defaults(write=False, source=a.source)
+        if got["state"] == "would":
+            a.dest = first_choice = got["place"]
             say(f"First backup: your photos {'would ' if a.check else ''}go to {got['drive']}, {got['where']}.")
-            drives = studio_file.load().get("drives", {})
-        elif got["state"] in ("ask-which", "ask-none"):
+        elif got["state"] in ("ask-which", "ask-none", "ask-sure"):
             say("5. ONE QUESTION before the first backup: which drive. Nothing is copied and nothing is saved yet.")
-            for ln in studio_file.ask_words(got["state"], got.get("drives", ())):
+            for ln in studio_file.ask_words(got["state"], got.get("drives", ()), got.get("skipped", ())):
                 say("  " + ln)
             sys.exit(5)
         else:
             say("STOP, before anything is copied:")
             say(f"  - {got.get('why') or 'I could not work out where your photos go.'}")
             sys.exit(2)
+    auto_name = bool(a.source and not a.name)            # no name given: the day, and the next free one if taken
     if a.source and not a.name:
         a.name = datetime.now().strftime("%A").lower() + " card"  # "saturday card"
     if this_computer.WINDOWS:
         # unproven on a real PC: a bare "E:" means the top of drive E; Python alone reads it as wherever it last
         # was on E. (A Mac's paths are left exactly as given.)
-        for k in ("source", "dest", "second"):
+        for k in ("dest", "second"):
             if getattr(a, k):
                 setattr(a, k, str(this_computer.drive_root(getattr(a, k))))
-
-    # Does the card answer at all? Asked first, by a small program of its own with a time limit, so a card that has
-    # gone quiet stops the backup in plain words within half a minute, instead of a silent wait with no end.
-    if a.source and not cards.answers(a.source):
-        say("STOP, before anything is copied:")
-        say(f"  - {cards.QUIET_CARD}")
-        sys.exit(2)
 
     # the ledger: a card already backed up is not copied again
     if a.source and not a.session and not a.again:
@@ -440,25 +534,34 @@ def main():
                     open_report(st, st)
                 return
     elif a.source and a.dest and a.name:
-        session = Path(a.dest).expanduser() / this_computer.safe_name(f"{a.date} {a.name.strip()}", limit=120)
-        if not session.exists():
+        asked = a.name
+        clash = None
+        if Path(a.source).is_dir():
+            session, st, a.name, clash = folder_for(a.source, a.dest, a.date, a.name, auto_name)
+        else:
+            session, st = Path(a.dest).expanduser() / this_computer.safe_name(f"{a.date} {a.name.strip()}", limit=120), None
+        if clash:
+            say("STOP, before anything is copied:")
+            say(f"  - {clash}")
+            sys.exit(2)
+        if a.name != asked:
+            say(f"(Another card was backed up today as \"{asked}\", so this one is \"{a.name}\".)")
+        if st is not None:
             # The same command again after the settle (the day folder is gone, its records are in .studio): a
-            # finished backup, never a second copy of the card. If the ledger missed it (a sample that covered the
-            # whole card, or a stop between the copy and the ledger), it is put in now.
-            try:
-                root, st = locate(session)
-            except SystemExit:
-                root, st = None, None
-            if st is not None and (st / "settled.json").exists():
-                from backup import whole_records
-                if whole_records(st):
+            # finished backup of THIS card (folder_for proved it from the records), never a second copy of it.
+            # If the ledger missed it (a sample that covered the whole card, or a stop between the copy and the
+            # ledger), it is put in now.
+            root, _ = locate(st)
+            from backup import whole_records
+            if whole_records(st):
+                if not a.check:
                     cards.register(a.source, st)
-                    say(f"This backup is finished and settled: the shoots are in {root}. The card is in the ledger.")
-                else:
-                    say(f"This backup is finished and settled: the shoots are in {root}. It was a sample of the card, so the card is not marked safe.")
-                if a.open:
-                    open_report(st, st)
-                return
+                say(f"This backup is finished and settled: the shoots are in {root}. The card is in the ledger.")
+            else:
+                say(f"This backup is finished and settled: the shoots are in {root}. It was a sample of the card, so the card is not marked safe.")
+            if a.open:
+                open_report(st, st)
+            return
     else:
         sys.exit("usage: --source [--dest --name], or --session <folder>")
     studio = session / "_studio"
@@ -483,8 +586,17 @@ def main():
             for p in problems:
                 say(f"  - {p}")
             sys.exit(2)
+        if first_choice and not a.check:
+            saved = studio_file.choose_defaults(drive=first_choice, source=a.source)
+            if saved["state"] not in ("chose", "set"):
+                say("STOP, before anything is copied:")
+                say(f"  - {saved.get('why') or 'I could not save where your photos go.'}")
+                sys.exit(2)
+            drives = studio_file.load().get("drives", {})
         if a.check:
             say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
+            if second_after:
+                say("NOTE: the second copy is made right after the backup itself, and never holds it up. Say nothing more.")
             if second_missed:
                 say(f"NOTE: the second drive ({second_missed}) is not plugged in, so this backup makes one copy. "
                     "Say nothing before the copy; the report says so afterwards, with its Make a second copy button.")
@@ -544,6 +656,9 @@ def main():
             say("   (a sample, so the card is NOT marked as backed up)")
         else:
             cards.register(a.source, session)  # now the ledger knows this card (it is told only once)
+    if second_after and a.source:
+        say("1b. The second copy")
+        second_copy_after(session, second_after)
     if a.with_:
         # one shoot on several cards (Dustin, Nov 12): link this card to the first one's backup, so one report
         # shows every card. The pages come at step 6; a link that fails leaves this card's report on its own.

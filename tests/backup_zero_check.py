@@ -224,8 +224,13 @@ def already_set(work):
     for args in ([], ["--drive", base / "drives" / "Big Kahuna"], ["--computer"], ["--dry-run"]):
         code, out = t.run("studio_file.py", "defaults", *args, env=env)
         outs.append((code, out))
-    check("defaults, defaults --drive and defaults --computer all say SET",
-          all(c == 0 and o.startswith("SET:") and "Other" in o for c, o in outs), str(outs))
+    check("defaults and a dry run say SET (exit 0)",
+          all(c == 0 and o.startswith("SET:") and "Other" in o for c, o in (outs[0], outs[3])), str(outs))
+    check("defaults --drive <another drive> and --computer say SET-OTHER and exit 6, so it can't be read as 'saved, go on'",
+          all(c == 6 and o.startswith("SET-OTHER:") and "NOTHING CHANGED" in o and "studio_file.py set --drive" in o
+              for c, o in (outs[1], outs[2])), str(outs))
+    code, out = t.run("studio_file.py", "defaults", "--drive", base / "drives" / "Other", env=env)
+    check("defaults --drive naming the drive that is on file is plain SET", code == 0 and out.startswith("SET:"), out)
     check("and the Studio File is byte for byte unchanged",
           (home / "studio.json").read_bytes() == before and (home / "studio-file.md").read_bytes() == md)
     check("no Shoots folder was made in Pictures", not (base / "folders" / "Pictures" / "Shoots").exists())
@@ -250,6 +255,329 @@ def never_the_source(work):
     code, out = t.run("night.py", "--source", folder, env=env)
     check("and backup now stops with the one question rather than copying a drive onto itself",
           code == 5 and not (home / "studio.json").exists(), out)
+
+
+# ---------------------------------------------------------------- the Nov 19 review of the zero-questions backup
+
+def world2(work, name, rows_):
+    """As world(), with each drive's row given whole: (name, total GB, free GB, removable)."""
+    base, home, env = world(work, name, [])
+    rows = []
+    for dname, total, free, removable in rows_:
+        p = base / "drives" / dname
+        p.mkdir(parents=True)
+        rows.append({"path": str(p), "name": dname, "shown": dname, "total": total * GB, "free": int(free * GB),
+                     "system": False, "removable": removable, "id": None})
+    (base / "drives.json").write_text(json.dumps(rows), encoding="utf-8")
+    return base, home, env
+
+
+def plug_in(base, dname, total=4000, free=2000):
+    p = base / "drives" / dname
+    p.mkdir(parents=True)
+    rows = json.loads((base / "drives.json").read_text(encoding="utf-8"))
+    rows.append({"path": str(p), "name": dname, "shown": dname, "total": total * GB, "free": free * GB,
+                 "system": False, "removable": False, "id": None})
+    (base / "drives.json").write_text(json.dumps(rows), encoding="utf-8")
+    return p
+
+
+def never_saved_before_it_works(work):
+    print("Review 1, 11: a drive is never saved before it is known to work")
+    if this_computer.WINDOWS or os.geteuid() == 0:
+        SKIPPED.append("a read-only drive")
+        print("  SKIP  a read-only drive   [a folder cannot be made read-only this way here]", flush=True)
+    else:
+        base, home, env = world2(work, "stuck", [("Client USB", 500, 250, False)])
+        usb = base / "drives" / "Client USB"
+        card = base / "CARD"
+        t.make_card(card, groups=(3,))
+        os.chmod(usb, 0o555)
+        try:
+            code, out = t.run("studio_file.py", "defaults", "--source", card, env=env)
+            check("the only drive cannot be written to: defaults saves nothing and asks instead (exit 4), saying why",
+                  code == 4 and "ASK no-drive" in out and "I can't save photos to Client USB: it can be read but not written to." in out
+                  and not (home / "studio.json").exists(), out)
+            code, out = t.run("night.py", "--source", card, "--check", env=env)
+            check("the quiet check asks the one question (exit 5) and saves nothing", code == 5 and not (home / "studio.json").exists(), out)
+            code, out = t.run("night.py", "--source", card, env=env)
+            check("backup now the same: exit 5, no drive saved, nothing copied",
+                  code == 5 and "First backup: your photos go to" not in out and not (home / "studio.json").exists(), out)
+            code, out = t.run("studio_file.py", "defaults", "--drive", usb, "--source", card, env=env)
+            check("naming that drive as the answer is refused with the reason, nothing saved",
+                  code != 0 and "STOP" in out and "can be read but not written to" in out and not (home / "studio.json").exists(), out)
+            big = plug_in(base, "Big Kahuna")
+            code, out = t.run("studio_file.py", "defaults", "--source", card, env=env)
+            check("their real drive plugged in beside it: the which-drive question, with the other one marked as not offered",
+                  code == 3 and "ASK which-drive" in out and "NOT OFFERED: Client USB" in out and not (home / "studio.json").exists(), out)
+            code, out = t.run("studio_file.py", "defaults", "--drive", big, "--source", card, env=env)
+            check("and the answer is saved", code == 0 and "CHOSE:" in out and same(sf(home)["drives"]["session"], big), out)
+        finally:
+            os.chmod(usb, 0o755)
+    base, home, env = world2(work, "full", [("Nearly Full", 500, 1, False)])
+    card = base / "CARD"
+    t.make_card(card, groups=(3,))
+    code, out = t.run("studio_file.py", "defaults", "--source", card, env=env)
+    check("the only drive has no room for this card: nothing saved, the question instead, saying why",
+          code == 4 and "Nearly Full does not have room for this card" in out and not (home / "studio.json").exists(), out)
+    base, home, env = world(work, "late", [("Big Kahuna", 4000)])
+    empty = base / "EMPTY CARD"
+    (empty / "DCIM").mkdir(parents=True)
+    code, out = t.run("night.py", "--source", empty, env=env)
+    check("backup now that stops in its own checks (an empty card) has saved no drive: saved only once the checks pass",
+          code == 2 and "Nothing on the card to copy" in out and not (home / "studio.json").exists(), out)
+
+
+def where_on_the_drive(work):
+    print("Review 3, 10: where on the drive is never a loose guess")
+    for label, top, inside in (("an Apple Photos library", "Photos Library.photoslibrary", ("database", "originals", "resources", "private")),
+                               ("Drawings (d-RAW-ings)", "Drawings", ("2019", "sketches", "clients-old")),
+                               ("Homework (home-WORK)", "Homework", ("math", "art", "music")),
+                               ("a Backups folder of dated folders", "Backups", ("2026-01-01", "2026-02-02")),
+                               ("Final Exports, dated", "Final Exports", ("2026-01-10 A", "2026-02-11 B")),
+                               ("a folder of dated folders with no shoot word", "Smith Archive", ("2024-01-01 a", "2025-02-02 b", "2026-03-03 c"))):
+        base, home, env = world(work, "guess-" + "".join(c for c in top if c.isalnum()), [("My Passport", 2000)])
+        drive = base / "drives" / "My Passport"
+        for sub in inside:
+            (drive / top / sub).mkdir(parents=True)
+        (drive / "Movies").mkdir()
+        code, out = t.run("studio_file.py", "defaults", "--dry-run", env=env)
+        check(f"{label}: photos go right on the drive, never inside it",
+              code == 0 and "WOULD CHOOSE:" in out and "| My Passport | right on the drive" in out and out.split("|")[0].strip().endswith("My Passport"), out)
+    import studio_file
+    base, home, env = world(work, "guess-ok", [("My Passport", 2000)])
+    drive = base / "drives" / "My Passport"
+    for top in ("Clients", "Photos Library.photoslibrary"):
+        for sub in ("2026-01-10 Smith", "2026-02-14 Jones", "2026-03-01 Beach"):
+            (drive / top / sub).mkdir(parents=True)
+    code, out = t.run("studio_file.py", "defaults", "--dry-run", env=env)
+    check("a folder plainly named for shoots, with folders in it, is still used", "| My Passport | in Clients" in out, out)
+    with t.environ(**env):
+        listed = [x["name"] for x in studio_file.drives()[0]["shoot_folders"]]
+    check("and a library package is never even listed as a shoot folder", listed == ["Clients"], str(listed))
+
+
+def a_card_is_never_the_drive(work):
+    print("Review 4: a memory card or a stick is never chosen as the drive by itself")
+    base, home, env = world(work, "videocard", [("XQD_VIDEO", 120)])
+    (base / "drives" / "XQD_VIDEO" / "PRIVATE" / "M4ROOT" / "CLIP").mkdir(parents=True)
+    card = base / "CARD"
+    t.make_card(card, groups=(3,))
+    code, out = t.run("studio_file.py", "defaults", "--source", card, "--dry-run", env=env)
+    check("a video camera's card (no DCIM, its own folders at the top) is not a drive at all", code == 4 and "ASK no-drive" in out, out)
+    code, out = t.run("studio_file.py", "drives", env=env)
+    check("and is not in the list the report's panels use", "XQD_VIDEO" not in out, out)
+    base, home, env = world2(work, "blankcard", [("Untitled", 120, 119, True)])
+    blank = base / "drives" / "Untitled"
+    card = base / "CARD"
+    t.make_card(card, groups=(3,))
+    code, out = t.run("studio_file.py", "defaults", "--source", card, env=env)
+    check("the only thing plugged in is removable media (a blank card, a stick): asked about, never chosen (exit 3), nothing saved",
+          code == 3 and "ASK is-this-the-drive" in out and "Should your photos go on Untitled?" in out
+          and not (home / "studio.json").exists(), out)
+    code, out = t.run("night.py", "--source", card, env=env)
+    check("backup now asks the same one question (exit 5) and copies nothing", code == 5 and not any(blank.iterdir())
+          and not (home / "studio.json").exists(), out)
+    code, out = t.run("studio_file.py", "defaults", "--drive", card, env=env)
+    check("a memory card named as the drive is refused", code != 0 and "That is a memory card" in out and not (home / "studio.json").exists(), out)
+    code, out = t.run("studio_file.py", "defaults", "--drive", blank, "--source", card, env=env)
+    check("their yes to the removable one is taken (it is their answer)", code == 0 and "CHOSE:" in out, out)
+
+
+def the_card_answers_first(work):
+    print("Review 13: the card is asked whether it answers before anything else looks at it")
+    base, home, env = world(work, "quiet", [("Big Kahuna", 4000)])
+    card = base / "CARD"
+    t.make_card(card, groups=(3,))
+    quiet = dict(env, ASSISTANT_CARD_ANSWER_SECONDS="0")
+    code, out = t.run("night.py", "--source", card, env=quiet)
+    check("a card that does not answer stops the first backup before a drive is worked out or saved",
+          code == 2 and "Your memory card has stopped answering" in out and "First backup" not in out
+          and not (home / "studio.json").exists(), out)
+    code, out = t.run("studio_file.py", "defaults", "--source", card, env=quiet)
+    check("defaults --source the same", code != 0 and "Your memory card has stopped answering" in out and not (home / "studio.json").exists(), out)
+
+
+def finish(night, env, studio):
+    """Do the look for a pretend backup that stopped at exit 4 (one shoot per group) and run it again."""
+    groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
+    shoots = [{"id": f"s{i}", "suggested": f"{studio.parent.name[11:]} {i}", "groups": [g["id"]], "photos": g.get("count", 0),
+               "recap": "Test frames.", "why": "test"} for i, g in enumerate(groups, 1)]
+    (studio / "shoots.json").write_text(json.dumps({"decided_by": "test", "shoots": shoots}), encoding="utf-8")
+    return t.run(*night, env=env)
+
+
+def other_photos(card, salt):
+    for p in (card / "DCIM" / "100CANON").glob("*.JPG"):
+        p.write_bytes(p.read_bytes() + salt)
+
+
+def two_cards_one_day(work):
+    print("Review 8: a second card on the same day is never told it is already backed up")
+    from datetime import datetime
+    base, home, env = world(work, "twocards", [("Big Kahuna", 4000)])
+    drive = base / "drives" / "Big Kahuna"
+    t.run("studio_file.py", "set", "--drive", drive, "--offered", "1", env=env)
+    a, b = base / "CARD A", base / "CARD B"
+    t.make_card(a, groups=(5,))
+    t.make_card(b, groups=(4, 3))
+    other_photos(b, b"card b")
+    day = datetime.now().strftime("%A").lower() + " card"
+    D = "2026-11-19"
+    night_a = ["night.py", "--source", a, "--date", D, "--no-peeks"]
+    code, out = t.run(*night_a, env=env)
+    st_a = drive / f"{D} {day}" / "_studio"
+    if code != 4:
+        check("card A reaches the look", False, out)
+        return None
+    code, out = finish(night_a, env, st_a)
+    rec_a = drive / ".studio" / f"{D} {day}"
+    check("card A is backed up under the day's name and settles", code == 0 and (rec_a / "settled.json").is_file(), out)
+    ledger = lambda: json.loads((home / "cards.json").read_text(encoding="utf-8"))["cards"]
+    n_cards = len(ledger())
+    night_b = ["night.py", "--source", b, "--date", D, "--no-peeks"]
+    code, out = t.run(*night_b, "--check", env=env)
+    check("the quiet check on card B says ready, never 'finished and settled', and puts nothing in the card ledger",
+          code == 0 and "PREFLIGHT OK" in out and "finished and settled" not in out and "already safe" not in out
+          and len(ledger()) == n_cards, out)
+    code, out = t.run(*night_b, env=env)
+    st_b = drive / f"{D} {day} 2" / "_studio"
+    m = json.loads((st_b / "manifest.json").read_text(encoding="utf-8")) if (st_b / "manifest.json").is_file() else {}
+    check("backup now on card B copies it, into a folder of its own with the next name, and says so in one line",
+          code == 4 and len(m.get("files", {})) == 8 and all(v.get("dest", {}).get("ok") for v in m["files"].values())
+          and f'so this one is "{day} 2"' in out, out)
+    code, out = t.run(*night_a, env=env)
+    check("card A again is still known as already safe", code == 0 and "already safe" in out, out)
+    # card A with photos taken since its backup
+    src = sorted((a / "DCIM" / "100CANON").glob("*.JPG"))[0]
+    for i in (1, 2):
+        (a / "DCIM" / "100CANON" / f"NEW_{i}.JPG").write_bytes(src.read_bytes() + bytes([i]))
+    code, out = t.run(*night_a, "--check", env=env)
+    check("card A with two new photos is not called finished", code == 0 and "PREFLIGHT OK" in out and "finished and settled" not in out
+          and "already safe" not in out, out)
+    code, out = t.run(*night_a, env=env)
+    m3 = drive / f"{D} {day} 3" / "_studio" / "manifest.json"
+    check("and is copied again in full under the next free name, the new photos with it",
+          code == 4 and m3.is_file() and "DCIM/100CANON/NEW_2.JPG" in json.loads(m3.read_text(encoding="utf-8"))["files"], out)
+    # a name they gave themselves is never changed: it stops
+    c = base / "CARD C"
+    t.make_card(c, groups=(2,))
+    other_photos(c, b"card c")
+    before = (home / "cards.json").read_bytes()
+    code, out = t.run("night.py", "--source", c, "--date", D, "--name", day, "--check", env=env)
+    check("a card given the name of a finished backup of another card stops (exit 2), is not in the ledger, and is not copied",
+          code == 2 and "different memory card" in out and (home / "cards.json").read_bytes() == before
+          and not (drive / f"{D} {day} 4").exists(), out)
+    return {"env": env, "rec_a": rec_a, "st_b": st_b, "night_b": night_b}
+
+
+def take_cards_apart(got):
+    print("Review 7: two backups put on one report can be taken apart again")
+    if not got:
+        return
+    env, rec_a, st_b = got["env"], got["rec_a"], got["st_b"]
+    code, out = t.run("shoot_report.py", "link", rec_a, st_b, env=env)
+    check("linked (two cards on one report)", code == 0 and (rec_a / "shoot.json").is_file() and (st_b / "shoot.json").is_file(), out)
+    linked = (rec_a / "shoot.json").read_bytes()
+    photos = sorted(str(p) for p in rec_a.parent.parent.rglob("*.JPG"))
+    code, out = t.run("shoot_report.py", "unlink", st_b, env=env)
+    check("unlink takes them apart: neither is part of a shoot any more",
+          code == 0 and not (rec_a / "shoot.json").exists() and not (st_b / "shoot.json").exists() and "No photo or folder was touched." in out, out)
+    kept = list(rec_a.glob("shoot.before-unlink-*.json"))
+    check("the record before is kept beside it, byte for byte", len(kept) == 1 and kept[0].read_bytes() == linked
+          and len(list(st_b.glob("shoot.before-unlink-*.json"))) == 1, str(kept))
+    check("no photo moved", sorted(str(p) for p in rec_a.parent.parent.rglob("*.JPG")) == photos)
+    code, out = t.run("shoot_report.py", "show", rec_a, env=env)
+    check("show says so", code == 2 and "Not part of a shoot" in out, out)
+    code, out = t.run("shoot_report.py", "unlink", st_b, env=env)
+    check("run twice: nothing to do (exit 2), nothing more written", code == 2 and len(list(rec_a.glob("shoot.before-unlink-*.json"))) == 1, out)
+
+
+def second_drive_trouble(work):
+    print("Review 2: a saved second drive with trouble never stops or breaks the backup")
+    base, home, env = world(work, "secondtrouble", [("Big Kahuna", 4000), ("LaCie", 2000)])
+    drive, lacie = base / "drives" / "Big Kahuna", base / "drives" / "LaCie"
+    t.run("studio_file.py", "set", "--drive", drive, "--second", lacie, "--offered", "1", env=env)
+    D = "2026-11-19"
+
+    def backup(name, salt, groups=(3,)):
+        card = base / f"CARD {name}"
+        t.make_card(card, groups=groups)
+        other_photos(card, salt)
+        return card, ["night.py", "--source", card, "--date", D, "--name", name, "--no-peeks"], drive / f"{D} {name}" / "_studio"
+
+    def one_copy(st):
+        m = json.loads((st / "manifest.json").read_text(encoding="utf-8")) if (st / "manifest.json").is_file() else {}
+        return bool(m.get("files")) and all(v.get("dest", {}).get("ok") for v in m["files"].values()) and not m.get("second") and not m.get("problems")
+
+    # the ordinary case still works: the second copy is made, after the backup
+    card, night, st = backup("good second", b"g")
+    code, out = t.run(*night, env=env)
+    m = json.loads((st / "manifest.json").read_text(encoding="utf-8")) if (st / "manifest.json").is_file() else {}
+    check("a good second drive: the backup reaches the look with a second copy made and every file of it checked",
+          code == 4 and m.get("second") and all(v.get("second", {}).get("ok") for v in m.get("files", {}).values())
+          and (lacie / f"{D} good second" / "DCIM" / "100CANON").is_dir() and out.index("1b. The second copy") > out.index("Copying to"), out)
+    code, out = finish(night, env, st)
+    check("and finishes and settles with it", code == 0, out[-600:])
+
+    # a file in the way on the second drive
+    card, night, st = backup("in the way", b"w")
+    first = sorted((card / "DCIM" / "100CANON").glob("*.JPG"))[0]
+    there = lacie / f"{D} in the way" / "DCIM" / "100CANON" / first.name
+    there.parent.mkdir(parents=True)
+    there.write_bytes(b"something else that was already here")
+    code, out = t.run(*night, env=env)
+    check("a different file already on the second drive under a photo's name: the backup is not 'Not finished' (exit 4, the look), one copy, card in the ledger",
+          code == 4 and one_copy(st) and "Not finished" not in out and "Traceback" not in out, out)
+    check("the file in the way is untouched", there.read_bytes() == b"something else that was already here")
+    code2, out2 = t.run(*night, env=env)
+    check("run again: the same, never a stop", code2 == 4 and one_copy(st), out2)
+    code, out = finish(night, env, st)
+    rec = drive / ".studio" / f"{D} in the way"
+    page = (rec / "report.html").read_text(encoding="utf-8") if (rec / "report.html").is_file() else ""
+    check("it finishes and settles, and the report calls the card safe", code == 0 and "safe to format" in page, out[-600:])
+
+    # no room on the second drive
+    rows = json.loads((base / "drives.json").read_text(encoding="utf-8"))
+    for r in rows:
+        if r["name"] == "LaCie":
+            r["free"] = GB // 2
+    (base / "drives.json").write_text(json.dumps(rows), encoding="utf-8")
+    card, night, st = backup("no room", b"r")
+    code, out = t.run(*night, "--check", env=env)
+    check("no room on the second drive: the quiet check still passes", code == 0 and "PREFLIGHT OK" in out, out)
+    code, out = t.run(*night, env=env)
+    note = json.loads((st / "second-missed.json").read_text(encoding="utf-8")) if (st / "second-missed.json").is_file() else {}
+    check("and the backup copies everything to the photo drive instead of stopping before a byte (exit 4), with the reason on record",
+          code == 4 and one_copy(st) and "Not enough room on LaCie" in note.get("words", ""), out)
+    t.run("report_page.py", st.parent, env=env)
+    page = (st / "report.html").read_text(encoding="utf-8") if (st / "report.html").is_file() else ""
+    check("the report's top says there is one copy and why, by the drive's name, with no path",
+          "No second copy yet, so there&#x27;s one copy for now. Not enough room on LaCie" in page and str(base) not in page.split("second-missed")[1][:400], page[:200])
+    for r in rows:
+        if r["name"] == "LaCie":
+            r["free"] = 1000 * GB
+    (base / "drives.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    # the second drive can be read but not written to
+    if this_computer.WINDOWS or os.geteuid() == 0:
+        SKIPPED.append("a read-only second drive")
+        print("  SKIP  a read-only second drive   [a folder cannot be made read-only this way here]", flush=True)
+        return
+    card, night, st = backup("read only", b"o")
+    os.chmod(lacie, 0o555)
+    try:
+        code, out = t.run(*night, env=env)
+        check("a second drive that cannot be written to: no Python error, the backup reaches the look with one copy",
+              code == 4 and one_copy(st) and "Traceback" not in out and "PermissionError" not in out, out)
+        code, out = finish(night, env, st)
+        rec = drive / ".studio" / f"{D} read only"
+        check("and finishes, sorted and settled", code == 0 and (rec / "settled.json").is_file() and (rec / "sort-log.json").is_file(), out[-600:])
+    finally:
+        os.chmod(lacie, 0o755)
+    code, out = t.run("second_copy.py", rec, "--to", lacie, env=env)
+    m = json.loads((rec / "manifest.json").read_text(encoding="utf-8"))
+    check("once the drive is right again, Make a second copy makes it", code == 0 and m.get("second"), out)
 
 
 def the_switch_and_help():
@@ -285,6 +613,13 @@ def main():
         no_drive(work)
         already_set(work)
         never_the_source(work)
+        never_saved_before_it_works(work)
+        where_on_the_drive(work)
+        a_card_is_never_the_drive(work)
+        the_card_answers_first(work)
+        if copies:
+            take_cards_apart(two_cards_one_day(work))
+            second_drive_trouble(work)
         the_switch_and_help()
     finally:
         shutil.rmtree(work, ignore_errors=True)

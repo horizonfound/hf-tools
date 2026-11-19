@@ -470,6 +470,37 @@ def changed_source(b):
         reset(b)
 
 
+def edited_since(b):
+    print("Photos saved over since the backup, with the card out (Nov 19 review)")
+    to = new_drive(b, "Edits Drive")
+    index = json.loads((b["records"] / "index.json").read_text(encoding="utf-8"))
+    two = [b["drive"] / x["file"] for x in index["photos"] if x.get("original")][:2]
+    good = [p.read_bytes() for p in two]
+    pull_card(b)
+    try:
+        for p in two:
+            p.write_bytes(p.read_bytes() + b" a rating written into the file")     # an editing program saved over it
+        outs = [second(b, to, *more) for more in (("--check",), (), ())]
+        check("refused up front (exit 2), with --check and without, every time: never 'Ready', never part of a copy",
+              all(c == 2 and "Ready" not in o for c, o in outs) and not any(to.iterdir())
+              and not (b["records"] / "second-copy.json").exists(), str(outs))
+        out = outs[0][1]
+        check("it says the photos were changed, that they are still on the drive, and what would make a copy possible",
+              "2 photos on Big Kahuna have been changed since the backup" in out and "Your photos on Big Kahuna are still there." in out
+              and "put it in and press Make a second copy" in out and "can't get a checked second copy any more" in out, out)
+        check("it never says they could not be found", "could not be found" not in " ".join(o for _, o in outs), out)
+        check("the two photos were not touched by any of it", all(p.read_bytes() == g + b" a rating written into the file" for p, g in zip(two, good)))
+        push_card(b)
+        code, out = second(b, to)
+        check("with the card back in, the copy is made from the card (exit 0), every file checked",
+              code == 0 and {k: v for k, v in tree(to / SESSION).items()} == {k: v["sha256"] for k, v in manifest(b)["files"].items()}, out[-400:])
+    finally:
+        for p, g in zip(two, good):
+            p.write_bytes(g)
+        push_card(b)
+        reset(b)
+
+
 def refusals(b):
     print("Refused before a byte is written")
     def refused(what, to, words, **edit):
@@ -495,6 +526,16 @@ def refusals(b):
     (b["drive"] / "Second copies").mkdir()
     refused("into a folder on the drive the photos are on", b["drive"] / "Second copies", "That is the drive your photos are already on (Big Kahuna).")
     refused("onto the memory card", b["card"], "That is the memory card itself.")
+    # Nov 19 review: any memory card, not only this backup's own while it is in under the name the backup recorded
+    other_card = b["base"] / "drives" / "EOS_DIGITAL 2"
+    (other_card / "DCIM" / "100CANON").mkdir(parents=True)
+    (other_card / "DCIM" / "100CANON" / "IMG_0001.JPG").write_bytes(b"a photo not backed up yet")
+    (other_card / "Second copies").mkdir()
+    refused("onto another memory card", other_card, "That is a memory card.")
+    refused("into a folder on another memory card", other_card / "Second copies", "That is a memory card.")
+    video_card = b["base"] / "drives" / "XQD_VIDEO"
+    (video_card / "PRIVATE" / "M4ROOT" / "CLIP").mkdir(parents=True)
+    refused("onto a video camera's card (no DCIM)", video_card, "That is a memory card.")
     shoot = json.loads((b["records"] / "shoots.json").read_text(encoding="utf-8"))["shoots"][0]["folder"]
     refused("inside the backup's own folders", b["drive"] / shoot, "inside the backup's own folder")
     tiny = new_drive(b, "Tiny Drive", free_gb=0.5)
@@ -755,6 +796,7 @@ def main():
                 already_there(b)
                 own_failed_copy(b)
                 changed_source(b)
+                edited_since(b)
                 refusals(b)
                 the_page(b)
                 if "--chrome" in sys.argv:

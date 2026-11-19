@@ -250,8 +250,8 @@ def check_words():
     # Since Nov 19 (Dustin: nothing is asked before the copy) the first backup has no opening speech and no
     # folder-naming question: these two cases held the old run of questions, and now hold that it is gone. Why there
     # are several folders is said on the report itself (WORDS["why_days"], checked above) and in backup.md's closing.
-    case("first-backup-setup.md: no questions before the copy; the starting message says the usual way can be changed on the report",
-         "**Question " not in f and "You can change any of it on the report afterwards." in f)
+    case("first-backup-setup.md: no questions before the copy; the starting message says what the report lets them change, and no more",
+         "**Question " not in f and "On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." in f)
     case("first-backup-setup.md: folder naming is not asked; year first is the usual way and the other ways are changed on ask",
          '"2026-10-18 Smith Family"' in f and "studio_file.py set --offered 2" in f and "studio_file.py set --example" in f)
     reel = (ROOT / "plugins/the-engine/skills/assistant-make-a-reel/SKILL.md").read_text(encoding="utf-8")

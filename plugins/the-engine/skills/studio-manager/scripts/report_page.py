@@ -320,8 +320,8 @@ OUR_WORDS = {
     "oc_none": "Back up the other card first: put it in and say backup now. Then come back here and pick it.",
     "oc_go": "Put them on one report",
     "oc_quiet": "Each card's photos stay in their own folders.",
-    "oc_done": "Done. Both cards are on one report now.",
-    "oc_done_many": "Done. All {n} cards are on one report now.",
+    "oc_done": "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.",
+    "oc_done_many": "Done. All {n} cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.",
     "oc_changed": "Your backups changed since this was opened. Press the button again.",
     "oc_cant": "I couldn't put them on one report just now. Tell your assistant and it'll sort it out.",
     # change how my shoots are named

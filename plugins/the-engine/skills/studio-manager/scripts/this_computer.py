@@ -623,6 +623,39 @@ def volumes():
     return []
 
 
+_REMOVABLE = {}
+
+
+def removable(vol):
+    """Is this drive (a row of volumes()) removable media: a memory card in a reader, or a USB stick? True,
+    False, or None when the computer cannot say. A PC says so in volumes() itself. A Mac is asked here, one
+    drive at a time and only when it matters (asking every drive on every volumes() call would slow each page):
+    `diskutil info` names the bus ("Secure Digital" for a Mac's own card slot) and the device ("... Card Reader"
+    for most readers on a cable). Either one: True. Anything else: None, since a Mac cannot tell a reader it does
+    not name from a drive (its "RemovableMedia" is no help: Dustin's RAID says True to it, seen Nov 19). So on a
+    Mac a blank card in a reader that does not call itself one is still taken for a drive: a named gap.
+    Remembered for as long as this program runs. unproven on a real card reader."""
+    if vol.get("removable") is not None or not MAC or _pretend_volumes() is not None:
+        return vol.get("removable")
+    path = str(vol.get("path") or "")
+    if path in _REMOVABLE:
+        return _REMOVABLE[path]
+    got = None
+    try:
+        import plistlib
+        import subprocess
+        r = subprocess.run(["diskutil", "info", "-plist", path], capture_output=True, timeout=10)  # pc-ok: the Mac branch
+        if r.returncode == 0:
+            d = plistlib.loads(r.stdout)
+            named = " ".join(str(d.get(k) or "") for k in ("MediaName", "IORegistryEntryName")).lower()
+            if str(d.get("BusProtocol") or "") == "Secure Digital" or "card reader" in named or "cardreader" in named:
+                got = True
+    except Exception:  # noqa: BLE001
+        got = None
+    _REMOVABLE[path] = got
+    return got
+
+
 def cards():
     """Memory cards in right now: a drive with a DCIM folder at the top. The same list on both computers."""
     out = []

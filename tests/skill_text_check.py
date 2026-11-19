@@ -1598,8 +1598,8 @@ def check_backup_zero():
          "Found your card: 3,931 photos, 127 GB. Copying to Big Kahuna now. Nothing on your card will be changed." in b
          and "**You can walk away. I'll have the report ready when you're back.**" in b)
     case("backup.md: the one extra sentence on a first backup, word for word",
-         "This is our first backup together, so I'm doing it the usual way. You can change any of it on the report afterwards." in b
-         and "This is our first backup together, so I'm doing it the usual way. You can change any of it on the report afterwards." in f)
+         "This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." in b
+         and "This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." in f)
     case("backup.md: the quiet check comes before the starting message and speaks only on a STOP; every STOP's words are still there",
          b.index("night.py --source \"<the card's path>\" --check") < b.index("Copying to Big Kahuna now.")
          and "It speaks only on a STOP" in b
@@ -1640,6 +1640,33 @@ def check_backup_zero():
          "I'll ask a few quick questions first" not in h and "There's nothing to answer first" in h)
     case("on-a-pc.md: the drive-letter stops stay, and nothing points at the old check-in screen",
          "Drive letters move, so check them before every backup" in pc and "one-screen check-in" not in pc and "never guess which letter is which" in pc)
+    # the Nov 19 review of the zero-questions backup: what the instructions must say, and must no longer say
+    case("the first-backup sentence no longer promises that anything can be changed on the report (rule 7)",
+         "You can change any of it on the report afterwards" not in b + f + h and "you can change anything on the report afterwards" not in h
+         and "nothing moves a finished backup" in f and "photo names are changed from the chat, not the report" in f)
+    case("first-backup-setup.md: the drive is worked out with --dry-run, and saved only by the backup once its checks pass",
+         'studio_file.py defaults --source "<the card\'s path>" --dry-run' in f and "`WOULD CHOOSE:" in f
+         and "only after its own checks have passed" in f and '--dry-run' in b)
+    case("first-backup-setup.md: the new answers: a maybe-card is asked about, an unusable only drive is said, a card is never the drive",
+         all(x in f for x in ("`ASK is-this-the-drive`", "cannot be used today", "**A memory card is never the drive.**")))
+    case("first-backup-setup.md: a wrong drive on file has a way out (SET-OTHER, then set --drive)",
+         "`SET-OTHER` (exit 6)" in f and "**When the drive on file is the wrong one.**" in f and "studio_file.py set --drive" in f)
+    case("first-backup-setup.md: where on the drive is in plain sight unless a folder is plainly named for shoots, and the starting message names a folder",
+         "right on the drive, where they will see it" in f and "Never inside a photo library or catalog" in f
+         and "into your Photo Shoots folder" in f and "into your Photo Shoots folder" in b)
+    case("backup.md: a second card of the day takes the next name by itself; only a name they gave stops",
+         "With no name given this never stops" in b and "saturday card 2" in b and "the name THEY gave" in b)
+    case("backup.md: the second copy is made after the backup and never holds it up",
+         "it is made right after the backup itself and never holds it up" in b)
+    case("hello.md: backup now pasted from the home page starts the backup, with no Want to dive in?",
+         'never explain and never ask "Want to dive in?"' in h and "start the backup straight away" in h)
+    a2 = re.sub(r"\s+", " ", read(SM / "parts" / "after-the-report.md"))
+    src = read(SM / "scripts" / "shoot_report.py")
+    case("after-the-report.md: a wrong card can be taken off a shoot's report, with a command shoot_report.py has",
+         "shoot_report.py unlink" in a2 and 'add_parser("unlink"' in src and "no command that takes a card off" not in a2)
+    case("after-the-report.md: a second copy refuses any memory card, and changed photos are never called lost",
+         "It refuses a memory card (this backup's own or any other" in a2 and '"could not be found" when it says they were changed' in a2
+         and "**The saved second drive had trouble during a backup**" in a2)
     import home_base
     case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
          "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]

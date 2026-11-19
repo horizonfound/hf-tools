@@ -299,6 +299,8 @@ def next_drive(w, b, base):
     sf = jread(w["home"] / "studio.json", {})
     check("a drive with an obvious shoot folder: the place is that folder, by the first backup's own rule",
           j.get("ok") is True and Path(sf["drives"]["session"]).resolve() == (w["old"] / "Photo Shoots").resolve(), str(sf.get("drives")))
+    check("and the page is told where on the drive, not only which drive (Nov 19 review)",
+          "goes to Old Shoots, in Photo Shoots." in j.get("words", "") and no_path(w, j), str(j))
     # the drive that second copies go on cannot also be the first place
     t.run("studio_file.py", "set", "--second", w["lacie"], env=w["env"])
     before = (w["home"] / "studio.json").read_bytes()
@@ -422,7 +424,7 @@ def another_card(w, b, base):
     drive0 = photos_on(w["drive"])
     code, j = jpost(base, "/link-card", {"backup": 0, "name": "second card"})
     check("Put them on one report: 'Done. Both cards are on one report now.'",
-          j.get("ok") is True and j.get("words") == "Done. Both cards are on one report now." and no_path(w, j), str(j))
+          j.get("ok") is True and j.get("words") == "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart." and no_path(w, j), str(j))
     link1, link2 = jread(b["records"] / "shoot.json", {}), jread(b2["records"] / "shoot.json", {})
     check("both backups hold the same link, the older card first",
           [c.get("name") for c in link1.get("cards", [])] == [b["session"], b2["session"]] and link1.get("cards") and
@@ -559,7 +561,7 @@ def in_a_browser(work):
             c.js("document.getElementById('oc-go').click(); true")
             c.wait_for("/^Done\\./.test(%s)" % (say % "oc-say"), seconds=60)
             check("Put them on one report: 'Done. Both cards are on one report now.' beside the button",
-                  c.js(say % "oc-say") == "Done. Both cards are on one report now.")
+                  c.js(say % "oc-say") == "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.")
             c.wait_for("document.querySelectorAll('iframe.card-frame').length === 2", seconds=30)
             check("and the page reloads into the shoot's page, both cards in their frames",
                   "2 cards" in c.js("document.querySelector('.eyebrow').textContent") and c.js("location.pathname") == "/report.html")
