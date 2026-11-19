@@ -86,7 +86,7 @@ And with two drives plugged in:
 | Was asked before the copy | Where it lives now |
 |---|---|
 | Which drive, where on it | Chosen by itself (one question at most). To change it for next time they say so ("put my photos on the LaCie from now on"): `studio_file.py set --drive "<path>"`. |
-| A second copy? | Not asked. When they ask for one ("copy my shoots to a second drive too"): `studio_file.py set --second "<a folder on another drive>"`, from the next backup on. Never a cloud folder (Dropbox, Google Drive, iCloud): raw files are far too big to sync. |
+| A second copy? | Not asked. **Make a second copy** on the report makes one of that backup afterwards, with a tick box for every backup; from the chat it is `second_copy.py` (`parts/after-the-report.md`, "A second copy, after the backup"). For future backups only ("copy my shoots to a second drive too"): `studio_file.py set --second "<a folder on another drive>"`, from the next backup on. Never a cloud folder (Dropbox, Google Drive, iCloud): raw files are far too big to sync. |
 | How shoot folders are named | Not asked. When they say they name them another way: `studio_file.py set --offered 2` ("Smith Family, Oct 18 2026"), or for their own way ask them to paste the name of one past shoot folder, read back what `studio_file.py pattern "<it>"` gives, and on yes `studio_file.py set --example "<it>"`. From the next backup on. |
 | Photo names | Told nowhere. "Keep my camera's file names": `studio_file.py set --file-names original`, from the next backup on. |
 | How they write to clients | Asked the first time they ask for a note (below). |

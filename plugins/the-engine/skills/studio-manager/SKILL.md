@@ -33,6 +33,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | the backup stops with exit 7; "Pick again" from the report; "pick different ones", "more of the kids" | `parts/sneak-peeks.md` |
 | a shoot needs its note to the client; "write a note for...", "make it shorter", "here's how I write to clients" | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |
+| "make a second copy", "copy that backup to my other drive too", "is the second copy done?", the report's Make a second copy | `parts/after-the-report.md` ("A second copy, after the backup") |
 | the editing queue: "what's in my queue", "what's due", a due date, a list of clients to add, "open the Johnson folder" | `parts/editing-queue.md` |
 | "I'm done with the beach shoot", "I finished editing", "make posts from the Miller shoot", a post kit | `parts/post-kit.md` |
 | "make my posts", "I've got photos", "I dropped something in", "sort these", "set up my Assistant folder" | `parts/photos-in.md`, then `parts/post-kit.md` for the kit |

@@ -1505,6 +1505,38 @@ def check_posted_and_path_v27():
          all(x in where for x in ("`posted_at`", "`feed.json`", "`read_at`", "last 30 days", "(`unposted`)")) and re.search(r"^POSTED_DAYS = 30\b", pq, re.M))
 
 
+def check_second_copy():
+    """Make a second copy, from the report, after the backup (Dustin, Nov 19): the instructions for it."""
+    print("\nA second copy after the backup (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    a, f, w, b = (flat(n) for n in ("after-the-report.md", "first-backup-setup.md", "where-things-live.md", "backup.md"))
+    core = re.sub(r"\s+", " ", read(SM / "SKILL.md"))
+    case("the core's table sends \"make a second copy\" to after-the-report.md",
+         "\"make a second copy\"" in core and "A second copy, after the backup" in core)
+    case("after-the-report.md: the section, the check first, then the copy in the background",
+         "## A second copy, after the backup" in read(SM / "parts" / "after-the-report.md")
+         and "second_copy.py \"<the backup's folder>\" --to \"<that drive>\" --check" in a
+         and a.index("--to \"<that drive>\" --check") < a.index("# in the background") and "Run `--check` first, every time." in a)
+    case("after-the-report.md: what the report's button and panel say, word for word",
+         all(x in a for x in ("Anything you'd like to change?", "Your photos are safe either way. These are here if you want them.",
+                              "**Make a second copy**", "Which drive should the second copy go on?", "**Look again**",
+                              "**Do this after every backup**", "**Make the second copy**", "Keep your card in until this is done.")))
+    case("after-the-report.md: it is the card's layout, never sorted, and the honest lines are said as they are",
+         "never sorted or renamed" in a and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
+         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a)
+    case("after-the-report.md: never called made before the last line says so; nothing deleted to make it pass; never a cloud folder",
+         "Never say there is a second copy until the command's last line says it is made." in a
+         and "never delete or move anything to make it pass" in a and "Never a cloud folder" in a)
+    case("after-the-report.md: the four exit codes, the missed second drive, and the eject line",
+         all(x in a for x in ("0 done", "2 refused before anything was written", "3 stopped part way", "1 problems"))
+         and "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." in a
+         and "A second copy is still being made from this card. It won't be long." in a and "It won't be long." in b)
+    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py",
+         "**Make a second copy** on the report" in f and "second_copy.py" in f)
+    case("where-things-live.md names the new records",
+         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock")))
+
+
 def check_backup_zero():
     """A backup asks nothing before it copies (Dustin, Nov 19): the instructions as rewritten for it."""
     print("\nNo questions before the copy (Nov 19)")
@@ -1570,7 +1602,7 @@ def check_backup_zero():
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

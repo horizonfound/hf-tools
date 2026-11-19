@@ -20,7 +20,33 @@ The editing queue and the archive are simply part of the Assistant, never a yes/
 - **A note to the client** ("write a note for the Garcias"): read `parts/client-note.md`. A note needs a name, so that is the one question then, and only then: "Who's the note going to? A first name is fine." Save it with `client_note.py save --night "<backup>" --shoot <id> --to "<name>"` and write the note. A shoot nobody asks a note for gets none.
 - **Shoots they are already in the middle of editing** ("I'm also editing the Lees, due Friday"): `edit_queue.py add-manual --name "..." --due <when> [--shot YYYY-MM-DD]`; if one of them is a shoot the Assistant already backed up, use `add --night` instead so it gets its thumbnails. Never ask whether there are any.
 - **A heads-up before a due date** ("tap my phone before things are due"): if this session can create a scheduled task, set up a daily one (late morning, their time) that runs `edit_queue.py reminders --mark` and sends each line it prints with the notification tool; if it cannot, say the heads-up will show whenever they open the Assistant. Remember the answer in the Studio File. Never offer it by yourself.
-- **Another card of the same shoot, a second copy, another way of naming folders, another drive next time:** each is something they say; `parts/backup.md` and the table in `parts/first-backup-setup.md` have the command for each.
+- **A second copy of this backup** ("make a second copy of the beach backup onto LaCie"): the section below, "A second copy, after the backup".
+- **Another card of the same shoot, another way of naming folders, another drive next time:** each is something they say; `parts/backup.md` and the table in `parts/first-backup-setup.md` have the command for each.
+
+## A second copy, after the backup
+
+**Nobody is asked about a second copy before a backup (Dustin, Nov 19).** It is offered afterwards, on the report, and they can say it any time.
+
+**On the report.** Under the shoots is a section, "Anything you'd like to change?", with one line: "Your photos are safe either way. These are here if you want them." Its button **Make a second copy** opens a small panel right there: "Which drive should the second copy go on?", every other drive that is plugged in by its name and free space, **Look again**, a tick box **Do this after every backup**, and **Make the second copy**. What happens is said beside the button: "Copying to LaCie Rugged: 240 of 3,931.", and "Keep your card in until this is done." while it is reading the card. When it is done the report says so in place of the button. You do nothing for a press on the page; if they ask how it is going, the same command below with `--check` tells you, or look at the report.
+
+**From the chat** ("make a second copy of the beach backup onto LaCie", "copy that card to my other drive too"):
+
+```
+python3 <scripts>/studio_file.py drives                                  # the drives plugged in, to find the one they named
+python3 <scripts>/second_copy.py "<the backup's folder>" --to "<that drive>" --check
+python3 <scripts>/second_copy.py "<the backup's folder>" --to "<that drive>"     # in the background
+```
+
+- **Which backup:** the one they name; with no name, the newest. `"<the backup's folder>"` is the folder you use for its report (the card ledger's, or its records in the hidden `.studio` folder).
+- **Run `--check` first, every time.** It writes nothing. If it says REFUSED, say its line as it is and stop: every line is plain words with the drive's name in it. It refuses the memory card itself, the drive the photos are already on (a copy there is not a second place), a folder inside the backup, a drive without room, a backup that has not finished, stopped with a problem or was a sample, and a second copy that is already being made. If the backup already has a second copy it says so and where.
+- **Then run it in the background** and say one line: "Making a second copy on LaCie Rugged now. If your card is still in, leave it in until I say it's done." When it ends, say its last line as it is.
+- **What it makes:** one folder on that drive named like the backup ("2026-11-19 thursday card"), with every file at the place and under the name the card gave it. It is never sorted or renamed: it is a copy of the card, not of their shoot folders. Say so if they go looking for shoot folders there.
+- **Where the files are read from:** the card when it is still in and is the card of that very backup; otherwise the checked copy on their drive. Either way every file is checked against what the backup recorded. Its last line says which, and you say it too, never more than it says: "It was made from the copy on Big Kahuna, since the card wasn't in." and, when the backup turned sideways video clips upright, "5 video clips are the upright ones from your drive."
+- **Exit codes:** 0 done (or nothing to do). 2 refused before anything was written. 3 stopped part way (a drive was unplugged or filled up): say its line; nothing was removed, and the same command again carries on where it stopped. 1 problems: a file already on that drive is different (never written over), or a photo on their drive no longer matches the backup. Say the line it printed and stop; never delete or move anything to make it pass.
+- **"After every backup" from the chat** ("always make a second copy on the LaCie"): add `--always` to the command, or for future backups only `python3 <scripts>/studio_file.py set --second "<that drive>"`. Never a cloud folder (Dropbox, Google Drive, iCloud).
+- **Never say there is a second copy until the command's last line says it is made.** A copy that is running or stopped is not one, and the card's "safe to format" does not depend on it either way.
+- **The saved second drive was not plugged in for a backup:** the backup no longer stops. It makes one copy, and the report's top says "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." If they ask, that button (or the command above) is the way.
+- **"Eject my card" while a second copy is reading that card** answers "A second copy is still being made from this card. It won't be long." Say that and nothing more. If they pull the card anyway, the copy carries on from their drive.
 
 ## When they name or rename a shoot
 

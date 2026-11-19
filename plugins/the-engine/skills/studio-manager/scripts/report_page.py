@@ -289,6 +289,138 @@ def fall_script(manifest, studio, all_good, card=None):
     return FALL_JS.replace("__FALL__", data)
 
 
+# ---------------------------------------------------------------- "Anything you'd like to change?" (Dustin, Nov 19)
+# Nothing is asked before a backup any more; what used to be a question is an option here, afterwards, each a
+# button with its result shown right beside it. Every word is ours and a draft for Dustin and Nicole. The page
+# never sends or shows a path: a drive is its name and its place in the list the server gave.
+OUR_WORDS = {
+    "opts_h": "Anything you'd like to change?",
+    "opts_lede": "Your photos are safe either way. These are here if you want them.",
+    "sc_button": "Make a second copy",
+    "sc_which": "Which drive should the second copy go on?",
+    "sc_none": "I can't see another drive. Plug one in, then press Look again.",
+    "sc_look": "Look again",
+    "sc_always": "Do this after every backup",
+    "sc_go": "Make the second copy",
+    "sc_made": "Second copy made on {drive}.",
+    "sc_starting": "Starting the copy to {drive}...",
+    "sc_changed": "The drives changed since this was opened. Press Look again.",
+    "sc_cant": "I couldn't start the copy just now. Tell your assistant and it'll sort it out.",
+    "sc_not_live": "Ask your assistant to show the report, and this button will work.",
+    "sc_looking": "Looking for your drives...",
+}
+OPTIONS_CSS = """
+.opts{display:grid;gap:.5rem;padding-top:clamp(2rem,4vw,3rem);padding-bottom:.6rem}
+.opts .h2{font:600 clamp(24px,3vw,34px)/1.1 var(--sans);letter-spacing:-.025em;text-wrap:balance}
+.opt{display:grid;gap:.8rem;background:var(--paper);border-radius:var(--r);padding:1.1rem 1.3rem;margin-top:.8rem}
+.opt-row{display:flex;flex-wrap:wrap;align-items:center;gap:.7rem 1.1rem}
+.opt-btn,.opt-go{font:600 15px/1 var(--sans);padding:.8rem 1.25rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer}
+.opt-go{background:var(--ink);color:#fff;justify-self:start}
+.opt-btn:disabled,.opt-go:disabled{opacity:.45;cursor:default}
+.opt-say,.opt-made{font-size:15px;line-height:1.45;color:var(--ink-2);max-width:40em}
+.opt-made{color:var(--ink);font-weight:500}
+.opt-note{font-size:14px;color:var(--ink-2)}
+.opt-panel{display:grid;gap:.7rem;border-top:1px solid var(--line);padding-top:.9rem}
+.opt-q{font:600 16px/1.3 var(--sans)}
+.opt-drives{display:grid;gap:.45rem}
+.opt-drives label,.opt-tick{display:flex;align-items:center;gap:.6rem;font-size:15px;cursor:pointer}
+.opt-link{font:600 14px/1 var(--sans);background:none;border:0;padding:0;color:var(--coral-2);text-decoration:underline;cursor:pointer;justify-self:start}
+.opt [hidden]{display:none}
+"""
+OPTIONS_SCRIPT = r"""<script>
+(function(){
+  var box=document.getElementById('opt-second'); if(!box) return;
+  var W=JSON.parse(document.getElementById('sc-words').textContent);
+  function $(id){ return document.getElementById(id); }
+  var open=$('sc-open'), say=$('sc-say'), keep=$('sc-keep'), panel=$('sc-panel'), list=$('sc-drives'), none=$('sc-none'),
+      look=$('sc-look'), always=$('sc-always'), go=$('sc-go'), made=$('sc-made');
+  var live=location.protocol==='http:'||location.protocol==='https:', drives=[], timer=null;
+  function tell(t){ say.textContent=t||''; }
+  function chosen(){ var r=list.querySelector('input:checked'); return r?parseInt(r.value,10):-1; }
+  function show(st){
+    clearTimeout(timer);
+    if(st.state==='copying'){
+      panel.hidden=true; open.disabled=true; tell(st.line); keep.hidden=!st.card;
+      timer=setTimeout(ask,1500);
+    } else if(st.state==='done'){
+      keep.hidden=true; panel.hidden=true; open.hidden=true; tell('');
+      made.hidden=false; if(st.line) made.textContent=st.line;
+    } else if(st.state==='stopped'){
+      keep.hidden=true; open.disabled=false; tell(st.line);
+    } else { keep.hidden=true; }
+  }
+  function ask(){
+    fetch('second-status',{cache:'no-store'}).then(function(r){ return r.json(); }).then(show)
+      .catch(function(){ timer=setTimeout(ask,4000); });
+  }
+  function lookAgain(){
+    tell(W.sc_looking); go.disabled=true;
+    fetch('second-drives',{cache:'no-store'}).then(function(r){ return r.json(); }).then(function(j){
+      drives=j.drives||[]; list.textContent=''; tell('');
+      drives.forEach(function(d){
+        var l=document.createElement('label'), i=document.createElement('input'), t=document.createElement('span');
+        i.type='radio'; i.name='sc-drive'; i.value=String(d.i); t.textContent=d.name+', '+d.free;
+        if(drives.length===1) i.checked=true;
+        i.addEventListener('change',function(){ go.disabled=chosen()<0; });
+        l.appendChild(i); l.appendChild(t); list.appendChild(l);
+      });
+      none.hidden=drives.length>0; go.disabled=chosen()<0;
+    }).catch(function(){ tell(W.sc_cant); });
+  }
+  open.addEventListener('click',function(){
+    if(!live){ tell(W.sc_not_live); return; }
+    panel.hidden=!panel.hidden; if(!panel.hidden) lookAgain();
+  });
+  look.addEventListener('click',lookAgain);
+  go.addEventListener('click',function(){
+    var i=chosen(), d=drives.filter(function(x){ return x.i===i; })[0]; if(!d) return;
+    go.disabled=true;
+    fetch('second-copy',{method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({drive:d.i,name:d.name,always:!!always.checked})})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if(j.ok){ panel.hidden=true; open.disabled=true; tell(j.words); timer=setTimeout(ask,800); }
+        else { tell(j.words||W.sc_cant); go.disabled=false; }
+      }).catch(function(){ tell(W.sc_cant); go.disabled=false; });
+  });
+  if(live) ask();
+})();
+</script>"""
+
+
+def options_section(manifest, studio):
+    """The options under the shoots, for a backup that finished clean and was not a sample (there is nothing to
+    offer on one that has not finished). Today: Make a second copy. A backup that already has one, every file
+    checked, shows that in place of the button. Returns (html, script), or ("", "")."""
+    import second_copy
+    if second_copy.whole(manifest):
+        return "", ""
+    e = html.escape
+    W = OUR_WORDS
+    had = second_copy.has_second(manifest)
+    made = W["sc_made"].format(drive=second_copy.drive_name(had)) if had else ""
+    words = {k: W[k] for k in ("sc_cant", "sc_not_live", "sc_looking")}
+    out = ["<section class='wrap opts' id='opts'>",
+           f"<h2 class='h2'>{e(W['opts_h'])}</h2>",
+           f"<p class='lede'>{e(W['opts_lede'])}</p>",
+           "<div class='opt' id='opt-second'>",
+           "<div class='opt-row'>"
+           f"<button type='button' class='opt-btn' id='sc-open'{' hidden' if had else ''}>{e(W['sc_button'])}</button>"
+           f"<span class='opt-made' id='sc-made'{'' if had else ' hidden'}>{e(made)}</span>"
+           "<span class='opt-say' id='sc-say' role='status' aria-live='polite'></span></div>",
+           f"<p class='opt-note' id='sc-keep' hidden>{e(second_copy.OUR_WORDS['keep_card'])}</p>",
+           "<div class='opt-panel' id='sc-panel' hidden>",
+           f"<p class='opt-q'>{e(W['sc_which'])}</p>",
+           "<div class='opt-drives' id='sc-drives'></div>",
+           f"<p class='opt-note' id='sc-none' hidden>{e(W['sc_none'])}</p>",
+           f"<button type='button' class='opt-link' id='sc-look'>{e(W['sc_look'])}</button>",
+           f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>",
+           f"<button type='button' class='opt-go' id='sc-go' disabled>{e(W['sc_go'])}</button>",
+           "</div></div></section>",
+           # the few lines the script itself says, handed over as data (text only, never markup)
+           "<script type='application/json' id='sc-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>"]
+    return "\n".join(out), OPTIONS_SCRIPT
+
+
 def human(n):
     for unit in ("bytes", "KB", "MB", "GB", "TB"):
         if n < 1024 or unit == "TB":
@@ -552,7 +684,7 @@ def build(manifest, studio, card=None):
     e = html.escape
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}{CARD_CSS if card else FALL_CSS}</style></head><body>"]
+           f"<title>{e(brand.title(name))}</title><style>{look.head_css()}{CSS}{SHOOTS_CSS}{CARD_CSS if card else FALL_CSS}{OPTIONS_CSS}</style></head><body>"]
     if not card:
         out.append(f"<div class='wrap'><div class='bar'>{home_link()}{brand.bar()}"
                    f"<span class='when'>{e(nice_time(finished)) if finished else 'Still running'}</span>"
@@ -585,6 +717,13 @@ def build(manifest, studio, card=None):
         out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and checked against the card, byte for byte. "
                    "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.</p>")
         out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
+        try:   # the saved second drive was not plugged in for this backup: one copy, said here, with the button below
+            import second_copy
+            missed = second_copy.missed(studio)
+        except Exception:  # noqa: BLE001  (never let this line break the report)
+            missed = None
+        if missed:
+            out.append(f"<p class='lede' id='second-missed'>{e(missed)}</p>")
     else:
         out.append(f"<h1 class='h1'>Not finished <span class='swap'>yet.</span></h1>")
         out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked so far. Run it again to continue.</p>")
@@ -625,6 +764,14 @@ def build(manifest, studio, card=None):
         out.append("</div>")
 
     # the sneak peeks and the note live inside each shoot's block now (Dustin, Oct 28)
+
+    # what used to be asked before the copy is an option here, afterwards (Dustin, Nov 19)
+    try:
+        options_html, options_script = options_section(manifest, studio)
+    except Exception:  # noqa: BLE001  (the options never break the report itself)
+        options_html, options_script = "", ""
+    if options_html:
+        out.append(options_html)
 
     # the details
     out.append("<div class='wrap'><div class='cards'>")
@@ -711,7 +858,7 @@ def build(manifest, studio, card=None):
                "const p=" + ("a.dataset.path||" if this_computer.WINDOWS else "") + "decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "try{const r=await fetch('open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
                "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask your assistant to show the report, or open the folder yourself: '+p);}});}}</script>")
-    out.append(shoots_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT
+    out.append(shoots_script + options_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT
                + (CARD_SCRIPT if card else "") + "</body></html>")
     return "\n".join(out)
 

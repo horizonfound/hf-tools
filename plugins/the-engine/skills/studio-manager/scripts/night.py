@@ -341,8 +341,20 @@ def main():
     second_from_file = bool(a.source and a.second is None and drives.get("second"))
     if a.source and not a.dest:
         a.dest = drives.get("session")
+    second_missed = None
     if a.source and a.second is None and drives.get("second"):
         a.second = drives["second"]
+        # The second drive they saved is not plugged in today (Dustin, Nov 19): the backup no longer stops for it.
+        # It carries on with one copy, and the report's top says so beside the Make a second copy button. A
+        # --second typed for this one backup still stops, as before. (On a PC a letter that belongs to another
+        # drive today is not "not plugged in": studio_file.drive_moved still stops that, below.)
+        try:
+            there = Path(this_computer.drive_root(a.second)).expanduser().is_dir()
+        except OSError:
+            there = False
+        if not there and not studio_file.drive_moved(drives, "second"):
+            second_missed = this_computer.drive_words(a.second) or drives.get("second_label") or "your second drive"
+            a.second, second_from_file = None, False
     if a.source and not a.dest:
         # No drive on file: the first backup. Nothing is asked before the copy (Dustin, Nov 19): the drive, where
         # on it and the naming are chosen here and written to the Studio File, so every later backup is the same.
@@ -473,6 +485,9 @@ def main():
             sys.exit(2)
         if a.check:
             say("PREFLIGHT OK: card readable, drive there with room to spare, Studio File set. You can walk away once it starts.")
+            if second_missed:
+                say(f"NOTE: the second drive ({second_missed}) is not plugged in, so this backup makes one copy. "
+                    "Say nothing before the copy; the report says so afterwards, with its Make a second copy button.")
             try:  # the one gentle nudge for shoots kept on the computer's own disk (Dustin, Oct 30)
                 if studio_file.on_internal_disk(a.dest):
                     total, free = this_computer.disk(a.dest)
@@ -512,6 +527,14 @@ def main():
         if a.sample:
             args += ["--sample", str(a.sample)]
         code = run("backup.py", *args)
+        if second_missed and (studio / "manifest.json").exists():
+            # on record for the report (report_page.py reads it while the backup has no second copy); never fatal
+            try:
+                (studio / "second-missed.json").write_text(json.dumps(
+                    {"when": datetime.now().isoformat(timespec="seconds"), "drive": second_missed}, indent=1), encoding="utf-8")
+                say(f"   (the second drive, {second_missed}, was not plugged in: one copy for now, and the report says so)")
+            except OSError:
+                pass
         if code != 0:
             sys.exit(code)  # 1 problems, 2 stop, 3 paused: backup.py already said why
     else:

@@ -374,6 +374,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if parts.path in ("/second-drives", "/second-status"):
+            return self.second(parts)
         if parts.path == "/queue-url":
             # the report's "Show my editing queue" link: the queue page's address, starting its server if it is not up
             url = queue_url()
@@ -438,6 +440,72 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(out)
+
+    def answer(self, obj, code=HTTPStatus.OK):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def second(self, parts):
+        """The report's Make a second copy (Dustin, Nov 19). Relative routes, so they work inside /card/N/ too.
+        GET second-drives: the drives it could go on, each {"i", "name", "free"}: a name and its room, never a
+        path. GET second-status: how the copy stands, from second-copy.json in the records and whether its job is
+        alive (second_copy.status), so a page that is reloaded picks a running copy up again."""
+        try:
+            import second_copy
+            if parts.path == "/second-status":
+                return self.answer(second_copy.status(self.studio))
+            rows = second_copy.offered_drives(self.studio)
+            return self.answer({"drives": [{"i": i, "name": r["name"], "free": r["free"]} for i, r in enumerate(rows)]})
+        except Exception as ex:  # noqa: BLE001  (a press must always get an answer; the reason goes to the log)
+            sys.stderr.write(f"{parts.path}: {ex.__class__.__name__}: {ex}\n")
+            if parts.path == "/second-status":
+                return self.answer({"state": "none", "done": 0, "total": 0, "name": "", "card": False, "line": ""})
+            return self.answer({"drives": []})
+
+    def second_copy(self, path):
+        """POST second-copy {"drive": <index>, "name": <that drive's name>, "always": bool}: start the copy.
+        Behind the pickers' same-page-only guard. The page never sends a path: the server lists the drives again
+        and the name must be the one at that index, so a drive plugged in or pulled since the panel was drawn can
+        never be copied onto by mistake. The questions asked before a byte is written are second_copy.py's own
+        (--check), in a fresh process; then the job is started on its own, so it outlives this server."""
+        import arrange
+        import report_page
+        import second_copy
+        W = report_page.OUR_WORDS
+        refused = arrange.guard(self, "application/json", 4096, path)
+        if refused is None and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            refused = (403, arrange.NOT_UNDERSTOOD)
+        if refused:
+            return self.answer({"ok": False, "words": refused[1]}, refused[0])
+        try:
+            d = json.loads(self.rfile.read(int(self.headers.get("Content-Length"))) or b"{}")
+            i, name, always = d["drive"], d["name"], d.get("always", False)
+            assert type(i) is int and isinstance(name, str) and isinstance(always, bool)
+        except (ValueError, KeyError, AssertionError, TypeError):
+            return self.answer({"ok": False, "words": arrange.NOT_UNDERSTOOD}, HTTPStatus.BAD_REQUEST)
+        try:
+            rows = second_copy.offered_drives(self.studio)
+            if not (0 <= i < len(rows)) or rows[i]["name"] != name:
+                return self.answer({"ok": False, "words": W["sc_changed"]}, HTTPStatus.CONFLICT)
+            cmd = [sys.executable, str(HERE / "second_copy.py"), self.studio, "--to", rows[i]["path"]]
+            r = subprocess.run(cmd + ["--check", "--json"], capture_output=True, encoding="utf-8", errors="replace",
+                               timeout=120, **quiet())
+            said = json.loads((r.stdout or "").strip().splitlines()[-1])
+            if said.get("state") != "ready":
+                return self.answer({"ok": False, "words": str(said.get("words") or W["sc_cant"])})
+            with open(fresh.server_log("second copy"), "a", encoding="utf-8") as fh:   # the job keeps its own copy of the handle
+                job = this_computer.popen_detached(cmd + (["--always"] if always else []), stdin=subprocess.DEVNULL,
+                                                   stdout=fh, stderr=subprocess.STDOUT)
+            threading.Thread(target=job.wait, daemon=True).start()   # so a finished job leaves nothing behind
+            sys.stderr.write(f"second copy asked: {name!r} always={always}\n")
+            return self.answer({"ok": True, "words": W["sc_starting"].format(drive=name)})
+        except Exception as ex:  # noqa: BLE001
+            sys.stderr.write(f"second-copy: {ex.__class__.__name__}: {ex}\n")
+            return self.answer({"ok": False, "words": W["sc_cant"]})
 
     def open_shoot(self, parts):
         """GET /open-shoot?shoot=<id>: each shoot's own "Open this folder" on the report (Nicole, Nov 13). The page
@@ -547,6 +615,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self.context()
         path = urlsplit(self.path).path
+        if path == "/second-copy":
+            return self.second_copy(path)
         if path == "/rename":
             try:
                 n = int(self.headers.get("Content-Length", "0"))
