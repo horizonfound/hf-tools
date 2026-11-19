@@ -10,6 +10,7 @@ A talking reel (Nicole, Nov 11 and 12) is the photographer talking to the camera
 - **"Place the photos in my talking reel for <shoot>"**: put their photos with what they say. "Placing the photos", below.
 - **"Cut my talking reel and place the photos for <shoot>"**: both. Cut first, all the way through to its Saved line, then place.
 - **"Set up talking reels"**: the page tells them to say this when their Mac needs one more thing first. "Set up talking reels", below.
+- **"Where did my talking reel go?"**, when the page shows no script for a shoot they made a talking reel for before an update: not this part. Read `parts/post-kit.md`, "Bring my old reels over" (`bring_older.py look` first). Never tell them to press Edit my video for it: that starts the script and the cuts afresh.
 - **In their own words:** "make a talking reel", "I want to talk to the camera about the beach shoot", "open my talking reel": open the page ("The page", below). "Cut it tighter", "take the photos off", "put different photos on it": work out which of the two jobs it is, and ask before you replace anything (see `--replace` in each).
 
 ## The rules

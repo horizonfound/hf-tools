@@ -162,9 +162,11 @@ def switch(rec, to, live, first):
     return True
 
 
-def new(rec, live, fresh, first, word, name=""):
+def new(rec, live, fresh, first, word, name="", as_id=None):
     """Start a new reel: the one being worked on is kept exactly as it is, and a blank one opens. Returns its id.
-    Its name is `name`, or hers: "<word> <how many reels there are now>", the next number that is free."""
+    Its name is `name`, or hers: "<word> <how many reels there are now>", the next number that is free.
+    `as_id` (bring_older.py only: a reel brought from the older pages keeps the id it had there, so a post
+    already in the queue for "...-reel-v2" still means that reel): the id to give it, which must be free."""
     by = _begin(rec, first)
     vs = _entries(rec)
     if len(vs) >= MOST:
@@ -177,6 +179,10 @@ def new(rec, live, fresh, first, word, name=""):
     while not name and f"{word} {k}".casefold() in taken:
         k += 1
     nid = "v%d" % (1 + max(int(v["id"][1:]) for v in vs))
+    if as_id is not None:
+        if not isinstance(as_id, str) or not ID.fullmatch(as_id) or any(v["id"] == as_id for v in vs):
+            raise Wrong(GONE)
+        nid = as_id
     if not ID.fullmatch(nid):
         raise Wrong(TOO_MANY)
     start = fresh(rec)                      # read before the open reel is put away (it may look at every reel)
