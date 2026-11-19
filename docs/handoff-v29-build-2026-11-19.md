@@ -448,3 +448,28 @@ For whoever closes the build: a sweep of every test, one at a time under the gua
 1. **A reel made again in a later month stays in the month it was first made.** A reel first made in October and reworked in November counts for October only, so November's recap does not show it. The other way (count it once in every month it was made in) would let a year's months add up to more than the year.
 2. **"One reel" means one reel on the reel page's Your reels list** (or one talking reel on its list). Starting a new reel with + Start a new reel counts as another; Try another mix and Make again on the same reel do not. A reel made from the chat the older way counts as the shoot's first reel.
 3. **Reels made before v26 (no list of reels) all count as that shoot's first reel,** so an older shoot with several separately made reels reads as one.
+
+### Stage 2, `home`, built (Nov 19)
+
+**What changed.**
+- `home.py`, server-drawn as before. Top to bottom: the hello (unchanged); one big white card, **Turn your shoots into posts**, with her line, one dark button that is a plain link to `/make-posts` ("Create your post kits →" with no post kits, "See all my post kits →" with some) and the same now-box beside it; **My posting queue**, full width, with its words, its box and "Open my posting queue →"; a small caps heading, **Also in your Assistant**, over two smaller outlined cards side by side, **Back up a card** and **My editing queue**, same words and boxes, no button label (the card is the press); then the recap card and the Your year bar, unchanged. No list of post kits anywhere on the page.
+- Gone from the page and from `WORDS`: the step numbers, "Your workflow" (`wf_h`), "Start wherever you are…" (`wf_say`), `s1_go`, `s2_go`, `s3_go`; `STEPS` and the `.flow4` styles. New `WORDS` keys, hers word for word from `pages/home-preview.html`: `s3_create`, `s3_see`, `also_h`.
+- The ids and press names are the ones the four steps had (`s1` backup, `s2` queue, `s3` posts, `s4` posting; `n1` to `n4`), so `home.py pending`, the hello's buttons and `now_boxes()` are untouched. One difference: `data-item='posts'` is on the big card's button (`#kitsBtn`), since the card itself is not a press (as hers).
+- **The stale eyebrow removed:** "Step 1 of your workflow" (`home_base.WORDS["b_eyebrow"]`) and its `<span class='eyebrow'>` on the Back up a card screen. That was the only one besides `m_eyebrow` ("Step 3 of your workflow", Make posts screen, left for stage 7): the editing queue's and the posting queue's eyebrows read "Editing queue" and "Posting queue" and never said a step.
+- `parts/hello.md`: the home page's description (the four cards, posts first, the button's two readings, no list of kits, never send them to "step 3") and one sentence on what each press is recorded as. `docs/SETUP-GUIDE.md`: its one sentence describing the home page (the PDF is not rebuilt; the PC guide had no such sentence).
+- Tests brought along: `home_v28_check.py` (the new order; her five v28 lines that v29 took out are a named list), `home_base_check.py` (posts first, the button instead of the card, "Step 1 of your workflow" named as left out on purpose), `loose_ends_v26_check.py` (what hello.md must say), `pc_smoke.py` (one line it looked for on the page). New: `tests/home_v29_check.py`, in `check-pc.yml` on the Mac job (`--no-chrome`) and the Mac page job (under the guard).
+
+**Checked,** this Mac, pretend kits, a scratch home, no windows: `home_v29_check.py` 47 of 47 on Python 3.12 and on Apple's 3.9 (27 without a browser, on both); with the old `home.py` put back it fails 5 of its first 8. `home_v28_check.py` 173 (3.12; 127 without a browser on 3.9), `home_base_check.py` 218, `skill_text_check.py` 640, `loose_ends_v26_check.py` 64, `pc_smoke.py` 230, `workflow_check.py` 14, `tools/check_pc.py` and `tools/check_plugin.py` clean. Looked at by eye: one picture of the page at desktop width and one at phone width in a hidden Chrome, pretend photos, beside her screenshot 01.
+
+**Not tried.** Nobody's hand, the Claude app's pane, real kits or photos, 20 or 30 post kits, Windows, GitHub (nothing pushed). The home page's "no post kits" state was tried by moving the pretend kits aside, not on a brand-new Assistant with no folder at all in a browser.
+
+**Found, not fixed (older, not this stage's):** the posting queue's own page (`/posting.html`) drops the connection when `posting.json` holds a piece that is not a record (a bare word in the list; `posting_queue.greens`). The home page survives the same record. Only a hand-broken file could do it; worth a line in the hardening pass.
+
+**Choices for Dustin and Nicole.**
+1. **The big card itself is not a press;** only its button is (as her page). The other three cards are a press anywhere on them.
+2. **"Some post kits" means kits that are not archived:** with every kit archived the button reads "Create your post kits" and the box "No post kits yet" (her page does the same).
+3. **Her accent words stay DM Sans in coral** (no serif, Dustin Nov 7), as on the v28 page.
+4. **The Back up a card screen now has no small line over its heading** (it had "Step 1 of your workflow"). Nothing of ours was put in its place.
+5. **The Make posts screen still says "Step 3 of your workflow"** until stage 7 reworks it.
+6. **`release.json`'s version 5 line still says "your four steps";** left for whoever closes the build and writes version 6.
+7. Her page shows a small label on the posting queue card only ("Open my posting queue →"); kept as hers, so three cards have a visible way in and two do not.

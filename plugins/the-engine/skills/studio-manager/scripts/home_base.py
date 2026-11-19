@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The home base's two screens, and what they read (Nicole's v26, Nov 13; built Nov 14).
 
-The home page (home.py, /home on the posting server; rebuilt after her v28) has the four steps in the order of the
-work. Two of the steps have a screen of their own, and this file is both of them:
+The home page (home.py, /home on the posting server; rebuilt after her v28) has four cards, making posts first
+(her v29). Two of them lead to a screen of their own, and this file is both of them:
 
     /backups       Back up a card: what a backup does, the two steps, and "Your backups": every card backed up,
                    newest first (the 10 newest, Show older by month, a search by shoot name)
@@ -69,7 +69,7 @@ WORDS = {
     "copied": "Copied",
     "back_home": "Back to home",
     # Back up a card
-    "b_eyebrow": "Step 1 of your workflow",
+    # (her "Step 1 of your workflow" eyebrow is gone since v29: the home page no longer numbers steps)
     "b_h1": "Back up <em>a card.</em>",
     "b_lede_1": "This is where your assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.",
     "b_lede_2": "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.",
@@ -426,7 +426,7 @@ def _paste(words):
 
 def backups_html():
     e = html.escape
-    body = (f"<header class='head'><span class='eyebrow'>{e(W('b_eyebrow'))}</span><h1>{W('b_h1')}</h1>"
+    body = (f"<header class='head'><h1>{W('b_h1')}</h1>"
             f"<p class='lede wide'>{e(W('b_lede_1'))}</p><p class='lede wide'>{e(W('b_lede_2'))}</p></header>"
             f"<p class='steps-title'>{e(W('b_steps'))}</p><div class='steps light'>"
             f"<div class='st'><span class='num'>1</span><div><p>{W('b_s1')}</p><span class='status' id='cardStatus'></span></div></div>"
