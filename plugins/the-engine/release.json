@@ -1,10 +1,11 @@
 {
-  "number": 5,
-  "date": "Nov 18, 2026",
+  "number": 6,
+  "date": "Nov 19, 2026",
   "new": [
-    "A new home page: a hello with photos from your newest shoot, and your four steps each saying what is going on right now.",
-    "A monthly recap, and Your year in December: your numbers and your own photos as stories you can save as pictures to share. You can hide the recap.",
-    "The backup report plays your backup back: the numbers count up while your photos fall into place.",
-    "Small celebrations: Posted lifts the post into your grid, Delivered flips the shoot's card, and a new post kit fans its photos out into its cards."
+    "Backup now just starts: nothing to answer before the copy. A first backup asks at most one thing, which drive, and only when it can't tell.",
+    "The report has the options afterwards: make a second copy, put two cards on one report, change how your shoots are named, and pick a different drive for next time.",
+    "A new home page with your posts first: Turn your shoots into posts and My posting queue on top, backing up a card and the editing queue below.",
+    "My vault: one post kit that draws from every shoot. Search your photos and clips, make a reel from any of them, and see everything in it.",
+    "The monthly recap counts each reel once, however many times you pressed Make."
   ]
 }
