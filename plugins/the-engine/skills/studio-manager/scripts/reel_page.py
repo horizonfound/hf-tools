@@ -710,6 +710,9 @@ VAULT_OUR_WORDS = {
     "vault_only": "That only works in your vault.",
     "vault_not_in": "That shoot isn't in your vault.",
     "vc_video_gone": "That clip's video isn't where it was, so it can't be added. Tell your assistant and it'll sort it out.",
+    # a vault with video clips and no photo yet: the reel page opens (B-roll needs no photo; the kinds with photos
+    # show her own "Photos you add to your vault show up here" and wait). The talking page needs photos, and says so
+    "talk_no_photos": "Your vault has no photos yet, and a talking reel puts your photos with what you say. Add a shoot to your vault first. A B-roll reel works with video clips alone.",
 }
 
 # Several reels from one shoot (her v25, Nov 12): the "Your reels" bar under the title. Hers, word for word
@@ -1277,13 +1280,30 @@ def _refind(lst, old_names, n_of):
     return out
 
 
+def has_list(kit, rows=None):
+    """Is there a numbered list to work from? For every post kit: a list with at least one photo, as ever. For
+    the vault alone (v29), a list that reads and holds no photo yet counts too: a vault with video clips and no
+    photo makes a B-roll reel from the clips (Nicole: nobody should have to bring a shoot in first for that)."""
+    rows = arrange.sheet_rows(kit) if rows is None else rows
+    if rows:
+        return True
+    if not is_vault_kit(kit):
+        return False
+    try:
+        d = json.loads((kit / ".kit" / "sheet.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(d, dict) and isinstance(d.get("photos"), list)
+
+
 def sync(kit):
-    """The record, brought in line with the numbered list. Returns (record, rows, stamp); rows is [] when the
-    list can't be read right now, and then NOTHING is changed. The caller holds the lock."""
+    """The record, brought in line with the numbered list. Returns (record, rows, stamp); the stamp is "" (and
+    rows []) when the list can't be read right now, and then NOTHING is changed. In the vault a list with no photo
+    yet is a list: rows is [] and the stamp is its own (has_list()). The caller holds the lock and goes by the stamp."""
     rec = load(kit)
     rows = arrange.sheet_rows(kit)
     stamp = arrange.sheet_stamp(kit)
-    if not rows or not stamp:
+    if not has_list(kit, rows) or not stamp:
         return rec, [], ""
     if rec.get("stamp") and rec.get("stamp") != stamp and (isinstance(rec.get("saved"), dict) or reels.several(rec)):
         # the list was re-made: find each photo again by its file name
@@ -1427,7 +1447,7 @@ def version_from_page(body):
         return _bad()
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
-        if not rows:
+        if not stamp:
             return _bad(NOT_READY, 404)
         try:
             changed = reels.op(rec, ask, REEL_LIVE, reel_fresh, REEL_FIRST, REEL_WORD)
@@ -1450,7 +1470,7 @@ def state(kit, reel=None):
     read right now. `reel` (a chat command naming another reel): that reel's choices, read only."""
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
-    if not rows:
+    if not stamp:
         return None
     open_reel = reels.current(rec, REEL_FIRST)
     whole = rec
@@ -2736,7 +2756,7 @@ def change_moments(body):
     still = None
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
-        if not rows:
+        if not stamp:
             return _bad(NOT_READY, 404)
         if _other_reel(body, rec):
             return _bad(OUR_WORDS["newer"], 409, why="newer")
@@ -2872,7 +2892,7 @@ def add_from(kit, pairs, reel=None, page_reel=None, page=False):
     stills, added, already = [], [], []
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
-        if not rows:
+        if not stamp:
             return _bad(NOT_READY, 404)
         if page_reel is not None and page_reel != reels.current(rec, REEL_FIRST):
             return _bad(OUR_WORDS["newer"], 409, why="newer")
@@ -3277,7 +3297,7 @@ def save_from_page(body):
         return _bad()
     with arrange.locked(lock_path(kit)):
         rec, rows, stamp = sync(kit)
-        if not rows:
+        if not stamp:
             return _bad(NOT_READY, 404)
         if body.get("stamp") != stamp:
             return _bad(OUR_WORDS["photos_changed"], 409, why="photos")
@@ -3478,7 +3498,7 @@ def _ask_from_page(body, kit, allowed):
     if "reel" in body and not (isinstance(body["reel"], str) and reels.ID.fullmatch(body["reel"])):
         return _bad()
     rows = arrange.sheet_rows(kit)
-    if not rows:
+    if not has_list(kit, rows):
         return _bad(NOT_READY, 404)
     if body.get("stamp") != arrange.sheet_stamp(kit):
         return _bad(OUR_WORDS["photos_changed"], 409, why="photos")
@@ -3709,7 +3729,7 @@ def _make(kit, ask, jid, t0, preview=False, work=None, limit=None):
     # The numbers on the page are the kit's numbered list (.kit/sheet.json); reel.py is handed that same list in
     # its working folder, so a photo exported since can never shift a number to another photo.
     rows = arrange.sheet_rows(kit)
-    if not rows or arrange.sheet_stamp(kit) != ask.get("stamp"):
+    if not has_list(kit, rows) or arrange.sheet_stamp(kit) != ask.get("stamp"):
         return {"state": "problem", "problem": OUR_WORDS["photos_changed"]}
     listing = [{"n": x["n"], "file": str(photos / arrange.photo_name(x)), "w": x.get("w") or 0, "h": x.get("h") or 0,
                 "way": x.get("way") or ""} for x in rows]
@@ -4272,7 +4292,7 @@ def _get_page(handler, q):
     if kit is None:
         return arrange._send_page(handler, arrange_page.plain_page(CANT_FIND))
     rows = arrange.sheet_rows(kit)
-    if not rows:
+    if not has_list(kit, rows):
         return arrange._send_page(handler, arrange_page.plain_page(NOT_READY))
     st = state(kit)
     if st is None:
@@ -4359,7 +4379,7 @@ def _get_state(handler, q):
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     relist_if_changed(kit)
-    st = state(kit) if arrange.sheet_rows(kit) else None
+    st = state(kit) if has_list(kit) else None
     if st is None:
         return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
     arrange._send_json(handler, st)
@@ -4411,7 +4431,7 @@ def _get_footage(handler, path, q):
             want_video(kit, _one(q, "want"))
         if _one(q, "for") == "talking":          # the talking reel page's video picker: the list, and nothing written
             return arrange._send_json(handler, footage_for_page(kit, read_only=True))
-        if not arrange.sheet_rows(kit):
+        if not has_list(kit):
             return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
         return arrange._send_json(handler, footage_for_page(kit))
     if path == "/reel-moment-still":
@@ -8017,7 +8037,8 @@ def cmd_open(kit):
         say(f"STOP: \"{kit.name}\" isn't in Your Content, so the page can't show it.")
         return 1
     if not arrange.sheet_rows(kit):
-        if kit_mod.sheet(kit) != 0 or not arrange.sheet_rows(kit):
+        # (the vault with no photo yet still opens: its list reads and is empty, and B-roll needs clips alone)
+        if kit_mod.sheet(kit) != 0 or not has_list(kit):
             say("STOP: couldn't number this shoot's photos. Are they where the kit says they are?")
             return 1
     got = arrange.make_previews(kit)
@@ -8030,7 +8051,10 @@ def cmd_open(kit):
     if not addr:
         say("STOP: couldn't start the page server.")
         return 2
-    say(f"{got['of']} photos in the shoot.")
+    if not got["of"] and is_vault_kit(kit):
+        say("No photos in the vault yet. A B-roll reel works from its video clips alone; the other kinds need photos first.")
+    else:
+        say(f"{got['of']} photos in the shoot.")
     kind = reel_kind((as_reel(load(kit), None).get("saved")))
     if kind:
         vs, cur = reel_names(kit)

@@ -6,6 +6,7 @@
 
     python3 tests/guard.py 3000 python3 tests/vault_reel_check.py clips [--port 9985] [--work <folder under /private/tmp>]
     python3 tests/guard.py 800  python3 tests/vault_reel_check.py clips --no-chrome      (everything but the page in a browser)
+    python3 tests/guard.py 3000 python3 tests/vault_reel_check.py empty [--port 9985] [--no-chrome]
 
 On pretend post kits it makes itself (tests/fake_kit.py, under /private/tmp; a scratch STUDIO_HOME; never the real
 ~/.studio, no drive, no real CapCut: a pretend CapCut folder under the run's own HOME; STUDIO_NO_WINDOWS_FOR_TESTS,
@@ -46,6 +47,20 @@ through `photo_words.py describe`; the page server itself has no pretend classif
     hands the reel script that photo's own path; a note changes the line to copy; a photo put in the vault's own
     Photos folder shows up under Added to my vault;
   * a plain post kit's photos page has none of it; EVERY OTHER POST KIT IS BYTE FOR BYTE UNCHANGED.
+
+Part `empty` (a vault with video clips and NO photo at all: Nicole's B-roll-from-clips case; no other post kit):
+  * the vault's list reads and is empty, and its reel page opens all the same: the chooser, the B-roll page with
+    its own steps, its state (no photos), its videos, a new reel, clips made from its video, a save;
+  * the watch step's preview, a test make ("2 clips and 0 photos"), Save my video into the vault's own Reels
+    folder, Add to my queue;
+  * the kinds that need photos say so in plain words: a make or a preview with no photos answers her "Pick a few
+    photos for the reel first.", the photos step shows her "Photos you add to your vault show up here, open and
+    ready." with + Add photos and Make my reel off, the talking page says our line (VAULT_OUR_WORDS);
+  * the chat: `reel_page.py open`, `show` and `note`, `vault.py clips`, `talking_page.py open`;
+  * a plain post kit whose list is empty is still told it isn't ready, on every route (only the vault changed);
+  * a shoot that arrives afterwards joins the open reel page by itself, the B-roll reel's clips still there;
+  * in a hidden Chrome: the B-roll page with its clips, the preview on the phone, Save my video pressed; the
+    photos kind's page with her line and Make my reel off.
 
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only. A Mac
 (the pretend photos are drawn with sips, the clips made with AVFoundation); anywhere else it says SKIP and exits 0.
@@ -1043,9 +1058,309 @@ def main_photos(a):
     return 1 if bad else 0
 
 
+# ====================== part `empty`: a vault with video clips and no photo at all (B-roll from clips alone) ======================
+
+PLAIN_EMPTY = "2026-11-02 Nothing yet"       # a plain post kit whose numbered list reads and holds no photo
+
+
+def make_empty_world(s, run):
+    """No shoot at all: the Assistant's folder, the vault, one video and one song of the vault's own. Beside it a
+    plain post kit whose list is empty (written by hand, as a list can be left), which must stay "not ready"."""
+    import reel_footage_check as rfc
+    s.store.mkdir(parents=True, exist_ok=True)
+    s.studio.mkdir(parents=True, exist_ok=True)
+    code, out = s.cmd("posts.py", "setup", "--home", str(s.target / "The Assistant"))
+    if code != 0:
+        raise RuntimeError("posts.py setup: " + out[-300:])
+    code, out = s.cmd("vault.py", "ensure")
+    if code != 0:
+        raise RuntimeError("vault.py ensure: " + out[-300:])
+    v = s.vault()
+    clips = rfc.make_clips(run / "clips")
+    shutil.copyfile(clips["clip.mov"], v / "Footage" / "own.mov")
+    shutil.copyfile(BEAT60, v / "Music" / "Test beat.wav")
+    k = s.content / PLAIN_EMPTY
+    for sub in ("Photos", "Footage", ".kit"):
+        (k / sub).mkdir(parents=True)
+    shutil.copyfile(clips["clip.mov"], k / "Footage" / "theirs.mov")
+    (k / ".kit" / "kit.json").write_text(json.dumps({"name": "Nothing yet", "date": "2026-11-02", "folder": PLAIN_EMPTY, "source": "drop"}), encoding="utf-8")
+    (k / ".kit" / "sheet.json").write_text(json.dumps({"folder": str(k / "Photos"), "photos": []}), encoding="utf-8")
+    s.note()
+    return clips
+
+
+def check_empty_opens(s):
+    R = rp(s)
+    v = s.vault()
+    case("(set up: the vault's list reads and holds no photo; one video in its Footage folder; no shoot in it)",
+         s.sheet().get("photos") == [] and s.sheet().get("vault") is True and (v / "Footage" / "own.mov").is_file(), s.sheet())
+    case("has_list(): the vault's empty list is a list; a plain post kit's empty list is not", getattr(R, "has_list", lambda k: None)(v) is True and R.has_list(s.content / PLAIN_EMPTY) is False)
+    code, _, raw = s.get("/reel.html?kit=" + VQ)
+    page = raw.decode("utf-8", "replace")
+    cards = re.findall(r"<a class='kind' id='(\w+)' href='([^']+)'><b>([^<]+)</b>", page)
+    case("the chooser opens for a vault with clips and no photo: her title and her four cards, not the \"isn't ready\" page",
+         code == 200 and R.NOT_READY not in html_mod.unescape(page) and [c[2] for c in cards] == ["Behind the scenes", "Just photos", "Talking to camera", "B-roll"]
+         and "Make my reel" in flat(page), (code, flat(page)[:6]))
+    pv = s.get("/reel.html?kit=%s&kind=broll" % VQ)[2].decode("utf-8", "replace")
+    case("the B-roll page opens with its own steps (clips, song, watch) and her panel", steps_of(pv) == STEPS["broll"] and "id='vcFind'" in pv and "id='ed'" in pv
+         and R.NOT_READY not in html_mod.unescape(pv), steps_of(pv))
+    st = s.state()
+    case("the page's state answers: ok, no photos, the list's own stamp", bool(st) and st.get("ok") is True and st.get("photos") == [] and bool(st.get("stamp"))
+         and st["stamp"] == hashlib.sha1((v / ".kit" / "sheet.json").read_bytes()).hexdigest()[:12], st and {k: st.get(k) for k in ("ok", "words", "stamp")})
+    case("no path in the state", no_path(st or {}))
+    f = s.foot()
+    case("its videos are listed: the vault's own first, then a video of a shoot that has no photos yet either",
+         bool(f) and f.get("ok") is True and [x["name"] for x in f.get("videos", [])] == ["own.mov", PLAIN_EMPTY + "/theirs.mov"], f)
+    key = f["videos"][0]["key"] if f and f.get("videos") else ""
+    got = s.wait(lambda: next((x for x in (s.foot("&want=" + key) or {}).get("videos", []) if x["preview"] == "ready"), None), 90)
+    case("...and the video is got ready for the editor", bool(got), s.foot())
+    code, j = s.post("/reel-version", {"kit": "My vault", "op": "new", "kind": "broll", "name": "Clips only"})
+    case("a new B-roll reel is started (POST /reel-version)", code == 200 and (j or {}).get("ok") and j.get("kind") == "broll", (code, j))
+    ids = []
+    for start in (0.5, 3.0):
+        code, j = s.moment({"do": "add", "video": key, "start": start, "seconds": 2.0})
+        ok = code == 200 and (j or {}).get("ok")
+        case("a clip made in the editor at %.1f s is added to the reel (POST /reel-moment add)" % start, bool(ok), (code, j))
+        ids = [m["id"] for m in (j or {}).get("moments", [])] if ok else ids
+    st = s.state()
+    sid = next((x["id"] for x in (s.get("/reel-songs?kit=" + VQ)[1] or {}).get("songs", []) if x["name"] == "Test beat"), None)
+    code, j = s.post("/reel-save", {"kit": "My vault", "stamp": st["stamp"], "base": st["rev"], "page": "emptyvault1", "saved": {"song": sid, "vault_ask": "Anything with the camera"}})
+    case("a save from the page is taken (the song, the ask box)", code == 200 and (j or {}).get("ok") and (s.record().get("saved") or {}).get("song") == sid
+         and (s.record().get("saved") or {}).get("vault_ask") == "Anything with the camera", (code, j))
+    code, j = s.post("/reel-save", {"kit": "My vault", "stamp": "000000000000", "base": s.state()["rev"], "page": "emptyvault1", "saved": {"vibe": "beat"}})
+    case("...and a save against another list's stamp is still refused (photos changed)", code == 409 and (j or {}).get("why") == "photos", (code, j))
+    return ids, sid
+
+
+def check_empty_broll(s, ids, sid):
+    R = rp(s)
+    v = s.vault()
+    st = s.state()
+    body = {"kit": "My vault", "stamp": st["stamp"], "picks": [], "song": sid, "vibe": "beat", "footage": True, "style": "broll", "clips": ids}
+    code, j = s.post("/reel-preview", body)
+    case("the watch step's preview: two clips, no photo, the song, her Plan line", code == 200 and (j or {}).get("ok") and [x["kind"] for x in j["pieces"]] == ["clip", "clip"]
+         and [x["id"] for x in j["pieces"]] == ids and j["words"][0].startswith("Plan: 2 clips and 0 photos") and j["song"]["id"] == sid and no_path(j), (code, j))
+    code, j = s.post("/reel-make", dict(body, test=True))
+    job = wait_job(s, j["job"]["id"]) if code == 200 and (j or {}).get("job") else None
+    case("a B-roll test make with no photo in the vault makes its plan: 2 clips and 0 photos", bool(job) and job["state"] == "done" and job["words"][0].startswith("Plan: 2 clips and 0 photos")
+         and no_path(job), job or (code, j))
+    try:
+        listing = json.loads((v / ".kit" / "reels" / "photos.json").read_text())["photos"]
+        cl = json.loads((v / ".kit" / "reels" / "clips.json").read_text())["clips"]
+    except (OSError, ValueError, KeyError):
+        listing, cl = None, []
+    case("the reel script was handed an empty photo list and the vault's own video for each clip", listing == [] and [c.get("path") for c in cl] == [str(v / "Footage" / "own.mov")] * 2, (listing, cl))
+    code, j = s.post("/reel-video", {"kit": "My vault", "stamp": st["stamp"], "song": sid, "clips": ids, "variation": 0})
+    job = wait_job(s, j["job"]["id"], 400) if code == 200 and (j or {}).get("job") else None
+    name = "My vault B-roll - Clips only.mp4"
+    case("Save my video: the finished MP4 in the vault's own Reels folder, from clips alone", bool(job) and job["state"] == "done" and job.get("video") == name
+         and (v / "Reels" / name).is_file() and (v / "Reels" / name).stat().st_size > 1000, job or (code, j))
+    made = [m for m in s.record().get("made") or [] if m.get("video")]
+    case("the made entry: the file's name, footage broll, the two clips, no picks, no path", bool(made) and made[-1]["video"] == name and made[-1]["footage"] == "broll"
+         and made[-1]["clips"] == ids and made[-1]["picks"] == "" and no_path(made[-1]), made[-1:])
+    case("the page's state says the reel is made", any((s.state().get("made") or {}).values()), s.state().get("made"))
+    code, j = s.post("/words-queue", {"kit": "My vault", "piece": "reel", "reel": s.state().get("current")})
+    try:
+        pieces = json.loads((s.studio / "posting.json").read_text()).get("pieces", [])
+    except (OSError, ValueError):
+        pieces = []
+    mine = [p for p in pieces if p.get("kind") == "reel" and p.get("shoot_name") == "My vault" and p.get("reel_name") == "Clips only"]
+    case("Add to my queue takes it: the vault's reel, ready to post", code == 200 and (j or {}).get("ok") and len(mine) == 1 and mine[0]["status"] == "green", (code, j, mine))
+    code, _, raw = s.get("/content/%s/Post%%20kit.html" % VQ)
+    case("the vault's own post kit page still opens, with no photo in it", code == 200 and "My vault" in raw.decode("utf-8", "replace"), code)
+
+
+def check_empty_others(s, ids, sid):
+    """The kinds that need photos say so in plain words; nothing breaks."""
+    R = rp(s)
+    v = s.vault()
+    st = s.state()
+    base = {"kit": "My vault", "stamp": st["stamp"], "song": sid, "vibe": "beat"}
+    before = sha(v / ".kit" / "reel-page.json")
+    for what, more in (("just photos", {"picks": [], "footage": False}), ("behind the scenes", {"picks": [], "footage": True, "style": "first", "clips": ids})):
+        code, j = s.post("/reel-make", dict(base, test=True, **more))
+        case("Make my reel for %s with no photo in the vault: her line, Pick a few photos for the reel first." % what, code == 400 and (j or {}).get("words") == R.WORDS["pick_photos"], (code, j))
+        code, j = s.post("/reel-preview", dict(base, **more))
+        case("...and the watch step's preview says the same", code == 400 and (j or {}).get("words") == R.WORDS["pick_photos"], (code, j))
+    code, j = s.post("/reel-make", dict(base, test=True, picks=[{"n": 1, "h": ""}], footage=False))
+    case("a photo number that is not on the (empty) list is refused, as ever", code == 400 and (j or {}).get("ok") is False, (code, j))
+    case("nothing was written by any of those", sha(v / ".kit" / "reel-page.json") == before)
+    for kind in ("photos", "bts"):
+        code, _, raw = s.get("/reel.html?kit=%s&kind=%s" % (VQ, kind))
+        case("the %s address still opens a page (the open reel is B-roll, so its own kind wins)" % kind, code == 200 and R.NOT_READY not in html_mod.unescape(raw.decode("utf-8", "replace")), code)
+    g = s.get("/reel-vault-photos?kit=" + VQ)[1]
+    case("what the photos step searches: nothing yet, and it answers", bool(g) and g.get("ok") is True and g.get("photos") == [] and g.get("shoots") == [], g)
+    line = R.VAULT_OUR_WORDS.get("talk_no_photos", "(no such line)")
+    case("our line for the talking page: plain, your assistant's words, no dash, no Claude", "no photos yet" in line and "B-roll" in line and "—" not in line and "Claude" not in line
+         and not re.search(r"\b(she|he|her|his)\b", line), line)
+    code, _, raw = s.get("/talking.html?kit=" + VQ)
+    page = html_mod.unescape(raw.decode("utf-8", "replace"))
+    case("Talking to camera in a vault with no photo: a plain page with that line, never \"make posts from this shoot\"", code == 200 and line in page and "make posts from this shoot" not in page, flat(raw.decode("utf-8", "replace"))[-3:])
+    code, j, _ = s.get("/talking-state?kit=" + VQ)
+    case("...and the talking page's state says the same line", code == 404 and (j or {}).get("words") == line, (code, j))
+
+
+def check_empty_chat(s):
+    R = rp(s)
+    code, out = s.cmd("reel_page.py", "open", "My vault")
+    case("reel_page.py open for a vault with no photo: the address, and that B-roll works from clips alone (no STOP)", code == 0 and "STOP" not in out
+         and "/reel.html?kit=My%20vault" in out and "No photos in the vault yet" in out and "B-roll" in out, out[-500:])
+    code, out = s.cmd("reel_page.py", "show", "My vault")
+    case("reel_page.py show: B-roll, 2 clips selected, the saved video", code == 0 and "B-roll (clips only, no photos), 2 clips selected" in out and "My vault B-roll - Clips only.mp4" in out, out[-600:])
+    code, out = s.cmd("reel_page.py", "note", "My vault")
+    case("reel_page.py note: the vault, 0 photos", code == 0 and "This is the vault: 0 photos" in out, out[-400:])
+    code, out = s.cmd("vault.py", "clips")
+    case("vault.py clips: the two clips, under Added to my vault", code == 0 and "2 clips in the vault" in out and "Added to my vault" in out, out[-500:])
+    code, out = s.cmd("talking_page.py", "open", "My vault")
+    case("talking_page.py open: stops with our plain line", code == 1 and "STOP: " + R.VAULT_OUR_WORDS.get("talk_no_photos", "(no such line)") in out and "couldn't number" not in out, out[-400:])
+
+
+def check_empty_plain(s):
+    """Only the vault changed: a plain post kit whose list is empty is told it isn't ready, on every route."""
+    R = rp(s)
+    q = quote(PLAIN_EMPTY)
+    k = s.content / PLAIN_EMPTY
+    for path in ("/reel.html?kit=" + q, "/reel.html?kit=%s&kind=broll" % q):
+        code, _, raw = s.get(path)
+        case("a plain post kit with an empty list: %s is the \"isn't ready\" page, as before" % path.split("?")[0] + ("" if "kind" not in path else " (B-roll)"),
+             code == 200 and R.NOT_READY in html_mod.unescape(raw.decode("utf-8", "replace")) and "id='ed'" not in raw.decode("utf-8", "replace"), code)
+    code, j, _ = s.get("/reel-state?kit=" + q)
+    case("...its state: 404, not ready", code == 404 and (j or {}).get("words") == R.NOT_READY, (code, j))
+    code, j, _ = s.get("/reel-footage?kit=" + q)
+    case("...its footage: 404, not ready", code == 404 and (j or {}).get("words") == R.NOT_READY, (code, j))
+    stamp = hashlib.sha1((k / ".kit" / "sheet.json").read_bytes()).hexdigest()[:12]
+    for path, body in (("/reel-version", {"op": "new", "kind": "broll", "name": "No"}),
+                       ("/reel-moment", {"do": "add", "video": "0123456789ab", "start": 0.5, "seconds": 2.0}),
+                       ("/reel-save", {"stamp": stamp, "base": 0, "page": "plainempty1", "saved": {"vibe": "beat"}}),
+                       ("/reel-make", {"stamp": stamp, "picks": [], "song": None, "vibe": "beat", "test": True, "footage": True, "style": "broll", "clips": []}),
+                       ("/reel-preview", {"stamp": stamp, "picks": [], "song": None, "vibe": "beat", "footage": True, "style": "broll", "clips": []})):
+        code, j = s.post(path, dict({"kit": PLAIN_EMPTY}, **body))
+        case("...POST %s: 404, not ready" % path, code == 404 and (j or {}).get("words") == R.NOT_READY, (code, j))
+    case("...and nothing was written into it", not (k / ".kit" / "reel-page.json").exists(), sorted(p.name for p in (k / ".kit").iterdir()))
+    code, _, raw = s.get("/talking.html?kit=" + q)
+    page = html_mod.unescape(raw.decode("utf-8", "replace"))
+    case("its talking page is the plain \"isn't ready\" page too, not the vault's line", "make posts from this shoot" in page and R.VAULT_OUR_WORDS.get("talk_no_photos", "(no such line)") not in page, None)
+
+
+def check_empty_page(c, s, ids):
+    R = rp(s)
+    v = s.vault()
+    W = dict(R.WATCH_WORDS, **R.ONSCREEN_WORDS)
+    c.open(s.url("/reel.html?kit=" + VQ))
+    case("the chooser in a browser, for a vault with clips and no photo: Make my reel., her four cards", c.text("#title").strip() == "Make my reel."
+         and c.js("Array.prototype.map.call(document.querySelectorAll('.kind b'), function(b){ return b.textContent; })") == ["Behind the scenes", "Just photos", "Talking to camera", "B-roll"], c.text("#title"))
+    c.click("#" + c.js("Array.prototype.filter.call(document.querySelectorAll('a.kind'), function(a){ return a.querySelector('b').textContent === 'B-roll'; })[0].id"))
+    got = True
+    try:
+        c.wait_for("window.Reel && Reel.state() && Reel.vaultPanel && Reel.vaultPanel().ready", 30)
+    except Exception:  # noqa: BLE001
+        got = False
+    case("the B-roll card opens the B-roll page, and its script runs (state read, the panel ready)", got, c.js("document.body.innerText.slice(0, 200)"))
+    nums = c.js("Array.prototype.map.call(document.querySelectorAll('section.step'), function(s){ return s.hidden ? null : s.id; }).filter(Boolean)")
+    f = folds(c)
+    case("its steps: clips, song, watch; Added to my vault open on top with the two clips made here, no shoot under it", nums == ["step0", "step3", "watch"]
+         and len(f) == 1 and f[0]["mine"] and f[0]["open"] and len(f[0]["tiles"]) == 2, (nums, f))
+    names = c.js("Array.prototype.map.call(document.querySelectorAll('#edTabs [data-ek] b'), function(b){ return b.textContent; })")
+    case("the editor lists the vault's video first, and the reel's two clips are its cards", names[:1] == ["own.mov"] and c.count("#clist .ci") == 2, (names, c.count("#clist .ci")))
+    ok = True
+    try:
+        c.wait_for("document.getElementById('pvWords').textContent.indexOf('B-roll: ') === 0", 60)
+    except Exception:  # noqa: BLE001
+        ok = False
+    words = c.js("document.getElementById('pvWords').textContent")
+    case("the watch step plays it: her line (B-roll: N seconds, 2 clips, each cut on the beat.), Make my reel on", ok and bool(re.match(r"B-roll: \d+\.\d seconds, 2 clips, each cut on the beat\.$", words))
+         and not c.js("document.getElementById('makeBtn').disabled") and c.text("#sum").strip().startswith("2 clips · B-roll"), (words, c.text("#sum")))
+    before = sorted(p.name for p in (v / "Reels").iterdir())
+    c.js("document.getElementById('pvSaveVid').scrollIntoView({block: 'center'})")
+    time.sleep(0.8)
+    c.click("#pvSaveVid")
+    new = s.wait(lambda: [n for n in sorted(p.name for p in (v / "Reels").iterdir()) if n not in before and n.endswith(".mp4") and not n.startswith(".")], 400, 1.0)
+    done = True
+    try:
+        c.wait_for("document.getElementById('pvSaved').textContent.trim() !== %s && !document.getElementById('pvSaveVid').disabled" % json.dumps(W["os_saving"]), 60)
+    except Exception:  # noqa: BLE001
+        done = False
+    case("Save my video pressed on the page: a new MP4 in the vault's Reels folder, and the page says it is saved", bool(new) and done
+         and (new or [""])[0] in c.js("document.getElementById('pvSaved').textContent"), (new, c.js("document.getElementById('pvSaved').textContent")))
+    case("no path anywhere on the page", no_path(c.js("document.body.innerText")))
+    # a kind that needs photos: its page opens, says where photos come from, and waits
+    code, j = s.post("/reel-version", {"kit": "My vault", "op": "new", "kind": "photos", "name": "Photos later"})
+    case("(set up: a new Just photos reel in the vault)", code == 200 and (j or {}).get("ok"), (code, j))
+    c.open(s.url("/reel.html?kit=" + VQ + "&kind=photos"))
+    got = True
+    try:
+        c.wait_for("window.Reel && Reel.state() && !!document.querySelector('#vpAdd')", 30)
+    except Exception:  # noqa: BLE001
+        got = False
+    step1 = c.js("document.getElementById('step1').innerText")
+    case("Just photos in a vault with no photo: the page opens and its photos step says her line, with + Add photos",
+         got and "Photos you add to your vault show up here, open and ready." in step1 and c.text("#vpAdd").strip() == "+ Add photos", step1[-300:])
+    case("...Make my reel is off until there are photos, and no step is broken (song and watch are there)", c.js("document.getElementById('makeBtn').disabled") is True
+         and c.js("!document.getElementById('step3').hidden && !document.getElementById('watch').hidden"), None)
+    case("...and nothing on it says \"isn't ready\"", "isn't ready" not in c.js("document.body.innerText"))
+
+
+def check_empty_arrives(s, ids):
+    """The first photos arrive: a shoot is made, and the open reel page takes them in by itself."""
+    s.fake(s.target, "Late shoot", 8)
+    late = s.content / "2026-11-01 Late shoot"
+    s.note()
+    got = s.wait(lambda: (lambda st: st if st and len(st.get("photos") or []) == 8 else None)(s.state()), 40, 1.0)
+    case("a shoot that arrives afterwards shows up on the vault's reel page by itself: 8 photos", bool(got), (s.state() or {}).get("photos"))
+    code, out = s.cmd("reel_page.py", "reels", "My vault", "--open", "Clips only")
+    st = s.state()
+    case("...and the B-roll reel still has its two clips", code == 0 and [m["id"] for m in st.get("moments", [])] == ids and st.get("kind") == "broll", (out[-200:], st.get("kind")))
+    case("...the new shoot itself was only read", late.is_dir() and not (late / ".kit" / "reel-page.json").exists())
+
+
+def main_empty(a):
+    work = Path(a.work).resolve() if a.work else Path(tempfile.mkdtemp(prefix="hf-vault-reel-empty-", dir="/private/tmp"))
+    if Path("/private/tmp") not in work.parents:
+        print("STOP: --work must be under /private/tmp.")
+        return 2
+    run = work / time.strftime("run-%H%M%S")
+    (run / "home").mkdir(parents=True)
+    s = World(run, a.port)
+    try:
+        group("(making a vault with one video and no photo at all, and a plain post kit with an empty list)")
+        make_empty_world(s, run)
+        s.start()
+        case("the page server is on a port of this test's own (%d)" % s.port, a.port <= s.port < a.port + 20 and s.port not in (8790, 8791, 8792, 8799))
+        group("a vault with clips and no photo: the reel page opens")
+        ids, sid = check_empty_opens(s)
+        group("B-roll from clips alone: the watch step, a test make, Save my video, the queue")
+        check_empty_broll(s, ids, sid)
+        group("the kinds that need photos say so")
+        check_empty_others(s, ids, sid)
+        group("the chat")
+        check_empty_chat(s)
+        s.untouched("all of it")
+        group("a plain post kit with an empty list, as it was")
+        check_empty_plain(s)
+        if a.no_chrome:
+            skip("the page in a browser: --no-chrome")
+        elif not chrome_drive.find_chrome():
+            skip("the page in a browser: no Chrome on this computer")
+        else:
+            group("the pages in a hidden Chrome")
+            with chrome_drive.Chrome(work=str(run), size=(1100, 900), extra_args=LIGHT) as c:
+                check_empty_page(c, s, ids)
+        group("the first photos arrive")
+        check_empty_arrives(s, ids)
+    finally:
+        s.stop()
+        if not a.work:
+            shutil.rmtree(work, ignore_errors=True)     # this run's own scratch folder, made a moment ago
+    n, bad = core.COUNT[0], core.FAILED
+    print(f"\n{n - len(bad)} of {n} passed" + (f"; FAILED: {len(bad)}" if bad else ""))
+    for f in bad:
+        print("  FAILED: " + f)
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("part", nargs="?", default="clips", choices=("clips", "photos"))
+    ap.add_argument("part", nargs="?", default="clips", choices=("clips", "photos", "empty"))
     ap.add_argument("--port", type=int, default=9985)
     ap.add_argument("--work")
     ap.add_argument("--no-chrome", action="store_true")
@@ -1058,6 +1373,8 @@ def main():
         return 2
     if a.part == "photos":
         return main_photos(a)
+    if a.part == "empty":
+        return main_empty(a)
     work = Path(a.work).resolve() if a.work else Path(tempfile.mkdtemp(prefix="hf-vault-reel-", dir="/private/tmp"))
     if Path("/private/tmp") not in work.parents:
         print("STOP: --work must be under /private/tmp.")

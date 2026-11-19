@@ -704,7 +704,7 @@ For whoever closes the build: a sweep of every test, one at a time under the gua
 **NOT tried.** Anyone's hand; the Claude app's pane; real phone footage (HEVC, 4K, long: a shoot's video that needs a small copy is copied small into the vault's `.kit` when first wanted, and how long that takes is not measured); a vault of many shoots with dozens of videos (the list reads every shoot's Footage folder on each 4-second look; facts are read once and kept); a shoot on an unplugged drive; a shoot's video exported again after a vault clip was made from it (its key changes, the clip finds it again by name); a real CapCut make of a vault reel (test makes only); behind the scenes in the vault through to a make (only B-roll was made); Undo by hand; two windows; a PC (no stills there, so tiles have no picture); GitHub; a fresh chat session following the new section; `talking_page_check` was not rerun.
 
 **Left out, said plainly.**
-1. **A vault with no photo at all cannot open its reel page** (it says the page is not ready). Every reel-page route stops on an empty numbered list, in seventeen places. Nicole's own reason for B-roll in the vault ("you don't want someone to have to upload a post kit to create a simple B-roll clip") is exactly a vault with only clips, so this is the first thing to mend next.
+1. **(Mended Nov 19, see "A vault with clips and no photo" at the end.)** A vault with no photo at all cannot open its reel page (it says the page is not ready). Every reel-page route stops on an empty numbered list, in seventeen places. Nicole's own reason for B-roll in the vault ("you don't want someone to have to upload a post kit to create a simple B-roll clip") is exactly a vault with only clips, so this is the first thing to mend next.
 2. **The photos step in the vault is the plain one** (stage 10).
 3. **Clips made in the vault's editor from a shoot's video** show under Added to my vault (they are the vault's), not under that shoot.
 4. Her "Talking to camera" steps on the same page: ours opens the talking page instead (the brief).
@@ -805,3 +805,17 @@ For whoever closes the build: a sweep of every test, one at a time under the gua
 13. **The clip plays muted,** as her mock-up's does. There is no sound button.
 14. **Draft words of ours:** the 19 in `vault_page.EVERY_OUR_WORDS` ("Everything in it", "Put it back", "Taken out of my vault ({n})", "These are still in their shoots. Nothing was deleted.", "Add a folder of finished photos", "Add videos", "Getting this clip ready to play…", the two empty lines, the no-vault line and the rest), the 11 in `vault.OUT_WORDS` (the four "Taken out of your vault…" lines, "Back in your vault.", the already and not-in-your-vault lines), every line `vault.py out` and `back` print, and the three instruction paragraphs. Her "Loading…" and "I can't reach your shoots right now." are from her page's script.
 15. **Tests of earlier stages changed** only where they held that the link was not drawn yet (`tests/vault_page_check.py`, three checks).
+
+## A vault with clips and no photo (mended Nov 19, after the build)
+
+**Why it said "not ready".** Every reel-page route took an empty numbered list to mean "this shoot's photos were never numbered". For the vault an empty list is a real list (made by `vault.py ensure`, with a stamp of its own), so a vault holding only video clips was turned away everywhere: the page, its state, a new reel, a clip, a save, the preview, Make and Save my video.
+
+**The fix.** `reel_page.has_list(kit, rows=None)`: a list with a photo, as ever; for the vault alone, a list that reads and holds no photo yet counts too. `sync()` goes by it and hands back the list's stamp, and its callers go by the stamp (a plain post kit: exactly as before, since an empty list there still gives no stamp). The page, state, footage, Make and preview routes ask `has_list`. `footage.py moments` goes by the stamp too. `reel_page.py open "My vault"` no longer stops ("No photos in the vault yet. A B-roll reel works from its video clips alone; the other kinds need photos first.").
+
+**The kinds that need photos.** Just photos and Behind the scenes open and wait: the photos step shows her "Photos you add to your vault show up here, open and ready." with + Add photos, Make my reel is off, and a make or preview by request answers her "Pick a few photos for the reel first." Talking to camera (page, state and `talking_page.py open`) says one line of ours, `reel_page.VAULT_OUR_WORDS["talk_no_photos"]`, a draft.
+
+**Tested** (this Mac, both Pythons): `tests/vault_reel_check.py empty`, in the Mac page job as a step of its own. With the fix taken out its first nine checks fail and it stops. A plain post kit whose list is empty is still told it isn't ready on every route.
+
+**NOT tried.** Anyone's hand; a clip made by dragging in the editor in this vault (the test adds clips through the page's own route); a real CapCut make (test makes only); "Look through my footage for My vault" in a vault with no photo; a PC; GitHub.
+
+**Found on the way, left as it is.** A post kit with videos and no numbered photos already shows its videos in the vault's Footage drop-down ("<shoot's folder>/<file name>"), though it has no photos in the vault.

@@ -413,6 +413,12 @@ NOT_READY = OUR_WORDS["not_ready"][0]   # the pickers' own "not ready" page (arr
 NOT_UNDERSTOOD = arrange.NOT_UNDERSTOOD
 
 
+def not_ready_words(kit):
+    """What this page says for a post kit with no numbered photos: the pickers' "not ready" line, as ever; for the
+    vault with video clips and no photo yet (v29), that a talking reel needs photos, and that B-roll does not."""
+    return reel_page.VAULT_OUR_WORDS["talk_no_photos"] if reel_page.has_list(kit) else NOT_READY
+
+
 def say(msg):
     TR.say(msg)
 
@@ -612,7 +618,7 @@ def _get_page(handler, q):
         return arrange._send_page(handler, arrange_page.plain_page(CANT_FIND))
     rows = arrange.sheet_rows(kit)
     if not rows:
-        return arrange._send_page(handler, arrange_page.plain_page(NOT_READY))
+        return arrange._send_page(handler, arrange_page.plain_page(not_ready_words(kit)))
     try:
         photos, _made = arrange.page_photos(kit, TR.kitmod.load_rec(kit), rows)
         if any(not x["have"] and not x["missing"] for x in photos) and not arrange.cant_make(kit, rows):
@@ -629,7 +635,7 @@ def _get_state(handler, q):
     if kit is None:
         return arrange._send_json(handler, {"ok": False, "words": CANT_FIND}, 404)
     if not arrange.sheet_rows(kit):
-        return arrange._send_json(handler, {"ok": False, "words": NOT_READY}, 404)
+        return arrange._send_json(handler, {"ok": False, "words": not_ready_words(kit)}, 404)
     only = _one(q, "only")
     if only:
         # while a make is at work the page asks once a second, and wants nothing but how the make stands: never
@@ -979,6 +985,9 @@ def cmd_open(kit):
         return 1
     if not arrange.sheet_rows(kit):
         if TR.kitmod.sheet(kit) != 0 or not arrange.sheet_rows(kit):
+            if reel_page.has_list(kit):             # the vault with no photo yet: its own plain line, not "couldn't number"
+                say("STOP: " + not_ready_words(kit))
+                return 1
             say("STOP: couldn't number this shoot's photos. Are they where the kit says they are?")
             return 1
     got = arrange.make_previews(kit)

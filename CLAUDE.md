@@ -1069,7 +1069,7 @@ Two things in one build, by Dustin's say (Nov 19): "I really like the zero quest
 - **Left out:** her "Preview" banners, the samples link, every "In the real version..." line, her test wiring.
 
 **Not built.**
-- **A vault with no photo at all cannot open its reel page.** It says the page is not ready. This is exactly Nicole's case of a B-roll from clips alone; mend it next.
+- ~~A vault with no photo at all cannot open its reel page.~~ **Mended Nov 19 (after the build):** a vault with video clips and no photo opens its reel chooser and B-roll page and goes all the way to Save my video (`reel_page.has_list`: the vault's empty list is a list; a plain post kit with an empty list is "not ready" as before). Just photos and Behind the scenes open and wait for photos (her "Photos you add to your vault show up here, open and ready."); Talking to camera says a draft line of ours (`reel_page.VAULT_OUR_WORDS["talk_no_photos"]`). `tests/vault_reel_check.py empty`. Not tried: anyone's hand, a clip dragged in the editor there, a real CapCut make, a footage look in such a vault, a PC, GitHub.
 - **Her 1.7** (the one sentence that says what it is): she is still deciding.
 - **Moving a finished backup** to another drive or folder; changing photo names from the report (chat only); a button to take two cards apart (chat only, `shoot_report.py unlink`); merging two cards' photos into one shoot folder.
 - **The vault's folds and search in the two designers** (they show every vault photo in one tray); a caption per reel; taking a description as a fact in a caption (never).

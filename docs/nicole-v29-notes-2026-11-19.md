@@ -55,7 +55,7 @@ Every word in the report's new options is ours and a draft, about 90 lines. They
 
 ## Not built
 
-- **A vault with no photos at all cannot open its reel page yet.** It says the page is not ready. This is your own case, a B-roll from clips with no post kit, so it is the first thing to mend.
+- ~~A vault with no photos at all cannot open its reel page yet.~~ **Mended the same day:** a vault with video clips and no photos opens its reel page and makes a B-roll reel from the clips alone, through the watch step to Save my video. Just photos and Behind the scenes open too and wait for photos (your line, "Photos you add to your vault show up here, open and ready.", and Make my reel stays off). Talking to camera says one line of ours, a draft for you: "Your vault has no photos yet, and a talking reel puts your photos with what you say. Add a shoot to your vault first. A B-roll reel works with video clips alone."
 - **Your 1.7,** the one sentence that says what it is. You are still deciding; nothing changed for it.
 - **The folds and search inside the two designers.**
 - **A caption per reel.** One caption for all of a kit's reels fits the vault badly, since each vault reel is about something else.

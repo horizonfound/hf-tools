@@ -117,7 +117,10 @@ name: Check it on a Windows PC
 #                                   the guard, on self-made clips). Part `photos` (stage 10): her Choose your photos
 #                                   step in the vault, the photos folded by shoot, the photo search (tags, words and
 #                                   the shoot's name), the line to copy, `vault.py relist --sheets --only`, a test make
-#                                   from each photo's own path (the same page job, a step of its own)
+#                                   from each photo's own path (the same page job, a step of its own). Part `empty`: a
+#                                   vault with video clips and no photo at all (B-roll from clips alone: the page opens,
+#                                   clips, the watch step, a test make, Save my video; the kinds that need photos say
+#                                   so; a plain post kit with an empty list is still "not ready") (a step of its own)
 #   tests/vault_everything_check.py  Nicole's v29, See everything in it (Nov 19): the vault's own page, her words both
 #                                   ways, what it draws with no path in it, a clip played from the vault's own video
 #                                   route, Remove from my vault (only the vault's vault.json is written, the version
@@ -777,6 +780,9 @@ jobs:
       - name: The vault's photos step in a hidden Chrome (her Choose your photos words, Added to my vault on top and each shoot folded shut with its count, the photo search opening only the shoots with a match, a tap adding a photo under its vault number, the note and the line to copy, vault.py relist --sheets --only, a test make from each photo's own path, every other post kit unchanged)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py photos --work /private/tmp/vault-reel-photos-ci
+      - name: A vault with video clips and no photo at all in a hidden Chrome (its reel page opens, a B-roll reel from clips alone through the watch step, a test make and Save my video, the kinds that need photos saying so in plain words, a plain post kit with an empty list still told it isn't ready, the first shoot arriving on the open page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py empty --work /private/tmp/vault-reel-empty-ci
       - name: See everything in it in a hidden Chrome (the tabs and counts, me with my camera finding the named clips, a tap playing a clip from the vault's own route between its start and end, Use it in a reel picking nothing, Remove from my vault writing only the vault's vault.json, Put it back under the same number, another Origin refused, every other post kit unchanged)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_everything_check.py --work /private/tmp/vault-everything-ci

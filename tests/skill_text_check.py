@@ -1835,7 +1835,8 @@ def check_vault_reel_clips():
          and all(x in page for x in ('"My vault · Reel"', '"title_vault": "Make my reel"', '"vc_added": "Added to my vault"', '"vc_from": "From its post kit · {n} clips"', '"vc_add": "+ Add"',
                                      '"vc_added_tile": "✓ Added"', '"clips_wl": "Your clips for this reel"', '"vc_found": "{n} found"')))
     case("no video is copied, nothing is written into the shoot's post kit, and what is not there yet is said", "No video is copied and nothing is written into the shoot's post kit." in sec
-         and "**Not there yet, say so plainly if asked:**" in sec and "does not open while the vault has no photo at all" in sec)
+         and "**Not there yet, say so plainly if asked:**" in sec and "does not open while the vault has no photo at all" not in sec
+         and "**A vault with video clips and no photo at all** still opens its reel page" in sec and "No photos in the vault yet" in sec)
     case("the core's table sends the pasted line to the reel skill's section and to arrange.md's",
          '| "Find my clips in my vault" (the line on the vault\'s reel page), "find me editing on the computer", "every clip of me at the beach", "make a B-roll from my vault" | '
          'the reel skill\'s "Find my clips in my vault" (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault\'s reel page" |' in core)
