@@ -85,14 +85,14 @@ And with two drives plugged in:
 
 | Was asked before the copy | Where it lives now |
 |---|---|
-| Which drive, where on it | Chosen by itself (one question at most). To change it for next time they say so ("put my photos on the LaCie from now on"): `studio_file.py set --drive "<path>"`. |
+| Which drive, where on it | Chosen by itself (one question at most). **Use a different drive next time** on the report changes it for the next backup; from the chat ("put my photos on the LaCie from now on"): `studio_file.py set --drive "<path>"`. Nothing moves a backup already made. |
 | A second copy? | Not asked. **Make a second copy** on the report makes one of that backup afterwards, with a tick box for every backup; from the chat it is `second_copy.py` (`parts/after-the-report.md`, "A second copy, after the backup"). For future backups only ("copy my shoots to a second drive too"): `studio_file.py set --second "<a folder on another drive>"`, from the next backup on. Never a cloud folder (Dropbox, Google Drive, iCloud): raw files are far too big to sync. |
-| How shoot folders are named | Not asked. When they say they name them another way: `studio_file.py set --offered 2` ("Smith Family, Oct 18 2026"), or for their own way ask them to paste the name of one past shoot folder, read back what `studio_file.py pattern "<it>"` gives, and on yes `studio_file.py set --example "<it>"`. From the next backup on. |
+| How shoot folders are named | Not asked. **Change how my shoots are named** on the report offers the two ways, and can rename that backup's shoots to match (`parts/after-the-report.md`, "What the report lets them change"). When they say they name them another way: `studio_file.py set --offered 2` ("Smith Family, Oct 18 2026"), or for their own way ask them to paste the name of one past shoot folder, read back what `studio_file.py pattern "<it>"` gives, and on yes `studio_file.py set --example "<it>"`. From the next backup on. |
 | Photo names | Told nowhere. "Keep my camera's file names": `studio_file.py set --file-names original`, from the next backup on. |
 | How they write to clients | Asked the first time they ask for a note (below). |
 | How often they post | Asked by the post kit's own buttons the first time they press Add to my queue. Never by you before a backup. |
-| How many memory cards | Not asked. Every card is its own "backup now"; when they say this card continues the last one, the two are joined (`parts/backup.md`). **Eject my card** is a button at the end of every backup. |
-| What's on the card? | Not asked. The name box and Rename on the report; the note when they ask for one. What they say without being asked is still used and kept. |
+| How many memory cards | Not asked. Every card is its own "backup now"; **This shoot continues on another card** on the report joins two finished backups on one report, and when they say this card continues the last one, the two are joined (`parts/backup.md`). **Eject my card** is a button at the end of every backup. |
+| What's on the card? | Not asked. The name box and Rename on the report; the note when they ask for one (**Write a note to my client** on each shoot gives the line to copy). What they say without being asked is still used and kept. |
 | "Same as usual?" | Gone. `studio_file.py glance` is the answer to "what are my settings?". |
 | Phone taps for several cards | Only when they ask ("set up phone taps"): `phone_setup.py url`. The ordinary tap at the end of a backup stays. |
 

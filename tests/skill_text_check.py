@@ -1537,6 +1537,53 @@ def check_second_copy():
          all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock")))
 
 
+def check_backup_options():
+    """The other options on the report (Dustin, Nov 19): another card, naming, the next drive, the note line."""
+    print("\nWhat the report lets them change (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    a, f = flat("after-the-report.md"), flat("first-backup-setup.md")
+    core = re.sub(r"\s+", " ", read(SM / "SKILL.md"))
+    case("the core's table has the three new asks and sends them to after-the-report.md",
+         all(x in core for x in ("\"this shoot was on two cards\"", "\"change how my shoots are named\"", "\"use a different drive next time\"",
+                                 "What the report lets them change")))
+    case("after-the-report.md: the section, and that a press on the page needs nothing run",
+         "## What the report lets them change" in read(SM / "parts" / "after-the-report.md")
+         and "You never need to run anything for a press on the page." in a)
+    case("after-the-report.md: another card, word for word, with the chat way and what it does not do",
+         all(x in a for x in ("**This shoot continues on another card.**", "Which backup is the other card?", "**Put them on one report**",
+                              "Done. Both cards are on one report now.", "Each card's photos stay in their own folders.",
+                              "Back up the other card first: put it in and say backup now. Then come back here and pick it.",
+                              "shoot_report.py link \"<card 1's backup>\" \"<card 2's backup>\"", "nothing can merge two cards' photos into one folder today")))
+    case("after-the-report.md: naming, word for word, with the chat ways",
+         all(x in a for x in ("**Change how my shoots are named.**", "How should a shoot folder be named?", "**Rename this backup's shoots to match**",
+                              "Name them your own way? Copy this into the chat:", "studio_file.py set --example", "studio_file.py set --offered 1",
+                              "--offered 2", "studio_file.py set --file-names original", "the photos keep their names")))
+    case("after-the-report.md: the next drive, word for word, and that nothing is ever moved",
+         all(x in a for x in ("**Use a different drive next time.**", "Where should your next backup go?",
+                              "Saved. Your next backup goes to LaCie Rugged. The photos from this backup stay where they are.",
+                              "studio_file.py set --drive", "no button and no command moves a finished backup to another drive")))
+    case("after-the-report.md: the note line to copy, no form, and where to read on",
+         "Write a note for the <shoot's name> shoot" in a and "There is no form." in a and "parts/client-note.md" in a)
+    case("after-the-report.md: the own-disk line as the report says it, and never a speech",
+         "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. "
+         "Plug one in and press Use a different drive next time." in a and "Never say it before a backup" in a)
+    case("first-backup-setup.md: the table names each button",
+         all(x in f for x in ("**Use a different drive next time** on the report", "**Change how my shoots are named** on the report",
+                              "**This shoot continues on another card** on the report", "**Write a note to my client**")))
+    sys.path.insert(0, str(SM / "scripts"))
+    try:
+        import report_page
+        import first_look
+        W, F = report_page.OUR_WORDS, first_look.OUR_WORDS
+        said = all(x in a for x in (W["oc_button"], W["oc_which"], W["oc_go"], W["oc_done"], W["oc_quiet"], W["oc_none"], W["nm_button"], W["nm_q"],
+                                    W["nm_apply"], W["nm_own"], W["nd_button"], W["nd_q"], F["note_button"], F["note_how"],
+                                    W["own_disk"].format(computer="Mac")))
+    except Exception as ex:  # noqa: BLE001
+        said = False
+        print("        ", ex)
+    case("and every line it quotes is the line the page itself says (read from the scripts)", said)
+
+
 def check_backup_zero():
     """A backup asks nothing before it copies (Dustin, Nov 19): the instructions as rewritten for it."""
     print("\nNo questions before the copy (Nov 19)")
@@ -1602,7 +1649,7 @@ def check_backup_zero():
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

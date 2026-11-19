@@ -192,6 +192,9 @@ def on_internal_disk(path):
     Mac: same device as the startup disk (and not under /Volumes). Windows: the system drive letter.
     Used for the teachable moment in setup (Dustin, Oct 30): shoots belong on an external drive."""
     p = Path(path).expanduser()
+    pretend = this_computer._pretend_volumes()   # the tests' switch: the drives are the pretend ones, and
+    if pretend is not None:                      # anything not on one of them is the computer's own disk
+        return not any(_inside(p, v["path"]) for v in pretend if not v.get("system"))
     try:
         if os.name == "nt":
             sysdrive = (os.environ.get("SystemDrive") or "C:").upper()
@@ -354,6 +357,54 @@ def _where_words(place, found):
     return f"this {this_computer.COMPUTER}", f"in {Path(place).name}"
 
 
+def place_on(drive):
+    """Where on a drive shoots go: the drive's one obvious shoot folder when it has one, else right on the
+    drive. A folder inside a drive is taken as given. The one place rule, for the first backup's own choice and
+    for the report's "Use a different drive next time" alike."""
+    root = this_computer.drive_root(drive)
+    top = next((x for x in drives() if _same(root, x["path"])), None)
+    if top and top["shoot_folders"]:
+        return Path(top["shoot_folders"][0]["path"])
+    return root
+
+
+def use_next(drive=None, computer=False):
+    """The report's "Use a different drive next time" (Dustin, Nov 19): where the NEXT backup goes. Only the
+    Studio File changes; no photo is moved, and the backups already made stay where they are. Returns a dict:
+    state "saved" (written), "same" (backups already go on that drive: nothing written), "second" (that drive
+    is where second copies go, so it cannot also be the first place: nothing written), or "stop" (`why`).
+    With a choice: place, drive (its name), where (in words). Run twice it writes once."""
+    sf = load()
+    d = sf.setdefault("drives", {})
+    now = d.get("session")
+    if computer:
+        place = this_computer.known_folder("Pictures") / SHOOTS_ON_COMPUTER
+        name, where = f"this {this_computer.COMPUTER}", f"in {SHOOTS_ON_COMPUTER}, inside Pictures"
+        if now and on_internal_disk(now):
+            return {"state": "same", "place": now, "drive": name, "where": where}
+    else:
+        root = this_computer.drive_root(drive or "")
+        if not drive or not root.is_dir():
+            return {"state": "stop", "why": "That drive is not plugged in right now."}
+        if now and _inside(now, root):
+            n, w = _where_words(now, drives())
+            return {"state": "same", "place": now, "drive": n, "where": w}
+        place = place_on(root)
+        name, where = _where_words(place, drives())
+        if d.get("second") and (_inside(d["second"], root) or _inside(place, d["second"])):
+            return {"state": "second", "place": str(place), "drive": name, "where": where}
+    if computer:
+        place.mkdir(parents=True, exist_ok=True)
+    if not set_drive(d, "session", place):
+        return {"state": "stop", "why": "That drive is not plugged in right now."}
+    sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note":
+                                       (f"Shoots are kept on this {this_computer.COMPUTER}'s own disk, in {SHOOTS_ON_COMPUTER} inside Pictures; "
+                                        "chosen on the report." if computer else
+                                        f"Photos go onto {name}, {where}, from now on: chosen on the report.")})
+    save(sf)
+    return {"state": "saved", "place": d["session"], "drive": name, "where": where}
+
+
 def choose_defaults(drive=None, computer=False, write=True, source=None):
     """The first backup's setup, done by the Assistant itself (Dustin, Nov 19: zero questions before the copy).
     Returns a dict: state "set" (a drive is already on file: nothing is changed, ever), "chose" (chosen and
@@ -385,10 +436,7 @@ def choose_defaults(drive=None, computer=False, write=True, source=None):
         root = this_computer.drive_root(drive)
         if not root.is_dir():
             return {"state": "stop", "why": f"{drive} is not a folder I can see."}
-        place = root
-        top = next((x for x in drives() if _same(root, x["path"])), None)
-        if top and top["shoot_folders"]:
-            place = Path(top["shoot_folders"][0]["path"])
+        place = place_on(root)
         name, where = _where_words(place, drives())
     elif len(found) == 1:
         place = Path(found[0]["shoot_folders"][0]["path"] if found[0]["shoot_folders"] else found[0]["path"])

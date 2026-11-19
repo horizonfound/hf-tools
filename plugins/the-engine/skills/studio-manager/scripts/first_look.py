@@ -54,6 +54,14 @@ OUR_WORDS = {
     "not_live": "Ask your assistant to show the report, and this will work.",
     "not_running": "The Assistant is not running right now. Ask your assistant to show the report, then try again.",
     "no_shoot": "I couldn't find that shoot's folder.",
+    # a note to the client is asked for in the chat, never written during the backup (Dustin, Nov 19): the
+    # button shows the line to copy, right there. {name} is the shoot's name, as text.
+    "note_button": "Write a note to my client",
+    "note_how": "Copy this into the chat:",
+    "note_line": "Write a note for the {name} shoot",
+    "copy": "Copy",
+    "copied": "Copied. Paste it in the chat.",
+    "copy_cant": "I couldn't copy it for you. Select the line and copy it yourself.",
 }
 NUMBER_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
 
@@ -171,6 +179,17 @@ CSS = """
 .queue .add:hover{background:var(--coral);color:#fff}
 .queue .queued b{color:var(--ink)}
 .queue .q-ask{display:block;width:100%;font:500 14.5px/1.45 var(--sans);color:var(--ink)}
+.note-ask{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin-top:.7rem;font-size:14px;color:var(--ink-2)}
+.note-ask .note-open{font:500 13.5px var(--sans);background:none;border:0;color:var(--ink-2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0}
+.note-ask .note-open:hover{color:var(--coral-2)}
+.note-ask .note-how{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .6rem;flex-basis:100%}
+.note-ask .note-how[hidden]{display:none}
+.note-ask .how-q{font:600 13px/1.3 var(--sans);color:var(--ink)}
+.copy-row{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.45rem .6rem;max-width:100%}
+.copy-text{font:500 14px/1.4 var(--sans);color:var(--ink);background:var(--sun-l);border-radius:12px;padding:.45rem .75rem;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}
+.copy-line{font:600 13px/1 var(--sans);padding:.55rem .9rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer}
+.copy-line:hover{background:var(--ink);color:var(--paper)}
+.copy-said{font-size:13px;color:var(--ink-2)}
 .open-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;margin-top:.2rem}
 .open-row .open-shoot{font:600 14px/1 var(--sans);padding:.7rem 1.1rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
 .open-row .open-shoot:hover{background:var(--ink);color:var(--paper)}
@@ -511,6 +530,41 @@ def peeks_by_shoot(studio):
     return out
 
 
+def copy_row(line, W=None):
+    """A line to copy into the chat, with its Copy button and what the press did right beside it. The line is
+    text only (a shoot's name with <b> or quotes in it stays text). COPY_SCRIPT does the copying."""
+    e = html.escape
+    W = W or OUR_WORDS
+    return (f"<span class='copy-row'><span class='copy-text'>{e(line)}</span>"
+            f"<button type='button' class='copy-line' data-copied='{e(W['copied'])}' data-cant='{e(W['copy_cant'])}'>{e(W['copy'])}</button>"
+            "<span class='copy-said' role='status' aria-live='polite'></span></span>")
+
+
+# One listener for every Copy button of this kind on the page, and for "Write a note to my client" (which only
+# shows its line). The app's pane refuses the newer clipboard call and honours the older one from a click
+# (checked Oct 30), so the older one is tried first. On the page once, however many scripts carry it.
+COPY_SCRIPT = """<script>
+(function(){
+  if(window.__copyLine) return; window.__copyLine=true;
+  document.addEventListener('click',function(ev){
+    var t=ev.target&&ev.target.closest?ev.target:null; if(!t) return;
+    var o=t.closest('.note-open');
+    if(o){ var how=o.parentNode.querySelector('.note-how'); if(how) how.hidden=!how.hidden; return; }
+    var b=t.closest('.copy-line'); if(!b) return;
+    var row=b.closest('.copy-row'), text=row.querySelector('.copy-text').textContent, said=row.querySelector('.copy-said'), ok=false;
+    function tell(good){ said.textContent=good?b.dataset.copied:b.dataset.cant; }
+    var ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly','');
+    ta.style.position='fixed'; ta.style.top='0'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+    try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+    document.body.removeChild(ta);
+    if(ok) tell(true);
+    else if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ tell(true); },function(){ tell(false); });
+    else tell(false);
+  });
+})();
+</script>"""
+
+
 def note_card(note):
     """The note to the client as a card with Copy buttons; None when there is nothing to show."""
     e = html.escape
@@ -752,6 +806,14 @@ def shoots_section(studio, closing=True):
                       else f"<span class='q-ask'>{e(WORDS['look_right'])}</span><button class='add' type='button'>Add to my editing queue</button>")
                    + f"<span class='pick' hidden><label>Due <input type='date' min='{e(today_iso())}'></label><button class='save' type='button' disabled>Save</button><button class='never' type='button'>Never mind</button></span>"
                    "<span class='qstate'></span></div>")
+        # a note to the client: a button that shows the line to copy into the chat, right there; no form
+        # (Dustin, Nov 19). Not shown once a note for this shoot is written (its card is below).
+        filed_as = " ".join(str(s.get("name") or s.get("suggested") or "").split())
+        if filed_as and not (notes.get(s["id"]) or {}).get("body"):
+            out.append(f"<div class='note-ask' data-shoot='{e(s['id'])}'>"
+                       f"<button class='note-open' type='button'>{e(OUR_WORDS['note_button'])}</button>"
+                       f"<span class='note-how' hidden><span class='how-q'>{e(OUR_WORDS['note_how'])}</span>"
+                       f"{copy_row(OUR_WORDS['note_line'].format(name=filed_as))}</span></div>")
         out.append("</div></div>")   # copy, top
         if mine:
             out.append("<div class='more'>")
@@ -771,7 +833,7 @@ def shoots_section(studio, closing=True):
     if closing:
         out.append(closing_html(photos=any(a for a, _ in counts.values()), wrap=False))
     open_words = json.dumps({k: OUR_WORDS[k] for k in ("opening", "not_live", "not_running", "no_shoot")}).replace("</", "<\\/")
-    return "\n".join(out), PICKER + SCRIPT.replace("__OPEN_WORDS__", open_words) + CLIPS_SCRIPT
+    return "\n".join(out), PICKER + SCRIPT.replace("__OPEN_WORDS__", open_words) + CLIPS_SCRIPT + COPY_SCRIPT
 
 
 def write_page(session_dir):

@@ -308,6 +308,51 @@ OUR_WORDS = {
     "sc_cant": "I couldn't start the copy just now. Tell your assistant and it'll sort it out.",
     "sc_not_live": "Ask your assistant to show the report, and this button will work.",
     "sc_looking": "Looking for your drives...",
+    # the other options (stage "backup-options", Nov 19). Button labels echo their question.
+    "opt_cant": "That didn't work just now. Tell your assistant and it'll sort it out.",
+    "opt_looking": "One moment...",
+    "copy": "Copy",
+    "copied": "Copied. Paste it in the chat.",
+    "copy_cant": "I couldn't copy it for you. Select the line and copy it yourself.",
+    # this shoot continues on another card
+    "oc_button": "This shoot continues on another card",
+    "oc_which": "Which backup is the other card?",
+    "oc_none": "Back up the other card first: put it in and say backup now. Then come back here and pick it.",
+    "oc_go": "Put them on one report",
+    "oc_quiet": "Each card's photos stay in their own folders.",
+    "oc_done": "Done. Both cards are on one report now.",
+    "oc_done_many": "Done. All {n} cards are on one report now.",
+    "oc_changed": "Your backups changed since this was opened. Press the button again.",
+    "oc_cant": "I couldn't put them on one report just now. Tell your assistant and it'll sort it out.",
+    # change how my shoots are named
+    "nm_button": "Change how my shoots are named",
+    "nm_q": "How should a shoot folder be named?",
+    "nm_now": "how they're named now",
+    "nm_apply": "Rename this backup's shoots to match",
+    "nm_save": "Save",
+    "nm_own": "Name them your own way? Copy this into the chat:",
+    "nm_own_line": "Change how my shoots are named",
+    "nm_saved": "Saved. Your next backup's shoots will be named like {example}.",
+    "nm_saved_renaming": "Saved. Renaming this backup's shoots to match...",
+    "nm_renaming": "Renaming this backup's shoots to match: {done} of {total}.",
+    "nm_done": "Done. This backup's shoots are renamed to match, and your next backup's will be named like {example}.",
+    "nm_problem": "Saved for your next backup, but a shoot here could not be renamed. Tell your assistant and it'll sort it out.",
+    "nm_cant": "I couldn't save that just now. Tell your assistant and it'll sort it out.",
+    "nm_wait": "A second copy of this backup is being made right now. Try this again when it's done.",
+    # use a different drive next time
+    "nd_button": "Use a different drive next time",
+    "nd_q": "Where should your next backup go?",
+    "nd_now": "where they go now",
+    "nd_save": "Save",
+    "nd_saved": "Saved. Your next backup goes to {drive}. The photos from this backup stay where they are.",
+    "nd_same": "Your backups already go to {drive}. Nothing changed.",
+    "nd_second": ("{drive} is where your second copies go, so your photos can't go there first as well. "
+                  "Pick another drive, or tell your assistant to change your second copy."),
+    "nd_gone": "I can't see {drive} right now. Is it plugged in?",
+    "nd_changed": "The drives changed since this was opened. Press the button again.",
+    # one quiet line under the where-card, when this backup's photos are on the computer's own disk
+    "own_disk": ("Your photos are on this {computer}'s own disk. An external drive is safer: if anything happens to "
+                 "the computer, the photos on it go too. Plug one in and press Use a different drive next time."),
 }
 OPTIONS_CSS = """
 .opts{display:grid;gap:.5rem;padding-top:clamp(2rem,4vw,3rem);padding-bottom:.6rem}
@@ -326,6 +371,9 @@ OPTIONS_CSS = """
 .opt-drives label,.opt-tick{display:flex;align-items:center;gap:.6rem;font-size:15px;cursor:pointer}
 .opt-link{font:600 14px/1 var(--sans);background:none;border:0;padding:0;color:var(--coral-2);text-decoration:underline;cursor:pointer;justify-self:start}
 .opt [hidden]{display:none}
+.opt-now{color:var(--ink-2);font-size:13.5px}
+.opt-own{display:grid;gap:.45rem;border-top:1px solid var(--line);padding-top:.8rem}
+.where-card .own-disk{font-size:13.5px;line-height:1.5;color:var(--ink-2)}
 """
 OPTIONS_SCRIPT = r"""<script>
 (function(){
@@ -387,10 +435,165 @@ OPTIONS_SCRIPT = r"""<script>
 </script>"""
 
 
+MORE_OPTIONS_SCRIPT = r"""<script>
+(function(){
+  var data=document.getElementById('opt-words'); if(!data) return;
+  var W=JSON.parse(data.textContent);
+  function $(id){ return document.getElementById(id); }
+  var live=location.protocol==='http:'||location.protocol==='https:';
+  function get(route){ return fetch(route,{cache:'no-store'}).then(function(r){ return r.json(); }); }
+  function post(route,body){
+    return fetch(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ return r.json(); });
+  }
+  // one choice per row, as text only: [{i, text, now}] -> radio buttons in `list`
+  function rows(list,name,items,go,nowWords){
+    list.textContent='';
+    items.forEach(function(d){
+      var l=document.createElement('label'), i=document.createElement('input'), t=document.createElement('span');
+      i.type='radio'; i.name=name; i.value=String(d.i); t.textContent=d.text;
+      if(d.now){ var n=document.createElement('span'); n.className='opt-now'; n.textContent=' ('+nowWords+')'; t.appendChild(n); i.checked=true; }
+      else if(items.length===1) i.checked=true;
+      i.addEventListener('change',function(){ go.disabled=picked(list)<0; });
+      l.appendChild(i); l.appendChild(t); list.appendChild(l);
+    });
+    go.disabled=picked(list)<0;
+  }
+  function picked(list){ var r=list.querySelector('input:checked'); return r?parseInt(r.value,10):-1; }
+  function panel(open,pan,say,load){
+    open.addEventListener('click',function(){
+      if(!live){ say.textContent=W.sc_not_live; return; }
+      pan.hidden=!pan.hidden; if(!pan.hidden){ say.textContent=''; load(); }
+    });
+  }
+
+  // This shoot continues on another card
+  (function(){
+    var open=$('oc-open'); if(!open) return;
+    var say=$('oc-say'), pan=$('oc-panel'), list=$('oc-list'), none=$('oc-none'), q=$('oc-q'), go=$('oc-go'), quiet=$('oc-quiet'), found=[];
+    function load(){
+      say.textContent=W.opt_looking; go.disabled=true;
+      get('other-backups').then(function(j){
+        found=j.backups||[]; say.textContent='';
+        rows(list,'oc-backup',found.map(function(b){ return {i:b.i,text:[b.name,b.day,b.count].filter(Boolean).join(' · ')}; }),go);
+        var any=found.length>0; none.hidden=any; q.hidden=!any; go.hidden=!any; quiet.hidden=!any;
+      }).catch(function(){ say.textContent=W.opt_cant; });
+    }
+    panel(open,pan,say,load);
+    go.addEventListener('click',function(){
+      var i=picked(list), b=found.filter(function(x){ return x.i===i; })[0]; if(!b) return;
+      go.disabled=true; say.textContent=W.opt_looking;
+      post('link-card',{backup:b.i,name:b.name}).then(function(j){
+        say.textContent=j.words||W.opt_cant;
+        if(j.ok){ pan.hidden=true; open.disabled=true;
+          // the report is the shoot's page now: show it (from inside a card's frame, the whole page)
+          setTimeout(function(){ var t=window; try{ if(window.top&&window.top!==window&&window.top.location.host===location.host) t=window.top; }catch(e){}
+            if(t!==window) t.location.reload(); else location.href='report.html'; },1600); }
+        else { go.disabled=false; if(j.again) load(); }
+      }).catch(function(){ say.textContent=W.opt_cant; go.disabled=false; });
+    });
+  })();
+
+  // Change how my shoots are named
+  (function(){
+    var open=$('nm-open'); if(!open) return;
+    var say=$('nm-say'), pan=$('nm-panel'), list=$('nm-list'), tick=$('nm-apply'), tickRow=$('nm-apply-row'), go=$('nm-go'), timer=null;
+    function status(j){
+      if(j&&j.line){ say.textContent=j.line; }
+      clearTimeout(timer);
+      if(j&&j.busy){ open.disabled=true; timer=setTimeout(watch,1500); } else { open.disabled=false; }
+    }
+    function watch(){ get('naming').then(status).catch(function(){ timer=setTimeout(watch,4000); }); }
+    function load(){
+      say.textContent=W.opt_looking; go.disabled=true;
+      get('naming').then(function(j){
+        say.textContent='';
+        rows(list,'nm-way',(j.ways||[]).map(function(w){ return {i:w.n,text:w.example,now:w.n===j.current}; }),go,W.nm_now);
+        tickRow.hidden=!(j.shoots>0); tick.checked=j.shoots>0;
+      }).catch(function(){ say.textContent=W.opt_cant; });
+    }
+    panel(open,pan,say,load);
+    go.addEventListener('click',function(){
+      var n=picked(list); if(n<0) return;
+      go.disabled=true;
+      post('naming',{offered:n,apply:!tickRow.hidden&&!!tick.checked}).then(function(j){
+        say.textContent=j.words||W.nm_cant;
+        if(j.ok){ pan.hidden=true; if(j.busy){ open.disabled=true; timer=setTimeout(watch,1200); } }
+        else go.disabled=false;
+      }).catch(function(){ say.textContent=W.nm_cant; go.disabled=false; });
+    });
+    if(live) get('naming').then(function(j){ if(j&&(j.line||j.busy)) status(j); }).catch(function(){});
+  })();
+
+  // Use a different drive next time
+  (function(){
+    var open=$('nd-open'); if(!open) return;
+    var say=$('nd-say'), pan=$('nd-panel'), list=$('nd-list'), go=$('nd-go'), found=[];
+    function load(){
+      say.textContent=W.opt_looking; go.disabled=true;
+      get('next-drives').then(function(j){
+        found=j.drives||[]; say.textContent='';
+        rows(list,'nd-drive',found.map(function(d){ return {i:d.i,text:d.name+(d.free?', '+d.free:''),now:d.now}; }),go,W.nd_now);
+      }).catch(function(){ say.textContent=W.opt_cant; });
+    }
+    panel(open,pan,say,load);
+    go.addEventListener('click',function(){
+      var i=picked(list), d=found.filter(function(x){ return x.i===i; })[0]; if(!d) return;
+      go.disabled=true;
+      post('next-drive',{drive:d.i,name:d.name}).then(function(j){
+        say.textContent=j.words||W.opt_cant;
+        if(j.ok) pan.hidden=true; else { go.disabled=false; if(j.again) load(); }
+      }).catch(function(){ say.textContent=W.opt_cant; go.disabled=false; });
+    });
+  })();
+})();
+</script>"""
+
+
+def more_options(W):
+    """The other three options, each a button, its line beside it, and a panel that opens right there."""
+    e = html.escape
+    copy_row = first_look.copy_row
+    return [
+        # this shoot continues on another card
+        "<div class='opt' id='opt-card'><div class='opt-row'>"
+        f"<button type='button' class='opt-btn' id='oc-open'>{e(W['oc_button'])}</button>"
+        "<span class='opt-say' id='oc-say' role='status' aria-live='polite'></span></div>"
+        "<div class='opt-panel' id='oc-panel' hidden>"
+        f"<p class='opt-q' id='oc-q'>{e(W['oc_which'])}</p>"
+        "<div class='opt-drives' id='oc-list'></div>"
+        f"<p class='opt-note' id='oc-none' hidden>{e(W['oc_none'])}</p>"
+        f"<button type='button' class='opt-go' id='oc-go' disabled>{e(W['oc_go'])}</button>"
+        f"<p class='opt-note' id='oc-quiet'>{e(W['oc_quiet'])}</p>"
+        "</div></div>",
+        # change how my shoots are named
+        "<div class='opt' id='opt-naming'><div class='opt-row'>"
+        f"<button type='button' class='opt-btn' id='nm-open'>{e(W['nm_button'])}</button>"
+        "<span class='opt-say' id='nm-say' role='status' aria-live='polite'></span></div>"
+        "<div class='opt-panel' id='nm-panel' hidden>"
+        f"<p class='opt-q'>{e(W['nm_q'])}</p>"
+        "<div class='opt-drives' id='nm-list'></div>"
+        f"<label class='opt-tick' id='nm-apply-row'><input type='checkbox' id='nm-apply' checked><span>{e(W['nm_apply'])}</span></label>"
+        f"<button type='button' class='opt-go' id='nm-go' disabled>{e(W['nm_save'])}</button>"
+        f"<div class='opt-own'><p class='opt-note'>{e(W['nm_own'])}</p>{copy_row(W['nm_own_line'], W)}</div>"
+        "</div></div>",
+        # use a different drive next time
+        "<div class='opt' id='opt-drive'><div class='opt-row'>"
+        f"<button type='button' class='opt-btn' id='nd-open'>{e(W['nd_button'])}</button>"
+        "<span class='opt-say' id='nd-say' role='status' aria-live='polite'></span></div>"
+        "<div class='opt-panel' id='nd-panel' hidden>"
+        f"<p class='opt-q'>{e(W['nd_q'])}</p>"
+        "<div class='opt-drives' id='nd-list'></div>"
+        f"<button type='button' class='opt-go' id='nd-go' disabled>{e(W['nd_save'])}</button>"
+        "</div></div>",
+    ]
+
+
 def options_section(manifest, studio):
     """The options under the shoots, for a backup that finished clean and was not a sample (there is nothing to
-    offer on one that has not finished). Today: Make a second copy. A backup that already has one, every file
-    checked, shows that in place of the button. Returns (html, script), or ("", "")."""
+    offer on one that has not finished): Make a second copy (a backup that already has one, every file checked,
+    shows that in place of the button), This shoot continues on another card, Change how my shoots are named,
+    Use a different drive next time. Returns (html, script), or ("", "")."""
     import second_copy
     if second_copy.whole(manifest):
         return "", ""
@@ -399,6 +602,7 @@ def options_section(manifest, studio):
     had = second_copy.has_second(manifest)
     made = W["sc_made"].format(drive=second_copy.drive_name(had)) if had else ""
     words = {k: W[k] for k in ("sc_cant", "sc_not_live", "sc_looking")}
+    more = {k: W[k] for k in ("sc_not_live", "opt_cant", "opt_looking", "nm_now", "nm_cant", "nd_now")}
     out = ["<section class='wrap opts' id='opts'>",
            f"<h2 class='h2'>{e(W['opts_h'])}</h2>",
            f"<p class='lede'>{e(W['opts_lede'])}</p>",
@@ -415,10 +619,13 @@ def options_section(manifest, studio):
            f"<button type='button' class='opt-link' id='sc-look'>{e(W['sc_look'])}</button>",
            f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>",
            f"<button type='button' class='opt-go' id='sc-go' disabled>{e(W['sc_go'])}</button>",
-           "</div></div></section>",
-           # the few lines the script itself says, handed over as data (text only, never markup)
-           "<script type='application/json' id='sc-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>"]
-    return "\n".join(out), OPTIONS_SCRIPT
+           "</div></div>"]
+    out += more_options(W)
+    out += ["</section>",
+            # the few lines the scripts themselves say, handed over as data (text only, never markup)
+            "<script type='application/json' id='sc-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>",
+            "<script type='application/json' id='opt-words'>" + json.dumps(more).replace("</", "<\\/") + "</script>"]
+    return "\n".join(out), OPTIONS_SCRIPT + MORE_OPTIONS_SCRIPT + first_look.COPY_SCRIPT
 
 
 def human(n):
@@ -841,6 +1048,15 @@ def build(manifest, studio, card=None):
         out.append(f"<p class='also'>Second copy{e(tail)}: {e(photos_folder(second))}</p>")
     if not all_good:
         out.append("<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
+    # one quiet line, once, when this backup's photos are on the computer's own disk (the Oct 30 teachable moment,
+    # moved here from before the copy: Dustin, Nov 19). Only where the button it names is on the page.
+    try:
+        import studio_file
+        own = bool(options_html) and bool(manifest.get("dest")) and studio_file.on_internal_disk(manifest["dest"])
+    except Exception:  # noqa: BLE001  (never let this line break the report)
+        own = False
+    if own:
+        out.append(f"<p class='own-disk' id='own-disk'>{e(OUR_WORDS['own_disk'].format(computer=this_computer.COMPUTER))}</p>")
     out.append("</div>")
     out.append("</div></div>")
 

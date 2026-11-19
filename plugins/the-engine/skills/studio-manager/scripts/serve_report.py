@@ -259,6 +259,64 @@ def named_as_text(want, folders):
 
 
 CARD_PATH = re.compile(r"^/card/(\d+)(/.*)?$")
+POST_CAP = 65536        # the most a page may send in one POST (every one is a few short fields)
+NAMING_SHOWN = 180      # seconds the "renamed to match" line stays beside its button after the last rename
+
+
+def context_for(session, studio):
+    """What one backup's requests need: its records, the folders its buttons may open, its two workers."""
+    studio = Path(studio)
+    manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
+    return {"studio": str(studio), "directory": str(studio),
+            "allowed": tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p),
+            "renames": Renames(str(session), studio), "picks": Picks(str(session), studio), "naming": None}
+
+
+def shoot_stamp(studio):
+    """When this backup's link to a shoot of several cards (shoot.json) last changed; None when it has none."""
+    try:
+        st = (Path(studio) / "shoot.json").stat()
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
+def read_cards(root, known=None):
+    """One card of a shoot on several cards (shoot_report.py): every card's records are served too, at /card/N/.
+    Returns (cards, is a shoot). A card this server already serves keeps its workers (a rename under way is not
+    forgotten); the backup the server was started for is always its own root."""
+    import shoot_report
+    known = known or {}
+    cards = {}
+    data = shoot_report.read(Path(root["studio"]))
+    for c in (data or {}).get("cards", []):
+        if not c.get("found"):
+            continue
+        rec = Path(c["found"])
+        if rec.resolve() == Path(root["studio"]).resolve():
+            cards[int(c["card"])] = root
+            continue
+        had = next((k for k in known.values() if k is not root and Path(k["studio"]).resolve() == rec.resolve()), None)
+        try:
+            cards[int(c["card"])] = had or context_for(str(rec), rec)
+        except (OSError, ValueError):
+            continue
+    return cards, len(cards) >= 2
+
+
+def run_option(cmd, studio, ask=None, timeout=180):
+    """One of the report's options (report_options.py), in a fresh process, so a server that has been up for days
+    does it with the code on disk. Returns what it printed as its last line (a dict), or None."""
+    r = subprocess.run([sys.executable, str(HERE / "report_options.py"), cmd, str(studio)],
+                       input=json.dumps(ask or {}), capture_output=True, encoding="utf-8", errors="replace",
+                       timeout=timeout, **quiet())
+    try:
+        out = json.loads((r.stdout or "").strip().splitlines()[-1])
+        assert isinstance(out, dict)
+        return out
+    except (ValueError, IndexError, AssertionError):
+        sys.stderr.write(f"option {cmd}: no answer (exit {r.returncode}): {(r.stderr or r.stdout or '').strip()[-300:]}\n")
+        return None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -270,12 +328,35 @@ class Handler(SimpleHTTPRequestHandler):
     root = None     # the backup this server was started for: {"studio", "session", "directory", "allowed", "renames", "picks"}
     cards = {}      # a shoot on several cards (shoot_report.py): card number -> the same for that card
     shoot = False   # ... and then /report.html is the shoot's page, each card at /card/N/
+    stamp = None    # shoot.json as it was when the cards were last read
+    sync = threading.Lock()
+
+    @classmethod
+    def sync_cards(cls, force=False):
+        """Read the link to a shoot of several cards again when it has changed since it was last read: the
+        report's own "This shoot continues on another card", or shoot_report.py link from the chat while this
+        server is up. One look at one file per request; the cards are swapped in one step."""
+        root = cls.root
+        if not root:
+            return
+        now = shoot_stamp(root["studio"])
+        if not force and now == cls.stamp:
+            return
+        with cls.sync:
+            try:
+                cards, shoot = read_cards(root, cls.cards)
+            except Exception as ex:  # noqa: BLE001  (a link that cannot be read leaves the report as it was)
+                sys.stderr.write(f"cards not read again: {ex.__class__.__name__}: {ex}\n")
+                cls.stamp = now
+                return
+            cls.cards, cls.shoot, cls.stamp = cards, shoot, now
 
     def context(self):
         """Which backup this request is for. /card/2/<rest> is card 2 of the shoot (the prefix comes off the path, so
         every page and route is the same as for a backup on its own); anything else is the backup this server was
         started for, whose /report.html is the shoot's page when it is one card of a shoot. Sets this request's
         records, folders and workers, so a rename asked on card 2's section renames card 2's shoot."""
+        self.sync_cards()
         ctx = self.root
         parts = urlsplit(self.path)
         m = CARD_PATH.match(parts.path)
@@ -287,6 +368,7 @@ class Handler(SimpleHTTPRequestHandler):
         if ctx:
             self.studio, self.directory, self.allowed = ctx["studio"], ctx["directory"], ctx["allowed"]
             self.renames, self.picks = ctx["renames"], ctx["picks"]
+        self.ctx = ctx
 
     def ours(self):
         """Was this request sent to this server by its own name (127.0.0.1 or localhost, and this port)? The report
@@ -376,6 +458,8 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if parts.path in ("/second-drives", "/second-status"):
             return self.second(parts)
+        if parts.path in ("/other-backups", "/naming", "/next-drives"):
+            return self.option_list(parts.path)
         if parts.path == "/queue-url":
             # the report's "Show my editing queue" link: the queue page's address, starting its server if it is not up
             url = queue_url()
@@ -468,7 +552,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def second_copy(self, path):
         """POST second-copy {"drive": <index>, "name": <that drive's name>, "always": bool}: start the copy.
-        Behind the pickers' same-page-only guard. The page never sends a path: the server lists the drives again
+        Behind the pickers' same-page-only guard, as every POST is (do_POST). The page never sends a path: the server lists the drives again
         and the name must be the one at that index, so a drive plugged in or pulled since the panel was drawn can
         never be copied onto by mistake. The questions asked before a byte is written are second_copy.py's own
         (--check), in a fresh process; then the job is started on its own, so it outlives this server."""
@@ -476,11 +560,6 @@ class Handler(SimpleHTTPRequestHandler):
         import report_page
         import second_copy
         W = report_page.OUR_WORDS
-        refused = arrange.guard(self, "application/json", 4096, path)
-        if refused is None and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
-            refused = (403, arrange.NOT_UNDERSTOOD)
-        if refused:
-            return self.answer({"ok": False, "words": refused[1]}, refused[0])
         try:
             d = json.loads(self.rfile.read(int(self.headers.get("Content-Length"))) or b"{}")
             i, name, always = d["drive"], d["name"], d.get("always", False)
@@ -506,6 +585,72 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as ex:  # noqa: BLE001
             sys.stderr.write(f"second-copy: {ex.__class__.__name__}: {ex}\n")
             return self.answer({"ok": False, "words": W["sc_cant"]})
+
+    def naming_line(self):
+        """How "Rename this backup's shoots to match" stands, for the line beside its button: {"line", "busy"}
+        from the rename queue's own states, so a page that reloads itself (the report is rebuilt after every
+        rename) picks the line up again. Nothing once it has been done for a few minutes."""
+        import report_page
+        W = report_page.OUR_WORDS
+        nm = (getattr(self, "ctx", None) or {}).get("naming")
+        if not nm or not self.renames:
+            return {}
+        with self.renames.lock:
+            states = [dict(self.renames.state.get(i) or {}) for i in nm["ids"]]
+        busy = any(st.get("state") in ("queued", "running") for st in states)
+        if busy:
+            done = sum(1 for st in states if st.get("state") in ("done", "problem"))
+            return {"busy": True, "line": W["nm_renaming"].format(done=done, total=len(states))}
+        nm.setdefault("ended", time.monotonic())
+        if time.monotonic() - nm["ended"] > NAMING_SHOWN:
+            return {}
+        if any(st.get("state") != "done" for st in states):
+            return {"busy": False, "line": W["nm_problem"]}
+        return {"busy": False, "line": W["nm_done"].format(example=nm["example"])}
+
+    def option_list(self, path):
+        """GET other-backups, naming, next-drives: what a panel shows when it opens (report_options.py). Names,
+        days, counts and places in a list; never a path. Relative routes, so they work inside /card/N/ too."""
+        empty = {"/other-backups": {"backups": []}, "/naming": {"current": 0, "ways": [], "shoots": 0}, "/next-drives": {"drives": []}}[path]
+        try:
+            out = run_option(path.lstrip("/"), self.studio, timeout=60) or empty
+            if path == "/naming":
+                out = dict({k: out.get(k) for k in ("current", "ways", "shoots")}, **self.naming_line())
+            else:
+                out = {k: out.get(k) or [] for k in empty}
+        except Exception as ex:  # noqa: BLE001  (a press must always get an answer; the reason goes to the log)
+            sys.stderr.write(f"{path}: {ex.__class__.__name__}: {ex}\n")
+            out = empty
+        return self.answer(out)
+
+    def option_post(self, path, d):
+        """POST link-card {"backup": <index>, "name"}, naming {"offered": 1|2, "apply": bool}, next-drive
+        {"drive": <index>, "name"}. Already through the same-page-only guard (do_POST). The page never sends a
+        path; report_options.py makes its list again and the name must still be the one at that place."""
+        import report_page
+        W = report_page.OUR_WORDS
+        try:
+            if path == "/link-card":
+                out = run_option("link", self.studio, {"backup": d.get("backup"), "name": d.get("name")}) or {"ok": False, "words": W["oc_cant"]}
+                if out.get("ok"):
+                    self.sync_cards(force=True)     # /report.html is the shoot's page from this answer on
+                sys.stderr.write(f"link-card asked: {d.get('name')!r} -> {'ok' if out.get('ok') else 'no'}\n")
+            elif path == "/naming":
+                out = run_option("set-naming", self.studio, {"offered": d.get("offered"), "apply": d.get("apply", False)}) or {"ok": False, "words": W["nm_cant"]}
+                todo = [(str(i)[:40], " ".join(str(n).split())[:120]) for i, n in (out.get("rename") or []) if i and n] if out.get("ok") else []
+                if todo and self.renames and getattr(self, "ctx", None):
+                    self.ctx["naming"] = {"ids": [i for i, _ in todo], "example": str(out.get("example") or "")}
+                    for i, n in todo:
+                        self.renames.ask(i, n)
+                    out["busy"] = True
+                sys.stderr.write(f"naming asked: {d.get('offered')!r} apply={d.get('apply')!r} -> {len(todo)} to rename\n")
+            else:
+                out = run_option("set-next-drive", self.studio, {"drive": d.get("drive"), "name": d.get("name")}) or {"ok": False, "words": W["opt_cant"]}
+                sys.stderr.write(f"next-drive asked: {d.get('name')!r} -> {'ok' if out.get('ok') else 'no'}\n")
+        except Exception as ex:  # noqa: BLE001
+            sys.stderr.write(f"{path}: {ex.__class__.__name__}: {ex}\n")
+            out = {"ok": False, "words": W["opt_cant"]}
+        return self.answer({k: out[k] for k in ("ok", "words", "again", "busy") if k in out})
 
     def open_shoot(self, parts):
         """GET /open-shoot?shoot=<id>: each shoot's own "Open this folder" on the report (Nicole, Nov 13). The page
@@ -615,8 +760,27 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self.context()
         path = urlsplit(self.path).path
+        # Every POST is for this report's own page (Nov 19): the pickers' same-page-only check (this server's
+        # own name, an Origin that is this server when one is sent, JSON, a stated length under the cap), and
+        # another website's press refused. Checked before a byte of the body is read or anything is changed.
+        # The page's routes are relative, so a press inside /card/N/ carries the same Origin and passes.
+        import arrange
+        refused = arrange.guard(self, "application/json", POST_CAP, path)
+        if refused is None and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            refused = (403, arrange.NOT_UNDERSTOOD)
+        if refused:
+            arrange._drain(self)
+            sys.stderr.write(f"refused: a POST to {path[:40]!r} that is not this report's own page ({refused[0]})\n")
+            return self.answer({"ok": False, "words": refused[1]}, refused[0])
         if path == "/second-copy":
             return self.second_copy(path)
+        if path in ("/link-card", "/naming", "/next-drive"):
+            try:
+                d = json.loads(self.rfile.read(int(self.headers.get("Content-Length"))) or b"{}")
+                assert isinstance(d, dict)
+            except (ValueError, AssertionError, TypeError):
+                return self.answer({"ok": False, "words": arrange.NOT_UNDERSTOOD}, HTTPStatus.BAD_REQUEST)
+            return self.option_post(path, d)
         if path == "/rename":
             try:
                 n = int(self.headers.get("Content-Length", "0"))
@@ -733,24 +897,12 @@ def main():
     from where import locate
     _, studio = locate(a.session)
 
-    def context_for(session, studio):
-        manifest = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
-        return {"studio": str(studio), "directory": str(studio),
-                "allowed": tuple(p for p in (manifest.get("source"), manifest.get("dest"), manifest.get("second")) if p),
-                "renames": Renames(session, studio), "picks": Picks(session, studio)}
     Handler.root = context_for(a.session, studio)
     Handler.allowed, Handler.renames, Handler.picks = Handler.root["allowed"], Handler.root["renames"], Handler.root["picks"]
     Handler.studio = str(studio)
-    # one card of a shoot on several cards (shoot_report.py): every card's records are served too, at /card/N/
-    import shoot_report
-    data = shoot_report.read(studio)
-    if data:
-        for c in data["cards"]:
-            if not c.get("found"):
-                continue
-            rec = Path(c["found"])
-            Handler.cards[int(c["card"])] = Handler.root if rec.resolve() == studio.resolve() else context_for(str(rec), rec)
-        Handler.shoot = len(Handler.cards) >= 2
+    # one card of a shoot on several cards (shoot_report.py): every card's records are served too, at /card/N/.
+    # Read again whenever the link changes (Handler.sync_cards), so a card joined from the report shows at once.
+    Handler.sync_cards(force=True)
     # the asked-for port, or the next free one: another session's server may be holding it
     srv = None
     for port in range(a.port, a.port + 20):

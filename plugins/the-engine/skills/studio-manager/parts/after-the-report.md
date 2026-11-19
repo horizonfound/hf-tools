@@ -21,7 +21,7 @@ The editing queue and the archive are simply part of the Assistant, never a yes/
 - **Shoots they are already in the middle of editing** ("I'm also editing the Lees, due Friday"): `edit_queue.py add-manual --name "..." --due <when> [--shot YYYY-MM-DD]`; if one of them is a shoot the Assistant already backed up, use `add --night` instead so it gets its thumbnails. Never ask whether there are any.
 - **A heads-up before a due date** ("tap my phone before things are due"): if this session can create a scheduled task, set up a daily one (late morning, their time) that runs `edit_queue.py reminders --mark` and sends each line it prints with the notification tool; if it cannot, say the heads-up will show whenever they open the Assistant. Remember the answer in the Studio File. Never offer it by yourself.
 - **A second copy of this backup** ("make a second copy of the beach backup onto LaCie"): the section below, "A second copy, after the backup".
-- **Another card of the same shoot, another way of naming folders, another drive next time:** each is something they say; `parts/backup.md` and the table in `parts/first-backup-setup.md` have the command for each.
+- **Another card of the same shoot, another way of naming folders, another drive next time:** each is a button on the report and something they can say; the section "What the report lets them change", below, has both.
 
 ## A second copy, after the backup
 
@@ -47,6 +47,36 @@ python3 <scripts>/second_copy.py "<the backup's folder>" --to "<that drive>"    
 - **Never say there is a second copy until the command's last line says it is made.** A copy that is running or stopped is not one, and the card's "safe to format" does not depend on it either way.
 - **The saved second drive was not plugged in for a backup:** the backup no longer stops. It makes one copy, and the report's top says "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." If they ask, that button (or the command above) is the way.
 - **"Eject my card" while a second copy is reading that card** answers "A second copy is still being made from this card. It won't be long." Say that and nothing more. If they pull the card anyway, the copy carries on from their drive.
+
+## What the report lets them change
+
+**Everything that used to be a question before a backup is a button on the report afterwards (Dustin, Nov 19).** They sit under the shoots, in "Anything you'd like to change?", on a backup that finished clean (not on a sample, an unfinished backup or one with a problem). Each button opens a small panel right there, and what a press did is said beside the button. You never need to run anything for a press on the page. When they say the same thing to you instead, this is what each one does and the command for it. A drive is always said by its name, never as a path.
+
+**Make a second copy.** The section above.
+
+**This shoot continues on another card.** The panel asks "Which backup is the other card?" and lists the other finished backups of the last 30 days, each by name, day and count ("tuesday card · Nov 17 · 1,840 photos"), then **Put them on one report**. The page answers "Done. Both cards are on one report now." and becomes the shoot's page: the verdict for every card on top, then each card's own report under it. With no other backup it says "Back up the other card first: put it in and say backup now. Then come back here and pick it."
+- It joins the reports only. "Each card's photos stay in their own folders." Say that if they expect one folder; nothing can merge two cards' photos into one folder today.
+- From the chat ("this shoot was on two cards", "the wedding was on both of those cards", "put those two backups on one report"), the older card first:
+
+```
+python3 <scripts>/shoot_report.py link "<card 1's backup>" "<card 2's backup>"
+```
+
+  Then show the report of either one; it is the shoot's page now. A card that is still to be backed up: `parts/backup.md` (`night.py --with`).
+- There is no button and no command that takes a card off a shoot's report again. If they joined the wrong two, say so plainly and that the photos and each card's own report are untouched.
+
+**Change how my shoots are named.** The panel asks "How should a shoot folder be named?" and shows the two ways with one of this backup's own shoots ("2026-11-19 Black-sand beach", "Black-sand beach, Nov 19 2026"), the one in use marked, a tick box **Rename this backup's shoots to match** (ticked), and **Save**. With the tick, each of this backup's shoots is renamed through the report's own rename queue, one at a time: the folder takes the new shape, the photos keep their names, every file is checked. The page ends on "Done. This backup's shoots are renamed to match, and your next backup's will be named like ...". Without the tick: "Saved. Your next backup's shoots will be named like ...". Under it the panel says "Name them your own way? Copy this into the chat:" with the line **Change how my shoots are named**.
+- When that line arrives, or they say it ("change how my shoots are named", "I name my folders differently"): ask one thing, "Paste the name of one of your past shoot folders, just as it is on your drive." Read back what `studio_file.py pattern "<it>"` gives ("So Smith Family on Oct 18 would be 'Smith Family - 10.18.26'. That right?"), and on yes `studio_file.py set --example "<it>"`. If they would rather pick: `studio_file.py set --offered 1` (year first) or `--offered 2` (name first).
+- That changes the next backup on. To bring a backup they already have into the new shape, rename each of its shoots to the name it already has: `rename_shoot.py "<backup>" --shoot s1 --name "<its name now>"`; the folder moves to the new shape and nothing else changes. Only when they ask for it.
+- Photo names are not on the report. "Keep my camera's file names": `studio_file.py set --file-names original`, from the next backup on.
+
+**Use a different drive next time.** The panel asks "Where should your next backup go?" and lists the drives plugged in by name and free space, the one in use marked, and the computer itself last ("This Mac"); then **Save**. The page answers "Saved. Your next backup goes to LaCie Rugged. The photos from this backup stay where they are." Nothing is moved, ever: no button and no command moves a finished backup to another drive, so never say one will.
+- From the chat ("use a different drive from now on", "put my photos on the LaCie next time"): `studio_file.py drives` to find the one they named, then `studio_file.py set --drive "<that drive, or its shoot folder>"`. Say the same line back: the next backup goes there, this one stays where it is.
+- The drive their second copies go on cannot also be the first place; the page says so ("LaCie Rugged is where your second copies go..."). Change the second copy first if that is what they want (`studio_file.py set --no-second`, or `--second` another drive).
+
+**Write a note to my client**, on each shoot. The button shows "Copy this into the chat:" with the line "Write a note for the <shoot's name> shoot" and **Copy**. There is no form. When that line arrives, read `parts/client-note.md`: ask who it is for, and the first time ever how they write to clients, then write it. A shoot whose note is already written shows the note instead of the button.
+
+**One quiet line when the photos are on the computer's own disk.** Under "Where your photos are" the report then says, once: "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. Plug one in and press Use a different drive next time." That is the whole of it. Never say it before a backup, and never add a speech of your own; if they ask why, answer in a sentence or two.
 
 ## When they name or rename a shoot
 
