@@ -2,7 +2,7 @@
 
 Nov 19, 2026. Your v29 is built into the Assistant on a branch called `v29`, together with the thing Dustin decided today: the backup asks nothing before it copies. It is not in the version you can install yet. Everything a photographer sees from your pack is meant to be yours: your words, your order. This note is what is different, what is missing, what nobody has tried, and the questions for you and Dustin.
 
-**The honest state first.** It was built fast, in eleven stages. Only the backup part had a second pair of eyes (two reviewers, 21 findings, one round of fixes). The home page, the recap and the whole vault had none. Nobody has seen any of it with their own eyes, not Dustin, not you. Everything ran on pretend shoots, pretend cards and pretend drives in a hidden browser on Dustin's Mac. No real card, no real drive, no real photo or video has been through it. Nothing has run on a PC.
+**The honest state first.** It was built fast, in eleven stages. The backup part had a second pair of eyes (two reviewers, 21 findings, one round of fixes). That evening the part of the vault that touches files on a drive had one too (two reviewers, 19 findings, one round of fixes; see "The vault mend and review" at the end). The home page, the recap and the vault's pages as pages had none. Nobody has seen any of it with their own eyes, not Dustin, not you. Everything ran on pretend shoots, pretend cards and pretend drives in a hidden browser on Dustin's Mac. No real card, no real drive, no real photo or video has been through it. Nothing has run on a PC.
 
 ## What is built from your v29
 
@@ -55,7 +55,6 @@ Every word in the report's new options is ours and a draft, about 90 lines. They
 
 ## Not built
 
-- ~~A vault with no photos at all cannot open its reel page yet.~~ **Mended the same day:** a vault with video clips and no photos opens its reel page and makes a B-roll reel from the clips alone, through the watch step to Save my video. Just photos and Behind the scenes open too and wait for photos (your line, "Photos you add to your vault show up here, open and ready.", and Make my reel stays off). Talking to camera says one line of ours, a draft for you: "Your vault has no photos yet, and a talking reel puts your photos with what you say. Add a shoot to your vault first. A B-roll reel works with video clips alone."
 - **Your 1.7,** the one sentence that says what it is. You are still deciding; nothing changed for it.
 - **The folds and search inside the two designers.**
 - **A caption per reel.** One caption for all of a kit's reels fits the vault badly, since each vault reel is about something else.
@@ -96,3 +95,12 @@ Every word in the report's new options is ours and a draft, about 90 lines. They
 17. **Joining two cards** on a report offers the last 30 days' backups, and taking them apart is a chat request. Enough?
 18. **The naming button** renames this backup's shoots to match, ticked by default.
 19. **Our draft words,** all yours to reword: the report's options; the vault's add, remove and "taken out" lines; the photo-search placeholder "laughing, a kiss, green backdrop, Hannah"; "Describe my photos for <shoot>"; the line joining the clip search and the footage editor; the PC line.
+
+## The vault mend and review (Nov 19, evening)
+
+- **A vault with no photos can make a reel now** (it was on the Not built list). A vault with video clips and no photos opens its reel page and makes a B-roll reel from the clips alone, through the watch step to Save my video. Just photos and Behind the scenes open too and wait for photos (your line, "Photos you add to your vault show up here, open and ready.", and Make my reel stays off). Talking to camera says one line of ours, a draft for you: "Your vault has no photos yet, and a talking reel puts your photos with what you say. Add a shoot to your vault first. A B-roll reel works with video clips alone."
+- **What the two reviewers found** in the vault code that touches a drive: 19 things, 3 of them serious. If the vault's own list could not be read for a moment, it was taken for empty: every photo got a new number and what you had taken out came back. The same fault sat in the photo descriptions. And a copy that came out damaged during + Add a shoot was left among your photos and quietly copied again as "name (2).jpg".
+- **Fixed:** a list that can't be read stops the step and changes nothing; a damaged one is put back from the copy beside it and kept aside, never thrown away. A damaged copy is set aside, named as a problem, and copied right the next time. No second "My vault 2" by accident. One file that can't be read no longer stops the rest of a folder. A photo the vault already has from a shoot is not copied a second time. A post kit folder you rename in Finder keeps its vault numbers. The strip's "2 clips" counts clips, not video files.
+- **Left, all small:** a half-made file from an add that was cut off stays in the vault's Photos folder until that folder is added again (removing it would be a delete); Remove on a photo that has since left its shoot still answers "still in its shoot"; a copy stopped hard reads "Copying…" until the page is started again.
+- **Still nobody has tried:** any of this by hand or in the Claude app; a real drive going wrong (it was imitated on a Mac); a PC; real photos; GitHub's machines. The fixes themselves had no second reviewer.
+- **For you and Dustin to confirm:** a photo taken out with Remove from my vault and then added again from its export folder counts as "already in your vault" and does not come back (Put it back is the way). A damaged copy in Drop a shoot here sits beside the photo as "<name>.studio-mismatch", in sight: hidden instead? The new lines of ours for a file that can't be read and a vault list that can't be read are drafts for you.
