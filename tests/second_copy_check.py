@@ -328,8 +328,13 @@ def cut_off(b):
         other = new_drive(b, "Lock Drive")
         code, out = second(b, other, "--check")
         check("and so is a check for another drive, with nothing written there", code == 2 and "already being made" in out and not any(other.iterdir()), out)
+        # The real answer is asked first, on this computer as it is; then eject() is walked past its PC refusal
+        # with that same answer. Never ask copying_from() again with WINDOWS flipped off on a PC: with no fcntl
+        # there it would ask still_running() the Mac way, and os.kill(pid, 0) is Ctrl+C on Windows.
         code, out = py("import eject_card as e\n"
-                       "print('COPYING' if e.copying_from(sys.argv[1]) else 'free')\n"
+                       "busy = e.copying_from(sys.argv[1])\n"
+                       "print('COPYING' if busy else 'free')\n"
+                       "e.copying_from = lambda p: busy\n"
                        "e.this_computer.WINDOWS = False\n"
                        "e.cards.answers = lambda p: True; e.is_card = lambda p: True; e.backed_up = lambda p: True\n"
                        "e.let_go = lambda p: (True, 'EJECTED')\n"
