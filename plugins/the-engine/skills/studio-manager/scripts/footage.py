@@ -399,7 +399,7 @@ def cmd_scan(kit, every=None, reel=None):
     if not reel_page.footage_ok(kit):
         return stop("this shoot's Footage folder is a link or not a folder, so I don't look in it.")
     coming = []
-    vids = reel_page.list_videos(kit, coming)
+    vids = reel_page.list_videos(kit, coming, members=False)   # (the vault: the look is of its own videos, not every shoot's)
     if not vids and coming:
         return stop("the only footage is still being copied in. Run the scan again once it's done.")
     if not vids:
@@ -748,7 +748,7 @@ def cmd_moments(kit, file, reel=None):
     stills = []
     with arrange.locked(reel_page.lock_path(kit)):
         rec, rows, stamp = reel_page.sync(kit)
-        if not rows:
+        if not stamp:                             # (the vault with clips and no photo yet has a list: rows is [])
             return stop("couldn't read this shoot's numbered list. Nothing was saved.")
         if {x["n"] for x in rows} != on_sheet:
             return stop("the shoot's numbered list changed while I checked. Run this again. Nothing was saved.")

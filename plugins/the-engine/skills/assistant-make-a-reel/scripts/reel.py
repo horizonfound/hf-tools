@@ -341,6 +341,12 @@ def kit_numbers(kit, folder):
     same = os.path.normcase
     if not rows or same(str(d.get("folder") or "")) != same(str(Path(folder))):
         return None
+    if d.get("vault") is True:
+        # The vault (v29): its list is references to other post kits' photos. Each row's path is its own, read
+        # through the kit the row names (vault.row_file), never every name joined to one folder: two shoots may
+        # both hold IMG_0001.jpg, and they are two photos with two numbers.
+        import vault
+        return vault.with_files(Path(kit).expanduser(), rows)
     return [dict(x, file=str(Path(folder) / Path(x["file"]).name)) for x in rows]
 
 

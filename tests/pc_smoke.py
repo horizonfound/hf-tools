@@ -1593,8 +1593,8 @@ def server_checks(work, home, kit, env, built):
                 return None, str(e).encode()
         code, body = get("/home")
         text = body.decode("utf-8", "replace")
-        check("it serves the home page (UTF-8; her four steps, and the hello's arrow as a letter of its own)",
-              code == 200 and "/home-state" in text and "Your workflow" in text and "id='s4'" in text and "\u21bb Another hello" in text, f"{code} {text[:200]}")
+        check("it serves the home page (UTF-8; her four cards, and the hello's arrow as a letter of its own)",
+              code == 200 and "/home-state" in text and "Also in your Assistant" in text and "id='s4'" in text and "\u21bb Another hello" in text, f"{code} {text[:200]}")
         code, body = get("/home-data")
         text = body.decode("utf-8", "replace")
         check("and what the Make posts screen draws from (UTF-8, the kit's name in it)",

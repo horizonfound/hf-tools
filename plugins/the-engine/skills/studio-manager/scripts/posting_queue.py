@@ -400,7 +400,13 @@ def cover_file(kit_dir, role, rel, rec=None):
         return None
     try:
         if role == "reel" and head == "Photos":
-            row = next((r for r in arrange.sheet_rows(kit_dir) if _nfc(arrange.photo_name(r)) == _nfc(name)), None)
+            if re.fullmatch(r"#[0-9]{1,6}", name):
+                # the vault (v29): two shoots may both hold IMG_0001.jpg, so its photos are picked by their number
+                # there ("Photos/#12"; no photo's own name looks like that), never by a name two of them share
+                row = next((r for r in arrange.sheet_rows(kit_dir) if isinstance(r.get("kit"), str) and r["n"] == int(name[1:])), None)
+            else:
+                row = next((r for r in arrange.sheet_rows(kit_dir) if not isinstance(r.get("kit"), str)
+                            and _nfc(arrange.photo_name(r)) == _nfc(name)), None)
             f = arrange.photo_path(kit_dir, rec if rec is not None else kit_mod.load_rec(kit_dir), row) if row else None
         elif role == "carousel" and head == "Carousel":
             f = next((x for x in kit_mod.carousel_shown(kit_dir, rec)["files"] if _nfc(x.name) == _nfc(name)), None)
@@ -578,7 +584,7 @@ def add_for_kit(p, kit_dir, reel=None):
     name = rec.get("name") or kit_dir.name
     sid = kit_sid(p, kit_dir)
     THUMBS.mkdir(parents=True, exist_ok=True)
-    photos = kit_mod.photo_files(kit_mod.photos_dir(kit_dir, rec))
+    photos = kit_mod.photo_list(kit_dir, rec)       # the vault: the photos its list points at
 
     def thumb_of(src, pid):
         if not src or not Path(src).exists():
@@ -1013,7 +1019,8 @@ def panel_choices(x, kit):
             continue                                   # can't be reached, or can't be read: not one to pick
         need = need or not ph["have"]
         out.append({"src": "/kit-photo?kit=%s&n=%d&size=s&v=%s" % (kq, ph["n"], quote(ph["v"] or "", safe="")),
-                    "rel": "Photos/" + arrange.photo_name(row), "in_reel": row["n"] in inside})
+                    "rel": "Photos/" + ("#%d" % row["n"] if isinstance(row.get("kit"), str) else arrange.photo_name(row)),
+                    "in_reel": row["n"] in inside})
     return out, need
 
 
@@ -2121,7 +2128,7 @@ class Handler(SimpleHTTPRequestHandler):
             import arrange
             return arrange.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/reel.html", "/reel-state", "/reel-font", "/reel-job", "/reel-songs", "/reel-footage", "/reel-video",
-                    "/reel-strip", "/reel-moment-still", "/reel-song"):
+                    "/reel-strip", "/reel-moment-still", "/reel-song", "/reel-vault-clips", "/reel-vault-photos", "/reel-vault-still"):
             # the reel page (Nicole's reel maker): every one of its requests is reel_page.py's to answer
             import reel_page
             return reel_page.handle_get(self, path, urlsplit(self.path).query)
@@ -2154,6 +2161,14 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path == "/photo-words-state":
+            # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
+            import photo_words
+            return photo_words.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/vault-add-status", "/vault.html", "/vault-data", "/vault-clip", "/vault-out-photo"):
+            # what the vault's page follows while + Add a shoot copies, and See everything in it (vault_page.py)
+            import vault_page
+            return vault_page.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/open", "/open-home", "/open-drop", "/open-shoot", "/queue-url", "/report-url", "/pick-folder") \
                 and (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
             # these open a folder window, a folder picker or another page server: for this server's own pages
@@ -2463,6 +2478,8 @@ class Handler(SimpleHTTPRequestHandler):
                 body, need = kit_mod.build_page(kit)
                 if need:
                     arrange.start_previews(kit)        # a reel photo on the card has no small copy yet: made in the background
+                import photo_words
+                photo_words.opened(kit)                # v29: photos with no tags yet are looked at in the background (never raises)
             except Exception as e:  # noqa: BLE001
                 try:
                     body = kit_mod.page_path(kit).read_text(encoding="utf-8")
@@ -2537,6 +2554,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/vault-open", "/vault-add", "/vault-clips", "/vault-remove"):
+            # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
+            import vault_page
+            return vault_page.handle_post(self, path, urlsplit(self.path).query)
         if not self.ours():
             return
         if path == "/feed":

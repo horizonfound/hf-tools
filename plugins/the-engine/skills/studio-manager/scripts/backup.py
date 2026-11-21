@@ -3,7 +3,7 @@
 check every file against the original, and write the morning report. Never deletes. Never moves. Stops on trouble.
 
   python3 backup.py --source "/path/to/card" --dest "/path/to/Sessions drive" --name "Johnson family beach"
-                    [--second "/path/to/cloud folder"] [--date 2026-10-23] [--dry-run]
+                    [--second "/path/on a second drive"] [--date 2026-10-23] [--dry-run]
 
 Writes <dest>/<date> <name>/ with the files in their original folders, plus _studio/manifest.json and
 _studio/morning-report.md. A second copy goes to <second>/<date> <name>/ with its own check.
@@ -376,7 +376,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True)
     ap.add_argument("--dest", required=True, help="the session drive or folder")
-    ap.add_argument("--second", default=None, help="the second copy (cloud drive folder)")
+    ap.add_argument("--second", default=None, help="the second copy: a folder on a second drive (never a cloud folder)")
     ap.add_argument("--name", required=True, help="session name, e.g. 'Johnson family beach'")
     ap.add_argument("--date", default=None, help="YYYY-MM-DD, default today")
     ap.add_argument("--dry-run", action="store_true")

@@ -7,8 +7,9 @@ What it does, on a pretend Assistant in a throwaway folder under /private/tmp (t
 kits; a scratch STUDIO_HOME; pretend records written into the kits and the scratch home; no real kit, no real
 drive, nothing of the real ~/.studio; the day is fixed with STUDIO_TODAY; the folder button opens nothing):
   * a PNG is really a PNG: the size, every chunk's checksum, nothing after the end; anything else refused;
-  * the counts, each from the record it is counted from: reels (the reel page's makes, a chat reel once, talking
-    reels of every version), carousels and sets of stories (one per design saved from, by the first save), posts,
+  * the counts, each from the record it is counted from: reels (each reel ONCE however often it was made, on the day of its first make,
+    Nicole's v29 2.2: the reel page's makes, a chat reel, talking reels of every version; and the case that fails
+    if the switch is turned back: three makes of one reel in a month are 1 reel made), carousels and sets of stories (one per design saved from, by the first save), posts,
     photos off the cards (shoots of 10 or more), the shoots, the top shoot, the weeks posted, since; a month and
     a year; never a path in what the page is handed;
   * the home page's two answers: which month the recap card shows ("so far." / "recapped." / no card) and when
@@ -215,16 +216,17 @@ def check_counts(wr, w):
     day = date.fromisoformat(TODAY)
     d = wr.data(month="2026-11")
     t = d["totals"]
-    case("November: 4 reels (two makes on the reel page, a talking reel, a chat reel; the chat copy of a page reel counted once)", t["reels"] == 4, t["reels"])
+    case("the switch as it ships: each reel once (Nicole, v29 2.2), not every make", wr.COUNT_EACH_MAKE is False)
+    case("November: 3 reels (a second reel on the reel page, a talking reel, a chat reel; reel 1 was first made in October, so its November make is no new reel)", t["reels"] == 3, t["reels"])
     by = {s["name"]: s for s in d["shoots"]}
-    case("November: Hannah has 3 reels (2 on the page, 1 talking), Katie 1 (from the chat)", by.get(A, {}).get("reels") == 3 and by.get(B, {}).get("reels") == 1, {k: v["reels"] for k, v in by.items()})
-    case("a line with no project or video is no reel", by[A]["reels"] == 3)
+    case("November: Hannah has 2 reels (1 on the page, 1 talking), Katie 1 (from the chat)", by.get(A, {}).get("reels") == 2 and by.get(B, {}).get("reels") == 1, {k: v["reels"] for k, v in by.items()})
+    case("a line with no project or video is no reel", by[A]["reels"] == 2)
     case("November: 1 carousel (the design first saved in October stays October's, however often it was saved again)", t["carousels"] == 1, t["carousels"])
     case("November: 1 set of stories", t["stories"] == 1, t["stories"])
     case("November: 2 posts; a post with no day is not counted; 1 ready to go", t["posted"] == 2 and t["ready"] == 1, (t["posted"], t["ready"]))
     case("November: 231 photos taken at 1 photo shoot (9 photos are not a shoot; October's backup is October's)", t["shot"] == 231 and t["photo_shoots"] == 1, (t["shot"], t["photo_shoots"]))
     case("November: 2 shoots shared; the top shoot is Hannah", t["shared_shoots"] == 2 and d["top"] == A, (t["shared_shoots"], d["top"]))
-    case("the time saved is hers: 45 a reel, 30 a carousel, 20 a set of stories", t["minutes_saved"] == 4 * 45 + 30 + 20 and d["minutes_each"] == {"reel": 45, "carousel": 30, "stories": 20}, t["minutes_saved"])
+    case("the time saved is hers: 45 a reel, 30 a carousel, 20 a set of stories", t["minutes_saved"] == 3 * 45 + 30 + 20 and d["minutes_each"] == {"reel": 45, "carousel": 30, "stories": 20}, t["minutes_saved"])
     case("November so far: 4 weeks, 2 with a post", t["weeks"] == 4 and t["weeks_posted"] == 2, (t["weeks"], t["weeks_posted"]))
     case("the label, the next month, so far", d["label"] == "November" and d["next"] == "December" and d["so_far"] is True and d["month"] == "2026-11", (d["label"], d["next"], d["so_far"]))
     case("their name and handle, from their Brand Homebase", d["me"] == "Nicole" and d["handle"] == "@nicolelhill_", (d["me"], d["handle"]))
@@ -238,19 +240,56 @@ def check_counts(wr, w):
     case("a month with nothing in it says so", n["anything"] is False and n["shoots"] == [] and n["top"] == "", n["totals"])
     y = wr.data(year="2026")
     ty = y["totals"]
-    case("2026: 6 reels, 2 carousels, 1 set of stories, 3 posts, 351 photos", (ty["reels"], ty["carousels"], ty["stories"], ty["posted"], ty["shot"]) == (6, 2, 1, 3, 351), ty)
+    case("2026: 5 reels (six makes, one of them a second make of reel 1), 2 carousels, 1 set of stories, 3 posts, 351 photos", (ty["reels"], ty["carousels"], ty["stories"], ty["posted"], ty["shot"]) == (5, 2, 1, 3, 351), ty)
     case("2026: the label is the year, next year after it, no weeks", y["label"] == "2026" and y["next"] == "next year" and ty["weeks"] == 0 and y["month"] == "", (y["label"], y["next"]))
     case("a year counts only that year (hers counted everything ever)", wr.data(year="2025")["anything"] is False)
     case("with no year named: this year (and last year from Jan 1 to 15)", wr.default_year(day) == 2026 and wr.default_year(date(2027, 1, 15)) == 2026 and wr.default_year(date(2027, 1, 16)) == 2027)
     blob = json.dumps([d, o, y])
     case("what the page is handed holds no path", str(w.work) not in blob and "/private/" not in blob and "\\\\" not in blob)
-    wr.COUNT_EACH_MAKE = False
+    ships = wr.COUNT_EACH_MAKE                  # put back exactly as it ships, so a switch turned back still fails below
+    wr.COUNT_EACH_MAKE = True
     try:
-        e = wr.data(year="2026")["totals"]["reels"]
+        e = (wr.data(year="2026")["totals"]["reels"], wr.data(month="2026-11")["totals"]["reels"])
     finally:
+        wr.COUNT_EACH_MAKE = ships
+    case("the other way of counting (every make, her v28 way): 6 in 2026, 4 in November", e == (6, 4), e)
+    case("the chips: hers, a zero left out, one of a thing in the singular", wr.chips(t) == ["231 photos", "3 reels", "1 carousel", "2 posts", "3 hours saved"], wr.chips(t))
+
+
+def check_once(wr, w):
+    """Nicole's v29 2.2: one reel made three times in a month is ONE reel made, and the time saved is one reel's.
+    Kit B's reel page gets three makes of its one reel in July (a month with nothing else in it) for these cases
+    only; the file is taken away again afterwards, so every other group sees the kit as it was built."""
+    f = w.content / B / ".kit" / "reel-page.json"
+    case("kit B has no reel page record of its own before this", not f.exists())
+    w.put(f, {"v": 1, "saved": {}, "made": [
+        {"project": "Katie reel", "when": ts("2026-07-06T10:00:00")},
+        {"project": "Katie reel 2", "when": ts("2026-07-06T10:20:00")},
+        {"project": "Katie reel 3", "when": ts("2026-07-21T16:00:00"), "variation": 2}]})
+    try:
+        d = wr.data(month="2026-07")
+        t = d["totals"]
+        case("three makes of one reel in July: 1 reel made, not 3 (fails if the switch is turned back)", t["reels"] == 1, t["reels"])
+        case("the time saved is one reel's: 45 minutes", t["minutes_saved"] == 45, t["minutes_saved"])
+        chips = wr.chips(t)
+        case("the home page's recap chips follow: \"1 reel\" in the singular, \"45 minutes saved\"", "1 reel" in chips and "45 minutes saved" in chips and not any(c.endswith(" reels") for c in chips), chips)
+        by = {s["name"]: s for s in d["shoots"]}
+        case("the shoot's own count is 1 too", by.get(B, {}).get("reels") == 1, {k: v["reels"] for k, v in by.items()})
+        r = wr.home_answers(day=date(2026, 7, 25), got=wr.gather())["recap"]
+        case("the recap card for July says 1 reel", bool(r) and r["month"] == "2026-07" and "1 reel" in r["chips"] and "3 reels" not in r["chips"], r and r["chips"])
+        case("the story's line is in the singular for one: \"reel made\"", "pl(D.totals.reels, 'reel made', 'reels made')" in wr.STORIES_JS)
+        case("a reel made again in a later month stays in the month it was first made (November has none of Katie's)",
+             {s["name"]: s["reels"] for s in wr.data(month="2026-11")["shoots"]}.get(B, 0) == 0)
+        ships = wr.COUNT_EACH_MAKE
         wr.COUNT_EACH_MAKE = True
-    case("the other way of counting (each reel once): 5 in 2026", e == 5, e)
-    case("the chips: hers, a zero left out, one of a thing in the singular", wr.chips(t) == ["231 photos", "4 reels", "1 carousel", "2 posts", "4 hours saved"], wr.chips(t))
+        try:
+            every = wr.data(month="2026-07")["totals"]
+        finally:
+            wr.COUNT_EACH_MAKE = ships
+        case("with the switch turned back the same month would say 3 reels and 135 minutes", (every["reels"], every["minutes_saved"]) == (3, 135), every)
+    finally:
+        f.unlink()
+    case("afterwards kit B is as it was built: November has its one chat reel again", {s["name"]: s["reels"] for s in wr.data(month="2026-11")["shoots"]}.get(B) == 1)
 
 
 def check_home(wr, w):
@@ -330,7 +369,7 @@ def check_routes(wr, w):
     case("the year's page opens", w.http("GET", "/wrapped.html")[0] == 200 and w.http("GET", "/wrapped.html?y=2026")[0] == 200)
     case("the page asked for under another name (not this server's) gets nothing", w.http("GET", "/wrapped.html", host="evil.example:%d" % w.port)[0] == 403)
     code, d = w.get_json("/wrapped-data?m=2026-11")
-    case("the numbers arrive, the same as counted", code == 200 and d and d["ok"] and d["totals"]["reels"] == 4 and d["totals"]["shot"] == 231, d and d.get("totals"))
+    case("the numbers arrive, the same as counted", code == 200 and d and d["ok"] and d["totals"]["reels"] == 3 and d["totals"]["shot"] == 231, d and d.get("totals"))
     case("the numbers are not for another website", w.get_json("/wrapped-data?m=2026-11", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403)
     case("a month that is not a month: nothing", w.get_json("/wrapped-data?m=2026-13")[0] == 404 and w.get_json("/wrapped-data?m=../../etc")[0] == 404 and w.get_json("/wrapped-data?m=2026-11&y=2026")[0] == 404)
     case("the serif's file is not served while the serif is off", w.http("GET", "/wrapped-font")[0] == 404)
@@ -442,7 +481,7 @@ def check_page(c, w, wr):
     case("a month with nothing in it says so, in her words", c.text("#wait") == "Nothing from August yet.", c.text("#wait"))
     c.open(w.base() + "/wrapped.html?y=2026")
     c.wait_for("window.__wrapped && document.getElementById('wait').hidden", seconds=120)
-    case("the year plays too, with its own numbers", c.js("window.__wrapped.data().totals.reels") == 6 and c.js("window.__wrapped.data().month") == "")
+    case("the year plays too, with its own numbers", c.js("window.__wrapped.data().totals.reels") == 5 and c.js("window.__wrapped.data().month") == "")
     # less motion asked for: each story is shown finished
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "reduce"}]})
     c.open(w.base() + "/wrapped.html?m=2026-11")
@@ -495,6 +534,7 @@ def main():
         case("the test's own scratch home, never the real one", Path(wr.HOME) == w.home and ".studio" not in str(wr.HOME))
         group("a PNG is a PNG", check_png, wr)
         group("the counts", check_counts, wr, w)
+        group("each reel once", check_once, wr, w)
         group("the home page's two answers", check_home, wr, w)
         group("the words", check_words, wr, w)
         w.start()

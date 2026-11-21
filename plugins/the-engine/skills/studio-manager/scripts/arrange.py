@@ -336,6 +336,12 @@ def photo_path(kit, rec, row):
         name = Path(row["file"]).name
         if not name or name.startswith("."):
             return None
+        if isinstance(row.get("kit"), str):
+            # The vault (v29): its list is references. A row that names the post kit it came from is found
+            # through that kit's own photos folder, one level only (vault.row_file). No other row has this field.
+            import vault
+            p = vault.row_file(kit, row)
+            return p if p is not None and p.is_file() else None
         p = kit_mod.photos_dir(kit, rec) / name
         return p if p.is_file() else None
     except (OSError, KeyError, TypeError, ValueError):
@@ -344,6 +350,15 @@ def photo_path(kit, rec, row):
 
 def photo_name(row):
     return Path(row["file"]).name
+
+
+def photo_key(row):
+    """What a record keeps beside a number so a re-made list can find the same photo again: the file's name.
+    In the vault two shoots may both hold IMG_0001.jpg, so a row that names its post kit is told apart by that
+    kit and its number there as well ("<kit folder>#<its number>/<file name>"). Never sent to a page."""
+    if isinstance(row.get("kit"), str) and row["kit"]:
+        return f"{row['kit']}#{row.get('src')}/{photo_name(row)}"
+    return photo_name(row)
 
 
 # ---------- the small copies the page shows ----------
@@ -846,7 +861,7 @@ def sync(kit, piece):
         stamp = sheet_stamp(kit)
         if not rows or not stamp:
             return data, None
-        name_of = {x["n"]: photo_name(x) for x in rows}
+        name_of = {x["n"]: photo_key(x) for x in rows}
         rec = kit_mod.load_rec(kit)
         nums, marks = kit_pick(rec, piece)
         text = pick_text(nums, marks)
@@ -875,7 +890,7 @@ def sync(kit, piece):
                 # the list was re-made: find each photo again by its file name
                 n_of = {}
                 for x in rows:
-                    n_of.setdefault(photo_name(x), x["n"])
+                    n_of.setdefault(photo_key(x), x["n"])
                 old_names = p.get("names") or {}
                 gone, gone_nums = [], []
 

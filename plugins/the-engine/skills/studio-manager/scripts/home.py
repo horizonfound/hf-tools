@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""The Assistant's home page (Nicole's v28, Nov 17), in the Claude app's browser pane.
+"""The Assistant's home page (Nicole's v28, Nov 17; posts first since her v29, Nov 19), in the Claude app's browser pane.
 
 Top to bottom: the bar (the name, the date, Open my Assistant folder); the hello (a collage of the newest shoot's
 photos, each framed on its faces, a greeting made from what is really going on and a button that goes there);
-Your workflow, her four steps in the order of the work, each saying what is going on right now: Back up a card
-(its own screen, /backups), My editing queue, Turn your shoots into posts (its own screen, /make-posts), My
-posting queue; the monthly recap card; and the Your year bar in its dates. Nothing else is on it, so it stays
-clean after years of shoots: every backup and every post kit is on its step's own screen (home_base.py). Served
+one big card, Turn your shoots into posts, whose button goes to its own screen (/make-posts); My posting queue,
+full width; then "Also in your Assistant" with two smaller cards, Back up a card (its own screen, /backups) and
+My editing queue; each card saying what is going on right now; the monthly recap card; and the Your year bar in
+its dates. No step numbers and no list of post kits, so it stays clean after years of shoots: every backup and
+every post kit is on its own screen (home_base.py). Served
 live by the posting server at /home (posting_queue.py serve), which also opens folders and pages for its buttons
 and records which card was pressed.
 
@@ -316,7 +317,9 @@ def gather():
 #   the bar          the name, the date (hidden under 520 px), Open my Assistant folder
 #   the hello        a collage of the newest shoot's photos, each framed on its faces (faces.py), a greeting made
 #                    from what is really going on, a button that goes there, and "Another hello" in the corner
-#   Your workflow    her four steps in her exact words, each with a box saying what is going on right now
+#   posts first      (her v29) the big Turn your shoots into posts card with its one button, My posting queue
+#                    full width, then "Also in your Assistant": Back up a card and My editing queue, smaller;
+#                    her exact words, each card with a box saying what is going on right now
 #   the recap card   the month's numbers (wrapped.py), Watch, and the x that hides it (kept in home-recap.json)
 #   Your year        the bar, only in its dates (Dec 1 to Jan 15, after about a year: wrapped.home_answers)
 # Everything on it is read fresh, and only read, from what the Assistant already keeps. The server draws the
@@ -326,24 +329,24 @@ def gather():
 # The words to paste in the chat for the two steps that start a conversation (shown on their own screens).
 SAY = {"backup": home_base.WORDS["b_say"], "posts": home_base.WORDS["m_say"], "setup": "set up my Assistant folder"}
 
-# Nicole's words (pages/home-test.html, v28), whole. "You would say what it is": the labels are plain on purpose
+# Nicole's words (pages/home-test.html, v28; the layout's own from pages/home-preview.html, v29), whole. "You would say what it is": the labels are plain on purpose
 # (her section 10); do not make them clever. <em> is hers (the accent word). {…} is filled in by the page.
 WORDS = {
     "folder": "Open my {short} folder",
     "again": "↻ Another hello",
     "again_title": "Another hello",
     "hello_plain": "Hello.",
-    "wf_h": "Your workflow",
-    "wf_say": "Start wherever you are. Making posts from an old shoot? Jump straight to 3.",
-    "s1_n": "Back up <em>a card</em>",
-    "s1_p": "Copies your card to your drive, checks every photo, and sorts it into shoots.",
-    "s1_go": "Back up →",
-    "s2_n": "My editing <em>queue</em>",
-    "s2_p": "The shoots you need to edit and when they're due.",
-    "s2_go": "Open my editing queue →",
+    # v29 (her pages/home-preview.html, Nov 19): posts first. The big card, the posting queue under it, then
+    # "Also in your Assistant" with the two smaller cards. No step numbers, no "Your workflow" (both gone, hers).
     "s3_n": "Turn your shoots <em>into posts</em>",
     "s3_p": "Turn your shoot into reels, carousels, stories, and captions.",
-    "s3_go": "Make posts →",
+    "s3_create": "Create your post kits →",         # the button with no post kits yet
+    "s3_see": "See all my post kits →",             # the same button once there are some
+    "also_h": "Also in your Assistant",
+    "s1_n": "Back up <em>a card</em>",
+    "s1_p": "Copies your card to your drive, checks every photo, and sorts it into shoots.",
+    "s2_n": "My editing <em>queue</em>",
+    "s2_p": "The shoots you need to edit and when they're due.",
     "s4_n": "My posting <em>queue</em>",
     "s4_p": "Your posts ready to go, and how your grid will look.",
     "s4_go": "Open my posting queue →",
@@ -468,6 +471,12 @@ _NOT_A_NAME = ("The", "At", "A", "An", "My", "Our", "Test", "Home", "Family", "F
 
 def who(name):
     name = str(name or "").strip()
+    try:                                # the vault (v29) reads whole, "My vault reel is waiting": one helper says so
+        import vault
+        if vault.who(name) is not None:
+            return name
+    except Exception:  # noqa: BLE001
+        pass
     first = (name.split() or [""])[0]
     if len(first) > 1 and first[0].isupper() and first[1:].islower() and first.isalpha() and first.isascii() and first not in _NOT_A_NAME:
         return first + "’s"
@@ -701,14 +710,8 @@ CSS_EXTRA = home_base.CSS + r"""
 .hello .note{color:#eef0f4}
 .again{position:absolute;right:14px;top:14px;z-index:2;font:600 12px/1 var(--sans);color:#fff;background:rgba(20,22,30,.35);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:0;border-radius:999px;padding:8px 11px;cursor:pointer;opacity:.75}
 .again:hover,.again:focus-visible{opacity:1}
-.wf{display:flex;align-items:baseline;justify-content:space-between;gap:.4rem 1rem;flex-wrap:wrap;margin-top:1.8rem}
-.wf h2{margin:0;font:600 13px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}.wf .say{margin:0;color:var(--ink-2);font-size:14px}
-.flow4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:.8rem 0 .2rem}
-@media(max-width:900px){.flow4{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){.flow4{grid-template-columns:minmax(0,1fr)}}
 .step{position:relative;display:flex;flex-direction:column;gap:.5rem;text-align:left;padding:18px 18px 16px;border:0;border-radius:20px;background:var(--paper);box-shadow:0 1px 0 var(--line);cursor:pointer;font:inherit;color:inherit;text-decoration:none;min-width:0;transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
 .step:hover{transform:translateY(-3px);box-shadow:0 0 0 2px var(--coral),var(--shadow)}
-.step .k{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--coral-l);color:var(--coral-2);font:700 12.5px/1 var(--sans)}
 .step .n{font:600 19px/1.15 var(--sans);letter-spacing:-.02em}.step .n em{font:inherit;font-style:normal;color:var(--coral-2)}
 .step p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
 .step .now{margin-top:auto;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;background:var(--cream);min-height:58px;min-width:0}
@@ -720,6 +723,19 @@ CSS_EXTRA = home_base.CSS + r"""
 .step .note{margin-top:0}
 .step.live{box-shadow:0 0 0 2px var(--coral),0 0 26px rgba(240,127,90,.35)}
 .step .now small.late{color:#C2412D}
+.mk{margin-top:1.6rem;padding:22px 22px 18px;cursor:default}
+.mk:hover{transform:none;box-shadow:0 1px 0 var(--line)}
+.mk .n{font-size:26px}.mk>p{margin:.1rem 0 0}
+.mk-go{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:1rem;min-width:0}
+.mk-go .now{flex:1 1 240px;margin:0}
+.btn.big{font-size:15px;padding:13px 20px;white-space:nowrap}
+.step.full{margin-top:12px}
+.also{margin-top:1.8rem}.also h2{margin:0 0 .6rem;font:600 13px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.also-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:620px){.also-row{grid-template-columns:minmax(0,1fr)}}
+.step.sm{padding:14px 16px;gap:.35rem;background:transparent;box-shadow:0 0 0 1px var(--line)}
+.step.sm .n{font-size:16px}.step.sm p{font-size:13px}.step.sm .now{min-height:0;background:var(--paper)}
+.step.sm.live{box-shadow:0 0 0 2px var(--coral),0 0 26px rgba(240,127,90,.35)}
 .yr,.rc{margin-top:1.8rem;position:relative;display:flex;align-items:center;gap:1.2rem;border-radius:22px;padding:16px 20px;min-width:0}
 .yr{background:var(--ink);color:#fff}.rc{background:linear-gradient(120deg,#FFE7DD,#F6EEFF);color:var(--ink)}
 .yr[hidden],.rc[hidden]{display:none}
@@ -978,7 +994,8 @@ def _now(dot, big, small=None, late=False, img=None):
 
 
 def now_boxes(f):
-    """What is going on right now, for each of the four steps (hers), and whether a card is in (step 1 glows)."""
+    """What is going on right now, for each of the four cards (hers), in the order backup, editing queue, posts,
+    posting queue (the ids n1 to n4, kept from v28 whatever order the page draws them in)."""
     boxes = []
     # 1. a card that is in; otherwise the last backup; otherwise nothing yet
     b = f.get("backup")
@@ -1044,15 +1061,6 @@ def _fan(photos):
     return "".join(f"<img src='{html.escape(photo_src(p), quote=True)}' alt=''>" for p in photos[:3])
 
 
-# The four steps: (what a click is recorded as, where it goes, its words)
-STEPS = [
-    ("backup", "/backups", "s1"),
-    ("queue", None, "s2"),
-    ("posts", "/make-posts", "s3"),
-    ("posting", "/posting.html", "s4"),
-]
-
-
 def page_html(query="", start=False):
     """The home page. query: the address's own (?wrapped=1 shows the Your year bar any time, for testing: hers).
     start: have the small copies the page wants made when some are missing (the page server passes True)."""
@@ -1063,14 +1071,23 @@ def page_html(query="", start=False):
     f = facts(force_year=force_year, start=start)
     e = html.escape
     boxes = now_boxes(f)
-    cards = []
-    for n, (item, href, key) in enumerate(STEPS, 1):
-        live_card = " live" if (n == 1 and f.get("card")) else ""
-        go_id = "" if href else " id='editingWords'"
-        inner = (f"<span class='k'>{n}</span><span class='n'>{W(key + '_n')}</span><p>{e(W(key + '_p'))}</p>"
-                 f"<div class='now' id='n{n}'>{boxes[n - 1]}</div><span class='go'{go_id}>{e(W(key + '_go'))}</span>")
-        cards.append(f"<a class='step{live_card}' id='s{n}' data-item='{item}' href='{href}'>{inner}</a>" if href
-                     else f"<button class='step' id='s{n}' data-item='{item}' type='button'>{inner}</button>")
+    live_card = " live" if f.get("card") else ""
+    # Posts first (Nicole, v29 1.2). The ids and the data-item names are the ones the four steps had (s1 backup,
+    # s2 queue, s3 posts, s4 posting), so home.py pending, the hello's buttons and the now-boxes read as before.
+    # The big card is not itself a press: its button is (a plain link). No list of post kits here, by her ask:
+    # "Think about when someone is going to end up having like 20 post kits, 30 post kits."
+    kits_btn = W("s3_see") if (f.get("kits") or f.get("newest")) else W("s3_create")
+    big = (f"<section class='mk step' id='s3'><span class='n'>{W('s3_n')}</span><p>{e(W('s3_p'))}</p>"
+           f"<div class='mk-go'><a class='btn solid big' id='kitsBtn' data-item='posts' href='/make-posts'>{e(kits_btn)}</a>"
+           f"<div class='now' id='n3'>{boxes[2]}</div></div></section>")
+    posting = (f"<a class='step full' id='s4' data-item='posting' href='/posting.html'><span class='n'>{W('s4_n')}</span><p>{e(W('s4_p'))}</p>"
+               f"<div class='now' id='n4'>{boxes[3]}</div><span class='go'>{e(W('s4_go'))}</span></a>")
+    also = (f"<div class='also'><h2>{e(W('also_h'))}</h2><div class='also-row'>"
+            f"<a class='step sm{live_card}' id='s1' data-item='backup' href='/backups'><span class='n'>{W('s1_n')}</span><p>{e(W('s1_p'))}</p>"
+            f"<div class='now' id='n1'>{boxes[0]}</div></a>"
+            f"<button class='step sm' id='s2' data-item='queue' type='button'><span class='n'>{W('s2_n')}</span><p>{e(W('s2_p'))}</p>"
+            f"<div class='now' id='n2'>{boxes[1]}</div><span id='editingWords' hidden></span></button>"
+            f"</div></div>")
     # the monthly recap card (drawn hidden when they hid it, so Show my monthly recap brings it back at once)
     recap = ""
     foot = ""
@@ -1114,8 +1131,7 @@ def page_html(query="", start=False):
             f"<section class='hello' id='hello'><div class='bgs'></div>"
             f"<button class='again' id='again' type='button' title='{e(W('again_title'), quote=True)}'>{e(W('again'))}</button>"
             f"<div class='tx' aria-live='polite'><h3>{e(W('hello_plain'))}</h3></div></section>"
-            f"<div class='wf'><h2>{e(W('wf_h'))}</h2><p class='say'>{e(W('wf_say'))}</p></div>"
-            f"<div class='flow4'>{''.join(cards)}</div>"
+            f"{big}{posting}{also}"
             f"{recap}{year}<p class='foot'>{foot}</p>"
             f"</div><script type='application/json' id='facts'>{_json_for_script(hello)}</script>"
             f"<script>const W = {_json_for_script(words)};{home_base.JS_SHARED}{HELLO_JS}{SCRIPT}</script></body></html>")

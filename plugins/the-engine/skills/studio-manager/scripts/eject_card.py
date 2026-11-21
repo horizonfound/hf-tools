@@ -6,10 +6,11 @@ and pop in your new one").
     python3 eject_card.py "<the card's path>"
 
 Ejecting does not change the card: nothing on it is written, renamed or deleted (rule 1). It only tells the
-computer to let go of it, so it is safe to pull out. Two things are checked first, and either one refuses:
+computer to let go of it, so it is safe to pull out. Three things are checked first, and any one refuses:
 
   - it is a memory card (a drive of its own with a DCIM folder at the top), never the photo drive or a folder
   - this card's backup is finished: every file copied and checked (the card ledger knows it)
+  - no second copy is being read from it right now (second_copy.py): then one plain line, and nothing else
 
 Every touch of the card has a time limit, so a card that has gone quiet gets plain words, not a silent wait.
 Exit codes: 0 the card is out, 1 the computer would not let go of it, 2 refused (says why), 3 not on this computer yet.
@@ -34,6 +35,7 @@ QUIET = ("The card isn't answering, so I can't eject it. Nothing of mine is usin
 NOT_A_CARD = "That isn't a memory card, so I won't eject it."
 NOT_SAFE = ("This card isn't backed up yet, so I won't eject it on my own. Say \"backup now\" first, "
             "or eject it yourself in {files}.")
+COPYING = "A second copy is still being made from this card. It won't be long."   # ours, a draft (Nov 19)
 ON_A_PC = ("I can't eject a card on a PC yet. Click the small USB icon by the clock at the bottom right, "
            "then pick the card. When it says it is safe, pull it out and put the next one in.")
 
@@ -65,6 +67,16 @@ def backed_up(path):
         return False
 
 
+def copying_from(path):
+    """True while a second copy is being made that reads this card (second_copy.py, started from the report).
+    Anything that cannot be asked means no: ejecting is then the computer's own to allow or refuse."""
+    try:
+        import second_copy
+        return bool(second_copy.reading_card(path))
+    except (Exception, SystemExit):  # noqa: BLE001
+        return False
+
+
 def let_go(path):
     """Ask the Mac to eject it. (ok, what it said)."""
     try:
@@ -86,6 +98,8 @@ def eject(path):
         return 2, NOT_A_CARD
     if not backed_up(path):
         return 2, words(NOT_SAFE)
+    if copying_from(path):
+        return 2, COPYING
     ok, said = let_go(path)
     if ok:
         return 0, OUT

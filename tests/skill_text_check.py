@@ -1489,7 +1489,7 @@ def check_posted_and_path_v27():
     case("words.md tells the words page's path and how to get back", f"**{path_words}**" in wordsp and "Press Beach post kit at the top of the page" in wordsp)
     case("the posting queue page still keeps Back to home, as the kit part says", "keeps its Back to home" in kitp and "Back to home</span>" in pq)
     case("the kit page's and the words page's bars are built by look.crumbs (else the parts' path is a story)",
-         "look.crumbs([(here, None)])" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
+         "trail if trail is not None else [(here, None)]" in read(SCRIPTS / "kit.py") and "look.crumbs(trail)" in read(SCRIPTS / "kit.py") and "look.crumbs(look.kit_trail(kit_name) + [(w[\"crumb_captions\"], None)])" in read(SCRIPTS / "words_page.py"))
     # --- "What's a post kit?": her Make posts paragraph, whole ---
     m = re.search(r'\*\*"What\'s a post kit\?"\*\* Answer in Nicole\'s words from the Make posts screen, whole: "([^"]+)"', kitp)
     case("post-kit.md answers \"What's a post kit?\" with one quoted paragraph", bool(m))
@@ -1505,10 +1505,388 @@ def check_posted_and_path_v27():
          all(x in where for x in ("`posted_at`", "`feed.json`", "`read_at`", "last 30 days", "(`unposted`)")) and re.search(r"^POSTED_DAYS = 30\b", pq, re.M))
 
 
+def check_second_copy():
+    """Make a second copy, from the report, after the backup (Dustin, Nov 19): the instructions for it."""
+    print("\nA second copy after the backup (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    a, f, w, b = (flat(n) for n in ("after-the-report.md", "first-backup-setup.md", "where-things-live.md", "backup.md"))
+    core = re.sub(r"\s+", " ", read(SM / "SKILL.md"))
+    case("the core's table sends \"make a second copy\" to after-the-report.md",
+         "\"make a second copy\"" in core and "A second copy, after the backup" in core)
+    case("after-the-report.md: the section, the check first, then the copy in the background",
+         "## A second copy, after the backup" in read(SM / "parts" / "after-the-report.md")
+         and "second_copy.py \"<the backup's folder>\" --to \"<that drive>\" --check" in a
+         and a.index("--to \"<that drive>\" --check") < a.index("# in the background") and "Run `--check` first, every time." in a)
+    case("after-the-report.md: what the report's button and panel say, word for word",
+         all(x in a for x in ("Anything you'd like to change?", "Your photos are safe either way. These are here if you want them.",
+                              "**Make a second copy**", "Which drive should the second copy go on?", "**Look again**",
+                              "**Do this after every backup**", "**Make the second copy**", "Keep your card in until this is done.")))
+    case("after-the-report.md: it is the card's layout, never sorted, and the honest lines are said as they are",
+         "never sorted or renamed" in a and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
+         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a)
+    case("after-the-report.md: never called made before the last line says so; nothing deleted to make it pass; never a cloud folder",
+         "Never say there is a second copy until the command's last line says it is made." in a
+         and "never delete or move anything to make it pass" in a and "Never a cloud folder" in a)
+    case("after-the-report.md: the four exit codes, the missed second drive, and the eject line",
+         all(x in a for x in ("0 done", "2 refused before anything was written", "3 stopped part way", "1 problems"))
+         and "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." in a
+         and "A second copy is still being made from this card. It won't be long." in a and "It won't be long." in b)
+    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py",
+         "**Make a second copy** on the report" in f and "second_copy.py" in f)
+    case("where-things-live.md names the new records",
+         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock")))
+
+
+def check_backup_options():
+    """The other options on the report (Dustin, Nov 19): another card, naming, the next drive, the note line."""
+    print("\nWhat the report lets them change (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    a, f = flat("after-the-report.md"), flat("first-backup-setup.md")
+    core = re.sub(r"\s+", " ", read(SM / "SKILL.md"))
+    case("the core's table has the three new asks and sends them to after-the-report.md",
+         all(x in core for x in ("\"this shoot was on two cards\"", "\"change how my shoots are named\"", "\"use a different drive next time\"",
+                                 "What the report lets them change")))
+    case("after-the-report.md: the section, and that a press on the page needs nothing run",
+         "## What the report lets them change" in read(SM / "parts" / "after-the-report.md")
+         and "You never need to run anything for a press on the page." in a)
+    case("after-the-report.md: another card, word for word, with the chat way and what it does not do",
+         all(x in a for x in ("**This shoot continues on another card.**", "Which backup is the other card?", "**Put them on one report**",
+                              "Done. Both cards are on one report now.", "Each card's photos stay in their own folders.",
+                              "Back up the other card first: put it in and say backup now. Then come back here and pick it.",
+                              "shoot_report.py link \"<card 1's backup>\" \"<card 2's backup>\"", "nothing can merge two cards' photos into one folder today")))
+    case("after-the-report.md: naming, word for word, with the chat ways",
+         all(x in a for x in ("**Change how my shoots are named.**", "How should a shoot folder be named?", "**Rename this backup's shoots to match**",
+                              "Name them your own way? Copy this into the chat:", "studio_file.py set --example", "studio_file.py set --offered 1",
+                              "--offered 2", "studio_file.py set --file-names original", "the photos keep their names")))
+    case("after-the-report.md: the next drive, word for word, and that nothing is ever moved",
+         all(x in a for x in ("**Use a different drive next time.**", "Where should your next backup go?",
+                              "Saved. Your next backup goes to LaCie Rugged. The photos from this backup stay where they are.",
+                              "studio_file.py set --drive", "no button and no command moves a finished backup to another drive")))
+    case("after-the-report.md: the note line to copy, no form, and where to read on",
+         "Write a note for the <shoot's name> shoot" in a and "There is no form." in a and "parts/client-note.md" in a)
+    case("after-the-report.md: the own-disk line as the report says it, and never a speech",
+         "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. "
+         "Plug one in and press Use a different drive next time." in a and "Never say it before a backup" in a)
+    case("first-backup-setup.md: the table names each button",
+         all(x in f for x in ("**Use a different drive next time** on the report", "**Change how my shoots are named** on the report",
+                              "**This shoot continues on another card** on the report", "**Write a note to my client**")))
+    sys.path.insert(0, str(SM / "scripts"))
+    try:
+        import report_page
+        import first_look
+        W, F = report_page.OUR_WORDS, first_look.OUR_WORDS
+        said = all(x in a for x in (W["oc_button"], W["oc_which"], W["oc_go"], W["oc_done"], W["oc_quiet"], W["oc_none"], W["nm_button"], W["nm_q"],
+                                    W["nm_apply"], W["nm_own"], W["nd_button"], W["nd_q"], F["note_button"], F["note_how"],
+                                    W["own_disk"].format(computer="Mac")))
+    except Exception as ex:  # noqa: BLE001
+        said = False
+        print("        ", ex)
+    case("and every line it quotes is the line the page itself says (read from the scripts)", said)
+
+
+def check_backup_zero():
+    """A backup asks nothing before it copies (Dustin, Nov 19): the instructions as rewritten for it."""
+    print("\nNo questions before the copy (Nov 19)")
+    flat = lambda n: re.sub(r"\s+", " ", read(SM / "parts" / n))   # noqa: E731
+    b, f, a, h, pc, c = (flat(n) for n in ("backup.md", "first-backup-setup.md", "after-the-report.md", "hello.md",
+                                            "on-a-pc.md", "client-note.md"))
+    gone = [w for w in ("Same as usual?", "How many memory cards for this shoot?", "What's on the card?",
+                        "Looks good (recommended)", "Change something", "one screen, every time") if w in b]
+    case("backup.md: the screen of questions before the copy is gone (Same as usual?, the cards question, What's on the card?, Change something)",
+         not gone, gone)
+    case("backup.md: the new starting line, and the walk-away line last and in bold",
+         "Found your card: 3,931 photos, 127 GB. Copying to Big Kahuna now. Nothing on your card will be changed." in b
+         and "**You can walk away. I'll have the report ready when you're back.**" in b)
+    case("backup.md: the one extra sentence on a first backup, word for word",
+         "This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." in b
+         and "This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." in f)
+    case("backup.md: the quiet check comes before the starting message and speaks only on a STOP; every STOP's words are still there",
+         b.index("night.py --source \"<the card's path>\" --check") < b.index("Copying to Big Kahuna now.")
+         and "It speaks only on a STOP" in b
+         and all(w in b for w in ("Your memory card has stopped answering", "already holds a backup made from a different memory card",
+                                  "would go onto the memory card itself", "onto the same drive the photos are coming from",
+                                  "Windows gave your drives different letters today", "the card is already safe")))
+    case("backup.md: the drive is chosen by `studio_file.py defaults`, and exit 5 is the one question",
+         "studio_file.py defaults --source" in b and "ONE QUESTION before the first backup" in b and "NEEDS SETUP" not in b)
+    case("backup.md: every card is its own backup now; the closing box has Show the report and Eject my card; --with only when they say the card continues the last one",
+         "every card is its own \"backup now\"" in b and "Never ask how many cards there are" in b
+         and "**Show the report** first and **Eject my card** second" in b and "--with" in b and "never guess that two cards belong together" in b)
+    case("backup.md: what they say unasked about the card is still used for the name and kept word for word",
+         "without being asked" in b and "client_note.py told --night" in b and "Never ask what is on the card" in b)
+    case("backup.md: the phone page only when they ask, and the pointer the PC part follows is really there",
+         "Phone taps: only when they ask" in b and "**Somewhere else this time.**" in b and "\"Somewhere else this time\"" in pc)
+    case("backup.md: the glance is only the answer to \"what are my settings?\"",
+         "studio_file.py glance" in b and "never shown before a backup" in b)
+    numbered = re.findall(r"\*\*Question \d", f)
+    case("first-backup-setup.md: no numbered questions and no conversation before the copy", not numbered and "asks nothing before it copies" in f
+         and "I need to ask you a few quick questions" not in f, numbered)
+    case("first-backup-setup.md: the defaults command and its three answers, and the one question in its two shapes",
+         all(w in f for w in ("studio_file.py defaults --source", "`CHOSE:", "`ASK which-drive`", "`ASK no-drive`",
+                              "\"Which drive should your photos go on?\"", "\"I don't see an external drive. Where should your photos go?\"",
+                              "\"I'll plug one in\"", "\"On this Mac for now\"", "\"On this PC for now\"",
+                              "studio_file.py defaults --drive", "studio_file.py defaults --computer")))
+    case("first-backup-setup.md: the computer's own disk is their call, with no speech",
+         "with no speech" in f and "Never refuse, never lecture" in f and "Quick note before we go on" not in f)
+    case("first-backup-setup.md: the table of where each old question lives now, and the client-voice question kept word for word for later",
+         "| Was asked before the copy | Where it lives now |" in f and "Asked later, only when it is needed" in f
+         and "How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone." in f
+         and "Never a \"Paste me a note\" choice" in f and "posting_queue.py interval" in f)
+    case("after-the-report.md: nothing is asked by itself when they come back",
+         "Ask nothing by yourself" in a and "Two one-time questions" not in a and "Ask them before anything else" not in a
+         and "Never ask whether there are any" in a and "Never offer it by yourself" in a)
+    case("client-note.md: a note is written only when they said who it is for, or ask; the voice question is asked then",
+         "Nothing about a note is asked before a backup" in c and "Asked later, only when it is needed" in c and "Question 5" not in c)
+    case("hello.md: a first backup is described with no questions first",
+         "I'll ask a few quick questions first" not in h and "There's nothing to answer first" in h)
+    case("on-a-pc.md: the drive-letter stops stay, and nothing points at the old check-in screen",
+         "Drive letters move, so check them before every backup" in pc and "one-screen check-in" not in pc and "never guess which letter is which" in pc)
+    # the Nov 19 review of the zero-questions backup: what the instructions must say, and must no longer say
+    case("the first-backup sentence no longer promises that anything can be changed on the report (rule 7)",
+         "You can change any of it on the report afterwards" not in b + f + h and "you can change anything on the report afterwards" not in h
+         and "nothing moves a finished backup" in f and "photo names are changed from the chat, not the report" in f)
+    case("first-backup-setup.md: the drive is worked out with --dry-run, and saved only by the backup once its checks pass",
+         'studio_file.py defaults --source "<the card\'s path>" --dry-run' in f and "`WOULD CHOOSE:" in f
+         and "only after its own checks have passed" in f and '--dry-run' in b)
+    case("first-backup-setup.md: the new answers: a maybe-card is asked about, an unusable only drive is said, a card is never the drive",
+         all(x in f for x in ("`ASK is-this-the-drive`", "cannot be used today", "**A memory card is never the drive.**")))
+    case("first-backup-setup.md: a wrong drive on file has a way out (SET-OTHER, then set --drive)",
+         "`SET-OTHER` (exit 6)" in f and "**When the drive on file is the wrong one.**" in f and "studio_file.py set --drive" in f)
+    case("first-backup-setup.md: where on the drive is in plain sight unless a folder is plainly named for shoots, and the starting message names a folder",
+         "right on the drive, where they will see it" in f and "Never inside a photo library or catalog" in f
+         and "into your Photo Shoots folder" in f and "into your Photo Shoots folder" in b)
+    case("backup.md: a second card of the day takes the next name by itself; only a name they gave stops",
+         "With no name given this never stops" in b and "saturday card 2" in b and "the name THEY gave" in b)
+    case("backup.md: the second copy is made after the backup and never holds it up",
+         "it is made right after the backup itself and never holds it up" in b)
+    case("hello.md: backup now pasted from the home page starts the backup, with no Want to dive in?",
+         'never explain and never ask "Want to dive in?"' in h and "start the backup straight away" in h)
+    a2 = re.sub(r"\s+", " ", read(SM / "parts" / "after-the-report.md"))
+    src = read(SM / "scripts" / "shoot_report.py")
+    case("after-the-report.md: a wrong card can be taken off a shoot's report, with a command shoot_report.py has",
+         "shoot_report.py unlink" in a2 and 'add_parser("unlink"' in src and "no command that takes a card off" not in a2)
+    case("after-the-report.md: a second copy refuses any memory card, and changed photos are never called lost",
+         "It refuses a memory card (this backup's own or any other" in a2 and '"could not be found" when it says they were changed' in a2
+         and "**The saved second drive had trouble during a backup**" in a2)
+    import home_base
+    case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
+         "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]
+         and "quick question" not in " ".join(home_base.WORDS.values()))
+
+
+def check_vault_core():
+    """The vault as a real post kit (Nicole's v29, 1.3; stage 6): where it lives, and the designer's blank first design."""
+    print("\nThe vault's folder and records (Nov 19)")
+    where = re.sub(r"\s+", " ", read(SM / "parts" / "where-things-live.md"))
+    src = read(SM / "scripts" / "vault.py")
+    for name in ("vault.json", "sheet.prev.json"):
+        case(f"where-things-live names {name}, and vault.py still uses that name", f"`{name}`" in where or f"`.kit/{name}`" in where and f'"{name}"' in src)
+    for key in ("numbers", "next", "out", "from"):
+        case(f"where-things-live names vault.json's `{key}`, and vault.py still writes it", f"`{key}`" in where and f'"{key}"' in src)
+    case("it says the vault is found by its mark, is made only by a command, and copies no photo",
+         '"vault": true' in where and "never by its name" in where and "`vault.py ensure`" in where and "no photo is copied to be in it" in where)
+    case("it says the vault only reads other post kits", "the vault only reads other post kits and never writes anything into one" in where)
+    for cmd in ("show", "ensure", "relist", "members"):
+        case(f"`vault.py {cmd}` is a command vault.py has", f"`vault.py {cmd}" in where and f'add_parser("{cmd}")' in src)
+    arr = re.sub(r"\s+", " ", read(SM / "parts" / "arrange.md"))
+    des = read(SM / "scripts" / "design.py")
+    case("the designer's blank first design in the vault: the line design.py prints starts BLANK:, and arrange.md says what to say for it",
+         'OPEN_NEW_BLANK = "BLANK:' in des and "If it starts `BLANK:`" in arr and "blank slides to start" in arr)
+
+
+def check_vault_everything():
+    """See everything in it (Nicole's v29, 1.6; stage 11): what the parts say, held to the code."""
+    print("\nSee everything in it, Remove from my vault, Put it back (Nov 19)")
+    kitp, core, where = read(SM / "parts" / "post-kit.md"), read(SM / "SKILL.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "vault_page.py")
+    sec = kitp.split("## My vault: one post kit for every shoot", 1)[-1].split("\n## ", 1)[0]
+    case("the switch is on, so the strip's link is drawn", "\nEVERYTHING = True" in src and "**See everything in it**" in sec)
+    case("See everything in it: the page's address, a route vault_page.py answers", "`/vault.html`" in sec and '"/vault.html"' in page)
+    case("her rule is there in her words, and Use it in a reel adds nothing", "**Nothing gets picked on this page; making happens in the post kit**" in sec
+         and "it adds nothing to any reel" in sec and '"use": "Use it in a reel"' in page)
+    case("take this out of my vault: `vault.py out`, a command vault.py has, by --photo or --clip", "`python3 <scripts>/vault.py out --photo <its vault number>`" in sec
+         and '`python3 <scripts>/vault.py out --clip "<shoot\'s folder>:<id>"`' in sec and '("out", "take one photo or clip out' in src and '"--photo"' in src and '"--clip"' in src)
+    case("it says nothing is deleted or moved, and to ask when more than one could be meant", "**Nothing is deleted and nothing is moved:**" in sec and "ask before taking anything out" in sec)
+    case("the lines it tells the assistant to say are the ones vault.py says", "Taken out of your vault. The photo itself is still in its shoot, and nothing was deleted." in sec
+         and '"photo_out": "Taken out of your vault. The photo itself is still in its shoot, and nothing was deleted."' in src
+         and "\"Back in your vault.\"" in sec and '"back": "Back in your vault."' in src)
+    case("put it back: `vault.py back`, a command vault.py has; the photo keeps its number and is not put back into a reel by itself",
+         "`python3 <scripts>/vault.py back --photo <number>`" in sec and '("back", "put a photo or clip that was taken out back' in src
+         and "comes back with the number it had" in sec and "not put back into a reel's order by itself" in sec)
+    case("the page's own names for it are the ones on the page", "**Put it back**" in sec and "**Taken out of my vault**" in sec and '"put_back": "Put it back"' in page
+         and '"out_fold": "Taken out of my vault ({n})"' in page and "**Remove from my vault**" in sec and '"remove": "Remove from my vault"' in page)
+    case("the core's table sends see everything, take this out and put it back to that section",
+         '| "see everything in it", "show me everything in my vault", "what\'s in my vault?", "take this out of my vault", "remove that clip from my vault", "put it back in my vault" | `parts/post-kit.md`, "My vault"' in core)
+    case("where-things-live says what the out list holds, that only vault.json is written, and names vault.prev.json", "`vault.prev.json`" in where and '"vault.prev.json"' in src
+         and "`<shoot's folder>:<the clip's id>`" in where and "writes only this file" in where and "`vault.py out`" in where and "`vault.py back`" in where)
+
+
+def check_vault_search():
+    """Photo descriptions and the search rule (Nicole's v29, 1.4 and 1.5; stage 8): what the parts say, held to the code."""
+    print("\nDescribing photos so they can be found, and search (Nov 19)")
+    kitp, where, core, pcp = read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "where-things-live.md"), read(SM / "SKILL.md"), read(SM / "parts" / "on-a-pc.md")
+    src, vsrc, tc = read(SM / "scripts" / "photo_words.py"), read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "this_computer.py")
+    guide = read(ROOT / "docs" / "SETUP-GUIDE-PC.md")
+    case("post-kit.md has the section", "\n## Describing photos so they can be found\n" in kitp)
+    sec = kitp.split("## Describing photos so they can be found", 1)[-1].split("\n## ", 1)[0]
+    case("it says no photo is ever renamed or changed, in her words", "**No photo is ever renamed or changed for this**" in sec and "I don't want the assistant to rename the photos" in sec)
+    case("her progress line is in the part and in the code, whole", "Getting your photos ready to search: 40 of 72." in sec and '"getting": "Getting your photos ready to search: {done} of {total}."' in src)
+    case("the quiet line and the line to copy are the page's own", 'Want search to find more, like "laughing" or "a kiss"? Copy this into the chat:' in sec
+         and '"more": "Want search to find more, like \\"laughing\\" or \\"a kiss\\"? Copy this into the chat:"' in src
+         and "**Describe my photos for <shoot>**" in sec and '"line": "Describe my photos for {shoot}"' in src and '"line_vault": "Describe the photos in my vault"' in src)
+    case("descriptions only when they ask, never because a kit was opened or made", "only when they ask" in sec and "Never describe photos because a kit was opened or made." in sec)
+    for cmd in ("status", "sheets", "describe"):
+        case(f"the part names `photo_words.py {cmd}`, a command the script has", f"python3 <scripts>/photo_words.py {cmd} " in sec and (f'"{cmd}"' in src))
+    case("the limits the part names are the script's: 140 letters, 2,000 photos a file, about 300 before asking, 48 to a sheet",
+         "up to 140 letters" in sec and "WORDS_MAX = 140" in src and "at most 2,000 photos a file" in sec and "FILE_MOST = 2000" in src
+         and "More than about 300" in sec and "ASK_ABOVE = 300" in src and "48 photos to a sheet" in sec)
+    case("from the sheets, never photo by photo (rule 6)", "Read the sheets, never photo by photo (rule 6)" in sec)
+    case("what a description may say, and never a person's name unless the photographer said it",
+         "**What a description may say.**" in sec and "**Never a person's name unless the photographer said it**" in sec and "never guess who someone is" in sec)
+    case("descriptions are for finding photos only, never a fact in a caption, a hook, a note or story words (rule 11)",
+         "**Descriptions are for finding photos only (rule 11).**" in sec and "as a fact in a caption, a hook, a note to a client or story words" in sec)
+    case("the vault: described in the post kit each photo came from; the total said first", "**\"Describe the photos in my vault\".**" in sec
+         and "described in the post kit each one came from" in sec and '`photo_words.py status "My vault"`' in sec and "Say the total first and ask before more than about 300" in sec)
+    case("find in my vault: `vault.py find`, a command vault.py has, with --photos and --clips", '`python3 <scripts>/vault.py find "<their words>"`' in sec
+         and 'add_parser("find"' in vsrc and '"--photos"' in vsrc and '"--clips"' in vsrc)
+    case("the search rule the part tells is the code's: everyday words ignored, every other word must match, tags, descriptions and the shoot's name",
+         "Everyday words (me, my, the, with, on...) are ignored and every other word has to match" in sec
+         and 'EVERYDAY = frozenset("me my on the a an of with at in and i to".split())' in vsrc and 'frozenset("find every clip clips from any".split())' in vsrc)
+    case("the core's table sends the two pasted lines and find in my vault to that section",
+         '"Describe my photos for <shoot>" (pasted from a post kit), "Describe the photos in my vault"' in core and '"find ... in my vault"' in core
+         and '| `parts/post-kit.md`, "Describing photos so they can be found" |' in core)
+    case("where-things-live names the store, the version before, its lock, its fields and its one writer",
+         all(x in where for x in ("`.kit/photo-words.json`", "`photo-words.prev.json`", "`photo-words.lock`", "`key`", "`tags`", "`words`", "`words_key`", "`unread`", "`photo_words.py` is its one writer"))
+         and all(x in src for x in ('STORE = "photo-words.json"', 'PREV = "photo-words.prev.json"', 'LOCK = "photo-words.lock"', '"words_key"', '"unread"')))
+    case("where-things-live says a shoot's photo keeps its words in the shoot's own file, and that the words are never a source for a caption",
+         "under the shoot's own number" in where and "never a source for a caption, a note or a hook" in where)
+    m = re.search(r'NO_TAGS_PC = \("([^"]+)"\s+"([^"]+)"\)', tc)
+    pc_line = (m.group(1) + m.group(2)) if m else ""
+    case("the PC line is in this_computer, and the PC part quotes it whole", pc_line == "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:"
+         and pc_line in pcp and "## Finding photos by what is in them" in pcp)
+    first = "On a PC, search finds your photos by shoot name and by anything your assistant has described."
+    case("the PC gap is on the PC part's list and the PC guide's list, in the same words", ("> - Photo tags for search. " + first) in pcp and ("- **Photo tags for search.** " + first) in guide)
+
+
+def check_vault_page():
+    """My vault on the pages (Nicole's v29, 1.3; stage 7): what the parts say, held to the code."""
+    print("\nMy vault: the card, its page and adding a folder (Nov 19)")
+    kitp, hello, where, core = read(SM / "parts" / "post-kit.md"), read(SM / "parts" / "hello.md"), read(SM / "parts" / "where-things-live.md"), read(SM / "SKILL.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "vault_page.py")
+    case("post-kit.md has a My vault section", "\n## My vault: one post kit for every shoot\n" in kitp)
+    sec = kitp.split("## My vault: one post kit for every shoot", 1)[-1].split("\n## ", 1)[0]
+    case("it says what the vault is in her words: a post kit like any other, not a place to pick photos first, no photo copied to be in it",
+         "a post kit like any other" in sec and "not a place to pick photos first" in sec and "no photo is copied to be in it" in sec)
+    case("show my vault: `vault.py ensure`, then shown like any post kit", "`python3 <scripts>/vault.py ensure`" in sec and "Post kit.html" in sec and 'add_parser("ensure")' in src)
+    case("nothing is picked until they ask", "**Nothing is picked until they ask**" in sec and "Never pick, order or make anything in the vault because it was opened" in sec)
+    for line in ("My favorite maternity photos this year", "Behind the scenes at the beach", "Moms laughing, from any shoot"):
+        case(f"her example is in the part and on the page, whole: {line}", line in sec and line in page)
+    case("add this folder to my vault: `vault.py add`, a command vault.py has", '`python3 <scripts>/vault.py add "<the folder>"`' in sec and 'add_parser("add"' in src)
+    case("it says only finished photos are copied, each checked, and the originals are never moved, renamed or changed",
+         "finished photos (JPEG, HEIC, PNG, WebP)" in sec and "every copy checked against its original" in sec and "**the originals are never moved, renamed or changed.**" in sec)
+    case("it says twice copies nothing, a cut-off copy is finished by the next, and nothing is written over",
+         "the second time copies nothing" in sec and "finished by the next one" in sec and "nothing is written over" in sec and "IMG_0001 (2).jpg" in sec)
+    case("the lines it tells the assistant to say are the ones vault.py prints", "Copied 48 finished photos into your vault. Your originals weren't moved." in sec
+         and "Copied {n} finished photo{s} into your vault. Your originals weren't moved." in src and "That shoot is already in your vault, from its post kit." in sec
+         and '"from_kit": "That shoot is already in your vault, from its post kit."' in src)
+    case("the exit codes the part names are the ones vault.py gives (4 not a folder to add, 1 a copy stopped or did not match)",
+         "Exit 4 means" in sec and "Exit 1 means" in sec and "return 4" in src and "return 0 if res[\"ok\"] else 1" in src)
+    case("+ Add clips: no video is copied, and the line is the page's own", "The Assistant copies no video." in sec
+         and "Put your videos in the folder that just opened. They show up in your vault's reel page, where you make clips from them." in sec
+         and "Put your videos in the folder that just opened. They show up in your vault's reel page, where you make clips from them." in page)
+    case("the core's table sends show my vault, open my vault and add this folder to my vault to that section",
+         '| "show my vault", "open my vault", "what\'s my vault?", "add this folder to my vault", "put these photos in my vault" | `parts/post-kit.md`, "My vault" |' in core)
+    case("hello.md says My vault is first on the post kits list, with no Archive, and names the screen by its new title",
+         "**My vault** first, a dark card on a row of its own" in hello and "it has no Archive and the search never hides it" in hello and "**Turn your shoots into posts**; **Make posts from a shoot** before Nov 19" in hello)
+    hb = read(SM / "scripts" / "home_base.py")
+    case("... and the screen's title in the code is that one", '"m_h1": "Turn your shoots <em>into posts.</em>"' in hb and "m_eyebrow" not in hb.replace('"m_eyebrow" not', ""))
+    case("where-things-live names the add log and what the page follows, as vault.py names them",
+         "`.kit/vault-adds.json`" in where and 'ADDS = "vault-adds.json"' in src and "`.kit/vault-add-job.json`" in where and 'ADD_JOB = "vault-add-job.json"' in src)
+    for key in ("status", "size", "mtime", "sha256"):
+        case(f"where-things-live names the log's `{key}`, and vault.py writes it", f"`{key}`" in where and f'"{key}"' in src)
+    case("it says what makes the vault: ensure, add, or the card's press, never a page being opened",
+         "or `vault.py add`, or the press of Open the post kit on My vault's card" in where and "never because a page was opened" in where)
+
+
+def check_vault_reel_clips():
+    """The vault's reel page and "Find my clips in my vault" (Nicole's v29, 1.5; stage 9): the instructions, held to the code."""
+    print("\nThe vault's reel page: clips from every shoot, and Find my clips in my vault (Nov 19)")
+    core, reel, arr, where = read(SM / "SKILL.md"), read(REEL / "SKILL.md"), read(SM / "parts" / "arrange.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "reel_page.py")
+    case("the reel skill has a Find my clips in my vault section", '\n## Find my clips in my vault: "Find my clips in my vault"\n' in reel)
+    sec = reel.split('## Find my clips in my vault: "Find my clips in my vault"', 1)[-1].split("\n## ", 1)[0]
+    case("the line it names is the one the page hands out", '"vc_line": "Find my clips in my vault"' in page and '**"Find my clips in my vault"**' in sec)
+    case("`vault.py clips` and `vault.py use-clips`, commands vault.py has, with --reel and --clips as the part writes them",
+         '`python3 <assistant scripts>/vault.py clips [--reel "<the vault reel\'s name>"]`' in sec and 'add_parser("clips"' in src
+         and '`python3 <assistant scripts>/vault.py use-clips [--reel "<name>"] --clips "<shoot\'s folder>:<id>,<shoot\'s folder>:<id>"`' in sec and 'add_parser("use-clips"' in src)
+    case("choose by the words, never by watching a video; what they typed is the whole brief; nothing typed, ask", "**Choose by the words, never by watching.**" in sec
+         and "never open a video to choose" in sec and "is the whole brief (rule 11)" in sec and "ask what the reel is about, one short question" in sec)
+    case("unnamed clips: offer Name my clips for <shoot>, never guess", '"Name my clips for <shoot>"' in sec and "Never guess what an unnamed clip shows." in sec and 'Offer: \\"Name my clips for' in src)
+    case("the same add as the page's, checked whole, twice changes nothing, never any other way and never a copied video", "the same add as the page's + Add" in sec
+         and "running it twice changes nothing" in sec and "**Never write a clip into the vault's records any other way,**" in sec and "never copy a video into the vault to use it" in sec
+         and "reel_page.add_from(" in src)
+    case("it says what is different in the vault: the look is of the vault's own videos, a photo is needed, the talking page's videos",
+         '**"Look through my footage for My vault" looks only through videos they added to the vault itself**' in sec and "needs at least one photo somewhere in the vault" in sec
+         and "the videos it can lay over the talk are the vault's own" in sec and "members=False" in read(SM / "scripts" / "footage.py"))
+    case("arrange.md has The vault's reel page", "\n## The vault's reel page\n" in arr)
+    sec = arr.split("## The vault's reel page", 1)[-1].split("\n## ", 1)[0]
+    case("its words are the page's: the top, Your clips, Added to my vault, From its post kit, + Add and ✓ Added, Your clips for this reel",
+         all(x in sec for x in ('"My vault · Reel"', '"Make my reel."', "From your vault: any clips and photos, from any of your shoots.", '**Step 1 is "Your clips".**', "**Added to my vault**",
+                                '"From its post kit · 10 clips"', "**+ Add**", "**✓ Added**", "**Your clips for this reel**", '"1 found"'))
+         and all(x in page for x in ('"My vault · Reel"', '"title_vault": "Make my reel"', '"vc_added": "Added to my vault"', '"vc_from": "From its post kit · {n} clips"', '"vc_add": "+ Add"',
+                                     '"vc_added_tile": "✓ Added"', '"clips_wl": "Your clips for this reel"', '"vc_found": "{n} found"')))
+    case("no video is copied, nothing is written into the shoot's post kit, and what is not there yet is said", "No video is copied and nothing is written into the shoot's post kit." in sec
+         and "**Not there yet, say so plainly if asked:**" in sec and "does not open while the vault has no photo at all" not in sec
+         and "**A vault with video clips and no photo at all** still opens its reel page" in sec and "No photos in the vault yet" in sec)
+    case("the core's table sends the pasted line to the reel skill's section and to arrange.md's",
+         '| "Find my clips in my vault" (the line on the vault\'s reel page), "find me editing on the computer", "every clip of me at the beach", "make a B-roll from my vault" | '
+         'the reel skill\'s "Find my clips in my vault" (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault\'s reel page" |' in core)
+    case("where-things-live says where the vault's clips live: nothing copied, from {kit, id}, the vault's own .kit/footage, vault_ask",
+         "**The vault's clips (Nov 19).**" in where and "`Footage/<shoot's folder>/<file name>`" in where and "`from: {kit: <shoot's folder>, id: <that clip's id>}`" in where
+         and "`<vault>/.kit/footage/`" in where and "`vault_ask`" in where and '"vault_ask"' in page and '"from": {"kit": fk, "id": fid}' in page)
+
+
+def check_vault_reel_photos():
+    """The vault's photos step and "Pick my reel photos from my vault" (Nicole's v29, 1.5; stage 10): the instructions, held to the code."""
+    print("\nThe vault's reel page: photos folded by shoot, photo search, Pick my reel photos from my vault (Nov 19)")
+    core, reel, arr, where = read(SM / "SKILL.md"), read(REEL / "SKILL.md"), read(SM / "parts" / "arrange.md"), read(SM / "parts" / "where-things-live.md")
+    src, page = read(SM / "scripts" / "vault.py"), read(SM / "scripts" / "reel_page.py")
+    step2 = reel.split("## Step 2: when they ask for your pick", 1)[-1].split("\n## ", 1)[0]
+    case("the reel skill's Step 2 has the vault's line, the one the page hands out", '**In My vault the line is "Pick my reel photos from my vault"**' in step2
+         and '"photo_for": "Pick my reel photos from my vault"' in page and '"photo_plain": "Pick my reel photos from my vault"' in page)
+    case("the note first, with the command as it is", '`python3 <assistant scripts>/reel_page.py note "My vault" [--reel "<the reel\'s name>"]`' in step2 and "This is the vault:" in page)
+    case("narrow before looking: vault.py find with the note's own words, then sheets of the shortlist only, commands vault.py has",
+         '`python3 <assistant scripts>/vault.py find "<the note\'s own words>" --photos`' in step2 and '`python3 <assistant scripts>/vault.py relist --sheets --only "<the numbers find printed>"`' in step2
+         and '"--only"' in src and "def shortlist_sheets(" in src and "never search for something the note did not say" in step2 and "it is a shortlist, not the answer" in step2)
+    case("48 to a sheet is the reel script's own number", "48 to a sheet" in step2 and "PER_SHEET = 48" in read(REEL / "scripts" / "reel.py"))
+    case("with no note: say how many photos first, then the whole vault's sheets", "**With no note, the whole vault:** say how many photos you are about to look through first" in step2
+         and "`python3 <assistant scripts>/vault.py relist --sheets` draws every photo" in step2)
+    case("saved with kit.py picks under the vault's numbers, for that reel; the note decides what may go in",
+         '`python3 <assistant scripts>/kit.py picks "My vault" --reel <vault numbers, in play order, marked> [--for-reel "<reel\'s name>"]`' in step2
+         and "**The note decides what may go in**" in step2 and "never widen it" in step2)
+    case("the strip in the vault names the vault as --kit and its own Photos folder", '`reel.py strip --kit "<the vault\'s folder>" --folder "<the vault\'s own Photos folder>" --picks ...`' in step2)
+    sec = arr.split("## The vault's reel page", 1)[-1].split("\n## ", 1)[0]
+    case("arrange.md's words for the photos step are the page's: the grid's heading, Added to my vault, + Add photos, From its post kit, found, her progress line",
+         all(x in sec for x in ('**"Choose your photos" in the vault**', "**All your photos, from every shoot in your vault**", "**Added to my vault** open on top", "**+ Add photos**",
+                                '"From its post kit · 72 photos"', '"3 found"', '"Getting your photos ready to search: 40 of 72."'))
+         and all(x in page for x in ('"all_summary": "All your photos, from every shoot in your vault"', '"vp_added": "Added to my vault"', '"vp_add_photos": "+ Add photos"',
+                                     '"vp_from": "From its post kit · {n} photos"'))
+         and '"getting": "Getting your photos ready to search: {done} of {total}."' in read(SM / "scripts" / "photo_words.py"))
+    case("it says search finds what is in a photo, and what to say while a shoot is still being looked at", "**The search finds what is in a photo**" in sec
+         and "tell them to give it a moment rather than that nothing matches" in sec and '"Describe the photos in my vault"' in sec)
+    case("it points the pasted line at the reel skill's Step 2 with the same commands", '**The line to copy there is "Pick my reel photos from my vault"**' in sec
+         and '`vault.py find "<the note\'s own words>" --photos`' in sec and '`vault.py relist --sheets --only "<those numbers>"`' in sec and "The note decides what may go in." in sec)
+    case("the stage 9 line that the photos step is the plain one is gone", "the photos step in the vault is still the plain one" not in arr)
+    case("the core's table has a row for the pasted line (the description is not touched)",
+         '| "Pick my reel photos from my vault" (the line on the vault\'s reel page; the reel\'s name and ", and follow my note" may follow), "pick photos from my vault for a reel", "moms laughing, from any shoot" | '
+         'the reel skill\'s Step 2, "In My vault the line is..." (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault\'s reel page" |' in core)
+    case("where-things-live says where the shortlist's sheets go", "**The vault's sheets (Nov 19).**" in where and "`.kit/reels/shortlist/`" in where and 'wd / "shortlist"' in src)
+    case("our search placeholder is in OUR words, a draft, and her mock-up's is nowhere", '"vp_search_ph": "laughing, a kiss, green backdrop, Hannah"' in page and "Search by shoot: maternity" not in page.split("VAULT_PICK_OUR_WORDS = {", 1)[1].split("}", 1)[0])
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

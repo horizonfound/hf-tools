@@ -29,10 +29,12 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | When | Read first |
 |---|---|
 | "hi", "morning", "what can you do", /assistant or /studio, or `home.py pending` shows a button they pressed | `parts/hello.md` |
-| "backup now", "the card's in", "back up this folder" | `parts/backup.md`; and if `studio_file.py show` says no drive is set yet, `parts/first-backup-setup.md` before it |
+| "backup now", "the card's in", "back up this folder", "what are my settings?" | `parts/backup.md`; and if `studio_file.py show` says no drive is set yet, `parts/first-backup-setup.md` before it (a backup asks nothing before it copies, the first one included) |
 | the backup stops with exit 7; "Pick again" from the report; "pick different ones", "more of the kids" | `parts/sneak-peeks.md` |
 | a shoot needs its note to the client; "write a note for...", "make it shorter", "here's how I write to clients" | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |
+| "make a second copy", "copy that backup to my other drive too", "is the second copy done?", the report's Make a second copy | `parts/after-the-report.md` ("A second copy, after the backup") |
+| "this shoot was on two cards", "put those two backups on one report", "I picked the wrong card", "take those two apart"; "change how my shoots are named" (also the line the report gives to copy), "I name my folders differently"; "use a different drive next time", "put my photos on the LaCie from now on"; "Write a note for the <shoot> shoot" | `parts/after-the-report.md` ("What the report lets them change"); the note also `parts/client-note.md` |
 | the editing queue: "what's in my queue", "what's due", a due date, a list of clients to add, "open the Johnson folder" | `parts/editing-queue.md` |
 | "I'm done with the beach shoot", "I finished editing", "make posts from the Miller shoot", a post kit | `parts/post-kit.md` |
 | "make my posts", "I've got photos", "I dropped something in", "sort these", "set up my Assistant folder" | `parts/photos-in.md`, then `parts/post-kit.md` for the kit |
@@ -50,6 +52,11 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | "make a single post", "a post with just one photo" (one slide on its own is a single post) | `parts/arrange.md`, "A single post" |
 | `home.py pending` prints a line starting ARRANGED | `parts/arrange.md` |
 | "show my post kit", "show me the beach kit", "open the post kit" | `parts/post-kit.md`, "Show my post kit" |
+| "show my vault", "open my vault", "what's my vault?", "add this folder to my vault", "put these photos in my vault" | `parts/post-kit.md`, "My vault" |
+| "see everything in it", "show me everything in my vault", "what's in my vault?", "take this out of my vault", "remove that clip from my vault", "put it back in my vault" | `parts/post-kit.md`, "My vault" ("See everything in it", "Take this out of my vault", "Put it back") |
+| "Pick my reel photos from my vault" (the line on the vault's reel page; the reel's name and ", and follow my note" may follow), "pick photos from my vault for a reel", "moms laughing, from any shoot" | the reel skill's Step 2, "In My vault the line is..." (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault's reel page" |
+| "Find my clips in my vault" (the line on the vault's reel page), "find me editing on the computer", "every clip of me at the beach", "make a B-roll from my vault" | the reel skill's "Find my clips in my vault" (`../assistant-make-a-reel/SKILL.md`), and `parts/arrange.md`, "The vault's reel page" |
+| "Describe my photos for <shoot>" (pasted from a post kit), "Describe the photos in my vault", "make my photos searchable", "find ... in my vault", "what's that Getting your photos ready line?" | `parts/post-kit.md`, "Describing photos so they can be found" |
 | "bring my old reels over", "my old reels aren't showing", "my reels are gone", "the reels I made before the update" (reels of any kind made on an earlier version of the pages) | `parts/post-kit.md`, "Bring my old reels over": `bring_older.py look` first, read it back, `bring` only on their yes |
 | "show my posting queue", "the beach reel's ready", "I posted it", "it's in my feed now", "that one didn't go out after all", "how much content do I have", "read my Instagram grid"; "remind me to post the beach reel", "is my reminder set", "I picked the wrong calendar", "pick the photo it shows in my grid", a line that says "reminders not updated" | `parts/posting-queue.md` |
 | "show my recap", "show my November recap", "show my year", "hide the monthly recap", "where did my recap pictures go" | `parts/hello.md`, "The monthly recap and Your year" |

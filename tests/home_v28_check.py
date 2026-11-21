@@ -66,6 +66,12 @@ HERS_NOT_OURS = {
     "animation samples": "test-only",
     "·": "the dot before her samples link",
     "Hello.": None,                     # on ours (kept in this table only so the None marks it as checked below)
+    # her v29 (Nov 19, pages/home-preview.html) took these off her own home page: posts first, no numbered steps
+    "Your workflow": "gone in her v29",
+    "Start wherever you are. Making posts from an old shoot? Jump straight to 3.": "gone in her v29",
+    "Back up →": "gone in her v29 (the small card is the press)",
+    "Open my editing queue →": "gone in her v29 (the small card is the press)",
+    "Make posts →": "gone in her v29 (the button reads Create your post kits / See all my post kits)",
 }
 
 
@@ -113,8 +119,10 @@ class World:
         rec["date"] = "2026-11-02"
         self.put(self.content / B / ".kit" / "kit.json", rec)
         a = self.content / A
-        # kit A: a reel made in November (so November has something to recap) and one in October
-        self.put(a / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")},
+        # kit A: a reel made in November (so November has something to recap) and one in October. They are two
+        # different reels of the shoot (v2 and the first): since v29 a reel counts once, in the month of its first
+        # make, so a second make of ONE reel in November would leave November with nothing to recap
+        self.put(a / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"},
                                                                    {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
         self.posting(interval=3.5)
         self.queue()
@@ -332,17 +340,19 @@ def check_page_words(w, home):
     case("every animation and every @keyframes of the page is inside prefers-reduced-motion: no-preference",
          "animation" not in calm and "@keyframes" not in calm and moving.count("@keyframes") == 3 and "animation:kb" in moving and "animation:pulse" in moving and "animation:rise" in moving)
     case("... and with reduced motion the collage does not change photos", "if (HP.length <= n || STILL) return;" in page and "prefers-reduced-motion: reduce" in page)
-    # her four steps, her exact words
-    order = [page.find(x) for x in ("Back up <em>a card</em>", "My editing <em>queue</em>", "Turn your shoots <em>into posts</em>", "My posting <em>queue</em>")]
-    case("Your workflow: her four steps in the order of the work", -1 not in order and order == sorted(order), order)
-    for line in ("Your workflow", "Start wherever you are. Making posts from an old shoot? Jump straight to 3.",
+    # her four cards, her exact words, posts first (her v29; tests/home_v29_check.py holds the new layout itself)
+    order = [page.find(x) for x in ("Turn your shoots <em>into posts</em>", "My posting <em>queue</em>", "Back up <em>a card</em>", "My editing <em>queue</em>")]
+    case("her four cards, posts first (v29): posts, the posting queue, then backing up and the editing queue", -1 not in order and order == sorted(order), order)
+    case("the numbered steps, Your workflow and the three old button labels are gone (v29)",
+         not any(("¦" + x + "¦") in shown for x in ("Your workflow", "Back up →", "Open my editing queue →", "Make posts →")) and "Start wherever you are" not in page and "flow4" not in page and "class='k'" not in page)
+    for line in ("Also in your Assistant", "See all my post kits →",
                  "Copies your card to your drive, checks every photo, and sorts it into shoots.", "The shoots you need to edit and when they're due.",
                  "Turn your shoot into reels, carousels, stories, and captions.", "Your posts ready to go, and how your grid will look.",
-                 "Back up →", "Open my editing queue →", "Make posts →", "Open my posting queue →", "Open my Assistant folder", "↻ Another hello"):
+                 "Open my posting queue →", "Open my Assistant folder", "↻ Another hello"):
         case("her words: %s" % line, ("¦" + line + "¦") in shown, line)
     case("each step where hers sends it: its own screen, the editing queue (a button), its own screen, the posting queue",
-         "id='s1' data-item='backup' href='/backups'" in page and "<button class='step' id='s2' data-item='queue'" in page
-         and "id='s3' data-item='posts' href='/make-posts'" in page and "id='s4' data-item='posting' href='/posting.html'" in page)
+         "id='s1' data-item='backup' href='/backups'" in page and "<button class='step sm' id='s2' data-item='queue'" in page
+         and "id='kitsBtn' data-item='posts' href='/make-posts'" in page and "id='s4' data-item='posting' href='/posting.html'" in page)
     case("the bar: the name, the date, Open my Assistant folder; no Today list, no welcome paragraphs, no folder card",
          "<span class='when' id='when'>Tuesday, November 17</span>" in page and "id='folder' data-item='folder'" in page
          and not re.search(r"Welcome to your|class='todayl'|item minor|Your workflow, step by step", page))
@@ -411,13 +421,13 @@ def check_boxes(w, home):
     f = home.facts()
     page = home.page_html()
     case("the first name comes from the Brand File", f["me"] == "Nicole")
-    case("step 1, a card in: the step glows (live), a coral dot, her line", "class='step live' id='s1'" in page and "<i class='dot coral'></i>" in box(page, 1)
+    case("step 1, a card in: the step glows (live), a coral dot, her line", "class='step sm live' id='s1'" in page and "<i class='dot coral'></i>" in box(page, 1)
          and box_words(page, 1) == ["A card is in", "EOS_DIGITAL · about 233 files"], box_words(page, 1))
     at(TODAY)
     f = home.facts()
     page = home.page_html()
     case("step 1, no card: no glow, the last backup by its day; its records can't be found, so no claim that every one was checked",
-         "class='step' id='s1'" in page and f["backup"] == {"when": "2026-11-13", "photos": 271, "clips": 6, "state": "unknown"}
+         "class='step sm' id='s1'" in page and f["backup"] == {"when": "2026-11-13", "photos": 271, "clips": 6, "state": "unknown"}
          and box_words(page, 1) == ["Last backup Nov 13", "271 photos and 6 video clips"], (f["backup"], box_words(page, 1)))
     # a backup whose records say how it stands
     rec = w.work / "gone" / "2026-11-13 card" / "_studio"
@@ -478,7 +488,7 @@ def check_boxes(w, home):
         page, why = home.page_html(), ""
     except BaseException as e:  # noqa: BLE001
         page, why = "", e.__class__.__name__
-    case("a queue and a posting record that can't be read: the page still comes, with its four steps", "id='s4'" in page and "Your workflow" in page, why)
+    case("a queue and a posting record that can't be read: the page still comes, with its four steps", "id='s4'" in page and "Also in your Assistant" in page, why)
     # no Brand File: no name, never an invented one
     kept = (w.assistant / "brand-homebase.md").read_text(encoding="utf-8")
     (w.assistant / "brand-homebase.md").unlink()
@@ -527,7 +537,7 @@ def check_recap(w, home):
     at("2026-12-03")
     case("... it was this month only: November recapped is hidden in December's first week (the same month's card)", " hidden>" in home.page_html().split("id='rc'", 1)[1][:40])
     at("2026-12-10")
-    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")}, {"project": "Dec", "when": ts("2026-12-09T10:00:00")}]})
+    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"}, {"project": "Dec", "when": ts("2026-12-09T10:00:00"), "version": "v3"}]})
     case("... and the next month's card shows again", "<div class='rc' id='rc' data-m='2026-12'>" in home.page_html())
     home.set_recap_hide("all")
     case("Stop showing monthly recaps: every month is hidden, and the choice before is kept beside it",
@@ -546,7 +556,7 @@ def check_recap(w, home):
     case("a choice file that can't be read hides nothing", home.recap_hide() == "" and "id='rc' data-m" in home.page_html())
     home.RECAP.unlink()
     home.RECAP_PREV.unlink()
-    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00")}, {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
+    w.put(w.content / A / ".kit" / "reel-page.json", {"v": 1, "made": [{"project": "Hannah reel", "when": ts("2026-11-03T10:00:00"), "version": "v2"}, {"project": "Hannah reel old", "when": ts("2026-10-20T10:00:00")}]})
     at(TODAY)
 
 
@@ -680,8 +690,8 @@ def check_browser(c, w, table):
     rect = c.rect(".hello .tile")
     case("the tiles are tall (about 2:3)", rect["h"] >= 230 and rect["h"] > rect["w"], rect)
     # the steps
-    case("the four steps, numbered, with her names", c.js("[...document.querySelectorAll('.flow4 .step .k')].map(x => x.textContent).join('')") == "1234"
-         and c.js("[...document.querySelectorAll('.flow4 .step .n')].map(x => x.textContent)") == ["Back up a card", "My editing queue", "Turn your shoots into posts", "My posting queue"])
+    case("the four cards, not numbered, with her names, posts first (v29)", c.js("document.querySelectorAll('.step .k').length") == 0
+         and c.js("[...document.querySelectorAll('.step .n')].map(x => x.textContent)") == ["Turn your shoots into posts", "My posting queue", "Back up a card", "My editing queue"])
     case("a card is in: step 1 glows coral and its dot pulses", c.js("document.getElementById('s1').classList.contains('live') && getComputedStyle(document.querySelector('#s1 .now .dot')).animationName") == "pulse"
          and "240, 127, 90" in c.js("getComputedStyle(document.getElementById('s1')).boxShadow"))
     case("the pictures in the boxes are there (the newest kit's photo, today's post)", c.js("[...document.querySelectorAll('.now img')].map(i => i.naturalWidth > 0)") == [True, True])
@@ -751,8 +761,8 @@ def check_browser(c, w, table):
     c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
     time.sleep(0.4)
     m = c.js("({sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, when: getComputedStyle(document.getElementById('when')).display, tiles: document.querySelectorAll('.hello .tile').length, "
-             "cols: getComputedStyle(document.querySelector('.flow4')).gridTemplateColumns.split(' ').length, fan: getComputedStyle(document.getElementById('rcFan')).display})")
-    case("at phone width: no sideways scroll, the date hidden, three tall tiles, the steps one under another, the recap's fan put away",
+             "cols: getComputedStyle(document.querySelector('.also-row')).gridTemplateColumns.split(' ').length, fan: getComputedStyle(document.getElementById('rcFan')).display})")
+    case("at phone width: no sideways scroll, the date hidden, three tall tiles, the two small cards one under another, the recap's fan put away",
          m["sw"] <= m["cw"] and m["when"] == "none" and m["tiles"] == 3 and m["cols"] == 1 and m["fan"] == "none", m)
     c.tap("#rcX")
     case("... and the x's menu opens whole on the screen", c.js("(() => { const r = document.getElementById('rcM').getBoundingClientRect(); return !document.getElementById('rcM').hidden && r.left >= 0 && r.right <= innerWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()") is True)

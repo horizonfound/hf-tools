@@ -1,77 +1,111 @@
-# The first backup: the setup questions
+# The first backup
 
-Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. Read this before parts/backup.md when there is no setup on file yet.
+Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. Read this before parts/backup.md when no drive is on file yet (`studio_file.py show` says there is no Studio File, or its "Sessions go on" line says "(not set)").
 
-## The very first time: a short conversation, then never ask again
+## No conversation before the copy (Dustin, Nov 19)
 
-If `python3 <scripts>/studio_file.py show` says there is no Studio File yet, or its "Sessions go on" line says "(not set)" (a folder for posts can be set up before any backup has been), have a short conversation **before** anything copies. It is a conversation, not a form: **one question per message, in plain words, with the Assistant's own pick already on the table so most people just say "yep."** Six questions and the card count, then go. This is a photographer who has never seen this before; they do not know what a Studio File, a pattern, a default or a frame name is, and they never need to.
+A first backup asks nothing before it copies. No setup questions, no "here's what I need to know first". They said "backup now": find the card, work out the drive, check quietly that everything is in place, say the starting message and go. Everything that used to be a question is chosen the usual way by the Assistant and can be changed afterwards, from the report or by saying so. The test for every default: could they fix a wrong guess in one click afterwards? Two things fall short of that, so never promise them: the backup just made stays on the drive and in the folder it went to (the report changes where the NEXT one goes; nothing moves a finished backup), and photo names are changed from the chat, not the report, from the next backup on.
 
-How it reads:
+Never say Studio File, pattern, default, option, configure or settings to them. Say "the usual way", "I'll remember that", "your camera's number".
 
-- **Buttons, one question at a time.** Each question is asked with the question tool (`AskUserQuestion` in Claude Code), so they click instead of type: **one question per call, never several in one**, two or three choices, the Assistant's pick listed first with "(recommended)" on it. The tool adds an "Other" box on its own; that is where someone with their own system types it. The question text itself is one plain sentence; the choice labels are the actual values, in words ("Big Kahuna, 18 TB free", "No second copy"), never "defaults" or "let me answer." If the question tool is not available (the desktop app's chat), ask the same thing as one plain sentence with the pick in it, and take a typed answer.
-- **No lists, no numbering, no code-styled file names, no bold labels in the chat.** Examples go in quotes in the sentence ("something like Smith Family, Oct 18 2026").
-- **Acknowledge each answer in a few words, then the next question.** "Got it, Big Kahuna." Never recap all the answers at the end as a list.
-- **If they type several answers at once in Other, take them all and skip ahead.** If they say "whatever you think," use the Assistant's picks below, say them in one friendly sentence, and start.
-- **Never say** Studio File, pattern, default, frame name, option, configure, settings, or "the Assistant's default." Say "I'll remember that," "the way I'd do it," "your camera's number."
+## The drive: chosen by itself
 
-The conversation, in this order (first find the card and run `studio_file.py drives` so the names are real):
+After finding the card (step 1 of `parts/backup.md`), run:
 
-**Opening, with the card found: warm them up before the first question (Dustin, Nov 5).** They came to back up their photos and are about to get a run of questions; without a heads-up it feels like a questionnaire, the opposite of "this will make my life easier." So one short message before any question, in three parts. First what you found, that nothing is copied yet and nothing on the memory card will be changed. Second, what is about to happen, so nothing at the end is a surprise (Nicole, Nov 13: she ended up with two folders and wasn't sure why), in these words or close to them: "Here's what's about to happen. I'll copy every photo to your drive and check each one against the card. If the card has more than one shoot on it, each one goes in its own folder, and you can name them on the report afterwards. Then I'll pick a few sneak peeks from each shoot, and you'll get a report that shows all of it." Say only what is true of this card: for a card of only video clips, leave the sneak peeks out. Then, in these words or close to them: "Since we've never done this together, I need to ask you a few quick questions first, so I know where your photos go and how you like things named. It takes about a minute, and it's only this once: I'll remember your answers, so from now on a backup is just "backup now" and you can walk away." Say it every first time, never skip it, and never start the questions cold. Keep the run itself as short as it can be: never ask something they already told you, and never add a question that isn't in the list below.
+```
+python3 <scripts>/studio_file.py defaults --source "<the card's path>" --dry-run
+```
 
-**Question 1, the drive.** "Here are the drives I can see. Which one do your shoots go on?" Choices: every connected drive by name with its free space ("Big Kahuna, 18 TB free"), plus "A folder on this Mac" ("A folder on this PC" on a PC). `studio_file.py drives` gives the list on either computer, already leaving out the computer's own disk, memory cards and Time Machine; leave out any other backup-software drive (on a PC, one with a `FileHistory` folder at the top). On a PC a drive goes by its name and its letter, the way the list prints it ("Big Kahuna (E:), 18 TB free"). The one marked "(recommended)" is the drive that already has shoots on it (a folder of dated subfolders full of photos is the tell); only when no drive shows that is the biggest free space the pick. Other is for a path or a drive that isn't plugged in yet; if they name one that isn't there, say they can plug it in now and you'll wait. Never assume the desktop.
+It writes nothing. It answers one of these ways:
 
-**If they pick the computer itself** ("A folder on this Mac" or "this PC", or a typed path where `studio_file.py internal "<path>"` says yes): a teachable moment, once, kindly, never a lecture (Dustin, Oct 30). Say, in about this shape: "Quick note before we go on. I can put your shoots on this computer, but photographers keep them on an external drive, and here's why: if anything happens to the computer (it's dropped, it dies, it's stolen), the photos on it go with it, while a drive on the shelf is still fine. And raw files are big; a few shoots can fill a laptop's disk and slow everything down. An external drive costs less than one session and takes a minute to plug in." Then one question: "Do you have an external hard drive we could use?" Choices: "Yes, let me plug it in" (wait, then run `studio_file.py drives` again and go back to the drive list), "I'll get one; use this computer for now", "No, this computer is where they go". The last two are their call: set it up where they said with no further comment, and note in the Studio File (`--note "on the computer's own disk; said OK on <date>"`) so the setup guide and later nudges know. One nudge later is fine: when a backup's preflight finds the computer's disk under 15% free, the report's top line says so and suggests a drive. Never refuse, never repeat the speech, never mention it on a normal backup.
+- **`WOULD CHOOSE: <place> | <drive name> | <where in words>`** (exit 0). Exactly one external drive is plugged in, photos can be saved to it today and it has room for this card, so that is the drive. Ask nothing; go on with `parts/backup.md`. The backup itself saves the choice, and only after its own checks have passed, so a drive that turns out not to work is never left on file. (`SET: ...` means a drive was already on file: the same, go on.)
+- **`ASK which-drive`** (exit 3), followed by the drives. More than one drive is plugged in and it cannot tell which is theirs. This is the one question (below).
+- **`ASK is-this-the-drive`** (exit 3). One thing is plugged in and it may be a memory card or a USB stick, so it is not chosen by itself. The one question in a yes or no shape; the lines it prints give the words and the command.
+- **`ASK no-drive`** (exit 4). No external drive is plugged in, or the only one cannot be used today (it can be read but not written to, or has no room for this card). When it prints a line to say first, say it as it is. This is the same one question in its other shape (below).
+- **`STOP: Your memory card has stopped answering...`**: pass it on as it is (`parts/backup.md`, step 4).
 
-**Question 2, where on the drive.** "Right on Big Kahuna, or inside a folder?" Choices: "Right on Big Kahuna (recommended)" first, unless the drive has an obvious shoot folder (a top-level folder named like Photo Shoots, Sessions, Clients, Weddings, or one whose contents are dated shoot folders), in which case that folder is first and recommended ("Photo Shoots, 212 shoots in there (recommended)"). Offer at most two such folders; never list the whole drive. Other is for a folder they name: look for it, and if it is there, confirm in one line what you found ("Found it: Photo Shoots, 212 folders in there. That's the spot?") with a yes/no pair before locking it in; if it is not there, say so and offer to make it. The chosen place is what goes in `--drive`.
+Nothing is written on an `ASK`. Without `--dry-run` the command saves what it chose (`CHOSE: ...`), and that is how the answer to the one question is saved (below). It only ever saves a drive that photos can go on today, run twice it writes once, and it never changes a drive that is already on file. `--source` keeps it from ever choosing the drive the photos are coming from.
 
-**Question 3, the second copy.** "Do you copy your shoots to a second drive as well?" Choices: "No, just the one drive (recommended if you don't have one)", then every other connected drive by name with its free space, from `studio_file.py drives` (leave out the drive they just chose, the computer's own disk, and any Time Machine or backup-software drive). Other is for a drive that isn't plugged in right now (say they can plug it in and you'll wait) or a folder they name. Never offer Dropbox, Google Drive or iCloud: raw files are far too big to sync, and nobody does it (Dustin, Oct 28). Cloud backup like Backblaze runs on its own behind the scenes and is not a second copy the Assistant makes.
+**A memory card is never the drive.** Anything a camera has written to (a `DCIM` folder, or a video camera's own folders, at its top) is left out of the drives altogether, and `defaults --drive` refuses one.
 
-**Question 4, how they name a shoot folder.** "How do you like a shoot folder named?" Choices: "2026-10-18 Smith Family (recommended, keeps them in order)", "Smith Family, Oct 18 2026", and "I have my own way". If they pick their own way, or type in Other, ask once more in plain words: "Paste me the name of one of your past shoot folders and I'll match it." Run `studio_file.py pattern "<it>"` and read back, in one line, what Smith Family on Oct 18, 2026 would look like, with a yes/no button pair ("That's it" / "Not quite, let me fix it"). Only lock it in on "That's it."
+**When the drive on file is the wrong one.** If the quiet check stops on a drive that is not their photo drive (a client's USB stick was the only thing plugged in the first time, say), `defaults` will not change it: it answers `SET-OTHER` (exit 6) and says nothing changed. Ask where their photos should go, then `studio_file.py set --drive "<that drive, or the folder on it>"`, and run the check again.
 
-**The photo names are not a question.** Say what you'll do in one sentence and move on: "I'll name each photo after the shoot and keep your camera's number on the end, so nothing ever loses its place. If you'd rather keep the camera's names exactly as they are, just say so." Only if they say so do you set `--file-names original`.
+## The one question, once ever, in its two shapes
 
-**Question 5, how they write to clients.** "When a shoot's for a client, I'll draft a note to send with the sneak peeks. You copy it into your email; nothing sends from here. How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone." Choices: "Warm and personal", "Short and plain", "Playful", and nothing else. **Never a "Paste me a note" choice (Dustin, Nov 11):** the only box they can paste into is Other, so a choice that says "paste it in the Other box" is a click that goes nowhere; the question's own words point at Other instead, and no tone is marked recommended, since the paste is the recommendation. On the paste: take the text as it comes, read the sign-off off its last lines, and save `client_note.py setup --sample-file <the text saved to a file> --sign-off "<as they signed it>"`. On a tone: one more, "How do you sign off?" (Other: they type it, like "xo, Nicole"), then `client_note.py setup --tone warm|plain|playful --sign-off "..."`. If they'd rather not paste right now, a tone is fine and they can say "here's how I write to clients" any time later. There is no "no notes" choice: whether a shoot gets a note is decided shoot by shoot, by its deadline (see "When they come back to the report" in `parts/after-the-report.md`).
+Only on a first backup, and only when the command says `ASK`. One question, one message, with the question tool so they click. Never a second question after it.
 
-**Question 6, how often they post.** "Last thing about you: how often do you like to post on Instagram? I'll keep your posts lined up at that pace and tell you when you're running low." Choices: "3 times a week (recommended)", "Every other day", "Once a week", "Every day". Other is for their own words ("twice a week", "every weekday"). Save it with `posting_queue.py interval "<their answer>"`. If it can't read the answer it says so; ask once more in their words.
+**More than one drive.** "Which drive should your photos go on?" One choice per drive, by its name and free space as the command printed them ("Big Kahuna, 2,794 GB free"), the one marked recommended first (the drive that already has shoots on it, else the biggest). On a PC a drive goes by its name and letter ("Big Kahuna (E:)"). Then:
 
-Save it in one go: `studio_file.py set --drive "<path>" [--second "<path>" | --no-second] [--offered 1|2 | --example "<pasted>"] --file-names original|shoot` (`--offered 1` is the date-first name, "2026-10-18 Smith Family"; `--offered 2` is the name-first one, "Smith Family, Oct 18 2026"; `--example` is the folder name they pasted). On a PC, also save which drive each letter is, right after (`--note "Shoots drive: Big Kahuna (E:)"`; see `parts/on-a-pc.md`, "Drive letters move"). Questions 5 and 6 are already saved by their own commands, above. Then the one question every backup gets, "How many memory cards for this shoot?" (buttons, see step 2 in `parts/backup.md`; on this first run there is no "Same as usual?" and no glance list, they just answered all of it), then one sentence that says it is starting, with the numbers and the drive by name ("Starting now: 3,931 photos onto Big Kahuna, a second copy on your LaCie. You can walk away."), and the backup runs as `parts/backup.md` says. From now on "backup now" asks only the one-screen check-in.
+```
+python3 <scripts>/studio_file.py defaults --drive "<that drive's path>" --source "<the card's path>"
+```
 
-A full first backup, so the tone is clear:
+If it answers `STOP`, that drive cannot take this card today (it says why, in plain words with the drive's name): say the line and ask the question again without that drive. Nothing was saved.
 
-> Found your card: 3,931 photos, 127 GB. Nothing's copied yet, and nothing on your memory card will be changed.
+**No external drive.** "I don't see an external drive. Where should your photos go?" Two choices: "I'll plug one in" and "On this Mac for now" ("On this PC for now" on a PC). On "I'll plug one in", wait until they say it is in, then run `defaults` again. On the computer itself:
+
+```
+python3 <scripts>/studio_file.py defaults --computer
+```
+
+**The computer's own disk, with no speech.** Their choice stands, with no talk about external drives before the copy and none after it in the chat. The photos go in a folder called Shoots inside Pictures, made if it is not there, and a note that they said OK is saved by the command itself. The report carries one quiet line about an external drive afterwards; that is the whole lesson. Never refuse, never lecture, never bring it up on a later backup. (One nudge is left, and the backup makes it by itself: when the computer's disk is under 15% free, the quiet check prints a NOTE line; pass it on in one sentence.)
+
+If they named a drive or a folder in the same breath as "backup now" ("backup now, onto the LaCie"), that is the answer: `defaults --drive "<it>"` with no question at all. A folder inside a drive is taken as given. When a drive is already on file this answers `SET-OTHER` (exit 6) and changes nothing: then it is "somewhere else this time" (`parts/backup.md`, step 2), or `studio_file.py set --drive` if they mean from now on.
+
+## What the usual way is
+
+Say none of this unless they ask; it is what `defaults` saves, in plain words:
+
+- **Where on the drive:** right on the drive, where they will see it, unless the drive has a folder plainly named for shoots (Photo Shoots, Sessions, Clients, Weddings, Photos) with folders already in it; then in there. Never inside a photo library or catalog, and never in a folder named for backups, exports or finished work, whatever is in it. The command's third field says which ("right on the drive", "in Photo Shoots"). When it is a folder, the starting message names it ("Copying to Big Kahuna now, into your Photo Shoots folder."), so they know where to look. If they want another folder: `studio_file.py set --drive "<that folder>"`, from the next backup on.
+- **Folder names:** the date first, then the name: "2026-10-18 Smith Family", so folders line up in date order.
+- **Photo names:** each photo is named after its shoot, with the camera's own number kept on the end, so nothing ever loses its place.
+- **A second copy:** none, until they ask for one.
+- **The backup's name:** the day ("thursday card"), unless they said what is on the card.
+
+On the very first backup, the starting message has one more sentence, before the bold line: "This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes." (The whole starting message is in `parts/backup.md`, step 3.)
+
+A whole first backup, so the tone is clear:
+
+> *backup now*
 >
-> Here's what's about to happen. I'll copy every photo to your drive and check each one against the card. If the card has more than one shoot on it, each one goes in its own folder, and you can name them on the report afterwards. Then I'll pick a few sneak peeks from each shoot, and you'll get a report that shows all of it.
+> Found your card: 3,931 photos, 127 GB. Copying to Big Kahuna now. Nothing on your card will be changed.
 >
-> Since we've never done this together, I need to ask you a few quick questions first, so I know where your photos go and how you like things named. It takes about a minute, and it's only this once: I'll remember your answers, so from now on a backup is just "backup now" and you can walk away.
+> This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes.
 >
-> Here are the drives I can see. Which one do your shoots go on?
-> [ Big Kahuna, 18 TB free (recommended) ] [ LaCie Rugged, 1.2 TB free ] [ A folder on this Mac ] [ Other ]
+> **You can walk away. I'll have the report ready when you're back.**
+
+And with two drives plugged in:
+
+> *backup now*
+>
+> Which drive should your photos go on?
+> [ Big Kahuna, 2,794 GB free (recommended) ] [ LaCie Rugged, 1,200 GB free ]
 >
 > *click: Big Kahuna*
 >
-> Got it, Big Kahuna. Right on the drive, or inside a folder?
-> [ Photo Shoots, 212 shoots in there (recommended) ] [ Right on Big Kahuna ] [ Other ]
+> Found your card: 3,931 photos, 127 GB. Copying to Big Kahuna now. Nothing on your card will be changed.
 >
-> *click: Photo Shoots*
->
-> Photo Shoots it is. Do you keep a second copy anywhere?
-> [ No, just the one drive (recommended if you don't have one) ] [ LaCie Rugged, 1.2 TB free ] [ Other ]
->
-> *click: No, just the one drive*
->
-> No problem, I'll say so in the report so you know where things stand. Next: how do you like a shoot folder named?
-> [ 2026-10-18 Smith Family (recommended, keeps them in order) ] [ Smith Family, Oct 18 2026 ] [ I have my own way ] [ Other ]
->
-> *click: I have my own way* → "Paste me the name of one of your past shoot folders and I'll match it." → *types: 2026.10.18_SmithFamily_Beach* → "So Smith Family on Oct 18 would be 2026.10.18_SmithFamily. That it?" [ That's it ] [ Not quite, let me fix it ]
->
-> Done. I'll name each photo after the shoot and keep your camera's number on the end, so nothing ever loses its place. One more about you: when a shoot's for a client, I'll draft a note to send with the sneak peeks (you copy it into your email; nothing sends from here). How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone.
-> [ Warm and personal ] [ Short and plain ] [ Playful ] [ Other ]
->
-> *click: Other* → *pastes one* → "Got it, I'll write the way you do, signed 'xo, Nicole'."
->
-> Last one: how many memory cards for this shoot?
-> [ Just this one ] [ 2 ] [ 3 ] [ 4 or more ]
->
-> Starting now: 3,931 photos onto Big Kahuna. Nothing on your memory card will be changed.
+> This is our first backup together, so I'm doing it the usual way. On the report afterwards you can add a second copy, rename your shoots, and change where the next backup goes.
 >
 > **You can walk away. I'll have the report ready when you're back.**
+
+## Where each old question lives now
+
+| Was asked before the copy | Where it lives now |
+|---|---|
+| Which drive, where on it | Chosen by itself (one question at most). **Use a different drive next time** on the report changes it for the next backup; from the chat ("put my photos on the LaCie from now on", or a different folder on the same drive): `studio_file.py set --drive "<the drive, or the folder on it>"`. Nothing moves a backup already made. |
+| A second copy? | Not asked. **Make a second copy** on the report makes one of that backup afterwards, with a tick box for every backup; from the chat it is `second_copy.py` (`parts/after-the-report.md`, "A second copy, after the backup"). For future backups only ("copy my shoots to a second drive too"): `studio_file.py set --second "<a folder on another drive>"`, from the next backup on. Never a cloud folder (Dropbox, Google Drive, iCloud): raw files are far too big to sync. |
+| How shoot folders are named | Not asked. **Change how my shoots are named** on the report offers the two ways, and can rename that backup's shoots to match (`parts/after-the-report.md`, "What the report lets them change"). When they say they name them another way: `studio_file.py set --offered 2` ("Smith Family, Oct 18 2026"), or for their own way ask them to paste the name of one past shoot folder, read back what `studio_file.py pattern "<it>"` gives, and on yes `studio_file.py set --example "<it>"`. From the next backup on. |
+| Photo names | Told nowhere. "Keep my camera's file names": `studio_file.py set --file-names original`, from the next backup on. |
+| How they write to clients | Asked the first time they ask for a note (below). |
+| How often they post | Asked by the post kit's own buttons the first time they press Add to my queue. Never by you before a backup. |
+| How many memory cards | Not asked. Every card is its own "backup now"; **This shoot continues on another card** on the report joins two finished backups on one report, and when they say this card continues the last one, the two are joined (`parts/backup.md`). **Eject my card** is a button at the end of every backup. |
+| What's on the card? | Not asked. The name box and Rename on the report; the note when they ask for one (**Write a note to my client** on each shoot gives the line to copy). What they say without being asked is still used and kept. |
+| "Same as usual?" | Gone. `studio_file.py glance` is the answer to "what are my settings?". |
+| Phone taps for several cards | Only when they ask ("set up phone taps"): `phone_setup.py url`. The ordinary tap at the end of a backup stays. |
+
+## Asked later, only when it is needed
+
+**How they write to clients** is asked the first time they ask for a note to a client (`parts/client-note.md`), never before a backup. The question, exactly: "When a shoot's for a client, I'll draft a note to send with the sneak peeks. You copy it into your email; nothing sends from here. How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone." Choices: "Warm and personal", "Short and plain", "Playful", and nothing else. **Never a "Paste me a note" choice (Dustin, Nov 11):** the only box they can paste into is Other, so a choice that says "paste it in the Other box" is a click that goes nowhere; the question's own words point at Other instead, and no tone is marked recommended, since the paste is the recommendation. On the paste: take the text as it comes, read the sign-off off its last lines, and save `client_note.py setup --sample-file <the text saved to a file> --sign-off "<as they signed it>"`. On a tone: one more, "How do you sign off?" (Other: they type it, like "xo, Nicole"), then `client_note.py setup --tone warm|plain|playful --sign-off "..."`. If they'd rather not paste right now, a tone is fine and they can say "here's how I write to clients" any time later.
+
+**How often they post** is the post kit's own question: the rhythm buttons show the first time they press Add to my queue on a post kit or a words page. If they tell you in the chat instead ("I post three times a week"), save it with `posting_queue.py interval "<their words>"`.

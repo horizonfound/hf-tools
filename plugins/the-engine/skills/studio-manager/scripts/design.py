@@ -194,6 +194,7 @@ DEFAULT_FONT = "Playfair Display"
 FALLBACK_FONT = "Georgia"               # what text is drawn in when its font can't be loaded
 GOOGLE_CSS = "https://fonts.googleapis.com/css2"
 OPEN_NEW = "NEW: this shoot had no design, so one was made just now, with one photo on each slide."
+OPEN_NEW_BLANK = "BLANK: the vault had no design, so a blank one was made just now. Nothing is on it until they put photos on, or ask you to."
 OPEN_THEIRS = "THEIRS: this design was already here. It is as they left it."
 SET_NAME = "{base} - slide {i:02d}.jpg"         # a saved slide's file name in the Carousel folder
 SET_AGAIN = "{base} ({k})"                      # the same design saved again: "<name> (2)", "<name> (3)". In brackets,
@@ -1106,7 +1107,7 @@ def count_worked_on(kit, kind=CAROUSEL):
 def _names_for(state, rows):
     """File names for the photos a layout uses, so a re-made numbered list can find the same photos again.
     Kept in the design's record; never sent to a page."""
-    name_of = {x["n"]: arrange.photo_name(x) for x in rows}
+    name_of = {x["n"]: arrange.photo_key(x) for x in rows}
     used = sorted({b["n"] for b in state["blocks"] if b.get("type") != "text" and b.get("n") is not None})
     return {str(n): name_of[n] for n in used if n in name_of}
 
@@ -1142,7 +1143,7 @@ def _sync(kit, d, rows, stamp, kind=CAROUSEL):
     old = json.loads(json.dumps(d))
     n_of = {}
     for x in rows:
-        n_of.setdefault(arrange.photo_name(x), x["n"])
+        n_of.setdefault(arrange.photo_key(x), x["n"])
     was = d.get("names") if isinstance(d.get("names"), dict) else {}
     dropped = 0
     for b in d["state"]["blocks"]:
@@ -1253,7 +1254,13 @@ def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL)
             src = _sync(kit, src, rows, stamp, kind)
             state, stem = src["state"], f"{src['name']} copy"
         elif state is None:
-            state = blank_story() if kind == STORIES else seed_state(rec, carousel_order(kit), rows)
+            if kind == STORIES:
+                state = blank_story()
+            elif rec.get("vault") is True:
+                # the vault (v29): nothing is picked until they ask, so its first carousel design is blank
+                state = {"slides": SLIDES_MIN, "bg": kit_bg(rec), "blocks": []}
+            else:
+                state = seed_state(rec, carousel_order(kit), rows)
         clean, why = validate_state(state, {x["n"] for x in rows}, kind=kind)
         if clean is None:
             return 400, {"ok": False, "why": why, "words": WHY_WORDS.get(why, NOT_UNDERSTOOD)}
@@ -3354,7 +3361,10 @@ def cmd_open(kit, did=None, kind=CAROUSEL):
     say(f"{n} design{'s' if n != 1 else ''} for this shoot. Opening \"{d['name']}\" ({d['state']['slides']} slides).")
     # which of the two things to tell the photographer (parts/arrange.md): a design made this minute with one
     # photo on each slide, or one they have already worked on
-    say(OPEN_NEW if had == 0 and n >= 1 else OPEN_THEIRS)
+    if had == 0 and n >= 1 and not d["state"]["blocks"]:
+        say(OPEN_NEW_BLANK)             # the vault: nothing is picked until they ask, so its first design is blank
+    else:
+        say(OPEN_NEW if had == 0 and n >= 1 else OPEN_THEIRS)
     say(addr)
     return 0
 

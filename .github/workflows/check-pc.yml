@@ -95,6 +95,56 @@ name: Check it on a Windows PC
 #                                   counting up while photos fall into the files box. Their pretend records need no
 #                                   add-on (--no-chrome on Windows: the words and the pages as written; the pages in
 #                                   a hidden Chrome on the Mac's page job)
+#   tests/backup_zero_check.py      a backup with no questions before the copy (Nov 19): one drive is chosen by itself,
+#                                   two drives or none is the one question, a set Studio File is never changed
+#   tests/second_copy_check.py      Make a second copy, from the report, after the backup (Nov 19): from the card and
+#                                   from the drive, a clip turned upright, cut off and finished, never written over,
+#                                   every refusal, the report's routes (the button in a hidden Chrome on the Mac's page job)
+#   tests/report_options_check.py   the other options on the report (Nov 19): another card joined on one report, the
+#                                   folder naming (this backup's shoots renamed to match, by the renamer's own proof),
+#                                   the next drive (only the Studio File changes), the note line, the own-disk line,
+#                                   and every POST of the report server refused from another page (the panels in a
+#                                   hidden Chrome on the Mac's page job)
+#   tests/vault_page_check.py      Nicole's v29, My vault first on the post kits list and the vault's own post kit
+#                                   page; + Add a shoot (vault.py add: checked copies, originals only read) (a Mac's
+#                                   page job, in a hidden Chrome under the guard)
+#   tests/vault_reel_check.py      Nicole's v29, the vault's reel page (Nov 19): her four kinds and words, both shoots'
+#                                   same-named videos listed apart with keys of their own, add-from (a shoot's clip into
+#                                   the vault's reel, refused for a kit not in the vault, an id that is not a clip,
+#                                   another Origin), vault.py clips and use-clips, a B-roll test make and Save my video
+#                                   from the shoots' own videos, the talking page for the vault, every other post kit
+#                                   byte for byte unchanged; the clip search in a hidden Chrome (a Mac's page job, under
+#                                   the guard, on self-made clips). Part `photos` (stage 10): her Choose your photos
+#                                   step in the vault, the photos folded by shoot, the photo search (tags, words and
+#                                   the shoot's name), the line to copy, `vault.py relist --sheets --only`, a test make
+#                                   from each photo's own path (the same page job, a step of its own). Part `empty`: a
+#                                   vault with video clips and no photo at all (B-roll from clips alone: the page opens,
+#                                   clips, the watch step, a test make, Save my video; the kinds that need photos say
+#                                   so; a plain post kit with an empty list is still "not ready") (a step of its own)
+#   tests/vault_everything_check.py  Nicole's v29, See everything in it (Nov 19): the vault's own page, her words both
+#                                   ways, what it draws with no path in it, a clip played from the vault's own video
+#                                   route, Remove from my vault (only the vault's vault.json is written, the version
+#                                   before kept, twice changes nothing, refused from another Origin or in a wrong
+#                                   shape), Put it back under the same number, a reel that used a removed photo,
+#                                   `vault.py out` and `back` (a Mac's page job, in a hidden Chrome under the guard,
+#                                   on self-made clips)
+#   tests/photo_words_check.py     Nicole's v29, what is in each photo kept beside the kit so search finds it, and
+#                                   her search rule (Nov 19): a pretend classifier, the store written whole with the
+#                                   version before kept, describe refusing a bad file whole, the job and her line
+#                                   "Getting your photos ready to search", every photo byte for byte unchanged and
+#                                   none renamed, the vault's catalog and find, a pretend PC; one real look by the
+#                                   Mac's own Vision that may SKIP (a Mac's page job, in a hidden Chrome under the guard)
+#   tests/vault_safety_check.py    the vault's review fixes (Nov 19): what touches files and records on a drive, each
+#                                   finding with its check (a Mac: the pretend photos are drawn with sips; no browser,
+#                                   no page server)
+#   tests/vault_core_check.py      Nicole's v29, the vault as a real post kit whose photo list is references (Nov 19):
+#                                   made once, same-named photos from two shoots as two numbers, numbers that never
+#                                   move, every other post kit byte for byte unchanged, the readers, the page server
+#                                   by request (a Mac: the pretend photos are drawn with sips; no browser needed)
+#   tests/home_v29_check.py         Nicole's v29, the home page with posts first: the big Turn your shoots into posts
+#                                   card and its one button, My posting queue, "Also in your Assistant" with the two
+#                                   smaller cards, no list of post kits, no numbered steps (a Mac, as home_v28_check:
+#                                   --no-chrome on the Mac job, the page in a hidden Chrome on the Mac's page job)
 #   tests/home_v28_check.py, tests/wrapped_check.py
 #                                   Nicole's v28, the home page rebuilt (the hello, the face finder, her four steps,
 #                                   the monthly recap card, the Your year bar) and Your year and the monthly recap as
@@ -245,12 +295,12 @@ on:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/bring_older_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/design_v27_check.py", "tests/kit_cards_check.py", "tools/check_pc.py",
-            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
+            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/bring_older_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/design_v27_check.py", "tests/kit_cards_check.py", "tools/check_pc.py",
-            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
+            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -295,6 +345,15 @@ jobs:
       - name: The backup's promises (never overwrite, never mix cards, never onto the card)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/backup_safety.py
+      - name: A backup with no questions before the copy (the drive chosen by itself, the one question)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/backup_zero_check.py
+      - name: A second copy made after the backup (three hashes agree, nothing written over, the manifest changed only at the end, one at a time)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/second_copy_check.py
+      - name: The other options on the report (another card, the folder naming, the next drive, the note line, every POST for the report's own page only)
+        if: ${{ !cancelled() && steps.py.outcome == 'success' }}
+        run: python tests/report_options_check.py
       - name: The page servers (restart after an update, never two on one port)
         if: ${{ !cancelled() && steps.py.outcome == 'success' }}
         run: python tests/pc_servers.py
@@ -503,6 +562,15 @@ jobs:
       - name: The backup's promises
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/backup_safety.py
+      - name: A backup with no questions before the copy
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/backup_zero_check.py
+      - name: A second copy made after the backup
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/second_copy_check.py
+      - name: The other options on the report
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/report_options_check.py
       - name: The page servers
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/pc_servers.py
@@ -532,6 +600,15 @@ jobs:
       - name: The home page after Nicole's v28, everything but the page in a browser (the face finder, what the page reads and draws, her four steps, the recap card hidden and back, the Your year bar's dates, the routes)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/home_v28_check.py --no-chrome
+      - name: The home page after Nicole's v29, posts first, everything but the page in a browser (the order of the cards, Create or See all my post kits, no list of kits, what went, the Back up a card screen without its Step 1 line)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/home_v29_check.py --no-chrome
+      - name: The vault as a real post kit whose photo list is references (made once, two shoots' same-named photos as two numbers, numbers that never move, every other post kit unchanged, the readers and the page server by request)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_core_check.py
+      - name: The vault's review fixes (a record that can't be read is never taken for empty, no second vault, a bad copy never left among the photos, one unreadable file never stops an add, no photo copied twice, a kit folder renamed by hand keeps its numbers)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/vault_safety_check.py
       - name: Your year and the monthly recap after Nicole's v28, everything but the page in a browser (a PNG really a PNG, every count from its own record, the routes, saving a story never over a file)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/wrapped_check.py --no-chrome
@@ -685,9 +762,36 @@ jobs:
       - name: The backup report plays the backup back in a hidden Chrome (the numbers count up to exactly what is written, the photos fall and are gone, Play it again, nothing with reduced motion, phone width)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/report_fall_check.py
+      - name: Make a second copy pressed on the report in a hidden Chrome (the panel, the drives by name, progress beside the button, a reload picks it up, done in place of the button)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/second_copy_check.py --chrome
+      - name: The report's other options pressed in a hidden Chrome (the note line as text, the next drive, the naming with its renames through the page's own reloads, two cards joined and the page becoming the shoot's page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/report_options_check.py --chrome
       - name: The home page after Nicole's v28 in a hidden Chrome (the hello, the collage framed on faces, her four steps, the recap card's two choices, phone width, nothing moving under reduced motion)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_v28_check.py
+      - name: The home page after Nicole's v29 in a hidden Chrome (posts first, the two small cards side by side, each card going where it went with its press recorded, no post kits, phone width)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_v29_check.py
+      - name: My vault on the post kits list and the vault's own post kit page in a hidden Chrome (first, alone, no Archive, made once by a guarded press, her words both ways, the strip, the three cards, vault.py add copying checked and safe to run twice or cut off)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_page_check.py
+      - name: Photo words and the search rule in a hidden Chrome (a pretend classifier, the store whole with the version before kept, describe refusing a bad file whole, her Getting your photos ready line showing and going, no photo touched or renamed, the vault's catalog and find, a pretend PC, one real Vision look that may skip)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/photo_words_check.py
+      - name: The vault's reel page in a hidden Chrome (her four kinds, clips from every shoot listed apart, the clip search opening only the shoots with a match, + Add and the card's x, add-from's refusals, vault.py clips and use-clips, a B-roll test make and Save my video from the shoots' own videos, every other post kit unchanged)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py clips --work /private/tmp/vault-reel-ci
+      - name: The vault's photos step in a hidden Chrome (her Choose your photos words, Added to my vault on top and each shoot folded shut with its count, the photo search opening only the shoots with a match, a tap adding a photo under its vault number, the note and the line to copy, vault.py relist --sheets --only, a test make from each photo's own path, every other post kit unchanged)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py photos --work /private/tmp/vault-reel-photos-ci
+      - name: A vault with video clips and no photo at all in a hidden Chrome (its reel page opens, a B-roll reel from clips alone through the watch step, a test make and Save my video, the kinds that need photos saying so in plain words, a plain post kit with an empty list still told it isn't ready, the first shoot arriving on the open page)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_reel_check.py empty --work /private/tmp/vault-reel-empty-ci
+      - name: See everything in it in a hidden Chrome (the tabs and counts, me with my camera finding the named clips, a tap playing a clip from the vault's own route between its start and end, Use it in a reel picking nothing, Remove from my vault writing only the vault's vault.json, Put it back under the same number, another Origin refused, every other post kit unchanged)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_everything_check.py --work /private/tmp/vault-everything-ci
       - name: Your year and the monthly recap in a hidden Chrome (the stories play, Next, Back, Pause and the arrow keys, Save this one and Save all of them as real pictures, the folder button, phone width)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/wrapped_check.py

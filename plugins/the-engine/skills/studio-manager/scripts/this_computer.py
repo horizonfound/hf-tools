@@ -584,16 +584,76 @@ def _windows_volumes():
     return out
 
 
+def _pretend_volumes():
+    """The tests' switch for the drives: STUDIO_DRIVES_FOR_TESTS names a JSON file holding a list of pretend
+    volumes in the shape volumes() returns. With it set, volumes() gives that list and nothing else, so a test
+    never looks at the drives really plugged in. Only a test sets it. A file that cannot be read is no drives at
+    all (never the real ones). None when the switch is not set."""
+    where = os.environ.get("STUDIO_DRIVES_FOR_TESTS")
+    if not where:
+        return None
+    import json
+    try:
+        rows = json.loads(Path(where).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for r in rows if isinstance(rows, list) else []:
+        if not isinstance(r, dict) or not r.get("path"):
+            continue
+        name = str(r.get("name") or Path(str(r["path"])).name)
+        out.append({"path": str(r["path"]), "name": name, "shown": str(r.get("shown") or name),
+                    "total": int(r.get("total") or 0), "free": int(r.get("free") or 0),
+                    "system": bool(r.get("system")), "removable": r.get("removable"), "id": r.get("id")})
+    return out
+
+
 def volumes():
     """Every drive plugged in right now. Each: path (where its files start), name (what they called it),
     shown (how to say it to them: "Big Kahuna" on a Mac, "Big Kahuna (E:)" on a PC), total and free
     bytes, system (the computer's own disk), removable (True, False, or None when the Mac cannot say),
     id (the volume's own number on a PC, which changes when a card is formatted)."""
+    pretend = _pretend_volumes()
+    if pretend is not None:
+        return pretend
     if WINDOWS:
         return _windows_volumes()
     if MAC:
         return _mac_volumes()
     return []
+
+
+_REMOVABLE = {}
+
+
+def removable(vol):
+    """Is this drive (a row of volumes()) removable media: a memory card in a reader, or a USB stick? True,
+    False, or None when the computer cannot say. A PC says so in volumes() itself. A Mac is asked here, one
+    drive at a time and only when it matters (asking every drive on every volumes() call would slow each page):
+    `diskutil info` names the bus ("Secure Digital" for a Mac's own card slot) and the device ("... Card Reader"
+    for most readers on a cable). Either one: True. Anything else: None, since a Mac cannot tell a reader it does
+    not name from a drive (its "RemovableMedia" is no help: Dustin's RAID says True to it, seen Nov 19). So on a
+    Mac a blank card in a reader that does not call itself one is still taken for a drive: a named gap.
+    Remembered for as long as this program runs. unproven on a real card reader."""
+    if vol.get("removable") is not None or not MAC or _pretend_volumes() is not None:
+        return vol.get("removable")
+    path = str(vol.get("path") or "")
+    if path in _REMOVABLE:
+        return _REMOVABLE[path]
+    got = None
+    try:
+        import plistlib
+        import subprocess
+        r = subprocess.run(["diskutil", "info", "-plist", path], capture_output=True, timeout=10)  # pc-ok: the Mac branch
+        if r.returncode == 0:
+            d = plistlib.loads(r.stdout)
+            named = " ".join(str(d.get(k) or "") for k in ("MediaName", "IORegistryEntryName")).lower()
+            if str(d.get("BusProtocol") or "") == "Secure Digital" or "card reader" in named or "cardreader" in named:
+                got = True
+    except Exception:  # noqa: BLE001
+        got = None
+    _REMOVABLE[path] = got
+    return got
 
 
 def cards():
@@ -649,6 +709,9 @@ _WINDOWS_FOLDERS = {"Pictures": "My Pictures", "Desktop": "Desktop", "Music": "M
 def known_folder(name):
     """Where Pictures, Desktop, Downloads, Music or Documents really is. On a PC, Windows often moves
     these into OneDrive, so they are asked for rather than assumed to sit in the home folder."""
+    pretend = os.environ.get("STUDIO_FOLDERS_FOR_TESTS")   # only a test sets it: Pictures and the rest live in there
+    if pretend:
+        return Path(pretend) / name
     if WINDOWS:
         try:
             import winreg
@@ -916,7 +979,10 @@ def pick_folder(prompt):
     """The computer's own "choose a folder" window. (path, "") when they chose one, (None, "cancelled") when
     they closed it, (None, why) when the window could not be shown."""
     if no_windows():
-        return None, "cancelled"
+        # inside a test no window is ever shown. STUDIO_PICK_FOLDER_FOR_TESTS (only a test sets it) is the folder
+        # the test "chose"; without it the answer is as if the window was closed.
+        chosen = os.environ.get("STUDIO_PICK_FOLDER_FOR_TESTS")
+        return (chosen, "") if chosen else (None, "cancelled")
     try:
         if MAC:
             script = ('tell application "System Events" to activate\n'
@@ -1115,6 +1181,12 @@ NO_VIDEO_PC = ("Saving a finished video isn't on a PC yet: it needs a part only 
 # for Nicole to reword.
 NO_TALKING_PC = ("Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. "
                  "Your photo reel, carousel and stories all work here.")
+
+# Photo tags (v29): a Mac's own Vision says what is in a photo ("outdoor", "people", "beach"), so search finds it.
+# A PC has no such part, so there are no tags there: search goes by the shoot's name and by what your assistant
+# has described. On the post kit page in place of the Mac's quiet line. Ours (hers has no PC): a draft for Nicole.
+NO_TAGS_PC = ("On a PC, search finds your photos by shoot name and by anything your assistant has described. "
+              "To have them described, copy this into the chat:")
 
 _SCRIPTS = set()                 # the JavaScript programs running now (so a server that starts over stops them)
 _SCRIPTS_LOCK = threading.Lock()

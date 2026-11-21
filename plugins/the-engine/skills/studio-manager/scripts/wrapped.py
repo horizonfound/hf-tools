@@ -16,11 +16,12 @@ assistant." So the numbers are the photographer's own work, counted from the rec
 NOTHING new is stored; everything here only reads, except a saved story picture.
 
 WHAT EACH NUMBER IS COUNTED FROM (every one a count of records; the only estimate is the time saved):
-  reels          every reel made in the period: each entry of a kit's .kit/reel-page.json "made" list that names a
+  reels          the reels made in the period, each reel ONCE, on the day it was first made: each entry of a kit's .kit/reel-page.json "made" list that names a
                  CapCut project or a saved video, by its "when"; a reel made from the chat the older way (kit.json
                  "reel", when the page's list does not know that project), by its "made"; and every talking reel
                  made (.kit/talking.json "made", the open reel's and each other reel's), by its "when".
-                 (COUNT_EACH_MAKE, below: hers counts every make, so making one reel again counts again.)
+                 A reel made again (another mix, a fix, a test) is still one reel, and stays in the month of
+                 its first make. (COUNT_EACH_MAKE, below, turns that round: every make counts.)
   carousels      the carousel designs slides were saved from (kit.json "laid_out" and "carousel_set": one per
                  design, however often it was saved again), by the day of the first save.
   stories        the same for sets of stories (kit.json "stories_laid_out" and "stories_set").
@@ -82,7 +83,10 @@ GET_PATHS = ("/wrapped.html", "/wrapped-data", "/wrapped-font")
 POST_PATHS = ("/share-image", "/share-open")
 
 MINUTES_SAVED = {"reel": 45, "carousel": 30, "stories": 20}     # hers: about how long each takes by hand. An estimate.
-COUNT_EACH_MAKE = True      # hers: every make of a reel counts. False: each reel counts once, on the day it was first made.
+# False (Nicole, v29 2.2, Nov 19): each reel counts once, on the day it was first made. Her November recap said
+# 79 reels because every make counted, test makes too; she wants what she actually made. The hours saved follow
+# (45 minutes a reel, counted once). True is her v28 way: every make of a reel counts.
+COUNT_EACH_MAKE = False
 REAL_SHOOT = 10             # hers: a shoot off a card counts when it has this many photos
 FAVS = 12                   # hers: up to this many of a shoot's photos are used for the pictures
 SHARE_FOLDER = "Stories to share"                               # hers: beside the content folder
@@ -264,7 +268,7 @@ def _kits():
     out = []
     try:
         h = posts.home()
-        listed = posts.kits(h) if h else []
+        listed = posts.kits(h, vault=True) if h else []      # the vault too: what was made in it counts; it is never a shoot
     except (Exception, SystemExit):  # noqa: BLE001
         listed = []
     for k in listed:
@@ -273,12 +277,14 @@ def _kits():
             if d.is_symlink() or not (d / ".kit" / "kit.json").is_file():
                 continue
             rec = _json(d / ".kit" / "kit.json")
-            try:
-                photos = len(kit_mod.photo_files(kit_mod.photos_dir(d)))
+            is_vault = rec.get("vault") is True
+            try:                        # the vault's photos are the shoots' own: counted there, never twice
+                photos = 0 if is_vault else len(kit_mod.photo_files(kit_mod.photos_dir(d)))
             except (Exception, SystemExit):  # noqa: BLE001
                 photos = 0
-            day = _day(k.get("date")) or _day(k["folder"]) or ""
+            day = "" if is_vault else (_day(k.get("date")) or _day(k["folder"]) or "")
             out.append({"folder": k["folder"], "short": look.short_name(k["folder"]) or k["folder"], "date": day, "photos": photos,
+                        "vault": is_vault,
                         "reel_days": _reel_days(d, rec), "carousel_days": _set_days(rec, "laid_out", "carousel_set"),
                         "story_days": _set_days(rec, "stories_laid_out", "stories_set"), "favs": _favs(d, rec), "path": d})
         except (Exception, SystemExit):  # noqa: BLE001
@@ -374,12 +380,12 @@ def data(month=None, year=None, got=None, day=None):
     year = (month[:4] if month else year if year_ok(str(year or "")) else str(default_year(day)))
     year = str(year)
     inside = (lambda d: d[:7] == month) if month else (lambda d: d[:4] == year)
-    shoots = []
+    shoots, in_vault = [], []           # the vault (v29) is not a shoot: what was made in it counts, and that is all
     for k in got["kits"]:
         s = {"name": k["folder"], "short": k["short"], "photos": k["photos"], "date": k["date"], "favs": k["favs"],
              "reels": sum(1 for d in k["reel_days"] if inside(d)), "carousels": sum(1 for d in k["carousel_days"] if inside(d)),
              "stories": sum(1 for d in k["story_days"] if inside(d)), "shot_here": bool(k["date"]) and inside(k["date"])}
-        shoots.append(s)
+        (in_vault if k.get("vault") else shoots).append(s)
     made = lambda s: s["reels"] + s["carousels"] + s["stories"]  # noqa: E731
     worked = [s for s in shoots if made(s)]
     # a month shows the shoots something was made from that month; a year, those and the ones shot that year
@@ -403,8 +409,9 @@ def data(month=None, year=None, got=None, day=None):
         weeks = len(wk)
         weeks_posted = len(wk & {date.fromisoformat(p).isocalendar()[:2] for p in posted})
     tot = {"photos": sum(s["photos"] for s in shown), "shot": shot, "photo_shoots": photo_shoots,
-           "shared_shoots": len(worked), "reels": sum(s["reels"] for s in shoots), "carousels": sum(s["carousels"] for s in shoots),
-           "stories": sum(s["stories"] for s in shoots), "posted": len(posted), "posted_days": len(set(posted)),
+           "shared_shoots": len(worked), "reels": sum(s["reels"] for s in shoots + in_vault),
+           "carousels": sum(s["carousels"] for s in shoots + in_vault),
+           "stories": sum(s["stories"] for s in shoots + in_vault), "posted": len(posted), "posted_days": len(set(posted)),
            "weeks_posted": weeks_posted, "weeks": weeks, "ready": got["ready"]}
     tot["minutes_saved"] = (tot["reels"] * MINUTES_SAVED["reel"] + tot["carousels"] * MINUTES_SAVED["carousel"]
                             + tot["stories"] * MINUTES_SAVED["stories"])
