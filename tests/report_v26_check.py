@@ -239,10 +239,16 @@ def check_words():
     part = lambda n: (PARTS / n).read_text(encoding="utf-8")   # noqa: E731
     b = part("backup.md")
     case("backup.md: the closing words are the new next step, with the one-line why for several folders",
-         "Open your folder to start editing." in b and "Make posts from a shoot" in b and "Never say days when it was a break in one day" in b)
+         "Open your folder to start editing." in b and O["come_back"] in b and "Never say days when it was a break in one day" in b)
+    # (Nov 22, v30: the home page has no Make posts from a shoot button any more; the come-back line names the four
+    # photo tiles that are there, in the report, the backup's closing words, the part after the report and the reel skill)
+    reel_skill = (PARTS.parent.parent / "assistant-make-a-reel" / "SKILL.md").read_text(encoding="utf-8")
+    case("the come-back line names the home page's four photo tiles, never the Make posts from a shoot button that is gone",
+         "Make posts from a shoot" not in O["come_back"] and all(w in O["come_back"] for w in ("Reels", "Carousels", "Stories", "Captions"))
+         and "click Make posts from a shoot" not in b and O["come_back"] in reel_skill and "click Make posts from a shoot" not in reel_skill, O["come_back"])
     a = part("after-the-report.md")
     case("after-the-report.md: Open this folder, the look-right line, and the honest answer for a moved folder",
-         "**Open this folder**" in a and HERS["look_right"] in a and "no command that re-points" in a)
+         "**Open this folder**" in a and HERS["look_right"] in a and "no command that re-points" in a and O["come_back"] in a)
     s = part("sneak-peeks.md")
     case("sneak-peeks.md: her line, and never 'marked in Lightroom' to someone who shoots JPEG",
          HERS["peeks"] in s and "never tell someone who shoots JPEG" in s)

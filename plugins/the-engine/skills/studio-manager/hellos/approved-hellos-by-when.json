@@ -1,0 +1,202 @@
+{
+ "greet": [
+  "Welcome back, {name}.",
+  "Hi, {name}!",
+  "Hey hey, {name}.",
+  "There you are, {name}.",
+  "Look who’s here, {name}!",
+  "So good to see you, {name}.",
+  "Hey, {name}!",
+  "Hi there, {name}.",
+  "Well hello, {name}.",
+  "Welcome in, {name}.",
+  "Yay, it’s you!",
+  "Hi, friend.",
+  "Hi, {name}. Love having you here.",
+  "Hey there, {name}.",
+  "Hi hi, {name}!",
+  "Hello, hello, {name}!",
+  "Hi, {name}. So glad you’re here.",
+  "Hey, {name}. Good to see you.",
+  "Hello again, {name}.",
+  "Hi, {name}. Welcome back.",
+  "Good to see you, {name}.",
+  "Hey hey, friend.",
+  "Hi, {name}! Come on in.",
+  "Look who it is!",
+  "Welcome back, friend.",
+  "Hi, {name}. Hope your day’s been good."
+ ],
+ "morning": [
+  "Good morning, {name}.",
+  "Morning, {name}."
+ ],
+ "afternoon": [
+  "Good afternoon, {name}.",
+  "Afternoon, {name}."
+ ],
+ "evening": [
+  "Good evening, {name}.",
+  "Evening, {name}."
+ ],
+ "greetday": [
+  "Happy {day}, {name}.",
+  "Happy Monday, {name}.",
+  "Happy Friday, {name}!",
+  "Happy weekend, {name}.",
+  "Hi, {name}. Happy {day}."
+ ],
+ "newest": [
+  "{shoot} looks so beautiful.",
+  "Your latest shoot, {shoot}, looks amazing.",
+  "{shoot} turned out so good. You should be proud.",
+  "I can’t stop looking at {shoot}.",
+  "{shoot} is stunning. Seriously.",
+  "{shoot} came out gorgeous.",
+  "Your clients are going to love {shoot}.",
+  "{shoot} is so beautiful.",
+  "{shoot} looks incredible.",
+  "You did such a good job on {shoot}.",
+  "I love how {shoot} turned out.",
+  "{shoot} looks amazing. Your clients are lucky.",
+  "{shoot} is so pretty. Seriously.",
+  "Just looked at {shoot}. Beautiful.",
+  "{shoot} came out so good.",
+  "{shoot} is beautiful work."
+ ],
+ "top": [
+  "{shoot} is your most-loved shoot this year. Iconic.",
+  "You keep coming back to {shoot}. It’s that good."
+ ],
+ "photos": [
+  "You’ve finished {n} photos this year. Incredible.",
+  "{n} shoots this year. That’s a lot of people with photos they’ll keep forever.",
+  "You’ve finished {n} photos this year. That’s amazing.",
+  "{n} photos finished this year. Look at you."
+ ],
+ "shoots": [
+  "{n} shoots this year. That’s a lot of memories you made for people.",
+  "You’ve photographed {n} shoots this year. Look at you.",
+  "{n} shoots this year. You’ve been busy, in the best way.",
+  "{n} shoots this year. That’s so many happy clients.",
+  "{n} shoots turned into posts. That’s amazing."
+ ],
+ "reels": [
+  "{n} reels this year. That’s a lot of beautiful work.",
+  "{n} reels made this year. Your feed thanks you.",
+  "{n} reels this year. Look at you go.",
+  "You’ve made {n} reels this year. That’s incredible."
+ ],
+ "carousels": [
+  "{n} carousels this year. Swipe-worthy, every one.",
+  "{n} carousels this year. Your feed looks so good."
+ ],
+ "posted": [
+  "{n} posts this year. So consistent.",
+  "You’ve shared {n} posts this year. Love that for you."
+ ],
+ "hours": [
+  "You’ve saved {n} hours this year. That’s a lot of time back."
+ ],
+ "week": [
+  "{n} posts out this week. Look at you go.",
+  "{n} posts this week already. Your feed is glowing.",
+  "{n} posts this week. You’re crushing it."
+ ],
+ "week1": [
+  "You shared your {kind} this week. Love that for you.",
+  "Your feed is looking so good right now.",
+  "You posted this week. Love to see it.",
+  "Another post out. Look at you.",
+  "Your grid is looking so pretty."
+ ],
+ "monday": [
+  "New week, same amazing you.",
+  "Fresh week. You’ve got this.",
+  "Hope your week is off to a great start."
+ ],
+ "friday": [
+  "Happy Friday. You earned it."
+ ],
+ "weekend": [
+  "Hope your weekend is a good one."
+ ],
+ "anyday": [
+  "Happy {day}. You’re doing great."
+ ],
+ "morningline": [
+  "A beautiful morning for beautiful work."
+ ],
+ "eveningline": [
+  "Hope today was a good one.",
+  "Hope you had a beautiful day."
+ ],
+ "warm": [
+  "Your clients are lucky to have you.",
+  "So glad you’re here.",
+  "Your work is looking so beautiful lately.",
+  "You make this look easy.",
+  "Your eye is so good.",
+  "You’re building something beautiful.",
+  "Proud of you. Just saying.",
+  "You’re so good at what you do.",
+  "Keep making beautiful things.",
+  "The world needs more of your photos.",
+  "Your clients will treasure these forever.",
+  "Look at everything you’ve made.",
+  "You’ve got such a gift.",
+  "This is your sign that you’re doing great.",
+  "You’re doing amazing. Truly.",
+  "Your work just keeps getting better.",
+  "People feel something when they see your work.",
+  "What you do matters.",
+  "You’re exactly where you’re supposed to be.",
+  "Your work is so beautiful.",
+  "You’re really good at this.",
+  "You should be so proud of your work.",
+  "Your clients are so lucky.",
+  "The way you see things is a gift.",
+  "You’re doing such a good job.",
+  "I’m so proud of you.",
+  "You’ve come so far.",
+  "You’re making something special.",
+  "Keep going. You’re doing great.",
+  "You’re so talented. Seriously.",
+  "Your photos are going to be loved for years.",
+  "Look how far you’ve come.",
+  "Every shoot, you get better.",
+  "You’ve got this. Always.",
+  "Your clients picked the right photographer.",
+  "You make beautiful look easy.",
+  "Your work is something to be proud of.",
+  "You were made for this.",
+  "Never forget how good you are at this."
+ ],
+ "first": [
+  "Hi! I’m your Assistant, and I’m so glad you’re here.",
+  "Hi, {name}! I’m your Assistant, and I’m here to help."
+ ],
+ "away": [
+  "So good to have you back.",
+  "Welcome back! Your work missed you.",
+  "There you are. Your photos are right where you left them.",
+  "Hi, {name}! So good to see you again.",
+  "Welcome back, {name}! Everything’s right where you left it.",
+  "There you are! So good to have you back."
+ ],
+ "later": [
+  "{n} posts this month. You’re on a roll.",
+  "You posted every week this month. So consistent.",
+  "About {n} hours saved this month. Hope you spent some on you.",
+  "You’ve saved about {n} hours this month. That’s time for you.",
+  "Your first reel is done. That’s a big deal.",
+  "Your first carousel! Look at you.",
+  "Your first post from the Assistant is out. So proud of you.",
+  "{n} reels this month. You’re on fire.",
+  "{n} carousels this month. So good.",
+  "Your 10th reel! Look at you go.",
+  "Your 50th post from the Assistant. So proud of you.",
+  "Your 100th post from the Assistant. Iconic.",
+  "About {n} hours saved this week. That’s yours to keep."
+ ]
+}

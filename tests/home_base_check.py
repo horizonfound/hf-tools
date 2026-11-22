@@ -400,7 +400,7 @@ def check_words(w):
     case("nothing from the internet, and the shared look first in each page's styles",
          "googleapis" not in everything and "<link" not in everything and all(("<style>" + home.look.head_css()) in p for p in pages.values()))
     all_js = home_base.JS_SHARED + home_base.JS_BACKUPS + home_base.JS_MAKE + home.SCRIPT + home.HELLO_JS
-    known = set(ours_words) | set(home_base.OUR_WORDS) | set(home.OUR_WORDS)
+    known = set(ours_words) | set(home_base.OUR_WORDS) | set(home.OUR_WORDS) | {k for k in home.WORDS if k.startswith("mk_")}   # the Create box's (v30: page_html hands these over)
     case("every line our scripts show is in the words (W.<name> names a line that exists)",
          all(k in known for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js))), sorted(k for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js)) if k not in known))
     # the home page itself is her v28's since Nov 17 (tests/home_v28_check.py checks it line by line); here only
@@ -642,9 +642,9 @@ def check_data_review(w, hb):
             page, why = home.page_html(), ""
         except BaseException as e:  # noqa: BLE001
             page, why = "", e.__class__.__name__
-        case("... and the home page still comes", "Also in your Assistant" in page and "id='s4'" in page, why)
+        case("... and the home page still comes", "id='s3'" in page and "id='s4'" in page, why)
         code, raw = w.http("GET", "/home")
-        case("... from the page server too (it answers, it does not drop the line)", code == 200 and b"Also in your Assistant" in raw, code)
+        case("... from the page server too (it answers, it does not drop the line)", code == 200 and b"id='s4'" in raw, code)
     finally:
         qf.write_bytes(kept)
 
@@ -888,12 +888,12 @@ def in_shoot(c, shoot, sel):
 def check_home_page(c, w):
     # (the home page itself, her v28's, is tests/home_v28_check.py's; here: it leads to the two screens and back)
     c.open(w.url("/home"))
-    c.wait_for("document.querySelectorAll('.step').length == 4", 10)
-    # (posts first since her v29, Nov 19: tests/home_v29_check.py holds the layout itself)
-    case("home: Also in your Assistant, and the four cards by name, posts first", c.text(".also h2") == "Also in your Assistant"
-         and texts(c, ".step .n") == ["Turn your shoots into posts", "My posting queue", "Back up a card", "My editing queue"], texts(c, ".step .n"))
-    case("home: the cards are not numbered", c.count(".step .k") == 0)
-    case("home: the button on the big card, and the one label left", c.text("#kitsBtn") in ("Create your post kits →", "See all my post kits →") and texts(c, ".step .go") == ["Open my posting queue →"], texts(c, ".step .go"))
+    c.wait_for("document.querySelectorAll('#s1, #s2, #s3, #s4').length == 4", 10)
+    # (her v30 look since Nov 21: tests/home_v30_check.py holds the layout itself)
+    case("home: Turn your shoots into posts, then the three cards by name (her v30)", c.text("#s3 h1") == "Turn your shoots into posts"
+         and texts(c, "#s4 .n, .also .n") == ["My posting queue", "Back up a card", "My editing queue"], texts(c, "#s4 .n, .also .n"))
+    case("home: the cards are not numbered", c.count(".k") == 0)
+    case("home: See all my post kits under the tiles, and the posting queue's own label", c.text("#kitsBtn") in ("Create your post kits →", "See all my post kits →") and texts(c, "#s4 .lnk2") == ["Open my posting queue →"], texts(c, "#s4 .lnk2"))
     case("home: no shoots and no kits listed on it", c.count(".shoot") == 0 and c.count(".backup") == 0)
     case("home: no page errors", not c.page_errors(), c.page_errors()[:2])
     # the editing queue card and the folder button: what they ask, and where the answer shows
@@ -903,7 +903,7 @@ def check_home_page(c, w):
          c.js("window.__asked[0]") == "/queue-url" and c.js("document.querySelector('#s2 .note').textContent") == "Pretend: the editing queue would open here.")
     c.click("#folder")
     asked(c, 2)
-    case("home: Open my Assistant folder asks to open it, and the line shows right under that button",
+    case("home: Open my Assistant folder asks to open it, and the line shows right beside that button",
          c.js("window.__asked[1]") == "/open-home" and c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder.")
     time.sleep(0.3)
     j = json.loads((w.home / "journey.json").read_text(encoding="utf-8"))
@@ -1137,7 +1137,7 @@ def check_phone(c, w):
 def check_phone_pages(c, w, long_name):
     c.phone(width=375, height=800)
     try:
-        for path, ready in (("/home", "document.querySelectorAll('.step').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
+        for path, ready in (("/home", "document.querySelectorAll('#s1, #s2, #s3, #s4').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)
@@ -1156,7 +1156,7 @@ def check_phone_pages(c, w, long_name):
                 case("phone width: %s: the Back to home button reads Home" % path, c.js("getComputedStyle(document.querySelector('.homelink .long')).display") == "none"
                      and c.js("getComputedStyle(document.querySelector('.homelink .short')).display") != "none")
         c.phone(width=336, height=700)
-        for path, ready in (("/home", "document.querySelectorAll('.step').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
+        for path, ready in (("/home", "document.querySelectorAll('#s1, #s2, #s3, #s4').length == 4"), ("/backups", "document.querySelectorAll('#backups .backup').length > 0"),
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)

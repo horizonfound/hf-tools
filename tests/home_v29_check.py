@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """The home page after Nicole's v29 (her pages/home-preview.html, section 1.2): posts first.
 
+(Since her v30, Nov 21, the layout is her new look: the hello, Turn your shoots into posts with four tiles and the
+button, then My posting queue beside Back up a card and My editing queue. This test holds posts first in that shape;
+tests/home_v30_check.py holds the rest of v30.)
+
     python3 tests/guard.py 3000 python3 tests/home_v29_check.py [--port 9930] [--work <a folder to keep>] [--no-chrome]
 
 What it holds, on the pretend Assistant tests/home_v28_check.py builds (two pretend kits from fake_kit.py, a scratch
@@ -47,7 +51,7 @@ import home_v28_check as v28  # noqa: E402  (its pretend Assistant: World, at, t
 
 TODAY = v28.TODAY
 A, B = v28.A, v28.B
-LAYOUT_KEYS = ("s3_n", "s3_p", "s3_create", "s3_see", "s4_n", "s4_p", "s4_go", "also_h", "s1_n", "s1_p", "s2_n", "s2_p")
+LAYOUT_KEYS = ("s3_n", "s3_p", "s3_create", "s3_see", "s4_n", "s4_p", "s4_go", "s1_n", "s1_p", "s2_n", "s2_p")   # (also_h: gone in her v30)
 GONE_KEYS = ("wf_h", "wf_say", "s1_go", "s2_go", "s3_go")
 GONE_LINES = ("Your workflow", "Start wherever you are", "Back up →", "Open my editing queue →", "Make posts →")
 
@@ -58,6 +62,11 @@ HERS_NOT_OURS = {
     "Trying ideas:": "test-only (the link to her samples page)",
     "animation samples": "test-only",
     "·": "the dot before her samples link",
+    # her v30 (Nov 21, pages/home-new-look.html) took these off: the hello's corner link, the heading (hers hides
+    # it), Watch's arrow, and the Newest box beside the button
+    "↻ Another hello": "gone in her v30",
+    "Also in your Assistant": "gone in her v30 (hers hides the heading)",
+    "▶ Watch": "her v30 reads Watch",
 }
 
 
@@ -101,59 +110,60 @@ def check_layout(w, home):
     v28.at(TODAY, "EOS_DIGITAL:233")
     f = home.facts()
     page = home.page_html()
-    marks = ["<section class='hello'", "id='s3'", "id='s4'", "class='also'", "id='s1'", "id='s2'", "class='rc'"]
+    marks = ["<section class='hello'", "id='s3'", "id='tiles'", "id='kitsBtn'", "id='s4'", "class='also'", "id='s1'", "id='s2'", "class='rc'"]
     order = [page.find(m) for m in marks]
-    case("top to bottom: the hello, Turn your shoots into posts, My posting queue, Also in your Assistant, Back up a card, My editing queue, the recap card",
+    case("top to bottom (her v30): the hello, Turn your shoots into posts, the tiles, See all my post kits, My posting queue, then Back up a card and My editing queue, the recap card",
          -1 not in order and order == sorted(order), dict(zip(marks, order)))
     case("each of those is on the page once", all(page.count(m) == 1 for m in marks), [m for m in marks if page.count(m) != 1])
     case("two pretend post kits are there, the newer one is Katie's", f["kits"] == 2 and f["newest"]["short"] == "Katie Austin Maternity", (f["kits"], f["newest"]))
-    big = part(page, "<section class='mk step' id='s3'>", "</section>")
-    case("the big card with post kits: its title, her line, See all my post kits, and the one Newest box; nothing else",
-         flat(big) == ["Turn your shoots into posts", "Turn your shoot into reels, carousels, stories, and captions.", "See all my post kits →", "Newest: Katie Austin Maternity", "2 post kits"], flat(big))
+    big = part(page, "<section id='s3'>", "</section>")
+    case("Turn your shoots into posts: its title, her line, the four tiles, See all my post kits; nothing else (no Newest box: her v30)",
+         flat(big) == ["Turn your shoots into posts", "Turn your shoot into reels, carousels, stories, and captions.", "Reels", "Carousels", "Stories", "Captions", "See all my post kits →"], flat(big))
     case("... the button is a dark, plain link to the post kits screen, and a press on it is recorded as posts",
-         "<a class='btn solid big' id='kitsBtn' data-item='posts' href='/make-posts'>See all my post kits →</a>" in big and big.count("<a ") == 1 and "<button" not in big)
-    case("... the big card itself is not a link or a button (only its button is the press)", "<section class='mk step' id='s3'>" in page and "data-item" not in page.split("id='s3'", 1)[0].rsplit("<", 1)[1])
+         "<a class='btn solid' id='kitsBtn' data-item='posts' href='/make-posts'>See all my post kits →</a>" in big and "<button" not in big)
+    case("... the section itself is not a link or a button (only its tiles and its button are presses)", "data-item" not in page.split("id='s3'", 1)[0].rsplit("<", 1)[1])
     cards = page.split("id='s3'", 1)[1].split("class='rc'", 1)[0]
     case("no list of post kits on the home page: the other kit's name is on no card, and nothing links to a post kit",
-         "Hannah" not in part(page, "id='s3'", "id='s4'") and "/content/" not in cards and "Post kit.html" not in cards and cards.count("Newest:") == 1
-         and sorted(re.findall(r"href='([^']*)'", cards)) == ["/backups", "/make-posts", "/posting.html"], re.findall(r"href='([^']*)'", cards))
-    post = part(page, "<a class='step full' id='s4'", "</a>")
-    case("My posting queue, full width, with her words, its box and its label", flat("<" + post) [:2] == ["My posting queue", "Your posts ready to go, and how your grid will look."]
-         and flat("<" + post)[-1] == "Open my posting queue →" and "data-item='posting' href='/posting.html'" in post and "id='n4'" in post, flat("<" + post))
-    also = part(page, "<div class='also'>", "</div></div>")
+         "Hannah" not in part(page, "id='s3'", "id='s4'") and "/content/" not in cards and "Post kit.html" not in cards and "Newest:" not in cards
+         and sorted(set(re.findall(r"href='([^']*)'", cards))) == ["/backups", "/make-posts", "/posting.html"], re.findall(r"href='([^']*)'", cards))
+    post = part(page, "<a class='pq' id='s4'", "</a>")
+    case("My posting queue, with her words, its box, its label and the little row of their grid",
+         flat("<" + post)[:2] == ["My posting queue", "Your posts ready to go, and how your grid will look."]
+         and "Open my posting queue →" in flat("<" + post) and flat("<" + post)[-1] == "Your grid, newest first"
+         and "data-item='posting' href='/posting.html'" in post and "id='n4'" in post, flat("<" + post))
+    also = part(page, "<div class='also'>", "</button></div>")
     words = flat(also)
-    case("Also in your Assistant: the heading, then Back up a card and My editing queue with their same words and boxes, and no button label",
-         words[0] == "Also in your Assistant" and "<h2>Also in your Assistant</h2>" in also
-         and words[1:3] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots."]
-         and words[3:5] == ["A card is in", "EOS_DIGITAL · about 233 files"]
+    case("Back up a card and My editing queue with their same words and boxes (no heading over them: hers hides it)",
+         "Also in your Assistant" not in page
+         and words[0:2] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots."]
+         and words[2:4] == ["A card is in", "EOS_DIGITAL · about 233 files"]
          and words[5:7] == ["My editing queue", "The shoots you need to edit and when they're due."]
-         and "class='go'" not in also and "→" not in also and "id='n1'" in also and "id='n2'" in also, words)
-    case("the two small cards open what they opened before: the Back up a card screen (a link) and the editing queue (a button), recorded as backup and queue",
-         "<a class='step sm live' id='s1' data-item='backup' href='/backups'>" in also and "<button class='step sm' id='s2' data-item='queue' type='button'>" in also
+         and "id='n1'" in also and "id='n2'" in also, words)
+    case("the two cards open what they opened before: the Back up a card screen (a link) and the editing queue (a button), recorded as backup and queue",
+         "<a class='row live' id='s1' data-item='backup' href='/backups'>" in also and "<button class='row' id='s2' data-item='queue' type='button'>" in also
          and "<span id='editingWords' hidden></span>" in also and "$('s2').onclick = () => assistant('/queue-url', $('editingWords'), W.opening_queue);" in page)
     case("what went: the step numbers, Your workflow, Start wherever you are, and the three old button labels",
          not any(g in page for g in GONE_LINES) and "class='k'" not in page and "flow4" not in page and not any(k in home.WORDS for k in GONE_KEYS), [g for g in GONE_LINES if g in page])
-    case("the new words are hers and kept with her words", home.WORDS.get("s3_create") == "Create your post kits →" and home.WORDS.get("s3_see") == "See all my post kits →"
-         and home.WORDS.get("also_h") == "Also in your Assistant" and not any(k in home.OUR_WORDS for k in ("s3_create", "s3_see", "also_h")))
+    case("the button's words are hers and kept with her words", home.WORDS.get("s3_create") == "Create your post kits →" and home.WORDS.get("s3_see") == "See all my post kits →"
+         and not any(k in home.OUR_WORDS for k in ("s3_create", "s3_see")))
     case("no serif, no em dash, never Claude, nothing from the internet", "serif" not in page.replace("sans-serif", "") and "Fraunces" not in page and "—" not in page and "claude" not in page.lower()
          and "https://" not in page and "http://" not in page)
-    case("her accent words are in the page's own font, coral, not italic", ".step .n em{font:inherit;font-style:normal;color:var(--coral-2)}" in page)
-    case("now_boxes still gives the four boxes in the order backup, editing queue, posts, posting queue",
-         [v28.box_words(page, n)[0] for n in (1, 2, 3, 4)] == ["A card is in", "2 shoots waiting", "Newest: Katie Austin Maternity", "Today: Katie’s reel"] or
-         [v28.box_words(page, n)[0][:6] for n in (1, 2, 3, 4)] == ["A card", "2 shoo", "Newest", "Today:"], [v28.box_words(page, n) for n in (1, 2, 3, 4)])
+    case("her accent words are in the page's own font, her one accent colour, not italic", "h1.big em{font:inherit;font-style:normal;color:var(--accent)}" in page)
+    case("now_boxes still gives the boxes in the order backup, editing queue, (none for posts since v30), posting queue",
+         [v28.box_words(page, n)[0][:6] for n in (1, 2, 4)] == ["A card", "2 shoo", "Today:"] and "id='n3'" not in page, [v28.box_words(page, n) for n in (1, 2, 4)])
     # no post kits
     with Kits(w):
         f0 = home.facts()
         page0 = home.page_html()
-    big0 = part(page0, "<section class='mk step' id='s3'>", "</section>")
-    case("with no post kits the button reads Create your post kits, the same plain link, and the box says so",
-         f0["kits"] == 0 and f0["newest"] is None
-         and flat(big0) == ["Turn your shoots into posts", "Turn your shoot into reels, carousels, stories, and captions.", "Create your post kits →", "No post kits yet", "Start with any finished shoot"]
-         and "<a class='btn solid big' id='kitsBtn' data-item='posts' href='/make-posts'>Create your post kits →</a>" in big0 and "See all my post kits" not in page0, flat(big0))
+    big0 = part(page0, "<section id='s3'>", "</section>")
+    case("with no post kits the button reads Create your post kits, the same plain link, and the tiles have no photos to show",
+         f0["kits"] == 0 and f0["newest"] is None and f0["tiles"] == [] and f0["hello_photos"] == []
+         and flat(big0) == ["Turn your shoots into posts", "Turn your shoot into reels, carousels, stories, and captions.", "Reels", "Carousels", "Stories", "Captions", "Create your post kits →"]
+         and "<a class='btn solid' id='kitsBtn' data-item='posts' href='/make-posts'>Create your post kits →</a>" in big0 and "See all my post kits" not in page0, flat(big0))
     case("... and the kits are back afterwards", home.facts()["kits"] == 2)
-    # a card that is not in: the small card does not glow
+    # a card that is not in
     v28.at(TODAY)
-    case("no card in: Back up a card does not glow", "<a class='step sm' id='s1' data-item='backup' href='/backups'>" in home.page_html())
+    case("no card in: Back up a card is not marked live", "<a class='row' id='s1' data-item='backup' href='/backups'>" in home.page_html())
     # the stale eyebrow
     import home_base
     bk = home_base.backups_html()
@@ -219,35 +229,33 @@ def check_browser(c, w):
                   "return f.apply(this, arguments); }; })();")
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
 
-    def home_page(path="/home", collage=True):
+    def home_page(path="/home", photos=True):
         c.open(w.url(path))
-        c.wait_for("!!document.getElementById('s3') && " + ("document.querySelectorAll('.hello .tile img.on').length > 0" if collage else "!!document.querySelector('.hello .tx h3')"), 20)
+        c.wait_for("!!document.getElementById('s3') && " + ("document.querySelectorAll('.hello .bgs img.on').length > 0" if photos else "!!document.querySelector('.hello .tx h2')"), 20)
         time.sleep(0.5)
 
     home_page()
     R = "(id => { const r = (typeof id === 'string' ? document.querySelector(id) : id).getBoundingClientRect(); return {t: Math.round(r.top + scrollY), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height)}; })"
-    m = c.js("(() => { const R = %s; return {hello: R('#hello'), s3: R('#s3'), s4: R('#s4'), also: R('.also h2'), s1: R('#s1'), s2: R('#s2'), rc: R('#rc'), wrap: R('.wrap'), btn: R('#kitsBtn'), n3: R('#n3')}; })()" % R)
-    tops = [m[k]["t"] for k in ("hello", "s3", "s4", "also", "s1", "rc")]
-    case("on the screen, top to bottom: the hello, the big card, the posting queue, the heading, the two small cards, the recap card", tops == sorted(tops) and len(set(tops)) == len(tops), tops)
-    case("the big card and the posting queue run the full width", abs(m["s3"]["w"] - m["hello"]["w"]) <= 2 and abs(m["s4"]["w"] - m["hello"]["w"]) <= 2, (m["s3"], m["s4"], m["hello"]))
-    case("the two small cards sit side by side, each under half the width, and smaller than the big card",
-         m["s1"]["t"] == m["s2"]["t"] and m["s2"]["l"] >= m["s1"]["l"] + m["s1"]["w"] and m["s1"]["w"] < m["s3"]["w"] / 2 + 2 and abs(m["s1"]["w"] - m["s2"]["w"]) <= 2, (m["s1"], m["s2"]))
-    sizes = c.js("['#s3 .n', '#s4 .n', '#s1 .n', '#s2 .n'].map(s => parseFloat(getComputedStyle(document.querySelector(s)).fontSize))")
-    case("the titles step down in size: the big card, the posting queue, the two small cards", sizes[0] > sizes[1] > sizes[2] == sizes[3], sizes)
-    case("the button and the Newest box sit beside each other", abs((m["btn"]["t"] + m["btn"]["h"] / 2) - (m["n3"]["t"] + m["n3"]["h"] / 2)) <= 4 and m["n3"]["l"] > m["btn"]["l"] + m["btn"]["w"], (m["btn"], m["n3"]))
-    st = c.js("(() => { const b = getComputedStyle(document.getElementById('kitsBtn')); const e = getComputedStyle(document.querySelector('#s3 .n em')); return {bg: b.backgroundColor, fg: b.color, text: document.getElementById('kitsBtn').textContent, font: e.fontFamily, style: e.fontStyle, n: document.querySelectorAll('.step .n').length, k: document.querySelectorAll('.step .k').length, go: document.querySelectorAll('.step.sm .go').length}; })()")
+    m = c.js("(() => { const R = %s; return {hello: R('#hello'), s3: R('#s3'), tiles: R('#tiles'), s4: R('#s4'), s1: R('#s1'), s2: R('#s2'), rc: R('#rc'), btn: R('#kitsBtn')}; })()" % R)
+    tops = [m[k]["t"] for k in ("hello", "s3", "tiles", "btn", "s4", "rc")]
+    case("on the screen, top to bottom: the hello, Turn your shoots into posts, the tiles, the button, the cards, the recap card", tops == sorted(tops) and len(set(tops)) == len(tops), tops)
+    case("My posting queue on the left, Back up a card and My editing queue stacked on the right (her v30)",
+         m["s4"]["t"] == m["s1"]["t"] and m["s1"]["l"] >= m["s4"]["l"] + m["s4"]["w"] and m["s2"]["t"] >= m["s1"]["t"] + m["s1"]["h"] and abs(m["s1"]["l"] - m["s2"]["l"]) <= 1, (m["s4"], m["s1"], m["s2"]))
+    sizes = c.js("['#s3 h1', '#s4 .n', '#s1 .n', '#s2 .n'].map(s => parseFloat(getComputedStyle(document.querySelector(s)).fontSize))")
+    case("the titles step down in size: Turn your shoots into posts, the posting queue, the two stacked cards", sizes[0] > sizes[1] > sizes[2] == sizes[3], sizes)
+    st = c.js("(() => { const b = getComputedStyle(document.getElementById('kitsBtn')); const e = getComputedStyle(document.querySelector('#s3 h1 em')); return {bg: b.backgroundColor, fg: b.color, text: document.getElementById('kitsBtn').textContent, font: e.fontFamily, style: e.fontStyle, color: e.color, k: document.querySelectorAll('.k').length}; })()")
     case("the button is dark with white words and reads See all my post kits", st["text"] == "See all my post kits →" and st["fg"] == "rgb(255, 255, 255)" and st["bg"] not in ("rgb(255, 255, 255)", "rgba(0, 0, 0, 0)"), st)
-    case("the accent words are in the page's own font (DM Sans, carried by the Assistant), not italic; four cards, no numbers, no label on the small cards", st["font"].startswith('"Assistant Sans"') and "Fraunces" not in st["font"] and "serif" not in st["font"].replace("sans-serif", "") and st["style"] == "normal" and st["n"] == 4 and st["k"] == 0 and st["go"] == 0, st)
-    case("a card is in: the small Back up a card glows", c.js("document.getElementById('s1').classList.contains('live')") is True and "240, 127, 90" in c.js("getComputedStyle(document.getElementById('s1')).boxShadow"))
-    names = c.js("[...document.querySelectorAll('#s3, #s4, .also')].map(x => x.innerText).join(' | ')")
-    case("no kit is listed: Katie's name is only in the Newest box and the posting queue's own box, Hannah's kit nowhere on the big card",
-         c.js("document.getElementById('s3').innerText").count("Katie Austin Maternity") == 1 and "Hannah" not in c.js("document.getElementById('s3').innerText")
-         and c.js("document.querySelectorAll('#s3 a').length") == 1 and c.js("document.querySelectorAll(\"a[href*='content/'], a[href*='kit=']\").length") == 0, names)
+    case("the accent words are in Helvetica (her v30), not italic, in her one accent; no numbers on the cards",
+         st["font"].startswith('"Helvetica Neue"') and "Fraunces" not in st["font"] and st["style"] == "normal" and st["color"] == "rgb(217, 96, 58)" and st["k"] == 0, st)
+    case("a card is in: Back up a card is marked live", c.js("document.getElementById('s1').classList.contains('live')") is True)
+    case("no kit is listed: no kit's name in Turn your shoots into posts, and nothing links to a post kit",
+         "Katie" not in c.js("document.getElementById('s3').innerText") and "Hannah" not in c.js("document.getElementById('s3').innerText")
+         and c.js("document.querySelectorAll(\"a[href*='content/'], a[href*='kit=']\").length") == 0)
     # presses: where each goes, and that the chat hears of it
     before = len(clicks(w))
-    c.click("#s3 .n")
+    c.click("#s3 h1")
     time.sleep(0.4)
-    case("a press on the big card itself goes nowhere and records nothing", c.js("location.pathname") == "/home" and len(clicks(w)) == before)
+    case("a press on the heading itself goes nowhere and records nothing", c.js("location.pathname") == "/home" and len(clicks(w)) == before)
     c.click("#kitsBtn")
     c.wait_for("location.pathname === '/make-posts'", 15)
     chrome_drive.wait_until(lambda: clicks(w)[before:] == ["posts"], 10, what="the press recorded")
@@ -273,25 +281,22 @@ def check_browser(c, w):
          "/queue-url" in c.js("window.__asked") and c.js("document.querySelector('#s2 .note').textContent") == "Pretend: the editing queue would open here."
          and c.js("getComputedStyle(document.querySelector('#s2 .note')).display") != "none" and clicks(w)[before:] == ["posts", "posting", "backup", "queue"], clicks(w)[before:])
     case("home.py pending tells the chat all four, in the order pressed", pending(w)[-4:] == ["posts", "posting", "backup", "queue"], pending(w))
-    # the hello's buttons still go where they went
-    go = c.js("JSON.parse(document.getElementById('facts').textContent).go")
-    case("the hello's buttons still know where to go", go.get("backup") == "/backups" and go.get("posting") == "/posting.html" and go.get("posts") == "/make-posts", go)
     # a phone
     c.phone(390, 844)
     home_page()
     time.sleep(0.4)
     p = c.js("(() => { const R = %s; const fits = s => { const r = document.querySelector(s).getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5; }; "
-             "return {sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, cols: getComputedStyle(document.querySelector('.also-row')).gridTemplateColumns.split(' ').length, "
-             "s1: R('#s1'), s2: R('#s2'), fits: ['#s3', '#kitsBtn', '#n3', '#s4', '#s1', '#s2', '.also h2'].map(fits)}; })()" % R)
-    case("at phone width: no sideways scroll, every card and the button whole on the screen, the two small cards one under the other",
-         p["sw"] <= p["cw"] and all(p["fits"]) and p["cols"] == 1 and p["s2"]["t"] >= p["s1"]["t"] + p["s1"]["h"], p)
+             "return {sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, cols: getComputedStyle(document.querySelector('.low')).gridTemplateColumns.split(' ').length, "
+             "s4: R('#s4'), s1: R('#s1'), s2: R('#s2'), fits: ['#s3', '#tiles', '#kitsBtn', '#s4', '#s1', '#s2'].map(fits)}; })()" % R)
+    case("at phone width: no sideways scroll, every card and the button whole on the screen, the cards one under the other",
+         p["sw"] <= p["cw"] and all(p["fits"]) and p["cols"] == 1 and p["s1"]["t"] >= p["s4"]["t"] + p["s4"]["h"] and p["s2"]["t"] >= p["s1"]["t"] + p["s1"]["h"], p)
     # no post kits, in the browser (the page reads everything fresh on each load)
     with Kits(w):
-        home_page(collage=False)
-        q = c.js("({b: document.getElementById('kitsBtn').textContent, href: document.getElementById('kitsBtn').getAttribute('href'), n3: document.getElementById('n3').innerText.replace(/\\s+/g, ' ').trim(), "
-                 "sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth})")
-    case("with no post kits (phone width): Create your post kits, the same link, No post kits yet, still no sideways scroll",
-         q["b"] == "Create your post kits →" and q["href"] == "/make-posts" and q["n3"] == "No post kits yet Start with any finished shoot" and q["sw"] <= q["cw"], q)
+        home_page(photos=False)
+        q = c.js("({b: document.getElementById('kitsBtn').textContent, href: document.getElementById('kitsBtn').getAttribute('href'), n3: !!document.getElementById('n3'), "
+                 "imgs: document.querySelectorAll('#tiles img[src], .hello img[src]').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth})")
+    case("with no post kits (phone width): Create your post kits, the same link, grey tiles with no photo, still no sideways scroll",
+         q["b"] == "Create your post kits →" and q["href"] == "/make-posts" and not q["n3"] and q["imgs"] == 0 and q["sw"] <= q["cw"], q)
 
 
 def summary():

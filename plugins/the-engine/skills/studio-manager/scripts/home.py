@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """The Assistant's home page (Nicole's v28, Nov 17; posts first since her v29, Nov 19), in the Claude app's browser pane.
 
-Top to bottom: the bar (the name, the date, Open my Assistant folder); the hello (a collage of the newest shoot's
-photos, each framed on its faces, a greeting made from what is really going on and a button that goes there);
-one big card, Turn your shoots into posts, whose button goes to its own screen (/make-posts); My posting queue,
-full width; then "Also in your Assistant" with two smaller cards, Back up a card (its own screen, /backups) and
-My editing queue; each card saying what is going on right now; the monthly recap card; and the Your year bar in
-its dates. No step numbers and no list of post kits, so it stays clean after years of shoots: every backup and
-every post kit is on its own screen (home_base.py). Served
+Top to bottom, in Nicole's v30 look (her pages/home-new-look.html and screenshot 01, Nov 21): the bar ("THE
+ASSISTANT" in her one accent, by Horizon Found, the date, Open my Assistant folder); the hello, ONE wide photo framed
+on its faces (from the 1600 px copies) with a greeting and one line from her approved lines over it (hello_lines.py:
+it only lifts them up, no reminders, no button, no "Another hello"); Turn your shoots into posts with four photo
+tiles, Reels, Carousels, Stories and Captions, and See all my post kits alone under them; My posting queue (with the
+last three posts of their grid) beside Back up a card and My editing queue stacked, each on its own light card, each
+saying what is going on right now; the monthly recap card on tan; and the Your year bar in its dates. No list of
+post kits, so it stays clean after years of shoots: every backup and every post kit is on its own screen
+(home_base.py). The v30 look is this page's alone (HOME_LOOK, one block); every other page keeps look.py's. Served
 live by the posting server at /home (posting_queue.py serve), which also opens folders and pages for its buttons
 and records which card was pressed.
 
@@ -313,36 +315,39 @@ def gather():
 
 # ---------- the page ----------
 #
-# The home page, top to bottom (Nicole's v28, Nov 17; her home-test.html and hello.js, built our way):
-#   the bar          the name, the date (hidden under 520 px), Open my Assistant folder
-#   the hello        a collage of the newest shoot's photos, each framed on its faces (faces.py), a greeting made
-#                    from what is really going on, a button that goes there, and "Another hello" in the corner
-#   posts first      (her v29) the big Turn your shoots into posts card with its one button, My posting queue
-#                    full width, then "Also in your Assistant": Back up a card and My editing queue, smaller;
-#                    her exact words, each card with a box saying what is going on right now
+# The home page, top to bottom (Nicole's v30, Nov 21; v28 and v29 before it, built our way):
+#   the bar          the name in her accent, the date (hidden under 560 px), Open my Assistant folder (a link-style
+#                    button, what it did shown beside it)
+#   the hello        one wide photo framed on its faces (faces.py), 1.22x toward them, changing every few seconds;
+#                    a greeting and one line from her approved lines (hello_lines.py), kept for a visit
+#   posts first      Turn your shoots into posts, the four tiles (data-make: what each makes), See all my post kits;
+#                    My posting queue beside Back up a card and My editing queue, each with what is going on now
 #   the recap card   the month's numbers (wrapped.py), Watch, and the x that hides it (kept in home-recap.json)
 #   Your year        the bar, only in its dates (Dec 1 to Jan 15, after about a year: wrapped.home_answers)
-# Everything on it is read fresh, and only read, from what the Assistant already keeps. The server draws the
-# steps, the card and the bar; the page's script draws the hello (it needs the clock and what was said last time).
+# Everything on it is read fresh, and only read, from what the Assistant already keeps (the hello's choice is the one
+# thing written: hello_lines keeps it for a visit). The server draws the words; the page's script loads the photos.
 # No path is in the page: a photo is a kit's folder name and a number (/kit-photo), a face a kit and numbers.
 
 # The words to paste in the chat for the two steps that start a conversation (shown on their own screens).
 SAY = {"backup": home_base.WORDS["b_say"], "posts": home_base.WORDS["m_say"], "setup": "set up my Assistant folder"}
 
-# Nicole's words (pages/home-test.html, v28; the layout's own from pages/home-preview.html, v29), whole. "You would say what it is": the labels are plain on purpose
-# (her section 10); do not make them clever. <em> is hers (the accent word). {…} is filled in by the page.
+# Nicole's words (her v30 pages/home-new-look.html, Nov 21; v28's home-test.html and v29's home-preview.html before
+# it), whole. "You would say what it is": the labels are plain on purpose (her section 10); do not make them clever.
+# <em> is hers (the accent word: "into posts"; on the cards it is drawn plain in the v30 look). {…} is filled in.
+# Gone in v30, by her ask (UPDATE-v30 sections 2 and 3): "↻ Another hello", the hello's button and every reminder
+# line in it, the "Newest: …" box beside See all my post kits, and the heading "Also in your Assistant" (hers hides it).
 WORDS = {
     "folder": "Open my {short} folder",
-    "again": "↻ Another hello",
-    "again_title": "Another hello",
     "hello_plain": "Hello.",
-    # v29 (her pages/home-preview.html, Nov 19): posts first. The big card, the posting queue under it, then
-    # "Also in your Assistant" with the two smaller cards. No step numbers, no "Your workflow" (both gone, hers).
     "s3_n": "Turn your shoots <em>into posts</em>",
     "s3_p": "Turn your shoot into reels, carousels, stories, and captions.",
     "s3_create": "Create your post kits →",         # the button with no post kits yet
     "s3_see": "See all my post kits →",             # the same button once there are some
-    "also_h": "Also in your Assistant",
+    # the four tiles (her section 4): a photo each, the word on it
+    "t_reel": "Reels",
+    "t_carousel": "Carousels",
+    "t_stories": "Stories",
+    "t_captions": "Captions",
     "s1_n": "Back up <em>a card</em>",
     "s1_p": "Copies your card to your drive, checks every photo, and sorts it into shoots.",
     "s2_n": "My editing <em>queue</em>",
@@ -350,7 +355,8 @@ WORDS = {
     "s4_n": "My posting <em>queue</em>",
     "s4_p": "Your posts ready to go, and how your grid will look.",
     "s4_go": "Open my posting queue →",
-    # what is going on right now, step by step
+    "s4_grid": "Your grid, newest first",
+    # what is going on right now, card by card
     "n1_card": "A card is in",
     "n1_card_small": "{name} · about {files} files",
     "n1_last": "Last backup {day}",
@@ -362,10 +368,6 @@ WORDS = {
     "n2_due": "{name} · due {day}",
     "n2_none": "All caught up",
     "n2_none_small": "Nothing waiting to edit",
-    "n3_newest": "Newest: {short}",
-    "n3_kits": "{n} post kit{s}",
-    "n3_none": "No post kits yet",
-    "n3_none_small": "Start with any finished shoot",
     "n4_today": "Today: {who} {kind}",
     "n4_late_too": "{who} {kind} is late too",
     "n4_ready": "{n} ready to go",
@@ -376,7 +378,7 @@ WORDS = {
     "n4_days": "About {n} days of posts",
     # the monthly recap card and the Your year bar
     "rc_t": "Your {label}, <em>{word}</em>",
-    "watch": "▶ Watch",
+    "watch": "Watch",
     "rc_hide_title": "Hide",
     "rc_hide_aria": "Hide the monthly recap",
     "rc_month": "Hide it for this month",
@@ -384,6 +386,22 @@ WORDS = {
     "rc_show": "Show my monthly recap",
     "yr_b": "Your {year}, <em>wrapped.</em>",
     "yr_small": "Your year with your assistant, story by story. Ready to share.",
+    # the four tiles ask which shoot, then go straight there (her section 4; screenshots 02 and 03)
+    "mk_reel": "Create a <em>reel</em>",
+    "mk_carousel": "Create a <em>carousel</em>",
+    "mk_stories": "Create your <em>stories</em>",
+    "mk_captions": "Write your <em>captions</em>",
+    "mk_sub": "Which shoot do you want to make it from?",
+    "mk_sub_none": "Start with a shoot: pick the folder with your finished photos.",
+    "mk_new": "A new shoot",
+    "mk_new_small": "Pick the folder with your finished photos",
+    "mk_shoots": "Your shoots",
+    "mk_vault": "My vault",
+    "mk_vault_small": "Mix photos and clips from all your shoots",
+    "mk_find": "Search your shoots",
+    "mk_nothing": "Nothing matches \"{q}\".",
+    "mk_close": "Close",
+    "mk_photos": "{n} photos",
 }
 # Ours, where hers has none. Each is a draft for Dustin and Nicole.
 OUR_WORDS = {
@@ -399,8 +417,14 @@ OUR_WORDS = {
     "rc_watch_aria": "Watch your {label} recap",
     "yr_watch_aria": "Watch your {year}, story by story",
     "rc_didnt": "That didn't work. Try again in a moment.",
+    # the four tiles, for a screen reader (the word on the photo says what it is; this says where it goes)
+    "t_aria": "{word}: make them from one of your shoots",
+    # "Create a reel: which shoot?" (her section 4), where hers has none
+    "mk_photo": "{n} photo",                                        # one photo (hers always says "photos")
+    "mk_picking": "Pick the folder in the window that opened. Your photos are copied, never moved.",
+    "mk_list_cant": "Couldn't load your shoots. Try again in a moment.",
+    "mk_didnt": "That didn't work. Try again in a moment.",
 }
-
 
 def W(key):
     return WORDS[key] if key in WORDS else OUR_WORDS[key] if key in OUR_WORDS else home_base.W(key)
@@ -531,7 +555,7 @@ class _Photos:
             return None
         if not p["have"]:
             self.need[name] = k
-        return {"kit": name, "n": n, "v": p["v"]}
+        return {"kit": name, "n": n, "v": p["v"], "way": p.get("way") or ""}
 
     def start(self):
         """Have the copies that are missing made, in a process of their own (as the kit page does)."""
@@ -552,13 +576,113 @@ def photo_src(p):
 def _thumb_src(t):
     """A posting piece's small picture ("posting-thumbs/<file>") as an address of this server, or None."""
     try:
-        if not isinstance(t, str) or not t.startswith("posting-thumbs/") or "\\" in t or ".." in t.split("/"):
+        if not isinstance(t, str) or not t.startswith(("posting-thumbs/", "feed/")) or "\\" in t or ".." in t.split("/"):
             return None
         if not (HOME / t).is_file():
             return None
         return "/" + quote(t, safe="/")
     except (OSError, ValueError):
         return None
+
+
+# ---------- the photos on the page (Nicole's v30 sections 2 and 4) ----------
+#
+# The hello: ONE wide photo at a time, horizontal favorites first ("they crop best into a wide strip"), the shoot the
+# hello's line names first, then the other shoots taking turns; a few more photos of any shape only when there are
+# fewer than HELLO_FEW wide ones. The tiles: four photos, each from a different shoot when there are four shoots
+# (fewer: the shoots take turns, a different photo each time), and the page takes the first of a tile's few
+# candidates that has a face. Every photo is a kit's folder name and a number (/kit-photo, arrange.py's route), never a path,
+# and only the kit's own copies are ever sent (the 1600 px one, size=l; never the photo itself).
+HELLO_MOST = 8          # photos the hello goes through
+HELLO_FEW = 3           # fewer wide favorites than this: favorites of any shape join after them
+TILE_CANDS = 6          # photos a tile may choose from (the first with a face wins)
+
+
+def _shoots(got):
+    """The shoots the photos come from, newest first: [(kit folder, favorite numbers)]. Only the post kits the post
+    kits screen lists and has not archived (so never My vault, whose photos are the shoots' own)."""
+    try:
+        listed = {k["folder"] for k in home_base.kits() if not k["archived"]}
+    except (Exception, SystemExit):  # noqa: BLE001
+        listed = set()
+    kits = [k for k in (got or {}).get("kits", []) if k.get("favs") and k.get("folder") in listed]
+    kits.sort(key=lambda k: (k.get("date") or "", k.get("folder") or ""), reverse=True)
+    return [(k["folder"], list(k["favs"])) for k in kits]
+
+
+def _turns(lists, most):
+    """One from each list in turn, then the second of each, and so on, up to most."""
+    out, r = [], 0
+    while len(out) < most and any(r < len(x) for x in lists):
+        for x in lists:
+            if r < len(x) and len(out) < most:
+                out.append(x[r])
+        r += 1
+    return out
+
+
+def hello_photos(pics, shoots, first=None):
+    """[{kit, n, v}] for the hello, wide favorites first (the hello's own shoot first)."""
+    order = sorted(shoots, key=lambda s: s[0] != first)
+    wide, other = [], []
+    for folder, favs in order:
+        w, o = [], []
+        for n in favs:
+            p = pics.one(folder, n)
+            if p:
+                (w if p.get("way") == "wide" else o).append({"kit": folder, "n": p["n"], "v": p["v"]})
+        wide.append(w)
+        other.append(o)
+    out = _turns(wide, HELLO_MOST)
+    if len(out) < HELLO_FEW:
+        out += _turns(other, HELLO_MOST - len(out))
+    return out
+
+
+def tile_photos(pics, shoots, skip=()):
+    """Four tiles, each {kit, cands: [{n, v}]}: a different shoot each while there are shoots enough; with fewer,
+    the shoots take turns and each turn uses photos of that shoot no tile has used yet. No photo the hello opens on
+    (skip: [(kit, n)]). No shoots: no tiles (grey placeholders)."""
+    if not shoots:
+        return []
+    used = set(skip)
+    out = []
+    for i, _make in enumerate(TILES):
+        folder, favs = shoots[i % len(shoots)]
+        ps = [p for p in (pics.one(folder, n) for n in favs) if p]
+        fresh = [p for p in ps if (folder, p["n"]) not in used]
+        cands = [{"n": p["n"], "v": p["v"]} for p in (fresh or ps)][:TILE_CANDS]
+        if len(shoots) < len(TILES):          # a shoot with more tiles to fill: this tile keeps only its share
+            share = max(1, len(cands) // -(-(len(TILES) - i) // len(shoots)))
+            cands = cands[:share]
+        used.update((folder, c["n"]) for c in cands)
+        out.append({"kit": folder, "cands": cands} if cands else {})
+    return out
+
+
+def grid_now():
+    """The last three posts of their grid, newest first, as the posting page draws its grid: the posts lined up
+    (the last in line sits first), the ones marked posted, then the posts read from their Instagram (pinned ones
+    left out: they are old ones kept at the top). Addresses of this server's own pictures only."""
+    import posting_queue
+    p = posting_queue.load()
+    pieces = [x for x in p.get("pieces") or [] if isinstance(x, dict)]
+    greens = sorted((x for x in pieces if x.get("status") == "green"), key=lambda x: (x.get("date") or "9999", x.get("slot") or 0))
+    posted = sorted((x for x in pieces if x.get("status") == "posted" and isinstance(x.get("posted_at"), str)), key=lambda x: x["posted_at"], reverse=True)
+    out = []
+    for x in list(reversed(greens)) + posted:
+        u = _thumb_src(x.get("thumb"))
+        if u and u not in out:
+            out.append(u)
+    try:
+        for x in posting_queue.load_feed().get("posts") or []:
+            if isinstance(x, dict) and not x.get("pinned"):
+                u = _thumb_src(x.get("thumb"))
+                if u and u not in out:
+                    out.append(u)
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
+    return out[:3]
 
 
 def facts(force_year=False, start=False):
@@ -568,7 +692,8 @@ def facts(force_year=False, start=False):
     iso = day.isoformat()
     f = {"today": day.strftime("%A, %B ") + str(day.day), "me": "", "card": None, "backup": None, "queue": [], "kits": 0,
          "newest": None, "posting": {"today": [], "late": [], "posted_week": [], "ready": 0, "per_week": None},
-         "year": None, "collage": None, "recap": None, "recap_hidden": False, "year_bar": None}
+         "year": None, "recap": None, "recap_hidden": False, "year_bar": None,
+         "hello": None, "hello_photos": [], "tiles": [], "grid": []}
     pics = _Photos()
     try:
         f["card"] = card_in()
@@ -622,12 +747,6 @@ def facts(force_year=False, start=False):
     if got:
         try:
             import wrapped
-            # the hello's collage: up to 12 favorite photos of the NEWEST shoot (hers), small copies only
-            newest = max((k for k in got["kits"] if k["favs"]), key=lambda k: (k["date"], k["folder"]), default=None)
-            if newest:
-                shown = [p for p in (pics.one(newest["folder"], n) for n in newest["favs"][:wrapped.FAVS]) if p]
-                if shown:
-                    f["collage"] = {"kit": newest["folder"], "photos": [{"n": p["n"], "v": p["v"]} for p in shown]}
             # the hello's lines about this year
             y = wrapped.data(year=str(day.year), got=got, day=day)
             last = max(y["shoots"], key=lambda s: s.get("date") or "", default=None)
@@ -681,181 +800,195 @@ def facts(force_year=False, start=False):
         f["posting"]["per_week"] = per if isinstance(per, (int, float)) and not isinstance(per, bool) and per > 0 else None
     except (Exception, SystemExit):  # noqa: BLE001
         pass
+    # 5. the hello (her section 3: it only lifts them up): her approved lines, kept for a visit (hello_lines.py)
+    try:
+        import hello_lines
+        f["hello"] = hello_lines.pick()
+    except (Exception, SystemExit):  # noqa: BLE001  (no hello is still a page: it says "Hello.")
+        f["hello"] = None
+    # 6. the photos: the hello's one wide photo (and the next ones), and the four tiles
+    try:
+        shoots = _shoots(got)
+        first = (f.get("hello") or {}).get("kit")
+        f["hello_photos"] = hello_photos(pics, shoots, first)
+        f["tiles"] = tile_photos(pics, shoots, skip=[(p["kit"], p["n"]) for p in f["hello_photos"][:1]])
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
+    # 6b. a brand-new Assistant (Nicole's v30, section 6): no post kit yet, so the hello and the tiles show the
+    # sample photos the plugin carries (samples.py), until the first post kit exists. Names only; they count in nothing.
+    f["samples"] = None
+    if not f["hello_photos"] and not any(f["tiles"]):
+        try:
+            import samples
+            f["samples"] = samples.for_home()
+        except (Exception, SystemExit):  # noqa: BLE001
+            f["samples"] = None
+    # 7. the last three posts of their grid, newest first, as the posting page's grid shows them
+    try:
+        f["grid"] = grid_now()
+    except (Exception, SystemExit):  # noqa: BLE001
+        pass
     if start:
         pics.start()
     return f
 
 
-# ---------- the page's look: hers (home-test.html's own styles), in the Assistant's colours and font ----------
-# Her serif accent is the coral accent word here (Dustin, Nov 7: no serif). Every animation is under
-# prefers-reduced-motion: no-preference, so with reduced motion nothing moves.
-CSS_EXTRA = home_base.CSS + r"""
-.bar .fold{position:relative;display:inline-flex}
-.bar .lnk{font:600 13px/1 var(--sans);color:var(--ink-2);background:none;border:0;cursor:pointer;padding:8px 10px;border-radius:999px;text-decoration:none;white-space:nowrap}
-.bar .lnk:hover{color:var(--ink);background:var(--sand-l)}
-.bar .fold .note{position:absolute;right:0;top:100%;margin:0;width:max-content;max-width:min(320px,80vw);text-align:right;z-index:4;background:var(--cream);border-radius:8px;padding:0 4px}
+# ---------- the page's look: Nicole's v30 (her pages/home-new-look.html, screenshot 01), the HOME PAGE only ----------
+#
+# Her approved look (UPDATE-v30 section 1): one typeface, Helvetica (Neue Bold for headings, regular for the rest,
+# letter spacing -1%), warm paper, black words, ONE accent (#D9603A, for "THE ASSISTANT" and the accent words), square
+# corners, a thin black line under the top bar, few boxes, calm sizes; the photos bring the colour. Helvetica is the
+# computer's own (a Mac has it; a PC gets Arial): nothing is downloaded. Every other page keeps look.py's look until
+# Dustin and Nicole say; the colours and the type live in this one block so they can move into look.py in one step.
+HOME_LOOK = r"""
+:root{--accent:#D9603A;--cream:#EDEAE4;--paper:#F5F3EF;--tan:#DED8CD;--ink:#111;--ink-2:#6E6A64;--line:rgba(17,17,17,.14);
+--placeholder:#D3CDC4;--late:#B3402A;--name-on-photo:#FFB08F;
+--coral:#D9603A;--coral-2:#D9603A;--coral-l:#E2DED6;--sand-l:#E2DED6;
+--sans:"Helvetica Neue",Helvetica,Arial,sans-serif;--ease:cubic-bezier(.2,.7,.2,1);--corner:2px}
+"""
+# (--name-on-photo is hers too: the accent lightened, so the name still reads on a dark photo.)
+
+# Her layout, rule for rule where hers has one (home-new-look.html's own styles), on our markup. Every animation is
+# under prefers-reduced-motion: no-preference, so with reduced motion nothing moves and the photo never changes.
+CSS_EXTRA = home_base.CSS + HOME_LOOK + r"""
+html,body{background:var(--cream)}
+body{color:var(--ink);font:400 15px/1.5 var(--sans);letter-spacing:-.01em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,40px) 1rem}
+.bar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:1.4rem;min-height:52px;border-bottom:1px solid var(--ink)}
+.brand{white-space:nowrap;min-width:0}
+.brand b{font:700 13px/1 var(--sans);letter-spacing:-.01em;text-transform:uppercase;color:var(--accent)}
+.brand small{display:inline;margin:0 0 0 .8em;font:400 12px/1 var(--sans);letter-spacing:-.01em;text-transform:none;color:var(--ink-2)}
+.bar .when{margin:0;font:400 12px/1 var(--sans);color:var(--ink-2);text-align:right}
+.bar .fold{display:inline-flex;align-items:baseline;gap:.8em;flex-direction:row-reverse}
+.bar .lnk{font:400 12px/1 var(--sans);letter-spacing:-.01em;color:var(--ink);background:none;border:0;padding:4px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.bar .fold .note{display:inline;margin:0;font-size:12px;line-height:1.3;color:var(--ink-2);max-width:min(320px,36vw);text-align:right;min-height:0}
 .bar .fold .note:empty{display:none}
-@media(max-width:520px){.bar .when{display:none}.bar .fold{margin-left:auto}}
-.hello{position:relative;margin-top:1.2rem;min-height:240px;border-radius:26px;overflow:hidden;color:#fff;display:flex;align-items:flex-end;padding:clamp(1.2rem,3.4vw,2rem);background:#2a2f3a}
-.hello .bgs{position:absolute;inset:0;display:grid;gap:3px}
-.hello .tile{position:relative;overflow:hidden;background:#2a2f3a}
-.hello .tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
-.hello .tile img.on{opacity:1}
-.hello::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(20,22,30,.86),rgba(20,22,30,.32) 55%,rgba(20,22,30,.05));pointer-events:none}
-.hello .tx{position:relative;z-index:1;max-width:38em;min-width:0}
-.hello h3{margin:0;font:600 clamp(28px,3.8vw,44px)/1.05 var(--sans);letter-spacing:-.03em;overflow-wrap:anywhere}.hello h3 em{font:inherit;font-style:normal;color:#FFB39A}
-.hello p{margin:.45rem 0 0;font-size:clamp(15.5px,1.4vw,18px);color:#eef0f4;overflow-wrap:anywhere}
-.hello .hgo{margin-top:.9rem;display:inline-flex;gap:.4rem;align-items:center;font:600 13.5px/1 var(--sans);padding:10px 16px;border-radius:999px;border:0;background:#fff;color:var(--ink);cursor:pointer;transition:background .2s}
-.hello .hgo:hover{background:var(--coral)}
-.hello .note{color:#eef0f4}
-.again{position:absolute;right:14px;top:14px;z-index:2;font:600 12px/1 var(--sans);color:#fff;background:rgba(20,22,30,.35);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:0;border-radius:999px;padding:8px 11px;cursor:pointer;opacity:.75}
-.again:hover,.again:focus-visible{opacity:1}
-.step{position:relative;display:flex;flex-direction:column;gap:.5rem;text-align:left;padding:18px 18px 16px;border:0;border-radius:20px;background:var(--paper);box-shadow:0 1px 0 var(--line);cursor:pointer;font:inherit;color:inherit;text-decoration:none;min-width:0;transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
-.step:hover{transform:translateY(-3px);box-shadow:0 0 0 2px var(--coral),var(--shadow)}
-.step .n{font:600 19px/1.15 var(--sans);letter-spacing:-.02em}.step .n em{font:inherit;font-style:normal;color:var(--coral-2)}
-.step p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
-.step .now{margin-top:auto;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;background:var(--cream);min-height:58px;min-width:0}
-.step .now img{width:40px;height:50px;object-fit:cover;border-radius:7px;flex:none;background:var(--sand-l)}
-.step .now span{font:500 13px/1.35 var(--sans);color:var(--ink);min-width:0;overflow-wrap:anywhere}.step .now small{display:block;color:var(--ink-2);font-size:12px}
-.step .now .dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--ocean)}
-.step .now .dot.coral{background:var(--coral)}.step .now .dot.green{background:var(--long)}.step .now .dot.red{background:#C2412D}.step .now .dot.yellow{background:#D9A400}
-.step .go{font:600 13px/1 var(--sans);color:var(--coral-2)}
-.step .note{margin-top:0}
-.step.live{box-shadow:0 0 0 2px var(--coral),0 0 26px rgba(240,127,90,.35)}
-.step .now small.late{color:#C2412D}
-.mk{margin-top:1.6rem;padding:22px 22px 18px;cursor:default}
-.mk:hover{transform:none;box-shadow:0 1px 0 var(--line)}
-.mk .n{font-size:26px}.mk>p{margin:.1rem 0 0}
-.mk-go{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:1rem;min-width:0}
-.mk-go .now{flex:1 1 240px;margin:0}
-.btn.big{font-size:15px;padding:13px 20px;white-space:nowrap}
-.step.full{margin-top:12px}
-.also{margin-top:1.8rem}.also h2{margin:0 0 .6rem;font:600 13px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
-.also-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-@media(max-width:620px){.also-row{grid-template-columns:minmax(0,1fr)}}
-.step.sm{padding:14px 16px;gap:.35rem;background:transparent;box-shadow:0 0 0 1px var(--line)}
-.step.sm .n{font-size:16px}.step.sm p{font-size:13px}.step.sm .now{min-height:0;background:var(--paper)}
-.step.sm.live{box-shadow:0 0 0 2px var(--coral),0 0 26px rgba(240,127,90,.35)}
-.yr,.rc{margin-top:1.8rem;position:relative;display:flex;align-items:center;gap:1.2rem;border-radius:22px;padding:16px 20px;min-width:0}
-.yr{background:var(--ink);color:#fff}.rc{background:linear-gradient(120deg,#FFE7DD,#F6EEFF);color:var(--ink)}
-.yr[hidden],.rc[hidden]{display:none}
-.yr .fan,.rc .fan{position:relative;width:110px;height:64px;flex:none}
-.yr .fan img,.rc .fan img{position:absolute;left:36px;top:0;width:44px;height:64px;object-fit:cover;border-radius:7px;transition:transform .5s var(--ease)}
-.yr .fan img{box-shadow:0 8px 18px rgba(0,0,0,.4)}.rc .fan img{box-shadow:0 8px 18px rgba(31,36,48,.25)}
-.fan img:nth-child(1){transform:translateX(-30px) rotate(-10deg)}.fan img:nth-child(3){transform:translateX(30px) rotate(10deg)}
-.yr:hover .fan img:nth-child(1),.rc:hover .fan img:nth-child(1){transform:translateX(-38px) rotate(-14deg)}.yr:hover .fan img:nth-child(3),.rc:hover .fan img:nth-child(3){transform:translateX(38px) rotate(14deg)}
-.yr>div,.rc>div{min-width:0}
-.yr b,.rc b{font:600 20px/1.1 var(--sans);letter-spacing:-.02em;overflow-wrap:anywhere}.yr b em{font:inherit;font-style:normal;color:var(--coral)}.rc b em{font:inherit;font-style:normal;color:var(--coral-2)}
-.yr small{display:block;color:#b9bcc6;font-size:13.5px;margin-top:3px}
-.yr .playbtn,.rc .playbtn{margin-left:auto;font:600 13px/1 var(--sans);padding:10px 15px;border-radius:999px;white-space:nowrap}
-.yr .playbtn{background:var(--coral);color:var(--ink)}.rc .playbtn{background:var(--ink);color:#fff}
-.yr .all,.rc .all{position:absolute;inset:0;border-radius:22px;z-index:1}
-.rc .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.rc .chips span{font:600 12.5px/1 var(--sans);background:rgba(255,255,255,.75);border-radius:999px;padding:6px 10px}
-.rc .chips span i{font-style:normal;font-weight:600;color:var(--coral-2)}
-.rc .x{position:absolute;right:8px;top:6px;z-index:2;border:0;background:none;color:var(--ink-2);font:600 18px/1 var(--sans);cursor:pointer;padding:4px 7px;border-radius:999px;opacity:.6}
-.rc .x:hover,.rc .x:focus-visible{opacity:1;background:rgba(255,255,255,.7)}
-.rcmenu{position:absolute;right:10px;top:34px;z-index:3;background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:6px;display:grid;min-width:210px}
+@media(max-width:560px){.bar{grid-template-columns:minmax(0,1fr) auto}.bar .when{display:none}
+ .bar .fold .note{position:absolute;right:0;top:100%;max-width:80vw;background:var(--cream);padding:2px 0;z-index:4}}
+.offline{margin:.6rem 0 0;color:var(--late);font-size:13px}
+.hello{position:relative;margin-top:10px;height:clamp(200px,24vh,290px);overflow:hidden;color:#fff;display:flex;align-items:flex-end;padding:clamp(1rem,3vw,2rem) clamp(1.1rem,3.4vw,2.4rem);background:var(--placeholder)}
+.hello.photo{background:#222}
+.hello .bgs{position:absolute;inset:0;overflow:hidden}
+.hello .bgs img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
+.hello .bgs img.on{opacity:1}
+.hello .bgs img:not([src]){display:none}
+.hello::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.1) 70%);pointer-events:none}
+.hello .tx{position:relative;z-index:1;max-width:46em;min-width:0}
+.hello .samplenote{position:absolute;top:10px;right:12px;z-index:1;margin:0;font-size:11px;line-height:1.3;color:#fff;background:rgba(0,0,0,.45);padding:4px 8px;max-width:calc(100% - 24px)}
+.hello .samplenote[hidden]{display:none}
+.hello h2{margin:0;font:700 clamp(26px,3vw,40px)/1.04 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
+.hello em{font:inherit;font-style:normal;color:var(--name-on-photo)}
+.hello p{margin:.4rem 0 0;font-size:15px;color:#fff;overflow-wrap:anywhere}
+.hello p em{font-weight:400}
+h1.big{margin:18px 0 0;font:700 clamp(26px,2.6vw,38px)/1.05 var(--sans);letter-spacing:-.01em}
+h1.big em{font:inherit;font-style:normal;color:var(--accent)}
+.sub{margin:.3rem 0 0;font-size:15px;color:var(--ink-2);max-width:40em}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+@media(max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tl{position:relative;display:block;height:clamp(130px,16vh,210px);overflow:hidden;background:var(--placeholder);color:#fff;text-decoration:none}
+.tl img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tl img:not([src]){display:none}
+.tl::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.14)}
+.tl b{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);z-index:1;text-align:center;font:700 clamp(18px,1.8vw,24px)/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.01em}
+.tl:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.go-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:12px}
+.btn{display:inline-flex;align-items:center;gap:.4rem;font:700 13px/1 var(--sans);letter-spacing:-.01em;padding:13px 18px;border:1px solid var(--ink);border-radius:0;background:var(--ink);color:#fff;text-decoration:none;cursor:pointer}
+.btn:hover,.btn.solid:hover{background:transparent;color:var(--ink);border-color:var(--ink)}
+.low{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px}
+@media(max-width:820px){.low{grid-template-columns:minmax(0,1fr)}}
+.pq{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:18px;align-items:center;padding:16px 18px;background:var(--paper);text-decoration:none;color:inherit;border-radius:var(--corner);min-width:0}
+.pq.nogrid{grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){.pq{grid-template-columns:minmax(0,1fr)}}
+.pq>div{min-width:0}
+.pq .n{display:block;margin:0;font:700 22px/1 var(--sans);letter-spacing:-.01em;text-transform:uppercase}
+.row .n{display:block;font:700 18px/1 var(--sans);letter-spacing:-.01em;text-transform:uppercase}
+.pq .n em,.row .n em{font:inherit;font-style:normal;color:inherit}
+.pq p{margin:.35rem 0 .7rem;font-size:13px;color:var(--ink-2)}
+.pq .lnk2{display:inline-block;margin-top:.7rem;font:700 13px/1 var(--sans);border-bottom:1px solid var(--ink);padding-bottom:3px}
+.stack{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;min-width:0}
+.stack img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:var(--placeholder)}
+.stack small{grid-column:1/-1;margin-top:6px;font-size:11px;color:var(--ink-2)}
+.also{display:grid;gap:12px;align-content:stretch;min-width:0}
+.row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) auto;gap:1rem;align-items:center;padding:14px 18px;border:0;border-radius:var(--corner);text-decoration:none;color:inherit;background:var(--paper);font:inherit;text-align:left;width:100%;cursor:pointer;min-width:0}
+.row>div{min-width:0}
+.row p{margin:.35rem 0 0;font-size:13px;color:var(--ink-2)}
+.row .ar{font-size:18px}
+.row .note{grid-column:1/-1;margin:0;font-size:12px}
+.row .note:empty{display:none}
+@media(max-width:1000px){.row{grid-template-columns:minmax(0,1fr) auto}.row .now{grid-column:1/-1;grid-row:2}}
+.now{display:flex;align-items:center;gap:10px;font-size:13px;min-width:0}
+.now img{width:34px;height:44px;object-fit:cover;flex:none}
+.now span{color:var(--ink);min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.now small{display:block;color:var(--ink-2);font-size:12px}
+.now small.late{color:var(--late)}
+.now .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ink-2)}
+.now .dot.red,.now .dot.coral{background:var(--late)}
+.rc,.yr{margin-top:12px;position:relative;display:flex;align-items:center;gap:1rem;padding:12px 18px;background:var(--tan);color:var(--ink);border-radius:var(--corner);min-width:0}
+.rc[hidden],.yr[hidden]{display:none}
+.rc .fan,.yr .fan{display:flex;gap:4px;flex:none}
+.rc .fan img,.yr .fan img{width:40px;height:52px;object-fit:cover;display:block}
+.rc>div,.yr>div{min-width:0}
+.rc b,.yr b{font:700 17px/1.1 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
+.rc b em,.yr b em{font:inherit;font-style:normal;color:inherit}
+.rc .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--ink-2)}
+.rc .chips span i{font-style:normal;font-weight:700;color:var(--ink)}
+.yr small{display:block;font-size:12px;color:var(--ink-2);margin-top:2px}
+.rc .playbtn,.yr .playbtn{margin-left:auto;font:700 13px/1 var(--sans);border-bottom:1px solid var(--ink);padding-bottom:3px;white-space:nowrap}
+.yr .all,.rc .all{position:absolute;inset:0;z-index:1}
+.rc .x{position:relative;z-index:2;border:0;background:none;font:400 18px/1 var(--sans);cursor:pointer;color:var(--ink-2);padding:4px 6px}
+.rc .x:hover,.rc .x:focus-visible{color:var(--ink)}
+.rcmenu{position:absolute;right:8px;top:calc(100% - 6px);z-index:3;background:#fff;padding:6px;display:grid;min-width:210px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
 .rcmenu[hidden]{display:none}
-.rcmenu button{border:0;background:none;text-align:left;font:500 13.5px/1.2 var(--sans);padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--ink)}
-.rcmenu button:hover,.rcmenu button:focus-visible{background:var(--sand-l)}
-.rc .rcnote{position:absolute;left:20px;bottom:2px;margin:0;font-size:12px;color:var(--coral-2);z-index:2}
-@media(max-width:560px){.yr .fan,.rc .fan{display:none}.rc{flex-wrap:wrap;padding-right:34px}.rc .playbtn{margin-left:0}}
-.foot{margin-top:1.4rem;font-size:13px;color:var(--ink-2);min-height:1em}
+.rcmenu button{border:0;background:none;text-align:left;font:400 13px/1.2 var(--sans);padding:10px 12px;cursor:pointer;color:var(--ink)}
+.rcmenu button:hover,.rcmenu button:focus-visible{background:var(--cream)}
+.rc .rcnote{position:absolute;left:18px;bottom:1px;margin:0;font-size:12px;color:var(--late);z-index:2}
+@media(max-width:560px){.rc,.yr{flex-wrap:wrap}.rc .fan,.yr .fan{display:none}.rc{padding-right:44px}.rc .x{position:absolute;right:8px;top:8px}}
+.foot{margin:.6rem 0 0;font-size:12px;color:var(--ink-2)}
 .foot button{border:0;background:none;padding:0;font:inherit;color:var(--ink-2);text-decoration:underline;cursor:pointer}
+/* "Create a reel: which shoot?" (her section 4): her dialog's styles, on our markup */
+.mk{position:fixed;inset:0;z-index:20;background:rgba(17,17,17,.45);display:grid;place-items:center;padding:16px}
+.mk[hidden]{display:none}
+.mkbox{width:min(760px,100%);max-height:86vh;overflow:auto;background:var(--paper);padding:clamp(18px,3vw,28px);outline:0}
+.mkh{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.mkh h3{margin:0;font:700 26px/1.05 var(--sans);letter-spacing:-.01em}
+.mkh h3 em{font-style:normal;color:var(--accent)}
+.mkh button{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--ink-2);padding:4px 6px}
+.mkh button:hover,.mkh button:focus-visible{color:var(--ink)}
+.mkbox>p{margin:.3rem 0 1rem;color:var(--ink-2);font-size:14px}
+.mkfind{box-sizing:border-box;width:100%;font:400 15px/1 var(--sans);letter-spacing:-.01em;padding:12px 14px;border:1px solid var(--line);border-radius:0;background:#fff;color:var(--ink);margin-bottom:10px}
+.mkfind[hidden]{display:none}
+.mklist{display:grid;gap:6px}
+#mkL{max-height:52vh;overflow:auto}
+.mkr{box-sizing:border-box;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:14px;align-items:center;padding:8px;background:#fff;text-decoration:none;color:var(--ink);border:1px solid transparent;border-radius:0;cursor:pointer;font:inherit;text-align:left;width:100%}
+.mkr:hover,.mkr:focus-visible{border-color:var(--ink);outline:0}
+.mkr:disabled{cursor:default;opacity:.6}.mkr:disabled:hover{border-color:transparent}
+.mkr .im{width:52px;height:52px;overflow:hidden;background:#d9d4cc;display:grid;place-items:center}
+.mkr .im img{width:100%;height:100%;object-fit:cover;display:block}
+.mkr>span{min-width:0}
+.mkr b{display:block;font:700 15px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
+.mkr small{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.mkr .ar{font-size:16px;color:var(--ink-2)}
+.mkr.new .im{background:var(--ink);color:#fff;font:400 26px/1 var(--sans)}
+.mkr.v .im{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--ink)}
+.mklab{margin:10px 0 6px;font:700 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.02em;color:var(--ink-2)}
+.mklab[hidden]{display:none}
+.mknote{margin:6px 0 0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink);border-left:3px solid var(--accent)}
+.mknote[hidden]{display:none}
+.mknothing{margin:0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink-2)}
 @media (prefers-reduced-motion: no-preference){
-.hello .tile img{transition:opacity 1.6s ease;animation:kb 14s ease-in-out infinite alternate}
-@keyframes kb{from{transform:scale(1)}to{transform:scale(1.07)}}
-.hello .tx > *{animation:rise .7s var(--ease) both}.hello .tx p{animation-delay:.12s}.hello .tx .hgo{animation-delay:.24s}
-@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.step.live .now .dot{animation:pulse 1.6s ease-in-out infinite}
-@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(240,127,90,.25)}}
+.hello .bgs img{transition:opacity 1.6s ease}
+.row .ar{transition:transform .3s var(--ease)}.row:hover .ar{transform:translateX(4px)}
 }
-@media (prefers-reduced-motion: reduce){.step,.fan img,.hello .hgo{transition:none}.step:hover{transform:none}}
 """
 
-# The hello (Nicole's hello.js, Nov 17): "personal, exciting, fun, and definitely different, like every time." Every
-# line comes from what is really going on (F, the facts the server read); only the wording is playful. Her openers
-# and her lines, whole. Ours underneath: the words reach the page as text (textContent), never as markup; the
-# name is only ever the one in their Brand File (no name: her openers without one, never an invented one); what
-# was said lately is kept in this browser (hers, a nicety for this viewer only), inside try/catch.
+# The photos (Nicole's v30 sections 2 and 4): the hello is ONE wide photo, cropped in toward the faces' middle (1.22x)
+# from the 1600 px copies (never the photos themselves), horizontal favorites first, a new one every few seconds; the
+# four tiles each a photo from a different shoot with a face, faces centered. The hello's words are drawn by the
+# server, as text (they are not this script's). A computer with no face finder (a PC): every photo centered.
 HELLO_JS = r"""
 const F = JSON.parse($('facts').textContent);
 const STILL = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-const pick1 = a => a[Math.floor(Math.random() * a.length)];
-// each line knows where it leads: [weight, subject, words, button]
-const GO = {backup: ['Back it up', 'backup'], posting: ['My posting queue', 'posting'], editing: ['My editing queue', 'queue'],
-            posts: ['Make posts', 'posts'], year: ['See your year', '']};
-function hellos(F, d){
-  const me = F.me || '', P = F.posting || {};
-  const hr = d.getHours(), day = d.toLocaleDateString('en-US', {weekday: 'long'}), mo = d.getMonth();
-  // an opener is [the plain words, the accent word]: "Welcome back, " + "Nicole." with a name, "Welcome back" + "." without
-  const N = t => me ? [t + ', ', me + '.'] : [t, '.'], Nx = t => me ? [t + ', ', me + '!'] : [t, '!'], Nq = t => me ? [t + ', ', me + '?'] : [t, '?'];
-  const op = [N(`Welcome back`), Nx(`Hi`), N(`Hey hey`), N(`Oh hi`), N(`There you are`), Nx(`Look who’s here`), [`Hello, `, `you.`]];
-  if (hr < 12) op.push(N(`Good morning`), N(`Morning`), N(`Rise and shine`), Nq(`Coffee first`));
-  else if (hr < 17) op.push(N(`Good afternoon`), N(`Afternoon`), N(`Hey there`));
-  else if (hr < 21) op.push(N(`Good evening`), N(`Evening`));
-  else op.push(Nq(`Late-night edit`), Nq(`Still up`), N(`Night owl mode`));
-  op.push(day === 'Monday' ? Nx(`New week`) : day === 'Friday' ? Nx(`Happy Friday`) : N(`Happy ${day}`));
-  if (mo === 10 || mo === 11) op.push([`Hello, `, `holiday season.`]);
-  const L = [], add = (w, key, opts, go) => L.push([w, key, pick1(opts), go]);
-  (P.today || []).forEach(x => { const n = x.who, k = x.kind;
-    add(5, 'today', [`${n} ${k} goes out today. Let’s make it a good one.`, `Today’s the day for ${n} ${k}.`, `${n} ${k} is up today, and it’s ready when you are.`], 'posting'); });
-  (P.late || []).forEach(x => { const n = x.who, k = x.kind, g = x.days;
-    add(4, 'late', [`${n} ${k} has been waiting ${g === 1 ? 'a day' : g + ' days'} to go out. Today?`, `Psst: ${n} ${k} is still waiting in the wings.`, `${n} ${k} is still ready and waiting. No pressure. (A little pressure.)`], 'posting'); });
-  const pw = (P.posted_week || []).length;
-  if (pw) add(3, 'posted', pw === 1 ? [`You posted ${P.posted_week[0].who} ${P.posted_week[0].kind} this week. Love that for you.`, `One post out this week. Look at you go.`]
-                                    : [`${pw} posts out this week. Look at you go.`, `${pw} posts this week already. Your feed is glowing.`, `You’ve posted ${pw} times this week. That’s how it’s done.`], 'posting');
-  if (P.ready) add(2, 'tank', P.ready <= 1 ? [`Only one post left ready to go. Want to make a few more?`] : [`${P.ready} posts are lined up and ready. Future you says thank you.`, `You’ve got ${P.ready} posts ready to go. Smooth sailing.`], P.ready <= 1 ? 'posts' : 'posting');
-  if (F.card) { const f = many(F.card.files || 0);
-    add(6, 'card', [`Your card is in. Let’s get those ${f} files safe.`, `I see a card! ${f} files, ready to back up whenever you are.`], 'backup'); }
-  const q = F.queue || [];
-  if (q.length === 1) add(3, 'queue', [`“${q[0].name}” is waiting for your magic.`, `“${q[0].name}” is in your editing queue, ready when you are.`], 'editing');
-  else if (q.length > 1) add(3, 'queue', [`${q.length} shoots are waiting for your magic.`, `${q.length} shoots in your editing queue. One at a time.`], 'editing');
-  q.filter(x => x.due_in !== null && x.due_in !== undefined).forEach(x => { const g = x.due_in;
-    if (g >= 0 && g <= 3) add(5, 'due', [`Heads up: “${x.name}” is due ${g === 0 ? 'today' : g === 1 ? 'tomorrow' : 'in ' + g + ' days'}.`], 'editing'); });
-  const Y = F.year;
-  if (Y) {
-    if (Y.newest) add(2, 'newest', [`${Y.newest} is your newest shoot. Want to turn it into posts?`, `Still thinking about ${Y.newest}? Let’s make something from it.`], 'posts');
-    if (Y.reels) add(1, 'reels', [`${Y.reels} reels made so far this year. That’s a lot of beats.`, `${Y.reels} reels this year and counting.`], 'year');
-    if (Y.photos) add(1, 'photos', [`${many(Y.photos)} finished photos this year. Every one of them yours.`], 'year');
-    if (Y.top) add(1, 'top', [`${Y.top} is your most-made-from shoot this year. Iconic.`], 'year');
-  }
-  if (day === 'Friday') add(2, 'day', [`Friday’s a great day to line up the weekend’s posts.`], 'posting');
-  if (day === 'Monday') add(2, 'day', [`Fresh week, fresh posts. Let’s see what’s waiting.`], 'posting');
-  if (!L.length) add(1, 'none', [`Everything’s calm. A great day to make something.`], 'posts');
-  return {op, L};
-}
-function recentSaid(){ try { const r = JSON.parse(localStorage.getItem('assistantHello') || '[]'); return Array.isArray(r) ? r.filter(x => typeof x === 'string') : []; } catch (e) { return []; } }
-function goFrom(where, el){
-  const g = GO[where]; if (!g) return;
-  if (g[1]) clicked(g[1]);
-  if (where === 'editing') assistant('/queue-url', el, W.opening_queue);
-  else if (F.go[where]) location.href = F.go[where];
-}
-function sayHello(el, d){
-  const {op, L} = hellos(F, d || new Date());
-  let recent = recentSaid();
-  const said = o => o[0] + o[1];
-  const freshOp = op.filter(o => !recent.includes(said(o))), o = pick1(freshOp.length ? freshOp : op);
-  const lastKeys = recent.filter(x => x.startsWith('k:')).slice(-2);          // a different subject than the last two times
-  let pool = L.filter(l => !lastKeys.includes('k:' + l[1]) && !recent.includes(l[2])); if (!pool.length) pool = L;
-  let r = Math.random() * pool.reduce((t, l) => t + l[0], 0), line = pool[0];
-  for (const l of pool) { r -= l[0]; if (r <= 0) { line = l; break; } }
-  recent = recent.concat([said(o), line[2], 'k:' + line[1]]).slice(-24); try { localStorage.setItem('assistantHello', JSON.stringify(recent)); } catch (e) {}
-  const g = GO[line[3]];
-  el.textContent = '';
-  const h = document.createElement('h3'), em = document.createElement('em'), p = document.createElement('p');
-  h.append(o[0]); em.textContent = o[1]; h.append(em); p.textContent = line[2]; el.append(h, p);
-  el.dataset.subject = line[1];
-  if (g && (line[3] === 'editing' || F.go[line[3]])) {
-    const b = document.createElement('button'), ar = document.createElement('span');
-    b.className = 'hgo'; b.type = 'button'; b.dataset.go = line[3]; b.append(g[0] + ' '); ar.setAttribute('aria-hidden', 'true'); ar.textContent = '→'; b.append(ar);
-    b.onclick = () => goFrom(line[3], b); el.append(b);
-  }
-}
-
-/* the collage: tall tiles, each photo centered on its faces (the Mac's own face finder, asked by the server) */
+const ZOOM = 1.22, EVERY = 6000;
 const clamp01 = v => Math.max(0, Math.min(1, v));
 function window1(fs, vis){
   let best = null;
@@ -865,68 +998,97 @@ function window1(fs, vis){
   if (!best || !best.inn.length) return fs.reduce((t, f) => t + f.c, 0) / fs.length;      // no stretch holds a whole face: the middle of them
   return (Math.min(...best.inn.map(f => f.a)) + Math.max(...best.inn.map(f => f.b))) / 2;
 }
+// the faces' middle, cropped in: object-position puts them in the frame, the 1.22x zoom grows from their middle
 function aim(img, x, bw, bh){
   const f = x.f || {}, w = f.w || x.nw || 1000, h = f.h || x.nh || 1500, sc = Math.max(bw / w, bh / h), dw = w * sc, dh = h * sc, fc = f.faces || [];
-  let cx = .5, cy = fc.length ? .35 : .5, px = .5, py = .5;        // no faces known (a PC, or none in the photo): the photo is centered
+  let cx = .5, cy = .5, px = .5, py = .5;        // no faces known (a PC, or none in the photo): the photo is centered
   if (fc.length) {
     cx = window1(fc.map(a => ({a: a[0], b: a[0] + a[2], c: a[0] + a[2] / 2, size: a[2] * a[3]})), bw / dw);
     cy = window1(fc.map(a => ({a: a[1] - a[3] * .4, b: a[1] + a[3] * 1.1, c: a[1] + a[3] / 2, size: a[2] * a[3]})), bh / dh);
-    px = dw > bw + 1 ? clamp01((cx * dw - bw / 2) / (dw - bw)) : .5; py = dh > bh + 1 ? clamp01((cy * dh - .38 * bh) / (dh - bh)) : .5;   // heads about 38% down the tile
+    px = dw > bw + 1 ? clamp01((cx * dw - bw / 2) / (dw - bw)) : .5; py = dh > bh + 1 ? clamp01((cy * dh - .5 * bh) / (dh - bh)) : .5;
   }
   img.style.objectPosition = `${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%`;
   img.style.transformOrigin = `${(cx * dw - px * (dw - bw)).toFixed(0)}px ${(cy * dh - py * (dh - bh)).toFixed(0)}px`;
+  img.style.transform = `scale(${ZOOM})`;
+  img.dataset.faces = String(fc.length);
 }
-// two photos with the same number of faces, every face within 0.09 of the other's: frames from one burst
-function twin(p, q){ const A = (p.f && p.f.faces) || [], B = (q.f && q.f.faces) || []; if (A.length !== B.length || !A.length) return false;
-  const c = x => [x[0] + x[2] / 2, x[1] + x[3] / 2], ca = A.map(c).sort((u, v) => u[0] - v[0]), cb = B.map(c).sort((u, v) => u[0] - v[0]);
-  return ca.every((u, i) => Math.hypot(u[0] - cb[i][0], u[1] - cb[i][1]) < .09); }
-let HP = [], HTIMER = 0;
-function collage(box, bg){
-  clearInterval(HTIMER); if (!HP.length) return;
-  const bw = box.clientWidth, n = Math.max(3, Math.round(bw / 165)), gap = 3, tw = (bw - gap * (n - 1)) / n, th = Math.max(230, Math.round(tw * 1.5));
-  box.style.minHeight = th + 'px';
-  bg.style.gridTemplateColumns = `repeat(${n},1fr)`;
-  bg.textContent = '';
-  for (let k = 0; k < n; k++) { const t = document.createElement('div'), a = document.createElement('img'), b = document.createElement('img');
-    t.className = 'tile'; a.alt = ''; b.alt = ''; a.className = 'on'; a.style.animationDelay = `-${k * 2.3}s`; t.append(a, b); bg.append(t); }
-  const put = (im, x) => { im.dataset.n = x.n; im.src = x.u; aim(im, x, tw, th); };
-  const step = Math.max(1, Math.floor(HP.length / n)); let HQ = n * step + 1, lastT = -1;
-  [...bg.children].forEach((t, k) => put(t.firstChild, HP[(k * step) % HP.length]));
-  if (HP.length <= n || STILL) return;                                   // reduced motion: the photos stay as they are
-  HTIMER = setInterval(() => {
-    let k; do { k = Math.floor(Math.random() * n); } while (n > 1 && k === lastT); lastT = k;
-    const t = bg.children[k]; if (!t) return;
-    const on = t.querySelector('img.on'), off = on === t.firstChild ? t.lastChild : t.firstChild;
-    off.onload = () => { on.classList.remove('on'); off.classList.add('on'); off.onload = null; }; put(off, HP[HQ++ % HP.length]);
-  }, 2800);
+const photoUrl = (kit, p) => '/kit-photo?kit=' + encodeURIComponent(kit) + '&n=' + p.n + '&size=l&v=' + encodeURIComponent(p.v || '');
+// a brand-new Assistant's sample photos (samples.py): by file name only, from the plugin's own samples folder
+const SAMPLES = F.samples || null;
+const sampleUrl = name => '/home-sample?name=' + encodeURIComponent(name);
+let SFACES = null;
+const sampleFaces = () => SFACES || (SFACES = live
+  ? fetch('/home-sample-faces', {cache: 'no-store'}).then(r => r.json()).then(d => (d && d.faces) || {}).catch(() => ({}))
+  : Promise.resolve({}));
+const sampleShown = () => { const s = document.getElementById('sampleNote'); if (s) s.hidden = false; };
+// the faces of a kit's photos, one ask per kit (faces.py looks at the 520 px copies; the boxes are fractions, so they
+// hold for the 1600 px copy too); remembered for this page
+const FACES = {};
+function facesOf(kit, ns){
+  const k = kit + '|' + ns.join(',');
+  if (!FACES[k]) FACES[k] = live && ns.length
+    ? fetch('/kit-faces?kit=' + encodeURIComponent(kit) + '&n=' + ns.slice(0, 24).join(','), {cache: 'no-store'}).then(r => r.json()).then(d => (d && d.faces) || {}).catch(() => ({}))
+    : Promise.resolve({});
+  return FACES[k];
 }
+const soon = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+function put(im, x, box){
+  return new Promise(res => {
+    const done = ok => { im.onload = im.onerror = null; res(ok); };
+    im.onload = () => { x.nw = im.naturalWidth; x.nh = im.naturalHeight; aim(im, x, box.clientWidth, box.clientHeight); done(true); };
+    im.onerror = () => done(false);
+    im.dataset.n = x.n; im.dataset.kit = x.kit; im.src = x.u;
+  });
+}
+
+/* the hello: one photo, a new one every few seconds (reduced motion: the first one stays) */
 async function startHello(box){
-  const bg = box.querySelector('.bgs'), tx = box.querySelector('.tx');
-  sayHello(tx);
-  const C = F.collage; if (!C || !C.photos.length || !live) return;
-  // the small copies only (never the photos themselves), and every face in one ask; if the faces take more than a
-  // moment (a brand new shoot), the collage starts anyway and re-aims when they arrive
-  const kq = encodeURIComponent(C.kit);
-  const all = C.photos.map(p => ({n: p.n, u: '/kit-photo?kit=' + kq + '&n=' + p.n + '&size=s&v=' + encodeURIComponent(p.v || ''), f: {}, ok: false, tries: 0}));
-  const load = x => new Promise(r => { const im = new Image(); im.onload = () => { x.ok = true; x.nw = im.naturalWidth; x.nh = im.naturalHeight; r(); }; im.onerror = () => r();
-    if (x.tries) x.u = x.u.replace(/&t=\d+$/, '') + '&t=' + x.tries; im.src = x.u; });
-  const faces = xs => fetch('/kit-faces?kit=' + kq + '&n=' + xs.map(x => x.n).join(','), {cache: 'no-store'}).then(r => r.json()).then(d => (d && d.faces) || {}).catch(() => ({}));
-  const build = () => { HP = []; all.filter(x => x.ok).forEach(x => { if (!HP.some(y => twin(x, y))) HP.push(x); }); collage(box, bg); box.dataset.photos = HP.length; };
-  async function round(first){
-    const todo = all.filter(x => !x.ok);
-    await Promise.all(todo.map(load));
-    const got = todo.filter(x => x.ok); if (!got.length) return;
-    const fq = faces(got).then(G => { got.forEach(x => { if (G[x.n]) x.f = G[x.n]; }); box.dataset.faces = '1'; });
-    const late = first ? await Promise.race([fq.then(() => false), new Promise(r => setTimeout(() => r(true), 900))]) : await fq.then(() => false);
-    if (late) fq.then(build);
-    build();
-  }
-  await round(true);
-  // a small copy that was still being made: asked for again a few times, then the collage is drawn again with it
-  let tries = 0;
-  (function again(){ if (!all.some(x => !x.ok) || ++tries > 6) return;
-    setTimeout(async () => { all.forEach(x => { if (!x.ok) x.tries = tries; }); await round(false); again(); }, 5000); })();
-  let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => collage(box, bg), 300); });
+  const P = SAMPLES ? (SAMPLES.hello || []).map(nm => ({kit: '', n: nm, u: sampleUrl(nm), f: {}}))
+    : (F.hello_photos || []).map(p => ({kit: p.kit, n: p.n, u: photoUrl(p.kit, p), f: {}}));
+  box.dataset.photos = String(P.length);
+  if (!P.length || !live) return;
+  const bg = box.querySelector('.bgs'), A = bg.children[0], B = bg.children[1];
+  const kits = [...new Set(P.map(x => x.kit))];
+  const asks = SAMPLES ? [sampleFaces().then(G => { P.forEach(x => { if (G[x.n]) x.f = G[x.n]; }); })]
+    : kits.map(k => facesOf(k, P.filter(x => x.kit === k).map(x => x.n)).then(G => { P.filter(x => x.kit === k).forEach(x => { if (G[x.n]) x.f = G[x.n]; }); }));
+  await soon(Promise.all(asks), 900);                       // a brand-new shoot's faces may take a moment: start anyway
+  let i = 0, ok = false;
+  for (; i < P.length && !ok; i++) ok = await put(A, P[i], box);
+  if (!ok) { A.removeAttribute('src'); return; }
+  A.classList.add('on'); box.classList.add('photo'); box.dataset.shown = String(i - 1);
+  if (SAMPLES) sampleShown();
+  Promise.all(asks).then(() => { const on = bg.querySelector('img.on'); const x = P.find(y => String(y.n) === on.dataset.n && y.kit === on.dataset.kit); if (x) aim(on, x, box.clientWidth, box.clientHeight); });
+  let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => bg.querySelectorAll('img[src]').forEach(im => { const x = P.find(y => String(y.n) === im.dataset.n && y.kit === im.dataset.kit); if (x) aim(im, x, box.clientWidth, box.clientHeight); }), 250); });
+  if (P.length < 2 || STILL) return;                        // reduced motion: the photo never changes
+  let next = i % P.length, busy = false;
+  setInterval(async () => {
+    if (busy || document.hidden) return; busy = true;
+    const on = bg.querySelector('img.on'), off = on === A ? B : A;
+    for (let tries = 0; tries < P.length; tries++) {
+      const k = next; next = (next + 1) % P.length;
+      if (await put(off, P[k], box)) { off.classList.add('on'); on.classList.remove('on'); box.dataset.shown = String(k); break; }
+    }
+    busy = false;
+  }, EVERY);
+}
+
+/* the four tiles: a photo from a different shoot each, the first one with a face, faces centered */
+async function startTiles(){
+  const T = SAMPLES ? (SAMPLES.tiles || []).map(ns => ({kit: '', sample: true, cands: (ns || []).map(nm => ({n: nm}))})) : (F.tiles || []);
+  const facesFor = t => t.sample ? sampleFaces() : facesOf(t.kit, t.cands.map(c => c.n));
+  const urlFor = (t, c) => t.sample ? sampleUrl(c.n) : photoUrl(t.kit, c);
+  document.querySelectorAll('#tiles .tl').forEach(async (el, i) => {
+    const t = T[i]; if (!t || !t.cands || !t.cands.length || !live) return;
+    const im = el.querySelector('img');
+    const G = await soon(facesFor(t), 2500) || {};
+    const withFace = t.cands.filter(c => G[c.n] && G[c.n].faces && G[c.n].faces.length);
+    const order = withFace.concat(t.cands.filter(c => !withFace.includes(c)));
+    for (const c of order) { if (await put(im, {kit: t.kit, n: c.n, u: urlFor(t, c), f: G[c.n] || {}}, el)) { if (t.sample) sampleShown(); return; } }
+    im.removeAttribute('src');
+  });
+  let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => document.querySelectorAll('#tiles .tl img[src]').forEach(im => {
+    const el = im.closest('.tl'), t = T[[...el.parentNode.children].indexOf(el)]; if (!t) return;
+    facesFor(t).then(G => aim(im, {f: G[im.dataset.n] || {}, nw: im.naturalWidth, nh: im.naturalHeight}, el.clientWidth, el.clientHeight)); }), 250); });
 }
 """
 
@@ -937,9 +1099,9 @@ $('s2').onclick = () => assistant('/queue-url', $('editingWords'), W.opening_que
 $('folder').onclick = () => assistant('/open-home', $('folder'), W.opening);
 if (!live) $('offline').hidden = false;
 startHello($('hello'));
-$('again').onclick = () => sayHello($('hello').querySelector('.tx'));
+startTiles();
 // a picture that can't be shown (its small copy is still being made) leaves no broken frame
-document.querySelectorAll('.now img, .fan img').forEach(im => { const gone = () => { im.remove(); }; if (im.complete && !im.naturalWidth) gone(); else im.addEventListener('error', gone); });
+document.querySelectorAll('.now img, .fan img, .stack img').forEach(im => { const gone = () => { im.remove(); }; if (im.complete && !im.naturalWidth) gone(); else im.addEventListener('error', gone); });
 // the monthly recap: the x opens two choices; the choice is saved with their records first, then the card goes.
 // "Show my monthly recap" in the footer brings it back.
 (function(){
@@ -961,9 +1123,103 @@ document.querySelectorAll('.now img, .fan img').forEach(im => { const gone = () 
   document.addEventListener('click', e => { if (!e.target.closest('#rcM') && !e.target.closest('#rcX')) open(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { open(false); x.focus(); } });
 })();
+// The four tiles are shortcuts (Nicole's v30, section 4): a press asks which shoot, then goes straight to that shoot's
+// page (the reel page, the carousel designer, the stories designer, the words page). "+ A new shoot" picks a folder,
+// the Assistant makes its post kit, and the page lands where the tile was going. Every word is drawn as text.
+const MK = (function(){
+  const box = $('mk'); if (!box) return null;
+  const TITLE = {reel: 'mk_reel', carousel: 'mk_carousel', stories: 'mk_stories', captions: 'mk_captions'};
+  let make = 'reel', from = null, list = null, following = false, asked = 0;
+  window.MK_HOLD = false;
+  const accent = (el, s) => { el.textContent = ''; const m = /^(.*)<em>(.*)<\/em>(.*)$/.exec(s);
+    if (!m) { el.textContent = s; return; } const e = document.createElement('em'); e.textContent = m[2]; el.append(m[1], e, m[3]); };
+  const el = (tag, cls, text) => { const x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; };
+  function row(tag, cls, imgs, title, small){
+    const r = el(tag, 'mkr' + (cls ? ' ' + cls : '')); if (tag === 'button') r.type = 'button';
+    const im = el('span', 'im'); im.setAttribute('aria-hidden', 'true');
+    if (typeof imgs === 'string') im.textContent = imgs;
+    else imgs.forEach(src => { const i = el('img'); i.alt = ''; i.loading = 'lazy'; i.addEventListener('error', () => { i.remove(); }); i.setAttribute('src', src); im.append(i); });
+    const t = el('span'); t.append(el('b', '', title), el('small', '', small));
+    const ar = el('span', 'ar', '→'); ar.setAttribute('aria-hidden', 'true');
+    r.append(im, t, ar); return r;
+  }
+  const say = t => { const n = $('mkNote'); n.textContent = t || ''; n.hidden = !t; };
+  const photos = n => fill(n === 1 ? W.mk_photo : W.mk_photos, {n: many(n || 0)});
+  function draw(){
+    const L = $('mkL'), kits = (list && list.kits) || [], q = ($('mkF').value || '').trim().toLowerCase();
+    $('mkS').textContent = (list && !kits.length) ? W.mk_sub_none : W.mk_sub;
+    $('mkLab').hidden = !kits.length; $('mkF').hidden = kits.length < 7;
+    L.textContent = '';
+    if (list && list.vault && kits.length && (!q || W.mk_vault.toLowerCase().includes(q))) {
+      const v = row('button', 'v', list.vault.thumbs || [], W.mk_vault, W.mk_vault_small); v.id = 'mkVault';
+      v.onclick = () => toVault(v); L.append(v);
+    }
+    const hit = kits.filter(k => !q || String(k.name).toLowerCase().includes(q));
+    hit.forEach(k => { const a = row('a', '', [k.thumb], k.name, [niceDay(k.date), photos(k.photos)].filter(Boolean).join(' · '));
+      a.setAttribute('href', k.go[make]); a.dataset.kit = k.folder; L.append(a); });
+    if (q && !L.children.length && kits.length) L.append(el('p', 'mknothing', fill(W.mk_nothing, {q: $('mkF').value.trim()})));
+  }
+  async function load(){
+    const mine = ++asked;
+    try { const r = await fetch('/make-list', {cache: 'no-store'}); const d = await r.json(); if (mine !== asked) return; if (!d || !d.ok) throw 0; list = d; }
+    catch (e) { if (mine !== asked) return; list = {kits: [], vault: null}; say(W.mk_list_cant); }
+    draw();
+  }
+  function open(kind, tile){
+    make = TITLE[kind] ? kind : 'reel'; from = tile || null;
+    accent($('mkT'), W[TITLE[make]]);
+    $('mkF').value = ''; if (!following) say('');
+    $('mkNew').disabled = following;
+    draw(); box.hidden = false; window.MK_HOLD = true; box.querySelector('.mkbox').focus();
+    load();
+  }
+  function close(){
+    if (box.hidden) return;
+    box.hidden = true; if (!following) window.MK_HOLD = false;
+    if (from) try { from.focus(); } catch (e) {}
+  }
+  async function toVault(b){
+    b.disabled = true;
+    try { const r = await fetch('/make-vault', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({make})});
+      const d = await r.json(); if (d && d.ok && d.url) { location.href = d.url; return; } say((d && d.words) || W.mk_didnt); }
+    catch (e) { say(W.mk_didnt); }
+    b.disabled = false;
+  }
+  function follow(){
+    following = true; window.MK_HOLD = true; $('mkNew').disabled = true;
+    const tick = async () => {
+      let j = null; try { j = await (await fetch('/make-new-status', {cache: 'no-store'})).json(); } catch (e) {}
+      if (j && j.state === 'done' && j.go) { following = false; say(j.words);
+        if (!box.hidden) { location.href = j.go[make]; return; } window.MK_HOLD = false; $('mkNew').disabled = false; return; }
+      if (j && (j.state === 'stopped' || j.state === 'none')) { following = false; $('mkNew').disabled = false; say(j.words || W.mk_didnt);
+        if (box.hidden) window.MK_HOLD = false; return; }
+      if (j && j.words) say(j.words);
+      setTimeout(tick, 700);
+    };
+    setTimeout(tick, 300);
+  }
+  async function newShoot(){
+    if (following) return;
+    const b = $('mkNew'); b.disabled = true; say(W.mk_picking);
+    let d = null;
+    try { const r = await fetch('/make-new', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); d = await r.json(); }
+    catch (e) { d = {ok: false, words: W.not_running}; }
+    if (d && d.state === 'working') { say(d.words); follow(); return; }
+    b.disabled = false; say(d && d.cancelled ? '' : ((d && d.words) || W.mk_didnt));     // a closed window changes nothing
+  }
+  $('mkNew').onclick = newShoot;
+  $('mkX').onclick = close;
+  box.addEventListener('click', e => { if (e.target === box) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !box.hidden) { e.preventDefault(); close(); } });
+  $('mkF').addEventListener('input', draw);
+  document.querySelectorAll('#tiles .tl').forEach(t => t.addEventListener('click', e => {
+    if (!live || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;     // a saved copy, or a new tab: the plain link
+    e.preventDefault(); open(t.dataset.make, t); }));
+  return {open, close};
+})();
 // Reload when anything changes (a card goes in, a backup lands, a queue moves).
 const STAMP = document.body.dataset.stamp;
-if (live) setInterval(async () => { try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
+if (live) setInterval(async () => { if (window.MK_HOLD) return; try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
 """
 
 
@@ -1021,14 +1277,8 @@ def now_boxes(f):
         boxes.append(_now("red" if late else "yellow", W("n2_one") if len(q) == 1 else W("n2_many").format(n=len(q)), small, late=late))
     else:
         boxes.append(_now("green", W("n2_none"), W("n2_none_small")))
-    # 3. the newest post kit, with its photo, and how many kits there are
-    k = f.get("newest")
-    if k:
-        n = f.get("kits") or 0
-        boxes.append(_now("", W("n3_newest").format(short=k["short"]), W("n3_kits").format(n=n, s="" if n == 1 else "s"),
-                          img=photo_src(k["photo"]) if k.get("photo") else None))
-    else:
-        boxes.append(_now("", W("n3_none"), W("n3_none_small")))
+    # 3. (gone in v30: the "Newest: ..." box beside See all my post kits. Nicole: "no one cares about the newest.")
+    boxes.append("")
     # 4. today's post with its picture, or one that missed its day; otherwise how many are ready
     P = f.get("posting") or {}
     t = (P.get("today") or [None])[0]
@@ -1061,6 +1311,38 @@ def _fan(photos):
     return "".join(f"<img src='{html.escape(photo_src(p), quote=True)}' alt=''>" for p in photos[:3])
 
 
+def _parts(parts):
+    """The hello's words (hello_lines' [{"text", "name"}]) as markup: every word escaped, the name in <em>."""
+    out = []
+    for p in parts or []:
+        if not isinstance(p, dict):
+            continue
+        t = html.escape(str(p.get("text") or ""))
+        out.append(f"<em>{t}</em>" if p.get("name") else t)
+    return "".join(out)
+
+
+# The four tiles (her section 4): which kind each one makes. A press opens "Create a reel: which shoot?" (make_box and
+# the page's script); the post kits screen stays the plain link (a saved copy of the page, a new tab).
+TILES = (("reel", "t_reel"), ("carousel", "t_carousel"), ("stories", "t_stories"), ("captions", "t_captions"))
+
+
+def make_box():
+    """"Create a reel: which shoot?" (her section 4), drawn hidden: the page's script fills its title, its list (from
+    /make-list) and its lines, all as text. + A new shoot is always there; Your shoots and the search box only when
+    there are shoots (the search from 7)."""
+    e = html.escape
+    return (f"<div class='mk' id='mk' hidden><div class='mkbox' role='dialog' aria-modal='true' aria-labelledby='mkT' tabindex='-1'>"
+            f"<div class='mkh'><h3 id='mkT'></h3><button type='button' id='mkX' aria-label='{e(W('mk_close'), quote=True)}'>&times;</button></div>"
+            f"<p id='mkS'>{e(W('mk_sub'))}</p>"
+            f"<div class='mklist' id='mkTop'><button type='button' class='mkr new' id='mkNew'><span class='im' aria-hidden='true'>+</span>"
+            f"<span><b>{e(W('mk_new'))}</b><small>{e(W('mk_new_small'))}</small></span><span class='ar' aria-hidden='true'>&rarr;</span></button></div>"
+            f"<p class='mknote' id='mkNote' role='status' hidden></p>"
+            f"<p class='mklab' id='mkLab' hidden>{e(W('mk_shoots'))}</p>"
+            f"<input class='mkfind' id='mkF' type='search' placeholder='{e(W('mk_find'), quote=True)}' aria-label='{e(W('mk_find'), quote=True)}' hidden>"
+            f"<div class='mklist' id='mkL'></div></div></div>")
+
+
 def page_html(query="", start=False):
     """The home page. query: the address's own (?wrapped=1 shows the Your year bar any time, for testing: hers).
     start: have the small copies the page wants made when some are missing (the page server passes True)."""
@@ -1072,22 +1354,38 @@ def page_html(query="", start=False):
     e = html.escape
     boxes = now_boxes(f)
     live_card = " live" if f.get("card") else ""
-    # Posts first (Nicole, v29 1.2). The ids and the data-item names are the ones the four steps had (s1 backup,
-    # s2 queue, s3 posts, s4 posting), so home.py pending, the hello's buttons and the now-boxes read as before.
-    # The big card is not itself a press: its button is (a plain link). No list of post kits here, by her ask:
-    # "Think about when someone is going to end up having like 20 post kits, 30 post kits."
+    # the hello (her section 3): a greeting and one line, made only from her approved lines, drawn here as text
+    h = f.get("hello") or {}
+    greet = _parts(h.get("greeting_parts")) if h.get("greeting_parts") else e(h.get("greeting") or W("hello_plain"))
+    line = _parts(h.get("line_parts")) if h.get("line_parts") else e(h.get("line") or "")
+    hello = (f"<section class='hello' id='hello' data-group='{e(str(h.get('group') or ''), quote=True)}'>"
+             f"<div class='bgs' aria-hidden='true'><img alt=''><img alt=''></div>"
+             f"<div class='tx'><h2 id='hi'>{greet}</h2>{f'<p>{line}</p>' if line else ''}</div>"
+             + (f"<p class='samplenote' id='sampleNote' hidden>{e(f['samples']['note'])}</p>" if f.get("samples") else "")
+             + "</section>")
+    # Turn your shoots into posts, the four tiles, and the one button (no "Newest" box: her section 2)
     kits_btn = W("s3_see") if (f.get("kits") or f.get("newest")) else W("s3_create")
-    big = (f"<section class='mk step' id='s3'><span class='n'>{W('s3_n')}</span><p>{e(W('s3_p'))}</p>"
-           f"<div class='mk-go'><a class='btn solid big' id='kitsBtn' data-item='posts' href='/make-posts'>{e(kits_btn)}</a>"
-           f"<div class='now' id='n3'>{boxes[2]}</div></div></section>")
-    posting = (f"<a class='step full' id='s4' data-item='posting' href='/posting.html'><span class='n'>{W('s4_n')}</span><p>{e(W('s4_p'))}</p>"
-               f"<div class='now' id='n4'>{boxes[3]}</div><span class='go'>{e(W('s4_go'))}</span></a>")
-    also = (f"<div class='also'><h2>{e(W('also_h'))}</h2><div class='also-row'>"
-            f"<a class='step sm{live_card}' id='s1' data-item='backup' href='/backups'><span class='n'>{W('s1_n')}</span><p>{e(W('s1_p'))}</p>"
-            f"<div class='now' id='n1'>{boxes[0]}</div></a>"
-            f"<button class='step sm' id='s2' data-item='queue' type='button'><span class='n'>{W('s2_n')}</span><p>{e(W('s2_p'))}</p>"
-            f"<div class='now' id='n2'>{boxes[1]}</div><span id='editingWords' hidden></span></button>"
-            f"</div></div>")
+    tiles = "".join(
+        f"<a class='tl' href='/make-posts' data-make='{make}' data-item='posts' aria-label='{e(W('t_aria').format(word=W(key)), quote=True)}'>"
+        f"<img alt=''><b>{e(W(key))}</b></a>" for make, key in TILES)
+    big = (f"<section id='s3'><h1 class='big'>{W('s3_n')}</h1><p class='sub'>{e(W('s3_p'))}</p>"
+           f"<div class='tiles' id='tiles'>{tiles}</div>"
+           f"<div class='go-row'><a class='btn solid' id='kitsBtn' data-item='posts' href='/make-posts'>{e(kits_btn)}</a></div></section>")
+    # My posting queue on the left, with the last three posts of their grid; Back up a card and My editing queue
+    # stacked on the right (hers: "That looks so good. I love that.")
+    grid = f.get("grid") or []
+    stack = ("<div class='stack' id='stack'>" + "".join(f"<img src='{e(u, quote=True)}' alt=''>" for u in grid[:3])
+             + f"<small>{e(W('s4_grid'))}</small></div>") if grid else ""
+    posting = (f"<a class='pq{'' if grid else ' nogrid'}' id='s4' data-item='posting' href='/posting.html'>"
+               f"<div><h2 class='n'>{W('s4_n')}</h2><p>{e(W('s4_p'))}</p><div class='now' id='n4'>{boxes[3]}</div>"
+               f"<span class='lnk2'>{e(W('s4_go'))}</span></div>{stack}</a>")
+    also = (f"<div class='also'>"
+            f"<a class='row{live_card}' id='s1' data-item='backup' href='/backups'><div><span class='n'>{W('s1_n')}</span><p>{e(W('s1_p'))}</p></div>"
+            f"<div class='now' id='n1'>{boxes[0]}</div><span class='ar' aria-hidden='true'>&rarr;</span></a>"
+            f"<button class='row' id='s2' data-item='queue' type='button'><div><span class='n'>{W('s2_n')}</span><p>{e(W('s2_p'))}</p></div>"
+            f"<div class='now' id='n2'>{boxes[1]}</div><span class='ar' aria-hidden='true'>&rarr;</span><span id='editingWords' hidden></span></button>"
+            f"</div>")
+    low = f"<div class='low'>{posting}{also}</div>"
     # the monthly recap card (drawn hidden when they hid it, so Show my monthly recap brings it back at once)
     recap = ""
     foot = ""
@@ -1109,31 +1407,23 @@ def page_html(query="", start=False):
         year = (f"<div class='yr' id='yr'><a class='all' href='{e(y['url'], quote=True)}' aria-label='{e(W('yr_watch_aria').format(year=y['year']), quote=True)}'></a>"
                 f"<div class='fan' id='yrFan'>{_fan(y['photos'])}</div><div><b>{W('yr_b').format(year=e(y['year']))}</b><small>{e(W('yr_small'))}</small></div>"
                 f"<span class='playbtn' aria-hidden='true'>{e(W('watch'))}</span></div>")
-    # what the hello is made from: names and numbers, as data (never markup, never a path)
-    go = {"backup": "/backups", "posting": "/posting.html", "posts": "/make-posts"}
-    if f.get("year"):
-        go["year"] = "/wrapped.html?y=" + f["year"]["y"]
-    hello = {"me": f["me"], "card": f["card"], "queue": [{"name": x["name"], "due_in": x["due_in"]} for x in f["queue"]],
-             "posting": {"today": [{"who": x["who"], "kind": x["kind"]} for x in f["posting"]["today"]],
-                         "late": [{"who": x["who"], "kind": x["kind"], "days": x["days"]} for x in f["posting"]["late"]],
-                         "posted_week": [{"who": x["who"], "kind": x["kind"]} for x in f["posting"]["posted_week"]],
-                         "ready": f["posting"]["ready"]},
-             "year": f["year"], "collage": f["collage"], "go": go}
+    # what the page's script draws from: kit folder NAMES and photo numbers only (never a path, never markup)
+    sm = f.get("samples") or None
+    data = {"hello_photos": f.get("hello_photos") or [], "tiles": f.get("tiles") or [],
+            "samples": {"hello": sm["hello"], "tiles": sm["tiles"]} if sm else None}
     words = dict(home_base.WORDS)
     words.update(home_base.OUR_WORDS)
     words.update({"rc_didnt": W("rc_didnt")})
+    words.update({k: W(k) for k in list(WORDS) + list(OUR_WORDS) if k.startswith("mk_")})
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}</style></head><body data-stamp='{e(fingerprint())}'>"
+            f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}</style></head><body class='home30' data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when' id='when'>{e(f['today'])}</span>"
             f"<span class='fold'><button class='lnk' id='folder' data-item='folder' type='button'>{e(W('folder').format(short=brand.short()))}</button><span class='note' role='status'></span></span></div>"
             f"<p class='offline' id='offline' hidden>{e(W('offline'))}</p>"
-            f"<section class='hello' id='hello'><div class='bgs'></div>"
-            f"<button class='again' id='again' type='button' title='{e(W('again_title'), quote=True)}'>{e(W('again'))}</button>"
-            f"<div class='tx' aria-live='polite'><h3>{e(W('hello_plain'))}</h3></div></section>"
-            f"{big}{posting}{also}"
-            f"{recap}{year}<p class='foot'>{foot}</p>"
-            f"</div><script type='application/json' id='facts'>{_json_for_script(hello)}</script>"
+            f"{hello}{big}{low}"
+            f"{recap}{year}<p class='foot'>{foot}</p>{make_box()}"
+            f"</div><script type='application/json' id='facts'>{_json_for_script(data)}</script>"
             f"<script>const W = {_json_for_script(words)};{home_base.JS_SHARED}{HELLO_JS}{SCRIPT}</script></body></html>")
 
 

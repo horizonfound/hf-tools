@@ -116,6 +116,28 @@ def check_source(s):
 
 # ---------- 2. the page ----------
 
+def check_size(c, s):
+    """Nicole's v30, section 5: the grid is about 420 px wide with a 3 px gap, so 12 to 15 posts show at once (it
+    was 820, about 6 at once). Only the width and the gap changed; the panel still opens inside it and fits."""
+    reel, car = posted.fresh_queue(s)
+    c.open(s.url("/posting.html"))
+    c.wait_for("document.querySelectorAll('#grid .tile.mine').length === 2", 10)
+    m = c.js("(function(){ var g = document.getElementById('grid'), cs = getComputedStyle(g), t = g.querySelector('.tile');"
+             " return {w: g.getBoundingClientRect().width, gap: cs.columnGap, rowgap: cs.rowGap, tw: t.getBoundingClientRect().width,"
+             " th: t.getBoundingClientRect().height, vw: innerWidth, sw: document.documentElement.scrollWidth}; })()")
+    case("at desktop width (1280) the grid is about 420 px wide (400 to 440), not 820", 400 <= m["w"] <= 440 and m["vw"] >= 1200, m)
+    case("...with a 3 px gap between posts, across and down", m["gap"] == "3px" and m["rowgap"] == "3px", m)
+    case("...so a post is about 135 px wide and four rows (12 posts) take under 720 px of height", 125 <= m["tw"] <= 140 and 4 * m["th"] + 12 < 720, m)
+    case("...and the page has no sideways scroll", m["sw"] <= m["vw"], m)
+    ppc.open_panel(c, car["id"])
+    p = c.js("(function(){ var k = document.getElementById('pick'), g = document.getElementById('grid'); return {inside: k.parentNode === g,"
+             " w: k.getBoundingClientRect().width, sw: k.scrollWidth, cw: k.clientWidth, gw: g.getBoundingClientRect().width,"
+             " pageW: document.documentElement.scrollWidth, vw: innerWidth}; })()")
+    case("a post's panel still opens inside the grid, the grid's width, with nothing in it running past its edge",
+         p["inside"] and abs(p["w"] - (p["gw"] - 8)) <= 2 and p["sw"] <= p["cw"] + 1 and p["pageW"] <= p["vw"], p)
+    c.click("#pick .x")
+
+
 def check_page(c, s):
     reel, car = posted.fresh_queue(s)
     rid, cid = reel["id"], car["id"]
@@ -266,6 +288,7 @@ def main():
             skip("the page in a browser: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
         else:
             with chrome_drive.Chrome(work=str(work), size=(1280, 1500)) as c:
+                group("the grid's size (v30)", check_size, c, s)
                 group("the page", check_page, c, s)
     finally:
         s.stop()

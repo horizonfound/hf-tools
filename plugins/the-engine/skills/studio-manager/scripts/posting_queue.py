@@ -1369,7 +1369,7 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .sec{padding:1.6rem 0 .4rem;display:grid;gap:.3rem}
 .sec h2{margin:0;font:600 22px/1.15 var(--sans);letter-spacing:-.02em}
 .sec p{margin:0;color:var(--ink-2);font-size:14.5px;max-width:40em}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:820px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;max-width:420px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
 .tile{position:relative;aspect-ratio:4/5;background:var(--sand-l);overflow:hidden;border-radius:6px;cursor:grab;user-select:none;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .tile.mine{touch-action:none}body.lifting,body.lifting *{cursor:grabbing!important}.tile.dragging{opacity:.3;box-shadow:inset 0 0 0 3px var(--coral)}.tile.over{box-shadow:inset 0 0 0 5px var(--sun);transform:scale(.94);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}.tile.lift{position:fixed;left:0;top:0;z-index:9999;margin:0;pointer-events:none;opacity:1;border-radius:8px;transform:scale(1.06);transition:none;box-shadow:inset 0 0 0 3px var(--coral),0 0 0 3px #fff,0 30px 60px -14px rgba(31,36,48,.6),0 8px 18px rgba(31,36,48,.25)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;pointer-events:none}
@@ -2140,6 +2140,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the talking reel page (Nicole's v24): every one of its requests is talking_page.py's to answer
             import talking_page
             return talking_page.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/home-sample", "/home-sample-faces"):
+            # a brand-new Assistant's sample photos on the home page (Nicole's v30, section 6): samples.py's to answer
+            import samples
+            return samples.handle_get(self, path, urlsplit(self.path).query)
         if path == "/kit-faces":
             # where the faces are in a kit's photos, for the home page's hello (Nicole's v28): faces.py's to answer
             import faces
@@ -2161,6 +2165,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/make-list", "/make-new-status"):
+            # the home page's four tiles: "Create a reel: which shoot?" (Nicole's v30, section 4): create_dialog.py's to answer
+            import create_dialog
+            return create_dialog.handle_get(self, path, urlsplit(self.path).query)
         if path == "/photo-words-state":
             # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
             import photo_words
@@ -2554,6 +2562,11 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/make-new", "/make-vault"):
+            # the home page's four tiles: + A new shoot and My vault in "Create a reel: which shoot?" (Nicole's v30).
+            # create_dialog.py checks each the way arrange.py does
+            import create_dialog
+            return create_dialog.handle_post(self, path, urlsplit(self.path).query)
         if path in ("/vault-open", "/vault-add", "/vault-clips", "/vault-remove"):
             # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
             import vault_page

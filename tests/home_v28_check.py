@@ -2,6 +2,9 @@
 """The home page after Nicole's v28 (her home-test.html and hello.js): the hello, the face finder, her four steps
 with what is going on now, the monthly recap card and hiding it, the Your year bar.
 
+(Since her v30, Nov 21, the hello is one wide photo and her approved lines only, with no button, no Another hello and
+no reminders; the collage is gone. This test holds what of v28 still stands; tests/home_v30_check.py the new page.)
+
     python3 tests/guard.py 3000 python3 tests/home_v28_check.py [--port 9900] [--work <a folder to keep>] [--no-chrome]
 
 What it does, on a pretend Assistant in a throwaway folder under /private/tmp (two pretend kits from fake_kit.py; a
@@ -72,6 +75,9 @@ HERS_NOT_OURS = {
     "Back up →": "gone in her v29 (the small card is the press)",
     "Open my editing queue →": "gone in her v29 (the small card is the press)",
     "Make posts →": "gone in her v29 (the button reads Create your post kits / See all my post kits)",
+    # her v30 (Nov 21, pages/home-new-look.html): the hello lost its corner link, and Watch its arrow
+    "↻ Another hello": "gone in her v30 (it was for her to flip through samples, not for customers)",
+    "▶ Watch": "her v30 reads Watch",
 }
 
 
@@ -331,32 +337,33 @@ def check_page_words(w, home):
     case("none of her test-only bits: no test-copy line, no samples link, no port of hers, nothing of the recap kept in the browser",
          not re.search(r"test copy|samples\.html|:8799|:8790|home=test|assistantRecapHide", page))
     stores = re.findall(r"(?:localStorage|sessionStorage)\.\w+\([^)]*\)", page)
-    case("the only thing kept in the browser is what the hello said lately (hers), each use inside try/catch",
-         stores and all("'assistantHello'" in s for s in stores) and all(re.search(r"try \{[^}]*" + re.escape(s), page) for s in stores), stores)
+    case("nothing is kept in the browser (v30: the hello's choice is kept by the Assistant, hello_lines.py)", not stores, stores)
     # every animation only where motion is welcome
     css = page.split("<style>", 1)[1].split("</style>", 1)[0]
     mine = css.split(home.home_base.CSS, 1)[1] if home.home_base.CSS in css else css
     calm, moving = mine.split("@media (prefers-reduced-motion: no-preference){", 1)
-    case("every animation and every @keyframes of the page is inside prefers-reduced-motion: no-preference",
-         "animation" not in calm and "@keyframes" not in calm and moving.count("@keyframes") == 3 and "animation:kb" in moving and "animation:pulse" in moving and "animation:rise" in moving)
-    case("... and with reduced motion the collage does not change photos", "if (HP.length <= n || STILL) return;" in page and "prefers-reduced-motion: reduce" in page)
+    case("every movement of the page (the photo's fade, the arrow) is inside prefers-reduced-motion: no-preference; no animation at all (v30)",
+         "animation" not in mine and "@keyframes" not in mine and "transition" not in calm and "transition:opacity 1.6s" in moving)
+    case("... and with reduced motion the hello's photo does not change", "if (P.length < 2 || STILL) return;" in page and "prefers-reduced-motion: reduce" in page)
     # her four cards, her exact words, posts first (her v29; tests/home_v29_check.py holds the new layout itself)
     order = [page.find(x) for x in ("Turn your shoots <em>into posts</em>", "My posting <em>queue</em>", "Back up <em>a card</em>", "My editing <em>queue</em>")]
     case("her four cards, posts first (v29): posts, the posting queue, then backing up and the editing queue", -1 not in order and order == sorted(order), order)
     case("the numbered steps, Your workflow and the three old button labels are gone (v29)",
          not any(("¦" + x + "¦") in shown for x in ("Your workflow", "Back up →", "Open my editing queue →", "Make posts →")) and "Start wherever you are" not in page and "flow4" not in page and "class='k'" not in page)
-    for line in ("Also in your Assistant", "See all my post kits →",
+    for line in ("See all my post kits →",
                  "Copies your card to your drive, checks every photo, and sorts it into shoots.", "The shoots you need to edit and when they're due.",
                  "Turn your shoot into reels, carousels, stories, and captions.", "Your posts ready to go, and how your grid will look.",
-                 "Open my posting queue →", "Open my Assistant folder", "↻ Another hello"):
+                 "Open my posting queue →", "Open my Assistant folder"):
         case("her words: %s" % line, ("¦" + line + "¦") in shown, line)
+    case("gone by her v30: Another hello, the heading Also in your Assistant, the Newest box",
+         not any(x in page for x in ("Another hello", "Also in your Assistant", "Newest:", "id='again'", "id='n3'")))
     case("each step where hers sends it: its own screen, the editing queue (a button), its own screen, the posting queue",
-         "id='s1' data-item='backup' href='/backups'" in page and "<button class='step sm' id='s2' data-item='queue'" in page
+         "id='s1' data-item='backup' href='/backups'" in page and "<button class='row' id='s2' data-item='queue'" in page
          and "id='kitsBtn' data-item='posts' href='/make-posts'" in page and "id='s4' data-item='posting' href='/posting.html'" in page)
     case("the bar: the name, the date, Open my Assistant folder; no Today list, no welcome paragraphs, no folder card",
          "<span class='when' id='when'>Tuesday, November 17</span>" in page and "id='folder' data-item='folder'" in page
          and not re.search(r"Welcome to your|class='todayl'|item minor|Your workflow, step by step", page))
-    case("the date is hidden under 520 px, as hers", "@media(max-width:520px){.bar .when{display:none}" in page)
+    case("the date is hidden under 560 px, as hers (v30)", "@media(max-width:560px){.bar{grid-template-columns:minmax(0,1fr) auto}.bar .when{display:none}" in page)
     hers = her_pack()
     if not hers:
         skip("her words compared with her own files: her handoff is not on this computer")
@@ -404,15 +411,13 @@ def check_page_words(w, home):
     ours_pieces = " ¤ ".join(sorted(pieces(ours_js))) + " ¤ " + " ¤ ".join(home.WORDS.values()) + ours_flat
     hello = (hers / "hello.js").read_text(encoding="utf-8")
     code_bits = ("/s/", "repeat(", "px ", "animation-delay", "class=", "data-go")
-    lost = sorted(p for p in pieces(hello) if p not in ours_pieces and not any(x in p for x in code_bits))
-    case("every line her hello writes is in ours, word for word (%d pieces of hers)" % len(pieces(hello)), not lost, lost[:6])
-    openers = re.findall(r"`([A-Z][^`$<]*?)\$\{N[xq]?\}`", hello)
-    case("every opener of hers is one of ours (%d)" % len(openers), len(openers) >= 18 and all(("(`%s`)" % o) in ours_js for o in openers), [o for o in openers if ("(`%s`)" % o) not in ours_js])
-    case("... and her two without a name: Hello, you. and Hello, holiday season.", "[`Hello, `, `you.`]" in ours_js and "[`Hello, `, `holiday season.`]" in ours_js)
-    buttons = re.findall(r"(\w+): \['([^']+)', '[^']*'\]", hello.split("const GO = ", 1)[1].split("};", 1)[0])
-    case("the hello's five buttons are hers: %s" % ", ".join(b for _, b in buttons), len(buttons) == 5 and all(("%s: ['%s'," % kb) in ours_js for kb in buttons))
+    # her v30 (section 3) replaced this hello with her approved lines only: none of its reminder lines may be on ours
+    reminders = ("No pressure. (A little pressure.)", "is still waiting in the wings", "Only one post left ready to go", "Heads up:", "Late-night edit", "Still up")
+    case("her v28 hello's reminder lines are gone from ours (her v30: the hello only lifts them up)", not any(r in page for r in reminders) and "hellos(F" not in ours_js,
+         [r for r in reminders if r in page])
     script = raw.split("<script>", 1)[1]
-    lost = sorted(p for p in pieces(script) if p not in ours_pieces and not any(x in p for x in code_bits + ("img src", "<i>", "wrapped.html")))
+    gone_v30 = ("No post kits yet", "Start with any finished shoot")       # the Newest box's lines: gone in her v30
+    lost = sorted(p for p in pieces(script) if p not in ours_pieces and p not in gone_v30 and not any(x in p for x in code_bits + ("img src", "<i>", "wrapped.html")))
     case("every line her page's script writes in the boxes and the recap card is in ours", not lost, lost[:8])
 
 
@@ -421,13 +426,13 @@ def check_boxes(w, home):
     f = home.facts()
     page = home.page_html()
     case("the first name comes from the Brand File", f["me"] == "Nicole")
-    case("step 1, a card in: the step glows (live), a coral dot, her line", "class='step sm live' id='s1'" in page and "<i class='dot coral'></i>" in box(page, 1)
+    case("step 1, a card in: the card is marked live, a coral dot, her line", "class='row live' id='s1'" in page and "<i class='dot coral'></i>" in box(page, 1)
          and box_words(page, 1) == ["A card is in", "EOS_DIGITAL · about 233 files"], box_words(page, 1))
     at(TODAY)
     f = home.facts()
     page = home.page_html()
     case("step 1, no card: no glow, the last backup by its day; its records can't be found, so no claim that every one was checked",
-         "class='step sm' id='s1'" in page and f["backup"] == {"when": "2026-11-13", "photos": 271, "clips": 6, "state": "unknown"}
+         "class='row' id='s1'" in page and f["backup"] == {"when": "2026-11-13", "photos": 271, "clips": 6, "state": "unknown"}
          and box_words(page, 1) == ["Last backup Nov 13", "271 photos and 6 video clips"], (f["backup"], box_words(page, 1)))
     # a backup whose records say how it stands
     rec = w.work / "gone" / "2026-11-13 card" / "_studio"
@@ -453,9 +458,7 @@ def check_boxes(w, home):
     late = home.page_html()
     case("... red when it is late", "<i class='dot red'></i>" in box(late, 2) and "<small class='late'>" in box(late, 2))
     at(TODAY)
-    case("step 3: the newest kit with its photo (a small copy, by the kit's name and a number), and how many kits",
-         box_words(page, 3) == ["Newest: Katie Austin Maternity", "2 post kits"]
-         and re.search(r"<img src='/kit-photo\?kit=%s&amp;n=\d+&amp;size=s&amp;v=\w*' alt=''>" % re.escape(quote(B, safe="")), box(page, 3)), box(page, 3)[:160])
+    case("step 3: no box beside See all my post kits (her v30: no Newest line)", "id='n3'" not in page and "Newest" not in page and f["newest"]["short"] == "Katie Austin Maternity")
     case("step 4: today's post with its picture, and the one that missed its day (red)",
          box_words(page, 4) == ["Today: Katie’s reel", "The beach day single post is late too"] and "<img src='/posting-thumbs/p5.jpg' alt=''>" in box(page, 4)
          and "<small class='late'>" in box(page, 4), box_words(page, 4))
@@ -488,12 +491,13 @@ def check_boxes(w, home):
         page, why = home.page_html(), ""
     except BaseException as e:  # noqa: BLE001
         page, why = "", e.__class__.__name__
-    case("a queue and a posting record that can't be read: the page still comes, with its four steps", "id='s4'" in page and "Also in your Assistant" in page, why)
+    case("a queue and a posting record that can't be read: the page still comes, with its cards", "id='s4'" in page and "id='s1'" in page and "id='s2'" in page, why)
     # no Brand File: no name, never an invented one
     kept = (w.assistant / "brand-homebase.md").read_text(encoding="utf-8")
     (w.assistant / "brand-homebase.md").unlink()
     try:
-        case("no Brand File: no name at all (the openers are said without one)", home.facts()["me"] == "" and '"me": ""' in home.page_html())
+        hp = home.page_html()
+        case("no Brand File: no name at all (the hello is said without one)", home.facts()["me"] == "" and "Nicole" not in hp.split("<section class='hello'", 1)[1].split("</section>", 1)[0])
     finally:
         (w.assistant / "brand-homebase.md").write_text(kept, encoding="utf-8")
     w.posting()
@@ -509,7 +513,7 @@ def check_recap(w, home):
     case("... its chips are the month's own numbers (wrapped.py's), the number in coral", chips and [" ".join(c) for c in chips] == f["recap"]["chips"] and ("1", "reel") in chips, chips)
     case("... a fan of the month's photos, Watch to the recap page, the x with her two choices",
          len(re.findall(r"<img src='/kit-photo\?", page.split("id='rcFan'>", 1)[1].split("</div>", 1)[0])) in (1, 2, 3)
-         and "<a class='all' href='/wrapped.html?m=2026-11'" in page and ">▶ Watch<" in page and "aria-label='Hide the monthly recap'" in page
+         and "<a class='all' href='/wrapped.html?m=2026-11'" in page and ">Watch<" in page and "aria-label='Hide the monthly recap'" in page
          and "<button type='button' data-h='month'>Hide it for this month</button><button type='button' data-h='all'>Stop showing monthly recaps</button>" in page)
     case("... shown, so the footer has no Show my monthly recap in sight", "<div class='rc' id='rc' data-m='2026-11'>" in page and "<span id='rcBack' hidden>" in page)
     case("no Your year bar in November", "class='yr'" not in page)
@@ -624,10 +628,12 @@ def check_routes(w):
 
 # ---------------------------------------------------------------- the page in a browser
 
-HELLO = "(() => { const t = document.querySelector('.hello .tx'); const b = t.querySelector('.hgo'); return {h: t.querySelector('h3').textContent, em: t.querySelector('h3 em').textContent, p: t.querySelector('p').textContent, b: b ? b.textContent : '', go: b ? b.dataset.go : '', k: t.dataset.subject}; })()"
+HELLO = "(() => { const t = document.querySelector('.hello .tx'); const em = t.querySelector('h2 em'); const p = t.querySelector('p'); return {h: t.querySelector('h2').textContent, em: em ? em.textContent : '', p: p ? p.textContent : '', buttons: t.querySelectorAll('button, a').length, again: !!document.getElementById('again')}; })()"
 
 
 def check_browser(c, w, table):
+    """(Since Nicole's v30, Nov 21, the hello is one wide photo and her approved lines: tests/home_v30_check.py holds
+    the new page; here what v28 built and still stands: the face finder framing, the cards, the recap, phone, motion.)"""
     c.init_script("window.__asked = []; (function(){ const f = window.fetch; window.fetch = function(u, o){ window.__asked.push(String(u)); "
                   "if (String(u).startsWith('/queue-url')) return Promise.resolve(new Response(JSON.stringify({words: 'Pretend: the editing queue would open here.'}), {headers: {'Content-Type': 'application/json'}})); "
                   "if (String(u).startsWith('/open-home')) return Promise.resolve(new Response(JSON.stringify({words: 'Opened The Assistant in Finder.'}), {headers: {'Content-Type': 'application/json'}})); "
@@ -636,85 +642,46 @@ def check_browser(c, w, table):
     # and then the page, rightly, plays nothing. Never left to the computer's own setting.
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
     c.open(w.url("/home"))
-    c.wait_for("document.getElementById('hello').dataset.faces === '1' && document.querySelectorAll('.hello .tile img.on').length > 0", 20)
+    c.wait_for("document.getElementById('hello').dataset.shown !== undefined && document.querySelectorAll('.hello .bgs img.on').length === 1", 20)
     h = c.js(HELLO)
-    case("the hello: an opener with their name as the accent word (or one of her two that take no name), a line, and a button that goes there",
-         ("Nicole" in h["em"] or h["h"] in ("Hello, you.", "Hello, holiday season.")) and h["h"].endswith(h["em"]) and len(h["p"]) > 10 and h["b"].strip().endswith("→") and h["go"] in ("backup", "posting", "editing", "posts", "year"), h)
-    case("... Another hello sits in its corner", c.text("#again") == "↻ Another hello" and c.js("getComputedStyle(document.getElementById('again')).position") == "absolute")
-    seen, same = [h], 0
-    for _ in range(14):
-        c.click("#again")
-        seen.append(c.js(HELLO))
-        same += 1 if (seen[-1]["h"] == seen[-2]["h"] or seen[-1]["p"] == seen[-2]["p"]) else 0
-    case("never the same twice in a row: 14 presses, the opener and the line change every time", same == 0, [(x["h"], x["p"]) for x in seen][:4])
-    case("... and never the same subject as the one before", all(seen[i]["k"] != seen[i - 1]["k"] for i in range(1, len(seen))), [x["k"] for x in seen])
-    case("... what was said lately is kept in this browser, the last 24", c.js("JSON.parse(localStorage.getItem('assistantHello')).length") == 24)
-    subjects = set(c.js("hellos(F, new Date(2026, 10, 20, 8)).L.map(l => l[1])"))
-    case("every line comes from something true: today's post, the late one, this week's post, what is ready, the card, the queue, what is due, the newest shoot, the year, the day",
-         subjects == {"today", "late", "posted", "tank", "card", "queue", "due", "newest", "reels", "photos", "top", "day"}, sorted(subjects))
-    lines = c.js("(() => { const out = {}; for (let i = 0; i < 60; i++) hellos(F, new Date(2026, 10, 20, 8)).L.forEach(l => { (out[l[1]] = out[l[1]] || {})[l[2]] = l[3]; }); return out; })()")
-    case("the lines say the real names and numbers", "Katie’s reel goes out today. Let’s make it a good one." in lines["today"] and "The beach day single post has been waiting 2 days to go out. Today?" in lines["late"]
-         and "You posted Hannah’s reel this week. Love that for you." in lines["posted"] and "3 posts are lined up and ready. Future you says thank you." in lines["tank"]
-         and "I see a card! 233 files, ready to back up whenever you are." in lines["card"] and "2 shoots are waiting for your magic." in lines["queue"]
-         and ("Heads up: “%s” is due in 2 days." % NASTY) in lines["due"] and "2 reels made so far this year. That’s a lot of beats." in lines["reels"]
-         and "Hannah is your most-made-from shoot this year. Iconic." in lines["top"] and "Friday’s a great day to line up the weekend’s posts." in lines["day"], {k: list(v)[:1] for k, v in lines.items()})
-    case("... each with the button that goes there", set(lines["today"].values()) == {"posting"} and set(lines["card"].values()) == {"backup"} and set(lines["queue"].values()) == {"editing"}
-         and set(lines["newest"].values()) == {"posts"} and set(lines["top"].values()) == {"year"})
-    ops = c.js("(d => hellos(F, d).op.map(o => o[0] + o[1]))(new Date(2026, 10, 20, 8))")
-    case("openers by the time of day, the weekday and the season (a Friday morning in November)",
-         all(x in ops for x in ("Good morning, Nicole.", "Coffee first, Nicole?", "Happy Friday, Nicole!", "Hello, holiday season.", "Welcome back, Nicole.", "Hello, you.")) and "Good evening, Nicole." not in ops, ops)
-    ops = c.js("(d => { const G = Object.assign({}, F, {me: ''}); return hellos(G, d).op.map(o => o[0] + o[1]); })(new Date(2026, 5, 15, 22))")
-    case("with no name the openers are said without one, never an invented one (a Monday night in June)",
-         all(x in ops for x in ("Welcome back.", "Still up?", "New week!", "Night owl mode.")) and not any("," in x and "Hello" not in x for x in ops) and "Hello, holiday season." not in ops, ops)
-    # the words are text, never markup
-    c.js("(() => { for (let i = 0; i < 40; i++) document.getElementById('again').click(); })()")
+    case("the hello (v30): a greeting and a line, no button in it, no Another hello", len(h["h"]) > 3 and len(h["p"]) > 10 and h["buttons"] == 0 and not h["again"], h)
     case("a shoot's name reaches the hello as text, never as markup", c.js("!window.__got && document.querySelectorAll('.hello .tx img').length === 0") is True)
-    # the collage
-    ph = c.js("JSON.stringify({n: document.querySelectorAll('.hello .tile').length, w: document.getElementById('hello').clientWidth, photos: document.getElementById('hello').dataset.photos, "
-              "srcs: [...document.querySelectorAll('.hello .tile img')].map(i => i.getAttribute('src') || ''), want: F.collage.photos.length, kit: F.collage.kit})")
-    ph = json.loads(ph)
-    case("the collage is the NEWEST shoot's photos, up to 12", ph["kit"] == B and ph["want"] == 12, (ph["kit"], ph["want"]))
-    case("tall tiles, as many as fit: max(3, round(width / 165))", ph["n"] == max(3, round(ph["w"] / 165)), (ph["n"], ph["w"]))
-    case("only the small copies are ever asked for (size=s), by the kit's name and a number", all("size=s" in s and s.startswith("/kit-photo?kit=") for s in ph["srcs"] if s)
-         and not any("size=l" in u or "/Photos/" in u for u in c.js("performance.getEntriesByType('resource').map(r => r.name)")))
+    srcs = c.js("[...document.querySelectorAll('.hello .bgs img')].map(i => i.getAttribute('src') || '')")
+    case("the hello's photo is the 1600 px copy (size=l), by the kit's name and a number, never the photo itself",
+         srcs[0].startswith("/kit-photo?kit=") and "size=l" in srcs[0] and not any("/Photos/" in u for u in c.js("performance.getEntriesByType('resource').map(r => r.name)")), srcs)
     asks = [u for u in c.js("window.__asked") if u.startswith("/kit-faces")]
-    case("every face is asked for in ONE request", len(asks) == 1 and asks[0].count(",") == 11, asks)
-    case("burst twins are skipped: two photos with the same faces in the same spots count once (12 photos, 11 used)", ph["photos"] == "11", ph["photos"])
-    aims = c.js("(() => { const out = {}; HP.forEach(x => { const im = document.createElement('img'); aim(im, x, 200, 300); out[x.n] = im.style.objectPosition; }); return out; })()")
-    case("a wide photo with its face far left is framed on the face, not on its middle", float(aims["1"].split("%")[0]) < 20, aims["1"])
-    case("... a photo with no faces known is centered", [float(x.rstrip("%")) for x in aims["5"].split()] == [50.0, 50.0], aims)
-    tall = c.js("(() => { const im = document.createElement('img'); aim(im, {f: {w: 400, h: 1200, faces: [[0.4, 0.5, 0.2, 0.07]]}}, 200, 300); return im.style.objectPosition; })()")
-    # a 400x1200 photo fills a 200x300 tile at 200x600; a face in its middle (head and shoulders from 283 to 346, the
-    # middle at 315) is put 38% down the tile (114 px): the photo is moved up 201 of the 300 it can move, 66.9%
-    case("... heads sit about 38% down the tile (a tall photo, a face in its middle: the photo is moved up so the head is 114 px down a 300 px tile)", tall == "50% 66.9%", tall)
-    rect = c.rect(".hello .tile")
-    case("the tiles are tall (about 2:3)", rect["h"] >= 230 and rect["h"] > rect["w"], rect)
-    # the steps
-    case("the four cards, not numbered, with her names, posts first (v29)", c.js("document.querySelectorAll('.step .k').length") == 0
-         and c.js("[...document.querySelectorAll('.step .n')].map(x => x.textContent)") == ["Turn your shoots into posts", "My posting queue", "Back up a card", "My editing queue"])
-    case("a card is in: step 1 glows coral and its dot pulses", c.js("document.getElementById('s1').classList.contains('live') && getComputedStyle(document.querySelector('#s1 .now .dot')).animationName") == "pulse"
-         and "240, 127, 90" in c.js("getComputedStyle(document.getElementById('s1')).boxShadow"))
-    case("the pictures in the boxes are there (the newest kit's photo, today's post)", c.js("[...document.querySelectorAll('.now img')].map(i => i.naturalWidth > 0)") == [True, True])
+    case("the faces are asked for once per shoot (the hello's and the tiles' share the answers)", 1 <= len(asks) <= 6 and all("&n=" in u for u in asks), asks)
+    aims = c.js("(() => { const im = document.createElement('img'); aim(im, {f: {w: 1200, h: 800, faces: [[0.05, 0.3, 0.1, 0.15]]}}, 1000, 250); const a = im.style.objectPosition; "
+                "const im2 = document.createElement('img'); aim(im2, {f: {w: 1200, h: 800, faces: []}}, 1000, 250); return [a, im2.style.objectPosition, im.style.transform]; })()")
+    case("a wide photo with its face near the top is cropped toward the face, not on its middle", float(aims[0].split()[1].rstrip("%")) < 50 or float(aims[0].split()[0].rstrip("%")) < 50, aims)
+    case("... a photo with no faces known is centered, and every photo is zoomed in 1.22x toward the faces' middle", aims[1] in ("50% 50%", "50.0% 50.0%") and aims[2] == "scale(1.22)", aims)
+    case("the three cards by name, posts first, not numbered", c.js("[...document.querySelectorAll('#s4 .n, .also .n')].map(x => x.textContent)") == ["My posting queue", "Back up a card", "My editing queue"]
+         and c.count(".k") == 0)
+    case("a card is in: Back up a card is marked live", c.js("document.getElementById('s1').classList.contains('live')") is True)
+    case("the pictures in the boxes are there (today's post)", c.js("[...document.querySelectorAll('.now img')].map(i => i.naturalWidth > 0)") == [True])
     c.js("window.__asked.length = 0")
     c.click("#s2")
     c.wait_for("!!document.querySelector('#s2 .note') && document.querySelector('#s2 .note').textContent.startsWith('Pretend')", 10)
     case("My editing queue asks for the queue, and what comes back shows on the card itself", "/queue-url" in c.js("window.__asked") and c.js("document.querySelector('#s2 .note').textContent") == "Pretend: the editing queue would open here.")
     c.click("#folder")
     c.wait_for("document.querySelector('.bar .fold .note').textContent.length > 20", 10)
-    case("Open my Assistant folder asks to open it, and the line shows right under the button", "/open-home" in c.js("window.__asked") and c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder.")
+    case("Open my Assistant folder asks to open it, and the line shows right beside the button", "/open-home" in c.js("window.__asked") and c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder."
+         and c.js("(() => { const b = document.getElementById('folder').getBoundingClientRect(), n = document.querySelector('.bar .fold .note').getBoundingClientRect(); return Math.abs((b.top + b.bottom) / 2 - (n.top + n.bottom) / 2) < 12 && n.right <= b.left + 1; })()") is True)
     time.sleep(0.3)
     j = json.loads((w.home / "journey.json").read_text(encoding="utf-8"))
     case("both presses were recorded for the chat (journey.json)", [x["item"] for x in j["clicks"]][-2:] == ["queue", "folder"], j["clicks"][-3:])
     case("no page errors, and nothing asked of the internet", not c.page_errors() and not c.outside_requests(), (c.page_errors()[:2], c.outside_requests()[:2]))
     # the recap card
-    (w.home / "home-recap.json").unlink()
+    if (w.home / "home-recap.json").exists():
+        (w.home / "home-recap.json").unlink()
     c.open(w.url("/home"))
     c.wait_for("!!document.getElementById('rc')", 10)
-    case("the recap card: Your November, so far., its chips, three photos fanned, Watch", c.text("#rcT") == "Your November, so far." and c.count("#rcC span") >= 2
-         and c.count("#rcFan img") == 3 and c.text("#rc .playbtn") == "▶ Watch" and c.js("getComputedStyle(document.getElementById('rc')).overflow") == "visible")
+    case("the recap card: Your November, so far., its chips, three photos, Watch, on her tan", c.text("#rcT") == "Your November, so far." and c.count("#rcC span") >= 2
+         and c.count("#rcFan img") == 3 and c.text("#rc .playbtn") == "Watch" and c.js("getComputedStyle(document.getElementById('rc')).overflow") == "visible"
+         and c.js("getComputedStyle(document.getElementById('rc')).backgroundColor") == "rgb(222, 216, 205)")
     case("... its menu is closed", c.js("document.getElementById('rcM').hidden") is True)
     c.click("#rcX")
-    case("the x opens her two choices, whole inside the card's corner (not cut off)", c.js("[...document.querySelectorAll('#rcM button')].map(b => b.textContent)") == ["Hide it for this month", "Stop showing monthly recaps"]
+    case("the x opens her two choices, whole (not cut off)", c.js("[...document.querySelectorAll('#rcM button')].map(b => b.textContent)") == ["Hide it for this month", "Stop showing monthly recaps"]
          and c.js("(() => { const r = document.getElementById('rcM').getBoundingClientRect(); const e = document.elementFromPoint(r.left + 20, r.bottom - 12); return !!e && !!e.closest('#rcM') && r.right <= innerWidth; })()") is True)
     c.key("Escape")
     case("Escape closes it, and nothing was saved", c.js("document.getElementById('rcM').hidden") is True and not (w.home / "home-recap.json").exists() and c.js("location.pathname") == "/home")
@@ -741,16 +708,6 @@ def check_browser(c, w, table):
     c.click("#rc .all")
     c.wait_for("location.pathname === '/wrapped.html'", 10)
     case("Watch (the whole card) opens that month's recap", c.js("location.pathname + location.search") == "/wrapped.html?m=2026-11")
-    # the hello's button goes there
-    c.open(w.url("/home"))
-    c.wait_for("!!document.querySelector('.hello .hgo')", 10)
-    c.js("(() => { for (let i = 0; i < 80 && document.querySelector('.hello .hgo').dataset.go !== 'backup'; i++) document.getElementById('again').click(); })()")
-    case("a hello about the card has Back it up", c.js("document.querySelector('.hello .hgo').dataset.go") == "backup" and c.text(".hello .hgo").startswith("Back it up"))
-    c.click(".hello .hgo")
-    c.wait_for("location.pathname === '/backups'", 10)
-    time.sleep(0.3)
-    j = json.loads((w.home / "journey.json").read_text(encoding="utf-8"))
-    case("... which opens the Back up a card screen, and the press is recorded as a backup press", c.js("location.pathname") == "/backups" and j["clicks"][-1]["item"] == "backup", j["clicks"][-1])
     c.open(w.url("/home?wrapped=1"))
     c.wait_for("!!document.getElementById('yr')", 10)
     case("the Your year bar (?wrapped=1): Your 2026, wrapped., Watch, to the year's stories", c.js("document.querySelector('#yr b').textContent") == "Your 2026, wrapped."
@@ -758,43 +715,42 @@ def check_browser(c, w, table):
     # a phone
     c.phone(390, 844)
     c.open(w.url("/home?wrapped=1"))
-    c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
+    c.wait_for("document.querySelectorAll('.hello .bgs img.on').length > 0", 20)
     time.sleep(0.4)
-    m = c.js("({sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, when: getComputedStyle(document.getElementById('when')).display, tiles: document.querySelectorAll('.hello .tile').length, "
-             "cols: getComputedStyle(document.querySelector('.also-row')).gridTemplateColumns.split(' ').length, fan: getComputedStyle(document.getElementById('rcFan')).display})")
-    case("at phone width: no sideways scroll, the date hidden, three tall tiles, the two small cards one under another, the recap's fan put away",
-         m["sw"] <= m["cw"] and m["when"] == "none" and m["tiles"] == 3 and m["cols"] == 1 and m["fan"] == "none", m)
+    m = c.js("({sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, when: getComputedStyle(document.getElementById('when')).display, "
+             "tiles: getComputedStyle(document.getElementById('tiles')).gridTemplateColumns.split(' ').length, "
+             "cols: getComputedStyle(document.querySelector('.low')).gridTemplateColumns.split(' ').length, fan: getComputedStyle(document.getElementById('rcFan')).display})")
+    case("at phone width: no sideways scroll, the date hidden, the tiles two by two, the cards one under another, the recap's photos put away",
+         m["sw"] <= m["cw"] and m["when"] == "none" and m["tiles"] == 2 and m["cols"] == 1 and m["fan"] == "none", m)
     c.tap("#rcX")
     case("... and the x's menu opens whole on the screen", c.js("(() => { const r = document.getElementById('rcM').getBoundingClientRect(); return !document.getElementById('rcM').hidden && r.left >= 0 && r.right <= innerWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth; })()") is True)
     c.desktop()
     # reduced motion
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "reduce"}]})
     c.open(w.url("/home"))
-    c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
-    before = c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',')")
-    time.sleep(3.4)
-    case("with reduced motion nothing moves: no zoom, no rise, no pulse, and the photos stay as they are",
-         c.js("STILL && getComputedStyle(document.querySelector('.hello .tile img')).animationName === 'none' && getComputedStyle(document.querySelector('.hello .tx h3')).animationName === 'none' "
-              "&& getComputedStyle(document.querySelector('#s1 .now .dot')).animationName === 'none'") is True
-         and c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',')") == before)
+    c.wait_for("document.querySelectorAll('.hello .bgs img.on').length > 0", 20)
+    before = c.js("document.querySelector('.hello .bgs img.on').getAttribute('src')")
+    time.sleep(7)
+    case("with reduced motion nothing moves: no fade, and the hello's photo stays as it is",
+         c.js("STILL && getComputedStyle(document.querySelector('.hello .bgs img')).transitionDuration === '0s' && getComputedStyle(document.querySelector('.hello .bgs img')).animationName === 'none'") is True
+         and c.js("document.querySelector('.hello .bgs img.on').getAttribute('src')") == before)
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
     c.open(w.url("/home"))
-    c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
-    before = c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',')")
-    c.wait_for("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.dataset.n).join(',') !== %s" % json.dumps(before), 12)
-    case("with motion welcome a tile changes to the next photo (every 2.8 s), with the slow zoom",
-         c.js("getComputedStyle(document.querySelector('.hello .tile img')).animationName") == "kb")
+    c.wait_for("document.querySelectorAll('.hello .bgs img.on').length > 0", 20)
+    before = c.js("document.querySelector('.hello .bgs img.on').getAttribute('src')")
+    c.wait_for("document.querySelector('.hello .bgs img.on').getAttribute('src') !== %s" % json.dumps(before), 14)
+    case("with motion welcome the hello changes to its next photo (every 6 s), with a fade", c.js("getComputedStyle(document.querySelector('.hello .bgs img')).transitionDuration") == "1.6s")
     case("no page errors at the end, and nothing asked of the internet", not c.page_errors() and not c.outside_requests(), (c.page_errors()[:2], c.outside_requests()[:2]))
 
 
 def check_pc_browser(c, w):
-    """The same page on a computer with no face finder (a PC): the collage still comes, every photo centered."""
+    """The same page on a computer with no face finder (a PC): the hello and the tiles still come, every photo centered."""
     c.open(w.url("/home"))
-    c.wait_for("document.querySelectorAll('.hello .tile img.on').length > 0", 20)
+    c.wait_for("document.querySelectorAll('.hello .bgs img.on').length > 0 && document.querySelectorAll('#tiles img[src]').length === 4", 20)
     time.sleep(0.5)
-    pos = c.js("[...document.querySelectorAll('.hello .tile img.on')].map(i => i.style.objectPosition)")
-    case("no face finder (the named PC gap): the collage is drawn all the same, every photo centered", pos and all(p == "50% 50%" or p == "50.0% 50.0%" for p in pos), pos)
-    case("... all twelve photos used (no faces, no twins to skip), and no page errors", c.js("document.getElementById('hello').dataset.photos") == "12" and not c.page_errors(), c.page_errors()[:2])
+    pos = c.js("[...document.querySelectorAll('.hello .bgs img.on, #tiles img[src]')].map(i => i.style.objectPosition)")
+    case("no face finder (the named PC gap): the hello and the four tiles are drawn all the same, every photo centered", len(pos) == 5 and all(p in ("50% 50%", "50.0% 50.0%") for p in pos), pos)
+    case("... and no page errors", not c.page_errors(), c.page_errors()[:2])
 
 
 def summary():
