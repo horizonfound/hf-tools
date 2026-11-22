@@ -17,6 +17,7 @@ body, never another website's). Never a path on the page: a kit is its folder's 
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -29,6 +30,10 @@ GET_ROUTES = ("/make-list", "/make-new-status")
 POST_ROUTES = ("/make-new", "/make-vault")
 POST_CAP = 200
 VAULT_THUMBS = 4
+# One + A new shoot at a time from this server: the folder window is open for as long as they take, and a second
+# press meanwhile (another window, a double click) must not open a second window or start a second copy (review,
+# Nov 21: two presses opened two windows and started two jobs).
+_PICKING = threading.Lock()
 
 # Ours, every one a draft for Dustin and Nicole.
 OUR_WORDS = {
@@ -147,20 +152,27 @@ def handle_post(handler, path, query):
         if path == "/make-new":
             if body != {}:
                 return _send(handler, {"ok": False, "words": arrange.NOT_UNDERSTOOD}, 400)
-            if new_shoot.job()["state"] == "working":
+            if not _PICKING.acquire(blocking=False):
                 return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["busy"]})
-            folder, why = this_computer.pick_folder("Pick the folder with your finished photos. The Assistant copies the photos; nothing is moved.")
-            if not folder:
-                if why == "cancelled":
-                    return _send(handler, {"ok": False, "cancelled": True, "words": OUR_WORDS["no_folder"]})
-                return _send(handler, {"ok": False, "words": OUR_WORDS["no_window_pc" if this_computer.WINDOWS else "no_window_mac"]})
             try:
-                _start(folder)
-            except OSError as e:
-                _log(f"couldn't start the copy ({e.__class__.__name__})")
-                new_shoot.job_write(state="stopped", words=OUR_WORDS["cant_start"], done=0, of=0)
-                return _send(handler, {"ok": False, "words": OUR_WORDS["cant_start"]})
-            return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["starting"]})
+                if new_shoot.job()["state"] == "working":
+                    return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["busy"]})
+                folder, why = this_computer.pick_folder("Pick the folder with your finished photos. The Assistant copies the photos; nothing is moved.")
+                if not folder:
+                    if why == "cancelled":
+                        return _send(handler, {"ok": False, "cancelled": True, "words": OUR_WORDS["no_folder"]})
+                    return _send(handler, {"ok": False, "words": OUR_WORDS["no_window_pc" if this_computer.WINDOWS else "no_window_mac"]})
+                if new_shoot.job()["state"] == "working":   # one started from the chat while the window was open
+                    return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["busy"]})
+                try:
+                    _start(folder)
+                except OSError as e:
+                    _log(f"couldn't start the copy ({e.__class__.__name__})")
+                    new_shoot.job_write(state="stopped", words=OUR_WORDS["cant_start"], done=0, of=0)
+                    return _send(handler, {"ok": False, "words": OUR_WORDS["cant_start"]})
+                return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["starting"]})
+            finally:
+                _PICKING.release()
 
         return _send(handler, {"ok": False, "words": arrange.NOT_UNDERSTOOD}, 404)
     except (Exception, SystemExit) as e:  # noqa: BLE001

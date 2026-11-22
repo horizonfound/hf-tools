@@ -53,6 +53,7 @@ MAKES = ("reel", "carousel", "stories", "captions")
 SAVE_EVERY = 10                         # the log is saved after this many copies (and at every stop)
 NAMES_MOST = 500                        # "IMG_0001 (500).jpg": past that, a photo is a problem, not a copy
 DATE_READS = 200                        # photos read for the shoot's date (the first one's date names the folder)
+ROOM_SPARE = 1 << 30                    # 1 GB left free on the drive after the copy (review, Nov 21)
 
 # Ours, every one a draft for Dustin and Nicole. The page shows `words`; never a path.
 WORDS = {
@@ -64,6 +65,7 @@ WORDS = {
     "no_folder": "I can't see that folder right now. Nothing was copied.",
     "inside": "That folder is already in your Assistant folder. Pick its shoot from Your shoots instead.",
     "holds": "That folder holds your Assistant folder. Pick the folder your finished photos were exported to.",
+    "would_hold": "Your Assistant folder will be made in that folder, so it can't be a shoot itself. Pick the folder your finished photos were exported to.",
     "clash": "There's already a shoot called \"{name}\" in Your Content. Nothing was copied. Rename that folder, or tell your assistant what to call this one.",
     "unplugged": "Your Assistant folder isn't there right now. Check that its drive is plugged in, then try again.",
     "no_place": "There's no place for your Assistant folder yet. Ask your assistant to set one up.",
@@ -72,6 +74,7 @@ WORDS = {
     "too_many_names": "{name} couldn't be given a name of its own in the shoot. Nothing was written over. Tell your assistant.",
     "unnumbered": "Your photos are in, but I couldn't get the post kit ready. Tell your assistant.",
     "busy": "A shoot is being copied in right now. One moment.",
+    "room": "There isn't room for these photos on the drive your Assistant folder is on: they need about {need}, and {free} is free. Nothing was copied.",
     "stopped": "The copy stopped before it finished. Nothing is lost; pick the same folder again to finish.",
 }
 
@@ -152,8 +155,11 @@ def home_place():
         return None
 
 
-def ensure_home():
-    """The Assistant folder, made where home_place says when there is none yet. (folder, made_now)."""
+def where_home():
+    """The Assistant folder, or where it WILL be made when there is none yet (home_place), WITHOUT making anything:
+    (folder, there_already). The folder they picked is checked against it, and its photos found, before a folder
+    is made or the Studio File changed (review, Nov 21: a brand-new Assistant used to be made first, so a folder
+    with no photos left an Assistant folder behind, and picking Pictures was then refused for holding it)."""
     h = posts.home()
     if h is not None:
         try:
@@ -162,22 +168,48 @@ def ensure_home():
             ok = False
         if not ok:
             raise Trouble(WORDS["unplugged"])
-        return posts.need_home(), False
+        return h, True
     place = home_place()
     if place is None:
         raise Trouble(WORDS["no_place"])
-    return posts.setup(home_path=str(place / posts.HOME_NAME)), True
+    return place / posts.HOME_NAME, False
+
+
+def ensure_home():
+    """The Assistant folder, made where home_place says when there is none yet. (folder, made_now)."""
+    h, there = where_home()
+    if there:
+        return posts.need_home(), False
+    return posts.setup(home_path=str(h)), True
 
 
 def _inside(child, parent):
+    """Is `child` the folder `parent` or inside it? Asked of the drive itself (the same file on disk, os.path.samefile,
+    up `child`'s folders), never of the spelling: most drives ignore capitals and how an accent is written, so
+    ".../YOUR CONTENT/Beach" typed in the chat is inside Your Content (review, Nov 21: the spelling was compared, and a
+    post kit's own Photos folder in capitals became a new shoot). A `child` not made yet is inside when the nearest
+    folder of it that is there is; a `parent` that is not there holds nothing."""
     try:
-        child, parent = Path(child).resolve(), Path(parent).resolve()
+        c = Path(child).resolve()
+        par = Path(parent).resolve()
+        if not par.exists():
+            return False
+        while not c.exists():
+            if c.parent == c:
+                return False
+            c = c.parent
+        for a in [c] + list(c.parents):
+            try:
+                if os.path.samefile(a, par):
+                    return True
+            except OSError:
+                continue
     except OSError:
         return False
-    return child == parent or parent in child.parents
+    return False
 
 
-def refusal(h, src):
+def refusal(h, src, there=True):
     """Why this folder can't be a new shoot, as a key of WORDS, or None when it can. Checked before anything is
     read: a folder that is not there; the Assistant's own Your Content or records (a shoot already there is picked
     from the list); a folder that holds the Assistant folder (a whole drive: it would copy the Assistant's own
@@ -191,7 +223,7 @@ def refusal(h, src):
     if _inside(src, h / posts.CONTENT_NAME) or _inside(src, h / ".studio"):
         return "inside"
     if _inside(h, src):
-        return "holds"
+        return "holds" if there else "would_hold"
     return None
 
 
@@ -213,6 +245,42 @@ def _listing(folder):
         return set(os.listdir(folder))
     except OSError:
         return set()
+
+
+def _listed(listing, name):
+    """The name as the folder's listing spells it, or None: the same name however its accents are written and
+    whatever its capitals, as most drives see it (a Mac's HFS+ drive, like Big Kahuna, stores "Café" decomposed
+    whatever spelling it was given; review, Nov 21: the exact spelling was compared, so the same accented folder
+    picked again stopped as a name clash with its own shoot)."""
+    want = _fold(name)
+    for n in sorted(listing):
+        if _fold(n) == want:
+            return n
+    return None
+
+
+def _free_name(name, listing):
+    """A name not yet in the folder (any capitals, any accent spelling): the name itself, else " (2)" and on."""
+    taken = {_fold(n) for n in listing}
+    stem, ext = os.path.splitext(name)
+    cand, i = name, 2
+    while _fold(cand) in taken:
+        if i > NAMES_MOST:
+            raise Trouble(WORDS["too_many_names"].format(name=name))
+        cand, i = f"{stem} ({i}){ext}", i + 1
+    return cand
+
+
+def _size(n):
+    return f"{n / (1 << 30):.1f} GB" if n >= 1 << 30 else f"{max(1, round(n / (1 << 20)))} MB"
+
+
+def _room(where, need):
+    """Stop before the first copy when the drive can't hold it with ROOM_SPARE left over (a whole drive or a
+    year of exports picked by mistake would otherwise fill it photo by photo). A drive that can't say is let be."""
+    free = this_computer.free_bytes(where)
+    if free is not None and need + ROOM_SPARE > free:
+        raise Trouble(WORDS["room"].format(need=_size(need), free=_size(free)))
 
 
 def names_for(rels, before, on_disk=()):
@@ -292,7 +360,11 @@ def earlier_run(h, src, log):
     names = _listing(content)
     where = str(Path(src).resolve())
     for run in reversed(log["runs"]):
-        if this_computer.same_place(run.get("from", ""), where) and run["kit"] in names and (content / run["kit"]).is_dir():
+        if not this_computer.same_place(run.get("from", ""), where):
+            continue
+        spelled = _listed(names, run["kit"])
+        if spelled is not None and (content / spelled).is_dir():
+            run["kit"] = spelled                    # as the drive spells it (accents), so every path below is exact
             return run
     return None
 
@@ -317,13 +389,30 @@ def job_write_pid(pid):
             pass
 
 
+def _alive(pid):
+    """Is the job's program still running? On a Mac the page server started it, so once it has ended it stays a
+    "zombie" until it is waited for, and asking with signal 0 says yes for ever (review, Nov 21: a job that was
+    killed showed "Copying..." for ever and + A new shoot answered "One moment" until the server restarted). So a
+    program of ours that has ended is waited for here; anyone else's is asked as before."""
+    if not this_computer.WINDOWS and type(pid) is int and pid > 0:
+        try:
+            got, _ = os.waitpid(pid, os.WNOHANG)    # pc-ok: a Mac (and Linux) only, a PC is asked below
+            if got == pid:
+                return False
+        except ChildProcessError:
+            pass                                    # not ours to wait for
+        except OSError:
+            pass
+    return this_computer.still_running(pid)
+
+
 def job():
     """What the page follows: {state: none | working | done | stopped, words, done, of, kit, go}. A job whose process
     is gone while its record still says working is "stopped" (picking the same folder again finishes it)."""
     d = _json(JOB)
     state = d.get("state") if d.get("state") in ("working", "done", "stopped") else "none"
     out = {"state": state, "words": str(d.get("words") or ""), "done": d.get("done") or 0, "of": d.get("of") or 0}
-    if state == "working" and this_computer.still_running(d.get("pid")) is False:
+    if state == "working" and _alive(d.get("pid")) is False:
         out.update(state="stopped", words=WORDS["stopped"])
     if state == "done" and isinstance(d.get("kit"), str):
         out["kit"] = d["kit"]
@@ -338,17 +427,32 @@ def make(folder, progress=None):
     Raises Trouble with plain words for every stop."""
     import kit as kit_mod
     progress = progress or (lambda **k: None)
-    h, made_home = ensure_home()
-    if made_home:
-        say(f"Made \"{posts.HOME_NAME}\" at {h} for their posts.")
+    h, there = where_home()                         # nothing is made until the folder is known to be a shoot
     src = Path(folder).expanduser()
-    no = refusal(h, src)
+    no = refusal(h, src, there)
     if no:
         raise Trouble(WORDS[no])
     src = src.resolve()
     rels = finished_photos(src)
     if not rels:
         raise Trouble(WORDS["none"])
+    done_before = set()
+    if there:
+        old = earlier_run(h, src, read_log(h))
+        kit_now = _listing(h / posts.CONTENT_NAME / old["kit"] / "Photos") if old else set()
+        done_before = {m["src"] for m in (old or {}).get("moves", []) if isinstance(m, dict) and m.get("done")
+                       and isinstance(m.get("dst"), str) and _listed(kit_now, m["dst"]) is not None}
+    need = 0
+    for r in rels:
+        if r not in done_before:
+            try:
+                need += (src / r).stat().st_size
+            except OSError:
+                pass
+    _room(h if there else h.parent, need)
+    h, made_home = ensure_home()
+    if made_home:
+        say(f"Made \"{posts.HOME_NAME}\" at {h} for their posts.")
     content = h / posts.CONTENT_NAME
     content.mkdir(parents=True, exist_ok=True)
     log = read_log(h)
@@ -389,12 +493,20 @@ def make(folder, progress=None):
     bad = []
     progress(state="working", words=WORDS["working"].format(n=0, of=len(moves)), done=0, of=len(moves))
     for i, m in enumerate(moves, 1):
-        dst = photos / m["dst"]
-        if m.get("done") and m["dst"] in _listing(photos):
+        listing = _listing(photos)
+        spelled = _listed(listing, m["dst"])
+        if m.get("done") and spelled is not None:
             pass                                    # copied and checked by an earlier run: left as it is
         else:
             try:
-                got = posts.copy_checked(src / m["src"], dst, aside=aside)
+                got = posts.copy_checked(src / m["src"], photos / (spelled or m["dst"]), aside=aside)
+                if got is None and spelled is not None and not m.get("done"):
+                    # The name this photo was given in a run that was cut off is now taken by a different file (one
+                    # they put there by hand): compared, never replaced, and the photo comes in under a free name
+                    # instead of failing the same way on every try (review, Nov 21).
+                    m["dst"] = _free_name(m["dst"], _listing(photos))
+                    write_log(h, log)
+                    got = posts.copy_checked(src / m["src"], photos / m["dst"], aside=aside)
             except OSError as ex:
                 write_log(h, log)                   # still "copying", with what is done marked: the next run finishes it
                 n = sum(1 for x in moves if x.get("done"))
@@ -474,11 +586,17 @@ def main():
         return 0
     if a.job:
         return run_job(a.folder)
-    try:
-        kit = make(a.folder, progress=lambda **k: None)
-    except Trouble as t:
-        say("STOP: " + str(t))
-        return 1
+    import kit as kit_mod
+    HOME.mkdir(parents=True, exist_ok=True)
+    with kit_mod._held(LOCK, 2.0) as got:   # one at a time, the page's job and the chat's alike (review, Nov 21)
+        if got is False:
+            say("STOP: " + WORDS["busy"])
+            return 3
+        try:
+            kit = make(a.folder, progress=lambda **k: None)
+        except Trouble as t:
+            say("STOP: " + str(t))
+            return 1
     say(f"Post kit: {kit.name}. Its {a.make} page: {go(kit.name)[a.make]}")
     return 0
 

@@ -375,6 +375,152 @@ def check_page(w):
     case("... no em dash, no serif, never Claude", "—" not in page and "serif" not in page.replace("sans-serif", "") and "claude" not in page.lower())
 
 
+# ---------------------------------------------------------------- the review (Nov 21)
+
+def in_world(env, code):
+    """A few lines of Python run against the scripts in a world of their own (its own STUDIO_HOME); the last line it
+    prints is JSON."""
+    pre = "import sys, json, os\nsys.path.insert(0, %r)\n" % str(SCRIPTS)
+    r = subprocess.run([sys.executable, "-c", pre + code], env=env, capture_output=True, text=True, timeout=300)
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"error": (r.stdout[-400:], r.stderr[-800:])}
+
+
+def review_world(w, name):
+    """A brand-new photographer: a scratch STUDIO_HOME and a pretend Pictures, no Assistant folder yet."""
+    base = w.work / "review" / name
+    (base / "studio").mkdir(parents=True)
+    pics = base / "folders" / "Pictures"
+    pics.mkdir(parents=True)
+    env = dict(w.env, STUDIO_HOME=str(base / "studio"), STUDIO_FOLDERS_FOR_TESTS=str(base / "folders"), STUDIO_NO_WINDOWS_FOR_TESTS="1")
+    return base, pics, env
+
+
+def jpgs(w, n):
+    return sorted(p for p in (w.content / A / "Photos").iterdir() if p.suffix.lower() == ".jpg")[:n]
+
+
+def check_review(w):
+    import unicodedata
+    # 1. nothing is made before the folder is known to be a shoot
+    base, pics, env = review_world(w, "nothing-first")
+    empty = base / "Only raws"
+    empty.mkdir()
+    (empty / "a.CR3").write_bytes(b"\x00" * 8)
+    r = run_new(env, empty)
+    sf = (base / "studio" / "studio.json")
+    case("review: a brand-new Assistant and a folder with no finished photos: stops, and NO Assistant folder is made, the Studio File untouched",
+         r.returncode == 1 and "No finished photos" in r.stdout and not (pics / "The Assistant").exists()
+         and "posts" not in (json.loads(sf.read_text(encoding="utf-8")) if sf.is_file() else {}), (r.stdout[-300:], sorted(p.name for p in pics.iterdir())))
+    for i, j in enumerate(jpgs(w, 3)):
+        shutil.copy2(str(j), str(pics / ("x%d.jpg" % i)))
+    r = run_new(env, pics)
+    case("review: picking Pictures itself, where a brand-new Assistant folder would go: stops in true words, nothing made",
+         r.returncode == 1 and "will be made in that folder" in r.stdout and not (pics / "The Assistant").exists(), (r.stdout[-300:], sorted(p.name for p in pics.iterdir())))
+    # 2. a folder inside Your Content, spelled in other capitals, is still inside it
+    base, pics, env = review_world(w, "capitals")
+    src = finished_folder(w, "Capitals Final")
+    r = run_new(env, src)
+    content = pics / "The Assistant" / "Your Content"
+    kits0 = sorted(content.iterdir()) if content.is_dir() else []
+    upper = Path(str(kits0[0] / "Photos").upper()) if kits0 else Path("/nowhere")
+    r2 = run_new(env, upper)
+    case("review: a post kit's own Photos folder typed in capitals is still inside Your Content: stops, no second kit",
+         r.returncode == 0 and upper.is_dir() and r2.returncode == 1 and "Pick its shoot from Your shoots instead." in r2.stdout
+         and sorted(content.iterdir()) == kits0, (r2.stdout[-300:], [p.name for p in content.iterdir()] if content.is_dir() else None))
+    # 3. the same accented folder again, its shoot's name stored decomposed (as an HFS+ drive stores it): back to it
+    base, pics, env = review_world(w, "accents")
+    src = finished_folder(w, "Caf\u00e9 Final")
+    r = run_new(env, src)
+    content = pics / "The Assistant" / "Your Content"
+    kit = next((p for p in content.iterdir() if "Caf" in p.name), None) if content.is_dir() else None
+    if kit is not None:
+        spare = content / "spare-name"
+        kit.rename(spare)
+        spare.rename(content / unicodedata.normalize("NFD", kit.name))
+    r2 = run_new(env, src)
+    case("review: the same accented folder again, its shoot spelled decomposed on the drive: back to that shoot, no name clash",
+         r.returncode == 0 and r2.returncode == 0 and "going back to it" in r2.stdout and len(list(content.iterdir())) == 1, r2.stdout[-300:])
+    # 4. a cut-off run, then a photo of theirs put by hand at a name the cut-off run had planned: theirs kept, the photo comes in
+    base, pics, env = review_world(w, "cut-off")
+    src = finished_folder(w, "Cut Off Final")
+    run_new(env, src)
+    content = pics / "The Assistant" / "Your Content"
+    kit = next(iter(content.iterdir()))
+    logp = pics / "The Assistant" / ".studio" / "new-shoots.json"
+    log = json.loads(logp.read_text(encoding="utf-8"))
+    m = [x for x in log["runs"][0]["moves"] if "/" not in x["src"]][-1]
+    m.pop("done", None)
+    m.pop("sha256", None)
+    log["runs"][0]["status"] = "copying"
+    logp.write_text(json.dumps(log), encoding="utf-8")
+    (kit / "Photos" / m["dst"]).unlink()           # the test's own copy, made a moment ago: as if the run stopped before it
+    hand = sorted((w.content / B / "Photos").glob("*.jpg"))[0]   # a different photo from any in the folder
+    shutil.copy2(str(hand), str(kit / "Photos" / m["dst"]))
+    mine = sha(kit / "Photos" / m["dst"])
+    stem, ext = os.path.splitext(m["dst"])
+    r = run_new(env, src)
+    r2 = run_new(env, src)
+    case("review: a name a cut-off run had planned, taken meanwhile by a photo of theirs: theirs is never written over and the photo comes in under \" (2)\", not a stop on every try",
+         r.returncode == 0 and r2.returncode == 0 and sha(kit / "Photos" / m["dst"]) == mine
+         and sha(kit / "Photos" / (stem + " (2)" + ext)) == sha(src / m["src"]), (r.stdout[-300:], sorted(p.name for p in (kit / "Photos").iterdir())))
+    # 5. no room: stops before the first copy
+    base, pics, env = review_world(w, "room")
+    src = finished_folder(w, "Room Final")
+    got = in_world(env, "import this_computer, new_shoot\nthis_computer.free_bytes = lambda p: 10\n"
+                        "try:\n    new_shoot.make(%r); print(json.dumps({'made': True}))\n"
+                        "except new_shoot.Trouble as t:\n    print(json.dumps({'words': str(t)}))\n" % str(src))
+    case("review: not enough room on the drive: stops in plain words before a byte is copied, no Assistant folder made",
+         "There isn't room for these photos" in got.get("words", "") and not (pics / "The Assistant").exists(), got)
+    # 6. a job that was killed is "stopped", not "working" for ever (the page server is its parent: waited for)
+    base, pics, env = review_world(w, "killed")
+    src = finished_folder(w, "Killed Final")
+    got = in_world(env, "import signal, time, create_dialog, new_shoot\np = create_dialog._start(%r)\n"
+                        "os.kill(p.pid, signal.SIGKILL)\ntime.sleep(1.0)\nprint(json.dumps(new_shoot.job()))\n" % str(src))
+    case("review: a job whose program was killed reads as stopped, so + A new shoot works again (not \"One moment\" for ever)",
+         got.get("state") == "stopped", got)
+    # 7. two presses at once: one folder window, one copy
+    base, pics, env = review_world(w, "two-presses")
+    src = finished_folder(w, "Two Final")
+    got = in_world(env, """import io, threading, time, create_dialog, this_computer
+calls, starts = [], []
+def slow(prompt):
+    calls.append(1); time.sleep(1.0); return %r, ""
+this_computer.pick_folder = slow
+create_dialog._start = lambda f: starts.append(f)
+class H:
+    def __init__(self):
+        self.headers = {"Host": "127.0.0.1:9", "Content-Type": "application/json", "Content-Length": "2"}
+        self.rfile = io.BytesIO(b"{}"); self.wfile = io.BytesIO()
+        self.server = type("S", (), {"server_address": ("127.0.0.1", 9)})()
+    def send_response(self, c): self.code = c
+    def send_header(self, *a): pass
+    def end_headers(self): pass
+hs = [H(), H()]
+ts = [threading.Thread(target=create_dialog.handle_post, args=(h, "/make-new", "")) for h in hs]
+[t.start() for t in ts]; [t.join() for t in ts]
+print(json.dumps({"windows": len(calls), "starts": len(starts), "said": [h.wfile.getvalue().decode() for h in hs]}))
+""" % str(src))
+    case("review: two presses of + A new shoot at once: one folder window and one copy; the other press is told it's busy",
+         got.get("windows") == 1 and got.get("starts") == 1 and any("being copied in right now" in s for s in got.get("said", [])), got)
+    # 8. the chat's make and the page's job never run at once
+    base, pics, env = review_world(w, "lock")
+    src = finished_folder(w, "Lock Final")
+    run_new(env, finished_folder(w, "Lock First"))          # the Assistant folder, made the usual way
+    content = pics / "The Assistant" / "Your Content"
+    names0 = sorted(p.name for p in content.iterdir())
+    got = in_world(env, """import subprocess, kit, new_shoot
+with kit._held(new_shoot.LOCK, 2.0) as g:
+    r = subprocess.run([sys.executable, os.path.join(%r, "new_shoot.py"), "make", %r], capture_output=True, text=True, timeout=120)
+print(json.dumps({"held": g, "code": r.returncode, "out": r.stdout[-300:]}))
+""" % (str(SCRIPTS), str(src)))
+    case("review: the chat's new_shoot.py make waits its turn: while a copy holds the lock it stops, nothing made",
+         got.get("held") == "held" and got.get("code") == 3 and "being copied in right now" in got.get("out", "")
+         and sorted(p.name for p in content.iterdir()) == names0, got)
+
+
 def summary():
     res = chrome_drive._results
     bad = [n for n, ok in res if not ok]
@@ -432,6 +578,7 @@ def main():
                 w.start(STUDIO_PICK_FOLDER_FOR_TESTS=str(src))
                 group("+ A new shoot in the page", check_new_shoot, c, w, src)
                 group("no post kits yet", check_empty, c, w)
+        group("the review of + A new shoot", check_review, w)
     finally:
         w.stop()
         chrome_drive.stop_all()
