@@ -304,6 +304,15 @@ def check_browser(c, w, shot):
     case("with reduced motion the hello's photo never changes, and nothing fades",
          c.js("document.querySelector('.hello img.on').getAttribute('src')") == first and c.js("getComputedStyle(document.querySelector('.hello .bgs img')).transitionDuration") == "0s")
     c.cdp("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-motion", "value": "no-preference"}]})
+    # about the Claude app's pane (Nov 22): her "fit on one screen" was measured at 1440 x 900; here the height is
+    # only measured and said, never promised, and nothing may scroll sideways
+    for wd, ht in ((1000, 800), (800, 800)):
+        c.desktop((wd, ht))
+        c.open(w.url("/home"))
+        ready(c)
+        pm = c.js("({sh: document.documentElement.scrollHeight, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, iw: innerWidth})")
+        print("  measured: at %d x %d the home page is %d px tall" % (wd, ht, pm["sh"]), flush=True)
+        case("%d x %d (about the Claude app's pane): no sideways scroll (its height is said above, not promised)" % (wd, ht), pm["iw"] == wd and pm["sw"] <= pm["cw"], pm)
     # phones
     for wd, ht in ((375, 812), (336, 700)):
         c.phone(wd, ht)

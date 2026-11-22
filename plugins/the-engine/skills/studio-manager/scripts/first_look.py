@@ -49,7 +49,9 @@ OUR_WORDS = {
     "peeks_some": ("{k} of them are marked 'sneak peek' in Lightroom, if you want to do a quick edit on them. "
                    "The others are a kind of photo I'd have to write inside to mark, and I never change your photos."),
     "peeks_change": "Not feeling them? Just say what you'd rather see.",   # Dustin's line of Nov 5, kept for the two buttons
-    "come_back": "When your edits are done, come back to your home base and click Make posts from a shoot.",
+    # (since Nov 22, v30: the home page has no Make posts from a shoot button any more, so the line names the four
+    # photo tiles that are there; before it named that old button)
+    "come_back": "When your edits are done, come back to your home base and click Reels, Carousels, Stories or Captions.",
     "opening": "Opening it...",
     "not_live": "Ask your assistant to show the report, and this will work.",
     "not_running": "The Assistant is not running right now. Ask your assistant to show the report, then try again.",

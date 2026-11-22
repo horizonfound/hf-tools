@@ -188,11 +188,12 @@ def check_parts():
     case("the editing queue's part names its sections in the page's own words, and says never \"finished\" or \"your shoots\"",
          all(w in q for w in ("**Uploaded shoots**", "**Delivered (n)**", "**Archived (n)**", "Mark as delivered", "never \"finished\" or \"your shoots\"")))
     h = texts["hello.md"]
-    # (posts first since her v29, Nov 19: the cards are no longer numbered, and the post kits are not listed)
+    # (posts first since her v29, Nov 19: the cards are no longer numbered, and the post kits are not listed;
+    # since her v30, Nov 22, no "Also in your Assistant" heading either: the four photo tiles and three light cards)
     case("the hello part describes the home base: the four cards, posts first and not numbered, and the two screens",
          "**1 Back up a card**" not in h and "Your workflow" not in h.replace('says "Your workflow"', "") and
          all(w in h for w in ("home base", "**Back up a card**", "**My editing queue**", "**Turn your shoots into posts**", "**Make posts from a shoot**", "**My posting queue**",
-                              "**Also in your Assistant**", "**Create your post kits**", "**See all my post kits**", "never listed on the home page",
+                              "four photo tiles: Reels, Carousels, Stories, Captions", "**Create your post kits**", "**See all my post kits**", "never listed on the home page",
                               "Your backups", "Your post kits", "/backups", "/make-posts")))
     a = texts["arrange.md"]
     case("the stories part speaks of sets of stories", "set of stories" in a or "sets of stories" in a)
@@ -251,8 +252,10 @@ def check_guides():
     for what, pat in stale.items():
         where = [n for n, t in (("the Mac guide", mac), ("the PC guide", pc)) if re.search(pat, t)]
         case("neither guide still describes %s" % what, not where, where)
-    case("the Mac guide names the home base's four steps and the two screens of their own",
-         all(w in mac for w in ("**Back up a card**", "**My editing queue**", "**Make posts from a shoot**", "**My posting queue**", "screen of their own")))
+    case("the Mac guide names the home base's cards, the four photo tiles and the two screens of their own",
+         all(w in mac for w in ("**Back up a card**", "**My editing queue**", "**See all my post kits**", "**My posting queue**", "screen of their own",
+                                "**Reels**", "**Captions**", "**+ A new shoot**")) and "click **Make posts from a shoot**" not in mac
+         and "Also in your Assistant" not in mac and "click **Make posts from a shoot**" not in pc)
     case("the Mac guide's first posts: the Make posts screen, the folder picker, make my posts, then the post kit and nothing picked until they ask",
          all(w in mac for w in ("It opens a screen of its own", "**Select the folder with your finished photos**", "**make my posts**",
                                 "opens the shoot's post kit beside the chat", "it doesn't pick photos or write anything until you ask",

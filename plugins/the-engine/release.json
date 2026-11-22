@@ -1,11 +1,10 @@
 {
-  "number": 6,
-  "date": "Nov 19, 2026",
+  "number": 7,
+  "date": "Nov 22, 2026",
   "new": [
-    "Backup now just starts: nothing to answer before the copy. A first backup asks at most one thing, which drive, and only when it can't tell.",
-    "The report has the options afterwards: make a second copy, put two cards on one report, change how your shoots are named, and pick a different drive for next time.",
-    "A new home page with your posts first: Turn your shoots into posts and My posting queue on top, backing up a card and the editing queue below.",
-    "My vault: one post kit that draws from every shoot. Search your photos and clips, make a reel from any of them, and see everything in it.",
-    "The monthly recap counts each reel once, however many times you pressed Make."
+    "A new look for your home page: one wide photo from your own shoots, faces centered, plain and calm so your photos are the star.",
+    "A hello that only cheers you on. No reminders and nothing to do: those stay in their own cards below.",
+    "Tap Reels, Carousels, Stories or Captions to go straight there: pick a shoot, or pick a folder of finished photos for a new one.",
+    "A smaller posting grid, about the size of your grid on your phone, so 12 to 15 posts fit on the screen at once."
   ]
 }

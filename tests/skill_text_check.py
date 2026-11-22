@@ -1902,10 +1902,35 @@ def check_create_tiles():
     case("the routes the page asks are create_dialog.py's", all(r in cd for r in ('"/make-list"', '"/make-new-status"', '"/make-new"', '"/make-vault"')))
 
 
+
+def check_v30_finish():
+    """Stage F of v30 (Nov 22): the core sends + A new shoot to its part, a PC hears about the tiles, the parts count
+    the home page's files right, and nothing tells them to click a Make posts from a shoot button the home page no
+    longer has."""
+    print("\nv30's loose ends: + A new shoot in the core, on a PC, and the come-back line (Nov 22)")
+    skill, photos, pc = read(SM / "SKILL.md"), read(SM / "parts" / "photos-in.md"), read(SM / "parts" / "on-a-pc.md")
+    where, hello = read(SM / "parts" / "where-things-live.md"), read(SM / "parts" / "hello.md")
+    rows = [ln for ln in skill.splitlines() if ln.startswith("|") and "+ A new shoot" in ln]
+    case("the core's table has a row for + A new shoot, sending it to photos-in.md's own section",
+         len(rows) == 1 and "`parts/photos-in.md`, \"+ A new shoot, from the home page's tiles\"" in rows[0]
+         and "**+ A new shoot, from the home page's tiles" in photos, rows)
+    case("photos-in.md says new_shoot.py status answers what happened", "`python3 <scripts>/new_shoot.py status`" in photos)
+    case("on-a-pc.md says how the tiles and + A new shoot work on a PC, and the chat's way when the window can't open",
+         "+ A new shoot" in pc and "no face finder" in pc and '`python3 <scripts>/new_shoot.py make "<folder>"`' in pc)
+    case("where-things-live counts three small files of the home page's own (the hello's is the third)",
+         "keeps three small files of its own" in where and "two small files" not in where and "home-hello.json" in where)
+    case("hello.md no longer says the three cards sit side by side", "three light cards side by side" not in hello and "stacked on the right" in hello)
+    told = {n: read(SM / "parts" / n) for n in ("backup.md", "after-the-report.md")}
+    told["the reel skill"] = read(SKILLS / "assistant-make-a-reel" / "SKILL.md")
+    told["first_look.py"] = read(SCRIPTS / "first_look.py")
+    stale = [n for n, x in told.items() if "click Make posts from a shoot" in x]
+    case("nothing tells them to click Make posts from a shoot (the home page has no such button since v30)", not stale, stale)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish):
         try:
             fn()
         except Exception as e:  # noqa: BLE001
