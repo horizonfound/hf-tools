@@ -814,6 +814,15 @@ def facts(force_year=False, start=False):
         f["tiles"] = tile_photos(pics, shoots, skip=[(p["kit"], p["n"]) for p in f["hello_photos"][:1]])
     except (Exception, SystemExit):  # noqa: BLE001
         pass
+    # 6b. a brand-new Assistant (Nicole's v30, section 6): no post kit yet, so the hello and the tiles show the
+    # sample photos the plugin carries (samples.py), until the first post kit exists. Names only; they count in nothing.
+    f["samples"] = None
+    if not f["hello_photos"] and not any(f["tiles"]):
+        try:
+            import samples
+            f["samples"] = samples.for_home()
+        except (Exception, SystemExit):  # noqa: BLE001
+            f["samples"] = None
     # 7. the last three posts of their grid, newest first, as the posting page's grid shows them
     try:
         f["grid"] = grid_now()
@@ -865,6 +874,8 @@ body{color:var(--ink);font:400 15px/1.5 var(--sans);letter-spacing:-.01em}
 .hello .bgs img:not([src]){display:none}
 .hello::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6),rgba(0,0,0,.1) 70%);pointer-events:none}
 .hello .tx{position:relative;z-index:1;max-width:46em;min-width:0}
+.hello .samplenote{position:absolute;top:10px;right:12px;z-index:1;margin:0;font-size:11px;line-height:1.3;color:#fff;background:rgba(0,0,0,.45);padding:4px 8px;max-width:calc(100% - 24px)}
+.hello .samplenote[hidden]{display:none}
 .hello h2{margin:0;font:700 clamp(26px,3vw,40px)/1.04 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
 .hello em{font:inherit;font-style:normal;color:var(--name-on-photo)}
 .hello p{margin:.4rem 0 0;font-size:15px;color:#fff;overflow-wrap:anywhere}
@@ -1002,6 +1013,14 @@ function aim(img, x, bw, bh){
   img.dataset.faces = String(fc.length);
 }
 const photoUrl = (kit, p) => '/kit-photo?kit=' + encodeURIComponent(kit) + '&n=' + p.n + '&size=l&v=' + encodeURIComponent(p.v || '');
+// a brand-new Assistant's sample photos (samples.py): by file name only, from the plugin's own samples folder
+const SAMPLES = F.samples || null;
+const sampleUrl = name => '/home-sample?name=' + encodeURIComponent(name);
+let SFACES = null;
+const sampleFaces = () => SFACES || (SFACES = live
+  ? fetch('/home-sample-faces', {cache: 'no-store'}).then(r => r.json()).then(d => (d && d.faces) || {}).catch(() => ({}))
+  : Promise.resolve({}));
+const sampleShown = () => { const s = document.getElementById('sampleNote'); if (s) s.hidden = false; };
 // the faces of a kit's photos, one ask per kit (faces.py looks at the 520 px copies; the boxes are fractions, so they
 // hold for the 1600 px copy too); remembered for this page
 const FACES = {};
@@ -1024,17 +1043,20 @@ function put(im, x, box){
 
 /* the hello: one photo, a new one every few seconds (reduced motion: the first one stays) */
 async function startHello(box){
-  const P = (F.hello_photos || []).map(p => ({kit: p.kit, n: p.n, u: photoUrl(p.kit, p), f: {}}));
+  const P = SAMPLES ? (SAMPLES.hello || []).map(nm => ({kit: '', n: nm, u: sampleUrl(nm), f: {}}))
+    : (F.hello_photos || []).map(p => ({kit: p.kit, n: p.n, u: photoUrl(p.kit, p), f: {}}));
   box.dataset.photos = String(P.length);
   if (!P.length || !live) return;
   const bg = box.querySelector('.bgs'), A = bg.children[0], B = bg.children[1];
   const kits = [...new Set(P.map(x => x.kit))];
-  const asks = kits.map(k => facesOf(k, P.filter(x => x.kit === k).map(x => x.n)).then(G => { P.filter(x => x.kit === k).forEach(x => { if (G[x.n]) x.f = G[x.n]; }); }));
+  const asks = SAMPLES ? [sampleFaces().then(G => { P.forEach(x => { if (G[x.n]) x.f = G[x.n]; }); })]
+    : kits.map(k => facesOf(k, P.filter(x => x.kit === k).map(x => x.n)).then(G => { P.filter(x => x.kit === k).forEach(x => { if (G[x.n]) x.f = G[x.n]; }); }));
   await soon(Promise.all(asks), 900);                       // a brand-new shoot's faces may take a moment: start anyway
   let i = 0, ok = false;
   for (; i < P.length && !ok; i++) ok = await put(A, P[i], box);
   if (!ok) { A.removeAttribute('src'); return; }
   A.classList.add('on'); box.classList.add('photo'); box.dataset.shown = String(i - 1);
+  if (SAMPLES) sampleShown();
   Promise.all(asks).then(() => { const on = bg.querySelector('img.on'); const x = P.find(y => String(y.n) === on.dataset.n && y.kit === on.dataset.kit); if (x) aim(on, x, box.clientWidth, box.clientHeight); });
   let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => bg.querySelectorAll('img[src]').forEach(im => { const x = P.find(y => String(y.n) === im.dataset.n && y.kit === im.dataset.kit); if (x) aim(im, x, box.clientWidth, box.clientHeight); }), 250); });
   if (P.length < 2 || STILL) return;                        // reduced motion: the photo never changes
@@ -1052,19 +1074,21 @@ async function startHello(box){
 
 /* the four tiles: a photo from a different shoot each, the first one with a face, faces centered */
 async function startTiles(){
-  const T = F.tiles || [];
+  const T = SAMPLES ? (SAMPLES.tiles || []).map(ns => ({kit: '', sample: true, cands: (ns || []).map(nm => ({n: nm}))})) : (F.tiles || []);
+  const facesFor = t => t.sample ? sampleFaces() : facesOf(t.kit, t.cands.map(c => c.n));
+  const urlFor = (t, c) => t.sample ? sampleUrl(c.n) : photoUrl(t.kit, c);
   document.querySelectorAll('#tiles .tl').forEach(async (el, i) => {
     const t = T[i]; if (!t || !t.cands || !t.cands.length || !live) return;
     const im = el.querySelector('img');
-    const G = await soon(facesOf(t.kit, t.cands.map(c => c.n)), 2500) || {};
+    const G = await soon(facesFor(t), 2500) || {};
     const withFace = t.cands.filter(c => G[c.n] && G[c.n].faces && G[c.n].faces.length);
     const order = withFace.concat(t.cands.filter(c => !withFace.includes(c)));
-    for (const c of order) { if (await put(im, {kit: t.kit, n: c.n, u: photoUrl(t.kit, c), f: G[c.n] || {}}, el)) return; }
+    for (const c of order) { if (await put(im, {kit: t.kit, n: c.n, u: urlFor(t, c), f: G[c.n] || {}}, el)) { if (t.sample) sampleShown(); return; } }
     im.removeAttribute('src');
   });
   let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => document.querySelectorAll('#tiles .tl img[src]').forEach(im => {
     const el = im.closest('.tl'), t = T[[...el.parentNode.children].indexOf(el)]; if (!t) return;
-    facesOf(t.kit, t.cands.map(c => c.n)).then(G => aim(im, {f: G[im.dataset.n] || {}, nw: im.naturalWidth, nh: im.naturalHeight}, el.clientWidth, el.clientHeight)); }), 250); });
+    facesFor(t).then(G => aim(im, {f: G[im.dataset.n] || {}, nw: im.naturalWidth, nh: im.naturalHeight}, el.clientWidth, el.clientHeight)); }), 250); });
 }
 """
 
@@ -1336,7 +1360,9 @@ def page_html(query="", start=False):
     line = _parts(h.get("line_parts")) if h.get("line_parts") else e(h.get("line") or "")
     hello = (f"<section class='hello' id='hello' data-group='{e(str(h.get('group') or ''), quote=True)}'>"
              f"<div class='bgs' aria-hidden='true'><img alt=''><img alt=''></div>"
-             f"<div class='tx'><h2 id='hi'>{greet}</h2>{f'<p>{line}</p>' if line else ''}</div></section>")
+             f"<div class='tx'><h2 id='hi'>{greet}</h2>{f'<p>{line}</p>' if line else ''}</div>"
+             + (f"<p class='samplenote' id='sampleNote' hidden>{e(f['samples']['note'])}</p>" if f.get("samples") else "")
+             + "</section>")
     # Turn your shoots into posts, the four tiles, and the one button (no "Newest" box: her section 2)
     kits_btn = W("s3_see") if (f.get("kits") or f.get("newest")) else W("s3_create")
     tiles = "".join(
@@ -1382,7 +1408,9 @@ def page_html(query="", start=False):
                 f"<div class='fan' id='yrFan'>{_fan(y['photos'])}</div><div><b>{W('yr_b').format(year=e(y['year']))}</b><small>{e(W('yr_small'))}</small></div>"
                 f"<span class='playbtn' aria-hidden='true'>{e(W('watch'))}</span></div>")
     # what the page's script draws from: kit folder NAMES and photo numbers only (never a path, never markup)
-    data = {"hello_photos": f.get("hello_photos") or [], "tiles": f.get("tiles") or []}
+    sm = f.get("samples") or None
+    data = {"hello_photos": f.get("hello_photos") or [], "tiles": f.get("tiles") or [],
+            "samples": {"hello": sm["hello"], "tiles": sm["tiles"]} if sm else None}
     words = dict(home_base.WORDS)
     words.update(home_base.OUR_WORDS)
     words.update({"rc_didnt": W("rc_didnt")})

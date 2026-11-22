@@ -167,7 +167,7 @@ def check_page(w, home):
          flat("<" + pq)[:2] == ["My posting queue", "Your posts ready to go, and how your grid will look."] and "Open my posting queue →" in flat("<" + pq)
          and "<small>Your grid, newest first</small>" in pq and "<img src='/posting-thumbs/p5.jpg' alt=''>" in part(pq, "id='stack'>", "</div>"), flat("<" + pq))
     case("the grid's row: the posts lined up (last in line first), then those marked posted, then their Instagram (not pinned), at most three",
-         home.grid_now() == ["/posting-thumbs/p5.jpg"] and len(data) == 2, home.grid_now())
+         home.grid_now() == ["/posting-thumbs/p5.jpg"] and set(data) == {"hello_photos", "tiles", "samples"}, home.grid_now())
     also = part(page, "<div class='also'>", "</button></div>")
     case("Back up a card and My editing queue, stacked, with their boxes", flat(also)[:4] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots.", "A card is in", "EOS_DIGITAL · about 233 files"]
          and "My editing queue" in flat(also) and "id='n1'" in also and "id='n2'" in also)
@@ -189,7 +189,7 @@ def check_page(w, home):
         p0 = home.page_html()
     d0 = json.loads(part(p0, "id='facts'>", "</script>"))
     case("a brand-new Assistant (no post kits): the hello and the tiles are grey placeholders with nothing to load, Create your post kits",
-         d0 == {"hello_photos": [], "tiles": []} and p0.count("class='tl'") == 4 and "Create your post kits →" in p0 and "--placeholder:#D3CDC4" in p0, d0)
+         d0 == {"hello_photos": [], "tiles": [], "samples": None} and p0.count("class='tl'") == 4 and "Create your post kits →" in p0 and "--placeholder:#D3CDC4" in p0, d0)
     case("... and the hello still says hello", f0.get("hello") is None or len(flat(part(p0, "<h2", "</h2>"))) >= 1)
     # her mock-up's words
     hers = her_mock()
@@ -349,7 +349,11 @@ def main():
     work = base / time.strftime("run-%H%M%S")
     w = v28.World(work, a.port)
     w.env["STUDIO_NO_WINDOWS_FOR_TESTS"] = "1"
-    os.environ.update(STUDIO_HOME=str(w.home), STUDIO_TODAY=TODAY, ASSISTANT_TEST_OPEN="front", STUDIO_CARD_FOR_TESTS="none", STUDIO_NO_WINDOWS_FOR_TESTS="1", FACES_PRETEND=str(w.pretend))
+    # an empty samples folder of the test's own (v30 section 6): "brand-new" here means grey, whatever the plugin ships
+    (work / "no-samples").mkdir(parents=True, exist_ok=True)
+    w.env["STUDIO_SAMPLES_FOR_TESTS"] = str(work / "no-samples")
+    os.environ.update(STUDIO_HOME=str(w.home), STUDIO_TODAY=TODAY, ASSISTANT_TEST_OPEN="front", STUDIO_CARD_FOR_TESTS="none", STUDIO_NO_WINDOWS_FOR_TESTS="1", FACES_PRETEND=str(w.pretend),
+                      STUDIO_SAMPLES_FOR_TESTS=str(work / "no-samples"))
     try:
         w.build()
         w.posting(pieces=[
