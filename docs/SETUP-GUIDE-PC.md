@@ -125,7 +125,7 @@ You'll know it worked when that word says **Auto**. Glance at it each time you s
 
 ### Step 6: Say hi
 
-That's the setup. Now meet your Assistant.
+That's the setup. Now meet the Assistant.
 
 1. Click inside the message box, type **hi** and press **Enter**.
 2. Give it a few minutes the first time: Python finishes setting itself up now. Grey lines show in the chat ("Ran 2 commands"): nothing to click. Then it asks to add one more free piece, called Pillow, for showing your photos: click **Yes, add it**. Then it introduces itself, and its home page opens beside the chat. **[check on a PC: how long Python's first run takes (a download of about 37 MB); that the page beside the chat opens on a PC]**
@@ -182,7 +182,7 @@ Edited and exported, sitting in a folder.
 
 The Assistant brings your photos in and opens the shoot's post kit beside the chat, and stops there: you choose the photos for each piece on its own page, and it picks only when you ask (the page gives you a line to copy). From the post kit you make a carousel (or a single post) and stories sized for Instagram, and a reel on a page where you pick the song and the pace, then finish the reel in CapCut (you'll need the CapCut app). The Assistant works from its own copies; your originals aren't moved or changed. **Reels in CapCut are new on a PC:** if yours doesn't show up in CapCut, tell the Assistant.
 
-What's behind that line since Nicole's v19 (Nov 7) and v25 (Nov 13), for the walk-through: the post kit is three cards (Reel, Carousel, Stories); a carousel of one slide is a single post; a shoot can have several reels; a caption is optional before Add to my queue; the reel page has footage, photos (drag them in, or "Let my assistant choose" with a note and a line to copy into the chat), the song (a Music folder inside the shoot, or a screen recording's sound), the style and the vibe, then **Make my reel**, which writes a CapCut project; the stories designer saves 9:16 stories into the kit's Stories folder. **[check on a PC: all of it; CapCut for Windows has never opened a project the Assistant wrote]**
+What's behind that line since Nicole's v19 (Nov 7) and v25 (Nov 13), for the walk-through: the post kit is three cards (Reel, Carousel, Stories); a carousel of one slide is a single post; a shoot can have several reels; a caption is optional before Add to my queue; the reel page has footage, photos (drag them in, or "Let the Assistant choose" with a note and a line to copy into the chat), the song (a Music folder inside the shoot, or a screen recording's sound), the style and the vibe, then **Make my reel**, which writes a CapCut project; the stories designer saves 9:16 stories into the kit's Stories folder. **[check on a PC: all of it; CapCut for Windows has never opened a project the Assistant wrote]**
 
 **Why not drag the folder in?** On a PC, dragging a folder into another folder on the same drive **moves** it rather than copying it, so the folder you dragged from ends up empty. Use the Select the folder button instead. Dragged one by mistake? Press **Ctrl + Z** in that File Explorer window right away and it comes back.
 
@@ -219,7 +219,7 @@ Windows gives each drive and memory card a letter when it's plugged in, and a dr
 - **Posting-day reminders don't reach your calendar by themselves.** The Assistant makes a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert. **[New Nov 11: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Talking reels.** Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here. **[New Nov 12: not in the PDF yet; wording is Dustin and Nicole's]**
 - **Saving a B-roll reel as a finished video.** Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
-- **Photo tags for search.** On a PC, search finds your photos by shoot name and by anything your assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask the Assistant to describe a shoot's photos and search will find them. **[New Nov 19: not in the PDF yet; wording is Dustin and Nicole's]**
+- **Photo tags for search.** On a PC, search finds your photos by shoot name and by anything the Assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask the Assistant to describe a shoot's photos and search will find them. **[New Nov 19: not in the PDF yet; wording is Dustin and Nicole's]**
 
 > **Not in the PDF: what is new on a PC and untried. Be straight with the PC tester about this box.**
 >

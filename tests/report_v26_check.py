@@ -41,6 +41,8 @@ sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT / "tests"))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 # the smallest picture a browser will take: every "preview" in the pretend backups is this
 TINY_JPEG = base64.b64decode(
@@ -204,7 +206,7 @@ def check_words():
          W["unplugged"] == home_base.WORDS["b_unplugged"] and W["moved"].format(files_app="Finder") == home_base.WORDS["b_moved"])
     notes = her_notes()
     if notes:
-        hers = notes.read_text(encoding="utf-8")
+        hers = nicole_nov22.read(notes)   # Nicole, Nov 22: everything is the Assistant
         for k in ("why", "look_right", "open", "peeks", "start", "gone"):
             case("her notes hold the line this test calls hers: %s" % k, HERS[k] in hers, HERS[k])
     else:
@@ -507,7 +509,7 @@ def check_browser(c, base, night):
     c.js("window.__f = window.fetch; window.fetch = () => Promise.reject(new Error('gone'))")
     c.click("article.shoot:nth-of-type(1) .open-shoot")
     c.wait_for("document.querySelector('article.shoot:nth-of-type(1) .open-state').textContent.length > 12", 10)
-    case("the Assistant not answering: the line under the button says so, with 'your assistant'", c.text("article.shoot:nth-of-type(1) .open-state") == O["not_running"])
+    case("the Assistant not answering: the line under the button says so, with 'the Assistant'", c.text("article.shoot:nth-of-type(1) .open-state") == O["not_running"])
     c.js("window.fetch = window.__f")
     for width in (390, 336):
         c.phone(width, 844)
@@ -556,15 +558,15 @@ def check_fake_night(c, work, port):
         case("Show me more still opens their six in six spots", True)
         c.click("article.shoot:nth-of-type(1) .pk.cancel2")
         # Rename on the page: the press still reaches the Assistant and the card says what happened, in plain
-        # words that say "your assistant". (The pretend backup has no sorted-photo records, so the rename itself
+        # words that say "the Assistant" (Nicole, Nov 22). (The pretend backup has no sorted-photo records, so the rename itself
         # stops, as it should; a rename followed by Open this folder is checked on the routes.)
         c.click("#s1")
         c.type_text("Lani swim")
         c.click(".go[data-shoot='s1']")
-        c.wait_for("/assistant/.test(document.querySelector(\".state[data-for='s1']\").textContent)", 40)
+        c.wait_for("/the Assistant/.test(document.querySelector(\".state[data-for='s1']\").textContent)", 40)
         said = c.text(".state[data-for='s1']")
-        case("Rename on the page still reaches the Assistant, and what stopped it is said with 'your assistant', never Claude",
-             "Tell your assistant and it'll sort it out." in said and "Claude" not in said, said)
+        case("Rename on the page still reaches the Assistant, and what stopped it is said with 'the Assistant', never Claude",
+             "Tell the Assistant and it'll sort it out." in said and "Claude" not in said, said)
         c.click("article.shoot:nth-of-type(1) .open-shoot")
         c.wait_for("document.querySelector('article.shoot:nth-of-type(1) .open-state').textContent.startsWith('Opened')", 10)
         case("Open this folder works on the pretend backup with pictures too", c.text("article.shoot:nth-of-type(1) .open-state") == "Opened 2026-06-24 Beach in %s." % APP,

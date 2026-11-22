@@ -500,7 +500,7 @@ try:
     check("look: a photo in the folder with no number here yet is not called missing; its number is shown as it will be",
           "have no number here yet" in sect(out, BEHIND) and "photo 3 there is \"p3.jpg\", number 3 here" in sect(out, BEHIND)
           and "can be brought" in sect(out, BEHIND) and "not among" not in sect(out, BEHIND), sect(out, BEHIND))
-    check("look: \"Let my assistant choose\" with another order showing: said", "comes over as their own order" in sect(out, STALE), sect(out, STALE))
+    check("look: \"Let the Assistant choose\" with another order showing: said", "comes over as their own order" in sect(out, STALE), sect(out, STALE))
     check("look: a video that is already a talking reel's here (same script) is left alone", "is already the video of a talking reel here" in sect(out, SAMEVID), sect(out, SAMEVID))
     check("look: a talking reel with no date for its script; one never finished; one with a word short; one whose words run past the video",
           "doesn't say when" in sect(out, TALKS) and "was never turned into a script" in sect(out, TALKS)
@@ -550,7 +550,7 @@ try:
           code == 0 and "already brought" in out and "versions" not in crec and ctalk.get("video") == "say.mov" and ctalk.get("status") == "ready"
           and ctalk.get("cut") == [[0, 1]] and read(cut / ".kit" / "brought-older.json")["runs"][-1]["state"] == "finished", (code, out, ctalk))
     check("...the pick was not written twice (no earlier pick kept beside it)", "reel_earlier" not in read(cut / ".kit" / "kit.json"), read(cut / ".kit" / "kit.json"))
-    check("...\"Let my assistant choose\" stays, since the kit's pick is the older one", crec["saved"]["mine"] is False and reel_page.assistant_pick(cut, crec) == order("2,1"), crec)
+    check("...\"Let the Assistant choose\" stays, since the kit's pick is the older one", crec["saved"]["mine"] is False and reel_page.assistant_pick(cut, crec) == order("2,1"), crec)
 
     # ================= bring, all of it =================
     hannah_kit_json = (hannah / ".kit" / "kit.json").read_bytes()
@@ -730,7 +730,7 @@ try:
           names_of(behind, rec["saved"]["picks"]) == ["p3.jpg", "p1.jpg"] and names_of(behind, [3]) == ["p3.jpg"], rec.get("saved"))
 
     rec = read(stale / ".kit" / "reel-page.json")
-    check("\"Let my assistant choose\" with another order showing: the post kit shows the order the older page showed (1 Longer, 2, 4), the pick kept too",
+    check("\"Let the Assistant choose\" with another order showing: the post kit shows the order the older page showed (1 Longer, 2, 4), the pick kept too",
           reel_page.order_for_kit_page(stale) == order("1+,2,4") and rec["saved"]["mine"] is True and read(stale / ".kit" / "kit.json")["picks"]["reel"] == [1, 2, 3],
           (reel_page.order_for_kit_page(stale), rec["saved"]))
 

@@ -57,7 +57,7 @@ DESIGN_CORE_JS = r"""
     // the short word beside the design's name while a change is not saved (the sentence that says why is in
     // the bar at the bottom of the window), and while the page has stopped until it is reloaded
     notSaved: 'Not saved', needsReload: 'Needs reload',
-    cantReach: 'Could not reach the Assistant. Tell your assistant instead.',
+    cantReach: 'Could not reach the Assistant. Tell the Assistant in the chat instead.',
     newer: 'This design was changed somewhere else. Here\'s the newest.',
     photosChanged: 'The photos in this shoot changed since this page opened.',
     reload: 'Reload',

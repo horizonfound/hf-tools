@@ -748,16 +748,16 @@ OUR_JOB_WORDS = {
     "servers": ("This Mac can only turn talking into words by sending the sound to Apple, and I won't send your video's "
                 "sound anywhere. So I can't make a script on this Mac yet.",
                 "hers sends the sound to Apple without a word (rules 7 and 8)"),
-    "no_tools": ("Talking reels need one more thing from Apple on this Mac before the first one. Tell your assistant: "
+    "no_tools": ("Talking reels need one more thing from Apple on this Mac before the first one. Tell the Assistant: "
                  "set up talking reels.",
                  "ours builds the transcriber on their Mac, which needs Apple's Command Line Tools"),
-    "old_tools": ("Apple's tools on this Mac are older than its macOS, so I couldn't finish setting up. Tell your "
-                  "assistant: set up talking reels.",
+    "old_tools": ("Apple's tools on this Mac are older than its macOS, so I couldn't finish setting up. Tell the "
+                  "Assistant: set up talking reels.",
                   "after a macOS update the compiler and the SDK can disagree"),
     "licence": ("Apple's tools on this Mac are waiting for their licence to be accepted, so I couldn't finish setting "
-                "up. Tell your assistant: set up talking reels.",
+                "up. Tell the Assistant: set up talking reels.",
                 "an Xcode whose licence was never accepted refuses to build"),
-    "setup_failed": ("I couldn't finish setting up talking reels on this Mac. Tell your assistant: set up talking reels.",
+    "setup_failed": ("I couldn't finish setting up talking reels on this Mac. Tell the Assistant: set up talking reels.",
                      "the build can fail in ways hers never meets"),
     "old_mac": ("Talking reels need macOS 13 or newer, and this Mac is on an older one.",
                 "hers needs macOS 13 too and does not say so"),

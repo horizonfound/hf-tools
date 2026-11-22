@@ -34,13 +34,19 @@ Ours, where her rules are silent (each a draft for Dustin and Nicole):
   * before any shoot, no greeting that says "back" or "again" (nobody has been here before);
   * never the same greeting or the same line twice running (and the last few are passed over while others fit).
 
+The very first hello (Nicole, Nov 22: "when they first log in everyones should say this only Hi! I'm your
+Assistant, and I'm so glad you're here."): before any shoot, and when the page has never greeted them (no visit kept
+in home-hello.json), the page shows ONLY that one line of hers (FIRST_ONLY), with no greeting over it, whatever
+their name; the answer says "only": true and its greeting is empty. It is kept for its 3 hours like any hello; after
+that the hello works as before.
+
 The same hello is kept for 3 hours (KEEP_HOURS) in ~/.studio/home-hello.json, written whole, the version before
 kept as home-hello.prev.json, so reloading the page keeps it; it is chosen again sooner when a post kit that was
 not there before comes in, or when the kept one stops being true (the morning is over, a shoot it named has
 gone, a number changed it is refilled with the new number). The same file keeps the last visit, for "away".
 
 For the page (stage B wires it): pick() answers {greeting, line, greeting_parts, line_parts, name, group,
-greeting_group, kit, shoot, chosen_at, keep_until, kept}. *_parts are [{"text": ..., "name": true|false}], so the
+greeting_group, kit, shoot, chosen_at, keep_until, kept, only}. *_parts are [{"text": ..., "name": true|false}], so the
 page can colour the name with textContent alone (no HTML from here, ever). kit is a post kit's FOLDER NAME (never a
 path), for the photos behind the hello.
 
@@ -82,6 +88,10 @@ NOON, EVENING = 12, 17          # hers (hr < 12 morning, < 17 afternoon, else ev
 WEIGHTS = {"newest": 4, "newest_new": 12, "top": 1, "photos": 1.5, "shoots": 1, "reels": 1, "carousels": 0.7,
            "posted": 0.7, "hours": 0.8, "week": 2, "week1": 1.5, "warm": 3, "monday": 1, "friday": 1, "weekend": 0.6,
            "anyday": 0.4, "morningline": 0.5, "eveningline": 0.6, "away": 6, "first": 1}
+
+# The one line the very first hello says, alone (Nicole, Nov 22): found among her "first" lines by these words, so
+# the text shown is always hers exactly as she sent it (curly apostrophes and all).
+FIRST_ONLY_HAS = "so glad you"
 
 KIND_WORDS = {"reel": "reel", "carousel": "carousel", "single": "post", "story": "stories", "stories": "stories"}
 
@@ -365,7 +375,7 @@ def save_state(d):
 
 def _answer(chosen, facts, now, kept):
     """What the page gets, filled from today's facts (a number that moved is refilled), or None if it can't be."""
-    g = fill(chosen["greeting_t"], facts, now, {})
+    g = ("", []) if chosen.get("only") else fill(chosen["greeting_t"], facts, now, {})
     ln = fill(chosen["line_t"], facts, now, chosen.get("slots") or {})
     if not g or not ln:
         return None
@@ -374,12 +384,27 @@ def _answer(chosen, facts, now, kept):
     return {"greeting": g[0], "line": ln[0], "greeting_parts": g[1], "line_parts": ln[1], "name": facts["name"],
             "group": chosen["group"], "greeting_group": chosen["greeting_group"], "kit": slots.get("kit") or "",
             "shoot": slots.get("shoot") or "", "chosen_at": _iso(at), "keep_until": _iso(at + timedelta(hours=KEEP_HOURS)),
-            "kept": kept}
+            "kept": kept, "only": bool(chosen.get("only"))}
+
+
+def first_only_line():
+    """Her one line for the very first hello, exactly as she sent it (no {name} in it), or None."""
+    for t in lines().get("first", []):
+        if FIRST_ONLY_HAS in t and "{" not in t:
+            return t
+    return None
+
+
+def first_ever(facts, st):
+    """The very first hello: no shoot yet, and the page has never greeted them (no visit kept)."""
+    return not facts.get("any_shoot") and not st.get("last_visit") and not st.get("chosen")
 
 
 def _still_true(chosen, facts, now):
     """The kept hello's greeting and line are still among what can be said now (with the same shoot)."""
     away = bool(chosen.get("away"))
+    if chosen.get("only"):                 # the very first hello: true for its 3 hours while there is no shoot yet
+        return not facts.get("any_shoot") and chosen.get("line_t") == first_only_line()
     if (chosen.get("greeting_group"), chosen.get("greeting_t")) not in greetings(facts, now, away):
         return False
     slots = chosen.get("slots") or {}
@@ -455,11 +480,16 @@ def pick(now=None, rng=None, facts=None, fresh=False, write=True):
             newest = facts["kits"][0]["folder"] if facts["kits"] else None
             new_kit = newest if newest and newest in new_kits else None
             recent = st.get("recent") if isinstance(st.get("recent"), dict) else {}
-            chosen = choose(facts, now, rng, away=away, new_kit=new_kit, recent=recent)
+            only = first_only_line() if first_ever(facts, st) else None
+            if only:
+                chosen = {"only": True, "greeting_group": "", "greeting_t": "", "group": "first", "line_t": only,
+                          "slots": {}, "away": False, "at": _iso(now)}
+            else:
+                chosen = choose(facts, now, rng, away=away, new_kit=new_kit, recent=recent)
             if chosen is None:
                 return None
             out = _answer(chosen, facts, now, kept=False)
-            recent = {"greetings": (list(recent.get("greetings") or []) + [chosen["greeting_t"]])[-RECENT:],
+            recent = {"greetings": (list(recent.get("greetings") or []) + ([chosen["greeting_t"]] if chosen["greeting_t"] else []))[-RECENT:],
                       "lines": (list(recent.get("lines") or []) + [chosen["line_t"]])[-RECENT:]}
             st["recent"] = recent
             st["kits_seen"] = list(facts.get("kits_seen") or [])

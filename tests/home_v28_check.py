@@ -56,6 +56,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 TODAY = "2026-11-17"            # a Tuesday
 A, B = "2026-11-01 Hannah", "2026-11-02 Katie Austin Maternity"
@@ -329,7 +331,7 @@ def check_page_words(w, home):
     at(TODAY, "EOS_DIGITAL:233")
     page = home.page_html()
     shown = text_of(page)
-    case("the page says \"your assistant\", never \"Claude\"", "claude" not in page.lower())
+    case("the page says \"the Assistant\", never \"Claude\"", "claude" not in page.lower())
     case("no em dash in any line of words", "—" not in page and not any("—" in v for v in list(home.WORDS.values()) + list(home.OUR_WORDS.values())))
     case("nothing from the internet, and the shared look first in the page's styles", "googleapis" not in page and "<link" not in page and "http://" not in page and "https://" not in page
          and ("<style>" + home.look.head_css()) in page)
@@ -368,7 +370,7 @@ def check_page_words(w, home):
     if not hers:
         skip("her words compared with her own files: her handoff is not on this computer")
         return
-    raw = (hers / "home-test.html").read_text(encoding="utf-8")
+    raw = nicole_nov22.read((hers / "home-test.html"))   # Nicole, Nov 22: everything is the Assistant
     body = raw.split("</style>", 1)[1].split("<script", 1)[0]
     theirs = [t.strip() for t in html_mod.unescape(re.sub(r"<[^>]+>", "¦", re.sub(r"</?em>", "", "<title>" + raw.split("<title>", 1)[1].split("</title>", 1)[0] + "</title>" + body))).split("¦") if t.strip()]
     ours_flat = html_mod.unescape(re.sub(r"</?em>", "", page.split("<script", 1)[0]))
@@ -409,7 +411,7 @@ def check_page_words(w, home):
         return out
     ours_js = page.split("<script>", 1)[1]
     ours_pieces = " ¤ ".join(sorted(pieces(ours_js))) + " ¤ " + " ¤ ".join(home.WORDS.values()) + ours_flat
-    hello = (hers / "hello.js").read_text(encoding="utf-8")
+    hello = nicole_nov22.read((hers / "hello.js"))   # Nicole, Nov 22: everything is the Assistant
     code_bits = ("/s/", "repeat(", "px ", "animation-delay", "class=", "data-go")
     # her v30 (section 3) replaced this hello with her approved lines only: none of its reminder lines may be on ours
     reminders = ("No pressure. (A little pressure.)", "is still waiting in the wings", "Only one post left ready to go", "Heads up:", "Late-night edit", "Still up")
@@ -518,7 +520,7 @@ def check_recap(w, home):
     case("... shown, so the footer has no Show my monthly recap in sight", "<div class='rc' id='rc' data-m='2026-11'>" in page and "<span id='rcBack' hidden>" in page)
     case("no Your year bar in November", "class='yr'" not in page)
     case("?wrapped=1 shows the Your year bar any time (hers, for testing)", "<div class='yr' id='yr'><a class='all' href='/wrapped.html?y=2026'" in home.page_html("wrapped=1")
-         and "Your 2026, <em>wrapped.</em>" in home.page_html("wrapped=1") and "Your year with your assistant, story by story. Ready to share." in home.page_html("wrapped=1"))
+         and "Your 2026, <em>wrapped.</em>" in home.page_html("wrapped=1") and "Your year with the Assistant, story by story. Ready to share." in home.page_html("wrapped=1"))
     at("2026-12-03")
     page = home.page_html()
     case("in the first week of December: last month, recapped.", "Your November, <em>recapped.</em>" in page and "data-m='2026-11'" in page)

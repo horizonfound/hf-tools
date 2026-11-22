@@ -87,6 +87,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 import vault_core_check as core  # noqa: E402
 from vault_core_check import A, B, case, group, tree  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 VQ = "My%20vault"
 BEAT60 = HERE / "fixtures" / "test-beat-60s.wav"
@@ -115,7 +117,7 @@ HERS_NOT_OURS = {
 # her file as she wrote it and to be one of ours.
 HERS_IN_SCRIPT = ["Every shoot", "Added to my vault ", "Clips you add to your vault show up here, open and ready.", "From its post kit · ",
                   " found", "+ Add", "✓ Added", " added", "Add clips from your search above.",
-                  "Nothing matches that yet. Try other words, or tell your assistant what to look for.", "Copied"]
+                  "Nothing matches that yet. Try other words, or tell the Assistant what to look for.", "Copied"]
 
 
 def skip(line):
@@ -275,9 +277,9 @@ def check_words(s):
             case("step 1 is headed Your clips, with her panel above our join line and the footage editor",
                  "</span>Your clips</h2>" in pv and pv.index("id='vcFind'") < pv.index(html_mod.escape(R.VAULT_OUR_WORDS["foot_say2_html"], quote=False)) < pv.index("id='ed'"), None)
             got = flat(pv[pv.index("<div class='row2'>"):pv.index("<div class='vchips'")])
-            case("the panel's words are hers: the search, Or tell your assistant, the examples, the line to copy", got == [
+            case("the panel's words are hers: the search, Or tell the Assistant, the examples, the line to copy", got == [
                 C["vc_search_b"], C["vc_search_s"], C["vc_ask_b"], C["vc_ask_s"], C["vc_line"], "Copy"] and
-                "placeholder='me with my camera, laughing, kitchen, beach'" in pv and 'placeholder="Optional: what you&#x27;d like your assistant to find"' in pv.replace("'Optional: what you&#x27;d like your assistant to find'", '"Optional: what you&#x27;d like your assistant to find"'), got)
+                "placeholder='me with my camera, laughing, kitchen, beach'" in pv and 'placeholder="Optional: what you&#x27;d like the Assistant to find"' in pv.replace("'Optional: what you&#x27;d like the Assistant to find'", '"Optional: what you&#x27;d like the Assistant to find"'), got)
             case("the reel's own clip cards are headed Your clips for this reel", "<span class='wl'>Your clips for this reel</span><span class='cnt' id='vcCnt'></span>" in pv)
     return page
 
@@ -315,7 +317,7 @@ def check_her_words(s):
     if f is None:
         skip("her words both ways: her v29 handoff isn't on this computer")
         return
-    hers_raw = f.read_text(encoding="utf-8")
+    hers_raw = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
     hers = flat(hers_raw[hers_raw.index("<body"):])
     ours_tables = dict(R.WORDS)
     ours_tables.update(R.KIND_WORDS)
@@ -634,7 +636,7 @@ def check_page(c, s):
     case("a press on the shut shoot leaves it shut while the search has nothing in it", not next(x for x in folds(c) if x["words"].startswith("Other farm"))["open"])
     type_in(c, "#vcQ", "zebra")
     time.sleep(0.2)
-    case("nothing found: her line", "Nothing matches that yet. Try other words, or tell your assistant what to look for." in c.text("#vcRes"), c.text("#vcRes"))
+    case("nothing found: her line", "Nothing matches that yet. Try other words, or tell the Assistant what to look for." in c.text("#vcRes"), c.text("#vcRes"))
     type_in(c, "#vcQ", "laughing")
     c.wait_for("!!document.querySelector('#vcRes .vc')", 5)
     still_ok = c.wait_for("(function(){ var i = document.querySelector('#vcRes .vc img'); return i && i.naturalWidth > 0; })()", 40)
@@ -653,7 +655,7 @@ def check_page(c, s):
     c.wait_for("document.querySelectorAll('#clist .ci').length === 1", 10)
     type_in(c, "#vcAsk", "Find me laughing at the beach")
     ok = s.wait(lambda: (s.record().get("saved") or {}).get("vault_ask") == "Find me laughing at the beach" and len(s.record().get("moments") or []) == 1, 8)
-    case("what is typed in Or tell your assistant what to look for is saved with this reel", bool(ok), s.record().get("saved"))
+    case("what is typed in Or tell the Assistant what to look for is saved with this reel", bool(ok), s.record().get("saved"))
     case("the line to copy is hers", c.text("#vcLine").strip() == "Find my clips in my vault" and c.text("#vcCopy").strip() == "Copy")
     c.reload()
     c.wait_for("window.Reel && Reel.state() && Reel.vaultPanel && Reel.vaultPanel().ready && document.querySelectorAll('#clist .ci').length === 1", 30)
@@ -687,8 +689,8 @@ H, F, T = "2026-11-01 Hannah beach", "2026-11-01 Other farm", "2026-11-01 Third 
 PHOTO_TAGS = {"beach-002.jpg": ["green", "outdoor"], "beach-003.jpg": {"tags": ["sky"], "faces": 2}}
 # her lines for the photos step that her page builds in its script
 HERS_PHOTO_SCRIPT = ["Added to my vault ", "Photos you add to your vault show up here, open and ready.", "From its post kit · ", " found",
-                     "Your assistant will pick these, or tap photos below to add your own.", "+ Add ${noun}", "'photos'",
-                     "Nothing matches that yet. Try other words, or tell your assistant what to look for."]
+                     "The Assistant will pick these, or tap photos below to add your own.", "+ Add ${noun}", "'photos'",
+                     "Nothing matches that yet. Try other words, or tell the Assistant what to look for."]
 
 
 class PhotoWorld(World):
@@ -757,7 +759,7 @@ def check_photo_words(s):
     if f is None:
         skip("her photos step both ways: her v29 handoff isn't on this computer")
         return
-    hers_raw = f.read_text(encoding="utf-8")
+    hers_raw = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
     body = hers_raw[hers_raw.index("<body"):]
     a0 = body.index('id="stepPhotos"')
     step = body[body.index(">", a0) + 1:body.rindex("<section", 0, body.index('id="stepSong"'))]
@@ -878,12 +880,12 @@ def check_photo_page(c, s):
     c.open(s.url("/reel.html?kit=" + VQ + "&kind=photos"))
     c.wait_for("window.Reel && Reel.state() && Reel.vaultPhotos && Reel.vaultPhotos.look().ready", 40)
     case("the page is the Moms reel's, a Just photos reel in the vault: Choose your photos is step 1", c.text("#step1 h2").replace("1", "").strip() == "Choose your photos", c.text("#step1 h2"))
-    case("a new reel starts on I'll drag them in myself, with her line where its photos will be: Your assistant will pick these, or tap photos below to add your own.",
-         c.count("#reel .tile") == 0 and c.js("document.querySelector('#vpEmpty').hidden") is False and c.text("#vpEmpty").strip() == "Your assistant will pick these, or tap photos below to add your own."
+    case("a new reel starts on I'll drag them in myself, with her line where its photos will be: The Assistant will pick these, or tap photos below to add your own.",
+         c.count("#reel .tile") == 0 and c.js("document.querySelector('#vpEmpty').hidden") is False and c.text("#vpEmpty").strip() == "The Assistant will pick these, or tap photos below to add your own."
          and c.text("#vpCnt").strip() == "", c.text("#vpEmpty"))
     c.click("#useClaude")
     c.wait_for("document.querySelectorAll('#reel .tile').length === 2", 5)
-    case("Let my assistant choose shows the assistant's pick for this reel under Your photos for this reel, counted \"2 added\"",
+    case("Let the Assistant choose shows the assistant's pick for this reel under Your photos for this reel, counted \"2 added\"",
          c.js("Array.prototype.map.call(document.querySelectorAll('#reel .tile'), function(t){ return +t.dataset.n; })") == [n(H, 1), n(F, 5)]
          and c.text(".vp-head .wl").strip().lower() == "your photos for this reel" and c.text("#vpCnt").strip() == "2 added" and c.js("document.querySelector('#vpEmpty').hidden") is True, c.text("#vpCnt"))
     c.js("document.querySelector('#allBox').open = true")
@@ -927,7 +929,7 @@ def check_photo_page(c, s):
     case("\"Hannah laughing\" finds across the shoot's name and the photo's words: one shoot open, \"1 found\", the other shut", hb["open"] and hb["hit"] == "1 found" and hb["seen"] == [n(H, 1)] and not of["open"] and of["nohit"], (hb, of))
     type_in(c, "#vpQ", "zebra")
     time.sleep(0.3)
-    case("nothing found: her line, and every shoot shut", c.js("document.querySelector('#vpNone').hidden") is False and c.text("#vpNone").strip() == "Nothing matches that yet. Try other words, or tell your assistant what to look for."
+    case("nothing found: her line, and every shoot shut", c.js("document.querySelector('#vpNone').hidden") is False and c.text("#vpNone").strip() == "Nothing matches that yet. Try other words, or tell the Assistant what to look for."
          and not any(x["open"] for x in pfolds(c)[1:]), pfolds(c))
     type_in(c, "#vpQ", "kiss")
     c.wait_for("document.querySelectorAll('#all .hit:not([hidden])').length === 1", 5)
@@ -1191,7 +1193,7 @@ def check_empty_others(s, ids, sid):
     g = s.get("/reel-vault-photos?kit=" + VQ)[1]
     case("what the photos step searches: nothing yet, and it answers", bool(g) and g.get("ok") is True and g.get("photos") == [] and g.get("shoots") == [], g)
     line = R.VAULT_OUR_WORDS.get("talk_no_photos", "(no such line)")
-    case("our line for the talking page: plain, your assistant's words, no dash, no Claude", "no photos yet" in line and "B-roll" in line and "—" not in line and "Claude" not in line
+    case("our line for the talking page: plain, the Assistant's words, no dash, no Claude", "no photos yet" in line and "B-roll" in line and "—" not in line and "Claude" not in line
          and not re.search(r"\b(she|he|her|his)\b", line), line)
     code, _, raw = s.get("/talking.html?kit=" + VQ)
     page = html_mod.unescape(raw.decode("utf-8", "replace"))

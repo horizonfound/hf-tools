@@ -372,7 +372,7 @@ try:
     good("captions on", {"captions": True}, "captions", True)
     refused("captions as a number", {"captions": 1})
     good("who places the photos: me", {"photo_mode": "me"}, "photo_mode", "me")
-    good("... my assistant", {"photo_mode": "assistant"}, "photo_mode", "assistant")
+    good("... the Assistant", {"photo_mode": "assistant"}, "photo_mode", "assistant")
     good("... not chosen", {"photo_mode": ""}, "photo_mode", "")
     refused("... anyone else", {"photo_mode": "claude"})
     for k, v in (("photos", {}), ("moves", {}), ("words", []), ("video", "x.mp4"), ("status", "ready"), ("claude_cut", []), ("rev", 9), ("earlier", {})):

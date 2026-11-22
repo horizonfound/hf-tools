@@ -87,7 +87,7 @@ class Renames:
                     why = last.replace("STOP: ", "")
                     if not why or "/" in why or "\\" in why:   # no file paths on the page (a PC's use backslashes)
                         why = "Something stopped the rename, and nothing was changed."
-                    self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell your assistant and it'll sort it out."}
+                    self.state[shoot_id] = {"state": "problem", "name": name, "line": why + " Tell the Assistant and it'll sort it out."}
             try:  # the report shows the new name and folder
                 rebuild_report(self.session)
             except Exception as ex:
@@ -225,7 +225,7 @@ class Picks:
                                errors="replace", **quiet())
             with self.lock:
                 self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
-                                        else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell your assistant and it'll sort it out."})
+                                        else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell the Assistant and it'll sort it out."})
             try:
                 rebuild_report(self.session)
             except Exception as ex:
@@ -688,7 +688,7 @@ class Handler(SimpleHTTPRequestHandler):
                              else f"Opened {target.name} in {APP}.") if ok else f"Couldn't open {APP}. ({why})"
                     self.last_open[str(target)] = now
         except Exception as e:  # noqa: BLE001  (a click must always get an answer in plain words)
-            ok, words = False, "Something went wrong opening that. Tell your assistant and it'll sort it out."
+            ok, words = False, "Something went wrong opening that. Tell the Assistant and it'll sort it out."
             print(f"open-shoot asked: failed: {e.__class__.__name__}: {e}", flush=True)
         print(f"open asked: /open-shoot {sid!r} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()
@@ -743,7 +743,7 @@ class Handler(SimpleHTTPRequestHandler):
                              else f"Opened {name} in {APP}.") if ok else f"Couldn't open {APP}. ({why})"
                 self.last_open[str(target)] = now
         except Exception as e:  # noqa: BLE001  (a click must always get an answer in plain words)
-            ok, words = False, "Something went wrong opening that. Tell your assistant and it'll sort it out."
+            ok, words = False, "Something went wrong opening that. Tell the Assistant and it'll sort it out."
             print(f"clips asked: {parts.path} failed: {e.__class__.__name__}: {e}", flush=True)
         print(f"open asked: {parts.path} -> {'ok' if ok else 'no'}: {words}", flush=True)
         out = json.dumps({"ok": ok, "words": words}).encode()

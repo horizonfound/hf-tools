@@ -48,6 +48,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import home_v28_check as v28  # noqa: E402  (its pretend Assistant: World, at, text_of, box_words)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 TODAY = v28.TODAY
 A, B = v28.A, v28.B
@@ -184,7 +186,7 @@ def check_her_words(w, home):
         return
     v28.at(TODAY, "EOS_DIGITAL:233")
     page = home.page_html()
-    raw = hers.read_text(encoding="utf-8")
+    raw = nicole_nov22.read(hers)   # Nicole, Nov 22: everything is the Assistant
     body = raw.split("</style>", 1)[1].split("<script", 1)[0]
     theirs = flat("<title>" + raw.split("<title>", 1)[1].split("</title>", 1)[0] + "</title>" + body)
     ours = "¦" + "¦".join(flat(page.split("<script", 1)[0]) + flat("¦".join(home.WORDS.values()))) + "¦"

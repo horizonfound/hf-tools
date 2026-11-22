@@ -14,7 +14,7 @@ From nothing (a PC that has never run the Assistant), the first conversation goe
 2. **Python.** Find it, or ask them to add it ("Python, the PC's one missing piece" below). If it isn't there, that is the whole conversation: the Store, then they close Claude and come back.
 3. **Python's first run.** The first time anything runs Python, Python downloads and sets itself up, which can take a few minutes. That happens inside step 2's first command; nothing to say about it unless it fails.
 4. **What kind of computer:** `python3 "<scripts>/this_computer.py"` (below). It says whether the pictures add-on (Pillow) is there.
-5. **The first-thing checks** from SKILL.md (the reminders, `home.py pending`).
+5. **The first-thing checks** from SKILL.md (`edit_queue.py offers --mark`, `updates.py check`, `home.py pending`; never the reminders, which the chat no longer opens with).
 6. **Pillow, on a yes,** only when step 4 said "Pillow (pictures on a PC): not here" and this is their very first hello: `python3 "<scripts>/home.py" hello` (without `--mark`; it only reads) says `"stage": "first"`. Ask it now, before the hello, in the first-hello words ("Pictures: one more free add-on" below has the words and the buttons), so their setup is finished in one sitting while they have the guide open. The setup guide's Step 6 tells them this question comes right after hi. If they say "Not now", don't ask again at a later hello; it is asked again before the first step that needs pictures, as that section says.
 7. **The hello,** as `parts/hello.md` says: the home page in the pane, then `home.py hello --mark` and its words.
 
@@ -170,7 +170,7 @@ When they ask what doesn't work on a PC (or "is there anything I'm missing?"), s
 > - Posting-day reminders don't reach your calendar by themselves. I make a calendar file with your caption in it, and you add it to your calendar yourself, and again after any change. Check that it has an alert.
 > - Talking reels. Talking reels aren't on a PC yet: turning your talking into words needs a part only a Mac has today. Your photo reel, carousel and stories all work here.
 > - Saving a B-roll reel as a finished video. Saving a finished video isn't on a PC yet: it needs a part only a Mac has today. Make this one in CapCut works here, and your words go with it.
-> - Photo tags for search. On a PC, search finds your photos by shoot name and by anything your assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask me to describe a shoot's photos and search will find them.
+> - Photo tags for search. On a PC, search finds your photos by shoot name and by anything the Assistant has described. A Mac also looks at each photo by itself and tags what is in it; a PC can't yet, so ask me to describe a shoot's photos and search will find them.
 >
 > And you're one of the first to use me on a PC, so the rest is new here too, CapCut for Windows most of all. If anything looks off, tell me.
 
@@ -178,7 +178,7 @@ Say only what they asked about when they asked about one thing ("can you do my f
 
 ## Finding photos by what is in them
 
-A Mac tags every photo in a post kit by itself (its own Vision), so search finds "beach" or "people" straight away. A PC has no such part, so there are no tags: the post kit page never shows "Getting your photos ready to search", and in its place says "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:" with the line to copy. Describing photos (`parts/post-kit.md`, "Describing photos so they can be found") works on a PC exactly as on a Mac, and so does `vault.py find`. Never tell a PC photographer their photos are being looked at by themselves.
+A Mac tags every photo in a post kit by itself (its own Vision), so search finds "beach" or "people" straight away. A PC has no such part, so there are no tags: the post kit page never shows "Getting your photos ready to search", and in its place says "On a PC, search finds your photos by shoot name and by anything the Assistant has described. To have them described, copy this into the chat:" with the line to copy. Describing photos (`parts/post-kit.md`, "Describing photos so they can be found") works on a PC exactly as on a Mac, and so does `vault.py find`. Never tell a PC photographer their photos are being looked at by themselves.
 
 ## The words page and posting-day reminders
 

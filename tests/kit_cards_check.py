@@ -48,6 +48,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import reel_page_check as rpc  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 KIT = rpc.KIT
 KQ = quote(KIT)
@@ -86,7 +88,7 @@ def her_text():
         for h in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*"), reverse=True):
             f = h / "Carousel designer and reel picker" / "pages" / "post-kit.html"
             if f.is_file() and "Add to my queue" in f.read_text(encoding="utf-8"):
-                return html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
+                return html.unescape(nicole_nov22.read(f)).replace("\\'", "'")   # Nicole, Nov 22: everything is the Assistant
     return None
 
 
@@ -123,7 +125,7 @@ def check_words(s):
     if "design_preview" not in t:
         print("SKIP  her design preview's words against her own page: her handoff v24 is not on this computer", flush=True)
     else:
-        raw = next(f.read_text(encoding="utf-8") for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))
+        raw = next(nicole_nov22.read(f) for base in (ROOT, Path("/Users/dustindamron/Projects/hf-tools"))   # Nicole, Nov 22: everything is the Assistant
                    for f in sorted((base / "reference-private").glob("nicole-handoff-v2[0-9]-*/Carousel designer and reel picker/pages/post-kit.html"), reverse=True)
                    if "design_preview" in f.read_text(encoding="utf-8"))
         hers_car = re.search(r"kit\.design_preview \? `<div class=\"status\"><span class=\"dot no\"></span>(.*?)</div>`", raw)
@@ -208,8 +210,8 @@ def check_empty_kit(s):
     c_href, c = card(text, "carousel")
     t_href, t = card(text, "stories")
     case("nothing made: three cards, Reel, Carousel and Stories, in her order", all((r, c, t)) and text.index("data-piece='reel'") < text.index("data-piece='carousel'") < text.index("data-piece='stories'"))
-    case("nothing made: the Reel card says her 'Your assistant hasn't picked the reel photos yet. Click to pick them yourself.' and 'Not made yet'",
-         "Your assistant hasn't picked the reel photos yet. Click to pick them yourself." in plain(r) and status_of(r) == "Not made yet", status_of(r))
+    case("nothing made: the Reel card says her 'The Assistant hasn't picked the reel photos yet. Click to pick them yourself.' and 'Not made yet'",
+         "The Assistant hasn't picked the reel photos yet. Click to pick them yourself." in plain(r) and status_of(r) == "Not made yet", status_of(r))
     case("nothing made: the CTAs are hers: Create my reels →, Design my carousel →, Make my stories →",
          "Create my reels →" in plain(r) and "Design my carousel →" in plain(c) and "Make my stories →" in plain(t))
     case("nothing made: 'No slides yet.' and 'No stories yet.', each 'Not made yet'",

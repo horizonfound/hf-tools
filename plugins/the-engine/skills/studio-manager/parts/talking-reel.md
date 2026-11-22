@@ -55,7 +55,7 @@ Then one or two lines, no more: "Your talking reel page is beside us. Press Add 
 
 What the page does by itself, so you know what they are looking at:
 
-- **Step 1.** **Add my video** makes a Talking folder for this shoot and opens it; they drag their video in, it shows on the page by itself, and they pick it there. **Edit my video** turns it into a script: "Getting your video ready…", then "Turning your words into a script…". A minute of video takes about a minute. Then the line to copy for you, and the heading "Your photos and videos", and under it "Who puts them with what you say?" with **I'll add them** or **My assistant places them**.
+- **Step 1.** **Add my video** makes a Talking folder for this shoot and opens it; they drag their video in, it shows on the page by itself, and they pick it there. **Edit my video** turns it into a script: "Getting your video ready…", then "Turning your words into a script…". A minute of video takes about a minute. Then the line to copy for you, and the heading "Your photos and videos", and under it "Who puts them with what you say?" with **I'll add them** or **The Assistant places them**.
 - **Step 2.** The script beside a preview. A click on a word plays from there. They highlight words to cut them, bring them back, add photos or a video from the shoot's Footage folder, or add a Punch in or a Slow zoom. A bar above the words is a photo or a video; they drag it or click it to change it.
   - **A word the Mac misheard they fix themselves** (Nicole, Nov 17): double-click it (or highlight a few and press **Fix the words**), type the right words, Enter. The captions, the preview and CapCut use the fixed word from then on; it wears a dotted underline, and hovering shows what was heard ("You fixed this. It was heard as …"). Undo fix puts the heard word back. The cuts and the timing never change. **You never fix a word for them (rule 3)**; if they ask you to, tell them how in one line: "Double-click the word on the page and type the right one." `show` and `photos` print the fixed word as the word; `status` says how many they fixed, never which.
   - **+ Add more photos** sits in the photo pop-up's footer (the one that opens from + Add photos or Change photos): it opens the shoot's Photos folder, and photos they drag in show up in the grid at the end, with the next numbers, while the pop-up is open. **Every photo keeps its number** (the Assistant numbers new ones after the highest ever given, and a photo that is gone keeps its number unused), so a contact sheet you drew still matches; run the sheet command again before you place, to see the new ones.
@@ -72,7 +72,7 @@ The page looks for your cut and your photos every few seconds and shows them by 
 
 - "No script yet" or "No video has been turned into a script yet": there is nothing to cut. Say "Add your video on the page and press Edit my video. Tell me when the script is there." and stop. `show` and `photos` answer the same way with a STOP.
 - "exported again since its script was made": the words belong to the old file. Ask them to press Edit my video again on the page before you cut or place.
-- "Stopped: ...": say that line as it is; it is already in plain words. If it ends "Tell your assistant: set up talking reels.", go to "Set up talking reels".
+- "Stopped: ...": say that line as it is; it is already in plain words. If it ends "Tell the Assistant: set up talking reels.", go to "Set up talking reels".
 
 ## "Cut my talking reel for <shoot>": the cut
 
@@ -143,7 +143,7 @@ The page looks for your cut and your photos every few seconds and shows them by 
 
 ## "Set up talking reels"
 
-Turning their talking into words is done by the Mac's own Speech Recognition, in a small app the Assistant builds on their Mac the first time (the Mac calls it Assistant Transcriber: that is the name in the Mac's box and in System Settings). Building it needs one free piece from Apple (its Command Line Tools: the same piece a Mac's Python comes with, so most Macs running the Assistant already have it). When it is missing, the page says "Talking reels need one more thing from Apple on this Mac before the first one. Tell your assistant: set up talking reels."
+Turning their talking into words is done by the Mac's own Speech Recognition, in a small app the Assistant builds on their Mac the first time (the Mac calls it Assistant Transcriber: that is the name in the Mac's box and in System Settings). Building it needs one free piece from Apple (its Command Line Tools: the same piece a Mac's Python comes with, so most Macs running the Assistant already have it). When it is missing, the page says "Talking reels need one more thing from Apple on this Mac before the first one. Tell the Assistant: set up talking reels."
 
 1. `talking_rec.py setup --check`. It says, for you: whether Apple's tools were found, whether the small app that listens is built, and what the Mac last said about Speech Recognition. It sets nothing up.
 2. **Everything found and built:** "Nothing to set up: it is ready." Say "Talking reels are set up. Press Edit my video on the page." and stop.

@@ -19,7 +19,10 @@ of the real ~/.studio, no real kit, no /Volumes, no window on the screen):
     by x, a press outside and Escape; each shoot landing on its page (the reel page's chooser, the carousel designer,
     the stories designer, the words page), My vault on its own reel page or its post kit page; + A new shoot making
     the kit and landing on the page that was tapped, a second time landing on the same kit; a closed picker changing
-    nothing.
+    nothing;
+  * Captions asks "Captions for a reel or a carousel?" [Reel] [Carousel] once the shoot is picked (Nicole, Nov 22),
+    from a shoot, from My vault (its own words page, which really opens) and from + A new shoot, and lands on the
+    words page's tab they chose.
 
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only; a Mac.
 """
@@ -159,7 +162,8 @@ def check_routes(w):
     raw = json.dumps(d)
     case("/make-list: every post kit, newest first, with a small picture and the four pages each lands on, never a path",
          code == 200 and d["ok"] and [k["folder"] for k in d["kits"]][:2] == sorted([k["folder"] for k in d["kits"]], reverse=True)[:2]
-         and all(set(k["go"]) == {"reel", "carousel", "stories", "captions"} and k["thumb"].startswith("/kit-thumb?kit=") for k in d["kits"])
+         and all(set(k["go"]) == {"reel", "carousel", "stories", "captions", "captions_reel", "captions_carousel"} and k["thumb"].startswith("/kit-thumb?kit=") for k in d["kits"])
+         and all(k["go"]["captions_carousel"].endswith("&piece=carousel") and k["go"]["captions_reel"].endswith("&piece=reel") for k in d["kits"])
          and str(w.work) not in raw and "/private/" not in raw, raw[:300])
     code, _ = w.get_json("/make-list", headers={"Sec-Fetch-Site": "cross-site"})
     case("... refused to another website", code == 403, code)
@@ -167,6 +171,14 @@ def check_routes(w):
     case("POST /make-new from another website: refused, no window, nothing made", code == 403, code)
     code, raw = w.http("POST", "/make-vault", raw=b'{"make":"nope"}', headers={"Content-Type": "application/json"})
     case("POST /make-vault with anything but one of the four: refused", code == 400, code)
+    code, raw = w.http("POST", "/make-vault", raw=b'{"make":"captions"}', headers={"Content-Type": "application/json"})
+    try:
+        d = json.loads(raw.decode("utf-8"))
+    except ValueError:
+        d = {}
+    case("POST /make-vault for Captions: both of the vault's words pages, for the page to choose from once they answer (Nov 22)",
+         code == 200 and d.get("ok") and (d.get("go") or {}).get("captions_reel") == "/words.html?kit=My%20vault&piece=reel"
+         and (d.get("go") or {}).get("captions_carousel") == "/words.html?kit=My%20vault&piece=carousel", d)
 
 
 # ---------------------------------------------------------------- in a browser
@@ -189,6 +201,12 @@ def box_state(c):
                 "rows: [...document.querySelectorAll('#mkL .mkr')].map(r => ({b: r.querySelector('b').textContent, small: r.querySelector('small').textContent, "
                 "href: r.getAttribute('href'), imgs: r.querySelectorAll('img').length, v: r.classList.contains('v')})), "
                 "nothing: (document.querySelector('#mkL .mknothing') || {}).textContent || ''}; })()")
+
+
+def ask_state(c):
+    return c.js("(() => ({shown: !document.getElementById('mkAsk').hidden, sub: document.getElementById('mkS').textContent, for: document.getElementById('mkFor').textContent, "
+                "buttons: [...document.querySelectorAll('#mkAsk button')].map(b => b.textContent), listShown: !document.getElementById('mkL').hidden, "
+                "newShown: !document.getElementById('mkTop').hidden, path: location.pathname, focus: (document.activeElement || {}).id}))()")
 
 
 def closed(c):
@@ -237,17 +255,63 @@ def check_browser(c, w, shot=None):
     case("no page errors, and nothing asked of the internet", not c.page_errors() and not c.outside_requests(), (c.page_errors()[:2], c.outside_requests()[:2]))
     # each landing address
     want = {"reel": ("/reel.html", {"kit": [B]}), "carousel": ("/design.html", {"kit": [B]}),
-            "stories": ("/design.html", {"kit": [B], "kind": ["stories"]}), "captions": ("/words.html", {"kit": [B], "piece": ["reel"]})}
+            "stories": ("/design.html", {"kit": [B], "kind": ["stories"]}), "captions": ("/words.html", {"kit": [B], "piece": ["carousel"]})}
     for make, (path, q) in want.items():
         c.open(w.url("/home"))
         ready(c)
         open_box(c, make)
         c.click("#mkL .mkr[data-kit=%s]" % json.dumps(B))
+        if make == "captions":
+            c.wait_for("!document.getElementById('mkAsk').hidden", 10)
+            a = ask_state(c)
+            case("Captions from a shoot: it asks \"Captions for a reel or a carousel?\", Reel and Carousel, naming the shoot, the list put away, still on the home page (Nov 22)",
+                 a == {"shown": True, "sub": "Captions for a reel or a carousel?", "for": "Katie Austin Maternity", "buttons": ["Reel", "Carousel"],
+                       "listShown": False, "newShown": False, "path": "/home", "focus": "mkAR"}, a)
+            c.click("#mkAC")
         c.wait_for("location.pathname === %s" % json.dumps(path), 20)
         u = urlsplit(c.js("location.href"))
-        case("%s from a shoot lands on %s for that shoot" % (make, path), u.path == path and parse_qs(u.query) == q, c.js("location.href"))
+        case("%s from a shoot lands on %s for that shoot" % (make, path), u.path == path and landed(u, q), c.js("location.href"))
         if make == "reel":
             case("... the reel page's chooser (no kind picked yet)", "kind" not in parse_qs(u.query))
+    # Captions, Reel: the words page's Reel tab
+    c.open(w.url("/home"))
+    ready(c)
+    open_box(c, "captions")
+    c.click("#mkL .mkr[data-kit=%s]" % json.dumps(B))
+    c.wait_for("!document.getElementById('mkAsk').hidden", 10)
+    c.click("#mkAR")
+    c.wait_for("location.pathname === '/words.html'", 20)
+    u = urlsplit(c.js("location.href"))
+    case("... Reel lands on the words page's Reel tab", parse_qs(u.query) == {"kit": [B], "piece": ["reel"]}, c.js("location.href"))
+    # the question opened afresh: Escape closes it, and the next tile shows its list again (nothing left over)
+    c.open(w.url("/home"))
+    ready(c)
+    open_box(c, "captions")
+    c.click("#mkL .mkr[data-kit=%s]" % json.dumps(B))
+    c.wait_for("!document.getElementById('mkAsk').hidden", 10)
+    c.key("Escape")
+    c.wait_for("document.getElementById('mk').hidden", 5)
+    open_box(c, "reel")
+    s = box_state(c)
+    case("... closed with Escape; the next tile opens on its list again, not the question", c.js("document.getElementById('mkAsk').hidden") and s["sub"] == "Which shoot do you want to make it from?"
+         and len(s["rows"]) >= 3 and s["top"], s)
+    c.key("Escape")
+    # My vault from Captions: the same question, then the vault's own words page (a page the vault has)
+    c.open(w.url("/home"))
+    ready(c)
+    open_box(c, "captions")
+    c.click("#mkVault")
+    c.wait_for("!document.getElementById('mkAsk').hidden", 10)
+    a = ask_state(c)
+    case("My vault from Captions: the same question, naming My vault", a["shown"] and a["for"] == "My vault" and a["path"] == "/home", a)
+    c.click("#mkAC")
+    c.wait_for("location.pathname === '/words.html'", 20)
+    href = c.js("decodeURIComponent(location.href)")
+    c.wait_for("document.readyState === 'complete'", 10)
+    body = c.js("document.body.innerText")
+    import arrange
+    case("... Carousel lands on the vault's own words page, Carousel tab, and the page really opens",
+         href.endswith("/words.html?kit=My vault&piece=carousel") and arrange.CANT_FIND not in body and len(body) > 40, (href, body[:200]))
     for make, path in (("reel", "/reel.html"), ("stories", "/content/")):
         c.open(w.url("/home"))
         ready(c)
@@ -294,6 +358,16 @@ def check_search(c, w):
         shutil.rmtree(str(k))
 
 
+def landed(u, want):
+    """The address the box sent them to. The stories designer itself adds `design=<id>` to its own address a moment
+    after it opens (history.replaceState, once it has opened or made the set), so a slow run can read the address
+    after that: the design the designer chose is not part of where the box landed them (final check, Nov 22: seen
+    on Apple's 3.9 only)."""
+    q = parse_qs(u.query)
+    q.pop("design", None)
+    return q == want
+
+
 def check_new_shoot(c, w, src):
     """+ A new shoot in the page: the picker (answered by the tests' switch), the kit made, landing on the tapped page."""
     before = hashes(src)
@@ -306,7 +380,7 @@ def check_new_shoot(c, w, src):
     u = urlsplit(c.js("location.href"))
     made = [n for n in content_names(w) if n not in names0]
     case("+ A new shoot from Stories: the post kit is made and the page lands on the stories designer, not the post kit",
-         len(made) == 1 and parse_qs(u.query) == {"kit": [made[0]], "kind": ["stories"]}, (c.js("location.href"), made))
+         len(made) == 1 and landed(u, {"kit": [made[0]], "kind": ["stories"]}), (c.js("location.href"), made))
     case("... the folder they picked is exactly as it was", hashes(src) == before)
     got = sorted(p.name for p in (w.content / made[0] / "Photos").iterdir()) if made else []
     case("... its photos are in the kit", len(got) == 5, got)
@@ -314,10 +388,14 @@ def check_new_shoot(c, w, src):
     ready(c)
     open_box(c, "captions")
     c.click("#mkNew")
-    c.wait_for("location.pathname === '/words.html'", 120)
+    c.wait_for("!document.getElementById('mkAsk').hidden || location.pathname === '/words.html'", 120)
+    a = ask_state(c)
+    case("the same folder again from Captions: it asks reel or carousel before landing (Nov 22)", a["shown"] and a["sub"] == "Captions for a reel or a carousel?" and a["path"] == "/home", a)
+    c.click("#mkAC")
+    c.wait_for("location.pathname === '/words.html'", 30)
     u = urlsplit(c.js("location.href"))
-    case("the same folder again from Captions: no second kit, the words page of the same one",
-         content_names(w) == sorted(names0 + made) and parse_qs(u.query) == {"kit": [made[0]], "piece": ["reel"]}, (content_names(w), c.js("location.href")))
+    case("... then no second kit, the words page of the same one, on the Carousel tab",
+         content_names(w) == sorted(names0 + made) and parse_qs(u.query) == {"kit": [made[0]], "piece": ["carousel"]}, (content_names(w), c.js("location.href")))
     return made[0] if made else None
 
 

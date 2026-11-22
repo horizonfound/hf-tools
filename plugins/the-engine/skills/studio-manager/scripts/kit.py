@@ -1759,11 +1759,11 @@ KIT_WORDS = {
     "reach": "I can't reach this shoot right now. Check that the photo drive is plugged in, then reload.",
     "reel": "Reels",                 # v27: the Reels card (four kinds of reel behind its door)
     "reel_sub": "Create as many reels as you like from this shoot: behind the scenes, just photos, talking to camera, or B-roll. Each one is cut on the beat of your song and opens in CapCut, ready for your look.",
-    "reel_none": "Your assistant hasn't picked the reel photos yet. Click to pick them yourself.",
+    "reel_none": "The Assistant hasn't picked the reel photos yet. Click to pick them yourself.",
     "in_capcut": "In CapCut:",
     "open_capcut": "Open in CapCut",
     "opening_capcut": "Opening CapCut...",
-    "capcut_unreached": "Could not reach the page server. Ask your assistant to open CapCut.",
+    "capcut_unreached": "Could not reach the page server. Ask the Assistant to open CapCut.",
     "not_made": "Not made yet",
     "carousel": "Carousel",
     "carousel_sub": "Lay out your slides in the carousel designer: photos across slides, type, your brand colors. One slide "
@@ -1860,14 +1860,14 @@ OUR_KIT_WORDS = {
     "canva_cover": "the reel cover",
     "canva_story": "story {n}",
     "opening": "Opening...",
-    "unreached": "Could not reach the Assistant. Tell your assistant instead.",
-    "saved_copy": "This is a saved copy. Say “show the {name} kit” to your assistant and the buttons work.",
+    "unreached": "Could not reach the Assistant. Tell the Assistant in the chat instead.",
+    "saved_copy": "This is a saved copy. Say “show the {name} kit” to the Assistant and the buttons work.",
     # ours (v27): a B-roll reel saved whole from the reel page (Save my video) is made, with no CapCut project to open;
     # her v27 card has no line for it (hers says "In CapCut:" for every made reel)
     "saved_video": "Saved as a video, in this shoot's Reels folder:",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
-    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell your assistant, and it'll sort it out.",
+    "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell the Assistant, and it'll sort it out.",
 }
 # Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
 # three cards with their three steps, v20) and never sends one from before them in its place.

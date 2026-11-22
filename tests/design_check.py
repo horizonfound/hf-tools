@@ -1509,7 +1509,7 @@ def main():
             import traceback
             case("the checks of v26's routes and commands ran to the end", False, f"{type(e).__name__}: {e} | {traceback.format_exc()[-900:]}")
     if a.only in (None, "browser", "v26"):
-        real_page("v26: sets of stories, Let my assistant choose, her templates, Redo, the x on a label")
+        real_page("v26: sets of stories, Let the Assistant choose, her templates, Redo, the x on a label")
         try:
             design_v26_check.check_v26_browser(case, work, a.port + 34, make_kit, Server, post, get_json, run)
         except Exception as e:  # noqa: BLE001

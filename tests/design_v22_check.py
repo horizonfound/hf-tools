@@ -27,6 +27,8 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import quote
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
@@ -126,7 +128,7 @@ def her_numbers():
     if not HER_PAGE.is_file():
         return None
     out = {}
-    for line in HER_PAGE.read_text(encoding="utf-8").splitlines():
+    for line in nicole_nov22.read(HER_PAGE).splitlines():   # Nicole, Nov 22: everything is the Assistant
         m = re.match(r"\s*\{ id: '((?:tp|cs)-[a-z0-9-]+)', name: '([^']+)', slides: (\d+), bg: '(#[0-9a-f]{6})', frames: \[(.*)\], texts: \[\] \},?\s*$", line)
         if not m:
             continue
@@ -258,7 +260,7 @@ def check_v22_page(case, work):
                 for h in HERS_STARTERS + HERS_SINGLES}
         bad = [k for k, v in got.items() if mine.get(k) != v]
         case(f"v22: this file's tables are her page's own numbers ({len(got)} layouts she wrote in plain numbers)", len(got) >= 9 and not bad, bad)
-        her = HER_PAGE.read_text(encoding="utf-8")
+        her = nicole_nov22.read(HER_PAGE)   # Nicole, Nov 22: everything is the Assistant
         ids = re.findall(r"\{ id: '((?:tp|st)-[a-z0-9-]+)'", her[her.index("const STARTERS"):her.index("// Story starters")])
         case("v22: the order of the starters is her page's own", ids == [h[0] for h in HERS_STARTERS], ids)
         ids1 = re.findall(r"\{ id: '(cs-[a-z0-9-]+)'", her)

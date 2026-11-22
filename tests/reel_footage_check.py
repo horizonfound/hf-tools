@@ -53,6 +53,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import reel_page_check as rpc  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 rpc.PHOTOS = PHOTOS = 12
 KIT = rpc.KIT
@@ -74,7 +76,7 @@ HERS1 = {
     "fix": "<b>Quick fix:</b> trim it first and keep just the parts you like. On your iPhone, open the video in Photos, tap Edit, and drag the ends of the timeline in. On a Mac, open it in QuickTime Player and choose Edit › Trim. A few short clips are quicker for me than one long video.",
     "paste_say": "Then, once your footage is in, copy this into the chat so I can look through it:",
     "copy": "Copy",
-    "ask_b": "Is there anything specific you'd like your assistant to look for?",
+    "ask_b": "Is there anything specific you'd like the Assistant to look for?",
     "ask": " Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
     "ex1": "For example: “Find the first kiss.” or “Find the part where the baby grabs the camera strap.”",
     "ex2": "Another example: “Find the footage of me walking into the frame with my camera.”",
@@ -324,7 +326,7 @@ def check_server(s, clips):
         code, j, _ = foot(s)
         case("a Footage folder that is a link: no videos listed from it", code == 200 and j["videos"] == [] and j["folder"] is False, j)
         code, j, _ = s.http("POST", "/reel-open", {"kit": KIT, "what": "footage"})
-        case("and Add my footage won't open it, in her words", code == 200 and j == {"ok": False, "words": "Could not open the folder. Ask your assistant to open it."}, j)
+        case("and Add my footage won't open it, in her words", code == 200 and j == {"ok": False, "words": "Could not open the folder. Ask the Assistant to open it."}, j)
     finally:
         real.rename(s.kit / "Footage link (test)")
         (s.kit / "Footage-real").rename(real)
@@ -343,7 +345,7 @@ def her_footage_items():
     f = rpc.her_folder()
     if not f:
         return None
-    src = (f / "server.py").read_text(encoding="utf-8")
+    src = nicole_nov22.read((f / "server.py"))   # Nicole, Nov 22: everything is the Assistant
     tree = ast.parse(src)
     fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "footage_items")
     mod = ast.Module(body=[fn], type_ignores=[])

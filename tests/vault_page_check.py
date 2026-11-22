@@ -48,6 +48,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 import vault_core_check as core  # noqa: E402
 from vault_core_check import A, B, case, group, tree  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 C = "2026-11-01 Third hill"
 
@@ -68,8 +70,8 @@ HERS_NOT_OURS = {
 # checked to be in her file as she wrote it, and to be on ours.
 HERS_IN_SCRIPT = {
     "make": ["My vault", "All your shoots in one post kit · ", " photos", "Open the post kit", "Archive", "Bring it back"],
-    "vault": ["Make it", "Reels", "Create my reels", "The same reel maker as every post kit: your assistant picks, orders and cuts on the beat of your song, and it opens in CapCut. The only difference is it picks from every shoot in your vault.",
-              "Tell your assistant what this reel is",
+    "vault": ["Make it", "Reels", "Create my reels", "The same reel maker as every post kit: the Assistant picks, orders and cuts on the beat of your song, and it opens in CapCut. The only difference is it picks from every shoot in your vault.",
+              "Tell the Assistant what this reel is",
               "\"My favorite maternity photos this year\" · \"Behind the scenes at the beach\" · \"Moms laughing, from any shoot\"",
               "Not made yet", "Carousel", "Design my carousel",
               "The same carousel designer, with photos from any shoot: a year of favorites, or three families in one post.",
@@ -272,8 +274,8 @@ def check_vault_page(s):
          "<a class='go' id='vaultEverything' href='/vault.html'>See everything in it &rarr;</a></span>" in markup)
     case("her three card lines", all(html_mod.escape(W[k]) in markup for k in ("reel_sub", "carousel_sub", "stories_sub")))
     case("the shoot page's own card lines are not on the vault's", "Create as many reels as you like from this shoot" not in markup and "Lay out your slides in the carousel designer" not in markup)
-    case("her box on the Reels card: Tell your assistant what this reel is, with her three examples",
-         "<span class='ask'><span class='k'>Tell your assistant what this reel is</span><span class='p'>" + html_mod.escape(W["ask_p"]) + "</span></span>" in markup)
+    case("her box on the Reels card: Tell the Assistant what this reel is, with her three examples",
+         "<span class='ask'><span class='k'>Tell the Assistant what this reel is</span><span class='p'>" + html_mod.escape(W["ask_p"]) + "</span></span>" in markup)
     kq = quote(s.vault().name)
     hrefs = dict(re.findall(r"<a class='piece' data-piece='(\w+)' href='([^']+)'", markup))
     case("the three cards lead to the reel page, the designer and the stories designer, for the vault",
@@ -284,7 +286,7 @@ def check_vault_page(s):
     case("no path on the vault's page", not s.no_path(page), s.no_path(page))
     for kit in (A, B, C):
         code, raw = s.page("/content/" + quote(kit, safe="") + "/Post%20kit.html")
-        ok = code == 200 and "id='inv'" not in raw and "Tell your assistant what this reel is" not in raw and "Create as many reels as you like from this shoot" in raw and "Open the kit folder" in raw
+        ok = code == 200 and "id='inv'" not in raw and "Tell the Assistant what this reel is" not in raw and "Create as many reels as you like from this shoot" in raw and "Open the kit folder" in raw
         if not ok:
             break
     case("a shoot's own post kit page is as it was: no strip, no box, its own lines and folder buttons", ok, kit)
@@ -329,7 +331,7 @@ def check_her_words(s):
              "vault": (d / "vault-kit-preview.html", s.page(s.vault_page())[1], list(vault_page.WORDS.values()) + list(kit_mod.KIT_WORDS.values()) + ["My post kits", "See everything in it →"])}
     seen_left = set()
     for key, (f, ours_page, ours_words) in pages.items():
-        raw = f.read_text(encoding="utf-8")
+        raw = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
         plain = html_mod.unescape(raw).replace("\\'", "'")
         body = raw.split("<body", 1)[1].split("<script", 1)[0]
         theirs = flat(body) + [t for t in HERS_IN_SCRIPT[key]] + [t for t in HERS_NOT_OURS if t.startswith("In the real version") and key == "vault"]
@@ -547,7 +549,7 @@ def check_browser_vault(c, s):
         folders: document.querySelectorAll('.folders').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth}; })()""")
     case("the strip shows the three shoots, the count, its two buttons and See everything in it", len(q["chips"]) == 3 and set(q["chips"]) == {"Fake beach", "Other farm", "Third hill"}
          and re.fullmatch(r"\d+ photos · 0 clips", q["count"]) and q["btns"] == ["+ Add a shoot", "+ Add clips", "See everything in it →"], q)
-    case("the path reads Home › My post kits › My vault, and the box on the Reels card is hers", q["crumbs"] == "Home › My post kits › My vault" and q["ask"].upper().startswith("TELL YOUR ASSISTANT WHAT THIS REEL IS") and "Moms laughing, from any shoot" in q["ask"], q)
+    case("the path reads Home › My post kits › My vault, and the box on the Reels card is hers", q["crumbs"] == "Home › My post kits › My vault" and q["ask"].upper().startswith("TELL THE ASSISTANT WHAT THIS REEL IS") and "Moms laughing, from any shoot" in q["ask"], q)
     case("the three cards, and no sideways scroll", q["cards"] == ["reel", "carousel", "stories"] and q["sw"] <= q["cw"], q)
     before = int(q["count"].split(" ")[0])
     # + Add clips: the line shows inside the strip, right under the buttons

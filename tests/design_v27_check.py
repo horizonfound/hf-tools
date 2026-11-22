@@ -55,6 +55,8 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import quote
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
@@ -67,12 +69,12 @@ SW, SH = 1080, 1920          # a story
 # Her words (pages/carousel-designer.html, v27), exactly.
 HERS = {
     # the ask box on a carousel (her askKindWords and askLineText)
-    "ask_button": "Let my assistant choose the photos",
-    "ask_head": "Tell your assistant what you want",
-    "ask_sub_car": "Your assistant fills your slides with a good mix from this shoot, in an order that flows, and follows your note.",
-    "ask_sub_story": "Your assistant picks a story with a good mix from this shoot, and follows your note.",
-    "ask_then_car": "Then copy this into the chat, and your assistant fills in your slides:",
-    "ask_then_story": "Then copy this into the chat, and your assistant fills in your stories:",
+    "ask_button": "Let the Assistant choose the photos",
+    "ask_head": "Tell the Assistant what you want",
+    "ask_sub_car": "The Assistant fills your slides with a good mix from this shoot, in an order that flows, and follows your note.",
+    "ask_sub_story": "The Assistant picks a story with a good mix from this shoot, and follows your note.",
+    "ask_then_car": "Then copy this into the chat, and the Assistant fills in your slides:",
+    "ask_then_story": "Then copy this into the chat, and the Assistant fills in your stories:",
     "ask_place_car": "Optional: what you'd like in your carousel",
     "ask_place_story": "Optional: what you'd like in your stories",
     "ask_line_car": "Pick my carousel photos",
@@ -182,7 +184,7 @@ HERS_NOT_OURS = {
 # hers run `open` and are Mac only. Checked below as its own case rather than as a line left out.)
 # Our own words where hers has none (drafts for Nicole), each with its reason.
 OUR_WORDS = {
-    "Your assistant’s pick is in your slides.": "the carousel's line for the moment the pick arrives on the open page (hers has none; the stories' line is from v26)",
+    "The Assistant’s pick is in your slides.": "the carousel's line for the moment the pick arrives on the open page (hers has none; the stories' line is from v26)",
     "It’s your only slide, so it stays.": "beside Remove this slide at one slide, where hers does nothing and says nothing (the stories' line is from v26)",
     "Put a new blank story in front of the one this is on": "her stories' tooltips still say slide (her page renames the three buttons only); ours say story, as every story word does (decision 20)",
     "It's behind this window: click <Finder> in <the Dock> to see it.": "added after her 'Your Carousel folder is open in Finder.' when macOS kept the browser in front (hers never knows); File Explorer and the taskbar on a PC",
@@ -215,7 +217,7 @@ GRID_IDS = ["sg-1", "sg-2", "sg-3", "sg-4", "sg-6", "sg-9", "sg-12"]
 def her_page():
     for p in HER_PAGES:
         if p.is_file():
-            return p.read_text(encoding="utf-8")
+            return nicole_nov22.read(p)   # Nicole, Nov 22: everything is the Assistant
     return None
 
 
@@ -223,7 +225,7 @@ def her_server():
     """Her server.py beside her page (read as text, never run)."""
     for p in HER_PAGES:
         if p.is_file() and (p.parent.parent / "server.py").is_file():
-            return (p.parent.parent / "server.py").read_text(encoding="utf-8")
+            return nicole_nov22.read((p.parent.parent / "server.py"))   # Nicole, Nov 22: everything is the Assistant
     return ""
 
 
@@ -621,7 +623,7 @@ def check_v27_page(case, work):
     case("v27 page: the core keeps the note for both kinds when a design is taken from the Assistant",
          "D.design.ask = typeof d.ask === 'string' ? d.ask : '';" in src["DESIGN_CORE_JS"] and "if (STORY) D.design.ask" not in src["DESIGN_CORE_JS"])
     case("v27 page: the carousel's line for the moment the pick arrives is ours, and the stories' line is as it was",
-         "'Your assistant’s pick is in your slides.'" in src["DESIGN_ASK_JS"] and "'Your assistant’s pick is in your stories.'" in src["DESIGN_ASK_JS"])
+         "'The Assistant’s pick is in your slides.'" in src["DESIGN_ASK_JS"] and "'The Assistant’s pick is in your stories.'" in src["DESIGN_ASK_JS"])
     case("v27 page: no page word says Claude, and none has a long dash", "Claude" not in "".join(HERS.values()) and "—" not in car and "—" not in story)
     case("v27 page: the note is never part of a layout, for a carousel either",
          "ask" not in design.validate_state({"slides": 1, "bg": "#ffffff", "blocks": [], "ask": "hello"})[0])
@@ -828,7 +830,7 @@ def check_v27_page(case, work):
     askjs = src["DESIGN_ASK_JS"]
     app = this_computer.FILES_APP
     tb = re.search(r"<span class='tray-btns'><button class='tb add-photos' id='add-photos' type='button' title='([^']*)'>([^<]*)</button><button class='tb ask-btn' id='ask-pick'", car)
-    case("v27 page: \"+ Add photos\" sits right before \"Let my assistant choose the photos\" beside the photos' heading, with her tooltip in this computer's words, on both pages",
+    case("v27 page: \"+ Add photos\" sits right before \"Let the Assistant choose the photos\" beside the photos' heading, with her tooltip in this computer's words, on both pages",
          tb and tb.group(2) == HERS["add_photos"] and html.unescape(tb.group(1)) == HERS["add_title"].replace("Finder", app) and "id='add-photos' type='button'" in design_page.page_html("2026-11-01 Fake beach", "stories"), tb and tb.groups())
     ln = re.search(r"<p class='hint' id='add-photos-line' role='status' hidden data-opening='([^']*)' data-open='([^']*)' data-cant='([^']*)'></p>", car)
     case("v27 page: her three lines are on the page as data on the line under the heading, Finder on a Mac and File Explorer on a PC",
@@ -1507,7 +1509,7 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             c.js("Designer.ask.look()")
             c.wait_for(f"Designer.st.blocks.filter(function(b){{ return b.type !== 'text'; }})[1].n === {free[0]}", 8)
             case("v27 browser: the open page takes the pick by itself: the two frames show the photos and the page says so",
-                 [b.get("n") for b in frames(st())][1:3] == free and c.text("#ask-said") == "Your assistant’s pick is in your slides.", (frames(st())[1:3], c.text("#ask-said")))
+                 [b.get("n") for b in frames(st())][1:3] == free and c.text("#ask-said") == "The Assistant’s pick is in your slides.", (frames(st())[1:3], c.text("#ask-said")))
             # ---- the path at the top (B21): in sight, the pills gone, the kit step a link, the page one bar ----
             crumbs = Jx("(function(){ var n = document.querySelector('.bar .crumbs'); if (!n) return null; var r = n.getBoundingClientRect(); "
                         "return {steps: Array.from(n.children).filter(function(e){ return !e.classList.contains('sep'); }).map(function(e){ return [e.tagName, e.textContent, e.getAttribute('href'), e.getAttribute('aria-current')]; }), "
@@ -2134,7 +2136,7 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             # ================= + Add photos (B16) =================
             import shutil
             ab = Jx("(function(){ var b = document.getElementById('add-photos'); return {text: b.textContent, title: b.title, next: b.nextElementSibling.id, wrap: b.parentNode.className, line: document.getElementById('add-photos-line').hidden, watching: Designer.addPhotos.watching()}; })()")
-            case("v27 browser: \"+ Add photos\" sits right before \"Let my assistant choose the photos\" beside the photos' heading, her tooltip in this computer's words, its line not showing, nothing being asked yet",
+            case("v27 browser: \"+ Add photos\" sits right before \"Let the Assistant choose the photos\" beside the photos' heading, her tooltip in this computer's words, its line not showing, nothing being asked yet",
                  ab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick", "wrap": "tray-btns", "line": True, "watching": False}, ab)
             c.js("document.getElementById('g-bg').querySelector('.sw[data-c=\"#f4efe6\"]').click()")       # a change first, so there is an Undo step to keep
             c.wait_for("Designer.save.idle() && document.getElementById('d-status').textContent === 'Saved'", 12)
@@ -2212,7 +2214,7 @@ def check_v27_browser(case, work, port, make_kit, Server, post, get_json, run):
             scr = Jx("Array.from(document.querySelectorAll('.bar .crumbs > *')).filter(function(e){ return !e.classList.contains('sep'); }).map(function(e){ return e.textContent; })")
             case("v27 browser: the stories page's path ends in Stories", scr == ["Home", "Beach post kit", "Stories"], scr)
             sab = Jx("(function(){ var b = document.getElementById('add-photos'); return {text: b.textContent, title: b.title, next: b.nextElementSibling.id}; })()")
-            case("v27 browser: the stories page has her + Add photos too, before Let my assistant choose", sab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick"}, sab)
+            case("v27 browser: the stories page has her + Add photos too, before Let the Assistant choose", sab == {"text": HERS["add_photos"], "title": HERS["add_title"].replace("Finder", app), "next": "ask-pick"}, sab)
             c.click("#strip .blk")
             sgrp = Jx("{top: document.getElementById('save-one').textContent, title: document.getElementById('save-one').title, sel: document.getElementById('save-one-sel').textContent, selTitle: document.getElementById('save-one-sel').title}")
             case("v27 browser: on the stories page the two buttons say story: \"Save just story 1\" and her \"Save just this story\" (the tooltips in story words, ours)",

@@ -36,6 +36,8 @@ import sys
 import time
 from pathlib import Path
 from urllib.parse import quote
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
@@ -48,12 +50,12 @@ W, H = 1080, 1920
 HERS = {
     "bands": "Show Instagram's guides",
     "lede_end": "Untick Show Instagram's guides to hide them.",
-    "ask_button": "Let my assistant choose the photos",
-    "ask_head": "Tell your assistant what you want",
-    "ask_sub": "Optional. Your assistant picks a story with a good mix from this shoot, and follows your note.",
+    "ask_button": "Let the Assistant choose the photos",
+    "ask_head": "Tell the Assistant what you want",
+    "ask_sub": "Optional. The Assistant picks a story with a good mix from this shoot, and follows your note.",
     "ask_example": "For example: “Start with the big laugh, then the details, and end on the two of them walking away.”",
     "ask_place": "Optional: what you'd like in your stories",
-    "ask_then": "Then copy this into the chat, and your assistant fills in your stories:",
+    "ask_then": "Then copy this into the chat, and the Assistant fills in your stories:",
     "ask_line": "Pick my story photos",
     "ask_for": " for ",
     "ask_note": ", and follow my note",
@@ -109,7 +111,7 @@ def _r(v):
 def her_page():
     for p in HER_PAGES:
         if p.is_file():
-            return p.read_text(encoding="utf-8")
+            return nicole_nov22.read(p)   # Nicole, Nov 22: everything is the Assistant
     return None
 
 
@@ -890,7 +892,7 @@ def check_v26_browser(case, work, port, make_kit, Server, post, get_json, run):
             sF = st()
             case("v26 browser: the open page shows the assistant's pick by itself, within a few seconds of it landing", took, [b.get("n") for b in frames(sF)])
             case("v26 browser: ... the words on the stories are untouched, the note is still in its box, and a quiet line says the pick is in",
-                 texts(sF) == texts(sA) and c.js("document.getElementById('ask-note').value") == note and c.text("#ask-said") == "Your assistant’s pick is in your stories.", c.text("#ask-said"))
+                 texts(sF) == texts(sA) and c.js("document.getElementById('ask-note').value") == note and c.text("#ask-said") == "The Assistant’s pick is in your stories.", c.text("#ask-said"))
             case("v26 browser: ... nothing of it was sent back as a change of theirs (the set on the drive is the assistant's, once)", disk(A)["state"] == sF and disk(A).get("filled_by") == "assistant")
             # ---- the review round: which set was asked about, and never under their hands ----
             case("v26 browser: Copy told the Assistant which set was asked about (a time noted with the set)", isinstance(disk(A).get("asked"), float), disk(A).get("asked"))

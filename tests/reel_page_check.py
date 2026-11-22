@@ -43,6 +43,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 PHOTOS = 44
 KIT = "2026-11-01 Fake beach"
@@ -52,12 +54,12 @@ CLAUDE = list(range(1, 45, 3))[:12]          # what fake_kit picks for 44 photos
 HERS = {
     # her v27 (Nov 17): step 2's heading and line, and the just-photos page's lede (tests/reel_v27_page_check.py holds them to her v27 page)
     "h2": "Choose your photos",
-    "say": "What order would you like your photos in? Your assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
-    "claude_b": "Let my assistant choose",
+    "say": "What order would you like your photos in? The Assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
+    "claude_b": "Let the Assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
-    "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
+    "claude_words": "The Assistant picks the strongest photos and orders them so each one flows into the next.",
     # her v25 line (the photographer picks: tests/picks_ask_check.py has the rest of that stage)
-    "not_picked": "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
+    "not_picked": "The Assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Drag any photo to move it, or drag one up from all your photos below. Tap × to take one out.",
     "tip": "If there's a photo you really want on screen a little longer, tap <b>Longer</b> under it. If there are ones you'd like to flash by quicker, tap <b>Quicker</b>. Leave the rest alone.",
@@ -112,7 +114,9 @@ def her_page_of(version):
         for h in sorted((base / "reference-private").glob("nicole-handoff-%s-*" % version)):
             f = h / "Carousel designer and reel picker" / "pages" / "reel-maker.html"
             if f.is_file():
-                return f.read_text(encoding="utf-8")
+                # Nicole, Nov 22: everything is the Assistant. Her pages said "your assistant" / "my assistant";
+                # ours say "the Assistant", so hers is read as it would say it now (tests/nicole_nov22.py).
+                return nicole_nov22.as_now(f.read_text(encoding="utf-8"))
     return None
 
 
@@ -161,7 +165,7 @@ def her_v27_text():
             f = h / "Carousel designer and reel picker"
             if (f / "pages" / "reel-maker.html").is_file() and (f / "server.py").is_file():
                 t = (f / "pages" / "reel-maker.html").read_text(encoding="utf-8") + "\n" + (f / "server.py").read_text(encoding="utf-8")
-                return html.unescape(t).replace("\\'", "'")
+                return nicole_nov22.as_now(html.unescape(t).replace("\\'", "'"))   # Nicole, Nov 22: everything is the Assistant
     return None
 
 
@@ -169,7 +173,7 @@ def her_page():
     """Her reel page as text: v23's when it is on this computer (the newest she sent), else v19's."""
     t = her_v23_page()
     if t is None and her_folder():
-        t = (her_folder() / "pages" / "reel-maker.html").read_text(encoding="utf-8")
+        t = nicole_nov22.as_now((her_folder() / "pages" / "reel-maker.html").read_text(encoding="utf-8"))   # Nicole, Nov 22
     return t
 
 
@@ -178,7 +182,7 @@ def her_text():
     if not f:
         return None
     t = "\n".join([her_page()] + [(f / n).read_text(encoding="utf-8") for n in ("server.py", "bts_reel.py")])
-    return html.unescape(t).replace("\\'", "'")
+    return nicole_nov22.as_now(html.unescape(t).replace("\\'", "'"))   # Nicole, Nov 22: everything is the Assistant
 
 
 # ---------- the pretend kit and the page server ----------
@@ -394,12 +398,14 @@ def check_v27_both_ways():
             f = h / "Carousel designer and reel picker"
             if (f / "pages" / "reel-maker.html").is_file():
                 folder = f
-    hers = page
+    page = nicole_nov22.as_now(page)   # Nicole, Nov 22: everything is the Assistant. Her v27 said "your assistant",
+    hers = page                        # ours "the Assistant": hers is read as it would say it now (tests/nicole_nov22.py)
     for name in ("server.py", "broll_video.py", "bts_reel.py", "footage.py", "UPDATE-v27.md"):     # her "← All the reels..." line is in UPDATE-v27.md, section 2
         if (folder / name).is_file():
             hers += "\n" + (folder / name).read_text(encoding="utf-8")
     hers = html.unescape(hers).replace("\\'", "'")
     hers = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), hers)     # her script writes '\u2713 Added'
+    hers = nicole_nov22.as_now(hers)   # Nicole, Nov 22: everything is the Assistant
     tables = {"KIND_WORDS": rp.KIND_WORDS, "REELS_WORDS": rp.REELS_WORDS, "PICK_WORDS": rp.PICK_WORDS, "SELECT_WORDS": rp.SELECT_WORDS,
               "DIRECT_WORDS": rp.DIRECT_WORDS, "WATCH_WORDS": rp.WATCH_WORDS, "ONSCREEN_WORDS": rp.ONSCREEN_WORDS, "EDITOR_WORDS": rp.EDITOR_WORDS,
               "VIDEO_WORDS": rp.VIDEO_WORDS}
@@ -610,7 +616,7 @@ def check_page(c, s):
     case("the recommended tag is not shown without footage (BUILD.md: with footage only)", t["claude_rec_hidden"] is True)
     c.click("#useClaude")
     t = texts(c)
-    case("Let my assistant choose with no pick: the same line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
+    case("Let the Assistant choose with no pick: the same line again, nothing else changes", t["claude_html"] == HERS["not_picked"] and t["mine_on"], t)
 
     # Claude picks; on their own (empty) order the page doesn't follow, but the words change
     code, out = s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))
@@ -623,7 +629,7 @@ def check_page(c, s):
     case("on their own order, the pick from the chat doesn't replace it", c.js(ORDER) == [])
     c.click("#useClaude")
     c.wait_for(READY, 10)
-    case("Let my assistant choose shows the assistant's order", c.js(ORDER) == CLAUDE, c.js(ORDER))
+    case("Let the Assistant choose shows the assistant's order", c.js(ORDER) == CLAUDE, c.js(ORDER))
     t = texts(c)
     case("her count words: 12 photos", t["count"] == "12 photos", t["count"])
     case("the assistant's order is the one marked", t["claude_on"] and not t["mine_on"])
@@ -703,7 +709,7 @@ def check_page(c, s):
 
     # the switch, both orders kept
     c.click("#useClaude")
-    case("Let my assistant choose shows the assistant's again", c.js(ORDER) == CLAUDE)
+    case("Let the Assistant choose shows the assistant's again", c.js(ORDER) == CLAUDE)
     case("their own order is kept while the assistant's shows", on_disk(s, {"mine": False, "mine_picks": picks(mine_order)}), (s.record() or {}).get("saved"))
     c.click("#useMine")
     case("I'll drag them in myself brings back their own, as they left it", c.js(ORDER) == mine_order, c.js(ORDER))
@@ -747,7 +753,7 @@ def check_page(c, s):
     time.sleep(5.5)
     case("on their own order, a fresh pick doesn't replace it", c.js(ORDER) == mine_order, c.js(ORDER))
     c.click("#useClaude")
-    case("and Let my assistant choose shows the fresh one", c.js(ORDER) == [8, 9], c.js(ORDER))
+    case("and Let the Assistant choose shows the fresh one", c.js(ORDER) == [8, 9], c.js(ORDER))
     s.cmd("kit.py", "picks", str(s.kit), "--reel", ",".join(map(str, CLAUDE)))
     c.wait_for("JSON.stringify(%s) === %s" % (ORDER, json.dumps(json.dumps(CLAUDE, separators=(",", ":")))), 8)
 
@@ -953,7 +959,7 @@ HERS3 = {
     "opening": "Opening your Music folder in Finder...",
     "open": "Your Music folder is open in Finder. Drag your song in, and it will show up here by itself.",
     "open_behind": "Your Music folder is open in Finder, behind this window. Click Finder in the Dock to see it. Drag your song in, and it will show up here by itself.",
-    "cant_open": "Could not open the folder. Ask your assistant to open it.",
+    "cant_open": "Could not open the folder. Ask the Assistant to open it.",
 }
 HERS5 = {
     "h2": "Pick the vibe",

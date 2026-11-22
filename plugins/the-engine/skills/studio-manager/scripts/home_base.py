@@ -64,14 +64,14 @@ WORDS = {
     "opening_queue": "Opening your editing queue…",
     "opening": "Opening…",
     "opening_report": "Opening the report…",
-    "not_running": "The Assistant isn't running right now. Ask your assistant to show the home page.",
+    "not_running": "The Assistant isn't running right now. Ask the Assistant to show the home page.",
     "copy": "Copy",
     "copied": "Copied",
     "back_home": "Back to home",
     # Back up a card
     # (her "Step 1 of your workflow" eyebrow is gone since v29: the home page no longer numbers steps)
     "b_h1": "Back up <em>a card.</em>",
-    "b_lede_1": "This is where your assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.",
+    "b_lede_1": "This is where the Assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.",
     "b_lede_2": "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.",
     "b_steps": "How to back up a card",
     "b_s1": "<b>Put your memory card in.</b> Shooting with more than one card? Back them up one at a time; they'll show up together below.",
@@ -90,7 +90,7 @@ WORDS = {
     "st_due": "To edit, {due}",
     "b_unplugged": "This one's on {drive}. Plug it in to open it.",
     "another_drive": "another drive",
-    "b_moved": "I can't find this folder anymore. If you moved or renamed it in Finder, tell your assistant where it went.",
+    "b_moved": "I can't find this folder anymore. If you moved or renamed it in Finder, tell the Assistant where it went.",
     "open_folder": "Open this folder",
     "card_n": "card {n}",
     "cards_n": "{n} cards",
@@ -115,7 +115,7 @@ WORDS = {
     "m_steps": "How to make a post kit from a shoot",
     "m_s1": "<b>Choose the folder with your finished photos.</b>",
     "m_pick": "Select the folder with your finished photos",
-    "m_s1_small": "Your assistant makes its own copies of the JPEGs in that folder. Your originals aren't moved or changed.",
+    "m_s1_small": "The Assistant makes its own copies of the JPEGs in that folder. Your originals aren't moved or changed.",
     "m_picking": "Pick the folder in the window that just opened…",
     "m_s2": "<b>Then paste this in the chat:</b>",
     "m_say": "make my posts",
@@ -147,13 +147,13 @@ OUR_WORDS = {
     # under step 2 of Back up a card. Hers read "Your assistant asks a quick question or two, then you can walk
     # away. The report is ready when you're back, and it shows up below.", which stopped being true on Nov 19
     # (Dustin: nothing is asked before the copy). A draft of ours, for Nicole to reword.
-    "b_s2_small": "Your assistant finds your card and starts copying. There's nothing to answer first, so you can walk away. The report is ready when you're back, and it shows up below.",
+    "b_s2_small": "The Assistant finds your card and starts copying. There's nothing to answer first, so you can walk away. The report is ready when you're back, and it shows up below.",
     # a sample backup (night.py --sample, for tests) is never called safe to format; the report's own words
     "sample_keep": "Keep the card: this was a sample",
     # a backed-up shoot that holds video clips: a clip is never called a photo (Dustin, Nov 11)
     "clips": "video clip",
     # the home page saved as a file (home.py page), which can't ask the Assistant anything
-    "offline": "This is a saved copy. Ask your assistant to “show the Assistant” for the live one.",
+    "offline": "This is a saved copy. Ask the Assistant to “show the Assistant” for the live one.",
     # the My vault card (v29): one photo is "1 photo" (hers is a template that always says "photos"), and the
     # lines its one press can end with
     "v_small_one": "All your shoots in one post kit · 1 photo",

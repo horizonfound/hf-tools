@@ -382,7 +382,7 @@ def check_vault(s):
     code, out = s.cmd("vault.py", "find", "cake", env=s.quick)
     case("find: a photo added to the vault itself, and a clip (\"cake\" is in \"cupcake\"), by one word", "  Added to my vault: %s" % own_n in out and "m1-abcdef" in out and "Clips matching \"cake\": 1." in out, out)
     code, out = s.cmd("vault.py", "find", "laughing", "--clips", env=s.quick)
-    case("find: \"laughing\" finds the clip your assistant named", "m1-abcdef | Fake beach | Laughing with the cupcake and knife" in out, out)
+    case("find: \"laughing\" finds the clip the Assistant named", "m1-abcdef | Fake beach | Laughing with the cupcake and knife" in out, out)
     code, out = s.cmd("vault.py", "find", "beach", "--clips", env=s.quick)
     case("find: a shoot's name finds its clips, the unnamed one too, as Not named yet", "Clips matching \"beach\": 3." in out and "u2-0a0a0a | Fake beach | Not named yet" in out, out)
     code, out = s.cmd("vault.py", "find", "me with the", env=s.quick)
@@ -396,10 +396,10 @@ def check_pc(s):
     code, out = s.py("import photo_words, kit; from pathlib import Path\nk = Path(%r)\nprint(photo_words.here(), photo_words.opened(k), photo_words.state(k)['can'])" % str(s.kit(E)), env=s.pc)
     case("no classifier here: nothing starts, and the state says so", out.splitlines()[-1:] == ["False False False"] and not s.store(E).exists(), out)
     code, out = s.cmd("photo_words.py", "tag", E, env=s.pc)
-    case("asked for tags from the chat, it says the PC line and writes nothing", code == 3 and "On a PC, search finds your photos by shoot name and by anything your assistant has described." in out and not s.store(E).exists(), out)
+    case("asked for tags from the chat, it says the PC line and writes nothing", code == 3 and "On a PC, search finds your photos by shoot name and by anything the Assistant has described." in out and not s.store(E).exists(), out)
     code, out = s.py("import kit; from pathlib import Path\nprint(kit.page_html(Path(%r)))" % str(s.kit(E)), env=s.pc)
     case("the post kit page carries the PC line with the line to copy, and not the Mac's line",
-         "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:" in out
+         "On a PC, search finds your photos by shoot name and by anything the Assistant has described. To have them described, copy this into the chat:" in out
          and "Describe my photos for Long day" in out and "Want search to find more" not in out, out[out.find("id='pw'"):][:400])
     code, out = s.py("import kit; from pathlib import Path\nprint(kit.page_html(Path(%r)))" % str(s.kit(E)), env=s.quick)
     case("on a Mac the same page carries the Mac's quiet line instead", "Want search to find more, like &quot;laughing&quot; or &quot;a kiss&quot;? Copy this into the chat:" in out and "On a PC" not in out)

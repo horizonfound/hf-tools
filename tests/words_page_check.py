@@ -52,6 +52,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 WINDOWS = os.name == "nt"
 # A shoot named to break a careless page: an accent, an emoji, an ampersand, a quote; and, where a folder may be
@@ -380,7 +382,7 @@ def check_words(wp):
     if f is None:
         skip("her words against her own page: her handoff (reference-private) isn't on this computer")
     else:
-        raw = f.read_text(encoding="utf-8")
+        raw = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
         t = html.unescape(raw).replace("\\'", "'")
         # ours in hers: each line of ours (each piece between its {names}) is a WHOLE piece of her wording, not
         # merely found somewhere in her file (so "Copy" can't be matched by her CSS, nor a line by half of hers)
@@ -435,7 +437,7 @@ def check_words(wp):
     case("...and 'Captions' is this page's own word, in WORDS (the rest of the path is look.py's)", wp.WORDS["crumb_captions"] == "Captions")
     f = her_page()
     if f is not None and "crumbs" in f.read_text(encoding="utf-8"):
-        hers = f.read_text(encoding="utf-8")
+        hers = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
         case("her v27 bar line: the pill hidden, the nav 'Where you are', and the call [[post kit, kit], ['Captions', null]]",
              '<a class="homelink" style="display:none" id="back"' in hers and '<nav class="crumbs" id="crumbs" aria-label="Where you are"></nav>' in hers
              and "C([[C.postKit, C.kit], ['Captions', null]])" in hers)

@@ -725,7 +725,7 @@ function dueTag(iso){
 function esc(s){return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(t){const el = $('#toast');el.textContent = t;el.classList.add('on');clearTimeout(el._t);el._t = setTimeout(() => el.classList.remove('on'), 2200)}
 async function send(body){
-  if(!LIVE){toast('Open the queue through your assistant to save changes');return false}
+  if(!LIVE){toast('Open the queue through the Assistant to save changes');return false}
   try{const r = await fetch('/queue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
       // 409: the shoot is somewhere else than this page thought (changed in the chat, or in another window):
       // nothing was changed, the answer is the newest lists, and the page shows them
@@ -834,12 +834,12 @@ function renderFolds(){
 // A link to one of the Assistant's other pages (Make posts, Back to home): this server is asked where it is, and
 // starts that page server if it is not running (after the computer was restarted, say). Never a dead link.
 async function goTo(route, fallback){
-  if(!LIVE){ if(fallback) location.href = fallback; else toast('Open the queue through your assistant to make posts from here'); return }
+  if(!LIVE){ if(fallback) location.href = fallback; else toast('Open the queue through the Assistant to make posts from here'); return }
   try{ const r = await fetch(route); const j = await r.json(); if(j.url){ location.href = j.url; return } }catch(e){}
-  if(fallback) location.href = fallback; else toast("I couldn't open that just now. Tell your assistant: make my posts");
+  if(fallback) location.href = fallback; else toast("I couldn't open that just now. Tell the Assistant: make my posts");
 }
 async function openFolder(id){
-  if(!LIVE){toast('Ask your assistant to “show my shoots” to open folders from here');return}
+  if(!LIVE){toast('Ask the Assistant to “show my shoots” to open folders from here');return}
   try{const r = await fetch('/open?id=' + encodeURIComponent(id)); const j = await r.json(); toast(j.words)}
   catch(e){toast('Could not open that folder.')}
 }
@@ -965,10 +965,10 @@ $('#addcancel').onclick = () => { $('#addform').hidden = true; $('#addname').val
 $('#addform').onsubmit = async e => {
   e.preventDefault(); const name = $('#addname').value.trim(), due = $('#adddue').value;
   if(!name){ $('#addname').focus(); return }
-  if(!LIVE){ $('#added').textContent = 'This is a saved copy. Ask your assistant to pull up your queue, then add it there.'; return }
+  if(!LIVE){ $('#added').textContent = 'This is a saved copy. Ask the Assistant to pull up your queue, then add it there.'; return }
   if(await send({action:'add', name, due})){ render(); $('#addname').value = ''; $('#adddue').value = '';
     $('#added').textContent = name + (due ? ' added, due ' + nice(due) + '.' : ' added, no due date yet.'); toast(name + ' is in your queue'); $('#addname').focus() }
-  else $('#added').textContent = 'Could not add it. Tell your assistant instead.';
+  else $('#added').textContent = 'Could not add it. Tell the Assistant instead.';
 };
 $('#q').addEventListener('input', e => {FILTER = e.target.value; renderBelow()});
 // One search for every shoot (Nicole, v26): the queue, uploaded, delivered and archived
@@ -1079,7 +1079,7 @@ def page_html(q):
             "<form class='addform' id='addform' hidden><input type='text' id='addname' placeholder='Client or shoot name' maxlength='80' autocomplete='off'>"
             "<input type='date' id='adddue' title='Due date (optional)'><button type='submit' class='go'>Add to the queue</button><button type='button' class='cancel' id='addcancel'>Cancel</button>"
             "<span class='hint'>The date is optional. A shoot added here has no photos behind it yet, so its card shows no previews.</span></form><p class='added' id='added'></p></div>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask your assistant to “pull up my queue” to check things off and change dates.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask the Assistant to “pull up my queue” to check things off and change dates.</p></header>"
             "<ol class='list' id='list'></ol>"
             "<div class='findall'><label class='search'><svg viewBox='0 0 24 24'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>"
             "<input id='q' type='search' placeholder='Find a shoot' autocomplete='off'></label>"

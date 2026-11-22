@@ -347,7 +347,7 @@ WORDS = {
     "copied": "Copied",
     # her v27 (Nov 17): the box asks for moments to look for (how the reel should go is step 4's, "Would you like to
     # direct this edit?"), and sits before the line to copy
-    "ask_label_html": "<b>Is there anything specific you'd like your assistant to look for?</b> Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
+    "ask_label_html": "<b>Is there anything specific you'd like the Assistant to look for?</b> Optional. Certain moments from the shoot, something funny you remember, or a special moment you'd love to have as a clip to choose from.",
     "ask_ex1": "For example: “Find the first kiss.” or “Find the part where the baby grabs the camera strap.”",
     "ask_ex2": "Another example: “Find the footage of me walking into the frame with my camera.”",
     "ask_placeholder": "Optional: the moments you'd like me to look for",
@@ -419,7 +419,7 @@ WORDS = {
     "moment_gone": "That moment isn't there anymore. Reload the page.",
     "video_not_here": "That video isn't in this shoot's Footage folder.",
     "cant_put_back": "That moment can't be put back.",
-    "no_moments": "There are no footage moments to use yet. Add your footage, copy the line into the chat, {_}and the moments your assistant finds will show up here. Or choose Just photos.",
+    "no_moments": "There are no footage moments to use yet. Add your footage, copy the line into the chat, {_}and the moments the Assistant finds will show up here. Or choose Just photos.",
     "select_clips": "Select the clip or clips to use for this style.",
     "pick_style": "Pick how the footage goes in.",
     "reveal_none": "The reveal needs footage moments that match one of your final photos, and none of these do. {_}Try Moment first or Back and forth.",
@@ -427,7 +427,7 @@ WORDS = {
 
     # step 2: put your photos in order
     "order_h2": "Choose your photos",                      # her v27 (Nov 17; v19: "Put your photos in order")
-    "order_say": "What order would you like your photos in? Your assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
+    "order_say": "What order would you like your photos in? The Assistant can choose them and their order for you, or you can drag them in yourself. Whichever you pick, the other one is kept, so you can switch back and forth to compare.",
     # her v27: + Add photos opens the shoot's Photos folder; the page notices new photos and offers to show them
     "add_photos": "+ Add photos",
     "add_photos_say": "Opens this shoot's Photos folder in Finder. Drag in more finished photos and they show up here.",
@@ -437,10 +437,10 @@ WORDS = {
     "opening_photos": "Opening your Photos folder in Finder...",
     "photos_open": "Your Photos folder is open in Finder. Drag your finished photos in, and I'll show them here.",
     "cant_open_photos": "Could not open the folder. Is the photo drive plugged in?",
-    "claude_b": "Let my assistant choose",
+    "claude_b": "Let the Assistant choose",
     "claude_rec": "Recommended for behind-the-scenes reels",
-    "claude_words": "Your assistant picks the strongest photos and orders them so each one flows into the next.",
-    "claude_words_bts": "Your assistant picks your strongest photos, the ones with the most feeling and the best story, and fits your behind-the-scenes moments in between.",
+    "claude_words": "The Assistant picks the strongest photos and orders them so each one flows into the next.",
+    "claude_words_bts": "The Assistant picks your strongest photos, the ones with the most feeling and the best story, and fits your behind-the-scenes moments in between.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Drag any photo to move it, or drag one up from all your photos below. Tap × to take one out.",
     "tip_html": "If there's a photo you really want on screen a little longer, tap <b>Longer</b> under it. If there are ones you'd like to flash by quicker, tap <b>Quicker</b>. Leave the rest alone.",
@@ -482,7 +482,7 @@ WORDS = {
     "got_it": "Got it: {name}.",
     "opening_music": "Opening your Music folder in Finder...",
     "music_open": "Your Music folder is open in Finder. Drag your song in, and it will show up here by itself.",
-    "cant_open": "Could not open the folder. Ask your assistant to open it.",
+    "cant_open": "Could not open the folder. Ask the Assistant to open it.",
     # Remove this song (her v27, section 2, step 3: "two taps, to the Trash"; reel-maker.html songRm, built Nov 17,
     # Lane E's E12). The button sits in the song drop-down (Lane A's A8): one tap turns it into song_sure for 4 s,
     # the second sends POST /reel-song-remove; the page then says song_trashed. A PC reads these through
@@ -543,7 +543,7 @@ WORDS = {
     "new_reel": "your new reel",
     "open_capcut_say": "Open CapCut, click it at the top of your projects, add your look, and export.",
     "open_capcut": "Open CapCut",
-    "no_server": "I couldn't reach the page server. Ask your assistant to make the reel instead.",
+    "no_server": "I couldn't reach the page server. Ask the Assistant to make the reel instead.",
     "capcut_opening": "CapCut is opening. Your newest reel is at the top of your projects.",
 
     # her server.py, when Make my reel can't go ahead
@@ -551,8 +551,8 @@ WORDS = {
     "pick_vibe": "Pick a vibe first.",
     "song_gone": "That song isn't there anymore. Press Add my music and drag it in again.",
     "no_sound": "I couldn't take the sound out of that recording. Try saving the song as an audio file.",
-    "went_wrong_make": "Something went wrong making the reel. Ask your assistant to make it instead.",
-    "too_long": "That took too long. Ask your assistant to make the reel instead.",
+    "went_wrong_make": "Something went wrong making the reel. Ask the Assistant to make it instead.",
+    "too_long": "That took too long. Ask the Assistant to make the reel instead.",
 
     # her v27 (Nov 14): straight into the posting queue from here, under Your reels once the reel is made, and in
     # the box after Make my reel. The rhythm is asked once, with her five chips (words_page.RHYTHMS, one copy)
@@ -634,9 +634,9 @@ VAULT_CLIP_WORDS = {
     "vc_search_b": "Search your clips",
     "vc_search_s": "Type what you're looking for. Results show up right away.",
     "vc_search_ph": "me with my camera, laughing, kitchen, beach",
-    "vc_ask_b": "Or tell your assistant what to look for",
+    "vc_ask_b": "Or tell the Assistant what to look for",
     "vc_ask_s": "For example: “Find me editing on the computer.” or “Every clip of me shooting at the beach.”",
-    "vc_ask_ph": "Optional: what you'd like your assistant to find",
+    "vc_ask_ph": "Optional: what you'd like the Assistant to find",
     "vc_line": "Find my clips in my vault",
     "vc_every": "Every shoot",
     "vc_added": "Added to my vault",
@@ -650,7 +650,7 @@ VAULT_CLIP_WORDS = {
     "clips_wl": "Your clips for this reel",
     "vc_n_added": "{n} added",
     "clips_empty": "Add clips from your search above.",
-    "vc_nothing": "Nothing matches that yet. Try other words, or tell your assistant what to look for.",
+    "vc_nothing": "Nothing matches that yet. Try other words, or tell the Assistant what to look for.",
 }
 # Choose your photos, in the vault (her #stepPhotos, screenshot 07; stage 10). Hers, word for word, laid over WORDS
 # and PICK_WORDS only when the kit is the vault: the two choices and their lines, the note and its example, the
@@ -659,20 +659,20 @@ VAULT_CLIP_WORDS = {
 # placeholder, "Then copy this...") are here too, so this table is her whole photos step.
 VAULT_PICK_WORDS = {
     "order_h2": "Choose your photos",
-    "order_say": "Your assistant can choose the photos and their order for you, or you can drag them in yourself.",
-    "claude_b": "Let my assistant choose",
-    "claude_words": "Your assistant picks the strongest photos from your vault and orders them so each one flows into the next.",
+    "order_say": "The Assistant can choose the photos and their order for you, or you can drag them in yourself.",
+    "claude_b": "Let the Assistant choose",
+    "claude_words": "The Assistant picks the strongest photos from your vault and orders them so each one flows into the next.",
     "mine_b": "I'll drag them in myself",
     "mine_words": "Search or browse all your photos below, and tap to add.",
-    "photo_ask_b": "Tell your assistant which photos you'd like in this reel",
+    "photo_ask_b": "Tell the Assistant which photos you'd like in this reel",
     "photo_ask_opt": " Optional, and only for this reel.",
     "photo_ask_ex": "For example: “My favorite maternity photos from this year.” or “Moms laughing, from any shoot.”",
     "photo_ask_placeholder": "Optional: which photos to use, or leave out",
-    "photo_then": "Then copy this into the chat, and your assistant picks the photos for this reel:",
+    "photo_then": "Then copy this into the chat, and the Assistant picks the photos for this reel:",
     "photo_plain": "Pick my reel photos from my vault",
     "photo_for": "Pick my reel photos from my vault",      # the vault's line names no shoot (the reel's name and the note follow as ever)
     "vp_for_reel": "Your photos for this reel",
-    "vp_for_say": "Your assistant will pick these, or tap photos below to add your own.",
+    "vp_for_say": "The Assistant will pick these, or tap photos below to add your own.",
     "all_summary": "All your photos, from every shoot in your vault",
     "vp_added": "Added to my vault",
     "vp_added_say": "Photos you add to your vault show up here, open and ready.",
@@ -681,7 +681,7 @@ VAULT_PICK_WORDS = {
     # her talking kind's step. Talking to camera opens our talking page (stage 9), so these two are kept here, hers,
     # and are not drawn on the reel page.
     "vp_talk_h2": "Your talking video",
-    "vp_talk_say": "Record yourself talking to the camera, the same as a talking reel in any post kit. Your assistant places photos from your vault with what you say, from any shoot.",
+    "vp_talk_say": "Record yourself talking to the camera, the same as a talking reel in any post kit. The Assistant places photos from your vault with what you say, from any shoot.",
 }
 # Ours, on the vault's photos step only, each a draft for Dustin and Nicole. Her search box says "Search by shoot:
 # maternity, Hannah, Christmas", which is her mock-up's limit (it could only search shoot names), not her wish
@@ -700,7 +700,7 @@ VAULT_ASK_MAX = 600                 # the ask box's length (as the footage ask a
 VAULT_OUR_WORDS = {
     # the one line that joins her search to our footage editor below it (in place of "Press Add my footage and a
     # Footage folder for this shoot opens...", which speaks of one shoot)
-    "foot_say2_html": "Videos you add show up in Your footage below. Make clips from them there, or ask your assistant to look through them.",
+    "foot_say2_html": "Videos you add show up in Your footage below. Make clips from them there, or ask the Assistant to look through them.",
     "vc_from_one": "From its post kit · 1 clip",
     "vc_one_clip": "1 clip",
     "vc_loading": "Finding your clips…",
@@ -709,7 +709,7 @@ VAULT_OUR_WORDS = {
     # what the Assistant answers when an add is refused
     "vault_only": "That only works in your vault.",
     "vault_not_in": "That shoot isn't in your vault.",
-    "vc_video_gone": "That clip's video isn't where it was, so it can't be added. Tell your assistant and it'll sort it out.",
+    "vc_video_gone": "That clip's video isn't where it was, so it can't be added. Tell the Assistant and it'll sort it out.",
     # a vault with video clips and no photo yet: the reel page opens (B-roll needs no photo; the kinds with photos
     # show her own "Photos you add to your vault show up here" and wait). The talking page needs photos, and says so
     "talk_no_photos": "Your vault has no photos yet, and a talking reel puts your photos with what you say. Add a shoot to your vault first. A B-roll reel works with video clips alone.",
@@ -739,12 +739,12 @@ REELS_WORDS = {
 # (saved.photo_ask), and the line to copy into the chat. Hers, word for word (pages/reel-maker.html, handoff v25);
 # tests/picks_ask_check.py compares them with her page.
 PICK_WORDS = {
-    "not_picked": "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
-    "photo_ask_b": "Tell your assistant which photos you'd like in this reel",
+    "not_picked": "The Assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat.",
+    "photo_ask_b": "Tell the Assistant which photos you'd like in this reel",
     "photo_ask_opt": " Optional, and only for this reel.",
     "photo_ask_ex": "For example: “Only the ones in front of the white backdrop.” or “Just the kitchen and the cupcakes.”",
     "photo_ask_placeholder": "Optional: which photos to use, or leave out",
-    "photo_then": "Then copy this into the chat, and your assistant picks the photos for this reel:",
+    "photo_then": "Then copy this into the chat, and the Assistant picks the photos for this reel:",
     "photo_plain": "Pick my reel photos",
     "photo_for": "Pick my reel photos for {short}",
     "photo_reel": ", {name}",                      # only when the shoot has more than one reel
@@ -757,11 +757,11 @@ PHOTO_ASK_MAX = 600                                # her box's length, and what 
 # for word (pages/reel-maker.html, handoff v27); not on a B-roll page.
 DIRECT_WORDS = {
     "direct_h2": "Would you like to direct this edit?",
-    "direct_say": "Optional. Tell your assistant how you'd like the reel to go, and it puts your clips and photos together that way.",
+    "direct_say": "Optional. Tell the Assistant how you'd like the reel to go, and it puts your clips and photos together that way.",
     "direct_b": "How should this reel go?",
     "direct_ex": "For example: “Start with the video of me shooting the first kiss, then the photos of the first kiss, then into the party after the ceremony.”",
     "direct_placeholder": "Optional: how you'd like the reel to go",
-    "direct_then": "Then copy this into the chat, and your assistant edits it your way:",
+    "direct_then": "Then copy this into the chat, and the Assistant edits it your way:",
     "direct_plain": "Edit my reel and follow my direction",   # hers, before the page knows the shoot's name
     "direct_for": "Edit my reel for {short}",
     "direct_reel": ", {name}",                     # only when the shoot has more than one reel
@@ -866,7 +866,7 @@ TRIM_WORDS = {
 # the − / + / ✂ Trim / Remove row and "Select your clips" are gone from her page, so they are gone from ours.
 EDITOR_WORDS = {
     "ed_h3": "Your footage",
-    "ed_say": "Play your footage, or drag along the timeline to find a moment. Then choose the clip or clips you'd like in your reel: use the ones your assistant found, or make your own with Start here and End here.",
+    "ed_say": "Play your footage, or drag along the timeline to find a moment. Then choose the clip or clips you'd like in your reel: use the ones the Assistant found, or make your own with Start here and End here.",
     "ed_wait": "Your footage shows up here once it's added.",
     "ed_play": "Play",
     "ed_back": "Back 1 second",
@@ -4301,7 +4301,7 @@ def _get_page(handler, q):
         # a PC without Pillow, or a kit too deep in folders for a PC: say so. A Mac: never.
         cant = arrange.cant_make(kit, rows)
         if cant:
-            return arrange._send_page(handler, arrange_page.plain_page(cant[1] + " Tell your assistant and it'll sort it out."))
+            return arrange._send_page(handler, arrange_page.plain_page(cant[1] + " Tell the Assistant and it'll sort it out."))
         arrange.start_previews(kit)
     # her v27: no kind in the address is the chooser; with one, the reel's own kind wins over the address (a saved
     # bts reel opened from a photos address shows as bts), and a reel never chosen takes the address's
@@ -6493,7 +6493,7 @@ ORDER_JS = r"""
   function refresh(){ limit(false); renderReel(); renderAll(); R.save(); track(); }
 
   // ---- the two orders ----
-  function followClaude(){        // on "Let my assistant choose", always show the assistant's latest order
+  function followClaude(){        // on "Let the Assistant choose", always show the assistant's latest order
     if (mine) return;
     var c = claudeOrder();
     if (!c.length) return;

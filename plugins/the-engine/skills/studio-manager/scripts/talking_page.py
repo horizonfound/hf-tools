@@ -109,7 +109,7 @@ WORDS = {
     "eyebrow": "Talking reel",
     "title": "{short} talking reel",
     "doc_title": "{short} · talking reel",
-    "lede": "Record your talking-to-camera reel, as messy as you like. Your assistant cuts the video for you; then you "
+    "lede": "Record your talking-to-camera reel, as messy as you like. The Assistant cuts the video for you; then you "
             "watch it, cut or bring back words, and add your photos or videos. Then it's made in CapCut.",
     # step 1
     "s1_h2": "Your video",
@@ -126,7 +126,7 @@ WORDS = {
     "status_ready": "{b}{video}{eb}: {n} words, {dur} of video",
     "status_after": ", {b}{after}{eb} after the cuts.",
     "secs": "{t} s",
-    "cut_say": "Copy this into the chat, and your assistant cuts the script like an editor: the warm-up, the restarts, "
+    "cut_say": "Copy this into the chat, and the Assistant cuts the script like an editor: the warm-up, the restarts, "
                "the words said twice. Nothing you keep is changed.",
     "cut_line": "Cut my talking reel for {short}",
     "copy": "Copy",
@@ -136,10 +136,10 @@ WORDS = {
     "who_me": "I'll add them",
     "who_me_say": "Highlight any words, then Add photos or Add video.",
     "who_me_toast": "Highlight any words, then Add photos or Add video",
-    "who_asst": "My assistant places them",
+    "who_asst": "The Assistant places them",
     "who_asst_say": "A photo with each part. Swap any you like.",
-    "place_say": "Copy this into the chat, and your assistant puts your photos with what you say:",
-    "place_say_wait": "Once your script is ready, copy this into the chat and your assistant puts your photos with what "
+    "place_say": "Copy this into the chat, and the Assistant puts your photos with what you say:",
+    "place_say_wait": "Once your script is ready, copy this into the chat and the Assistant puts your photos with what "
                       "you say:",
     "place_line": "Place the photos in my talking reel for {short}",
     "cut_place_line": "Cut my talking reel and place the photos for {short}",
@@ -342,7 +342,7 @@ OUR_WORDS = {
                "waits for it, as the reel page does for Footage"),
     "copy_failed": ("Select the words and copy them",
                     "the app's pane can refuse a copy; hers then says nothing (the words page's own line)"),
-    "cant_open": ("Could not open the folder. Ask your assistant to open it.",
+    "cant_open": ("Could not open the folder. Ask the Assistant to open it.",
                   "her talking page says its folder is open whether or not it opened; this is her reel maker's line"),
     "behind": (reel_page.OUR_WORDS["behind"],
                "the folder can open behind the Claude app; every folder button of the Assistant says so"),
@@ -403,7 +403,7 @@ OUR_WORDS["made_only_note"] = (
     "the same, with capcut.py's own note after it on the same line (what to do so the reel shows up in CapCut), as "
     "the photo reel's page shows it")
 OUR_WORDS["not_ready"] = (
-    "This shoot isn't ready for this yet. Tell your assistant: make posts from this shoot.",
+    "This shoot isn't ready for this yet. Tell the Assistant: make posts from this shoot.",
     "the pickers' own line said \"to Claude\" when this page was built, which no line on this page may; the same page, reworded")
 OUR_WORDS.update({"job_" + k: v for k, v in TR.OUR_JOB_WORDS.items()})
 OUR_WORDS.update({"make_" + k: v for k, v in TR.OUR_MAKE_WORDS.items()})

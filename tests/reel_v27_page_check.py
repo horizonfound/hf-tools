@@ -71,6 +71,8 @@ TITLES = {"bts": "behind the scenes", "photos": "reel", "broll": "B-roll"}
 TITLES_B = {"bts": "Behind the scenes", "photos": "Just photos", "broll": "B-roll"}   # her kind names on the path at the top (crumbs.js)
 sys.path.insert(0, str(SCRIPTS))
 import look  # noqa: E402   (the path at the top, as the page builds it)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 
 
@@ -85,7 +87,7 @@ def her_v27(name="pages/reel-maker.html"):
         for h in sorted((base / "reference-private").glob("nicole-handoff-v27-*")):
             f = h / "Carousel designer and reel picker" / name
             if f.is_file():
-                return f.read_text(encoding="utf-8")
+                return nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
     return None
 
 
@@ -671,10 +673,10 @@ def run_page(c, s):
          c.text("#title") == short + " behind the scenes." and nums(c) == ["step0=1", "step1=2", "step3=3", "stepDirect=4", "stepStyle=5", "step4=6", "watch=7"], (c.text("#title"), nums(c)))
     case("step 1 on it: her heading, Add my footage, the ask box with her new label before the line to copy, no feel row, no yes/no cards",
          c.text("#step0 h2") == "1Choose your behind-the-scenes footage" and c.js("!document.getElementById('btsBox').hidden")
-         and c.js("document.querySelector('#btsBox label b').textContent") == "Is there anything specific you'd like your assistant to look for?"
+         and c.js("document.querySelector('#btsBox label b').textContent") == "Is there anything specific you'd like the Assistant to look for?"
          and c.js("document.getElementById('askIn').getBoundingClientRect().top < document.getElementById('pasteWords').getBoundingClientRect().top")
          and c.js("document.getElementById('feelRow').hidden") and c.count("#modeBts") == 0, c.text("#step0 h2"))
-    case("the recommended tag shows on Let my assistant choose only here (behind the scenes)", c.js("!document.getElementById('claudeRec').hidden"))
+    case("the recommended tag shows on Let the Assistant choose only here (behind the scenes)", c.js("!document.getElementById('claudeRec').hidden"))
     c.set_value("#verSel", "v1")
     c.wait_for("window.Reel && window.Reel.state() && window.Reel.state().current === 'v1' && location.search.indexOf('kind=photos') > 0", 20)
     case("switching under Your reels back to the first (just photos) lands on its own kind (hers kept the address's kind), with no recommended tag",

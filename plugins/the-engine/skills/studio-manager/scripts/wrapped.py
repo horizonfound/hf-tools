@@ -111,7 +111,7 @@ WORDS = {
     "h1_month": "Your {label}, <em>{word}</em>",
     "so_far": "so far.",
     "recapped": "recapped.",
-    "lede_year": "Your year with your assistant, story by story, with your real numbers and your own photos. Tap the right side for the next one, the left side to go back, and hold to pause.",
+    "lede_year": "Your year with the Assistant, story by story, with your real numbers and your own photos. Tap the right side for the next one, the left side to go back, and hold to pause.",
     "lede_month": "Your {label} in photos, reels and posts. Tap the right side for the next one, the left side to go back, and hold to pause.",
     "back": "‹ Back", "pause": "Pause", "play": "Play", "next": "Next ›", "again": "Start over",
     "save_one": "Save this one to share", "save_all": "Save all of them",
@@ -137,9 +137,9 @@ OUR_WORDS = {
     "estimate": "It is an estimate.",            # after her "Time saved counts about..." line
     "open_folder": "Open the folder",            # beside the line that says where a story was saved
     "opened": "Opened Stories to share in {app}.",
-    "cant_open": "Could not open the folder. Ask your assistant to open it.",
+    "cant_open": "Could not open the folder. Ask the Assistant to open it.",
     "no_folder": "I can't find your Assistant folder to save into. Is the drive plugged in?",
-    "not_set_up": "There's no Assistant folder to save into yet. Say \"set up my Assistant folder\" to your assistant first.",
+    "not_set_up": "There's no Assistant folder to save into yet. Say \"set up my Assistant folder\" to the Assistant first.",
     "photos_wait": "Getting your photos ready…",
     "nothing_year": "Nothing from {label} yet.",
     "back_home": "Back to home", "home_short": "Home",

@@ -112,7 +112,7 @@ THUMBS = HOME / "posting-thumbs"
 PAGE = HOME / "posting.html"
 FEED = HOME / "feed.json"
 FEED_THUMBS = HOME / "feed"
-FEED_MAX = 15            # tiles read from their profile: five rows of three
+FEED_MAX = 15            # tiles read from their profile (the grid shows 12 of them at most: GRID_MOST, four rows)
 FEED_ORIGINS = ("https://www.instagram.com", "https://instagram.com")
 FEED_PICTURE_HOSTS = (".cdninstagram.com", ".fbcdn.net")   # where Instagram keeps the pictures themselves
 FEED_TILE_MAX = 2_500_000  # a full-size grid picture is 100 to 400 KB; anything bigger is not one
@@ -1369,7 +1369,12 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 .sec{padding:1.6rem 0 .4rem;display:grid;gap:.3rem}
 .sec h2{margin:0;font:600 22px/1.15 var(--sans);letter-spacing:-.02em}
 .sec p{margin:0;color:var(--ink-2);font-size:14.5px;max-width:40em}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;max-width:420px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
+/* Nicole's v31, section 8: the grid is as wide as her line above it ("Click on a post to change the photo..."), not a
+   number: the box takes the line's own width (fit-content), and the grid and the panel take the box's width while
+   adding nothing to it (width 0, min-width 100%). With the line hidden (no post to click) it keeps its width and no height. */
+.gridbox{width:fit-content;max-width:100%;display:flex;flex-direction:column;gap:.3rem}   /* (a column, with the section's own .3rem gap: the room between her line and the grid stays as it was) */
+.gridbox>.grid,.gridbox>.pick{width:0;min-width:100%}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:1rem 0 .4rem;background:var(--paper);padding:4px;border-radius:18px;box-shadow:0 1px 0 var(--line)}
 .tile{position:relative;aspect-ratio:4/5;background:var(--sand-l);overflow:hidden;border-radius:6px;cursor:grab;user-select:none;transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
 .tile.mine{touch-action:none}body.lifting,body.lifting *{cursor:grabbing!important}.tile.dragging{opacity:.3;box-shadow:inset 0 0 0 3px var(--coral)}.tile.over{box-shadow:inset 0 0 0 5px var(--sun);transform:scale(.94);transition:transform .18s var(--ease),box-shadow .18s var(--ease)}.tile.lift{position:fixed;left:0;top:0;z-index:9999;margin:0;pointer-events:none;opacity:1;border-radius:8px;transform:scale(1.06);transition:none;box-shadow:inset 0 0 0 3px var(--coral),0 0 0 3px #fff,0 30px 60px -14px rgba(31,36,48,.6),0 8px 18px rgba(31,36,48,.25)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;pointer-events:none}
@@ -1398,6 +1403,7 @@ h1{margin:0;font:600 clamp(32px,4.6vw,54px)/1.03 var(--sans);letter-spacing:-.03
 @media(max-width:600px){.row{grid-template-columns:auto 52px 1fr}.row .act{grid-column:2/4}}
 /* a post's panel (Nicole's v20 and v21): the note above the grid, the outlined tile, the panel under its row */
 .sec p.pickhint{margin:.9rem 0 -.4rem;font:600 14px/1.35 var(--sans);color:var(--coral-2);max-width:none}
+.sec p.pickhint[hidden]{display:block;visibility:hidden;height:0;margin:0 0 -.3rem;overflow:hidden}   /* hidden, it still sets the grid's width (v31), and takes back the box's gap under it */
 .pickhint:before{content:'\270E';margin-right:.45rem}
 .tile.mine:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 .tile.picking{box-shadow:inset 0 0 0 4px var(--coral-2)!important}
@@ -1463,8 +1469,8 @@ function say(m){toast.textContent=m;toast.classList.add('on');clearTimeout(tt);t
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}   // a shoot's name is theirs: only ever text
 function nice(iso){if(!iso)return'';const d=new Date(iso+'T12:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
 async function post(body){if(TRYING){say(PW.preview);return null}   // ?try=posted is playing: nothing is sent, whatever is pressed
- if(!live){say('This is a saved copy. Ask your assistant to “show my posting queue” to change things.');return null}
- try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell your assistant instead.');return null}}
+ if(!live){say('This is a saved copy. Ask the Assistant to “show my posting queue” to change things.');return null}
+ try{const r=await fetch('/posting',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;return await r.json()}catch(e){say('Could not reach the Assistant. Tell the Assistant in the chat instead.');return null}}
 // ---------- Posted lifts the post into the feed (Nicole's v28) ----------
 // The save has already happened when this runs: lift() only draws. It notes where every tile is, draws the new
 // state, then plays each tile from where it was to where it is: the post that changed rides an arc (a little
@@ -1508,10 +1514,11 @@ function tryPosted(){
  setTimeout(()=>{if(LAST!==keep)return;   // a real press happened meanwhile: the page already shows what is saved
   TRYING=true;lift(x.id,S,true);say(PW.posted_toast);
   setTimeout(()=>{TRYING=false;if(LAST===S)render(keep);say(PW.preview)},4500)},700)}
+const GRID_MOST=12;   // Nicole's v31, section 8: 12 posts in the grid, four rows of three
 function render(S){LAST=S;
  $('#tankh').innerHTML=S.tank_head;$('#tankp').textContent=S.tank_line;
  const bar=$('#tankbar');bar.className='tankbar'+(S.weeks===null?'':S.weeks<=1?' low':S.weeks<=2?' mid':'');bar.firstElementChild.style.width=(S.weeks===null?0:Math.min(100,S.weeks/4*100))+'%';
- $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell your assistant to change it.`:`No posting rhythm yet. Tell your assistant how often you like to post.`;
+ $('#rhythm').innerHTML=S.interval?`Posting <b>${S.interval_words}</b>. Tell the Assistant to change it.`:`No posting rhythm yet. Tell the Assistant how often you like to post.`;
  const g=$('#grid');if(PEL.parentNode===g)g.after(PEL);g.innerHTML='';   // the panel is kept (it lives under a row of the grid while open)
  const greens=S.greens.slice().reverse();  // Instagram shows the newest first: the last in line sits top-left
  const feed=S.feed&&S.feed.posts||[];const pinned=feed.filter(x=>x.pinned),rest=feed.filter(x=>!x.pinned);
@@ -1531,15 +1538,15 @@ function render(S){LAST=S;
   const rk=mkel('span','rk',x.kind==='reel'?'▶︎':x.kind==='single'?'▢︎':'⧉');rk.setAttribute('aria-label',x.kind==='reel'?'Reel':x.kind==='single'?'Single post':'Carousel');t.appendChild(rk);
   if(live){t.tabIndex=0;t.onclick=()=>openPick(x.id);t.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target===t){e.preventDefault();openPick(x.id)}})}
   g.appendChild(t)});
- if(feed.length){for(const x of rest){if(g.children.length>=15)break;g.appendChild(real(x))}   // every post read, five rows at most
+ if(feed.length){for(const x of rest){if(g.children.length>=GRID_MOST)break;g.appendChild(real(x))}   // every post read, four rows at most (v31: 12, was 15)
   while(g.children.length%3){const t=document.createElement('div');t.className='tile ghost';t.innerHTML='<small>older posts</small>';g.appendChild(t)}}
  else for(let i=0,n=Math.max(0,9-g.children.length);i<n;i++){const t=document.createElement('div');t.className='tile ghost';t.innerHTML=`<small>${i===0&&greens.length===0?'nothing ready yet':'what’s on your feed now'}</small>`;g.appendChild(t)}   // (the posted ones count too, so the rows stay whole)
- $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to your assistant to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to your assistant.`;
+ $('#gridnote').innerHTML=S.feed&&S.feed.posts.length?`Your last ${S.feed.posts.length} posts${S.feed.handle?' on <b>@'+esc(S.feed.handle)+'</b>':''}, read ${nice(S.feed.read_at.slice(0,10))}, with the pieces you've green-lit in their place. Say “read my grid again” to the Assistant to bring it up to date.`:`To see your real feed behind these, say “read my Instagram grid” to the Assistant.`;
  const mk=(sel,items,empty,act)=>{const el=$(sel);el.innerHTML='';if(!items.length){el.innerHTML=`<li class="empty">${empty}</li>`;return}
   items.forEach(x=>{const li=document.createElement('li');li.className='row';li.innerHTML=`<span class="light ${esc(x.status)}"></span><span class="th">${x.thumb?`<img src="${esc(x.thumb)}" alt="">`:''}</span><div><div class="name">${esc(x.shoot_name)} ${esc(x.kind)}${x.n?' '+esc(x.n):''}${x.reel_name?' · '+esc(x.reel_name):''}</div><div class="sub">${act.sub(x)}</div></div><div class="act">${act.btns(x)}</div>`;el.appendChild(li)})};
  mk('#greens',S.greens,'Nothing ready to post yet.',{sub:x=>x.date?`Down for ${nice(x.date)}`:'Ready, waiting for a rhythm',btns:x=>`<button class="btn" data-a="posted" data-id="${esc(x.id)}">Posted</button><button class="btn o" data-a="unready" data-id="${esc(x.id)}">Not ready yet</button>`});
  mk('#yellows',S.yellows,'Nothing in progress.',{sub:x=>`In progress${x.where?': '+esc(x.where):''}${x.days!=null?` · ${x.days} day${x.days!==1?'s':''}`:''}`,btns:x=>`<button class="btn g" data-a="ready" data-id="${esc(x.id)}">Ready to post</button>`});
- mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to your assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
+ mk('#reds',S.reds,'Nothing waiting to be made.',{sub:x=>`Not started. Say “make the ${esc(x.shoot_name)} ${esc(x.kind)}” to the Assistant.`,btns:x=>`<button class="btn o" data-a="skip" data-id="${esc(x.id)}">Skip this one</button>`});
  document.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const S2=await post({action:b.dataset.a,id:b.dataset.id});if(S2){
   // Posted (v28): the save is done; the row slides out first, then the post lifts into the feed
   if(b.dataset.a==='posted'){const li=b.closest('li');if(li&&li.animate&&!calm())await played(li.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateX(40px)'}],{duration:260,easing:'ease-in',fill:'forwards'}),260);lift(b.dataset.id,S2,true)}else render(S2);
@@ -1600,7 +1607,7 @@ function copyText(t,what){   // the old way first: the Claude app's pane refuses
  try{a.select();a.setSelectionRange(0,t.length);ok=document.execCommand('copy')}catch(e){ok=false}a.remove();
  const said=()=>say(PW.copied.replace('{what}',what));
  if(ok){said();return}
- try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell your assistant instead.'))}catch(e){say('Could not copy that. Tell your assistant instead.')}}
+ try{navigator.clipboard.writeText(t).then(said,()=>say('Could not copy that. Tell the Assistant instead.'))}catch(e){say('Could not copy that. Tell the Assistant instead.')}}
 function closePick(){PICK=null;MORE=null;PSEQ++;PEL.hidden=true;PEL.textContent='';delete PEL.dataset.id;delete PEL.dataset.posted;document.querySelectorAll('.tile.picking').forEach(z=>z.classList.remove('picking'))}
 // Posted or not (Nicole's v27): a grey switch on the post itself, beside Done. Posted takes it out of the queue and into the
 // feed; back to Not posted puts it back in line, ready to post. Built as text (never her innerHTML), aria-checked said plainly.
@@ -1712,7 +1719,7 @@ const RW={set:'Set a reminder to post',on:'🔔 Reminder: ',close:'Close',
  pc_new_one:'Set a new reminder',
  pc_set_toast:'Reminder ready: {when}. Add it to your calendar.',pc_off_toast:'Reminder off. Take it off your calendar too.',
  pc_opened:'Opened in your calendar app. Say yes to it there.',pc_opened_n:'Opened {n} reminders in your calendar app. Say yes to each one there.',
- pc_open_cant:'I couldn’t open that calendar file. Tell your assistant instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
+ pc_open_cant:'I couldn’t open that calendar file. Tell the Assistant instead.',pc_trouble:'I couldn’t make your calendar file just now.'};
 function hm(t){if(!t)return'';let[h,m]=t.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return h===12&&m===0&&ap==='pm'?'noon':`${h}${m?':'+String(m).padStart(2,'0'):''} ${ap}`}
 function RM(){return LAST.reminding||{}}
 function remindButton(x){if(!live||!RM().way)return null;
@@ -1881,10 +1888,10 @@ def page_html(p):
             f"<span class='when'>{html.escape(when)}</span></div>"
             "<header class='head'><span class='eyebrow'>Posting queue</span><h1 id='tankh'></h1><p class='lede' id='tankp'></p>"
             "<div class='tankbar' id='tankbar'><i></i></div><span class='rhythm' id='rhythm'></span>"
-            "<p class='offline' id='offline' hidden>This is a saved copy. Ask your assistant to “show my posting queue” to change things.</p></header>"
+            "<p class='offline' id='offline' hidden>This is a saved copy. Ask the Assistant to “show my posting queue” to change things.</p></header>"
             "<section class='sec'><h2>Your Instagram grid, with your new posts in it</h2><p>Newest at the top, like Instagram. The outlined ones are your upcoming posts. Click one to pick the photo it shows. Drag one to a different spot to change the order; the dates update to match.</p>"
-            "<p class='pickhint' id='pickhint' hidden>Click on a post to change the photo it shows in your grid, or to copy its caption.</p>"
-            "<div class='grid' id='grid'></div><div class='pick' id='pick' hidden></div><p class='gridnote' id='gridnote'></p></section>"
+            "<div class='gridbox' id='gridbox'><p class='pickhint' id='pickhint' hidden>Click on a post to change the photo it shows in your grid, or to copy its caption.</p>"
+            "<div class='grid' id='grid'></div><div class='pick' id='pick' hidden></div></div><p class='gridnote' id='gridnote'></p></section>"
             "<section class='sec'><h2>Ready to post</h2></section><ul class='list' id='greens'></ul>"
             "<section class='sec'><h2>Still finishing</h2><p>These are made but you're still working on them in CapCut or Canva. Press Ready when one is done.</p></section><ul class='list' id='yellows'></ul>"
             "<section class='sec'><h2>Not started</h2></section><ul class='list' id='reds'></ul>"
@@ -1908,7 +1915,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     (the reel page's is "Open CapCut")."""
     project = (rec.get("reel") or {}).get("project")
     if not project:
-        return False, "The reel hasn't been made yet. Say “make the reel” to your assistant."
+        return False, "The reel hasn't been made yet. Say “make the reel” to the Assistant."
     if not (this_computer.MAC or this_computer.WINDOWS):
         return False, "Opening CapCut only works on a Mac or a PC."
     if this_computer.no_windows():      # inside a test: CapCut is never started
@@ -1947,7 +1954,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
     if extra:                                    # the reel that was waiting is in its list now (or why it isn't)
         words += " " + extra
     if damaged:                                  # pressing again would meet the same damaged list: Claude sorts it out
-        return True, words + " If it isn't in the list, tell your assistant and it'll sort it out."
+        return True, words + " If it isn't in the list, tell the Assistant and it'll sort it out."
     try:
         waiting = capcut.waiting()               # still not in CapCut's list: CapCut was open (or it couldn't be told)
     except Exception:  # noqa: BLE001  (a hint, never a reason for the button to fail)
@@ -1956,7 +1963,7 @@ def open_capcut(rec, ok_words=None, button="Open in CapCut"):
         if unsure:
             # pressing again would not help (this computer can't tell whether CapCut is open): Claude adds it with
             # `capcut.py open --closed` once they say CapCut is closed (parts/on-a-pc.md)
-            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell your assistant “add my waiting reel”."
+            words += f" If it isn't in the list, {capcut.QUIT} CapCut and tell the Assistant “add my waiting reel”."
         else:
             words += f" If it isn't in the list, {capcut.QUIT} CapCut and press {button} again, and I'll add it."
     return True, words
@@ -2253,7 +2260,7 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up, or plug in the drive it lives on."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask the Assistant to set one up, or plug in the drive it lives on."})
         if drop:
             h = h / posts.DROP_NAME
             h.mkdir(exist_ok=True)
@@ -2272,7 +2279,7 @@ class Handler(SimpleHTTPRequestHandler):
             s = next((x for x in edit_queue.load()["shoots"] if x["id"] == sid), None)  # only a shoot's own folder, never a path from the page
             ok, words = edit_queue.open_folder(s) if s else (False, "I don't know that shoot.")
         except Exception as e:  # noqa: BLE001
-            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask your assistant."
+            ok, words = False, f"Couldn't open it ({e.__class__.__name__}). Ask the Assistant."
         self.answer({"ok": ok, "words": words})
 
     def report_url(self, query):
@@ -2301,12 +2308,12 @@ class Handler(SimpleHTTPRequestHandler):
             import serve_report
             url = serve_report.report_url(studio)
             if not url:
-                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and your assistant will."})
+                return self.answer({"ok": False, "words": "Couldn't open the report. Say \"show me the report\" and the Assistant will."})
             # always the top of the report (Dustin, Nov 5: jumping to the shoot's name box opened it "scrolled
             # half way down the page", which read as a glitch)
             return self.answer({"ok": True, "url": url})
         except Exception as e:  # noqa: BLE001
-            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and your assistant will."})
+            return self.answer({"ok": False, "words": f"Couldn't open the report ({e.__class__.__name__}). Say \"show me the report\" and the Assistant will."})
 
     def pick_folder(self):
         """The home page's "Choose the folder your finished photos are in": the computer's own folder picker
@@ -2316,11 +2323,11 @@ class Handler(SimpleHTTPRequestHandler):
         import posts
         h = posts.home()
         if not h or not h.is_dir():
-            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask your assistant to set one up."})
+            return self.answer({"ok": False, "words": f"There's no {posts.HOME_NAME} folder yet. Ask the Assistant to set one up."})
         if not (this_computer.MAC or this_computer.WINDOWS):
             return self.answer({"ok": False, "words": "Drag the folder of finished photos into Drop a shoot here instead."})
         if this_computer.WINDOWS:
-            no_window = ("The folder window didn't open. Tell your assistant which folder your finished photos are in (you can copy its "
+            no_window = ("The folder window didn't open. Tell the Assistant which folder your finished photos are in (you can copy its "
                          f"address from the top of its {this_computer.FILES_APP} window), and it'll copy the photos for you.")
         else:
             no_window = f"The folder window didn't open. Drag the folder into Drop a shoot here instead (hold the {this_computer.COPY_KEY} key so it copies)."
@@ -2329,7 +2336,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.answer({"ok": False, "words": "No folder chosen." if why == "cancelled" else no_window})
         got = posts.bring(h, folder)
         if not got:
-            return self.answer({"ok": False, "words": "Something stopped the copy. Tell your assistant and it'll sort it out."})
+            return self.answer({"ok": False, "words": "Something stopped the copy. Tell the Assistant and it'll sort it out."})
         copied, skipped, dest = got
         left = ", ".join(posts.plural(n, k) for k, n in sorted(skipped.items()))
         label = Path(folder).name
@@ -2344,7 +2351,7 @@ class Handler(SimpleHTTPRequestHandler):
         """The live editing-queue page's address, starting its server if needed (serve_report has the logic)."""
         import serve_report
         u = serve_report.queue_url()
-        self.answer({"url": u, "words": None if u else "Ask your assistant: show my editing queue"})
+        self.answer({"url": u, "words": None if u else "Ask the Assistant: show my editing queue"})
 
     def open_kit_folder(self, query):
         """A kit page's "Open the ... folder" button, and the designer's "Open folder": only a kit in Content, or one

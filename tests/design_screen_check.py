@@ -306,7 +306,7 @@ def check_screen_browser(case, work, port, make_kit, Server, post, get_json, run
             c.wait_for("document.getElementById('open-line').textContent !== ''", 5)
             said = c.text("#open-line")
             case("a failure that spells out where the folder is on the computer is said in the page's own words, with no path",
-                 said == "Couldn’t open the folder from here. Ask your assistant to open your Carousel folder." and "/" not in said, said)
+                 said == "Couldn’t open the folder from here. Ask the Assistant to open your Carousel folder." and "/" not in said, said)
             c.key("Escape")
             case("...and a key takes the answer away too", c.text("#open-line") == "")
 
