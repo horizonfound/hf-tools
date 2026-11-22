@@ -1883,10 +1883,29 @@ def check_vault_reel_photos():
     case("our search placeholder is in OUR words, a draft, and her mock-up's is nowhere", '"vp_search_ph": "laughing, a kiss, green backdrop, Hannah"' in page and "Search by shoot: maternity" not in page.split("VAULT_PICK_OUR_WORDS = {", 1)[1].split("}", 1)[0])
 
 
+def check_create_tiles():
+    """The home page's four tiles ask which shoot (Nicole's v30, section 4; stage C): what the parts say, held to the code."""
+    print("\nThe four tiles: Create a reel, which shoot? (Nov 21)")
+    hello, photos, where = read(SM / "parts" / "hello.md"), read(SM / "parts" / "photos-in.md"), read(SM / "parts" / "where-things-live.md")
+    home, ns, cd = read(SCRIPTS / "home.py"), read(SCRIPTS / "new_shoot.py"), read(SCRIPTS / "create_dialog.py")
+    for line in ("Which shoot do you want to make it from?", "Pick the folder with your finished photos", "Mix photos and clips from all your shoots",
+                 "Start with a shoot: pick the folder with your finished photos.", "Search your shoots"):
+        case(f"hello.md says her line, and the home page has it: {line}", line in hello and line in home)
+    case("hello.md says where each tile lands", all(t in hello for t in ("Reels to the reel page", "Carousels to the carousel designer",
+                                                                         "Stories to the stories designer", "Captions to the words page")))
+    case("hello.md and photos-in.md say + A new shoot copies, never moves, and lands on the page they tapped",
+         "copied and checked, never moved" in hello and "not on the post kit" in hello and "the folder they picked is only read" in photos)
+    case("photos-in.md's by-hand line is a command new_shoot.py has", '`python3 <scripts>/new_shoot.py make "<folder>"`' in photos and 'add_parser("make"' in ns)
+    case("hello.md's status line is a command new_shoot.py has", "`python3 <scripts>/new_shoot.py status`" in hello and 'add_parser("status"' in ns)
+    case("where-things-live names the log and the job record new_shoot.py writes", ".studio/new-shoots.json" in where and "new-shoot-job.json" in where
+         and 'LOG_NAME = "new-shoots.json"' in ns and '"new-shoot-job.json"' in ns)
+    case("the routes the page asks are create_dialog.py's", all(r in cd for r in ('"/make-list"', '"/make-new-status"', '"/make-new"', '"/make-vault"')))
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

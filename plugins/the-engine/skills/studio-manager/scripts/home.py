@@ -386,6 +386,22 @@ WORDS = {
     "rc_show": "Show my monthly recap",
     "yr_b": "Your {year}, <em>wrapped.</em>",
     "yr_small": "Your year with your assistant, story by story. Ready to share.",
+    # the four tiles ask which shoot, then go straight there (her section 4; screenshots 02 and 03)
+    "mk_reel": "Create a <em>reel</em>",
+    "mk_carousel": "Create a <em>carousel</em>",
+    "mk_stories": "Create your <em>stories</em>",
+    "mk_captions": "Write your <em>captions</em>",
+    "mk_sub": "Which shoot do you want to make it from?",
+    "mk_sub_none": "Start with a shoot: pick the folder with your finished photos.",
+    "mk_new": "A new shoot",
+    "mk_new_small": "Pick the folder with your finished photos",
+    "mk_shoots": "Your shoots",
+    "mk_vault": "My vault",
+    "mk_vault_small": "Mix photos and clips from all your shoots",
+    "mk_find": "Search your shoots",
+    "mk_nothing": "Nothing matches \"{q}\".",
+    "mk_close": "Close",
+    "mk_photos": "{n} photos",
 }
 # Ours, where hers has none. Each is a draft for Dustin and Nicole.
 OUR_WORDS = {
@@ -403,6 +419,11 @@ OUR_WORDS = {
     "rc_didnt": "That didn't work. Try again in a moment.",
     # the four tiles, for a screen reader (the word on the photo says what it is; this says where it goes)
     "t_aria": "{word}: make them from one of your shoots",
+    # "Create a reel: which shoot?" (her section 4), where hers has none
+    "mk_photo": "{n} photo",                                        # one photo (hers always says "photos")
+    "mk_picking": "Pick the folder in the window that opened. Your photos are copied, never moved.",
+    "mk_list_cant": "Couldn't load your shoots. Try again in a moment.",
+    "mk_didnt": "That didn't work. Try again in a moment.",
 }
 
 def W(key):
@@ -913,6 +934,36 @@ h1.big em{font:inherit;font-style:normal;color:var(--accent)}
 @media(max-width:560px){.rc,.yr{flex-wrap:wrap}.rc .fan,.yr .fan{display:none}.rc{padding-right:44px}.rc .x{position:absolute;right:8px;top:8px}}
 .foot{margin:.6rem 0 0;font-size:12px;color:var(--ink-2)}
 .foot button{border:0;background:none;padding:0;font:inherit;color:var(--ink-2);text-decoration:underline;cursor:pointer}
+/* "Create a reel: which shoot?" (her section 4): her dialog's styles, on our markup */
+.mk{position:fixed;inset:0;z-index:20;background:rgba(17,17,17,.45);display:grid;place-items:center;padding:16px}
+.mk[hidden]{display:none}
+.mkbox{width:min(760px,100%);max-height:86vh;overflow:auto;background:var(--paper);padding:clamp(18px,3vw,28px);outline:0}
+.mkh{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.mkh h3{margin:0;font:700 26px/1.05 var(--sans);letter-spacing:-.01em}
+.mkh h3 em{font-style:normal;color:var(--accent)}
+.mkh button{border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:var(--ink-2);padding:4px 6px}
+.mkh button:hover,.mkh button:focus-visible{color:var(--ink)}
+.mkbox>p{margin:.3rem 0 1rem;color:var(--ink-2);font-size:14px}
+.mkfind{box-sizing:border-box;width:100%;font:400 15px/1 var(--sans);letter-spacing:-.01em;padding:12px 14px;border:1px solid var(--line);border-radius:0;background:#fff;color:var(--ink);margin-bottom:10px}
+.mkfind[hidden]{display:none}
+.mklist{display:grid;gap:6px}
+#mkL{max-height:52vh;overflow:auto}
+.mkr{box-sizing:border-box;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:14px;align-items:center;padding:8px;background:#fff;text-decoration:none;color:var(--ink);border:1px solid transparent;border-radius:0;cursor:pointer;font:inherit;text-align:left;width:100%}
+.mkr:hover,.mkr:focus-visible{border-color:var(--ink);outline:0}
+.mkr:disabled{cursor:default;opacity:.6}.mkr:disabled:hover{border-color:transparent}
+.mkr .im{width:52px;height:52px;overflow:hidden;background:#d9d4cc;display:grid;place-items:center}
+.mkr .im img{width:100%;height:100%;object-fit:cover;display:block}
+.mkr>span{min-width:0}
+.mkr b{display:block;font:700 15px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
+.mkr small{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.mkr .ar{font-size:16px;color:var(--ink-2)}
+.mkr.new .im{background:var(--ink);color:#fff;font:400 26px/1 var(--sans)}
+.mkr.v .im{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--ink)}
+.mklab{margin:10px 0 6px;font:700 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.02em;color:var(--ink-2)}
+.mklab[hidden]{display:none}
+.mknote{margin:6px 0 0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink);border-left:3px solid var(--accent)}
+.mknote[hidden]{display:none}
+.mknothing{margin:0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink-2)}
 @media (prefers-reduced-motion: no-preference){
 .hello .bgs img{transition:opacity 1.6s ease}
 .row .ar{transition:transform .3s var(--ease)}.row:hover .ar{transform:translateX(4px)}
@@ -1048,9 +1099,103 @@ document.querySelectorAll('.now img, .fan img, .stack img').forEach(im => { cons
   document.addEventListener('click', e => { if (!e.target.closest('#rcM') && !e.target.closest('#rcX')) open(false); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { open(false); x.focus(); } });
 })();
+// The four tiles are shortcuts (Nicole's v30, section 4): a press asks which shoot, then goes straight to that shoot's
+// page (the reel page, the carousel designer, the stories designer, the words page). "+ A new shoot" picks a folder,
+// the Assistant makes its post kit, and the page lands where the tile was going. Every word is drawn as text.
+const MK = (function(){
+  const box = $('mk'); if (!box) return null;
+  const TITLE = {reel: 'mk_reel', carousel: 'mk_carousel', stories: 'mk_stories', captions: 'mk_captions'};
+  let make = 'reel', from = null, list = null, following = false, asked = 0;
+  window.MK_HOLD = false;
+  const accent = (el, s) => { el.textContent = ''; const m = /^(.*)<em>(.*)<\/em>(.*)$/.exec(s);
+    if (!m) { el.textContent = s; return; } const e = document.createElement('em'); e.textContent = m[2]; el.append(m[1], e, m[3]); };
+  const el = (tag, cls, text) => { const x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; };
+  function row(tag, cls, imgs, title, small){
+    const r = el(tag, 'mkr' + (cls ? ' ' + cls : '')); if (tag === 'button') r.type = 'button';
+    const im = el('span', 'im'); im.setAttribute('aria-hidden', 'true');
+    if (typeof imgs === 'string') im.textContent = imgs;
+    else imgs.forEach(src => { const i = el('img'); i.alt = ''; i.loading = 'lazy'; i.addEventListener('error', () => { i.remove(); }); i.setAttribute('src', src); im.append(i); });
+    const t = el('span'); t.append(el('b', '', title), el('small', '', small));
+    const ar = el('span', 'ar', '→'); ar.setAttribute('aria-hidden', 'true');
+    r.append(im, t, ar); return r;
+  }
+  const say = t => { const n = $('mkNote'); n.textContent = t || ''; n.hidden = !t; };
+  const photos = n => fill(n === 1 ? W.mk_photo : W.mk_photos, {n: many(n || 0)});
+  function draw(){
+    const L = $('mkL'), kits = (list && list.kits) || [], q = ($('mkF').value || '').trim().toLowerCase();
+    $('mkS').textContent = (list && !kits.length) ? W.mk_sub_none : W.mk_sub;
+    $('mkLab').hidden = !kits.length; $('mkF').hidden = kits.length < 7;
+    L.textContent = '';
+    if (list && list.vault && kits.length && (!q || W.mk_vault.toLowerCase().includes(q))) {
+      const v = row('button', 'v', list.vault.thumbs || [], W.mk_vault, W.mk_vault_small); v.id = 'mkVault';
+      v.onclick = () => toVault(v); L.append(v);
+    }
+    const hit = kits.filter(k => !q || String(k.name).toLowerCase().includes(q));
+    hit.forEach(k => { const a = row('a', '', [k.thumb], k.name, [niceDay(k.date), photos(k.photos)].filter(Boolean).join(' · '));
+      a.setAttribute('href', k.go[make]); a.dataset.kit = k.folder; L.append(a); });
+    if (q && !L.children.length && kits.length) L.append(el('p', 'mknothing', fill(W.mk_nothing, {q: $('mkF').value.trim()})));
+  }
+  async function load(){
+    const mine = ++asked;
+    try { const r = await fetch('/make-list', {cache: 'no-store'}); const d = await r.json(); if (mine !== asked) return; if (!d || !d.ok) throw 0; list = d; }
+    catch (e) { if (mine !== asked) return; list = {kits: [], vault: null}; say(W.mk_list_cant); }
+    draw();
+  }
+  function open(kind, tile){
+    make = TITLE[kind] ? kind : 'reel'; from = tile || null;
+    accent($('mkT'), W[TITLE[make]]);
+    $('mkF').value = ''; if (!following) say('');
+    $('mkNew').disabled = following;
+    draw(); box.hidden = false; window.MK_HOLD = true; box.querySelector('.mkbox').focus();
+    load();
+  }
+  function close(){
+    if (box.hidden) return;
+    box.hidden = true; if (!following) window.MK_HOLD = false;
+    if (from) try { from.focus(); } catch (e) {}
+  }
+  async function toVault(b){
+    b.disabled = true;
+    try { const r = await fetch('/make-vault', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({make})});
+      const d = await r.json(); if (d && d.ok && d.url) { location.href = d.url; return; } say((d && d.words) || W.mk_didnt); }
+    catch (e) { say(W.mk_didnt); }
+    b.disabled = false;
+  }
+  function follow(){
+    following = true; window.MK_HOLD = true; $('mkNew').disabled = true;
+    const tick = async () => {
+      let j = null; try { j = await (await fetch('/make-new-status', {cache: 'no-store'})).json(); } catch (e) {}
+      if (j && j.state === 'done' && j.go) { following = false; say(j.words);
+        if (!box.hidden) { location.href = j.go[make]; return; } window.MK_HOLD = false; $('mkNew').disabled = false; return; }
+      if (j && (j.state === 'stopped' || j.state === 'none')) { following = false; $('mkNew').disabled = false; say(j.words || W.mk_didnt);
+        if (box.hidden) window.MK_HOLD = false; return; }
+      if (j && j.words) say(j.words);
+      setTimeout(tick, 700);
+    };
+    setTimeout(tick, 300);
+  }
+  async function newShoot(){
+    if (following) return;
+    const b = $('mkNew'); b.disabled = true; say(W.mk_picking);
+    let d = null;
+    try { const r = await fetch('/make-new', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); d = await r.json(); }
+    catch (e) { d = {ok: false, words: W.not_running}; }
+    if (d && d.state === 'working') { say(d.words); follow(); return; }
+    b.disabled = false; say(d && d.cancelled ? '' : ((d && d.words) || W.mk_didnt));     // a closed window changes nothing
+  }
+  $('mkNew').onclick = newShoot;
+  $('mkX').onclick = close;
+  box.addEventListener('click', e => { if (e.target === box) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !box.hidden) { e.preventDefault(); close(); } });
+  $('mkF').addEventListener('input', draw);
+  document.querySelectorAll('#tiles .tl').forEach(t => t.addEventListener('click', e => {
+    if (!live || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;     // a saved copy, or a new tab: the plain link
+    e.preventDefault(); open(t.dataset.make, t); }));
+  return {open, close};
+})();
 // Reload when anything changes (a card goes in, a backup lands, a queue moves).
 const STAMP = document.body.dataset.stamp;
-if (live) setInterval(async () => { try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
+if (live) setInterval(async () => { if (window.MK_HOLD) return; try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
 """
 
 
@@ -1153,9 +1298,25 @@ def _parts(parts):
     return "".join(out)
 
 
-# The four tiles (her section 4): which kind each one makes. Stage C turns a press into "Create a reel: which shoot?";
-# until then each goes to the post kits screen. data-make is what stage C reads.
+# The four tiles (her section 4): which kind each one makes. A press opens "Create a reel: which shoot?" (make_box and
+# the page's script); the post kits screen stays the plain link (a saved copy of the page, a new tab).
 TILES = (("reel", "t_reel"), ("carousel", "t_carousel"), ("stories", "t_stories"), ("captions", "t_captions"))
+
+
+def make_box():
+    """"Create a reel: which shoot?" (her section 4), drawn hidden: the page's script fills its title, its list (from
+    /make-list) and its lines, all as text. + A new shoot is always there; Your shoots and the search box only when
+    there are shoots (the search from 7)."""
+    e = html.escape
+    return (f"<div class='mk' id='mk' hidden><div class='mkbox' role='dialog' aria-modal='true' aria-labelledby='mkT' tabindex='-1'>"
+            f"<div class='mkh'><h3 id='mkT'></h3><button type='button' id='mkX' aria-label='{e(W('mk_close'), quote=True)}'>&times;</button></div>"
+            f"<p id='mkS'>{e(W('mk_sub'))}</p>"
+            f"<div class='mklist' id='mkTop'><button type='button' class='mkr new' id='mkNew'><span class='im' aria-hidden='true'>+</span>"
+            f"<span><b>{e(W('mk_new'))}</b><small>{e(W('mk_new_small'))}</small></span><span class='ar' aria-hidden='true'>&rarr;</span></button></div>"
+            f"<p class='mknote' id='mkNote' role='status' hidden></p>"
+            f"<p class='mklab' id='mkLab' hidden>{e(W('mk_shoots'))}</p>"
+            f"<input class='mkfind' id='mkF' type='search' placeholder='{e(W('mk_find'), quote=True)}' aria-label='{e(W('mk_find'), quote=True)}' hidden>"
+            f"<div class='mklist' id='mkL'></div></div></div>")
 
 
 def page_html(query="", start=False):
@@ -1225,6 +1386,7 @@ def page_html(query="", start=False):
     words = dict(home_base.WORDS)
     words.update(home_base.OUR_WORDS)
     words.update({"rc_didnt": W("rc_didnt")})
+    words.update({k: W(k) for k in list(WORDS) + list(OUR_WORDS) if k.startswith("mk_")})
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}</style></head><body class='home30' data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
@@ -1232,7 +1394,7 @@ def page_html(query="", start=False):
             f"<span class='fold'><button class='lnk' id='folder' data-item='folder' type='button'>{e(W('folder').format(short=brand.short()))}</button><span class='note' role='status'></span></span></div>"
             f"<p class='offline' id='offline' hidden>{e(W('offline'))}</p>"
             f"{hello}{big}{low}"
-            f"{recap}{year}<p class='foot'>{foot}</p>"
+            f"{recap}{year}<p class='foot'>{foot}</p>{make_box()}"
             f"</div><script type='application/json' id='facts'>{_json_for_script(data)}</script>"
             f"<script>const W = {_json_for_script(words)};{home_base.JS_SHARED}{HELLO_JS}{SCRIPT}</script></body></html>")
 

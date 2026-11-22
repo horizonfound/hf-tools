@@ -400,7 +400,7 @@ def check_words(w):
     case("nothing from the internet, and the shared look first in each page's styles",
          "googleapis" not in everything and "<link" not in everything and all(("<style>" + home.look.head_css()) in p for p in pages.values()))
     all_js = home_base.JS_SHARED + home_base.JS_BACKUPS + home_base.JS_MAKE + home.SCRIPT + home.HELLO_JS
-    known = set(ours_words) | set(home_base.OUR_WORDS) | set(home.OUR_WORDS)
+    known = set(ours_words) | set(home_base.OUR_WORDS) | set(home.OUR_WORDS) | {k for k in home.WORDS if k.startswith("mk_")}   # the Create box's (v30: page_html hands these over)
     case("every line our scripts show is in the words (W.<name> names a line that exists)",
          all(k in known for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js))), sorted(k for k in set(re.findall(r"\bW\.([a-z_0-9]+)", all_js)) if k not in known))
     # the home page itself is her v28's since Nov 17 (tests/home_v28_check.py checks it line by line); here only

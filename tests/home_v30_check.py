@@ -17,7 +17,7 @@ real kit, no /Volumes, no window on the screen):
   * her look: Helvetica, warm paper, black words, one accent, square corners, a thin black line under the bar, and
     the look on the home page only (every other page keeps look.py's);
   * in a HIDDEN Chrome at 1440 x 900: all of the above on the screen, the page fitting about one laptop screen,
-    a tile's press going to the post kits screen and recorded for the chat, phone width (375 and 336) with no
+    a tile's press asking which shoot and recorded for the chat, phone width (375 and 336) with no
     sideways scroll, reduced motion (the photo never changes), and a brand-new Assistant (grey placeholders).
 A screenshot of the page at 1440 x 900 is written where --shot says (default: none).
 
@@ -154,7 +154,7 @@ def check_page(w, home):
     makes = re.findall(r"data-make='(\w+)'", s3)
     case("four photo tiles, Reels, Carousels, Stories, Captions, each with data-make (what stage C opens)",
          makes == MAKES and flat(part(s3, "id='tiles'>", "</div>")) == TILE_WORDS, (makes, flat(part(s3, "id='tiles'>", "</div>"))))
-    case("... each, for now, goes to the post kits screen and is recorded as a posts press", s3.count("class='tl' href='/make-posts'") == 4 and s3.count("data-item='posts'") == 5)
+    case("... each a link to the post kits screen (a saved copy, a new tab), its press asking which shoot and recorded as a posts press", s3.count("class='tl' href='/make-posts'") == 4 and s3.count("data-item='posts'") == 5)
     tiles = data["tiles"]
     case("... a photo from a different shoot for each pair of neighbours (two shoots: they take turns)", [t.get("kit") for t in tiles] == [B, A, B, A], [t.get("kit") for t in tiles])
     used = [(t["kit"], c["n"]) for t in tiles for c in t["cands"]]
@@ -279,12 +279,14 @@ def check_browser(c, w, shot):
     fit = c.js("({sh: document.documentElement.scrollHeight, ih: innerHeight, iw: innerWidth, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth})")
     case("the whole home page fits one laptop screen, or nearly (1440 x 900: at most 930 px tall)", fit["iw"] == 1440 and fit["sh"] <= 930 and fit["sw"] <= fit["cw"], fit)
     case("no page errors, and nothing asked of the internet", not c.page_errors() and not c.outside_requests(), (c.page_errors()[:2], c.outside_requests()[:2]))
-    # a tile's press: the post kits screen for now (stage C makes it ask which shoot), recorded as posts
+    # a tile's press: "Create a carousel: which shoot?" (stage C; tests/create_dialog_check.py holds the box), recorded as posts
     before = len(clicks(w))
     c.click("#tiles .tl[data-make=carousel]")
-    c.wait_for("location.pathname === '/make-posts'", 15)
+    c.wait_for("!document.getElementById('mk').hidden", 15)
     chrome_drive.wait_until(lambda: clicks(w)[before:] == ["posts"], 10, what="the press recorded")
-    case("a tile's press goes to the post kits screen and is recorded as posts", clicks(w)[before:] == ["posts"], clicks(w)[before:])
+    case("a tile's press asks which shoot (Create a carousel), stays on the home page, and is recorded as posts",
+         clicks(w)[before:] == ["posts"] and c.js("document.getElementById('mkT').textContent") == "Create a carousel" and c.js("location.pathname") == "/home", clicks(w)[before:])
+    c.key("Escape")
     # the photo changes every few seconds
     c.open(w.url("/home"))
     ready(c)

@@ -153,6 +153,11 @@ name: Check it on a Windows PC
 #                                   side by side, the page fitting one laptop screen, phones, reduced motion, a brand-new
 #                                   Assistant (a Mac, as home_v29_check: --no-chrome on the Mac job, the page in a
 #                                   hidden Chrome on the Mac's page job)
+#   tests/create_dialog_check.py    Nicole's v30, the four tiles are shortcuts: Create a reel, which shoot? (+ A new
+#                                   shoot made with no chat, copied and checked, never moved, safe twice, a clash and
+#                                   the other stops; My vault first, newest first, search from 7, closed three ways,
+#                                   each landing page; a Mac: --no-chrome on the Mac job, the box in a hidden Chrome
+#                                   on the Mac's page job)
 #   tests/home_v28_check.py, tests/wrapped_check.py
 #                                   Nicole's v28, the home page rebuilt (the hello, the face finder, her four steps,
 #                                   the monthly recap card, the Your year bar) and Your year and the monthly recap as
@@ -303,12 +308,12 @@ on:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/bring_older_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/design_v27_check.py", "tests/kit_cards_check.py", "tools/check_pc.py",
-            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/home_v30_check.py", "tests/hello_lines_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
+            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/home_v30_check.py", "tests/create_dialog_check.py", "tests/hello_lines_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
   pull_request:
     paths: ["plugins/**", "tests/pc_*.py", "tests/backup_safety.py", "tests/chrome_drive.py", "tests/fixtures/**", "tests/reel_timing_check.py", "tests/reel_hits_check.py", "tests/sheet_numbers_check.py", "tests/words_check.py", "tests/updates_check.py", "tests/words_page_check.py", "tests/kit_steps_check.py", "tests/posting_panel_check.py", "tests/edit_queue_v26_check.py", "tests/home_base_check.py", "tests/report_v26_check.py", "tests/posting_reminders_page_check.py", "tests/reminders_check.py", "tests/skill_text_check.py", "tests/peek_check.py", "tests/fake_night.py", "tests/shoot_report_check.py",
             "tests/video_check.py", "tests/video_fixes_check.py", "tests/talking_*.py", "tests/reels_check.py", "tests/bring_older_check.py", "tests/kit_reels_queue_check.py", "tests/picks_ask_check.py", "tests/reel_trim_select_check.py", "tests/reel_v27_page_check.py", "tests/reel_watch_check.py", "tests/reel_footage_check.py", "tests/songs_check.py", "tests/trash_check.py", "tests/loose_ends_v26_check.py", "docs/SETUP-GUIDE*.md", "tests/transcribe_check.py", "tests/capcut_even.py", "tests/guard.py", "tests/guard_check.py", "tests/posting_posted_check.py",
             "tests/design_preview_check.py", "tests/design_v26_check.py", "tests/design_check.py", "tests/design_v27_check.py", "tests/kit_cards_check.py", "tools/check_pc.py",
-            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/home_v30_check.py", "tests/hello_lines_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
+            "tests/edit_queue_v28_check.py", "tests/posting_lift_check.py", "tests/report_fall_check.py", "tests/home_v28_check.py", "tests/home_v29_check.py", "tests/home_v30_check.py", "tests/create_dialog_check.py", "tests/hello_lines_check.py", "tests/vault_core_check.py", "tests/vault_safety_check.py", "tests/vault_page_check.py", "tests/photo_words_check.py", "tests/vault_reel_check.py", "tests/vault_everything_check.py", "tests/backup_zero_check.py", "tests/second_copy_check.py", "tests/report_options_check.py", "tests/wrapped_check.py", "tests/kit_fan_check.py", "tests/workflow_check.py", ".github/workflows/check-pc.yml"]
 permissions:
   contents: read
 jobs:
@@ -620,6 +625,9 @@ jobs:
       - name: The home page in Nicole's v30 look, everything but the page in a browser (her approved hello with no button or reminder, the hello's photos, the four tiles, See all my post kits alone, the cards, her look on this page only)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_v30_check.py --no-chrome
+      - name: The four tiles ask which shoot, everything but the box in a browser (+ A new shoot made with no chat, copied and checked, never moved, the same folder twice one shoot, a clash and the other stops, a brand-new Assistant, the routes)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/create_dialog_check.py --no-chrome
       - name: The vault as a real post kit whose photo list is references (made once, two shoots' same-named photos as two numbers, numbers that never move, every other post kit unchanged, the readers and the page server by request)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_core_check.py
@@ -794,6 +802,9 @@ jobs:
       - name: The home page in Nicole's v30 look in a hidden Chrome (one wide hello photo, the four tiles, the three cards side by side, fitting 1440 x 900, a tile's press, phones, reduced motion, a brand-new Assistant)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_v30_check.py
+      - name: The four tiles ask which shoot in a hidden Chrome (her four titles, + A new shoot on top, My vault first, newest first, search from 7, no post kits, closed three ways, each landing page, + A new shoot landing on the tapped page, a closed folder window changing nothing)
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/create_dialog_check.py
       - name: My vault on the post kits list and the vault's own post kit page in a hidden Chrome (first, alone, no Archive, made once by a guarded press, her words both ways, the strip, the three cards, vault.py add copying checked and safe to run twice or cut off)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_page_check.py

@@ -2161,6 +2161,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/make-list", "/make-new-status"):
+            # the home page's four tiles: "Create a reel: which shoot?" (Nicole's v30, section 4): create_dialog.py's to answer
+            import create_dialog
+            return create_dialog.handle_get(self, path, urlsplit(self.path).query)
         if path == "/photo-words-state":
             # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
             import photo_words
@@ -2554,6 +2558,11 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/make-new", "/make-vault"):
+            # the home page's four tiles: + A new shoot and My vault in "Create a reel: which shoot?" (Nicole's v30).
+            # create_dialog.py checks each the way arrange.py does
+            import create_dialog
+            return create_dialog.handle_post(self, path, urlsplit(self.path).query)
         if path in ("/vault-open", "/vault-add", "/vault-clips", "/vault-remove"):
             # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
             import vault_page
