@@ -346,6 +346,11 @@ OUR_WORDS = {
     "nd_save": "Save",
     "nd_saved": "Saved. Your next backup goes to {drive}. The photos from this backup stay where they are.",
     "nd_same": "Your backups already go to {drive}. Nothing changed.",
+    # put these shoots in one folder (Nicole, Nov 23: joining shoots after the backup). Opens Name your shoots.
+    "ns_button": "Put these shoots in one folder",
+    "ns_note": ("For mini sessions, or one shoot that was split in two. This opens Name your shoots, where you can keep "
+                "them together. To put only some of them together, tell the Assistant which ones."),
+    "ns_opening": "Opening Name your shoots...",
     "nd_second": ("{drive} is where your second copies go, so your photos can't go there first as well. "
                   "Pick another drive, or tell the Assistant to change your second copy."),
     "nd_gone": "I can't see {drive} right now. Is it plugged in?",
@@ -604,6 +609,42 @@ def more_options(W):
     ]
 
 
+JOIN_OPTION_SCRIPT = r"""<script>
+(function(){
+  var open=document.getElementById('ns-open'); if(!open) return;
+  var say=document.getElementById('ns-say'), W=JSON.parse(document.getElementById('ns-words').textContent);
+  var live=location.protocol==='http:'||location.protocol==='https:';
+  open.addEventListener('click',function(){
+    if(!live){ say.textContent=W.sc_not_live; return; }
+    say.textContent=W.ns_opening;
+    fetch('name-shoots-url',{cache:'no-store'}).then(function(r){ return r.json(); }).then(function(j){
+      if(j&&j.url&&/^http:\/\/(127\.0\.0\.1|localhost):\d+\//.test(j.url)){ (window.top||window).location.href=j.url; }
+      else say.textContent=W.opt_cant;
+    }).catch(function(){ say.textContent=W.opt_cant; });
+  });
+})();
+</script>"""
+
+
+def join_option(studio):
+    """(html lines, script) for "Put these shoots in one folder": only when this backup has two or more shoots in
+    folders of their own. The button asks this report's server for the Name your shoots page of this backup."""
+    try:
+        sh = json.loads((Path(studio) / "shoots.json").read_text(encoding="utf-8")).get("shoots") or []
+    except (OSError, ValueError, AttributeError):
+        sh = []
+    if len([s for s in sh if isinstance(s, dict) and s.get("folder")]) < 2:
+        return [], ""
+    e = html.escape
+    W = OUR_WORDS
+    words = {k: W[k] for k in ("ns_opening", "opt_cant", "sc_not_live")}
+    return ["<div class='opt' id='opt-join'><div class='opt-row ns'>"
+            f"<button type='button' class='opt-btn' id='ns-open'>{e(W['ns_button'])}</button>"
+            "<span class='opt-say' id='ns-say' role='status' aria-live='polite'></span></div>"
+            f"<p class='opt-note' id='ns-note'>{e(W['ns_note'])}</p></div>",
+            "<script type='application/json' id='ns-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>"], JOIN_OPTION_SCRIPT
+
+
 def options_section(manifest, studio):
     """The options under the shoots, for a backup that finished clean and was not a sample (there is nothing to
     offer on one that has not finished): Make a second copy (a backup that already has one, every file checked,
@@ -648,11 +689,13 @@ def options_section(manifest, studio):
            f"<button type='button' class='opt-go' id='sc-go' disabled>{e(W['sc_go'])}</button>",
            "</div></div>"]
     out += more_options(W)
+    join_html, join_script = join_option(studio)
+    out += join_html
     out += ["</section>",
             # the few lines the scripts themselves say, handed over as data (text only, never markup)
             "<script type='application/json' id='sc-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>",
             "<script type='application/json' id='opt-words'>" + json.dumps(more).replace("</", "<\\/") + "</script>"]
-    return "\n".join(out), OPTIONS_SCRIPT + MORE_OPTIONS_SCRIPT + first_look.COPY_SCRIPT
+    return "\n".join(out), OPTIONS_SCRIPT + MORE_OPTIONS_SCRIPT + join_script + first_look.COPY_SCRIPT
 
 
 def human(n):

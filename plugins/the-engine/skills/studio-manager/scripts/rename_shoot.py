@@ -149,6 +149,7 @@ def plan_rename(session, studio, shoot_id, new_name):
         return listings[folder]
 
     moves = []
+    planned_sidecars = set()   # one sidecar is planned once, however many photos share its stem (a RAW and its JPEG)
     for p in in_folder:
         cur = Path(p["file"])
         into = new_folder / inside(cur).parent   # the same place inside the shoot (Photos, Videos, or the top)
@@ -172,6 +173,9 @@ def plan_rename(session, studio, shoot_id, new_name):
             sc = cur.with_suffix(ext)
             so = Path(p["original"]).with_suffix(ext).as_posix()
             if so in files and (session / sc).exists():
+                if sc.as_posix().lower() in planned_sidecars:
+                    break
+                planned_sidecars.add(sc.as_posix().lower())
                 if not files[so].get("sha256"):
                     sys.exit(f"STOP: no verified record for {so}. Nothing renamed.")
                 moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(ext)).as_posix(),
@@ -181,12 +185,16 @@ def plan_rename(session, studio, shoot_id, new_name):
             # a sidecar the Studio wrote itself (the sneak-peek keyword) is not in the backup's records;
             # it travels along too, checked against its own hash, so Lightroom keeps pairing it with the photo.
             # Found by name regardless of case, since an older rename could leave its case behind the photo's.
+            # (Nov 23: a sidecar their own editing program wrote since the backup travels the same way, so it keeps
+            # its photo's name; before, it stayed behind under the old name. Marked "theirs" in the log.)
             found = names_in(cur.parent).get((cur.stem + ".xmp").lower())
             if found:
                 sc = cur.parent / found
-                if studio_wrote(session / sc):
+                if (session / sc).is_file() and sc.as_posix().lower() not in planned_sidecars:
+                    planned_sidecars.add(sc.as_posix().lower())
+                    ours = studio_wrote(session / sc)
                     moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(Path(found).suffix)).as_posix(),
-                                  "original": None, "sha256": sha256_of(session / sc), "studio": True})
+                                  "original": None, "sha256": sha256_of(session / sc), **({"studio": True} if ours else {"theirs": True})})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
     dests = [x["to"].lower() for x in moves]
@@ -294,8 +302,10 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
                 entry["problems"].append(f"no hash to check against: {m['to']}")
                 continue
             if sha256_of(dst) != m["sha256"]:
-                entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
-                continue
+                if not (m.get("theirs") and dst.is_file()):
+                    entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
+                    continue
+                m["saved_again"] = True   # their own sidecar, saved again by their editing program meanwhile: theirs
             hashed += 1
         entry["verified"] += 1
     entry["hashed_in_full"] = hashed
@@ -310,7 +320,14 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             say(f"    - {p}")
         sys.exit(1)
     update_queue(session, studio, shoot["id"], new_name, new_folder)
-    say("  All done.")
+    say("  All done.")   # a second copy follows once, after the last rename of this run (work() -> mirror_follows)
+
+
+def follow_second(studio):
+    """A second copy of this backup on another drive is brought in line with the new name. One way of doing it,
+    mirror_follows (below): it renames there too, or notes that it is waiting for that drive. The rename here is
+    done either way."""
+    mirror_follows(studio)
 
 
 def update_queue(session, studio, shoot_id, new_name, new_folder):
@@ -503,6 +520,12 @@ def finish_unfinished(session, studio):
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
                     entry["verified"] += 1
                     m["checked"] = True
+                elif m.get("theirs") and dst.is_file():
+                    # their own sidecar (never the backup's): its hash was taken at the plan only to prove the
+                    # move, and their editing program saved it again before this run finished the rename. It is
+                    # beside its photo under its new name; what it holds is theirs. Noted, never a problem.
+                    entry["verified"] += 1
+                    m["checked"] = m["saved_again"] = True
                 else:
                     entry["problems"].append(f"could not verify {m['to']}")
             elif on_disk(src) and on_disk(dst):
@@ -514,6 +537,11 @@ def finish_unfinished(session, studio):
         checked = {m["to"] for m in real if m.get("checked")}
         tail = " already exists; not overwritten"
         entry["problems"] = [q for q in entry["problems"] if not (q.endswith(tail) and q[:-len(tail)] in checked)]
+        # what an earlier try at finishing could not do, and this one did: a file that was missing then and is now
+        # under its new name and matches its hash is no longer a problem (only with that proof, as above)
+        mended = ({f"missing: {m['from']}" for m in real if m.get("checked")} | {f"never moved: {m['from']}" for m in real if m.get("checked")}
+                  | {f"could not verify {m['to']}" for m in real if m.get("checked")})
+        entry["problems"] = [q for q in entry["problems"] if q not in mended]
         log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
         if new_folder:
             write_records(session, studio, entry["shoot"], new_folder, real, entry["to_name"])
@@ -529,6 +557,7 @@ def finish_unfinished(session, studio):
             sys.exit(1)
         if entry.get("stops") and new_folder:  # it stopped on a PC (a file held open) and is now done: the queue follows
             update_queue(session, studio, entry["shoot"], entry["to_name"], new_folder)
+        follow_second(studio)
 
 
 def main():
@@ -541,7 +570,28 @@ def main():
     a = ap.parse_args()
     from where import locate
     session, studio = locate(a.session)  # the folder the shoots sit in, and the records (before or after the night settles)
+    try:
+        import join_shoots
+    except ImportError:
+        join_shoots = None
+    if join_shoots is None:
+        return work(a, session, studio, None)
+    # One rename or join at a time on this computer (Nov 23: the Name your shoots page, the report's Rename and the
+    # chat can all ask at once, and two at work on one backup would write over each other's log). A rename waits
+    # its turn for up to RENAME_WAIT seconds; the job that started this one may hold the lock for it.
+    with join_shoots.held(wait=RENAME_WAIT) as got:
+        if not got:
+            sys.exit("STOP: " + join_shoots.WORDS["busy"])
+        return work(a, session, studio, join_shoots)
+
+
+RENAME_WAIT = float(os.environ.get("STUDIO_RENAME_WAIT_FOR_TESTS") or 120)   # seconds a rename waits its turn
+
+
+def work(a, session, studio, join_shoots):
     finish_unfinished(session, studio)
+    if join_shoots is not None:   # a join of two shoots that was cut off is finished first too, from its own log
+        join_shoots.finish_unfinished(session, studio)
 
     jobs = []
     if a.from_names:
@@ -573,11 +623,13 @@ def mirror_follows(studio):
     second copy, or one of the earlier kind (the card's layout), is left alone. Never stops a rename: it is done."""
     try:
         import second_copy
-        got = second_copy.follow(studio)
+        got = second_copy.follow(str(studio))
         if got.get("words"):
             say("  " + got["words"])
-    except Exception:  # noqa: BLE001
+    except (ImportError, AttributeError):
         pass
+    except (Exception, SystemExit) as e:  # noqa: BLE001
+        say(f"  (the second copy could not be brought in line just now: {e.__class__.__name__})")
 
 
 if __name__ == "__main__":

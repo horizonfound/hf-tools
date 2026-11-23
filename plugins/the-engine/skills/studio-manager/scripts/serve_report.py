@@ -473,6 +473,18 @@ class Handler(SimpleHTTPRequestHandler):
             return self.second(parts)
         if parts.path in ("/other-backups", "/naming", "/next-drives"):
             return self.option_list(parts.path)
+        if parts.path == "/name-shoots-url":
+            # the report's "Put these shoots in one folder": the Name your shoots page for THIS backup (name_shoots.py,
+            # on the Assistant's own page server, started if it is not up). An address on this computer, never a path.
+            if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+                return self.answer({"url": None}, HTTPStatus.FORBIDDEN)
+            try:
+                import name_shoots
+                url = name_shoots.url_for(self.studio, again=True)
+            except (Exception, SystemExit) as ex:  # noqa: BLE001  (a press must always get an answer)
+                sys.stderr.write(f"name-shoots-url: {ex.__class__.__name__}: {ex}\n")
+                url = None
+            return self.answer({"url": url}, HTTPStatus.OK if url else HTTPStatus.SERVICE_UNAVAILABLE)
         if parts.path == "/queue-url":
             # the report's "Show my editing queue" link: the queue page's address, starting its server if it is not up
             url = queue_url()

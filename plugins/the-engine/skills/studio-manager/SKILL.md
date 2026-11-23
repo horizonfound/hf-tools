@@ -37,6 +37,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | "write a note to my client", "here's how I write to clients" (no longer part of a backup: never offered) | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |
 | "make a second copy", "copy that backup to my other drive too", "is the second copy done?", "my second drive still has the old names", the report's Make a second copy | `parts/after-the-report.md` ("A second copy, after the backup") |
+| "name my shoots", "show me the naming page", the home page's Name them, the report's Put these shoots in one folder; "join the two beach shoots", "those two are one shoot", "these are mini sessions, keep them in one folder" | `parts/after-the-report.md` ("Naming the shoots after the backup, and putting shoots in one folder") |
 | "this shoot was on two cards", "put those two backups on one report", "I picked the wrong card", "take those two apart"; "change how my shoots are named" (also the line the report gives to copy), "I name my folders differently"; "use a different drive next time", "put my photos on the LaCie from now on" | `parts/after-the-report.md` ("What the report lets them change") |
 | the editing queue: "what's in my queue", "what's due", a due date, a list of clients to add, "open the Johnson folder" | `parts/editing-queue.md` |
 | "I'm done with the beach shoot", "I finished editing", "make posts from the Miller shoot", a post kit | `parts/post-kit.md` |
