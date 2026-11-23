@@ -1025,19 +1025,24 @@ def panel_choices(x, kit):
 
 
 def panel_words(x, kit):
-    """The post's words for its panel, straight from words.py: {piece, caption, hook}. The caption is the drafted
-    one, or their own when that is all there is; the hook is the first one they picked (a reel's). None for a
-    piece that has no words record (reminders.words_piece decides whose words a piece reads)."""
+    """The post's words for its panel, straight from words.py: {piece, reel, caption, hook}. The caption is the
+    drafted one, or their own when that is all there is; the hook is the first one they picked (a reel's). None
+    for a piece that has no words record (reminders.words_piece decides whose words a piece reads). A reel's
+    words are THAT reel's own (Nicole, Nov 23: each reel gets its own caption): which reel is read from the
+    piece's own name (reel_version), and `reel` is its id, for the link to its words page."""
     import reminders as posting_reminders      # by this name: this file has a reminders() of its own
     import words as words_mod
     which = posting_reminders.words_piece(x)
     if not which:
         return None
-    w = (words_mod.load(kit).get("pieces") or {}).get(which)
-    w = w if isinstance(w, dict) else {}
+    reel = reel_version(x) if which == "reel" and kit_role(x) == "reel" else None
+    try:
+        w = words_mod.read_of(words_mod.load(kit), which, reel)
+    except words_mod.Stop:
+        w = {}
     def text(v):
         return v.strip() if isinstance(v, str) else ""
-    return {"piece": which, "caption": text(w.get("caption")) or text(w.get("own")),
+    return {"piece": which, "reel": reel, "caption": text(w.get("caption")) or text(w.get("own")),
             "hook": posting_reminders.picked_hook(w) if x.get("kind") == "reel" else ""}
 
 
@@ -1678,7 +1683,7 @@ function drawPick(x,P,fresh){const el=PEL,reel=x.role==='reel',C=P.choices||[];
  warn.textContent=(!reel&&one&&cur!==one.rel)?PW.warn:'';
  if(fresh&&on&&on.offsetParent){const st=on.parentNode;st.scrollLeft=Math.max(0,on.offsetLeft-st.offsetLeft-(st.clientWidth-on.offsetWidth)/2)}else if(first)first.scrollLeft=at}
 function drawWords(el,x,W){const w=el.querySelector('.pw');w.textContent='';if(!W||!x.folder)return;   // no words record for this post: no row
- const page='/words.html?kit='+encodeURIComponent(x.folder)+'&piece='+encodeURIComponent(W.piece);
+ const page='/words.html?kit='+encodeURIComponent(x.folder)+(W.reel?'&reel='+encodeURIComponent(W.reel):'')+'&piece='+encodeURIComponent(W.piece);
  const link=t=>{const a=mkel('a','pwl',t+' →');a.href=page;return a};
  // the "Set a reminder to post" button sits in this place in the row (remindButton(x) returns it, or null)
  const slot=mkel('span','rslot');slot.dataset.remindSlot=x.id;const rb=remindButton(x);if(rb)slot.appendChild(rb);

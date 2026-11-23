@@ -1311,8 +1311,9 @@ def check_queue_v25():
     note = re.search(r'^NO_CAPTION = "([^"]+)"', rem, re.M)
     case("posting-queue.md says what a reminder's notes hold for a post with no caption, as reminders.py writes it",
          bool(note) and ('"' + note.group(1) + '"') in post and "still gets its reminder" in post, note and note.group(1))
-    case("posting-queue.md: the first reel keeps its place, nothing is renamed; one caption for the shoot's reels",
-         "nothing already in the queue is renamed or moved" in post and "one caption and one set of hooks for the shoot's reels" in post)
+    case("posting-queue.md: the first reel keeps its place, nothing is renamed; each reel has its own caption (Nov 23)",
+         "nothing already in the queue is renamed or moved" in post and "one caption and one set of hooks for the shoot's reels" not in post
+         and "**Each reel has its own words (Nicole, Nov 23" in post)
     case("arrange.md points a second reel at its own place in the queue", '`posting_queue.py ready "<shoot> reel" --reel "<name>"`' in arr)
     case("where-things-live.md names what a reel's piece carries", "`version`" in where and "`reel_name`" in where and "`...-reel-v2`" in where
          and 'x["version"], x["reel_name"] = ' in pq)
@@ -1978,8 +1979,54 @@ def check_chat_no_reminders():
          any("\"what's due\"" in r and "parts/editing-queue.md" in r for r in table_rows(skill)) and "\"what's due?\"" in q)
 
 
+def check_reel_words():
+    """Nicole, Nov 23: "each reel gets its own caption". The instructions say so wherever a reel's words are
+    written, read or queued, name the command's --reel and carry-reel as words.py has them, never tell the chat
+    to guess a reel, and no longer say a shoot's reels share one caption."""
+    print("\nEach reel has its own words (Nicole, Nov 23)")
+    skill = read(SM / "SKILL.md")
+    part, post, kitp, where = (read(SM / "parts" / n) for n in ("words.md", "posting-queue.md", "post-kit.md", "where-things-live.md"))
+    w, wp = read(SM / "scripts" / "words.py"), read(SM / "scripts" / "words_page.py")
+    case("words.md has the section, in her words", '## Each reel has its own words (Nicole, Nov 23: "each reel gets its own caption")' in part
+         and "**Every reel has its own answers, its own caption, its own ten hooks and its own picked hook.**" in part)
+    case("...the lines the page hands out name the reel after a comma, as the page writes them",
+         '"Ask me about the Beach reel, White Backdrop"' in part and '"talk_line_reel": "Ask me about the {short} reel, {reel}"' in wp
+         and '"write_line_reel": "Write my words for the {short} reel, {reel}"' in wp)
+    case("...every reel command takes --reel, and words.py has it on each of them",
+         'add `--reel "<reel name>"` to `ask`, `answer`, `show`, `draft`' in part and w.count('add_argument("--reel"') >= 3)
+    case("...never guess which reel: the command stops and lists the names, and the chat asks",
+         "**Never guess which reel.**" in part and "the command stops, saves nothing, and lists the reels by name" in part
+         and "each reel has its own words. Say which one with --reel" in w and '"this shoot has 2 reels, and each reel has its own words"' in part)
+    case("...a shoot with one reel needs none of it", "**A shoot with one reel needs none of this.**" in part)
+    case("...carry-reel is named as words.py has it, answers only, never over a reel's own",
+         '`words.py carry-reel "<kit>" --from "Reel 1" --reel "<this reel>"`' in part and 'sub.add_parser("carry-reel")' in w
+         and "The caption and the hooks are never copied" in part and "It never writes over answers a reel already has." in part)
+    case("...the page's own button for it is named as the page writes it", '"Use my answers from Reel 1"' in part and '"from_yes": "Use my answers from {from}"' in wp)
+    case("...no command copies a caption between reels, and the chat says so", "there is no command that copies a caption from one reel to another" in part)
+    case("...reels made before this: the one caption is the first reel's, the others have none", "that caption and those hooks are the shoot's first reel's now" in part)
+    case("...the commands block has carry-reel and says --reel is needed with several reels",
+         'words.py carry-reel "<kit>" --from "<a reel\'s name>" --reel "<another reel\'s name>"' in part
+         and '`words.py draft "<kit>" reel --reel "White Backdrop" --file <d.json>`' in part)
+    case("...and the traps name both mistakes", "Writing one reel's words without `--reel` when the shoot has several" in part
+         and "Giving two reels of one shoot the same caption." in part)
+    case("posting-queue.md: the caption question, the panel, the reminder and Open my words are that reel's own",
+         "when THAT reel has no caption" in post and "shows that reel's own caption and its own picked hook" in post
+         and "never borrows another reel's" in post and "a reel's post reads that reel's own words" in post
+         and '`--reel "<reel name>"`, since each reel has its own caption' in post)
+    case("...and it names the kit page's list of reels in Your words as the page writes it",
+         all(('"' + x + '"') in read(SM / "scripts" / "kit.py") for x in ("caption ready", "told, not written yet", "not written yet"))
+         and '"caption ready · 10 hooks, 2 picked", "told, not written yet", "not written yet"' in post)
+    case("post-kit.md points a shoot with several reels at each reel's own words", "**A shoot with several reels: each reel has its own caption and hooks**" in kitp)
+    case("where-things-live.md says where a later reel's words are kept, as words.py keeps them",
+         "`pieces.reels.<the reel's id>`" in where and 'LATER = "reels"' in w and "a shoot with one reel has no such part" in where)
+    case("the core's table sends a line with a reel's name after a comma to words.md",
+         any("with a reel's name after a comma" in r and "parts/words.md" in r for r in table_rows(skill)))
+    stale = [rel(f) for f in instruction_files() if re.search(r"one caption (and one set of hooks )?for (all of )?(the|a) shoot's reels|words page has one Reel tab", read(f))]
+    case("no instruction still says a shoot's reels share one caption", not stale, stale)
+
+
 def main():
-    for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
+    for fn in (check_reel_words, check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
                check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders):
         try:

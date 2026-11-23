@@ -343,11 +343,11 @@ def check_routes(s):
 
     # the words, straight from the words record
     w = panel(s, rid)[1]["words"]
-    case("the panel's words: the caption whole, and no hook while none is picked", w == {"piece": "reel", "caption": CAPTION.strip(), "hook": ""}, w)
+    case("the panel's words: the caption whole, and no hook while none is picked", w == {"piece": "reel", "reel": "v1", "caption": CAPTION.strip(), "hook": ""}, w)
     s.save("reel", picked=[2, 0])
     case("...the hook is the first one they picked", panel(s, rid)[1]["words"]["hook"] == HOOKS[2], panel(s, rid)[1]["words"])
     wc = panel(s, cid)[1]["words"]
-    case("a carousel has its caption (their own typed one, when that is all there is) and never a hook", wc == {"piece": "carousel", "caption": OWN, "hook": ""}, wc)
+    case("a carousel has its caption (their own typed one, when that is all there is) and never a hook", wc == {"piece": "carousel", "reel": None, "caption": OWN, "hook": ""}, wc)
     s.save("carousel", own="")
     case("no caption yet: the caption is empty", panel(s, cid)[1]["words"]["caption"] == "")
     s.save("carousel", own=OWN)

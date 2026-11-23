@@ -222,6 +222,19 @@ def words_piece(piece):
     return None
 
 
+_REEL_LATER = re.compile(r"-reel-(v[1-9][0-9]{0,3})$")      # posting_queue.REEL_LATER: a later reel's own piece
+
+
+def words_reel(piece):
+    """Which of its shoot's reels a reel piece is, for its words (Nicole, Nov 23: each reel has its own caption):
+    "v2" for "...-reel-v2"; None for the shoot's first reel (the kit's own reel piece) and for anything else.
+    Read from the piece's own name, as posting_queue.reel_version does, never from a field a page could send."""
+    if piece.get("kind") != "reel":
+        return None
+    m = _REEL_LATER.search(str(piece.get("id") or ""))
+    return m.group(1) if m else None
+
+
 def first_slide(cover):
     """Whether a carousel's grid photo is its slide 1, from the file's name: the last number in it is 1
     ("Hannah carousel - slide 01.jpg", "Slide 01 (Canva).jpg", "Hannah carousel (2) - slide 01.jpg")."""
@@ -252,7 +265,13 @@ def notes(piece, words_record):
     kit's words record ({"caption", "own", "hooks", "picked"}), or the whole record ({"pieces": {...}})."""
     w = words_record if isinstance(words_record, dict) else {}
     if isinstance(w.get("pieces"), dict):
-        w = w["pieces"].get(words_piece(piece) or "") or {}
+        which, later = words_piece(piece) or "", words_reel(piece)
+        if which == "reel" and later:
+            # a later reel reads only its own words ("pieces.reels.<id>"); with none it has no caption yet
+            m = w["pieces"].get("reels")
+            w = m.get(later) if isinstance(m, dict) else {}
+        else:
+            w = w["pieces"].get(which) or {}
         w = w if isinstance(w, dict) else {}
     cap = _clean(w.get("caption") or w.get("own") or "").strip()
     lines = []
@@ -288,8 +307,10 @@ def words_for(piece):
     if not kit.is_dir():
         raise KitAway(str(kit))
     import words as words_mod     # here, not at the top: it brings kit.py and its friends with it
-    got = (words_mod.load(kit).get("pieces") or {}).get(which)
-    return got if isinstance(got, dict) else {}
+    try:
+        return words_mod.read_of(words_mod.load(kit), which, words_reel(piece))     # that reel's own words only
+    except words_mod.Stop:
+        return {}
 
 
 # ---------------------------------------------------------------- what should be there, pure
