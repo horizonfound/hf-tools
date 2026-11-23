@@ -390,6 +390,10 @@ def the_page(work, shot=None):
                   and c.js("document.getElementById('sub').textContent") == "We found 3 shoots on your card, sorted by when you took them. Give each one a name, or do it later.")
             check("her mini sessions box, not ticked", c.js("document.querySelector('.mini').textContent") == "These are mini sessions. Keep them in one folder."
                   and c.js("document.getElementById('mini').checked") is False)
+            try:
+                c.wait_for("[...document.querySelectorAll('.nshoot img')].every(i => i.complete && i.naturalWidth > 0)", 15)
+            except Exception:  # noqa: BLE001  (the check below says what is missing)
+                pass
             check("each shoot: three pictures that loaded, when and how many, a box that says Shoot name, the folder it has now",
                   c.js("[...document.querySelectorAll('.nshoot')].every(b => b.querySelectorAll('img').length === 3 && [...b.querySelectorAll('img')].every(i => i.complete && i.naturalWidth > 0))")
                   and c.js("document.querySelector('.nshoot small').textContent") == "Thursday 9:00 to 9:03 am · 5 photos"

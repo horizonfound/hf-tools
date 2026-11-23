@@ -186,7 +186,7 @@ function pics(s, only){
   const th = el('div', 'th');
   const n = only ? 1 : 3;
   for (let i = 0; i < n; i++){
-    if (i < s.pics){ const im = el('img'); im.alt = ''; im.loading = 'lazy'; im.src = '/name-shoots-pic' + q + '&shoot=' + encodeURIComponent(s.id) + '&i=' + i; th.appendChild(im); }
+    if (i < s.pics){ const im = el('img'); im.alt = ''; im.src = '/name-shoots-pic' + q + '&shoot=' + encodeURIComponent(s.id) + '&i=' + i; th.appendChild(im); }
     else if (!only) th.appendChild(el('i'));
   }
   return th;
