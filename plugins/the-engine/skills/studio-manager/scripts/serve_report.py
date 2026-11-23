@@ -387,6 +387,15 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         return False
 
+    def foreign(self):
+        """Is this ask from another website? The browser itself says where an ask comes from: Sec-Fetch-Site, and
+        an Origin that is not this server's own. (A plain ask with neither, as a command or a test makes, is not.)"""
+        if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            return True
+        origin = (self.headers.get("Origin") or "").strip().lower()
+        port = self.server.server_address[1]
+        return bool(origin) and origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+
     def do_HEAD(self):
         # the report's own "has it been rebuilt?" check asks for report.html this way, every 4 seconds
         if self.ours():
@@ -456,6 +465,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if parts.path in ("/second-drives", "/second-status", "/other-backups", "/naming", "/next-drives") and self.foreign():
+            # These list drives and backups by name, and second-status may start the second copy's catch-up (renames
+            # on the second drive): only ever for this report's own page, never for an ask from another website.
+            return self.send_error(HTTPStatus.FORBIDDEN)
         if parts.path in ("/second-drives", "/second-status"):
             return self.second(parts)
         if parts.path in ("/other-backups", "/naming", "/next-drives"):

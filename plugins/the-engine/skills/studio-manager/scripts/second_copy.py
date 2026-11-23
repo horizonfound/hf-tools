@@ -36,7 +36,9 @@ The same promises as backup.py, whose own functions do the work here (imported, 
     recorded for that file must all three agree. A source that no longer matches the backup's record is a
     problem, is not counted, and is not left under the photo's name on the second drive
   - log first: second-copy.json in the backup's records, written whole before the first byte and after every file
-    (each file with where it is on the second drive, each folder this copy made)
+    (each file with where it is on the second drive, each folder this copy made); and before each file's first
+    byte, a small note of which file and the name it is going under (second-copy.going.json), so a copy killed
+    before the record heard of a file that had landed finds it again
   - the backup's own manifest.json is changed ONCE, at the very end, only when every file is copied and checked
     (the manifest before is kept once as manifest.before-second-copy.json). Until then it says there is no
     second copy, so a copy that is running or has stopped can never switch off "Card safe to format"
@@ -48,7 +50,10 @@ before it happens, each file proved the same file afterwards by its identity on 
 cannot prove it), names checked against the folder's own listing, nothing ever taken over. Run twice it does
 nothing; a run cut off is finished by the next. With the second drive not plugged in it notes "waiting" in
 second-copy.json; the report says so, and the next command that sees the drive (the report's own status check, a
-backup, or follow --all) does it.
+backup, or follow --all) does it. The same goes for a rename that came while this computer's one second-copy lock
+was held by something else (noted in second-follow-later.json, a file of its own: the record is only ever written
+by whoever holds the lock), for a follow that was cut off (found by its own identity, never by "something has
+that name"; no two files are ever on record at one place), and for one stopped by something in the way.
 
 --check   only the questions asked before a byte is written; nothing is made or changed
 --json    the last line printed is one JSON object {"ok", "state", "words"} (for the report's server)
@@ -91,6 +96,12 @@ MIRROR_RECORDS = ".studio-second"   # the hidden folder on the second drive that
 #                                     ".studio": nothing that looks for a backup's records may ever take a copy for one
 FOLLOW_LOG = "second-follow-log.json"   # in the backup's records: every rename made on the second drive, written first
 FOLLOW_KEPT = 6             # how many finished runs the follow log keeps in full (older ones keep their counts)
+GOING = "second-copy.going.json"   # in the backup's records: the one file being copied right now and the name it is going
+#                                   under, written before its first byte, so a copy killed before the record heard of
+#                                   the file can find it again (and give it its new name after a rename)
+LATER = "second-follow-later.json"  # in the backup's records: a rename came while this computer's one second-copy lock
+#                                   was held by something else, so this copy still has to follow. A note of its own:
+#                                   the record itself is never written by anyone who does not hold the lock
 MOVING = ".studio-moving"   # the ending of a name a file steps aside under for a moment, when names go round in a ring
 REMEMBER_SECOND = False     # Nicole, Nov 23: the second drive is asked each time. True brings back "Do this after
 #                             every backup" (the report's tick box, --always, and a saved second drive used by itself)
@@ -159,6 +170,10 @@ OUR_WORDS = {
     "follow_waiting": ("Your second copy on {drive} still has the folders and names from before. "
                        "Plug {drive} in and it will catch up."),
     "follow_busy": "A second copy is being made right now; it takes the new names itself before it finishes.",
+    "follow_later": ("Your second copy on {drive} still has the folders and names from before. Another second copy "
+                     "is being made right now; this one catches up as soon as that is done."),
+    "follow_part_way": ("Your second copy on {drive} was part way through taking its new folders and names. "
+                        "It finishes by itself in a moment."),
     "follow_problem": ("I couldn't give your second copy on {drive} the same folders and names as {photos}: {why} "
                        "Nothing was removed or written over. Tell the Assistant and it'll sort it out."),
     "follow_folder": "a folder called {folder} is already there that isn't part of the copy.",
@@ -366,8 +381,11 @@ def drive_places(root, studio, keys=()):
     says the photo is (the sort, a rename and the settle are all followed there), where the sort and rename
     logs say a sidecar went, and its card path itself. With `keys` (the manifest's), a sidecar is also looked
     for beside its photo under the photo's name now, which is where the sort, a rename and a join all put it,
-    whatever log they kept. The set-aside leftovers are looked for by the caller, in the records. A wrong guess
-    can never make a wrong copy: every file is checked against the backup's hash."""
+    whatever log they kept: that place comes FIRST for a sidecar, since a join keeps a log this does not read and
+    an older log entry may by now name a place another shoot's sidecar has taken. The set-aside leftovers are
+    looked for by the caller, in the records. A wrong guess can never copy wrong bytes (every file is checked
+    against the backup's hash), but in a copy that looks like the photo drive the place also decides the NAME the
+    copy gets, so when more than one place fits, on_main() takes the one whose hash is this file's."""
     places = {}
 
     def add(key, rel):
@@ -396,7 +414,11 @@ def drive_places(root, studio, keys=()):
         for key in keys:
             photo = beside.get(Path(key).with_suffix("").as_posix())
             if photo and Path(key).suffix.lower() == ".xmp":
-                add(key, Path(photo).with_suffix(Path(key).suffix))
+                rel = Path(photo).with_suffix(Path(key).suffix).as_posix()
+                got = places.setdefault(key, [])
+                if rel in got:
+                    got.remove(rel)
+                got.insert(0, rel)
     return places
 
 
@@ -447,15 +469,40 @@ def on_main(key, entry, view):
     root, studio = view["root"], view["studio"]
     cands = [("shoot", rel, root / rel) for rel in view["places"].get(key, [])]
     cands.append(("aside", key, studio / "from-the-card" / Path(*key.split("/"))))
-    other = None
+    other, fits, seen = None, [], set()
     for kind, rel, at in cands:
+        if str(at) in seen:
+            continue
+        seen.add(str(at))
         try:
             if at.is_file():
                 if at.stat().st_size == size:
-                    return {"kind": kind, "rel": Path(rel).as_posix(), "src": at, "changed": False}
-                other = other or (kind, rel)
+                    fits.append((kind, rel, at))
+                else:
+                    other = other or (kind, rel)
         except OSError:
             continue
+    if len(fits) > 1:
+        # More than one place holds a file of this size (after a join, an older log may name a place that another
+        # photo or sidecar has since taken). Size alone would put this file's copy under the other one's name:
+        # the place whose hash is this file's is the one, and no two files are ever given the same place.
+        hashes, claimed = view.setdefault("hashes", {}), view.setdefault("claimed", {})
+        right = []
+        for f in fits:
+            try:
+                if str(f[2]) not in hashes:
+                    hashes[str(f[2])] = backup.sha256_of(f[2])
+            except OSError:
+                continue
+            if hashes[str(f[2])] == entry.get("sha256"):
+                right.append(f)
+        if right:
+            pick = next((f for f in right if claimed.get(str(f[2]), key) == key), right[0])
+            claimed[str(pick[2])] = key
+            fits = [pick]
+    if fits:
+        kind, rel, at = fits[0]
+        return {"kind": kind, "rel": Path(rel).as_posix(), "src": at, "changed": False}
     if other:
         return {"kind": other[0], "rel": Path(other[1]).as_posix(), "src": None, "changed": True}
     return None
@@ -537,6 +584,29 @@ def proved(path, ident, entry):
         return False
 
 
+def same_ident(path, ident):
+    """Is the file at path the one that had this identity (file number, size, modified time)? Never a guess:
+    False when there is no identity to go by."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    return bool(ident and ident[0]) and [st.st_ino, st.st_size, st.st_mtime_ns] == list(ident)
+
+
+def same_hash(path, entry):
+    """Is the file at path, read in full, the one the backup recorded?"""
+    want = entry.get("sha256")
+    try:
+        return bool(want) and os.stat(path).st_size == entry.get("size") and backup.sha256_of(path) == want
+    except OSError:
+        return False
+
+
+def place_key(rel):
+    return "/".join(fold(x) for x in Path(rel).parts)
+
+
 def unit_of(rel, prefix):
     """The shoot's own folder in a place on the drive: the first folder, or the first inside the day folder
     while the backup has not settled. None for a file that sits in no folder, or in the hidden records."""
@@ -573,11 +643,27 @@ def align(place, mirror_name, view, studio, rec, files, save):
     if not isinstance(log, dict) or not isinstance(log.get("runs"), list):
         log = {"runs": []}
     idents = {}
-    dirty = False
+    dirty = False               # the record changed here and is not saved yet
+    log_dirty = False           # the log changed here and is not written yet
     changed = set()             # the files whose place on the second drive this run changed
 
     def at(k):
         return recs[k]["at"]
+
+    # A copy killed in the moment between a file landing under its name and the record hearing of it: the note
+    # written before that file's first byte says which file and where. When it is there, in one of this copy's
+    # own folders, and its hash is the backup's, it is this copy's file: on record now, so it takes a new name
+    # with the others instead of staying behind under the old one.
+    going = read_json(Path(studio) / GOING)
+    if isinstance(going, dict) and same_place(str(going.get("place") or ""), str(place)):
+        k, rel = going.get("key"), going.get("at")
+        if (k in files and isinstance(rel, str) and rel and not (recs.get(k) or {}).get("ok")
+                and (Path(rel).parts[0] == MIRROR_RECORDS or ours(rec, Path(rel).parts[0]))
+                and not any(r.get("ok") and r.get("at") and place_key(r["at"]) == place_key(rel) for r in recs.values())
+                and names.exact(place / rel) and same_hash(place / rel, files[k])):
+            recs[k] = {"ok": True, "from": "there", "note": "found where a copy that was cut off had left it", "at": rel}
+            dirty = True
+    keys = [k for k, r in recs.items() if r.get("ok") and r.get("at") and k in files]
 
     # a run that was cut off: where its log says a file may have got to is looked at first
     for run in log["runs"]:
@@ -591,31 +677,82 @@ def align(place, mirror_name, view, studio, rec, files, save):
                     if at(k) == f["from"] or at(k).startswith(f["from"] + "/"):
                         recs[k]["at"] = f["to"] + at(k)[len(f["from"]):]
                         dirty = True
-        for m in run.get("moves", []):
-            k = m.get("key")
-            if k not in recs or k not in keys:
-                continue
-            if m.get("ident"):
-                idents[k] = m["ident"]
-            for step in (m.get("via"), m.get("to")):
-                if step and at(k) != step and not names.exact(place / at(k)) and names.exact(place / step) \
-                        and proved(place / step, m.get("ident"), files[k]):
-                    recs[k]["at"] = step
-                    dirty = True
+        # Where did each file of that run get to? Never answered by "something has that name": when names were
+        # changing hands (a ring after a join, or one photo taking the name another had), the name a file left
+        # may hold ANOTHER file by now. Each file is found by its own identity on the drive as the log kept it
+        # (a rename never changes it), and, where that cannot say, by its hash; and no two files are ever put on
+        # record at one place.
+        moves = [m for m in (run.get("moves") if isinstance(run.get("moves"), list) else [])
+                 if isinstance(m, dict) and m.get("key") in keys]
+        claimed, found = {}, {}
+        for by_hash in (False, True):
+            for m in moves:
+                k = m["key"]
+                if k in found:
+                    continue
+                if m.get("ident"):
+                    idents[k] = m["ident"]
+                for step in (m.get("to"), m.get("via"), at(k), m.get("from")):
+                    if not step or place_key(step) in claimed or not names.exact(place / step):
+                        continue
+                    if same_hash(place / step, files[k]) if by_hash else same_ident(place / step, m.get("ident")):
+                        found[k] = step
+                        claimed[place_key(step)] = k
+                        break
+        for k, step in found.items():
+            if at(k) != step:
+                recs[k]["at"] = step
+                dirty = True
         run["finished"] = datetime.now().isoformat(timespec="seconds") + " (cut off; picked up by a later run)"
-        dirty = True
+        log_dirty = True
+
+    # Never two files on record at one place (a record left that way by a run cut off before Nov 23's fix, or a
+    # file that could not be found above). The file that IS there, by its hash, keeps the place; another that
+    # claims it is looked for where it should be by now, and failing that is said as not where it was left: the
+    # file that is there is never moved in its name.
+    lost = set()
+    by_place = {}
+    for k in keys:
+        by_place.setdefault(place_key(at(k)), []).append(k)
+    for ks in by_place.values():
+        if len(ks) < 2:
+            continue
+        holder = next((k for k in ks if same_hash(place / at(k), files[k])), None)
+        for k in ks:
+            if k != holder:
+                lost.add(k)
+    if lost:
+        taken = {place_key(at(k)) for k in keys if k not in lost}
+        for k in sorted(lost):
+            loc = on_main(k, files[k], view)
+            to = mirror_rel(loc, view, mirror_name) if loc is not None else None
+            if to and place_key(to) not in taken and names.exact(place / to) and same_hash(place / to, files[k]):
+                recs[k]["at"] = to
+                taken.add(place_key(to))
+                lost.discard(k)
+                dirty = True
+    if dirty:
+        save()                  # the record first: the log is only marked picked-up once the record knows
+        dirty = False
 
     want = {}
     for k in keys:
+        if k in lost:
+            continue
         loc = on_main(k, files[k], view)
         if loc is not None:           # (not on the photo drive just now: its copy stays where it is)
             want[k] = mirror_rel(loc, view, mirror_name)
     diffs = [k for k in want if at(k) != want[k]]
+    if lost:
+        out["gone"] += len(lost)
     if not diffs:
-        if dirty or rec.get("prefix") != view["prefix"]:
+        if rec.get("prefix") != view["prefix"] and not lost:
             rec["prefix"] = view["prefix"]
-            write_whole(log_path, log)
             save()
+        if log_dirty:
+            write_whole(log_path, log)
+        if lost:
+            out["problems"].append(OUR_WORDS["follow_gone"].format(**plural(len(lost))))
         return out
 
     run = {"place": str(place), "started": datetime.now().isoformat(timespec="seconds"), "folders": [], "moves": []}
@@ -634,6 +771,8 @@ def align(place, mirror_name, view, studio, rec, files, save):
     # 1. a whole shoot folder that only changed its name (or went up out of the day folder): one step, as on the photo drive
     under = {}
     for k in keys:
+        if k in lost:
+            continue
         u = unit_of(at(k), was_prefix)
         if u:
             under.setdefault(u, []).append(k)
@@ -718,8 +857,14 @@ def align(place, mirror_name, view, studio, rec, files, save):
     if out["problems"]:
         run["problems"] = list(out["problems"])
         out["moved"] = len(changed)
-        write_whole(log_path, log)
-        save()
+        if not changed and not run["folders"]:
+            log["runs"].remove(run)     # nothing moved at all: nothing to pick up, and a try every few seconds
+            #                             while something is in the way must not grow the log
+            if log_dirty:
+                write_whole(log_path, log)
+        else:
+            write_whole(log_path, log)
+            save()
         return out                      # nothing in the way is ever moved or taken over: no file moved
     for m in moves:
         try:
@@ -827,8 +972,8 @@ def align(place, mirror_name, view, studio, rec, files, save):
     else:
         run["problems"] = list(out["problems"])
     run["done"] = out["moved"]
-    write_whole(log_path, log)
-    save()
+    save()                      # the record first: the log says "finished" only once the record knows where every
+    write_whole(log_path, log)  # file is (cut between the two, the next run finds the run unfinished and checks)
     return out
 
 
@@ -897,20 +1042,56 @@ def _follow(arg):
     place = Path(rec.get("place") or rec.get("to") or "")
     name = str(rec.get("to_name") or "your second drive")
     photos = drive_name(root)
+    was = dict(rec.get("follow") or {})
+
+    def note(state, line="", **more):
+        rec["follow"] = dict({"state": state, "when": datetime.now().isoformat(timespec="seconds"), "line": line}, **more)
+        write_whole(studio / RECORD, rec)
+        behind = lambda f: (f.get("state"), f.get("line")) if f.get("state") in ("waiting", "problem") else None  # noqa: E731
+        if behind(was) != behind(rec["follow"]) and (studio / "report.html").is_file():
+            rebuild_report(studio)      # the line under "Second copy made" comes or goes on the page as a file too
+
     held = _held_lock()
     if held is None:
-        return {"state": "busy", "moved": 0, "words": OUR_WORDS["follow_busy"]}
+        # Something holds this computer's one second-copy lock. Only a copy of THIS backup takes the new names
+        # itself before it finishes. Anything else (another backup's copy, another backup's follow) will not: so
+        # this copy is noted as waiting, the report says so, and the next look (the report's own status check,
+        # a backup, follow --all) brings it in line. The record is this backup's own; the lock's holder never
+        # writes it.
+        info = running() or {}
+        try:
+            # (the note of who is copying outlives its copy, and a follow holds the lock without writing one: so
+            # the note counts only while the process it names is alive)
+            own = (bool(info.get("studio")) and Path(info["studio"]).resolve() == Path(studio).resolve()
+                   and bool(this_computer.still_running(info.get("pid"))))
+        except OSError:
+            own = False
+        if own or rec.get("state") == "copying":
+            return {"state": "busy", "moved": 0, "words": OUR_WORDS["follow_busy"]}
+        line = OUR_WORDS["follow_later"].format(drive=name)
+        try:
+            had = read_json(studio / LATER, {}) or {}
+            if (had.get("state"), had.get("line")) != ("waiting", line):
+                write_whole(studio / LATER, {"state": "waiting", "line": line, "when": datetime.now().isoformat(timespec="seconds")})
+                if was.get("state") not in ("waiting", "problem") and (studio / "report.html").is_file():
+                    rebuild_report(studio)
+        except OSError:
+            pass
+        return {"state": "waiting", "moved": 0, "words": line}
     lock, got = held
     try:
+        fresh = read_json(studio / RECORD)      # as it is now that the lock is ours (a follow just before may have moved files)
+        if isinstance(fresh, dict) and fresh.get("layout") == LAYOUT_MAIN:
+            rec.clear()
+            rec.update(fresh)
+            was = dict(rec.get("follow") or {})
+        later = read_json(studio / LATER, {}) or {}
+        if later.get("state") == "waiting":
+            # the lock is ours now: that note has done its work (kept, emptied; never removed)
+            write_whole(studio / LATER, {"state": "", "when": datetime.now().isoformat(timespec="seconds")})
+            if was.get("state") not in ("waiting", "problem"):
+                was = {"state": "waiting", "line": str(later.get("line") or "")}
         mirror_name = rec.get("mirror") or this_computer.safe_name(manifest.get("session") or studio.name, limit=120)
-        was = dict(rec.get("follow") or {})
-
-        def note(state, line="", **more):
-            rec["follow"] = dict({"state": state, "when": datetime.now().isoformat(timespec="seconds"), "line": line}, **more)
-            write_whole(studio / RECORD, rec)
-            behind = lambda f: (f.get("state"), f.get("line")) if f.get("state") in ("waiting", "problem") else None  # noqa: E731
-            if behind(was) != behind(rec["follow"]) and (studio / "report.html").is_file():
-                rebuild_report(studio)      # the line under "Second copy made" comes or goes on the page as a file too
 
         try:
             there = place.is_dir()
@@ -918,7 +1099,7 @@ def _follow(arg):
             there = False
         if not there:
             line = OUR_WORDS["follow_waiting"].format(drive=name)
-            if was.get("state") != "waiting":
+            if (was.get("state"), was.get("line")) != ("waiting", line):
                 note("waiting", line)
             return {"state": "waiting", "moved": 0, "words": line}
         view = main_view(root, studio, files)
@@ -929,8 +1110,9 @@ def _follow(arg):
             got_ = {"moved": 0, "problems": [OUR_WORDS["follow_cant"]]}
         if got_["problems"]:
             line = OUR_WORDS["follow_problem"].format(drive=name, photos=photos, why=" ".join(got_["problems"]))
-            note("problem", line, moved=got_["moved"])
-            keep_mirror_record(place, mirror_name, rec)
+            if got_["moved"] or saved or (was.get("state"), was.get("line")) != ("problem", line):
+                note("problem", line, moved=got_["moved"])      # (the same problem met again, nothing moved: nothing rewritten)
+                keep_mirror_record(place, mirror_name, rec)
             return {"state": "problem", "moved": got_["moved"], "words": line}
         if not got_["moved"] and not saved and was.get("state") not in ("waiting", "problem"):
             return {"state": "same", "moved": 0, "words": ""}
@@ -944,9 +1126,28 @@ def _follow(arg):
         lock.close()
 
 
+def behind_how(studio, rec):
+    """Why this mirror may not be in line with the photo drive, or "": "waiting" (its drive was out, or another
+    copy held the lock, when a shoot was renamed), "problem" (something was in the way: worth another try, since
+    they may have moved it since), "cut" (a follow was cut off part way: its log has a run that never finished)."""
+    f = rec.get("follow") or {}
+    if f.get("state") in ("waiting", "problem"):
+        return f["state"]
+    if (read_json(Path(studio) / LATER, {}) or {}).get("state") == "waiting":
+        return "waiting"
+    log = read_json(Path(studio) / FOLLOW_LOG)
+    place = str(rec.get("place") or "")
+    for run in (log.get("runs") if isinstance(log, dict) and isinstance(log.get("runs"), list) else []):
+        if isinstance(run, dict) and not run.get("finished") and "done" not in run and not run.get("problems") \
+                and same_place(str(run.get("place") or ""), place):
+            return "cut"
+    return ""
+
+
 def follow_all():
-    """Every backup the card ledger knows whose second copy was waiting for its drive: followed now, when that
-    drive is in. Quiet, never raises. Returns how many were brought in line."""
+    """Every backup the card ledger knows whose second copy is behind (it was waiting for its drive or for another
+    copy to end, something was in the way, or a follow was cut off): followed now, when that drive is in. Quiet,
+    never raises. Returns how many were brought in line."""
     n = 0
     try:
         sessions = [s.get("folder") for entry in (cards.load().get("cards") or {}).values()
@@ -957,7 +1158,7 @@ def follow_all():
         try:
             _, studio = locate(folder)
             rec = read_json(Path(studio) / RECORD)
-            if not isinstance(rec, dict) or (rec.get("follow") or {}).get("state") != "waiting":
+            if not isinstance(rec, dict) or rec.get("layout") != LAYOUT_MAIN or not behind_how(studio, rec):
                 continue
             if not Path(rec.get("place") or "").is_dir():
                 continue
@@ -1273,6 +1474,11 @@ def copy_all(plan, always=False):
             got = {"problems": [OUR_WORDS["follow_cant"]]}
         if not got["problems"]:
             rec.pop("follow", None)         # (a note that it was waiting for this drive, or for something in the way)
+            try:
+                if (read_json(where["studio"] / LATER, {}) or {}).get("state") == "waiting":
+                    write_whole(where["studio"] / LATER, {"state": "", "when": datetime.now().isoformat(timespec="seconds")})
+            except OSError:
+                pass
             return None
         return OUR_WORDS["follow_problem"].format(drive=name, photos=drive_name(where["root"]), why=" ".join(got["problems"]))
 
@@ -1379,6 +1585,15 @@ def copy_all(plan, always=False):
                 if rec.get("reading") != ("card" if from_card else "drive"):
                     rec["reading"] = "card" if from_card else "drive"
                     save()
+                if main:
+                    # log first: which file, and the name it is going under, before its first byte (a small note
+                    # of its own; align() reads it when a copy was killed before the record heard of the file)
+                    try:
+                        if not where["studio"].is_dir():
+                            relocate()
+                        write_whole(where["studio"] / GOING, {"key": key, "at": at["at"], "place": str(place)})
+                    except OSError:
+                        pass
                 try:
                     read_hash, back_hash = backup.copy_with_hash(src, dst)
                 except OSError as e:
@@ -1550,8 +1765,9 @@ def status(studio):
     """How this backup's second copy stands, for the report's page: {"state": "none"|"copying"|"done"|"stopped",
     "done", "total", "name", "card" (is it reading the card right now), "line", "behind", "catch", "old"}.
     behind: the line to show when the copy still has the folders and names from before a rename or a join (its
-    drive was not plugged in, or something was in the way); "" when it is in line. catch: it is behind only
-    because its drive was out, and the drive is in now (the report's server then runs follow). old: it is a copy
+    drive was not plugged in, another copy was being made, a follow was cut off, or something was in the way); ""
+    when it is in line, and while it is set `line` never says the copy has the photo drive's folders and names.
+    catch: it is behind and its drive is in now (the report's server then runs follow). old: it is a copy
     of the earlier kind, laid out as the card was. Never a path."""
     studio = Path(studio)
     out = _status(studio)
@@ -1561,13 +1777,24 @@ def status(studio):
         manifest = read_json(studio / "manifest.json", {}) or {}
         out["old"] = manifest.get("second_layout") != LAYOUT_MAIN
     if isinstance(rec, dict) and rec.get("layout") == LAYOUT_MAIN and out["state"] != "copying":
-        f = rec.get("follow") or {}
-        if f.get("state") in ("waiting", "problem"):
-            out["behind"] = str(f.get("line") or "")
+        how = behind_how(studio, rec)
+        if how:
+            f = rec.get("follow") or {}
+            if f.get("state") not in ("waiting", "problem"):
+                f = read_json(studio / LATER, {}) or {}
+            out["behind"] = (str(f.get("line") or "") if how != "cut" else "") or OUR_WORDS["follow_part_way"].format(
+                drive=str(rec.get("to_name") or "your second drive"))
+            # worth a try whenever the drive is in: waiting catches up, a cut-off run is finished, and a problem
+            # is looked at again (they may have moved what was in the way). The server asks no oftener than every
+            # 20 seconds, and a try that meets the same problem moves and writes nothing.
             try:
-                out["catch"] = f.get("state") == "waiting" and Path(rec.get("place") or "").is_dir()
+                out["catch"] = Path(rec.get("place") or "").is_dir() and not running()
             except OSError:
                 pass
+            # While it is behind, the made line must not say it has the photo drive's folders and names: cut there.
+            cut = out["line"].find(OUR_WORDS["like_main"].split("{photos}")[0])
+            if cut >= 0:
+                out["line"] = out["line"][:cut]
     return out
 
 

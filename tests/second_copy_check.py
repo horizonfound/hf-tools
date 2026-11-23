@@ -185,7 +185,8 @@ def reset(b):
     """Put the pretend backup back to "no second copy", for the next case (a test's own tidying of its own
     scratch records; the Assistant itself never removes these)."""
     (b["records"] / "manifest.json").write_bytes(b["clean"])
-    for name in ("second-copy.json", "manifest.before-second-copy.json", "second-follow-log.json", "second-missed.json"):
+    for name in ("second-copy.json", "manifest.before-second-copy.json", "second-follow-log.json", "second-missed.json",
+                 "second-copy.going.json", "second-follow-later.json"):
         try:
             (b["records"] / name).unlink()
         except OSError:
@@ -221,9 +222,10 @@ def new_drive(b, name, free_gb=1000):
     return p
 
 
-def a_finished_backup(work):
+def a_finished_backup(work, sidecars=1):
     """One whole pretend backup, made by night.py: copied and checked, sorted into two shoots, settled, and one
-    shoot renamed afterwards. Returns what the cases need, or None when it could not be made."""
+    shoot renamed afterwards. Returns what the cases need, or None when it could not be made. sidecars: how many
+    of the first photos come with a sidecar from the card (more than one: all the same size, each its own bytes)."""
     base = work / "world"
     home, folders = base / "home", base / "folders"
     home.mkdir(parents=True)
@@ -238,6 +240,9 @@ def a_finished_backup(work):
     card = base / "CARD"
     photos = t.make_card(card, groups=(5, 4))
     (photos[0].with_suffix(".xmp")).write_bytes(b"<x:xmpmeta>a rating made in the camera</x:xmpmeta>")   # a sidecar from the card
+    if sidecars > 1:
+        for i, p in enumerate(photos[:sidecars], 1):
+            p.with_suffix(".xmp").write_bytes(b"<x:xmpmeta>rating %d</x:xmpmeta>" % i)
     before = t.card_snapshot(card)
     t.run("studio_file.py", "set", "--drive", drive, "--offered", "1", "--file-names", "shoot", env=env)
     night = ["night.py", "--source", card, "--name", "copy card", "--date", "2026-11-19", "--no-peeks"]
@@ -259,7 +264,7 @@ def a_finished_backup(work):
     check("and one of its shoots is renamed afterwards", code == 0, out)
     m = json.loads((records / "manifest.json").read_text(encoding="utf-8"))
     check("the pretend backup holds the photos, the card's sidecar and a camera file that is not a photo",
-          len(m["files"]) == len(photos) + 2 and "MISC/M01.CTG" in m["files"] and not m.get("second"), str(sorted(m["files"])))
+          len(m["files"]) == len(photos) + 1 + sidecars and "MISC/M01.CTG" in m["files"] and not m.get("second"), str(sorted(m["files"])))
     return {"base": base, "home": home, "env": env, "listing": listing, "drive": drive, "card": card,
             "card_away": base / "CARD (pulled out)", "records": records, "card_before": before,
             "clean": (records / "manifest.json").read_bytes(), "n": len(m["files"])}
@@ -953,7 +958,8 @@ def something_in_the_way(b, to, before):
           and "Nothing was removed or written over." in got_.get("words", "") and str(b["base"]) not in got_.get("words", ""), out)
     check("no file was moved, and their folder is exactly as it was", {k: v for k, v in stamps(to).items() if not k.startswith(MIRROR)} == held and set(before) <= set(numbers(to))
           and (to / new_folder / "notes.txt").read_bytes() == b"their own folder, put here by them")
-    check("the status carries the same line for the report", "isn't part of the copy" in status_of(b).get("behind", "") and status_of(b).get("catch") is False, str(status_of(b)))
+    check("the status carries the same line for the report, and offers another try (they may have moved it since)",
+          "isn't part of the copy" in status_of(b).get("behind", "") and status_of(b).get("catch") is True, str(status_of(b)))
     os.rename(to / new_folder, to / "Their own folder")        # (they rename their folder out of the way)
     code, got_, out = follow(b)
     check("once it is out of the way, follow finishes", got_.get("state") == "followed" and mirror_tree(to) == {**expected(b["records"]), "Their own folder/notes.txt": sha(to / "Their own folder" / "notes.txt")}, out)
