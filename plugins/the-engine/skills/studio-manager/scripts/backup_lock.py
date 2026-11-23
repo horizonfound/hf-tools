@@ -171,6 +171,42 @@ def _same(a, b):
         return str(a) == str(b)
 
 
+BEING_MADE = "This backup is still being made. Try this again when it's done."   # ours, a draft: a rename or a join says it
+
+
+def working_on(studio):
+    """True while a backup is running right now that may still be working on THIS backup's folders (a rename or a
+    join asks before it moves anything, Nov 23: the report's Rename and the Name your shoots page can be reached
+    while a page-started backup is still sorting or putting its shoots away). A backup that has settled is
+    finished with its folders, so a backup of another card never holds up a rename of an older one. One that has
+    not settled counts as this one unless the running backup plainly has another name."""
+    try:    # a page-started job that is alive and is about this very backup: between its steps too (the moment
+        # after the shoots are put away and before its second copy has begun, when nothing else holds a lock)
+        job = job_running()
+        session = ((job or {}).get("private") or {}).get("session")
+        if job is not None and session:
+            mine = Path(studio)
+            mine = mine.parent.name if mine.name == "_studio" else mine.name
+            if mine and mine == Path(session).name:
+                return True
+    except (OSError, TypeError, ValueError):
+        pass
+    info = running()
+    if info is None:
+        return False
+    try:
+        studio = Path(studio)
+        if (studio / "settled.json").exists():
+            return False
+        name = " ".join(str(info.get("name") or "").split())
+        mine = studio.parent.name if studio.name == "_studio" else studio.name
+        if name and mine and not (mine == name or mine.endswith(" " + name)):
+            return False
+    except OSError:
+        pass
+    return True
+
+
 def reading_card(card):
     """True while a backup is running that was started on this very card (eject_card.py asks before it lets go):
     night.py itself, or a page-started job between two of its steps. A backup whose note cannot be read just now

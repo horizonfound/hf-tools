@@ -95,6 +95,14 @@ HERS_NOT_TRUE = {
 # Ours: drafts for Dustin and Nicole.
 OUR_WORDS = {
     "found_one": "We found 1 shoot on your card. Give it a name, or do it later.",
+    # a FOLDER was backed up (Back up a folder instead): no memory card in any line
+    "found_folder": "We found {n} shoots in your folder, sorted by when you took them. Give each one a name, or do it later.",
+    "found_one_folder": "We found 1 shoot in your folder. Give it a name, or do it later.",
+    "safe_folder": "✓ Every photo is copied and checked on {where}.",
+    "safe_folder_and": "✓ Every photo is copied and checked on {where} and {second}.",
+    # the name typed in the Back up a card box before the backup, when the card turned out to hold several shoots
+    # (so the backup could not know which one it was for): said back, never put on a shoot by guessing
+    "typed_before": "Before the backup you typed “{name}”. Put it on the shoot it belongs to.",
     "note": ("Each folder gets its name, and the photos in it start with the first word of that name, like "
              "{example}. The camera's own name stays inside."),
     "each_own": "Each in its own folder, in Your backups.",
@@ -175,7 +183,7 @@ const AGAIN = new URLSearchParams(location.search).get('again') === '1';
 const $ = id => document.getElementById(id);
 const fill = (t, o) => String(t).replace(/\{(\w+)\}/g, (m, k) => (k in o ? o[k] : m));
 const q = '?backup=' + encodeURIComponent(BACKUP);
-let D = null, MINI = false, NAMES = {}, MINI_NAME = '', FORM = AGAIN, timer = null, SAY = '';
+let D = null, MINI = false, NAMES = {}, MINI_NAME = '', MINI_TOUCHED = false, FORM = AGAIN, timer = null, SAY = '';
 
 function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function clean(n){ return String(n).replace(/[\\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim(); }
@@ -199,7 +207,8 @@ function pics(s, only){
 function form(){
   head(false);
   const top = $('top'); top.textContent = '';
-  $('sub').textContent = D.shoots.length === 1 ? W.found_one : fill(W.found, {n: D.shoots.length});
+  $('sub').textContent = D.shoots.length === 1 ? (D.from_folder ? W.found_one_folder : W.found_one) : fill(D.from_folder ? W.found_folder : W.found, {n: D.shoots.length});
+  if (D.typed){ const tp = el('p', 'note', fill(W.typed_before, {name: D.typed})); tp.id = 'typed'; top.appendChild(tp); if (!MINI_NAME && !MINI_TOUCHED) MINI_NAME = D.typed; }
   if (D.shoots.length > 1){
     const l = el('label', 'mini'), c = el('input'); c.type = 'checkbox'; c.id = 'mini'; c.checked = MINI;
     c.onchange = () => { MINI = c.checked; SAY = ''; form(); };
@@ -212,7 +221,7 @@ function form(){
     const i = el('input'); i.id = 'name-mini'; i.maxLength = 120; i.placeholder = W.mini_placeholder; i.value = MINI_NAME; i.setAttribute('aria-label', W.mini_placeholder);
     const pv = el('small', 'pv');
     const show = () => { pv.textContent = fill(W.folder, {name: folderFor(D.mini_tpl, i.value.trim() || W.mini_default, D.space)}); };
-    i.oninput = () => { MINI_NAME = i.value; show(); }; show();
+    i.oninput = () => { MINI_NAME = i.value; MINI_TOUCHED = true; show(); }; show();
     r.appendChild(i); r.appendChild(pv); b.appendChild(th); b.appendChild(r); top.appendChild(b);
   } else {
     D.shoots.forEach(s => {
@@ -524,7 +533,10 @@ def facts(studio):
                 second = second_copy.drive_name(second_copy.has_second(_json(studio / "manifest.json", {}) or {}))
             except Exception:  # noqa: BLE001
                 second = None
-        safe_line = WORDS["safe_and"].format(where=where, second=second) if second else WORDS["safe"].format(where=where)
+        if st.get("folder"):
+            safe_line = OUR_WORDS["safe_folder_and"].format(where=where, second=second) if second else OUR_WORDS["safe_folder"].format(where=where)
+        else:
+            safe_line = WORDS["safe_and"].format(where=where, second=second) if second else WORDS["safe"].format(where=where)
     elif st.get("sample"):
         safe_line = OUR_WORDS["sample"]
     elif not st.get("known"):
@@ -540,6 +552,7 @@ def facts(studio):
                 pass
         return MARK
 
+    by_time = str((_json(studio / "shoots.json", {}) or {}).get("decided_by") or "").startswith("the backup")
     shoots, total_p, total_c, first_when, example = [], 0, 0, None, None
     for s in sh:
         if not isinstance(s, dict) or not s.get("id") or not s.get("folder"):
@@ -557,15 +570,38 @@ def facts(studio):
             if f:
                 parts = Path(f).name.split("_", 2)
                 example = "Name_0001_" + (parts[2] if len(parts) == 3 and parts[1].isdigit() else Path(f).name)
+        # a name they gave: on the report or here (names.json), or typed in the Back up a card box and used by
+        # the backup because the card held one shoot ("placeholder": false). Never a stand-in like "Shoot 1".
+        given = names.get(s["id"]) or (s.get("suggested") if by_time and s.get("placeholder") is False else "")
         shoots.append({"id": str(s["id"]), "when": when_words(when, ends[-1] if ends else when) if when else "",
-                       "count": clips.words(n_p, n_c), "named": " ".join(str(names.get(s["id"]) or "").split()),
+                       "count": clips.words(n_p, n_c), "named": " ".join(str(given or "").split()),
                        "folder": str(s["folder"]), "tpl": tpl(when), "pics": len(shoot_pics(studio, s, groups))})
     note = WORDS["keep_names"] if keep_names else OUR_WORDS["note"].format(example=example or "Name_0001_IMG_4471.JPG")
     return {"ok": True, "backup": backup_name(studio), "safe": st.get("safe") is True, "safe_line": safe_line,
             "shoots": shoots, "mark": MARK, "space": naming.get("space", " "), "mini_tpl": tpl(first_when),
             "mini_all": WORDS["mini_all"].format(count=clips.words(total_p, total_c)), "note": note,
             "another": ANOTHER_CARD, "job": job_for_page(studio),
+            "from_folder": bool(st.get("folder")), "typed": typed_before(studio, shoots),
             "half": half_done(studio) == "half", "stuck": half_done(studio) == "stuck"}
+
+
+TYPED_MARK = "Shoot name typed before the backup: "   # night.py's own line in told.json (the by-time backup)
+
+
+def typed_before(studio, shoots):
+    """The name typed in the Back up a card box that the backup could not put on a shoot (the card held several),
+    or "" (none typed, or a shoot already carries it)."""
+    try:
+        text = (_json(Path(studio) / "told.json", {}) or {}).get("text") or ""
+    except AttributeError:
+        return ""
+    name = ""
+    for ln in str(text).splitlines():
+        if ln.startswith(TYPED_MARK):
+            name = " ".join(ln[len(TYPED_MARK):].split())[:NAME_MAX]
+    if not name or any(s.get("named") == name for s in shoots):
+        return ""
+    return name
 
 
 def folder_for(naming, name, when):
@@ -836,7 +872,7 @@ def page_html(backup):
     words = {k: W(k) for k in ("title", "title_done", "found", "found_one", "mini", "placeholder", "mini_placeholder",
                                "mini_default", "folder", "save", "later", "another", "another_note", "see_all",
                                "each_own", "one_folder", "saving", "saving_one", "saving_mini", "leave", "cant", "change", "half", "finish", "finishing",
-                               "needs_look")}
+                               "needs_look", "found_folder", "found_one_folder", "typed_before")}
     data = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")  # noqa: E731
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

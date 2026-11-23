@@ -2109,6 +2109,25 @@ def check_nov23_engine():
                               "\"placeholder\": true", "the backup, by time", "the file's own time")))
     case("after-the-report.md offers no note and names the first look",
          "Never offer one" in a and "A first look at your shoot." in a)
+def check_nov23_whole():
+    """The four Nov 23 lanes together: the instructions say what the wired pages and scripts really do."""
+    print("\nNov 23, the lanes together: Try again, a second copy not made, a backup still being made, the typed name")
+    b, a = read(SM / "parts" / "backup.md"), read(SM / "parts" / "after-the-report.md")
+    sys.path.insert(0, str(SM / "scripts"))
+    import backup_popup as bp
+    import backup_lock
+    import name_shoots
+    two = b[b.find("## Two ways to start a backup"):b.find('## When they say "backup now"')]
+    case("backup.md: a stopped page backup has Try again on the home card, as the page words it, and it starts the same backup again",
+         "**Try again**" in two and bp.OUR_WORDS["try_again"] == "Try again" and "under the same name" in two)
+    case("... a second copy that was not made leaves the backup Done, says so on the card in the page's words, and points at Make a second copy",
+         '"' + bp.OUR_WORDS["second_not"] + '"' in two and "**Make a second copy**" in two and "the backup itself is whole" in two)
+    case("after-the-report.md: nothing is renamed or joined while a backup is still being made, in the scripts' own line",
+         backup_lock.BEING_MADE in a and "A second copy of this backup is being made right now. Try this again when it's done." in a and "never work around it" in a)
+    case("... placeholder names are never typed into a box, and the name typed before the backup is said back as the page says it",
+         '"Folder: Shoot 1_11-22-26"' in a and name_shoots.OUR_WORDS["typed_before"].format(name="Aurora") in a and "never guesses which shoot" in a)
+
+
 def check_backup_box_nov23():
     """Back up a card is a box on the home page that starts the backup itself (Nicole's v31; built Nov 23)."""
     hello, backup, skill, where = (re.sub(r"\s+", " ", read(SM / "parts" / n)) for n in ("hello.md", "backup.md", "../SKILL.md", "where-things-live.md"))
@@ -2140,7 +2159,7 @@ def check_backup_box_nov23():
 def main():
     for fn in (check_reel_words, check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders, check_nov23_engine, check_backup_box_nov23):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders, check_nov23_engine, check_backup_box_nov23, check_nov23_whole):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

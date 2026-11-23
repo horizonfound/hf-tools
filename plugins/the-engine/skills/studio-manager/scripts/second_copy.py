@@ -129,6 +129,8 @@ OUR_WORDS = {
                  "shoots. Finish the backup first."),
     "mid_rename": ("One of this backup's shoots is part way through being renamed. Tell the Assistant, and once "
                    "that's finished the second copy can be made."),
+    "mid_join": ("Shoots in this backup are part way through being put in one folder. Tell the Assistant, and once "
+                 "that's finished the second copy can be made."),
     "has_one": "This backup already has a second copy, on {drive}. Nothing to do.",
     "has_one_elsewhere": "This backup already has a second copy, on {drive}. I keep one second copy of a backup.",
     "busy": "A second copy is already being made. One at a time: try again when it's done.",
@@ -1259,7 +1261,7 @@ def preflight(arg, to):
         except (OSError, ValueError):
             why = "unreadable"
         if why:
-            key = "mid_rename" if "rename" in why else "unsorted"
+            key = "mid_rename" if "rename" in why else "mid_join" if "join" in why else "unsorted"
             raise Refused(key, OUR_WORDS[key])
     # never onto the card, never inside the backup, never onto the drive the photos are on
     card = Path(manifest["source"]) if manifest.get("source") else None

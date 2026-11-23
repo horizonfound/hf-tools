@@ -239,6 +239,12 @@ def make_plan(session, studio, ids, name=None):
         why = in_use(studio, chosen, names)
         if why:
             raise Stop(why)
+    try:    # a backup that is still sorting or putting these very folders away: wait until it is done
+        import backup_lock
+        if backup_lock.working_on(studio):
+            raise Stop(backup_lock.BEING_MADE)
+    except (ImportError, AttributeError):
+        pass
     try:    # a join while a second copy reads the same folders could make that copy miss a photo: wait
         import second_copy
         if second_copy.status(studio).get("state") == "copying":

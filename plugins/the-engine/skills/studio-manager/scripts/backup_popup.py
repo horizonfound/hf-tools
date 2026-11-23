@@ -55,7 +55,7 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JOB_FILE = HOME / "backup-job.json"
 
 GET_ROUTES = ("/backup-popup", "/backup-job", "/backup-report")
-POST_ROUTES = ("/backup-folders", "/backup-folder-new", "/backup-pick", "/backup-naming", "/backup-start")
+POST_ROUTES = ("/backup-folders", "/backup-folder-new", "/backup-pick", "/backup-naming", "/backup-start", "/backup-again")
 POST_CAP = 6000                 # a folder's path as names, a few hundred bytes; never more
 LIST_MAX = 400                  # folders shown in one listing
 SCAN_MAX = 6000                 # entries looked at in one folder before it says "there are more"
@@ -175,6 +175,15 @@ OUR_WORDS = {
     "problem_head": "The backup stopped before it finished.",
     "problem_do": "Tap here and press Start the backup again. Photos already copied are checked, not copied again.",
     "problem_do_open": "Press Start the backup again. Photos already copied are checked, not copied again.",
+    # a backup the page's own job stopped on: the job's lines say "press Try again", so the card has that button.
+    # It starts the same backup again (same card or folder, same place, same second drive), under the same name.
+    "try_again": "Try again",
+    "problem_again": "Photos already copied are checked, not copied again.",
+    "again_gone": "I can't start that one again from here. Tap Back up a card and press Start the backup.",
+    # the second copy while it is being made, with how far it is
+    "second_count": "Making your second copy ({done} of {total})",
+    # the second copy asked for with this backup did not finish: the backup itself is whole, and the card says so
+    "second_not": "Second copy not made",
     # the tiles
     "card_plain": "Your card",
     "folder_small": "Your folder",
@@ -573,6 +582,9 @@ def note_start(from_folder):
 def started_from_folder(rec):
     if rec.get("source") == "folder":
         return True
+    private = rec.get("private")
+    if isinstance(private, dict) and isinstance(private.get("is_card"), bool):
+        return not private["is_card"]       # the job's own record says what it was started on (backup_job.py)
     try:
         note = json.loads(START_NOTE.read_text(encoding="utf-8"))
         a = datetime.fromisoformat(str(note["at"])[:19])
@@ -676,7 +688,8 @@ def job_view(rec=None):
         if v["step"] == "sorting":
             v.update(head=W("sorting"), sub=W("almost"), frac=1.0)
         elif v["step"] == "second":
-            v.update(head=W("second_step"), sub=W("second_sub").format(drive=second) if second else "", frac=1.0)
+            v.update(head=W("second_count").format(done=f"{min(done, total):,}", total=f"{total:,}") if total else W("second_step"),
+                     sub=W("second_sub").format(drive=second) if second else "", frac=(min(done, total) / total) if total else 0.0)
         else:
             v["step"] = "copying"
             v.update(head=W("copying").format(done=f"{min(done, total):,}", total=f"{total:,}") if total else W("copying_plain"),
@@ -700,6 +713,14 @@ def job_view(rec=None):
                 pass
         v["checked"], v["sample"] = checked, sample
         v["steps"] = [{"t": t, "dn": True, "on": False} for _, t in names]
+        # what the job itself has to say about a finished backup, in its own plain words (never a path): the card
+        # was already backed up, files set aside, nothing could be sorted, a second copy that did not finish
+        v["note"] = " ".join(str(rec.get("line") or "").split())[:700]
+        if second and rec.get("second_ok") is False:
+            v["second_bad"] = True
+            v["steps"] = [{"t": W("second_not") if k == "second" else t, "dn": k != "second", "on": False, "bad": k == "second"} for k, t in names]
+            if not v["note"]:
+                v["note"] = " ".join(str(rec.get("second_line") or "").split())[:700]
         if checked:
             found = (W("found_one_folder") if shoots == 1 else W("found_many_folder").format(n=shoots)) if from_folder else \
                     (W("found_one") if shoots == 1 else W("found_many").format(n=shoots))
@@ -717,7 +738,44 @@ def job_view(rec=None):
     line = " ".join(str(rec.get("line") or "").split())[:300]
     v.update(head=line or W("problem_head"), sub=W("problem_do"), sub_open=W("problem_do_open"), bad=True,
              link={"kind": "report", "words": W("see_report")} if _records(rec) is not None else None)
+    if _again_ask(rec) is not None:         # the page's own job: Try again starts the same backup again
+        v.update(again=W("try_again"), sub=W("problem_again"), sub_open=W("problem_again"))
     return v
+
+
+def _again_ask(rec):
+    """What Try again would start, from the job's own record (never from a page): (source, dest, second, shoot
+    name), or None when the record does not say (then the card keeps its "press Start the backup again" line)."""
+    p = rec.get("private") if rec.get("state") == "problem" else None
+    if not isinstance(p, dict) or not isinstance(p.get("source"), str) or not isinstance(p.get("dest"), str) or not p["source"] or not p["dest"]:
+        return None
+    second = p.get("second") if isinstance(p.get("second"), str) and p.get("second") else None
+    name = p.get("shoot_name") if isinstance(p.get("shoot_name"), str) and p.get("shoot_name") else None
+    return p["source"], p["dest"], second, name
+
+
+def again():
+    """POST /backup-again. The backup that stopped is started again exactly as it was asked for (the job's own
+    record holds what that was; the page sends nothing), so it carries on under the same name: what is already
+    copied is checked, not copied again. Answers {"ok", "words", "job"}."""
+    rec = job_record()
+    if rec.get("state") == "running":
+        return {"ok": False, "running": True, "words": W("already"), "job": job_view()}
+    ask = _again_ask(rec)
+    mod = job_module()
+    if ask is None or mod is None or not hasattr(mod, "start"):
+        return {"ok": False, "words": W("again_gone"), "job": job_view()}
+    source, dest, second, name = ask
+    try:
+        ans = mod.start(source, dest, second=second, shoot_name=name)
+    except (Exception, SystemExit) as e:  # noqa: BLE001
+        _log(f"the backup could not be started again ({e.__class__.__name__}: {str(e)[:120]})")
+        return {"ok": False, "words": W("cant_start"), "job": job_view()}
+    if not isinstance(ans, dict) or not ans.get("ok"):
+        why = " ".join(str((ans or {}).get("why") or "").split())[:300] if isinstance(ans, dict) else ""
+        return {"ok": False, "words": why or W("cant_start"), "job": job_view()}
+    _log("a backup that stopped was started again from the home page")
+    return {"ok": True, "job": job_view()}
 
 
 def card_box(view=None):
@@ -733,10 +791,13 @@ def card_box(view=None):
                 f"<small>{e(v.get('sub') or '')}</small><small class='nw'>{e(W('no_wait'))}</small></div>")
     link = v.get("link")
     lk = f" · <button type='button' class='lk' data-bk='{e(link['kind'], quote=True)}'>{e(link['words'])}</button>" if link else ""
+    if v.get("again"):
+        lk = f" · <button type='button' class='lk' data-bk='again'>{e(v['again'])}</button>" + lk
     if not (v.get("sub") or ""):
         lk = lk[3:]
     cls = "bad" if v.get("bad") else "dn"
-    return f"<div class='bk'><b class='{cls}'>{e(v['head'])}</b><small>{e(v.get('sub') or '')}{lk}</small></div>"
+    note = f"<small class='nt'>{e(v['note'])}</small>" if v.get("note") else ""
+    return f"<div class='bk'><b class='{cls}'>{e(v['head'])}</b><small>{e(v.get('sub') or '')}{lk}</small>{note}</div>"
 
 
 def state():
@@ -940,6 +1001,15 @@ def handle_post(handler, path, query):
                 if not folder:
                     return _send(handler, {"ok": False, "cancelled": why == "cancelled", "words": "" if why == "cancelled" else W("no_window")})
                 return _send(handler, picked_in_window(folder))
+            if path == "/backup-again":
+                if body != {}:
+                    raise Refused(arrange.NOT_UNDERSTOOD, 400)
+                if not _STARTING.acquire(blocking=False):
+                    return _send(handler, {"ok": False, "words": W("starting")})
+                try:
+                    return _send(handler, again())
+                finally:
+                    _STARTING.release()
             if path == "/backup-start":
                 if not _STARTING.acquire(blocking=False):
                     return _send(handler, {"ok": False, "words": W("starting")})
@@ -1097,13 +1167,25 @@ const BK = (function(){
 
   // how it is going: the same few lines on the home card and in the box
   function linkBtn(v){ if (!v.link) return null; const b = btn('lk', v.link.words); b.dataset.bk = v.link.kind; b.onclick = e => { e.stopPropagation(); go(v.link.kind, b); }; return b; }
+  // a backup the job stopped on: Try again starts the same one again (the Assistant knows what it was; the page sends nothing)
+  function againBtn(v){ if (!v.again) return null; const b = btn('lk', v.again); b.dataset.bk = 'again'; b.onclick = e => { e.stopPropagation(); tryAgain(b); }; return b; }
+  async function tryAgain(b){
+    if (busy) return; busy = true; b.disabled = true;
+    const d = await post('/backup-again', {}); busy = false; b.disabled = false;
+    if (d && d.job) job = d.job;
+    if (d && (d.ok || d.running)) { MSG = ''; paintCard(); if (!box.hidden) draw(); soon(300); return; }
+    const say = (d && d.words) || BW.cant_start;
+    if (!box.hidden) { MSG = say; draw(); } else { paintCard(); note(n1, say); }
+  }
+  function tail(v, sm, sub){ const ab = againBtn(v), lb = linkBtn(v); let any = !!sub;
+    [ab, lb].forEach(x => { if (!x) return; if (any) sm.append(' \u00b7 '); sm.append(x); any = true; }); }
   function barOf(v){ const bar = el('div', 'bar2'), i = el('i'); i.style.width = Math.round(100 * (v.frac || 0)) + '%'; bar.append(i); return bar; }
   function paintCard(){
     if (!job || !job.show) return;
     const k = el('div', 'bk'), v = job;
     if (v.state === 'running') { k.append(el('b', '', v.head), barOf(v), el('small', '', v.sub || ''), el('small', 'nw', BW.no_wait)); }
-    else { k.append(el('b', v.bad ? 'bad' : 'dn', v.head)); const sm = el('small', '', v.sub || ''); const lb = linkBtn(v);
-      if (lb) { if (v.sub) sm.append(' \u00b7 '); sm.append(lb); } k.append(sm); }
+    else { k.append(el('b', v.bad ? 'bad' : 'dn', v.head)); const sm = el('small', '', v.sub || ''); tail(v, sm, v.sub); k.append(sm);
+      if (v.note) k.append(el('small', 'nt', v.note)); }
     n1.textContent = ''; n1.append(k); n1.dataset.bk = '1'; s1.classList.remove('live');
   }
   function prog(){
@@ -1111,9 +1193,10 @@ const BK = (function(){
     p.append(el('b', v.state === 'running' ? '' : (v.bad ? 'bad' : 'dn'), v.head));
     if (v.state === 'running') p.append(barOf(v));
     if ((v.steps || []).length) { const st = el('div', 'bksteps'); v.steps.forEach((x, i) => { if (i) st.append(el('span', '', '\u00b7'));
-      st.append(el('span', x.dn ? 'dn' : x.on ? 'on' : '', (x.dn ? '\u2713 ' : '') + x.t)); }); p.append(st); }
+      st.append(el('span', x.bad ? 'bad' : x.dn ? 'dn' : x.on ? 'on' : '', (x.dn ? '\u2713 ' : '') + x.t)); }); p.append(st); }
     const sub = v.state === 'problem' ? (v.sub_open || v.sub) : v.state === 'done' ? [v.safe_format ? BW.safe_format : '', v.backed || '', v.sub || ''].filter(Boolean).join(' ') : (v.sub || '');
-    const sm = el('small', '', sub); const lb = linkBtn(v); if (lb) { if (sub) sm.append(' \u00b7 '); sm.append(lb); } p.append(sm);
+    const sm = el('small', '', sub); tail(v, sm, sub); p.append(sm);
+    if (v.state === 'done' && v.note) p.append(el('small', 'nt', v.note));
     if (v.state === 'running') p.append(el('small', 'nw', BW.run_nw));
     return p;
   }
@@ -1300,7 +1383,7 @@ const BK = (function(){
   s1.addEventListener('click', e => { if (e.target.closest('a, button')) return; e.preventDefault(); open(); });
   s1.addEventListener('keydown', e => { if (e.target !== s1) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clicked('backup'); open(); } });
   // the box the server drew on the card (a reload while a backup runs or has just finished): its link works too
-  n1.querySelectorAll('button[data-bk]').forEach(b => { b.onclick = e => { e.stopPropagation(); go(b.dataset.bk, b); }; });
+  n1.querySelectorAll('button[data-bk]').forEach(b => { b.onclick = e => { e.stopPropagation(); if (b.dataset.bk === 'again') tryAgain(b); else go(b.dataset.bk, b); }; });
   if (live) soon(job && job.state === 'running' ? 800 : 2500);
   return {open, close, state: () => ({S, job, DEST, PICK, LIST, SECOND})};
 })();

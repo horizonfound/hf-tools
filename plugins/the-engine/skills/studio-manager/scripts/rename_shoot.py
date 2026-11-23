@@ -588,7 +588,32 @@ def main():
 RENAME_WAIT = float(os.environ.get("STUDIO_RENAME_WAIT_FOR_TESTS") or 120)   # seconds a rename waits its turn
 
 
+def being_made(studio):
+    """The plain line when this backup is still being made, or its second copy is being made right now (so a
+    rename waits: nothing is moved under a copy that is reading these folders); None when a rename may go ahead."""
+    try:
+        import backup_lock
+        if backup_lock.working_on(studio):
+            return backup_lock.BEING_MADE
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import second_copy
+        if second_copy.status(studio).get("state") == "copying":
+            return "A second copy of this backup is being made right now. Try this again when it's done."
+    except (ImportError, AttributeError):
+        pass
+    except Exception:  # noqa: BLE001  (a second copy that cannot be asked about never stops a rename)
+        pass
+    return None
+
+
 def work(a, session, studio, join_shoots):
+    if not a.dry_run:
+        why = being_made(studio)
+        if why:
+            say("STOP: " + why)
+            sys.exit(2)
     finish_unfinished(session, studio)
     if join_shoots is not None:   # a join of two shoots that was cut off is finished first too, from its own log
         join_shoots.finish_unfinished(session, studio)

@@ -2591,7 +2591,7 @@ class Handler(SimpleHTTPRequestHandler):
             # create_dialog.py checks each the way arrange.py does
             import create_dialog
             return create_dialog.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/backup-folders", "/backup-folder-new", "/backup-pick", "/backup-naming", "/backup-start"):
+        if path in ("/backup-folders", "/backup-folder-new", "/backup-pick", "/backup-naming", "/backup-start", "/backup-again"):
             # the home page's Back up a card box: the folder browser, the naming, and Start the backup.
             # backup_popup.py checks each the way arrange.py does
             import backup_popup

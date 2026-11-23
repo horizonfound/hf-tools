@@ -526,10 +526,14 @@ def check_job(w):
     w.job(state="running", step="sorting", done=181, total=181)
     v = view()
     case("sorting: \"Sorting into shoots\", the bar full", v["head"] == "Sorting into shoots" and v["frac"] == 1.0 and [s["dn"] for s in v["steps"]] == [True, False, False], v)
-    w.job(state="running", step="second", done=181, total=181, second="LaCie")
+    w.job(state="running", step="second", done=0, total=0, second="LaCie")
     v = view()
     case("a second copy asked for: \"Making your second copy\" is a step of its own, after the sorting", v["head"] == "Making your second copy" and "LaCie" in v["sub"]
          and [s["t"] for s in v["steps"]] == ["Copying and checking", "Sorting into shoots", "Making your second copy", "Done"] and v["second"] == "LaCie", v)
+    w.job(state="running", step="second", done=3, total=10, second="LaCie")
+    v = view()
+    case("... with how far the second copy is, once the job says (its own count, the bar following it)",
+         v["head"] == "Making your second copy (3 of 10)" and abs(v["frac"] - 0.3) < 1e-9, v)
     rec = w.records()
     now = datetime.now().isoformat(timespec="seconds")
     w.job(state="done", step="done", done=181, total=181, shoots=3, records=str(rec), finished=now)
@@ -561,6 +565,49 @@ def check_job(w):
          and "Start the backup again" in v["sub"] and v["bad"] is True and v["show"], v)
     w.job(state="problem", line="", finished=now)
     case("... with no words from the job: ours", view()["head"] == "The backup stopped before it finished.")
+    # the real job's record (backup_job.py): what was asked is kept under "private", so the card has Try again
+    case("a stopped backup whose record does not say what was asked has no Try again", "again" not in view())
+    private = {"pid": 1, "source": str(w.card), "dest": str(w.gpapa / "CLIENT WORK"), "second": str(w.lacie), "shoot_name": "Aurora", "is_card": True}
+    w.job(state="problem", step="copying", done=40, total=181, finished=now, private=private,
+          line="The backup stopped before it finished. Nothing is lost: press Try again and it picks up where it left off.")
+    v = view()
+    case("the job's own stopped backup: Try again on the card, and no line telling them to press Start the backup again",
+         v.get("again") == "Try again" and "Start the backup again" not in json.dumps(v) and "press Try again" in v["head"] and no_path(w, v) and "private" not in v, v)
+    box = bp_card_box()
+    case("... drawn by the server on a reload too, as a button", "data-bk='again'>Try again</button>" in box and "class='bad'" in box, box)
+    had = len(w.calls())
+    code, d = w.post("/backup-again", {"source": "/tmp/x"})
+    case("Try again takes nothing from the page (a body with anything in it is refused, nothing started)", code == 400 and len(w.calls()) == had, d)
+    code, d = w.post("/backup-again", {}, headers={"Origin": "http://evil.example"})
+    case("... and another website can't press it", code == 403 and len(w.calls()) == had, d)
+    code, d = w.post("/backup-again", {})
+    last = (w.calls() or [{}])[-1]
+    case("Try again starts the same backup again: the same card, the exact same folder, the same second drive and name, from the record",
+         code == 200 and d.get("ok") is True and len(w.calls()) == had + 1 and last == {"source": str(w.card), "dest": str(w.gpapa / "CLIENT WORK"),
+                                                                                       "second": str(w.lacie), "shoot_name": "Aurora"}
+         and d["job"]["state"] == "running" and no_path(w, d), (code, d, last))
+    code, d = w.post("/backup-again", {})
+    case("... pressed again while it runs: nothing more is started", d.get("ok") is False and d.get("running") is True and len(w.calls()) == had + 1, d)
+    w.job(state="done", step="done", shoots=3, records=str(rec), finished=now)
+    code, d = w.post("/backup-again", {})
+    case("... and there is nothing to try again on a backup that finished", d.get("ok") is False and len(w.calls()) == had + 1 and d.get("words"), d)
+    # a folder, said by the job's own record; a second copy that did not finish; what the job has to add
+    w.job(state="done", step="done", shoots=2, records=str(rec), finished=now, private={"source": "x", "dest": "y", "is_card": False})
+    v = view()
+    case("the job's record says it was a folder: \"in your folder\", and nothing is called safe to format",
+         v["from_folder"] is True and v["sub"] == "We found 2 shoots in your folder" and v["safe_format"] is False, v)
+    line = "3 files that are not a photo were set aside. Your photos are backed up and checked. The second copy isn't made yet: LaCie already has a folder called Shoot 1."
+    w.job(state="done", step="done", shoots=3, records=str(rec), finished=now, second="LaCie", second_ok=False, second_line="x", line=line)
+    v = view()
+    steps = {s["t"]: s for s in v["steps"]}
+    case("a second copy that did not finish: the backup is still Done and checked, the second step is NOT ticked, and the job's own words are on the card",
+         v["head"] == "Done. Every photo checked." and v.get("second_bad") is True and steps["Second copy not made"]["dn"] is False
+         and steps["Second copy not made"].get("bad") is True and steps["Sorting into shoots"]["dn"] is True and v["note"] == line, v)
+    box = bp_card_box()
+    case("... on a reload too", "<small class='nt'>" in box and "The second copy isn&#x27;t made yet" in box, box)
+    w.job(state="done", step="done", shoots=3, records=str(rec), finished=now, second="LaCie", second_ok=True, line="")
+    v = view()
+    case("a second copy that was made: every step ticked, nothing more to say", all(s["dn"] for s in v["steps"]) and not v.get("second_bad") and v["note"] == "", v)
     import backup_popup as bp
     w.job(state="running", step="copying", done=3, total=5)
     box = bp.card_box()
@@ -574,6 +621,11 @@ def check_job(w):
     case("a listing that takes too long is given up on, not waited for", _slow(bp))
     code, d = w.get("/backup-report")
     case("the report of a job that is not there: plain words, no address", code == 200 and d["ok"] is False and d["words"], d)
+
+
+def bp_card_box():
+    import backup_popup as bp
+    return bp.card_box()
 
 
 def _slow(bp):
