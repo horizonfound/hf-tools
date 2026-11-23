@@ -533,8 +533,9 @@ def clashes(studio, names):
         if k in will and (new or will[k][1]):
             return OUR_WORDS["same_name"].format(name=new or will[k][1])
         will[k] = (s["id"], new)
-        if new and k not in mine and join_shoots.named_like(root, folder):
-            return OUR_WORDS["taken"].format(folder=folder, name=new)
+        there = join_shoots.named_like(root, folder) if new and k not in mine else []
+        if there:
+            return OUR_WORDS["taken"].format(folder=there[0], name=new)     # the folder as it is spelled on the drive
     return None
 
 
