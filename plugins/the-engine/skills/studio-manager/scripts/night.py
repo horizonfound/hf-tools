@@ -19,6 +19,13 @@ setup (no Studio File yet: ask their drive and naming, save with
 studio_file.py, run again) · 7 needs the first-look picks (read the pages it names,
 peek_sheets.py pick ..., run again).
 
+One backup at a time on this computer: a second start, from the chat or from a page, says "A backup is
+already running." (exit 2) and changes nothing (backup_lock.py).
+
+With --by-time nobody looks (a backup started from the home page, backup_job.py): the card is split into shoots
+wherever the camera was quiet for four hours, each shoot gets a placeholder name, and the six first-look photos
+are chosen by a script; it never stops with exit 4 or 7.
+
 Their drive, second copy and naming come from ~/.studio (studio_file.py), so
 after the first run the command is just:  night.py --source /Volumes/CARD
 A card the ledger (cards.py) already knows is not copied again.
@@ -30,6 +37,7 @@ import os
 import stat
 import subprocess
 import threading
+import unicodedata
 import time
 import sys
 from datetime import datetime
@@ -37,6 +45,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import backup_lock  # noqa: E402  (one backup at a time on this computer, from the chat or from a page)
 import cards  # noqa: E402
 import clips  # noqa: E402  (which files are video, and how to say a count)
 import studio_file  # noqa: E402
@@ -152,7 +161,7 @@ def run(script, *args):
     cmd = this_computer.awake_command([sys.executable, str(HERE / script), *map(str, args)])
     outputs = (("out", sys.stdout), ("err", sys.stderr))
     if not any(which in _GONE or _can_close(stream) for which, stream in outputs):
-        return subprocess.run(cmd).returncode   # a terminal or a file: exactly as before
+        return subprocess.run(cmd, **backup_lock.for_a_step()).returncode   # a terminal or a file: exactly as before
     for which, stream in outputs:
         if which in _GONE:
             continue
@@ -167,7 +176,7 @@ def run(script, *args):
              for which, stream in outputs}
     if route["out"] == subprocess.PIPE and route["err"] == subprocess.PIPE and _same_pipe(sys.stdout, sys.stderr):
         route["err"] = subprocess.STDOUT
-    p = subprocess.Popen(cmd, stdout=route["out"], stderr=route["err"])
+    p = subprocess.Popen(cmd, stdout=route["out"], stderr=route["err"], **backup_lock.for_a_step())
     relays = [threading.Thread(target=_relay, args=(src, which), daemon=True)
               for src, which in ((p.stdout, "out"), (p.stderr, "err")) if src is not None]
     for t in relays:
@@ -397,6 +406,90 @@ def check_shoots(studio):
     return None
 
 
+# ---------------------------------------------------------------- sorting with nobody looking (--by-time)
+# A backup started from the home page has no Claude turn, so nothing can read the contact sheet (exit 4) or the
+# first-look pages (exit 7). There the card is split by time alone, and the photographer names the shoots after.
+BY_TIME_GAP_MIN = 240           # Nicole, Nov 23: "i think the gap should be more like four hours"
+BY_TIME_NEW_DAY_SPLITS = False  # a new day alone starts no new shoot: a wedding that runs past midnight stays one.
+#                                 (Two days of shooting are always more than four quiet hours apart unless the
+#                                 camera kept going through midnight. Ours to turn round: True splits at midnight.)
+PLACEHOLDER = "Shoot {n}"       # ours, a draft: differs from shoot to shoot, carries no date (the folder naming adds it)
+BY_TIME = "the backup, by time"  # who decided the shoots and the first-look photos (decided_by, picked_by)
+
+
+def by_time_grouped(studio):
+    """Were the groups on record found the by-time way (four hours, midnight not a split)? A backup the chat
+    started and left at its look has 15-minute groups; picked up by a page it is grouped again."""
+    try:
+        g = json.loads((studio / "groups.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return float(g.get("gap_minutes") or 0) == float(BY_TIME_GAP_MIN) and bool(g.get("across_midnight")) == (not BY_TIME_NEW_DAY_SPLITS)
+
+
+def same_name(name):
+    """A name as a drive that ignores capitals AND the way an accent is spelled would compare it. "Zoë" can be
+    written with one letter for the ë or with an e and a mark after it; a Mac's drives list names the second way
+    (HFS+ always, like Big Kahuna) and treat both as one folder, so both must count as one name here too."""
+    return unicodedata.normalize("NFC", str(name)).casefold()
+
+
+def names_taken(folder):
+    """The names in a folder exactly as its listing has them, compared as the drive would (same_name)."""
+    try:
+        return {same_name(x.name) for x in Path(folder).iterdir()}
+    except OSError:
+        return set()
+
+
+def by_time_shoots(session, studio, shoot_name=None):
+    """Write shoots.json with nobody looking: one shoot per group, in time order. The name is what they typed
+    (--shoot-name) only when the card holds exactly one shoot; otherwise each shoot gets a placeholder that differs
+    from the others AND from every folder already where the shoots will settle (two shoots must never want one
+    folder: the settle would leave the whole backup in its day folder). What they typed is then kept word for word
+    with what they said about the card (told.json), for the naming afterwards. No recap: nobody looked."""
+    from sort import safe_folder
+    groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
+    naming = studio_file.load().get("naming", {})
+    taken = names_taken(Path(session).parent) | names_taken(session)
+    typed = " ".join(str(shoot_name or "").split())
+    shoots, n = [], 0
+    for i, g in enumerate(groups, 1):
+        def folder_of(name):
+            return safe_folder(studio_file.render(naming, name, g["start"])) if naming.get("folder_pattern") else safe_folder(name)
+        name = None
+        if typed and len(groups) == 1 and same_name(folder_of(typed)) not in taken:
+            name = typed
+        while name is None:
+            n += 1
+            cand = PLACEHOLDER.format(n=n)
+            if same_name(folder_of(cand)) not in taken:
+                name = cand
+        taken.add(same_name(folder_of(name)))
+        shoots.append({"id": f"s{i}", "suggested": name, "groups": [g["id"]], "photos": g.get("photos", g.get("count", 0)),
+                       "recap": "", "why": f"split by time: the camera was quiet for {BY_TIME_GAP_MIN // 60} hours or more before it"
+                       if i > 1 else "the first photos on the card",
+                       "placeholder": name != typed})
+    tmp = studio / "shoots.json.tmp"
+    tmp.write_text(json.dumps({"decided_by": BY_TIME, "gap_minutes": BY_TIME_GAP_MIN, "shoots": shoots}, indent=1, ensure_ascii=False), encoding="utf-8")
+    this_computer.replace(tmp, studio / "shoots.json")
+    used = bool(typed) and len(shoots) == 1 and shoots[0]["suggested"] == typed
+    if typed and not used:
+        # more than one shoot on the card (or the name is taken): the name waits for the naming afterwards
+        try:
+            import client_note
+            old = client_note.told(studio)
+            line = f"Shoot name typed before the backup: {typed}"
+            if line not in (old or ""):
+                tmp = studio / "told.json.tmp"
+                tmp.write_text(json.dumps({"text": ((old + "\n") if old else "") + line, "at": datetime.now().isoformat(timespec="seconds")},
+                                          indent=1, ensure_ascii=False), encoding="utf-8")
+                this_computer.replace(tmp, studio / "told.json")
+        except Exception:  # noqa: BLE001  (what they typed is a convenience; the backup goes on)
+            pass
+    return shoots, used
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source")
@@ -405,7 +498,10 @@ def main():
     ap.add_argument("--second", default=None)
     ap.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"))
     ap.add_argument("--session", help="an existing session folder, to continue")
-    ap.add_argument("--gap", default="15", help="quiet minutes that start a new group")
+    ap.add_argument("--gap", default=None, help="quiet minutes that start a new group (15; with --by-time, 240)")
+    ap.add_argument("--by-time", action="store_true", help="nobody looks: shoots are split by time alone (four quiet hours), named with placeholders, and the six first-look photos are chosen by a script; never stops with exit 4 or 7")
+    ap.add_argument("--no-second", action="store_true", help="make no second copy by itself, whatever second drive is on file (a backup started from a page: the page asks each time, and the job makes that copy afterwards)")
+    ap.add_argument("--shoot-name", default=None, help="with --by-time: the shoot's name, used only when the card holds exactly one shoot")
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
     ap.add_argument("--no-open", action="store_true", help="(kept for old callers; the report is never opened by the backup now)")
     ap.add_argument("--open", action="store_true", help="show the report of a finished backup in the browser (via serve_report.py in its own pane)")
@@ -415,7 +511,28 @@ def main():
     ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card; the card is never marked safe")
     ap.add_argument("--with", dest="with_", default=None, help="the first card's backup of this shoot: this card is linked to it, so the report shows every card on one page")
     a = ap.parse_args()
+    if a.gap is None:
+        a.gap = str(BY_TIME_GAP_MIN) if a.by_time else "15"
 
+    # One backup at a time on this computer, whoever started it (Nov 23). Asked before anything touches the card
+    # or the drive. A page-started job (backup_job.py) that is alive counts too, unless this run is its own.
+    job = backup_lock.job_running()
+    mine = job is not None and str((job.get("private") or {}).get("pid")) == os.environ.get("STUDIO_BACKUP_JOB", "")
+    other_job = job is not None and not mine
+    if a.check:
+        if other_job or backup_lock.running() is not None:
+            say("STOP, before anything is copied:")
+            say(f"  - {backup_lock.BUSY}")
+            sys.exit(2)
+    elif other_job or not backup_lock.take(a.source or a.session, a.name):
+        say("STOP, before anything is copied:")
+        say(f"  - {backup_lock.BUSY}")
+        sys.exit(2)
+
+    try:   # for the tests only: a wait with the lock held, so a test can stop the job that started this backup
+        time.sleep(float(os.environ.get("STUDIO_NIGHT_PAUSE_FOR_TESTS") or 0) if not a.check else 0)
+    except ValueError:
+        pass
     if this_computer.WINDOWS and a.source:
         a.source = str(this_computer.drive_root(a.source))   # unproven on a real PC: a bare "E:" is the top of drive E
     # Does the card answer at all? Asked first, before anything else looks at it (the first backup's own choice
@@ -431,12 +548,12 @@ def main():
     sf = studio_file.load()
     drives = sf.get("drives", {})
     dest_from_file = bool(a.source and not a.dest)       # the usual drive, not one named for this backup only
-    second_from_file = bool(a.source and a.second is None and drives.get("second"))
+    second_from_file = bool(a.source and a.second is None and drives.get("second") and not a.no_second)
     if a.source and not a.dest:
         a.dest = drives.get("session")
     second_missed = None
     first_choice = None
-    if a.source and a.second is None and drives.get("second"):
+    if a.source and a.second is None and drives.get("second") and not a.no_second:
         a.second = drives["second"]
         # The second drive they saved is not plugged in today (Dustin, Nov 19): the backup no longer stops for it.
         # It carries on with one copy, and the report's top says so beside the Make a second copy button. A
@@ -678,9 +795,11 @@ def main():
         run("previews.py", session, "--count", "12")
 
     # 3. groups and the sheet
-    if not fresh(studio / "groups.json", studio / "index.json"):
+    regroup = a.by_time and not (studio / "shoots.json").exists() and not by_time_grouped(studio)
+    if regroup or not fresh(studio / "groups.json", studio / "index.json"):
         say("3. Finding the shoots")
-        if run("groups.py", session, "--gap", a.gap) != 0:
+        extra = ["--across-midnight"] if a.by_time and not BY_TIME_NEW_DAY_SPLITS else []
+        if run("groups.py", session, "--gap", a.gap, *extra) != 0:
             sys.exit(1)
     else:
         say("3. Groups are there")
@@ -691,7 +810,7 @@ def main():
     groups = json.loads((studio / "groups.json").read_text(encoding="utf-8"))["groups"]
     # groups of nothing but video clips: three frames from each clip (start, middle, end) on pages of their
     # own, so the look can tell what happens in them and name them for it (Dustin, Nov 11). A Mac only for now.
-    if not (studio / "clip-sheets.json").exists() and any(g.get("clips") and not g.get("photos") for g in groups):
+    if not a.by_time and not (studio / "clip-sheets.json").exists() and any(g.get("clips") and not g.get("photos") for g in groups):
         run("clips.py", "sheets", session)
 
     # 3b. sideways video clips stand up in the backup copy (Dustin, Nov 11). The card is never changed; the copy
@@ -702,7 +821,12 @@ def main():
         if run("clips.py", "rotate", session) != 0:
             sys.exit(1)
 
-    # 4. Claude's one look
+    # 4. Claude's one look; or, with nobody looking, the shoots by time
+    if a.by_time and not (studio / "shoots.json").exists():
+        made, used = by_time_shoots(session, studio, a.shoot_name)
+        say(f"4. Shoots by time: {len(made)} (a new shoot wherever the camera was quiet for {BY_TIME_GAP_MIN // 60} hours)")
+        if a.shoot_name and not used:
+            say("   (the shoot name typed before the backup is kept for the naming afterwards: the card holds more than one shoot, or that name is taken)")
     if not (studio / "shoots.json").exists():
         say("\n4. NEEDS A LOOK. Read this image: " + str(studio / "groups-sheet.png"))
         say("   One row per group, in this order:")
@@ -756,6 +880,12 @@ def main():
             # sneak peeks are photos only: a shoot of nothing but video clips has none, and is never asked about
             none = [sh["name"] for sh in sheets.values() if not sh.get("moments")]
             sheets = {sid: sh for sid, sh in sheets.items() if sh.get("moments")}
+            if a.by_time and sheets:
+                # nobody looking: the six are chosen by a script, spread across each shoot's moments (never Claude)
+                say("6b. Choosing six first-look photos per shoot, by script")
+                if run("peek_sheets.py", "auto", studio) != 0:
+                    say("   (the first-look photos could not be chosen; the report shows three previews per shoot instead)")
+                sheets = {}
             if none and not sheets:
                 say("6b. No photos on this card, only video clips, so there are no first-look photos to pick.")
             elif none:
@@ -801,7 +931,8 @@ def main():
     say(f"\nDone. Report: {studio / 'report.html'}")
     # The report is not opened here: it is shown once, by Claude, when the first-look photos are in it
     # (Dustin, Oct 28: it opened early, twice, in two browsers). `night.py --open` shows it on request.
-    say("Not on screen yet: show the report once, now that the first-look photos are in it.")
+    if not a.by_time:
+        say("Not on screen yet: show the report once, now that the first-look photos are in it.")
 
 
 def open_report(session, studio):

@@ -154,6 +154,8 @@ OUR_WORDS = {
     "b_s2_small": "The Assistant finds your card and starts copying. There's nothing to answer first, so you can walk away. The report is ready when you're back, and it shows up below.",
     # a sample backup (night.py --sample, for tests) is never called safe to format; the report's own words
     "sample_keep": "Keep the card: this was a sample",
+    # a FOLDER was backed up (Back up a folder instead), so there is no card to call safe to format (Nov 23 review)
+    "folder_safe": "Copied and checked",
     # a backed-up shoot that holds video clips: a clip is never called a photo (Dustin, Nov 11)
     "clips": "video clip",
     # the home page saved as a file (home.py page), which can't ask the Assistant anything
@@ -309,7 +311,8 @@ function groupCard(g){
   const cards = bs.length > 1 ? fill(W.cards_n, {n: bs.length}) + ' · ' : '';
   // the backup at a glance: is the card safe to format, is there a second copy
   const flags = [];
-  if (bs.every(b => b.safe === true)) flags.push(`<span class="pill ok">${esc(fill(W.safe, {card: bs.length > 1 ? W.safe_cards : W.safe_card}))}</span>`);
+  if (bs.every(b => b.safe === true) && bs.every(b => b.folder)) flags.push(`<span class="pill ok">${esc(W.folder_safe)}</span>`);   // a folder was backed up: no card to format
+  else if (bs.every(b => b.safe === true)) flags.push(`<span class="pill ok">${esc(fill(W.safe, {card: bs.length > 1 ? W.safe_cards : W.safe_card}))}</span>`);
   else if (bs.some(b => b.safe === false)) flags.push(`<span class="pill late">${esc(W.needs_look)}</span>`);
   if (bs.some(b => b.sample)) flags.push(`<span class="pill soon">${esc(W.sample_keep)}</span>`);        // a sample is never "safe to format"
   if (bs.some(b => b.known)) flags.push(bs.every(b => b.second) ? `<span class="pill ok">${esc(W.second_yes)}</span>` : `<span class="pill">${esc(W.second_no)}</span>`);
@@ -538,7 +541,8 @@ _STATUS_LOCK = threading.Lock()
 
 
 def backup_status(studio):
-    """How a backup stands, from its own manifest: {"known", "safe", "second", "sample"}.
+    """How a backup stands, from its own manifest: {"known", "safe", "second", "sample", "folder"} (folder: a
+    folder was backed up, not a memory card, so nothing is called safe to format).
     safe: True only when it finished with no problems, every file's copy checked (the second copy too, when there
     is one), and it was not a sample; False when it has not finished or something went wrong; None for a sample
     that is otherwise fine (a sample is never called safe to format), and when the manifest can't be read."""
@@ -547,11 +551,11 @@ def backup_status(studio):
         st = f.stat()
         key = (str(f), st.st_mtime_ns, st.st_size)
     except OSError:
-        return {"known": False, "safe": None, "second": False, "sample": False}
+        return {"known": False, "safe": None, "second": False, "sample": False, "folder": False}
     with _STATUS_LOCK:
         if key in _STATUS:
             return dict(_STATUS[key])
-    out = {"known": False, "safe": None, "second": False, "sample": False}
+    out = {"known": False, "safe": None, "second": False, "sample": False, "folder": False}
     try:
         m = json.loads(f.read_text(encoding="utf-8"))
         files = m.get("files") or {}
@@ -562,7 +566,7 @@ def backup_status(studio):
         sample = bool(m.get("sample"))
         out = {"known": True, "safe": (None if sample else True) if good else False,
                "second": second and all((v.get("second") or {}).get("ok") for v in files.values()) and bool(files),
-               "sample": sample}
+               "sample": sample, "folder": m.get("source_kind") == "folder"}
     except (OSError, ValueError, AttributeError, TypeError):
         pass
     with _STATUS_LOCK:

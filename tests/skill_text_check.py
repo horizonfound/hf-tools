@@ -2026,12 +2026,66 @@ def check_reel_words():
          any("with a reel's name after a comma" in r and "parts/words.md" in r for r in table_rows(skill)))
     stale = [rel(f) for f in instruction_files() if re.search(r"one caption (and one set of hooks )?for (all of )?(the|a) shoot's reels|words page has one Reel tab", read(f))]
     case("no instruction still says a shoot's reels share one caption", not stale, stale)
+def check_nov23_engine():
+    """Nicole's Nov 23 answers, the backup's engine: the six photos are a first look (no keyword, no client note),
+    and a backup started from the home page can be read and carried on from the chat."""
+    print("\nNov 23: a first look, no client note, and a backup started from the home page")
+    part = lambda n: read(SM / "parts" / n)   # noqa: E731
+    skill, b, s, c, a, w = read(SM / "SKILL.md"), part("backup.md"), part("sneak-peeks.md"), part("client-note.md"), part("after-the-report.md"), part("where-things-live.md")
+    case("sneak-peeks.md is the first look now: the page's line, six per shoot, the close look and the checked lines kept",
+         "A first look at your shoot." in s and "six per shoot, always" in s and "peek_sheets.py closer" in s and "--checked" in s
+         and "peek_sheets.py taste" in s)
+    case("... and it never says the six are for a client, are sneak peeks to send, or are marked in Lightroom",
+         "send your client" not in s and "marks each pick in Lightroom" not in s and "to send the client" not in s
+         and "Never say a photo is marked, tagged or findable in Lightroom" in s)
+    case("... an older backup's 'sneak peek' sidecars are left where they are, and it says what to answer",
+         "They are left exactly where they are" in s and "New backups don't." in s)
+    case("... a backup started from the home page picks its own six, with nobody looking",
+         "A backup started from the home page picks its own six" in s and "night.py --by-time" in s)
+    case("backup.md: step 8b is the first look, step 8c says no note is written or offered",
+         "8b. **The first look (exit code 7).**" in b and "8c. **No note to the client (Nicole and Dustin, Nov 23).**" in b
+         and "the sneak peeks are in it" not in b and "the notes (8c)" not in b)
+    case("no instruction still tells the Assistant to save a client note onto the report",
+         not [n for n in ("backup.md", "after-the-report.md", "first-backup-setup.md", "client-note.md", "hello.md", "sneak-peeks.md")
+              if "client_note.py save" in part(n) or "client_note.py setup" in part(n) or "client_note.py facts" in part(n)])
+    case("what they say about a card is still kept (client_note.py told), in backup.md and in the retired part",
+         "client_note.py told --night" in b and "client_note.py told --night" in c)
+    rows = [ln for ln in skill.splitlines() if ln.startswith("|") and "A backup started from the home page" in ln]
+    case("the core's table sends 'is my backup done?' and 'A backup is already running.' to backup.md's own section",
+         len(rows) == 1 and "is my backup done?" in rows[0] and "A backup is already running." in rows[0]
+         and "## A backup started from the home page (Nov 23)" in b, rows)
+    case("the core's first-thing check and table call the six first-look photos, never sneak peeks",
+         "six first-look photos" in skill and "sneak peek" not in skill.lower())
+    sec = b[b.find("## A backup started from the home page"):b.find('## "What are my settings?"')]
+    case("backup.md: how a page-started backup went is read with backup_job.py status --words, and never a path read out",
+         "backup_job.py status --words" in sec and "Never read a path from it out loud" in sec and "serve_report.py" in sec)
+    case("... split by time at four quiet hours, placeholder names, the six chosen by a script",
+         "quiet for four hours" in sec and "\"Shoot 1\", \"Shoot 2\"" in sec and "chosen by a script" in sec and "past midnight stays one shoot" in sec)
+    case("... a problem is carried on with Try again or backup_job.py start, under the same name",
+         "**Try again**" in sec and "backup_job.py start --source" in sec and "picks up under the same name" in sec)
+    case("... one backup at a time, and eject's own line while a backup runs from the card",
+         "A backup is already running." in sec and "start nothing" in sec and "A backup is still running from this card. It won't be long." in sec)
+    case("... a folder instead: a HEIC by the file's own time, an undated file kept and said, never hidden",
+         "by the file's own time" in sec and "kept with the backup's records" in sec)
+    sys.path.insert(0, str(SM / "scripts"))
+    try:
+        import backup_lock
+        import backup_job
+        case("the lines the instructions quote are the ones the scripts say",
+             backup_lock.BUSY in sec and backup_lock.BUSY_CARD in sec and backup_job.OUR_WORDS["busy"] == backup_lock.BUSY)
+    except Exception as e:  # noqa: BLE001
+        case("the lines the instructions quote are the ones the scripts say", False, repr(e))
+    case("where-things-live.md names the job's record, the two locks, the log, and the by-time marks in a backup's records",
+         all(x in w for x in ("backup-job.json", "backup-job.lock", "backup.lock", "backup.running.json", "logs/backup-job.log",
+                              "\"placeholder\": true", "the backup, by time", "the file's own time")))
+    case("after-the-report.md offers no note and names the first look",
+         "Never offer one" in a and "A first look at your shoot." in a)
 
 
 def main():
     for fn in (check_reel_words, check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders, check_nov23_engine):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

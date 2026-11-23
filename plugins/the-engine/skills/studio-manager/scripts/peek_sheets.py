@@ -112,6 +112,8 @@ def moments(photos, gap):
 def spread(items, n):
     if len(items) <= n:
         return items
+    if n <= 1:
+        return [items[len(items) // 2]] if n == 1 else []
     step = (len(items) - 1) / (n - 1)
     return [items[round(i * step)] for i in range(n)]
 
@@ -702,6 +704,82 @@ def pick(night, picks, by, checked=None, checked_file=None):
     return 0
 
 
+AUTO_BY = "the backup, by time"   # picked_by for a pick nobody looked at (night.py --by-time)
+AUTO_SHORTLIST = 18               # how many moments, spread across the shoot, the face check is asked about (a Mac)
+
+
+def auto_choose(moments, verdicts, want=6):
+    """Six of a shoot's moments with nobody looking, as their numbers, hero first. Spread across the shoot from
+    first frame to last, so the six show the whole of it. `verdicts` ({str(n): judge()'s answer}, a Mac's face
+    check; {} on a PC) only ever takes photos away or moves one to the front: a face the check flagged (eyes
+    half-closed, mouth open) is passed over while there are six others, and the hero is the clearest face
+    looking at the camera when there is one. Pure: the same moments and verdicts give the same six."""
+    ns = [m["n"] for m in moments]
+    if not ns:
+        return []
+    v = {int(k): x for k, x in (verdicts or {}).items() if str(k).isdigit() and isinstance(x, dict)}
+    clean = [n for n in ns if not (v.get(n) or {}).get("flags")]
+    if len(clean) >= want:
+        chosen = spread(clean, want)
+    else:                           # too few without a fault: every clean one, then flagged ones to make up the six
+        flagged = [n for n in ns if n not in clean]
+        chosen = sorted(clean + spread(flagged, max(0, min(want, len(ns)) - len(clean)))) if flagged else list(clean)
+
+    def face(n):
+        x = v.get(n) or {}
+        if not x.get("judged") or x.get("flags") or "looking away" in (x.get("notes") or []):
+            return -1.0
+        return float(((x.get("measured") or {}).get("quality")) or 0.0) + float(((x.get("measured") or {}).get("face")) or 0.0)
+    best = max(chosen, key=lambda n: (face(n), -chosen.index(n)))
+    if face(best) >= 0:
+        chosen.remove(best)
+        chosen.insert(0, best)
+    return chosen
+
+
+def auto(night, only=None):
+    """The six first-look photos of every shoot, chosen by a script (a backup sorted by time, with nobody
+    looking: night.py --by-time). A shoot that already has picks is left as it is, so running this again changes
+    nothing. Photos only: a shoot of nothing but video clips gets none. Writes records/sneak-peeks.json in the
+    shape pick() writes; nothing beside any photo."""
+    root, studio = locate(night)
+    try:
+        sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
+    except (OSError, ValueError, KeyError):
+        say("STOP: the pages are not made yet (peek_sheets.py make).")
+        return 1
+    pj = studio / "sneak-peeks.json"
+    try:
+        had = json.loads(pj.read_text(encoding="utf-8")) if pj.exists() else {}
+    except ValueError:
+        had = {}
+    existing = had.get("picks", [])
+    have = {p.get("shoot") for p in existing}
+    new = []
+    for sid, sh in sheets.items():
+        if (only and sid not in only) or sid in have or not sh.get("list"):
+            continue
+        short = spread(sh["list"], AUTO_SHORTLIST)
+        verdicts = {}
+        try:
+            verdicts = check_faces(studio, sid, short)       # a Mac: one ask for the whole shortlist; {} on a PC
+        except Exception:  # noqa: BLE001  (the face check only ever improves the pick; never stops it)
+            verdicts = {}
+        by_n = {m["n"]: m for m in short}
+        for n in auto_choose(short, verdicts):
+            pk = {"file": current_path(studio, by_n[n]["file"]), "shoot": sid, "n": n}
+            if verdicts.get(str(n)):
+                pk["seen"] = verdicts[str(n)]["words"]
+            new.append(pk)
+        say(f"{sid}: {sum(1 for p in new if p['shoot'] == sid)} first-look photos, chosen by time across the shoot"
+            + (" (faces checked)" if verdicts else ""))
+    if not new:
+        say("Nothing to choose: every shoot with photos already has its first-look photos.")
+        return 0
+    save_json(pj, {"picks": existing + new, "picked_by": had.get("picked_by") or AUTO_BY}, indent=1, ensure_ascii=False)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -715,6 +793,7 @@ def main():
     k.add_argument("--by", default="Claude, from the pages")
     k.add_argument("--checked", action="append", help='one per photo: "s1 29: eyes open to camera, mouth closed, sharp, nothing cut off"')
     k.add_argument("--checked-file", help="the same lines in a file, one per line")
+    au = sub.add_parser("auto", help="six first-look photos per shoot chosen by a script, with nobody looking (night.py --by-time)"); au.add_argument("night"); au.add_argument("shoots", nargs="*")
     fc = sub.add_parser("faces", help="the face check on a shortlist, without drawing pages (a Mac)"); fc.add_argument("night"); fc.add_argument("picks", nargs="+")
     c2 = sub.add_parser("candidates", help="the shortlist for one shoot, as JSON (for the report's Show me more)"); c2.add_argument("night"); c2.add_argument("shoot")
     q = sub.add_parser("ask", help="the report's Pick again: remember it and keep the note as taste"); q.add_argument("night"); q.add_argument("--shoot", required=True); q.add_argument("--note", default="")
@@ -724,6 +803,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "make":
         return make(a.night, a.gap, a.max, a.per_page, a.thumb)
+    if a.cmd == "auto":
+        return auto(a.night, set(a.shoots) or None)
     if a.cmd == "closer":
         return closer(a.night, a.picks)
     if a.cmd == "candidates":

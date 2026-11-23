@@ -39,6 +39,8 @@ WORDS = {
     "moved": "I can't find this folder anymore. If you moved or renamed it in {files_app}, tell the Assistant where it went.",
 }
 OUR_WORDS = {
+    # over the shoots when a folder was backed up, not a memory card (Nov 23 review)
+    "in_folder": "What was in the folder",
     # the same line when the shoots were not one a day (told apart by the breaks between them and one look
     # at the pictures): never "days" when it was not days
     "why_shoots": "Since these looked like {n} different shoots, I put them in {n} separate folders. You can name them in the boxes below.",
@@ -709,7 +711,12 @@ def shoots_section(studio, closing=True):
     except Exception:  # noqa: BLE001  the queue is a convenience; the report still builds without it
         pass
 
-    out = ["<div class='wrap'><div class='shoots-head'><span class='eyebrow'>What's on the card</span>",
+    try:
+        a_folder = json.loads((studio / "manifest.json").read_text(encoding="utf-8")).get("source_kind") == "folder"
+    except (OSError, ValueError, AttributeError):
+        a_folder = False
+    over = e(OUR_WORDS["in_folder"]) if a_folder else "What's on the card"
+    out = [f"<div class='wrap'><div class='shoots-head'><span class='eyebrow'>{over}</span>",
            f"<h2 class='h2'>{n} shoot{'s' if n != 1 else ''}, <span class='swap'>{total}</span>, across {len(days)} day{'s' if len(days) != 1 else ''} of shooting.</h2>",
            (f"<p class='lede why-folders'>{e(why)}</p>" if why else
             f"<p class='lede'>{'Each one is already in its own folder, named by date. Give it a better name and everything is renamed to match.' if filed else 'Give each one a name and it is filed, named and ready for you.'}</p>"),

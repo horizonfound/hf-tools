@@ -31,12 +31,12 @@ def spread(items, count):
     return [items[round(i * step)] for i in range(count)]
 
 
-def find_groups(photos, gap_minutes):
+def find_groups(photos, gap_minutes, across_midnight=False):
     dated = sorted((p for p in photos if p.get("taken")), key=lambda p: p["taken"])
     groups, cur, prev_t = [], [], None
     for p in dated:
         t = datetime.fromisoformat(p["taken"])
-        if cur and (t.date() != prev_t.date() or (t - prev_t).total_seconds() > gap_minutes * 60):
+        if cur and ((t.date() != prev_t.date() and not across_midnight) or (t - prev_t).total_seconds() > gap_minutes * 60):
             groups.append(cur)
             cur = []
         cur.append(p)
@@ -47,7 +47,7 @@ def find_groups(photos, gap_minutes):
     out, prev_end = [], None
     for i, g in enumerate(groups, 1):
         start, end = datetime.fromisoformat(g[0]["taken"]), datetime.fromisoformat(g[-1]["taken"])
-        gap_before = round((start - prev_end).total_seconds() / 60) if prev_end and prev_end.date() == start.date() else None
+        gap_before = round((start - prev_end).total_seconds() / 60) if prev_end and (across_midnight or prev_end.date() == start.date()) else None
         cams = Counter(p.get("serial") or p.get("camera") or "?" for p in g)
         out.append({
             "id": f"g{i:02d}",
@@ -78,11 +78,13 @@ def main():
     ap.add_argument("session")
     ap.add_argument("--gap", type=float, default=15, help="minutes of quiet that start a new group")
     ap.add_argument("--previews", type=int, default=4, help="previews per group, 0 for none")
+    ap.add_argument("--across-midnight", action="store_true",
+                    help="a new day alone starts no new group; only the quiet gap does (a backup sorted by time, with nobody looking)")
     a = ap.parse_args()
     session = Path(a.session)
     studio = session / "_studio"
     index = json.loads((studio / "index.json").read_text(encoding="utf-8"))
-    groups, undated = find_groups(index["photos"], a.gap)
+    groups, undated = find_groups(index["photos"], a.gap, a.across_midnight)
 
     if a.previews:
         ok, words = pictures.ready()
@@ -115,7 +117,7 @@ def main():
                 clips.borrow_turns(folder, g["clip_previews"])   # a still with nobody in it stands the way its neighbour does
 
     (studio / "groups.json").write_text(json.dumps({
-        "session": index.get("session"), "gap_minutes": a.gap,
+        "session": index.get("session"), "gap_minutes": a.gap, "across_midnight": bool(a.across_midnight),
         "built": datetime.now().isoformat(timespec="seconds"),
         "groups": groups, "undated": undated}, indent=1), encoding="utf-8")
 
