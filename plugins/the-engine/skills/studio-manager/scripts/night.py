@@ -26,8 +26,12 @@ With --by-time nobody looks (a backup started from the home page, backup_job.py)
 wherever the camera was quiet for four hours, each shoot gets a placeholder name, and the six first-look photos
 are chosen by a script; it never stops with exit 4 or 7.
 
-Their drive, second copy and naming come from ~/.studio (studio_file.py), so
-after the first run the command is just:  night.py --source /Volumes/CARD
+Their drive and naming come from ~/.studio (studio_file.py), so after the first
+run the command is just:  night.py --source /Volumes/CARD
+A second copy is never made by itself (Nicole, Nov 23: the second drive is asked
+each time, on the report). --second "<a drive>" names one for this one backup: it
+is made by second_copy.py after the settle (step 7b), with the same shoot folders
+and photo names as the photo drive.
 A card the ledger (cards.py) already knows is not copied again.
 """
 import argparse
@@ -358,11 +362,13 @@ def folder_for(source, dest, date, name, auto):
 
 
 def second_copy_after(session, second):
-    """The second copy onto the drive they saved, made AFTER the backup itself is whole (Nov 19 review: made
-    inside the copy, any trouble with that optional drive, read-only, full, a file in the way, stopped or
-    broke the whole backup, card never called safe). Now it is the report's own Make a second copy
-    (second_copy.py), run here: whatever goes wrong with it, the backup stands, the report says there is one
-    copy and why, and its button carries on. Run again it does nothing when the copy is made. Never fatal."""
+    """The second copy onto the drive named for this backup (--second), made AFTER the backup itself is whole,
+    sorted and settled (Nov 19 review: made inside the copy, any trouble with that optional drive, read-only,
+    full, a file in the way, stopped or broke the whole backup, card never called safe; Nicole, Nov 23: it
+    "should look just like the main drive", so it waits for the shoot folders to exist). It is the report's own
+    Make a second copy (second_copy.py), run here: whatever goes wrong with it, the backup stands, the report
+    says there is one copy and why, and its button carries on. Run again it does nothing when the copy is made.
+    Never fatal."""
     try:
         code = run("second_copy.py", session, "--to", second)
         if code == 0:
@@ -381,6 +387,7 @@ def second_copy_after(session, second):
             if words:
                 note["words"] = f"No second copy yet, so there's one copy for now. {words}"
             (studio / "second-missed.json").write_text(json.dumps(note, indent=1), encoding="utf-8")
+            run("report_page.py", studio)     # the report is already written by now: its top takes the line
         say("   (the second copy is not made: one copy for now. The backup itself is whole, and the report says so, "
             "with its Make a second copy button)")
     except Exception as e:  # noqa: BLE001  (an optional copy never stops the backup)
@@ -547,6 +554,14 @@ def main():
     # their drive and second copy come from the Studio File unless given here
     sf = studio_file.load()
     drives = sf.get("drives", {})
+    # A second drive saved for every backup is no longer used by itself (Nicole, Nov 23: "ask each time"; the
+    # switch is second_copy.REMEMBER_SECOND). It is said once, plainly, on the first report after that.
+    saved_unused = None
+    import second_copy as second_copy_rules
+    if a.source and drives.get("second") and not second_copy_rules.REMEMBER_SECOND:
+        if a.second is None and not drives.get("second_asked_each_time"):
+            saved_unused = drives.get("second_label") or this_computer.drive_words(drives["second"]) or "a second drive"
+        drives = dict(drives, second=None)
     dest_from_file = bool(a.source and not a.dest)       # the usual drive, not one named for this backup only
     second_from_file = bool(a.source and a.second is None and drives.get("second") and not a.no_second)
     if a.source and not a.dest:
@@ -717,6 +732,10 @@ def main():
             if second_missed:
                 say(f"NOTE: the second drive ({second_missed}) is not plugged in, so this backup makes one copy. "
                     "Say nothing before the copy; the report says so afterwards, with its Make a second copy button.")
+            if saved_unused:
+                say(f"NOTE: a second drive ({saved_unused}) was saved for every backup. That is no longer done by itself: "
+                    "a second copy is asked for each time, with Make a second copy on the report. Say nothing before the "
+                    "copy; this backup's report says so once.")
             try:  # the one gentle nudge for shoots kept on the computer's own disk (Dustin, Oct 30)
                 if studio_file.on_internal_disk(a.dest):
                     total, free = this_computer.disk(a.dest)
@@ -726,6 +745,12 @@ def main():
             except Exception:
                 pass
             return
+
+    # A second drive named for this one backup (--second): its copy is made after the settle, by second_copy.py,
+    # with the same shoot folders and names as the photo drive (Nicole, Nov 23), never inside the copy itself in the
+    # card's layout. The questions above were still asked of it, so a drive that is not there still stops up front.
+    if a.second:
+        second_after, a.second = second_after or a.second, None
 
     # 1. copy and verify (backup.py also builds the index and the report page)
     manifest = studio / "manifest.json"
@@ -773,9 +798,18 @@ def main():
             say("   (a sample, so the card is NOT marked as backed up)")
         else:
             cards.register(a.source, session)  # now the ledger knows this card (it is told only once)
-    if second_after and a.source:
-        say("1b. The second copy")
-        second_copy_after(session, second_after)
+    if saved_unused and (studio / "manifest.json").exists() and not (studio / "second-missed.json").exists():
+        # said once (the Studio File remembers it was said), on this backup's report, beside the button
+        try:
+            (studio / "second-missed.json").write_text(json.dumps(
+                {"when": datetime.now().isoformat(timespec="seconds"), "drive": saved_unused, "asked_each_time": True,
+                 "words": second_copy_rules.OUR_WORDS["saved_unused"].format(drive=saved_unused)}, indent=1), encoding="utf-8")
+            fresh_sf = studio_file.load()
+            fresh_sf.setdefault("drives", {})["second_asked_each_time"] = datetime.now().isoformat(timespec="seconds")
+            studio_file.save(fresh_sf)
+            say(f"   (a second drive, {saved_unused}, was saved for every backup; it is asked each time now, and the report says so once)")
+        except Exception:  # noqa: BLE001  (a note only; the backup goes on)
+            pass
     if a.with_:
         # one shoot on several cards (Dustin, Nov 12): link this card to the first one's backup, so one report
         # shows every card. The pages come at step 6; a link that fails leaves this card's report on its own.
@@ -926,6 +960,16 @@ def main():
         session = studio  # every script finds the photos from the records now
         run("first_look.py", studio)
         run("report_page.py", studio)  # the report's "where your photos are" now points at the new place
+    # 1b (it was step 1b until Nov 23, right after the copy). The second copy, when a drive was named for it: now
+    # that the shoots are in their folders, so it has the same folders and names. And any second copy that was
+    # waiting for its drive to take a rename catches up, now that a command is looking.
+    if second_after and a.source:
+        say("7b. The second copy")
+        second_copy_after(session, second_after)
+    try:
+        second_copy_rules.follow_all()
+    except Exception:  # noqa: BLE001
+        pass
     # every shoot of the night goes on "your shoots" (the archive below the queue); the queue question comes when they're back
     run("edit_queue.py", "register", "--night", studio)
     say(f"\nDone. Report: {studio / 'report.html'}")

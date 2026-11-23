@@ -126,7 +126,7 @@ def as_markdown(sf):
              "## Drives", "",
              f"- Sessions go on: `{d.get('session', '(not set)')}`" + (f" ({d['session_label']})" if d.get("session_label") else ""),
              (f"- Second copy: `{d.get('second')}`" + (f" ({d['second_label']})" if d.get("second_label") else ""))
-             if d.get("second") else "- Second copy: none (that's fine)", "",
+             if d.get("second") and second_remembered() else SECOND_EACH_TIME_MD, "",
              "## Naming", ""]
     if n.get("folder_pattern"):
         lines += [f"- Shoot folders look like: **{render(n, 'Smith Family', date(2026, 10, 18))}**",
@@ -557,7 +557,7 @@ def use_next(drive=None, computer=False):
             return {"state": "same", "place": now, "drive": n, "where": w}
         place = place_on(root)
         name, where = _where_words(place, drives())
-        if d.get("second") and (_inside(d["second"], root) or _inside(place, d["second"])):
+        if d.get("second") and second_remembered() and (_inside(d["second"], root) or _inside(place, d["second"])):
             return {"state": "second", "place": str(place), "drive": name, "where": where}
         why = cannot_use(place)
         if why:
@@ -793,6 +793,21 @@ def place_words(path):
     return drive if (not here or here == drive or len(path.parts) <= 3) else f"{here} on {drive}"
 
 
+SECOND_EACH_TIME = ("A second copy is yours to ask for after each backup, on its report",
+                    "a second copy when you ask for one on the report")       # ours, a draft (Nicole, Nov 23: "ask each time")
+SECOND_EACH_TIME_MD = "- Second copy: asked for each time, with Make a second copy on a backup's report"
+
+
+def second_remembered():
+    """Is a saved second drive still used by itself after every backup? Not since Nov 23 (Nicole: ask each time).
+    The one switch is second_copy.REMEMBER_SECOND; a drive saved before then stays on file, unused."""
+    try:
+        import second_copy
+        return bool(second_copy.REMEMBER_SECOND)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def glance(sf=None):
     """The usual, to glance at before a backup (Dustin, Nov 11: from the second backup on, "a quick little list for
     them to glance at so they can see all of the settings up front", then Looks good or Change something).
@@ -804,9 +819,9 @@ def glance(sf=None):
         return [], ""
     naming = sf.get("naming", {})
     lines = [("Photos go onto " + place_words(drives_["session"]), "photos onto " + place_words(drives_["session"]))]
-    second = drives_.get("second")
+    second = drives_.get("second") if second_remembered() else None
     lines.append(("A second copy goes onto " + place_words(second), "a second copy onto " + place_words(second)) if second
-                 else ("No second copy", "no second copy"))
+                 else SECOND_EACH_TIME if not second_remembered() else ("No second copy", "no second copy"))
     label = naming.get("label")
     if not label and naming.get("folder_pattern"):
         try:
