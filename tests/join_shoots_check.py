@@ -199,10 +199,11 @@ def refusals(work):
     (w["drive"] / "Weddings_06-04-26").mkdir()
     refused("a name another folder already has", ["--shoots", "s1", "s2", "--name", "Weddings"],
             "There is already a folder called Weddings_06-04-26 next to these shoots.")
-    (w["drive"] / "weddings_06-04-26 (JOINING)").mkdir()
-    refused("the gathering folder's name taken, in other capitals", ["--shoots", "s1", "s2", "--name", "weddings"], "There is already a folder called")
-    os.rmdir(w["drive"] / "weddings_06-04-26 (JOINING)")
     os.rmdir(w["drive"] / "Weddings_06-04-26")
+    (w["drive"] / "weddings_06-04-26 (JOINING)").mkdir()
+    refused("the name of the folder the photos are gathered in is taken, in other capitals", ["--shoots", "s1", "s2", "--name", "Weddings"],
+            "There is already a folder called weddings_06-04-26 (JOINING) next to these shoots.")
+    os.rmdir(w["drive"] / "weddings_06-04-26 (JOINING)")
     theirs = w["drive"] / "Beach_06-04-26" / "my notes.txt"
     theirs.write_text("theirs", encoding="utf-8")
     refused("the folder whose name the joined shoot takes holds something of theirs", ["--shoots", "s1", "s2"],

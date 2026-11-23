@@ -335,7 +335,7 @@ def make_plan(session, studio, ids, name=None):
             raise Stop(WORDS["extras"].format(folder=there, names=", ".join(Path(x).name for x in extras[:3])
                                               + (f" and {len(extras) - 3} more" if len(extras) > 3 else "")))
     if named_like(session, staging.name):
-        raise Stop(WORDS["name_taken"].format(folder=staging.name))
+        raise Stop(WORDS["name_taken"].format(folder=named_like(session, staging.name)[0]))   # as the drive spells it
     for m in moves:
         if not (session / m["from"]).is_file():
             raise Stop(WORDS["missing"].format(name=Path(m["from"]).name))
