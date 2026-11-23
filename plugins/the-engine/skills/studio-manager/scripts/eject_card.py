@@ -11,6 +11,9 @@ computer to let go of it, so it is safe to pull out. Three things are checked fi
   - it is a memory card (a drive of its own with a DCIM folder at the top), never the photo drive or a folder
   - this card's backup is finished: every file copied and checked (the card ledger knows it)
   - no second copy is being read from it right now (second_copy.py): then one plain line, and nothing else
+  - no backup is running from it right now (night.py's own lock, or a backup started from the home page that is
+    between two of its steps): then one plain line, and nothing else. Asked FIRST, before anything else looks at
+    the card, so a card that is mid-copy is never even asked whether it answers.
 
 Every touch of the card has a time limit, so a card that has gone quiet gets plain words, not a silent wait.
 Exit codes: 0 the card is out, 1 the computer would not let go of it, 2 refused (says why), 3 not on this computer yet.
@@ -77,6 +80,16 @@ def copying_from(path):
         return False
 
 
+def backing_up(path):
+    """True while a backup is running that was started on this card (backup_lock.py: night.py holds the one
+    backup lock for as long as it runs; a page-started job counts between its steps too)."""
+    try:
+        import backup_lock
+        return bool(backup_lock.reading_card(path))
+    except (Exception, SystemExit):  # noqa: BLE001  (cannot be asked: ejecting is then the computer's own to allow or refuse)
+        return False
+
+
 def let_go(path):
     """Ask the Mac to eject it. (ok, what it said)."""
     try:
@@ -92,6 +105,9 @@ def eject(path):
     """(exit code, the words to say)."""
     if this_computer.WINDOWS:
         return 3, words(ON_A_PC)   # unproven on a real PC
+    if backing_up(path):
+        import backup_lock
+        return 2, backup_lock.BUSY_CARD
     if not cards.answers(path):
         return 1, words(QUIET)
     if not is_card(path):

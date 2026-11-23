@@ -74,16 +74,25 @@ HERS_NOT_OURS = {
     # "Step 1" over its heading, and the post kits screen (her v29 make-posts-preview.html) none either
     "Step 1 of your workflow": "gone with the numbered steps (v29)",
     "Step 3 of your workflow": "gone with the numbered steps (v29; her make-posts-preview.html has no eyebrow)",
-    # no longer true since Nov 19 (Dustin: nothing is asked before the copy); ours is OUR_WORDS["b_s2_small"]
-    "The Assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
-    # no longer true since Nov 23 (Nicole and Dustin: the six photos are a first look, nothing is marked in Lightroom,
-    # nothing is for a client); ours is OUR_WORDS["b_lede_2"]
-    "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.": "a first look, not sneak peeks (Nov 23)",
+    # gone with her v31 (Nov 22; built Nov 23): backing up happens in the box on the home page, so her v26 Back up a
+    # card screen's explanation and its two steps are off the screen, which is only "Your backups." and the list
+    # (tests/backup_popup_check.py holds the box and the trimmed screen)
+    "The Assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "the steps box is gone (v31)",
+    "a card.": "her v26 heading, Back up a card.; the screen is Your backups. now (v31)",
+    "This is where the Assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.": "the explanation is gone (v31)",
+    "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.": "the explanation is gone (v31), and so are sneak peeks",
+    "How to back up a card": "the steps box is gone (v31)",
+    "Put your memory card in.": "the steps box is gone (v31)",
+    "Shooting with more than one card? Back them up one at a time; they'll show up together below.": "the steps box is gone (v31)",
+    "Paste this in the chat:": "the steps box is gone (v31); \"backup now\" in the chat still works",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
     # (the two screens keep her line for it)
 }
 # Capitalised runs her scripts hold that are code or comments, not words a photographer reads.
 HERS_JS_NOT_WORDS = ("Content-Type", "Nothing ready")     # a header's name; a test of the posting queue's line, not a line shown
+# Lines her v26 Back up a card screen's script wrote that went with its steps box in her v31 (the card is in the
+# box on the home page now: tests/backup_popup_check.py).
+HERS_JS_GONE = ("A card is in:", "No card in yet.")
 
 
 def skip(line):
@@ -437,6 +446,16 @@ def check_words(w):
     if "make-posts-preview.html" not in raw:
         skip("her v29 preview of the post kits screen is not on this computer: its title and the My vault card's lines are not compared here")
         ours_words = {k: v for k, v in ours_words.items() if k not in ("m_h1", "v_name", "v_small")}
+    # v31 (Nov 22): Your backups is only her heading and the list (pages/your-backups.html); its heading is hers
+    v31 = None
+    for r in her_roots():
+        for f in sorted(r.glob("nicole-handoff-v31-*/*/pages/your-backups.html")):
+            v31 = f
+    if v31:
+        raw["your-backups.html"] = nicole_nov22.read(v31)
+    else:
+        skip("her v31 Your backups page is not on this computer: its heading is not compared here")
+        ours_words = {k: v for k, v in ours_words.items() if k != "b_h1"}
     hers_all = untag("\n".join(raw.values()).replace("\\'", "'"))
     # 1. ours -> hers: every line in WORDS, cut at its gaps, is in her files
     missing = []
@@ -465,7 +484,7 @@ def check_words(w):
         src = raw[n] if n.endswith(".js") else scripts_of(raw[n])
         for t in js_words(src):
             t2 = t.rstrip(".\u2026?!")
-            if t in ours_flat or t2 in ours_flat or t.strip('"') in ours_flat or any(x in t for x in HERS_JS_NOT_WORDS):
+            if t in ours_flat or t2 in ours_flat or t.strip('"') in ours_flat or any(x in t for x in HERS_JS_NOT_WORDS) or t in HERS_JS_GONE:
                 continue
             lost.append((n, t))
     case("every line her scripts write on the page is in ours", not lost, lost[:8])
@@ -916,9 +935,11 @@ def check_home_page(c, w):
     time.sleep(4.6)
     case("home: recording a press does not reload the page from under the line it just showed",
          c.js("document.querySelector('.bar .fold .note').textContent") == "Opened The Assistant in Finder.")
-    c.click("#s1")
+    # (the card itself opens the Back up a card box since her v31: tests/backup_popup_check.py presses it, on pretend
+    # drives; here its link to the list)
+    c.click("#seeAll")
     c.wait_for("location.pathname === '/backups'", 10)
-    case("home: Back up a card opens its own screen", c.js("location.pathname") == "/backups")
+    case("home: See all my backups, on the Back up a card card, opens the list", c.js("location.pathname") == "/backups")
     time.sleep(0.3)
     j = json.loads((w.home / "journey.json").read_text(encoding="utf-8"))
     case("... and the press is recorded as a backup press", j["clicks"][-1]["item"] == "backup", j["clicks"][-1])
@@ -937,14 +958,10 @@ def check_home_page(c, w):
 def check_backups_page(c, w):
     c.open(w.url("/backups"))
     c.wait_for("document.querySelectorAll('#backups .backup').length > 0", 15)
-    case("backups: her heading, her two paragraphs, her steps box", c.text("h1") == "Back up a card." and len(texts(c, ".head .lede")) == 2
-         and c.text(".steps-title") == "How to back up a card" and texts(c, ".steps .num") == ["1", "2"])
-    case("backups: step 1 says whether a card is in", c.text("#cardStatus") == "No card in yet.", c.text("#cardStatus"))
-    case("backups: the words to paste, with Copy", c.text(".paste .words") == "backup now" and c.text(".paste .copy") == "Copy" and c.js("document.querySelector('.paste .copy').dataset.copy") == "backup now")
-    c.js("document.execCommand = function(){ window.__copied = document.activeElement && document.activeElement.value; return true; }")
-    c.click(".paste .copy")
-    case("backups: Copy copies them and says Copied", c.js("window.__copied") == "backup now" and c.text(".paste .copy") == "Copied")
-    case("backups: the steps box is light (white, not black)", c.js("getComputedStyle(document.querySelector('.steps')).backgroundColor") == "rgb(255, 255, 255)")
+    # her v31 (Nov 22): only "Your backups." and the list. The explanation, the steps box, the card line and the
+    # words to paste went to the box on the home page (tests/backup_popup_check.py)
+    case("backups: her heading, Your backups., and nothing over the list: no paragraphs, no steps box, nothing to paste", c.text("h1") == "Your backups."
+         and c.count(".head .lede") == 0 and c.count(".steps") == 0 and c.count(".steps-title") == 0 and c.count(".paste") == 0 and c.count("#cardStatus") == 0)
     case("backups: the 10 newest, and a button for the rest", c.count("#backups .backup") == 10 and c.text("#older") == "Show 9 older backups" and c.count("#backups h3.month") == 0,
          (c.count("#backups .backup"), c.text("#older") if c.count("#older") else None))
     case("backups: the newest is first, dated as she writes a day", texts(c, "#backups .backup h3")[0] == "Backed up Nov 13, 2026", texts(c, "#backups .backup h3")[:2])
@@ -954,8 +971,9 @@ def check_backups_page(c, w):
     case("backups: a queued shoot says To edit with its due date; a delivered one Edited; an uploaded one Just for you",
          in_shoot(c, "Garcia wedding", ".pill") == ["To edit, due in 6 days"] and in_shoot(c, "Patio session", ".pill") == ["Edited"] and in_shoot(c, NASTY, ".pill") == ["Just for you"],
          (in_shoot(c, "Garcia wedding", ".pill"), in_shoot(c, "Patio session", ".pill"), in_shoot(c, NASTY, ".pill")))
-    case("backups: each shoot has Open this folder with See the report under it",
-         in_shoot(c, "Garcia wedding", ".acts .btn") == ["Open this folder", "See the report"]
+    case("backups: See the report comes first (the main, dark button), with Open this folder under it (Nicole's v31)",
+         in_shoot(c, "Garcia wedding", ".acts .btn") == ["See the report", "Open this folder"]
+         and c.js("(() => { const b = Array.from(document.querySelectorAll('#backups .shoot')).find(s => s.querySelector('b').textContent === 'Garcia wedding').querySelectorAll('.acts .btn'); return b[0].classList.contains('solid') && !b[1].classList.contains('solid'); })()")
          and c.js("(() => { const b = Array.from(document.querySelectorAll('#backups .shoot')).find(s => s.querySelector('b').textContent === 'Garcia wedding').querySelectorAll('.acts .btn'); return b[1].getBoundingClientRect().top >= b[0].getBoundingClientRect().bottom - 1; })()"))
     case("backups: a name with <, & and a script is shown as text only", c.js("window.__got === undefined && !document.querySelector('#backups img[src=x]')") and backup_of(c, NASTY) == 0)
     # the cards of one shoot
@@ -1148,11 +1166,10 @@ def check_phone_pages(c, w, long_name):
             c.wait_for(ready, 15)
             if path == "/backups":
                 c.js("document.querySelector('#older').click()")
-                c.js("document.querySelector('#cardStatus').textContent = fill(W.b_card_in, {name: %s, files: '3,931'})" % json.dumps("CARD_" + "W" * 100))
             if path == "/home":
                 case("phone width: the long name is in the editing queue's box on the home page", long_name in c.js("document.querySelector('#n2').textContent"))
             if path == "/backups":
-                case("phone width: the long name is on a backup, and the long card name in the steps box", backup_of(c, long_name) >= 0 and "WWWWWWWW" in c.text("#cardStatus"))
+                case("phone width: the long name is on a backup", backup_of(c, long_name) >= 0)
             case("phone width: %s has no sideways scroll, with a 100-letter name that has no place to break" % path, no_sideways(c, 375), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
             if path == "/make-posts":
                 case("phone width: the What's a post kit? box fits the screen", c.js("(r => r.left >= 0 && r.right <= window.innerWidth && r.height > 40)(document.querySelector('.whatkit').getBoundingClientRect())"),
@@ -1165,8 +1182,6 @@ def check_phone_pages(c, w, long_name):
                             ("/make-posts", "document.querySelectorAll('#recent .shoot').length > 0")):
             c.open(w.url(path))
             c.wait_for(ready, 15)
-            if path == "/backups":
-                c.js("document.querySelector('#cardStatus').textContent = fill(W.b_card_in, {name: %s, files: '3,931'})" % json.dumps("CARD_" + "W" * 100))
             case("a narrow phone (336): %s has no sideways scroll" % path, no_sideways(c, 336), c.js("[document.documentElement.scrollWidth, window.innerWidth]"))
     finally:
         c.desktop()

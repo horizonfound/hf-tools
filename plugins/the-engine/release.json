@@ -1,13 +1,13 @@
 {
-  "number": 9,
+  "number": 10,
   "date": "Nov 23, 2026",
   "new": [
+    "Back up a card right from your home page: pick where it goes, press Start, and keep working.",
+    "The home page shows how the backup is going, and says Done when every photo is checked.",
+    "Name your shoots after the backup, and put mini sessions in one folder.",
+    "A second copy now looks just like your main drive: same folders, same names.",
+    "Your backups is just your list, with See the report first.",
     "Each reel gets its own caption and hooks.",
-    "The carousel designer opens with a first carousel laid out as an example.",
-    "In My vault, the designers group your photos by shoot, like the reel page.",
-    "A shoot name that's already taken? Type a new one right there.",
-    "New backups name folders like Aurora_11-22-26 and photos like Johnson_0001_IMG_4471.",
-    "The six photos on a backup's report are a first look at your shoot.",
-    "Your monthly recap counts only shoots you actually posted."
+    "The carousel designer opens with a first carousel laid out as an example."
   ]
 }

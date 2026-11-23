@@ -112,6 +112,15 @@ def case_twin(a, b):
     return not same_text(a, b) and a.as_posix().lower() == b.as_posix().lower()
 
 
+# A photo of the backup that is no longer in its shoot's folder (deleted or moved by hand since: ordinary
+# culling) is theirs to have removed. It is left out of a rename and said plainly, never a reason to stop
+# (Nov 23 review: one culled photo stopped the rename part way and then jammed every rename and join of that
+# backup for good). Its record stays as it was. Kept here by shoot id, between the plan and the log.
+GONE = {}
+GONE_WORDS = ("  ({n} of this shoot's photos {is_} no longer in its folder (deleted or moved since the backup); "
+              "left out, the rest {are} renamed.)")
+
+
 def plan_rename(session, studio, shoot_id, new_name):
     manifest = load(studio, "manifest.json")
     index = load(studio, "index.json")
@@ -149,8 +158,12 @@ def plan_rename(session, studio, shoot_id, new_name):
         return listings[folder]
 
     moves = []
+    planned_sidecars = set()   # one sidecar is planned once, however many photos share its stem (a RAW and its JPEG)
+    gone = GONE[shoot_id] = [p["file"] for p in in_folder if not on_disk(session / p["file"])]
     for p in in_folder:
         cur = Path(p["file"])
+        if p["file"] in gone:
+            continue
         into = new_folder / inside(cur).parent   # the same place inside the shoot (Photos, Videos, or the top)
         rec = files.get(p["original"])
         if not rec or not rec.get("sha256"):
@@ -172,6 +185,9 @@ def plan_rename(session, studio, shoot_id, new_name):
             sc = cur.with_suffix(ext)
             so = Path(p["original"]).with_suffix(ext).as_posix()
             if so in files and (session / sc).exists():
+                if sc.as_posix().lower() in planned_sidecars:
+                    break
+                planned_sidecars.add(sc.as_posix().lower())
                 if not files[so].get("sha256"):
                     sys.exit(f"STOP: no verified record for {so}. Nothing renamed.")
                 moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(ext)).as_posix(),
@@ -181,14 +197,20 @@ def plan_rename(session, studio, shoot_id, new_name):
             # a sidecar the Studio wrote itself (the sneak-peek keyword) is not in the backup's records;
             # it travels along too, checked against its own hash, so Lightroom keeps pairing it with the photo.
             # Found by name regardless of case, since an older rename could leave its case behind the photo's.
+            # (Nov 23: a sidecar their own editing program wrote since the backup travels the same way, so it keeps
+            # its photo's name; before, it stayed behind under the old name. Marked "theirs" in the log.)
             found = names_in(cur.parent).get((cur.stem + ".xmp").lower())
             if found:
                 sc = cur.parent / found
-                if studio_wrote(session / sc):
+                if (session / sc).is_file() and sc.as_posix().lower() not in planned_sidecars:
+                    planned_sidecars.add(sc.as_posix().lower())
+                    ours = studio_wrote(session / sc)
                     moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(Path(found).suffix)).as_posix(),
-                                  "original": None, "sha256": sha256_of(session / sc), "studio": True})
+                                  "original": None, "sha256": sha256_of(session / sc), **({"studio": True} if ours else {"theirs": True})})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
+    if gone:
+        say(GONE_WORDS.format(n=len(gone), is_="is" if len(gone) == 1 else "are", are="are"))
     dests = [x["to"].lower() for x in moves]
     if len(set(dests)) != len(dests):
         sys.exit("STOP: two files would get the same new name. Nothing renamed.")
@@ -242,6 +264,8 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
     log = json.loads(log_path.read_text(encoding="utf-8")) if log_path.exists() else {"renames": []}
     entry = {"shoot": shoot["id"], "from_name": shoot.get("name"), "to_name": new_name,
              "started": datetime.now().isoformat(timespec="seconds"), "moves": moves, "verified": 0, "problems": []}
+    if GONE.get(shoot["id"]):
+        entry["gone"] = list(GONE[shoot["id"]])     # photos no longer in the folder when this rename was planned
     log["renames"].append(entry)
     log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
 
@@ -294,8 +318,10 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
                 entry["problems"].append(f"no hash to check against: {m['to']}")
                 continue
             if sha256_of(dst) != m["sha256"]:
-                entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
-                continue
+                if not (m.get("theirs") and dst.is_file()):
+                    entry["problems"].append(f"hash mismatch after the rename: {m['to']}")
+                    continue
+                m["saved_again"] = True   # their own sidecar, saved again by their editing program meanwhile: theirs
             hashed += 1
         entry["verified"] += 1
     entry["hashed_in_full"] = hashed
@@ -310,7 +336,14 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             say(f"    - {p}")
         sys.exit(1)
     update_queue(session, studio, shoot["id"], new_name, new_folder)
-    say("  All done.")
+    say("  All done.")   # a second copy follows once, after the last rename of this run (work() -> mirror_follows)
+
+
+def follow_second(studio):
+    """A second copy of this backup on another drive is brought in line with the new name. One way of doing it,
+    mirror_follows (below): it renames there too, or notes that it is waiting for that drive. The rename here is
+    done either way."""
+    mirror_follows(studio)
 
 
 def update_queue(session, studio, shoot_id, new_name, new_folder):
@@ -458,7 +491,7 @@ def finish_unfinished(session, studio):
             if not m.get("sha256") and lower_to.count(m["to"].lower()) > 1:
                 m["phantom"] = True
         real = [m for m in moves if not m.get("phantom")]
-        pending = [m for m in real if not m.get("moved")]
+        pending = [m for m in real if not m.get("moved") and not m.get("gone")]
         if entry.get("finished") and not pending:
             if resolve_phantoms(session, entry):
                 log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
@@ -503,17 +536,43 @@ def finish_unfinished(session, studio):
                 if m.get("sha256") and sha256_of(dst) == m["sha256"]:
                     entry["verified"] += 1
                     m["checked"] = True
+                elif m.get("theirs") and dst.is_file():
+                    # their own sidecar (never the backup's): its hash was taken at the plan only to prove the
+                    # move, and their editing program saved it again before this run finished the rename. It is
+                    # beside its photo under its new name; what it holds is theirs. Noted, never a problem.
+                    entry["verified"] += 1
+                    m["checked"] = m["saved_again"] = True
                 else:
                     entry["problems"].append(f"could not verify {m['to']}")
             elif on_disk(src) and on_disk(dst):
                 entry["problems"].append(f"{m['to']} is in the way of {src.name}; both left as they are")
             elif on_disk(src):
                 entry["problems"].append(f"never moved: {m['from']}")
+            elif folder_moved and (session / new_folder).is_dir() and on_disk(session / new_folder):
+                # The shoot's folder is there under its new name and this file is in it under neither its old
+                # name nor its new one: it was deleted or moved by hand (culled) before or during the rename.
+                # Theirs to remove: noted, never a problem, and never again a reason to stop every rename and
+                # join of this backup (Nov 23 review).
+                m["gone"] = True
+                if m["from"] not in entry.setdefault("gone", []):
+                    entry["gone"].append(m["from"])
             else:
                 entry["problems"].append(f"missing: {m['from']}")
         checked = {m["to"] for m in real if m.get("checked")}
         tail = " already exists; not overwritten"
         entry["problems"] = [q for q in entry["problems"] if not (q.endswith(tail) and q[:-len(tail)] in checked)]
+        # what an earlier try at finishing could not do, and this one did: a file that was missing then and is now
+        # under its new name and matches its hash is no longer a problem (only with that proof, as above)
+        mended = ({f"missing: {m['from']}" for m in real if m.get("checked")} | {f"never moved: {m['from']}" for m in real if m.get("checked")}
+                  | {f"could not verify {m['to']}" for m in real if m.get("checked")})
+        # ... and so is "something was in the way of it", once what was in the way has gone and the file is under
+        # its new name, matching its hash
+        mended |= {f"{m['to']} is in the way of {Path(inside(m['from'])).name}; both left as they are" for m in real if m.get("checked")}
+        entry["problems"] = [q for q in entry["problems"] if q not in mended]
+        culled = {f"missing: {m['from']}" for m in real if m.get("gone")}
+        entry["problems"] = [q for q in entry["problems"] if q not in culled]
+        if culled:
+            say(GONE_WORDS.format(n=len(culled), is_="is" if len(culled) == 1 else "are", are="were"))
         log_path.write_text(json.dumps(log, indent=1), encoding="utf-8")
         if new_folder:
             write_records(session, studio, entry["shoot"], new_folder, real, entry["to_name"])
@@ -529,6 +588,7 @@ def finish_unfinished(session, studio):
             sys.exit(1)
         if entry.get("stops") and new_folder:  # it stopped on a PC (a file held open) and is now done: the queue follows
             update_queue(session, studio, entry["shoot"], entry["to_name"], new_folder)
+        follow_second(studio)
 
 
 def main():
@@ -541,7 +601,53 @@ def main():
     a = ap.parse_args()
     from where import locate
     session, studio = locate(a.session)  # the folder the shoots sit in, and the records (before or after the night settles)
+    try:
+        import join_shoots
+    except ImportError:
+        join_shoots = None
+    if join_shoots is None:
+        return work(a, session, studio, None)
+    # One rename or join at a time on this computer (Nov 23: the Name your shoots page, the report's Rename and the
+    # chat can all ask at once, and two at work on one backup would write over each other's log). A rename waits
+    # its turn for up to RENAME_WAIT seconds; the job that started this one may hold the lock for it.
+    with join_shoots.held(wait=RENAME_WAIT) as got:
+        if not got:
+            sys.exit("STOP: " + join_shoots.WORDS["busy"])
+        return work(a, session, studio, join_shoots)
+
+
+RENAME_WAIT = float(os.environ.get("STUDIO_RENAME_WAIT_FOR_TESTS") or 120)   # seconds a rename waits its turn
+
+
+def being_made(studio):
+    """The plain line when this backup is still being made, or its second copy is being made right now (so a
+    rename waits: nothing is moved under a copy that is reading these folders); None when a rename may go ahead."""
+    try:
+        import backup_lock
+        if backup_lock.working_on(studio):
+            return backup_lock.BEING_MADE
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import second_copy
+        if second_copy.status(studio).get("state") == "copying":
+            return "A second copy of this backup is being made right now. Try this again when it's done."
+    except (ImportError, AttributeError):
+        pass
+    except Exception:  # noqa: BLE001  (a second copy that cannot be asked about never stops a rename)
+        pass
+    return None
+
+
+def work(a, session, studio, join_shoots):
+    if not a.dry_run:
+        why = being_made(studio)
+        if why:
+            say("STOP: " + why)
+            sys.exit(2)
     finish_unfinished(session, studio)
+    if join_shoots is not None:   # a join of two shoots that was cut off is finished first too, from its own log
+        join_shoots.finish_unfinished(session, studio)
 
     jobs = []
     if a.from_names:
@@ -562,6 +668,24 @@ def main():
     for shoot_id, new_name in jobs:
         shoot, old_folder, new_folder, moves = plan_rename(session, studio, shoot_id, new_name)
         apply(session, studio, shoot, old_folder, new_folder, moves, new_name, a.dry_run)
+    if not a.dry_run:
+        mirror_follows(studio)
+
+
+def mirror_follows(studio):
+    """A second copy that looks like the photo drive (Nicole, Nov 23) takes the same new folder and names
+    (second_copy.follow: renames on the second drive only, logged first, every file proved the same). With that
+    drive not plugged in it is noted as waiting, and done when a command next sees the drive. A backup with no
+    second copy, or one of the earlier kind (the card's layout), is left alone. Never stops a rename: it is done."""
+    try:
+        import second_copy
+        got = second_copy.follow(str(studio))
+        if got.get("words"):
+            say("  " + got["words"])
+    except (ImportError, AttributeError):
+        pass
+    except (Exception, SystemExit) as e:  # noqa: BLE001
+        say(f"  (the second copy could not be brought in line just now: {e.__class__.__name__})")
 
 
 if __name__ == "__main__":

@@ -359,8 +359,8 @@ def check_page_words(w, home):
         case("her words: %s" % line, ("¦" + line + "¦") in shown, line)
     case("gone by her v30: Another hello, the heading Also in your Assistant, the Newest box",
          not any(x in page for x in ("Another hello", "Also in your Assistant", "Newest:", "id='again'", "id='n3'")))
-    case("each step where hers sends it: its own screen, the editing queue (a button), its own screen, the posting queue",
-         "id='s1' data-item='backup' href='/backups'" in page and "<button class='row' id='s2' data-item='queue'" in page
+    case("each step where hers sends it: the Back up a card box on this page (her v31) with See all my backups as its link, the editing queue (a button), its own screen, the posting queue",
+         "id='s1' data-item='backup' role='button'" in page and "<a class='seeall' id='seeAll' href='/backups'>" in page and "<button class='row' id='s2' data-item='queue'" in page
          and "id='kitsBtn' data-item='posts' href='/make-posts'" in page and "id='s4' data-item='posting' href='/posting.html'" in page)
     case("the bar: the name, the date, Open my Assistant folder; no Today list, no welcome paragraphs, no folder card",
          "<span class='when' id='when'>Tuesday, November 17</span>" in page and "id='folder' data-item='folder'" in page

@@ -68,17 +68,11 @@ WORDS = {
     "copy": "Copy",
     "copied": "Copied",
     "back_home": "Back to home",
-    # Back up a card
-    # (her "Step 1 of your workflow" eyebrow is gone since v29: the home page no longer numbers steps)
-    "b_h1": "Back up <em>a card.</em>",
-    "b_lede_1": "This is where the Assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.",
-    "b_steps": "How to back up a card",
-    "b_s1": "<b>Put your memory card in.</b> Shooting with more than one card? Back them up one at a time; they'll show up together below.",
-    "b_card_in": "A card is in: {name}, about {files} files.",
-    "b_card_out": "No card in yet.",
-    "b_s2": "<b>Paste this in the chat:</b>",
+    # Your backups (her v31 pages/your-backups.html, Nov 22): only the heading and the list. Backing up happens in
+    # the box on the home page (backup_popup.py), so her v26 explanation, the two steps and "Paste this in the
+    # chat" are gone from this screen; "backup now" in the chat still works (b_say is what the chat is told).
+    "b_h1": "Your <em>backups.</em>",
     "b_say": "backup now",
-    "b_h2": "Your backups",
     "b_say_list": "Every card you've backed up, newest first. Open a shoot's folder to start editing, or see its report.",
     "b_find": "Find a shoot by name",
     "loading": "Loading…",
@@ -143,17 +137,10 @@ WORDS = {
 
 # Ours, where hers has none. Each is a draft for Dustin and Nicole.
 OUR_WORDS = {
-    # Hers read "It also picks six photos from each shoot that would be great to edit first and send your client as
-    # sneak peeks, and marks them "sneak peek" in Lightroom so they're easy to find. ..." Since Nov 23 (Nicole: "keep
-    # sneak peek out and give the 6 photos but it can say something like a first look at your shoot") the six are a
-    # first look, nothing is marked in Lightroom and nothing is for a client. A draft of ours, for Nicole to reword.
-    "b_lede_2": "It also pulls six photos from each shoot as a first look, so you can see what you got. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.",
-    # under step 2 of Back up a card. Hers read "Your assistant asks a quick question or two, then you can walk
-    # away. The report is ready when you're back, and it shows up below.", which stopped being true on Nov 19
-    # (Dustin: nothing is asked before the copy). A draft of ours, for Nicole to reword.
-    "b_s2_small": "The Assistant finds your card and starts copying. There's nothing to answer first, so you can walk away. The report is ready when you're back, and it shows up below.",
     # a sample backup (night.py --sample, for tests) is never called safe to format; the report's own words
     "sample_keep": "Keep the card: this was a sample",
+    # a FOLDER was backed up (Back up a folder instead), so there is no card to call safe to format (Nov 23 review)
+    "folder_safe": "Copied and checked",
     # a backed-up shoot that holds video clips: a clip is never called a photo (Dustin, Nov 11)
     "clips": "video clip",
     # the home page saved as a file (home.py page), which can't ask the Assistant anything
@@ -297,7 +284,7 @@ function shootCard(s, cardLabel){
   let acts;
   if (!s.plugged) acts = `<p class="warn">${esc(fill(W.b_unplugged, {drive: s.drive || W.another_drive}))}</p>`;
   else if (!s.found) acts = `<p class="warn">${esc(W.b_moved)}</p>`;
-  else acts = `<button class="btn solid" data-open="${esc(s.id)}">${esc(W.open_folder)}</button><button class="btn" data-report="${esc(s.id)}">${esc(W.see_report)}</button>`;
+  else acts = `<button class="btn solid" data-report="${esc(s.id)}">${esc(W.see_report)}</button><button class="btn" data-open="${esc(s.id)}">${esc(W.open_folder)}</button>`;   // the report first (Nicole, Nov 22)
   return `<div class="shoot"><div class="ph">${th}</div><b>${esc(s.name)}</b><small>${esc(meta)}</small>
     ${st ? `<span class="pill ${stCls}">${esc(st)}</span>` : ''}
     <div class="acts stack">${acts}</div></div>`;
@@ -309,7 +296,8 @@ function groupCard(g){
   const cards = bs.length > 1 ? fill(W.cards_n, {n: bs.length}) + ' · ' : '';
   // the backup at a glance: is the card safe to format, is there a second copy
   const flags = [];
-  if (bs.every(b => b.safe === true)) flags.push(`<span class="pill ok">${esc(fill(W.safe, {card: bs.length > 1 ? W.safe_cards : W.safe_card}))}</span>`);
+  if (bs.every(b => b.safe === true) && bs.every(b => b.folder)) flags.push(`<span class="pill ok">${esc(W.folder_safe)}</span>`);   // a folder was backed up: no card to format
+  else if (bs.every(b => b.safe === true)) flags.push(`<span class="pill ok">${esc(fill(W.safe, {card: bs.length > 1 ? W.safe_cards : W.safe_card}))}</span>`);
   else if (bs.some(b => b.safe === false)) flags.push(`<span class="pill late">${esc(W.needs_look)}</span>`);
   if (bs.some(b => b.sample)) flags.push(`<span class="pill soon">${esc(W.sample_keep)}</span>`);        // a sample is never "safe to format"
   if (bs.some(b => b.known)) flags.push(bs.every(b => b.second) ? `<span class="pill ok">${esc(W.second_yes)}</span>` : `<span class="pill">${esc(W.second_no)}</span>`);
@@ -341,7 +329,6 @@ function render(){
 async function load(){
   let g;
   try { g = await homeData(); } catch (e) { if (!got) $('backups').innerHTML = `<p class="empty">${esc(W.b_cant)}</p>`; return; }
-  $('cardStatus').textContent = g.card ? fill(W.b_card_in, {name: g.card.name, files: many(g.card.files)}) : W.b_card_out;
   // the backups could not be read just now: the list as it last was stays, or her "can't reach" line; an empty
   // list here would say "Nothing backed up yet", which is not true
   if (g.problem_backups) { if (!got) { $('backups').innerHTML = `<p class="empty">${esc(W.b_cant)}</p>`; $('olderBox').innerHTML = ''; } return g; }
@@ -469,15 +456,13 @@ def _paste(words):
 
 def backups_html():
     e = html.escape
-    body = (f"<header class='head'><h1>{W('b_h1')}</h1>"
-            f"<p class='lede wide'>{e(W('b_lede_1'))}</p><p class='lede wide'>{e(W('b_lede_2'))}</p></header>"
-            f"<p class='steps-title'>{e(W('b_steps'))}</p><div class='steps light'>"
-            f"<div class='st'><span class='num'>1</span><div><p>{W('b_s1')}</p><span class='status' id='cardStatus'></span></div></div>"
-            f"<div class='st'><span class='num'>2</span><div><p>{W('b_s2')}</p>{_paste(W('b_say'))}<small>{e(W('b_s2_small'))}</small></div></div></div>"
-            f"<section class='sec'><h2>{e(W('b_h2'))}</h2><p class='say'>{e(W('b_say_list'))}</p>"
+    # Only "Your backups." and the list (Nicole's v31, section 4): backing up happens in the box on the home page
+    # now, so the explanation and the two steps ("Paste this in the chat: backup now") are gone from here.
+    body = (f"<header class='head'><h1>{W('b_h1')}</h1></header>"
+            f"<section class='sec'><p class='say'>{e(W('b_say_list'))}</p>"
             f"<div class='find'><input id='find' type='search' placeholder='{e(W('b_find'), quote=True)}' aria-label='{e(W('b_find'), quote=True)}'></div>"
             f"<div id='backups'><p class='empty'>{e(W('loading'))}</p></div><div id='olderBox'></div></section>")
-    return _page("Back up a card", body, JS_BACKUPS % {"recent": RECENT_BACKUPS})
+    return _page("Your backups", body, JS_BACKUPS % {"recent": RECENT_BACKUPS})
 
 
 def make_posts_html():
@@ -538,7 +523,8 @@ _STATUS_LOCK = threading.Lock()
 
 
 def backup_status(studio):
-    """How a backup stands, from its own manifest: {"known", "safe", "second", "sample"}.
+    """How a backup stands, from its own manifest: {"known", "safe", "second", "sample", "folder"} (folder: a
+    folder was backed up, not a memory card, so nothing is called safe to format).
     safe: True only when it finished with no problems, every file's copy checked (the second copy too, when there
     is one), and it was not a sample; False when it has not finished or something went wrong; None for a sample
     that is otherwise fine (a sample is never called safe to format), and when the manifest can't be read."""
@@ -547,11 +533,11 @@ def backup_status(studio):
         st = f.stat()
         key = (str(f), st.st_mtime_ns, st.st_size)
     except OSError:
-        return {"known": False, "safe": None, "second": False, "sample": False}
+        return {"known": False, "safe": None, "second": False, "sample": False, "folder": False}
     with _STATUS_LOCK:
         if key in _STATUS:
             return dict(_STATUS[key])
-    out = {"known": False, "safe": None, "second": False, "sample": False}
+    out = {"known": False, "safe": None, "second": False, "sample": False, "folder": False}
     try:
         m = json.loads(f.read_text(encoding="utf-8"))
         files = m.get("files") or {}
@@ -562,7 +548,7 @@ def backup_status(studio):
         sample = bool(m.get("sample"))
         out = {"known": True, "safe": (None if sample else True) if good else False,
                "second": second and all((v.get("second") or {}).get("ok") for v in files.values()) and bool(files),
-               "sample": sample}
+               "sample": sample, "folder": m.get("source_kind") == "folder"}
     except (OSError, ValueError, AttributeError, TypeError):
         pass
     with _STATUS_LOCK:

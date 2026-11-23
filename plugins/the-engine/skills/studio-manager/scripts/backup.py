@@ -171,6 +171,11 @@ def run_copy(label, files, src_root, dest_root, manifest, dry, save=None, budget
     done = 0
     total = len(files)
     t0 = time.time()
+    pause = 0.0
+    try:   # for the tests only: a wait after each file, so a copy of small pretend photos can be cut off part way
+        pause = float(os.environ.get("STUDIO_BACKUP_PAUSE_FOR_TESTS") or 0)
+    except ValueError:
+        pass
     for p, size in files:
         rel = p.relative_to(src_root)
         key = rel.as_posix()  # one spelling in the records on a Mac and a PC, so a drive can move between them
@@ -216,6 +221,8 @@ def run_copy(label, files, src_root, dest_root, manifest, dry, save=None, budget
         done += 1
         if save:
             save()
+        if pause:
+            time.sleep(pause)
         if done % 25 == 0 or done == total or size > 200 * 1024 * 1024:
             say(f"  {label}: {done}/{total} files, {time.time() - t0:.0f} s")
         if budget and time.time() - t_start > budget:
@@ -264,6 +271,20 @@ def not_this_card(manifest, src, files, name):
         return (f"The folder \"{folder}\" on the drive already holds a finished backup of this card, from before its newest "
                 f"photos were taken. So nothing gets mixed up, I won't add to it. {again} Everything on the card is copied there.")
     return None
+
+
+def source_kind(src):
+    """"card" when what is being backed up is the top of a memory card (a folder a camera makes sits there), else
+    "folder". Kept in the manifest (source_kind), so the report of a folder never talks about a memory card,
+    least of all "safe to format" (Nov 23 review). A backup made before this has no such line and reads as a card."""
+    try:
+        import studio_file
+        return "card" if studio_file.looks_like_card(src) else "folder"
+    except ImportError:
+        try:
+            return "card" if (Path(src) / "DCIM").is_dir() else "folder"
+        except OSError:
+            return "card"
 
 
 def whole_records(records):
@@ -380,6 +401,7 @@ def main():
     ap.add_argument("--name", required=True, help="session name, e.g. 'Johnson family beach'")
     ap.add_argument("--date", default=None, help="YYYY-MM-DD, default today")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--as-folder", action="store_true", help="what is backed up was picked as a folder (Back up a folder instead), whatever is inside it: its records never call it a memory card")
     ap.add_argument("--budget", type=float, default=None, help="seconds to work before pausing cleanly (run again to continue)")
     ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card (in path order). "
                     "The records say it was a sample, the report says the card is not backed up, and the card is never marked safe.")
@@ -461,6 +483,12 @@ def main():
     mpath = studio / "manifest.json"
     manifest = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {"session": folder, "source": str(src), "files": {}}
     manifest["source"] = str(src)
+    # Picked as a folder on a page ("Back up a folder instead"): a folder, even when a card's DCIM folder is
+    # inside it (a card dragged to the Desktop). No card was read, so no line may say a card is safe to format
+    # (Nov 23 review). Once a backup's records say folder, a later run never turns it back into a card.
+    manifest["source_kind"] = "folder" if (a.as_folder or manifest.get("source_kind_asked") == "folder") else source_kind(src)
+    if a.as_folder:
+        manifest["source_kind_asked"] = "folder"
     manifest["dest"] = str(dest)
     manifest["second"] = str(second) if second else None
     manifest["skipped_system_files"] = skipped
@@ -507,12 +535,13 @@ def main():
     manifest["work_seconds"] = manifest.get("work_seconds", 0) + elapsed  # across resumed runs
     mpath.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
+    a_folder = manifest.get("source_kind") == "folder"
     lines = [f"# Report · {folder}", ""]
     if problems:
         lines += ["## Needs you first", ""] + [f"- {p}" for p in problems] + [""]
-        lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. Nothing on the memory card has been changed; run it again when the problem is fixed and it picks up where it left off.", ""]
+        lines += [f"**Not finished.** {ok_dest} of {len(files)} files are copied and checked on the session drive. " + ("Nothing in the folder you backed up has been changed" if a_folder else "Nothing on the memory card has been changed") + "; run it again when the problem is fixed and it picks up where it left off.", ""]
     else:
-        lines += [f"**All {len(files)} files ({human(total_bytes)}) have been safely backed up and verified.** Every one was checked against the card, byte for byte."
+        lines += [f"**All {len(files)} files ({human(total_bytes)}) have been safely backed up and verified.** Every one was checked against {'the original' if a_folder else 'the card'}, byte for byte."
                   + (" They are on your drive and in your second copy." if second else ""), ""]
     mac = "Mac " if this_computer.MAC else ""   # "hidden Mac system file" on a Mac, word for word as before; "hidden system file" on a PC
     skipped_note = f" ({skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be)" if skipped else ""
@@ -528,8 +557,12 @@ def main():
     lines += ["", "## Where", "", f"- Session drive: `{dest}`"]
     if second:
         lines.append(f"- Second copy: `{second}`" + ("" if ok_second == len(files) else f" ({ok_second} of {len(files)} checked)"))
-    lines += ["", "## The card", "", "Nothing on it was changed. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
-              "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · your memory card is exactly as it was._"]
+    if a_folder:
+        lines += ["", "## The folder you backed up", "", "Nothing in it was changed." + ("" if not problems else " Keep it as it is."),
+                  "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · the folder you backed up is exactly as it was._"]
+    else:
+        lines += ["", "## The card", "", "Nothing on it was changed. " + ("It is safe to format when you're ready." if not problems else "Keep it."),
+                  "", f"_{len(files)} files · {human(total_bytes)} · {elapsed:.0f} seconds · your memory card is exactly as it was._"]
     report = "\n".join(lines) + "\n"
     (studio / "morning-report.md").write_text(report, encoding="utf-8")
     # the index (when each photo was taken, which camera) and the same report as a

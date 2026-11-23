@@ -346,10 +346,27 @@ OUR_WORDS = {
     "nd_save": "Save",
     "nd_saved": "Saved. Your next backup goes to {drive}. The photos from this backup stay where they are.",
     "nd_same": "Your backups already go to {drive}. Nothing changed.",
+    # put these shoots in one folder (Nicole, Nov 23: joining shoots after the backup). Opens Name your shoots.
+    "ns_button": "Put these shoots in one folder",
+    "ns_note": ("For mini sessions, or one shoot that was split in two. This opens Name your shoots, where you can keep "
+                "them together. To put only some of them together, tell the Assistant which ones."),
+    "ns_opening": "Opening Name your shoots...",
     "nd_second": ("{drive} is where your second copies go, so your photos can't go there first as well. "
                   "Pick another drive, or tell the Assistant to change your second copy."),
     "nd_gone": "I can't see {drive} right now. Is it plugged in?",
     "nd_changed": "The drives changed since this was opened. Press the button again.",
+    # a folder was backed up, not a memory card (Back up a folder instead): the same lines with no card in them,
+    # and never "safe to format" (Nov 23 review: the report of a folder told them a card could be formatted)
+    "f_unchanged_now": "Nothing in the folder you backed up has been changed",
+    "f_checked": "checked against the original, byte for byte",
+    "f_as_it_was": "The folder you backed up is exactly as it was: nothing in it was changed, renamed or deleted.",
+    "f_pill": "Everything is copied and checked",
+    "f_pill_wait": "Not finished yet",
+    "f_chip": "copied and checked",
+    "f_chip_wait": "not finished yet",
+    "f_keep": "Nothing in the folder you backed up was changed. Leave it as it is until this report says every file is checked.",
+    "f_foot": "The folder you backed up is exactly as it was.",
+    "aside_undated": "{n} with no date could not be sorted into a shoot: set aside, not deleted.",
     # one quiet line under the where-card, when this backup's photos are on the computer's own disk
     "own_disk": ("Your photos are on this {computer}'s own disk. An external drive is safer: if anything happens to "
                  "the computer, the photos on it go too. Plug one in and press Use a different drive next time."),
@@ -381,12 +398,13 @@ OPTIONS_SCRIPT = r"""<script>
   var W=JSON.parse(document.getElementById('sc-words').textContent);
   function $(id){ return document.getElementById(id); }
   var open=$('sc-open'), say=$('sc-say'), keep=$('sc-keep'), panel=$('sc-panel'), list=$('sc-drives'), none=$('sc-none'),
-      look=$('sc-look'), always=$('sc-always'), go=$('sc-go'), made=$('sc-made');
+      look=$('sc-look'), always=$('sc-always'), go=$('sc-go'), made=$('sc-made'), behind=$('sc-behind');
   var live=location.protocol==='http:'||location.protocol==='https:', drives=[], timer=null;
   function tell(t){ say.textContent=t||''; }
   function chosen(){ var r=list.querySelector('input:checked'); return r?parseInt(r.value,10):-1; }
   function show(st){
     clearTimeout(timer);
+    if(behind){ behind.textContent=st.behind||''; behind.hidden=!st.behind; }
     if(st.state==='copying'){
       panel.hidden=true; open.disabled=true; tell(st.line); keep.hidden=!st.card;
       timer=setTimeout(ask,1500);
@@ -396,6 +414,8 @@ OPTIONS_SCRIPT = r"""<script>
     } else if(st.state==='stopped'){
       keep.hidden=true; open.disabled=false; tell(st.line);
     } else { keep.hidden=true; }
+    // a copy waiting for its drive to take the new names: looked at again, so the line goes once it has caught up
+    if(st.behind && st.state!=='copying') timer=setTimeout(ask,6000);
   }
   function ask(){
     fetch('second-status',{cache:'no-store'}).then(function(r){ return r.json(); }).then(show)
@@ -424,7 +444,7 @@ OPTIONS_SCRIPT = r"""<script>
     var i=chosen(), d=drives.filter(function(x){ return x.i===i; })[0]; if(!d) return;
     go.disabled=true;
     fetch('second-copy',{method:'POST',headers:{'Content-Type':'application/json'},
-           body:JSON.stringify({drive:d.i,name:d.name,always:!!always.checked})})
+           body:JSON.stringify({drive:d.i,name:d.name,always:!!(always&&always.checked)})})
       .then(function(r){ return r.json(); }).then(function(j){
         if(j.ok){ panel.hidden=true; open.disabled=true; tell(j.words); timer=setTimeout(ask,800); }
         else { tell(j.words||W.sc_cant); go.disabled=false; }
@@ -589,6 +609,42 @@ def more_options(W):
     ]
 
 
+JOIN_OPTION_SCRIPT = r"""<script>
+(function(){
+  var open=document.getElementById('ns-open'); if(!open) return;
+  var say=document.getElementById('ns-say'), W=JSON.parse(document.getElementById('ns-words').textContent);
+  var live=location.protocol==='http:'||location.protocol==='https:';
+  open.addEventListener('click',function(){
+    if(!live){ say.textContent=W.sc_not_live; return; }
+    say.textContent=W.ns_opening;
+    fetch('name-shoots-url',{cache:'no-store'}).then(function(r){ return r.json(); }).then(function(j){
+      if(j&&j.url&&/^http:\/\/(127\.0\.0\.1|localhost):\d+\//.test(j.url)){ (window.top||window).location.href=j.url; }
+      else say.textContent=W.opt_cant;
+    }).catch(function(){ say.textContent=W.opt_cant; });
+  });
+})();
+</script>"""
+
+
+def join_option(studio):
+    """(html lines, script) for "Put these shoots in one folder": only when this backup has two or more shoots in
+    folders of their own. The button asks this report's server for the Name your shoots page of this backup."""
+    try:
+        sh = json.loads((Path(studio) / "shoots.json").read_text(encoding="utf-8")).get("shoots") or []
+    except (OSError, ValueError, AttributeError):
+        sh = []
+    if len([s for s in sh if isinstance(s, dict) and s.get("folder")]) < 2:
+        return [], ""
+    e = html.escape
+    W = OUR_WORDS
+    words = {k: W[k] for k in ("ns_opening", "opt_cant", "sc_not_live")}
+    return ["<div class='opt' id='opt-join'><div class='opt-row ns'>"
+            f"<button type='button' class='opt-btn' id='ns-open'>{e(W['ns_button'])}</button>"
+            "<span class='opt-say' id='ns-say' role='status' aria-live='polite'></span></div>"
+            f"<p class='opt-note' id='ns-note'>{e(W['ns_note'])}</p></div>",
+            "<script type='application/json' id='ns-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>"], JOIN_OPTION_SCRIPT
+
+
 def options_section(manifest, studio):
     """The options under the shoots, for a backup that finished clean and was not a sample (there is nothing to
     offer on one that has not finished): Make a second copy (a backup that already has one, every file checked,
@@ -601,6 +657,16 @@ def options_section(manifest, studio):
     W = OUR_WORDS
     had = second_copy.has_second(manifest)
     made = W["sc_made"].format(drive=second_copy.drive_name(had)) if had else ""
+    try:    # a copy that still has the folders and names from before a rename (its drive was out), said under the line
+        st = second_copy.status(studio)
+    except Exception:  # noqa: BLE001  (the report is still written)
+        st = {}
+    behind = str(st.get("behind") or "")
+    # a second copy made before Nov 23 is laid out as the card was, not as their shoots: said plainly, once, here
+    old = second_copy.OUR_WORDS["card_layout"] if had and manifest.get("second_layout") != second_copy.LAYOUT_MAIN else ""
+    # "Do this after every backup" is off since Nov 23 (Nicole: the second drive is asked each time)
+    tick = (f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>"
+            if second_copy.REMEMBER_SECOND else "")
     words = {k: W[k] for k in ("sc_cant", "sc_not_live", "sc_looking")}
     more = {k: W[k] for k in ("sc_not_live", "opt_cant", "opt_looking", "nm_now", "nm_cant", "nd_now")}
     out = ["<section class='wrap opts' id='opts'>",
@@ -612,20 +678,24 @@ def options_section(manifest, studio):
            f"<span class='opt-made' id='sc-made'{'' if had else ' hidden'}>{e(made)}</span>"
            "<span class='opt-say' id='sc-say' role='status' aria-live='polite'></span></div>",
            f"<p class='opt-note' id='sc-keep' hidden>{e(second_copy.OUR_WORDS['keep_card'])}</p>",
+           f"<p class='opt-note' id='sc-behind' role='status'{'' if behind else ' hidden'}>{e(behind)}</p>",
+           *([f"<p class='opt-note' id='sc-old'>{e(old)}</p>"] if old else []),
            "<div class='opt-panel' id='sc-panel' hidden>",
            f"<p class='opt-q'>{e(W['sc_which'])}</p>",
            "<div class='opt-drives' id='sc-drives'></div>",
            f"<p class='opt-note' id='sc-none' hidden>{e(W['sc_none'])}</p>",
            f"<button type='button' class='opt-link' id='sc-look'>{e(W['sc_look'])}</button>",
-           f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>",
+           *([tick] if tick else []),
            f"<button type='button' class='opt-go' id='sc-go' disabled>{e(W['sc_go'])}</button>",
            "</div></div>"]
     out += more_options(W)
+    join_html, join_script = join_option(studio)
+    out += join_html
     out += ["</section>",
             # the few lines the scripts themselves say, handed over as data (text only, never markup)
             "<script type='application/json' id='sc-words'>" + json.dumps(words).replace("</", "<\\/") + "</script>",
             "<script type='application/json' id='opt-words'>" + json.dumps(more).replace("</", "<\\/") + "</script>"]
-    return "\n".join(out), OPTIONS_SCRIPT + MORE_OPTIONS_SCRIPT + first_look.COPY_SCRIPT
+    return "\n".join(out), OPTIONS_SCRIPT + MORE_OPTIONS_SCRIPT + join_script + first_look.COPY_SCRIPT
 
 
 def human(n):
@@ -667,6 +737,14 @@ def sort_aside(studio):
         return [a["from"] for a in json.loads(p.read_text(encoding="utf-8")).get("set_aside", [])]
     except (ValueError, OSError):
         return []
+
+
+def sort_undated(studio):
+    """The photos and video clips among them whose date could not be read (sort.py names them, Nov 23)."""
+    try:
+        return set(json.loads((studio / "sort-log.json").read_text(encoding="utf-8")).get("set_aside_undated") or [])
+    except (ValueError, OSError, AttributeError):
+        return set()
 
 
 def index_facts(studio):
@@ -885,6 +963,7 @@ def build(manifest, studio, card=None):
     work = manifest.get("work_seconds")
     took = seconds_text(work) if work else duration(manifest.get("started"), finished)
     all_good = not problems and ok_dest == total and (ok_second == total if second else True)
+    a_folder = manifest.get("source_kind") == "folder"   # Back up a folder instead: no memory card in any line
     pics, pick_note = teasers(studio)
     peeks, _ = sneak_peeks(studio)
     notes = client_notes(studio)
@@ -906,7 +985,7 @@ def build(manifest, studio, card=None):
         out.append(f"<span class='eyebrow'>Backup report · {e(name)}</span>")
     if problems:
         out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
-        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. Nothing on the memory card has been changed; "
+        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. {e(OUR_WORDS['f_unchanged_now']) if a_folder else 'Nothing on the memory card has been changed'}; "
                    "fix what's below, run it again, and it picks up where it left off.</p>")
         out.append("<span class='pill bad'><span class='dot'>!</span>Not finished</span>")
         out.append("<div class='problems'><span class='eyebrow'>Needs you first</span><h2>What stopped it</h2><ul>"
@@ -921,9 +1000,10 @@ def build(manifest, studio, card=None):
     elif all_good:
         where = "your drive and your second copy" if second else "your drive"
         out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
-        out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and checked against the card, byte for byte. "
-                   "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.</p>")
-        out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
+        out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and {e(OUR_WORDS['f_checked']) if a_folder else 'checked against the card, byte for byte'}. "
+                   + (e(OUR_WORDS["f_as_it_was"]) if a_folder else "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.") + "</p>")
+        out.append("<span class='pill'><span class='dot'>&#10003;</span>"
+                   + (e(OUR_WORDS["f_pill"]) if a_folder else "The card is safe to format when you're ready") + "</span>")
         try:   # the saved second drive was not plugged in for this backup: one copy, said here, with the button below
             import second_copy
             missed = second_copy.missed(studio)
@@ -934,7 +1014,7 @@ def build(manifest, studio, card=None):
     else:
         out.append(f"<h1 class='h1'>Not finished <span class='swap'>yet.</span></h1>")
         out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked so far. Run it again to continue.</p>")
-        out.append("<span class='pill wait'><span class='dot'>…</span>Keep the card for now</span>")
+        out.append(f"<span class='pill wait'><span class='dot'>…</span>{e(OUR_WORDS['f_pill_wait']) if a_folder else 'Keep the card for now'}</span>")
     out.append("</section>")
 
     # the numbers
@@ -962,7 +1042,8 @@ def build(manifest, studio, card=None):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
         chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", media_words),
                  ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
-                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good and not manifest.get("sample") else "keep the card")]
+                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", (OUR_WORDS["f_chip"] if all_good else OUR_WORDS["f_chip_wait"]) if a_folder
+                  else "safe to format" if all_good and not manifest.get("sample") else "keep the card")]
         for cls, rot, pos, text in chips:
             out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
         out.append("</div>")
@@ -1001,6 +1082,11 @@ def build(manifest, studio, card=None):
         mac = "Mac " if this_computer.MAC else ""   # "hidden Mac system files" on a Mac, as always; on a PC just "hidden system files"
         out.append(f"<p>{skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
     aside = sort_aside(studio)
+    undated = sort_undated(studio)      # a photo with no date IS a photo: named on a line of its own
+    aside = [a for a in aside if a not in undated and not this_computer.housekeeping_file(Path(a).name)]
+    if undated:
+        n = len(undated)
+        out.append("<p>" + e(OUR_WORDS["aside_undated"].format(n=f"{n:,} photo{'s' if n != 1 else ''} or video clip{'s' if n != 1 else ''}")) + "</p>")
     if aside:
         out.append(f"<p>{len(aside)} file{'s that are' if len(aside) != 1 else ' that is'} not a photo or a video clip "
                    f"({', '.join(sorted({Path(a).suffix.lower().lstrip('.') for a in aside}))}) set aside, not deleted.</p>")
@@ -1047,7 +1133,8 @@ def build(manifest, studio, card=None):
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
         out.append(f"<p class='also'>Second copy{e(tail)}: {e(photos_folder(second))}</p>")
     if not all_good:
-        out.append("<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
+        out.append(f"<p class='also'>{e(OUR_WORDS['f_keep'])}</p>" if a_folder else
+                   "<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
     # one quiet line, once, when this backup's photos are on the computer's own disk (the Oct 30 teachable moment,
     # moved here from before the copy: Dustin, Nov 19). Only where the button it names is on the page.
     try:
@@ -1061,7 +1148,7 @@ def build(manifest, studio, card=None):
     out.append("</div></div>")
 
     if not card:
-        out.append("<footer class='foot'><div class='wrap'>Your memory card is exactly as it was.</div>"
+        out.append(f"<footer class='foot'><div class='wrap'>{e(OUR_WORDS['f_foot']) if a_folder else 'Your memory card is exactly as it was.'}</div>"
                    f"<div class='wordmark'>{e(brand.name())}</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.

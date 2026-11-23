@@ -642,7 +642,7 @@ def check_whole_build():
          and "use the Select the folder button on the Make posts screen" in flat("on-a-pc.md")
          and not re.search(r"home page's \"Select the folder|Select the folder button on the home page", flat("photos-in.md") + flat("on-a-pc.md")))
     # a press on step 1 or 3 opens a screen that also lists backups and kits: it may be someone only looking
-    case("hello.md: a press on Back up a card or Make posts may only be someone looking; what they asked is answered, then home.py seen",
+    case("hello.md: a press on See all my post kits may only be someone looking; what they asked is answered, then home.py seen (Back up a card never shows as a press since Nov 23)",
          "may only be someone looking" in flat("hello.md") and "answer what they asked, say nothing about the press, and run `home.py seen`" in flat("hello.md")
          and "may only be someone looking" in re.sub(r"\s+", " ", read(SM / "SKILL.md")))
     # the PC's "what can't you do" list names reminders, and the PC part points at the reminder section
@@ -1521,21 +1521,49 @@ def check_second_copy():
     case("after-the-report.md: what the report's button and panel say, word for word",
          all(x in a for x in ("Anything you'd like to change?", "Your photos are safe either way. These are here if you want them.",
                               "**Make a second copy**", "Which drive should the second copy go on?", "**Look again**",
-                              "**Do this after every backup**", "**Make the second copy**", "Keep your card in until this is done.")))
-    case("after-the-report.md: it is the card's layout, never sorted, and the honest lines are said as they are",
-         "never sorted or renamed" in a and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
-         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a)
+                              "**Make the second copy**", "Keep your card in until this is done.")))
+    case("after-the-report.md: no tick box for every backup, and nothing about it is remembered (Nicole, Nov 23: ask each time)",
+         "**Do this after every backup**" not in a and "There is no tick box for every backup any more." in a
+         and "no drive is saved for the next backup" in a and "there is no such setting any more" in a
+         and "`--always` is still taken by the command and saves nothing" in a
+         and "I ask each time now instead: press Make a second copy whenever you want one." in a)
+    case("after-the-report.md: it looks like the photo drive (Nicole, Nov 23), and the honest lines are said as they are",
+         "the same shoot folders with the same photo names as on their photo drive" in a and "never sorted or renamed" not in a
+         and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
+         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a
+         and "It has the same folders and photo names as Big Kahuna." in a
+         and "A video clip the backup turned upright is always read from their drive" in a)
+    case("after-the-report.md: the copy follows a rename or a join, waits for its drive, and their own files in the way are theirs to move",
+         "**It follows a rename or a join.**" in a and "second_copy.py follow \"<the backup's folder>\"" in a and "follow --all" in a
+         and "Your second copy on LaCie Rugged still has the folders and names from before. Plug LaCie Rugged in and it will catch up." in a
+         and "never move, rename or delete their file to make it pass" in a)
+    case("after-the-report.md: a second copy from before Nov 23 is left as it is and said truthfully; a folder of theirs with a shoot's name is refused",
+         "**A second copy made before Nov 23**" in a and "never converted" in a and "its folders and names are the memory card's, not your shoots'" in a
+         and "that isn't part of this second copy." in a and "nothing is copied into a folder of theirs" in a)
     case("after-the-report.md: never called made before the last line says so; nothing deleted to make it pass; never a cloud folder",
          "Never say there is a second copy until the command's last line says it is made." in a
          and "never delete or move anything to make it pass" in a and "Never a cloud folder" in a)
     case("after-the-report.md: the four exit codes, the missed second drive, and the eject line",
          all(x in a for x in ("0 done", "2 refused before anything was written", "3 stopped part way", "1 problems"))
-         and "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." in a
          and "A second copy is still being made from this card. It won't be long." in a and "It won't be long." in b)
-    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py",
-         "**Make a second copy** on the report" in f and "second_copy.py" in f)
-    case("where-things-live.md names the new records",
-         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock")))
+    case("backup.md: a second copy is never made by itself; a drive named for one backup gets its copy after the shoots are put away",
+         "A second copy is never made by itself" in b and "with a second copy on your LaCie afterwards." in b
+         and "it is made after the shoots are sorted and put away, with the same folders and names as the photo drive" in b
+         and "If they keep a second copy, the first line says so" not in b)
+    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py, and offers nothing for every backup",
+         "**Make a second copy** on the report" in f and "second_copy.py" in f and "never remembered" in f
+         and "with a tick box for every backup" not in f and "studio_file.py set --second" not in f)
+    case("where-things-live.md names the records, the copy's hidden folder on the second drive, and the earlier kind",
+         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock",
+                              "second-follow-log.json", ".studio-second/<the backup's name>/", "`layout`", "`second_layout: \"main\"`",
+                              "**A second copy made before Nov 23**", "asked_each_time")))
+    case("the core's table sends \"my second drive still has the old names\" there too",
+         "\"my second drive still has the old names\"" in core)
+    sc = read(SM / "scripts" / "second_copy.py")
+    case("the lines the instructions quote are the script's own",
+         all(x in sc for x in ("still has the folders and names from before. \"", "has the same folders and names as {photos} again.",
+                               " It has the same folders and photo names as {photos}.", "that isn't part of this second copy.",
+                               "I ask each time now instead: \"")) and "REMEMBER_SECOND = False" in sc)
 
 
 def check_backup_options():
@@ -1660,8 +1688,8 @@ def check_backup_zero():
          and "into your Photo Shoots folder" in f and "into your Photo Shoots folder" in b)
     case("backup.md: a second card of the day takes the next name by itself; only a name they gave stops",
          "With no name given this never stops" in b and "saturday card 2" in b and "the name THEY gave" in b)
-    case("backup.md: the second copy is made after the backup and never holds it up",
-         "it is made right after the backup itself and never holds it up" in b)
+    case("backup.md: a second copy named for one backup is made after the shoots are put away and never holds the backup up",
+         "it is made once the shoots are sorted and put away, with the same folders and names, and never holds the backup up" in b)
     case("hello.md: backup now pasted from the home page starts the backup, with no Want to dive in?",
          'never explain and never ask "Want to dive in?"' in h and "start the backup straight away" in h)
     a2 = re.sub(r"\s+", " ", read(SM / "parts" / "after-the-report.md"))
@@ -1670,11 +1698,11 @@ def check_backup_zero():
          "shoot_report.py unlink" in a2 and 'add_parser("unlink"' in src and "no command that takes a card off" not in a2)
     case("after-the-report.md: a second copy refuses any memory card, and changed photos are never called lost",
          "It refuses a memory card (this backup's own or any other" in a2 and '"could not be found" when it says they were changed' in a2
-         and "**The saved second drive had trouble during a backup**" in a2)
+         and "**A second drive named for one backup had trouble**" in a2 and "**A second drive saved by an earlier version**" in a2)
     import home_base
-    case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
-         "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]
-         and "quick question" not in " ".join(home_base.WORDS.values()))
+    case("the backups screen no longer says a question or two is asked (its steps box went with her v31: backing up starts in the box on the home page)",
+         "b_s2_small" not in home_base.WORDS and "b_s2_small" not in home_base.OUR_WORDS
+         and "quick question" not in " ".join(list(home_base.WORDS.values()) + list(home_base.OUR_WORDS.values())))
 
 
 def check_vault_core():
@@ -1973,7 +2001,8 @@ def check_chat_no_reminders():
     case("home.py's hello words for getting-started and regular no longer ask for the day's rundown, and say never what is due",
          "The day in" not in hw and hw.count("never what is due") + hw.count("Never what is due") == 2, hw)
     case("the core no longer counts a tile press among presses that may only be someone looking (tiles never reach pending)",
-         "See all my post kits or a tile may only be" not in skill and "Back up a card or See all my post kits may only be someone looking" in skill)
+         "See all my post kits or a tile may only be" not in skill and "a press on See all my post kits may only be someone looking" in skill
+         and "Back up a card or See all my post kits may only be someone looking" not in skill)
     case("posting-queue.md says the grid shows up to 12 posts in four rows (not 12 to 15, not five rows)",
          "12 to 15 posts" not in pq and "up to five rows" not in pq and "up to 12 posts show at once, four rows" in pq
          and "up to four rows (12 posts)" in pq)
@@ -2026,12 +2055,111 @@ def check_reel_words():
          any("with a reel's name after a comma" in r and "parts/words.md" in r for r in table_rows(skill)))
     stale = [rel(f) for f in instruction_files() if re.search(r"one caption (and one set of hooks )?for (all of )?(the|a) shoot's reels|words page has one Reel tab", read(f))]
     case("no instruction still says a shoot's reels share one caption", not stale, stale)
+def check_nov23_engine():
+    """Nicole's Nov 23 answers, the backup's engine: the six photos are a first look (no keyword, no client note),
+    and a backup started from the home page can be read and carried on from the chat."""
+    print("\nNov 23: a first look, no client note, and a backup started from the home page")
+    part = lambda n: read(SM / "parts" / n)   # noqa: E731
+    skill, b, s, c, a, w = read(SM / "SKILL.md"), part("backup.md"), part("sneak-peeks.md"), part("client-note.md"), part("after-the-report.md"), part("where-things-live.md")
+    case("sneak-peeks.md is the first look now: the page's line, six per shoot, the close look and the checked lines kept",
+         "A first look at your shoot." in s and "six per shoot, always" in s and "peek_sheets.py closer" in s and "--checked" in s
+         and "peek_sheets.py taste" in s)
+    case("... and it never says the six are for a client, are sneak peeks to send, or are marked in Lightroom",
+         "send your client" not in s and "marks each pick in Lightroom" not in s and "to send the client" not in s
+         and "Never say a photo is marked, tagged or findable in Lightroom" in s)
+    case("... an older backup's 'sneak peek' sidecars are left where they are, and it says what to answer",
+         "They are left exactly where they are" in s and "New backups don't." in s)
+    case("... a backup started from the home page picks its own six, with nobody looking",
+         "A backup started from the home page picks its own six" in s and "night.py --by-time" in s)
+    case("backup.md: step 8b is the first look, step 8c says no note is written or offered",
+         "8b. **The first look (exit code 7).**" in b and "8c. **No note to the client (Nicole and Dustin, Nov 23).**" in b
+         and "the sneak peeks are in it" not in b and "the notes (8c)" not in b)
+    case("no instruction still tells the Assistant to save a client note onto the report",
+         not [n for n in ("backup.md", "after-the-report.md", "first-backup-setup.md", "client-note.md", "hello.md", "sneak-peeks.md")
+              if "client_note.py save" in part(n) or "client_note.py setup" in part(n) or "client_note.py facts" in part(n)])
+    case("what they say about a card is still kept (client_note.py told), in backup.md and in the retired part",
+         "client_note.py told --night" in b and "client_note.py told --night" in c)
+    rows = [ln for ln in skill.splitlines() if ln.startswith("|") and "A backup started from the home page" in ln]
+    case("the core's table sends 'is my backup done?' and 'A backup is already running.' to backup.md's own section",
+         len(rows) == 1 and "is my backup done?" in rows[0] and "A backup is already running." in rows[0]
+         and "## A backup started from the home page (Nov 23)" in b, rows)
+    case("the core's first-thing check and table call the six first-look photos, never sneak peeks",
+         "six first-look photos" in skill and "sneak peek" not in skill.lower())
+    sec = b[b.find("## A backup started from the home page"):b.find('## "What are my settings?"')]
+    case("backup.md: how a page-started backup went is read with backup_job.py status --words, and never a path read out",
+         "backup_job.py status --words" in sec and "Never read a path from it out loud" in sec and "serve_report.py" in sec)
+    case("... split by time at four quiet hours, placeholder names, the six chosen by a script",
+         "quiet for four hours" in sec and "\"Shoot 1\", \"Shoot 2\"" in sec and "chosen by a script" in sec and "past midnight stays one shoot" in sec)
+    case("... a problem is carried on with Try again or backup_job.py start, under the same name",
+         "**Try again**" in sec and "backup_job.py start --source" in sec and "picks up under the same name" in sec)
+    case("... one backup at a time, and eject's own line while a backup runs from the card",
+         "A backup is already running." in sec and "start nothing" in sec and "A backup is still running from this card. It won't be long." in sec)
+    case("... a folder instead: a HEIC by the file's own time, an undated file kept and said, never hidden",
+         "by the file's own time" in sec and "kept with the backup's records" in sec)
+    sys.path.insert(0, str(SM / "scripts"))
+    try:
+        import backup_lock
+        import backup_job
+        case("the lines the instructions quote are the ones the scripts say",
+             backup_lock.BUSY in sec and backup_lock.BUSY_CARD in sec and backup_job.OUR_WORDS["busy"] == backup_lock.BUSY)
+    except Exception as e:  # noqa: BLE001
+        case("the lines the instructions quote are the ones the scripts say", False, repr(e))
+    case("where-things-live.md names the job's record, the two locks, the log, and the by-time marks in a backup's records",
+         all(x in w for x in ("backup-job.json", "backup-job.lock", "backup.lock", "backup.running.json", "logs/backup-job.log",
+                              "\"placeholder\": true", "the backup, by time", "the file's own time")))
+    case("after-the-report.md offers no note and names the first look",
+         "Never offer one" in a and "A first look at your shoot." in a)
+def check_nov23_whole():
+    """The four Nov 23 lanes together: the instructions say what the wired pages and scripts really do."""
+    print("\nNov 23, the lanes together: Try again, a second copy not made, a backup still being made, the typed name")
+    b, a = read(SM / "parts" / "backup.md"), read(SM / "parts" / "after-the-report.md")
+    sys.path.insert(0, str(SM / "scripts"))
+    import backup_popup as bp
+    import backup_lock
+    import name_shoots
+    two = b[b.find("## Two ways to start a backup"):b.find('## When they say "backup now"')]
+    case("backup.md: a stopped page backup has Try again on the home card, as the page words it, and it starts the same backup again",
+         "**Try again**" in two and bp.OUR_WORDS["try_again"] == "Try again" and "under the same name" in two)
+    case("... a second copy that was not made leaves the backup Done, says so on the card in the page's words, and points at Make a second copy",
+         '"' + bp.OUR_WORDS["second_not"] + '"' in two and "**Make a second copy**" in two and "the backup itself is whole" in two)
+    case("after-the-report.md: nothing is renamed or joined while a backup is still being made, in the scripts' own line",
+         backup_lock.BEING_MADE in a and "A second copy of this backup is being made right now. Try this again when it's done." in a and "never work around it" in a)
+    case("... placeholder names are never typed into a box, and the name typed before the backup is said back as the page says it",
+         '"Folder: Shoot 1_11-22-26"' in a and name_shoots.OUR_WORDS["typed_before"].format(name="Aurora") in a and "never guesses which shoot" in a)
+
+
+def check_backup_box_nov23():
+    """Back up a card is a box on the home page that starts the backup itself (Nicole's v31; built Nov 23)."""
+    hello, backup, skill, where = (re.sub(r"\s+", " ", read(SM / "parts" / n)) for n in ("hello.md", "backup.md", "../SKILL.md", "where-things-live.md"))
+    sys.path.insert(0, str(SM / "scripts"))
+    import backup_popup as bp
+    case("hello.md: Back up a card opens a box on the home page; See all my backups opens Your backups, only the list, See the report first",
+         "**Back up a card opens a box on the home page itself" in hello and "opens **Your backups**, which is only the list" in hello
+         and "each shoot with **See the report** first" in hello and 'has the two steps (card in, paste "backup now")' not in hello)
+    case("hello.md says the box's words as the page has them", bp.W("safe") in hello and bp.W("safety") in hello and bp.W("only_once").split(" After")[0] in hello
+         and "Copying and checking (128 of 181)" in hello and bp.W("sorting") in hello and bp.OUR_WORDS["second_step"] in hello and bp.W("done_head") in hello
+         and bp.W("no_wait") in hello and bp.W("second_add") in hello and bp.W("who_label") in hello)
+    case("hello.md: a press on Back up a card never reaches the chat; nothing promises a notification",
+         "`home.py pending` leaves it out, as it leaves out a tile" in hello and "never promise a tap or a notification for a backup started there" in hello)
+    case("hello.md: asked how a backup works, the answer is the box, and the one thing it asks the first time",
+         "The first time it asks one thing, where your backups should go" in hello and "I see we haven't backed up a card together yet" not in hello)
+    case("backup.md: two ways to start; backup now in the chat still works; a running backup from the page is never doubled",
+         "## Two ways to start a backup (since Nov 23)" in read(SM / "parts" / "backup.md") and '**"backup now" in the chat still works**' in backup
+         and "never start another backup" in backup and "`python3 <scripts>/backup_job.py status`" in backup
+         and "Never promise a notification or a phone tap for a backup started from the page" in backup
+         and "asked every time and never remembered" in backup and "never at the same moment" in backup)
+    case("the core: a press on Back up a card never shows in pending, and \"how's my backup going?\" goes to backup.md",
+         "a press on Back up a card never shows here" in skill and "\"how's my backup going?\"" in skill)
+    case("where-things-live.md names what the box keeps: the exact folder, never the second drive, and its one small note",
+         "exactly the folder picked in the box" in where and "the second drive picked there is never saved" in where and "`~/.studio/backup-popup-start.json`" in where)
+    case("hello.md no longer speaks of a Back up a card screen: the list is the Your backups screen",
+         "Back up a card screen" not in hello and "**What the Your backups screen says about a backup" in hello)
 
 
 def main():
     for fn in (check_reel_words, check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders, check_nov23_engine, check_backup_box_nov23, check_nov23_whole):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

@@ -154,6 +154,11 @@ def gates(studio):
         for e in json.loads(rl.read_text(encoding="utf-8")).get("renames", []):
             if not e.get("finished") or e.get("problems"):
                 return "a rename is unfinished or had problems"
+    jl = studio / "join-log.json"   # two shoots being joined into one (join_shoots.py)
+    if jl.exists():
+        for e in json.loads(jl.read_text(encoding="utf-8")).get("joins", []):
+            if not e.get("finished") or e.get("problems"):
+                return "a join of two shoots is unfinished or had problems"
     return None
 
 
@@ -371,6 +376,13 @@ def main():
             say(f"  - {p}")
         sys.exit(1)
     say(f"Settled. {len(log['folders'])} shoot folders in {parent}, {checked:,} files checked, nothing overwritten.")
+    try:    # a second copy made while the shoots were still in the day folder moves its shoots up the same way
+        import second_copy
+        got = second_copy.follow(records)
+        if got.get("words"):
+            say(got["words"])
+    except Exception:  # noqa: BLE001  (the settle is done; the copy catches up the next time it is looked at)
+        pass
     if log.get("day_folder_left"):
         say(DAY_FOLDER_LEFT.format(name=session.name))
 

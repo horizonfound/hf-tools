@@ -22,8 +22,20 @@ import clips  # noqa: E402  (which files are video, and how to say a count)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 this_computer.utf8_output()
 
-MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw", ".jpg", ".jpeg", ".heic", ".png",
+MEDIA = {".cr2", ".cr3", ".arw", ".nef", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw", ".jpg", ".jpeg", ".heic", ".heif", ".png",
          ".tif", ".tiff", ".mov", ".mp4", ".m4v"}
+
+
+BY_FILE_TIME = {".heic", ".heif"}   # photos dated by the file's own time when no date can be read inside them
+
+
+def file_time(path):
+    """The file's own time as local time ("2026-11-07T07:01:11"), or None for a time that cannot be right."""
+    try:
+        t = datetime.fromtimestamp(Path(path).stat().st_mtime)
+        return t.isoformat(timespec="seconds") if t.year >= 1990 else None
+    except (OSError, OverflowError, ValueError):
+        return None
 
 
 def build(session_dir):
@@ -50,6 +62,13 @@ def build(session_dir):
                 when, how = clips.recorded(p)
                 if when:
                     rec["taken"], rec["taken_from"] = when, how
+        elif p.suffix.lower() in BY_FILE_TIME and not rec.get("taken"):
+            # A phone's HEIC whose date the reader cannot find (it reads no HEIC yet) would be left out of every
+            # shoot and set aside out of sight (found Nov 22, for Back up a folder). As for a clip: the file's own
+            # time, which the phone set when it wrote the photo and the backup kept, and the record says so.
+            when = file_time(p)
+            if when:
+                rec["taken"], rec["taken_from"] = when, "the file's own time"
         records.append(rec)
     unreadable = [r["file"] for r in records if not r.get("taken")]
     records.sort(key=lambda r: (r.get("taken") or "9999", r["file"]))

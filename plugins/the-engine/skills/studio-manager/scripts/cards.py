@@ -103,8 +103,9 @@ def save(ledger):
     LEDGER.write_text(json.dumps(ledger, indent=1), encoding="utf-8")
 
 
-def check(root):
-    """The session that already holds this card's photos and is still on disk, or None."""
+def check(root, prefer=None):
+    """The session that already holds this card's photos and is still on disk, or None. With `prefer` (the
+    folder backups are going in today), a backup of this card in THAT place comes first; else the newest."""
     fp = fingerprint(root)
     if not fp:
         return None, None
@@ -119,7 +120,18 @@ def check(root):
         except SystemExit:
             continue
         live.append(dict(s, root=str(root), studio=str(studio)))
+    if prefer and live:
+        here = [s for s in live if same_place(s["root"], _resolved(prefer)) or same_place(Path(s["root"]).parent, _resolved(prefer))]
+        if here:
+            return fp, here[-1]
     return fp, (live[-1] if live else None)
+
+
+def _resolved(path):
+    try:
+        return str(Path(path).expanduser().resolve())
+    except OSError:
+        return str(path)
 
 
 def register(root, session):

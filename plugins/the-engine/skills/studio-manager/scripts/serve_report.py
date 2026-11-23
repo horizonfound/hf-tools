@@ -387,6 +387,15 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         return False
 
+    def foreign(self):
+        """Is this ask from another website? The browser itself says where an ask comes from: Sec-Fetch-Site, and
+        an Origin that is not this server's own. (A plain ask with neither, as a command or a test makes, is not.)"""
+        if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+            return True
+        origin = (self.headers.get("Origin") or "").strip().lower()
+        port = self.server.server_address[1]
+        return bool(origin) and origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+
     def do_HEAD(self):
         # the report's own "has it been rebuilt?" check asks for report.html this way, every 4 seconds
         if self.ours():
@@ -456,10 +465,26 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if parts.path in ("/second-drives", "/second-status", "/other-backups", "/naming", "/next-drives") and self.foreign():
+            # These list drives and backups by name, and second-status may start the second copy's catch-up (renames
+            # on the second drive): only ever for this report's own page, never for an ask from another website.
+            return self.send_error(HTTPStatus.FORBIDDEN)
         if parts.path in ("/second-drives", "/second-status"):
             return self.second(parts)
         if parts.path in ("/other-backups", "/naming", "/next-drives"):
             return self.option_list(parts.path)
+        if parts.path == "/name-shoots-url":
+            # the report's "Put these shoots in one folder": the Name your shoots page for THIS backup (name_shoots.py,
+            # on the Assistant's own page server, started if it is not up). An address on this computer, never a path.
+            if (self.headers.get("Sec-Fetch-Site") or "").strip().lower() == "cross-site":
+                return self.answer({"url": None}, HTTPStatus.FORBIDDEN)
+            try:
+                import name_shoots
+                url = name_shoots.url_for(self.studio, again=True)
+            except (Exception, SystemExit) as ex:  # noqa: BLE001  (a press must always get an answer)
+                sys.stderr.write(f"name-shoots-url: {ex.__class__.__name__}: {ex}\n")
+                url = None
+            return self.answer({"url": url}, HTTPStatus.OK if url else HTTPStatus.SERVICE_UNAVAILABLE)
         if parts.path == "/queue-url":
             # the report's "Show my editing queue" link: the queue page's address, starting its server if it is not up
             url = queue_url()
@@ -541,13 +566,25 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             import second_copy
             if parts.path == "/second-status":
-                return self.answer(second_copy.status(self.studio))
+                st = second_copy.status(self.studio)
+                if st.pop("catch", False):
+                    # its drive was out when a shoot was renamed, and is in now: the copy takes the new folders and
+                    # names (second_copy.py follow, a job of its own; one at a time, by second_copy's own lock)
+                    now = time.monotonic()
+                    if now - getattr(Handler, "caught", -60.0) > 20:
+                        Handler.caught = now
+                        with open(fresh.server_log("second copy"), "a", encoding="utf-8") as fh:
+                            job = this_computer.popen_detached([sys.executable, str(HERE / "second_copy.py"), "follow", self.studio],
+                                                               stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT)
+                        threading.Thread(target=job.wait, daemon=True).start()
+                return self.answer(st)
             rows = second_copy.offered_drives(self.studio)
             return self.answer({"drives": [{"i": i, "name": r["name"], "free": r["free"]} for i, r in enumerate(rows)]})
         except Exception as ex:  # noqa: BLE001  (a press must always get an answer; the reason goes to the log)
             sys.stderr.write(f"{parts.path}: {ex.__class__.__name__}: {ex}\n")
             if parts.path == "/second-status":
-                return self.answer({"state": "none", "done": 0, "total": 0, "name": "", "card": False, "line": ""})
+                return self.answer({"state": "none", "done": 0, "total": 0, "name": "", "card": False, "line": "",
+                                    "behind": "", "old": False})
             return self.answer({"drives": []})
 
     def second_copy(self, path):
@@ -577,7 +614,9 @@ class Handler(SimpleHTTPRequestHandler):
             if said.get("state") != "ready":
                 return self.answer({"ok": False, "words": str(said.get("words") or W["sc_cant"])})
             with open(fresh.server_log("second copy"), "a", encoding="utf-8") as fh:   # the job keeps its own copy of the handle
-                job = this_computer.popen_detached(cmd + (["--always"] if always else []), stdin=subprocess.DEVNULL,
+                # ("always" is only listened to with second_copy.REMEMBER_SECOND on: the drive is asked each time)
+                job = this_computer.popen_detached(cmd + (["--always"] if always and second_copy.REMEMBER_SECOND else []),
+                                                   stdin=subprocess.DEVNULL,
                                                    stdout=fh, stderr=subprocess.STDOUT)
             threading.Thread(target=job.wait, daemon=True).start()   # so a finished job leaves nothing behind
             sys.stderr.write(f"second copy asked: {name!r} always={always}\n")

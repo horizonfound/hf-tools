@@ -312,7 +312,41 @@ def rename_new(src, dst, tries=25):
             return False
         os.rename(src, dst)
         return True
+    _link_stop_for_tests(dst)
     os.unlink(src)                               # the same file is under its real name now; only the old name goes
+    return True
+
+
+def _link_stop_for_tests(dst):
+    """For the tests only (never a photographer's computer): STUDIO_LINK_STOP_FOR_TESTS="<part of the new
+    name>|<a marker file>" ends the program on the spot between the link and the unlink of rename_new, once, as a
+    kill at that instant would: the file is then under both names."""
+    part, _, marker = (os.environ.get("STUDIO_LINK_STOP_FOR_TESTS") or "").partition("|")
+    if part and marker and part in str(dst) and not os.path.exists(marker):
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write("stopped here once")
+        os._exit(9)
+
+
+def same_file_twice(a, b):
+    """True when a and b are two NAMES of one and the same file on a drive (one file, two links): what
+    rename_new leaves when it is killed between giving the file its new name and dropping the old one. Never
+    true for one name spelled two ways on a drive that ignores capital letters (that is one link)."""
+    try:
+        sa, sb = os.lstat(a), os.lstat(b)
+    except OSError:
+        return False
+    import stat as _stat
+    return (_stat.S_ISREG(sa.st_mode) and sa.st_ino != 0 and (sa.st_ino, sa.st_dev) == (sb.st_ino, sb.st_dev)
+            and sa.st_nlink >= 2 and str(a) != str(b))
+
+
+def drop_old_name(old, new):
+    """Finish a rename_new that was cut off: when `old` and `new` are two names of the same file, the old name
+    goes (the file itself stays, under its new name). True when it did. Nothing else is ever unlinked here."""
+    if not same_file_twice(old, new):
+        return False
+    os.unlink(old)
     return True
 
 

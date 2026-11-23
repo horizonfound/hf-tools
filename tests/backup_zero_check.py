@@ -131,7 +131,8 @@ def shoot_folder(work):
           and same(sf(home)["drives"]["session"], drive / "Photo Shoots"), out)
     check("nothing was made on the drive", sorted(p.name for p in drive.iterdir()) == ["Movies", "Photo Shoots"])
     code, out = t.run("studio_file.py", "glance", env=env)
-    check("the glance still answers 'what are my settings?'", code == 0 and "No second copy" in out and "Smith Family_10-18-26" in out, out)
+    check("the glance still answers 'what are my settings?'", code == 0 and "A second copy is yours to ask for after each backup, on its report" in out
+          and "No second copy" not in out and "Smith Family_10-18-26" in out, out)
 
 
 def two_drives(work, copies):
@@ -495,48 +496,61 @@ def take_cards_apart(got):
 
 
 def second_drive_trouble(work):
-    print("Review 2: a saved second drive with trouble never stops or breaks the backup")
+    print("Review 2: a second drive with trouble never stops or breaks the backup (since Nov 23: a drive named for that one backup, "
+          "copied after the settle with the photo drive's own folders and names; a saved one is no longer used by itself)")
     base, home, env = world(work, "secondtrouble", [("Big Kahuna", 4000), ("LaCie", 2000)])
     drive, lacie = base / "drives" / "Big Kahuna", base / "drives" / "LaCie"
-    t.run("studio_file.py", "set", "--drive", drive, "--second", lacie, "--offered", "1", env=env)
+    t.run("studio_file.py", "set", "--drive", drive, "--offered", "1", env=env)
     D = "2026-11-19"
 
     def backup(name, salt, groups=(3,)):
         card = base / f"CARD {name}"
         t.make_card(card, groups=groups)
         other_photos(card, salt)
-        return card, ["night.py", "--source", card, "--date", D, "--name", name, "--no-peeks"], drive / f"{D} {name}" / "_studio"
+        return card, ["night.py", "--source", card, "--date", D, "--name", name, "--no-peeks", "--second", lacie], drive / f"{D} {name}" / "_studio"
 
     def one_copy(st):
         m = json.loads((st / "manifest.json").read_text(encoding="utf-8")) if (st / "manifest.json").is_file() else {}
         return bool(m.get("files")) and all(v.get("dest", {}).get("ok") for v in m["files"].values()) and not m.get("second") and not m.get("problems")
 
-    # the ordinary case still works: the second copy is made, after the backup
+    # the ordinary case still works: the second copy is made, after the backup is sorted and settled
     card, night, st = backup("good second", b"g")
     code, out = t.run(*night, env=env)
-    m = json.loads((st / "manifest.json").read_text(encoding="utf-8")) if (st / "manifest.json").is_file() else {}
-    check("a good second drive: the backup reaches the look with a second copy made and every file of it checked",
-          code == 4 and m.get("second") and all(v.get("second", {}).get("ok") for v in m.get("files", {}).values())
-          and (lacie / f"{D} good second" / "DCIM" / "100CANON").is_dir() and out.index("1b. The second copy") > out.index("Copying to"), out)
+    check("a good second drive: the card is copied and checked first (exit 4, the look), with nothing on the second drive yet",
+          code == 4 and one_copy(st) and not any(lacie.iterdir()), out)
     code, out = finish(night, env, st)
-    check("and finishes and settles with it", code == 0, out[-600:])
+    rec = drive / ".studio" / f"{D} good second"
+    m = json.loads((rec / "manifest.json").read_text(encoding="utf-8")) if (rec / "manifest.json").is_file() else {}
+    folders = sorted(x.name for x in drive.iterdir() if x.is_dir() and not x.name.startswith("."))
+    check("it finishes and settles, and then the second copy is made, every file of it checked",
+          code == 0 and m.get("second") and all(v.get("second", {}).get("ok") for v in m.get("files", {}).values())
+          and out.index("7b. The second copy") > out.index("7. Putting the shoots where they belong"), out[-700:])
+    check("the second drive has the photo drive's own shoot folders and nothing of the card's layout (Nicole, Nov 23)",
+          folders and sorted(x.name for x in lacie.iterdir() if not x.name.startswith(".")) == folders
+          and not (lacie / "DCIM").exists() and not (lacie / f"{D} good second").exists()
+          and all(sorted(p.name for p in (lacie / f).iterdir()) == sorted(p.name for p in (drive / f).iterdir()) for f in folders),
+          str(sorted(x.name for x in lacie.iterdir())))
 
-    # a file in the way on the second drive
+    # a folder of theirs with a shoot's name is already on the second drive
     card, night, st = backup("in the way", b"w")
-    first = sorted((card / "DCIM" / "100CANON").glob("*.JPG"))[0]
-    there = lacie / f"{D} in the way" / "DCIM" / "100CANON" / first.name
+    there = lacie / "in the way 1_06-04-26" / "their own file.jpg"
     there.parent.mkdir(parents=True)
     there.write_bytes(b"something else that was already here")
     code, out = t.run(*night, env=env)
-    check("a different file already on the second drive under a photo's name: the backup is not 'Not finished' (exit 4, the look), one copy, card in the ledger",
+    check("a folder of theirs with the shoot's name on the second drive: the backup is not 'Not finished' (exit 4, the look), one copy, card in the ledger",
           code == 4 and one_copy(st) and "Not finished" not in out and "Traceback" not in out, out)
-    check("the file in the way is untouched", there.read_bytes() == b"something else that was already here")
-    code2, out2 = t.run(*night, env=env)
-    check("run again: the same, never a stop", code2 == 4 and one_copy(st), out2)
     code, out = finish(night, env, st)
     rec = drive / ".studio" / f"{D} in the way"
+    check("(that is the name the shoot's folder got)", (drive / "in the way 1_06-04-26").is_dir(), str(sorted(x.name for x in drive.iterdir())))
+    check("it finishes and settles with one copy (exit 0), and their folder is untouched: nothing was copied into it",
+          code == 0 and one_copy(rec) and there.read_bytes() == b"something else that was already here"
+          and sorted(x.name for x in there.parent.iterdir()) == ["their own file.jpg"], out[-600:])
     page = (rec / "report.html").read_text(encoding="utf-8") if (rec / "report.html").is_file() else ""
-    check("it finishes and settles, and the report calls the card safe", code == 0 and "safe to format" in page, out[-600:])
+    check("the report calls the card safe, and its top says there is one copy and why, naming the folder, with no path",
+          "safe to format" in page and "No second copy yet, so there&#x27;s one copy for now. LaCie already has a folder called in the way 1_06-04-26 that isn&#x27;t part of this second copy." in page
+          and str(base) not in page.split("second-missed")[1][:500], page[:200])
+    code2, out2 = t.run(*night, env=env)
+    check("run again: the same, never a stop", code2 == 0 and one_copy(rec) and there.read_bytes() == b"something else that was already here", out2)
 
     # no room on the second drive
     rows = json.loads((base / "drives.json").read_text(encoding="utf-8"))
@@ -545,15 +559,15 @@ def second_drive_trouble(work):
             r["free"] = GB // 2
     (base / "drives.json").write_text(json.dumps(rows), encoding="utf-8")
     card, night, st = backup("no room", b"r")
-    code, out = t.run(*night, "--check", env=env)
-    check("no room on the second drive: the quiet check still passes", code == 0 and "PREFLIGHT OK" in out, out)
     code, out = t.run(*night, env=env)
-    note = json.loads((st / "second-missed.json").read_text(encoding="utf-8")) if (st / "second-missed.json").is_file() else {}
-    check("and the backup copies everything to the photo drive instead of stopping before a byte (exit 4), with the reason on record",
-          code == 4 and one_copy(st) and "Not enough room on LaCie" in note.get("words", ""), out)
-    t.run("report_page.py", st.parent, env=env)
-    page = (st / "report.html").read_text(encoding="utf-8") if (st / "report.html").is_file() else ""
-    check("the report's top says there is one copy and why, by the drive's name, with no path",
+    check("no room on the second drive: the backup copies everything to the photo drive (exit 4)", code == 4 and one_copy(st), out)
+    code, out = finish(night, env, st)
+    rec = drive / ".studio" / f"{D} no room"
+    note = json.loads((rec / "second-missed.json").read_text(encoding="utf-8")) if (rec / "second-missed.json").is_file() else {}
+    check("and finishes with one copy, the reason on record",
+          code == 0 and one_copy(rec) and "Not enough room on LaCie" in note.get("words", ""), out[-600:])
+    page = (rec / "report.html").read_text(encoding="utf-8") if (rec / "report.html").is_file() else ""
+    check("the report it leaves says at its top that there is one copy and why, by the drive's name, with no path",
           "No second copy yet, so there&#x27;s one copy for now. Not enough room on LaCie" in page and str(base) not in page.split("second-missed")[1][:400], page[:200])
     for r in rows:
         if r["name"] == "LaCie":
@@ -573,12 +587,31 @@ def second_drive_trouble(work):
               code == 4 and one_copy(st) and "Traceback" not in out and "PermissionError" not in out, out)
         code, out = finish(night, env, st)
         rec = drive / ".studio" / f"{D} read only"
-        check("and finishes, sorted and settled", code == 0 and (rec / "settled.json").is_file() and (rec / "sort-log.json").is_file(), out[-600:])
+        check("and finishes, sorted and settled, with one copy and no Python error",
+              code == 0 and (rec / "settled.json").is_file() and (rec / "sort-log.json").is_file() and one_copy(rec)
+              and "Traceback" not in out and "PermissionError" not in out, out[-600:])
     finally:
         os.chmod(lacie, 0o755)
     code, out = t.run("second_copy.py", rec, "--to", lacie, env=env)
     m = json.loads((rec / "manifest.json").read_text(encoding="utf-8"))
     check("once the drive is right again, Make a second copy makes it", code == 0 and m.get("second"), out)
+
+    # a second drive saved for every backup by an earlier version is no longer used by itself
+    sf_path = home / "studio.json"
+    sf = json.loads(sf_path.read_text(encoding="utf-8"))
+    sf["drives"]["second"], sf["drives"]["second_label"] = str(lacie), "LaCie"
+    sf_path.write_text(json.dumps(sf), encoding="utf-8")
+    held = sorted(x.name for x in lacie.iterdir())
+    card = base / "CARD saved"
+    t.make_card(card, groups=(2,))
+    other_photos(card, b"s")
+    night = ["night.py", "--source", card, "--date", D, "--name", "saved", "--no-peeks"]
+    st = drive / f"{D} saved" / "_studio"
+    code, out = t.run(*night, env=env)
+    code, out = finish(night, env, st)
+    rec = drive / ".studio" / f"{D} saved"
+    check("a saved second drive (plugged in) gets no copy by itself any more (Nicole, Nov 23: ask each time): one copy, nothing new on it",
+          code == 0 and one_copy(rec) and sorted(x.name for x in lacie.iterdir()) == held and "7b. The second copy" not in out, out[-500:])
 
 
 def the_switch_and_help():
