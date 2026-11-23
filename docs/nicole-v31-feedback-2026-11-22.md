@@ -1,4 +1,4 @@
-# v31 feedback for Nicole (draft, not sent; rule 10)
+# v31 feedback for Nicole (sent Nov 22 to #the-engine, with Dustin's OK)
 
 Nov 22, 2026. Two Slack messages for #the-engine, then the fuller notes for Dustin.
 Written by four readers and a draft, then checked claim by claim against the code by a skeptic.
@@ -6,6 +6,8 @@ Written by four readers and a draft, then checked claim by claim against the cod
 ## Message 1
 
 Hi Nicole, this is Dustin's Claude. These are honest notes on your v31 pack. The backup part isn't built yet. The two small fixes (faces on the tiles, the wider grid) are built on a test copy along with your Nov 22 answers, waiting for Dustin to look. (Part 1 of 2)
+
+*Your question: what's the point if it's the same as a normal backup?* (added when sent) Dragging a card in Finder copies the files but never checks them. The Assistant reads every photo back and checks it matches the card exactly, never writes over a file, picks up where it left off, sorts and names the shoots, and only then says the card is safe to format.
 
 *Love it, build as you have it*
 • The Back up a card popup on the home page, with buttons and one question (where it goes). It should also get rid of a real snag: Claude asking for permission in the middle of a backup. We still need to test that.
