@@ -60,6 +60,18 @@ QUIET_SORT_SECONDS = 1500   # after the copy (previews, sorting, the first look)
 QUIET_SECOND_SECONDS = 600  # the second copy: its own record not moving for this long
 RERUNS = 1                  # a stop that is not done / problems / stop is run again this many times, same name
 
+
+def _for_tests(name, default=None):
+    """A number only a test sets (never a photographer's computer): STUDIO_BACKUP_JOB_<NAME>_FOR_TESTS.
+    PAUSE: seconds the job waits, holding its lock, before it touches anything (so a test can press Start twice,
+    eject, or take the card away while a job is plainly alive). QUIET: the watchdog's limit, in seconds, for every
+    step. BUDGET: the first run of night.py is given this --budget (0 pauses it after one file: a stop to rerun)."""
+    v = os.environ.get(f"STUDIO_BACKUP_JOB_{name}_FOR_TESTS")
+    try:
+        return float(v) if v not in (None, "") else default
+    except ValueError:
+        return default
+
 # Every line here may be shown on a page, so none of them ever holds a path. All ours, all drafts for Dustin and Nicole.
 OUR_WORDS = {
     "busy": backup_lock.BUSY,
@@ -337,19 +349,34 @@ class Job:
         except OSError:
             pass
 
-    def free(self):
+    def partial(self):
+        """The file being copied right now, as (how many, their sizes added up): backup.py writes each file under
+        <name>.studio-partial and only then gives it its name, so while one big file copies, this number moves
+        though no line is printed. (The drive's free room would be no proof: other programs change it.)"""
+        n = size = 0
         try:
-            return this_computer.free_bytes(self.p["dest"])
-        except Exception:  # noqa: BLE001
-            return None
+            for dirpath, dirnames, filenames in os.walk(self.p["session"]):
+                dirnames[:] = [d for d in dirnames if d != "_studio"]
+                for fn in filenames:
+                    if fn.endswith(".studio-partial"):
+                        try:
+                            size += os.stat(os.path.join(dirpath, fn)).st_size
+                            n += 1
+                        except OSError:
+                            pass
+        except OSError:
+            pass
+        return n, size
 
-    def night(self):
+    def night(self, budget=None):
         """Run night.py once, following its lines. (exit code, why-lines after a STOP, the last lines).
         Stopped by the watchdog: code "quiet"."""
         cmd = [sys.executable, "-u", str(HERE / "night.py"), "--source", self.p["source"], "--dest", self.p["dest"],
                "--name", self.p["name"], "--date", self.p["date"], "--by-time"]
         if self.p.get("shoot_name"):
             cmd += ["--shoot-name", self.p["shoot_name"]]
+        if budget is not None:
+            cmd += ["--budget", str(budget)]
         env = dict(os.environ, STUDIO_BACKUP_JOB=str(os.getpid()), PYTHONUNBUFFERED="1")
         try:
             proc = this_computer.popen_detached(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
@@ -367,7 +394,8 @@ class Job:
             lines.put(None)
         threading.Thread(target=pump, daemon=True).start()
         why, tail, stopping, ended = [], [], False, False
-        last, free = time.monotonic(), self.free()
+        last, part, looked = time.monotonic(), None, 0.0
+        quiet = _for_tests("QUIET")
         while not ended:
             try:
                 ln = lines.get(timeout=2)
@@ -408,13 +436,17 @@ class Job:
                 ended = True
             if changed:
                 self.save()
-            # the watchdog: while copying, a big file gives no line for minutes, so the drive's free room moving counts too
+            # the watchdog: while copying, one big file gives no line for minutes, so the file being written
+            # growing counts as progress too (looked at only once the lines have gone quiet for a little while)
             if not ended:
-                limit = QUIET_COPY_SECONDS if self.rec["step"] == "copying" else QUIET_SORT_SECONDS
-                if self.rec["step"] == "copying":
-                    f = self.free()
-                    if f is not None and f != free:
-                        free, last = f, time.monotonic()
+                limit = quiet or (QUIET_COPY_SECONDS if self.rec["step"] == "copying" else QUIET_SORT_SECONDS)
+                idle = time.monotonic() - last
+                if self.rec["step"] == "copying" and idle > min(10, limit / 2) and time.monotonic() - looked > min(10, limit / 4):
+                    looked = time.monotonic()
+                    now_part = self.partial()
+                    if part is not None and now_part != part:
+                        last = time.monotonic()
+                    part = now_part
                 if time.monotonic() - last > limit:
                     self.log(f"WATCHDOG: no progress for {limit} s; stopping the backup")
                     this_computer.stop_tree(proc.pid)
@@ -492,7 +524,7 @@ class Job:
                 seen, last, self._n_out = now_at, time.monotonic(), len(out)
                 if now_at and isinstance(now_at[0], int) and isinstance(now_at[1], int):
                     self.save(done=now_at[0], total=now_at[1])
-            if time.monotonic() - last > QUIET_SECOND_SECONDS:
+            if time.monotonic() - last > (_for_tests("QUIET") or QUIET_SECOND_SECONDS):
                 self.log("WATCHDOG: the second copy has not moved; stopping it")
                 this_computer.stop_tree(proc.pid)
                 return False, None
@@ -547,7 +579,7 @@ class Job:
 
         code, why, tail = None, [], []
         for attempt in range(RERUNS + 1):
-            code, why, tail = self.night()
+            code, why, tail = self.night(budget=_for_tests("BUDGET") if attempt == 0 else None)
             if code in (0, 1, 2, "quiet"):
                 break
             self.log(f"night.py ended with {code}; " + ("running it again, same name" if attempt < RERUNS else "not running it again"))
@@ -606,6 +638,7 @@ def run_job():
     this_computer.awake_while()     # the computer stays awake for as long as this job runs
     job = Job(rec)
     try:
+        time.sleep(_for_tests("PAUSE") or 0)
         return job.run()
     except BaseException as e:  # noqa: BLE001  (whatever happens, the record never stays "running")
         try:
