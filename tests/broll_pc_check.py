@@ -116,6 +116,15 @@ def main():
     case("parts/on-a-pc.md names the gap in the page's own words", pc["gap"] in part)
     case("parts/on-a-pc.md says the page tells them up front (the card's line and the watch step)",
          pc["card"] in part and "Make this one in CapCut is the main button" in part, "")
+    reel = (ROOT / "plugins" / "the-engine" / "skills" / "assistant-make-a-reel" / "SKILL.md").read_text(encoding="utf-8")
+    arr = (PARTS / "arrange.md").read_text(encoding="utf-8")
+    told = "On a PC the page says so before they press anything (Nicole, Nov 23)"
+    case("the reel skill and parts/arrange.md say the page tells a PC before any press, and no longer 'the button says'",
+         told in reel and told in arr and "On a PC the button says" not in reel + arr)
+    new = (PARTS / "photos-in.md").read_text(encoding="utf-8")
+    case("parts/photos-in.md: a taken name is asked for in the box, --name from the chat, and the name is theirs to choose",
+         "**A name that is already taken (Nicole, Nov 23).**" in new and "--name \"<their name>\"" in new and "**Use this name**" in new
+         and "Never pick the new name for them" in new and "kit.py start --folder ... --name" not in new)
     print()
     n = len(RESULTS)
     print("%d of %d passed." % (sum(RESULTS), n))

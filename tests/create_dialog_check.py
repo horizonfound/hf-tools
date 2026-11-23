@@ -560,6 +560,9 @@ def check_taken(c, w, other, holder):
     c.wait_for("!document.getElementById('mkName').hidden", 120)
     time.sleep(0.3)
     n = name_state(c)
+    if os.environ.get("NAME_BOX_SHOT"):              # a picture of the box as it asks for a name, for a person to look at
+        import base64
+        Path(os.environ["NAME_BOX_SHOT"]).write_bytes(base64.b64decode(c.cdp("Page.captureScreenshot", {"format": "png"})["data"]))
     case("the name box is not there until a name is taken", hidden0 is True)
     case("a folder whose name is taken: the box says so, and nothing is copied",
          n["note"] == 'You already have a shoot called "Aston Martin". Type a new name for this one. Nothing is copied until you do.' and n["path"] == "/home" and content_names(w) == names0, n)
