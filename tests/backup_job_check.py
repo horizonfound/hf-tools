@@ -17,12 +17,14 @@
 Everything is pretend: a scratch STUDIO_HOME, pretend drives (STUDIO_DRIVES_FOR_TESTS), pretend cards (temp
 folders with a DCIM). No browser, no window, nothing on the real ~/.studio, no real card or drive.
 
-    python3 tests/backup_job_check.py [--only lock,bytime,job,trouble,second,folder,units]
+    python3 tests/backup_job_check.py [--only lock,bytime,job,trouble,second,folder,units,alone]
 """
 import argparse
 import json
 import os
+import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -281,6 +283,17 @@ def unit_checks(work):
           used is False and "Garcia" not in names and told == "Shoot name typed before the backup: Garcia", told)
     (studio / "shoots.json").unlink()
     (studio / "groups.json").write_text(json.dumps({"groups": gs[:1]}), encoding="utf-8")
+    # a folder of theirs with an accent, spelled the way a Mac's drives list it (the e and its mark as two letters)
+    import unicodedata
+    theirs = place / unicodedata.normalize("NFD", "Zo\u00eb_06-04-26")
+    theirs.mkdir()
+    with t.environ(**env):
+        shoots, used = night.by_time_shoots(session, studio, "Zo\u00eb")
+    check("a typed name with an accent never wants a folder that is already there, however the drive spells the accent",
+          used is False and shoots[0]["suggested"] != "Zo\u00eb" and shoots[0]["placeholder"] is True
+          and night.same_name(theirs.name) == night.same_name("ZO\u00cb_06-04-26"), str(shoots))
+    (studio / "shoots.json").unlink()
+    (studio / "told.json").unlink()
     with t.environ(**env):
         shoots, used = night.by_time_shoots(session, studio, "  The Johnson   Family ")
     check("one shoot on the card: the typed name is the shoot's name (spaces tidied), not a placeholder",
@@ -327,12 +340,26 @@ def unit_checks(work):
     # words
     import backup_job
     lines = list(backup_job.OUR_WORDS.values()) + [backup_lock_words()]
+    instructions_checks()
     check("none of the job's words holds a path, 'Claude', 'your assistant', an em dash or 'sneak peek'",
           not [x for x in lines if "/" in x.replace("and/or", "") or "Claude" in x or "your assistant" in x.lower() or "—" in x or "sneak" in x.lower()], str(lines))
     check("a line with a path in it is never shown: the known places are said by name, anything else is dropped",
           backup_job.no_path("The card is not there: /Volumes/EOS", {"source": "/Volumes/EOS"}) == "The card is not there: your card"
           and backup_job.no_path("Cannot write to /Volumes/Other/x", {}) is None
           and backup_job.no_path("see C:\\Users\\me\\x", {}) is None and backup_job.no_path("look in _studio/report.html", {}) is None)
+
+
+def instructions_checks():
+    part = (t.SCRIPTS.parent / "parts" / "backup.md").read_text(encoding="utf-8")
+    check("the instructions say where files that are not a photo were set aside, that a folder is never called a card, "
+          "and that a record can say running after its job stopped",
+          "`from-the-card`" in part and "is never called a card" in part and "turns to done by itself" in part
+          and "nothing could be sorted into shoots" in part)
+
+
+def backup_job_words():
+    import backup_job
+    return backup_job.OUR_WORDS
 
 
 def backup_lock_words():
@@ -422,6 +449,9 @@ def job_checks(work):
           seen.count("A first look at your shoot.") >= 3 and not re.search(r"sneak peek|Lightroom|note to (my|your) client|Write a note", seen, re.I),
           str(re.findall(r".{40}(?:sneak peek|Lightroom|Write a note).{40}", seen, re.I | re.S)[:3]))
     check("no note to a client anywhere in the records", not (records / "notes").exists())
+    check("a CARD's report still says the card is safe to format, and its records say it was a card",
+          "The card is safe to format when you're ready" in (records / "report.html").read_text(encoding="utf-8")
+          and manifest.get("source_kind") == "card", str(manifest.get("source_kind")))
     q = json.loads((home / "queue.json").read_text(encoding="utf-8")) if (home / "queue.json").exists() else {"shoots": []}
     mine = [s for s in q["shoots"] if "Shoot" in str(s.get("name"))]
     check("the three shoots are registered (Your backups, Uploaded shoots) and NOT put in the editing queue",
@@ -635,6 +665,8 @@ def second_checks(work):
     check("a second copy that is refused (the same drive): the backup itself is DONE and checked; the record says the second copy is not made, and why",
           r.get("state") == "done" and r.get("second_ok") is False and "second copy" in (r.get("line") or "").lower()
           and str(base) not in (r.get("line") or "") and r.get("shoots") == 1, str(r))
+    check("... and the numbers on that finished record are the backup's own (every file), never '0 of 4'",
+          r.get("done") == r.get("total") and r.get("total", 0) >= 4, f"{r.get('done')} of {r.get('total')}")
 
 
 # ---------------------------------------------------------------- a folder instead of a card
@@ -655,6 +687,8 @@ def folder_checks(work):
     os.utime(heic, (when, when))
     (src / "from my phone" / "no date at all.JPG").write_bytes(t.jpeg_bytes(300, 200, lambda x, y: (90, 90, 200)))
     (src / "notes.txt").write_text("the lake, in June", encoding="utf-8")
+    (src / "Zo\u00eb final.psd").write_bytes(b"8BPS" + b"a Photoshop file of theirs" * 40)
+    (src / "contract.pdf").write_bytes(b"%PDF-1.4 a contract of theirs")
     before = t.card_snapshot(src)
     code, got = start(env, src, dest)
     r = wait(env)
@@ -672,23 +706,205 @@ def folder_checks(work):
     names = sorted(p.name for p in shoot.iterdir())
     check("... so it is sorted into its shoot with the photos around it, not set aside out of sight",
           any("IMG_0099" in n for n in names) and len(names) == 5, str(names))
-    check("the record says honestly what was set aside: one photo with no date, one file that is not a photo",
-          r.get("set_aside") == {"undated": 1, "other": 1} and "1 photo or video clip with no date" in r.get("line", "")
-          and "1 other file" in r["line"] and str(base) not in r["line"], str(r.get("set_aside")) + " " + str(r.get("line")))
+    check("the record says honestly what was set aside: one photo with no date, three files that are not a photo, by kind",
+          r.get("set_aside") == {"undated": 1, "other": 3, "kinds": ["pdf", "psd", "txt"]} and "1 photo or video clip with no date" in r.get("line", "")
+          and "3 files that are not a photo or a video clip (pdf, psd, txt)" in r["line"] and str(base) not in r["line"],
+          str(r.get("set_aside")) + " " + str(r.get("line")))
+    check("... and their own Photoshop file, PDF and notes are never called camera housekeeping",
+          "housekeeping" not in r.get("line", "") and "housekeeping" not in " ".join(backup_job_words().values()), r.get("line"))
+    # the report of a folder never talks about a memory card (least of all one that is safe to format)
+    manifest = json.loads((records / "manifest.json").read_text(encoding="utf-8"))
+    page = (records / "report.html").read_text(encoding="utf-8")
+    text = " ".join(re.sub(r"<[^>]+>", " ", re.sub(r"(?s)<(script|style)\b.*?</\1>", " ", page)).split())
+    lied = [w for w in ("memory card", "safe to format", "against the card", "What's on the card", "eep the card") if w in text]
+    check("the backup's records say a folder was backed up, not a card", manifest.get("source_kind") == "folder", str(manifest.get("source_kind")))
+    check("the report of a folder never says memory card, 'checked against the card' or 'safe to format'", not lied, str(lied))
+    check("... it says the folder is as it was, that everything is copied and checked, and what was in the folder",
+          "The folder you backed up is exactly as it was" in text and "Everything is copied and checked" in text
+          and "What was in the folder" in text and "checked against the original, byte for byte" in text, text[:600])
+    check("... and names the undated photo as a photo, apart from the three files that are not",
+          "1 photo or video clip with no date" in text and "3 files that are not a photo or a video clip (pdf, psd, txt)" in text, text[-900:])
+    plain = (records / "morning-report.md").read_text(encoding="utf-8") if (records / "morning-report.md").exists() else ""
+    check("the plain-text report says the same (no memory card, nothing safe to format)",
+          "the folder you backed up is exactly as it was" in plain and "memory card" not in plain and "safe to format" not in plain, plain[-500:])
+    with t.environ(**env):
+        import home_base
+        st = home_base.backup_status(records)
+    check("the Back up a card screen: this backup is a folder ('Copied and checked'), not a card that is safe to format",
+          st.get("folder") is True and st.get("safe") is True and "W.folder_safe" in Path(home_base.__file__).read_text(encoding="utf-8")
+          and home_base.OUR_WORDS.get("folder_safe") == "Copied and checked", str(st))
     log = log_of(home)
     check("the sorter's own words no longer call an undated photo 'not a photo'",
-          "1 photo or video clip with no date could not be sorted into a shoot" in log and "1 file that is not a photo set aside" in log, log[-900:])
+          "1 photo or video clip with no date could not be sorted into a shoot" in log and "3 files that are not photos set aside" in log, log[-900:])
     aside = records / "from-the-card"
     check("what was set aside is kept, copied and checked, with the backup's records (nothing deleted)",
           (aside / "from my phone" / "no date at all.JPG").is_file() and (aside / "notes.txt").is_file())
     check("the folder that was backed up is exactly as it was", t.card_snapshot(src) == before)
-    on_drive = tree(dest)
     (dest / "Backups go here").mkdir()
     code, got = start(env, dest, dest / "Backups go here")
     r = wait(env)
+    # a folder whose photos carry no date at all (web exports with the date stripped)
+    bare = base / "folders" / "Downloads" / "Web exports"
+    bare.mkdir(parents=True)
+    for i in range(4):
+        (bare / f"export-{i}.jpg").write_bytes(t.jpeg_bytes(300, 200, lambda x, y, i=i: (40 * i, 90, 200)))
+    was = t.card_snapshot(bare)
+    code, got = start(env, bare, dest)
+    r2 = wait(env)
+    check("a folder of photos with no date: done, every file copied and checked, and the record SAYS none could be sorted into a shoot",
+          r2.get("state") == "done" and r2.get("done") == r2.get("total") == 4 and not r2.get("shoots") and r2.get("unsorted") == 4
+          and "could not be sorted into shoots" in (r2.get("line") or "") and "All 4 files are copied and checked" in r2["line"], str(r2))
+    check("... it names the one folder they are in, by name only (no path), and that folder holds them",
+          (r2.get("backup") or "") in (r2.get("line") or "") and bool(r2.get("backup")) and str(base) not in r2["line"] and "/" not in r2["line"]
+          and len(list((dest / r2["backup"]).glob("export-*.jpg"))) == 4, str(r2.get("line")))
+    check("... and the folder that was backed up is exactly as it was", t.card_snapshot(bare) == was)
+    on_drive = tree(dest)
     check("a folder that would be backed up into itself is refused in plain words with no path, and nothing is copied",
           r.get("state") == "problem" and "inside the very folder being backed up" in (r.get("line") or "")
           and str(base) not in r["line"] and "/" not in r["line"] and tree(dest) == on_drive, str(r))
+
+
+# ---------------------------------------------------------------- the job dies, the backup does not (Nov 23 review)
+
+def kill_one(pid):
+    """Stop ONE process and nothing it started (the job without its night.py; night.py without its copy)."""
+    try:
+        os.kill(int(pid), signal.SIGTERM if this_computer.WINDOWS else signal.SIGKILL)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def busy(env):
+    return t.run("backup_lock.py", env=env)[0] == 3
+
+
+def night_at(home, source):
+    """The number of the night.py that holds the backup lock for this card right now, or None."""
+    try:
+        note = json.loads((home / "backup.running.json").read_text(encoding="utf-8"))
+        if Path(note.get("source") or "").resolve() != Path(source).resolve() or not this_computer.still_running(note.get("pid")):
+            return None
+        return note.get("pid")
+    except (OSError, ValueError):
+        return None
+
+
+def wait_for(what, seconds=60):
+    end = time.time() + seconds
+    while time.time() < end:
+        got = what()
+        if got:
+            return got
+        time.sleep(0.2)
+    return what()
+
+
+def alone_checks(work):
+    print("Only one process dies: the job without its backup, the backup without its copy")
+    ok, how = t.pictures.ready()
+    if not ok:
+        skip("everything that needs a whole backup", how)
+        return
+    base, home, env = world(work, "alone")
+    dest, second = base / "drives" / "G PAPA", base / "drives" / "LaCie"
+
+    # 1. a step of night.py holds the backup lock too: night.py killed alone never frees the lock under its copy
+    if this_computer.WINDOWS:
+        skip("a step keeps the lock when night.py alone is killed", "a PC's lock cannot be handed to a step: a named gap")
+    else:
+        for how_out in ("a pipe", "a file"):
+            sleeper, note = base / "sleeper.py", base / f"sleeper-{how_out[2:]}.pid"
+            sleeper.write_text("import os, sys, time\nopen(sys.argv[1], 'w').write(str(os.getpid()))\ntime.sleep(600)\n", encoding="utf-8")
+            code = ("import sys; sys.path.insert(0, %r); import backup_lock, night; "
+                    "ok = backup_lock.take('x', 'held by the test'); sys.stderr.write('HELD\\n' if ok else 'NOT\\n'); sys.stderr.flush(); "
+                    "night.run(%r, %r)" % (str(t.SCRIPTS), str(sleeper), str(note)))
+            out = subprocess.PIPE if how_out == "a pipe" else open(base / "night-out.txt", "wb")
+            p = subprocess.Popen([sys.executable, "-c", code], stdout=out, stderr=subprocess.PIPE, env=t.child_env(env))
+            said = p.stderr.readline().decode().strip()
+            end = time.time() + 20
+            while time.time() < end and not (note.exists() and note.read_text().strip()):
+                time.sleep(0.1)
+            child = int(note.read_text().strip()) if note.exists() and note.read_text().strip() else None
+            p.kill()
+            p.wait()
+            time.sleep(0.5)
+            held = busy(env)
+            if child:
+                os.kill(child, signal.SIGKILL)
+            end = time.time() + 10
+            while time.time() < end and busy(env):
+                time.sleep(0.2)
+            check(f"night.py killed alone while a step is at work (output to {how_out}): the lock is STILL held, by the step; it is free once the step ends",
+                  said == "HELD" and child is not None and held is True and not busy(env), f"said={said} child={child} held={held}")
+            if out is not subprocess.PIPE:
+                out.close()
+
+    # 2. the job is killed while night.py runs: night.py carries on, and the record must say so, then say done
+    card = base / "CARD A"
+    card_at(card, [(D4.replace(hour=9), 6)])
+    code, got = start(dict(env, STUDIO_NIGHT_PAUSE_FOR_TESTS="4"), card, dest)
+    npid = wait_for(lambda: night_at(home, card))
+    r = status(env)
+    pid = (r.get("private") or {}).get("pid")
+    check("(the job is up and its backup holds the lock)", isinstance(pid, int) and isinstance(npid, int) and pid != npid, f"{pid} {npid}")
+    kill_one(pid)
+    time.sleep(0.6)
+    r = status(env)
+    check("the job alone was killed, the backup itself is still running: the record says running, not 'stopped, press Try again'",
+          r.get("state") == "running" and busy(env), str(r))
+    code, again = start(env, card, dest)
+    check("... Try again meanwhile says a backup is already running, which now agrees with the record", again == {"ok": False, "why": BUSY}, str(again))
+    end = time.time() + 180
+    while time.time() < end and busy(env):
+        time.sleep(0.5)
+    r = status(env)
+    check("the backup then finished by itself: the record says done, every file, one shoot (never 'problem, 0 of 6' for good)",
+          r.get("state") == "done" and r.get("step") == "done" and r.get("done") == r.get("total") == 7 and r.get("shoots") == 1
+          and r.get("finished") and r.get("records"), str(r))
+    check("... saved so (a page reload reads the same), and the shoot is settled on the drive",
+          json.loads((home / "backup-job.json").read_text(encoding="utf-8")).get("state") == "done"
+          and len(photos_on(dest)) == 6 and not any(p.name.endswith(" card") for p in dest.iterdir()), str(sorted(p.name for p in dest.iterdir())))
+
+    # 3. the job is killed while the second copy is being made: second_copy.py carries on
+    card = base / "CARD B"
+    card_at(card, [(D4.replace(month=7, hour=9), 6)], first_number=6001)
+    code, got = start(dict(env, STUDIO_SECOND_COPY_PAUSE_FOR_TESTS="1"), card, dest, "--second", second)
+    r = wait(env, 180, lambda r: r.get("step") == "second" or r.get("state") != "running")
+    pid = (r.get("private") or {}).get("pid")
+    check("(the job reached the second copy)", r.get("state") == "running" and r.get("step") == "second", str(r))
+    time.sleep(1.5)
+    kill_one(pid)
+    time.sleep(0.6)
+    r = status(env)
+    check("the job alone was killed during the second copy: the photos are backed up and the second copy is still being made, so the record says running, step second",
+          r.get("state") == "running" and r.get("step") == "second", str(r))
+    r = wait(env, 120)
+    check("... and when the second copy finished by itself: done, second copy made and checked",
+          r.get("state") == "done" and r.get("second_ok") is True and r.get("done") == r.get("total") == 7, str(r))
+
+    # 4. night.py alone is killed mid-copy: its copy carries on, and the job's rerun WAITS for it (never two copies at once)
+    if this_computer.WINDOWS:
+        skip("the rerun waits for a copy that outlived night.py", "a PC's lock cannot be handed to a step: a named gap")
+        return
+    card = base / "CARD C"
+    card_at(card, [(D4.replace(month=8, hour=9), 8)], first_number=8001)
+    before = t.card_snapshot(card)
+    code, got = start(dict(env, STUDIO_BACKUP_PAUSE_FOR_TESTS="0.7"), card, dest)
+    seen = lambda: [p for p in dest.rglob("*IMG_80*.JPG")]       # noqa: E731
+    wait_for(lambda: len(seen()) >= 2)
+    npid = night_at(home, card)
+    check("(the copy is under way)", isinstance(npid, int) and 2 <= len(seen()) < 8, f"{npid} {len(seen())}")
+    kill_one(npid)
+    r = wait(env, 240)
+    log = log_of(home)
+    tail = log[log.rfind("night.py ended with"):]
+    check("night.py alone was killed mid-copy: the job waited for the copy that was still at work before running the backup again",
+          "one of its steps is still at work; waiting for it before running again" in tail, tail[:600])
+    check("... and the backup finished: done, nothing 'would not copy', no problem on record",
+          r.get("state") == "done" and "would not copy" not in tail
+          and not json.loads((Path(r["records"]) / "manifest.json").read_text(encoding="utf-8")).get("problems"), str(r) + tail[-600:])
+    check("... every photo of that card once, none half-written, the card as it was",
+          len(seen()) == 8 and not list(dest.rglob("*.studio-partial")) and t.card_snapshot(card) == before, str(len(seen())))
 
 
 def main():
@@ -702,7 +918,7 @@ def main():
     os.environ["STUDIO_HOME"] = str(work / "never-used-home")     # nothing here may ever look at the real ~/.studio
     try:
         for name, fn in (("units", unit_checks), ("lock", lock_checks), ("job", job_checks), ("trouble", trouble_checks),
-                         ("second", second_checks), ("folder", folder_checks)):
+                         ("second", second_checks), ("folder", folder_checks), ("alone", alone_checks)):
             if only and name not in only:
                 continue
             fn(work)

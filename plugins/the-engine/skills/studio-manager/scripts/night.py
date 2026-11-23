@@ -37,6 +37,7 @@ import os
 import stat
 import subprocess
 import threading
+import unicodedata
 import time
 import sys
 from datetime import datetime
@@ -160,7 +161,7 @@ def run(script, *args):
     cmd = this_computer.awake_command([sys.executable, str(HERE / script), *map(str, args)])
     outputs = (("out", sys.stdout), ("err", sys.stderr))
     if not any(which in _GONE or _can_close(stream) for which, stream in outputs):
-        return subprocess.run(cmd).returncode   # a terminal or a file: exactly as before
+        return subprocess.run(cmd, **backup_lock.for_a_step()).returncode   # a terminal or a file: exactly as before
     for which, stream in outputs:
         if which in _GONE:
             continue
@@ -175,7 +176,7 @@ def run(script, *args):
              for which, stream in outputs}
     if route["out"] == subprocess.PIPE and route["err"] == subprocess.PIPE and _same_pipe(sys.stdout, sys.stderr):
         route["err"] = subprocess.STDOUT
-    p = subprocess.Popen(cmd, stdout=route["out"], stderr=route["err"])
+    p = subprocess.Popen(cmd, stdout=route["out"], stderr=route["err"], **backup_lock.for_a_step())
     relays = [threading.Thread(target=_relay, args=(src, which), daemon=True)
               for src, which in ((p.stdout, "out"), (p.stderr, "err")) if src is not None]
     for t in relays:
@@ -426,10 +427,17 @@ def by_time_grouped(studio):
     return float(g.get("gap_minutes") or 0) == float(BY_TIME_GAP_MIN) and bool(g.get("across_midnight")) == (not BY_TIME_NEW_DAY_SPLITS)
 
 
+def same_name(name):
+    """A name as a drive that ignores capitals AND the way an accent is spelled would compare it. "Zoë" can be
+    written with one letter for the ë or with an e and a mark after it; a Mac's drives list names the second way
+    (HFS+ always, like Big Kahuna) and treat both as one folder, so both must count as one name here too."""
+    return unicodedata.normalize("NFC", str(name)).casefold()
+
+
 def names_taken(folder):
-    """The names in a folder exactly as its listing has them, lower-cased (most drives ignore capitals)."""
+    """The names in a folder exactly as its listing has them, compared as the drive would (same_name)."""
     try:
-        return {x.name.casefold() for x in Path(folder).iterdir()}
+        return {same_name(x.name) for x in Path(folder).iterdir()}
     except OSError:
         return set()
 
@@ -450,14 +458,14 @@ def by_time_shoots(session, studio, shoot_name=None):
         def folder_of(name):
             return safe_folder(studio_file.render(naming, name, g["start"])) if naming.get("folder_pattern") else safe_folder(name)
         name = None
-        if typed and len(groups) == 1 and folder_of(typed).casefold() not in taken:
+        if typed and len(groups) == 1 and same_name(folder_of(typed)) not in taken:
             name = typed
         while name is None:
             n += 1
             cand = PLACEHOLDER.format(n=n)
-            if folder_of(cand).casefold() not in taken:
+            if same_name(folder_of(cand)) not in taken:
                 name = cand
-        taken.add(folder_of(name).casefold())
+        taken.add(same_name(folder_of(name)))
         shoots.append({"id": f"s{i}", "suggested": name, "groups": [g["id"]], "photos": g.get("photos", g.get("count", 0)),
                        "recap": "", "why": f"split by time: the camera was quiet for {BY_TIME_GAP_MIN // 60} hours or more before it"
                        if i > 1 else "the first photos on the card",
@@ -521,6 +529,10 @@ def main():
         say(f"  - {backup_lock.BUSY}")
         sys.exit(2)
 
+    try:   # for the tests only: a wait with the lock held, so a test can stop the job that started this backup
+        time.sleep(float(os.environ.get("STUDIO_NIGHT_PAUSE_FOR_TESTS") or 0) if not a.check else 0)
+    except ValueError:
+        pass
     if this_computer.WINDOWS and a.source:
         a.source = str(this_computer.drive_root(a.source))   # unproven on a real PC: a bare "E:" is the top of drive E
     # Does the card answer at all? Asked first, before anything else looks at it (the first backup's own choice

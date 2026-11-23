@@ -350,6 +350,18 @@ OUR_WORDS = {
                   "Pick another drive, or tell the Assistant to change your second copy."),
     "nd_gone": "I can't see {drive} right now. Is it plugged in?",
     "nd_changed": "The drives changed since this was opened. Press the button again.",
+    # a folder was backed up, not a memory card (Back up a folder instead): the same lines with no card in them,
+    # and never "safe to format" (Nov 23 review: the report of a folder told them a card could be formatted)
+    "f_unchanged_now": "Nothing in the folder you backed up has been changed",
+    "f_checked": "checked against the original, byte for byte",
+    "f_as_it_was": "The folder you backed up is exactly as it was: nothing in it was changed, renamed or deleted.",
+    "f_pill": "Everything is copied and checked",
+    "f_pill_wait": "Not finished yet",
+    "f_chip": "copied and checked",
+    "f_chip_wait": "not finished yet",
+    "f_keep": "Nothing in the folder you backed up was changed. Leave it as it is until this report says every file is checked.",
+    "f_foot": "The folder you backed up is exactly as it was.",
+    "aside_undated": "{n} with no date could not be sorted into a shoot: set aside, not deleted.",
     # one quiet line under the where-card, when this backup's photos are on the computer's own disk
     "own_disk": ("Your photos are on this {computer}'s own disk. An external drive is safer: if anything happens to "
                  "the computer, the photos on it go too. Plug one in and press Use a different drive next time."),
@@ -669,6 +681,14 @@ def sort_aside(studio):
         return []
 
 
+def sort_undated(studio):
+    """The photos and video clips among them whose date could not be read (sort.py names them, Nov 23)."""
+    try:
+        return set(json.loads((studio / "sort-log.json").read_text(encoding="utf-8")).get("set_aside_undated") or [])
+    except (ValueError, OSError, AttributeError):
+        return set()
+
+
 def index_facts(studio):
     """When it was taken and on what, from index.json, in plain words."""
     p = studio / "index.json"
@@ -885,6 +905,7 @@ def build(manifest, studio, card=None):
     work = manifest.get("work_seconds")
     took = seconds_text(work) if work else duration(manifest.get("started"), finished)
     all_good = not problems and ok_dest == total and (ok_second == total if second else True)
+    a_folder = manifest.get("source_kind") == "folder"   # Back up a folder instead: no memory card in any line
     pics, pick_note = teasers(studio)
     peeks, _ = sneak_peeks(studio)
     notes = client_notes(studio)
@@ -906,7 +927,7 @@ def build(manifest, studio, card=None):
         out.append(f"<span class='eyebrow'>Backup report · {e(name)}</span>")
     if problems:
         out.append(f"<h1 class='h1 bad'>Something needs you before this is <span class='swap'>safe.</span></h1>")
-        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. Nothing on the memory card has been changed; "
+        out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked. {e(OUR_WORDS['f_unchanged_now']) if a_folder else 'Nothing on the memory card has been changed'}; "
                    "fix what's below, run it again, and it picks up where it left off.</p>")
         out.append("<span class='pill bad'><span class='dot'>!</span>Not finished</span>")
         out.append("<div class='problems'><span class='eyebrow'>Needs you first</span><h2>What stopped it</h2><ul>"
@@ -921,9 +942,10 @@ def build(manifest, studio, card=None):
     elif all_good:
         where = "your drive and your second copy" if second else "your drive"
         out.append(f"<h1 class='h1'>All {total:,} files, safely backed up and <span class='swap'>verified.</span></h1>")
-        out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and checked against the card, byte for byte. "
-                   "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.</p>")
-        out.append("<span class='pill'><span class='dot'>&#10003;</span>The card is safe to format when you're ready</span>")
+        out.append(f"<p class='lede'>Every {'video clip' if n_clips and media == n_clips else 'photo and video clip' if n_clips else 'photo'} was copied to {where} and {e(OUR_WORDS['f_checked']) if a_folder else 'checked against the card, byte for byte'}. "
+                   + (e(OUR_WORDS["f_as_it_was"]) if a_folder else "Your memory card is exactly as it was: nothing on it was changed, renamed or deleted.") + "</p>")
+        out.append("<span class='pill'><span class='dot'>&#10003;</span>"
+                   + (e(OUR_WORDS["f_pill"]) if a_folder else "The card is safe to format when you're ready") + "</span>")
         try:   # the saved second drive was not plugged in for this backup: one copy, said here, with the button below
             import second_copy
             missed = second_copy.missed(studio)
@@ -934,7 +956,7 @@ def build(manifest, studio, card=None):
     else:
         out.append(f"<h1 class='h1'>Not finished <span class='swap'>yet.</span></h1>")
         out.append(f"<p class='lede'>{ok_dest:,} of {total:,} files are copied and checked so far. Run it again to continue.</p>")
-        out.append("<span class='pill wait'><span class='dot'>…</span>Keep the card for now</span>")
+        out.append(f"<span class='pill wait'><span class='dot'>…</span>{e(OUR_WORDS['f_pill_wait']) if a_folder else 'Keep the card for now'}</span>")
     out.append("</section>")
 
     # the numbers
@@ -962,7 +984,8 @@ def build(manifest, studio, card=None):
             out.append(f"<div class='ph' style='--rot:{ROTS[i % len(ROTS)]}deg'><img src='previews/{e(p.name)}' alt=''></div>")
         chips = [("f-sun", "-6deg", "top:1.2rem;left:-.4rem", media_words),
                  ("f-ocean", "5deg", "top:.6rem;right:-.2rem", "a few from the shoot"),
-                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", "safe to format" if all_good and not manifest.get("sample") else "keep the card")]
+                 ("f-lime", "-4deg", "bottom:.8rem;right:12%", (OUR_WORDS["f_chip"] if all_good else OUR_WORDS["f_chip_wait"]) if a_folder
+                  else "safe to format" if all_good and not manifest.get("sample") else "keep the card")]
         for cls, rot, pos, text in chips:
             out.append(f"<span class='chip {cls}' style='--rot:{rot};{pos}'>{e(text)}</span>")
         out.append("</div>")
@@ -1001,6 +1024,11 @@ def build(manifest, studio, card=None):
         mac = "Mac " if this_computer.MAC else ""   # "hidden Mac system files" on a Mac, as always; on a PC just "hidden system files"
         out.append(f"<p>{skipped} hidden {mac}system file{'s' if skipped != 1 else ''} left behind, as they should be.</p>")
     aside = sort_aside(studio)
+    undated = sort_undated(studio)      # a photo with no date IS a photo: named on a line of its own
+    aside = [a for a in aside if a not in undated and not this_computer.housekeeping_file(Path(a).name)]
+    if undated:
+        n = len(undated)
+        out.append("<p>" + e(OUR_WORDS["aside_undated"].format(n=f"{n:,} photo{'s' if n != 1 else ''} or video clip{'s' if n != 1 else ''}")) + "</p>")
     if aside:
         out.append(f"<p>{len(aside)} file{'s that are' if len(aside) != 1 else ' that is'} not a photo or a video clip "
                    f"({', '.join(sorted({Path(a).suffix.lower().lstrip('.') for a in aside}))}) set aside, not deleted.</p>")
@@ -1047,7 +1075,8 @@ def build(manifest, studio, card=None):
         tail = "" if ok_second == total else f" ({ok_second:,} of {total:,} checked)"
         out.append(f"<p class='also'>Second copy{e(tail)}: {e(photos_folder(second))}</p>")
     if not all_good:
-        out.append("<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
+        out.append(f"<p class='also'>{e(OUR_WORDS['f_keep'])}</p>" if a_folder else
+                   "<p class='also'>Nothing on the memory card was changed. Keep it until this report says every file is checked.</p>")
     # one quiet line, once, when this backup's photos are on the computer's own disk (the Oct 30 teachable moment,
     # moved here from before the copy: Dustin, Nov 19). Only where the button it names is on the page.
     try:
@@ -1061,7 +1090,7 @@ def build(manifest, studio, card=None):
     out.append("</div></div>")
 
     if not card:
-        out.append("<footer class='foot'><div class='wrap'>Your memory card is exactly as it was.</div>"
+        out.append(f"<footer class='foot'><div class='wrap'>{e(OUR_WORDS['f_foot']) if a_folder else 'Your memory card is exactly as it was.'}</div>"
                    f"<div class='wordmark'>{e(brand.name())}</div></footer>")
     # Served from localhost (inside the Claude app), a page may not open file:// links itself,
     # so ask serve_report.py to open the folder in Finder. Opened as a file in Safari, the links work as they are.

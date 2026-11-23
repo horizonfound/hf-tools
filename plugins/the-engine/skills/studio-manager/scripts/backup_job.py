@@ -29,7 +29,9 @@ What the job adds around night.py:
 The record: {"state": "idle"|"running"|"done"|"problem", "step": "copying"|"sorting"|"second"|"done",
 "done", "total", "card", "drive", "folders", "second", "shoots", "backup", "records", "line", "started",
 "finished"}, plus "already" (the card was backed up before: nothing was copied), "set_aside" (what could not be
-sorted into a shoot, said honestly), "second_ok" and "second_line" (how the second copy went). "records" and
+sorted into a shoot, said honestly: {"undated", "other", "kinds"}), "unsorted" (how many files, when nothing at
+all could be sorted), "second_ok" and "second_line" (how the second copy went). On a finished record "done" and
+"total" are the backup's own count, whatever became of the second copy. "records" and
 everything under "private" are paths, for the server only: NEVER sent to a page.
 
 No notification is sent (Nicole, Nov 23: "no"). The shoots are registered as night.py registers them (Your
@@ -91,7 +93,13 @@ OUR_WORDS = {
     "second_missed": "Your photos are backed up and checked. The second copy isn't made yet: {why}",
     "second_plain": "Your photos are backed up and checked. The second copy isn't finished: use Make a second copy on the report to carry on.",
     "aside_undated": "{n} with no date could not be sorted into a shoot. Copied and checked, and kept with the backup's records.",
-    "aside_other": "{n} (camera housekeeping, not a photo or a video) kept with the backup's records.",
+    # every file that is not a photo or a video: the camera's own small files on a card, but in a folder also a
+    # Photoshop file, a PDF, a text file of theirs. Never called "camera housekeeping": the kinds are named instead.
+    "aside_other": "{n} not a photo or a video clip ({kinds}) {was} copied and checked, and set aside with the backup's records, not in a shoot's folder. Nothing was deleted. Ask the Assistant where {it}.",
+    "unsorted": ("Nothing here has a date the Assistant can read, so it could not be sorted into shoots. All {n} are copied "
+                 "and checked, and kept together in one folder: {folder}."),
+    "still_going": ("The backup was interrupted, and one of its steps is still at work by itself. Nothing is lost. "
+                    "Give it a few minutes, then press Try again."),
 }
 
 
@@ -167,10 +175,15 @@ def card_words(source):
 
 
 def is_card(source):
+    """The top of a memory card (backup.source_kind: the same answer the backup's own records will hold)."""
     try:
-        return (Path(source) / "DCIM").is_dir()
-    except OSError:
-        return False
+        from backup import source_kind
+        return source_kind(source) == "card"
+    except Exception:  # noqa: BLE001
+        try:
+            return (Path(source) / "DCIM").is_dir()
+        except OSError:
+            return False
 
 
 def ensure_naming():
@@ -191,6 +204,126 @@ def ensure_naming():
     return True
 
 
+def facts_of(p):
+    """What a backup's own records say, from the job's private notes: (records folder, its name, how many shoots,
+    what was set aside, how many files could not be sorted at all). All None when the records can't be found."""
+    from where import locate
+    try:
+        _, studio = locate(p["session"])
+    except (SystemExit, KeyError, TypeError):
+        # a card backed up before, on another day or under another name: the card ledger knows where
+        try:
+            import cards
+            _, held = cards.check(p["source"])
+            _, studio = locate(held["studio"])
+        except (Exception, SystemExit):  # noqa: BLE001
+            return None, None, None, None, None
+
+    def load(name):
+        try:
+            return json.loads((studio / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+    name = (load("manifest.json") or {}).get("session")
+    try:
+        shoots = len(load("shoots.json")["shoots"])
+    except (KeyError, TypeError):
+        shoots = None
+    aside = unsorted = None
+    log = load("sort-log.json")
+    try:
+        if log is not None:
+            undated = set(log.get("set_aside_undated") or [])
+            # what is theirs or the camera's, never the computer's own hidden notes (.DS_Store, Thumbs.db)
+            other = [e["from"] for e in (log.get("set_aside") or [])
+                     if e["from"] not in undated and not this_computer.housekeeping_file(Path(e["from"]).name)]
+            if undated or other:
+                aside = {"undated": len(undated), "other": len(other),
+                         "kinds": sorted({Path(f).suffix.lower().lstrip(".") or "no ending" for f in other})}
+        elif not shoots:
+            # nothing was sorted at all (a folder of photos with no date inside them): every file is still
+            # loose in the backup's own folder, and no record said so
+            unsorted = len((load("manifest.json") or {}).get("files") or {}) or None
+    except (KeyError, TypeError, AttributeError):
+        pass
+    return studio, name or Path(str(p.get("session") or "")).name, shoots, aside, unsorted
+
+
+def said_aside(rec, aside, unsorted, folder):
+    """The lines that say honestly what was not sorted into a shoot; also noted on the record."""
+    lines = []
+    if unsorted:
+        rec["unsorted"] = unsorted
+        lines.append(OUR_WORDS["unsorted"].format(n=f"{unsorted:,} file{'s' if unsorted != 1 else ''}", folder=folder))
+    if aside:
+        rec["set_aside"] = aside
+        n = aside["undated"]
+        if n:
+            lines.append(OUR_WORDS["aside_undated"].format(n=f"{n:,} photo{'s' if n != 1 else ''} or video clip{'s' if n != 1 else ''}"))
+        n = aside["other"]
+        if n:
+            lines.append(OUR_WORDS["aside_other"].format(n=f"{n:,} file{'s that are' if n != 1 else ' that is'}", kinds=", ".join(aside.get("kinds") or []),
+                                                         was="were" if n != 1 else "was", it="they are" if n != 1 else "it is"))
+    return lines
+
+
+def files_in(studio, fallback=0):
+    try:
+        return len(json.loads((Path(studio) / "manifest.json").read_text(encoding="utf-8")).get("files") or {}) or fallback
+    except (OSError, ValueError, AttributeError):
+        return fallback
+
+
+def left_alone(rec):
+    """A record that says "running" whose job has died. The job starts night.py (and the second copy) so that they
+    outlive it, so the job dying is not the backup dying (Nov 23 review: the record said "stopped, press Try
+    again" while the backup carried on, Try again said "already running", and when the backup finished by itself
+    the record said problem for good). So: (the record as it truly stands, whether to save it).
+      - the backup, or its second copy, is still at work: still "running", nothing saved
+      - it finished by itself (settled, every file checked): "done", with the same lines the job would have written
+      - otherwise: a problem, Try again picks it up"""
+    p = rec.get("private") or {}
+    info = backup_lock.running()
+    if info is not None and (not info.get("source") or not p.get("source") or backup_lock._same(info.get("source"), p.get("source"))):
+        return rec, False
+    studio = bname = None
+    if p.get("session"):
+        studio, bname, shoots, aside, unsorted = facts_of(p)
+    whole = False
+    if studio is not None and (studio / "settled.json").exists():
+        try:    # read only: a look at the record must never change a backup's own records
+            m = json.loads((studio / "manifest.json").read_text(encoding="utf-8"))
+            files = m.get("files") or {}
+            whole = (bool(m.get("finished")) and not m.get("problems") and not m.get("sample") and bool(files)
+                     and all((v.get("dest") or {}).get("ok") for v in files.values()))
+        except (OSError, ValueError, AttributeError):
+            whole = False
+    if not whole:
+        rec.update({"state": "problem", "line": OUR_WORDS["died"], "finished": now()})
+        return rec, True
+    second_ok = None
+    if p.get("second"):
+        try:
+            import second_copy
+            at = second_copy.running()
+            if at and backup_lock._same(at.get("studio"), studio):
+                rec.update(step="second", records=str(studio), backup=bname)
+                return rec, False
+            second_ok = second_copy.status(studio).get("state") == "done"
+        except Exception:  # noqa: BLE001
+            second_ok = False
+    lines = said_aside(rec, aside, unsorted, bname)
+    if second_ok is not None:
+        rec["second_ok"] = second_ok
+        if not second_ok:
+            rec["second_line"] = OUR_WORDS["second_plain"]
+            lines.append(rec["second_line"])
+    n = files_in(studio, rec.get("total") or 0)
+    rec.update(state="done", step="done", done=n, total=n, shoots=shoots, records=str(studio), backup=bname,
+               line=" ".join(lines), finished=now())
+    return rec, True
+
+
 def blank(**kw):
     rec = {"state": "idle", "step": "copying", "done": 0, "total": 0, "card": None, "drive": None, "folders": [],
            "second": None, "shoots": None, "backup": None, "records": None, "line": "", "started": None, "finished": None}
@@ -204,8 +337,9 @@ def alive():
 
 
 def status():
-    """The job's record, true right now. A record that says "running" whose process has died is turned into a
-    problem here (and saved so), unless it was written a moment ago and its process is still on its way up."""
+    """The job's record, true right now. A record that says "running" whose process has died is looked into here
+    (left_alone): still running when the backup itself is, done when it finished by itself, otherwise a problem
+    (and saved so), unless it was written a moment ago and its process is still on its way up."""
     rec = read()
     if rec is None:
         return blank()
@@ -217,11 +351,16 @@ def status():
         if (rec.get("private") or {}).get("pid") or age > STARTING_SECONDS:
             again = read() or rec           # it may have finished between the two looks
             if again.get("state") == "running" and not alive():
-                again.update({"state": "problem", "line": OUR_WORDS["died"], "finished": now()})
                 try:
-                    write(again)
-                except OSError:
-                    pass
+                    again, save = left_alone(again)
+                except Exception:  # noqa: BLE001  (a record that can't be worked out is a problem, never "running" for ever)
+                    again.update({"state": "problem", "line": OUR_WORDS["died"], "finished": now()})
+                    save = True
+                if save:
+                    try:
+                        write(again)
+                    except OSError:
+                        pass
             rec = again
     return rec
 
@@ -464,37 +603,23 @@ class Job:
         return code, why, tail
 
     def finished_facts(self):
-        """What a finished backup's own records say: (records folder, its name, how many shoots, what was set aside)."""
-        from where import locate
-        try:
-            _, studio = locate(self.p["session"])
-        except SystemExit:
-            # a card backed up before, on another day or under another name: the card ledger knows where
-            try:
-                import cards
-                _, held = cards.check(self.p["source"])
-                _, studio = locate(held["studio"])
-            except (Exception, SystemExit):  # noqa: BLE001
-                return None, None, None, None
-        try:
-            name = json.loads((studio / "manifest.json").read_text(encoding="utf-8")).get("session")
-        except (OSError, ValueError):
-            name = None
-        try:
-            shoots = len(json.loads((studio / "shoots.json").read_text(encoding="utf-8"))["shoots"])
-        except (OSError, ValueError, KeyError):
-            shoots = None
-        aside = None
-        try:
-            log = json.loads((studio / "sort-log.json").read_text(encoding="utf-8"))
-            entries = log.get("set_aside") or []
-            undated = len(log.get("set_aside_undated") or [])
-            other = len([e for e in entries if not this_computer.housekeeping_file(Path(e["from"]).name)]) - undated
-            if undated or other > 0:
-                aside = {"undated": undated, "other": max(0, other)}
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
-        return studio, name or Path(self.p["session"]).name, shoots, aside
+        """What a finished backup's own records say (facts_of)."""
+        return facts_of(self.p)
+
+    def wait_for_a_step(self):
+        """night.py has ended, but one of its steps (the copy, most likely) is still at work and holds the backup
+        lock: wait for it, so the rerun never starts a second copy beside it. False when it has not let go after
+        a long while with nothing moving."""
+        last, part = time.monotonic(), None
+        limit = _for_tests("QUIET") or QUIET_SORT_SECONDS
+        while backup_lock.running() is not None:
+            now_part = self.partial()
+            if now_part != part:
+                part, last = now_part, time.monotonic()
+            if time.monotonic() - last > limit:
+                return False
+            time.sleep(1)
+        return True
 
     def second_copy(self, studio):
         """The second copy of the finished backup (second_copy.py, exactly as night.py's step 1b runs it), followed
@@ -584,11 +709,18 @@ class Job:
             if code in (0, 1, 2, "quiet"):
                 break
             self.log(f"night.py ended with {code}; " + ("running it again, same name" if attempt < RERUNS else "not running it again"))
-        studio, bname, shoots, aside = self.finished_facts()
+            if attempt < RERUNS and backup_lock.running() is not None:
+                self.log("one of its steps is still at work; waiting for it before running again")
+                if not self.wait_for_a_step():
+                    code = "held"
+                    break
+        studio, bname, shoots, aside, unsorted = self.finished_facts()
         if studio is not None:
             self.rec.update(records=str(studio), backup=bname)
         if code == "quiet":
             return self.problem(OUR_WORDS["quiet"])
+        if code == "held":
+            return self.problem(OUR_WORDS["still_going"])
         if code == 2:
             said = [w for w in (no_path(x, self.p) for x in why) if w]
             return self.problem(" ".join(said)[:600] if said else OUR_WORDS["stopped"])
@@ -602,12 +734,7 @@ class Job:
         lines = []
         if self.rec.get("already"):
             lines.append(OUR_WORDS["already"])
-        if aside:
-            self.rec["set_aside"] = aside
-            if aside["undated"]:
-                lines.append(OUR_WORDS["aside_undated"].format(n=f"{aside['undated']:,} photo{'s' if aside['undated'] != 1 else ''} or video clip{'s' if aside['undated'] != 1 else ''}"))
-            if aside["other"]:
-                lines.append(OUR_WORDS["aside_other"].format(n=f"{aside['other']:,} other file{'s' if aside['other'] != 1 else ''}"))
+        lines += said_aside(self.rec, aside, unsorted, bname)
         self.save(step="sorting", shoots=shoots, done=self.rec["total"] or self.rec["done"], line=" ".join(lines))
         if self.p.get("second"):
             self.save(step="second", done=0)
@@ -616,12 +743,10 @@ class Job:
             if not ok:
                 self.rec["second_line"] = OUR_WORDS["second_missed"].format(why=said) if said else OUR_WORDS["second_plain"]
                 lines.append(self.rec["second_line"])
-            try:
-                n = len(json.loads((Path(studio) / "manifest.json").read_text(encoding="utf-8")).get("files") or {})
-            except (OSError, ValueError):
-                n = self.rec["total"]
-            self.rec.update(done=n if ok else self.rec["done"], total=n or self.rec["total"])
-        self.save(state="done", step="done", line=" ".join(lines), finished=now())
+        # the numbers on a finished record are the BACKUP's: every file copied and checked. How far a second copy
+        # got is said in words (second_line), never as "0 of 10" on a card that says Done.
+        n = files_in(studio, self.rec["total"] or self.rec["done"])
+        self.save(state="done", step="done", done=n, total=n, line=" ".join(lines), finished=now())
         return 0
 
 

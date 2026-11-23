@@ -119,6 +119,24 @@ def take(source=None, name=None):
     return True
 
 
+def for_a_step():
+    """What night.py adds when it starts one of its steps (the copy, the sort, the settle...), so the step holds
+    the one backup lock too: {"pass_fds": (...)} for subprocess. A Mac's lock belongs to the open lock file, and a
+    step that is handed that open file keeps the lock for as long as it lives. Why (Nov 23 review): night.py
+    alone held the lock, so when only night.py was killed its copy carried on with the lock free, and the next
+    backup started a second copy into the same folder at the same moment, the very case the lock is for.
+    A PC's lock cannot be handed on (and subprocess has no pass_fds there): {} there, a gap that is named."""
+    if this_computer.WINDOWS:
+        return {}
+    fds = []
+    for f in _held:
+        try:
+            fds.append(f.fileno())
+        except (OSError, ValueError):
+            pass
+    return {"pass_fds": tuple(fds)} if fds else {}
+
+
 def let_go():
     """Give the lock back before the process ends (the tests' own use; a process that ends lets go by itself)."""
     while _held:
