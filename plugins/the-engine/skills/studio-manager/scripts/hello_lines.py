@@ -156,7 +156,8 @@ def gather(now=None):
             made = lambda s: s["reels"] + s["carousels"] + s["stories"]  # noqa: E731
             worked = [s for s in y["shoots"] if made(s)]
             f["year"] = {"photos": int(t.get("photos") or 0), "shoots": int(t.get("photo_shoots") or 0),
-                         "shared": int(t.get("shared_shoots") or 0), "reels": int(t.get("reels") or 0),
+                         "shared": int(t.get("made_shoots", t.get("shared_shoots")) or 0),   # made from, as "{n} shoots turned into posts" says (the recap's "shared" is posted only since Nov 23)
+                         "reels": int(t.get("reels") or 0),
                          "carousels": int(t.get("carousels") or 0), "posted": int(t.get("posted") or 0),
                          "hours": int(round((t.get("minutes_saved") or 0) / 60.0))}
             top = next((s for s in worked if s["name"] == y.get("top")), None)

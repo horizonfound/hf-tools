@@ -939,6 +939,12 @@ SELECT_WORDS = {
 
 # Lines that are ours, not hers, each with why (they go on the "Tell Nicole" list):
 OUR_WORDS = {
+    # B-roll on a PC (Nicole, Nov 23: "thats ok. Make sure it states that so theyre aware if they have a PC"). Save my
+    # video is a Mac's only, so a PC is told before any press: one short line on the chooser's B-roll card, and the
+    # watch step says Make this one in CapCut where hers says Save my video (her sentence, with only that changed),
+    # with this_computer.NO_VIDEO_PC right under it. Both are ours, drafts for Nicole.
+    "broll_card_pc": "On a PC it's made in CapCut: saving it as a finished video is Mac only for now.",
+    "pv_say_broll_pc_html": "Press play to see it cut on your song. Add your words if you'd like, then press <b>Make this one in CapCut</b>. Changed something you didn't mean to? <b>Undo</b> takes you back a step.",
     # several reels (v25): hers lets two reels share a name; the chat tells them apart by name, so ours does not.
     # And nothing can ever be removed, so there is an end to how many a shoot keeps (hers has none).
     "reels_taken": reels.NAME_TAKEN,
@@ -4982,7 +4988,8 @@ V27_CSS = r"""
 .kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:1rem}
 .kind{display:grid;gap:.35rem;padding:1.1rem 1.2rem;border:1.5px solid var(--line);border-radius:16px;background:var(--paper);text-decoration:none;color:var(--ink);cursor:pointer;transition:border-color .2s,box-shadow .2s}
 .kind:hover{border-color:var(--coral-2);box-shadow:0 0 0 1px var(--coral-2)}
-.kind b{font:600 17px/1.2 var(--sans)}.kind span{color:var(--ink-2);font-size:14px}
+.kind b{font:600 17px/1.2 var(--sans)}.kind span{color:var(--ink-2);font-size:14px}.kind span.pcnote{color:var(--coral-2);font-size:13px}
+.watch .pcnote{color:var(--coral-2);margin-top:-.2rem}
 .chooser h2{margin-bottom:.3rem}
 .vdrop{border:1.5px solid var(--line);border-radius:14px;background:var(--paper);padding:0}
 .vdrop summary{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px 8px 8px;cursor:pointer}
@@ -5345,6 +5352,7 @@ def _watch_section(w, num, kind="photos"):
     finished MP4 with the song and the words, saved into the shoot's Reels folder (save_video_from_page)."""
     e = html.escape
     broll = kind == BROLL_STYLE
+    no_video = broll and pc_footage()          # a PC: no Save my video; said up front, and CapCut is the main button
     chips = lambda attr, keys, word: "".join("<button type='button' data-" + attr + "='" + k + "'>" + e(w[word % k]) + "</button>" for k in keys)  # noqa: E731
     pace = ("" if broll else
             "<span class='wl'>" + e(w["pv_pace"]) + "</span>"
@@ -5362,7 +5370,9 @@ def _watch_section(w, num, kind="photos"):
     return (
         "<section class='step watch' id='watch'>"
         "<h2><span class='num'>" + str(num) + "</span>" + e(w["watch_h2"]) + "</h2>"
-        "<p class='say' id='" + ("pvSayBroll" if broll else "pvSayReel") + "'>" + w["pv_say_broll_html" if broll else "pv_say_reel_html"] + "</p>"
+        "<p class='say' id='" + ("pvSayBroll" if broll else "pvSayReel") + "'>"
+        + (OUR_WORDS["pv_say_broll_pc_html"] if no_video else w["pv_say_broll_html" if broll else "pv_say_reel_html"]) + "</p>"
+        + ("<p class='say sm pcnote' id='pvPcNote'>" + e(this_computer.NO_VIDEO_PC) + "</p>" if no_video else "") +
         "<div class='wgrid'>"
         "<div class='pvphone' id='pvPhone'>"
         "<img id='pvImg' alt=''><video id='pvVid' playsinline muted preload='auto'></video>"
@@ -5383,8 +5393,8 @@ def _watch_section(w, num, kind="photos"):
         "<span class='say sm' id='pvMixSay'></span></div>"
         "<p class='say sm' id='pvWords'></p>"
         + os_box +
-        "<div class='wrow'>" + ("<button class='btn main' id='pvSaveVid' type='button'>" + e(w["os_save"]) + "</button>" if broll else "")
-        + "<button class='btn" + ("" if broll else " main") + "' id='pvMake' type='button'>" + e(w["pv_make"]) + "</button></div>"
+        "<div class='wrow'>" + ("<button class='btn main' id='pvSaveVid' type='button'" + (" hidden" if no_video else "") + ">" + e(w["os_save"]) + "</button>" if broll else "")
+        + "<button class='btn" + ("" if broll and not no_video else " main") + "' id='pvMake' type='button'>" + e(w["pv_make"]) + "</button></div>"
         "<p class='say sm' id='pvSaved' role='status'></p>"
         "</div></div>"
         "<audio id='pvAudio' preload='auto'></audio>"
@@ -5446,8 +5456,10 @@ def chooser_section(w, kit_name):
     e = html.escape
 
     def card(kid, kind):
+        pc = ("<span class='pcnote' id='kBrollPc'>" + e(OUR_WORDS["broll_card_pc"]) + "</span>"
+              if kind == BROLL_STYLE and pc_footage() else "")       # Nicole, Nov 23: a PC knows before it picks B-roll
         return ("<a class='kind' id='" + kid + "' href='" + e(kind_address(kit_name, kind), quote=True) + "'><b>"
-                + e(w["kind_%s_b" % kind]) + "</b><span>" + e(w["kind_%s_s" % kind]) + "</span></a>")
+                + e(w["kind_%s_b" % kind]) + "</b><span>" + e(w["kind_%s_s" % kind]) + "</span>" + pc + "</a>")
     return ("<section class='step chooser' id='chooser'>"
             "<h2>" + e(w["chooser_h2"]) + "</h2>"
             "<p class='say'>" + e(w["chooser_say"]) + "</p>"

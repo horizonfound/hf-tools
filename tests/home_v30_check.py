@@ -344,8 +344,11 @@ def check_browser(c, w, shot):
                  "const el = document.querySelector('#tiles .tl'), bw = el.clientWidth, bh = el.clientHeight; "
                  "return {order: tileOrder([{n: 1}, {n: 3}, {n: 2}, {n: 4}], G, bw, bh).map(c => c.n), low: tileFits({f: G[1]}, bw, bh), mid: tileFits({f: G[2]}, bw, bh), "
                  "none: tileOrder([{n: 5}, {n: 6}], {}, bw, bh).map(c => c.n)}; })()" % json.dumps(FACE))
-    case("... a photo whose faces can't be brought that high (a face near the bottom) gives way to the next photo with a face; then the other faces, then the rest",
-         order == {"order": [2, 1, 4, 3], "low": False, "mid": True, "none": [5, 6]}, order)
+    case("... a photo whose faces can't be brought that high (a face near the bottom) gives way to the next photo with a face; then a photo with no face, then the other faces (Nicole, Nov 23)",
+         order == {"order": [2, 3, 1, 4], "low": False, "mid": True, "none": [5, 6]}, order)
+    nofit = c.js("(() => { const low = {w: 520, h: 347, faces: [[.1, .80, .1, .12]]}, G = {1: low, 2: {w: 520, h: 347, faces: []}, 4: low}; "
+                 "const el = document.querySelector('#tiles .tl'); return tileOrder([{n: 1}, {n: 2}, {n: 3}, {n: 4}], G, el.clientWidth, el.clientHeight).map(c => c.n); })()")
+    case("... when no photo's face fits above the word, a photo with no face comes before one whose face sits behind the word", nofit == [2, 3, 1, 4], nofit)
     cen = c.js("(() => { const im = document.createElement('img'); aim(im, {f: {w: 520, h: 347, faces: []}}, 300, 150, TILE_AT); return [im.style.objectPosition, im.dataset.faces]; })()")
     case("... a tile photo with no face stays centered", cen[0] in ("50% 50%", "50.0% 50.0%") and cen[1] == "0", cen)
     # a tile's press: "Create a carousel: which shoot?" (stage C; tests/create_dialog_check.py holds the box), recorded as

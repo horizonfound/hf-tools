@@ -2574,7 +2574,7 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
-        if path in ("/make-new", "/make-vault"):
+        if path in ("/make-new", "/make-new-name", "/make-vault"):
             # the home page's four tiles: + A new shoot and My vault in "Create a reel: which shoot?" (Nicole's v30).
             # create_dialog.py checks each the way arrange.py does
             import create_dialog

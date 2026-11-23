@@ -26,6 +26,12 @@ WHAT EACH NUMBER IS COUNTED FROM (every one a count of records; the only estimat
                  design, however often it was saved again), by the day of the first save.
   stories        the same for sets of stories (kit.json "stories_laid_out" and "stories_set").
   posted         the pieces in ~/.studio/posting.json marked posted, by "posted_at"; ready: the ones ready to post.
+  shared_shoots  the shoots with at least one piece actually posted in the period (Nicole, Nov 23: "lets only
+                 count stuff they actually posted"): each posted piece is traced to its shoot by the post kit
+                 folder it was made from (else by the shoot id it carries); the vault is never a shoot; a posted
+                 piece that names no shoot at all counts as a post and as no shoot. This is the N of "You shared
+                 N shoots with the world". made_shoots is what it counted before: the shoots something was made
+                 from in the period, posted or not (the hello's "{n} shoots turned into posts" still reads that).
   shot           photos off their cards: the backups the editing queue knows (home_base.backups: each backup once,
                  wherever its records are now) whose "added" day is in the period, counting the shoots of 10 or
                  more photos; photo_shoots is how many such shoots. With none, the page says "finished photos":
@@ -64,6 +70,7 @@ import html
 import json
 import os
 import re
+import unicodedata
 import struct
 import sys
 import zlib
@@ -292,11 +299,29 @@ def _kits():
     return out
 
 
+def _slug(text):
+    """A kit's short id, as the posting queue makes it (posting_queue.slug: kept the same here, by a test)."""
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")[:40]
+
+
+def _piece_shoot(p):
+    """Which shoot a posted piece is from: (the post kit folder's NAME or "", its shoot id or ""), or None when
+    the piece names no shoot. Never a path: only the last part of the folder it was made from."""
+    was, sid = p.get("kit"), p.get("shoot_id")
+    name = ""
+    if isinstance(was, str) and was.strip("\\/ "):
+        name = unicodedata.normalize("NFC", re.split(r"[\\/]", was.rstrip("\\/ "))[-1])
+    sid = sid.strip() if isinstance(sid, str) else ""
+    return (name, sid) if (name or sid) else None
+
+
 def _posting():
+    """(the days of the posts marked posted, how many are ready, and for each posted piece (day, its shoot))."""
     pieces = _json(HOME / "posting.json").get("pieces")
     pieces = [p for p in (pieces if isinstance(pieces, list) else []) if isinstance(p, dict)]
-    posted = sorted(d for d in (_day(p.get("posted_at")) for p in pieces if p.get("status") == "posted") if d)
-    return posted, sum(1 for p in pieces if p.get("status") == "green")
+    done = sorted(((d, _piece_shoot(p)) for d, p in ((_day(p.get("posted_at")), p) for p in pieces if p.get("status") == "posted") if d),
+                  key=lambda x: x[0])
+    return [d for d, _ in done], sum(1 for p in pieces if p.get("status") == "green"), done
 
 
 def _backups():
@@ -343,13 +368,13 @@ def _who():
 def gather():
     """Everything the counts are made from, read once."""
     kits = _kits()
-    posted, ready = _posting()
+    posted, ready, posted_from = _posting()
     backups = _backups()
     days = list(posted) + [d for d, _ in backups]
     for k in kits:
         days += k["reel_days"] + k["carousel_days"] + k["story_days"]
     me, handle = _who()
-    return {"kits": kits, "posted": posted, "ready": ready, "backups": backups, "since": min(days) if days else "",
+    return {"kits": kits, "posted": posted, "posted_from": posted_from, "ready": ready, "backups": backups, "since": min(days) if days else "",
             "me": me, "handle": handle}
 
 
@@ -391,6 +416,9 @@ def data(month=None, year=None, got=None, day=None):
     # a month shows the shoots something was made from that month; a year, those and the ones shot that year
     shown = worked if month else [s for s in shoots if made(s) or s["shot_here"]]
     posted = [d for d in got["posted"] if inside(d)]
+    shared = _shared(got, inside, shoots)       # the shoots with a piece actually posted in the period
+    for s in shoots:
+        s["shared"] = s["name"] in shared["kits"]
     shot = photo_shoots = 0
     for d, counts in got["backups"]:
         if inside(d):
@@ -409,7 +437,7 @@ def data(month=None, year=None, got=None, day=None):
         weeks = len(wk)
         weeks_posted = len(wk & {date.fromisoformat(p).isocalendar()[:2] for p in posted})
     tot = {"photos": sum(s["photos"] for s in shown), "shot": shot, "photo_shoots": photo_shoots,
-           "shared_shoots": len(worked), "reels": sum(s["reels"] for s in shoots + in_vault),
+           "shared_shoots": shared["n"], "made_shoots": len(worked), "reels": sum(s["reels"] for s in shoots + in_vault),
            "carousels": sum(s["carousels"] for s in shoots + in_vault),
            "stories": sum(s["stories"] for s in shoots + in_vault), "posted": len(posted), "posted_days": len(set(posted)),
            "weeks_posted": weeks_posted, "weeks": weeks, "ready": got["ready"]}
@@ -422,10 +450,37 @@ def data(month=None, year=None, got=None, day=None):
     else:
         label, nxt = year, "next year"
     anything = bool(tot["reels"] or tot["carousels"] or tot["stories"] or tot["posted"] or tot["shot"])
+    # a shoot posted this period that nothing was made from this period (made last month, posted this one) is
+    # shown too, after the others, so the "You shared" story has its photo; the photo count stays as it was
+    listed = shown + [s for s in shoots if s["shared"] and s not in shown]
     return {"ok": True, "me": got["me"], "handle": got["handle"], "year": year, "month": month or "", "label": label,
-            "next": nxt, "shoots": shown or (shoots if anything else []), "totals": tot, "minutes_each": dict(MINUTES_SAVED),
+            "next": nxt, "shoots": listed or (shoots if anything else []), "totals": tot, "minutes_each": dict(MINUTES_SAVED),
             "since": got["since"], "top": top["name"] if top else "", "anything": anything,
             "so_far": bool(month) and month == day.isoformat()[:7]}
+
+
+def _shared(got, inside, shoots):
+    """The shoots with at least one piece posted in the period (Nicole, Nov 23): {"n": how many, "kits": the names
+    of the post kits among them}. A piece is its kit's by the folder it was made from, or (a piece from before the
+    folder was written down) by the short id the posting queue gave that kit; a posted piece from a shoot with no
+    post kit here (an older route, a kit on a drive that is unplugged) is still one shoot, by what it carries; a
+    piece made in the vault, or one that names no shoot, is no shoot."""
+    by_name = {unicodedata.normalize("NFC", k["folder"]): k for k in got["kits"]}
+    by_id = {}
+    for k in got["kits"]:
+        by_id.setdefault("kit:" + _slug(k["folder"]), k)
+    names = {s["name"] for s in shoots}
+    kits, others = set(), set()
+    for d, who in got.get("posted_from") or []:
+        if not who or not inside(d):
+            continue
+        name, sid = who
+        k = by_name.get(name) if name else by_id.get(sid)
+        if k is None:
+            others.add(sid or name)
+        elif not k.get("vault") and k["folder"] in names:
+            kits.add(k["folder"])
+    return {"n": len(kits) + len(others), "kits": kits}
 
 
 def chips(tot):
@@ -797,6 +852,8 @@ h1{margin:0;font:600 34px/1.05 var(--sans);letter-spacing:-.03em}h1 em{color:var
 # The stories and the player: hers (pages/wrapped.html), with these changes, each named where it is.
 #   * photos come through /kit-photo (the kit's small copies, by number), never an address with a folder in it
 #   * the picture is sent as itself (image/png), not as text inside JSON, and its name is made by the server
+#   * "You shared N shoots with the world" counts only shoots with a piece actually posted in the month (Nicole,
+#     Nov 23), and its photos are those shoots'
 #   * a story with nothing to brag about is left out (hers showed "You shared 0 shoots", a top shoot nothing was
 #     made from, "0 reels made"); one of a thing is "1 reel", never "1 reels"
 #   * "so far." or "recapped." is the server's answer (hers asked the browser's clock in London time)
@@ -890,7 +947,8 @@ const ALL = [
     text(yr ? 'You had' : 'You shared', W / 2, 200, {size: 64, weight: 700, color: C.ink, alpha: ease(win(t, 0, .6))});
     text(`${ns} ${pl(ns, yr ? 'photo shoot' : 'shoot')}`, W / 2, 360, {size: ns > 9 ? 150 : 170, weight: 900, color: C.ink, ls: -7, alpha: ease(win(t, .2, 1))});
     text(yr ? (ns === 1 ? 'and it counted' : 'and every one of them counted') : 'with the world', W / 2, 470, {size: 80, serif: true, italic: true, weight: 400, color: C.coral2, alpha: ease(win(t, .5, 1.3)), max: 980});
-    const sh = D.shoots.slice(0, 3), spots = [[90, 600, -.05], [570, 780, .05], [130, 1250, -.03]];
+    // a month: the photos are of the shoots that were posted (Nicole, Nov 23), never of one that was only made from
+    const sh = (yr ? D.shoots : D.shoots.filter(s => s.shared)).slice(0, 3), spots = [[90, 600, -.05], [570, 780, .05], [130, 1250, -.03]];
     sh.forEach((s, k) => {
       const [x, y, rot] = spots[k], at = .9 + k * .55, p = back(win(t, at, at + .8)); if (p <= 0) return;
       ctx.save(); ctx.globalAlpha = cl(p * 2);
