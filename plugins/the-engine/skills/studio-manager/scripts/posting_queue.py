@@ -2172,6 +2172,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home base's two screens (Nicole's v26): every one of their requests is home_base.py's to answer
             import home_base
             return home_base.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/name-shoots.html", "/name-shoots-data", "/name-shoots-pic"):
+            # Name your shoots, the page after a backup (Nicole's v31, section 6): name_shoots.py's to answer
+            import name_shoots
+            return name_shoots.handle_get(self, path, urlsplit(self.path).query)
         if path in ("/make-list", "/make-new-status"):
             # the home page's four tiles: "Create a reel: which shoot?" (Nicole's v30, section 4): create_dialog.py's to answer
             import create_dialog
@@ -2569,6 +2573,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the Make posts screen's Archive and Bring it back: home_base.py checks it the way arrange.py does
             import home_base
             return home_base.handle_post(self, path, urlsplit(self.path).query)
+        if path == "/name-shoots-save":
+            # Name your shoots: Save the names (Nicole's v31, section 6). name_shoots.py checks it the way arrange.py does
+            import name_shoots
+            return name_shoots.handle_post(self, path, urlsplit(self.path).query)
         if path in ("/make-new", "/make-vault"):
             # the home page's four tiles: + A new shoot and My vault in "Create a reel: which shoot?" (Nicole's v30).
             # create_dialog.py checks each the way arrange.py does
