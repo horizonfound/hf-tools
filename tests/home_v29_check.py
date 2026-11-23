@@ -138,11 +138,13 @@ def check_layout(w, home):
     case("Back up a card and My editing queue with their same words and boxes (no heading over them: hers hides it)",
          "Also in your Assistant" not in page
          and words[0:2] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots."]
-         and words[2:4] == ["A card is in", "EOS_DIGITAL · about 233 files"]
-         and words[5:7] == ["My editing queue", "The shoots you need to edit and when they're due."]
+         and words[2] == "See all my backups"            # the link to the list, on the card (Nicole's v31)
+         and words[3:5] == ["A card is in", "EOS_DIGITAL · about 233 files"]
+         and words[6:8] == ["My editing queue", "The shoots you need to edit and when they're due."]
          and "id='n1'" in also and "id='n2'" in also, words)
-    case("the two cards open what they opened before: the Back up a card screen (a link) and the editing queue (a button), recorded as backup and queue",
-         "<a class='row live' id='s1' data-item='backup' href='/backups'>" in also and "<button class='row' id='s2' data-item='queue' type='button'>" in also
+    case("Back up a card opens its box on this page (her v31: a button, with See all my backups as the link to the list) and the editing queue as before (a button), recorded as backup and queue",
+         "<div class='row live' id='s1' data-item='backup' role='button' tabindex='0' aria-haspopup='dialog'>" in also and "<a class='seeall' id='seeAll' href='/backups'>See all my backups</a>" in also
+         and "<button class='row' id='s2' data-item='queue' type='button'>" in also
          and "<span id='editingWords' hidden></span>" in also and "$('s2').onclick = () => assistant('/queue-url', $('editingWords'), W.opening_queue);" in page)
     case("what went: the step numbers, Your workflow, Start wherever you are, and the three old button labels",
          not any(g in page for g in GONE_LINES) and "class='k'" not in page and "flow4" not in page and not any(k in home.WORDS for k in GONE_KEYS), [g for g in GONE_LINES if g in page])
@@ -165,12 +167,12 @@ def check_layout(w, home):
     case("... and the kits are back afterwards", home.facts()["kits"] == 2)
     # a card that is not in
     v28.at(TODAY)
-    case("no card in: Back up a card is not marked live", "<a class='row' id='s1' data-item='backup' href='/backups'>" in home.page_html())
+    case("no card in: Back up a card is not marked live", "<div class='row' id='s1' data-item='backup' role='button'" in home.page_html())
     # the stale eyebrow
     import home_base
     bk = home_base.backups_html()
-    case("the Back up a card screen no longer says Step 1 of your workflow, and has no empty eyebrow",
-         "Step 1 of your workflow" not in bk and "of your workflow" not in part(bk, "<body", "<script") and "b_eyebrow" not in home_base.WORDS and "eyebrow" not in part(bk, "<header class='head'>", "</header>") and "<h1>Back up <em>a card.</em></h1>" in bk)
+    case("the backups screen (Your backups. since her v31) no longer says Step 1 of your workflow, and has no empty eyebrow",
+         "Step 1 of your workflow" not in bk and "of your workflow" not in part(bk, "<body", "<script") and "b_eyebrow" not in home_base.WORDS and "eyebrow" not in part(bk, "<header class='head'>", "</header>") and "<h1>Your <em>backups.</em></h1>" in bk)
     stale = []
     for p in sorted(SCRIPTS.glob("*.py")):
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
@@ -268,12 +270,14 @@ def check_browser(c, w):
     chrome_drive.wait_until(lambda: clicks(w)[before:] == ["posts", "posting"], 10, what="the press recorded")
     case("My posting queue opens the posting queue, recorded as posting", clicks(w)[before:] == ["posts", "posting"], clicks(w)[before:])
     home_page()
-    c.click("#s1")
+    # (the card itself opens the Back up a card box since her v31: tests/backup_popup_check.py presses it, on pretend
+    # drives. Here only its link to the list, so this test never looks at the drives that are really plugged in.)
+    c.click("#seeAll")
     c.wait_for("location.pathname === '/backups'", 15)
     chrome_drive.wait_until(lambda: clicks(w)[before:] == ["posts", "posting", "backup"], 10, what="the press recorded")
-    case("Back up a card opens its screen as before, recorded as backup", c.js("location.pathname") == "/backups" and clicks(w)[before:] == ["posts", "posting", "backup"], clicks(w)[before:])
+    case("See all my backups, on the Back up a card card, opens the list, recorded as backup", c.js("location.pathname") == "/backups" and clicks(w)[before:] == ["posts", "posting", "backup"], clicks(w)[before:])
     case("... and that screen has no Step 1 of your workflow over its heading", "of your workflow" not in c.js("document.body.innerText") and c.js("document.querySelectorAll('.head .eyebrow').length") == 0
-         and c.js("document.querySelector('.head h1').textContent") == "Back up a card.")
+         and c.js("document.querySelector('.head h1').textContent") == "Your backups.")
     home_page()
     c.js("window.__asked.length = 0")
     c.click("#s2")
@@ -282,7 +286,10 @@ def check_browser(c, w):
     case("My editing queue asks for the queue as before, what comes back shows on the card, recorded as queue",
          "/queue-url" in c.js("window.__asked") and c.js("document.querySelector('#s2 .note').textContent") == "Pretend: the editing queue would open here."
          and c.js("getComputedStyle(document.querySelector('#s2 .note')).display") != "none" and clicks(w)[before:] == ["posts", "posting", "backup", "queue"], clicks(w)[before:])
-    case("home.py pending tells the chat all four, in the order pressed", pending(w)[-4:] == ["posts", "posting", "backup", "queue"], pending(w))
+    # (a press on the Back up a card card is answered by the page since Nov 23: its box starts the backup itself,
+    # so it is kept in the record and never handed to the chat, as a tile's press is not)
+    case("home.py pending tells the chat the three it still explains, in the order pressed; the backup card's press is the page's own",
+         pending(w)[-3:] == ["posts", "posting", "queue"] and "backup" not in pending(w), pending(w))
     # a phone
     c.phone(390, 844)
     home_page()

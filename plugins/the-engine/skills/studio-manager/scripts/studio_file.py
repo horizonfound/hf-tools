@@ -574,6 +574,79 @@ def use_next(drive=None, computer=False):
     return {"state": "saved", "place": d["session"], "drive": name, "where": where}
 
 
+def set_backup_place(place, source=None, need=None, computer=False):
+    """The Back up a card popup's own writer (Nicole's v31; built Nov 23): where backups go from now on is EXACTLY
+    the folder picked there, a drive AND a folder on it. Nothing is guessed and nothing is swapped in: not the
+    top of the drive (use_next cuts a pick down to it), not the drive's likely shoot folder (place_on). Called
+    only when Start the backup is pressed, never while they are still picking.
+
+    Returns {"state": "saved" | "same" | "stop", "place", "why"}. "stop", and nothing written, when the folder is
+    not there, is on a memory card, would put the copy on or inside what is being backed up (backup.onto_itself),
+    cannot be written to, or has no room for this card (cannot_use). "same": backups already go exactly there.
+    computer: they chose the computer itself (no external drive): <Pictures>/Shoots, made if missing.
+    It never touches drives.second, and leaves a naming on file alone. Run twice it writes once."""
+    if computer:
+        folder = this_computer.known_folder("Pictures") / SHOOTS_ON_COMPUTER
+    else:
+        folder = Path(str(place or "")).expanduser()
+        if not place or not folder.is_absolute() or not folder.is_dir():
+            return {"state": "stop", "why": "That folder is not there right now."}
+    if card_above(folder if folder.is_dir() else folder.parent) is not None:
+        return {"state": "stop", "why": "That is a memory card. Photos belong on a drive that never gets formatted."}
+    if source:
+        if _inside(source, folder) or _inside(folder, source):
+            return {"state": "stop", "why": "That is where the photos are coming from. Pick a different place."}
+        try:
+            import backup
+            why = backup.onto_itself(source, folder, "the backup")
+        except Exception:  # noqa: BLE001  (the backup itself asks again before it copies a byte)
+            why = None
+        if why:
+            return {"state": "stop", "why": why}
+    if computer:
+        folder.mkdir(parents=True, exist_ok=True)
+    why = cannot_use(folder, need)
+    if why:
+        return {"state": "stop", "why": why}
+    sf = load()
+    d = sf.setdefault("drives", {})
+    try:
+        exact = str(folder.resolve())
+    except OSError:
+        exact = str(folder)
+    n = sf.setdefault("naming", {})
+    named = bool(n.get("folder_pattern"))
+    if d.get("session") == exact and named:
+        return {"state": "same", "place": exact}
+    if not set_drive(d, "session", folder):
+        return {"state": "stop", "why": "That folder is not there right now."}
+    if not named:                            # only when no naming is on file (as the first backup's own choice)
+        n.update(OFFERED[0])
+        n.pop("example", None)
+        n.setdefault("file_names", "shoot")
+    sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note":
+                                       f"Backups go into {place_words(d['session'])}: picked on the home page."})
+    save(sf)
+    return {"state": "saved", "place": d["session"]}
+
+
+def set_offered(n):
+    """Save one of the two offered ways of naming shoot folders for every backup from now on (the popup's
+    "named Shoot name_Date · Change"; the report's naming option does the same for its own backup). True when
+    the Studio File changed; ValueError for anything but 1 or 2. Folders already on a drive are not renamed."""
+    if type(n) is not int or not 1 <= n <= len(OFFERED):
+        raise ValueError("not one of the offered ways")
+    sf = load()
+    now, way = sf.setdefault("naming", {}), OFFERED[n - 1]
+    if now.get("folder_pattern") == way["folder_pattern"] and now.get("date_format") == way["date_format"]:
+        return False
+    now.update(way)
+    now.pop("example", None)
+    now.setdefault("file_names", "shoot")
+    save(sf)
+    return True
+
+
 def choose_defaults(drive=None, computer=False, write=True, source=None, need=None):
     """The first backup's setup, done by the Assistant itself (Dustin, Nov 19: zero questions before the copy).
     Returns a dict: state "set" (a drive is already on file: nothing is changed, ever), "set-other" (a drive is

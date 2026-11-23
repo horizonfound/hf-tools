@@ -2181,6 +2181,10 @@ class Handler(SimpleHTTPRequestHandler):
             # the home page's four tiles: "Create a reel: which shoot?" (Nicole's v30, section 4): create_dialog.py's to answer
             import create_dialog
             return create_dialog.handle_get(self, path, urlsplit(self.path).query)
+        if path in ("/backup-popup", "/backup-job", "/backup-report"):
+            # the home page's Back up a card box (Nicole's v31): backup_popup.py's to answer
+            import backup_popup
+            return backup_popup.handle_get(self, path, urlsplit(self.path).query)
         if path == "/photo-words-state":
             # how far "Getting your photos ready to search" has got for a post kit (v29): photo_words.py's to answer
             import photo_words
@@ -2579,6 +2583,11 @@ class Handler(SimpleHTTPRequestHandler):
             # create_dialog.py checks each the way arrange.py does
             import create_dialog
             return create_dialog.handle_post(self, path, urlsplit(self.path).query)
+        if path in ("/backup-folders", "/backup-folder-new", "/backup-pick", "/backup-naming", "/backup-start"):
+            # the home page's Back up a card box: the folder browser, the naming, and Start the backup.
+            # backup_popup.py checks each the way arrange.py does
+            import backup_popup
+            return backup_popup.handle_post(self, path, urlsplit(self.path).query)
         if path in ("/vault-open", "/vault-add", "/vault-clips", "/vault-remove"):
             # My vault: its card's one press, + Add a shoot and + Add clips. vault_page.py checks each the way arrange.py does
             import vault_page
