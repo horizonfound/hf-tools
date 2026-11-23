@@ -468,7 +468,9 @@ def check_page(c, s, ids):
          and c.js("Array.from(document.querySelectorAll('#pick .pw > *')).map(function(e){ return e.className; }).join('|')") == "btn|btn o|rslot|pwl"
          and c.js("document.querySelector('#pick .rslot').dataset.remindSlot") == rid)
     href = c.js("document.querySelector('#pick .pwl').getAttribute('href')")
-    case("Open my words leads to this post's words page on this same server", href == "/words.html?kit=%s&piece=reel" % quote(KIT, safe="~()*!.'"), href)
+    # since Nov 23 each reel has its own words: a reel's post names its reel in the link (the shoot's first reel here)
+    case("Open my words leads to this post's own words page (its reel named) on this same server",
+         href == "/words.html?kit=%s&reel=v1&piece=reel" % quote(KIT, safe="~()*!.'"), href)
     # v25: the reel's own photos first under "From your reel, in the order it plays", numbered; the rest under
     # "Any other photo from the shoot", open already here because the photo in use is one of those
     strip = c.js("Array.from(document.querySelectorAll('#pick .ps .sub, #pick .ps .c, #pick .ps .more')).map(function(e){ return e.classList.contains('c') ? e.dataset.rel + (e.classList.contains('on') ? ' ON' : '') : e.className.split(' ').pop().toUpperCase() + ':' + e.textContent; })")

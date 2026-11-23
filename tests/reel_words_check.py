@@ -698,6 +698,57 @@ def check_page(c, work, port):
         s.stop()
 
 
+def check_kit_page(c, work, port):
+    """The post kit's page in a browser, three reels made: Reel 1 with no caption, SECOND with its caption, THIRD
+    with none."""
+    s = krq.fresh(work, "kitpage", port)
+    three_reels(s)
+    krq.set_made(s, "v3", krq.P3)
+    chat(s, "draft", KIT, "reel", "--reel", SECOND, given={"caption": "Second caption", "hooks": HOOKS})
+    s.start()
+    try:
+        s.http("POST", "/words-rhythm", {"text": "3 a week"})
+        c.init_script(krq.POPUPS)
+        url = s.url(krq.PAGE)
+        live = "document.body.classList.contains('live') && !!document.querySelector('[data-box=queue-reel] [data-add]')"
+        c.open(url)
+        c.wait_for(live, 10)
+        rows = c.js("Array.from(document.querySelectorAll('[data-box=words-reel] .wreels li')).map(function(n){ return n.textContent; })")
+        case("in a browser: Your words lists the three reels, each with its own state",
+             len(rows) == 3 and rows[0].startswith("Reel 1: not written yet") and rows[1].startswith(SECOND + ": caption ready · 10 hooks")
+             and rows[2].startswith(THIRD + ": not written yet") and c.count("[data-box=words-reel] .wreels li b *") == 0, rows)
+        c.click("[data-box=queue-reel] [data-add]")
+        c.wait_for(krq.BOX, 5)
+        case("Add to my queue asks which reel first", c.js(krq.BOX_SAYS)[0] == krq.WHICH_TITLE and c.js(krq.BOX_SAYS)[2] == ["Reel 1", SECOND, THIRD], c.js(krq.BOX_SAYS))
+        c.click("#nocapRow button", nth=1)                 # the second reel: it has its caption
+        try:
+            chrome_drive.wait_until(lambda: [x["status"] for i, x in krq.reel_pieces(s).items() if i.endswith("-reel-v2")] == ["green"], 10, what="the add")
+            added = True
+        except chrome_drive.Timeout:
+            added = False
+        case("the reel that HAS its caption goes in at once: no caption question, though the other reels have none",
+             added and c.js("window.__pop") == [] and c.js(krq.BOX) is False, krq.reel_pieces(s))
+        c.open(url)
+        c.wait_for(live, 10)
+        c.click("[data-box=queue-reel] [data-add]")
+        c.wait_for(krq.BOX, 5)
+        c.click("#nocapRow button", nth=0)                 # the first reel: no caption of its own
+        c.wait_for("document.getElementById('nocapTitle').textContent.indexOf('caption') > 0", 5)
+        said = c.js(krq.BOX_SAYS)
+        case("the reel with NO caption of its own gets her question (the second reel's caption is not its own)",
+             said[0] == krq.NOCAP_TITLE % "reel" and said[1] == krq.NOCAP_TEXT and not any(i.endswith("-reel") and x["status"] == "green" for i, x in krq.reel_pieces(s).items()), said)
+        c.click("#nocapRow button", nth=1)                 # Write my caption
+        c.wait_for("location.pathname === '/words.html'", 10)
+        case("Write my caption opens THAT reel's own words page", c.js("decodeURIComponent(location.search)") == "?kit=%s&reel=v1&piece=reel" % KIT, c.js("location.href"))
+        c.open(url)
+        c.wait_for(live, 10)
+        c.click("[data-box=words-reel] .wreels li", nth=1)
+        c.wait_for("location.pathname === '/words.html'", 10)
+        case("a row of Your words opens that reel's words page", c.js("decodeURIComponent(location.search)") == "?kit=%s&reel=v2&piece=reel" % KIT, c.js("location.href"))
+    finally:
+        s.stop()
+
+
 def main():
     global ONLY
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -732,6 +783,7 @@ def main():
             else:
                 with chrome_drive.Chrome(work=str(work), size=(1280, 1500)) as c:
                     group("the page", check_page, c, work, a.port)
+                    group("the post kit's page", check_kit_page, c, work, a.port)
     finally:
         chrome_drive.stop_all()
         if not keep:
