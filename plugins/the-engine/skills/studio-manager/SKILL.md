@@ -32,6 +32,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 |---|---|
 | "hi", "morning", "what can you do", /assistant or /studio, or `home.py pending` shows a button they pressed | `parts/hello.md` |
 | "backup now", "the card's in", "back up this folder", "what are my settings?" | `parts/backup.md`; and if `studio_file.py show` says no drive is set yet, `parts/first-backup-setup.md` before it (a backup asks nothing before it copies, the first one included) |
+| "is my backup done?", "how did my backup go?", "the backup I started on the home page stopped"; your own backup stops with "A backup is already running." | `parts/backup.md` ("A backup started from the home page") |
 | the backup stops with exit 7 (the six first-look photos per shoot); "Pick again" from the report; "pick different ones", "more of the kids" | `parts/sneak-peeks.md` |
 | "write a note to my client", "here's how I write to clients" (no longer part of a backup: never offered) | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |

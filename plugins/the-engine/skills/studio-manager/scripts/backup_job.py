@@ -11,7 +11,8 @@ one line of JSON: {"ok": true}, or {"ok": false, "why": "<plain words>"} (a back
 is gone...). The job copies nothing itself. It runs night.py --by-time, the very backup the chat runs, with
 nobody looking: shoots split wherever the camera was quiet for four hours, placeholder names, six first-look
 photos per shoot chosen by a script. --dest is used exactly as given (no guessing where on the drive). Then,
-when a second drive was asked for, second_copy.py makes the second copy of the finished backup. A folder is
+when a second drive was asked for, second_copy.py makes the second copy of the finished backup. A second drive
+saved in the Studio File is NOT used (Nicole, Nov 23: the second drive is asked each time): only --second is. A folder is
 backed up the same way as a card ("Back up a folder instead").
 
 What the job adds around night.py:
@@ -372,7 +373,7 @@ class Job:
         """Run night.py once, following its lines. (exit code, why-lines after a STOP, the last lines).
         Stopped by the watchdog: code "quiet"."""
         cmd = [sys.executable, "-u", str(HERE / "night.py"), "--source", self.p["source"], "--dest", self.p["dest"],
-               "--name", self.p["name"], "--date", self.p["date"], "--by-time"]
+               "--name", self.p["name"], "--date", self.p["date"], "--by-time", "--no-second"]
         if self.p.get("shoot_name"):
             cmd += ["--shoot-name", self.p["shoot_name"]]
         if budget is not None:

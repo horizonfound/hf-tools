@@ -492,6 +492,7 @@ def main():
     ap.add_argument("--session", help="an existing session folder, to continue")
     ap.add_argument("--gap", default=None, help="quiet minutes that start a new group (15; with --by-time, 240)")
     ap.add_argument("--by-time", action="store_true", help="nobody looks: shoots are split by time alone (four quiet hours), named with placeholders, and the six first-look photos are chosen by a script; never stops with exit 4 or 7")
+    ap.add_argument("--no-second", action="store_true", help="make no second copy by itself, whatever second drive is on file (a backup started from a page: the page asks each time, and the job makes that copy afterwards)")
     ap.add_argument("--shoot-name", default=None, help="with --by-time: the shoot's name, used only when the card holds exactly one shoot")
     ap.add_argument("--budget", default=None, help="seconds the copy may run before pausing cleanly")
     ap.add_argument("--no-open", action="store_true", help="(kept for old callers; the report is never opened by the backup now)")
@@ -535,12 +536,12 @@ def main():
     sf = studio_file.load()
     drives = sf.get("drives", {})
     dest_from_file = bool(a.source and not a.dest)       # the usual drive, not one named for this backup only
-    second_from_file = bool(a.source and a.second is None and drives.get("second"))
+    second_from_file = bool(a.source and a.second is None and drives.get("second") and not a.no_second)
     if a.source and not a.dest:
         a.dest = drives.get("session")
     second_missed = None
     first_choice = None
-    if a.source and a.second is None and drives.get("second"):
+    if a.source and a.second is None and drives.get("second") and not a.no_second:
         a.second = drives["second"]
         # The second drive they saved is not plugged in today (Dustin, Nov 19): the backup no longer stops for it.
         # It carries on with one copy, and the report's top says so beside the Make a second copy button. A

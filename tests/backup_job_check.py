@@ -539,10 +539,24 @@ def trouble_checks(work):
             stamp = first.stat().st_mtime_ns, first.stat().st_ino
         finally:
             bad.chmod(0o644)
+        # ... and they only press Try again the NEXT day: made to look so here, by giving the stopped backup
+        # yesterday's day and name (its folder, and what the job's record remembers of it)
+        rec = json.loads((home / "backup-job.json").read_text(encoding="utf-8"))
+        old = session.with_name("2026-06-01 monday card")
+        session.rename(old)
+        m["session"] = old.name
+        (old / "_studio" / "manifest.json").write_text(json.dumps(m, indent=1), encoding="utf-8")
+        rec["private"].update(name="monday card", date="2026-06-01", session=str(old))
+        rec["backup"] = old.name
+        (home / "backup-job.json").write_text(json.dumps(rec), encoding="utf-8")
         code, got = start(env, card_b, dest)
         r2 = wait(env)
-        check("Try again once the photo reads: the same backup carries on under the same name and finishes",
-              r2.get("state") == "done" and r2.get("backup") == r.get("backup") and r2.get("total") == r2.get("done"), str(r2))
+        check("Try again once the photo reads, even on a later day: the same backup carries on under the same name and day, and finishes",
+              r2.get("state") == "done" and r2.get("backup") == "2026-06-01 monday card" and r2.get("total") == r2.get("done"), str(r2))
+        check("... no second backup folder was started for that card (nothing copied twice)",
+              sorted(x.name for x in (dest / ".studio").iterdir() if "card" in x.name).count("2026-06-01 monday card") == 1
+              and not [x for x in dest.iterdir() if x.is_dir() and x.name.endswith(" card")]
+              and len([x for x in (dest / ".studio").iterdir() if x.is_dir()]) == 2, str(sorted(x.name for x in (dest / ".studio").iterdir())))
         check("... every photo of that card once, byte for byte, none half-written",
               len([p for p in photos_on(dest) if "IMG_50" in p.name]) == 5 and not list(dest.rglob("*.studio-partial")))
 
@@ -599,6 +613,17 @@ def second_checks(work):
     log = log_of(home)
     check("the second copy came after the backup itself was finished (never inside the copy)",
           0 < log.find("Done. Report:") < log.find("Second copy of") or "Second copy" in log[log.find("Done. Report:"):], log[-600:])
+    # a second drive remembered from before is NOT used by a page's backup: the popup asks each time (Nicole, Nov 23)
+    t.run("studio_file.py", "set", "--drive", dest, "--second", second, env=env)
+    saved = json.loads((home / "studio.json").read_text(encoding="utf-8")).get("drives", {}).get("second")
+    card3 = base / "CARD 3"
+    card_at(card3, [(D4.replace(month=9, hour=9), 3)], first_number=3001)
+    had = len(list(second.rglob("*.JPG")))
+    code, got = start(env, card3, dest)
+    r = wait(env)
+    check("a second drive saved before, and none asked for in the popup: the backup is done with ONE copy (it is asked each time)",
+          bool(saved) and r.get("state") == "done" and r.get("second") is None and len(list(second.rglob("*.JPG"))) == had
+          and "second_ok" not in r, f"saved={saved} {r}")
     # a second drive that cannot take it never breaks the backup
     card2 = base / "CARD 2"
     card_at(card2, [(D4.replace(month=8, hour=9), 4)], first_number=8001)
