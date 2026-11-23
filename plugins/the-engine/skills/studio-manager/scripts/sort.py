@@ -404,8 +404,17 @@ def main():
             log["set_aside"] = aside
             stopped(log, log_path, e, "setting aside what is not a photo")
         log["set_aside"] = aside
-        if aside:
-            say(f"{len(aside)} file{'s that are not photos' if len(aside) != 1 else ' that is not a photo'} set aside in _studio/from-the-card")
+        # Said honestly (Nov 23): a photo or a video clip whose date could not be read is set aside too, and it IS
+        # a photo. Before, every file set aside was called "not a photo", which hid an undated photo out of sight.
+        no_date = set((load(studio, "index.json", required=False) or {}).get("no_date") or [])
+        undated = [e for e in aside if e["from"] in no_date]
+        log["set_aside_undated"] = [e["from"] for e in undated]
+        other = len(aside) - len(undated)
+        if undated:
+            say(f"{len(undated)} photo{'s' if len(undated) != 1 else ''} or video clip{'s' if len(undated) != 1 else ''} with no date "
+                f"could not be sorted into a shoot: set aside, copied and checked, in _studio/from-the-card")
+        if other:
+            say(f"{other} file{'s that are not photos' if other != 1 else ' that is not a photo'} set aside in _studio/from-the-card")
 
     if not a.no_verify and not log["problems"]:
         # A rename on the same drive never rewrites a byte: the file keeps its identity (inode), size and
