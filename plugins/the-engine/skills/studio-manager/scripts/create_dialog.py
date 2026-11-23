@@ -8,6 +8,9 @@ which shoot?" box asks the page server.
     GET  /make-new-status      what "+ A new shoot" is doing: {state, words, done, of, go} (new_shoot.job)
     POST /make-new   {}        "+ A new shoot": the computer's own folder picker, then new_shoot.py make --job,
                                detached; a cancelled picker changes nothing
+    POST /make-new-name {"name"}   the folder's name was taken (the job said "taken", Nicole, Nov 23): the shoot is
+                               made from the folder that is waiting, under the name they typed (new_shoot.py make
+                               --job --name); the folder is the server's own note, never sent by the page
     POST /make-vault {"make"}  My vault: made if there is none (vault.ensure, the guarded way its own card makes it),
                                then the page it lands on (new_shoot.vault_go): {ok, url, go}; for Captions the page
                                asks "a reel or a carousel?" and takes go.captions_reel or go.captions_carousel
@@ -28,8 +31,10 @@ import new_shoot  # noqa: E402
 import this_computer  # noqa: E402
 
 GET_ROUTES = ("/make-list", "/make-new-status")
-POST_ROUTES = ("/make-new", "/make-vault")
+POST_ROUTES = ("/make-new", "/make-new-name", "/make-vault")
 POST_CAP = 200
+NAME_CAP = 700                          # /make-new-name's body: a typed name, up to 120 letters of any alphabet
+NAME_TYPED_MOST = 120
 VAULT_THUMBS = 4
 # One + A new shoot at a time from this server: the folder window is open for as long as they take, and a second
 # press meanwhile (another window, a double click) must not open a second window or start a second copy (review,
@@ -107,13 +112,15 @@ def handle_get(handler, path, query):
         return _send(handler, {"ok": False, "words": OUR_WORDS["didnt_work"]}, 500)
 
 
-def _start(folder):
-    """`new_shoot.py make "<folder>" --job`, detached so it outlives this request (and the page server)."""
+def _start(folder, name=None):
+    """`new_shoot.py make "<folder>" --job [--name "<theirs>"]`, detached so it outlives this request (and the
+    page server)."""
     new_shoot.job_write(state="working", words=new_shoot.WORDS["starting"], done=0, of=0)
     logs = new_shoot.HOME / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     with open(logs / "new-shoot.log", "ab") as out:
-        p = this_computer.popen_detached([sys.executable, str(HERE / "new_shoot.py"), "make", str(folder), "--job"],
+        p = this_computer.popen_detached([sys.executable, str(HERE / "new_shoot.py"), "make", str(folder), "--job"]
+                                         + (["--name=" + name] if name is not None else []),
                                          stdin=subprocess.DEVNULL, stdout=out, stderr=out)
     new_shoot.job_write_pid(p.pid)
     return p
@@ -122,7 +129,7 @@ def _start(folder):
 def handle_post(handler, path, query):
     import arrange
     try:
-        refused = arrange.guard(handler, "application/json", POST_CAP, path)
+        refused = arrange.guard(handler, "application/json", NAME_CAP if path == "/make-new-name" else POST_CAP, path)
         if refused is None and _cross_site(handler):
             refused = (403, arrange.NOT_UNDERSTOOD)
         if refused:
@@ -150,6 +157,33 @@ def handle_post(handler, path, query):
                 _log(f"made the vault ({v.name})")
             pages = new_shoot.vault_go(v.name)
             return _send(handler, {"ok": True, "url": pages[body["make"]], "go": pages})
+
+        if path == "/make-new-name":
+            # the name box under "You already have a shoot called ...": only a name, never a folder (the folder that
+            # is waiting is the job's own note); one at a time, as + A new shoot
+            if (not isinstance(body, dict) or set(body) != {"name"} or not isinstance(body["name"], str)
+                    or len(body["name"]) > NAME_TYPED_MOST):
+                return _send(handler, {"ok": False, "words": arrange.NOT_UNDERSTOOD}, 400)
+            if not _PICKING.acquire(blocking=False):
+                return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["busy"]})
+            try:
+                now = new_shoot.job()
+                if now["state"] == "working":
+                    return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["busy"]})
+                folder = new_shoot.waiting_folder()
+                if not folder:
+                    return _send(handler, {"ok": False, "words": new_shoot.WORDS["name_gone"]})
+                name = new_shoot.typed_name(body["name"])
+                if not name:                # nothing left of what they typed: the box stays, nothing is started
+                    return _send(handler, {"ok": False, "state": "taken", "name": now.get("name") or "", "words": new_shoot.WORDS["name_empty"]})
+                try:
+                    _start(folder, name)
+                except OSError as e:
+                    _log(f"couldn't start the copy ({e.__class__.__name__})")
+                    return _send(handler, {"ok": False, "state": "taken", "name": name, "words": OUR_WORDS["cant_start"]})
+                return _send(handler, {"ok": True, "state": "working", "words": new_shoot.WORDS["starting"]})
+            finally:
+                _PICKING.release()
 
         if path == "/make-new":
             if body != {}:

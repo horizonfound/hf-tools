@@ -434,6 +434,10 @@ OUR_WORDS = {
     "mk_didnt": "That didn't work. Try again in a moment.",
     # Captions asks which words they want after the shoot is picked (Nicole, Nov 22: "captions should ask reel or
     # carousel"); drafts for Dustin and Nicole
+    # + A new shoot whose name is taken (Nicole, Nov 23: "notify them its taken and give option for a new name"):
+    # the line that says so is new_shoot.WORDS["taken"]; these are the name box's label and its button
+    "mk_name_label": "A new name for this shoot",
+    "mk_name_go": "Use this name",
     "mk_ask": "Captions for a reel or a carousel?",
     "mk_ask_reel": "Reel",
     "mk_ask_carousel": "Carousel",
@@ -990,6 +994,15 @@ h1.big em{font:inherit;font-style:normal;color:var(--accent)}
 .mknothing{margin:0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink-2)}
 /* Captions: a reel or a carousel? (Nicole, Nov 22) two plain buttons in her look, after the shoot is picked */
 .mkask[hidden]{display:none}
+/* + A new shoot whose name is taken (Nicole, Nov 23): a name box and a button right under the line that says so */
+.mkname{margin:6px 0 0;background:#fff;padding:12px 14px;border-left:3px solid var(--accent)}
+.mkname[hidden]{display:none}
+.mkname label{display:block;margin:0 0 6px;font:700 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.02em;color:var(--ink-2)}
+.mknr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.mknr input{box-sizing:border-box;min-width:0;font:400 15px/1 var(--sans);letter-spacing:-.01em;padding:12px 14px;border:1px solid var(--line);border-radius:0;background:#fff;color:var(--ink)}
+.mknr input:focus-visible{border-color:var(--ink);outline:0}
+.mknr button{padding:12px 16px;background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:0;cursor:pointer;font:700 14px/1 var(--sans);letter-spacing:-.01em}
+.mknr button:disabled{opacity:.5;cursor:default}
 .mkfor{margin:0 0 10px;font:700 15px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
 .mkab{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .mkab button{box-sizing:border-box;padding:18px 14px;background:#fff;color:var(--ink);border:1px solid transparent;border-radius:0;cursor:pointer;font:700 17px/1 var(--sans);letter-spacing:-.01em}
@@ -1011,7 +1024,7 @@ const STILL = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion
 const ZOOM = 1.22, EVERY = 6000;
 // the four tiles (Nicole's v31, section 7): the faces' middle about 30% from the top, above the word, which sits in the
 // middle; a photo whose faces can't be brought within TILE_SLACK of that (not enough photo above or below) gives way
-// to the next photo with a face. The hello keeps its faces in the middle (its words sit at the bottom).
+// to the next photo with a face, and with none of those to a photo with no face (Nicole, Nov 23). The hello keeps its faces in the middle (its words sit at the bottom).
 const TILE_AT = .3, TILE_SLACK = .1;
 const clamp01 = v => Math.max(0, Math.min(1, v));
 function window1(fs, vis){
@@ -1042,12 +1055,13 @@ function tileFits(x, bw, bh){
   const r = framing(x, bw, bh, TILE_AT);
   return r.fc.length > 0 && Math.abs(r.lands - TILE_AT) <= TILE_SLACK;
 }
-// the order a tile tries its photos in: faces that fit above the word, then other photos with faces, then the rest
+// the order a tile tries its photos in (Nicole, Nov 23: "a photo with no face" before one whose face is behind the
+// word): faces that fit above the word, then photos with no face, then the photos whose faces can't be brought up there
 function tileOrder(cands, G, bw, bh){
   const xOf = c => ({f: G[c.n] || {}});
   const faced = cands.filter(c => G[c.n] && G[c.n].faces && G[c.n].faces.length);
   const fit = faced.filter(c => tileFits(xOf(c), bw, bh));
-  return fit.concat(faced.filter(c => !fit.includes(c)), cands.filter(c => !faced.includes(c)));
+  return fit.concat(cands.filter(c => !faced.includes(c)), faced.filter(c => !fit.includes(c)));
 }
 function aim(img, x, bw, bh, at){
   const {fc, cx, cy, px, py, dw, dh} = framing(x, bw, bh, at);
@@ -1188,11 +1202,27 @@ const MK = (function(){
   }
   const say = t => { const n = $('mkNote'); n.textContent = t || ''; n.hidden = !t; };
   const photos = n => fill(n === 1 ? W.mk_photo : W.mk_photos, {n: many(n || 0)});
+  // + A new shoot whose name is taken (Nicole, Nov 23): the line above says so, and this is the name box under it,
+  // starting from the folder's name. null puts it away.
+  function nameBox(name){
+    const f = $('mkName'); f.hidden = name == null; $('mkNmGo').disabled = false;
+    if (name != null) { const i = $('mkNm'); i.value = name; if (!box.hidden) { i.focus(); i.select(); } }
+  }
+  async function useName(e){
+    e.preventDefault(); if (following) return;
+    const b = $('mkNmGo'); b.disabled = true;
+    let d = null;
+    try { const r = await fetch('/make-new-name', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: $('mkNm').value})}); d = await r.json(); }
+    catch (e2) { d = {ok: false, state: 'taken', words: W.not_running}; }
+    if (d && d.state === 'working') { nameBox(null); say(d.words); follow(); return; }
+    say((d && d.words) || W.mk_didnt);
+    if (d && d.state === 'taken') { b.disabled = false; $('mkNm').focus(); } else nameBox(null);     // nothing is waiting for a name anymore
+  }
   // Captions: a reel or a carousel? (Nicole, Nov 22) asked once the shoot is picked; the answer picks the words
   // page's tab. target: {go, name} for a shoot, {vault: true, name} for My vault.
   function ask(target){
     asking = target;
-    $('mkS').textContent = W.mk_ask; $('mkFor').textContent = target.name || '';
+    $('mkS').textContent = W.mk_ask; $('mkFor').textContent = target.name || ''; nameBox(null);
     ['mkTop', 'mkLab', 'mkF', 'mkL'].forEach(id => { $(id).hidden = true; });
     $('mkAsk').hidden = false; $('mkAR').disabled = $('mkAC').disabled = false;
     $('mkAR').focus();
@@ -1233,7 +1263,7 @@ const MK = (function(){
     make = TITLE[kind] ? kind : 'reel'; from = tile || null; asking = null;
     accent($('mkT'), W[TITLE[make]]);
     $('mkAsk').hidden = true; $('mkTop').hidden = false; $('mkL').hidden = false;
-    $('mkF').value = ''; if (!following) say('');
+    $('mkF').value = ''; if (!following) { say(''); nameBox(null); }
     $('mkNew').disabled = following;
     draw(); box.hidden = false; window.MK_HOLD = true; box.querySelector('.mkbox').focus();
     load();
@@ -1258,6 +1288,8 @@ const MK = (function(){
       if (j && j.state === 'done' && j.go) { following = false; say(j.words);
         if (!box.hidden && make === 'captions') { $('mkNew').disabled = false; ask({go: j.go, name: j.kit || ''}); return; }
         if (!box.hidden) { location.href = j.go[make]; return; } window.MK_HOLD = false; $('mkNew').disabled = false; return; }
+      if (j && j.state === 'taken') { following = false; $('mkNew').disabled = false; say(j.words || W.mk_didnt); nameBox(j.name || '');
+        if (box.hidden) window.MK_HOLD = false; return; }
       if (j && (j.state === 'stopped' || j.state === 'none')) { following = false; $('mkNew').disabled = false; say(j.words || W.mk_didnt);
         if (box.hidden) window.MK_HOLD = false; return; }
       if (j && j.words) say(j.words);
@@ -1267,7 +1299,7 @@ const MK = (function(){
   }
   async function newShoot(){
     if (following) return;
-    const b = $('mkNew'); b.disabled = true; say(W.mk_picking);
+    const b = $('mkNew'); b.disabled = true; nameBox(null); say(W.mk_picking);
     let d = null;
     try { const r = await fetch('/make-new', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}); d = await r.json(); }
     catch (e) { d = {ok: false, words: W.not_running}; }
@@ -1275,6 +1307,7 @@ const MK = (function(){
     b.disabled = false; say(d && d.cancelled ? '' : ((d && d.words) || W.mk_didnt));     // a closed window changes nothing
   }
   $('mkNew').onclick = newShoot;
+  $('mkName').addEventListener('submit', useName);
   $('mkAR').onclick = () => answer('reel');
   $('mkAC').onclick = () => answer('carousel');
   $('mkX').onclick = close;
@@ -1410,6 +1443,9 @@ def make_box():
             f"<button type='button' id='mkAR' data-piece='reel'>{e(W('mk_ask_reel'))}</button>"
             f"<button type='button' id='mkAC' data-piece='carousel'>{e(W('mk_ask_carousel'))}</button></div></div>"
             f"<p class='mknote' id='mkNote' role='status' hidden></p>"
+            f"<form class='mkname' id='mkName' hidden><label for='mkNm'>{e(W('mk_name_label'))}</label><div class='mknr'>"
+            f"<input id='mkNm' type='text' maxlength='60' autocomplete='off' spellcheck='false'>"
+            f"<button type='submit' id='mkNmGo'>{e(W('mk_name_go'))}</button></div></form>"
             f"<p class='mklab' id='mkLab' hidden>{e(W('mk_shoots'))}</p>"
             f"<input class='mkfind' id='mkF' type='search' placeholder='{e(W('mk_find'), quote=True)}' aria-label='{e(W('mk_find'), quote=True)}' hidden>"
             f"<div class='mklist' id='mkL'></div></div></div>")

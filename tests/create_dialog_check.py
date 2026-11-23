@@ -22,7 +22,15 @@ of the real ~/.studio, no real kit, no /Volumes, no window on the screen):
     nothing;
   * Captions asks "Captions for a reel or a carousel?" [Reel] [Carousel] once the shoot is picked (Nicole, Nov 22),
     from a shoot, from My vault (its own words page, which really opens) and from + A new shoot, and lands on the
-    words page's tab they chose.
+    words page's tab they chose;
+  * a name already taken (Nicole, Nov 23: "they need to be able to type a new name. So notify them its taken and
+    give option for a new name"): from the chat the stop says to run it again with --name, and --name makes the
+    shoot under that name (made safe; a name that is taken too still stops; nothing over anything; the same folder
+    again goes back to ITS shoot whatever name is given); the page's job says "taken" with the folder's name and
+    never a path; POST /make-new-name takes only a name, refuses another website, keeps the box on an empty or
+    taken name, and makes the shoot from the folder that was waiting; in the browser the box says the name is
+    taken, shows a name box (the folder's name in it) and a button right under the line, and the name they type
+    makes the shoot and lands on the page that was tapped.
 
 Every line says PASS, FAIL or SKIP; exit 1 only when something FAILED. Python 3.9, standard library only; a Mac.
 """
@@ -84,6 +92,15 @@ def run_new(env, folder, *more):
                           capture_output=True, text=True, timeout=300)
 
 
+def aston(n):
+    """Is this the shoot + A new shoot makes from the pretend Aston Martin folder (either folder pattern)?"""
+    return n.endswith(" Aston Martin") or n.startswith("Aston Martin_")
+
+
+def photo_hashes(kit):
+    return {p.name: sha(p) for p in sorted((kit / "Photos").iterdir()) if p.is_file()}
+
+
 def content_names(w):
     return sorted(p.name for p in w.content.iterdir() if not p.name.startswith("."))
 
@@ -96,7 +113,7 @@ def check_making(w):
     r = run_new(env, src, "--for", "stories")
     made = [n for n in content_names(w) if n not in kits_before]
     case("+ A new shoot: one picked folder makes ONE post kit, named for the folder (export words left off) in their folder pattern",
-         r.returncode == 0 and len(made) == 1 and made[0].endswith(" Aston Martin") and made[0][:4].isdigit(), (r.stdout[-400:], made))
+         r.returncode == 0 and len(made) == 1 and aston(made[0]) and "Final" not in made[0] and "Exports" not in made[0], (r.stdout[-400:], made))
     kit = w.content / made[0] if made else None
     photos = sorted(p.name for p in (kit / "Photos").iterdir()) if kit else []
     case("... only the finished photos are copied, flat, the second one of a name with its subfolder in front", len(photos) == 5
@@ -136,6 +153,47 @@ def check_making(w):
     r3 = run_new(env, other)
     case("a shoot of the same name from another folder: stops in plain words, nothing copied", r3.returncode == 1 and "There's already a shoot called" in r3.stdout
          and content_names(w) == n0, r3.stdout[-300:])
+    # Nicole, Nov 23: a name that is taken can be typed anew. From the chat that is --name.
+    case("... and the stop says how the Assistant gives it a name of its own (--name)", "--name" in r3.stdout and "Rename that folder" not in r3.stdout, r3.stdout[-300:])
+    first = photo_hashes(kit)
+    ob = hashes(other)
+    r3b = run_new(env, other, "--name", "Aston Martin")
+    case("--name with the name that is taken: still stops, nothing copied", r3b.returncode == 1 and "There's already a shoot called" in r3b.stdout and content_names(w) == n0, r3b.stdout[-300:])
+    r3c = run_new(env, other, "--name", "  .. / ")
+    case("--name with nothing left of it once made safe: stops and asks for a name, nothing copied", r3c.returncode == 1 and "Type a name for this shoot first." in r3c.stdout and content_names(w) == n0, r3c.stdout[-300:])
+    r3d = run_new(env, other, "--name", "Aston Martin: take/2?")
+    new = [n for n in content_names(w) if n not in n0]
+    case("--name with a name of their own: the shoot is made under it, made safe for any drive (no colon, slash or question mark)",
+         r3d.returncode == 0 and len(new) == 1 and new[0].startswith("Aston Martin take 2") and not any(ch in new[0] for ch in ':/?'), (r3d.stdout[-300:], new))
+    kit2 = w.content / new[0] if new else None
+    rec2 = json.loads((kit2 / ".kit" / "kit.json").read_text(encoding="utf-8")) if kit2 else {}
+    case("... its record carries the name they gave, its photos are the folder's, each byte for byte",
+         rec2.get("name") == "Aston Martin take 2" and rec2.get("source") == "picked" and kit2 is not None
+         and sorted(photo_hashes(kit2).values()) == sorted(v for k, v in ob.items() if k.lower().endswith(".jpg")), rec2)
+    case("... the shoot that had the name is exactly as it was, and so is the folder they picked", photo_hashes(kit) == first and hashes(other) == ob)
+    n1 = content_names(w)
+    r3e = run_new(env, other)
+    case("that folder picked again, with no name: back to ITS shoot (the one they named), no clash, no second shoot",
+         r3e.returncode == 0 and content_names(w) == n1 and "going back to it" in r3e.stdout, r3e.stdout[-300:])
+    r3f = run_new(env, src, "--name", "Something Else")
+    case("the first folder again with a new name given: still back to ITS shoot, never a new one under the new name",
+         r3f.returncode == 0 and content_names(w) == n1 and "The name it has is kept." in r3f.stdout and photo_hashes(kit) == first, r3f.stdout[-300:])
+    third = w.work / "Exports 3" / "Aston Martin"
+    third.mkdir(parents=True)
+    shutil.copy2(str(jp[0]), str(third / "one.jpg"))
+    r3g = run_new(env, third, "--job")
+    job = json.loads((w.home / "new-shoot-job.json").read_text(encoding="utf-8"))
+    st = subprocess.run([sys.executable, str(SCRIPTS / "new_shoot.py"), "status"], env=env, capture_output=True, text=True, timeout=60).stdout
+    case("the page's job on a taken name: exit 4, state taken, the words that say so, the folder's name to start from; nothing copied",
+         r3g.returncode == 4 and job.get("state") == "taken" and job.get("name") == "Aston Martin" and content_names(w) == n1
+         and job.get("words") == 'You already have a shoot called "Aston Martin". Type a new name for this one. Nothing is copied until you do.', job)
+    try:
+        shown = json.loads(st.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        shown = {}
+    case("... what a page is handed has the name and the words, and never the folder that is waiting",
+         shown.get("state") == "taken" and shown.get("name") == "Aston Martin" and "from" not in shown and "Exports 3" not in st and str(w.work) not in st, st[-300:])
+    n0 = content_names(w)
     r4 = run_new(env, w.content / A / "Photos")
     case("a folder inside Your Content: stops, pick it from Your shoots", r4.returncode == 1 and "Pick its shoot from Your shoots instead." in r4.stdout and content_names(w) == n0, r4.stdout[-200:])
     r5 = run_new(env, w.work)
@@ -153,7 +211,7 @@ def check_making(w):
     env2 = dict(env, STUDIO_HOME=str(fresh / "studio"), STUDIO_FOLDERS_FOR_TESTS=str(fresh / "folders"))
     r7 = run_new(env2, src)
     made2 = sorted(p.name for p in (pics / "The Assistant" / "Your Content").iterdir()) if (pics / "The Assistant" / "Your Content").is_dir() else []
-    case("a brand-new Assistant: its folder is made in Pictures, and the shoot in it", r7.returncode == 0 and len(made2) == 1 and made2[0].endswith("Aston Martin"), (r7.stdout[-300:], made2))
+    case("a brand-new Assistant: its folder is made in Pictures, and the shoot in it", r7.returncode == 0 and len(made2) == 1 and aston(made2[0]), (r7.stdout[-300:], made2))
     return made[0] if made else None
 
 
@@ -179,6 +237,88 @@ def check_routes(w):
     case("POST /make-vault for Captions: both of the vault's words pages, for the page to choose from once they answer (Nov 22)",
          code == 200 and d.get("ok") and (d.get("go") or {}).get("captions_reel") == "/words.html?kit=My%20vault&piece=reel"
          and (d.get("go") or {}).get("captions_carousel") == "/words.html?kit=My%20vault&piece=carousel", d)
+
+
+def put_away(w, start):
+    """The shoots a group made are moved out of Your Content (the test's own, made a moment ago), so the groups
+    after it see the pretend Assistant as they expect it."""
+    for n in content_names(w):
+        if n.startswith(start):
+            (w.content / n).rename(w.work / ("put-away " + n))
+
+
+def wait_job(w, want, secs=90):
+    end = time.time() + secs
+    d = {}
+    while time.time() < end:
+        _, d = w.get_json("/make-new-status")
+        if d and d.get("state") in want:
+            return d
+        time.sleep(0.3)
+    return d or {}
+
+
+def post_name(w, body, headers=None):
+    raw = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+    code, out = w.http("POST", "/make-new-name", raw=raw, headers=dict({"Content-Type": "application/json"}, **(headers or {})))
+    try:
+        return code, json.loads(out.decode("utf-8"))
+    except ValueError:
+        return code, {}
+
+
+def check_name_routes(w):
+    """POST /make-new-name (Nicole, Nov 23): the name box's own route. A folder is left waiting for a name by the
+    page's job (run here by hand, as the page server runs it), then the route is asked."""
+    env = dict(w.env, STUDIO_NO_WINDOWS_FOR_TESTS="1")
+    jp = sorted((w.content / A / "Photos").glob("*.jpg"))
+    one = w.work / "Exports R1" / "Route Shoot"
+    two = w.work / "Exports R2" / "Route Shoot"
+    for f, n in ((one, 2), (two, 3)):
+        f.mkdir(parents=True)
+        for p in jp[:n]:
+            shutil.copy2(str(p), str(f / p.name))
+    r = run_new(env, one)
+    holder = [n for n in content_names(w) if n.startswith("Route Shoot")]
+    case("(a shoot called Route Shoot is there)", r.returncode == 0 and len(holder) == 1, r.stdout[-200:])
+    held = photo_hashes(w.content / holder[0]) if holder else {}
+    before = hashes(two)
+    r = run_new(env, two, "--job")
+    names0 = content_names(w)
+    code, st = w.get_json("/make-new-status")
+    raw = json.dumps(st)
+    case("/make-new-status on a taken name: state taken, the line that says so, the folder's name; never a path or the folder",
+         r.returncode == 4 and code == 200 and st.get("state") == "taken" and st.get("name") == "Route Shoot" and st.get("words", "").startswith('You already have a shoot called "Route Shoot".')
+         and "from" not in st and "Exports R2" not in raw and str(w.work) not in raw, raw[:300])
+    code, d = post_name(w, {"name": "Route Shoot evening"}, {"Origin": "http://evil.example"})
+    case("POST /make-new-name from another website: refused", code == 403 and content_names(w) == names0, code)
+    code, d = post_name(w, {"name": "Route Shoot evening"}, {"Sec-Fetch-Site": "cross-site"})
+    case("... and a cross-site press too", code == 403, code)
+    for body, what in (({"name": 5}, "a name that is not text"), ({"name": "x", "folder": "/tmp"}, "a folder sent along"), ({}, "no name"),
+                       ({"name": "x" * 121}, "a name of 121 letters"), (b"not json", "not JSON")):
+        code, d = post_name(w, body)
+        case("POST /make-new-name with %s: refused, nothing started" % what, code == 400 and wait_job(w, ("taken",), 5).get("state") == "taken" and content_names(w) == names0, (code, d))
+    code, d = post_name(w, {"name": "  . / "})
+    case("an empty name: the box stays (state taken) with 'Type a name for this shoot first.', nothing started",
+         code == 200 and d.get("ok") is False and d.get("state") == "taken" and d.get("words") == "Type a name for this shoot first." and content_names(w) == names0, (code, d))
+    code, d = post_name(w, {"name": "Route Shoot"})
+    st = wait_job(w, ("taken", "done", "stopped"))
+    case("the same taken name typed again: tried, and taken again; the box stays, nothing copied",
+         code == 200 and d.get("state") == "working" and st.get("state") == "taken" and st.get("name") == "Route Shoot" and content_names(w) == names0, (d, st))
+    code, d = post_name(w, {"name": "Route Shoot: evening"})
+    st = wait_job(w, ("done", "stopped", "taken"))
+    new = [n for n in content_names(w) if n not in names0]
+    case("a name of their own: the shoot is made from the folder that was waiting, under that name (made safe), and the page is told where to land",
+         code == 200 and d.get("ok") and d.get("state") == "working" and st.get("state") == "done" and len(new) == 1 and new[0].startswith("Route Shoot evening")
+         and ":" not in new[0] and st.get("kit") == new[0] and set(st.get("go") or {}) >= {"reel", "carousel", "stories", "captions"}, (d, st, new))
+    kit = w.content / new[0] if new else None
+    case("... its photos are that folder's, each byte for byte; the folder is as it was; the shoot that had the name is untouched",
+         kit is not None and photo_hashes(kit) == before and hashes(two) == before and photo_hashes(w.content / holder[0]) == held)
+    code, d = post_name(w, {"name": "Once more"})
+    case("pressed again once it is made: nothing is waiting, nothing started", code == 200 and d.get("ok") is False and content_names(w) == sorted(names0 + new), (code, d))
+    r = run_new(env, two, "--job")
+    st = wait_job(w, ("done", "stopped", "taken"))
+    case("that folder picked again: back to ITS shoot, no name asked", r.returncode == 0 and st.get("state") == "done" and st.get("kit") == new[0] and content_names(w) == sorted(names0 + new), st)
 
 
 # ---------------------------------------------------------------- in a browser
@@ -397,6 +537,63 @@ def check_new_shoot(c, w, src):
     case("... then no second kit, the words page of the same one, on the Carousel tab",
          content_names(w) == sorted(names0 + made) and parse_qs(u.query) == {"kit": [made[0]], "piece": ["carousel"]}, (content_names(w), c.js("location.href")))
     return made[0] if made else None
+
+
+def name_state(c):
+    return c.js("(() => { const f = document.getElementById('mkName'), n = document.getElementById('mkNote'); return {shown: !f.hidden, note: n.hidden ? '' : n.textContent, "
+                "value: document.getElementById('mkNm').value, label: f.querySelector('label').textContent, button: document.getElementById('mkNmGo').textContent, "
+                "under: n.nextElementSibling === f, path: location.pathname, focus: (document.activeElement || {}).id, "
+                "gap: Math.round(f.getBoundingClientRect().top - n.getBoundingClientRect().bottom), newOff: document.getElementById('mkNew').disabled}; })()")
+
+
+def check_taken(c, w, other, holder):
+    """+ A new shoot whose name is taken, in the page (Nicole, Nov 23): the box says so, a name box and a button
+    right under the line, and the name they type makes the shoot and lands where the tile was going."""
+    before = hashes(other)
+    names0 = content_names(w)
+    held = photo_hashes(w.content / holder)
+    c.open(w.url("/home"))
+    ready(c)
+    open_box(c, "reel")
+    hidden0 = c.js("document.getElementById('mkName').hidden")
+    c.click("#mkNew")
+    c.wait_for("!document.getElementById('mkName').hidden", 120)
+    time.sleep(0.3)
+    n = name_state(c)
+    case("the name box is not there until a name is taken", hidden0 is True)
+    case("a folder whose name is taken: the box says so, and nothing is copied",
+         n["note"] == 'You already have a shoot called "Aston Martin". Type a new name for this one. Nothing is copied until you do.' and n["path"] == "/home" and content_names(w) == names0, n)
+    case("... a name box with the folder's name in it and a button, right under the line that says so (the test of Oct 30)",
+         n["shown"] and n["value"] == "Aston Martin" and n["label"] == "A new name for this shoot" and n["button"] == "Use this name" and n["under"] and 0 <= n["gap"] <= 24, n)
+    case("... the cursor is in the name box, and + A new shoot can be pressed again", n["focus"] == "mkNm" and n["newOff"] is False, n)
+    c.click("#mkNmGo")                               # the same name again
+    c.wait_for("document.getElementById('mkNote').textContent.indexOf('Looking at') < 0 && !document.getElementById('mkName').hidden && !document.getElementById('mkNmGo').disabled", 60)
+    time.sleep(0.5)
+    n = name_state(c)
+    case("the taken name used again: told again, the box stays, nothing copied", n["shown"] and "You already have a shoot called" in n["note"] and n["path"] == "/home" and content_names(w) == names0, n)
+    c.js("(() => { const i = document.getElementById('mkNm'); i.value = '   '; })()")
+    c.click("#mkNmGo")
+    c.wait_for("document.getElementById('mkNote').textContent === 'Type a name for this shoot first.'", 30)
+    n = name_state(c)
+    case("an empty name: 'Type a name for this shoot first.', the box stays", n["shown"] and content_names(w) == names0, n)
+    c.js("(() => { const i = document.getElementById('mkNm'); i.value = 'Aston Martin sunset'; })()")
+    c.js("document.getElementById('mkName').requestSubmit()")            # Enter in the box
+    c.wait_for("location.pathname === '/reel.html'", 120)
+    u = urlsplit(c.js("location.href"))
+    made = [x for x in content_names(w) if x not in names0]
+    case("a name of their own: the shoot is made under it and the page lands where the tile was going (the reel page)",
+         len(made) == 1 and made[0].startswith("Aston Martin sunset") and parse_qs(u.query).get("kit") == [made[0]], (c.js("location.href"), made))
+    case("... its photos are the folder's, byte for byte; the folder and the shoot that had the name are as they were",
+         bool(made) and sorted(photo_hashes(w.content / made[0]).values()) == sorted(v for k, v in before.items() if k.lower().endswith(".jpg"))
+         and hashes(other) == before and photo_hashes(w.content / holder) == held)
+    c.open(w.url("/home"))
+    ready(c)
+    open_box(c, "stories")
+    c.click("#mkNew")
+    c.wait_for("location.pathname === '/design.html'", 120)
+    u = urlsplit(c.js("location.href"))
+    case("that folder picked again: straight to ITS shoot, no name asked, no second shoot",
+         landed(u, {"kit": [made[0]], "kind": ["stories"]}) and content_names(w) == sorted(names0 + made), (c.js("location.href"), content_names(w)))
 
 
 def check_cancel(c, w):
@@ -637,24 +834,33 @@ def main():
         group("+ A new shoot, without the page", check_making, w)
         # the shoot made above is put away, so the browser's + A new shoot makes one fresh (the log keeps the
         # earlier run's folder name, which is then gone from Your Content: a new kit, as a deleted one would be)
-        made = [n for n in content_names(w) if n.endswith(" Aston Martin")]
+        made = [n for n in content_names(w) if "Aston Martin" in n]
         for n in made:
             (w.content / n).rename(w.work / ("put-away " + n))
         src = w.work / "Exports" / "Aston Martin Final Exports"
         if a.no_chrome or not chrome_drive.find_chrome():
             w.start()
             group("the routes", check_routes, w)
+            group("a name already taken: the name box's route", check_name_routes, w)
+            put_away(w, "Route Shoot")
             skip("the box in a browser: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
         else:
             w.start()
             group("the routes", check_routes, w)
+            group("a name already taken: the name box's route", check_name_routes, w)
+            put_away(w, "Route Shoot")
             with chrome_drive.Chrome(work=str(work), size=(1440, 900)) as c:
                 group("the box in a browser", check_browser, c, w, a.shot)
                 group("the search box", check_search, c, w)
                 group("a closed folder window", check_cancel, c, w)
                 w.stop()
                 w.start(STUDIO_PICK_FOLDER_FOR_TESTS=str(src))
-                group("+ A new shoot in the page", check_new_shoot, c, w, src)
+                made_in_page = group("+ A new shoot in the page", check_new_shoot, c, w, src)
+                other = w.work / "Exports" / "Aston Martin"          # another folder that comes to the same name
+                holder = made_in_page or next((n for n in content_names(w) if aston(n)), "")
+                w.stop()
+                w.start(STUDIO_PICK_FOLDER_FOR_TESTS=str(other))
+                group("+ A new shoot whose name is taken, in the page", check_taken, c, w, other, holder)
                 group("no post kits yet", check_empty, c, w)
         group("the review of + A new shoot", check_review, w)
     finally:
