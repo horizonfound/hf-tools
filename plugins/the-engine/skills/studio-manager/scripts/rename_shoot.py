@@ -542,6 +542,11 @@ def main():
     from where import locate
     session, studio = locate(a.session)  # the folder the shoots sit in, and the records (before or after the night settles)
     finish_unfinished(session, studio)
+    try:    # a join of two shoots that was cut off is finished first too (join_shoots.py), from its own log
+        import join_shoots
+        join_shoots.finish_unfinished(session, studio)
+    except ImportError:
+        pass
 
     jobs = []
     if a.from_names:

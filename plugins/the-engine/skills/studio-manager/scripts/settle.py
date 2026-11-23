@@ -154,6 +154,11 @@ def gates(studio):
         for e in json.loads(rl.read_text(encoding="utf-8")).get("renames", []):
             if not e.get("finished") or e.get("problems"):
                 return "a rename is unfinished or had problems"
+    jl = studio / "join-log.json"   # two shoots being joined into one (join_shoots.py)
+    if jl.exists():
+        for e in json.loads(jl.read_text(encoding="utf-8")).get("joins", []):
+            if not e.get("finished") or e.get("problems"):
+                return "a join of two shoots is unfinished or had problems"
     return None
 
 
