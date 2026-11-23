@@ -15,6 +15,13 @@ command prints the rules again so they are never skipped.
                                                         what's already written
     python3 words.py draft  "hannah" reel --file d.json save {"caption": "...", "hooks": ["...", ...]}
     python3 words.py carry  "hannah" reel carousel      copy one piece's answers to the other (never "where")
+    python3 words.py carry-reel "hannah" --from "Reel 1" --reel "Reel 2"
+                                                        a new reel starts from another reel's answers (answers only)
+
+EACH REEL HAS ITS OWN WORDS (Nicole, Nov 23: "each reel gets its own caption"). A shoot (or My vault) with more
+than one reel: every command that means a reel takes --reel "<its name>" (a part of the name, or its id), and with
+several reels and no --reel it stops and lists the names. A shoot with one reel needs none, and its record is
+byte for byte what it always was.
 
 The piece is reel or carousel. Stories have no words (Nicole, Nov 10). A few words find the kit, as for kit.py.
 
@@ -22,7 +29,10 @@ answer's file: any of about, who (a list of new, past, followers, photographers)
 trial; reels only), purpose (share, book, offer, other), purpose_text, notes.
 
 The record is <kit>/.kit/post-words.json; the version before every save is kept beside it as
-post-words.prev.json. Their own caption ("own") and their picked hooks are kept by a draft; picks are cleared
+post-words.prev.json. Her shape, kept: {"pieces": {"reel": {...}, "carousel": {...}}}. "reel" is the shoot's FIRST
+reel (reels.FIRST_ID), as it always was; every reel started after it keeps its words under its own id beside it,
+{"pieces": {"reels": {"v2": {...}, ...}}}, each in the very shape "reel" has. That map is not written until a
+later reel has words of its own. Their own caption ("own") and their picked hooks are kept by a draft; picks are cleared
 only when the hooks change.
 
 Exit: 0 done, 1 a problem with the kit, 2 STOP (a purpose or place that isn't one of the buttons, an empty file).
@@ -41,6 +51,7 @@ sys.path.insert(0, str(HERE))
 import fresh           # noqa: E402
 import kit as kitmod   # noqa: E402
 import posts           # noqa: E402
+import reels as reels_mod   # noqa: E402
 import this_computer   # noqa: E402
 
 PIECES = ("reel", "carousel")                     # no stories (Nicole, Nov 10)
@@ -53,6 +64,14 @@ FIELDS = {"about": 3000, "who_text": 600, "purpose_text": 1000, "notes": 1000}  
 CAPTION_MOST, HOOKS_MOST, HOOK_MOST = 4000, 20, 200
 RECORD, BEFORE = "post-words.json", "post-words.prev.json"
 HOMEBASE = "brand-homebase.md"
+# Each reel its own words (Nicole, Nov 23). The shoot's first reel is "pieces.reel", as ever; a later reel's words
+# are "pieces.reels.<its id>". A reel with no words of its own is EMPTY: it never reads another reel's.
+FIRST_REEL = reels_mod.FIRST_ID
+LATER = "reels"
+ANSWERED = ("about", "who", "who_text", "purpose", "purpose_text", "notes")
+# Ours (drafts for Nicole): what the chat is told when a reel has to be named, or can't be found.
+NOT_A_REEL = "that isn't one of this shoot's reels"
+WHICH_REEL = "this shoot has {n} reels, and each reel has its own words. Say which one with --reel: {names}"
 
 # Nicole's rules, word for word (handoff v20, words.py). Rule 11 in CLAUDE.md says the same thing from our side:
 # specifics come only from the photographer.
@@ -142,24 +161,72 @@ def load(kit):
     return rec
 
 
-def piece_of(rec, piece):
-    w = rec.setdefault("pieces", {}).get(piece)
-    if not isinstance(w, dict):
-        w = rec["pieces"][piece] = {}
+def later_reel(piece, reel):
+    """Where a reel's words are kept: None for the carousel and for the shoot's first reel (they are
+    "pieces.<piece>", as ever), else the reel's own id, the key under "pieces.reels". An id that is not a reel
+    id's shape is refused (Stop) before anything is read or written, so nothing odd is ever made a key."""
+    if piece != "reel" or reel is None or reel == FIRST_REEL:
+        return None
+    if not isinstance(reel, str) or not reels_mod.ID.fullmatch(reel):
+        raise Stop(NOT_A_REEL)
+    return reel
+
+
+def piece_of(rec, piece, reel=None):
+    """One piece's words in the record, to CHANGE: made (empty) when it isn't there yet. `reel`: which of the
+    shoot's reels (a reel's id); none, or the first reel's, is "pieces.reel"."""
+    later = later_reel(piece, reel)
+    pieces = rec.setdefault("pieces", {})
+    if later is None:
+        w = pieces.get(piece)
+        if not isinstance(w, dict):
+            w = pieces[piece] = {}
+    else:
+        m = pieces.get(LATER)
+        if not isinstance(m, dict):
+            m = pieces[LATER] = {}
+        w = m.get(later)
+        if not isinstance(w, dict):
+            w = m[later] = {}
     if not isinstance(w.get("answers"), dict):
         w["answers"] = {}
     return w
 
 
-def change(kit, piece, how):
+def read_of(rec, piece, reel=None):
+    """One piece's words in the record, to READ: {} with empty answers when it has none. Nothing in the record is
+    changed or added. A later reel reads only its own; never another reel's, never the first reel's."""
+    later = later_reel(piece, reel)
+    pieces = rec.get("pieces") if isinstance(rec, dict) and isinstance(rec.get("pieces"), dict) else {}
+    if later is None:
+        w = pieces.get(piece)
+    else:
+        m = pieces.get(LATER)
+        w = m.get(later) if isinstance(m, dict) else None
+    w = dict(w) if isinstance(w, dict) else {}
+    if not isinstance(w.get("answers"), dict):
+        w["answers"] = {}
+    return w
+
+
+def reels_with_words(rec):
+    """The ids of the later reels that have a words entry of their own in this record."""
+    pieces = rec.get("pieces") if isinstance(rec, dict) and isinstance(rec.get("pieces"), dict) else {}
+    m = pieces.get(LATER)
+    return [k for k, v in m.items() if isinstance(k, str) and reels_mod.ID.fullmatch(k) and isinstance(v, dict)] if isinstance(m, dict) else []
+
+
+def change(kit, piece, how, reel=None):
     """Read the record, change one piece (how(piece_record, whole_record)), and save it as one step no other
-    command or page can get in the middle of. The version before is kept beside it. Returns the saved record."""
+    command or page can get in the middle of. The version before is kept beside it. Returns the saved record.
+    `reel`: which reel's words (see piece_of); only that reel's entry is handed to `how`."""
     kit = Path(kit)
+    later_reel(piece, reel)                     # an id that isn't one stops here, before the folder is touched
     kitmod.hidden(kit)
     with kitmod._held(kit / ".kit" / "words.lock", 10.0):
         p = record_path(kit)
         rec = load(kit)
-        how(piece_of(rec, piece), rec)
+        how(piece_of(rec, piece, reel), rec)
         if p.exists():
             try:
                 kitmod._write_text_whole(p.with_name(BEFORE), p.read_text(encoding="utf-8"))
@@ -198,7 +265,7 @@ def take_answers(ans, given):
     return done
 
 
-def save_answers(kit, piece, given):
+def save_answers(kit, piece, given, reel=None):
     done = []
 
     def how(w, rec):
@@ -210,11 +277,11 @@ def save_answers(kit, piece, given):
             raise Stop("the answer file has none of: about, who, who_text, where, purpose, purpose_text, notes")
         done.extend(got)
         w["updated"] = time.time()
-    change(kit, piece, how)
+    change(kit, piece, how, reel)
     return done
 
 
-def save_draft(kit, piece, given):
+def save_draft(kit, piece, given, reel=None):
     """A caption and, for a reel, hooks. Returns (caption saved?, how many hooks saved)."""
     if not isinstance(given, dict):
         raise Stop("the draft isn't a caption and a list of hooks")
@@ -236,12 +303,13 @@ def save_draft(kit, piece, given):
                 w["picked"] = []
             w["hooks"] = hooks
         w["drafted"] = w["updated"] = time.time()
-    change(kit, piece, how)
+    change(kit, piece, how, reel)
     return bool(cap), len(hooks)
 
 
-def save_from_page(kit, piece, given):
-    """What the words page sends: any of answers, caption, own, hooks, picked. Returns the saved piece."""
+def save_from_page(kit, piece, given, reel=None):
+    """What the words page sends: any of answers, caption, own, hooks, picked. Returns the saved piece.
+    `reel`: which reel's words (the page says which; the first reel's when it says none)."""
     if piece not in PIECES:
         raise Stop("words are for a reel or a carousel")
     if not isinstance(given, dict):
@@ -267,30 +335,103 @@ def save_from_page(kit, piece, given):
             ps = given["picked"] if isinstance(given["picked"], (list, tuple)) else []
             w["picked"] = [i for i in dict.fromkeys(ps) if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < n]
         w["updated"] = time.time()
-    rec = change(kit, piece, how)
-    return rec["pieces"][piece]
+    rec = change(kit, piece, how, reel)
+    return read_of(rec, piece, reel)
 
 
-def carry(kit, src, dst):
-    """Copy one piece's answers to the other, so they never answer twice. "where" is a reel's own question."""
-    a = dict(piece_of(load(kit), src)["answers"])
+def carry(kit, src, dst, reel=None):
+    """Copy one piece's answers to the other, so they never answer twice. "where" is a reel's own question.
+    `reel`: which reel is the reel end of it (from that reel to the carousel, or from the carousel to it)."""
+    a = dict(read_of(load(kit), src, reel)["answers"])
     a.pop("where", None)
-    if not any(a.get(k) for k in ("about", "who", "who_text", "purpose", "purpose_text", "notes")):
+    if not any(a.get(k) for k in ANSWERED):
         raise Stop(f"the {src} has no answers to carry over yet")
-    return save_answers(kit, dst, a)
+    return save_answers(kit, dst, a, reel)
 
 
-def status(kit):
-    """For the post kit: {piece: {answered, caption, hooks, picked}}."""
+def carry_reel(kit, src, dst):
+    """A reel that has no answers yet starts from another reel's (answers only: never its caption, its hooks or
+    their own caption, which are each reel's own). Never over answers the reel already has. Returns the names."""
+    if (later_reel("reel", src) or FIRST_REEL) == (later_reel("reel", dst) or FIRST_REEL):
+        raise Stop("that is the same reel")
+    rec = load(kit)
+    a = dict(read_of(rec, "reel", src)["answers"])
+    if not any(a.get(k) for k in ANSWERED):
+        raise Stop("that reel has no answers to use yet")
+    done = []
+
+    def how(w, rec):
+        if any(w["answers"].get(k) for k in ANSWERED):          # looked at under the lock: never over theirs
+            raise Stop("this reel already has answers of its own")
+        done.extend(take_answers(w["answers"], a))
+        w["updated"] = time.time()
+    change(kit, "reel", how, dst)
+    return done
+
+
+def _status(w):
+    a = w["answers"]
+    return {"answered": any(a.get(k) for k in ANSWERED),
+            "caption": bool((w.get("caption") or "").strip() or (w.get("own") or "").strip()),
+            "hooks": len(w.get("hooks") or []), "picked": len(w.get("picked") or [])}
+
+
+def status(kit, reel=None):
+    """For the post kit: {piece: {answered, caption, hooks, picked}}. `reel`: which reel "reel" means (the
+    shoot's first when none)."""
+    rec = load(kit)
+    return {p: _status(read_of(rec, p, reel if p == "reel" else None)) for p in PIECES}
+
+
+def reels_status(kit, ids):
+    """{reel id: {answered, caption, hooks, picked}} for each of the shoot's reels named (an id that isn't one
+    is left out), read from one look at the record."""
     rec = load(kit)
     out = {}
-    for p in PIECES:
-        w = piece_of(rec, p)
-        a = w["answers"]
-        out[p] = {"answered": any(a.get(k) for k in ("about", "who", "who_text", "purpose", "purpose_text", "notes")),
-                  "caption": bool((w.get("caption") or "").strip() or (w.get("own") or "").strip()),
-                  "hooks": len(w.get("hooks") or []), "picked": len(w.get("picked") or [])}
+    for vid in ids:
+        try:
+            out[vid] = _status(read_of(rec, "reel", vid))
+        except Stop:
+            pass
     return out
+
+
+def kit_reel_names(kit):
+    """([{id, name}] for the shoot's reels, the id of the one being worked on). One reel, or a reel record that
+    can't be read: ([], None), and then nothing anywhere asks which reel."""
+    try:
+        import reel_page
+        names, cur = reel_page.reel_names(Path(kit))
+    except (Exception, SystemExit):  # noqa: BLE001
+        return [], None
+    names = [v for v in names if isinstance(v, dict) and isinstance(v.get("id"), str) and isinstance(v.get("name"), str)]
+    return (names, cur) if len(names) > 1 else ([], None)
+
+
+def which_reel(kit, said):
+    """For a command's --reel: (the reel's id or None, its name or ""). A shoot with one reel: (None, "") and
+    --reel is not needed (given anyway, it must fit that reel). Several reels: the one `said` names (its name, a
+    part of one name only, or its id); nothing said, or a name that fits none or more than one, is a Stop that
+    lists the reels by name, so words are never saved to a reel nobody named."""
+    names, _ = kit_reel_names(kit)
+    if not names:
+        if said:
+            import reel_page
+            try:
+                vid, why = reel_page.which_reel(Path(kit), said)
+            except (Exception, SystemExit):  # noqa: BLE001
+                vid, why = FIRST_REEL, None
+            if vid is None:
+                raise Stop(why)
+        return None, ""
+    listed = ", ".join(f"\"{v['name']}\"" for v in names)
+    if not said:
+        raise Stop(WHICH_REEL.format(n=len(names), names=listed))
+    import reel_page
+    vid, why = reel_page.which_reel(Path(kit), said)
+    if vid is None:
+        raise Stop(why)
+    return vid, next((v["name"] for v in names if v["id"] == vid), "")
 
 
 # ---------- their brand ----------
@@ -338,9 +479,18 @@ def answered(ans):
 
 # ---------- the commands ----------
 
-def cmd_show(kit, piece):
+def _the(piece, reel_name):
+    """ "reel" or "carousel", with the reel's name when the shoot has several: reel "Reel 2". """
+    return f"{piece} \"{reel_name}\"" if piece == "reel" and reel_name else piece
+
+
+def _reel_flag(reel_name):
+    return f" --reel \"{reel_name}\"" if reel_name else ""
+
+
+def cmd_show(kit, piece, reel=None, reel_name=""):
     rec = load(kit)
-    w = piece_of(rec, piece)
+    w = read_of(rec, piece, reel if piece == "reel" else None)
     ans = w["answers"]
     say(RULES.format(task=f"{HOW_MANY[piece]} {WHAT[piece]}, and one caption" if HOW_MANY[piece]
                      else "one caption, and no cover lines (Nicole, Nov 10: they can figure that out themselves)"))
@@ -358,7 +508,10 @@ def cmd_show(kit, piece):
             for s in (v.get("never") or [])[:5]:
                 say("    They'd never write: " + s.replace("\n", " / "))
     say("")
-    say(f"{kit.name}, the {piece}: what they said")
+    say(f"{kit.name}, the {_the(piece, reel_name)}: what they said")
+    if piece == "reel" and reel_name:
+        say("  (Each reel of this shoot has its own answers, caption and hooks. These are this reel's only;"
+            f" save with{_reel_flag(reel_name)}.)")
     rows = answered(ans)
     for k, v in rows:
         say(f"  {k}: {(v or '').strip() or '(nothing yet)'}")
@@ -374,16 +527,41 @@ def cmd_show(kit, piece):
         else:
             say("\n  They haven't answered yet. Ask them in the chat, one question at a time, or point them to the page.")
     other = [p for p in PIECES if p != piece][0]
-    ow = piece_of(rec, other)
-    if ow.get("caption"):
-        say(f"\nThe {other}'s caption, already written (their answers carry over; the words must not repeat):")
-        say("  " + ow["caption"].replace("\n", " / "))
+    names, _ = kit_reel_names(kit)
+    # the captions this one must not repeat: the other piece's, and, with several reels, every other reel's
+    # (to READ only: nothing of another reel is ever saved here)
+    others = []
+    if piece == "reel":
+        oc = read_of(rec, "carousel")
+        if oc.get("caption"):
+            others.append(("carousel", oc["caption"]))
+        for v in names:
+            if (later_reel("reel", v["id"]) or FIRST_REEL) != (later_reel("reel", reel) or FIRST_REEL):
+                c = read_of(rec, "reel", v["id"]).get("caption")
+                if c:
+                    others.append((f"reel \"{v['name']}\"", c))
+    else:
+        for v in names or [{"id": FIRST_REEL, "name": ""}]:
+            c = read_of(rec, "reel", v["id"]).get("caption")
+            if c:
+                others.append((_the("reel", v["name"]), c))
+    for i, (what, text) in enumerate(others):
+        named = '"' in what                 # a reel by its name: "the caption of the reel "Reel 2""
+        if i:
+            say(f"\nAnd the caption of the {what}, already written (this one must be genuinely different from it too):")
+        elif named:
+            say(f"\nThe caption of the {what}, already written (the words must not repeat):")
+        else:
+            say(f"\nThe {what}'s caption, already written (their answers carry over; the words must not repeat):")
+        say("  " + text.replace("\n", " / "))
+    if others:
+        theirs = "those" if len(others) > 1 or '"' in others[0][0] else f"the {others[0][0]}'s"
         say(f"  The {piece} caption must be genuinely DIFFERENT from this one (Nicole, Nov 10: someone who sees both"
             f" shouldn't feel like they're reading a slightly different version). Same facts, same goal in the opening"
             f" lines, but a different way in: a different opening line and angle, a different part of their story up"
             f" front, a different shape and different sentences. Don't reuse its lines or reword them one by one."
             f" Use only their answers for facts; their answers are your source, this caption is only what to avoid."
-            + (f" Then write new {WHAT[piece].split(' (')[0]}, different from the {other}'s too." if HOW_MANY[piece] else ""))
+            + (f" Then write new {WHAT[piece].split(' (')[0]}, different from {theirs} too." if HOW_MANY[piece] else ""))
     if w.get("caption") or w.get("hooks"):
         say("\nAlready written (a new draft replaces it; the version before is kept):")
         if w.get("caption"):
@@ -399,23 +577,49 @@ def cmd_show(kit, piece):
     return 0
 
 
-def cmd_ask(kit, piece):
-    w = piece_of(load(kit), piece)
+def cmd_ask(kit, piece, reel=None, reel_name=""):
+    rec = load(kit)
+    w = read_of(rec, piece, reel if piece == "reel" else None)
     what = WHAT[piece].split(" (")[0] if HOW_MANY[piece] else "caption"
     say(ASK.format(piece=piece, what=what).replace("the caption and caption are", "the caption is"))
     say("")
-    say(f"{kit.name}, the {piece}: answered so far")
+    say(f"{kit.name}, the {_the(piece, reel_name)}: answered so far")
+    if piece == "reel" and reel_name:
+        say(f"  (This reel's own answers. Save each with{_reel_flag(reel_name)}.)")
     for k, v in answered(w["answers"]):
         say(f"  {k}: {(v or '').strip() or '(not yet)'}")
     other = [p for p in PIECES if p != piece][0]
-    st = status(kit)
+    names, _ = kit_reel_names(kit)
+    if not _status(w)["answered"] and piece == "reel" and names:
+        # a new reel starts empty; another reel of the shoot that is answered is offered first, with their yes
+        mine = later_reel("reel", reel) or FIRST_REEL
+        src = next((v for v in names if v["id"] != mine and _status(read_of(rec, "reel", v["id"]))["answered"]), None)
+        if src is not None:
+            say(f"\nNothing is answered for this reel yet, but \"{src['name']}\" is. Don't start again from question 1:"
+                f" offer to start from what they said for that reel (buttons: Use what I said for {src['name']} · Ask me again)."
+                f" On yes: words.py carry-reel \"<kit>\" --from \"{src['name']}\" --reel \"{reel_name}\", then ask what"
+                " is different about this reel and save only that. The caption and the hooks are never copied: each"
+                " reel gets its own.")
+            return 0
+    if piece == "carousel" and len(names) > 1 and not _status(w)["answered"]:
+        src = next((v for v in names if _status(read_of(rec, "reel", v["id"]))["answered"]), None)
+        if src is not None:
+            say(f"\nNothing is answered for the carousel yet, but the reel \"{src['name']}\" is. Don't start again from"
+                f" question 1: offer to use what they said for that reel (buttons: Use what I said for {src['name']} · Ask me again)."
+                f" On yes: words.py carry \"<kit>\" reel carousel --reel \"{src['name']}\", then ask only what is still open.")
+        return 0 if src is not None else _ask_told(kit, w)
+    st = status(kit, reel)
     if not st[piece]["answered"] and st[other]["answered"]:
         # so they never answer twice (Nicole): offered, with their yes; "where" is the reel's own and never carries
         say(f"\nNothing is answered for the {piece} yet, but the {other} is. Don't start again from question 1: offer"
             f" to use what they said for the {other} (buttons: Use what I said for the {other} · Ask me again)."
-            f" On yes: words.py carry \"<kit>\" {other} {piece}, then ask only what is still open"
+            f" On yes: words.py carry \"<kit>\" {other} {piece}{_reel_flag(reel_name)}, then ask only what is still open"
             + (" (2c: feed or trial reel)." if piece == "reel" else "."))
         return 0
+    return _ask_told(kit, w)
+
+
+def _ask_told(kit, w):
     if not (w["answers"].get("about") or "").strip():
         # what they said when the kit was made is theirs, but it was said about the whole shoot, before this
         # piece existed: it is offered as question 1's answer, with their yes, never saved there unasked
@@ -447,30 +651,47 @@ def main(argv=None):
         s.add_argument("piece", choices=PIECES)
         if with_file:
             s.add_argument("--file", required=True, help="a UTF-8 JSON file")
+        s.add_argument("--reel", default="", help="which reel, by its name, when the shoot has more than one")
     c = sub.add_parser("carry")
     c.add_argument("words"); c.add_argument("piece", choices=PIECES); c.add_argument("to", choices=PIECES)
+    c.add_argument("--reel", default="", help="which reel is the reel end of it, when the shoot has more than one")
+    r = sub.add_parser("carry-reel")
+    r.add_argument("words")
+    r.add_argument("--from", dest="src", required=True, help="the reel whose answers to start from, by its name")
+    r.add_argument("--reel", required=True, help="the reel that gets them, by its name")
     a = ap.parse_args(argv)
     fresh.announce()
     kit = kitmod.find_kit(a.words)
     try:
+        if a.cmd == "carry-reel":
+            src, src_name = which_reel(kit, a.src)
+            dst, dst_name = which_reel(kit, a.reel)
+            if not src_name or not dst_name:
+                raise Stop("this shoot has one reel, so there is no other reel to start from")
+            done = carry_reel(kit, src, dst)
+            say(f"\"{dst_name}\" now starts from what they said for \"{src_name}\" ({', '.join(done)}). Only the answers:"
+                " its caption and hooks are still to write, and are its own.")
+            return 0
+        # which reel: only where a reel is meant (a carousel's own commands never ask)
+        reel, reel_name = which_reel(kit, a.reel) if (a.piece == "reel" or (a.cmd == "carry" and a.to == "reel")) else (None, "")
         if a.cmd == "show":
-            return cmd_show(kit, a.piece)
+            return cmd_show(kit, a.piece, reel, reel_name)
         if a.cmd == "ask":
-            return cmd_ask(kit, a.piece)
+            return cmd_ask(kit, a.piece, reel, reel_name)
         if a.cmd == "answer":
-            done = save_answers(kit, a.piece, read_json(a.file))
-            say(f"Saved {', '.join(done)} for the {kit.name} {a.piece}. The page shows it in a few seconds.")
+            done = save_answers(kit, a.piece, read_json(a.file), reel)
+            say(f"Saved {', '.join(done)} for the {kit.name} {_the(a.piece, reel_name)}. The page shows it in a few seconds.")
             return 0
         if a.cmd == "draft":
-            cap, n = save_draft(kit, a.piece, read_json(a.file))
-            say(f"Saved the {a.piece} words for {kit.name}: " + ("a caption" if cap else "") + (" and " if cap and n else "")
+            cap, n = save_draft(kit, a.piece, read_json(a.file), reel)
+            say(f"Saved the {_the(a.piece, reel_name)} words for {kit.name}: " + ("a caption" if cap else "") + (" and " if cap and n else "")
                 + (f"{n} {WHAT[a.piece].split(' (')[0]}" if n else "") + ". The page shows them in a few seconds.")
             return 0
         if a.cmd == "carry":
             if a.piece == a.to:
                 raise Stop("carry goes from one piece to the other")
-            done = carry(kit, a.piece, a.to)
-            say(f"Carried {', '.join(done)} from the {a.piece} to the {a.to}. They don't have to answer again.")
+            done = carry(kit, a.piece, a.to, reel)
+            say(f"Carried {', '.join(done)} from the {_the(a.piece, reel_name)} to the {_the(a.to, reel_name)}. They don't have to answer again.")
             return 0
     except Stop as e:
         say(f"STOP: {e}. Nothing was saved.")

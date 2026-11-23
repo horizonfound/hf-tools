@@ -200,14 +200,15 @@ def check_words():
     case("her line for two days of shooting, word for word", W["why_days"].format(n="two") == HERS["why"], W["why_days"])
     case("her line above Add to my editing queue, word for word", W["look_right"] == HERS["look_right"])
     case("her button's name: Open this folder", W["open_folder"] == HERS["open"])
-    case("her sneak peeks line, word for word", W["peeks"].format(n="six") == HERS["peeks"], W["peeks"])
+    case("her Nov 13 sneak peeks line is kept in the table for the record, word for word (not shown since Nov 23)",
+         W["peeks"].format(n="six") == HERS["peeks"], W["peeks"])
     case("her next step: Open your folder to start editing", W["start"].rstrip(".") == HERS["start"], W["start"])
     case("a folder that is gone is said in the Back up a card screen's own words",
          W["unplugged"] == home_base.WORDS["b_unplugged"] and W["moved"].format(files_app="Finder") == home_base.WORDS["b_moved"])
     notes = her_notes()
     if notes:
         hers = nicole_nov22.read(notes)   # Nicole, Nov 22: everything is the Assistant
-        for k in ("why", "look_right", "open", "peeks", "start", "gone"):
+        for k in ("why", "look_right", "open", "start", "gone"):   # ("peeks" was hers on Nov 13; gone from her pages since)
             case("her notes hold the line this test calls hers: %s" % k, HERS[k] in hers, HERS[k])
     else:
         skip("her notes are not on this computer (reference-private is never pushed): her lines are compared with this test's own copy")
@@ -216,16 +217,16 @@ def check_words():
     every = list(W.values()) + list(O.values())
     case("no line says Claude, and none has an em dash", not any("Claude" in x or "—" in x for x in every))
     case("our line for a split that was not days claims no days", "day" not in O["why_shoots"].lower() and "{n}" in O["why_shoots"])
-    # the sneak peeks line, true to the shoot
-    case("six picks, all a kind that gets the mark: her line", first_look.peeks_words(6, 6) == HERS["peeks"])
-    none = first_look.peeks_words(6, 0)
-    case("six picks, none marked (JPEG): it never says they are marked in Lightroom",
-         none.startswith("I picked six photos that could be great sneak peeks to send your client.") and "aren't marked in Lightroom" in none
-         and "They're marked" not in none, none)
-    some = first_look.peeks_words(6, 4)
-    case("six picks, four marked: it says four are, and why the others are not",
-         "Four of them are marked 'sneak peek' in Lightroom" in some and "The others" in some and "They're marked" not in some, some)
-    case("four picks: it says four, not six", first_look.peeks_words(4, 4).startswith("I picked four photos") and "six" not in first_look.peeks_words(4, 4))
+    # the line under the six photos (Nicole, Nov 23: "keep sneak peek out and give the 6 photos but it can say
+    # something like a first look at your shoot"). Whatever kind of photo, however many: one line, and it never
+    # says sneak peek, Lightroom, marked or client.
+    for n, marked in ((6, 6), (6, 0), (6, 4), (4, 4)):
+        got = first_look.peeks_words(n, marked)
+        case("%d picks, %d of a kind that used to get a keyword: a first look, nothing about Lightroom or a client" % (n, marked),
+             got == O["first_look"] == "A first look at your shoot."
+             and not re.search(r"sneak|Lightroom|marked|client", got, re.I), got)
+    case("the switches that would bring the old words, the note button and the note card back are all off",
+         first_look.PEEKS_ARE_MARKED is False and first_look.NOTE_BUTTON is False and first_look.NOTE_CARD is False)
     # the old line is gone from everything a photographer or the assistant reads
     left = []
     for f in list((ROOT / "plugins").rglob("*.py")) + list((ROOT / "plugins").rglob("*.md")):
@@ -252,8 +253,9 @@ def check_words():
     case("after-the-report.md: Open this folder, the look-right line, and the honest answer for a moved folder",
          "**Open this folder**" in a and HERS["look_right"] in a and "no command that re-points" in a and O["come_back"] in a)
     s = part("sneak-peeks.md")
-    case("sneak-peeks.md: her line, and never 'marked in Lightroom' to someone who shoots JPEG",
-         HERS["peeks"] in s and "never tell someone who shoots JPEG" in s)
+    case("sneak-peeks.md: the six are a first look, the page's own line, and never 'marked in Lightroom' or for a client",
+         O["first_look"] in s and HERS["peeks"] not in s and "no keyword, no mark in Lightroom" in s
+         and "never suggest sending the six to anyone" in s)
     f = part("first-backup-setup.md")
     # Since Nov 19 (Dustin: nothing is asked before the copy) the first backup has no opening speech and no
     # folder-naming question: these two cases held the old run of questions, and now hold that it is gone. Why there
@@ -287,8 +289,10 @@ def check_pages(work):
     case("above Add to my editing queue: her line, once per shoot, right before the button",
          p.count("<span class='q-ask'>" + HERS["look_right"] + "</span><button class='add' type='button'>Add to my editing queue</button>") == 2)
     lines = text_of(p, "peeks-line")
-    case("RAW shooters: her sneak peeks line in full, then the way to change them",
-         len(lines) == 2 and all(x == HERS["peeks"] + " " + O["peeks_change"] for x in lines), lines)
+    case("RAW shooters: the first-look line, then the way to change them",
+         len(lines) == 2 and all(x == O["first_look"] + " " + O["peeks_change"] for x in lines), lines)
+    case("nothing on the page says sneak peek, Lightroom or a note to a client",
+         not re.search(r"sneak peek|Lightroom|note to (my|your) client", re.sub(r"<(style|script)[^>]*>.*?</\1>", "", p, flags=re.S), re.I))
     case("Pick again and Show me more are still under it", p.count("class='pk again'") == 2 and p.count("class='pk more'") == 2)
     case("under the shoots, once: open the folder to start editing, and where to come back to",
          text_of(p, "next-step") == [W["start"] + " " + O["come_back"]], text_of(p, "next-step"))
@@ -302,9 +306,8 @@ def check_pages(work):
     why = text_of(p, "why-folders")
     case("two shoots in ONE day: the line never says days", why == [O["why_shoots"].format(n="two")] and "day" not in why[0].lower(), why)
     lines = text_of(p, "peeks-line")
-    case("JPEG shooters: the line says what the picks are for and that they are NOT marked in Lightroom",
-         len(lines) == 2 and all(x.startswith("I picked six photos that could be great sneak peeks to send your client.")
-                                 and "aren't marked in Lightroom" in x and "They're marked" not in x and x.endswith(O["peeks_change"]) for x in lines), lines)
+    case("JPEG shooters: the very same first-look line (there is no mark to be honest about any more)",
+         len(lines) == 2 and all(x == O["first_look"] + " " + O["peeks_change"] for x in lines), lines)
 
     across = make_backup(work / "2026-06-26 across", [
         {"name": "Wedding", "day": "2026-06-24", "n": 8, "ext": "cr3", "peeks": RAW6},
@@ -318,8 +321,8 @@ def check_pages(work):
     p = page(single)
     case("one shoot: no line about several folders, the older line stays", text_of(p, "why-folders") == [] and "Each one is already in its own folder" in p)
     lines = text_of(p, "peeks-line")
-    case("four RAW picks and two JPEG: four are marked, and it says so", len(lines) == 1 and "Four of them are marked 'sneak peek' in Lightroom" in lines[0]
-         and "They're marked" not in lines[0], lines)
+    case("four RAW picks and two JPEG: the first-look line, and nothing about marks",
+         lines == [O["first_look"] + " " + O["peeks_change"]], lines)
     case("one shoot still has its Open this folder, the look-right line and the next step",
          p.count("class='open-shoot'") == 1 and p.count("class='q-ask'") == 1 and len(text_of(p, "next-step")) == 1)
 
@@ -327,8 +330,9 @@ def check_pages(work):
         {"name": "Minis", "day": "2026-06-24", "n": 10, "ext": "cr3", "peeks": ["cr3"] * 4}])
     p = page(four)
     lines = text_of(p, "peeks-line")
-    case("a shoot with four sneak peeks: the line says four, in her words otherwise, and there are no buttons to lead into",
-         lines == [HERS["peeks"].replace("six", "four")] and "class='pk again'" not in p, lines)
+    case("a shoot with four first-look photos: the same line under the eyebrow 'A first look', and no buttons to lead into",
+         lines == [O["first_look"]] and "class='pk again'" not in p and "<span class='eyebrow'>A first look</span>" in p
+         and "Sneak peeks" not in p, lines)
 
     clips_only = make_backup(work / "2026-06-24 clips", [
         {"name": "Garden demo", "day": "2026-06-24", "n": 5, "ext": "mp4", "clips": True}])
@@ -487,9 +491,9 @@ def check_browser(c, base, night):
     case("... and it really is in the scratch queue with that date", any(x.get("shoot") == "s2" and x.get("due") == "2027-02-03" for x in q["shoots"]))
     # the sneak peeks
     line = c.text("article.shoot:nth-of-type(1) .peeks-line")
-    case("the sneak peeks line in the browser: hers, then the way to change them; only its first sentence is bold",
-         line == HERS["peeks"] + " " + O["peeks_change"]
-         and c.text("article.shoot:nth-of-type(1) .peeks-line b") == "I picked six photos that could be great sneak peeks to send your client.", line)
+    case("the first-look line in the browser, then the way to change them; only its first sentence is bold",
+         line == O["first_look"] + " " + O["peeks_change"]
+         and c.text("article.shoot:nth-of-type(1) .peeks-line b") == O["first_look"], line)
     c.click("article.shoot:nth-of-type(1) .pk.again")
     case("Pick again still opens its box", shown("article.shoot:nth-of-type(1) .peeks-ask"))
     c.click("article.shoot:nth-of-type(1) .peeks-ask input")
@@ -551,8 +555,9 @@ def check_fake_night(c, work, port):
     try:
         c.open(srv.base + "/report.html")
         c.wait_for("document.querySelectorAll('article.shoot').length === 2", 15)
-        case("two JPEG shoots in one day: no 'days', and the sneak peeks are not called marked",
-             c.text(".why-folders") == first_look.OUR_WORDS["why_shoots"].format(n="two") and "aren't marked in Lightroom" in c.text("article.shoot:nth-of-type(1) .peeks-line"))
+        case("two JPEG shoots in one day: no 'days', and the six are a first look with nothing about Lightroom",
+             c.text(".why-folders") == first_look.OUR_WORDS["why_shoots"].format(n="two") and "Lightroom" not in c.text("article.shoot:nth-of-type(1) .peeks-line")
+             and c.text("article.shoot:nth-of-type(1) .peeks-line").startswith(first_look.OUR_WORDS["first_look"]))
         c.click("article.shoot:nth-of-type(1) .pk.more")
         c.wait_for("document.querySelectorAll('article.shoot:nth-of-type(1) .peeks-more .slot .cand').length === 6", 15)
         case("Show me more still opens their six in six spots", True)

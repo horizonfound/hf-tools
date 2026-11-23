@@ -76,6 +76,9 @@ HERS_NOT_OURS = {
     "Step 3 of your workflow": "gone with the numbered steps (v29; her make-posts-preview.html has no eyebrow)",
     # no longer true since Nov 19 (Dustin: nothing is asked before the copy); ours is OUR_WORDS["b_s2_small"]
     "The Assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
+    # no longer true since Nov 23 (Nicole and Dustin: the six photos are a first look, nothing is marked in Lightroom,
+    # nothing is for a client); ours is OUR_WORDS["b_lede_2"]
+    "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.": "a first look, not sneak peeks (Nov 23)",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
     # (the two screens keep her line for it)
 }

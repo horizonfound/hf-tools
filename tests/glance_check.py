@@ -38,7 +38,7 @@ def main():
         one = out.split("ONE LINE (put this in the question itself):")[-1].strip()
         check("the drive, no second copy, the folder naming and the photo naming, one short line each",
               len(lines) == 4 and lines[0].startswith("Photos go onto Photo Shoots") and lines[1] == "No second copy"
-              and "Smith Family, Oct 18 2026" in lines[2] and "named after the shoot" in lines[3], out)
+              and "2026-10-18 Smith Family" in lines[2] and "named after the shoot" in lines[3], out)
         check("every line is short and plain: no path, no code marks, no setting names",
               all(len(x) <= 90 and "/" not in x.replace("Dustin / ", "") and "`" not in x and "{" not in x for x in lines), str(lines))
         check("the same thing as one line for the question, ending in a full stop",
@@ -49,9 +49,11 @@ def main():
         t.run("posting_queue.py", "interval", "3 a week", env=env)
         before = (home / "studio.json").read_bytes()
         code, out = t.run("studio_file.py", "glance", env=env)
-        check("a second copy, the camera's own names, the tone and sign-off, and the posting rhythm all show",
+        check("a second copy, the camera's own names and the posting rhythm all show",
               "A second copy goes onto Second" in out and "Photos keep the camera's own names" in out
-              and "Client notes written warm and personal, signed \u201cxo, Nicole\u201d" in out and "Posts lined up at 3 a week" in out, out)
+              and "Posts lined up at 3 a week" in out, out)
+        check("notes to clients are not in the glance any more (taken out Nov 23), though how they write is still on file",
+              "lient note" not in out and "xo, Nicole" in (home / "studio.json").read_text(encoding="utf-8"), out)
         check("looking changes nothing that is remembered", (home / "studio.json").read_bytes() == before)
     finally:
         shutil.rmtree(work, ignore_errors=True)

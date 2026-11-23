@@ -9,7 +9,7 @@ It never posts anything and never changes an original.
 | Say | What happens |
 |---|---|
 | **hi** | It says where things stand and opens its home page beside the chat. |
-| **backup now** | Copies a memory card to your drive, checks every file, sorts and names the shoots, picks six sneak peeks, and leaves a report. |
+| **backup now** | Copies a memory card to your drive, checks every file, sorts and names the shoots, pulls six photos per shoot as a first look, and leaves a report. |
 | **make my posts** | Turns a folder of finished photos into a post kit: single posts, a carousel, stories, a reel cover, and captions written from what you tell it. |
 | **make a reel** | Picks the photos and opens the reel page beside the chat: add your song, pick the vibe, press Make my reel, and the photos land on the beat as a CapCut project for you to style and export. |
 | **make my stories** | Opens the stories designer: your photos in layouts, your own words, saved as Instagram stories. |

@@ -16,7 +16,7 @@ Exit codes: 0 done · 1 problems (read the report) · 2 stop (missing source
 or drive) · 3 paused (run again) · 4 needs Claude's look (read
 _studio/groups-sheet.png, write _studio/shoots.json, run again) · 5 needs
 setup (no Studio File yet: ask their drive and naming, save with
-studio_file.py, run again) · 7 needs the sneak peeks (read the pages it names,
+studio_file.py, run again) · 7 needs the first-look picks (read the pages it names,
 peek_sheets.py pick ..., run again).
 
 Their drive, second copy and naming come from ~/.studio (studio_file.py), so
@@ -410,7 +410,7 @@ def main():
     ap.add_argument("--no-open", action="store_true", help="(kept for old callers; the report is never opened by the backup now)")
     ap.add_argument("--open", action="store_true", help="show the report of a finished backup in the browser (via serve_report.py in its own pane)")
     ap.add_argument("--again", action="store_true", help="copy even if the ledger says this card is already backed up")
-    ap.add_argument("--no-peeks", action="store_true", help="skip the sneak peeks (the backup still finishes and settles)")
+    ap.add_argument("--no-peeks", action="store_true", help="skip the first-look photos (the backup still finishes and settles)")
     ap.add_argument("--check", action="store_true", help="preflight only: is everything in place for the night to run unattended? (a few seconds)")
     ap.add_argument("--sample", type=int, default=None, help="a TEST only: copy just the first N files of the card; the card is never marked safe")
     ap.add_argument("--with", dest="with_", default=None, help="the first card's backup of this shoot: this card is linked to it, so the report shows every card on one page")
@@ -747,9 +747,9 @@ def main():
     # on the report. Nothing is on screen yet: Claude shows the report once, after the picks and the notes.
     if not a.no_peeks and not (studio / "sneak-peeks.json").exists():
         if not (studio / "peek-sheets.json").exists():
-            say("6b. Thinning each shoot to its moments, for the sneak peeks")
+            say("6b. Thinning each shoot to its moments, for the first look")
             if run("peek_sheets.py", "make", studio) != 0:
-                say("   (could not make the pages; going on without sneak peeks)")
+                say("   (could not make the pages; going on without the first-look photos)")
         sheets = {}
         if (studio / "peek-sheets.json").exists():
             sheets = json.loads((studio / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
@@ -757,11 +757,11 @@ def main():
             none = [sh["name"] for sh in sheets.values() if not sh.get("moments")]
             sheets = {sid: sh for sid, sh in sheets.items() if sh.get("moments")}
             if none and not sheets:
-                say("6b. No photos on this card, only video clips, so there are no sneak peeks to pick.")
+                say("6b. No photos on this card, only video clips, so there are no first-look photos to pick.")
             elif none:
-                say("6b. No sneak peeks for " + ", ".join(none) + ": video clips only.")
+                say("6b. No first-look photos for " + ", ".join(none) + ": video clips only.")
         if sheets:
-            say("\n6b. NEEDS THE PICKS. For each shoot, read its page(s) and choose six sneak peeks by number:")
+            say("\n6b. NEEDS THE PICKS. For each shoot, read its page(s) and choose six first-look photos by number:")
             for sid, sh in sheets.items():
                 say(f"   {sid} {sh['name']}: {sh['moments']} moments on {len(sh['pages'])} page(s)")
                 for pg in sh["pages"]:
@@ -779,9 +779,9 @@ def main():
             say("   A flagged photo is refused (the hero always); the pick says what to fix. Then run this command again.")
             sys.exit(7)
     if (studio / "sneak-peeks.json").exists():
-        say("6b. Marking the sneak peeks for Lightroom")
+        say("6b. Making the first-look pictures for the report")
         if run("sneak_peeks.py", "--night", studio) not in (0, 2):
-            say("   (the sneak peeks could not all be marked; the report still shows them)")
+            say("   (the first-look pictures could not all be made; the report shows what there is)")
         run("first_look.py", session)
         run("report_page.py", session)
 
@@ -799,10 +799,9 @@ def main():
     # every shoot of the night goes on "your shoots" (the archive below the queue); the queue question comes when they're back
     run("edit_queue.py", "register", "--night", studio)
     say(f"\nDone. Report: {studio / 'report.html'}")
-    # The report is not opened here. The backup is only the first half: Claude still picks the sneak
-    # peeks and writes the notes, and the report is shown once, by Claude, when all of that is done
+    # The report is not opened here: it is shown once, by Claude, when the first-look photos are in it
     # (Dustin, Oct 28: it opened early, twice, in two browsers). `night.py --open` shows it on request.
-    say("Not on screen yet: the sneak peeks and the notes come next, then the report is shown once.")
+    say("Not on screen yet: show the report once, now that the first-look photos are in it.")
 
 
 def open_report(session, studio):

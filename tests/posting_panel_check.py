@@ -343,11 +343,11 @@ def check_routes(s):
 
     # the words, straight from the words record
     w = panel(s, rid)[1]["words"]
-    case("the panel's words: the caption whole, and no hook while none is picked", w == {"piece": "reel", "caption": CAPTION.strip(), "hook": ""}, w)
+    case("the panel's words: the caption whole, and no hook while none is picked", w == {"piece": "reel", "reel": "v1", "caption": CAPTION.strip(), "hook": ""}, w)
     s.save("reel", picked=[2, 0])
     case("...the hook is the first one they picked", panel(s, rid)[1]["words"]["hook"] == HOOKS[2], panel(s, rid)[1]["words"])
     wc = panel(s, cid)[1]["words"]
-    case("a carousel has its caption (their own typed one, when that is all there is) and never a hook", wc == {"piece": "carousel", "caption": OWN, "hook": ""}, wc)
+    case("a carousel has its caption (their own typed one, when that is all there is) and never a hook", wc == {"piece": "carousel", "reel": None, "caption": OWN, "hook": ""}, wc)
     s.save("carousel", own="")
     case("no caption yet: the caption is empty", panel(s, cid)[1]["words"]["caption"] == "")
     s.save("carousel", own=OWN)
@@ -468,7 +468,9 @@ def check_page(c, s, ids):
          and c.js("Array.from(document.querySelectorAll('#pick .pw > *')).map(function(e){ return e.className; }).join('|')") == "btn|btn o|rslot|pwl"
          and c.js("document.querySelector('#pick .rslot').dataset.remindSlot") == rid)
     href = c.js("document.querySelector('#pick .pwl').getAttribute('href')")
-    case("Open my words leads to this post's words page on this same server", href == "/words.html?kit=%s&piece=reel" % quote(KIT, safe="~()*!.'"), href)
+    # since Nov 23 each reel has its own words: a reel's post names its reel in the link (the shoot's first reel here)
+    case("Open my words leads to this post's own words page (its reel named) on this same server",
+         href == "/words.html?kit=%s&reel=v1&piece=reel" % quote(KIT, safe="~()*!.'"), href)
     # v25: the reel's own photos first under "From your reel, in the order it plays", numbered; the rest under
     # "Any other photo from the shoot", open already here because the photo in use is one of those
     strip = c.js("Array.from(document.querySelectorAll('#pick .ps .sub, #pick .ps .c, #pick .ps .more')).map(function(e){ return e.classList.contains('c') ? e.dataset.rel + (e.classList.contains('on') ? ' ON' : '') : e.className.split(' ').pop().toUpperCase() + ':' + e.textContent; })")

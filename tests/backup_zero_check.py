@@ -102,8 +102,9 @@ def one_drive(work, copies):
     s = sf(home) if (home / "studio.json").exists() else {}
     n, d = s.get("naming", {}), s.get("drives", {})
     check("the Studio File now has the drive", same(d.get("session", ""), drive), str(d))
-    check("year-first folder names, photos named for the shoot",
-          n.get("folder_pattern") == "{date} {shoot}" and n.get("date_format") == "%Y-%m-%d" and n.get("file_names") == "shoot", str(n))
+    check("folders named for the shoot then the date (Aurora_11-22-26), photos named for the shoot",
+          n.get("folder_pattern") == "{shoot}_{date}" and n.get("date_format") == "%m-%d-%y" and n.get("file_names") == "shoot"
+          and n.get("since"), str(n))
     check("no second copy", not d.get("second"), str(d))
     check("and one note saying it was chosen by itself",
           len(s.get("notes", [])) == 1 and "chosen by itself" in s["notes"][0]["note"] and "Big Kahuna" in s["notes"][0]["note"],
@@ -130,7 +131,7 @@ def shoot_folder(work):
           and same(sf(home)["drives"]["session"], drive / "Photo Shoots"), out)
     check("nothing was made on the drive", sorted(p.name for p in drive.iterdir()) == ["Movies", "Photo Shoots"])
     code, out = t.run("studio_file.py", "glance", env=env)
-    check("the glance still answers 'what are my settings?'", code == 0 and "No second copy" in out and "2026-10-18 Smith Family" in out, out)
+    check("the glance still answers 'what are my settings?'", code == 0 and "No second copy" in out and "Smith Family_10-18-26" in out, out)
 
 
 def two_drives(work, copies):
@@ -241,7 +242,7 @@ def already_set(work):
     code, out = t.run("studio_file.py", "defaults", env=env)
     n = sf(home)["naming"]
     check("the drive is chosen and their naming is left alone",
-          code == 0 and "CHOSE:" in out and n.get("folder_pattern") == "{shoot}, {date}" and n.get("file_names") == "original", str(n))
+          code == 0 and "CHOSE:" in out and n.get("folder_pattern") == "{date} {shoot}" and n.get("file_names") == "original", str(n))
 
 
 def never_the_source(work):

@@ -265,6 +265,10 @@ def check_all(work, port):
     env = dict(os.environ, STUDIO_HOME=str(studio))
     for k in ("DESIGN_TEST_STOP", "DESIGN_TEST_STOP_ONCE", "ARRANGE_TEST_STOP", "ARRANGE_TEST_STOP_ONCE"):
         env.pop(k, None)
+    # this part meets the real first visit: no plain start here, and no face finder (so the Mac's own Vision is never
+    # asked and the example is the same on every computer: whole photos)
+    env.pop("STUDIO_FIRST_DESIGN_FOR_TESTS", None)
+    env["FACES_PRETEND"] = "none"
     content = target / "The Assistant" / "Your Content"
     kit_name = "2026-11-01 Fake beach"
     kit = content / kit_name
@@ -325,9 +329,13 @@ def check_all(work, port):
         DID, STAMP = d["id"], st["stamp"]
         carousel = json.loads(rec_file.read_text(encoding="utf-8"))["picks"]["carousel"]
         case("state: the first visit made one design, named '<Shoot name> carousel 1'", d["name"] == "Fake beach carousel 1" and len(st["designs"]) == 1 and st["designs"][0]["open"] is True, (d["name"], st["designs"]))
-        case("state: it is one photo per slide, in the carousel's order, each filling its slide",
-             d["state"]["slides"] == len(carousel) and [b["n"] for b in d["state"]["blocks"]] == carousel
-             and all(b["x"] == i * 1080 and b["y"] == 0 and b["w"] == 1080 and b["h"] == 1350 for i, b in enumerate(d["state"]["blocks"])), d["state"])
+        # Nicole, Nov 23: the first design is an example laid out by rule (design_first.py; tests/design_nov23_check.py holds
+        # the rules). Here: it is made of the carousel's own photos, each once, in that order, and is no longer one photo
+        # filling every slide.
+        first_ns = [b["n"] for b in d["state"]["blocks"]]
+        case("state: it is the example: the carousel's own photos, each once, in the carousel's order, in a mix of layouts and with no words",
+             first_ns == [n for n in carousel if n in first_ns] and len(set(first_ns)) == len(first_ns) and 1 <= d["state"]["slides"] <= 10
+             and not all(b["w"] == 1080 and b["h"] == 1350 for b in d["state"]["blocks"]) and all(b.get("type") != "text" for b in d["state"]["blocks"]), d["state"])
         case("state: on the kit's slide background", d["state"]["bg"] == "#ffffff" and st["slide_bg"] == "#ffffff", d["state"]["bg"])
         case("state: the design's id was made by the server (lower-case letters and digits)", re.fullmatch(r"[a-z][a-z0-9]{5,23}", DID), DID)
         f = designs / f"{DID}.json"
@@ -1355,6 +1363,11 @@ def main():
     # Nothing here may ever look at the real ~/.studio: this process and every command it runs get a
     # STUDIO_HOME inside the work folder (the pretend kit's own, once it is made).
     os.environ["STUDIO_HOME"] = str(work / "no-studio")
+    # Since Nov 23 a shoot's FIRST design is an example laid out by rule (design_first.py; tests/design_nov23_check.py
+    # holds it, and the server part below checks it on the real first visit). Every other part here drives the designer
+    # from a known start, one photo filling each slide, which is what "+ New design, One photo per slide" still makes:
+    # the tests' own switch gives them that start. Nothing but a test ever sets it.
+    os.environ["STUDIO_FIRST_DESIGN_FOR_TESTS"] = "plain"
     r = subprocess.run([PY, str(ROOT / "tools" / "check_plugin.py")], capture_output=True, text=True)
     case("tools/check_plugin.py prints CLEAN", r.returncode == 0 and "CLEAN" in r.stdout, r.stdout[-300:])
     for f in ("design.py", "design_page.py", "design_js_model.py", "design_js_core.py", "design_js_edit.py", "design_js_type.py", "design_js_text.py",

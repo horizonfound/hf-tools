@@ -134,8 +134,8 @@ class World:
         rec["reel"] = {"project": "Katie reel", "made": "2026-11-15T12:00:00"}
         self.put(b / ".kit" / "kit.json", rec)
         self.put(self.home / "posting.json", {"interval": None, "reminded": {}, "pieces": [
-            {"id": "p1", "name": "Hannah reel", "status": "posted", "posted_at": "2026-11-04T18:00:00"},
-            {"id": "p2", "name": "Hannah carousel", "status": "posted", "posted_at": "2026-11-11T18:00:00"},
+            {"id": "p1", "name": "Hannah reel", "status": "posted", "posted_at": "2026-11-04T18:00:00", "kit": str(a), "shoot_id": "kit:other"},
+            {"id": "p2", "name": "Hannah carousel", "status": "posted", "posted_at": "2026-11-11T18:00:00", "shoot_id": "kit:" + re.sub(r"[^a-z0-9]+", "-", A.lower()).strip("-")[:40]},
             {"id": "p3", "name": "Old one", "status": "posted", "posted_at": "2026-10-02T18:00:00"},
             {"id": "p4", "name": "No day", "status": "posted"},
             {"id": "p5", "name": "Katie reel", "status": "green", "date": "2026-11-20"},
@@ -227,7 +227,27 @@ def check_counts(wr, w):
     case("November: 1 set of stories", t["stories"] == 1, t["stories"])
     case("November: 2 posts; a post with no day is not counted; 1 ready to go", t["posted"] == 2 and t["ready"] == 1, (t["posted"], t["ready"]))
     case("November: 231 photos taken at 1 photo shoot (9 photos are not a shoot; October's backup is October's)", t["shot"] == 231 and t["photo_shoots"] == 1, (t["shot"], t["photo_shoots"]))
-    case("November: 2 shoots shared; the top shoot is Hannah", t["shared_shoots"] == 2 and d["top"] == A, (t["shared_shoots"], d["top"]))
+    # Nicole, Nov 23: "lets only count stuff they actually posted". Hannah has two posts in November (one piece
+    # knows its kit folder, one only its short id); Katie's reel is made and ready, not posted: not shared.
+    case("November: 1 shoot shared (only Hannah was actually posted; Katie was made from, not posted); the top shoot is Hannah",
+         t["shared_shoots"] == 1 and t["made_shoots"] == 2 and d["top"] == A, (t["shared_shoots"], t.get("made_shoots"), d["top"]))
+    case("... each shoot says whether it was shared, and a shoot is counted once however many of its pieces were posted",
+         by[A]["shared"] is True and by[B]["shared"] is False, {k: v.get("shared") for k, v in by.items()})
+    case("... a post that names no shoot is a post and no shoot; October's post is October's", t["posted"] == 2 and wr.data(month="2026-10")["totals"]["shared_shoots"] == 0)
+    case("the short id is the posting queue's own", all(wr._slug(x) == __import__("posting_queue").slug(x) for x in (A, B, "Wow... Beach & Co!", "x" * 60)))
+    g = wr.gather()
+    extra = dict(g, posted_from=g["posted_from"] + [("2026-11-12", (B, "")), ("2026-11-13", ("", "kit:" + wr._slug(B))), ("2026-11-13", ("Gone Shoot_11-01-26", "kit:gone")),
+                                                     ("2026-11-14", ("", "kit:gone")), ("2026-11-14", ("", "s9")), ("2026-12-01", ("", "s10")), ("2026-11-15", ("My vault", ""))],
+                 kits=g["kits"] + [{"folder": "My vault", "short": "My vault", "date": "", "photos": 0, "vault": True, "reel_days": [], "carousel_days": [], "story_days": [], "favs": []}])
+    e = wr.data(month="2026-11", got=extra)
+    case("... Katie posted too: 2 kits; a posted shoot with no post kit here counts once by what it carries (2 more); the vault is no shoot; December's is December's",
+         e["totals"]["shared_shoots"] == 4 and {s["name"]: s["shared"] for s in e["shoots"]} == {A: True, B: True}, (e["totals"]["shared_shoots"], [(s["name"], s["shared"]) for s in e["shoots"]]))
+    later = dict(g, posted_from=[("2026-12-02", (A, ""))], posted=["2026-12-02"])
+    dec = wr.data(month="2026-12", got=later, day=date(2026, 12, 20))
+    case("a shoot made in November and posted in December is December's shared shoot, shown so its photo can be, and adds no photos to the count",
+         dec["totals"]["shared_shoots"] == 1 and [s["name"] for s in dec["shoots"]] == [A] and dec["totals"]["photos"] == 0 and dec["totals"]["made_shoots"] == 0, dec["totals"])
+    yr = wr.data(year="2026")
+    case("the year: shared is posted only too, made_shoots what it was", yr["totals"]["shared_shoots"] == 1 and yr["totals"]["made_shoots"] == 2, yr["totals"])
     case("the time saved is hers: 45 a reel, 30 a carousel, 20 a set of stories", t["minutes_saved"] == 3 * 45 + 30 + 20 and d["minutes_each"] == {"reel": 45, "carousel": 30, "stories": 20}, t["minutes_saved"])
     case("November so far: 4 weeks, 2 with a post", t["weeks"] == 4 and t["weeks_posted"] == 2, (t["weeks"], t["weeks_posted"]))
     case("the label, the next month, so far", d["label"] == "November" and d["next"] == "December" and d["so_far"] is True and d["month"] == "2026-11", (d["label"], d["next"], d["so_far"]))

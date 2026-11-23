@@ -1867,6 +1867,11 @@ OUR_KIT_WORDS = {
     "saved_video": "Saved as a video, in this shoot's Reels folder:",
     # ours: the kit's records can't be read into the page (a record changed by hand, most likely) and the saved
     # copy is from before her three cards, so neither can be shown as it is
+    # ours (Nicole, Nov 23: "each reel gets its own caption"): the Your words step of a shoot with several reels
+    # lists each reel by name with where its own words stand; hers has one line for the whole shoot
+    "w_ready": "caption ready",
+    "w_told": "told, not written yet",
+    "w_none": "not written yet",
     "cant_build": "Something in this post kit's records couldn't be read, so this page can't show it right now. Tell the Assistant, and it'll sort it out.",
 }
 # Every kit page built by build_page carries this mark, so the server knows a saved copy is of today's page (her
@@ -1986,6 +1991,11 @@ body:not(.live) #queueLink{display:none}
 .w.go-words{cursor:pointer;transition:border-color .2s,background .2s}
 .w.go-words:hover,.w.go-words:focus-visible{border-color:var(--coral);border-style:solid;background:#FFF6F2}
 .w .wl{display:inline-flex;margin-top:.6rem;font:600 13.5px/1 var(--sans);color:var(--coral-2)}
+.wreels{margin:.2rem 0 0;padding:0;list-style:none;font-size:14px;color:var(--ink-2)}
+.wreels li{margin:.1rem -.4rem;padding:.4rem;border-radius:9px;cursor:pointer;overflow-wrap:anywhere}
+.wreels li:hover,.wreels li:focus-visible{background:#FFF6F2}
+.wreels li b{color:var(--ink);font-weight:600}
+.wreels li .wl{display:block;margin-top:.25rem}
 .w .ws{font-size:14px;color:var(--ink);margin:0}
 .w.q{cursor:default}
 .w.q .qb{margin-top:.6rem}
@@ -2072,7 +2082,7 @@ if (askEl) {
 function askNoCaption(piece, reel, from){
   askBox(W.nocap_title.replace('{piece}', piece), W.nocap_text, [
     {label: W.nocap_add, main: true, fn: function(){ add(piece, reel); }},
-    {label: W.nocap_write, fn: function(){ go('/words.html?kit=' + encodeURIComponent(KIT) + '&piece=' + encodeURIComponent(piece)); }}], from);
+    {label: W.nocap_write, fn: function(){ go('/words.html?kit=' + encodeURIComponent(KIT) + (reel ? '&reel=' + encodeURIComponent(reel) : '') + '&piece=' + encodeURIComponent(piece)); }}], from);
 }
 // Which reel goes in the queue, when the shoot has more than one (Nicole, Nov 12): a button for each reel that is
 // made and not in the queue yet (the button's own list, names as text); no question when only one is left
@@ -2081,8 +2091,8 @@ function askWhichReel(a, then){
   try { can = JSON.parse(a.dataset.reels || '[]'); } catch (e) { can = []; }
   can = can.filter(function(r){ return r && typeof r.id === 'string' && typeof r.name === 'string'; });
   if (!can.length) return;
-  if (can.length === 1) { then(can[0].id); return; }
-  askBox(W.which_title, W.which_text, can.map(function(r, i){ return {label: r.name, main: i === 0, fn: function(){ then(r.id); }}; }), a);
+  if (can.length === 1) { then(can[0].id, !!can[0].nocap); return; }
+  askBox(W.which_title, W.which_text, can.map(function(r, i){ return {label: r.name, main: i === 0, fn: function(){ then(r.id, !!r.nocap); }}; }), a);
 }
 // A press on Add to my queue: which reel (a shoot with several), then the caption question (a piece with none),
 // then into the queue
@@ -2090,7 +2100,9 @@ function press(a){
   if (busy) return;
   const piece = a.dataset.add;
   if (!live) { say(piece, W.saved_copy); return; }
-  const then = function(reel){ if (a.dataset.nocap) askNoCaption(piece, reel, a); else add(piece, reel); };
+  // the caption question looks at THAT reel's own caption (each reel has its own words): the reel's entry in the
+  // button's list says whether it has one; a shoot with one reel, and a carousel, by the button itself
+  const then = function(reel, nocap){ if (nocap === undefined ? a.dataset.nocap : nocap) askNoCaption(piece, reel, a); else add(piece, reel); };
   if (a.dataset.multi) askWhichReel(a, then); else then();
 }
 function add(piece, reel){
@@ -2363,6 +2375,32 @@ def words_box(kit_name, piece, w):
             f"{_step(2, label)}{state}<span class='wl'>{html.escape(link)} &rarr;</span></div>")
 
 
+def reels_words_box(kit_name, reel_list, statuses):
+    """Step 2 of the Reel card when the shoot has more than one reel (Nicole, Nov 23: each reel gets its own
+    caption): each reel by name with where ITS words stand, each row the way to that reel's own words page
+    (&reel=<its id>). reel_list is reel_page.reels_for_kit's; statuses is {reel id: words.py's status}. Names
+    are text only; nothing in it is an <a>."""
+    K, O = KIT_WORDS, OUR_KIT_WORDS
+    label = K["step_words"] + f"{K['caption']} & {K['hooks']}"
+    rows = []
+    for r in reel_list:
+        w = statuses.get(r["id"]) if isinstance(statuses, dict) else None
+        w = w if isinstance(w, dict) else {}
+        hooks, picked = int(w.get("hooks") or 0), int(w.get("picked") or 0)
+        if w.get("caption") or hooks:
+            bits = [O["w_ready"]] if w.get("caption") else []
+            if hooks:
+                bits.append(f"{hooks} {K['hooks']}" + (f", {picked} {K['picked']}" if picked else ""))
+            st = " · ".join(bits)
+        else:
+            st = O["w_told"] if w.get("answered") else O["w_none"]
+        link = K["open_words"] if w.get("caption") or hooks else K["write_words"]
+        href = f"/words.html?kit={quote(kit_name, safe='')}&reel={quote(r['id'], safe='')}&piece=reel"
+        rows.append(f"<li class='go-words' role='link' tabindex='0' data-reel='{html.escape(r['id'])}' data-href='{html.escape(href)}'>"
+                    f"<b>{html.escape(r['name'])}</b>: {html.escape(st)}<span class='wl'>{html.escape(link)} &rarr;</span></li>")
+    return f"<div class='w' data-box='words-reel'>{_step(2, label)}<ul class='wreels'>{''.join(rows)}</ul></div>"
+
+
 def nice_day(iso):
     """Hers: "Wed, Nov 11"."""
     try:
@@ -2409,9 +2447,18 @@ def reels_queue_box(reel_list, has_caption, queues):
     in the queue by name, and one Add to my queue that asks which reel. reel_list is reel_page.reels_for_kit's;
     queues is {reel id: words_page.queue_state}. A reel that can go in is one that is made and is not in the
     queue yet; the button names them (data-reels, ids and names as text only), so the page asks "Which reel goes
-    in your queue?" with a button each, or skips the question when one is left. Nothing in it is an <a>."""
+    in your queue?" with a button each, or skips the question when one is left. Nothing in it is an <a>.
+    has_caption (Nov 23, each reel its own caption): {reel id: does THAT reel have a caption}; each reel in the
+    button's list says so itself ("nocap"), and the page asks the no-caption question about the reel they picked.
+    (True or False, the older way, means every reel alike.)"""
     K = KIT_WORDS
     head = _step(3, K["step_queue"])
+
+    def has_cap(r):
+        if isinstance(has_caption, dict):
+            v = has_caption.get(r["id"])
+            return bool(v.get("caption") if isinstance(v, dict) else v)
+        return bool(has_caption)
 
     def in_q(r):
         return (queues.get(r["id"]) or {}).get("status") in ("green", "posted")
@@ -2426,11 +2473,12 @@ def reels_queue_box(reel_list, has_caption, queues):
         else:
             st = K["r_made"] if r["made"] else K["r_not"]
         rows.append(f"<li data-reel='{html.escape(r['id'])}'><b>{html.escape(r['name'])}</b>: {html.escape(st)}</li>")
-    can = [{"id": r["id"], "name": r["name"]} for r in reel_list if r["made"] and not in_q(r)]
+    can = [dict({"id": r["id"], "name": r["name"]}, **({} if has_cap(r) else {"nocap": True}))
+           for r in reel_list if r["made"] and not in_q(r)]
     any_in = any(in_q(r) for r in reel_list)
     feed = (f"<span class='qlink' role='link' tabindex='0' data-href='/posting.html'>{html.escape(K['feed'])} &rarr;</span>" if any_in else "")
     if can:
-        nocap = "" if has_caption else " data-nocap='1'"
+        nocap = "" if any(has_cap(r) for r in reel_list if r["made"] and not in_q(r)) else " data-nocap='1'"
         btn = (f"<button class='qbtn' type='button' data-add='reel' data-multi='1'{nocap} "
                f"data-reels='{html.escape(json.dumps(can, ensure_ascii=True))}'>{html.escape(K['step_queue'])}</button>")
     else:
@@ -2574,6 +2622,14 @@ def steps_facts(kit, f):
                 q = {}
         out["reels"][r["id"]] = q
         out["rhythm"] = out["rhythm"] or bool(q.get("interval"))
+    # Nov 23: each reel has its own words. {reel id: words.py's status} for a shoot with several reels
+    out["reel_words"] = {}
+    if f.get("reels"):
+        try:
+            import words as words_mod
+            out["reel_words"] = words_mod.reels_status(kit, [r["id"] for r in f["reels"]])
+        except (Exception, SystemExit):  # noqa: BLE001
+            out["reel_words"] = {}
     return out
 
 
@@ -2660,7 +2716,8 @@ def build_page(kit):
         optional). A shoot with several reels has her list of reels in the Reel card's queue box."""
         w = steps["words"][piece]
         if piece == "reel" and several:
-            return words_box(kit.name, piece, w) + reels_queue_box(several, bool(w.get("caption")), steps.get("reels") or {})
+            rw = steps.get("reel_words") or {}       # each reel's own words (Nicole, Nov 23)
+            return reels_words_box(kit.name, several, rw) + reels_queue_box(several, rw, steps.get("reels") or {})
         return words_box(kit.name, piece, w) + queue_box(piece, made, bool(w.get("caption")), steps["queue"][piece])
 
     reel_sub, car_sub, sto_sub = KIT_WORDS["reel_sub"], KIT_WORDS["carousel_sub"], KIT_WORDS["stories_sub"]
@@ -2788,8 +2845,20 @@ def show(kit):
         st = words_status(kit)
     except (Exception, SystemExit):  # noqa: BLE001
         st = {}
-    say("  Words: " + ", ".join(f"{k} " + ("caption written" if (st.get(k) or {}).get("caption") else "told, not written" if (st.get(k) or {}).get("answered") else "not yet")
-                                for k in ("reel", "carousel")))
+    def _stand(w):
+        return "caption written" if (w or {}).get("caption") else "told, not written" if (w or {}).get("answered") else "not yet"
+    try:
+        import words as words_mod
+        names, _ = words_mod.kit_reel_names(kit)
+        per_reel = words_mod.reels_status(kit, [v["id"] for v in names]) if names else {}
+    except (Exception, SystemExit):  # noqa: BLE001
+        names, per_reel = [], {}
+    if names:
+        # each reel has its own words (Nicole, Nov 23): said by name, so the chat never takes one reel's for another's
+        say("  Words: " + ", ".join(f"reel \"{v['name']}\" " + _stand(per_reel.get(v["id"])) for v in names)
+            + ", carousel " + _stand(st.get("carousel")))
+    else:
+        say("  Words: " + ", ".join(f"{k} " + _stand(st.get(k)) for k in ("reel", "carousel")))
     say(f"  Page: {page_path(kit)}" if page_path(kit).exists() else "  Page: not yet")
 
 

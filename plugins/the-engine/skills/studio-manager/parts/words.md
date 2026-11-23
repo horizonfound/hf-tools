@@ -12,12 +12,25 @@ A post isn't finished when the reel or the carousel is made; it is finished when
 - **"Write my words for the <shoot> reel"** (or carousel): write the caption (and a reel's hooks) from what they've said. "Writing", below.
 - **"Polish my caption for the <shoot> reel"** (or carousel): they wrote their own. "Polishing", below.
 - **The same in their own words:** "write a caption for the beach reel", "I need hooks", "redo the captions", "make the caption shorter", "change the opening". Work out which of the three it is ("In their own words", below).
+- **Any of the three with a reel's name after a comma: "Write my words for the <shoot> reel, <reel name>".** The shoot has more than one reel, and the line is about that reel only. "Each reel has its own words", below.
 
 **Where they are on the words page (Nicole's v27).** The path at the top of the page reads **Home › Beach post kit › Captions**: Home and the post kit are links, Captions is this page. Asked how to get back to the kit, say "Press Beach post kit at the top of the page" (the page's old Back to the post kit pill is gone from view).
 
+## Each reel has its own words (Nicole, Nov 23: "each reel gets its own caption")
+
+A shoot can have several reels (`parts/arrange.md`, "Several reels from one shoot"), and so can My vault. **Every reel has its own answers, its own caption, its own ten hooks and its own picked hook.** Nothing is shared between two reels, and a new reel starts with no words at all. The carousel's words are still the shoot's: one carousel, one caption.
+
+- **On the words page** a shoot with several reels shows **Your reels** under the Reel and Carousel tabs: a link for each reel by name, the one this page is about marked, and the line "Each reel has its own caption and hooks. These are for <reel name>." Pressing another reel's name opens that reel's own words. The lines the page hands out name the reel after a comma: "Ask me about the Beach reel, White Backdrop".
+- **From the chat, every reel command names the reel:** add `--reel "<reel name>"` to `ask`, `answer`, `show`, `draft`, and to a `carry` that starts or ends at a reel. A few words of the name are enough when they fit only one reel. The name comes from the line they pasted (after the comma), or from what they said.
+- **Never guess which reel.** With several reels and no `--reel`, the command stops, saves nothing, and lists the reels by name. If they didn't say which reel, ask once, with a button for each name: "Which reel is this caption for?" Never pick one for them, and never write one reel's words "for all of them".
+- **A shoot with one reel needs none of this.** No `--reel`, no question; everything in this part works as written.
+- **A new reel with nothing answered yet:** `ask` says when another reel of the shoot is already answered. Don't start again from question 1: ask once, "You told me about this shoot for Reel 1. Start from that for this reel?" [Use what I said for Reel 1] [Ask me again]. On yes: `words.py carry-reel "<kit>" --from "Reel 1" --reel "<this reel>"`, then ask what is different about this reel and save only that. It copies the answers only. The caption and the hooks are never copied: each reel gets its own, and `show` prints the other reels' captions as what this one must differ from. (The page has the same thing as one button: "Use my answers from Reel 1".) It never writes over answers a reel already has.
+- **"Use the same caption for both reels":** there is no command that copies a caption from one reel to another, on purpose. Say so in a line, and offer the two ways: write this reel one of its own from the same answers (carry-reel, then "Writing"), or they copy the caption on the first reel's page and paste it into "or write your own" on this reel's page.
+- **Reels they made before this** (one caption for the whole shoot): that caption and those hooks are the shoot's first reel's now. Every other reel has none yet, on its words page, in its post's panel and in its reminder. If they ask where a reel's caption went, say that plainly and offer to write that reel's own.
+
 ## What gets words, and what doesn't
 
-- **A reel:** one caption and ten hooks (a hook is the line on the reel's first photo).
+- **A reel:** one caption and ten hooks (a hook is the line on the reel's first photo). Each reel of a shoot its own.
 - **A carousel:** one caption, and nothing else. No hooks, no cover lines, no lines for the slides: what a slide says they type themselves in the designer (`parts/arrange.md`).
 - **A single post** is a one-slide carousel, and its words are the carousel's. Use `carousel`.
 - **Stories get no words from you.** They type on a story themselves, in the stories designer. If they ask for story words, say so in one line and offer to open the designer (`parts/arrange.md`, "Making stories"). The only words that ever go on a story for them are a line they gave you for a Canva story template (`parts/canva.md`).
@@ -33,7 +46,11 @@ python3 <scripts>/words.py answer "<kit>" reel --file <a.json>    save what they
 python3 <scripts>/words.py show   "<kit>" reel                    the rules, their Brand Homebase, everything they said, what's written
 python3 <scripts>/words.py draft  "<kit>" reel --file <d.json>    save the caption, and a reel's ten hooks
 python3 <scripts>/words.py carry  "<kit>" reel carousel           copy one piece's answers to the other
+python3 <scripts>/words.py carry-reel "<kit>" --from "<a reel's name>" --reel "<another reel's name>"
+                                                                  a reel with no answers yet starts from another reel's
 ```
+
+A shoot with more than one reel: every line above that says `reel` also takes `--reel "<reel name>"`, and needs it ("Each reel has its own words", above). For example `words.py draft "<kit>" reel --reel "White Backdrop" --file <d.json>`, and `words.py carry "<kit>" reel carousel --reel "White Backdrop"`.
 
 **Every command prints the rules for the moment it is for:** `ask` prints how to ask, `show` prints how to write, Nicole's own rules, word for word. Follow what it prints every time, even when you remember it; her hook rules stand as written, and where anything else you have read about hooks or captions differs, what the command prints wins. This part doesn't repeat them. It says what a command can't: when to run what, in what order, what to say afterwards, and the traps.
 
@@ -61,7 +78,7 @@ A draft file:
 
 Leave `hooks` out for a carousel, and for a reel whenever only the caption is changing.
 
-**What the commands answer.** Exit 0: done, and a line saying what was saved. Exit 2, a line starting `STOP:` that ends "Nothing was saved.": the file had something that isn't one of the buttons, or nothing in it; mend the file and save again. Also exit 2: no kit matches those words (`posts.py list` names every kit). Exit 1: the words fit more than one kit, and it names them; ask which with buttons, then use that kit's whole folder name. If they didn't say which piece, ask: [The reel] [The carousel].
+**What the commands answer.** Exit 0: done, and a line saying what was saved. Exit 2, a line starting `STOP:` that ends "Nothing was saved.": the file had something that isn't one of the buttons, or nothing in it; mend the file and save again. Also exit 2, saying "this shoot has 2 reels, and each reel has its own words": run it again with `--reel "<name>"`, asking them which reel if they didn't say. Also exit 2: no kit matches those words (`posts.py list` names every kit). Exit 1: the words fit more than one kit, and it names them; ask which with buttons, then use that kit's whole folder name. If they didn't say which piece, ask: [The reel] [The carousel].
 
 ## "Ask me about the <shoot> reel": the interview
 
@@ -126,4 +143,6 @@ They wrote their own caption in the "or write your own" box on the page. `words.
 - Lines for a carousel's cover or slides, words for a story, hashtags, a short caption.
 - Asking two questions at once, skipping 1b, 2b or 3b, or saving the answers in one go at the end.
 - Putting what they said on the command line instead of in a file.
+- Writing one reel's words without `--reel` when the shoot has several, or deciding for them which reel a caption is for.
+- Giving two reels of one shoot the same caption. Each reel's is its own, and genuinely different.
 - Pasting the caption into the chat instead of saying it's on the page.

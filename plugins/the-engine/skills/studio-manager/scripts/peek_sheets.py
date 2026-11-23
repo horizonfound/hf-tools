@@ -536,7 +536,7 @@ def add_taste_note(line):
     f = taste_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     if not f.exists():
-        f.write_text("# Taste notes\n\nWhat you've told the Assistant about the photos you like, one line a time. It reads this before picking sneak peeks.\n\n", encoding="utf-8")
+        f.write_text("# Taste notes\n\nWhat you've told the Assistant about the photos you like, one line a time. It reads this before picking the first-look photos.\n\n", encoding="utf-8")
     with open(f, "a", encoding="utf-8") as fh:
         fh.write(f"- {datetime.now().strftime('%Y-%m-%d')}: {line.strip()}\n")
 
@@ -560,7 +560,7 @@ def ask_again(night, sid, note):
         except (OSError, ValueError, KeyError):
             pass
         name = shoots.get(sid, {}).get("name") or sid
-        add_taste_note(f"{name}: asked for different sneak peeks: \"{note.strip()}\"")
+        add_taste_note(f"{name}: asked for different first-look photos: \"{note.strip()}\"")
     return len(asks)
 
 
@@ -694,11 +694,11 @@ def pick(night, picks, by, checked=None, checked_file=None):
             after = [p["n"] for p in new if p["shoot"] == sid]
             if before and before != after:
                 name = sheets[sid].get("name") or sid
-                add_taste_note(f"{name}: chose their own sneak peeks; kept {sorted(set(before) & set(after))}, dropped {sorted(set(before) - set(after))}, added {sorted(set(after) - set(before))} (numbers on that shoot's pages; look at those frames to see what they went for)")
+                add_taste_note(f"{name}: chose their own first-look photos; kept {sorted(set(before) & set(after))}, dropped {sorted(set(before) - set(after))}, added {sorted(set(after) - set(before))} (numbers on that shoot's pages; look at those frames to see what they went for)")
             mark_asked_done(night, sid)
     save_json(pj, {"picks": kept + new, "picked_by": by}, indent=1, ensure_ascii=False)
     for sid in chosen_shoots:
-        say(f"{sid}: {sum(1 for p in new if p['shoot'] == sid)} sneak peeks")
+        say(f"{sid}: {sum(1 for p in new if p['shoot'] == sid)} first-look photos")
     return 0
 
 

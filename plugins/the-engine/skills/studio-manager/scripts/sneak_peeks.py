@@ -260,6 +260,9 @@ def write_log(studio, entry):
     this_computer.replace(tmp, log)
 
 
+MARK_IN_LIGHTROOM = False   # True writes the 'sneak peek' keyword beside each pick again (taken out Nov 23)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--night", required=True)
@@ -281,6 +284,15 @@ def main():
             return 1
         files = [p["file"] for p in json.loads(pf.read_text(encoding="utf-8"))["picks"]]
 
+    if not MARK_IN_LIGHTROOM:
+        # Since Nov 23 (Nicole and Dustin): the six photos are only a first look on the report. No keyword is
+        # written beside any photo. Sidecars an older backup wrote are left exactly where they are.
+        if not a.dry_run and not a.no_previews:
+            made, names = make_previews(root, files, studio)
+            say(f"Pictures for the report's first look: {len(names)} ({made} new).")
+        else:
+            say("Nothing to do: the first-look photos are not marked in Lightroom.")
+        return 0
     todo, upgrade, skipped, problems = plan(root, files)
     if not a.dry_run and not a.files:
         moved, left = set_aside_dropped(root, studio, files)

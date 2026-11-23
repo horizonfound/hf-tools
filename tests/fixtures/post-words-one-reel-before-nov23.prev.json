@@ -1,0 +1,54 @@
+{
+ "pieces": {
+  "reel": {
+   "answers": {
+    "about": "Zoë & the boys, a windy morning 🌊",
+    "who_text": "moms",
+    "purpose_text": "Minis, Dec 4",
+    "notes": "No names",
+    "who": [
+     "new",
+     "followers"
+    ],
+    "where": "trial",
+    "purpose": "offer"
+   },
+   "updated": 1700000004.5,
+   "caption": "Line one\n\nLine two “quoted”",
+   "picked": [
+    2,
+    0
+   ],
+   "hooks": [
+    "hook 0",
+    "hook 1",
+    "hook 2",
+    "hook 3",
+    "hook 4",
+    "hook 5",
+    "hook 6",
+    "hook 7",
+    "hook 8",
+    "hook 9"
+   ],
+   "drafted": 1700000003.0,
+   "own": "my own"
+  },
+  "carousel": {
+   "answers": {
+    "about": "Zoë & the boys, a windy morning 🌊",
+    "who_text": "moms",
+    "purpose_text": "Minis, Dec 4",
+    "notes": "No names",
+    "who": [
+     "new",
+     "followers"
+    ],
+    "purpose": "offer"
+   },
+   "updated": 1700000007.5,
+   "caption": "A carousel caption",
+   "drafted": 1700000007.5
+  }
+ }
+}

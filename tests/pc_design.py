@@ -110,6 +110,7 @@ work = Path(tempfile.mkdtemp(prefix="assistant pc design "))
 STUDIO = work / "studio"
 STUDIO.mkdir()
 os.environ["STUDIO_HOME"] = str(STUDIO)           # before arrange is imported: it reads STUDIO_HOME then
+os.environ.setdefault("FACES_PRETEND", "none")     # the PC's machinery: no face finder, so the first design (Nov 23) is the same on every computer
 ENV = dict(os.environ)
 sys.path.insert(0, str(SCRIPTS))
 import this_computer as tc  # noqa: E402

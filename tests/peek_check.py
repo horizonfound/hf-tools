@@ -171,12 +171,12 @@ def picking(work):
         check("a photo that was never on the close-look pages: refused (on a Mac)", code == 1 and "s1 13: not on the close-look pages" in out, out[-300:])
         check("... and that refusal writes nothing either", after == before)
     else:
-        check("a photo that was never on the close-look pages: accepted off a Mac (no face check to put it through)", code == 0 and "s1: 6 sneak peeks" in out, out[-300:])
+        check("a photo that was never on the close-look pages: accepted off a Mac (no face check to put it through)", code == 0 and "s1: 6 first-look photos" in out, out[-300:])
         got = [p["n"] for p in json.loads(after)["picks"] if p["shoot"] == "s1"]
         check("... and that accepted pick is written, in the order asked", got == [1, 13, 9, 10, 11, 12], str(got))
     code, out = run("peek_sheets.py", "pick", str(night), "s1=1,3,9,10,11,12", "s2=1,2,3,4,5,6", *[L("s1", n) for n in (1, 9, 10, 11, 12)], L("s1", 3, "anyway: a laugh, mouth open on purpose, eyes open"),
                     *[L("s2", n, "no face: a landscape, no eyes or mouth to see, sharp") for n in (1, 2, 3, 4, 5, 6)], env=env)
-    check("a clean hero, a flagged photo said anyway, and a landscape shoot with no faces: accepted", code == 0 and "s1: 6 sneak peeks" in out and "s2: 6 sneak peeks" in out, out[-300:])
+    check("a clean hero, a flagged photo said anyway, and a landscape shoot with no faces: accepted", code == 0 and "s1: 6 first-look photos" in out and "s2: 6 first-look photos" in out, out[-300:])
     picks = json.loads(pj.read_text(encoding="utf-8"))
     s1 = [p for p in picks["picks"] if p["shoot"] == "s1"]
     check("the records carry each photo's checked line and what the check saw", s1[0]["checked"].startswith("eyes open") and s1[0]["seen"] == "eyes open · mouth closed · facing" and s1[1].get("anyway") is True and "MOUTH OPEN" in s1[1]["seen"], json.dumps(s1[:2]))

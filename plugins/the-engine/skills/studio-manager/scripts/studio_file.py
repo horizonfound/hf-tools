@@ -34,11 +34,19 @@ HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JSON = HOME / "studio.json"
 MD = HOME / "studio-file.md"
 
-# the same order as the skill offers them: 1 is the recommended one (date first, so folders line up)
+# The two ways offered. 1 is the one every new backup gets (Nicole and Dustin, Nov 22 to 23: the shoot's name,
+# then the date, no periods: "Aurora_11-22-26"); 2 is year first, for anyone who wants folders in date order.
 OFFERED = [
+    {"label": "Smith Family_10-18-26", "folder_pattern": "{shoot}_{date}", "date_format": "%m-%d-%y"},
     {"label": "2026-10-18 Smith Family", "folder_pattern": "{date} {shoot}", "date_format": "%Y-%m-%d"},
-    {"label": "Smith Family, Oct 18 2026", "folder_pattern": "{shoot}, {date}", "date_format": "%b %-d %Y"},
 ]
+# What was offered before Nov 23. A Studio File still on one of these moves to OFFERED[0] once, for its next
+# backups (Nicole, Nov 23: "all new name"). Folders already on a drive are never renamed by this.
+OFFERED_BEFORE = [
+    ("{date} {shoot}", "%Y-%m-%d"),
+    ("{shoot}, {date}", "%b %-d %Y"),
+]
+NAMING_SINCE = 9   # the version whose naming a Studio File has been brought to (so a later choice is never undone)
 
 # date spellings a photographer might use in a folder name, most specific first
 DATE_FORMS = [
@@ -63,20 +71,48 @@ DATE_FORMS = [
 ]
 
 
+def newer_naming(sf):
+    """Bring a Studio File's naming to today's, once. True when something changed. A naming that was one of the
+    two offered before Nov 23 becomes OFFERED[0]; a way of their own (learned from a folder they pasted) is left
+    exactly as it is. Either way the file is marked, so choosing year first later on the report sticks."""
+    n = sf.get("naming")
+    if not isinstance(n, dict) or not n.get("folder_pattern") or n.get("since"):
+        return False
+    if (n.get("folder_pattern"), n.get("date_format")) in OFFERED_BEFORE:
+        n.update(OFFERED[0])
+        n.pop("example", None)
+        sf.setdefault("notes", []).append({"on": date.today().isoformat(), "note":
+                                           "Folders for new backups are now named like Smith Family_10-18-26. "
+                                           "Folders already on your drive keep their names."})
+    n["since"] = NAMING_SINCE
+    return True
+
+
 def load():
     if JSON.exists():
         try:
-            return json.loads(JSON.read_text(encoding="utf-8"))
+            sf = json.loads(JSON.read_text(encoding="utf-8"))
         except ValueError:
-            pass
+            return {}
+        if isinstance(sf, dict) and newer_naming(sf):
+            try:
+                save(sf)
+            except OSError:
+                pass     # a Studio File that can't be written today is still read the new way
+        return sf
     return {}
 
 
 def save(sf):
     HOME.mkdir(parents=True, exist_ok=True)
     sf["updated"] = datetime.now().isoformat(timespec="seconds")
+    if isinstance(sf.get("naming"), dict) and sf["naming"].get("folder_pattern"):
+        sf["naming"].setdefault("since", NAMING_SINCE)
     JSON.write_text(json.dumps(sf, indent=1, ensure_ascii=False), encoding="utf-8")
     MD.write_text(as_markdown(sf), encoding="utf-8")
+
+
+CLIENT_NOTES = False   # True puts "Client notes written ..." back in the glance (notes to clients were taken out Nov 23)
 
 
 def as_markdown(sf):
@@ -99,15 +135,14 @@ def as_markdown(sf):
     else:
         lines += ["- Shoot folders: (not set)"]
     lines += [f"- Photos: {'keep their original frame names' if n.get('file_names', 'shoot') == 'original' else 'take the shoot name and a running number, with the original frame name kept at the end'}",
-              "", "## Client notes", ""]
+              ]
+    # Notes to clients are no longer written with a backup (Nicole and Dustin, Nov 23), so nothing about them is
+    # shown unless this photographer had set up how they write before; that is kept, never thrown away.
     c = sf.get("note", {})
-    if not c:
-        lines += ["- (not asked yet)"]
-    elif not c.get("on"):
-        lines += ["- No notes, thanks."]
-    else:
+    if c and c.get("on"):
+        lines += ["", "## Client notes", ""]
         tones = {"warm": "warm and personal", "plain": "short and plain", "playful": "playful"}
-        lines += ["- A note to the client is drafted with the sneak peeks, for you to copy and send.",
+        lines += ["- How you write to clients, kept from before (notes to clients are no longer written with a backup).",
                   "- Written to match a note you sent before:" if c.get("sample") else f"- Tone: {tones.get(c.get('tone', 'warm'), 'warm and personal')}"]
         if c.get("sample"):
             lines += ["", "  > " + c["sample"].strip().replace("\n", "\n  > "), ""]
@@ -132,7 +167,8 @@ NOT_SHOOTS = re.compile(r"(?<![a-z])(backups?|back ?ups?|time machine|exports?|e
 # A memory card is never a drive, whichever camera wrote it: these sit at the top of a card.
 CARD_FOLDERS = ("DCIM", "PRIVATE/M4ROOT", "PRIVATE/AVCHD", "PRIVATE/SONY", "AVCHD", "M4ROOT", "XDROOT", "CONTENTS/CLIPS001",
                 "MP_ROOT", "AVF_INFO")
-DATED = re.compile(r"(19|20)\d\d[-._ ]?\d\d[-._ ]?\d\d|\b(19|20)\d\d\b")
+# a year-first date, a bare year, or the date our own folders end in since Nov 23 ("Aurora_11-22-26")
+DATED = re.compile(r"(19|20)\d\d[-._ ]?\d\d[-._ ]?\d\d|\b(19|20)\d\d\b|(?<![0-9])\d{1,2}-\d{1,2}-\d{2}(?![0-9])")
 
 
 def _looks_like_shoot(folder, limit=40):
@@ -711,7 +747,7 @@ def glance(sf=None):
     else:
         lines.append(("Photos named after the shoot, with the camera's number kept", "photos named after the shoot"))
     note = sf.get("note") or {}
-    if note.get("on"):
+    if CLIENT_NOTES and note.get("on"):
         how = "the way you write" if note.get("sample") else {"warm": "warm and personal", "plain": "short and plain",
                                                              "playful": "playful"}.get(note.get("tone"), "in your voice")
         sign = " / ".join(x.strip() for x in (note.get("sign_off") or "").splitlines() if x.strip())

@@ -410,7 +410,7 @@ def shaped_jpeg(src, w, h, out):
 
 
 def empty_kit(s):
-    hits = [p for p in (s.target / "The Assistant" / "Your Content").iterdir() if p.name.endswith(EMPTY_NAME)]
+    hits = [p for p in (s.target / "The Assistant" / "Your Content").iterdir() if EMPTY_NAME in p.name]
     return hits[0] if hits else None
 
 

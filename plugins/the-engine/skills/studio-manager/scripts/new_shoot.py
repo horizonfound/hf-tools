@@ -19,16 +19,23 @@ not on the post kit. It is the chat's "make my posts" for one folder, done by th
     byte is written, and what was copied, with each copy's hash, as it goes;
     safe to run twice: the same folder picked again goes back to the shoot it made (photos already there are left
     as they are, new ones are added), never a second shoot; a run cut off part way is finished by the next;
-    a name clash stops it in plain words: a folder of that name already in Your Content that this did not make;
+    a name already taken asks for a new one (Nicole, Nov 23: "they need to be able to type a new name. So notify
+    them its taken and give option for a new name"): when a folder of that name is already in Your Content and this
+    did not make it, nothing is copied; the page's job says "taken" with the folder's name to start from, the box
+    shows a name box, and the shoot is made under the name they type (`make --name`), with the very same checks
+    (a safe name, the folder's exact listing, never over anything). The same folder picked again still goes back
+    to ITS shoot, whatever name is typed;
     then the kit record (.kit/kit.json) and its numbered list (kit.sheet, the list only: the contact sheets are
     drawn when the chat asks for them, with the numbers kept).
 
 Commands (the page server runs `make` detached; a person may run either by hand):
-    new_shoot.py make "<folder>" [--for reel|carousel|stories|captions] [--job]
+    new_shoot.py make "<folder>" [--for reel|carousel|stories|captions] [--name "<a name of their own>"] [--job]
     new_shoot.py status                     what the page follows, as JSON
 
-What the page follows is ~/.studio/new-shoot-job.json: {state: working | done | stopped, words, done, of, kit, go}.
-Never a path: `kit` is the post kit's folder name, `go` the page addresses for it.
+What the page follows is ~/.studio/new-shoot-job.json: {state: working | done | stopped | taken, words, done, of,
+kit, go, name}. Never a path: `kit` is the post kit's folder name, `go` the page addresses for it, `name` (state
+taken) the shoot's name to start the name box from. The record itself also keeps which folder is waiting for a
+name ("from"), for the page server only: job() never hands it to a page.
 """
 import argparse
 import json
@@ -51,6 +58,7 @@ LOCK = HOME / "new-shoot.lock"
 LOG_NAME = "new-shoots.json"            # in the Assistant folder's hidden .studio, beside the drop box's log
 MAKES = ("reel", "carousel", "stories", "captions")
 SAVE_EVERY = 10                         # the log is saved after this many copies (and at every stop)
+NAME_MOST = 60                          # a typed shoot name is cut to this (the folder pattern adds the date)
 NAMES_MOST = 500                        # "IMG_0001 (500).jpg": past that, a photo is a problem, not a copy
 DATE_READS = 200                        # photos read for the shoot's date (the first one's date names the folder)
 ROOM_SPARE = 1 << 30                    # 1 GB left free on the drive after the copy (review, Nov 21)
@@ -66,7 +74,11 @@ WORDS = {
     "inside": "That folder is already in your Assistant folder. Pick its shoot from Your shoots instead.",
     "holds": "That folder holds your Assistant folder. Pick the folder your finished photos were exported to.",
     "would_hold": "Your Assistant folder will be made in that folder, so it can't be a shoot itself. Pick the folder your finished photos were exported to.",
-    "clash": "There's already a shoot called \"{name}\" in Your Content. Nothing was copied. Rename that folder, or tell the Assistant what to call this one.",
+    "clash": "There's already a shoot called \"{name}\" in Your Content. Nothing was copied. Tell the Assistant what to call this one (it runs this again with --name).",
+    # a name already taken, on the page (Nicole, Nov 23): said in the box, with a name box and a button under it
+    "taken": "You already have a shoot called \"{name}\". Type a new name for this one. Nothing is copied until you do.",
+    "name_empty": "Type a name for this shoot first.",
+    "name_gone": "That folder isn't waiting for a name anymore. Pick it again with + A new shoot.",
     "unplugged": "Your Assistant folder isn't there right now. Check that its drive is plugged in, then try again.",
     "no_place": "There's no place for your Assistant folder yet. Ask the Assistant to set one up.",
     "held": "Something stopped the copy part way: {why}. {n} of {of} photos are in, each one checked. Nothing is lost and your originals weren't moved; pick the same folder again to finish.",
@@ -81,6 +93,25 @@ WORDS = {
 
 class Trouble(Exception):
     """A stop in plain words (the page shows them as they are)."""
+
+
+class NeedsName(Trouble):
+    """The shoot's name is taken by another shoot (or the name they typed came to nothing): nothing was copied, and
+    the page asks for a name. `suggest` is what the name box starts with; `page` the words the box shows (str() of
+    it is the chat's line, which says what the Assistant can do about it)."""
+
+    def __init__(self, chat, page, suggest):
+        super().__init__(chat)
+        self.page = page
+        self.suggest = suggest
+
+
+def typed_name(name):
+    """A name they typed, made safe for a folder on any drive (posts.clean_name, this_computer.safe_name), cut to
+    NAME_MOST. "" when nothing is left of it."""
+    if not isinstance(name, str):
+        return ""
+    return this_computer.safe_name(posts.clean_name(name), limit=NAME_MOST, fallback="")
 
 
 def say(msg):
@@ -421,8 +452,10 @@ def job():
     """What the page follows: {state: none | working | done | stopped, words, done, of, kit, go}. A job whose process
     is gone while its record still says working is "stopped" (picking the same folder again finishes it)."""
     d = _json(JOB)
-    state = d.get("state") if d.get("state") in ("working", "done", "stopped") else "none"
+    state = d.get("state") if d.get("state") in ("working", "done", "stopped", "taken") else "none"
     out = {"state": state, "words": str(d.get("words") or ""), "done": d.get("done") or 0, "of": d.get("of") or 0}
+    if state == "taken":                # the name to start the name box from; never the folder that is waiting
+        out["name"] = str(d.get("name") or "")
     if state == "working" and _alive(d.get("pid")) is False:
         out.update(state="stopped", words=WORDS["stopped"])
     if state == "done" and isinstance(d.get("kit"), str):
@@ -431,11 +464,20 @@ def job():
     return out
 
 
+def waiting_folder():
+    """The folder that is waiting for a name (the job said "taken"), for the page server only; None when none is."""
+    d = _json(JOB)
+    f = d.get("from")
+    return f if d.get("state") == "taken" and isinstance(f, str) and f else None
+
+
 # ---------- making it ----------
 
-def make(folder, progress=None):
+def make(folder, progress=None, name=None):
     """Make a post kit from one folder of finished photos (see the top of this file). Returns the kit folder.
-    Raises Trouble with plain words for every stop."""
+    Raises Trouble with plain words for every stop. `name`: a name of their own for the shoot (the box's name box,
+    or the chat's --name), used only when this folder has not made a shoot before; a name that is taken, theirs or
+    the folder's, raises NeedsName before anything is copied."""
     import kit as kit_mod
     progress = progress or (lambda **k: None)
     h, there = where_home()                         # nothing is made until the folder is known to be a shoot
@@ -470,12 +512,20 @@ def make(folder, progress=None):
     run = earlier_run(h, src, log)
     if run is None:
         when = shoot_date(src, rels)
-        name = posts.clean_name(posts.date_name([{"folders": [src.name]}]))
+        own = posts.clean_name(posts.date_name([{"folders": [src.name]}]))     # the folder's own name
+        if name is not None:
+            given = typed_name(name)
+            if not given:
+                raise NeedsName(WORDS["name_empty"], WORDS["name_empty"], own)
+            name = given
+        else:
+            name = own
         folder_name = posts.folder_name(name, when)
         if not folder_name or folder_name.startswith("."):
             folder_name = posts.folder_name("Shoot", when)
         if _fold(folder_name) in {_fold(n) for n in _listing(content)}:
-            raise Trouble(WORDS["clash"].format(name=folder_name))
+            # taken by another shoot (this folder never made one): nothing is copied, and they are asked for a name
+            raise NeedsName(WORDS["clash"].format(name=folder_name), WORDS["taken"].format(name=name), name)
         kit = content / folder_name
         if this_computer.WINDOWS and kit_mod._kit_too_long(kit):
             raise Trouble("That shoot's folder would sit too deep in folders for this PC. Tell the Assistant.")
@@ -486,7 +536,8 @@ def make(folder, progress=None):
     else:
         run["status"] = "copying"
         run["again"] = datetime.now().isoformat(timespec="seconds")
-        say(f"This folder made \"{run['kit']}\" before: going back to it (photos already there are left as they are).")
+        say(f"This folder made \"{run['kit']}\" before: going back to it (photos already there are left as they are)."
+            + (" The name it has is kept." if name is not None else ""))
     kit = content / run["kit"]
     before = {m["src"]: m["dst"] for m in run["moves"] if isinstance(m, dict) and isinstance(m.get("src"), str) and isinstance(m.get("dst"), str)}
     names = names_for(rels, before, _listing(kit / "Photos"))
@@ -558,8 +609,9 @@ def make(folder, progress=None):
     return kit
 
 
-def run_job(folder):
-    """`make --job`: the page server's detached run. One at a time (a lock); every line the page sees in the job."""
+def run_job(folder, name=None):
+    """`make --job`: the page server's detached run. One at a time (a lock); every line the page sees in the job.
+    A name that is taken leaves the job "taken", with the folder that is waiting kept for the page server (exit 4)."""
     import kit as kit_mod
     HOME.mkdir(parents=True, exist_ok=True)
     with kit_mod._held(LOCK, 2.0) as got:
@@ -568,7 +620,11 @@ def run_job(folder):
             return 3
         job_write(state="working", words=WORDS["starting"], done=0, of=0)
         try:
-            kit = make(folder, progress=lambda **k: job_write(**k))
+            kit = make(folder, progress=lambda **k: job_write(**k), name=name)
+        except NeedsName as t:
+            job_write(state="taken", words=t.page, name=t.suggest, done=0, of=0, **{"from": str(Path(folder).expanduser())})
+            say("NAME TAKEN: " + str(t))
+            return 4
         except Trouble as t:
             job_write(state="stopped", words=str(t), done=0, of=0)
             say("STOP: " + str(t))
@@ -589,6 +645,7 @@ def main():
     mk = sub.add_parser("make", help="make a post kit from one folder of finished photos (copied, never moved)")
     mk.add_argument("folder")
     mk.add_argument("--for", dest="make", choices=MAKES, default="reel", help="the page to name at the end")
+    mk.add_argument("--name", help="a name of their own for the shoot, when the folder's name is taken (used only for a folder that has not made a shoot yet)")
     mk.add_argument("--job", action="store_true", help="the page server's run: follow it in new-shoot-job.json")
     sub.add_parser("status", help="what the page follows, as JSON")
     a = ap.parse_args()
@@ -596,7 +653,7 @@ def main():
         say(json.dumps(job(), ensure_ascii=False))
         return 0
     if a.job:
-        return run_job(a.folder)
+        return run_job(a.folder, a.name)
     import kit as kit_mod
     HOME.mkdir(parents=True, exist_ok=True)
     with kit_mod._held(LOCK, 2.0) as got:   # one at a time, the page's job and the chat's alike (review, Nov 21)
@@ -604,7 +661,7 @@ def main():
             say("STOP: " + WORDS["busy"])
             return 3
         try:
-            kit = make(a.folder, progress=lambda **k: None)
+            kit = make(a.folder, progress=lambda **k: None, name=a.name)
         except Trouble as t:
             say("STOP: " + str(t))
             return 1

@@ -476,7 +476,7 @@ def parse_specs(specs):
 def folder_name(name, when):
     naming = studio_file.load().get("naming", {})
     if not naming.get("folder_pattern"):
-        naming = {"folder_pattern": "{date} {shoot}", "date_format": "%Y-%m-%d"}
+        naming = dict(studio_file.OFFERED[0])
     return studio_file.render(naming, name, when)
 
 

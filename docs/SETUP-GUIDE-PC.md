@@ -293,7 +293,7 @@ What to look at, in order:
 7. **The phone:** the Settings switch, the two /config lines, a real tap with the tester away from the PC.
 8. **Part 2, posts:** a real export folder (the folder window from the home page and whether it comes up in front, a post kit built, the reel page with a song from the Music folder and Make my reel, the carousel and stories designers with real photos, one reel opened in CapCut for Windows (if it doesn't open, one CapCut project folder zipped and sent to us), a Canva carousel brought into a kit, reading the Instagram grid).
 9. **Part 2, a card:** a real card (the drive letter, the letters on a second day with the card put in before the drive, Windows' note when a card goes in, the setup questions, a full backup, the report, Show the report after an hour away).
-10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Start here, End here and Add clip on the timeline, a clip reel; Save my video on a B-roll reel says it isn't on a PC yet.
+10. **Footage:** an H.264 video and an iPhone HEVC video on the reel page, Start here, End here and Add clip on the timeline, a clip reel; a B-roll reel says up front that on a PC it is made in CapCut (there is no Save my video button on a PC).
 11. How long each step took, and the whole setup.
 
 After the walk-through: replace the drawings that turned out wrong (or swap them for the tester's screenshots), take the marks out of this file, update both PDFs if Settings now says Plugins, and only then send the PDF to a student.

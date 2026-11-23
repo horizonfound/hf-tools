@@ -65,9 +65,26 @@ def safe_folder(name):
 
 
 def slug(name):
-    """The shoot's name as a filename prefix: Lani swim shoot -> Lani-swim-shoot."""
+    """A name with only letters, numbers and dashes: Lani swim shoot -> Lani-swim-shoot."""
     s = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-")
     return s[:40] or "Shoot"
+
+
+LITTLE_WORDS = {"the", "a", "an"}
+
+
+def prefix_for(name):
+    """What goes in front of every photo's name: the first word of the shoot's name, so a long name never makes
+    a long file name (Nicole, Nov 23: "The Johnson Family" -> Johnson_0001_IMG_4471.jpg). A leading The, A or An
+    is passed over; a name that is only such a word keeps it. Accents are folded to plain letters (Côte -> Cote), since
+    a file name with an accent is spelled two ways by two kinds of drive."""
+    import unicodedata
+    plain = "".join(c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c))   # Zoë -> Zoe
+    words = [w for w in re.split(r"[^A-Za-z0-9]+", plain) if w]
+    for w in words:
+        if w.lower() not in LITTLE_WORDS:
+            return w[:40]
+    return (words[0][:40] if words else "Shoot")
 
 
 def sha256_of(path, chunk=4 * 1024 * 1024):
@@ -174,7 +191,7 @@ def make_plan(session, studio):
             continue
         shoot_date = photos[0].get("taken") or groups[s["groups"][0]]["start"]
         folder = safe_folder(studio_file.render(naming, name, shoot_date)) if naming.get("folder_pattern") else safe_folder(name)
-        prefix = slug(name)
+        prefix = prefix_for(name)
         # photos and clips together: two folders inside the shoot's, each numbered on its own, so a clip never
         # sits in among the photos or takes one of their numbers (Dustin, Nov 11). One kind only: one flat folder.
         stills, videos = [p for p in photos if not clips.is_clip(p)], [p for p in photos if clips.is_clip(p)]

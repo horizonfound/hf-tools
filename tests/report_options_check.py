@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The other options on the report, under "Anything you'd like to change?" (Dustin, Nov 19: nothing is asked
 before a backup; what used to be a question is a button afterwards): This shoot continues on another card, Change
-how my shoots are named, Use a different drive next time, Write a note to my client on each shoot, the one quiet
+how my shoots are named, Use a different drive next time, no Write a note to my client any more (Nov 23), the one quiet
 line when the photos are on the computer's own disk, and the same-page-only guard on every POST of the report's
 server.
 
@@ -206,11 +206,11 @@ def the_words(w, b):
     check("the routes are asked for by relative address, so they work inside /card/N/",
           all(f"('{r}'" in page for r in ("other-backups", "link-card", "naming", "next-drives", "next-drive")) and "fetch('/" not in page)
     # the note line, per shoot
-    check("each shoot has Write a note to my client, with the line to copy hidden until it is pressed",
-          page.count("class='note-open'") == 2 and page.count("class='note-how' hidden") == 2 and page.count("Copy this into the chat:") >= 3)
-    check("the line names the shoot", "<span class='copy-text'>Write a note for the Beach shoot</span>" in page
-          and "<span class='copy-text'>Write a note for the Palms shoot</span>" in page, page[page.find("note-ask"):page.find("note-ask") + 500])
-    check("with no form anywhere in it", "<form" not in page and "<textarea" not in page[page.find("note-ask"):page.find("note-ask") + 900])
+    # no note to a client any more (Nicole and Dustin, Nov 23): no button, no line to copy, no card
+    check("no shoot has Write a note to my client, and no line to copy for one",
+          "class='note-open'" not in page and "class='note-ask'" not in page and "Write a note" not in page
+          and "class='note-wrap'" not in page)
+    check("with no form anywhere on the page", "<form" not in page)
     check("the own-disk line is not on a report whose photos are on an external drive", "id='own-disk'" not in page)
     rp = t.run_python(["-c", f"import sys; sys.path.insert(0, {str(t.SCRIPTS)!r}); import report_page, first_look, json; "
                              "print(json.dumps([report_page.OUR_WORDS, first_look.OUR_WORDS]))"], env=w["env"])[1]
@@ -228,9 +228,10 @@ def a_hard_name(w, b, base):
     code, out = t.run("rename_shoot.py", b["records"], "--shoot", "s2", "--name", HARD, env=w["env"])
     t.run("report_page.py", b["records"], env=w["env"])
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
-    want = "Write a note for the Smith &lt;b&gt;&quot;Family&quot;&lt;/b&gt; &amp; co shoot"
+    want = "Smith &lt;b&gt;&quot;Family&quot;&lt;/b&gt; &amp; co"
     check("the renamer took the name", code == 0, out)
-    check("the note line carries it as text, never as markup", want in page and "the Smith <b>" not in page, page[page.find("Write a note for the Smith"):][:200])
+    check("the page carries the name as text, never as markup (and has no note line for it)",
+          want in page and "Smith <b>" not in page and "Write a note" not in page, page[page.find("Smith &lt;"):][:200])
     j = jget(base, "/naming")
     check("and the naming panel's answer is data, the name whole", isinstance(j.get("ways"), list) and no_path(w, j))
     code, out = t.run("rename_shoot.py", b["records"], "--shoot", "s2", "--name", "Palms", env=w["env"])
@@ -326,35 +327,35 @@ def next_drive(w, b, base):
 def naming(w, b, base):
     print("Change how my shoots are named")
     j = jget(base, "/naming")
-    check("GET naming: the two ways, shown with this backup's own first shoot and its day; year first is theirs now",
-          j.get("current") == 1 and [x.get("example") for x in j.get("ways") or []] == ["2026-06-04 Beach", "Beach, Jun 4 2026"]
+    check("GET naming: the two ways, shown with this backup's own first shoot and its day; the shoot's name then the date is theirs now",
+          j.get("current") == 1 and [x.get("example") for x in j.get("ways") or []] == ["Beach_06-04-26", "2026-06-04 Beach"]
           and j.get("shoots") == 2 and not j.get("line"), str(j))
     folders0 = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
     drive0 = photos_on(w["drive"])
     code, j = jpost(base, "/naming", {"offered": 3, "apply": True})
     check("a way that is not one of the two is refused, nothing changed",
-          j.get("ok") is False and jread(w["home"] / "studio.json", {})["naming"]["folder_pattern"] == "{date} {shoot}", str(j))
+          j.get("ok") is False and jread(w["home"] / "studio.json", {})["naming"]["folder_pattern"] == "{shoot}_{date}", str(j))
     code, j = jpost(base, "/naming", {"offered": 2, "apply": False})
     sf = jread(w["home"] / "studio.json", {})
     check("Save without the tick: only the next backup, said so",
-          j.get("ok") is True and j.get("words") == "Saved. Your next backup's shoots will be named like Beach, Jun 4 2026."
-          and not j.get("busy") and sf["naming"]["folder_pattern"] == "{shoot}, {date}", str(j))
+          j.get("ok") is True and j.get("words") == "Saved. Your next backup's shoots will be named like 2026-06-04 Beach."
+          and not j.get("busy") and sf["naming"]["folder_pattern"] == "{date} {shoot}", str(j))
     check("and this backup's folders are as they were", sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith(".")) == folders0
           and photos_on(w["drive"]) == drive0)
-    check("the panel now marks name first as theirs", jget(base, "/naming").get("current") == 2)
+    check("the panel now marks year first as theirs", jget(base, "/naming").get("current") == 2)
     # with the tick: each shoot goes through the report's own rename queue
     code, j = jpost(base, "/naming", {"offered": 2, "apply": True})
     check("Save with the tick: 'Saved. Renaming this backup's shoots to match...'",
           j.get("ok") is True and j.get("busy") is True and j.get("words") == "Saved. Renaming this backup's shoots to match...", str(j))
     j = wait_naming(base)
     check("the line beside the button ends on Done, and a reloaded page is given it again",
-          j.get("line") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like Beach, Jun 4 2026."
+          j.get("line") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like 2026-06-04 Beach."
           and jget(base, "/naming").get("line") == j.get("line"), str(j))
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-    check("the folders took the new shape", folders == ["Beach, Jun 4 2026", "Palms, Jun 4 2026"], str(folders))
+    check("the folders took the new shape", folders == ["2026-06-04 Beach", "2026-06-04 Palms"], str(folders))
     sh = jread(b["records"] / "shoots.json", {}).get("shoots", [])
     index = jread(b["records"] / "index.json", {})
-    check("the records follow: each shoot's folder, each photo's place", [s.get("folder") for s in sh] == ["Beach, Jun 4 2026", "Palms, Jun 4 2026"]
+    check("the records follow: each shoot's folder, each photo's place", [s.get("folder") for s in sh] == ["2026-06-04 Beach", "2026-06-04 Palms"]
           and all(p["file"].split("/")[0] in folders for p in index.get("photos", []) if p.get("original")), str([s.get("folder") for s in sh]))
     bad, n = t.photos_match(w["drive"], index, b["card"])
     check("every photo is under its recorded name and byte for byte the card's", not bad and n == 9, str(bad)[:300])
@@ -368,7 +369,7 @@ def naming(w, b, base):
     status = jread_text(get(base, "/rename-status")[1])
     check("each shoot's own line says it was renamed", all(status.get(s, {}).get("line") == "Done. Folder and photos renamed." for s in ("s1", "s2")), str(status))
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
-    check("the report was rebuilt with nothing lost: both shoots, their names, the options", page.count("class='note-open'") == 2 and "id='opt-naming'" in page)
+    check("the report was rebuilt with nothing lost: both shoots, their names, the options", page.count("<article class='shoot'>") == 2 and "id='opt-naming'" in page)
     # pressed again: nothing to do
     drive1, n_log = photos_on(w["drive"]), len(log)
     code, j = jpost(base, "/naming", {"offered": 2, "apply": True})
@@ -377,11 +378,11 @@ def naming(w, b, base):
     check("pressed again: every shoot is 'Already called that.', nothing moved, nothing logged",
           all(status.get(s, {}).get("line") == "Already called that." for s in ("s1", "s2")) and photos_on(w["drive"]) == drive1
           and len((jread(b["records"] / "rename-log.json", {}) or {}).get("renames", [])) == n_log, str(status))
-    # and back to year first, by the same button
+    # and back to name then date, by the same button
     code, j = jpost(base, "/naming", {"offered": 1, "apply": True})
     j = wait_naming(base)
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-    check("and year first again by the same button puts every folder back as it was", folders == folders0 and photos_on(w["drive"]) == drive0, str(folders))
+    check("and name then date again by the same button puts every folder back as it was", folders == folders0 and photos_on(w["drive"]) == drive0, str(folders))
     check("the card is exactly as it was", t.card_snapshot(b["card"]) == b["before"])
 
 
@@ -443,12 +444,12 @@ def another_card(w, b, base):
     check("the linked backup is no longer offered", jget(base, "/other-backups") == {"backups": []} and jget(base, "/card/2/other-backups") == {"backups": []})
     # the routes inside a card's frame
     j = jget(base, "/card/2/naming")
-    check("inside /card/2/, GET naming shows card 2's own shoot", [x.get("example") for x in j.get("ways") or []][:1] == ["2026-06-04 Ceremony"], str(j))
+    check("inside /card/2/, GET naming shows card 2's own shoot", [x.get("example") for x in j.get("ways") or []][:1] == ["Ceremony_06-04-26"], str(j))
     code, j = jpost(base, "/card/2/naming", {"offered": 2, "apply": True}, Origin=base)
     j = wait_naming(base, "/card/2")
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
     check("and a POST from inside /card/2/ (this server's own Origin) renames card 2's shoot only",
-          "Ceremony, Jun 4 2026" in folders and "2026-06-04 Beach" in folders and "2026-06-04 Palms" in folders and (j.get("line") or "").startswith("Done."), str((folders, j)))
+          "2026-06-04 Ceremony" in folders and "Beach_06-04-26" in folders and "Palms_06-04-26" in folders and (j.get("line") or "").startswith("Done."), str((folders, j)))
     t.run("studio_file.py", "set", "--offered", "1", env=w["env"])
     the_guard(w, b2, base, "/card/2")
     return b2
@@ -509,16 +510,10 @@ def in_a_browser(work):
             c.open(base + "/report.html")
             check("the three options are on the page, panels closed, nothing said",
                   c.js("['oc','nm','nd'].every(i => document.getElementById(i+'-panel').hidden && document.getElementById(i+'-say').textContent === '')"))
-            # the note line
-            c.js("document.querySelectorAll('.note-open')[1].click(); true")
-            line = c.js("(() => { const how = document.querySelectorAll('.note-how')[1]; return [how.hidden, how.querySelector('.copy-text').textContent, how.querySelector('.how-q').textContent, how.querySelectorAll('b').length]; })()")
-            check("Write a note to my client shows the line right there, the shoot's name as text",
-                  line == [False, f"Write a note for the {HARD} shoot", "Copy this into the chat:", 0], str(line))
-            check("the first shoot's line stays closed", c.js("document.querySelectorAll('.note-how')[0].hidden") is True)
-            c.click(".note-how:not([hidden]) .copy-line")
-            c.wait_for("document.querySelectorAll('.note-how')[1].querySelector('.copy-said').textContent !== ''", seconds=10)
-            said = c.js("document.querySelectorAll('.note-how')[1].querySelector('.copy-said').textContent")
-            check("Copy says what it did, beside the button", said in ("Copied. Paste it in the chat.", "I couldn't copy it for you. Select the line and copy it yourself."), said)
+            # no note to a client any more (Nicole and Dustin, Nov 23)
+            check("no Write a note to my client button anywhere on the page",
+                  c.js("document.querySelectorAll('.note-open, .note-ask, .note-wrap').length") == 0
+                  and c.js("!/Write a note/.test(document.body.innerText)") is True)
             # a different drive next time
             c.js("document.getElementById('nd-open').click(); true")
             c.wait_for("document.querySelectorAll('#nd-list label').length > 0", seconds=20)
@@ -539,15 +534,15 @@ def in_a_browser(work):
             c.wait_for("document.querySelectorAll('#nm-list label').length === 2", seconds=20)
             labels = c.js("[...document.querySelectorAll('#nm-list label')].map(l => l.textContent)")
             check("Change how my shoots are named: the two ways with this backup's own shoot, the one in use marked, the tick box ticked",
-                  labels == ["2026-06-04 Beach (how they're named now)", "Beach, Jun 4 2026"] and c.js("document.getElementById('nm-apply').checked && !document.getElementById('nm-apply-row').hidden"), str(labels))
+                  labels == ["Beach_06-04-26 (how they're named now)", "2026-06-04 Beach"] and c.js("document.getElementById('nm-apply').checked && !document.getElementById('nm-apply-row').hidden"), str(labels))
             check("with the line to copy for their own way", c.js("document.querySelector('#nm-panel .copy-text').textContent") == "Change how my shoots are named")
             c.js("document.querySelectorAll('#nm-list input')[1].click(); document.getElementById('nm-go').click(); true")
             c.wait_for("/^Done\\./.test(%s)" % (say % "nm-say"), seconds=90)
             check("Save: the shoots are renamed, and the line beside the button says so (through the page's own reloads)",
-                  c.js(say % "nm-say") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like Beach, Jun 4 2026."
+                  c.js(say % "nm-say") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like 2026-06-04 Beach."
                   and c.js(beside % ("nm", "nm")), c.js(say % "nm-say"))
             folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-            check("on the drive too", "Beach, Jun 4 2026" in folders and "2026-06-04 Beach" not in folders, str(folders))
+            check("on the drive too", "2026-06-04 Beach" in folders and "Beach_06-04-26" not in folders, str(folders))
             check("nothing in the section holds a path", no_path(w, c.js("document.getElementById('opts').innerText")))
             # another card, last: the page becomes the shoot's page
             c.wait_for("!document.getElementById('nm-open').disabled", seconds=20)
