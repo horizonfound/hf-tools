@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The other options on the report, under "Anything you'd like to change?" (Dustin, Nov 19: nothing is asked
 before a backup; what used to be a question is a button afterwards): This shoot continues on another card, Change
-how my shoots are named, Use a different drive next time, Write a note to my client on each shoot, the one quiet
+how my shoots are named, Use a different drive next time, no Write a note to my client any more (Nov 23), the one quiet
 line when the photos are on the computer's own disk, and the same-page-only guard on every POST of the report's
 server.
 
@@ -206,11 +206,11 @@ def the_words(w, b):
     check("the routes are asked for by relative address, so they work inside /card/N/",
           all(f"('{r}'" in page for r in ("other-backups", "link-card", "naming", "next-drives", "next-drive")) and "fetch('/" not in page)
     # the note line, per shoot
-    check("each shoot has Write a note to my client, with the line to copy hidden until it is pressed",
-          page.count("class='note-open'") == 2 and page.count("class='note-how' hidden") == 2 and page.count("Copy this into the chat:") >= 3)
-    check("the line names the shoot", "<span class='copy-text'>Write a note for the Beach shoot</span>" in page
-          and "<span class='copy-text'>Write a note for the Palms shoot</span>" in page, page[page.find("note-ask"):page.find("note-ask") + 500])
-    check("with no form anywhere in it", "<form" not in page and "<textarea" not in page[page.find("note-ask"):page.find("note-ask") + 900])
+    # no note to a client any more (Nicole and Dustin, Nov 23): no button, no line to copy, no card
+    check("no shoot has Write a note to my client, and no line to copy for one",
+          "class='note-open'" not in page and "class='note-ask'" not in page and "Write a note" not in page
+          and "class='note-wrap'" not in page)
+    check("with no form anywhere on the page", "<form" not in page)
     check("the own-disk line is not on a report whose photos are on an external drive", "id='own-disk'" not in page)
     rp = t.run_python(["-c", f"import sys; sys.path.insert(0, {str(t.SCRIPTS)!r}); import report_page, first_look, json; "
                              "print(json.dumps([report_page.OUR_WORDS, first_look.OUR_WORDS]))"], env=w["env"])[1]
@@ -228,9 +228,10 @@ def a_hard_name(w, b, base):
     code, out = t.run("rename_shoot.py", b["records"], "--shoot", "s2", "--name", HARD, env=w["env"])
     t.run("report_page.py", b["records"], env=w["env"])
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
-    want = "Write a note for the Smith &lt;b&gt;&quot;Family&quot;&lt;/b&gt; &amp; co shoot"
+    want = "Smith &lt;b&gt;&quot;Family&quot;&lt;/b&gt; &amp; co"
     check("the renamer took the name", code == 0, out)
-    check("the note line carries it as text, never as markup", want in page and "the Smith <b>" not in page, page[page.find("Write a note for the Smith"):][:200])
+    check("the page carries the name as text, never as markup (and has no note line for it)",
+          want in page and "Smith <b>" not in page and "Write a note" not in page, page[page.find("Smith &lt;"):][:200])
     j = jget(base, "/naming")
     check("and the naming panel's answer is data, the name whole", isinstance(j.get("ways"), list) and no_path(w, j))
     code, out = t.run("rename_shoot.py", b["records"], "--shoot", "s2", "--name", "Palms", env=w["env"])
@@ -368,7 +369,7 @@ def naming(w, b, base):
     status = jread_text(get(base, "/rename-status")[1])
     check("each shoot's own line says it was renamed", all(status.get(s, {}).get("line") == "Done. Folder and photos renamed." for s in ("s1", "s2")), str(status))
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
-    check("the report was rebuilt with nothing lost: both shoots, their names, the options", page.count("class='note-open'") == 2 and "id='opt-naming'" in page)
+    check("the report was rebuilt with nothing lost: both shoots, their names, the options", page.count("<article class='shoot'>") == 2 and "id='opt-naming'" in page)
     # pressed again: nothing to do
     drive1, n_log = photos_on(w["drive"]), len(log)
     code, j = jpost(base, "/naming", {"offered": 2, "apply": True})
@@ -509,16 +510,10 @@ def in_a_browser(work):
             c.open(base + "/report.html")
             check("the three options are on the page, panels closed, nothing said",
                   c.js("['oc','nm','nd'].every(i => document.getElementById(i+'-panel').hidden && document.getElementById(i+'-say').textContent === '')"))
-            # the note line
-            c.js("document.querySelectorAll('.note-open')[1].click(); true")
-            line = c.js("(() => { const how = document.querySelectorAll('.note-how')[1]; return [how.hidden, how.querySelector('.copy-text').textContent, how.querySelector('.how-q').textContent, how.querySelectorAll('b').length]; })()")
-            check("Write a note to my client shows the line right there, the shoot's name as text",
-                  line == [False, f"Write a note for the {HARD} shoot", "Copy this into the chat:", 0], str(line))
-            check("the first shoot's line stays closed", c.js("document.querySelectorAll('.note-how')[0].hidden") is True)
-            c.click(".note-how:not([hidden]) .copy-line")
-            c.wait_for("document.querySelectorAll('.note-how')[1].querySelector('.copy-said').textContent !== ''", seconds=10)
-            said = c.js("document.querySelectorAll('.note-how')[1].querySelector('.copy-said').textContent")
-            check("Copy says what it did, beside the button", said in ("Copied. Paste it in the chat.", "I couldn't copy it for you. Select the line and copy it yourself."), said)
+            # no note to a client any more (Nicole and Dustin, Nov 23)
+            check("no Write a note to my client button anywhere on the page",
+                  c.js("document.querySelectorAll('.note-open, .note-ask, .note-wrap').length") == 0
+                  and c.js("!/Write a note/.test(document.body.innerText)") is True)
             # a different drive next time
             c.js("document.getElementById('nd-open').click(); true")
             c.wait_for("document.querySelectorAll('#nd-list label').length > 0", seconds=20)
