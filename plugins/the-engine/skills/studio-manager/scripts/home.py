@@ -53,6 +53,7 @@ sys.path.insert(0, str(HERE))
 import brand  # noqa: E402
 import look  # noqa: E402  (the font, the colours and the rules every page shares)
 import home_base  # noqa: E402  (the home base's words, look and two screens)
+import backup_popup  # noqa: E402  (Back up a card, the box on this page that starts the backup itself)
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
 from where import same_place  # noqa: E402  (two recorded paths, the same folder? case-blind on a PC)
 this_computer.utf8_output()
@@ -62,8 +63,9 @@ JOURNEY = HOME / "journey.json"
 PAGE = HOME / "home.html"
 CATEGORIES = ("backup", "posts", "queue", "posting", "reel", "folder", "tile")
 # Presses the page itself has answered (a tile asks which shoot and lands on its page): kept in the record, never
-# handed to the chat as something to explain (Nicole, Nov 22).
-ANSWERED_BY_PAGE = ("tile",)
+# handed to the chat as something to explain (Nicole, Nov 22). Back up a card is one of them since Nov 23: its press
+# opens the box that starts the backup itself (backup_popup.py).
+ANSWERED_BY_PAGE = ("tile", "backup")
 
 
 def say(msg):
@@ -1288,7 +1290,7 @@ const MK = (function(){
 })();
 // Reload when anything changes (a card goes in, a backup lands, a queue moves).
 const STAMP = document.body.dataset.stamp;
-if (live) setInterval(async () => { if (window.MK_HOLD) return; try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
+if (live) setInterval(async () => { if (window.MK_HOLD || window.BK_HOLD) return; try { const r = await fetch('/home-state', {cache: 'no-store'}); const t = (await r.text()).trim(); if (t && STAMP && t !== STAMP) location.reload(); } catch (e) {} }, 4000);
 """
 
 
@@ -1425,7 +1427,11 @@ def page_html(query="", start=False):
     f = facts(force_year=force_year, start=start)
     e = html.escape
     boxes = now_boxes(f)
-    live_card = " live" if f.get("card") else ""
+    try:        # a backup started from this page: how it is going, on the card (None: the card as it always was)
+        bk_box = backup_popup.card_box()
+    except (Exception, SystemExit):  # noqa: BLE001
+        bk_box = None
+    live_card = " live" if (f.get("card") and not bk_box) else ""
     # the hello (her section 3): a greeting and one line, made only from her approved lines, drawn here as text
     h = f.get("hello") or {}
     greet = _parts(h.get("greeting_parts")) if h.get("greeting_parts") else e(h.get("greeting") or W("hello_plain"))
@@ -1455,8 +1461,12 @@ def page_html(query="", start=False):
                f"<div><h2 class='n'>{W('s4_n')}</h2><p>{e(W('s4_p'))}</p><div class='now' id='n4'>{boxes[3]}</div>"
                f"<span class='lnk2'>{e(W('s4_go'))}</span></div>{stack}</a>")
     also = (f"<div class='also'>"
-            f"<a class='row{live_card}' id='s1' data-item='backup' href='/backups'><div><span class='n'>{W('s1_n')}</span><p>{e(W('s1_p'))}</p></div>"
-            f"<div class='now' id='n1'>{boxes[0]}</div><span class='ar' aria-hidden='true'>&rarr;</span></a>"
+            # Back up a card opens its box on this page (Nicole's v31; backup_popup.py); See all my backups is the
+            # link to the list. A backup that is running, has just finished or has stopped shows in the card's box.
+            f"<div class='row{live_card}' id='s1' data-item='backup' role='button' tabindex='0' aria-haspopup='dialog'>"
+            f"<div><span class='n'>{W('s1_n')}</span><p>{e(W('s1_p'))}</p>"
+            f"<a class='seeall' id='seeAll' href='/backups'>{e(backup_popup.W('see_all'))}</a></div>"
+            f"<div class='now' id='n1'{' data-bk=1' if bk_box else ''}>{bk_box or boxes[0]}</div><span class='ar' aria-hidden='true'>&rarr;</span></div>"
             f"<button class='row' id='s2' data-item='queue' type='button'><div><span class='n'>{W('s2_n')}</span><p>{e(W('s2_p'))}</p></div>"
             f"<div class='now' id='n2'>{boxes[1]}</div><span class='ar' aria-hidden='true'>&rarr;</span><span id='editingWords' hidden></span></button>"
             f"</div>")
@@ -1491,15 +1501,15 @@ def page_html(query="", start=False):
     words.update({"rc_didnt": W("rc_didnt")})
     words.update({k: W(k) for k in list(WORDS) + list(OUR_WORDS) if k.startswith("mk_")})
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}</style></head><body class='home30' data-stamp='{e(fingerprint())}'>"
+            f"<title>{e(brand.title())}</title><style>{look.head_css()}{CSS_EXTRA}{backup_popup.CSS}</style></head><body class='home30' data-stamp='{e(fingerprint())}'>"
             f"<div class='wrap'><div class='bar'>{brand.bar()}"
             f"<span class='when' id='when'>{e(f['today'])}</span>"
             f"<span class='fold'><button class='lnk' id='folder' data-item='folder' type='button'>{e(W('folder').format(short=brand.short()))}</button><span class='note' role='status'></span></span></div>"
             f"<p class='offline' id='offline' hidden>{e(W('offline'))}</p>"
             f"{hello}{big}{low}"
-            f"{recap}{year}<p class='foot'>{foot}</p>{make_box()}"
+            f"{recap}{year}<p class='foot'>{foot}</p>{make_box()}{backup_popup.box_html()}"
             f"</div><script type='application/json' id='facts'>{_json_for_script(data)}</script>"
-            f"<script>const W = {_json_for_script(words)};{home_base.JS_SHARED}{HELLO_JS}{SCRIPT}</script></body></html>")
+            f"<script>const W = {_json_for_script(words)};{home_base.JS_SHARED}{HELLO_JS}{SCRIPT}{backup_popup.script()}</script></body></html>")
 
 
 # ---------- the routes of the home page's own (the posting server hands them over) ----------
