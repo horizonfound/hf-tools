@@ -49,9 +49,11 @@ def main():
         t.run("posting_queue.py", "interval", "3 a week", env=env)
         before = (home / "studio.json").read_bytes()
         code, out = t.run("studio_file.py", "glance", env=env)
-        check("a second copy, the camera's own names, the tone and sign-off, and the posting rhythm all show",
+        check("a second copy, the camera's own names and the posting rhythm all show",
               "A second copy goes onto Second" in out and "Photos keep the camera's own names" in out
-              and "Client notes written warm and personal, signed \u201cxo, Nicole\u201d" in out and "Posts lined up at 3 a week" in out, out)
+              and "Posts lined up at 3 a week" in out, out)
+        check("notes to clients are not in the glance any more (taken out Nov 23), though how they write is still on file",
+              "lient note" not in out and "xo, Nicole" in (home / "studio.json").read_text(encoding="utf-8"), out)
         check("looking changes nothing that is remembered", (home / "studio.json").read_bytes() == before)
     finally:
         shutil.rmtree(work, ignore_errors=True)

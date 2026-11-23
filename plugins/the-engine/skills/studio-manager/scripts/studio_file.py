@@ -112,6 +112,9 @@ def save(sf):
     MD.write_text(as_markdown(sf), encoding="utf-8")
 
 
+CLIENT_NOTES = False   # True puts "Client notes written ..." back in the glance (notes to clients were taken out Nov 23)
+
+
 def as_markdown(sf):
     d, n = sf.get("drives", {}), sf.get("naming", {})
     import brand
@@ -132,15 +135,14 @@ def as_markdown(sf):
     else:
         lines += ["- Shoot folders: (not set)"]
     lines += [f"- Photos: {'keep their original frame names' if n.get('file_names', 'shoot') == 'original' else 'take the shoot name and a running number, with the original frame name kept at the end'}",
-              "", "## Client notes", ""]
+              ]
+    # Notes to clients are no longer written with a backup (Nicole and Dustin, Nov 23), so nothing about them is
+    # shown unless this photographer had set up how they write before; that is kept, never thrown away.
     c = sf.get("note", {})
-    if not c:
-        lines += ["- (not asked yet)"]
-    elif not c.get("on"):
-        lines += ["- No notes, thanks."]
-    else:
+    if c and c.get("on"):
+        lines += ["", "## Client notes", ""]
         tones = {"warm": "warm and personal", "plain": "short and plain", "playful": "playful"}
-        lines += ["- A note to the client is drafted with the sneak peeks, for you to copy and send.",
+        lines += ["- How you write to clients, kept from before (notes to clients are no longer written with a backup).",
                   "- Written to match a note you sent before:" if c.get("sample") else f"- Tone: {tones.get(c.get('tone', 'warm'), 'warm and personal')}"]
         if c.get("sample"):
             lines += ["", "  > " + c["sample"].strip().replace("\n", "\n  > "), ""]
@@ -745,7 +747,7 @@ def glance(sf=None):
     else:
         lines.append(("Photos named after the shoot, with the camera's number kept", "photos named after the shoot"))
     note = sf.get("note") or {}
-    if note.get("on"):
+    if CLIENT_NOTES and note.get("on"):
         how = "the way you write" if note.get("sample") else {"warm": "warm and personal", "plain": "short and plain",
                                                              "playful": "playful"}.get(note.get("tone"), "in your voice")
         sign = " / ".join(x.strip() for x in (note.get("sign_off") or "").splitlines() if x.strip())

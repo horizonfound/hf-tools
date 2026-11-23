@@ -91,6 +91,8 @@ def why_folders(shoots, groups):
 
 PEEKS_ARE_MARKED = False   # True brings back the Nov 13 words about sneak peeks and the Lightroom keyword
 NOTE_BUTTON = False        # True brings back "Write a note to my client" on each shoot (taken out Nov 23)
+NOTE_CARD = False          # True shows a note an older backup had written, as a card under its shoot (taken out Nov 23;
+                           # the note itself stays in the backup's records, and `client_note.py show` still prints it)
 
 
 def peeks_words(n, marked):
@@ -414,7 +416,7 @@ async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>
   try{const r=await fetch('queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;(window.top||window).location.href=d.url;}
   catch(e){st.textContent='Could not open the queue page. Ask the Assistant to show your editing queue.';st.className='qstate bad';}});}
 document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
-// The sneak peeks are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
+// The first-look photos are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
 document.querySelectorAll('.peeks-wrap').forEach(w=>{
  const id=w.dataset.shoot,ask=w.querySelector('.peeks-ask'),more=w.querySelector('.peeks-more'),st=w.querySelector('.peeks-state'),inp=ask.querySelector('input');
  const live=location.protocol.startsWith('http');
@@ -839,7 +841,7 @@ def shoots_section(studio, closing=True):
                     f"<div class='ph' data-g='{e(s['id'])}' style='--rot:{ROTS[(j + 3) % len(ROTS)]}deg' title='Click to see it bigger'><img src='sneak-peeks/{e(p)}' alt=''></div>"
                     for j, p in enumerate(rest)) + "</div>")
             out.append("</div>")
-        card = note_card(notes.get(s["id"]))
+        card = note_card(notes.get(s["id"])) if NOTE_CARD else None
         if card:
             out.append(card)
         out.append("</article>")

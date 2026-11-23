@@ -4,7 +4,7 @@ Part of the Assistant's instructions. The first-thing checks, the rules and how 
 
 ## When they come back to the report: about each shoot
 
-**Ask nothing by yourself (Dustin, Nov 19).** The backup may have finished while they were away. When they come back, there are no questions waiting for them: not what to call a shoot, not when it is due, not who a note goes to, not what else they are editing, not whether they want a tap before a due date. The report offers each of those as a button, and they can say any of them. Answer what they bring up, and nothing else.
+**Ask nothing by yourself (Dustin, Nov 19).** The backup may have finished while they were away. When they come back, there are no questions waiting for them: not what to call a shoot, not when it is due, not what else they are editing, not whether they want a tap before a due date. The report offers each of those as a button, and they can say any of them. Answer what they bring up, and nothing else.
 
 The editing queue and the archive are simply part of the Assistant, never a yes/no: every shoot the Assistant backs up lands in Uploaded shoots on the queue page, and a shoot is in the queue when they add it with a due date. (If `edit_queue.py status` says "never asked", run `edit_queue.py setup --on` quietly; "off" only if they once said so.)
 
@@ -17,7 +17,7 @@ The editing queue and the archive are simply part of the Assistant, never a yes/
 **What they can say instead of pressing, and what you do then:**
 - **A name** ("the big one is the Smith family"): the name box and Rename are on the page; when they say it to you, rename it (below).
 - **A due date** ("add the beach one to my queue, due the 14th"): `edit_queue.py add --night "<the backup's folder>" --shoot <id> --due <date>`.
-- **A note to the client** ("write a note for the Garcias"): read `parts/client-note.md`. A note needs a name, so that is the one question then, and only then: "Who's the note going to? A first name is fine." Save it with `client_note.py save --night "<backup>" --shoot <id> --to "<name>"` and write the note. A shoot nobody asks a note for gets none.
+- **A note to the client:** not part of a backup any more (Nicole and Dustin, Nov 23). Never offer one. If they ask outright, `parts/client-note.md` says what to do: write it in the chat from what they tell you, and save it nowhere.
 - **Shoots they are already in the middle of editing** ("I'm also editing the Lees, due Friday"): `edit_queue.py add-manual --name "..." --due <when> [--shot YYYY-MM-DD]`; if one of them is a shoot the Assistant already backed up, use `add --night` instead so it gets its thumbnails. Never ask whether there are any.
 - **A heads-up before a due date** ("tap my phone before things are due"): if this session can create a scheduled task, set up a daily one (late morning, their time) that runs `edit_queue.py reminders --mark` and sends each line it prints with the notification tool; if it cannot, say the heads-up is on the home page's My editing queue card and the editing queue page (the chat never opens with it). Remember the answer in the Studio File. Never offer it by yourself.
 - **A second copy of this backup** ("make a second copy of the beach backup onto LaCie"): the section below, "A second copy, after the backup".
@@ -75,7 +75,7 @@ python3 <scripts>/shoot_report.py link "<card 1's backup>" "<card 2's backup>"
 - From the chat ("use a different drive from now on", "put my photos on the LaCie next time"): `studio_file.py drives` to find the one they named, then `studio_file.py set --drive "<that drive, or its shoot folder>"`. Say the same line back: the next backup goes there, this one stays where it is.
 - The drive their second copies go on cannot also be the first place; the page says so ("LaCie Rugged is where your second copies go..."). Change the second copy first if that is what they want (`studio_file.py set --no-second`, or `--second` another drive).
 
-**Write a note to my client**, on each shoot. The button shows "Copy this into the chat:" with the line "Write a note for the <shoot's name> shoot" and **Copy**. There is no form. When that line arrives, read `parts/client-note.md`: ask who it is for, and the first time ever how they write to clients, then write it. A shoot whose note is already written shows the note instead of the button.
+**There is no Write a note to my client button any more (Nicole and Dustin, Nov 23),** and a note an older backup had written is no longer shown on its report. The six photos on each shoot are "A first look at your shoot.", with **Pick again** and **Show me more** under them (`parts/sneak-peeks.md`).
 
 **One quiet line when the photos are on the computer's own disk.** Under "Where your photos are" the report then says, once: "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. Plug one in and press Use a different drive next time." That is the whole of it. Never say it before a backup, and never add a speech of your own; if they ask why, answer in a sentence or two.
 
