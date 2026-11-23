@@ -17,11 +17,18 @@ steps, the posting queue step, the other piece's box). Underneath it is ours:
   * the look is look.py's (DM Sans from /look-font, nothing from the internet); where hers sets the lines to
     copy in a serif italic, ours are DM Sans, slanted (Dustin, Nov 7: no serif).
 
+Each reel has its own words (Nicole, Nov 23: "each reel gets its own caption"). A shoot with several reels: the
+page is one reel's, named in its address (&reel=<the reel's id>; with none, the reel being worked on), it says
+which reel under the tabs and lets them switch (links, one per reel), and every look and every save names that
+reel, so one reel's words can never land in another's. The page's reel is fixed when it opens: a reel started
+elsewhere while it is open never changes whose words its boxes hold. A shoot with one reel is as it always was.
+
 Routes, all on the posting server:
-    GET  /words.html?kit=<kit folder>&piece=reel|carousel     the page
-    GET  /words-state?kit=&piece=                             everything the page draws from; asked every 2.5 s
-    POST /words-save   {kit, piece, answers?, own?, caption?, picked?}     saved by words.save_from_page
-    POST /words-carry  {kit, piece}                           this piece's answers copied to the other (words.carry)
+    GET  /words.html?kit=<kit folder>&piece=reel|carousel[&reel=<id>]     the page
+    GET  /words-state?kit=&piece=[&reel=]                     everything the page draws from; asked every 2.5 s
+    POST /words-save   {kit, piece, reel?, answers?, own?, caption?, picked?}     saved by words.save_from_page
+    POST /words-carry  {kit, piece, reel?}                    this piece's answers copied to the other (words.carry)
+    POST /words-carry  {kit, piece: "reel", reel, from}       a reel with no answers starts from another reel's
     POST /words-rhythm {text}                                 how often they post, asked once, from her five chips
     POST /words-queue  {kit, piece}                           the piece goes in the posting queue, ready to post
     POST /words-open   {kit}                                  opens the kit's Carousel folder (ours; see OUR_WORDS)
@@ -63,7 +70,7 @@ TYPING_MS = 5000                         # hers: nothing is filled in within 5 s
 STRIP_REEL, STRIP_SLIDES = 12, 10        # hers: the first 12 reel photos, the first 10 slides
 RHYTHMS = ("Every day", "Every other day", "3 a week", "Twice a week", "Once a week")     # her five chips
 POSTING_PAGE = "/posting.html"           # "See it in my feed": the posting queue, on this same server
-SAVE_KEYS = {"kit", "piece", "answers", "own", "caption", "picked"}
+SAVE_KEYS = {"kit", "piece", "reel", "answers", "own", "caption", "picked"}
 ANSWER_KEYS = ("about", "who", "who_text", "where", "purpose", "purpose_text", "notes")
 
 # Her words (pages/words.html, handoff v20), word for word. {short} is the shoot's short name, {piece} "reel" or
@@ -195,6 +202,18 @@ OUR_WORDS = {
     "nothing_to_carry": "Tell me about it above first",
     "cant_reach": arrange.CANT_REACH,
     "queue_cant": "The posting queue couldn't be saved just now. Tell the Assistant.",
+    # Each reel its own words (Nicole, Nov 23). Hers has one Reel tab for the whole shoot; these say which reel a
+    # page is about when the shoot has several. All drafts for Nicole. {reel} is the reel's name.
+    "reels_label": "Your reels",                      # hers, from the reel page's own bar
+    "reels_say": "Each reel has its own caption and hooks. These are for {reel}.",
+    "talk_line_reel": "Ask me about the {short} reel, {reel}",
+    "write_line_reel": "Write my words for the {short} reel, {reel}",
+    "polish_quoted_reel": "“Polish my caption for the {short} reel, {reel}”",
+    "o_line_reel": "Write my words for the {short} reel, {reel}",
+    "from_say": "This reel starts fresh. Want to begin with what you told me about {from}?",
+    "from_yes": "Use my answers from {from}",
+    "from_done": "Your answers from {from} are in",
+    "reel_gone": reels_mod.GONE,
 }
 ON_DRIVE = " on your photo drive"        # her words; left out when Your Content is on the computer's own disk
 
@@ -382,23 +401,88 @@ def queue_state(kit, piece, slides, version=None):
     return out
 
 
-def state(kit, piece, facts=None):
-    """Everything the page draws from, for one piece. No path is in it."""
-    rec_kit, project, slides = facts or kit_facts(kit)
-    rec = words_mod.load(kit)
-    w = piece_for_page(words_mod.piece_of(rec, piece))
-    other = OTHER[piece]
-    st = words_mod.status(kit)[other]
-    strip, need = strip_for_page(kit, piece, rec_kit, slides)
-    # a shoot with several reels (v25): this page's reel is the one being worked on, so "is it made" and its
-    # place in the queue are that reel's (the queue step adds that one)
+FIRST_REEL = words_mod.FIRST_REEL
+
+
+class NoSuchReel(Exception):
+    """A page named a reel the shoot doesn't have (any more)."""
+
+
+def page_reel(kit, reel, rec_kit=None, opening=False):
+    """Which reel a words page (or one of its saves) is about: (the shoot's reels when it has several, else [];
+    the reel's id, or None for a shoot with one reel).
+
+    One reel: ([], None) whatever was asked; the words are the shoot's, as ever. Several: the reel named, which
+    must be one of the shoot's (NoSuchReel otherwise: nothing is ever saved to, or shown from, a reel that isn't
+    there). With none named: when a page is OPENING, the reel being worked on (hers); for a look or a save from
+    a page that named none (it opened when the shoot had one reel), the shoot's first reel, whose words those
+    are, never whichever reel happens to be open now."""
     several = kit_reels(kit, rec_kit)
-    open_reel = reel_open(kit) if several else None
-    mine = next((r for r in several if r["id"] == open_reel), None)
+    if not several:
+        if reel not in (None, "", FIRST_REEL) and not opening:
+            raise NoSuchReel(reel)          # one reel, and a look or a save names another: never the one reel's
+        return [], None
+    ids = [r["id"] for r in several]
+    if reel is None or reel == "":
+        if opening:
+            cur = reel_open(kit)
+            return several, cur if cur in ids else ids[0]
+        return several, FIRST_REEL
+    if not isinstance(reel, str) or reel not in ids:
+        raise NoSuchReel(reel)
+    return several, reel
+
+
+def reel_strip(kit, rec, reel, several):
+    """A later reel's own photos for the strip (reels_for_kit's order, by number), as the small copies."""
+    mine = next((r for r in several if r["id"] == reel), None)
+    if mine is None:
+        return None
+    rows = arrange.sheet_rows(kit)
+    by_n = {x["n"]: x for x in rows}
+    shown = [by_n[x["n"]] for x in mine.get("order") or [] if x.get("n") in by_n][:STRIP_REEL]
+    if not shown:
+        return [], False
+    photos, _ = arrange.page_photos(kit, rec, shown)
+    kq = quote(kit.name, safe="")
+    need = any(not p["have"] and not p["missing"] for p in photos)
+    return ["/kit-photo?kit=%s&n=%d&size=s&v=%s" % (kq, p["n"], quote(p["v"] or "", safe="")) for p in photos if not p["missing"] or p["have"]], need
+
+
+def state(kit, piece, facts=None, reel=None, opening=False):
+    """Everything the page draws from, for one piece. No path is in it. `reel`: which of the shoot's reels the
+    page is about (page_reel); NoSuchReel when it names one the shoot doesn't have."""
+    rec_kit, project, slides = facts or kit_facts(kit)
+    several, reel = page_reel(kit, reel, rec_kit, opening)
+    rec = words_mod.load(kit)
+    w = piece_for_page(words_mod.read_of(rec, piece, reel if piece == "reel" else None))
+    other = OTHER[piece]
+    st = words_mod.status(kit, reel)[other]
+    strip, need = strip_for_page(kit, piece, rec_kit, slides)
+    # a shoot with several reels: this page's reel is the one its address names, so its strip, "is it made" and
+    # its place in the queue are that reel's (the queue step adds that one), and so are its words
+    mine = next((r for r in several if r["id"] == reel), None)
     if mine is not None:
         project = mine["project"] or ""
+        if piece == "reel":
+            try:
+                got = reel_strip(kit, rec_kit, reel, several)
+            except (OSError, ValueError, TypeError, AttributeError, KeyError):
+                got = None
+            if got is not None:
+                strip, need = got
+    # a reel with nothing answered yet may start from another reel's answers (one press; answers only)
+    start_from = None
+    if piece == "reel" and several and not any(w["answers"].get(k) for k in words_mod.ANSWERED):
+        sts = words_mod.reels_status(kit, [r["id"] for r in several])
+        src = next((r for r in several if r["id"] != reel and (sts.get(r["id"]) or {}).get("answered")), None)
+        if src is not None:
+            start_from = {"id": src["id"], "name": src["name"]}
     return {
         "ok": True, "piece": piece, "short": short_name(kit.name),
+        "reel": reel, "reel_name": mine["name"] if mine is not None else "",
+        "reels": [{"id": r["id"], "name": r["name"]} for r in several],
+        "from": start_from,
         "w": w,
         "kit": {"reel": project, "slides": len(slides), "made": bool(project) if piece == "reel" else bool(slides),
                 "on_drive": on_photo_drive(kit)},
@@ -406,7 +490,7 @@ def state(kit, piece, facts=None):
                   "answered": bool(st["answered"]), "caption": bool(st["caption"]), "hooks": int(st["hooks"])},
         "strip": strip, "strip_wait": need,
         # a shoot with several reels (v25): this page's queue step is about the reel being worked on
-        "queue": queue_state(kit, piece, slides, version=open_reel if piece == "reel" and mine is not None else None),
+        "queue": queue_state(kit, piece, slides, version=reel if piece == "reel" and mine is not None else None),
     }
 
 
@@ -431,6 +515,20 @@ def _kit_and_piece(body, keys):
     return (kit, piece), None
 
 
+def _body_reel(kit, body):
+    """Which reel a POST means: (the reel's id or None, None), or (None, the answer to send). `reel`, when it is
+    sent, must be a reel id by its shape and one of the shoot's own reels; a reel that isn't there is refused
+    (409, her "That reel isn't there anymore."), never saved under another reel."""
+    reel = body.get("reel")
+    if "reel" in body and (not isinstance(reel, str) or not reels_mod.ID.fullmatch(reel)):
+        return None, _bad()
+    try:
+        _, reel = page_reel(kit, reel)
+    except NoSuchReel:
+        return None, _bad(OUR_WORDS["reel_gone"], 409)
+    return reel, None
+
+
 def save_from_page(body):
     """POST /words-save {kit, piece, answers?, own?, caption?, picked?}. Each part in its own shape, or nothing
     is saved; words.py holds every text to its limit. The hooks themselves are only ever written from the chat."""
@@ -438,6 +536,11 @@ def save_from_page(body):
     if no:
         return no
     kit, piece = got
+    reel, no = _body_reel(kit, body)
+    if no:
+        return no
+    if piece != "reel":
+        reel = None                         # a carousel's words are the shoot's, whichever reel its page names
     given = {}
     if "answers" in body:
         a = body["answers"]
@@ -463,7 +566,7 @@ def save_from_page(body):
     if not given:
         return _bad()
     try:
-        w = words_mod.save_from_page(kit, piece, given)
+        w = words_mod.save_from_page(kit, piece, given, reel)
     except words_mod.Stop:
         return _bad()
     except OSError as e:
@@ -475,14 +578,27 @@ def save_from_page(body):
 def carry_from_page(body):
     """POST /words-carry {kit, piece}: this piece's answers are copied to the other one (never "where"), so
     they don't answer twice (words.carry)."""
-    got, no = _kit_and_piece(body, {"kit", "piece"})
+    got, no = _kit_and_piece(body, {"kit", "piece", "reel", "from"})
     if no:
         return no
     kit, piece = got
+    reel, no = _body_reel(kit, body)
+    if no:
+        return no
+    src = body.get("from")
+    if "from" in body and (piece != "reel" or "reel" not in body or not isinstance(src, str) or not reels_mod.ID.fullmatch(src)):
+        return _bad()                       # a start from another reel always names the reel it is for
     try:
-        words_mod.carry(kit, piece, OTHER[piece])
+        if "from" in body:
+            # a reel with no answers yet starts from another reel's (answers only); both must be the shoot's own
+            several, _ = page_reel(kit, None)
+            if reel is None or src not in [r["id"] for r in several] or src == reel:
+                return _bad(OUR_WORDS["reel_gone"], 409)
+            words_mod.carry_reel(kit, src, reel)
+        else:
+            words_mod.carry(kit, piece, OTHER[piece], reel)
     except words_mod.Stop:
-        return 200, {"ok": False, "words": OUR_WORDS["nothing_to_carry"]}
+        return 200, {"ok": False, "words": "" if "from" in body else OUR_WORDS["nothing_to_carry"]}
     except OSError as e:
         arrange.log(f"words page: couldn't carry the answers of {kit.name!r} ({e.__class__.__name__}: {str(e)[:160]})")
         return _bad(WORDS["not_saved"], 503)
@@ -610,6 +726,13 @@ def _get_page(handler, q):
     if kit is None or piece not in PIECES:
         return arrange._send_page(handler, arrange_page.plain_page(CANT_FIND))
     rec_kit, project, slides = kit_facts(kit)
+    # which reel this page is about, fixed for as long as it is open: the one its address names, else the reel
+    # being worked on; None for a shoot with one reel. An id that isn't one of the shoot's reels opens the reel
+    # being worked on, as an address with none does.
+    try:
+        _, reel = page_reel(kit, _one(q, "reel") or None, rec_kit, opening=True)
+    except NoSuchReel:
+        _, reel = page_reel(kit, None, rec_kit, opening=True)
     _, need = strip_for_page(kit, piece, rec_kit, slides)
     if need:
         try:
@@ -617,7 +740,7 @@ def _get_page(handler, q):
                 arrange.start_previews(kit)          # a reel photo in the strip has no small copy yet: made in the background
         except (Exception, SystemExit) as e:  # noqa: BLE001  (the strip only; the page still opens)
             arrange.log(f"words page: the small copies couldn't be started ({e.__class__.__name__})")
-    arrange._send_page(handler, page_html(kit.name, piece))
+    arrange._send_page(handler, page_html(kit.name, piece, reel))
 
 
 def _get_state(handler, q):
@@ -629,7 +752,14 @@ def _get_state(handler, q):
     piece = _one(q, "piece")
     if piece not in PIECES:
         return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 404)
-    arrange._send_json(handler, state(kit, piece))
+    reel = _one(q, "reel") or None
+    if reel is not None and not reels_mod.ID.fullmatch(reel):
+        return arrange._send_json(handler, {"ok": False, "words": NOT_UNDERSTOOD}, 404)
+    try:
+        out = state(kit, piece, reel=reel)
+    except NoSuchReel:
+        return arrange._send_json(handler, {"ok": False, "words": OUR_WORDS["reel_gone"]}, 404)
+    arrange._send_json(handler, out)
 
 
 def handle_get(handler, path, query):
@@ -769,6 +899,13 @@ h1,.say,.say b,.todo b,.todo p,.other b,.other p,.talk p,.q > b,.q > small,.went
 .went{display:block;font-size:13.5px;color:var(--ink-2);margin:.35rem 0 0;min-height:0}
 .otherlink{margin:.5rem 0 0}
 .strip img.wait{visibility:hidden}
+.reelsbar{margin:.8rem 0 0}
+.reelsbar .rl{display:block;font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin:0 0 .4rem}
+.reelsbar .pieces{margin:0}
+.reelsbar .pieces a{font-size:13px;padding:.45rem .85rem;max-width:100%;overflow-wrap:anywhere}
+.reelsbar .say{margin:.5rem 0 0;font-size:14px}
+.fromreel{margin:.2rem 0 1.1rem;background:#FFF6F2;border:1.5px solid var(--coral-l);border-radius:14px;padding:.75rem .95rem}
+.fromreel p{margin:0 0 .5rem;color:var(--ink-2);font-size:15px;max-width:44em;overflow-wrap:anywhere}
 @media (max-width:520px){.hook{flex-wrap:wrap}.hook .t{flex-basis:100%}}
 """
 
@@ -790,8 +927,10 @@ def page_words():
     return w
 
 
-def page_html(kit_name, piece):
-    """The words page for one piece of one kit. Everything that changes arrives by /words-state."""
+def page_html(kit_name, piece, reel=None):
+    """The words page for one piece of one kit. Everything that changes arrives by /words-state. `reel`: the id
+    of the reel the page is about, when the shoot has several (None: one reel); the page keeps it for every look
+    and save, and the reels' names arrive with the state, as text."""
     e = html.escape
     w = page_words()
     short = short_name(kit_name)
@@ -802,10 +941,13 @@ def page_html(kit_name, piece):
             s = s.replace("{" + k + "}", v)
         return s
     kq = quote(kit_name, safe="")
+    reel = reel if isinstance(reel, str) and reels_mod.ID.fullmatch(reel) else None
     data = {"kit": kit_name, "piece": piece, "short": short, "words": w, "rhythms": list(RHYTHMS),
-            "saveAfter": SAVE_AFTER_MS, "lookEvery": LOOK_EVERY_MS, "typing": TYPING_MS, "posting": POSTING_PAGE}
+            "saveAfter": SAVE_AFTER_MS, "lookEvery": LOOK_EVERY_MS, "typing": TYPING_MS, "posting": POSTING_PAGE,
+            "reel": reel}
+    rq = "&amp;reel=" + reel if reel else ""
     tabs = "".join(
-        "<a href='/words.html?kit=%s&amp;piece=%s' data-piece='%s'%s>%s</a>" % (kq, p, p, " class='on'" if p == piece else "", e(w["tab_" + p]))
+        "<a href='/words.html?kit=%s%s&amp;piece=%s' data-piece='%s'%s>%s</a>" % (kq, rq, p, p, " class='on'" if p == piece else "", e(w["tab_" + p]))
         for p in PIECES)
 
     def chips(group, keys):
@@ -822,6 +964,9 @@ def page_html(kit_name, piece):
         "<div class='talk'><p><b>" + e(w["talk_b"]) + "</b> " + e(w["talk"]) + "</p>"
         "<div class='line'><span id='talkLine'>" + e(f("talk_line")) + "</span>"
         "<button class='btn main' id='talkBtn' type='button'>" + e(w["copy"]) + "</button></div></div>"
+        # a reel with nothing answered yet, when another reel of the shoot is answered (drawn from the state)
+        "<div class='fromreel' id='fromReel' hidden><p id='fromSay'></p>"
+        "<button class='btn small' id='fromBtn' type='button'></button></div>"
         "<div class='q'><b id='qAbout'>" + e(w["q_about"]) + "</b><small>" + e(w["q_about_small"]) + "</small>"
         + box("about", lim["about"], w["about_ph"], big=True) + "</div>"
         "<div class='q'><b>" + e(w["q_who"]) + "</b><small>" + e(w["q_who_small"]) + "</small>"
@@ -867,6 +1012,10 @@ def page_html(kit_name, piece):
         "<h1 id='title'>" + e(f("title")) + "<em>.</em></h1>"
         "<p class='lede'>" + e(w["lede"]) + "</p>"
         "<nav class='pieces' id='pieces'>" + tabs + "</nav>"
+        # several reels: which reel this page is about, and a link to each other reel's own words (from the state)
+        "<div class='reelsbar' id='reelsBar' hidden><span class='rl'>" + e(w["reels_label"]) + "</span>"
+        "<nav class='pieces' id='reelsNav' aria-label='" + e(w["reels_label"], quote=True) + "'></nav>"
+        "<p class='say' id='reelsSay'></p></div>"
         "<div class='strip" + (" wide" if piece == "carousel" else "") + "' id='strip'></div></header>"
         + step1 + step2 + step3 +
         "</div><div class='toast' id='toast' role='status'></div>"
@@ -882,7 +1031,12 @@ SCRIPT = r"""
 var D = JSON.parse(document.getElementById('wordsData').textContent);
 var W = D.words, KIT = D.kit, PIECE = D.piece, SHORT = D.short, OTHER = PIECE === 'reel' ? 'carousel' : 'reel';
 var $ = function(id){ return document.getElementById(id); };
-var Q = '?kit=' + encodeURIComponent(KIT) + '&piece=';
+// Which reel this page is about (a shoot with several): fixed when the page opened, sent with every look and
+// every save. Null for a shoot with one reel; if a second reel is started while the page is open, the words it
+// holds are the first reel's, and the server says so (st.reel).
+var REEL = D.reel || null, REELNAME = '', reelsKey = null;
+function Q(){ return '?kit=' + encodeURIComponent(KIT) + (REEL ? '&reel=' + encodeURIComponent(REEL) : '') + '&piece='; }
+function line(key){ return PIECE === 'reel' && REELNAME ? fill(W[key + '_reel'], {reel: REELNAME}) : fill(W[key]); }
 function fill(s, o){ o = o || {}; return s.replace(/\{(\w+)\}/g, function(m, k){
   if (k in o) return o[k];
   return k === 'short' ? SHORT : k === 'piece' ? PIECE : k === 'other' ? OTHER : m; }); }
@@ -950,6 +1104,7 @@ function send(extra, leaving){
   if (!any) return Promise.resolve(true);
   dirty = {};
   body.kit = KIT; body.piece = PIECE;
+  if (REEL) body.reel = REEL;
   inflight++;
   function failed(){
     inflight--;
@@ -1130,7 +1285,7 @@ function addToQueue(){
   }
   adding = true;
   area.textContent = W.q_adding;
-  flush().then(function(){ return post('/words-queue', {kit: KIT, piece: PIECE}); }).then(function(r){
+  flush().then(function(){ return post('/words-queue', REEL && PIECE === 'reel' ? {kit: KIT, piece: PIECE, reel: REEL} : {kit: KIT, piece: PIECE}); }).then(function(r){
     adding = false;
     if (!r || !r.ok) { toast((r && r.words) || W.cant_add); showNext(); return; }
     S.queue = r.queue; lastRest = null; showNext(); toast(W.added);
@@ -1179,7 +1334,8 @@ function showNext(){
 }
 function showOther(o){
   var b;
-  var doIt = $('otherDo'), url = '/words.html' + Q + OTHER;
+  var doIt = $('otherDo'), url = '/words.html' + Q() + OTHER;
+  var oLine = OTHER === 'reel' && REELNAME ? fill(W.o_line_reel, {reel: REELNAME}) : fill(W.o_line);
   doIt.textContent = '';
   function go(cls){ var a = el('a', cls, fill(W.o_go)); a.href = url; a.id = 'otherGo'; return a; }
   if (o.caption) {
@@ -1189,9 +1345,9 @@ function showOther(o){
   } else if (o.answered || carried) {
     $('otherHead').textContent = fill(W.o_waiting_h);
     $('otherSay').textContent = fill(W.o_waiting);
-    var ln = el('div', 'line'), sp = el('span', '', fill(W.o_line)); sp.id = 'otherLine';
+    var ln = el('div', 'line'), sp = el('span', '', oLine); sp.id = 'otherLine';
     b = btn('btn main', W.copy); b.id = 'otherCopy';
-    b.onclick = function(){ copy(fill(W.o_line), W.what_line); };
+    b.onclick = function(){ copy(oLine, W.what_line); };
     ln.appendChild(sp); ln.appendChild(b); doIt.appendChild(ln);
     var p = el('p', 'otherlink'); p.appendChild(go('')); doIt.appendChild(p);
   } else {
@@ -1200,7 +1356,7 @@ function showOther(o){
     b = btn('btn main', fill(W.o_yes)); b.id = 'otherYes';
     b.onclick = function(){
       b.disabled = true;
-      flush().then(function(){ return post('/words-carry', {kit: KIT, piece: PIECE}); }).then(function(r){
+      flush().then(function(){ return post('/words-carry', REEL ? {kit: KIT, piece: PIECE, reel: REEL} : {kit: KIT, piece: PIECE}); }).then(function(r){
         if (r && r.ok) { carried = true; S.other.answered = true; showNext(); toast(fill(W.carried)); return; }
         b.disabled = false;
         toast((r && r.words) || W.not_saved);
@@ -1227,10 +1383,51 @@ function showStrip(urls){
   });
 }
 
+/* ---------- several reels: which reel this is, the way to the others, a start from another reel ---------- */
+function showReels(st){
+  var rs = st.reels || [], key = JSON.stringify([rs, st.reel, st.reel_name, st.from]);
+  if (key === reelsKey) return;
+  reelsKey = key;
+  REELNAME = rs.length > 1 ? (st.reel_name || '') : '';
+  var bar = $('reelsBar'), nav = $('reelsNav');
+  nav.textContent = '';
+  bar.hidden = !(PIECE === 'reel' && rs.length > 1);
+  if (!bar.hidden) rs.forEach(function(r){
+    var a = el('a', r.id === st.reel ? 'on' : '', r.name);
+    a.href = '/words.html?kit=' + encodeURIComponent(KIT) + '&reel=' + encodeURIComponent(r.id) + '&piece=reel';
+    a.dataset.reel = r.id;
+    if (r.id === st.reel) a.setAttribute('aria-current', 'page');
+    nav.appendChild(a);
+  });
+  $('reelsSay').textContent = PIECE === 'reel' && REELNAME ? fill(W.reels_say, {reel: REELNAME}) : '';
+  // the lines to copy name the reel, so the chat knows whose words to write
+  $('talkLine').textContent = line('talk_line');
+  $('copyLine').textContent = line('write_line');
+  $('polishWords').textContent = line('polish_quoted');
+  $('eyebrow').textContent = W.eyebrow + W['tab_' + PIECE] + (PIECE === 'reel' && REELNAME ? ' · ' + REELNAME : '');
+  Array.prototype.forEach.call(document.querySelectorAll('#pieces a'), function(a){ a.href = '/words.html' + Q() + a.dataset.piece; });
+  var box = $('fromReel'), f = PIECE === 'reel' ? st.from : null;
+  box.hidden = !f;
+  if (f) {
+    $('fromSay').textContent = fill(W.from_say, {from: f.name});
+    var b = $('fromBtn'); b.textContent = fill(W.from_yes, {from: f.name}); b.disabled = false;
+    b.onclick = function(){
+      b.disabled = true;
+      flush().then(function(){ return post('/words-carry', {kit: KIT, piece: 'reel', reel: REEL, from: f.id}); }).then(function(r){
+        if (r && r.ok) toast(fill(W.from_done, {from: f.name})); else if (r && r.words) toast(r.words);
+        lastServerAns = null; reelsKey = null; load();
+      }, function(){ b.disabled = false; toast(W.not_saved); });
+    };
+  }
+  lastRest = null;                          // the steps and the other piece's box are drawn again with the reel's name
+}
+
 /* ---------- start, and pick up answers and drafts as they arrive ---------- */
 function load(){
-  return ask('/words-state' + Q + PIECE).then(function(st){
+  return ask('/words-state' + Q() + PIECE).then(function(st){
     if (!st || !st.ok) return;
+    if (st.reel && !REEL) REEL = st.reel;      // a second reel was started since this page opened: its words are the first reel's
+    showReels(st);
     var first = !loaded;                   // no look has come back yet (the very first one may have failed)
     var p = st.w, a = p.answers, aj = JSON.stringify(a);
     // the first look, or answers given in the chat; never while they are typing (within 5 s of their last key),

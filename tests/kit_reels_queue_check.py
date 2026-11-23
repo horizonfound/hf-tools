@@ -325,7 +325,7 @@ def check_optional(s):
     case("the posting page is told no reel name for a shoot with one reel", g.get("reel_name") is None, g)
     code, p, _ = ppc.panel(s, g["id"])
     case("its panel, with no caption: the words row has none to copy (the page says 'No caption yet.')",
-         code == 200 and p["words"] == {"piece": "reel", "caption": "", "hook": ""}, p.get("words"))
+         code == 200 and p["words"] == {"piece": "reel", "reel": "v1", "caption": "", "hook": ""}, p.get("words"))
     # with a caption the page says it's ready and asks nothing
     s2 = s
     s2.words("draft", "reel", {"caption": "MINI SESSIONS are coming to Laguna Beach on December 4th!!!", "hooks": HOOKS})
@@ -380,7 +380,7 @@ def check_reels(s):
     btn = add_button(t) or ""
     offered = json.loads(html.unescape(re.search(r"data-reels='([^']*)'", btn).group(1))) if "data-reels" in btn else None
     case("Add to my queue offers the reels that are made and not in the queue yet: only the second", "data-multi='1'" in btn
-         and offered == [{"id": "v2", "name": SECOND}], (btn, offered))
+         and offered == [{"id": "v2", "name": SECOND, "nocap": True}], (btn, offered))
     code, j = add(s, reel="v2")
     pcs = reel_pieces(s)
     v2 = pcs.get(was["id"] + "-v2") or {}
@@ -423,7 +423,7 @@ def check_reels(s):
     code, t = look(s)
     btn = add_button(t) or ""
     offered = json.loads(html.unescape(re.search(r"data-reels='([^']*)'", btn).group(1)))
-    case("the third reel made: it is the only one offered (the others are in the queue or posted)", offered == [{"id": "v3", "name": THIRD}], offered)
+    case("the third reel made: it is the only one offered (the others are in the queue or posted)", offered == [{"id": "v3", "name": THIRD, "nocap": True}], offered)
     # the open reel when none is named (hers)
     code, j = add(s)
     case("a press that names no reel adds the one being worked on (hers)", code == 200 and (was["id"] + "-v3") in reel_pieces(s)
@@ -621,10 +621,16 @@ def check_reminders(s):
     ok = rpc.until(lambda: len(rpc.events(s, base)) == 1) and rpc.settle(s)
     case("...and the first reel's has its own event at its own time", ok and rpc.events(s, base)[0]["time"] == "18:00"
          and rpc.events(s, base)[0]["date"] != ev.get("date") and len(rpc.book(s)) == 2, rpc.book(s))
-    s.words("draft", "reel", {"caption": "A caption written later.", "hooks": HOOKS})
+    # since Nov 23 each reel has its own caption: the second reel's is written for the second reel, by name
+    f = s.work / "second-reel-draft.json"
+    f.write_text(json.dumps({"caption": "A caption written later.", "hooks": HOOKS}, ensure_ascii=False), encoding="utf-8")
+    code, out = s.cmd("words.py", "draft", KIT, "reel", "--reel", SECOND, "--file", str(f))
     rpc.press(s, {"action": "remind-sync"})
-    ok = rpc.until(lambda: "A caption written later." in (rpc.events(s, v2) or [{}])[0].get("notes", ""), 20) and rpc.settle(s)
-    case("a caption written later reaches the reminder's notes", ok, (rpc.events(s, v2) or [{}])[0].get("notes"))
+    ok = code == 0 and rpc.until(lambda: "A caption written later." in (rpc.events(s, v2) or [{}])[0].get("notes", ""), 20) and rpc.settle(s)
+    case("a caption written later for that reel reaches its reminder's notes", ok, (out[-200:], (rpc.events(s, v2) or [{}])[0].get("notes")))
+    case("...and never the other reel's: the first reel's reminder still says it has no caption",
+         NO_CAPTION_NOTE in rpc.events(s, base)[0].get("notes", "") and "A caption written later." not in rpc.events(s, base)[0].get("notes", ""),
+         rpc.events(s, base)[0].get("notes"))
     rpc.press(s, {"action": "unready", "id": v2})
     ok = rpc.until(lambda: not rpc.events(s, v2)) and rpc.settle(s)
     case("that reel taken out of line: its event goes, the other reel's stays", ok and len(rpc.events(s, base)) == 1, rpc.book(s))
