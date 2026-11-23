@@ -414,7 +414,7 @@ def part_first(a):
         case("STUDIO_FIRST_DESIGN_FOR_TESTS=plain is the only thing that brings back the old first design", F.plain_for_tests() is False and F.PLAIN_FOR_TESTS == "STUDIO_FIRST_DESIGN_FOR_TESTS")
         src = (SCRIPTS / "design.py").read_text(encoding="utf-8")
         case("design.py asks for the example only from the first visit (ensure_design), and falls back to one photo per slide if the rules ever fail",
-             "new_design(kit, kind=kind, first=True)" in src and src.count("first=True") == 1 and "if state is None:\n                    state = seed_state(rec, carousel_order(kit), rows)" in src)
+             "new_design(kit, kind=kind, first=True)" in src and src.count(", first=True)") == 1 and "if state is None:\n                    state = seed_state(rec, carousel_order(kit), rows)" in src)
 
         group("what the Assistant is told (design.py open), and the vault")
         env = dict(run.env, FACES_PRETEND=str(tfile))
