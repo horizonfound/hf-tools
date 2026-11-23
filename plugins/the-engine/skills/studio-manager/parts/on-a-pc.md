@@ -77,7 +77,7 @@ Every command in the parts is written the way a Mac's command line reads it. **O
 
 ## Pictures: one more free add-on
 
-On a Mac, previews, contact sheets and sneak peeks are made with the Mac's own picture tool. A PC has none, so there they need one free add-on called Pillow. For camera RAW files the Assistant uses the small JPEG every camera tucks inside the RAW (what the back of the camera shows); the RAW itself is only ever read.
+On a Mac, previews, contact sheets and the first-look photos are made with the Mac's own picture tool. A PC has none, so there they need one free add-on called Pillow. For camera RAW files the Assistant uses the small JPEG every camera tucks inside the RAW (what the back of the camera shows); the RAW itself is only ever read.
 
 **When to ask.** At their very first hello, before it, when `this_computer.py` says it isn't there (step 6 of "The first conversation on a PC"). And before the first backup, drop, post kit, reel page, carousel or story designer in any conversation: run `python3 "<scripts>/pictures.py"` first.
 
@@ -190,5 +190,5 @@ The words page (`parts/words.md`) and the posting queue's panel for a post work 
 - **Claude keeps stopping to ask permission:** the word under the message box, at the right, has slipped back from Auto. Say: "Say yes to the one on screen, then click the word under the message box, at the right, and pick Auto." If Auto isn't in that list: pick the newest Claude in the list just left of it (Anthropic's documentation: Auto shows only with a recent model), or update Claude (the three lines at the top left, then Help, then Check for Updates; an older Claude on Windows also starts in Manual rather than Auto). [check on a PC]
 - **Reading their Instagram grid** fetches the pictures with curl, which comes with Windows 10 and 11. [check on a PC]
 - **Canva:** the same connector as on a Mac; for `canva_kit.py fetch`, the links always go in a file (see Commands).
-- **Lightroom:** the same on both. The "sneak peek" keyword sits in a small sidecar file beside each photo, which Lightroom reads on import; photos already imported in Lightroom Classic need Metadata > Read Metadata from Files.
+- **Lightroom:** the same on both. A backup writes nothing beside a photo any more (since Nov 23); a backup made before then may have left a small "sneak peek" sidecar file beside a few photos, which Lightroom reads on import and which is left where it is.
 - **Anything else that stops by naming a Mac tool** (`sips`, `afconvert`, `osascript`, "the Mac's own..."): that step hasn't been switched over for a PC yet. Say plainly that this part isn't ready on a PC yet, keep everything as it is, and carry on with what does work. Never write your own replacement.
