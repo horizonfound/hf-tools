@@ -2,6 +2,20 @@
 
 Part of the Assistant's instructions. The first-thing checks, the rules and how you talk are in SKILL.md and apply here too. When the backup stops with exit 7, read parts/sneak-peeks.md. When a shoot gets a note, read parts/client-note.md. Steps 8b and 8c below are those two parts.
 
+## Two ways to start a backup (since Nov 23)
+
+**The home page's Back up a card box is how most people start now (Nicole's v31).** They tap Back up a card, check the two pictures (their card, and the drive and folder their backups go in), and press **Start the backup**. The page starts the backup itself; there is nothing for you to run, press or answer, and no permission question in the chat. What the box shows and says is in `parts/hello.md` ("The Back up a card box"). A backup started there sorts the shoots by the breaks in time with nobody looking, and they name them afterwards from the card's **Name them**.
+
+**"backup now" in the chat still works**, exactly as below, for anyone who likes it.
+
+**When a backup started from the page is running or has just finished**, `python3 <scripts>/backup_job.py status` prints its record (state `running`, `done`, `problem` or `idle`; step `copying`, `sorting`, `second`, `done`; how many of how many):
+- **Running:** never start another backup, and never run `night.py` for the same card. Say how it is going in the page's own words ("Copying and checking (128 of 181)", "Sorting into shoots", "Making your second copy") and that the Back up a card card on their home page shows it. They don't have to wait.
+- **Done:** say so, and that the card on the home page has Name them and the report. "Every photo checked" only when the report says so.
+- **Problem:** say the record's `line` as it is. Pressing Start the backup again in the box carries on (photos already copied are checked, not copied again); or do it here with "backup now".
+- **Never promise a notification or a phone tap for a backup started from the page** (Nicole, Nov 23: no notification). The card turning to Done is how they know. (The phone tap further down is only for a backup you start from the chat.)
+- **The second copy from the box is asked every time and never remembered**; it is made right after the main copy, never at the same moment.
+- **To change where backups go**, send them to the box's **Change** (it clears the drive and the folder so they pick again; saved when they press Start), or do it from the chat as before (`studio_file.py set --drive`).
+
 ## When they say "backup now"
 
 **Nothing is asked before the copy (Dustin, Nov 19).** "backup now" means: find the card, know the drive, check quietly, say the starting message, go. No screen of questions, no list of settings to agree to, no question about how many cards or what is on the card, no phone page. The only things you may ask are the "cannot tell" cases in steps 1 and 2. Everything else is chosen the usual way and can be changed afterwards, from the report or by saying so.

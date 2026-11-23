@@ -642,7 +642,7 @@ def check_whole_build():
          and "use the Select the folder button on the Make posts screen" in flat("on-a-pc.md")
          and not re.search(r"home page's \"Select the folder|Select the folder button on the home page", flat("photos-in.md") + flat("on-a-pc.md")))
     # a press on step 1 or 3 opens a screen that also lists backups and kits: it may be someone only looking
-    case("hello.md: a press on Back up a card or Make posts may only be someone looking; what they asked is answered, then home.py seen",
+    case("hello.md: a press on See all my post kits may only be someone looking; what they asked is answered, then home.py seen (Back up a card never shows as a press since Nov 23)",
          "may only be someone looking" in flat("hello.md") and "answer what they asked, say nothing about the press, and run `home.py seen`" in flat("hello.md")
          and "may only be someone looking" in re.sub(r"\s+", " ", read(SM / "SKILL.md")))
     # the PC's "what can't you do" list names reminders, and the PC part points at the reminder section
@@ -1668,9 +1668,9 @@ def check_backup_zero():
          "It refuses a memory card (this backup's own or any other" in a2 and '"could not be found" when it says they were changed' in a2
          and "**The saved second drive had trouble during a backup**" in a2)
     import home_base
-    case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
-         "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]
-         and "quick question" not in " ".join(home_base.WORDS.values()))
+    case("the backups screen no longer says a question or two is asked (its steps box went with her v31: backing up starts in the box on the home page)",
+         "b_s2_small" not in home_base.WORDS and "b_s2_small" not in home_base.OUR_WORDS
+         and "quick question" not in " ".join(list(home_base.WORDS.values()) + list(home_base.OUR_WORDS.values())))
 
 
 def check_vault_core():
@@ -1969,7 +1969,8 @@ def check_chat_no_reminders():
     case("home.py's hello words for getting-started and regular no longer ask for the day's rundown, and say never what is due",
          "The day in" not in hw and hw.count("never what is due") + hw.count("Never what is due") == 2, hw)
     case("the core no longer counts a tile press among presses that may only be someone looking (tiles never reach pending)",
-         "See all my post kits or a tile may only be" not in skill and "Back up a card or See all my post kits may only be someone looking" in skill)
+         "See all my post kits or a tile may only be" not in skill and "a press on See all my post kits may only be someone looking" in skill
+         and "Back up a card or See all my post kits may only be someone looking" not in skill)
     case("posting-queue.md says the grid shows up to 12 posts in four rows (not 12 to 15, not five rows)",
          "12 to 15 posts" not in pq and "up to five rows" not in pq and "up to 12 posts show at once, four rows" in pq
          and "up to four rows (12 posts)" in pq)
@@ -1978,10 +1979,38 @@ def check_chat_no_reminders():
          any("\"what's due\"" in r and "parts/editing-queue.md" in r for r in table_rows(skill)) and "\"what's due?\"" in q)
 
 
+def check_backup_box_nov23():
+    """Back up a card is a box on the home page that starts the backup itself (Nicole's v31; built Nov 23)."""
+    hello, backup, skill, where = (re.sub(r"\s+", " ", read(SM / "parts" / n)) for n in ("hello.md", "backup.md", "../SKILL.md", "where-things-live.md"))
+    sys.path.insert(0, str(SM / "scripts"))
+    import backup_popup as bp
+    case("hello.md: Back up a card opens a box on the home page; See all my backups opens Your backups, only the list, See the report first",
+         "**Back up a card opens a box on the home page itself" in hello and "opens **Your backups**, which is only the list" in hello
+         and "each shoot with **See the report** first" in hello and 'has the two steps (card in, paste "backup now")' not in hello)
+    case("hello.md says the box's words as the page has them", bp.W("safe") in hello and bp.W("safety") in hello and bp.W("only_once").split(" After")[0] in hello
+         and "Copying and checking (128 of 181)" in hello and bp.W("sorting") in hello and bp.OUR_WORDS["second_step"] in hello and bp.W("done_head") in hello
+         and bp.W("no_wait") in hello and bp.W("second_add") in hello and bp.W("who_label") in hello)
+    case("hello.md: a press on Back up a card never reaches the chat; nothing promises a notification",
+         "`home.py pending` leaves it out, as it leaves out a tile" in hello and "never promise a tap or a notification for a backup started there" in hello)
+    case("hello.md: asked how a backup works, the answer is the box, and the one thing it asks the first time",
+         "The first time it asks one thing, where your backups should go" in hello and "I see we haven't backed up a card together yet" not in hello)
+    case("backup.md: two ways to start; backup now in the chat still works; a running backup from the page is never doubled",
+         "## Two ways to start a backup (since Nov 23)" in read(SM / "parts" / "backup.md") and '**"backup now" in the chat still works**' in backup
+         and "never start another backup" in backup and "`python3 <scripts>/backup_job.py status`" in backup
+         and "Never promise a notification or a phone tap for a backup started from the page" in backup
+         and "asked every time and never remembered" in backup and "never at the same moment" in backup)
+    case("the core: a press on Back up a card never shows in pending, and \"how's my backup going?\" goes to backup.md",
+         "a press on Back up a card never shows here" in skill and "\"how's my backup going?\"" in skill)
+    case("where-things-live.md names what the box keeps: the exact folder, never the second drive, and its one small note",
+         "exactly the folder picked in the box" in where and "the second drive picked there is never saved" in where and "`~/.studio/backup-popup-start.json`" in where)
+    case("hello.md no longer speaks of a Back up a card screen: the list is the Your backups screen",
+         "Back up a card screen" not in hello and "**What the Your backups screen says about a backup" in hello)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders, check_backup_box_nov23):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

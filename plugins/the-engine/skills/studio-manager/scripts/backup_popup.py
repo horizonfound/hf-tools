@@ -1271,6 +1271,7 @@ const BK = (function(){
       if (DEST && DEST.kind === 'saved' && !(S.saved && S.saved.here)) DEST = null;
       if (DEST && DEST.kind === 'computer' && (S.drives || []).length) DEST = null;
       if (SECOND && !(S.drives || []).some(x => x.d === SECOND.d && x.name === SECOND.name)) SECOND = null;
+      if (!DEST && !PICK && !cleared && S.saved && S.saved.here) DEST = {kind: 'saved'};      // their drive, plugged in while the box was open
       const a = document.activeElement; if (a && a.tagName === 'INPUT' && box.contains(a)) return true;       // never under their typing: the next look redraws
       draw(); }
     return true; }

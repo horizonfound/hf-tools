@@ -182,7 +182,7 @@ def check_page(w, home):
     case("the grid's row: the posts lined up (last in line first), then those marked posted, then their Instagram (not pinned), at most three",
          home.grid_now() == ["/posting-thumbs/p5.jpg"] and set(data) == {"hello_photos", "tiles", "samples"}, home.grid_now())
     also = part(page, "<div class='also'>", "</button></div>")
-    case("Back up a card and My editing queue, stacked, with their boxes", flat(also)[:4] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots.", "A card is in", "EOS_DIGITAL · about 233 files"]
+    case("Back up a card and My editing queue, stacked, with their boxes", flat(also)[:5] == ["Back up a card", "Copies your card to your drive, checks every photo, and sorts it into shoots.", "See all my backups", "A card is in", "EOS_DIGITAL · about 233 files"]
          and "My editing queue" in flat(also) and "id='n1'" in also and "id='n2'" in also)
     case("a name with markup in it reaches the page as text", "&lt;img src=x" in also and "<img src=x" not in page.split("<script", 1)[0])
     case("the recap card and its x as before, Watch in her word", "id='rc'" in page and ">Watch<" in page and "▶" not in page and "aria-label='Hide the monthly recap'" in page)
