@@ -181,12 +181,15 @@ def plan_rename(session, studio, shoot_id, new_name):
             # a sidecar the Studio wrote itself (the sneak-peek keyword) is not in the backup's records;
             # it travels along too, checked against its own hash, so Lightroom keeps pairing it with the photo.
             # Found by name regardless of case, since an older rename could leave its case behind the photo's.
+            # (Nov 23: a sidecar their own editing program wrote since the backup travels the same way, so it keeps
+            # its photo's name; before, it stayed behind under the old name. Marked "theirs" in the log.)
             found = names_in(cur.parent).get((cur.stem + ".xmp").lower())
             if found:
                 sc = cur.parent / found
-                if studio_wrote(session / sc):
+                if (session / sc).is_file():
+                    ours = studio_wrote(session / sc)
                     moves.append({"from": sc.as_posix(), "to": (into / sidecar_name(Path(found).suffix)).as_posix(),
-                                  "original": None, "sha256": sha256_of(session / sc), "studio": True})
+                                  "original": None, "sha256": sha256_of(session / sc), **({"studio": True} if ours else {"theirs": True})})
     if not moves:
         sys.exit(f"STOP: no sorted photos found in {old_folder}. Nothing renamed.")
     dests = [x["to"].lower() for x in moves]

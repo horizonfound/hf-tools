@@ -589,22 +589,27 @@ def carry_out(session, studio, log, log_path, entry, deep=False):
             try:
                 s = os.stat(session / m["from"])
                 m["ident"] = [s.st_ino, s.st_size, s.st_mtime_ns]
+                if os.environ.get("STUDIO_JOIN_NO_IDENT_FOR_TESTS"):   # tests only: a drive that numbers no file
+                    m["ident"][0] = 0
             except OSError:
                 m["ident"] = None
         entry["started"] = now()
         write_json(log_path, log)
     cut_for_tests("after-log")
 
-    moved_elsewhere = [m for m in moves if m["from"] != m["to"]]
     if not entry.get("named") and not on_disk(st):
         # No gathering folder: either nothing has happened yet, or the folder already took its name and the
-        # power went before the log could say so. Told apart by proof, never by a name being there.
-        at_final = [m for m in moved_elsewhere if on_disk(session / m["to"]) and proved(session / m["to"], m)[0]]
-        if moved_elsewhere and len(at_final) == len(moved_elsewhere):
+        # power went before the log could say so. Told apart by where the files are: named, every file is under
+        # its new name and none is left under an old one (an old name that is also some file's new name says
+        # nothing, so it is not asked). Whether each is the very file it should be is proved below, never here.
+        new_names = {m["to"] for m in moves}
+        olds = [m for m in moves if m["from"] not in new_names]
+        all_there = all(on_disk(session / m["to"]) for m in moves)
+        if all_there and olds and not any(on_disk(session / m["from"]) for m in olds):
             entry["named"] = True
             write_json(log_path, log)
-        elif at_final and any(not on_disk(session / m["from"]) for m in moves):
-            entry["problems"].append("the joined folder is there but not every photo is in it; nothing more was moved")
+        elif any(not on_disk(session / m["from"]) for m in moves):
+            entry["problems"].append("some photos are not where the log says they were, and the joined folder is not whole; nothing more was moved")
             write_json(log_path, log)
             say(f"  PROBLEMS: {entry['problems'][0]}")
             sys.exit(1)
