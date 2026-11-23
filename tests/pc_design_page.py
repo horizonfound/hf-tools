@@ -74,6 +74,9 @@ work = Path(tempfile.mkdtemp(prefix="assistant pc design page "))
 STUDIO = work / "studio"
 STUDIO.mkdir()
 os.environ["STUDIO_HOME"] = str(STUDIO)           # before arrange is imported: it reads STUDIO_HOME then
+# A PC has nothing that finds faces. This is the PC's page test, so it is run that way on a Mac too: the first design
+# (an example laid out by rule since Nov 23, design_first.py) is then made of whole photos, the same on every computer.
+os.environ["FACES_PRETEND"] = "none"
 ENV = dict(os.environ)
 sys.path.insert(0, str(SCRIPTS))
 import this_computer as tc  # noqa: E402
@@ -183,10 +186,14 @@ def main():
             return
         st = c.js("JSON.stringify({slides: Designer.st.slides, blocks: Designer.st.blocks.length, name: Designer.design.name, kit: Designer.KIT})")
         st = json.loads(st)
-        check(f"one photo on each of {PHOTOS} slides, in the shoot named by its folder alone",
-              st["slides"] == PHOTOS and st["blocks"] == PHOTOS and st["kit"] == kit.name, st)
+        S, B = st["slides"], st["blocks"]
+        check(f"the first design is the example (Nov 23): the shoot's photos on up to {PHOTOS} slides, in the shoot named by its folder alone",
+              2 <= S <= PHOTOS and S <= B <= PHOTOS and st["kit"] == kit.name, st)
+        cut = c.js("""Designer.st.blocks.filter(function(b){ var p = Designer.by[b.n], L = Designer.M.layoutImg(b, p.w, p.h);
+                      return L.iw > b.w * 1.08 || L.ih > b.h * 1.08; }).map(function(b){ return b.n; })""")
+        check("with no face finder (a PC) every photo of it is shown whole, or all but a sliver: none is cut by guesswork", cut == [], cut)
         try:
-            c.wait_for(DRAWN + " >= %d" % PHOTOS, 60, tell=DRAWN)
+            c.wait_for(DRAWN + " >= %d" % B, 60, tell=DRAWN)
             drawn = True
         except chrome_drive.Timeout as e:
             drawn = str(e)
@@ -237,11 +244,11 @@ def main():
             pass
         line = c.text("#save-line")
         check("Save slides: the line says the six slides are in the Carousel folder",
-              line.startswith(f"Saved {PHOTOS} slides in your Carousel folder, named \""), line)
+              line.startswith(f"Saved {S} slides in your Carousel folder, named \""), line)
         car = kit / "Carousel"
         files = sorted(n for n in os.listdir(car)) if car.is_dir() else []
         whole = [n for n in files if design.slide_ok((car / n).read_bytes())]
-        check(f"{PHOTOS} finished 1080 x 1350 JPEGs are in the Carousel folder, and nothing else", len(files) == PHOTOS and whole == files, files)
+        check(f"{S} finished 1080 x 1350 JPEGs (one a slide) are in the Carousel folder, and nothing else", len(files) == S and whole == files, files)
         check("no path anywhere on the page's lines", "\\" not in line and str(work) not in c.js("document.body.innerText"))
         check("the folder's button shows beside the line (it is not pressed here: no window is ever opened)",
               c.js("!document.getElementById('open-wrap').hidden") is True)
