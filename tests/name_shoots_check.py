@@ -174,6 +174,29 @@ def the_words():
         print("  SKIP  her own file is not on this computer (the comparison runs where her handoff is)")
 
 
+def the_instructions():
+    print("The Assistant's instructions")
+    skill = HERE.parent / "plugins" / "the-engine" / "skills" / "studio-manager"
+    part = (skill / "parts" / "after-the-report.md").read_text(encoding="utf-8")
+    core = (skill / "SKILL.md").read_text(encoding="utf-8")
+    at = part.find("## Naming the shoots after the backup, and putting shoots in one folder")
+    sec = part[at:part.find("\n## ", at + 5)] if at >= 0 else ""
+    check("after-the-report.md has the section on naming after the backup and joining", bool(sec))
+    for words in ("name_shoots.py url", "join_shoots.py \"<the backup's folder>\" --list", "--shoots s1 s2", "--all --name \"Mini sessions\"",
+                  "--dry-run", "--finish", "join the two beach shoots", "never \"client name\"", "Exit 2 is a refusal", "Exit 1 is a stop part way",
+                  "never move or rename anything by hand", "Shoots from two different backups can't be joined yet",
+                  "Taking a joined shoot apart again is not built", "Take it out of your queue first"):
+        check(f"it says: {words[:60]}", words in sec, words)
+    check("it never tells the Assistant to say the photos keep their own names to someone whose photos take the shoot's name",
+          "Never say \"your photos keep their own names\" to anyone else" in sec)
+    check("no 'your assistant', no 'Claude', no em dash in the section", "your assistant" not in sec.lower() and "Claude" not in sec and "—" not in sec)
+    row = next((ln for ln in core.splitlines() if "join the two beach shoots" in ln), "")
+    check("the core's table sends naming and joining to that section",
+          "parts/after-the-report.md" in row and "Name them" in row and "mini sessions" in row, row)
+    desc = core.split("---")[1] if core.startswith("---") else ""
+    check("the core's description was not touched (still under its limit)", 0 < len(desc) < 1200 and "join" not in desc.lower())
+
+
 def the_routes(work):
     print("The page and what it draws from")
     w, b = world(work, "routes")
@@ -471,6 +494,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix="name-shoots-check-"))
     try:
         the_words()
+        the_instructions()
         the_routes(work)
         the_report(work)
         if chrome:

@@ -79,6 +79,43 @@ python3 <scripts>/shoot_report.py link "<card 1's backup>" "<card 2's backup>"
 
 **One quiet line when the photos are on the computer's own disk.** Under "Where your photos are" the report then says, once: "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. Plug one in and press Use a different drive next time." That is the whole of it. Never say it before a backup, and never add a speech of your own; if they ask why, answer in a sentence or two.
 
+## Naming the shoots after the backup, and putting shoots in one folder (Nicole, Nov 23)
+
+**Nothing about names is asked before a backup.** The photos are made safe first; the names come after, on a page of their own, or by saying them to you.
+
+**The page: Name your shoots.** It opens from the home page when a backup is done ("We found 3 shoots on your card · Name them") and from the report's **Put these shoots in one folder** (under "Anything you'd like to change?", on a backup with two or more shoots). To show it yourself ("let me name my shoots", "show me the naming page"):
+
+```
+python3 <scripts>/name_shoots.py url "<the backup's folder>"     # prints the page's address; load it in the pane
+```
+
+On it: "✓ Every photo is checked and safe on G PAPA › CLIENT WORK. It's safe to format your card." (only when that backup's own records say so; a sample or a backup with a problem gets a plain line that says to keep the card instead), then each shoot the sorting found with three pictures, when it was taken, how many, and a box that says "Shoot name". The folder's name is shown under the box and changes as they type ("Folder: Aurora_11-22-26": their own pattern, the photos' own date). **Save the names** renames each shoot they named, one at a time, as a job that carries on if they leave the page; a box left empty is left as it is. **Do it later** changes nothing. Then **All set** lists the folders as they are now, with **Back up another card** and **See all my backups**. You run nothing for a press on that page.
+
+- Always "shoot name", never "client name" or "who is it for": not everyone shoots for clients.
+- The photos take the first word of the shoot's name ("The Johnson Family" gives Johnson_0001_IMG_4471.JPG), keeping their number and the camera's own name. Someone who keeps the camera's file names (`studio_file.py set --file-names original`) gets only the folder renamed. Never say "your photos keep their own names" to anyone else.
+- Two shoots can't be given one name (they would share a folder), and a name whose folder is already there is refused: the page says so under the buttons and nothing is renamed. They pick another name, or tick mini sessions.
+- If the page says "This stopped part way. Nothing is lost. Press Save the names and it will finish.", that is all they need to do. If they tell you about it instead, run the rename command below for the shoot that was left; it finishes what was cut off first.
+
+**"These are mini sessions. Keep them in one folder."** Ticking that on the page and pressing Save the names puts every shoot of that backup into one folder (named "Mini sessions" unless they type a name), the photos numbered on in shooting order across all of them.
+
+**From the chat** ("join the two beach shoots", "those two are one shoot", "these are mini sessions, keep them together", "put the first two in one folder"):
+
+```
+python3 <scripts>/join_shoots.py "<the backup's folder>" --list                                  # its shoots: id | name | folder | how many
+python3 <scripts>/join_shoots.py "<the backup's folder>" --shoots s1 s2 --name "Beach" --dry-run # the plan, nothing touched
+python3 <scripts>/join_shoots.py "<the backup's folder>" --shoots s1 s2 --name "Beach"
+python3 <scripts>/join_shoots.py "<the backup's folder>" --all --name "Mini sessions"            # every shoot of the backup into one
+```
+
+- **Which shoots:** work it out from `--list` and what they said ("the two beach ones"). If you can't tell which they mean, ask one short question. With no name given, the joined shoot keeps the first shoot's name; ask for a name only when they hinted at one.
+- **What it does:** every photo and video clip of those shoots goes into one folder named their way, numbered on in shooting order, each one checked to be the very same file afterwards. A sidecar travels with its photo. Photos and video clips together become Photos and Videos inside the folder. The emptied folders are removed only when truly empty; nothing is deleted or written over, and the memory card is never touched. Say back in one line what it is now: "Done. Those two are one shoot now: Beach_11-22-26, 412 photos."
+- **Exit 2 is a refusal with nothing changed:** say its STOP line as it is; every one is plain words. It refuses a shoot that is in the editing queue with a due date ("Take it out of your queue first, then join them."), a delivered shoot, a shoot a post kit was made from, a name whose folder is already there, a backup that is not fully checked, and a second copy that is being made right now.
+- **Exit 1 is a stop part way:** nothing is lost and nothing needs undoing; never move or rename anything by hand. Run the very same command again (or `--finish`) and it finishes from its log. On a PC the reason is usually a photo held open by Lightroom or a folder window: pass its line on, and on go run it again.
+- **A folder "is still there because it has things in it that I didn't put there":** that is theirs (an export, a contract). Say so; they can move it and delete the empty folder themselves.
+- **Shoots from two different backups can't be joined yet** (two cards of one shoot stay in their own folders; `shoot_report.py link` puts them on one report). Say so plainly; never move photos between backups by hand.
+- **Taking a joined shoot apart again is not built.** The log (`join-log.json` in the backup's records) holds every move; say it can't be undone with a button and ask what they need.
+- Run twice, the second run says "Already joined" and changes nothing. After a join or a rename, a second copy on another drive is brought in line by itself when that drive is plugged in.
+
 ## When they name or rename a shoot
 
 They will say it loosely: "the big one is the Smith family," "call the sunset one Kaia," "the yoga day is Marisol's." Work out which shoot they mean from `shoots.json` (its recap, date and photo count), confirm the spelling only if it is unusual, then:
