@@ -79,6 +79,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import words_page_check as wpc  # noqa: E402   (its tiny picture, and how her page's lines are pulled out)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -390,7 +392,7 @@ def worth(frag):
 
 def her_page_raw():
     """Her v27 page, with her crumbs script taken out (it sits before the page's own script)."""
-    raw = (HERS27 / "pages" / "talking-reel.html").read_text(encoding="utf-8")
+    raw = nicole_nov22.read((HERS27 / "pages" / "talking-reel.html"))   # Nicole, Nov 22: everything is the Assistant
     return HER_CRUMBS.sub("", raw, count=1)
 
 
@@ -418,7 +420,7 @@ def her_lines():
     shown = [x for _, x in wpc.her_strings(raw)] + [a for a in attrs if "${" not in a]
     py = ""
     for name in ("talking_core.py", "server.py", "talking_capcut.py"):
-        src = ((HERS24 if name == "talking_capcut.py" else HERS27) / name).read_text(encoding="utf-8")
+        src = nicole_nov22.read((HERS24 if name == "talking_capcut.py" else HERS27) / name)   # Nicole, Nov 22: everything is the Assistant
         py += "\n" + src
         if name == "server.py":                      # only her talking reel's own part of the server
             src = her_server_part(src)
@@ -439,7 +441,7 @@ def check_words(s):
     tp = s.tp
     w = tp.WORDS
     ours_lines = [line for line, _why in tp.OUR_WORDS.values()]
-    case("no word on the page says \"Claude\" (hers: \"my assistant\", \"your assistant\")",
+    case("no word on the page says \"Claude\" (hers: \"the Assistant\", \"the Assistant\")",
          not [v for v in list(w.values()) + ours_lines if "claude" in v.lower()], [v for v in list(w.values()) + ours_lines if "claude" in v.lower()][:3])
     case("every line of ours has its reason beside it", all(isinstance(v, tuple) and len(v) == 2 and v[0] and len(v[1]) > 10 for v in tp.OUR_WORDS.values()))
     # the hand test (Nov 12): the Mac's box and System Settings name the app by the plist's CFBundleName
@@ -458,7 +460,7 @@ def check_words(s):
          and "stop if it can't" in s.TR.APPLE_NOTE and not re.search(r"nothing leaves|never sent|not sent|isn't sent", s.TR.APPLE_NOTE))
     case("no key is both hers and ours", not set(w) & set(tp.OUR_WORDS), sorted(set(w) & set(tp.OUR_WORDS)))
     if HERS27 is not None:
-        crumbs_line = HER_CRUMBS.search((HERS27 / "pages" / "talking-reel.html").read_text(encoding="utf-8"))
+        crumbs_line = HER_CRUMBS.search(nicole_nov22.read((HERS27 / "pages" / "talking-reel.html")))   # Nicole, Nov 22: everything is the Assistant
         case("the two steps of the path this page adds after the post kit are her crumbs call's, word for word (Reels, Talking to camera); Home and the kit's crumb are Lane D's look",
              bool(crumbs_line) and all("'%s'" % v in crumbs_line.group(0) for v in tp.CRUMB_WORDS.values()) and set(tp.CRUMB_WORDS) == {"reels", "here"}
              and s.tp.look.CRUMB_WORDS["home"] == "Home" and s.tp.look.CRUMB_WORDS["where"] == "Where you are", crumbs_line.group(0) if crumbs_line else None)
@@ -476,7 +478,7 @@ def check_words(s):
         skip("her words against her own files: her handoff (reference-private, v24 and v27) isn't on this computer")
         return
     whole, shown, text = her_lines()
-    text24 = " ".join((html.unescape((HERS24 / "pages" / "talking-reel.html").read_text(encoding="utf-8"))).replace("\\'", "'").split())
+    text24 = " ".join((html.unescape(nicole_nov22.read((HERS24 / "pages" / "talking-reel.html")))).replace("\\'", "'").split())   # Nicole, Nov 22: everything is the Assistant
     # ours in hers: each piece of each line of ours is a WHOLE piece of her wording (or, for a piece of 12
     # characters or more, is found word for word in her files; her script's pieces inside an attribute are not
     # pulled out whole)
@@ -492,7 +494,7 @@ def check_words(s):
     case("the lines of ours still in her v24 wording (%d, each with the item that brings it to v27) are truly her v24 lines" % len(STILL_V24), not old, old)
     case("...and none of them is already v27's (then it comes out of STILL_V24)", not [k for k in STILL_V24 if k in w and " ".join(w[k].split()) in text],
          [k for k in STILL_V24 if k in w and " ".join(w[k].split()) in text])
-    maker = (HERS24 / "talking_capcut.py").read_text(encoding="utf-8")
+    maker = nicole_nov22.read((HERS24 / "talking_capcut.py"))   # Nicole, Nov 22: everything is the Assistant
     not_hers = [k for k in HER_MAKER_LINES if ('print(f"' + w[k].replace("{project}", "{dest.name}").replace('"', '\\"') + '")') not in maker]
     case("the two lines her maker prints into the result box are in talking_page.WORDS exactly as she wrote them", not not_hers and maker.count('print(f"Made ') == len(HER_MAKER_LINES), not_hers)
     raw = her_page_raw()
@@ -654,8 +656,8 @@ def check_routes(s):
     code2, j2, _raw, _h = s.http("GET", "/talking-state" + s.q(NO_SHEET))
     case("a kit whose photos aren't numbered yet: the pickers' own \"not ready\" page, and the state says the same",
          code == 200 and b"startBtn" not in raw and s.tp.NOT_READY in html.unescape(raw.decode("utf-8")) and code2 == 404 and j2 == {"ok": False, "words": s.tp.NOT_READY}, (code, code2, j2))
-    case("...in this page's own words: \"your assistant\", never \"Claude\" (the pickers' line says \"to Claude\")",
-         "claude" not in raw.decode("utf-8").lower() and "claude" not in json.dumps(j2).lower() and "your assistant" in s.tp.NOT_READY
+    case("...in this page's own words: \"the Assistant\", never \"Claude\" (the pickers' line says \"to Claude\")",
+         "claude" not in raw.decode("utf-8").lower() and "claude" not in json.dumps(j2).lower() and "the Assistant" in s.tp.NOT_READY
          and s.tp.NOT_READY == s.tp.OUR_WORDS["not_ready"][0], j2)
 
     # ---- the state, whole and short
@@ -1017,7 +1019,7 @@ def check_page(c, s):
     # ---- who places the photos, before there is a script
     c.click("#whoAsst")
     c.wait_for("!document.getElementById('placeAsk').hidden", 5)
-    case("My assistant places them, before the script: the line to copy with her \"Once your script is ready...\"",
+    case("The Assistant places them, before the script: the line to copy with her \"Once your script is ready...\"",
          c.text("#placeLine") == "Place the photos in my talking reel for " + SHORT and c.text("#placeSay") == W["place_say_wait"]
          and c.js("document.getElementById('whoAsst').classList.contains('on') && document.getElementById('askCut').hidden") and s.rec(KIT)["photo_mode"] == "assistant",
          (c.text("#placeLine"), c.text("#placeSay")))
@@ -1148,7 +1150,7 @@ def check_edit(c, s, kit, k1, k2):
     case("...and Copy copies it", toast(c) == W["copied"], toast(c))
     c.click("#whoAsst")
     c.wait_for("!document.getElementById('placeAsk').hidden", 5)
-    case("My assistant places them and nothing cut yet: ONE line does both, and the cut line hides",
+    case("The Assistant places them and nothing cut yet: ONE line does both, and the cut line hides",
          c.text("#placeLine") == "Cut my talking reel and place the photos for " + SHORT and c.text("#placeSay") == W["place_say"] and c.js("document.getElementById('askCut').hidden"),
          c.text("#placeLine"))
     s.cut(KIT, [])

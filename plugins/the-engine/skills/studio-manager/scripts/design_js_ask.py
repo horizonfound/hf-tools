@@ -43,7 +43,7 @@ DESIGN_ASK_JS = r"""
     line: words.textContent,                // "Pick my story photos" / "Pick my carousel photos" (written into the page, hers)
     forShoot: function(shoot){ return ' for ' + shoot; }, withNote: ', and follow my note',
     copy: copyBtn.textContent, copied: 'Copied',
-    arrived: D.STORY ? 'Your assistant’s pick is in your stories.' : 'Your assistant’s pick is in your slides.'
+    arrived: D.STORY ? 'The Assistant’s pick is in your stories.' : 'The Assistant’s pick is in your slides.'
   };
   var MAX = Number(note.getAttribute('maxlength')) || 600;
   var WATCH = 10 * 60 * 1000, EVERY = 4000;

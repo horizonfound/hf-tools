@@ -151,7 +151,7 @@ def check_wide_kit(s):
          and "<a class='piece' data-piece='reel' href='/reel.html?kit=%s'>" % WIDE_KIT.replace(" ", "%20") in page
          and "<span class='cta'>Create my reels &rarr;</span>" in page, out[-200:])
     case("2. with her line for a shoot not picked yet, and nothing pointing at the chat",
-         "Your assistant hasn&#x27;t picked the reel photos yet. Click to pick them yourself." in page and "Say “make the reel” to Claude" not in page)
+         "The Assistant hasn&#x27;t picked the reel photos yet. Click to pick them yourself." in page and "Say “make the reel” to Claude" not in page)
     case("2. no Covers folder named on a kit with no Covers folder",
          "data-sub='Covers'" not in page and "The reel cover" not in page and not (k / "Covers").exists())
     # 4. a chat reel after the numbers were re-made under the list the page left in .kit/reels

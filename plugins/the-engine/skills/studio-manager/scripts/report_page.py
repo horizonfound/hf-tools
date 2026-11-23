@@ -305,11 +305,11 @@ OUR_WORDS = {
     "sc_made": "Second copy made on {drive}.",
     "sc_starting": "Starting the copy to {drive}...",
     "sc_changed": "The drives changed since this was opened. Press Look again.",
-    "sc_cant": "I couldn't start the copy just now. Tell your assistant and it'll sort it out.",
-    "sc_not_live": "Ask your assistant to show the report, and this button will work.",
+    "sc_cant": "I couldn't start the copy just now. Tell the Assistant and it'll sort it out.",
+    "sc_not_live": "Ask the Assistant to show the report, and this button will work.",
     "sc_looking": "Looking for your drives...",
     # the other options (stage "backup-options", Nov 19). Button labels echo their question.
-    "opt_cant": "That didn't work just now. Tell your assistant and it'll sort it out.",
+    "opt_cant": "That didn't work just now. Tell the Assistant and it'll sort it out.",
     "opt_looking": "One moment...",
     "copy": "Copy",
     "copied": "Copied. Paste it in the chat.",
@@ -320,10 +320,10 @@ OUR_WORDS = {
     "oc_none": "Back up the other card first: put it in and say backup now. Then come back here and pick it.",
     "oc_go": "Put them on one report",
     "oc_quiet": "Each card's photos stay in their own folders.",
-    "oc_done": "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.",
-    "oc_done_many": "Done. All {n} cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.",
+    "oc_done": "Done. Both cards are on one report now. Picked the wrong one? Tell the Assistant and it will take them apart.",
+    "oc_done_many": "Done. All {n} cards are on one report now. Picked the wrong one? Tell the Assistant and it will take them apart.",
     "oc_changed": "Your backups changed since this was opened. Press the button again.",
-    "oc_cant": "I couldn't put them on one report just now. Tell your assistant and it'll sort it out.",
+    "oc_cant": "I couldn't put them on one report just now. Tell the Assistant and it'll sort it out.",
     # change how my shoots are named
     "nm_button": "Change how my shoots are named",
     "nm_q": "How should a shoot folder be named?",
@@ -336,8 +336,8 @@ OUR_WORDS = {
     "nm_saved_renaming": "Saved. Renaming this backup's shoots to match...",
     "nm_renaming": "Renaming this backup's shoots to match: {done} of {total}.",
     "nm_done": "Done. This backup's shoots are renamed to match, and your next backup's will be named like {example}.",
-    "nm_problem": "Saved for your next backup, but a shoot here could not be renamed. Tell your assistant and it'll sort it out.",
-    "nm_cant": "I couldn't save that just now. Tell your assistant and it'll sort it out.",
+    "nm_problem": "Saved for your next backup, but a shoot here could not be renamed. Tell the Assistant and it'll sort it out.",
+    "nm_cant": "I couldn't save that just now. Tell the Assistant and it'll sort it out.",
     "nm_wait": "A second copy of this backup is being made right now. Try this again when it's done.",
     # use a different drive next time
     "nd_button": "Use a different drive next time",
@@ -347,7 +347,7 @@ OUR_WORDS = {
     "nd_saved": "Saved. Your next backup goes to {drive}. The photos from this backup stay where they are.",
     "nd_same": "Your backups already go to {drive}. Nothing changed.",
     "nd_second": ("{drive} is where your second copies go, so your photos can't go there first as well. "
-                  "Pick another drive, or tell your assistant to change your second copy."),
+                  "Pick another drive, or tell the Assistant to change your second copy."),
     "nd_gone": "I can't see {drive} right now. Is it plugged in?",
     "nd_changed": "The drives changed since this was opened. Press the button again.",
     # one quiet line under the where-card, when this backup's photos are on the computer's own disk
@@ -1073,7 +1073,7 @@ def build(manifest, studio, card=None):
                "a.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();const now=Date.now();if(now-last<800)return;last=now;"
                "const p=" + ("a.dataset.path||" if this_computer.WINDOWS else "") + "decodeURIComponent(a.getAttribute('href').replace(/^file:\\/\\//,'').replace(/\\/$/,''));"
                "try{const r=await fetch('open?path='+encodeURIComponent(p),{cache:'no-store'});const j=await r.json();tell(j.words||(j.ok?'Opened in " + this_computer.FILES_APP + ".':'Could not open it.'));}"
-               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask your assistant to show the report, or open the folder yourself: '+p);}});}}</script>")
+               "catch(e){tell('" + e(brand.name()).replace("'", "\\\\'") + " isn\\'t running right now, so this button can\\'t open " + this_computer.FILES_APP + ". Ask the Assistant to show the report, or open the folder yourself: '+p);}});}}</script>")
     out.append(shoots_script + options_script + (NOTES_SCRIPT if notes else "") + (PEEK_SCRIPT if (peeks or shoots_html) else "") + REFRESH_SCRIPT
                + (CARD_SCRIPT if card else "") + "</body></html>")
     return "\n".join(out)

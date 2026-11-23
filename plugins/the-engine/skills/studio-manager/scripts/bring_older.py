@@ -518,7 +518,7 @@ def plan_reel(kit, numbers, her_id, name, data, made, store):
     if (out.get("mine") is False and shown and p["claude"] and shown != [x["n"] for x in p["claude"]]
             and shown != [x["n"] for x in bts]):
         out["mine"], out["mine_picks"] = True, [dict(x) for x in out["picks"]]
-        left.append("\"Let my assistant choose\": the order the older page showed was not the assistant's pick as it "
+        left.append("\"Let the Assistant choose\": the order the older page showed was not the assistant's pick as it "
                     "stands, so it comes over as their own order (the pick is kept beside it)")
     if any("about" in m for m in their_moments) or any(isinstance(m, dict) and "about" in m for m in
                                                         (data.get("moments_found") if isinstance(data.get("moments_found"), list) else [])):
@@ -1048,7 +1048,7 @@ class Shoot:
                 p["left"].append("the assistant's pick from the older page: this shoot already has a reel pick here, and that one is never replaced")
             if p["saved"].get("mine") is False and p["saved"].get("picks"):
                 p["saved"]["mine"] = True
-                p["left"].append("\"Let my assistant choose\": so the page shows the same order the older page showed, it comes over as their own order")
+                p["left"].append("\"Let the Assistant choose\": so the page shows the same order the older page showed, it comes over as their own order")
 
     def tell(self, doing):
         say(f"\n{self.short}  (the older records are named \"{self.name}\")")

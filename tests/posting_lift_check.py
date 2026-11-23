@@ -95,6 +95,11 @@ def check_source(s):
     start = SOURCE.index('SCRIPT = r"""')
     script = SOURCE[start:SOURCE.index('"""', start + 20)]
     case("her line is on the page, whole", "preview:'%s'" % PREVIEW in script)
+    case("v31: the grid shows 12 posts at most (GRID_MOST, four rows), not 15", "const GRID_MOST=12;" in script
+         and "g.children.length>=GRID_MOST" in script and ">=15" not in script)
+    case("v31: the grid has no fixed width; it takes the width of her line through the box around them (fit-content)",
+         "max-width:420px" not in SOURCE and ".gridbox{width:fit-content;max-width:100%;display:flex;flex-direction:column;gap:.3rem}" in SOURCE
+         and "<div class='gridbox' id='gridbox'><p class='pickhint'" in SOURCE)
     d = her_diff()
     if d is None:
         skip("her line compared with her diff: her v28 pack is not beside the project")
@@ -116,19 +121,53 @@ def check_source(s):
 
 # ---------- 2. the page ----------
 
+LINE_W = ("(function(){ var h = document.getElementById('pickhint'), sec = h.closest('.sec'), k = h.cloneNode(true);"
+          " k.removeAttribute('id'); k.hidden = false; k.style.cssText += ';position:absolute;left:0;top:0;width:max-content;visibility:hidden';"
+          " sec.appendChild(k); var w = k.getBoundingClientRect().width; k.remove(); return w; })()")
+GRID_W = "document.getElementById('grid').getBoundingClientRect().width"
+
+
 def check_size(c, s):
-    """Nicole's v30, section 5: the grid is about 420 px wide with a 3 px gap, so 12 to 15 posts show at once (it
-    was 820, about 6 at once). Only the width and the gap changed; the panel still opens inside it and fits."""
+    """Nicole's v31, section 8 (was v30, section 5: about 420 px): the grid is as wide as her line above it, "Click on
+    a post to change the photo it shows in your grid, or to copy its caption", about 550 px, and it follows the line,
+    not a number: a bigger font makes the grid wider. 12 posts at most (four rows of three; v30 showed 15). The gap
+    is still 3 px, and the panel still opens inside the grid at the grid's width."""
     reel, car = posted.fresh_queue(s)
     c.open(s.url("/posting.html"))
     c.wait_for("document.querySelectorAll('#grid .tile.mine').length === 2", 10)
-    m = c.js("(function(){ var g = document.getElementById('grid'), cs = getComputedStyle(g), t = g.querySelector('.tile');"
+    c.js("document.fonts.ready.then(function(){ return 1; })")
+    m = c.js("(function(){ var g = document.getElementById('grid'), cs = getComputedStyle(g), t = g.querySelector('.tile'), h = document.getElementById('pickhint');"
              " return {w: g.getBoundingClientRect().width, gap: cs.columnGap, rowgap: cs.rowGap, tw: t.getBoundingClientRect().width,"
-             " th: t.getBoundingClientRect().height, vw: innerWidth, sw: document.documentElement.scrollWidth}; })()")
-    case("at desktop width (1280) the grid is about 420 px wide (400 to 440), not 820", 400 <= m["w"] <= 440 and m["vw"] >= 1200, m)
+             " th: t.getBoundingClientRect().height, vw: innerWidth, sw: document.documentElement.scrollWidth, shown: !h.hidden,"
+             " lines: Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)), line: %s}; })()" % LINE_W)
+    case("at desktop width (1280) her line shows on one line above the grid", m["shown"] and m["lines"] == 1 and m["vw"] >= 1200, m)
+    case("...and the grid is exactly as wide as her line (within 1 px), about 550 px (520 to 600), not 420",
+         abs(m["w"] - m["line"]) <= 1 and 520 <= m["w"] <= 600, m)
     case("...with a 3 px gap between posts, across and down", m["gap"] == "3px" and m["rowgap"] == "3px", m)
-    case("...so a post is about 135 px wide and four rows (12 posts) take under 720 px of height", 125 <= m["tw"] <= 140 and 4 * m["th"] + 12 < 720, m)
+    room = c.js("(function(){ var h = document.getElementById('pickhint').getBoundingClientRect(), g = document.getElementById('grid').getBoundingClientRect(), r = parseFloat(getComputedStyle(document.documentElement).fontSize); return [g.top - h.bottom, 0.9 * r]; })()")
+    case("...and between her line and the grid the same room as before (.9rem: the box's margins add up, never collapse)", abs(room[0] - room[1]) <= 0.5, room)
+    case("...so a post is about 180 px wide and four rows (12 posts) are about 900 px tall",
+         170 <= m["tw"] <= 200 and 4 * m["th"] + 12 < 1000, m)
     case("...and the page has no sideways scroll", m["sw"] <= m["vw"], m)
+    # the line, not the number: a bigger font on her line makes the grid follow it
+    big = c.js("(function(){ var h = document.getElementById('pickhint'); h.style.fontSize = '17px'; var r = {w: %s, line: %s}; h.style.fontSize = ''; return r; })()" % (GRID_W, LINE_W))
+    case("her line in a bigger font: the grid grows with it, still exactly as wide as the line", big["w"] > m["w"] + 40 and abs(big["w"] - big["line"]) <= 1, (big, m["w"]))
+    # with no post to click her line is hidden: it takes no room, and the grid keeps its width
+    hid = c.js("(function(){ var h = document.getElementById('pickhint'); h.hidden = true; var p = h.closest('.sec').querySelector('p:not(.pickhint)').getBoundingClientRect(), g = document.getElementById('grid').getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize);"
+                " var r = {w: %s, h: h.getBoundingClientRect().height, vis: getComputedStyle(h).visibility, room: g.top - p.bottom, want: 1.3 * rem}; h.hidden = false; return r; })()" % GRID_W)
+    case("her line hidden: it is not seen and takes no height, the grid keeps the same width, and sits where it did before (1.3rem under the words above)",
+         hid["h"] == 0 and hid["vis"] == "hidden" and abs(hid["w"] - m["w"]) <= 1 and abs(hid["room"] - hid["want"]) <= 0.5, hid)
+    # 12 posts at most: twenty posts read from their feed, two upcoming ones, four rows of three
+    feed = c.js("(function(){ var px = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', posts = [];"
+                " for (var i = 0; i < 20; i++) posts.push({id: 'f' + i, thumb: px, pinned: false});"
+                " render(Object.assign({}, LAST, {feed: {handle: 'h', read_at: '2026-11-20T10:00:00', posts: posts}}));"
+                " var g = document.getElementById('grid'), t = Array.prototype.slice.call(g.children).filter(function(e){ return e.classList.contains('tile'); });"
+                " return {n: t.length, mine: g.querySelectorAll('.tile.mine').length, real: g.querySelectorAll('.tile.real').length, ghost: g.querySelectorAll('.tile.ghost').length,"
+                " rows: Math.round(g.getBoundingClientRect().height / (t[0].getBoundingClientRect().height + 3))}; })()")
+    case("with 20 feed posts and 2 upcoming: 12 posts in the grid (2 upcoming, 10 of the feed), four rows, not 15",
+         feed["n"] == 12 and feed["mine"] == 2 and feed["real"] == 10 and feed["ghost"] == 0 and feed["rows"] == 4, feed)
+    c.reload()
+    c.wait_for("document.querySelectorAll('#grid .tile.mine').length === 2", 10)
     ppc.open_panel(c, car["id"])
     p = c.js("(function(){ var k = document.getElementById('pick'), g = document.getElementById('grid'); return {inside: k.parentNode === g,"
              " w: k.getBoundingClientRect().width, sw: k.scrollWidth, cw: k.clientWidth, gw: g.getBoundingClientRect().width,"
@@ -136,6 +175,17 @@ def check_size(c, s):
     case("a post's panel still opens inside the grid, the grid's width, with nothing in it running past its edge",
          p["inside"] and abs(p["w"] - (p["gw"] - 8)) <= 2 and p["sw"] <= p["cw"] + 1 and p["pageW"] <= p["vw"], p)
     c.click("#pick .x")
+    # a phone: her line wraps, and the grid takes the width there is, with no sideways scroll
+    c.cdp("Emulation.setDeviceMetricsOverride", {"width": 375, "height": 812, "deviceScaleFactor": 1, "mobile": False})
+    try:
+        c.reload()
+        c.wait_for("document.querySelectorAll('#grid .tile.mine').length === 2", 10)
+        ph = c.js("(function(){ var g = document.getElementById('grid'), h = document.getElementById('pickhint');"
+                  " return {w: g.getBoundingClientRect().width, hw: h.getBoundingClientRect().width, vw: innerWidth, sw: document.documentElement.scrollWidth}; })()")
+        case("at phone width (375) the grid is as wide as her wrapped line, inside the window, with no sideways scroll",
+             abs(ph["w"] - ph["hw"]) <= 1 and ph["w"] <= ph["vw"] - 20 and ph["sw"] <= ph["vw"], ph)
+    finally:
+        c.cdp("Emulation.clearDeviceMetricsOverride", {})
 
 
 def check_page(c, s):
@@ -288,7 +338,7 @@ def main():
             skip("the page in a browser: " + ("not asked for" if a.no_chrome else "no Chrome on this computer"))
         else:
             with chrome_drive.Chrome(work=str(work), size=(1280, 1500)) as c:
-                group("the grid's size (v30)", check_size, c, s)
+                group("the grid's size (v31)", check_size, c, s)
                 group("the page", check_page, c, s)
     finally:
         s.stop()

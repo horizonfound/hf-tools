@@ -48,6 +48,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 WINDOWS = os.name == "nt"
 TODAY = "2026-11-14"
@@ -88,11 +90,11 @@ HERS = [
     "no due date keep the order you put them in. Press Set a due date on any shoot, or drag one up or down. When a gallery is delivered, "
     "press the check mark. Not a client shoot? Take it out of your queue and it goes back to your uploaded shoots below.",
     "<b>Nothing waiting.</b><span>Shoots land here when you add them after a backup.</span>",
-    "Open the queue through your assistant to save changes",
-    "Ask your assistant to “show my shoots” to open folders from here",
-    "This is a saved copy. Ask your assistant to pull up your queue, then add it there.",
-    "Could not add it. Tell your assistant instead.",
-    "This is a saved copy. Ask your assistant to “pull up my queue” to check things off and change dates.",
+    "Open the queue through the Assistant to save changes",
+    "Ask the Assistant to “show my shoots” to open folders from here",
+    "This is a saved copy. Ask the Assistant to pull up your queue, then add it there.",
+    "Could not add it. Tell the Assistant instead.",
+    "This is a saved copy. Ask the Assistant to “pull up my queue” to check things off and change dates.",
 ]
 # hers, left out of ours on purpose (her test-only bits; each with its reason in the v26 notes)
 HERS_NOT_OURS = ["8799", "home=test", "sessionStorage", "home-test.html", "make-posts.html"]
@@ -328,7 +330,7 @@ def check_words(eq):
     src = (SCRIPTS / "edit_queue.py").read_text(encoding="utf-8")
     missing = [w for w in HERS if w not in page]
     case("her words are on the page, whole (%d lines)" % len(HERS), not missing, missing)
-    case("\"your assistant\", never \"Claude\", anywhere on the page", "Claude" not in page and "claude" not in page.lower().replace("claude-", ""), re.findall(r".{30}[Cc]laude.{30}", page)[:3])
+    case("\"the Assistant\", never \"Claude\", anywhere on the page", "Claude" not in page and "claude" not in page.lower().replace("claude-", ""), re.findall(r".{30}[Cc]laude.{30}", page)[:3])
     case("the old words are gone (Mark finished, Your shoots as a heading, finished, moved to your shoots below, the screenshot line)",
          not any(w in page for w in ('"Mark finished"', "<span>Your shoots</span>", "moved to your shoots below", "Send Claude a screenshot", ">Edited", "when you finish editing one")))
     case("none of her test-only bits in our file (port 8799, ?home=test, sessionStorage)", not any(w in src for w in HERS_NOT_OURS), [w for w in HERS_NOT_OURS if w in src])
@@ -351,7 +353,7 @@ def check_words(eq):
     if not hers:
         skip("her words against her own file: her handoff (reference-private) isn't on this computer")
         return
-    theirs = hers.read_text(encoding="utf-8")
+    theirs = nicole_nov22.read(hers)   # Nicole, Nov 22: everything is the Assistant
     absent = [w for w in HERS if w not in theirs and w.replace("${esc(s.count_words)}", "") not in theirs]
     case("each of those lines is in her changed file, letter for letter", not absent, absent)
     # the other way: everything her page says in a toast, and every sentence of her page's own HTML, is in ours

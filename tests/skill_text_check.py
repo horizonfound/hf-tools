@@ -707,7 +707,7 @@ def check_talking():
         case(f'the part names the line "{said}"', ('"' + said + '"') in part)
     hit = [r for r in rows if '"set up talking reels"' in r.split(" | ")[0]]
     case('the line the page tells them to say when the Mac needs setting up ("set up talking reels") has its row too',
-         len(hit) == 1 and "parts/talking-reel.md" in hit[0] and "Tell your assistant: set up talking reels." in talking_rec.line_for("no_tools"))
+         len(hit) == 1 and "parts/talking-reel.md" in hit[0] and "Tell the Assistant: set up talking reels." in talking_rec.line_for("no_tools"))
     case("the three lines lead nowhere else: no other row of the table takes a talking reel",
          not [r for r in rows if "talking" in r.split(" | ")[0].lower() and "parts/talking-reel.md" not in r])
 
@@ -927,7 +927,7 @@ def check_talking():
          "a photo that is gone keeps its number unused" in flat and "after the highest ever given" in flat
          and "nxt = max(before.values(), default=0) + 1" in read(REEL / "scripts" / "reel.py") and "def number_photos(photos, before):" in read(REEL / "scripts" / "reel.py"))
     v27 = [ln for ln in part.splitlines() if ln.startswith(("  - **A word the Mac misheard", "  - **+ Add more photos**", "**Open CapCut**"))]
-    case("the three v27 paragraphs are there and say your assistant, never Claude (the app's own name stays where the part names the Claude app's pane)",
+    case("the three v27 paragraphs are there and say the Assistant, never Claude (the app's own name stays where the part names the Claude app's pane)",
          len(v27) == 3 and not any("Claude" in ln for ln in v27), [ln[:60] for ln in v27])
 
 
@@ -949,8 +949,8 @@ def check_carousel_v27():
          'design.py note "<kit>" [--design <id>]' in part and 'design.py fill "<kit>" --photos 3,8,12 [--design <id>] [--replace]' in part
          and 'sub.add_parser("note"' in design and 'sub.add_parser("fill"' in design and 'sub.add_parser("story-note"' in design)
     case("carousel v27: the page's line and its button are named as the page has them",
-         '**"Pick my carousel photos for <shoot>"** (and "..., and follow my note")' in part and '**"Let my assistant choose the photos"**' in part
-         and 'ASK_LINE_CAROUSEL = "Pick my carousel photos"' in page and 'ASK_BUTTON = "Let my assistant choose the photos"' in page)
+         '**"Pick my carousel photos for <shoot>"** (and "..., and follow my note")' in part and '**"Let the Assistant choose the photos"**' in part
+         and 'ASK_LINE_CAROUSEL = "Pick my carousel photos"' in page and 'ASK_BUTTON = "Let the Assistant choose the photos"' in page)
     case("carousel v27: the five steps mirror the stories' (note, one look at the sheet with curating.md, the shape each frame wants, fill in the frames' order, the page shows it by itself)",
          "1. `design.py note \"<kit>\"`" in part and "2. `kit.py sheet \"<kit>\"`" in part and "shared/curating.md" in part and "3. Give each frame a photo of the shape it wants" in part
          and "4. `design.py fill \"<kit>\" --photos N,N,N --design <id>`" in part and "5. The open page shows your pick by itself within a few seconds" in part)
@@ -1027,8 +1027,8 @@ def check_stories_v26():
          and "a photo that is already in the set" in part and "`asked`, the time they last pressed Copy there" in read(SM / "parts" / "where-things-live.md")
          and "def _post_asked(" in design and "def _pick_there(" in design and '"/design-asked"' in design)
     case("stories: the page's line and its button are named as the page has them",
-         '"Pick my story photos for <shoot>"' in part and '"..., and follow my note"' in part and '"Let my assistant choose the photos"' in part
-         and 'ASK_BUTTON = "Let my assistant choose the photos"' in page and 'ASK_LINE = "Pick my story photos"' in page)
+         '"Pick my story photos for <shoot>"' in part and '"..., and follow my note"' in part and '"Let the Assistant choose the photos"' in part
+         and 'ASK_BUTTON = "Let the Assistant choose the photos"' in page and 'ASK_LINE = "Pick my story photos"' in page)
     case("stories: choosing is the assistant's job, the note is theirs and comes first, one look at the sheet",
          "Choosing and ordering the photos is your job (rule 11); the note is theirs and outranks your taste" in flat and "One look at the sheet, never photo by photo" in flat
          and "never pretend" in flat)
@@ -1078,8 +1078,8 @@ def check_several_reels():
     case("several reels: a pasted line that names a reel is checked against the reel open on the page first",
          "run `reel_page.py note \"<kit>\" --reel \"Kitchen\"` first: it checks that the reel named is the one open on the page" in flat
          and "say which reel your pick went to" in flat and 'sub.add_parser("note"' in rp)
-    case("several reels: a new reel has no pick until they ask, and a pick waits under Let my assistant choose",
-         "Pick for it only when they ask." in flat and 'your pick waits under "Let my assistant choose": tell them to press it' in flat)
+    case("several reels: a new reel has no pick until they ask, and a pick waits under Let the Assistant choose",
+         "Pick for it only when they ask." in flat and 'your pick waits under "Let the Assistant choose": tell them to press it' in flat)
     case("several reels: a reel is never removed, said plainly; two reels never share a name (the scripts refuse it)",
          "**A reel can never be removed** (nothing is deleted)" in part and "Two reels of one shoot never share a name" in flat and "NAME_TAKEN" in read(SCRIPTS / "reels.py"))
     case("several reels: CapCut's projects are named for the shoot, not the reel; each reel's mixes are its own",
@@ -1182,7 +1182,7 @@ def check_photographer_picks():
     case("where-things-live.md names the note in the reel page's record", "`photo_ask`" in read(SM / "parts" / "where-things-live.md") and '"photo_ask"' in rp)
     said = [ln[:140] for name, t in (("arrange", arr), ("post-kit", kitp), ("photos-in", photos), ("reel", reel))
             for ln in t.splitlines() if re.search(r"\bClaude\b", ln) and re.search(r"hasn't picked|which photos you'd like", ln)]
-    case("the page's lines are quoted as the page has them: 'your assistant', never 'Claude'", not said, said)
+    case("the page's lines are quoted as the page has them: 'the Assistant', never 'Claude'", not said, said)
 
 
 def check_trim_and_select():
@@ -1452,7 +1452,7 @@ def check_posted_and_path_v27():
     sect = re.search(r"\*\*Posted, on the post itself.*?(?=- \*\*|## )", post)
     case("posting-queue.md has the Posted-on-the-post section: the switch beside Done, no date and no posted-on label, read my Instagram grid, the switch only",
          bool(sect) and all(x in sect.group(0) for x in ("**Not posted** switch beside **Done**", 'no "posted on" label', '"read my Instagram grid"', "the switch and Done only", "no photo strip, no words and no reminder")))
-    case("... and that section never says Claude (the pages say your assistant)", bool(sect) and "Claude" not in sect.group(0))
+    case("... and that section never says Claude (the pages say the Assistant)", bool(sect) and "Claude" not in sect.group(0))
     case("the page draws posted posts from the server's list, never filtering by read_at itself (so the part's rule is the server's)",
          "S.posted" in pq and "def posted_in_grid" in pq or ("S.posted" in pq and "POSTED_DAYS" in pq))
     # --- unposted: the command, its line, the row ---
@@ -1761,9 +1761,9 @@ def check_vault_search():
          "under the shoot's own number" in where and "never a source for a caption, a note or a hook" in where)
     m = re.search(r'NO_TAGS_PC = \("([^"]+)"\s+"([^"]+)"\)', tc)
     pc_line = (m.group(1) + m.group(2)) if m else ""
-    case("the PC line is in this_computer, and the PC part quotes it whole", pc_line == "On a PC, search finds your photos by shoot name and by anything your assistant has described. To have them described, copy this into the chat:"
+    case("the PC line is in this_computer, and the PC part quotes it whole", pc_line == "On a PC, search finds your photos by shoot name and by anything the Assistant has described. To have them described, copy this into the chat:"
          and pc_line in pcp and "## Finding photos by what is in them" in pcp)
-    first = "On a PC, search finds your photos by shoot name and by anything your assistant has described."
+    first = "On a PC, search finds your photos by shoot name and by anything the Assistant has described."
     case("the PC gap is on the PC part's list and the PC guide's list, in the same words", ("> - Photo tags for search. " + first) in pcp and ("- **Photo tags for search.** " + first) in guide)
 
 
@@ -1927,10 +1927,61 @@ def check_v30_finish():
     case("nothing tells them to click Make posts from a shoot (the home page has no such button since v30)", not stale, stale)
 
 
+def check_chat_no_reminders():
+    """Nicole, Nov 22: "i dont think the chat needs the reminders. either." The chat never leads with what is due or
+    late, in any conversation or hello: the first-thing checks no longer run the two reminders commands or say
+    "Heads up: ...", and the chat's hello stages say no due or late items. The page check-offs, updates and
+    home.py pending stay; asked "what's due?", the chat answers; calendar reminders and a phone tap they asked for
+    are untouched. (Before this, SKILL.md opened every conversation with those lines on purpose.)"""
+    print("\nThe chat never opens with reminders (Nicole, Nov 22)")
+    skill = read(SM / "SKILL.md")
+    first = skill.split("## First thing, every time", 1)[-1].split("## Read the part before you act", 1)[0]
+    case("the first-thing checks no longer run edit_queue.py reminders or posting_queue.py reminders",
+         "## First thing, every time" in skill and not re.search(r"`python3 <scripts>/(?:edit|posting)_queue\.py reminders", first), first[:300])
+    case("...and say the chat never opens with reminders, naming where they live and that a question is answered",
+         "**The chat never opens with reminders" in first and "Don't run `edit_queue.py reminders` or `posting_queue.py reminders`" in first
+         and "My editing queue and My posting queue cards" in first and "answer as before" in first)
+    case("...while the page check-offs, the update check, home.py pending and Pick again still run first",
+         "`python3 <scripts>/edit_queue.py offers --mark`" in first and "updates.py check" in first
+         and "home.py pending" in first and "peek_sheets.py asks" in first)
+    case("...and calendar reminders and a phone tap they asked for are kept", "Posting-day reminders on their calendar" in first and "phone tap" in first)
+    stale = [rel(f) for f in instruction_files() if "Heads up: the Garcia" in read(f) or "Anything they print goes first" in read(f)]
+    case("no instruction still opens a conversation with \"Heads up: ...\" lines", not stale, stale)
+    named = []
+    for f in instruction_files():
+        for ln in read(f).splitlines():
+            if re.search(r"(?:edit|posting)_queue\.py reminders", ln) and "Don't run" not in ln and "scheduled task" not in ln:
+                named.append((rel(f), ln[:120]))
+    case("the reminders commands are named only for a phone tap they asked for (a scheduled task), never to say in the chat", not named, named)
+    hello = read(SM / "parts" / "hello.md")
+    stages = {k: next((ln for ln in hello.splitlines() if ln.lstrip().startswith(f'- **"{k}"')), "") for k in ("getting-started", "regular")}
+    case("the chat's hello: getting-started and regular no longer say what is due or late",
+         all(stages.values()) and not any(re.search(r"due or late[,)]|anything due or late", v) for v in stages.values()), stages)
+    case("...and every stage is told never to open with what is due or late", "never open with what is due or late (Nicole, Nov 22)" in hello)
+    pq, pc, after = read(SM / "parts" / "posting-queue.md"), read(SM / "parts" / "on-a-pc.md"), read(SM / "parts" / "after-the-report.md")
+    case("posting-queue.md no longer says the start-of-conversation lines are said in the chat",
+         "Those are said in the chat" not in pq and "The chat never opens with what is due to post" in pq)
+    case("on-a-pc.md's first conversation no longer lists the reminders as a first-thing check", "(the reminders, `home.py pending`)" not in pc)
+    case("after-the-report.md no longer promises the heads-up whenever they open the Assistant",
+         "will show whenever they open the Assistant" not in after and "My editing queue card" in after)
+    # The final check of v31-prep (Nov 22): home.py's hello words are what `home.py hello` hands Claude, so they say the same.
+    hw = read(SM / "scripts" / "home.py").split("HELLO_WORDS = {", 1)[-1].split("}", 1)[0]
+    case("home.py's hello words for getting-started and regular no longer ask for the day's rundown, and say never what is due",
+         "The day in" not in hw and hw.count("never what is due") + hw.count("Never what is due") == 2, hw)
+    case("the core no longer counts a tile press among presses that may only be someone looking (tiles never reach pending)",
+         "See all my post kits or a tile may only be" not in skill and "Back up a card or See all my post kits may only be someone looking" in skill)
+    case("posting-queue.md says the grid shows up to 12 posts in four rows (not 12 to 15, not five rows)",
+         "12 to 15 posts" not in pq and "up to five rows" not in pq and "up to 12 posts show at once, four rows" in pq
+         and "up to four rows (12 posts)" in pq)
+    q = read(SM / "parts" / "editing-queue.md")
+    case("asked, the chat still answers: \"what's due\" is in the core's table and opens the queue in editing-queue.md",
+         any("\"what's due\"" in r and "parts/editing-queue.md" in r for r in table_rows(skill)) and "\"what's due?\"" in q)
+
+
 def main():
     for fn in (check_search, check_table, check_descriptions, check_curating, check_reel_skill, check_doors, check_words, check_posting, check_whole_build, check_talking,
                check_stories_v26, check_carousel_v27, check_several_reels, check_photographer_picks, check_trim_and_select, check_songs_v25, check_queue_v25, check_trash_helper,
-               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish):
+               check_watch_direct_broll, check_instructions_v27_lane_a, check_posted_and_path_v27, check_backup_zero, check_second_copy, check_backup_options, check_vault_core, check_vault_page, check_vault_search, check_vault_reel_clips, check_vault_reel_photos, check_vault_everything, check_create_tiles, check_v30_finish, check_chat_no_reminders):
         try:
             fn()
         except Exception as e:  # noqa: BLE001

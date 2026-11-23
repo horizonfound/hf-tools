@@ -93,10 +93,10 @@ def check_assistant():
             "the kit page's can't-reach line": kit.OUR_KIT_WORDS["unreached"], "the kit's saved copy": kit.OUR_KIT_WORDS["saved_copy"],
             "the kit that can't be built": kit.OUR_KIT_WORDS["cant_build"], "a reminder stopped here": reminders.STOPPED_HERE}
     for what, line in said.items():
-        case("%s says \"your assistant\"" % what, "your assistant" in line and "Claude" not in line, line)
+        case("%s says \"the Assistant\"" % what, "the Assistant" in line and "Claude" not in line, line)
     for name in ("arrange_page.py", "design_js_core.py", "design_js_save.py", "posting_queue.py"):
         t = read(SCRIPTS / name)
-        case("%s: its lines for a page say \"your assistant\"" % name, "your assistant" in t and not TO_CLAUDE.search(t))
+        case("%s: its lines for a page say \"the Assistant\"" % name, "the Assistant" in t and not TO_CLAUDE.search(t))
     parts = []
     for f in sorted(PARTS.glob("*.md")):
         for m in re.finditer(r"[^.]*\b(?:[Tt]ell|[Aa]sk) Claude\b[^.]*|[^.(]*\bto Claude;[^.]*", read(f)):

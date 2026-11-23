@@ -94,7 +94,7 @@ DESIGN_SAVE_JS = r"""
     changed: 'The design changed while its slides were being made. Nothing was added to your Carousel folder. Press Save slides again.',
     photoNewer: 'A photo on these slides was exported again since this page opened, so no slides were made. Nothing was added to your Carousel folder. Press Reload, then Save slides again.',
     already: function(base){ return 'Already saved as "' + base + '". Change something to save a new set.'; },
-    cantOpen: 'Couldn’t open the folder from here. Ask your assistant to open your Carousel folder.',
+    cantOpen: 'Couldn’t open the folder from here. Ask the Assistant to open your Carousel folder.',
     // Save just this slide (hers, v27): the top button's two labels, the line with no slide to mean, the making line and
     // her "Stopped" line; the saved line is the Assistant's (her words, with the file's name filled in)
     saveOneAny: 'Save just one slide', saveOneN: function(k){ return 'Save just slide ' + k; },

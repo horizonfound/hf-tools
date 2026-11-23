@@ -41,6 +41,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import edit_queue_v26_check as base  # noqa: E402  (its pretend Assistant, page server and helpers)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 NASTY = base.NASTY
 # the smallest picture a browser will draw (1 x 1, grey)
@@ -115,7 +117,7 @@ def check_words(s):
         case("her line is on the page: %s" % line, line in eq.SCRIPT)
     hers = her_file()
     if hers:
-        theirs = hers.read_text(encoding="utf-8")
+        theirs = nicole_nov22.read(hers)   # Nicole, Nov 22: everything is the Assistant
         case("each of those lines is in her own changed file too", all(line in theirs for line in HERS), [line for line in HERS if line not in theirs])
         case("her confetti count is ours (34)", "k < 34" in theirs and "const CONFETTI = 34;" in eq.SCRIPT)
         case("her flip waits 2 s before the card leaves, as ours", "}, 2000);" in theirs and "leave(2000);" in eq.SCRIPT)
@@ -129,7 +131,7 @@ def check_words(s):
     case("in the code, the save comes before anything flips", 0 < fin.index("await send(") < fin.index("li.animate("))
     case("the preview never reaches send()", "send(" not in eq.SCRIPT[eq.SCRIPT.index("function tryDelivered"):eq.SCRIPT.index("// drag to reorder")])
     page = eq.page_html(eq.load())
-    case("the page says \"your assistant\", never \"Claude\"", "Claude" not in page and "your assistant" in page)
+    case("the page says \"the Assistant\", never \"Claude\"", "Claude" not in page and "the Assistant" in page)
     new = eq.SCRIPT[eq.SCRIPT.index("async function finish"):eq.SCRIPT.index("// drag to reorder")]
     case("no long dash in the new words", "—" not in new and "&mdash;" not in new)
     case("the motion asks the computer's reduce-motion setting", "prefers-reduced-motion: reduce" in eq.SCRIPT and "calm()" in fin)

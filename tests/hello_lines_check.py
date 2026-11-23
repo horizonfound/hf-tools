@@ -33,6 +33,9 @@ from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import nicole_nov22  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
@@ -112,11 +115,14 @@ def check_data():
         for p in sorted(r.glob("nicole-handoff-v30-*/hellos/approved-hellos-by-when.json")):
             pack = p
     if pack:
+        # Nicole, Nov 22: her own "I’m your Assistant" lines stay as she wrote them, so her file is byte for byte.
         case("her file is in the plugin byte for byte", pack.read_bytes() == H.DATA.read_bytes())
         app = json.loads((pack.parent / "approved-hellos.json").read_text(encoding="utf-8"))["approved"]
-        case("... and the 150 are exactly her approved list", sorted(app) == sorted(ALL))
+        case("... and the 150 are exactly her approved list", sorted(nicole_nov22.as_now(t) for t in app) == sorted(ALL))
     else:
         skip("her pack is not on this computer (reference-private/ is never pushed)")
+    case("Nicole, Nov 22: no line says \"your assistant\" but her two \"I\u2019m your Assistant\" introductions",
+         not [t for t in ALL if nicole_nov22.old_words(t)] and sum("I\u2019m your Assistant" in t for t in ALL) == 2)
     bad = [t for t in ALL if re.search(r"\b(waiting|due|late|pressure|back up|still up|remind)\b", t, re.I)]
     case("no reminder words in any line", not bad, bad)
 
@@ -363,6 +369,43 @@ def check_kept():
     reset()
 
 
+# ---------- the very first hello: her one line alone (Nicole, Nov 22) ----------
+
+ONLY = "Hi! I\u2019m your Assistant, and I\u2019m so glad you\u2019re here."
+
+
+def check_first_only():
+    t0 = datetime(2026, 11, 18, 14, 0)
+    case("her line for the very first hello is in her file, exactly", ONLY in L["first"] and H.first_only_line() == ONLY, H.first_only_line())
+    for name in ("Nicole", ""):
+        reset()
+        a = H.pick(now=t0, rng=random.Random(1), facts=facts(name=name, first=True))
+        case("the very first hello (no shoot, never greeted%s): only her line, no greeting over it" % (", a name known" if name else ", no name"),
+             a and a["only"] is True and a["greeting"] == "" and a["greeting_parts"] == [] and a["line"] == ONLY
+             and a["line_parts"] == [{"text": ONLY, "name": False}] and a["group"] == "first", a)
+    reset()
+    f = facts(first=True)
+    a = H.pick(now=t0, rng=random.Random(2), facts=f)
+    b = H.pick(now=t0 + timedelta(hours=2), rng=random.Random(3), facts=f)
+    case("... a reload within its 3 hours keeps it, still alone", b["only"] and b["kept"] and b["line"] == ONLY and b["greeting"] == "", b)
+    c = H.pick(now=t0 + timedelta(hours=3, minutes=5), rng=random.Random(4), facts=f)
+    gt = {t for _, t in H.greetings(f, t0)}
+    case("... after that the hello works as before: a greeting and one of her first lines",
+         not c["only"] and c["greeting"] and c["line"] in L["first"] + [t.replace("{name}", "Nicole") for t in L["first"]], c)
+    reset()
+    H.save_state({"last_visit": H._iso(t0 - timedelta(days=1))})
+    d = H.pick(now=t0, rng=random.Random(5), facts=facts(first=True))
+    case("greeted on the page before, still no shoot: as before, never the lone line", not d["only"] and d["greeting"], d)
+    reset()
+    e = H.pick(now=t0, rng=random.Random(6), facts=facts())
+    case("a first visit with a shoot already (a backup or a post kit): as before", not e["only"] and e["greeting"] and e["group"] != "first", e)
+    reset()
+    H.pick(now=t0, rng=random.Random(7), facts=facts(first=True))
+    g = H.pick(now=t0 + timedelta(minutes=30), rng=random.Random(8), facts=facts())
+    case("a first post kit coming in during the first hello's 3 hours: a new hello, as before", not g["only"] and not g["kept"] and g["greeting"], g)
+    reset()
+
+
 # ---------- the facts, from a pretend Assistant ----------
 
 def put(p, obj):
@@ -428,6 +471,7 @@ def main():
         check_when()
         check_names_slots()
         check_kept()
+        check_first_only()
         check_gather()
     finally:
         real = Path.home() / ".studio"

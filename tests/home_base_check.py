@@ -54,6 +54,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 WINDOWS = os.name == "nt"
 TODAY = "2026-11-14"
@@ -73,7 +75,7 @@ HERS_NOT_OURS = {
     "Step 1 of your workflow": "gone with the numbered steps (v29)",
     "Step 3 of your workflow": "gone with the numbered steps (v29; her make-posts-preview.html has no eyebrow)",
     # no longer true since Nov 19 (Dustin: nothing is asked before the copy); ours is OUR_WORDS["b_s2_small"]
-    "Your assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
+    "The Assistant asks a quick question or two, then you can walk away. The report is ready when you're back, and it shows up below.": "no questions before the copy (v29)",
     # our Today is drawn by the server with the page, so there is no moment when the home page waits for records
     # (the two screens keep her line for it)
 }
@@ -391,7 +393,7 @@ def check_words(w):
     pages = {"/home": home.page_html(), "/backups": home_base.backups_html(), "/make-posts": home_base.make_posts_html()}
     everything = "\n".join(pages.values())
     ours_words = dict(home_base.WORDS)
-    case("the pages say \"your assistant\", never \"Claude\"", "Claude" not in everything and "claude" not in everything.lower(), re.findall(r".{30}[Cc]laude.{20}", everything)[:3])
+    case("the pages say \"the Assistant\", never \"Claude\"", "Claude" not in everything and "claude" not in everything.lower(), re.findall(r".{30}[Cc]laude.{20}", everything)[:3])
     case("none of her test-only bits: no port 8799, no ?home=test, no test-copy line",
          not re.search(r"(?<![\d.\w])8799(?![\d.\w])|home=test|assistantHomeTest|test copy|Test copy|/hp/", everything))   # 8799 as a port, not four digits inside a record's time stamp
     # (the home page, her v28: what the hello said lately is kept in the browser, as hers; tests/home_v28_check.py holds it to that)
@@ -417,18 +419,18 @@ def check_words(w):
     if not hers:
         skip("her words compared with her own pages: her handoff is not on this computer")
         return home_base
-    raw = {n: (hers / "pages" / n).read_text(encoding="utf-8") for n in ("home-test.html", "backups.html", "make-posts.html", "home-test.js")}
-    raw["server.py"] = (hers / "server.py").read_text(encoding="utf-8")
+    raw = {n: nicole_nov22.read((hers / "pages" / n)) for n in ("home-test.html", "backups.html", "make-posts.html", "home-test.js")}   # Nicole, Nov 22: everything is the Assistant
+    raw["server.py"] = nicole_nov22.read((hers / "server.py"))   # Nicole, Nov 22: everything is the Assistant
     newest = her_newest("make-posts.html")                 # v27 changed this one page (section 8); v26's is still beside it
     case("her Make posts page is read from her newest pack that has it (v27 or later)", newest is not None and int(re.search(r"-v(\d+)-", newest.parents[2].name).group(1)) >= 27, newest)
     if newest:
-        raw["make-posts.html"] = newest.read_text(encoding="utf-8")
+        raw["make-posts.html"] = nicole_nov22.read(newest)   # Nicole, Nov 22: everything is the Assistant
     # v29 (Nov 19): her preview of the same screen, with her new title and My vault first; its lines are hers too
     # (tests/vault_page_check.py compares that page line by line)
     for r in her_roots():
         for f in sorted(r.glob("nicole-handoff-v29-*/unpacked/Carousel designer and reel picker/pages/make-posts-preview.html")) + \
                 sorted(r.glob("nicole-handoff-v29-*/Carousel designer and reel picker/pages/make-posts-preview.html")):
-            raw["make-posts-preview.html"] = f.read_text(encoding="utf-8")
+            raw["make-posts-preview.html"] = nicole_nov22.read(f)   # Nicole, Nov 22: everything is the Assistant
     if "make-posts-preview.html" not in raw:
         skip("her v29 preview of the post kits screen is not on this computer: its title and the My vault card's lines are not compared here")
         ours_words = {k: v for k, v in ours_words.items() if k not in ("m_h1", "v_name", "v_small")}
@@ -681,8 +683,8 @@ def check_routes(w, hb):
     case("See the report on an unplugged drive: \"Plug in <drive> to see this report.\"", json.loads(raw).get("words") == "Plug in %s to see this report." % NO_DRIVE, raw[:200])
     code, raw = w.http("GET", "/report-url?id=old-spelling-1")
     words = json.loads(raw).get("words") or ""
-    case("See the report finds a settled backup's records from the day folder it settled out of (never \"plug in\"), and says \"your assistant\"",
-         "Plug in" not in words and "your assistant" in words and "Claude" not in words, words)
+    case("See the report finds a settled backup's records from the day folder it settled out of (never \"plug in\"), and says \"the Assistant\"",
+         "Plug in" not in words and "the Assistant" in words and "Claude" not in words, words)
     code, raw = w.http("GET", "/open-shoot?id=no-such-shoot")
     case("Open this folder for a shoot nobody knows opens nothing", json.loads(raw) == {"ok": False, "words": "I don't know that shoot."}, raw[:200])
     code, raw = w.http("GET", "/open-shoot?id=unplugged-1")
@@ -967,7 +969,7 @@ def check_backups_page(c, w):
     case("backups: a SAMPLE never says safe to format; it says to keep the card", in_backup(c, "Sample shoot", ".flags .pill") == ["Keep the card: this was a sample", "No second copy"], in_backup(c, "Sample shoot", ".flags .pill"))
     case("backups: a backup with a problem: Something needs a look: see the report", in_backup(c, "Trouble shoot", ".flags .pill")[0] == "Something needs a look: see the report", in_backup(c, "Trouble shoot", ".flags .pill"))
     case("backups: a folder that was moved says so, with no dead button",
-         in_shoot(c, "Moved shoot", ".warn") == ["I can't find this folder anymore. If you moved or renamed it in Finder, tell your assistant where it went."] and in_shoot(c, "Moved shoot", ".btn") == [], in_shoot(c, "Moved shoot", ".warn"))
+         in_shoot(c, "Moved shoot", ".warn") == ["I can't find this folder anymore. If you moved or renamed it in Finder, tell the Assistant where it went."] and in_shoot(c, "Moved shoot", ".btn") == [], in_shoot(c, "Moved shoot", ".warn"))
     # a press, and where its line shows
     c.js("Array.from(document.querySelectorAll('#backups .shoot')).find(s => s.querySelector('b').textContent === 'Garcia wedding').querySelector('[data-open]').click()")
     asked(c, 1)

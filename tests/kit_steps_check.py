@@ -58,6 +58,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import words_page_check as wpc  # noqa: E402  (its pretend Assistant: one kit, the page server, words.py from the chat)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 KIT, SHORT, PROJECT, HOOKS, WINDOWS = wpc.KIT, wpc.SHORT, wpc.PROJECT, wpc.HOOKS, wpc.WINDOWS
 KQ = quote(KIT, safe="")
@@ -265,7 +267,7 @@ def check_words(k):
     if f is None:
         skip("her words against her own page: her handoff (reference-private) isn't on this computer")
     else:
-        t = html.unescape(f.read_text(encoding="utf-8")).replace("\\'", "'")
+        t = html.unescape(nicole_nov22.read(f)).replace("\\'", "'")   # Nicole, Nov 22: everything is the Assistant
         bad = []
         for key, v in k.KIT_WORDS.items():
             if key.startswith("preview_") and "design_preview" not in t:

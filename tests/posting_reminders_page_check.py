@@ -489,7 +489,7 @@ def check_pc(s):
 
 # ---------------------------------------------------------------- the fix round (Nov 11)
 
-STOPPED_HERE = "Something on this computer got in the way. Tell your assistant and it'll sort it out."
+STOPPED_HERE = "Something on this computer got in the way. Tell the Assistant and it'll sort it out."
 WAITING = "🔔 Your reminder at 9 am is waiting until this post has a posting day."
 
 
@@ -732,8 +732,9 @@ def check_page(c, s):
                 " return {bg: getComputedStyle(l).backgroundColor, lines: Array.from(l.children).map(function(e){ return Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2); }),"
                 " xright: Math.round(r.right - x.getBoundingClientRect().right), below: r.top >= w.bottom - 1, above: r.bottom <= s.top + 1, h: r.height,"
                 " dark: getComputedStyle(l.querySelector('[data-m=yes]')).backgroundColor, title: x.title}; })()")
-    # (v30, section 5: the grid, and so the panel inside it, is about 420 px wide now: her question wraps to two
-    # lines over the buttons, so the strip is about 121 px tall where it was under 90 at 820)
+    # (v30, section 5: the grid, and so the panel inside it, was about 420 px wide, and her question wrapped to two
+    # lines over the buttons, about 121 px tall where it was under 90 at 820; v31, section 8: the grid is as wide as
+    # her line above it, about 550 px)
     case("...one pale yellow strip, text then its buttons together (wrapping under the text when the panel is narrow, as hers), the × at the right end, between the button row and the photos",
          look["bg"] == "rgb(251, 242, 214)" and max(look["lines"][1:]) - min(look["lines"][1:]) <= 3 and 0 <= look["xright"] <= 16 and look["below"] and look["above"] and look["h"] < 140
          and look["dark"] == "rgb(31, 36, 48)", look)
@@ -930,7 +931,7 @@ def check_page_pc(c, s):
     line_is(c, "🔔 Your reminder for %s at 6 pm has changed. Add it to your calendar again." % d1)
     cfg(s, opener="fail")
     c.click("#pick .pr [data-m=add]")
-    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell your assistant instead.")
+    toast = ppc.wait_toast(c, "I couldn’t open that calendar file. Tell the Assistant instead.")
     case("a file that can't be opened: said plainly, and it is still waiting", toast is True and reminding(s).get("waiting") == {rid: "again"}, toast)
 
 

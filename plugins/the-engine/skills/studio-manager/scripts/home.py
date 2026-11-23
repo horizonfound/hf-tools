@@ -29,9 +29,12 @@ POST /home-recap (behind the pickers' same-page-only guard). The faces are faces
     python3 home.py seen            mark them answered
     python3 home.py did <category> [--note "..."]   remember something done in a category
     python3 home.py journey         the whole record
-    python3 home.py hello [--mark]  which hello to give: a first-time introduction, or the day's rundown (JSON)
+    python3 home.py hello [--mark]  which hello to give: a first-time introduction, or a warm hello that never opens with what is due (JSON)
 
-Categories: backup, posts, queue, posting, reel, folder.
+Categories: backup, posts, queue, posting, reel, folder, tile. A press on one of the four photo tiles (Reels,
+Carousels, Stories, Captions) is kept as "tile" (Nicole, Nov 22): the tile has already taken them to the page they
+asked for, so `pending` leaves it out (no first-time explanation, no "Want to dive in?" in the chat), and the hello
+counts it as having started posts.
 """
 import argparse
 import errno
@@ -57,7 +60,10 @@ this_computer.utf8_output()
 HOME = Path(os.environ.get("STUDIO_HOME", Path.home() / ".studio"))
 JOURNEY = HOME / "journey.json"
 PAGE = HOME / "home.html"
-CATEGORIES = ("backup", "posts", "queue", "posting", "reel", "folder")
+CATEGORIES = ("backup", "posts", "queue", "posting", "reel", "folder", "tile")
+# Presses the page itself has answered (a tile asks which shoot and lands on its page): kept in the record, never
+# handed to the chat as something to explain (Nicole, Nov 22).
+ANSWERED_BY_PAGE = ("tile",)
 
 
 def say(msg):
@@ -144,11 +150,12 @@ def record_done(category, note=None):
 
 
 def pending():
-    """Unanswered clicks, newest last, each with what they've done in that category before."""
+    """Unanswered clicks, newest last, each with what they've done in that category before. A tile's press is
+    left out: the page has answered it already (ANSWERED_BY_PAGE)."""
     j = load_journey()
     out = []
     for c in j["clicks"]:
-        if c.get("seen"):
+        if c.get("seen") or c.get("item") in ANSWERED_BY_PAGE:
             continue
         d = j["done"].get(c["item"]) or {}
         out.append({"item": c["item"], "at": c["at"], "first_time": not d.get("count"),
@@ -169,8 +176,8 @@ def mark_seen():
 HELLO_WORDS = {
     "first": "They have never been here. Introduce yourself with the first-time script in the skill. No rundown of the day.",
     "new": "They've said hello before but haven't done anything yet. One warm line and the one first step. No introduction again, no rundown.",
-    "getting-started": "They've done one side but not the other. The day in a line or two if there is anything in it, then one line inviting them to what they haven't tried.",
-    "regular": "They know their way around. The day in two or three lines, then what they can say next.",
+    "getting-started": "They've done one side but not the other. Never what is due or late (Nicole, Nov 22): a card that is in, if there is one, then one line inviting them to what they haven't tried.",
+    "regular": "They know their way around. A warm line and a card that is in, if there is one; never what is due, late or waiting to post (Nicole, Nov 22). Then what they can say next.",
 }
 
 
@@ -185,7 +192,8 @@ def hello(mark=False):
     g = gather()
     done = {c: d for c, d in (j.get("done") or {}).items() if d.get("count")}
     did = {"backup": bool(g["setup"] or done.get("backup")),
-           "posts": bool(done.get("posts") or done.get("reel") or g["kits"])}
+           "posts": bool(done.get("posts") or done.get("reel") or g["kits"]
+                         or any(c.get("item") == "tile" for c in j.get("clicks") or []))}   # a tile pressed: posts started
     if not (did["backup"] or did["posts"] or done):
         stage = "first" if not h.get("count") else "new"
     elif did["backup"] and did["posts"]:
@@ -385,7 +393,7 @@ WORDS = {
     "rc_all": "Stop showing monthly recaps",
     "rc_show": "Show my monthly recap",
     "yr_b": "Your {year}, <em>wrapped.</em>",
-    "yr_small": "Your year with your assistant, story by story. Ready to share.",
+    "yr_small": "Your year with the Assistant, story by story. Ready to share.",
     # the four tiles ask which shoot, then go straight there (her section 4; screenshots 02 and 03)
     "mk_reel": "Create a <em>reel</em>",
     "mk_carousel": "Create a <em>carousel</em>",
@@ -424,6 +432,11 @@ OUR_WORDS = {
     "mk_picking": "Pick the folder in the window that opened. Your photos are copied, never moved.",
     "mk_list_cant": "Couldn't load your shoots. Try again in a moment.",
     "mk_didnt": "That didn't work. Try again in a moment.",
+    # Captions asks which words they want after the shoot is picked (Nicole, Nov 22: "captions should ask reel or
+    # carousel"); drafts for Dustin and Nicole
+    "mk_ask": "Captions for a reel or a carousel?",
+    "mk_ask_reel": "Reel",
+    "mk_ask_carousel": "Carousel",
 }
 
 def W(key):
@@ -975,6 +988,13 @@ h1.big em{font:inherit;font-style:normal;color:var(--accent)}
 .mknote{margin:6px 0 0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink);border-left:3px solid var(--accent)}
 .mknote[hidden]{display:none}
 .mknothing{margin:0;background:#fff;padding:12px 14px;font-size:13.5px;color:var(--ink-2)}
+/* Captions: a reel or a carousel? (Nicole, Nov 22) two plain buttons in her look, after the shoot is picked */
+.mkask[hidden]{display:none}
+.mkfor{margin:0 0 10px;font:700 15px/1.2 var(--sans);letter-spacing:-.01em;overflow-wrap:anywhere}
+.mkab{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mkab button{box-sizing:border-box;padding:18px 14px;background:#fff;color:var(--ink);border:1px solid transparent;border-radius:0;cursor:pointer;font:700 17px/1 var(--sans);letter-spacing:-.01em}
+.mkab button:hover,.mkab button:focus-visible{border-color:var(--ink);outline:0}
+.mkab button:disabled{cursor:default;opacity:.6}
 @media (prefers-reduced-motion: no-preference){
 .hello .bgs img{transition:opacity 1.6s ease}
 .row .ar{transition:transform .3s var(--ease)}.row:hover .ar{transform:translateX(4px)}
@@ -989,6 +1009,10 @@ HELLO_JS = r"""
 const F = JSON.parse($('facts').textContent);
 const STILL = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const ZOOM = 1.22, EVERY = 6000;
+// the four tiles (Nicole's v31, section 7): the faces' middle about 30% from the top, above the word, which sits in the
+// middle; a photo whose faces can't be brought within TILE_SLACK of that (not enough photo above or below) gives way
+// to the next photo with a face. The hello keeps its faces in the middle (its words sit at the bottom).
+const TILE_AT = .3, TILE_SLACK = .1;
 const clamp01 = v => Math.max(0, Math.min(1, v));
 function window1(fs, vis){
   let best = null;
@@ -998,15 +1022,35 @@ function window1(fs, vis){
   if (!best || !best.inn.length) return fs.reduce((t, f) => t + f.c, 0) / fs.length;      // no stretch holds a whole face: the middle of them
   return (Math.min(...best.inn.map(f => f.a)) + Math.max(...best.inn.map(f => f.b))) / 2;
 }
-// the faces' middle, cropped in: object-position puts them in the frame, the 1.22x zoom grows from their middle
-function aim(img, x, bw, bh){
+// the faces' middle, cropped in: object-position puts them in the frame (at = how far down the frame: the middle for
+// the hello, TILE_AT for a tile), the 1.22x zoom grows from their middle, so the zoom never moves them
+function framing(x, bw, bh, at){
+  at = at == null ? .5 : at;
   const f = x.f || {}, w = f.w || x.nw || 1000, h = f.h || x.nh || 1500, sc = Math.max(bw / w, bh / h), dw = w * sc, dh = h * sc, fc = f.faces || [];
   let cx = .5, cy = .5, px = .5, py = .5;        // no faces known (a PC, or none in the photo): the photo is centered
   if (fc.length) {
     cx = window1(fc.map(a => ({a: a[0], b: a[0] + a[2], c: a[0] + a[2] / 2, size: a[2] * a[3]})), bw / dw);
     cy = window1(fc.map(a => ({a: a[1] - a[3] * .4, b: a[1] + a[3] * 1.1, c: a[1] + a[3] / 2, size: a[2] * a[3]})), bh / dh);
-    px = dw > bw + 1 ? clamp01((cx * dw - bw / 2) / (dw - bw)) : .5; py = dh > bh + 1 ? clamp01((cy * dh - .5 * bh) / (dh - bh)) : .5;
+    px = dw > bw + 1 ? clamp01((cx * dw - bw / 2) / (dw - bw)) : .5; py = dh > bh + 1 ? clamp01((cy * dh - at * bh) / (dh - bh)) : .5;
   }
+  // where the faces' middle lands, as a share of the frame's height (the zoom grows from it, so it stays there)
+  const lands = (cy * dh - py * (dh - bh)) / bh;
+  return {fc, cx, cy, px, py, dw, dh, lands};
+}
+// a tile's photo whose faces can be brought to about TILE_AT (her section 7); a photo with no faces is never one
+function tileFits(x, bw, bh){
+  const r = framing(x, bw, bh, TILE_AT);
+  return r.fc.length > 0 && Math.abs(r.lands - TILE_AT) <= TILE_SLACK;
+}
+// the order a tile tries its photos in: faces that fit above the word, then other photos with faces, then the rest
+function tileOrder(cands, G, bw, bh){
+  const xOf = c => ({f: G[c.n] || {}});
+  const faced = cands.filter(c => G[c.n] && G[c.n].faces && G[c.n].faces.length);
+  const fit = faced.filter(c => tileFits(xOf(c), bw, bh));
+  return fit.concat(faced.filter(c => !fit.includes(c)), cands.filter(c => !faced.includes(c)));
+}
+function aim(img, x, bw, bh, at){
+  const {fc, cx, cy, px, py, dw, dh} = framing(x, bw, bh, at);
   img.style.objectPosition = `${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%`;
   img.style.transformOrigin = `${(cx * dw - px * (dw - bw)).toFixed(0)}px ${(cy * dh - py * (dh - bh)).toFixed(0)}px`;
   img.style.transform = `scale(${ZOOM})`;
@@ -1032,10 +1076,10 @@ function facesOf(kit, ns){
   return FACES[k];
 }
 const soon = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
-function put(im, x, box){
+function put(im, x, box, at){
   return new Promise(res => {
     const done = ok => { im.onload = im.onerror = null; res(ok); };
-    im.onload = () => { x.nw = im.naturalWidth; x.nh = im.naturalHeight; aim(im, x, box.clientWidth, box.clientHeight); done(true); };
+    im.onload = () => { x.nw = im.naturalWidth; x.nh = im.naturalHeight; aim(im, x, box.clientWidth, box.clientHeight, at); done(true); };
     im.onerror = () => done(false);
     im.dataset.n = x.n; im.dataset.kit = x.kit; im.src = x.u;
   });
@@ -1072,7 +1116,7 @@ async function startHello(box){
   }, EVERY);
 }
 
-/* the four tiles: a photo from a different shoot each, the first one with a face, faces centered */
+/* the four tiles: a photo from a different shoot each, the first one whose faces sit above the word (v31 section 7) */
 async function startTiles(){
   const T = SAMPLES ? (SAMPLES.tiles || []).map(ns => ({kit: '', sample: true, cands: (ns || []).map(nm => ({n: nm}))})) : (F.tiles || []);
   const facesFor = t => t.sample ? sampleFaces() : facesOf(t.kit, t.cands.map(c => c.n));
@@ -1081,14 +1125,13 @@ async function startTiles(){
     const t = T[i]; if (!t || !t.cands || !t.cands.length || !live) return;
     const im = el.querySelector('img');
     const G = await soon(facesFor(t), 2500) || {};
-    const withFace = t.cands.filter(c => G[c.n] && G[c.n].faces && G[c.n].faces.length);
-    const order = withFace.concat(t.cands.filter(c => !withFace.includes(c)));
-    for (const c of order) { if (await put(im, {kit: t.kit, n: c.n, u: urlFor(t, c), f: G[c.n] || {}}, el)) { if (t.sample) sampleShown(); return; } }
+    const order = tileOrder(t.cands, G, el.clientWidth, el.clientHeight);
+    for (const c of order) { if (await put(im, {kit: t.kit, n: c.n, u: urlFor(t, c), f: G[c.n] || {}}, el, TILE_AT)) { if (t.sample) sampleShown(); return; } }
     im.removeAttribute('src');
   });
   let rsz = 0; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => document.querySelectorAll('#tiles .tl img[src]').forEach(im => {
     const el = im.closest('.tl'), t = T[[...el.parentNode.children].indexOf(el)]; if (!t) return;
-    facesFor(t).then(G => aim(im, {f: G[im.dataset.n] || {}, nw: im.naturalWidth, nh: im.naturalHeight}, el.clientWidth, el.clientHeight)); }), 250); });
+    facesFor(t).then(G => aim(im, {f: G[im.dataset.n] || {}, nw: im.naturalWidth, nh: im.naturalHeight}, el.clientWidth, el.clientHeight, TILE_AT)); }), 250); });
 }
 """
 
@@ -1129,7 +1172,7 @@ document.querySelectorAll('.now img, .fan img, .stack img').forEach(im => { cons
 const MK = (function(){
   const box = $('mk'); if (!box) return null;
   const TITLE = {reel: 'mk_reel', carousel: 'mk_carousel', stories: 'mk_stories', captions: 'mk_captions'};
-  let make = 'reel', from = null, list = null, following = false, asked = 0;
+  let make = 'reel', from = null, list = null, following = false, asked = 0, asking = null;
   window.MK_HOLD = false;
   const accent = (el, s) => { el.textContent = ''; const m = /^(.*)<em>(.*)<\/em>(.*)$/.exec(s);
     if (!m) { el.textContent = s; return; } const e = document.createElement('em'); e.textContent = m[2]; el.append(m[1], e, m[3]); };
@@ -1145,7 +1188,26 @@ const MK = (function(){
   }
   const say = t => { const n = $('mkNote'); n.textContent = t || ''; n.hidden = !t; };
   const photos = n => fill(n === 1 ? W.mk_photo : W.mk_photos, {n: many(n || 0)});
+  // Captions: a reel or a carousel? (Nicole, Nov 22) asked once the shoot is picked; the answer picks the words
+  // page's tab. target: {go, name} for a shoot, {vault: true, name} for My vault.
+  function ask(target){
+    asking = target;
+    $('mkS').textContent = W.mk_ask; $('mkFor').textContent = target.name || '';
+    ['mkTop', 'mkLab', 'mkF', 'mkL'].forEach(id => { $(id).hidden = true; });
+    $('mkAsk').hidden = false; $('mkAR').disabled = $('mkAC').disabled = false;
+    $('mkAR').focus();
+  }
+  async function answer(piece){
+    const t = asking; if (!t) return;
+    if (!t.vault) { location.href = t.go['captions_' + piece] || t.go.captions; return; }
+    $('mkAR').disabled = $('mkAC').disabled = true;
+    try { const r = await fetch('/make-vault', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({make})});
+      const d = await r.json(); if (d && d.ok && (d.go || d.url)) { location.href = (d.go && d.go['captions_' + piece]) || d.url; return; } say((d && d.words) || W.mk_didnt); }
+    catch (e) { say(W.mk_didnt); }
+    $('mkAR').disabled = $('mkAC').disabled = false;
+  }
   function draw(){
+    if (asking) return;
     const L = $('mkL'), kits = (list && list.kits) || [], q = ($('mkF').value || '').trim().toLowerCase();
     $('mkS').textContent = (list && !kits.length) ? W.mk_sub_none : W.mk_sub;
     $('mkLab').hidden = !kits.length; $('mkF').hidden = kits.length < 7;
@@ -1156,7 +1218,9 @@ const MK = (function(){
     }
     const hit = kits.filter(k => !q || String(k.name).toLowerCase().includes(q));
     hit.forEach(k => { const a = row('a', '', [k.thumb], k.name, [niceDay(k.date), photos(k.photos)].filter(Boolean).join(' · '));
-      a.setAttribute('href', k.go[make]); a.dataset.kit = k.folder; L.append(a); });
+      a.setAttribute('href', k.go[make]); a.dataset.kit = k.folder;
+      if (make === 'captions') a.addEventListener('click', e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; e.preventDefault(); ask({go: k.go, name: k.name}); });
+      L.append(a); });
     if (q && !L.children.length && kits.length) L.append(el('p', 'mknothing', fill(W.mk_nothing, {q: $('mkF').value.trim()})));
   }
   async function load(){
@@ -1166,8 +1230,9 @@ const MK = (function(){
     draw();
   }
   function open(kind, tile){
-    make = TITLE[kind] ? kind : 'reel'; from = tile || null;
+    make = TITLE[kind] ? kind : 'reel'; from = tile || null; asking = null;
     accent($('mkT'), W[TITLE[make]]);
+    $('mkAsk').hidden = true; $('mkTop').hidden = false; $('mkL').hidden = false;
     $('mkF').value = ''; if (!following) say('');
     $('mkNew').disabled = following;
     draw(); box.hidden = false; window.MK_HOLD = true; box.querySelector('.mkbox').focus();
@@ -1179,6 +1244,7 @@ const MK = (function(){
     if (from) try { from.focus(); } catch (e) {}
   }
   async function toVault(b){
+    if (make === 'captions') { ask({vault: true, name: W.mk_vault}); return; }
     b.disabled = true;
     try { const r = await fetch('/make-vault', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({make})});
       const d = await r.json(); if (d && d.ok && d.url) { location.href = d.url; return; } say((d && d.words) || W.mk_didnt); }
@@ -1190,6 +1256,7 @@ const MK = (function(){
     const tick = async () => {
       let j = null; try { j = await (await fetch('/make-new-status', {cache: 'no-store'})).json(); } catch (e) {}
       if (j && j.state === 'done' && j.go) { following = false; say(j.words);
+        if (!box.hidden && make === 'captions') { $('mkNew').disabled = false; ask({go: j.go, name: j.kit || ''}); return; }
         if (!box.hidden) { location.href = j.go[make]; return; } window.MK_HOLD = false; $('mkNew').disabled = false; return; }
       if (j && (j.state === 'stopped' || j.state === 'none')) { following = false; $('mkNew').disabled = false; say(j.words || W.mk_didnt);
         if (box.hidden) window.MK_HOLD = false; return; }
@@ -1208,6 +1275,8 @@ const MK = (function(){
     b.disabled = false; say(d && d.cancelled ? '' : ((d && d.words) || W.mk_didnt));     // a closed window changes nothing
   }
   $('mkNew').onclick = newShoot;
+  $('mkAR').onclick = () => answer('reel');
+  $('mkAC').onclick = () => answer('carousel');
   $('mkX').onclick = close;
   box.addEventListener('click', e => { if (e.target === box) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !box.hidden) { e.preventDefault(); close(); } });
@@ -1337,6 +1406,9 @@ def make_box():
             f"<p id='mkS'>{e(W('mk_sub'))}</p>"
             f"<div class='mklist' id='mkTop'><button type='button' class='mkr new' id='mkNew'><span class='im' aria-hidden='true'>+</span>"
             f"<span><b>{e(W('mk_new'))}</b><small>{e(W('mk_new_small'))}</small></span><span class='ar' aria-hidden='true'>&rarr;</span></button></div>"
+            f"<div class='mkask' id='mkAsk' hidden><p class='mkfor' id='mkFor'></p><div class='mkab'>"
+            f"<button type='button' id='mkAR' data-piece='reel'>{e(W('mk_ask_reel'))}</button>"
+            f"<button type='button' id='mkAC' data-piece='carousel'>{e(W('mk_ask_carousel'))}</button></div></div>"
             f"<p class='mknote' id='mkNote' role='status' hidden></p>"
             f"<p class='mklab' id='mkLab' hidden>{e(W('mk_shoots'))}</p>"
             f"<input class='mkfind' id='mkF' type='search' placeholder='{e(W('mk_find'), quote=True)}' aria-label='{e(W('mk_find'), quote=True)}' hidden>"
@@ -1358,7 +1430,10 @@ def page_html(query="", start=False):
     h = f.get("hello") or {}
     greet = _parts(h.get("greeting_parts")) if h.get("greeting_parts") else e(h.get("greeting") or W("hello_plain"))
     line = _parts(h.get("line_parts")) if h.get("line_parts") else e(h.get("line") or "")
-    hello = (f"<section class='hello' id='hello' data-group='{e(str(h.get('group') or ''), quote=True)}'>"
+    if h.get("only") and line:
+        # the very first hello (Nicole, Nov 22): her one line alone, as the heading, nothing stacked over it
+        greet, line = line, ""
+    hello = (f"<section class='hello' id='hello' data-group='{e(str(h.get('group') or ''), quote=True)}'{' data-only=1' if h.get('only') else ''}>"
              f"<div class='bgs' aria-hidden='true'><img alt=''><img alt=''></div>"
              f"<div class='tx'><h2 id='hi'>{greet}</h2>{f'<p>{line}</p>' if line else ''}</div>"
              + (f"<p class='samplenote' id='sampleNote' hidden>{e(f['samples']['note'])}</p>" if f.get("samples") else "")
@@ -1366,7 +1441,7 @@ def page_html(query="", start=False):
     # Turn your shoots into posts, the four tiles, and the one button (no "Newest" box: her section 2)
     kits_btn = W("s3_see") if (f.get("kits") or f.get("newest")) else W("s3_create")
     tiles = "".join(
-        f"<a class='tl' href='/make-posts' data-make='{make}' data-item='posts' aria-label='{e(W('t_aria').format(word=W(key)), quote=True)}'>"
+        f"<a class='tl' href='/make-posts' data-make='{make}' data-item='tile' aria-label='{e(W('t_aria').format(word=W(key)), quote=True)}'>"
         f"<img alt=''><b>{e(W(key))}</b></a>" for make, key in TILES)
     big = (f"<section id='s3'><h1 class='big'>{W('s3_n')}</h1><p class='sub'>{e(W('s3_p'))}</p>"
            f"<div class='tiles' id='tiles'>{tiles}</div>"

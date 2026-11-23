@@ -66,13 +66,13 @@ WORDS = {
     "inside": "That folder is already in your Assistant folder. Pick its shoot from Your shoots instead.",
     "holds": "That folder holds your Assistant folder. Pick the folder your finished photos were exported to.",
     "would_hold": "Your Assistant folder will be made in that folder, so it can't be a shoot itself. Pick the folder your finished photos were exported to.",
-    "clash": "There's already a shoot called \"{name}\" in Your Content. Nothing was copied. Rename that folder, or tell your assistant what to call this one.",
+    "clash": "There's already a shoot called \"{name}\" in Your Content. Nothing was copied. Rename that folder, or tell the Assistant what to call this one.",
     "unplugged": "Your Assistant folder isn't there right now. Check that its drive is plugged in, then try again.",
-    "no_place": "There's no place for your Assistant folder yet. Ask your assistant to set one up.",
+    "no_place": "There's no place for your Assistant folder yet. Ask the Assistant to set one up.",
     "held": "Something stopped the copy part way: {why}. {n} of {of} photos are in, each one checked. Nothing is lost and your originals weren't moved; pick the same folder again to finish.",
-    "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your shoot. Your originals weren't moved. Pick the same folder again to try again, or tell your assistant.",
-    "too_many_names": "{name} couldn't be given a name of its own in the shoot. Nothing was written over. Tell your assistant.",
-    "unnumbered": "Your photos are in, but I couldn't get the post kit ready. Tell your assistant.",
+    "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your shoot. Your originals weren't moved. Pick the same folder again to try again, or tell the Assistant.",
+    "too_many_names": "{name} couldn't be given a name of its own in the shoot. Nothing was written over. Tell the Assistant.",
+    "unnumbered": "Your photos are in, but I couldn't get the post kit ready. Tell the Assistant.",
     "busy": "A shoot is being copied in right now. One moment.",
     "room": "There isn't room for these photos on the drive your Assistant folder is on: they need about {need}, and {free} is free. Nothing was copied.",
     "stopped": "The copy stopped before it finished. Nothing is lost; pick the same folder again to finish.",
@@ -120,20 +120,31 @@ def _write_whole(path, obj):
 
 # ---------- where each tile lands ----------
 
+def _words_pages(q):
+    """The words page's two tabs for a kit (q: its folder name, already in an address). Captions asks "a reel or a
+    carousel?" first (Nicole, Nov 22) and lands on the one they chose; "captions" alone stays the Reel tab (the
+    chat's `make --for captions`, a page that does not ask)."""
+    return {"captions": f"/words.html?kit={q}&piece=reel", "captions_reel": f"/words.html?kit={q}&piece=reel",
+            "captions_carousel": f"/words.html?kit={q}&piece=carousel"}
+
+
 def go(kit_folder):
-    """The four pages a kit's tiles land on, the addresses the post kit page itself uses: the reel page's chooser
-    (kit.reel_door), the carousel designer and the stories designer (kit.design_door), the words page (Reel tab)."""
+    """The pages a kit's tiles land on, the addresses the post kit page itself uses: the reel page's chooser
+    (kit.reel_door), the carousel designer and the stories designer (kit.design_door), the words page (its Reel or
+    its Carousel tab, as they answer)."""
     import kit as kit_mod
     q = quote(kit_folder, safe="")
-    return {"reel": kit_mod.reel_door(kit_folder), "carousel": kit_mod.design_door(kit_folder),
-            "stories": kit_mod.design_door(kit_folder, stories=True), "captions": f"/words.html?kit={q}&piece=reel"}
+    return dict({"reel": kit_mod.reel_door(kit_folder), "carousel": kit_mod.design_door(kit_folder),
+                 "stories": kit_mod.design_door(kit_folder, stories=True)}, **_words_pages(q))
 
 
 def vault_go(vault_folder):
-    """My vault (her section 4): its own reel page for Reels, its post kit page for the others."""
+    """My vault (her section 4): its own reel page for Reels, its post kit page for Carousels and Stories, and for
+    Captions its own words page (the vault's post kit page links the same one, so it is a page the vault has), on
+    the tab they chose."""
     q = quote(vault_folder, safe="")
     kit_page = "/content/" + q + "/Post%20kit.html"
-    return {"reel": "/reel.html?kit=" + q, "carousel": kit_page, "stories": kit_page, "captions": kit_page}
+    return dict({"reel": "/reel.html?kit=" + q, "carousel": kit_page, "stories": kit_page}, **_words_pages(q))
 
 
 # ---------- the Assistant folder ----------
@@ -467,7 +478,7 @@ def make(folder, progress=None):
             raise Trouble(WORDS["clash"].format(name=folder_name))
         kit = content / folder_name
         if this_computer.WINDOWS and kit_mod._kit_too_long(kit):
-            raise Trouble("That shoot's folder would sit too deep in folders for this PC. Tell your assistant.")
+            raise Trouble("That shoot's folder would sit too deep in folders for this PC. Tell the Assistant.")
         run = {"from": str(src), "picked": src.name, "kit": folder_name, "name": name, "date": when[:10],
                "started": datetime.now().isoformat(timespec="seconds"), "status": "copying", "moves": []}
         log["runs"].append(run)

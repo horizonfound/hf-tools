@@ -40,13 +40,15 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import talking_page_check as t  # noqa: E402   (its Setup: a scratch home, pretend kits, the page server)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 SCRIPTS = t.SCRIPTS
 PORT = 9880
 KIT = "2026-09-23 Zoë & the 'boys' 🌊" if t.WINDOWS else "2026-09-23 Zoë <b>& the 'boys' 🌊"
 NEW_KIT = "2026-09-26 Brought in"
 PAGE = "abcdefgh12"
-NOT_PICKED = "Your assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat."
+NOT_PICKED = "The Assistant hasn't picked for this reel yet. Tell it which photos you'd like below, then copy the line into the chat."
 OLD_LINE = "hasn't picked for this shoot yet"
 NOTE = "Only the ones in front of the white backdrop.\nNot the $5 \"cupcake\" ones, <b>please</b>."
 
@@ -116,8 +118,8 @@ def run_words(s):
     if hers is None:
         t.skip("the photo note's words against her v25 reel page: her handoff (reference-private) isn't on this computer")
         return
-    page = (hers / "pages" / "reel-maker.html").read_text(encoding="utf-8")
-    server = (hers / "server.py").read_text(encoding="utf-8")
+    page = nicole_nov22.read((hers / "pages" / "reel-maker.html"))   # Nicole, Nov 22: everything is the Assistant
+    server = nicole_nov22.read((hers / "server.py"))   # Nicole, Nov 22: everything is the Assistant
     flat = page.replace("\\'", "'")
     bad = [(k, frag) for k, v in w.items() for frag in re.split(r"\{\w+\}", v) if len(frag.strip()) >= 2 and frag not in flat]
     case("every word of ours for this (%d lines) is in her v25 reel page, word for word" % len(w), not bad, bad)
@@ -230,7 +232,7 @@ def run_new_kit(s):
     code, _j, raw, _h = s.http("GET", "/content/" + NEW_KIT.replace(" ", "%20") + "/Post%20kit.html")
     page = raw.decode("utf-8", "replace")
     case("the post kit opens with nothing picked and nothing made (her Reel card line, No slides yet, No stories yet)",
-         code == 200 and "Your assistant hasn&#x27;t picked the reel photos yet." in page.replace("'", "&#x27;") and "No slides yet." in page and "No stories yet." in page, code)
+         code == 200 and "The Assistant hasn&#x27;t picked the reel photos yet." in page.replace("'", "&#x27;") and "No slides yet." in page and "No stories yet." in page, code)
 
 
 # ---------- the page ----------
@@ -253,21 +255,21 @@ def run_page(c, s):
     s.make_kit(kit, photos=8)
     c.open(s.url("/reel.html" + s.q(kit) + "&kind=photos"))     # v27: the note box is on a kind's page (the chooser has none)
     c.wait_for("window.Reel && window.Reel.state()", 20)
-    case("a new shoot's reel: Let my assistant choose says her line, as plain words", c.text("#claudeWords") == NOT_PICKED and c.count("#claudeWords b") == 0, c.text("#claudeWords"))
+    case("a new shoot's reel: Let the Assistant choose says her line, as plain words", c.text("#claudeWords") == NOT_PICKED and c.count("#claudeWords b") == 0, c.text("#claudeWords"))
     case("...and the page is on I'll drag them in myself, with nothing in the reel", c.js("document.getElementById('useMine').classList.contains('on')") and c.count("#reel .tile") == 0)
     box = c.js(BOX)
     case("her note box is under the two choices, before the tip, in step 2",
          box["prev"] == "choice" and box["next"] == "tip" and box["inStep"] is True, box)
     case("her words on it: the title, optional and only for this reel, her two examples, the placeholder, the line above the copy line",
-         box["title"] == "Tell your assistant which photos you'd like in this reel" and box["opt"] == " Optional, and only for this reel."
+         box["title"] == "Tell the Assistant which photos you'd like in this reel" and box["opt"] == " Optional, and only for this reel."
          and box["ex"] == "For example: “Only the ones in front of the white backdrop.” or “Just the kitchen and the cupcakes.”"
          and box["ph"] == "Optional: which photos to use, or leave out" and box["forIn"] == "photoAskIn"
-         and box["then"] == "Then copy this into the chat, and your assistant picks the photos for this reel:" and box["copy"] == "Copy", box)
+         and box["then"] == "Then copy this into the chat, and the Assistant picks the photos for this reel:" and box["copy"] == "Copy", box)
     case("the box is two rows and takes 600 letters (hers)", box["rows"] == 2 and box["max"] == 600, box)
     case("with one reel and no note the line is the shoot only, and the shoot's name is letters, not a tag",
          line(c) == "Pick my reel photos for " + short and box["kids"] == 0, line(c))
     c.click("#useClaude")
-    case("Let my assistant choose with no pick: her line stays, nothing else changes",
+    case("Let the Assistant choose with no pick: her line stays, nothing else changes",
          c.text("#claudeWords") == NOT_PICKED and c.js("document.getElementById('useMine').classList.contains('on')"))
     # a note
     c.click("#photoAskIn")
@@ -312,12 +314,12 @@ def run_page(c, s):
     code, out = run(s, "kit.py", "picks", kit, "--reel", "3+,1,2-")
     c.js("window.Reel.followNow()")
     c.wait_for("document.getElementById('claudeWords').textContent !== %s" % json.dumps(NOT_PICKED), 10)
-    case("the Assistant's pick arrives: her line gives way to what Let my assistant choose does, and their own (empty) order stays on the screen",
+    case("the Assistant's pick arrives: her line gives way to what Let the Assistant choose does, and their own (empty) order stays on the screen",
          code == 0 and c.text("#claudeWords") == rp.WORDS["claude_words"] and c.count("#reel .tile") == 0
          and c.js("document.getElementById('useMine').classList.contains('on')"), (out, c.text("#claudeWords")))
     c.click("#useClaude")
     c.wait_for("document.querySelectorAll('#reel .tile').length === 3", 5)
-    case("...and pressing Let my assistant choose shows the pick", c.js("Array.from(document.querySelectorAll('#reel .tile')).map(function(x){ return +x.dataset.n; })") == [3, 1, 2])
+    case("...and pressing Let the Assistant choose shows the pick", c.js("Array.from(document.querySelectorAll('#reel .tile')).map(function(x){ return +x.dataset.n; })") == [3, 1, 2])
     # a note written in another window shows when the box is not under their hand
     chrome_drive.wait_until(lambda: (reel_rec(s, kit)["saved"].get("mine") is False), 8, what="the choice saved")
     save(s, kit, {"photo_ask": "from the other window"}, page="otherpage1")

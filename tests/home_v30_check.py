@@ -18,7 +18,12 @@ real kit, no /Volumes, no window on the screen):
     the look on the home page only (every other page keeps look.py's);
   * in a HIDDEN Chrome at 1440 x 900: all of the above on the screen, the page fitting about one laptop screen,
     a tile's press asking which shoot and recorded for the chat, phone width (375 and 336) with no
-    sideways scroll, reduced motion (the photo never changes), and a brand-new Assistant (grey placeholders).
+    sideways scroll, reduced motion (the photo never changes), and a brand-new Assistant (grey placeholders);
+  * Nicole's Nov 22 decisions: the very first hello is her one line alone ("Hi! I'm your Assistant, and I'm so glad
+    you're here.", no greeting over it); a tile's press is recorded as "tile", which `home.py pending` leaves out
+    (no first-time explanation in the chat) and the hello stage counts as posts started; the four tiles put the
+    faces' middle about 30% from the top, above the word (her v31 section 7), and a photo whose faces can't be
+    brought there gives way to the next photo with a face; the hello keeps its faces in the middle.
 A screenshot of the page at 1440 x 900 is written where --shot says (default: none).
 
 The page server and the hidden Chrome are this test's own and are stopped at the end. Every line says PASS, FAIL
@@ -45,6 +50,8 @@ sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
 import home_v28_check as v28  # noqa: E402  (its pretend Assistant: World, at, box_words)
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 TODAY = v28.TODAY
 A, B = v28.A, v28.B
@@ -89,13 +96,18 @@ def her_mock():
     return None
 
 
+# A face a little above the photo's middle on the left (Nov 22: high enough that the old framing, which put the faces
+# in the middle, and the new one, 30% from the top, land in different places in a tile)
+FACE = [0.12, 0.40, 0.14, 0.15]
+
+
 def pretend_faces(w):
-    """A face for every other small copy (a face high on the left), none for the rest; kept in the test's own file."""
+    """A face for every other small copy (FACE), none for the rest; kept in the test's own file."""
     table = {}
     for kit in (A, B):
         for n, name in w.copies(kit).items():
             if n % 2:
-                table[name] = {"w": 520, "h": 347, "faces": [[0.12, 0.18, 0.14, 0.22]]}
+                table[name] = {"w": 520, "h": 347, "faces": [list(FACE)]}
     w.put(w.pretend, table)
 
 
@@ -154,7 +166,8 @@ def check_page(w, home):
     makes = re.findall(r"data-make='(\w+)'", s3)
     case("four photo tiles, Reels, Carousels, Stories, Captions, each with data-make (what stage C opens)",
          makes == MAKES and flat(part(s3, "id='tiles'>", "</div>")) == TILE_WORDS, (makes, flat(part(s3, "id='tiles'>", "</div>"))))
-    case("... each a link to the post kits screen (a saved copy, a new tab), its press asking which shoot and recorded as a posts press", s3.count("class='tl' href='/make-posts'") == 4 and s3.count("data-item='posts'") == 5)
+    case("... each a link to the post kits screen (a saved copy, a new tab), its press asking which shoot and recorded as a tile press (Nov 22; See all my post kits stays posts)",
+         s3.count("class='tl' href='/make-posts'") == 4 and s3.count("data-item='tile'") == 4 and s3.count("data-item='posts'") == 1)
     tiles = data["tiles"]
     case("... a photo from a different shoot for each pair of neighbours (two shoots: they take turns)", [t.get("kit") for t in tiles] == [B, A, B, A], [t.get("kit") for t in tiles])
     used = [(t["kit"], c["n"]) for t in tiles for c in t["cands"]]
@@ -191,12 +204,52 @@ def check_page(w, home):
     case("a brand-new Assistant (no post kits): the hello and the tiles are grey placeholders with nothing to load, Create your post kits",
          d0 == {"hello_photos": [], "tiles": [], "samples": None} and p0.count("class='tl'") == 4 and "Create your post kits →" in p0 and "--placeholder:#D3CDC4" in p0, d0)
     case("... and the hello still says hello", f0.get("hello") is None or len(flat(part(p0, "<h2", "</h2>"))) >= 1)
+    # a tile's press, for the chat (Nov 22): left out of pending; the hello stage counts it as posts started
+    jp = home.JOURNEY
+    saved_j = jp.read_bytes() if jp.exists() else None
+    try:
+        with Kits(w):
+            home.save_journey({"clicks": [], "done": {}, "hellos": {"first": None, "count": 0}})
+            before = home.hello()
+            home.record_click("tile")
+            after = home.hello()
+            pend = home.pending()
+            home.record_click("posts")
+            pend2 = home.pending()
+    finally:
+        if saved_j is not None:
+            jp.write_bytes(saved_j)
+        elif jp.exists():
+            jp.unlink()
+    case("a tile's press is kept as tile, and pending leaves it out (no first-time explanation in the chat)", pend == [], pend)
+    case("... while See all my post kits (posts) still shows in pending, as before", [x["item"] for x in pend2] == ["posts"] and pend2[0]["first_time"], pend2)
+    case("... and the hello counts a tile's press as posts started", "posts" in before["not_tried"] and "posts" not in after["not_tried"], (before, after))
+    # the very first hello (Nicole, Nov 22): her one line alone, nothing stacked over it
+    import hello_lines
+    saved = hello_lines.STATE.read_bytes() if hello_lines.STATE.exists() else None
+    real_gather = hello_lines.gather
+    try:
+        if hello_lines.STATE.exists():
+            hello_lines.STATE.unlink()
+        hello_lines.gather = lambda now=None: dict(hello_lines._empty_facts(), name="Nicole")   # no shoot yet
+        p1 = home.page_html()
+        p2 = home.page_html()
+    finally:
+        hello_lines.gather = real_gather
+        if saved is not None:
+            hello_lines.STATE.write_bytes(saved)
+    only = "Hi! I\u2019m your Assistant, and I\u2019m so glad you\u2019re here."
+    h1 = part(p1, "<section class='hello'", "</section>")
+    case("the very first hello: only her line, as the heading, with no greeting over it and no line under it (Nov 22)",
+         flat("<h2" + part(h1, "<h2", "</h2>") + "</h2>") == [only] and "<p>" not in part(h1, "<div class='tx'>", "</div>") and "data-only=1" in h1
+         and "Nicole" not in h1, flat("<x" + h1))
+    case("... and a reload keeps it", part(p2, "<section class='hello'", "</section>") == h1)
     # her mock-up's words
     hers = her_mock()
     if not hers:
         skip("her words compared with her mock-up: her v30 handoff is not on this computer")
         return
-    raw = hers.read_text(encoding="utf-8")
+    raw = nicole_nov22.read(hers)   # Nicole, Nov 22: everything is the Assistant
     for t in ("Turn your shoots <em>into posts</em>", "Turn your shoot into reels, carousels, stories, and captions.", "Your grid, newest first", "See all my post kits &rarr;",
               "Your posts ready to go, and how your grid will look.", "Open my posting queue &rarr;", "Copies your card to your drive, checks every photo, and sorts it into shoots.",
               "The shoots you need to edit and when they're due.", ">Watch<", "Open my Assistant folder", "'Reels', 'Carousels', 'Stories', 'Captions'", "#D9603A", "#EDEAE4", "#F5F3EF", "#DED8CD", "#6E6A64"):
@@ -279,13 +332,33 @@ def check_browser(c, w, shot):
     fit = c.js("({sh: document.documentElement.scrollHeight, ih: innerHeight, iw: innerWidth, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth})")
     case("the whole home page fits one laptop screen, or nearly (1440 x 900: at most 930 px tall)", fit["iw"] == 1440 and fit["sh"] <= 930 and fit["sw"] <= fit["cw"], fit)
     case("no page errors, and nothing asked of the internet", not c.page_errors() and not c.outside_requests(), (c.page_errors()[:2], c.outside_requests()[:2]))
-    # a tile's press: "Create a carousel: which shoot?" (stage C; tests/create_dialog_check.py holds the box), recorded as posts
+    # the tiles' faces (her v31 section 7): the faces' middle about 30% down each tile, above the word
+    tf = c.js("[...document.querySelectorAll('#tiles .tl')].map(el => { const im = el.querySelector('img'); return {faces: im.dataset.faces, "
+              "at: parseFloat(im.style.transformOrigin.split(' ')[1]) / el.clientHeight, word: (el.querySelector('b').getBoundingClientRect().top - el.getBoundingClientRect().top) / el.clientHeight}; })")
+    case("each tile's faces sit about 30% from the top, above the word in the middle (v31 section 7)",
+         all(x["faces"] == "1" and abs(x["at"] - 0.30) <= 0.06 and x["at"] < x["word"] for x in tf), tf)
+    hb = c.js("(() => { const box = document.getElementById('hello'), F = {f: {w: 520, h: 347, faces: [%s]}}; "
+              "return {hello: framing(F, box.clientWidth, box.clientHeight).lands, tile: framing(F, box.clientWidth, box.clientHeight, TILE_AT).lands}; })()" % json.dumps(FACE))
+    case("... the hello keeps its faces in the middle (its words sit at the bottom); only the tiles aim at 30%", abs(hb["hello"] - 0.5) <= 0.03 and abs(hb["tile"] - 0.3) <= 0.03, hb)
+    order = c.js("(() => { const G = {1: {w: 520, h: 347, faces: [[.1, .80, .1, .12]]}, 2: {w: 520, h: 347, faces: [%s]}, 4: {w: 520, h: 347, faces: [[.1, .80, .1, .12]]}}; "
+                 "const el = document.querySelector('#tiles .tl'), bw = el.clientWidth, bh = el.clientHeight; "
+                 "return {order: tileOrder([{n: 1}, {n: 3}, {n: 2}, {n: 4}], G, bw, bh).map(c => c.n), low: tileFits({f: G[1]}, bw, bh), mid: tileFits({f: G[2]}, bw, bh), "
+                 "none: tileOrder([{n: 5}, {n: 6}], {}, bw, bh).map(c => c.n)}; })()" % json.dumps(FACE))
+    case("... a photo whose faces can't be brought that high (a face near the bottom) gives way to the next photo with a face; then the other faces, then the rest",
+         order == {"order": [2, 1, 4, 3], "low": False, "mid": True, "none": [5, 6]}, order)
+    cen = c.js("(() => { const im = document.createElement('img'); aim(im, {f: {w: 520, h: 347, faces: []}}, 300, 150, TILE_AT); return [im.style.objectPosition, im.dataset.faces]; })()")
+    case("... a tile photo with no face stays centered", cen[0] in ("50% 50%", "50.0% 50.0%") and cen[1] == "0", cen)
+    # a tile's press: "Create a carousel: which shoot?" (stage C; tests/create_dialog_check.py holds the box), recorded as
+    # "tile" (Nov 22): `pending` leaves it out, so the chat never explains posts after it, and the hello counts it
+    import home
+    home.mark_seen()
     before = len(clicks(w))
     c.click("#tiles .tl[data-make=carousel]")
     c.wait_for("!document.getElementById('mk').hidden", 15)
-    chrome_drive.wait_until(lambda: clicks(w)[before:] == ["posts"], 10, what="the press recorded")
-    case("a tile's press asks which shoot (Create a carousel), stays on the home page, and is recorded as posts",
-         clicks(w)[before:] == ["posts"] and c.js("document.getElementById('mkT').textContent") == "Create a carousel" and c.js("location.pathname") == "/home", clicks(w)[before:])
+    chrome_drive.wait_until(lambda: clicks(w)[before:] == ["tile"], 10, what="the press recorded")
+    case("a tile's press asks which shoot (Create a carousel), stays on the home page, and is recorded as tile",
+         clicks(w)[before:] == ["tile"] and c.js("document.getElementById('mkT').textContent") == "Create a carousel" and c.js("location.pathname") == "/home", clicks(w)[before:])
+    case("... home.py pending leaves it out: no first-time explanation and no Want to dive in? in the chat", not any(x["item"] == "tile" for x in home.pending()), home.pending())
     c.key("Escape")
     # the photo changes every few seconds
     c.open(w.url("/home"))

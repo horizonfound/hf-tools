@@ -424,7 +424,7 @@ def another_card(w, b, base):
     drive0 = photos_on(w["drive"])
     code, j = jpost(base, "/link-card", {"backup": 0, "name": "second card"})
     check("Put them on one report: 'Done. Both cards are on one report now.'",
-          j.get("ok") is True and j.get("words") == "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart." and no_path(w, j), str(j))
+          j.get("ok") is True and j.get("words") == "Done. Both cards are on one report now. Picked the wrong one? Tell the Assistant and it will take them apart." and no_path(w, j), str(j))
     link1, link2 = jread(b["records"] / "shoot.json", {}), jread(b2["records"] / "shoot.json", {})
     check("both backups hold the same link, the older card first",
           [c.get("name") for c in link1.get("cards", [])] == [b["session"], b2["session"]] and link1.get("cards") and
@@ -561,7 +561,7 @@ def in_a_browser(work):
             c.js("document.getElementById('oc-go').click(); true")
             c.wait_for("/^Done\\./.test(%s)" % (say % "oc-say"), seconds=60)
             check("Put them on one report: 'Done. Both cards are on one report now.' beside the button",
-                  c.js(say % "oc-say") == "Done. Both cards are on one report now. Picked the wrong one? Tell your assistant and it will take them apart.")
+                  c.js(say % "oc-say") == "Done. Both cards are on one report now. Picked the wrong one? Tell the Assistant and it will take them apart.")
             c.wait_for("document.querySelectorAll('iframe.card-frame').length === 2", seconds=30)
             check("and the page reloads into the shoot's page, both cards in their frames",
                   "2 cards" in c.js("document.querySelector('.eyebrow').textContent") and c.js("location.pathname") == "/report.html")

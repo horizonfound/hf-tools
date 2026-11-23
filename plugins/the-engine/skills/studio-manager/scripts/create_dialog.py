@@ -9,7 +9,8 @@ which shoot?" box asks the page server.
     POST /make-new   {}        "+ A new shoot": the computer's own folder picker, then new_shoot.py make --job,
                                detached; a cancelled picker changes nothing
     POST /make-vault {"make"}  My vault: made if there is none (vault.ensure, the guarded way its own card makes it),
-                               then the page it lands on (new_shoot.vault_go)
+                               then the page it lands on (new_shoot.vault_go): {ok, url, go}; for Captions the page
+                               asks "a reel or a carousel?" and takes go.captions_reel or go.captions_carousel
 
 Every POST is checked the way arrange.py checks its own (this server's Host, its own Origin when sent, JSON, a short
 body, never another website's). Never a path on the page: a kit is its folder's name, a picture a /kit-thumb address.
@@ -38,8 +39,8 @@ _PICKING = threading.Lock()
 # Ours, every one a draft for Dustin and Nicole.
 OUR_WORDS = {
     "no_folder": "No folder chosen.",
-    "no_window_mac": "The folder window didn't open. Tell your assistant which folder your finished photos are in, and it'll make the shoot for you.",
-    "no_window_pc": ("The folder window didn't open. Tell your assistant which folder your finished photos are in (you can copy its "
+    "no_window_mac": "The folder window didn't open. Tell the Assistant which folder your finished photos are in, and it'll make the shoot for you.",
+    "no_window_pc": ("The folder window didn't open. Tell the Assistant which folder your finished photos are in (you can copy its "
                      "address from the top of its File Explorer window), and it'll make the shoot for you."),
     "cant_start": "Couldn't start the copy. Try again in a moment.",
     "didnt_work": "That didn't work. Try again in a moment.",
@@ -147,7 +148,8 @@ def handle_post(handler, path, query):
                 return _send(handler, {"ok": False, "words": str(t)})
             if made:
                 _log(f"made the vault ({v.name})")
-            return _send(handler, {"ok": True, "url": new_shoot.vault_go(v.name)[body["make"]]})
+            pages = new_shoot.vault_go(v.name)
+            return _send(handler, {"ok": True, "url": pages[body["make"]], "go": pages})
 
         if path == "/make-new":
             if body != {}:

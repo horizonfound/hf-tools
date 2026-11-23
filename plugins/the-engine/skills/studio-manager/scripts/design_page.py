@@ -320,19 +320,19 @@ STORY_PREVIEW = "Preview"
 STORY_BANDS = "Show Instagram's guides"     # hers, v26: Nicole couldn't find it as "Show Instagram's buttons"
 # "Let my assistant choose the photos" (hers, v26; stories only): a note for the assistant, kept with the set of
 # stories, and a line to copy into the chat. Every line here is hers, whole.
-ASK_BUTTON = "Let my assistant choose the photos"
-ASK_HEAD = "Tell your assistant what you want"
-ASK_SUB = "Optional. Your assistant picks a story with a good mix from this shoot, and follows your note."
+ASK_BUTTON = "Let the Assistant choose the photos"
+ASK_HEAD = "Tell the Assistant what you want"
+ASK_SUB = "Optional. The Assistant picks a story with a good mix from this shoot, and follows your note."
 ASK_EXAMPLE = "For example: \u201cStart with the big laugh, then the details, and end on the two of them walking away.\u201d"
 ASK_PLACE = "Optional: what you'd like in your stories"
-ASK_THEN = "Then copy this into the chat, and your assistant fills in your stories:"
+ASK_THEN = "Then copy this into the chat, and the Assistant fills in your stories:"
 ASK_LINE = "Pick my story photos"           # the page adds " for <shoot>", and ", and follow my note" when there is one
 ASK_COPY = "Copy"
 ASK_MAX = 600
 # ... and on a carousel too (hers, v27, Nov 14: "carousels too"): the same button and box, worded for slides.
-ASK_SUB_CAROUSEL = "Optional. Your assistant fills your slides with a good mix from this shoot, in an order that flows, and follows your note."
+ASK_SUB_CAROUSEL = "Optional. The Assistant fills your slides with a good mix from this shoot, in an order that flows, and follows your note."
 ASK_PLACE_CAROUSEL = "Optional: what you'd like in your carousel"
-ASK_THEN_CAROUSEL = "Then copy this into the chat, and your assistant fills in your slides:"
+ASK_THEN_CAROUSEL = "Then copy this into the chat, and the Assistant fills in your slides:"
 ASK_LINE_CAROUSEL = "Pick my carousel photos"
 SAVE_STORIES = "Save stories"
 OPEN_STORIES = "Open folder"           # hers, v27, the same button beside Save stories

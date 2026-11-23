@@ -48,6 +48,8 @@ SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scrip
 sys.path.insert(0, str(HERE))
 import chrome_drive  # noqa: E402
 from chrome_drive import case, group  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/nicole_nov22.py
+import nicole_nov22  # noqa: E402  Nicole, Nov 22: everything is the Assistant
 
 TODAY = "2026-11-17"
 A, B = "2026-11-01 Hannah", "2026-11-01 Katie Austin Maternity"
@@ -331,7 +333,7 @@ def check_words(wr, w):
     for name, page in (("the year's page", year), ("the month's page", month)):
         case(name + ": never \"Claude\", no em dash, nothing from the internet",
              "claude" not in page.lower() and "—" not in page and not re.search(r"https?://", page) and "fonts.googleapis" not in page)
-    case("the year: her heading, her lede with \"your assistant\"", "Your year, <em>wrapped.</em>" in year and "Your year with your assistant, story by story" in year)
+    case("the year: her heading, her lede with \"the Assistant\"", "Your year, <em>wrapped.</em>" in year and "Your year with the Assistant, story by story" in year)
     case("the month: \"Your November, so far.\" and her lede", "Your November, <em>so far.</em>" in month and "Your November in photos, reels and posts." in month)
     case("a month that is over: \"recapped.\"", "Your October, <em>recapped.</em>" in wr.page_html("2026-10", None))
     case("her buttons, by her names", all((">%s<" % b) in year for b in ("‹ Back", "Pause", "Next ›", "Start over", "Save this one to share", "Save all of them")))
@@ -343,7 +345,7 @@ def check_words(wr, w):
     hers = her_page()
     if not hers:
         return skip("her own page is not on this computer (reference-private): her words were compared with the list above only")
-    her = hers.read_text(encoding="utf-8")
+    her = nicole_nov22.read(hers)   # Nicole, Nov 22: everything is the Assistant
     side = ["Tap the right side for the next one, the left side to go back, and hold to pause.", "Save this one to share", "Save all of them", "Start over",
             "Each one is a 1080×1920 picture, the size of an Instagram story, saved in your Assistant folder under Stories to share.",
             "Time saved counts about 45 minutes a reel, 30 a carousel and 20 a set of stories, done by hand.", "Getting your year ready…",

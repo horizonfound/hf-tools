@@ -559,8 +559,8 @@ def part_rules():
     for st in ("setup_failed", "too_long", "a state nobody planned for"):
         pretend(needs_setup=True, setup=st)
         r = cli("setup")
-        check(f"setup that can't finish ({st}): STOP, where the Mac's own words are, and never \"Tell your assistant: set up talking reels\" (the command it just ran)",
-              r.returncode == 2 and "STOP: " in r.stdout and "Tell your assistant" not in r.stdout and "talking log" in r.stdout
+        check(f"setup that can't finish ({st}): STOP, where the Mac's own words are, and never \"Tell the Assistant: set up talking reels\" (the command it just ran)",
+              r.returncode == 2 and "STOP: " in r.stdout and "Tell the Assistant" not in r.stdout and "talking log" in r.stdout
               and "talking.log" in r.stdout and "don't send them round again" in r.stdout and "Traceback" not in r.stdout + r.stderr, r.stdout + r.stderr)
     pretend(needs_setup=True)
     TALK_HOME.mkdir(parents=True, exist_ok=True)

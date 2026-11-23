@@ -35,7 +35,7 @@ WORDS = {
     "start": "Open your folder to start editing.",
     # the two lines the Back up a card screen already says in place of a dead button (her v26 home base)
     "unplugged": "This one's on {drive}. Plug it in to open it.",
-    "moved": "I can't find this folder anymore. If you moved or renamed it in {files_app}, tell your assistant where it went.",
+    "moved": "I can't find this folder anymore. If you moved or renamed it in {files_app}, tell the Assistant where it went.",
 }
 OUR_WORDS = {
     # the same line when the shoots were not one a day (told apart by the breaks between them and one look
@@ -53,8 +53,8 @@ OUR_WORDS = {
     # photo tiles that are there; before it named that old button)
     "come_back": "When your edits are done, come back to your home base and click Reels, Carousels, Stories or Captions.",
     "opening": "Opening it...",
-    "not_live": "Ask your assistant to show the report, and this will work.",
-    "not_running": "The Assistant is not running right now. Ask your assistant to show the report, then try again.",
+    "not_live": "Ask the Assistant to show the report, and this will work.",
+    "not_running": "The Assistant is not running right now. Ask the Assistant to show the report, then try again.",
     "no_shoot": "I couldn't find that shoot's folder.",
     # a note to the client is asked for in the chat, never written during the backup (Dustin, Nov 19): the
     # button shows the line to copy, right there. {name} is the shoot's name, as text.
@@ -363,7 +363,7 @@ window.peekPicker=function(more,id,d,say){
    closeBig();more.hidden=true;say('Saving your picks...','on');
    const t=setInterval(async()=>{try{const q=await fetch('picks-status',{cache:'no-store'});const all=await q.json();const s2=all[id];if(!s2)return;say(s2.line,s2.state==='problem'?'bad':'on');
     if(s2.state==='done'||s2.state==='problem'){clearInterval(t);if(s2.state==='done')setTimeout(()=>location.reload(),1200);}}catch(e){}},1200);}
-  catch(e){say('Could not reach the Assistant. Tell your assistant instead.','bad');}});
+  catch(e){say('Could not reach the Assistant. Tell the Assistant in the chat instead.','bad');}});
  draw();
 };
 </script>"""
@@ -378,10 +378,10 @@ function show(id,st){const el=stateEl(id);if(!el)return;el.textContent=st.line||
 async function rename(id){const inp=document.getElementById(id);const name=inp.value.trim()||(inp.dataset.was||'').trim();
  if(name){inp.value=name;inp.dataset.was=name;inp.placeholder=inp.dataset.hint||inp.placeholder;inp.classList.remove('hint');inp.blur();}
  if(!name){show(id,{state:'problem',line:'Type a name first.'});return;}
- if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell your assistant the name.'});return;}
+ if(!location.protocol.startsWith('http')){show(id,{state:'problem',line:'Open this page through the Assistant to rename here, or just tell the Assistant the name.'});return;}
  try{const r=await fetch('rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,name})});
   if(!r.ok)throw 0;show(id,{state:'queued',line:'Renaming...'});poll();}
- catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell your assistant the name instead.'});}}
+ catch(e){show(id,{state:'problem',line:'Could not reach the Assistant. Tell the Assistant the name in the chat instead.'});}}
 let timer=null;
 async function poll(){if(timer)return;timer=setInterval(async()=>{try{const r=await fetch('rename-status',{cache:'no-store'});const st=await r.json();let busy=false;
  for(const id in st){show(id,st[id]);if(st[id].state==='queued'||st[id].state==='running')busy=true;}
@@ -398,9 +398,9 @@ if(location.protocol.startsWith('http'))poll();
 function niceDate(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
 // "Show my editing queue": ask the Assistant for the queue page's address (it starts the page if it isn't up) and open it
 async function wireShow(a,st){if(!a)return;a.addEventListener('click',async ev=>{ev.preventDefault();
-  if(!location.protocol.startsWith('http')){st.textContent='Ask your assistant to show your editing queue.';st.className='qstate bad';return;}
+  if(!location.protocol.startsWith('http')){st.textContent='Ask the Assistant to show your editing queue.';st.className='qstate bad';return;}
   try{const r=await fetch('queue-url',{cache:'no-store'});const d=await r.json();if(!d.url)throw 0;(window.top||window).location.href=d.url;}
-  catch(e){st.textContent='Could not open the queue page. Ask your assistant to show your editing queue.';st.className='qstate bad';}});}
+  catch(e){st.textContent='Could not open the queue page. Ask the Assistant to show your editing queue.';st.className='qstate bad';}});}
 document.querySelectorAll('.queue .show-queue').forEach(a=>wireShow(a,a.closest('.queue').querySelector('.qstate')));
 // The sneak peeks are a first pass (Dustin, Nov 5): Pick again with a note, or Show me more and choose your own six.
 document.querySelectorAll('.peeks-wrap').forEach(w=>{
@@ -410,17 +410,17 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
  w.querySelector('.again').addEventListener('click',()=>{more.hidden=true;ask.hidden=!ask.hidden;if(!ask.hidden)inp.focus()});
  ask.querySelector('.cancel').addEventListener('click',()=>{ask.hidden=true});
  ask.querySelector('.send').addEventListener('click',async()=>{
-  if(!live){say('Open this page through the Assistant for this, or just tell your assistant: "pick different sneak peeks for the beach shoot."','bad');return;}
+  if(!live){say('Open this page through the Assistant for this, or just tell the Assistant: "pick different sneak peeks for the beach shoot."','bad');return;}
   try{const r=await fetch('peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();ask.hidden=true;say(d.words||'Got it.','on');}
-  catch(e){say('Could not reach the Assistant. Tell your assistant instead.','bad');}});
+  catch(e){say('Could not reach the Assistant. Tell the Assistant in the chat instead.','bad');}});
  w.querySelector('.more').addEventListener('click',async()=>{
   ask.hidden=true;if(!more.hidden){more.hidden=true;return;}
-  if(!live){say('Open this page through the Assistant for this, or tell your assistant "show me more from the beach shoot."','bad');return;}
+  if(!live){say('Open this page through the Assistant for this, or tell the Assistant "show me more from the beach shoot."','bad');return;}
   say('');
   try{const r=await fetch('peeks-more?shoot='+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw 0;const d=await r.json();
    window.peekPicker(more,id,d,say);more.hidden=false;}
-  catch(e){say('Could not load more right now. Tell your assistant "show me more from this shoot."','bad');}});
+  catch(e){say('Could not load more right now. Tell the Assistant "show me more from this shoot."','bad');}});
 });
 document.querySelectorAll('.queue').forEach(q=>{
  const id=q.dataset.shoot,pick=q.querySelector('.pick'),inp=q.querySelector('input'),save=q.querySelector('.save'),st=q.querySelector('.qstate');
@@ -430,7 +430,7 @@ document.querySelectorAll('.queue').forEach(q=>{
  q.querySelector('.never').addEventListener('click',close);
  inp.addEventListener('input',()=>{save.disabled=!inp.value});
  save.addEventListener('click',async()=>{if(!inp.value)return;
-  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell your assistant.';st.className='qstate bad';return;}
+  if(!location.protocol.startsWith('http')){st.textContent='Open this page through the Assistant to add it, or just tell the Assistant.';st.className='qstate bad';return;}
   save.disabled=true;
   try{const r=await fetch('queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,due:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();
@@ -439,7 +439,7 @@ document.querySelectorAll('.queue').forEach(q=>{
    const span=document.createElement('span');span.className='queued';span.innerHTML='In your editing queue, due <b>'+niceDate(d.due)+'</b>. <button class="change" type="button">Change the date</button> <a class="show-queue" href="#">Show my editing queue <span aria-hidden="true">↗</span></a>';
    q.insertBefore(span,pick);span.querySelector('.change').addEventListener('click',open);wireShow(span.querySelector('.show-queue'),st);
    st.textContent=d.words||'';st.className='qstate';}
-  catch(e){st.textContent='Could not add it. Tell your assistant instead.';st.className='qstate bad';save.disabled=false;}});
+  catch(e){st.textContent='Could not add it. Tell the Assistant instead.';st.className='qstate bad';save.disabled=false;}});
 });
 // "Open this folder" on each shoot (Nicole, Nov 13): the report's server opens that shoot's own folder, worked out
 // from the backup's records by the shoot's id (the page never has a place on the drive), and what happened is
@@ -607,9 +607,9 @@ CLIPS_SCRIPT = """<script>(()=>{
 const say=(row,m)=>{const t=row&&row.querySelector('.clips-state');if(t)t.textContent=m||''};
 const rowOf=id=>document.querySelector(".clips-row[data-shoot='"+id+"']");
 const ask=async(row,url)=>{
- if(!location.protocol.startsWith('http')){say(row,'Ask your assistant to show the report, and this will work.');return}
+ if(!location.protocol.startsWith('http')){say(row,'Ask the Assistant to show the report, and this will work.');return}
  try{const r=await fetch(url,{cache:'no-store'});const j=await r.json();say(row,j.words||(j.ok?'':'Could not open it.'))}
- catch(e){say(row,'The Assistant is not running right now. Ask your assistant to show the report, then try again.')}};
+ catch(e){say(row,'The Assistant is not running right now. Ask the Assistant to show the report, then try again.')}};
 document.querySelectorAll('.ph.clip[data-play]').forEach(p=>{
  const go=()=>{const row=rowOf(p.dataset.shoot);say(row,'Opening it...');ask(row,'play?file='+encodeURIComponent(p.dataset.play))};
  p.addEventListener('click',go);p.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();go()}})});
@@ -788,7 +788,7 @@ def shoots_section(studio, closing=True):
         out.append(f"<p class='recap'>{e(s.get('recap', ''))}</p>")
         out.append(f"<div class='name'><label for='{s['id']}'>What should I call this one?</label>"
                    f"<div class='field'><span class='pen'>&#9998;</span>"
-                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell your assistant' autocomplete='off'>"
+                   f"<input id='{s['id']}' name='{s['id']}' value='{e(val)}' title='{e(val)}' placeholder='Type a name here, or just tell the Assistant' autocomplete='off'>"
                    f"<button class='go' type='button' data-shoot='{e(s['id'])}'>Rename</button></div>"
                    f"<span class='state' data-for='{e(s['id'])}'></span>"
                    + (f"<small>Filed as <b>{e(s.get('name') or s.get('suggested', ''))}</b>. Give it a better name and everything gets renamed to match."

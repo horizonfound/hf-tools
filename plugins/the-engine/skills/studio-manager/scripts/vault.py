@@ -159,9 +159,9 @@ def is_vault(kit_or_rec):
 
 
 CANT_READ_VAULT = ("I can't read your vault's own record right now, so nothing was made, copied or changed. "
-                   "Try again in a moment. If it keeps happening, tell your assistant.")      # ours, a draft
+                   "Try again in a moment. If it keeps happening, tell the Assistant.")      # ours, a draft
 CANT_READ_LIST = ("I can't read your vault's list of photo numbers right now, so nothing was changed. "
-                  "Try again in a moment. If it keeps happening, tell your assistant.")       # ours, a draft
+                  "Try again in a moment. If it keeps happening, tell the Assistant.")       # ours, a draft
 
 
 def _vault_unread(d):
@@ -814,8 +814,8 @@ ADD_WORDS = {
     "no_folder": "I can't see that folder right now. Nothing was copied.",
     "busy": "Photos are being copied into your vault right now. Try again when that's done.",
     "held": "Something stopped the copy part way: {why}. {n} of {of} photos are in, each one checked. Nothing is lost and your originals weren't moved; add the same folder again to finish.",
-    "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your vault. Your originals weren't moved. Tell your assistant.",
-    "unread": "{n} file{s} in that folder could not be read, so {they} not in your vault. Nothing was changed there. Tell your assistant.",
+    "mismatch": "{n} photo{s} did not match the original after copying, so {they} not in your vault. Your originals weren't moved. Tell the Assistant.",
+    "unread": "{n} file{s} in that folder could not be read, so {they} not in your vault. Nothing was changed there. Tell the Assistant.",
     "working": "Copying {n} of {of}…",
     "starting": "Looking at the photos in that folder…",
     "stopped": "The copy stopped before it finished. Nothing is lost; add the same folder again to finish.",
@@ -1381,7 +1381,7 @@ def _say_find(v, query, photos, clips):
             for folder, ns in by.items():
                 say(f"  {res['shoots'].get(folder) or folder or added}: {_numbers(ns)}")
             if not res["photos"]:
-                say("  None. Photos are found by what this computer saw in them, by your assistant's descriptions "
+                say("  None. Photos are found by what this computer saw in them, by the Assistant's descriptions "
                     "(photo_words.py status shows which shoots have none), and by the shoot's name.")
     if clips:
         if not res["clip_words"]:

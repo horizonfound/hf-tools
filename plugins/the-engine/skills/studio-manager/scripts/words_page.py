@@ -190,11 +190,11 @@ OUR_WORDS = {
     # the test for anything a photographer sees (Oct 30): a folder that is named has its button beside it
     "open_carousel": "Open the Carousel folder",
     "opened": "Opened Carousel in {app}.",
-    "cant_open": "Could not open the folder. Ask your assistant to open it.",
+    "cant_open": "Could not open the folder. Ask the Assistant to open it.",
     # "Yes, make the ... version" with nothing answered yet: hers shows "You've already told me about the carousel"
     "nothing_to_carry": "Tell me about it above first",
     "cant_reach": arrange.CANT_REACH,
-    "queue_cant": "The posting queue couldn't be saved just now. Tell your assistant.",
+    "queue_cant": "The posting queue couldn't be saved just now. Tell the Assistant.",
 }
 ON_DRIVE = " on your photo drive"        # her words; left out when Your Content is on the computer's own disk
 
