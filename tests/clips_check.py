@@ -103,7 +103,7 @@ def mixed(work):
 
     code, out = night(card, env, "clips card")
     check("it sorts, and asks for sneak peeks for the photos (exit 7)", code == 7, out[-600:])
-    garcia, park = session / "2026-06-04 Garcia", session / "2026-06-04 Park"
+    garcia, park = session / "Garcia_06-04-26", session / "Park_06-04-26"
     got = listing(garcia)
     want = ([f"Photos/Garcia_{n:04d}_IMG_{4470 + n}.JPG" for n in range(1, 7)] + ["Photos/Garcia_0001_IMG_4471.xmp"]
             + [f"Videos/Garcia_{n:04d}_MVI_{9000 + n}.MP4" for n in range(1, 4)])
@@ -112,7 +112,7 @@ def mixed(work):
     same = all(sha(p) == before[p.name.split("_", 2)[2]] for p in list(garcia.rglob("*.*")) + list(park.rglob("*.*")) if p.is_file())
     check("every sorted file is byte for byte what the card holds", same)
     sh = json.loads((st / "shoots.json").read_text(encoding="utf-8"))["shoots"]
-    check("the shoot's folder on record is its own, not Photos inside it", sh[0].get("folder") == "2026-06-04 Garcia", str(sh[0].get("folder")))
+    check("the shoot's folder on record is its own, not Photos inside it", sh[0].get("folder") == "Garcia_06-04-26", str(sh[0].get("folder")))
     sheets = json.loads((st / "peek-sheets.json").read_text(encoding="utf-8"))["shoots"]
     check("the sneak-peek pages hold photos only", all(not m["file"].upper().endswith(".MP4") for s in sheets.values() for m in s["list"])
           and sheets["s1"]["photos"] == 6, str({k: v["photos"] for k, v in sheets.items()}))
@@ -133,18 +133,18 @@ def mixed(work):
 
     # rename, there and back, before the settle
     snap = {p.name.split("_", 2)[2]: sha(p) for p in garcia.rglob("*.*") if p.is_file()}
-    code, out = t.run("rename_shoot.py", session, "--shoot", "s1", "--name", "Garcia family", env=env)
-    fam = session / "2026-06-04 Garcia family"
+    code, out = t.run("rename_shoot.py", session, "--shoot", "s1", "--name", "Reyes family", env=env)
+    fam = session / "Reyes family_06-04-26"
     got = listing(fam) if fam.is_dir() else []
-    want2 = ([f"Photos/Garcia-family_{n:04d}_IMG_{4470 + n}.JPG" for n in range(1, 7)] + ["Photos/Garcia-family_0001_IMG_4471.xmp"]
-             + [f"Videos/Garcia-family_{n:04d}_MVI_{9000 + n}.MP4" for n in range(1, 4)])
+    want2 = ([f"Photos/Reyes_{n:04d}_IMG_{4470 + n}.JPG" for n in range(1, 7)] + ["Photos/Reyes_0001_IMG_4471.xmp"]
+             + [f"Videos/Reyes_{n:04d}_MVI_{9000 + n}.MP4" for n in range(1, 4)])
     extra = [x for x in got if x.endswith(".xmp") and "IMG_4471" not in x]   # the Assistant's own sneak-peek sidecars, if marked yet
     check("a rename carries both folders: every photo and clip takes the new name in its own folder",
           code == 0 and sorted(set(got) - set(extra)) == sorted(want2) and not garcia.exists(), out[-500:] + str(got))
     check("after the rename every file is the same bytes", fam.is_dir() and all(sha(p) == snap[p.name.split("_", 2)[2]] for p in fam.rglob("*.*") if p.is_file() and p.name.split("_", 2)[2] in snap))
     ix = json.loads((st / "index.json").read_text(encoding="utf-8"))["photos"]
     check("the records say where every file is now", all((session / p["file"]).is_file() for p in ix), str([p["file"] for p in ix if not (session / p["file"]).is_file()][:3]))
-    code, out = t.run("rename_shoot.py", session, "--shoot", "s1", "--name", "Garcia family", env=env)
+    code, out = t.run("rename_shoot.py", session, "--shoot", "s1", "--name", "Reyes family", env=env)
     check("the same rename again does nothing", code == 0 and "Nothing to do" in out, out[-300:])
 
     # a rename cut off after the folder moved and one file was renamed: the next run finishes it
@@ -153,20 +153,20 @@ def mixed(work):
     moves = []
     for p in ix:
         cur = Path(p["file"])
-        new = Path("2026-06-04 Cut off") / cur.parent.name / cur.name.replace("Garcia-family_", "Cut-off_")
+        new = Path("Cut off_06-04-26") / cur.parent.name / cur.name.replace("Reyes_", "Cut_")
         moves.append({"from": p["file"], "to": new.as_posix(), "original": p["original"], "sha256": files[p["original"]]["sha256"]}) if cur.parts[0] == fam.name else None
-    cut = session / "2026-06-04 Cut off"
+    cut = session / "Cut off_06-04-26"
     fam.rename(cut)
     first = moves[0]
     (cut / Path(*Path(first["from"]).parts[1:])).rename(session / first["to"])
     first["moved"] = True
     log = json.loads(log_path.read_text(encoding="utf-8"))
-    log["renames"].append({"shoot": "s1", "from_name": "Garcia family", "to_name": "Cut off", "started": "2026-11-11T10:00:00",
+    log["renames"].append({"shoot": "s1", "from_name": "Reyes family", "to_name": "Cut off", "started": "2026-11-11T10:00:00",
                            "moves": moves, "verified": 0, "problems": []})
     log_path.write_text(json.dumps(log), encoding="utf-8")
     code, out = t.run("rename_shoot.py", session, "--shoot", "s1", "--name", "Cut off", env=env)
     got = [x for x in listing(cut) if not (x.endswith(".xmp") and "IMG_4471" not in x)]
-    want3 = [w.replace("Garcia-family_", "Cut-off_") for w in want2 if not w.endswith(".xmp")]
+    want3 = [w.replace("Reyes_", "Cut_") for w in want2 if not w.endswith(".xmp")]
     check("a rename cut off part way is finished by the next run, in both folders",
           code == 0 and [x for x in got if not x.endswith(".xmp")] == sorted(want3), out[-500:] + str(got))
     ix = json.loads((st / "index.json").read_text(encoding="utf-8"))["photos"]
@@ -176,18 +176,18 @@ def mixed(work):
 
     code, out = night(card, env, "clips card")
     records = drive / ".studio" / session.name
-    up = drive / "2026-06-04 Garcia"
+    up = drive / "Garcia_06-04-26"
     check("the backup finishes and settles (exit 0), both folders in place on the drive",
           code == 0 and (records / "settled.json").is_file() and not session.exists()
           and (up / "Photos").is_dir() and (up / "Videos").is_dir() and len(list((up / "Videos").glob("*.MP4"))) == 3, out[-600:])
     if (records / "settled.json").is_file():
-        same = all(sha(p) == before[p.name.split("_", 2)[2]] for f in (up, drive / "2026-06-04 Park") for p in f.rglob("*.*")
+        same = all(sha(p) == before[p.name.split("_", 2)[2]] for f in (up, drive / "Park_06-04-26") for p in f.rglob("*.*")
                    if p.is_file() and p.name.split("_", 2)[2] in before)
         check("after the settle every photo and clip is byte for byte the card's", same)
-        code, out = t.run("rename_shoot.py", records, "--shoot", "s1", "--name", "Garcia beach", env=env)
-        beach = drive / "2026-06-04 Garcia beach"
+        code, out = t.run("rename_shoot.py", records, "--shoot", "s1", "--name", "Lopez beach", env=env)
+        beach = drive / "Lopez beach_06-04-26"
         check("a rename after the settle carries both folders too", code == 0 and (beach / "Photos").is_dir()
-              and len(list((beach / "Videos").glob("Garcia-beach_*.MP4"))) == 3 and not up.exists(), out[-400:])
+              and len(list((beach / "Videos").glob("Lopez_*.MP4"))) == 3 and not up.exists(), out[-400:])
         q = json.loads((home / "queue.json").read_text(encoding="utf-8"))["shoots"]
         x = next((s for s in q if s.get("shoot") == "s1"), {})
         check("your shoots counts 6 photos and 3 clips for it", (x.get("count"), x.get("clips")) == (6, 3), str(x))
@@ -224,8 +224,8 @@ def video_only(work):
     records = drive / ".studio" / session.name
     check("no photos, so no sneak peeks are asked for: it finishes in one go (exit 0, never 7)",
           code == 0 and "only video clips" in out and (records / "settled.json").is_file(), out[-700:])
-    flat = drive / "2026-06-05 Video clips"
-    check("a shoot of clips only is one flat folder", listing(flat) == [f"Video-clips_{n:04d}_MVI_{7000 + n}.MP4" for n in range(1, 5)] if flat.is_dir() else False, str(listing(flat) if flat.is_dir() else out[-300:]))
+    flat = drive / "Video clips_06-05-26"
+    check("a shoot of clips only is one flat folder", listing(flat) == [f"Video_{n:04d}_MVI_{7000 + n}.MP4" for n in range(1, 5)] if flat.is_dir() else False, str(listing(flat) if flat.is_dir() else out[-300:]))
     if (records / "report.html").is_file():
         page = (records / "report.html").read_text(encoding="utf-8")
         check("the report says 4 clips and never calls them photos", "4 video clips" in page and "4 photos" not in page and "photos or clips" not in page)
@@ -363,7 +363,7 @@ def turning(work):
     # the rest of the backup: sort, report, settle, all proving the turned files
     code, out = night(card, env, "turn card")
     records = drive / ".studio" / session.name
-    flat = drive / "2026-06-06 Chair"
+    flat = drive / "Chair_06-06-26"
     check("the backup sorts and settles with the turned clips (exit 0), every file proved", code == 0 and (records / "settled.json").is_file()
           and sorted(p.name for p in flat.glob("*.MP4")) == [f"Chair_{n:04d}_MVI_{8000 + n}.MP4" for n in range(1, 4)], out[-700:])
     if (records / "report.html").is_file():
@@ -371,7 +371,7 @@ def turning(work):
         check("the report says the 3 clips were turned upright and the card is as it was",
               "3 video clips were filmed with the camera on its side" in page and "memory card is exactly as it was" in page)
     code, out = t.run("rename_shoot.py", records, "--shoot", "s1", "--name", "Green chair", env=env)
-    moved = drive / "2026-06-06 Green chair"
+    moved = drive / "Green chair_06-06-26"
     check("a rename after the turn still proves every clip", code == 0 and moved.is_dir() and len(list(moved.glob("*.MP4"))) == 3, out[-400:])
     code, out = t.run("clips.py", "rotate", records, "--undo", env=env)
     manifest = json.loads((records / "manifest.json").read_text(encoding="utf-8"))["files"]
@@ -415,7 +415,7 @@ def served(records, env):
         r2 = get("/play?file=" + quote(str(records / "manifest.json")))
         check("anything that is not a clip the records list is refused", not r["ok"] and not r2["ok"] and len(opened) == 1, str(opened))
         r = get("/open-clips?shoot=s1")
-        check("See all opens the folder the shoot's clips are in", r["ok"] and opened[-1] == ("folder", "2026-06-05 Video clips"), str((r, opened)))
+        check("See all opens the folder the shoot's clips are in", r["ok"] and opened[-1] == ("folder", "Video clips_06-05-26"), str((r, opened)))
         r = get("/open-clips?shoot=nope")
         check("a shoot the report does not know opens nothing", not r["ok"] and len(opened) == 2, str(opened))
     finally:

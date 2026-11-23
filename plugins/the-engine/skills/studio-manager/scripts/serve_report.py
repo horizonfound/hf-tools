@@ -212,7 +212,7 @@ class Picks:
                 if not self.queue:
                     return
                 shoot_id, nums = self.queue.pop(0)
-                self.state[shoot_id] = {"state": "running", "line": "Saving your picks and marking them in Lightroom..."}
+                self.state[shoot_id] = {"state": "running", "line": "Saving your picks..."}
             spec = f"{shoot_id}=" + ",".join(str(n) for n in nums)
             r = subprocess.run([sys.executable, str(HERE / "peek_sheets.py"), "pick", self.session, spec, "--by", "photographer"],
                                capture_output=True, encoding="utf-8", errors="replace", **quiet())
@@ -224,7 +224,7 @@ class Picks:
                 subprocess.run([sys.executable, str(HERE / "first_look.py"), self.session], capture_output=True, encoding="utf-8",
                                errors="replace", **quiet())
             with self.lock:
-                self.state[shoot_id] = ({"state": "done", "line": "Done. These are your sneak peeks now, marked in Lightroom."} if ok
+                self.state[shoot_id] = ({"state": "done", "line": "Done. These are your first-look photos now."} if ok
                                         else {"state": "problem", "line": "Something stopped it, and nothing was changed. Tell the Assistant and it'll sort it out."})
             try:
                 rebuild_report(self.session)

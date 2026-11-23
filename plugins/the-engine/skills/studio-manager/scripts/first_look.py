@@ -30,6 +30,7 @@ WORDS = {
     "why_days": "Since these were {n} days, I put them in {n} separate folders. You can name them in the boxes below.",
     "look_right": "Does everything look right? If so, add it to your editing queue.",
     "open_folder": "Open this folder",
+    # (Nicole's Nov 13 line, kept for the record; not shown since Nov 23: no sneak peeks to send, no Lightroom mark)
     "peeks": ("I picked {n} photos that could be great sneak peeks to send your client. "
               "They're marked 'sneak peek' in Lightroom, if you want to do a quick edit on them."),
     "start": "Open your folder to start editing.",
@@ -48,6 +49,10 @@ OUR_WORDS = {
                    "(a JPEG, for one) I'd have to write inside it, and I never change your photos."),
     "peeks_some": ("{k} of them are marked 'sneak peek' in Lightroom, if you want to do a quick edit on them. "
                    "The others are a kind of photo I'd have to write inside to mark, and I never change your photos."),
+    # Since Nov 23 (Nicole: "keep sneak peek out and give the 6 photos but it can say something like a first look
+    # at your shoot"): the six photos are a first look, nothing more. No keyword in Lightroom, no note to send.
+    "first_look": "A first look at your shoot.",
+    "first_look_eyebrow": "A first look",
     "peeks_change": "Not feeling them? Just say what you'd rather see.",   # Dustin's line of Nov 5, kept for the two buttons
     # (since Nov 22, v30: the home page has no Make posts from a shoot button any more, so the line names the four
     # photo tiles that are there; before it named that old button)
@@ -84,9 +89,15 @@ def why_folders(shoots, groups):
     return (WORDS["why_days"] if by_day else OUR_WORDS["why_shoots"]).format(n=count_word(len(shoots)))
 
 
+PEEKS_ARE_MARKED = False   # True brings back the Nov 13 words about sneak peeks and the Lightroom keyword
+NOTE_BUTTON = False        # True brings back "Write a note to my client" on each shoot (taken out Nov 23)
+
+
 def peeks_words(n, marked):
     """What the sneak peeks are for, true to this shoot: n picks, of which `marked` are a kind of photo that gets
     the 'sneak peek' keyword beside it. All of them: Nicole's line. None (JPEG shooters) or some: said so."""
+    if not PEEKS_ARE_MARKED:
+        return OUR_WORDS["first_look"]
     if marked >= n:
         return WORDS["peeks"].format(n=count_word(n))
     first = OUR_WORDS["peeks_picked"].format(n=count_word(n))
@@ -100,6 +111,7 @@ def peeks_line(n, marked, tail=""):
     leads into Pick again and Show me more, where those buttons are)."""
     e = html.escape
     first, _, rest = peeks_words(n, marked).partition(". ")
+    first = first.rstrip(".")
     return f"<b>{e(first)}.</b>" + (" " + e(rest) if rest else "") + (" " + e(tail) if tail else "")
 
 
@@ -410,7 +422,7 @@ document.querySelectorAll('.peeks-wrap').forEach(w=>{
  w.querySelector('.again').addEventListener('click',()=>{more.hidden=true;ask.hidden=!ask.hidden;if(!ask.hidden)inp.focus()});
  ask.querySelector('.cancel').addEventListener('click',()=>{ask.hidden=true});
  ask.querySelector('.send').addEventListener('click',async()=>{
-  if(!live){say('Open this page through the Assistant for this, or just tell the Assistant: "pick different sneak peeks for the beach shoot."','bad');return;}
+  if(!live){say('Open this page through the Assistant for this, or just tell the Assistant: "pick different first-look photos for the beach shoot."','bad');return;}
   try{const r=await fetch('peeks-again',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shoot:id,note:inp.value})});
    if(!r.ok)throw 0;const d=await r.json();ask.hidden=true;say(d.words||'Got it.','on');}
   catch(e){say('Could not reach the Assistant. Tell the Assistant in the chat instead.','bad');}});
@@ -811,7 +823,7 @@ def shoots_section(studio, closing=True):
         # a note to the client: a button that shows the line to copy into the chat, right there; no form
         # (Dustin, Nov 19). Not shown once a note for this shoot is written (its card is below).
         filed_as = " ".join(str(s.get("name") or s.get("suggested") or "").split())
-        if filed_as and not (notes.get(s["id"]) or {}).get("body"):
+        if NOTE_BUTTON and filed_as and not (notes.get(s["id"]) or {}).get("body"):
             out.append(f"<div class='note-ask' data-shoot='{e(s['id'])}'>"
                        f"<button class='note-open' type='button'>{e(OUR_WORDS['note_button'])}</button>"
                        f"<span class='note-how' hidden><span class='how-q'>{e(OUR_WORDS['note_how'])}</span>"
@@ -820,7 +832,7 @@ def shoots_section(studio, closing=True):
         if mine:
             out.append("<div class='more'>")
             if 3 <= len(mine) < 6:   # fewer than six (an older backup): what they are for is said here, with no buttons
-                out.append("<span class='eyebrow'>Sneak peeks</span>"
+                out.append(f"<span class='eyebrow'>{e(OUR_WORDS['first_look_eyebrow'] if not PEEKS_ARE_MARKED else 'Sneak peeks')}</span>"
                            f"<p class='line peeks-line'>{peeks_line(len(mine[:6]), min(marks.get(s['id'], 0), len(mine[:6])))}</p>")
             if rest:
                 out.append("<div class='row'>" + "".join(

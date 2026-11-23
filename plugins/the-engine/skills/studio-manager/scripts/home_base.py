@@ -72,7 +72,7 @@ WORDS = {
     # (her "Step 1 of your workflow" eyebrow is gone since v29: the home page no longer numbers steps)
     "b_h1": "Back up <em>a card.</em>",
     "b_lede_1": "This is where the Assistant takes everything off your memory card and puts it safely on your hard drive. It copies every photo and double-checks each one against your card, so you know nothing got lost on the way. If your card has more than one shoot on it, it splits them into their own folders and names each one using your naming system, so they sit right next to your other shoots.",
-    "b_lede_2": "It also picks six photos from each shoot that would be great to edit first and send your client as sneak peeks, and marks them \"sneak peek\" in Lightroom so they're easy to find. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.",
+    "b_lede_2": "It also pulls six photos from each shoot as a first look, so you can see what you got. Nothing on your memory card is changed or deleted. Once the report says everything's safe, you can format it.",
     "b_steps": "How to back up a card",
     "b_s1": "<b>Put your memory card in.</b> Shooting with more than one card? Back them up one at a time; they'll show up together below.",
     "b_card_in": "A card is in: {name}, about {files} files.",

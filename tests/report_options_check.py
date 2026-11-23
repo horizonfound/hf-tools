@@ -326,35 +326,35 @@ def next_drive(w, b, base):
 def naming(w, b, base):
     print("Change how my shoots are named")
     j = jget(base, "/naming")
-    check("GET naming: the two ways, shown with this backup's own first shoot and its day; year first is theirs now",
-          j.get("current") == 1 and [x.get("example") for x in j.get("ways") or []] == ["2026-06-04 Beach", "Beach, Jun 4 2026"]
+    check("GET naming: the two ways, shown with this backup's own first shoot and its day; the shoot's name then the date is theirs now",
+          j.get("current") == 1 and [x.get("example") for x in j.get("ways") or []] == ["Beach_06-04-26", "2026-06-04 Beach"]
           and j.get("shoots") == 2 and not j.get("line"), str(j))
     folders0 = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
     drive0 = photos_on(w["drive"])
     code, j = jpost(base, "/naming", {"offered": 3, "apply": True})
     check("a way that is not one of the two is refused, nothing changed",
-          j.get("ok") is False and jread(w["home"] / "studio.json", {})["naming"]["folder_pattern"] == "{date} {shoot}", str(j))
+          j.get("ok") is False and jread(w["home"] / "studio.json", {})["naming"]["folder_pattern"] == "{shoot}_{date}", str(j))
     code, j = jpost(base, "/naming", {"offered": 2, "apply": False})
     sf = jread(w["home"] / "studio.json", {})
     check("Save without the tick: only the next backup, said so",
-          j.get("ok") is True and j.get("words") == "Saved. Your next backup's shoots will be named like Beach, Jun 4 2026."
-          and not j.get("busy") and sf["naming"]["folder_pattern"] == "{shoot}, {date}", str(j))
+          j.get("ok") is True and j.get("words") == "Saved. Your next backup's shoots will be named like 2026-06-04 Beach."
+          and not j.get("busy") and sf["naming"]["folder_pattern"] == "{date} {shoot}", str(j))
     check("and this backup's folders are as they were", sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith(".")) == folders0
           and photos_on(w["drive"]) == drive0)
-    check("the panel now marks name first as theirs", jget(base, "/naming").get("current") == 2)
+    check("the panel now marks year first as theirs", jget(base, "/naming").get("current") == 2)
     # with the tick: each shoot goes through the report's own rename queue
     code, j = jpost(base, "/naming", {"offered": 2, "apply": True})
     check("Save with the tick: 'Saved. Renaming this backup's shoots to match...'",
           j.get("ok") is True and j.get("busy") is True and j.get("words") == "Saved. Renaming this backup's shoots to match...", str(j))
     j = wait_naming(base)
     check("the line beside the button ends on Done, and a reloaded page is given it again",
-          j.get("line") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like Beach, Jun 4 2026."
+          j.get("line") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like 2026-06-04 Beach."
           and jget(base, "/naming").get("line") == j.get("line"), str(j))
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-    check("the folders took the new shape", folders == ["Beach, Jun 4 2026", "Palms, Jun 4 2026"], str(folders))
+    check("the folders took the new shape", folders == ["2026-06-04 Beach", "2026-06-04 Palms"], str(folders))
     sh = jread(b["records"] / "shoots.json", {}).get("shoots", [])
     index = jread(b["records"] / "index.json", {})
-    check("the records follow: each shoot's folder, each photo's place", [s.get("folder") for s in sh] == ["Beach, Jun 4 2026", "Palms, Jun 4 2026"]
+    check("the records follow: each shoot's folder, each photo's place", [s.get("folder") for s in sh] == ["2026-06-04 Beach", "2026-06-04 Palms"]
           and all(p["file"].split("/")[0] in folders for p in index.get("photos", []) if p.get("original")), str([s.get("folder") for s in sh]))
     bad, n = t.photos_match(w["drive"], index, b["card"])
     check("every photo is under its recorded name and byte for byte the card's", not bad and n == 9, str(bad)[:300])
@@ -377,11 +377,11 @@ def naming(w, b, base):
     check("pressed again: every shoot is 'Already called that.', nothing moved, nothing logged",
           all(status.get(s, {}).get("line") == "Already called that." for s in ("s1", "s2")) and photos_on(w["drive"]) == drive1
           and len((jread(b["records"] / "rename-log.json", {}) or {}).get("renames", [])) == n_log, str(status))
-    # and back to year first, by the same button
+    # and back to name then date, by the same button
     code, j = jpost(base, "/naming", {"offered": 1, "apply": True})
     j = wait_naming(base)
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-    check("and year first again by the same button puts every folder back as it was", folders == folders0 and photos_on(w["drive"]) == drive0, str(folders))
+    check("and name then date again by the same button puts every folder back as it was", folders == folders0 and photos_on(w["drive"]) == drive0, str(folders))
     check("the card is exactly as it was", t.card_snapshot(b["card"]) == b["before"])
 
 
@@ -443,12 +443,12 @@ def another_card(w, b, base):
     check("the linked backup is no longer offered", jget(base, "/other-backups") == {"backups": []} and jget(base, "/card/2/other-backups") == {"backups": []})
     # the routes inside a card's frame
     j = jget(base, "/card/2/naming")
-    check("inside /card/2/, GET naming shows card 2's own shoot", [x.get("example") for x in j.get("ways") or []][:1] == ["2026-06-04 Ceremony"], str(j))
+    check("inside /card/2/, GET naming shows card 2's own shoot", [x.get("example") for x in j.get("ways") or []][:1] == ["Ceremony_06-04-26"], str(j))
     code, j = jpost(base, "/card/2/naming", {"offered": 2, "apply": True}, Origin=base)
     j = wait_naming(base, "/card/2")
     folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
     check("and a POST from inside /card/2/ (this server's own Origin) renames card 2's shoot only",
-          "Ceremony, Jun 4 2026" in folders and "2026-06-04 Beach" in folders and "2026-06-04 Palms" in folders and (j.get("line") or "").startswith("Done."), str((folders, j)))
+          "2026-06-04 Ceremony" in folders and "Beach_06-04-26" in folders and "Palms_06-04-26" in folders and (j.get("line") or "").startswith("Done."), str((folders, j)))
     t.run("studio_file.py", "set", "--offered", "1", env=w["env"])
     the_guard(w, b2, base, "/card/2")
     return b2
@@ -539,15 +539,15 @@ def in_a_browser(work):
             c.wait_for("document.querySelectorAll('#nm-list label').length === 2", seconds=20)
             labels = c.js("[...document.querySelectorAll('#nm-list label')].map(l => l.textContent)")
             check("Change how my shoots are named: the two ways with this backup's own shoot, the one in use marked, the tick box ticked",
-                  labels == ["2026-06-04 Beach (how they're named now)", "Beach, Jun 4 2026"] and c.js("document.getElementById('nm-apply').checked && !document.getElementById('nm-apply-row').hidden"), str(labels))
+                  labels == ["Beach_06-04-26 (how they're named now)", "2026-06-04 Beach"] and c.js("document.getElementById('nm-apply').checked && !document.getElementById('nm-apply-row').hidden"), str(labels))
             check("with the line to copy for their own way", c.js("document.querySelector('#nm-panel .copy-text').textContent") == "Change how my shoots are named")
             c.js("document.querySelectorAll('#nm-list input')[1].click(); document.getElementById('nm-go').click(); true")
             c.wait_for("/^Done\\./.test(%s)" % (say % "nm-say"), seconds=90)
             check("Save: the shoots are renamed, and the line beside the button says so (through the page's own reloads)",
-                  c.js(say % "nm-say") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like Beach, Jun 4 2026."
+                  c.js(say % "nm-say") == "Done. This backup's shoots are renamed to match, and your next backup's will be named like 2026-06-04 Beach."
                   and c.js(beside % ("nm", "nm")), c.js(say % "nm-say"))
             folders = sorted(p.name for p in w["drive"].iterdir() if p.is_dir() and not p.name.startswith("."))
-            check("on the drive too", "Beach, Jun 4 2026" in folders and "2026-06-04 Beach" not in folders, str(folders))
+            check("on the drive too", "2026-06-04 Beach" in folders and "Beach_06-04-26" not in folders, str(folders))
             check("nothing in the section holds a path", no_path(w, c.js("document.getElementById('opts').innerText")))
             # another card, last: the page becomes the shoot's page
             c.wait_for("!document.getElementById('nm-open').disabled", seconds=20)

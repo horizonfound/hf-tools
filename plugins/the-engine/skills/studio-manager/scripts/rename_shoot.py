@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sort import safe_folder, slug, sha256_of, load, say  # noqa: E402
+from sort import safe_folder, prefix_for, sha256_of, load, say  # noqa: E402
 import studio_file  # noqa: E402
 from sneak_peeks import TOOL as STUDIO_TOOL  # noqa: E402
 import this_computer  # noqa: E402  (the Mac way and the PC way of everything, in one place)
@@ -130,7 +130,7 @@ def plan_rename(session, studio, shoot_id, new_name):
     in_folder = [p for p in index["photos"] if old_folder in Path(p["file"]).parents and p.get("original")]
     shoot_date = min((p["taken"] for p in in_folder if p.get("taken")), default=None)
     new_folder = Path(safe_folder(studio_file.render(naming, new_name, shoot_date)) if naming.get("folder_pattern") and shoot_date else safe_folder(new_name))
-    prefix = slug(new_name)
+    prefix = prefix_for(new_name)
     if not (session / old_folder).is_dir():
         sys.exit(f"STOP: the folder {old_folder} is not there. Nothing renamed.")
     if not same_text(new_folder, old_folder) and (session / new_folder).exists() and not case_twin(session / old_folder, session / new_folder):

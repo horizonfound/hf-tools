@@ -779,9 +779,9 @@ def main():
             say("   A flagged photo is refused (the hero always); the pick says what to fix. Then run this command again.")
             sys.exit(7)
     if (studio / "sneak-peeks.json").exists():
-        say("6b. Marking the sneak peeks for Lightroom")
+        say("6b. Making the first-look pictures for the report")
         if run("sneak_peeks.py", "--night", studio) not in (0, 2):
-            say("   (the sneak peeks could not all be marked; the report still shows them)")
+            say("   (the first-look pictures could not all be made; the report shows what there is)")
         run("first_look.py", session)
         run("report_page.py", session)
 

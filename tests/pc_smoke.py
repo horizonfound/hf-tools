@@ -775,7 +775,7 @@ def whole_backup(work, how_pictures, nobody_reading=None):
     before = card_snapshot(card)
     drive = work / "drive night"
     drive.mkdir()
-    run("studio_file.py", "set", "--drive", drive, "--offered", "1", "--file-names", "shoot", env=env)
+    run("studio_file.py", "set", "--drive", drive, "--offered", "2", "--file-names", "shoot", env=env)
     night = ["night.py", "--source", card, "--name", "Côte card", "--date", "2026-11-06"]
     unseen = []                          # what night.py said where nobody was reading, but it could still be seen
 
@@ -1275,7 +1275,7 @@ def posts_checks(work):
     check("the folder for their posts is made (posts.py setup)", code == 0, out[-300:])
     code, out = run("kit.py", "start", "--folder", photos, "--name", KIT_NAME, env=env)
     content = work / "kit drive" / "The Assistant" / "Your Content"
-    want = "2026-06-01 " + KIT_NAME
+    want = KIT_NAME + "_06-01-26"
     check("a post kit is started from a folder of finished photos, its folder named exactly (accent, curly apostrophe, emoji)",
           code == 0 and want in listing(content), f"{code} {listing(content)} {out[-300:]}")
     if code != 0:
@@ -1522,7 +1522,7 @@ def canva_checks(work, kit, env, built):
         one.mkdir()
         (one / "Fresh 01.jpg").write_bytes(jpeg_bytes(64, 48, lambda bx, by: (90, 140, 60), exif_blob(datetime(2026, 6, 2, 10, 0))))
         code, out = run("kit.py", "start", "--folder", one, "--name", "Fresh one", env=env)
-        fresh_kit = kit.parent / "2026-06-02 Fresh one"
+        fresh_kit = kit.parent / "Fresh one_06-02-26"
         links4 = work / "links four.json"
         links4.write_text(json.dumps([stand_in.url("/export/gone.jpg", "seven")]), encoding="utf-8")
         before_kit = listing(fresh_kit)
@@ -2708,7 +2708,7 @@ def main():
 
     # ---- the Studio File, the walk-away check, the queue
     helper = "Shérman 📷"
-    code, out = run("studio_file.py", "set", "--drive", drive, "--offered", "2", "--file-names", "shoot", "--name", helper, env=env)
+    code, out = run("studio_file.py", "set", "--drive", drive, "--folder-pattern", "{shoot}, {date}", "--date-format", "%b %-d %Y", "--file-names", "shoot", "--name", helper, env=env)
     try:
         kept = helper in (home / "studio.json").read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):

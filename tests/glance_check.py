@@ -38,7 +38,7 @@ def main():
         one = out.split("ONE LINE (put this in the question itself):")[-1].strip()
         check("the drive, no second copy, the folder naming and the photo naming, one short line each",
               len(lines) == 4 and lines[0].startswith("Photos go onto Photo Shoots") and lines[1] == "No second copy"
-              and "Smith Family, Oct 18 2026" in lines[2] and "named after the shoot" in lines[3], out)
+              and "2026-10-18 Smith Family" in lines[2] and "named after the shoot" in lines[3], out)
         check("every line is short and plain: no path, no code marks, no setting names",
               all(len(x) <= 90 and "/" not in x.replace("Dustin / ", "") and "`" not in x and "{" not in x for x in lines), str(lines))
         check("the same thing as one line for the question, ending in a full stop",
