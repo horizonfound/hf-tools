@@ -84,6 +84,8 @@ Students install in the Claude desktop app from Settings, Customize, Plugins (se
 
 **Not launched yet (Dustin, Oct 25): we are still building.** No students depend on main today, so new work goes straight to main and Dustin's Code session just says "get the latest from GitHub." Don't hold work back on a branch or talk about "switching it on for everyone." The keep-main-shippable rule starts with the beta testers.
 
+**Every build ends merged on GitHub, without asking (Dustin, Nov 22).** "Whatever we have, just push it up to the GitHub so that it's usable. We're going to be running through trials on the most current version as it sits on GitHub." When he or Nicole asks for a new build: finish it, raise `release.json`'s number, push, open the PR, merge it, rebuild `dist/The-Assistant.zip`, and say what is in it and what is unproven. No "merge it?" question. Sending anything to Nicole or Slack still needs his say-so (rule 10) unless he said so for that build.
+
 ## Where things stand (Oct 23, 2026)
 
 - **Studio Manager safety core: built and proven once.** `backup.py` copies a card (or any folder) to the session drive and optionally a second folder, sha256 while copying, write to `.studio-partial` then rename, re-read verify, never overwrite, resumable from `_studio/manifest.json`, `--budget` seconds to pause cleanly (exit 3), morning report with problems first. Ran on Dustin's R5 card to his RAID "Big Kahuna" (`/Volumes/Big Kahuna/The Engine Test/`): 6.9 GB, 5 files, all verified; independent `sha256sum` matched. Exit codes: 0 safe, 1 problems, 2 stop (missing source or space), 3 paused.
@@ -1209,3 +1211,18 @@ Dustin, Nov 21, night: "slack with new version start building. going to bed". Ni
 12. **Our draft words:** `home.OUR_WORDS` (`t_aria`, `mk_photo`, `mk_picking`, `mk_list_cant`, `mk_didnt`), `new_shoot.WORDS`, `create_dialog.OUR_WORDS`, the folder window's prompt, the come-back line, the samples README.
 
 **Earlier notes in this file that this build changes** (each has a dated pointer where it stands): the v28 home page's hello; the v29 home page ("posts first"); the Nov 14 colour story; the repo layout.
+
+## Nicole's Nov 22 answers and v31's two small fixes (version 8, Nov 22)
+
+Nicole answered the v30 questions in #the-engine (Nov 22, 12:56 and after; Dustin's Claude clarified the confusing ones at 13:10). Built on branch `v31-prep` and merged as version 8 (Dustin: "Yes, merge it"). Same rule as before: her words whole.
+
+- **The chat no longer opens with reminders** (Nicole: "i dont think the chat needs the reminders"). SKILL.md's first-thing checks no longer lead with what is due or late, and the regular chat hello no longer opens with it. What is due stays in the home page's cards, and "what's due?" is still answered. The phone tap before a due date was kept (Dustin and Nicole's call). Older notes in this file that say "reminders first in every conversation" are history.
+- **"the Assistant" everywhere** (Nicole: "everything is the assistant"): every page line and instruction that said "your assistant" now says "the Assistant". Kept: "Assistant folder", and her own self-introductions ("Hi! I’m your Assistant, and I’m so glad you’re here.", "Hi, {name}! I’m your Assistant, and I’m here to help."), which are her words. `tests/the_assistant_check.py` holds it.
+- **The first hello is her line alone** for someone brand new: "Hi! I’m your Assistant, and I’m so glad you’re here." (`hello_lines.first_only_line`, `"only": true`). Her lines file is byte for byte hers.
+- **Captions asks reel or carousel first** (`home.py` `mk_ask*`, our draft words); then the words page opens on that tab.
+- **The `later` lines stay out.**
+- **A tile press counts on its own** (category `tile`, not `posts`), so a hello afterwards does not explain posts and ask "Want to dive in?".
+- **From her v31 (sections 7 and 8):** on the four tiles the faces' middle sits about 30% from the top (`TILE_AT = .3`, `TILE_SLACK = .1`; faces that fit first, then other faces, then photos with no face; the hello stays centered); the posting grid is as wide as its line (about 550 px) and shows 12 posts (`GRID_MOST = 12`; `FEED_MAX` stays 15).
+- **Not built from v31:** the backup popup and everything in her sections 1 to 6. Feedback sent to her Nov 22 (`docs/nicole-v31-feedback-2026-11-22.md`, 13 questions); build nothing there until she and Dustin answer.
+- **Still waiting on Nicole:** the three light cards' titles in capitals or sentence case; the report's last line; the sample photos.
+- **Checked** on this Mac only, pretend shoots, both Pythons; `tests/nicole_nov22.py` and `tests/the_assistant_check.py` are new and in GitHub's check. Nobody's hand or eye; GitHub's checks had not run at merge time.

@@ -1,10 +1,12 @@
 {
-  "number": 7,
+  "number": 8,
   "date": "Nov 22, 2026",
   "new": [
-    "A new look for your home page: one wide photo from your own shoots, faces centered, plain and calm so your photos are the star.",
-    "A hello that only cheers you on. No reminders and nothing to do: those stay in their own cards below.",
-    "Tap Reels, Carousels, Stories or Captions to go straight there: pick a shoot, or pick a folder of finished photos for a new one.",
-    "A smaller posting grid, about the size of your grid on your phone, so 12 to 15 posts fit on the screen at once."
+    "The chat says hello without reminders. What's due stays in the cards on your home page.",
+    "Your very first hello is just: Hi! I’m your Assistant, and I’m so glad you’re here.",
+    "Tap Captions and it asks first: a reel or a carousel?",
+    "Faces sit above the words on the Reels, Carousels, Stories and Captions tiles.",
+    "The posting grid is a little wider and shows 12 posts.",
+    "It says the Assistant everywhere."
   ]
 }
