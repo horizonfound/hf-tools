@@ -1385,6 +1385,9 @@ const BK = (function(){
   // the box the server drew on the card (a reload while a backup runs or has just finished): its link works too
   n1.querySelectorAll('button[data-bk]').forEach(b => { b.onclick = e => { e.stopPropagation(); if (b.dataset.bk === 'again') tryAgain(b); else go(b.dataset.bk, b); }; });
   if (live) soon(job && job.state === 'running' ? 800 : 2500);
+  // "Back up another card" on the Name your shoots page lands here as /home#backup: the box opens by itself
+  // (the mark is taken off the address, so a reload does not open it again)
+  if (live && location.hash === '#backup') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} open(); }
   return {open, close, state: () => ({S, job, DEST, PICK, LIST, SECOND})};
 })();
 """

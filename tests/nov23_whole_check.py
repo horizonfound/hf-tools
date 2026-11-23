@@ -434,7 +434,7 @@ def chrome_checks(w, view, data):
     try:
         with chrome_drive.Chrome(work=str(w.base / "chrome"), size=(1280, 900)) as c:
             c.open(w.url("/home"))
-            c.wait_for("document.querySelector('#n1 button[data-bk=\"name\"]')", 20)
+            c.wait_for("!!document.querySelector('#n1 button[data-bk=\"name\"]')", 20)
             text = c.js("document.querySelector('#n1').innerText")
             check("in the browser: the home card says Done. Every photo checked. · Name them", "Done. Every photo checked." in text and "Name them" in text, text)
             c.js("document.querySelector('#n1 button[data-bk=\"name\"]').click()")
@@ -448,9 +448,15 @@ def chrome_checks(w, view, data):
                   got["boxes"] == ["", "", ""] and got["pv"] == ["Folder: Shoot 1_06-04-26", "Folder: Shoot 2_06-04-26", "Folder: Shoot 3_06-04-26"]
                   and "Aurora" in got["typed"] and "We found 3 shoots on your card" in got["sub"], str(got))
             c.js("document.getElementById('mini').click()")
-            c.wait_for("document.getElementById('name-mini')", 10)
+            c.wait_for("!!document.getElementById('name-mini')", 10)
             check("... ticking mini sessions offers the typed name as the one folder's name", c.js("document.getElementById('name-mini').value") == "Aurora")
             c.js("document.getElementById('mini').click()")
+            import name_shoots
+            href = name_shoots.ANOTHER_CARD
+            c.open(w.url("/home#backup"))
+            c.wait_for("!!document.querySelector('.bkbox') && !document.querySelector('.bkbox').closest('[hidden]')", 20)
+            check("... Back up another card goes to the home page with the box already open (/home#backup), and a reload does not open it again",
+                  href == "/home#backup" and c.js("location.hash") == "" and "Start the backup" in c.js("document.querySelector('.bkbox').innerText"), str(href))
     except chrome_drive.NoChrome as e:
         skip("the pages in a hidden Chrome", str(e))
 
@@ -566,6 +572,14 @@ def chat_checks(w):
     check("its shoots carry the names from the look, in the same name_date folders", len([k for k in tree if k.startswith("Chat shoot 1_09-04-26/Chat_")]) == 4, str(sorted(tree))[-400:])
     check("no keyword file was written for Lightroom (the first look marks nothing)", not list(w.dest.rglob("*.xmp")))
     check("no second copy was made by itself (asked each time)", not [k for k in shoots_tree(w.lacie) if k.startswith("Chat")])
+    # a second copy asked for while a join of this backup's shoots is cut off part way: refused with words about the join
+    (records / "join-log.json").write_text(json.dumps({"joins": [{"finished": None, "problems": []}]}), encoding="utf-8")
+    code, out = t.run("second_copy.py", str(records), "--to", str(w.lacie), "--check", "--json", env=env)
+    (records / "join-log.json").unlink()
+    check("Make a second copy while shoots are part way through being put in one folder: refused, and the words are about that (not 'not sorted yet')",
+          "part way through being put in one folder" in out and "aren't sorted into shoots yet" not in out, out[-400:])
+    code, out = t.run("second_copy.py", str(records), "--to", str(w.lacie), "--check", "--json", env=env)
+    check("... and with the join finished it may be made", '"ok": true' in out.lower().replace("'", '"') or code == 0, out[-300:])
     code, out = t.run("backup_job.py", "status", env=env)
     check("the page's job record is not touched by a chat backup", '"card": "CARD B"' in out or '"card": "EOS_DIGITAL"' in out, out[-300:])
 
