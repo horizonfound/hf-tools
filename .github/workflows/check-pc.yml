@@ -604,7 +604,7 @@ jobs:
           retention-days: 7
   mac:
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       - id: venv
@@ -916,6 +916,22 @@ jobs:
       - name: Sample photos for a brand-new Assistant in a hidden Chrome (the hello and the four tiles from the samples with her line, faces aimed at, gone by themselves when a first post kit comes in, an empty folder grey, no sample on any other page)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/home_samples_check.py
+  mac-page-vault:
+    # My vault's pages in a hidden Chrome on GitHub's Mac (the vault's post kit page, photo words, its reel page, See everything in it).
+    # Split from mac-page (Nov 23): as one job the page tests ran past its 50 minutes on GitHub's Mac, so the job
+    # was cut off and the later steps had never run there. Same rules as mac-page: may fail without failing the
+    # check, one hidden Chrome at a time, under the guard.
+    runs-on: macos-latest
+    timeout-minutes: 75
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - id: venv
+        name: A Python with Pillow
+        run: python3 -m venv /tmp/v && /tmp/v/bin/pip install --quiet pillow
+      - name: Which Chrome this machine carries
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/chrome_drive.py --where
       - name: My vault on the post kits list and the vault's own post kit page in a hidden Chrome (first, alone, no Archive, made once by a guarded press, her words both ways, the strip, the three cards, vault.py add copying checked and safe to run twice or cut off)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_page_check.py
@@ -934,6 +950,22 @@ jobs:
       - name: See everything in it in a hidden Chrome (the tabs and counts, me with my camera finding the named clips, a tap playing a clip from the vault's own route between its start and end, Use it in a reel picking nothing, Remove from my vault writing only the vault's vault.json, Put it back under the same number, another Origin refused, every other post kit unchanged)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/vault_everything_check.py --work /private/tmp/vault-everything-ci
+  mac-page-reel:
+    # Your year, the post kit's fan and the reel pages in a hidden Chrome on GitHub's Mac.
+    # Split from mac-page (Nov 23): as one job the page tests ran past its 50 minutes on GitHub's Mac, so the job
+    # was cut off and the later steps had never run there. Same rules as mac-page: may fail without failing the
+    # check, one hidden Chrome at a time, under the guard.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - id: venv
+        name: A Python with Pillow
+        run: python3 -m venv /tmp/v && /tmp/v/bin/pip install --quiet pillow
+      - name: Which Chrome this machine carries
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/chrome_drive.py --where
       - name: Your year and the monthly recap in a hidden Chrome (the stories play, Next, Back, Pause and the arrow keys, Save this one and Save all of them as real pictures, the folder button, phone width)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/wrapped_check.py
@@ -964,6 +996,22 @@ jobs:
       - name: The footage editor and clip naming (Nicole's v27, Lane A stage 3, on the real page - one player, the Footage drop-down, Start here, End here and Add clip with the orange trim dragged on the timeline, Your clips in two columns, footage.py picks and describe; the PC's way with no stills)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 800 /tmp/v/bin/python tests/reel_footage_check.py --work /private/tmp/reel-footage-ci
+  mac-page-design:
+    # The designers and the post kit's cards in a hidden Chrome on GitHub's Mac.
+    # Split from mac-page (Nov 23): as one job the page tests ran past its 50 minutes on GitHub's Mac, so the job
+    # was cut off and the later steps had never run there. Same rules as mac-page: may fail without failing the
+    # check, one hidden Chrome at a time, under the guard.
+    runs-on: macos-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - id: venv
+        name: A Python with Pillow
+        run: python3 -m venv /tmp/v && /tmp/v/bin/pip install --quiet pillow
+      - name: Which Chrome this machine carries
+        if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
+        run: /tmp/v/bin/python tests/chrome_drive.py --where
       - name: The designer's small preview picture for the post kit (the real page; its shape, when it is sent, Save slides untouched)
         if: ${{ !cancelled() && steps.venv.outcome == 'success' }}
         run: /tmp/v/bin/python tests/guard.py 3000 /tmp/v/bin/python tests/design_preview_check.py --work /private/tmp/design-preview-ci
