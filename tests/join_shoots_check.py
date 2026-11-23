@@ -24,6 +24,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+# Nothing here may ever look at the real ~/.studio: even the modules this test imports itself get a scratch home
+# (every script it runs gets its own pretend world's on top of this).
+os.environ["STUDIO_HOME"] = tempfile.mkdtemp(prefix="scratch-studio-home-")
+os.environ["STUDIO_NO_WINDOWS_FOR_TESTS"] = "1"
 import report_options_check as r  # noqa: E402  (its pretend world and whole pretend backups)
 t = r.t
 
