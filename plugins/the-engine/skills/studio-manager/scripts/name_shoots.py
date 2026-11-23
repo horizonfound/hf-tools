@@ -226,7 +226,7 @@ function form(){
   const save = el('button', 'go', W.save); save.id = 'save'; save.type = 'button'; save.onclick = send;
   const later = el('a', 'lk', W.later); later.id = 'later'; later.href = '/home';
   row.appendChild(save); row.appendChild(later); top.appendChild(row);
-  const say = el('p', 'say', SAY); say.id = 'say'; say.setAttribute('role', 'status'); top.appendChild(say);
+  const say = el('p', 'say', SAY); say.id = 'line'; say.setAttribute('role', 'status'); top.appendChild(say);
   top.appendChild(el('p', 'note', D.note));
 }
 function working(){
@@ -275,16 +275,16 @@ async function load(){
   } catch (e) { timer = setTimeout(load, 2000); }
 }
 async function send(){
-  const b = $('save'); b.disabled = true; SAY = ''; $('say').textContent = '';
+  const b = $('save'); b.disabled = true; SAY = ''; $('line').textContent = '';
   const names = {};
   if (!MINI) D.shoots.forEach(s => { const v = $('name-' + s.id).value.trim(); if (v) names[s.id] = v; });
   try {
     const r = await fetch('/name-shoots-save', {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({backup: BACKUP, names: names, mini: MINI, mini_name: MINI ? $('name-mini').value.trim() : ''})});
     const j = await r.json();
-    if (!j.ok){ SAY = j.words || W.cant; $('say').textContent = SAY; b.disabled = false; return; }
+    if (!j.ok){ SAY = j.words || W.cant; $('line').textContent = SAY; b.disabled = false; return; }
     FORM = false; SAY = ''; load();
-  } catch (e) { SAY = W.cant; $('say').textContent = SAY; b.disabled = false; }
+  } catch (e) { SAY = W.cant; $('line').textContent = SAY; b.disabled = false; }
 }
 if (BACKUP !== null) load();
 """

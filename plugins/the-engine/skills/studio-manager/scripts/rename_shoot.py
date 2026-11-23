@@ -310,7 +310,20 @@ def apply(session, studio, shoot, old_folder, new_folder, moves, new_name, dry):
             say(f"    - {p}")
         sys.exit(1)
     update_queue(session, studio, shoot["id"], new_name, new_folder)
+    follow_second(studio)
     say("  All done.")
+
+
+def follow_second(studio):
+    """A second copy of this backup on another drive is brought in line with the new name (second_copy.follow:
+    it renames there too, or notes that it is waiting for that drive). The rename here is done either way."""
+    try:
+        import second_copy
+        second_copy.follow(str(studio))
+    except (ImportError, AttributeError):
+        pass
+    except (Exception, SystemExit) as e:  # noqa: BLE001
+        say(f"  (the second copy could not be brought in line just now: {e.__class__.__name__})")
 
 
 def update_queue(session, studio, shoot_id, new_name, new_folder):
@@ -529,6 +542,7 @@ def finish_unfinished(session, studio):
             sys.exit(1)
         if entry.get("stops") and new_folder:  # it stopped on a PC (a file held open) and is now done: the queue follows
             update_queue(session, studio, entry["shoot"], entry["to_name"], new_folder)
+        follow_second(studio)
 
 
 def main():
