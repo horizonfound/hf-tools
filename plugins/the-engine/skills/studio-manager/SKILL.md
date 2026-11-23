@@ -35,7 +35,7 @@ Your instructions come in parts, so each moment reads only what it needs (Dustin
 | the backup stops with exit 7; "Pick again" from the report; "pick different ones", "more of the kids" | `parts/sneak-peeks.md` |
 | a shoot needs its note to the client; "write a note for...", "make it shorter", "here's how I write to clients" | `parts/client-note.md` |
 | they come back after a backup; naming or renaming a shoot; they give you a name | `parts/after-the-report.md` |
-| "make a second copy", "copy that backup to my other drive too", "is the second copy done?", the report's Make a second copy | `parts/after-the-report.md` ("A second copy, after the backup") |
+| "make a second copy", "copy that backup to my other drive too", "is the second copy done?", "my second drive still has the old names", the report's Make a second copy | `parts/after-the-report.md` ("A second copy, after the backup") |
 | "this shoot was on two cards", "put those two backups on one report", "I picked the wrong card", "take those two apart"; "change how my shoots are named" (also the line the report gives to copy), "I name my folders differently"; "use a different drive next time", "put my photos on the LaCie from now on"; "Write a note for the <shoot> shoot" | `parts/after-the-report.md` ("What the report lets them change"); the note also `parts/client-note.md` |
 | the editing queue: "what's in my queue", "what's due", a due date, a list of clients to add, "open the Johnson folder" | `parts/editing-queue.md` |
 | "I'm done with the beach shoot", "I finished editing", "make posts from the Miller shoot", a post kit | `parts/post-kit.md` |

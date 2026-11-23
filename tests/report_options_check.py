@@ -301,14 +301,17 @@ def next_drive(w, b, base):
           j.get("ok") is True and Path(sf["drives"]["session"]).resolve() == (w["old"] / "Photo Shoots").resolve(), str(sf.get("drives")))
     check("and the page is told where on the drive, not only which drive (Nov 19 review)",
           "goes to Old Shoots, in Photo Shoots." in j.get("words", "") and no_path(w, j), str(j))
-    # the drive that second copies go on cannot also be the first place
+    # A drive an earlier version saved for second copies is no longer set apart (Nicole, Nov 23: the second drive
+    # is asked each time, so nothing is saved for it): it can be chosen for the next backup like any other drive.
     t.run("studio_file.py", "set", "--second", w["lacie"], env=w["env"])
-    before = (w["home"] / "studio.json").read_bytes()
     code, j = jpost(base, "/next-drive", {"drive": LACIE, "name": "LaCie Rugged"})
-    check("the drive second copies go on is refused in plain words, nothing written",
-          j.get("ok") is False and j.get("words", "").startswith("LaCie Rugged is where your second copies go")
-          and (w["home"] / "studio.json").read_bytes() == before, str(j))
+    sf = jread(w["home"] / "studio.json", {})
+    check("a drive once saved for second copies is no longer refused as the next backup's drive",
+          j.get("ok") is True and "where your second copies go" not in j.get("words", "")
+          and Path(sf["drives"]["session"]).resolve() == Path(w["lacie"]).resolve(), str(j))
     t.run("studio_file.py", "set", "--no-second", env=w["env"])
+    code, out = t.run_python(["-c", f"import sys; sys.path.insert(0, {str(t.SCRIPTS)!r}); import second_copy; print(second_copy.REMEMBER_SECOND)"], env=w["env"])
+    check("(the one switch for all of this is off: second_copy.REMEMBER_SECOND)", out.strip().endswith("False"), out)
     code, j = jpost(base, "/next-drive", {"drive": HERE_, "name": f"This {this_computer.COMPUTER}"})
     sf = jread(w["home"] / "studio.json", {})
     shoots = w["folders"] / "Pictures" / "Shoots"

@@ -36,8 +36,9 @@ def main():
         code, out = t.run("studio_file.py", "glance", env=env)
         lines = out.split("THE USUAL")[-1].split("ONE LINE")[0].strip().splitlines()[1:]
         one = out.split("ONE LINE (put this in the question itself):")[-1].strip()
-        check("the drive, no second copy, the folder naming and the photo naming, one short line each",
-              len(lines) == 4 and lines[0].startswith("Photos go onto Photo Shoots") and lines[1] == "No second copy"
+        check("the drive, the second copy asked for each time (Nicole, Nov 23), the folder naming and the photo naming, one short line each",
+              len(lines) == 4 and lines[0].startswith("Photos go onto Photo Shoots")
+              and lines[1] == "A second copy is yours to ask for after each backup, on its report"
               and "2026-10-18 Smith Family" in lines[2] and "named after the shoot" in lines[3], out)
         check("every line is short and plain: no path, no code marks, no setting names",
               all(len(x) <= 90 and "/" not in x.replace("Dustin / ", "") and "`" not in x and "{" not in x for x in lines), str(lines))
@@ -49,8 +50,10 @@ def main():
         t.run("posting_queue.py", "interval", "3 a week", env=env)
         before = (home / "studio.json").read_bytes()
         code, out = t.run("studio_file.py", "glance", env=env)
-        check("a second copy, the camera's own names, the tone and sign-off, and the posting rhythm all show",
-              "A second copy goes onto Second" in out and "Photos keep the camera's own names" in out
+        check("the camera's own names, the tone and sign-off, and the posting rhythm all show; a second drive saved by an earlier "
+              "version is no longer said to get a copy by itself",
+              "A second copy goes onto" not in out and "A second copy is yours to ask for after each backup, on its report" in out
+              and "Photos keep the camera's own names" in out
               and "Client notes written warm and personal, signed \u201cxo, Nicole\u201d" in out and "Posts lined up at 3 a week" in out, out)
         check("looking changes nothing that is remembered", (home / "studio.json").read_bytes() == before)
     finally:

@@ -964,6 +964,9 @@ def something_in_the_way(b, to, before):
     check("a file of theirs under a name one of the photos should take stops it too, and is not written over",
           got_.get("state") == "problem" and "something else already has a name one of its files should take." in got_.get("words", "")
           and b"a file of theirs" in (to / Path(now[k]).parent / Path(now[k]).name).read_bytes(), out)
+    check("and no photo was moved at all, not even aside: the one whose name is taken is still under its old name",
+          (to / Path(now[k]).parent / Path(was[k]).name).is_file() and not [x for x in listing(to) if x.endswith(".studio-moving")]
+          and not any(m.get("moved") for m in (follow_log(b).get("runs") or [{}])[-1].get("moves", [])), str(listing(to))[:600])
     check("every photo of the copy is still there, the very same files (the folder took its new name; no photo was renamed onto anything)",
           set(numbers(to)) - {(to / Path(now[k]).parent / Path(now[k]).name).stat().st_ino} == set(before) and
           {r["at"] for r in record(b)["files"].values()} <= set(listing(to)), str(sorted(listing(to)))[:500])
@@ -1418,6 +1421,14 @@ def words_and_help():
               second_copy.proved(c, ident, entry) is False and second_copy.proved(c, None, entry) is False)
         check("proved(): with no identity to go by (a drive that numbers no file), the hash proves it, and a missing hash proves nothing",
               second_copy.proved(a, [0, st.st_size, st.st_mtime_ns], entry) is True and second_copy.proved(a, None, {"size": 9}) is False)
+        # names are read from the folder's own listing: a name in other capitals is "held", never "exactly there"
+        (work / "Beach").mkdir()
+        (work / "Beach" / "Smith_0001.JPG").write_bytes(b"x")
+        names = second_copy.Names()
+        check("Names: another spelling of a name is seen as holding it, and is never taken for the exact name",
+              names.has(work / "beach") == "Beach" and names.exact(work / "beach") is False and names.exact(work / "Beach") is True
+              and names.has(work / "Beach" / "smith_0001.jpg") == "Smith_0001.JPG" and names.exact(work / "Beach" / "smith_0001.jpg") is False
+              and names.has(work / "Beach" / "other.jpg") is None)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

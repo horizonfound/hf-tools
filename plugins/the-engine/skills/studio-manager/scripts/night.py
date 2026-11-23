@@ -374,6 +374,7 @@ def second_copy_after(session, second):
             if words:
                 note["words"] = f"No second copy yet, so there's one copy for now. {words}"
             (studio / "second-missed.json").write_text(json.dumps(note, indent=1), encoding="utf-8")
+            run("report_page.py", studio)     # the report is already written by now: its top takes the line
         say("   (the second copy is not made: one copy for now. The backup itself is whole, and the report says so, "
             "with its Make a second copy button)")
     except Exception as e:  # noqa: BLE001  (an optional copy never stops the backup)

@@ -1520,21 +1520,49 @@ def check_second_copy():
     case("after-the-report.md: what the report's button and panel say, word for word",
          all(x in a for x in ("Anything you'd like to change?", "Your photos are safe either way. These are here if you want them.",
                               "**Make a second copy**", "Which drive should the second copy go on?", "**Look again**",
-                              "**Do this after every backup**", "**Make the second copy**", "Keep your card in until this is done.")))
-    case("after-the-report.md: it is the card's layout, never sorted, and the honest lines are said as they are",
-         "never sorted or renamed" in a and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
-         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a)
+                              "**Make the second copy**", "Keep your card in until this is done.")))
+    case("after-the-report.md: no tick box for every backup, and nothing about it is remembered (Nicole, Nov 23: ask each time)",
+         "**Do this after every backup**" not in a and "There is no tick box for every backup any more." in a
+         and "no drive is saved for the next backup" in a and "there is no such setting any more" in a
+         and "`--always` is still taken by the command and saves nothing" in a
+         and "I ask each time now instead: press Make a second copy whenever you want one." in a)
+    case("after-the-report.md: it looks like the photo drive (Nicole, Nov 23), and the honest lines are said as they are",
+         "the same shoot folders with the same photo names as on their photo drive" in a and "never sorted or renamed" not in a
+         and "It was made from the copy on Big Kahuna, since the card wasn't in." in a
+         and "5 video clips are the upright ones from your drive." in a and "never more than it says" in a
+         and "It has the same folders and photo names as Big Kahuna." in a
+         and "A video clip the backup turned upright is always read from their drive" in a)
+    case("after-the-report.md: the copy follows a rename or a join, waits for its drive, and their own files in the way are theirs to move",
+         "**It follows a rename or a join.**" in a and "second_copy.py follow \"<the backup's folder>\"" in a and "follow --all" in a
+         and "Your second copy on LaCie Rugged still has the folders and names from before. Plug LaCie Rugged in and it will catch up." in a
+         and "never move, rename or delete their file to make it pass" in a)
+    case("after-the-report.md: a second copy from before Nov 23 is left as it is and said truthfully; a folder of theirs with a shoot's name is refused",
+         "**A second copy made before Nov 23**" in a and "never converted" in a and "its folders and names are the memory card's, not your shoots'" in a
+         and "that isn't part of this second copy." in a and "nothing is copied into a folder of theirs" in a)
     case("after-the-report.md: never called made before the last line says so; nothing deleted to make it pass; never a cloud folder",
          "Never say there is a second copy until the command's last line says it is made." in a
          and "never delete or move anything to make it pass" in a and "Never a cloud folder" in a)
     case("after-the-report.md: the four exit codes, the missed second drive, and the eject line",
          all(x in a for x in ("0 done", "2 refused before anything was written", "3 stopped part way", "1 problems"))
-         and "Your second drive wasn't plugged in, so there's one copy for now. Plug it in and press Make a second copy." in a
          and "A second copy is still being made from this card. It won't be long." in a and "It won't be long." in b)
-    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py",
-         "**Make a second copy** on the report" in f and "second_copy.py" in f)
-    case("where-things-live.md names the new records",
-         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock")))
+    case("backup.md: a second copy is never made by itself; a drive named for one backup gets its copy after the shoots are put away",
+         "A second copy is never made by itself" in b and "with a second copy on your LaCie afterwards." in b
+         and "it is made after the shoots are sorted and put away, with the same folders and names as the photo drive" in b
+         and "If they keep a second copy, the first line says so" not in b)
+    case("first-backup-setup.md: the table's second-copy row points at the report's button and second_copy.py, and offers nothing for every backup",
+         "**Make a second copy** on the report" in f and "second_copy.py" in f and "never remembered" in f
+         and "with a tick box for every backup" not in f and "studio_file.py set --second" not in f)
+    case("where-things-live.md names the records, the copy's hidden folder on the second drive, and the earlier kind",
+         all(x in w for x in ("second-copy.json", "manifest.before-second-copy.json", "second-missed.json", "second-copy.lock",
+                              "second-follow-log.json", ".studio-second/<the backup's name>/", "`layout`", "`second_layout: \"main\"`",
+                              "**A second copy made before Nov 23**", "asked_each_time")))
+    case("the core's table sends \"my second drive still has the old names\" there too",
+         "\"my second drive still has the old names\"" in core)
+    sc = read(SM / "scripts" / "second_copy.py")
+    case("the lines the instructions quote are the script's own",
+         all(x in sc for x in ("still has the folders and names from before. \"", "has the same folders and names as {photos} again.",
+                               " It has the same folders and photo names as {photos}.", "that isn't part of this second copy.",
+                               "I ask each time now instead: \"")) and "REMEMBER_SECOND = False" in sc)
 
 
 def check_backup_options():
@@ -1656,8 +1684,8 @@ def check_backup_zero():
          and "into your Photo Shoots folder" in f and "into your Photo Shoots folder" in b)
     case("backup.md: a second card of the day takes the next name by itself; only a name they gave stops",
          "With no name given this never stops" in b and "saturday card 2" in b and "the name THEY gave" in b)
-    case("backup.md: the second copy is made after the backup and never holds it up",
-         "it is made right after the backup itself and never holds it up" in b)
+    case("backup.md: a second copy named for one backup is made after the shoots are put away and never holds the backup up",
+         "it is made once the shoots are sorted and put away, with the same folders and names, and never holds the backup up" in b)
     case("hello.md: backup now pasted from the home page starts the backup, with no Want to dive in?",
          'never explain and never ask "Want to dive in?"' in h and "start the backup straight away" in h)
     a2 = re.sub(r"\s+", " ", read(SM / "parts" / "after-the-report.md"))
@@ -1666,7 +1694,7 @@ def check_backup_zero():
          "shoot_report.py unlink" in a2 and 'add_parser("unlink"' in src and "no command that takes a card off" not in a2)
     case("after-the-report.md: a second copy refuses any memory card, and changed photos are never called lost",
          "It refuses a memory card (this backup's own or any other" in a2 and '"could not be found" when it says they were changed' in a2
-         and "**The saved second drive had trouble during a backup**" in a2)
+         and "**A second drive named for one backup had trouble**" in a2 and "**A second drive saved by an earlier version**" in a2)
     import home_base
     case("the Back up a card screen no longer says a question or two is asked: that line is ours now",
          "b_s2_small" not in home_base.WORDS and "nothing to answer first" in home_base.OUR_WORDS["b_s2_small"]
