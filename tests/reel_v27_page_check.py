@@ -209,9 +209,24 @@ def run_chooser(s):
     case("with no kind in the address the reel page is the chooser (hers): her title", code == 200 and title_of(pg) == short + " reels", title_of(pg))
     case("her lede on it", lede_of(pg) == rp.KIND_WORDS["chooser_lede"], lede_of(pg))
     case("her heading and her line", "<h2>" + html.escape(rp.KIND_WORDS["chooser_h2"]) + "</h2>" in pg and html.escape(rp.KIND_WORDS["chooser_say"]) in pg)
-    cards = re.findall(r"<a class='kind' id='(\w+)' href='([^']*)'><b>(.*?)</b><span>(.*?)</span></a>", pg)
+    # Where no finished video can be made (a PC) the B-roll card carries one short line of ours after hers, inside
+    # the card (Nicole, Nov 23; tests/broll_pc_check.py holds its words and place). Her four cards are the same on
+    # both computers; the line is there exactly where reel_page.pc_footage() says so, and nowhere else.
+    # (the page server is started without the tests' no-video switch, see talking_page_check.Setup, so ask the same way)
+    held = os.environ.pop("ASSISTANT_NO_AVFOUNDATION", None)
+    try:
+        no_video = bool(rp.pc_footage())
+    finally:
+        if held is not None:
+            os.environ["ASSISTANT_NO_AVFOUNDATION"] = held
+    pc_line = "<span class='pcnote' id='kBrollPc'>" + html.escape(rp.OUR_WORDS["broll_card_pc"]) + "</span>"
+    cards = re.findall(r"<a class='kind' id='(\w+)' href='([^']*)'><b>(.*?)</b><span>(.*?)</span>(<span class='pcnote' id='kBrollPc'>.*?</span>)?</a>", pg)
     case("her four cards, in her order, with her words, each a plain link written on the server",
-         [(a, html.unescape(c), html.unescape(d)) for a, _b, c, d in cards] == HER_KINDS, cards)
+         [(a, html.unescape(c), html.unescape(d)) for a, _b, c, d, _p in cards] == HER_KINDS, cards)
+    case("...our one PC line is on the B-roll card only, and only on a computer that can't save a finished video (%s here)"
+         % ("it can't" if no_video else "it can"),
+         [p for _a, _b, _c, _d, p in cards] == ["", "", "", pc_line if no_video else ""] and pg.count("id='kBrollPc'") == (1 if no_video else 0), cards[-1:])
+    cards = [c[:4] for c in cards]
     hrefs = {a: html.unescape(b) for a, b, _c, _d in cards}
     case("the three kinds open this shoot's reel page as that kind, by the folder name only",
          hrefs.get("kBts") == "/reel.html?kit=%s&kind=bts" % quote(kit) and hrefs.get("kPhotos") == "/reel.html?kit=%s&kind=photos" % quote(kit)

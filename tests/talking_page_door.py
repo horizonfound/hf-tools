@@ -85,7 +85,8 @@ def run_requests(t, s):
     # ---- the card as the server writes it
     page = rp.chooser_html(name, short, True)
     kinds = re.search(r"<div class='kinds'>(.*?)</div>", page, re.S).group(1)
-    case("the card is third of the four kinds on the chooser", re.findall(r"id='(k\w+)'", kinds) == ["kBts", "kPhotos", "kTalk", "kBroll"], kinds[:300])
+    case("the card is third of the four kinds on the chooser", re.findall(r"<a class='kind' id='(k\w+)'", kinds) == ["kBts", "kPhotos", "kTalk", "kBroll"]
+         and kinds.count("<a ") == 4, kinds[:300])   # the cards by their own tag: on a PC the B-roll card holds a line of ours (kBrollPc) inside it
     m = re.search(r"<a class='kind' id='kTalk' href='([^']*)'><b>(.*?)</b><span>(.*?)</span></a>", kinds)
     case("it is a plain link with the look of the other kinds (class kind), written on the server", bool(m), kinds[-300:])
     href = html.unescape(m.group(1)) if m else ""

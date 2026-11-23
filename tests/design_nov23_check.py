@@ -68,6 +68,9 @@ from urllib.parse import quote
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 SCRIPTS = ROOT / "plugins" / "the-engine" / "skills" / "studio-manager" / "scripts"
+# Scratch folders go under /private/tmp on a Mac (where the pretend kits must live); a PC has no such folder, so
+# there the computer's own temp folder is used (only the rules part runs on a PC: it makes no kit).
+TMP = "/private/tmp" if os.path.isdir("/private/tmp") else None
 sys.path.insert(0, str(HERE))
 import vault_core_check as core  # noqa: E402
 from vault_core_check import case, group  # noqa: E402
@@ -122,7 +125,7 @@ def slide_marks(st):
 # ====================== part `rules` ======================
 
 def part_rules():
-    os.environ.setdefault("STUDIO_HOME", tempfile.mkdtemp(prefix="hf-nov23-rules-", dir="/private/tmp"))
+    os.environ.setdefault("STUDIO_HOME", tempfile.mkdtemp(prefix="hf-nov23-rules-", dir=TMP))
     os.environ["STUDIO_NO_WINDOWS_FOR_TESTS"] = "1"
     sys.path.insert(0, str(SCRIPTS))
     import design
@@ -296,7 +299,7 @@ def table_for(arrange, kit, kit_mod, faces_by_n):
 
 
 def part_first(a):
-    work = Path(tempfile.mkdtemp(prefix="hf-nov23-first-", dir="/private/tmp"))
+    work = Path(tempfile.mkdtemp(prefix="hf-nov23-first-", dir=TMP))
     run = core.Run(work, a.port)
     run.env.pop("STUDIO_FIRST_DESIGN_FOR_TESTS", None)
     try:
@@ -567,7 +570,7 @@ def tray_checks(c, s, kind, vr):
 
 def part_vault(a):
     import vault_reel_check as vr
-    work = Path(tempfile.mkdtemp(prefix="hf-nov23-vault-", dir="/private/tmp"))
+    work = Path(tempfile.mkdtemp(prefix="hf-nov23-vault-", dir=TMP))
     run = work / "run"
     (run / "home").mkdir(parents=True)
     s = vr.PhotoWorld(run, a.port)
