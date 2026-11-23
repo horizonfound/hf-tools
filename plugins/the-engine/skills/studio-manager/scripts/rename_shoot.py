@@ -558,12 +558,28 @@ def main():
     a = ap.parse_args()
     from where import locate
     session, studio = locate(a.session)  # the folder the shoots sit in, and the records (before or after the night settles)
-    finish_unfinished(session, studio)
-    try:    # a join of two shoots that was cut off is finished first too (join_shoots.py), from its own log
+    try:
         import join_shoots
-        join_shoots.finish_unfinished(session, studio)
     except ImportError:
-        pass
+        join_shoots = None
+    if join_shoots is None:
+        return work(a, session, studio, None)
+    # One rename or join at a time on this computer (Nov 23: the Name your shoots page, the report's Rename and the
+    # chat can all ask at once, and two at work on one backup would write over each other's log). A rename waits
+    # its turn for up to RENAME_WAIT seconds; the job that started this one may hold the lock for it.
+    with join_shoots.held(wait=RENAME_WAIT) as got:
+        if not got:
+            sys.exit("STOP: " + join_shoots.WORDS["busy"])
+        return work(a, session, studio, join_shoots)
+
+
+RENAME_WAIT = float(os.environ.get("STUDIO_RENAME_WAIT_FOR_TESTS") or 120)   # seconds a rename waits its turn
+
+
+def work(a, session, studio, join_shoots):
+    finish_unfinished(session, studio)
+    if join_shoots is not None:   # a join of two shoots that was cut off is finished first too, from its own log
+        join_shoots.finish_unfinished(session, studio)
 
     jobs = []
     if a.from_names:

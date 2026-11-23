@@ -11,7 +11,7 @@ of eight points finished by the next, every record following, and the refusals i
 Everything is pretend: a scratch STUDIO_HOME, pretend drives and cards (temp folders), whole pretend backups made
 by night.py itself. No page server, no browser, no window.
 
-    python3 tests/join_shoots_check.py
+    python3 tests/join_shoots_check.py [--only plain,refusals,letters,cut_off,unprovable,with_clips,settle_waits,second_copy_follows]
 """
 import json
 import os
@@ -251,6 +251,12 @@ def refusals(work):
         got = this_computer.try_lock(f)
         if got:
             refused("while another rename or join holds the lock", ["--shoots", "s1", "s2"], "A rename or a join is already at work.")
+            before = listing(w["drive"])
+            code, out = t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Aurora", env=dict(w["env"], STUDIO_RENAME_WAIT_FOR_TESTS="1"))
+            check("a rename asked while it is held waits its turn, then says so and changes nothing",
+                  code == 1 and "A rename or a join is already at work." in out and listing(w["drive"]) == before, out)
+            code, out = t.run("rename_shoot.py", st, "--shoot", "s1", "--name", "Beach", env=dict(w["env"], STUDIO_SHOOT_LOCK_HELD="1"))
+            check("the job that holds the lock can still run a rename itself", code == 0 and "Nothing to do" in out, out)
             this_computer.unlock(f)
     # photos that keep the camera's names: two frames with one name would land on one file
     code, out = join(w, b, "--shoots", "s1", "s2")
@@ -461,15 +467,12 @@ def second_copy_follows(work):
 
 def main():
     work = Path(tempfile.mkdtemp(prefix="join-shoots-check-"))
+    parts = [plain, refusals, letters, cut_off, unprovable, with_clips, settle_waits, second_copy_follows]
+    only = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else None     # e.g. --only refusals,cut_off
     try:
-        plain(work)
-        refusals(work)
-        letters(work)
-        cut_off(work)
-        unprovable(work)
-        with_clips(work)
-        settle_waits(work)
-        second_copy_follows(work)
+        for part in parts:
+            if not only or part.__name__ in only:
+                part(work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"\n{N[0] - len(FAILED)} of {N[0]} passed" + (f"; FAILED: {len(FAILED)}" if FAILED else ""))

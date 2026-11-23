@@ -330,22 +330,31 @@ def known_backups():
     return out
 
 
+_FOUND, _FOUND_LOCK, FOUND_FOR = {}, threading.Lock(), 8.0
+_WHERE = {}
+
+
 def find_backup(name):
     """The records of the backup a PAGE asked for by name, or None. Its name is the name of its records folder
     (or the name the backup itself wrote down, or one of its shoots' ids in the editing queue's list); with two
     backups of one name, the newer. Never a path: a name with a slash in it finds nothing."""
     if not isinstance(name, str) or not name or len(name) > 200 or "/" in name or "\\" in name or name in (".", ".."):
         return None
-    hits = []
-    for rec in known_backups():
-        if backup_name(rec) == name:
-            hits.append(rec)
-            continue
-        try:
-            if (json.loads((rec / "manifest.json").read_text(encoding="utf-8")).get("session") or "") == name:
-                hits.append(rec)
-        except (OSError, ValueError, AttributeError):
-            pass
+    # the page asks again every second while names are being saved: what was found is kept for a few seconds,
+    # as long as that backup's records are still there
+    with _FOUND_LOCK:
+        hit = _FOUND.get(name)
+    if hit and time.time() - hit[1] < FOUND_FOR and (hit[0] / "manifest.json").is_file():
+        return hit[0]
+    known = known_backups()
+    hits = [rec for rec in known if backup_name(rec) == name]
+    if not hits:        # by the name the backup itself wrote down (a manifest can be a megabyte: only when needed)
+        for rec in known:
+            try:
+                if (json.loads((rec / "manifest.json").read_text(encoding="utf-8")).get("session") or "") == name:
+                    hits.append(rec)
+            except (OSError, ValueError, AttributeError):
+                pass
     if not hits:
         try:
             import edit_queue
@@ -365,7 +374,12 @@ def find_backup(name):
             return (rec / "manifest.json").stat().st_mtime
         except OSError:
             return 0
-    return max(hits, key=when)
+    best = max(hits, key=when)
+    with _FOUND_LOCK:
+        if len(_FOUND) > 200:
+            _FOUND.clear()
+        _FOUND[name] = (best, time.time())
+    return best
 
 
 def tag_of(studio):
@@ -403,6 +417,17 @@ def when_words(start, end):
 def where_words(root):
     """ "G PAPA › CLIENT WORK": the drive by its name, then the folders down to where the shoots are."""
     root = Path(root)
+    kept = _WHERE.get(str(root))
+    if kept and time.time() - kept[1] < 30:      # asking the computer for its drives can take a moment
+        return kept[0]
+    out = _where_words(root)
+    if len(_WHERE) > 200:
+        _WHERE.clear()
+    _WHERE[str(root)] = (out, time.time())
+    return out
+
+
+def _where_words(root):
     best = None
     try:
         for v in this_computer.volumes():
@@ -453,7 +478,6 @@ def facts(studio):
     root = locate(studio)[0]
     import home_base
     st = home_base.backup_status(studio)
-    manifest = _json(studio / "manifest.json", {}) or {}
     sh = (_json(studio / "shoots.json", {}) or {}).get("shoots") or []
     groups = {g["id"]: g for g in (_json(studio / "groups.json", {}) or {}).get("groups") or [] if isinstance(g, dict) and g.get("id")}
     names = _json(studio / "names.json", {}) or {}
@@ -465,7 +489,7 @@ def facts(studio):
         if st.get("second"):
             try:
                 import second_copy
-                second = second_copy.drive_name(second_copy.has_second(manifest))
+                second = second_copy.drive_name(second_copy.has_second(_json(studio / "manifest.json", {}) or {}))
             except Exception:  # noqa: BLE001
                 second = None
         safe_line = WORDS["safe_and"].format(where=where, second=second) if second else WORDS["safe"].format(where=where)

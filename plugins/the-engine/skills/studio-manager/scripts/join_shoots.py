@@ -728,7 +728,11 @@ def unfinished(studio):
 
 
 class held:
-    """Hold the one lock for the length of the work, unless the job that started us holds it already."""
+    """Hold the one lock for the length of the work, unless the job that started us holds it already. Waits up
+    to `wait` seconds for whoever has it; False from the with-line when they kept it longer."""
+    def __init__(self, wait=2.0):
+        self.wait = wait
+
     def __enter__(self):
         self.f = None
         if os.environ.get(LOCK_HELD):
@@ -738,7 +742,7 @@ class held:
             self.f = open(LOCK, "ab")
         except OSError:
             return True                      # no lock to be had: carry on without one, as before
-        end = time.time() + 2.0
+        end = time.time() + self.wait
         while True:
             got = this_computer.try_lock(self.f)
             if got or got is None:
