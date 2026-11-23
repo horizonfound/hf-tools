@@ -372,6 +372,7 @@ def a_turned_clip(b):
         rec = record(b)
         check("everything else came from the card", rec.get("from_card") == b["n"] - 1 and rec.get("from_drive") == 1
               and rec["files"][key].get("from") == "drive", f"{rec.get('from_card')} {rec.get('from_drive')}")
+        check("and the card's own file was never tried for it and then doubted (it is right, it is only sideways)", not rec.get("notes"), str(rec.get("notes")))
         check("the done line says 1 video clip is the upright one, and never that the card wasn't in",
               "1 video clip is the upright one from your drive." in out and "wasn't in" not in out, out)
         check("the whole copy matches the photo drive", mirror_tree(to) == expected(b["records"]))
@@ -847,9 +848,8 @@ def waits_for_the_drive(b, to, before):
           and st.get("state") == "done" and str(b["base"]) not in json.dumps(st), str(st))
     check("the backup still has its second copy and is still safe: every file of it is checked, only its names are behind",
           safe_of(b).get("second") is True and safe_of(b).get("safe") is True, str(safe_of(b)))
-    t.run("report_page.py", b["records"], env=b["env"])
     page = (b["records"] / "report.html").read_text(encoding="utf-8")
-    check("the report says it under Second copy made, where the button was",
+    check("the report (written again by the rename itself) says it under Second copy made, where the button was",
           "id='sc-behind' role='status'>Your second copy on Follow Drive still has the folders and names from before." in page, page[page.find("sc-behind") - 80:][:400])
     code, got_, out = follow(b)
     check("follow with the drive still out answers waiting again and writes nothing new", code == 3 and got_.get("state") == "waiting"
@@ -882,6 +882,13 @@ def waits_for_the_drive(b, to, before):
     finally:
         srv.kill()
         srv.communicate()
+    end = time.time() + 30
+    while time.time() < end:      # (the record is written first, then the page: a moment between the two)
+        page = (b["records"] / "report.html").read_text(encoding="utf-8")
+        if "id='sc-behind' role='status' hidden></p>" in page:
+            break
+        time.sleep(0.3)
+    check("and the report as a file no longer says the copy is behind", "id='sc-behind' role='status' hidden></p>" in page, page[page.find("sc-behind") - 60:][:300])
     got, want = mirror_tree(to), expected(b["records"])
     check("the second drive has the newest names (both renames at once), the very same files", got == want and numbers(to) == before
           and any("Lopez family" in k for k in got), str(sorted(set(got) ^ set(want))))

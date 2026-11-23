@@ -832,6 +832,16 @@ def align(place, mirror_name, view, studio, rec, files, save):
     return out
 
 
+def rebuild_report(studio):
+    """The report's page is written again, so the page as a file says what the live page says. Never fatal."""
+    for script in ("first_look.py", "report_page.py"):
+        try:
+            subprocess.run([sys.executable, str(HERE / script), str(studio)], capture_output=True, timeout=600,
+                           **({"creationflags": 0x08000000} if this_computer.WINDOWS else {}))
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+
 def keep_mirror_record(place, mirror_name, rec):
     """The mirror's own hidden records keep a copy of where each of its files is (best effort: the record that
     counts is the one in the backup's records on the photo drive)."""
@@ -898,6 +908,9 @@ def _follow(arg):
         def note(state, line="", **more):
             rec["follow"] = dict({"state": state, "when": datetime.now().isoformat(timespec="seconds"), "line": line}, **more)
             write_whole(studio / RECORD, rec)
+            behind = lambda f: (f.get("state"), f.get("line")) if f.get("state") in ("waiting", "problem") else None  # noqa: E731
+            if behind(was) != behind(rec["follow"]) and (studio / "report.html").is_file():
+                rebuild_report(studio)      # the line under "Second copy made" comes or goes on the page as a file too
 
         try:
             there = place.is_dir()
@@ -1505,12 +1518,7 @@ def copy_all(plan, always=False):
                 say("Saved: every backup from now on gets a second copy there.")
         except Exception as e:  # noqa: BLE001  (the copy is made and checked; the setting can be said again)
             say(f"(could not save it as the usual second copy: {e.__class__.__name__})")
-    for script in ("first_look.py", "report_page.py"):     # the report now says there is a second copy
-        try:
-            subprocess.run([sys.executable, str(HERE / script), str(studio)], capture_output=True, timeout=600,
-                           **({"creationflags": 0x08000000} if this_computer.WINDOWS else {}))
-        except (OSError, subprocess.SubprocessError):
-            pass
+    rebuild_report(studio)                                 # the report now says there is a second copy
     rec["state"] = "done"
     rec["finished"] = fresh["second_made"]
     rec["upright"] = upright

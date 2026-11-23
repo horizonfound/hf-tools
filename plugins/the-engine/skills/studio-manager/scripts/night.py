@@ -19,8 +19,12 @@ setup (no Studio File yet: ask their drive and naming, save with
 studio_file.py, run again) · 7 needs the sneak peeks (read the pages it names,
 peek_sheets.py pick ..., run again).
 
-Their drive, second copy and naming come from ~/.studio (studio_file.py), so
-after the first run the command is just:  night.py --source /Volumes/CARD
+Their drive and naming come from ~/.studio (studio_file.py), so after the first
+run the command is just:  night.py --source /Volumes/CARD
+A second copy is never made by itself (Nicole, Nov 23: the second drive is asked
+each time, on the report). --second "<a drive>" names one for this one backup: it
+is made by second_copy.py after the settle (step 7b), with the same shoot folders
+and photo names as the photo drive.
 A card the ledger (cards.py) already knows is not copied again.
 """
 import argparse
