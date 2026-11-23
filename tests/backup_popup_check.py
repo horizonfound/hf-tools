@@ -893,9 +893,15 @@ def check_browser(c, w, shot=None):
         c.screenshot("popup-5-done.png")
     c.click("#n1 button[data-bk='name']")
     time.sleep(1.2)
-    case("Name them, while the naming page is not there: it falls back to the report (here, its plain line), and the box stays shut",
-         c.js("location.pathname") in ("/home", "/name-shoots.html") and (c.js("location.pathname") != "/home" or (not box(c)["open"] and "report" in c.js("document.getElementById('n1').innerText").lower())),
-         c.js("document.getElementById('n1').innerText"))
+    # Name your shoots is there now (name_shoots.py): a backup it can find opens on it; one it cannot find (404)
+    # falls back to the report, as before
+    at = c.js("location.pathname")
+    if at == "/name-shoots.html":
+        case("Name them opens Name your shoots for that backup, by the name the job gave it",
+             c.js("new URLSearchParams(location.search).get('backup')") == "monday card", c.js("location.href"))
+    else:
+        case("Name them, for a backup the naming page cannot find: it falls back to the report (here, its plain line), and the box stays shut",
+             at == "/home" and not box(c)["open"] and "report" in c.js("(document.getElementById('n1') || {innerText: ''}).innerText").lower(), at)
     if c.js("location.pathname") != "/home":
         c.open(w.url("/home"))
     c.reload()
