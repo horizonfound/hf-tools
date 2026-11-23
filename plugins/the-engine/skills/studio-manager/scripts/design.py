@@ -155,6 +155,7 @@ import this_computer  # noqa: E402
 import arrange  # noqa: E402
 import kit as kit_mod  # noqa: E402
 import posts  # noqa: E402
+import design_first  # noqa: E402
 
 HOME = arrange.HOME                     # STUDIO_HOME, as every other script resolves it
 TEMPLATES = HOME / "design-templates"
@@ -194,6 +195,15 @@ DEFAULT_FONT = "Playfair Display"
 FALLBACK_FONT = "Georgia"               # what text is drawn in when its font can't be loaded
 GOOGLE_CSS = "https://fonts.googleapis.com/css2"
 OPEN_NEW = "NEW: this shoot had no design, so one was made just now, with one photo on each slide."
+OPEN_NEW_EXAMPLE = ("NEW: this shoot had no design, so one was made just now as an EXAMPLE: {n} with a mix of layouts ({kinds}), "
+                    "no words on it. It was laid out by rule from the photos' shapes and where the faces are, so that no head is cut; "
+                    "nobody has looked at it by eye. Everything on it can be changed.")
+OPEN_NEW_EXAMPLE_WHOLE = ("NEW: this shoot had no design, so one was made just now as an EXAMPLE: {n} with a mix of layouts ({kinds}), "
+                          "no words on it. Nothing on this {pc} can look for faces, so every photo is shown whole rather than cut into "
+                          "by guesswork; nobody has looked at it by eye. Everything on it can be changed.")
+# how the Assistant names a layout of the example in that line (design_first.py's kinds)
+EXAMPLE_KINDS = {"full": "a photo filling its slide", "pair": "two photos together", "spread": "a photo across two slides",
+                 "border": "a photo with a border", "inset": "a smaller bordered photo", "closer": "a small photo on a quiet last slide"}
 OPEN_NEW_BLANK = "BLANK: the vault had no design, so a blank one was made just now. Nothing is on it until they put photos on, or ask you to."
 OPEN_THEIRS = "THEIRS: this design was already here. It is as they left it."
 SET_NAME = "{base} - slide {i:02d}.jpg"         # a saved slide's file name in the Carousel folder
@@ -1223,10 +1233,12 @@ def blank_story():
     return {"slides": 1, "bg": "#ffffff", "blocks": []}
 
 
-def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL):
+def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL, first=False):
     """Make a NEW design; it never takes the place of another. Returns (status, answer).
       state  a layout to start from (checked here); left out, it is one photo per slide (stories: one empty story)
       copy   the id of a design of this shoot to make a copy of, as it is stored
+      first  only from ensure_design: the shoot's very first carousel design, which is laid out as an example (Nicole,
+             Nov 23; design_first.py). Everywhere else a design with no layout sent is one photo per slide, as it was
       token  the name the page gave this press: the same token again gives the same design back, so a press
              whose answer was lost does not leave two
     Stories come in sets (Nicole's v26): each "+ New set of stories" is a design of its own, like a carousel's."""
@@ -1246,7 +1258,7 @@ def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL)
             return 409, {"ok": False, "why": "full", "words": TOO_MANY_DESIGNS}
         rec = kit_mod.load_rec(kit)
         shoot = rec.get("name") or kit.name
-        stem = None
+        stem, example = None, None
         if copy is not None:
             src = load_design(kit, copy, kind)
             if src is None:
@@ -1260,7 +1272,18 @@ def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL)
                 # the vault (v29): nothing is picked until they ask, so its first carousel design is blank
                 state = {"slides": SLIDES_MIN, "bg": kit_bg(rec), "blocks": []}
             else:
-                state = seed_state(rec, carousel_order(kit), rows)
+                if first and not design_first.plain_for_tests():
+                    # the shoot's first design: an example laid out by rule (a mix of layouts, no head cut). Anything
+                    # going wrong there is never the photographer's trouble: the plain one-photo-per-slide design is made
+                    try:
+                        state, example = design_first.first_state(kit, rec, carousel_order(kit), rows, kit_bg(rec))
+                        if state is not None and validate_state(state, {x["n"] for x in rows}, kind=kind)[0] is None:
+                            state, example = None, None
+                    except (Exception, SystemExit) as e:  # noqa: BLE001
+                        arrange.log(f"first design: the example couldn't be laid out: {e.__class__.__name__}: {str(e)[:160]}")
+                        state, example = None, None
+                if state is None:
+                    state = seed_state(rec, carousel_order(kit), rows)
         clean, why = validate_state(state, {x["n"] for x in rows}, kind=kind)
         if clean is None:
             return 400, {"ok": False, "why": why, "words": WHY_WORDS.get(why, NOT_UNDERSTOOD)}
@@ -1275,20 +1298,22 @@ def new_design(kit, state=None, name=None, token=None, copy=None, kind=CAROUSEL)
             did = new_id("d")
         d = {"id": did, "name": name, "rev": 0, "stamp": stamp, "names": _names_for(clean, rows), "state": clean,
              "made": now_iso(), "made_by": token or "assistant"}
+        if example:
+            d["example"] = example      # how the first design was laid out (design_first.py): for the Assistant's own line, never a page's
         _store(kit, d, kind=kind)
         designs = [d] + designs
         return 200, {"ok": True, "design": _design_for_page(kit, d, kind), "designs": _design_list(kit, designs, did, kind)}
 
 
 def ensure_design(kit, kind=CAROUSEL):
-    """The first visit to a shoot with no design makes one: one photo per slide from the carousel's order
-    (stories: one empty white story, and the page opens on Add stories). Returns the newest design, or None
-    when the shoot is not ready."""
+    """The first visit to a shoot with no design makes one: an example laid out by rule from the carousel's order
+    (Nicole, Nov 23: design_first.py; stories: one empty white story, and the page opens on Add stories; the vault:
+    a blank one). Returns the newest design, or None when the shoot is not ready."""
     with arrange.locked(design_lock(kit)):
         designs = list_designs(kit, kind)
         if designs:
             return designs[0]
-        code, out = new_design(kit, kind=kind)
+        code, out = new_design(kit, kind=kind, first=True)
         return load_design(kit, out["design"]["id"], kind) if code == 200 else None
 
 
@@ -2511,7 +2536,11 @@ def _get_page(handler, q):
     if st["previews"]["made"] < st["previews"]["of"] and to_make:
         arrange.start_previews(kit)
     tidy(kit, kind=kind)                # day-old slides of saves that were never finished (the Assistant's own scratch)
-    _send_page(handler, design_page.page_html(kit.name, kind))
+    try:
+        in_vault = kit_mod.load_rec(kit).get("vault") is True      # My vault: its tray is grouped by shoot (Nov 23)
+    except (OSError, ValueError):
+        in_vault = False
+    _send_page(handler, design_page.page_html(kit.name, kind, vault=in_vault))
 
 
 def _get_state(handler, q):
@@ -3364,7 +3393,17 @@ def cmd_open(kit, did=None, kind=CAROUSEL):
     if had == 0 and n >= 1 and not d["state"]["blocks"]:
         say(OPEN_NEW_BLANK)             # the vault: nothing is picked until they ask, so its first design is blank
     else:
-        say(OPEN_NEW if had == 0 and n >= 1 else OPEN_THEIRS)
+        ex = d.get("example") if had == 0 and n >= 1 and isinstance(d.get("example"), dict) else None
+        if ex:
+            kinds = []
+            for k in ex.get("kinds") or []:
+                if EXAMPLE_KINDS.get(k) and EXAMPLE_KINDS[k] not in kinds:
+                    kinds.append(EXAMPLE_KINDS[k])
+            line = OPEN_NEW_EXAMPLE if ex.get("looked") else OPEN_NEW_EXAMPLE_WHOLE
+            k = d["state"]["slides"]
+            say(line.format(n=f"{k} slide{'s' if k != 1 else ''}", kinds=", ".join(kinds), pc=this_computer.COMPUTER))
+        else:
+            say(OPEN_NEW if had == 0 and n >= 1 else OPEN_THEIRS)
     say(addr)
     return 0
 

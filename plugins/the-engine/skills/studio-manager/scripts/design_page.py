@@ -379,8 +379,19 @@ def _shell(title, body_attrs, inner, scripts="", crumbs=""):
             + inner + scripts + "</body></html>")
 
 
-def page_html(kit_name, kind="carousel"):
-    """The designer for one shoot (kind "stories": the stories designer). Everything else arrives by /design-state."""
+def vault_part():
+    """What My vault's designers get on top of the page (Nicole, Nov 23: the tray grouped by shoot, like the vault's
+    reel page): the reel page's own words as data, the folds' styles and the script (design_js_vault.py). Goes on the
+    page before it starts. A plain shoot's page gets none of it and is exactly what it was."""
+    import design_js_vault
+    words = json.dumps(design_js_vault.vault_words(), ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    return ("<style>" + design_js_vault.DESIGN_VAULT_CSS + "</style><script>window.DESIGN_VAULT_WORDS=" + words + ";</script>"
+            "<script>" + design_js_vault.vault_js() + "</script>")
+
+
+def page_html(kit_name, kind="carousel", vault=False):
+    """The designer for one shoot (kind "stories": the stories designer). Everything else arrives by /design-state.
+    vault: the shoot is My vault, whose photo tray is grouped by shoot (vault_part)."""
     import design
     from urllib.parse import quote
     story = kind == design.STORIES
@@ -493,7 +504,8 @@ def page_html(kit_name, kind="carousel"):
     # anything a page sent; "<" is written so that it can't end the script early.
     limits = json.dumps(design.limits_for(kind), separators=(",", ":")).replace("<", "\\u003c")
     scripts = ("<script>window.DESIGN_LIMITS=" + limits + ";</script>"
-               + "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + "<script>" + DESIGN_START_JS + "</script>")
+               + "".join("<script>" + src + "</script>" for _, src in SCRIPTS) + (vault_part() if vault else "")
+               + "<script>" + DESIGN_START_JS + "</script>")
     crumbs = look.crumbs(look.kit_trail(kit_name) + [(CRUMB_STORIES if story else CRUMB_CAROUSEL, None)])
     return _shell(brand.title(STORY_TAB if story else "Carousel designer"), attrs, inner, scripts, crumbs)
 
