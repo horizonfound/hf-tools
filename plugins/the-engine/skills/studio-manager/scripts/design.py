@@ -52,6 +52,15 @@ stories are saved, a small picture of the set CHANGED last, exactly as a carouse
     (4), My editing queue (1; no photo; its list is filled on the page from GET /design-queue, the editing queue's
     waiting shoots in order, as named), The full story (10), Seamless swipe (6).
 
+THE FIRST DESIGN IS AN EXAMPLE (Nicole, Nov 23). The first visit to a shoot with no carousel design makes one laid
+out like a magazine story: a mix of layouts, no head cut, no words. The rules are design_first.py's (shapes, and on
+a Mac the faces in the small copies; never looked at by eye); ensure_design is the only caller (new_design's
+first=True), the record keeps how it was made as "example", and if the rules ever fail the old one-photo-per-slide
+design is made instead. An existing design is never rebuilt; a design asked for with no layout ("+ New design",
+One photo per slide) is as it always was; the vault's first design is blank; stories start with one empty story.
+MY VAULT'S TRAY (Nicole, Nov 23): in the vault both designers group the photos by shoot, as the vault's reel page
+does (design_js_vault.py, put on the page only for the vault by design_page.page_html(vault=True)).
+
 Rules this file keeps:
   * Everything the page knows is on disk, saved as they work, with a counter (rev). A reload, a server that
     starts over or a new port loses nothing. Nothing that matters is in the browser's storage.

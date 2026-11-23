@@ -252,6 +252,28 @@ def part_rules():
     case("every frame shows the whole photo, or all but a sliver of it (never a guess)", worst >= F.GUESS_SHOWS - 0.005, worst)
     case("no photo is laid across two slides", any_spread == 0, any_spread)
     case("and still no two slides next to each other alike", bad_same == 0, bad_same)
+    group("the instructions say what the page now does (kept here, so tests/skill_text_check.py is not this lane's to change)")
+    parts = SCRIPTS.parent / "parts"
+    arr = re.sub(r"\s+", " ", (parts / "arrange.md").read_text(encoding="utf-8"))
+    pc = re.sub(r"\s+", " ", (parts / "on-a-pc.md").read_text(encoding="utf-8"))
+    where = re.sub(r"\s+", " ", (parts / "where-things-live.md").read_text(encoding="utf-8"))
+    des = (SCRIPTS / "design.py").read_text(encoding="utf-8")
+    case("arrange.md: the first design is an example, with her words for it, laid out by rule and never looked at by eye",
+         "**as an example**" in arr and "Don't crop any heads" in arr and "laid out by rule, not by eye" in arr and "Nobody has looked at it, you included" in arr
+         and "it makes the first one: one photo on each slide" not in arr)
+    case("arrange.md: what to say for a NEW: line that says EXAMPLE, and the PC sentence, and design.py prints lines that start that way",
+         "starts `NEW:` and says EXAMPLE" in arr and "nobody has looked at it yet" in arr and "I kept every photo whole rather than guess where to cut" in arr
+         and 'OPEN_NEW_EXAMPLE = ("NEW:' in des and 'OPEN_NEW_EXAMPLE_WHOLE = ("NEW:' in des and "EXAMPLE" in design.OPEN_NEW_EXAMPLE and "shown whole" in design.OPEN_NEW_EXAMPLE_WHOLE)
+    case("arrange.md: an existing design is never rebuilt, and + New design keeps its choices", "An existing design is never rebuilt" in arr and "still offers Blank, One photo per slide and the templates" in arr)
+    case("arrange.md: the vault's blank first design is still said as it was", "If it starts `BLANK:`" in arr and 'OPEN_NEW_BLANK = "BLANK:' in des)
+    case("arrange.md: in My vault the designers' photos are grouped by shoot, like the reel page, and a plain shoot's are one list",
+         "In My vault the photos below the slides are grouped by shoot" in arr and "Added to my vault" in arr and "A plain shoot's photos are one list, as before." in arr)
+    case("on-a-pc.md: on a PC the example is made of whole photos, and says why", "The first design is an example made of whole photos." in pc and "nothing that finds faces" in pc)
+    case("where-things-live.md names the `example` note in a first design's record, and design.py still writes it", "also carries `example`" in where and 'd["example"] = example' in des)
+    for k, v in design.EXAMPLE_KINDS.items():
+        if k not in F.CYCLE + ("closer",):
+            case("every layout design.py can name in its line is one the rules make", False, k)
+    case("every layout the rules make has a name for the Assistant's line", set(F.CYCLE) | {"closer"} == set(design.EXAMPLE_KINDS))
     return finish()
 
 
@@ -583,8 +605,11 @@ def part_vault(a):
         case("the page server is on a port of this test's own (%d)" % s.port, s.port not in NEVER)
         code, _, raw = s.get("/design.html?kit=" + VQ)
         page = raw.decode("utf-8", "replace")
-        code2, _, raw2 = s.get("/design.html?kit=" + quote(vr.H))
         code3, _, raw3 = s.get("/design.html?kit=" + VQ + "&kind=stories")
+        code4, j4, _ = s.get("/design-state?kit=" + VQ)
+        s.untouched("the vault's designer pages and their first look, by request")
+        code2, _, raw2 = s.get("/design.html?kit=" + quote(vr.H))
+        s.note()                        # the test itself just opened a shoot's own designer, which gets that shoot's page ready
         case("the Assistant puts the vault's part on My vault's designer pages only (carousel and stories), never on a shoot's",
              code == 200 and "DESIGN_VAULT_WORDS" in page and code2 == 200 and b"DESIGN_VAULT_WORDS" not in raw2 and code3 == 200 and b"DESIGN_VAULT_WORDS" in raw3)
         case("no path on the vault's page", vr.no_path(re.sub(r"<script\b.*?</script>", "", page, flags=re.S)))
@@ -650,8 +675,6 @@ def part_vault(a):
                     c.wait_for("window.Designer && Designer.st && document.querySelectorAll('#thumbs .th').length === 8", 60)
                     case("a plain shoot's tray is one flat list of its photos: no folds, no search box, no chips",
                          c.count("#thumbs > .th") == 8 and c.count("#thumbs details") == 0 and c.count("#vq") == 0 and c.count("#vshoots") == 0 and c.js("!!Designer.vaultTray") is False)
-        if a.no_chrome:
-            s.untouched("the vault's designer pages by request")
     finally:
         s.stop()
         shutil.rmtree(work, ignore_errors=True)      # this run's own scratch folder, made a moment ago

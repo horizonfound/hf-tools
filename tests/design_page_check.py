@@ -467,7 +467,9 @@ def check_browser(case, work, port, make_kit, Server, post, get_json):
             S0 = st()
             files = sorted(p.name for p in designs.glob("*.json")) if designs.exists() else []
             case("first visit: the Assistant made one design for the shoot, and the page opened it", len(files) == 1 and files[0] == did() + ".json", files)
-            case("first visit: one photo per slide, in the carousel's order, each filling its slide",
+            # (since Nov 23 a shoot's real first design is an example laid out by rule: tests/design_nov23_check.py. This
+            # part starts from the plain design the tests' own switch gives, set in tests/design_check.py's main.)
+            case("first visit, with the tests' plain start: one photo per slide, in the carousel's order, each filling its slide",
                  S0["slides"] == len(carousel) and [b["n"] for b in S0["blocks"]] == carousel
                  and all(b["x"] == i * W and b["y"] == 0 and b["w"] == W and b["h"] == H for i, b in enumerate(S0["blocks"])), S0)
             case("first visit: the design's name shows, and the line beside it says Saved", c.text("#d-name") == "Fake beach carousel 1" and c.text("#d-status") == "Saved", (c.text("#d-name"), c.text("#d-status")))

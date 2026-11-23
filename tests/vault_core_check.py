@@ -461,7 +461,7 @@ def check_server(s, nums):
         case("the vault's first carousel design is blank (nothing is picked until they ask)", blocks == [], d)
         code, j, _ = s.http("GET", f"/design-state?kit={quote(A)}&kind=carousel")
         blocks = (((j or {}).get("design") or {}).get("state") or {}).get("blocks")
-        case("a plain kit's first design is still one photo a slide", code == 200 and blocks and all(b.get("n") for b in blocks), blocks)
+        case("a plain kit's first design is not blank: it has photos on it (the example, since Nov 23)", code == 200 and blocks and all(b.get("n") for b in blocks), blocks)
         s.note()            # the designer's first look at kit A made A's own first design: A's own, not the vault's
 
         # a photo dropped into the vault's own Photos folder joins the list on the reel page's own look
