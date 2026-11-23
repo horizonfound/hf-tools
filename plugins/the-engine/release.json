@@ -1,12 +1,13 @@
 {
-  "number": 8,
-  "date": "Nov 22, 2026",
+  "number": 9,
+  "date": "Nov 23, 2026",
   "new": [
-    "The chat says hello without reminders. What's due stays in the cards on your home page.",
-    "Your very first hello is just: Hi! I’m your Assistant, and I’m so glad you’re here.",
-    "Tap Captions and it asks first: a reel or a carousel?",
-    "Faces sit above the words on the Reels, Carousels, Stories and Captions tiles.",
-    "The posting grid is a little wider and shows 12 posts.",
-    "It says the Assistant everywhere."
+    "Each reel gets its own caption and hooks.",
+    "The carousel designer opens with a first carousel laid out as an example.",
+    "In My vault, the designers group your photos by shoot, like the reel page.",
+    "A shoot name that's already taken? Type a new one right there.",
+    "New backups name folders like Aurora_11-22-26 and photos like Johnson_0001_IMG_4471.",
+    "The six photos on a backup's report are a first look at your shoot.",
+    "Your monthly recap counts only shoots you actually posted."
   ]
 }
