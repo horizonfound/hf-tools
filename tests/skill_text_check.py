@@ -1562,14 +1562,16 @@ def check_backup_options():
          all(x in a for x in ("**Use a different drive next time.**", "Where should your next backup go?",
                               "Saved. Your next backup goes to LaCie Rugged. The photos from this backup stay where they are.",
                               "studio_file.py set --drive", "no button and no command moves a finished backup to another drive")))
-    case("after-the-report.md: the note line to copy, no form, and where to read on",
-         "Write a note for the <shoot's name> shoot" in a and "There is no form." in a and "parts/client-note.md" in a)
+    case("after-the-report.md: no Write a note to my client button any more (Nov 23), and where to read if they ask outright",
+         "There is no Write a note to my client button any more" in a and "Write a note for the <shoot's name> shoot" not in a
+         and "Never offer one" in a and "parts/client-note.md" in a and "A first look at your shoot." in a)
     case("after-the-report.md: the own-disk line as the report says it, and never a speech",
          "Your photos are on this Mac's own disk. An external drive is safer: if anything happens to the computer, the photos on it go too. "
          "Plug one in and press Use a different drive next time." in a and "Never say it before a backup" in a)
     case("first-backup-setup.md: the table names each button",
          all(x in f for x in ("**Use a different drive next time** on the report", "**Change how my shoots are named** on the report",
-                              "**This shoot continues on another card** on the report", "**Write a note to my client**")))
+                              "**This shoot continues on another card** on the report"))
+         and "**Write a note to my client**" not in f)
     sys.path.insert(0, str(SM / "scripts"))
     try:
         import report_page
@@ -1627,15 +1629,16 @@ def check_backup_zero():
                               "studio_file.py defaults --drive", "studio_file.py defaults --computer")))
     case("first-backup-setup.md: the computer's own disk is their call, with no speech",
          "with no speech" in f and "Never refuse, never lecture" in f and "Quick note before we go on" not in f)
-    case("first-backup-setup.md: the table of where each old question lives now, and the client-voice question kept word for word for later",
+    case("first-backup-setup.md: the table of where each old question lives now; how they write to clients is never asked (Nov 23)",
          "| Was asked before the copy | Where it lives now |" in f and "Asked later, only when it is needed" in f
-         and "How do you usually write to clients? Best is a note you've sent before: click Other and paste it right there. Or pick a tone." in f
-         and "Never a \"Paste me a note\" choice" in f and "posting_queue.py interval" in f)
+         and "How they write to clients is never asked" in f and "How do you usually write to clients?" not in f
+         and "posting_queue.py interval" in f)
     case("after-the-report.md: nothing is asked by itself when they come back",
          "Ask nothing by yourself" in a and "Two one-time questions" not in a and "Ask them before anything else" not in a
          and "Never ask whether there are any" in a and "Never offer it by yourself" in a)
-    case("client-note.md: a note is written only when they said who it is for, or ask; the voice question is asked then",
-         "Nothing about a note is asked before a backup" in c and "Asked later, only when it is needed" in c and "Question 5" not in c)
+    case("client-note.md: retired (Nov 23): never offered, never 'on the report', saved nowhere; what they say about a card is still kept",
+         "A backup no longer comes with a note to the client." in c and "you never offer a note" in c and "save it nowhere" in c
+         and "client_note.py told --night" in c and "client_note.py save" not in c and "Question 5" not in c)
     case("hello.md: a first backup is described with no questions first",
          "I'll ask a few quick questions first" not in h and "There's nothing to answer first" in h)
     case("on-a-pc.md: the drive-letter stops stay, and nothing points at the old check-in screen",
