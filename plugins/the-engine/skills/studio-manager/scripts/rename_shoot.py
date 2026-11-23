@@ -562,6 +562,22 @@ def main():
     for shoot_id, new_name in jobs:
         shoot, old_folder, new_folder, moves = plan_rename(session, studio, shoot_id, new_name)
         apply(session, studio, shoot, old_folder, new_folder, moves, new_name, a.dry_run)
+    if not a.dry_run:
+        mirror_follows(studio)
+
+
+def mirror_follows(studio):
+    """A second copy that looks like the photo drive (Nicole, Nov 23) takes the same new folder and names
+    (second_copy.follow: renames on the second drive only, logged first, every file proved the same). With that
+    drive not plugged in it is noted as waiting, and done when a command next sees the drive. A backup with no
+    second copy, or one of the earlier kind (the card's layout), is left alone. Never stops a rename: it is done."""
+    try:
+        import second_copy
+        got = second_copy.follow(studio)
+        if got.get("words"):
+            say("  " + got["words"])
+    except Exception:  # noqa: BLE001
+        pass
 
 
 if __name__ == "__main__":

@@ -541,13 +541,25 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             import second_copy
             if parts.path == "/second-status":
-                return self.answer(second_copy.status(self.studio))
+                st = second_copy.status(self.studio)
+                if st.pop("catch", False):
+                    # its drive was out when a shoot was renamed, and is in now: the copy takes the new folders and
+                    # names (second_copy.py follow, a job of its own; one at a time, by second_copy's own lock)
+                    now = time.monotonic()
+                    if now - getattr(Handler, "caught", -60.0) > 20:
+                        Handler.caught = now
+                        with open(fresh.server_log("second copy"), "a", encoding="utf-8") as fh:
+                            job = this_computer.popen_detached([sys.executable, str(HERE / "second_copy.py"), "follow", self.studio],
+                                                               stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT)
+                        threading.Thread(target=job.wait, daemon=True).start()
+                return self.answer(st)
             rows = second_copy.offered_drives(self.studio)
             return self.answer({"drives": [{"i": i, "name": r["name"], "free": r["free"]} for i, r in enumerate(rows)]})
         except Exception as ex:  # noqa: BLE001  (a press must always get an answer; the reason goes to the log)
             sys.stderr.write(f"{parts.path}: {ex.__class__.__name__}: {ex}\n")
             if parts.path == "/second-status":
-                return self.answer({"state": "none", "done": 0, "total": 0, "name": "", "card": False, "line": ""})
+                return self.answer({"state": "none", "done": 0, "total": 0, "name": "", "card": False, "line": "",
+                                    "behind": "", "old": False})
             return self.answer({"drives": []})
 
     def second_copy(self, path):
@@ -577,7 +589,9 @@ class Handler(SimpleHTTPRequestHandler):
             if said.get("state") != "ready":
                 return self.answer({"ok": False, "words": str(said.get("words") or W["sc_cant"])})
             with open(fresh.server_log("second copy"), "a", encoding="utf-8") as fh:   # the job keeps its own copy of the handle
-                job = this_computer.popen_detached(cmd + (["--always"] if always else []), stdin=subprocess.DEVNULL,
+                # ("always" is only listened to with second_copy.REMEMBER_SECOND on: the drive is asked each time)
+                job = this_computer.popen_detached(cmd + (["--always"] if always and second_copy.REMEMBER_SECOND else []),
+                                                   stdin=subprocess.DEVNULL,
                                                    stdout=fh, stderr=subprocess.STDOUT)
             threading.Thread(target=job.wait, daemon=True).start()   # so a finished job leaves nothing behind
             sys.stderr.write(f"second copy asked: {name!r} always={always}\n")

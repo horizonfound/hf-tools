@@ -381,12 +381,13 @@ OPTIONS_SCRIPT = r"""<script>
   var W=JSON.parse(document.getElementById('sc-words').textContent);
   function $(id){ return document.getElementById(id); }
   var open=$('sc-open'), say=$('sc-say'), keep=$('sc-keep'), panel=$('sc-panel'), list=$('sc-drives'), none=$('sc-none'),
-      look=$('sc-look'), always=$('sc-always'), go=$('sc-go'), made=$('sc-made');
+      look=$('sc-look'), always=$('sc-always'), go=$('sc-go'), made=$('sc-made'), behind=$('sc-behind');
   var live=location.protocol==='http:'||location.protocol==='https:', drives=[], timer=null;
   function tell(t){ say.textContent=t||''; }
   function chosen(){ var r=list.querySelector('input:checked'); return r?parseInt(r.value,10):-1; }
   function show(st){
     clearTimeout(timer);
+    if(behind){ behind.textContent=st.behind||''; behind.hidden=!st.behind; }
     if(st.state==='copying'){
       panel.hidden=true; open.disabled=true; tell(st.line); keep.hidden=!st.card;
       timer=setTimeout(ask,1500);
@@ -396,6 +397,8 @@ OPTIONS_SCRIPT = r"""<script>
     } else if(st.state==='stopped'){
       keep.hidden=true; open.disabled=false; tell(st.line);
     } else { keep.hidden=true; }
+    // a copy waiting for its drive to take the new names: looked at again, so the line goes once it has caught up
+    if(st.behind && st.state!=='copying') timer=setTimeout(ask,6000);
   }
   function ask(){
     fetch('second-status',{cache:'no-store'}).then(function(r){ return r.json(); }).then(show)
@@ -424,7 +427,7 @@ OPTIONS_SCRIPT = r"""<script>
     var i=chosen(), d=drives.filter(function(x){ return x.i===i; })[0]; if(!d) return;
     go.disabled=true;
     fetch('second-copy',{method:'POST',headers:{'Content-Type':'application/json'},
-           body:JSON.stringify({drive:d.i,name:d.name,always:!!always.checked})})
+           body:JSON.stringify({drive:d.i,name:d.name,always:!!(always&&always.checked)})})
       .then(function(r){ return r.json(); }).then(function(j){
         if(j.ok){ panel.hidden=true; open.disabled=true; tell(j.words); timer=setTimeout(ask,800); }
         else { tell(j.words||W.sc_cant); go.disabled=false; }
@@ -601,6 +604,16 @@ def options_section(manifest, studio):
     W = OUR_WORDS
     had = second_copy.has_second(manifest)
     made = W["sc_made"].format(drive=second_copy.drive_name(had)) if had else ""
+    try:    # a copy that still has the folders and names from before a rename (its drive was out), said under the line
+        st = second_copy.status(studio)
+    except Exception:  # noqa: BLE001  (the report is still written)
+        st = {}
+    behind = str(st.get("behind") or "")
+    # a second copy made before Nov 23 is laid out as the card was, not as their shoots: said plainly, once, here
+    old = second_copy.OUR_WORDS["card_layout"] if had and manifest.get("second_layout") != second_copy.LAYOUT_MAIN else ""
+    # "Do this after every backup" is off since Nov 23 (Nicole: the second drive is asked each time)
+    tick = (f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>"
+            if second_copy.REMEMBER_SECOND else "")
     words = {k: W[k] for k in ("sc_cant", "sc_not_live", "sc_looking")}
     more = {k: W[k] for k in ("sc_not_live", "opt_cant", "opt_looking", "nm_now", "nm_cant", "nd_now")}
     out = ["<section class='wrap opts' id='opts'>",
@@ -612,12 +625,14 @@ def options_section(manifest, studio):
            f"<span class='opt-made' id='sc-made'{'' if had else ' hidden'}>{e(made)}</span>"
            "<span class='opt-say' id='sc-say' role='status' aria-live='polite'></span></div>",
            f"<p class='opt-note' id='sc-keep' hidden>{e(second_copy.OUR_WORDS['keep_card'])}</p>",
+           f"<p class='opt-note' id='sc-behind' role='status'{'' if behind else ' hidden'}>{e(behind)}</p>",
+           *([f"<p class='opt-note' id='sc-old'>{e(old)}</p>"] if old else []),
            "<div class='opt-panel' id='sc-panel' hidden>",
            f"<p class='opt-q'>{e(W['sc_which'])}</p>",
            "<div class='opt-drives' id='sc-drives'></div>",
            f"<p class='opt-note' id='sc-none' hidden>{e(W['sc_none'])}</p>",
            f"<button type='button' class='opt-link' id='sc-look'>{e(W['sc_look'])}</button>",
-           f"<label class='opt-tick'><input type='checkbox' id='sc-always'><span>{e(W['sc_always'])}</span></label>",
+           *([tick] if tick else []),
            f"<button type='button' class='opt-go' id='sc-go' disabled>{e(W['sc_go'])}</button>",
            "</div></div>"]
     out += more_options(W)
